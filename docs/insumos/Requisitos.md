@@ -1,0 +1,448 @@
+﻿**DOCUMENTO DE ESPECIFICACIÓN DE REQUISITOS**
+
+**Next Control Residencial**
+
+Soporte de avance — Plataforma de control de acceso residencial
+
+|**Proyecto**|**Versión**|**Fecha**|**Autor(es)**|
+| :- | :- | :- | :- |
+|Nex Control Residential|V1.0|1/09/2026|Argenis Omaña|
+
+**Control de versiones**
+
+|**Versión**|**Fecha**|**Autor**|**Cambios / avance registrado**|
+| :- | :- | :- | :- |
+|Beta 1.0|01/09/2026|Argenis Omaña|Planteamiento de requisitos 1 (Objetivos y KPIS)|
+|||||
+|||||
+|||||
+
+# **1. Objetivo del proyecto**
+**Objetivo general:** Permitir que una copropiedad opere el control de acceso vehicular de residentes y visitantes desde una plataforma propia que funcione sin internet y cuente con un aplicativo móvil donde el residente pueda autorizar visitantes, usando el hardware hikvision para trazar cada evento
+
+**Objetivos específicos**
+
+|**#**|**Objetivo específico**|**Cómo se verifica**|
+| :- | :- | :- |
+|*OE-01*|Habilitar la administración completa del patrón de la copropiedad – viviendas, residentes, vehículos y sus relaciones – como base sobre la que operan las reglas de acceso|Al consultar una vivienda se obtienen sus residentes asociados; las operaciones de creación, edición y eliminación funcionan sin pérdida de integridad |
+|*OE-02*|Permitir que el residente autorice el ingreso de visitantes con vigencia por fecha y hora desde una aplicación móvil, y que esa autorización se propague al motor de reglas sin intervención de portería.|Un visitante autorizado ingresa dentro de la vigencia sin que el portero actúe; fuera de la vigencia, el acceso se niega.|
+|*OE-03*|Integrar cámaras LPR, talanqueras, torniquetes, terminales faciales y controladores de zona a través de una capa de proveedor única, de modo que la lógica de negocio y la interfaz no dependan de un fabricante.|Ninguna llamada a ISAPI ni dirección de dispositivo existe fuera de la capa de proveedor; la suite de pruebas corre completa con un adaptador simulado, sin hardware conectado.|
+|*OE-04*|Habilitar el registro de rostros de residentes y visitantes a partir de una fotografía, con validación de calidad, consentimiento verificable, sincronización a las terminales autorizadas y supresión automática al vencer la vigencia.|Una persona registrada es reconocida por la terminal; al vencer la autorización, su plantilla desaparece del equipo sin intervención manual.|
+|*OE-05*|Registrar de forma inmutable todo intento de acceso, cualquiera sea el actor, la zona o el dispositivo, y alertar al operador y a los residentes cercanos ante accesos no autorizados o manipulación de equipos.|Ningún acceso presente en el log del dispositivo carece de evento en la plataforma; un intento no autorizado genera notificación.|
+|*OE-06*|Garantizar que la operación crítica de acceso siga funcionando localmente mediante Edge Gateway y caché de reglas cuando no haya conexión a internet, y que los eventos generados durante el corte se reconcilien sin pérdida ni duplicación al restablecerse.|Con la WAN desconectada, los accesos con regla en caché se resuelven normalmente; al reconectar, todos los eventos locales aparecen en la nube exactamente una vez.|
+|*OE-07*|Permitir que un operador externo al complejo atienda eventos, converse con el visitante, autorice o niegue el ingreso y accione dispositivos, sobre uno o varios proyectos, con registro de identidad en cada acción.|El operador ejecuta el ciclo completo de atención sin estar en el complejo y cada acción queda atribuida a su usuario.|
+|*OE-08*|Operar dos o más copropiedades sobre una misma instancia, garantizando que ningún usuario acceda a información de una copropiedad distinta a la suya, ni por interfaz ni por API.|Todo intento de acceso cruzado, incluido el acceso directo por identificador, es rechazado y registrado|
+
+**Indicadores de éxito**
+
+|**ID**|**Indicador**|**Meta**|**Fuente de medición**|
+| :- | :- | :- | :- |
+|*01*|Modelo de datos de copropiedades|**Meta**|**Fuente de medición**|
+|*KPI-01*|Integridad referencial|0 residentes sin vivienda activa|Consulta de huérfanos|
+|*KPI-02*|Unidad de placa|100% de rechazo ante placa duplicada activa|Carga de 100 placas con 10 placas duplicadas|
+|*KPI-03*|Integridad bajo concurrencia|0 Duplicados en 100 inserciones simultaneas|Script de carga concurrente|
+|*KPI-04*|Preservación histórica|0 eliminaciones físicas de registros con eventos asociados|Intento de borrado de residente con historial|
+|*KPI-05*|Auditoria de cambios|100% De operaciones con usuario y marca de tiempo|Consulta de logs|
+|*02*|Autorización autónoma desde la app|**Meta**|**Fuente de medición**|
+|*KPI-06*|Tasa de ingreso autónomo|≥ 95% de autorizados ingresan sin apertura manual|20 Ingresos de prueba: contar eventos de tipo manual|
+|*KPI-07*|Respeto de vigencia|0 Ingresos permitidos fuera del rango establecido|Cruce entre marca de tiempo del evento y vigencia establecida del acceso|
+|*KPI-08*|Fidelización de sincronización|100% de autorizaciones llegan integras a administración |30 Autorizaciones, comparación campo a campo|
+|*KPI-09*|Latencia de propagación |< 5s entre creación y disponibilidad en el motor de base de datos|Marca de tiempo de creación vs disponibilidad|
+|*KPI-10*|Tiempo de autorización|< 60s de extremo a extremo|Prueba de usabilidad con 5 residentes|
+|*03*|Capa de integración desacoplada|**Meta**|**Fuente de medición**|
+|*KPI-11*|Desacople de interfaz |0 referencias a ISAPI o IP de dispositivo fuera del proveedor|Análisis estáticos en integración continua monitoreando que siempre presente|
+|*KPI-12*|Sustituibilidad del proveedor|Suite completa verde con adaptadores simulados|Ejecución en CI con otros dispositivos de otro proveedor|
+|*KPI-13*|Latencia de apertura|< 3s entre decisión y accionamiento del relé|` `Marcas de tiempo en los eventos|
+|*KPI-14*|Cobertura de dispositivos |100% de los dispositivos deben estar en alcance operable|Matriz de testing por tipo de equipos con distancias y zonas|
+|*KPI-15*|Cumplimientos de reglas de zona|100% de aperturas respetan horario y aforo|Pruebas en el límite: aforo máximo, ingresos fuera de horario permitido|
+|*04*|Control biométrico|**Meta**|**Fuente de medición**|
+|*KPI-16*|Calidad de Apertura|≥ 95% de fotos adjuntadas son aceptadas al primer intento|100 fotos de rostros en luz normal|
+|*KPI-17*|Falso rechazo (FRR)|< 5%|` `100 intentos de personas registradas|
+|*KPI-18*|Falsa aceptación (FAR)|< 0.1%|100 intentos de personas no registradas|
+|*KPI-20*|Consentimiento previo|100% de aceptaciones con consentimiento antes de sincronizar rostro|Todas las personas cuyas fotos fueron tratadas, aprobaron el uso de su biométrico en el sistema y consultar que plantillas faciales fueron sincronizadas sin consentimiento |
+|*KP1-21*|Supresión al vencer|100% eliminadas de la terminal dentro de 24h|Consultar la terminal tras vencimiento de foto del visitante|
+|*05*|Trazabilidad|**Meta**|**Fuente de medición**|
+|*KPI-22*|Completitud de auditoria|0 Accesos del log sin evento en plataforma|Cruce de 50 accesos|
+|*KPI-23*|Completitud de campos|100% Con actor, dispositivo, zona, resultado y regla aplicada|Consulta de campos Nulos|
+|*KPI-24*|Inmutabilidad|0 Eventos editables o eliminables desde la aplicacion|Prueba de intento de edicion|
+|*KPI-25*|Latencia de alerta|< 10s entre evento y notificación|Marca de tiempo del evento vs recepcion|
+|*KPI-26*|` `Cobertura de sabotaje|100% de eventos de manipulación generan alerta|10 Aperturas de gabinete no autorizadas o desconexiones|
+|*KPI-27*|Tasa de falsa alarma|< 5% |Clasificación manual de una semana de alertas (F-V)|
+|*06*|Continuidad ante caída de red|**Meta**|**Fuente de medición**|
+|*KPI-28*|Continuidad Local|100% de accesos con regla en cache resueltos durante el corte|30 Minutos sin WAN, 20 accesos de prueba|
+|*KPI-29*|Reconciliación|100% Sincronizados en < 5min sin duplicados|Conteo de eventos locales vs nube|
+|*KPI-30*|Autonomía del Edge|24h sin conexión sin degradación de la operación critica|Prueba de resistencia prolongada/prueba de estres|
+|*KPI-31*|Vigencia del cache|0 Decisiones tomadas con reglas obsoletas más allá del margen definido|Revisión de la marca obtenida y versión de reglas en el evento ocurrido|
+|*07*|Operación remota|**Meta**|**Fuente de medición**|
+|*KPI-32*|Latencia de apertura remota|< 3s entre la acción y el accionamiento|Marca de tiempo durante el evento|
+|*KPI-33*|Latencia de audio y video|< 2s de extremo a extremo|Medición en sesión de intercomunicador|
+|*KPI-34*|Trazabilidad de acción remota|100% de acciones con identidad del operador en turno|Consulta de ventos de origen remoto|
+|*KPI-35*|Continuidad multiproyecto|Un operador atiende ≥2 copropiedades sin fuga de datos entre ellas|` `Prueba de sesión con proyectos alternados|
+|*08*|Multiempresa con aislamiento de datos|**Meta**|**Fuente de medición**|
+|*KPI-36*|Aislamiento|100% de intentos cruzados responden con error 403 o 404|Suite que recorre todos los endpoints con IDs ajenos|
+|*KPI-37*|Cobertura de la prueba|100% de endpoints cubiertos|Rutas expuestas vs rutas probadas|
+|*KPI-38*|Registro del intento|100% de accesos cruzados quedan en auditoria|Consulta de eventos de seguridad|
+
+# **2. Diagnóstico (situación actual — AS-IS)**
+**Proceso actual:** Para poder autorizar el ingreso de visitantes, este debe llamar a portería, minutos antes o en el momento, indicando el nombre de la persona a ingresar, el operador en portería debe anotar en una libreta el nombre de la persona que ingreso y esta persona debe anunciarse en portería y hacía que apartamento se dirige para poder ingresar.
+
+De cara al operador, este no tiene control alguno de los accesos a zonas comunes de forma remota, para bloquear accesos
+
+
+
+**Problemas identificados**
+
+|**ID**|**Problema**|**Impacto (tiempo / costo / riesgo)**|
+| :- | :- | :- |
+|*PB-01*|La autorización de un visitante depende de una llamada a portería y de que el residente esté disponible en ese momento.|Tiempo: 2 a 4 minutos por visitante y congestión en hora pico. Riesgo: visitantes legítimos rechazados cuando el residente no contesta.|
+|*PB-02*|El registro de ingresos se lleva a mano en la libreta de portería, sin evidencia fotográfica.|Riesgo: registro incompleto o ilegible; imposible auditar un incidente después de ocurrido.|
+|*PB-03*|Las autorizaciones no tienen vigencia: quien fue autorizado una vez puede volver a anunciarse indefinidamente.|Riesgo de seguridad por ingreso de personas que ya no deberían entrar.|
+|*PB-04*|El operador no tiene control remoto sobre los accesos a zonas comunes ni puede bloquearlos.|Riesgo: cualquier restricción exige presencia física; sin capacidad de respuesta fuera de horario.|
+|*PB-05*|El alta y baja de rostros y placas depende de personal técnico operando HikCentral.|Tiempo: días de demora para un cambio simple. Costo: visita técnica por cada modificación.|
+|*PB-06*|No queda constancia de quién autorizó cada ingreso.|Riesgo: imposible asignar responsabilidad cuando ocurre un incidente.|
+
+**Herramientas y sistemas actuales**
+
+|**Herramienta / sistema**|**Uso actual**|**¿Se reemplaza o convive?**|
+| :- | :- | :- |
+|HikCentral|Visor de cámaras, alta de rostros y placas|Convive inicialmente; se reduce dependencia hasta retirarlo|
+|Libreta de portería|Registro manual del ingreso de visitantes|Se reemplaza|
+|Citófono / llamada telefónica|Anuncio y autorización verbal del visitante|Se reemplaza por autorización previa; se conserva como respaldo|
+|Archivo Excel o listado impreso|Padrón de viviendas, residentes y placas|Se reemplaza; se migra como carga inicial|
+|WhatsApp portería–residentes|Coordinación informal de visitantes|Se reemplaza por notificaciones de la app|
+
+# **3. Justificación (caso de negocio)**
+**Beneficio esperado: Eliminar la intervención manual en el ingreso de visitantes y residentes, reducir el tiempo de acceso vehicular, dar al residente control directo sobre quién entra a su vivienda y disponer de un registro auditable completo de cada acceso. Para Grupo Control, dejar de depender de licencias de terceros en la capa de gestión y contar con un producto propio, multiempresa y comercializable bajo modelo de suscripción recurrente.**
+
+
+**Costo de no hacerlo: La oferta sigue limitada a la venta de hardware con margen decreciente y sin ingreso recurrente. La capa de gestión permanece atada a HikCentral, sin posibilidad de diferenciación comercial, sin control sobre la hoja de ruta del producto y sin activo propio de propiedad intelectual.**
+
+
+**Alcance**
+
+|**Alcance INCLUIDO**|**Alcance EXCLUIDO**|
+| :- | :- |
+|Autenticación, MFA administrativo, roles y permisos (RBAC)|Facturación, cartera y recaudo de cuotas de administración|
+|Padrón: viviendas, residentes, vehículos, relaciones y estados|Reservas de zonas comunes con cobro o pago en línea|
+|Autorización de visitantes: única, recurrente y con acompañantes|VMS y grabación continua de video (se conserva el de Hikvision)|
+|Aplicación móvil del residente en Flutter (iOS y Android)|Control de correspondencia y paquetería|
+|LPR: detección, listas blancas y negras, apertura de talanquera|Integración contable o con ERP|
+|Biometría facial: captura, consentimiento, sincronización y supresión|Módulo de convivencia, PQR o asambleas|
+|Zonas comunes con horario, aforo y reglas configurables|Aplicación dedicada para el visitante|
+|Motor de reglas configurable por persona, vivienda, placa, zona y vigencia|Adaptadores para fabricantes distintos a Hikvision (la arquitectura los admite; no se implementan)|
+|Consola de portería y consola de guardia virtual multiproyecto|Publicación en tiendas públicas de aplicaciones|
+|Intercom con audio y video para atención remota|Reconocimiento de placas de motocicletas en movimiento a alta velocidad|
+|Edge Gateway: caché de reglas, operación offline y reconciliación|Integración con sistemas de alarma o incendio|
+|Eventos, alertas, auditoría inmutable e informes exportables|Migración automática desde HikCentral|
+|Capa HikvisionProvider desacoplada, con adaptador simulado|Soporte multiidioma|
+
+# **4. Implicados (stakeholders)**
+
+|**Nombre / Área**|**Interés en el proyecto**|**Influencia (A/M/B)**|**Rol (aprueba / consulta / informa)**|
+| :- | :- | :- | :- |
+|Gerencia — Grupo Control|Producto propio comercializable y retorno de la inversión|Alta|Aprueba|
+|Argenis Omaña — Desarrollo|Diseño, construcción y entrega del producto|Alta|Ejecuta|
+|Área técnica e instalaciones|Integración real con el hardware y laboratorio de pruebas|Alta|Consulta|
+|Asesoría jurídica|Consentimiento biométrico, tratamiento de datos y contratos|Media|Aprueba|
+|Administrador de copropiedad piloto|Operación diaria y aceptación del producto|Media|Consulta|
+|Portero / personal de seguridad|Usabilidad de la consola operativa|Baja|Consulta|
+|Residente piloto|Simplicidad de la aplicación móvil|Baja|Consulta|
+
+# **5. Roles del sistema**
+
+|**Rol**|**Descripción**|**Permisos y acciones que puede realizar**|
+| :- | :- | :- |
+|Superadministrador|Rol de plataforma, transversal a todas las copropiedades.|Crear y configurar copropiedades, crear administradores, consultar auditoría global, gestionar catálogo de dispositivos. No accede a datos operativos de una copropiedad sin dejar registro.|
+|Administrador|Control integral de una copropiedad.|CRUD de viviendas, residentes, vehículos, zonas, dispositivos y reglas. Gestionar listas negras. Consultar y exportar informes y auditoría. Forzar sincronización de dispositivos.|
+|Portero / Seguridad|Consola operativa presencial en tiempo real.|Ver evento actual con evidencia, abrir o negar con motivo obligatorio, registrar novedad, consultar historial inmediato, ver alertas. No modifica padrón, reglas ni autorizaciones.|
+|Operador de central|Guardia virtual remota, puede atender varias copropiedades.|Todo lo del portero, más: atender intercom con audio y video, contactar al residente, accionar dispositivos remotamente y escalar a supervisión. Cada acción queda atribuida a su usuario.|
+|Residente|Aplicación móvil (Flutter) o PWA.|Gestionar sus vehículos, crear y revocar autorizaciones de visitante con vigencia, capturar foto del visitante, autorizar zonas comunes, ver historial e informes de sus propios visitantes.|
+|Servicio / integración|Identidad no humana usada por el Edge Gateway y los procesos automáticos.|Ingerir eventos de dispositivos, sincronizar plantillas y reglas, ejecutar supresiones programadas. Sin acceso a interfaz de usuario.|
+
+# **6. Reglas de negocio**
+
+|**ID**|**Regla**|**Origen / justificación**|**Prioridad**|
+| :- | :- | :- | :- |
+|*RN-01*|Una autorización vencida no habilita el acceso, aunque la placa o el rostro estén registrados en el sistema.|OE-02 · Decisión de producto|Alta|
+|*RN-02*|Todo intento de acceso, permitido o negado, genera un evento con actor, dispositivo, zona, resultado, regla aplicada y evidencia.|OE-05 · Trazabilidad|Alta|
+|*RN-03*|Los eventos son inmutables: ningún rol puede editarlos ni eliminarlos desde la aplicación.|Auditoría|Alta|
+|*RN-04*|Una placa solo puede estar asociada a una vivienda activa a la vez.|OE-01 · Integridad del padrón|Alta|
+|*RN-05*|Un residente solo puede autorizar visitantes hacia su propia vivienda.|OE-02 · Decisión de producto|Alta|
+|*RN-06*|Una persona o placa en lista negra no puede ser autorizada por ningún residente ni ingresar por ningún medio.|Reglamento de copropiedad|Alta|
+|*RN-07*|Solo el administrador y el operador de central pueden crear o levantar una lista negra.|Control de seguridad|Alta|
+|*RN-08*|Toda apertura manual exige motivo escrito y queda atribuida al usuario que la ejecutó.|Auditoría|Alta|
+|*RN-09*|El dato biométrico exige consentimiento del titular registrado ANTES de la sincronización a la terminal.|Ley 1581 de 2012, arts. 5 y 9|Alta|
+|*RN-10*|El consentimiento del visitante lo otorga el visitante, no el residente que lo invita.|Ley 1581 de 2012 · titularidad del dato|Alta|
+|*RN-11*|Al vencer la vigencia o revocarse el consentimiento, la plantilla biométrica se elimina de todas las terminales dentro de las 24 horas siguientes.|Ley 1581 de 2012 · principio de finalidad|Alta|
+|*RN-12*|La interfaz de usuario no puede invocar directamente el hardware; toda comunicación pasa por la capa de proveedor.|OE-03 · Arquitectura obligatoria|Alta|
+|*RN-13*|Una vivienda inactiva no genera nuevas autorizaciones; las vigentes se conservan hasta su vencimiento.|Decisión de gerencia|Media|
+|*RN-14*|El acceso a una zona común se niega si se superó el aforo o si está fuera del horario configurado, aunque la persona tenga permiso vigente.|Reglamento de copropiedad|Alta|
+|*RN-15*|Ningún usuario accede a datos de una copropiedad distinta a la suya; el intento se rechaza y se registra como evento de seguridad.|OE-08 · Multiempresa|Alta|
+|*RN-16*|Durante una caída de conexión el Edge Gateway decide con la última versión vigente del caché de reglas, y marca el evento con esa versión.|OE-06 · Continuidad|Alta|
+|*RN-17*|Los eventos generados en modo autónomo se sincronizan con clave de idempotencia; un mismo evento nunca se duplica en la nube.|OE-06 · Continuidad|Alta|
+|*RN-18*|Un evento crítico —lista negra, sabotaje, dispositivo caído o acceso dudoso— se escala automáticamente al operador de central.|OE-05 · Decisión de producto|Alta|
+|*RN-19*|Los registros con eventos asociados no se eliminan físicamente; se marcan como inactivos.|Integridad histórica y auditoría|Alta|
+|*RN-20*|Toda sesión de rol administrativo requiere segundo factor de autenticación.|Seguridad|Media|
+|*RN-21*|Las credenciales y secretos de dispositivos nunca se exponen al frontend ni a la aplicación móvil.|Seguridad|Alta|
+|*RN-22*|Una autorización recurrente se evalúa contra su patrón de días y franjas; fuera del patrón se niega aunque la vigencia esté activa.|OE-02 · Decisión de producto|Media|
+
+# **7. Historias de usuario**
+*Formato: Como [rol], quiero [acción], para [beneficio].*
+
+|**ID**|**Historia**|**Prioridad (MoSCoW)**|**Épica**|**Estado**|
+| :- | :- | :- | :- | :- |
+|*HU-01*|Como administrador, quiero crear y editar viviendas, para reflejar la estructura real de la copropiedad.|Must|Padrón|Pendiente|
+|*HU-02*|Como administrador, quiero registrar residentes y asociarlos a una vivienda, para saber quién pertenece a cada unidad.|Must|Padrón|Pendiente|
+|*HU-03*|Como administrador, quiero cargar el padrón inicial desde un archivo, para no digitar cientos de registros.|Should|Padrón|Pendiente|
+|*HU-04*|Como administrador, quiero marcar una vivienda o residente como inactivo, para retirar su acceso sin perder su historial.|Must|Padrón|Pendiente|
+|*HU-05*|Como residente, quiero registrar las placas de mis vehículos, para entrar sin intervención de portería.|Must|Vehículos|Pendiente|
+|*HU-06*|Como sistema, quiero rechazar una placa ya asociada a otra vivienda activa, para mantener la integridad del padrón.|Must|Vehículos|Pendiente|
+|*HU-07*|Como residente, quiero crear una autorización de visitante con nombre, documento, placa y vigencia desde/hasta, para que ingrese sin que yo esté disponible.|Must|Autorización|Pendiente|
+|*HU-08*|Como residente, quiero crear una autorización recurrente por días y franjas horarias, para el personal doméstico o de servicios.|Must|Autorización|Pendiente|
+|*HU-09*|Como residente, quiero registrar acompañantes en una autorización, para que ingresen en el mismo vehículo.|Should|Autorización|Pendiente|
+|*HU-10*|Como residente, quiero revocar una autorización vigente, para cancelar un ingreso que ya no debe ocurrir.|Must|Autorización|Pendiente|
+|*HU-11*|Como residente, quiero tomar una foto del visitante desde la app, para que ingrese por reconocimiento facial.|Must|Biometría|Pendiente|
+|*HU-12*|Como visitante, quiero otorgar mi consentimiento para el tratamiento de mi rostro, para que el registro sea lícito.|Must|Biometría|Pendiente|
+|*HU-13*|Como sistema, quiero validar la calidad de la fotografía antes de aceptarla, para no sincronizar plantillas inservibles.|Must|Biometría|Pendiente|
+|*HU-14*|Como sistema, quiero eliminar la plantilla biométrica de las terminales al vencer la vigencia, para cumplir el principio de finalidad.|Must|Biometría|Pendiente|
+|*HU-15*|Como titular del dato, quiero revocar mi consentimiento, para que mi rostro deje de estar en el sistema.|Must|Biometría|Pendiente|
+|*HU-16*|Como sistema, quiero validar una placa detectada contra las reglas vigentes, para decidir si abro la talanquera.|Must|Motor de reglas|Pendiente|
+|*HU-17*|Como sistema, quiero registrar la evidencia fotográfica de cada detección, para sustentar la decisión tomada.|Must|Motor de reglas|Pendiente|
+|*HU-18*|Como administrador, quiero configurar zonas comunes con horario y aforo, para controlar su uso.|Must|Zonas comunes|Pendiente|
+|*HU-19*|Como residente, quiero autorizar a mi visitante el acceso a piscina o gimnasio, para que use las zonas conmigo.|Should|Zonas comunes|Pendiente|
+|*HU-20*|Como sistema, quiero negar el acceso a una zona con aforo lleno, para respetar el reglamento.|Must|Zonas comunes|Pendiente|
+|*HU-21*|Como portero, quiero ver el evento actual con foto, placa o rostro y la vivienda destino, para decidir con contexto.|Must|Consola portería|Pendiente|
+|*HU-22*|Como portero, quiero abrir o negar manualmente registrando el motivo, para atender casos que la regla no cubre.|Must|Consola portería|Pendiente|
+|*HU-23*|Como portero, quiero consultar el historial inmediato de accesos, para verificar un ingreso reciente.|Must|Consola portería|Pendiente|
+|*HU-24*|Como portero, quiero ver las alertas y listas negras activas, para actuar ante un caso crítico.|Must|Consola portería|Pendiente|
+|*HU-25*|Como operador de central, quiero atender eventos de varias copropiedades desde una sola consola, para operar de forma remota.|Must|Guardia virtual|Pendiente|
+|*HU-26*|Como operador de central, quiero hablar con el visitante por audio y video, para validar su identidad.|Must|Guardia virtual|Pendiente|
+|*HU-27*|Como operador de central, quiero contactar al residente desde el evento, para confirmar un ingreso no autorizado previamente.|Should|Guardia virtual|Pendiente|
+|*HU-28*|Como operador de central, quiero abrir remotamente una talanquera, puerta o zona, para permitir el acceso tras validar.|Must|Guardia virtual|Pendiente|
+|*HU-29*|Como sistema, quiero escalar automáticamente los eventos críticos al operador de central, para que no dependan de que alguien los revise.|Must|Guardia virtual|Pendiente|
+|*HU-30*|Como sistema, quiero seguir resolviendo accesos con el caché local cuando no hay conexión, para no bloquear la operación.|Must|Continuidad|Pendiente|
+|*HU-31*|Como sistema, quiero reconciliar los eventos generados sin conexión sin duplicarlos, para mantener la auditoría íntegra.|Must|Continuidad|Pendiente|
+|*HU-32*|Como administrador, quiero consultar y exportar el historial de accesos filtrando por vivienda, persona y fecha, para responder ante un incidente.|Must|Trazabilidad|Pendiente|
+|*HU-33*|Como residente, quiero ver el historial de mis visitantes, para saber quién entró y cuándo.|Should|App residente|Pendiente|
+|*HU-34*|Como residente, quiero recibir una notificación cuando mi visitante ingresa, para estar enterado.|Should|App residente|Pendiente|
+|*HU-35*|Como administrador, quiero incluir a una persona o placa en lista negra, para impedir su ingreso futuro.|Must|Seguridad|Pendiente|
+|*HU-36*|Como superadministrador, quiero crear copropiedades y sus administradores, para operar varias en una misma instancia.|Must|Multiempresa|Pendiente|
+|*HU-37*|Como administrador, quiero autenticarme con segundo factor, para proteger la consola.|Must|Seguridad|Pendiente|
+|*HU-38*|Como administrador, quiero ver el estado de los dispositivos y forzar su sincronización, para detectar equipos caídos.|Must|Dispositivos|Pendiente|
+
+# **8. Casos de uso**
+**CU-01: Ingreso vehicular por detección de placa**
+
+|**Actor(es)**|Cámara LPR (actor del sistema) · Motor de reglas · Portero (secundario)|
+| :- | :- |
+|**Precondición**|La cámara está sincronizada, la copropiedad tiene al menos una talanquera configurada y existen reglas vigentes en caché.|
+|**Flujo principal**|1\. La cámara detecta una placa y emite el evento hacia HikvisionProvider.<br>2\. El proveedor normaliza el evento y lo entrega al motor de reglas.<br>3\. El motor busca la placa entre vehículos de residentes y autorizaciones de visitante vigentes.<br>4\. Verifica que no exista lista negra, que la vigencia esté activa y que el patrón horario aplique.<br>5\. Ordena la apertura del relé a través del proveedor.<br>6\. Registra el evento con resultado permitido, evidencia fotográfica, regla aplicada y versión del caché.|
+|**Flujos alternos**|4a. La placa existe pero la autorización venció → se niega, se registra el motivo y se muestra al portero (RN-01).<br>4b. La placa no existe en el sistema → se muestra en la consola para gestión manual o se escala a guardia virtual.<br>4c. La placa está en lista negra → se niega, se genera alerta y se escala automáticamente (RN-06, RN-18).<br>4d. La autorización es recurrente y la detección ocurre fuera del patrón de días u horas → se niega (RN-22).|
+|**Excepciones**|5a. El proveedor no logra comunicarse con el relé → dos reintentos, evento registrado como fallido con causa técnica y escalamiento al portero.<br>2a. Evento malformado o duplicado → se descarta con registro en log técnico, sin generar evento de acceso.<br>3a. Lectura de placa con confianza por debajo del umbral → no se decide automáticamente; se envía a validación humana.|
+|**Postcondición**|Existe exactamente un evento de acceso con resultado, actor, dispositivo, zona, regla aplicada y evidencia.|
+|**Historias relacionadas**|HU-16, HU-17, HU-21, HU-22 · RN-01, RN-02, RN-06, RN-12, RN-22|
+
+**CU-02: Alta y sincronización de rostro de visitante con consentimiento**
+
+|**Actor(es)**|Residente · Visitante (titular del dato) · Motor de sincronización · Terminal facial|
+| :- | :- |
+|**Precondición**|El residente tiene una autorización creada para ese visitante y existe al menos una terminal facial asignada a la zona.|
+|**Flujo principal**|1\. El residente captura la fotografía del visitante desde la app.<br>2\. El sistema valida calidad de imagen (encuadre, nitidez, iluminación, rostro único).<br>3\. El sistema envía al visitante una solicitud de consentimiento por el canal registrado.<br>4\. El visitante acepta; se registra titular, finalidad, fecha, versión de la política y evidencia.<br>5\. Solo entonces se genera la plantilla biométrica y se encola la sincronización.<br>6\. El proveedor da de alta la plantilla en las terminales de las zonas autorizadas.<br>7\. Se programa la supresión automática para la fecha de vencimiento de la vigencia.|
+|**Flujos alternos**|2a. La calidad es insuficiente → se rechaza con motivo y se solicita repetir la captura (HU-13).<br>3a. El visitante no responde en el plazo definido → la autorización queda vigente solo por placa, sin acceso facial.<br>4a. El visitante rechaza el consentimiento → no se genera plantilla y se notifica al residente.|
+|**Excepciones**|6a. La terminal no responde → la sincronización queda en cola con reintentos; el estado del dispositivo se marca como degradado y se alerta al administrador.<br>7a. El titular revoca el consentimiento antes del vencimiento → se dispara supresión inmediata en todas las terminales (RN-11).|
+|**Postcondición**|La plantilla existe en las terminales autorizadas únicamente si hay consentimiento previo registrado, y tiene fecha de supresión programada.|
+|**Historias relacionadas**|HU-11, HU-12, HU-13, HU-14, HU-15 · RN-09, RN-10, RN-11|
+
+**CU-03: Atención de visitante no anunciado por guardia virtual**
+
+|**Actor(es)**|Visitante · Operador de central · Residente · Intercom / videoportero|
+| :- | :- |
+|**Precondición**|El intercom está registrado, hay un operador con sesión activa y existe conectividad hacia la central.|
+|**Flujo principal**|1\. El visitante pulsa el intercom en la portería.<br>2\. El sistema crea un evento de atención y lo enruta a la cola del operador de la copropiedad correspondiente.<br>3\. El operador acepta, se establece sesión de audio y video y ve la ficha de la vivienda destino.<br>4\. El operador conversa con el visitante y verifica identidad.<br>5\. El operador contacta al residente desde el mismo evento para confirmar.<br>6\. Con la confirmación, autoriza y ordena la apertura remota.<br>7\. Se registra el evento con identidad del operador, resultado y grabación o captura de evidencia.|
+|**Flujos alternos**|5a. El residente no responde → el operador niega el ingreso y registra la novedad.<br>5b. El residente niega el ingreso → se registra el evento como negado con motivo.<br>3a. El operador está atendiendo otra copropiedad → el evento espera en cola con indicador de tiempo de espera.|
+|**Excepciones**|2a. No hay operador disponible → el evento se escala a supervisión y se notifica al portero presencial si existe.<br>6a. Falla la orden de apertura → se reintenta y, si persiste, se registra como fallo técnico y se alerta.|
+|**Postcondición**|El evento queda cerrado con resultado, identidad del operador que decidió y evidencia asociada.|
+|**Historias relacionadas**|HU-25, HU-26, HU-27, HU-28, HU-29 · RN-02, RN-08, RN-15, RN-18|
+
+**CU-04: Operación autónoma durante caída de conexión y reconciliación**
+
+|**Actor(es)**|Edge Gateway · Motor de reglas local · Dispositivos · Nube Next Control|
+| :- | :- |
+|**Precondición**|El Edge Gateway tiene caché de reglas vigente y su reloj sincronizado.|
+|**Flujo principal**|1\. Se pierde la conexión WAN hacia la nube.<br>2\. El Edge detecta la pérdida y conmuta a modo autónomo.<br>3\. Cada detección se resuelve contra el caché local de reglas, marcando el evento con la versión de caché usada.<br>4\. Los eventos se acumulan en la bandeja de salida local con clave de idempotencia.<br>5\. Al restablecerse la conexión, el Edge envía los eventos pendientes en orden.<br>6\. La nube los acepta descartando duplicados por clave de idempotencia.<br>7\. La nube devuelve la versión vigente de reglas y el Edge actualiza su caché.|
+|**Flujos alternos**|3a. La regla necesaria no está en caché → se aplica la política de contingencia configurada (denegar por defecto o escalar al portero presencial).<br>5a. La conexión se restablece de forma intermitente → el envío se reanuda desde el último evento confirmado.|
+|**Excepciones**|6a. Llega un evento con clave ya existente → se descarta silenciosamente y se registra en log técnico (RN-17).<br>2a. El caché supera el margen de vigencia definido → el Edge marca los eventos como decididos con reglas potencialmente obsoletas.|
+|**Postcondición**|Todos los eventos generados durante el corte existen en la nube exactamente una vez, con la versión de reglas con que fueron decididos.|
+|**Historias relacionadas**|HU-30, HU-31 · RN-16, RN-17|
+
+**CU-05: Acceso a zona común con horario y aforo**
+
+|**Actor(es)**|Residente o visitante autorizado · Torniquete o controlador de zona · Motor de reglas|
+| :- | :- |
+|**Precondición**|La zona está configurada con horario y aforo, y la persona tiene autorización vigente sobre ella.|
+|**Flujo principal**|1\. La persona se identifica en el controlador de la zona (rostro o credencial).<br>2\. El motor verifica autorización vigente sobre esa zona específica.<br>3\. Verifica que la hora esté dentro del horario configurado.<br>4\. Verifica que el aforo actual sea menor al máximo.<br>5\. Ordena la apertura e incrementa el contador de aforo.<br>6\. Registra el evento con zona, resultado y aforo resultante.|
+|**Flujos alternos**|3a. Fuera de horario → se niega con motivo “fuera de horario” (RN-14).<br>4a. Aforo lleno → se niega con motivo “aforo superado” y se informa en pantalla.<br>2a. La persona tiene acceso al complejo pero no a esa zona → se niega con motivo “zona no autorizada”.|
+|**Excepciones**|5a. Falla el controlador → evento fallido con causa técnica, sin incrementar aforo.<br>6a. Salida no registrada por falla de sensor → el contador de aforo se reinicia según la política horaria configurada.|
+|**Postcondición**|El acceso queda registrado y el contador de aforo de la zona refleja el estado real.|
+|**Historias relacionadas**|HU-18, HU-19, HU-20 · RN-14, RN-02|
+
+
+# **9. Matriz de trazabilidad**
+
+|**Objetivo**|**Regla de negocio**|**Historia / requisito**|**Caso de uso**|**Caso de prueba**|
+| :- | :- | :- | :- | :- |
+|OE-01|RN-04, RN-19|HU-01 a HU-06|—|CP-01 Integridad del padrón|
+|OE-02|RN-01, RN-05, RN-13, RN-22|HU-07 a HU-10|CU-01|CP-02 Vigencia de autorización|
+|OE-02|RN-06, RN-07|HU-35|CU-01|CP-03 Lista negra|
+|OE-03|RN-12|HU-16, HU-17, HU-38|CU-01|CP-04 Desacople de proveedor|
+|OE-03|RN-14|HU-18, HU-19, HU-20|CU-05|CP-05 Horario y aforo|
+|OE-04|RN-09, RN-10, RN-11|HU-11 a HU-15|CU-02|CP-06 Consentimiento y supresión|
+|OE-05|RN-02, RN-03, RN-08|HU-21 a HU-24, HU-32|CU-01, CU-03|CP-07 Integridad de auditoría|
+|OE-05|RN-18|HU-29, HU-34|CU-03|CP-08 Escalamiento y alertas|
+|OE-06|RN-16, RN-17|HU-30, HU-31|CU-04|CP-09 Continuidad y reconciliación|
+|OE-07|RN-08, RN-18|HU-25 a HU-28|CU-03|CP-10 Operación remota|
+|OE-08|RN-15, RN-20, RN-21|HU-36, HU-37|—|CP-11 Aislamiento multiempresa|
+
+# **10. Criterios de aceptación**
+*Formato Gherkin: Dado que [contexto], cuando [acción], entonces [resultado esperado].*
+
+|**ID**|**Historia asociada**|**Criterio (Dado / Cuando / Entonces)**|
+| :- | :- | :- |
+|*CA-01*|HU-02|Dado que existe una vivienda activa, cuando el administrador registra un residente y lo asocia a ella, entonces al consultar la vivienda el residente aparece en su listado.|
+|*CA-02*|HU-04|Dado que un residente tiene eventos de acceso asociados, cuando el administrador intenta eliminarlo, entonces el sistema impide el borrado físico y ofrece marcarlo como inactivo.|
+|*CA-03*|HU-06|Dado que la placa ABC123 está asociada a una vivienda activa, cuando se intenta asociarla a otra vivienda activa, entonces el sistema rechaza la operación indicando el conflicto.|
+|*CA-04*|HU-07|Dado que el residente crea una autorización con vigencia del 10 al 12 de octubre, cuando la cámara detecta la placa el 11 de octubre, entonces el sistema abre la talanquera y registra el evento como permitido.|
+|*CA-05*|HU-07|Dado que la autorización venció ayer, cuando la cámara detecta la placa, entonces el sistema niega el acceso, registra el motivo “vigencia expirada” y no acciona el relé.|
+|*CA-06*|HU-08|Dado que existe una autorización recurrente para lunes a viernes de 7:00 a 12:00, cuando la detección ocurre un sábado, entonces el sistema niega el acceso con motivo “fuera del patrón autorizado”.|
+|*CA-07*|HU-10|Dado que una autorización está vigente, cuando el residente la revoca, entonces la siguiente detección de esa placa se niega en menos de 60 segundos.|
+|*CA-08*|HU-11|Dado que el residente captura una foto borrada o sin rostro detectable, cuando intenta guardarla, entonces el sistema la rechaza indicando el motivo y no genera plantilla.|
+|*CA-09*|HU-12|Dado que el visitante no ha otorgado consentimiento, cuando el sistema intenta sincronizar su plantilla a la terminal, entonces la sincronización se bloquea y el registro queda en estado “pendiente de consentimiento”.|
+|*CA-10*|HU-14|Dado que la vigencia de un visitante venció, cuando transcurren 24 horas, entonces su plantilla ya no existe en ninguna terminal y queda registro de la supresión.|
+|*CA-11*|HU-15|Dado que un titular revoca su consentimiento, cuando la revocación se registra, entonces la plantilla se elimina de todas las terminales y el acceso facial se niega en el siguiente intento.|
+|*CA-12*|HU-16|Dado que la placa no existe en el sistema, cuando la cámara la detecta, entonces el evento aparece en la consola del portero con la evidencia y sin apertura automática.|
+|*CA-13*|HU-16|Dado que la persona o placa está en lista negra, cuando se detecta en cualquier punto de acceso, entonces el sistema niega, genera alerta y escala al operador de central.|
+|*CA-14*|HU-20|Dado que la zona común alcanzó su aforo máximo, cuando una persona autorizada se identifica, entonces el sistema niega el acceso con motivo “aforo superado”.|
+|*CA-15*|HU-18|Dado que la zona tiene horario de 6:00 a 22:00, cuando alguien se identifica a las 23:00, entonces el sistema niega el acceso con motivo “fuera de horario”.|
+|*CA-16*|HU-22|Dado que el portero decide abrir manualmente, cuando confirma la acción sin escribir motivo, entonces el sistema no ejecuta la apertura y solicita el motivo.|
+|*CA-17*|HU-22|Dado que el portero abre manualmente con motivo, cuando se completa la acción, entonces el evento registra su identidad, el motivo y la marca de tiempo.|
+|*CA-18*|HU-29|Dado que ocurre un evento crítico, cuando se genera, entonces el operador de central recibe la notificación en menos de 10 segundos.|
+|*CA-19*|HU-26|Dado que un visitante pulsa el intercom, cuando el operador acepta la sesión, entonces se establece audio y video bidireccional con retardo inferior a 2 segundos.|
+|*CA-20*|HU-28|Dado que el operador autoriza remotamente, cuando ejecuta la apertura, entonces el relé se acciona en menos de 3 segundos y el evento registra su identidad.|
+|*CA-21*|HU-30|Dado que no hay conexión a internet, cuando se detecta una placa con regla en caché, entonces el Edge resuelve el acceso localmente y registra el evento con la versión de caché usada.|
+|*CA-22*|HU-31|Dado que se generaron 20 eventos sin conexión, cuando se restablece la red, entonces los 20 aparecen en la nube exactamente una vez en menos de 5 minutos.|
+|*CA-23*|HU-32|Dado que existen eventos registrados, cuando cualquier usuario intenta editarlos o eliminarlos desde la aplicación, entonces la operación es rechazada por todos los roles.|
+|*CA-24*|HU-36|Dado que un administrador de la copropiedad A está autenticado, cuando consulta por API un recurso de la copropiedad B, entonces el sistema responde 403 o 404 y registra el intento como evento de seguridad.|
+|*CA-25*|HU-37|Dado que un usuario con rol administrativo inicia sesión, cuando ingresa credenciales válidas sin segundo factor, entonces el acceso no se concede hasta completar el MFA.|
+|*CA-26*|HU-38|Dado que una terminal lleva más del umbral configurado sin reportarse, cuando el administrador consulta dispositivos, entonces aparece marcada como caída y se generó la alerta correspondiente.|
+
+# **11. Glosario**
+
+|**Término**|**Definición en el contexto del proyecto**|
+| :- | :- |
+|Copropiedad|Conjunto residencial, villa o parcelación gestionado como una unidad. Es la frontera de aislamiento de datos del modelo multiempresa.|
+|Vivienda|Unidad privada dentro de la copropiedad. Entidad a la que se asocian residentes, vehículos y autorizaciones.|
+|Residente|Persona vinculada a una vivienda con capacidad de autorizar visitantes. Distinto de propietario, que es una figura jurídica y puede no residir.|
+|Visitante|Persona autorizada temporalmente por un residente, con vigencia definida.|
+|Autorización|Permiso con vigencia que habilita el ingreso de una persona o placa. No implica que el ingreso haya ocurrido.|
+|Autorización recurrente|Autorización que se repite según un patrón de días y franjas horarias, además de su vigencia general.|
+|Acceso|Intento de ingreso evaluado por el sistema. Puede resultar permitido o negado. No es sinónimo de apertura.|
+|Apertura|Accionamiento físico del relé sobre talanquera, torniquete o puerta.|
+|Evento|Registro inmutable de un acceso o de una acción operativa, con actor, dispositivo, zona, resultado, regla aplicada y evidencia.|
+|Dispositivo|Equipo físico integrado: cámara LPR, terminal facial, controlador de zona, relé o intercom.|
+|Terminal facial|Dispositivo que almacena plantillas biométricas y ejecuta el reconocimiento localmente.|
+|Plantilla biométrica|Vector de características derivado de una fotografía, usado para comparar rostros. Es dato sensible bajo la Ley 1581 de 2012. No es un hash: admite comparación por similitud.|
+|Consentimiento|Autorización previa, expresa e informada del titular del dato para el tratamiento de su información biométrica.|
+|Vigencia|Rango de fecha y hora durante el cual una autorización produce efectos.|
+|Zona|Área de la copropiedad con control de acceso propio: entrada vehicular, entrada peatonal, piscina, gimnasio, salón social.|
+|Aforo|Número máximo de personas admitidas simultáneamente en una zona.|
+|Lista negra|Conjunto de personas o placas cuyo ingreso está prohibido, con precedencia sobre cualquier autorización.|
+|Motor de reglas|Componente que decide si un acceso se permite o se niega evaluando las reglas vigentes. Reside en la nube y, replicado, en el Edge Gateway.|
+|Edge Gateway|Equipo local que mantiene caché de reglas, decide accesos sin conexión y reconcilia eventos al restablecerse la red.|
+|Proveedor (Provider)|Capa de integración que traduce entre el modelo de Next Control y el protocolo de un fabricante. HikvisionProvider es su primera implementación.|
+|Adaptador simulado|Implementación del proveedor sin hardware real, usada para ejecutar la suite de pruebas en integración continua.|
+|Clave de idempotencia|Identificador único de un evento que garantiza que su reenvío no produzca registros duplicados.|
+
+# **12. Mockups y wireframes**
+
+|**Pantalla / flujo**|**Rol destinatario**|**Enlace o adjunto**|**Historia relacionada**|
+| :- | :- | :- | :- |
+|Login y selección de copropiedad|Todos|[pendiente]|HU-36, HU-37|
+|Dashboard operativo|Administrador|[pendiente]|HU-32, HU-38|
+|Viviendas y residentes|Administrador|[pendiente]|HU-01 a HU-04|
+|Vehículos y placas|Administrador · Residente|[pendiente]|HU-05, HU-06|
+|Visitantes y autorizaciones|Administrador · Residente|[pendiente]|HU-07 a HU-10|
+|Zonas comunes y aforo|Administrador|[pendiente]|HU-18 a HU-20|
+|Dispositivos y sincronización|Administrador|[pendiente]|HU-38|
+|Eventos, alertas y auditoría|Administrador|[pendiente]|HU-24, HU-32|
+|Consola de portería|Portero|[pendiente]|HU-21 a HU-24|
+|Consola de guardia virtual|Operador de central|[pendiente]|HU-25 a HU-29|
+|App — inicio / mi vivienda|Residente|[pendiente]|HU-33|
+|App — crear visitante y capturar rostro|Residente|[pendiente]|HU-07, HU-11|
+|App — historial y notificaciones|Residente|[pendiente]|HU-33, HU-34|
+|Pantalla de consentimiento del visitante|Visitante|[pendiente]|HU-12, HU-15|
+
+*Si el entregable de esta versión no tiene interfaz, marcar la sección como “No aplica”.*
+# 13\. Arquitectura y stack tecnológico
+Esta sección no forma parte del estándar de especificación de requisitos, pero se incorpora porque las decisiones de arquitectura condicionan directamente el cumplimiento de OE-03, OE-06 y OE-08.
+
+13\.1 Componentes de la solución
+
+|**Componente**|**Responsabilidad**|**Se despliega en**|
+| :- | :- | :- |
+|App móvil del residente|Autorizar visitantes, registrar placas, capturar rostro, ver historial y recibir notificaciones.|Dispositivo del residente (iOS / Android)|
+|Consola web|Administración, consola de portería y consola de guardia virtual.|Navegador|
+|API Next Control|Motor de reglas, orquestación, capa de proveedor, ingesta de eventos, sincronización de dispositivos.|Nube|
+|Supabase|Base de datos, autenticación, almacenamiento de evidencia y canal de tiempo real.|Nube gestionada|
+|Edge Gateway|Decisión local con caché de reglas, bandeja de salida de eventos y reconciliación.|Equipo industrial en sitio|
+|HikvisionProvider|Traducción entre el modelo de Next Control y el protocolo del fabricante.|Librería compartida entre API y Edge|
+|Puente de intercom|Traducción entre el protocolo del videoportero y el navegador del operador.|Nube|
+
+13\.2 Stack sugerido
+
+|**Capa**|**Tecnología**|**Por qué**|
+| :- | :- | :- |
+|Base de datos|PostgreSQL sobre Supabase|Ya cuentas con credenciales. RLS nativo para el aislamiento de OE-08, y extensiones para trabajos programados y cifrado.|
+|Autenticación|Supabase Auth con claims de copropiedad y rol, más MFA TOTP|Resuelve RBAC y multiempresa desde el propio token (RN-15, RN-20).|
+|Almacenamiento|Supabase Storage con buckets privados y URLs firmadas|Evidencia fotográfica y fotos de visitante sin exponer rutas públicas (RN-21).|
+|Tiempo real|Supabase Realtime|Alimenta la consola de portería y la de guardia virtual sin polling.|
+|API y lógica de negocio|NestJS sobre TypeScript|Motor de reglas y capa de proveedor con patrón puerto/adaptador. Stack que ya dominas.|
+|Despliegue de API|Railway o Fly.io|Continuidad con la infraestructura que ya usas.|
+|Trabajos y colas|pg-boss sobre PostgreSQL|Sincronización de terminales, supresión programada de plantillas y reintentos, sin introducir Redis.|
+|Consola web|Next.js con TypeScript, Tailwind y shadcn/ui|Renderizado híbrido y componentes accesibles para tres consolas distintas.|
+|Aplicación móvil|Flutter (Dart)|Un solo código para iOS y Android, con acceso nativo a cámara y notificaciones.|
+|Notificaciones push|Firebase Cloud Messaging|Integración directa con Flutter en ambas plataformas.|
+|Intercom|SIP hacia el videoportero, con puente WebRTC (LiveKit o Janus)|Los intercom Hikvision hablan SIP; el navegador del operador habla WebRTC.|
+|Edge Gateway|Node.js con TypeScript y SQLite local|Reutiliza la misma capa de proveedor de la API. SQLite sostiene caché y bandeja de salida.|
+|Observabilidad|Sentry y logs estructurados|Necesario para sustentar los indicadores de latencia.|
+|CI/CD|GitHub Actions|Ejecuta el análisis estático de KPI-11 y la suite con adaptador simulado de KPI-12.|
+
+13\.3 Sobre Flutter para la aplicación móvil
+
+Flutter es una elección adecuada para esta aplicación. El alcance del residente es formularios, cámara, listados y notificaciones: nada que exija capacidades exclusivas de una plataforma. Un solo código reduce a la mitad el esfuerzo de construir y mantener iOS y Android, y el resultado visual es idéntico en ambas, lo que importa cuando la app es parte de la propuesta comercial.
+
+Dos advertencias. La primera: si más adelante se quiere embeber video en vivo de las cámaras dentro de la app usando el SDK móvil de Hikvision, ese SDK es nativo y habrá que escribir canales de plataforma para iOS y Android por separado. No es un impedimento, pero deja de ser "un solo código". La segunda: Flutter introduce un lenguaje más al proyecto. Con TypeScript en API, consola y Edge, Dart será el único componente que no comparte código ni tipos con el resto, de modo que los contratos de la API deben quedar documentados con OpenAPI y generarse los clientes, no escribirse a mano.
+
+13\.4 Riesgos técnicos que conviene resolver antes de programar
+
+|**Riesgo**|**Por qué importa**|**Cómo mitigarlo**|
+| :- | :- | :- |
+|El intercom con audio y video es la pieza más difícil del proyecto.|OE-07 depende de él y el puente SIP a WebRTC no es trivial. Es donde más tiempo se pierde.|Hacer una prueba de concepto aislada con el videoportero real antes de comprometer la arquitectura.|
+|RLS de Supabase no basta por sí sola para el aislamiento.|El Edge y los procesos automáticos usan clave de servicio, que omite RLS. Todo el aislamiento quedaría sin efecto en esa ruta.|Reforzar la validación de copropiedad también en la capa de aplicación y cubrir ambos caminos en la suite de KPI-36.|
+|¿Quién decide, la cámara o el software?|El principio del proyecto es que el software decide. Si la cámara resuelve la apertura por sí misma, se pierde trazabilidad y el motor de reglas queda decorativo.|Verificar en el modelo Hikvision concreto que puede operar en modo evento, reportando sin accionar.|
+|El Edge es una segunda fuente de verdad durante los cortes.|Sin contrato de reconciliación explícito aparecen eventos duplicados o perdidos, y RN-17 no se cumple.|Definir desde el inicio el esquema de clave de idempotencia y versionado del caché de reglas.|
+|Latencia de Supabase Realtime bajo carga.|La consola de portería necesita ver el evento casi al instante; el indicador de alerta exige menos de 10 segundos.|Medir con carga simulada temprano y prever un canal directo desde la API si no alcanza.|
+|Almacenamiento de plantillas biométricas.|Es dato sensible. Su ubicación y cifrado determinan la exposición legal del proyecto.|Mantener la plantilla en la terminal y en la base cifrada, nunca en el cliente, y documentar el ciclo de vida completo.|
+
+13\.5 Orden de construcción sugerido
+
+|**Fase**|**Qué se construye**|**Qué queda demostrado**|
+| :- | :- | :- |
+|1|Modelo de datos, autenticación, RBAC y aislamiento por copropiedad.|OE-01 y OE-08. Es la base sobre la que se apoya todo lo demás.|
+|2|Capa de proveedor con adaptador simulado y motor de reglas, con la suite de pruebas completa.|OE-03 sin depender de hardware. Permite avanzar mientras se consigue el laboratorio.|
+|3|Integración real con una cámara LPR y una talanquera.|El ciclo completo de CU-01. Es el hito que más pesa en la evaluación.|
+|4|App en Flutter: autorización de visitante con vigencia y registro de placas.|OE-02 de extremo a extremo.|
+|5|Biometría con consentimiento, sincronización y supresión programada.|OE-04, incluido el cumplimiento normativo.|
+|6|Eventos, alertas, auditoría, informes y zonas comunes.|OE-05 y el resto del núcleo funcional.|
+|7|Edge Gateway con caché, decisión local y reconciliación.|OE-06, el diferenciador técnico del producto.|
+|8|Consola de guardia virtual e intercom.|OE-07. Se deja al final porque es el de mayor riesgo e incertidumbre.|
+

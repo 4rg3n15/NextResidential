@@ -1,5 +1,5 @@
 # PROMPT MAESTRO — NEXT CONTROL RESIDENCIAL
-### Contrato de trabajo del agente de desarrollo · v2.0
+### Contrato de trabajo del agente de desarrollo · v3.0
 
 ---
 
@@ -222,6 +222,17 @@ Estas decisiones están **cerradas**. No las reabras ni propongas alternativas s
 
 **Decisión.** El audio bidireccional de la guardia virtual se implementa sobre **ISAPI TwoWayAudio** de Hikvision. Se descarta el camino SIP + Asterisk.
 
+**`[CONTRADICCIÓN]` — resuelta, no reabrir.**
+La §13.2 del documento de requisitos (tabla «Stack sugerido», fila *Intercom*) propone *«SIP hacia el videoportero, con puente WebRTC (LiveKit o Janus)»*, y la §13.4 lo señala como el mayor riesgo de cronograma del proyecto. El diagrama arquitectónico, en cambio, deja abiertas ambas rutas: *«ISAPI TwoWayAudio, o SIP con Asterisk si el modelo no lo soporta»*.
+
+**Resolución:** prevalece **ISAPI TwoWayAudio**, por decisión expresa del cliente posterior a la redacción del documento. Esta decisión **sobrescribe** la sugerencia de §13.2, que era eso —una sugerencia dentro de una sección que el propio documento declara ajena al estándar de especificación—, no un requisito con criterio de verificación asociado. Ningún OE, RN, HU, CU ni CA exige SIP; los KPI comprometidos (KPI-32, KPI-33, CA-19, CA-20) son de latencia y trazabilidad, y son agnósticos al protocolo.
+
+**Obligaciones derivadas de esta resolución:**
+- La ETAPA 00 debe registrar esta contradicción en `docs/auditoria/contradicciones-y-supuestos.md` con su resolución y esta justificación, y formalizar el ADR-01 en `docs/decisiones/`.
+- Toda referencia a SIP, Asterisk, LiveKit o Janus queda **fuera del alcance de implementación**. No se construye, no se deja andamiaje para ello, no se menciona en el código.
+- El documento de requisitos original **no se modifica**: la corrección vive en el ADR y en el informe de auditoría. Si Grupo Control revisa el `.docx`, debe encontrar el ADR como el registro formal de por qué lo construido difiere de la sugerencia inicial.
+- La ruta SIP sobrevive únicamente como **contingencia documentada** (ver más abajo), realizable como adaptador nuevo detrás del mismo puerto.
+
 **Diseño resultante:**
 - El puerto `IntercomProvider` del dominio expone intención pura, sin protocolo: `abrirSesion(dispositivoId, operadorId)`, `enviarAudio(chunk)`, `recibirAudio()`, `cerrarSesion(motivo)`, `estadoSesion()`. El dominio no sabe qué es TwoWayAudio.
 - `HikvisionIntercomProvider` (etapa 15) implementa ese puerto: abre el canal por `/ISAPI/System/TwoWayAudio/channels/<id>/open`, transmite y recibe el flujo de audio con autenticación **Digest**, y lo cierra explícitamente. Maneja códec, muestreo y semiduplex/duplex completo según el modelo.
@@ -269,6 +280,7 @@ RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE` sobre `eventos` para to
 | 13 | Auditoría de ciberseguridad y endurecimiento | `etapa-13-auditoria-seguridad` | 12 | KPI-36 a 38 |
 | 14 | Observabilidad, CI/CD, PWA instalable y escritorio | `etapa-14-cicd-pwa-escritorio` | 13 | Entregabilidad |
 | 15 | **Integración real con hardware Hikvision** | `etapa-15-integracion-hikvision` | 14 | OE-03, OE-07 reales |
+| 16 | **Documentación técnica final y README** | `etapa-16-documentacion-final` | 14 (ejecutable), 15 (definitiva) | Entregable documental completo |
 
 ---
 
@@ -605,6 +617,46 @@ GitHub Actions: lint; análisis estático de frontera de arquitectura (KPI-11); 
 
 ---
 
+### ETAPA 16 — Documentación técnica final y README
+`etapa-16-documentacion-final`
+
+**Objetivo.** Que cualquier ingeniero que llegue nuevo al proyecto —o cualquier evaluador de Grupo Control— pueda entenderlo, levantarlo y operarlo leyendo el repositorio, sin preguntarle nada a quien lo construyó. La documentación pesa el **10 % de la evaluación** del reto y es la única parte del entregable que se lee antes que el código.
+
+**Cuándo se ejecuta.** Se puede ejecutar apenas cerrada la ETAPA 14, si la 15 se pospone por falta de hardware. En ese caso **se vuelve a ejecutar tras la ETAPA 15** para incorporar la integración real, y el README indica explícitamente qué estaba verificado contra `MockProvider` y qué contra hardware.
+
+**Alcance.**
+
+*1 · `README.md` en la raíz — el documento de entrada al proyecto.* Debe contener, en este orden:
+
+1. **Encabezado**: nombre, una frase de qué es, estado del proyecto, versión, y el principio rector (*Next Control decide, el hardware ejecuta*).
+2. **Índice** navegable con anclas a cada sección, incluidas las subsecciones de segundo nivel. Verificado: ningún enlace roto, ningún ancla huérfana.
+3. **Qué resuelve** — el problema AS-IS (los 6 PB) y el beneficio esperado, en prosa breve.
+4. **Arquitectura** — las 5 capas, el diagrama en Mermaid, la estructura del monorepo comentada carpeta por carpeta, y el mapa de módulos con sus fronteras.
+5. **Stack tecnológico** con la justificación de cada elección.
+6. **Puesta en marcha** — prerrequisitos con versiones exactas, clonado, instalación, variables de entorno (remitiendo a `.env.example`, jamás con valores), migraciones, seeds, arranque de cada una de las cuatro aplicaciones, y verificación de que todo levantó. Un ingeniero nuevo debe llegar a "funcionando" siguiendo solo esta sección.
+7. **Cómo ejecutar las pruebas**, incluida la suite completa con adaptador simulado y sin hardware.
+8. **Modelo de datos** — resumen y enlace al detalle.
+9. **Seguridad** — resumen de las 8 medidas de §2.7 y enlace a la auditoría.
+10. **Decisiones de arquitectura (ADR)** — tabla con id, decisión, estado y enlace. ADR-01 explicando por qué el intercom es ISAPI y no SIP.
+11. **Trazabilidad** — enlace a la matriz consolidada y estado de cobertura de los 8 OE, 22 RN, 38 HU, 5 CU, 26 CA y 37 KPI.
+12. **Mapa de etapas** con enlace a cada informe.
+13. **Guías operativas** — índice de las guías de `docs/guias/`.
+14. **Convenciones de contribución** — ramas, commits, fronteras de arquitectura, umbral de cobertura.
+15. **Glosario** (ver punto 2).
+16. **Licencia y propiedad intelectual** — la cláusula de titularidad de Grupo Control y la restricción de reutilización.
+
+*2 · Glosario, dentro del README y con ancla propia.* Los 22 términos del documento de requisitos —copropiedad, vivienda, residente, visitante, autorización, autorización recurrente, acceso, apertura, evento, dispositivo, terminal facial, plantilla biométrica, consentimiento, vigencia, zona, aforo, lista negra, motor de reglas, Edge Gateway, proveedor, adaptador simulado, clave de idempotencia— **más los términos técnicos que introdujo la construcción**: agregado raíz, objeto de valor, puerto, adaptador, política, especificación, versión de reglas, bandeja de salida, RLS, ISAPI, TwoWayAudio, Digest, ONVIF, LPR/ANPR, RBAC, MFA, CSP. Cada entrada: definición en el contexto de este proyecto —no la genérica— y, cuando aplique, dónde vive en el código. Ordenado alfabéticamente y enlazado desde las secciones que usan cada término.
+
+*3 · Índice general de la documentación* — `docs/README.md` que mapee todo `docs/` (auditoría, etapas, arquitectura, decisiones, seguridad, guías) con una línea de propósito por documento, para que nada quede enterrado.
+
+*4 · Consolidación y verificación.* Revisa que las guías producidas en etapas anteriores sigan siendo correctas tras los cambios posteriores —una guía desactualizada es peor que ninguna—; que los 17 informes de etapa estén completos; que todo enlace interno resuelva; que no haya secretos, IPs reales ni credenciales en ningún documento; y que los diagramas Mermaid rendericen.
+
+*5 · Documentación de API.* OpenAPI publicado y navegable, con descripción por endpoint, códigos de error tipados y ejemplos de request/response.
+
+**DoD.** Un ingeniero que nunca vio el proyecto clona el repositorio, sigue el README y llega a un sistema funcionando con datos de prueba, sin ayuda externa. El índice no tiene enlaces rotos. Ningún término del glosario aparece definido en dos lugares con redacciones distintas.
+
+---
+
 ## §7. ENTREGA FINAL ESPERADA
 
 **Un solo repositorio** que contenga, funcionando y documentado:
@@ -617,7 +669,8 @@ GitHub Actions: lint; análisis estático de frontera de arquitectura (KPI-11); 
 - Capa de proveedores con `MockProvider` e `HikvisionProvider`.
 - Suite de pruebas que corre **completa sin hardware**.
 - CI/CD que verifica arquitectura, aislamiento, seguridad y cobertura.
-- Documentación: auditoría documental, ADR, arquitectura, modelo de datos, conexión a Supabase, despliegue, despliegue del Edge, manual por rol, ciclo de vida biométrico, auditoría de ciberseguridad, integración Hikvision y los **16 informes de etapa**.
+- Documentación: auditoría documental, ADR, arquitectura, modelo de datos, conexión a Supabase, despliegue, despliegue del Edge, manual por rol, ciclo de vida biométrico, auditoría de ciberseguridad, integración Hikvision y los **17 informes de etapa**.
+- **`README.md` raíz con índice navegable y glosario completo** (ETAPA 16), más `docs/README.md` como índice general de la documentación. Es la puerta de entrada al proyecto y lo primero que lee un evaluador.
 
 Cada etapa en su propia rama, nombrada con la etapa. **Nunca con un nombre genérico autogenerado.**
 
