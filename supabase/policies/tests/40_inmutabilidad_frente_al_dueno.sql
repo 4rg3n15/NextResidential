@@ -20,6 +20,12 @@
 
 \set ON_ERROR_STOP on
 
+-- Contexto de escritura. NO se hace `SET ROLE`: la prueba debe correr con la
+-- identidad TAL COMO LLEGA la conexión — que es el punto ciego que dejó pasar
+-- el hallazgo del rol `postgres`.
+SET request.jwt.claims =
+  '{"rol":"administrador","usuario_id":"00000000-0000-4000-8000-000000000010","copropiedad_id":"10000000-0000-4000-8000-000000000001"}';
+
 -- 1 · Nadie, ni el dueño, conserva UPDATE/DELETE/TRUNCATE --------------------
 DO $$
 DECLARE n int; detalle text;
@@ -121,5 +127,59 @@ BEGIN
 
   ALTER TABLE public.evidencias ENABLE ALWAYS TRIGGER tg_prohibir_update;
   RAISE NOTICE '4 · Un trigger desactivado se detecta y rompe el despliegue: ok';
+END
+$$;
+
+-- 5 · El camino que SÍ elude la RLS: la llave secreta -------------------------
+-- Es el escenario decisivo. Frente al dueño hay tres barreras y la RLS ya basta
+-- (`eventos` no tiene política de UPDATE, y FORCE alcanza al dueño, así que la
+-- sentencia afecta a cero filas). Pero `service_role` lleva BYPASSRLS: para él
+-- la RLS no cuenta y solo quedan los permisos y el trigger. Aquí se comprueba
+-- que, si alguien le devolviera el UPDATE, el trigger lo detiene igual.
+--
+-- Sin esta sección, «el trigger protege» sería una afirmación sin demostrar:
+-- en el camino del dueño el trigger ni siquiera llega a dispararse.
+DO $$
+DECLARE v_id uuid; v_regla text;
+BEGIN
+  SET LOCAL request.jwt.claims =
+    '{"rol":"administrador","usuario_id":"00000000-0000-4000-8000-000000000010","copropiedad_id":"10000000-0000-4000-8000-000000000001"}';
+
+  INSERT INTO public.eventos (copropiedad_id, ocurrido_en, tipo, resultado, motivo, metodo,
+                              dispositivo_id, regla_aplicada, version_reglas,
+                              clave_idempotencia, creado_por)
+  SELECT c.id, now(),'denegado','negado','LISTA_NEGRA','placa', d.id,
+         'intacta', 1, 'prueba-bypassrls-0001', u.id
+    FROM public.copropiedades c
+    JOIN public.dispositivos d ON d.copropiedad_id = c.id
+    JOIN public.usuarios     u ON u.copropiedad_id = c.id
+   WHERE c.id = '10000000-0000-4000-8000-000000000001'
+   LIMIT 1
+  RETURNING id INTO v_id;
+  ASSERT v_id IS NOT NULL, 'La prueba requiere las semillas cargadas';
+
+  -- Se le devuelve deliberadamente el privilegio para dejar al trigger solo.
+  GRANT UPDATE ON public.eventos TO service_role;
+  BEGIN
+    SET LOCAL ROLE service_role;
+    BEGIN
+      EXECUTE format(
+        'UPDATE public.eventos SET regla_aplicada = ''ALTERADA'' WHERE id = %L', v_id);
+      RESET ROLE;
+      REVOKE UPDATE ON public.eventos FROM service_role;
+      RAISE EXCEPTION
+        'ADR-005 INCUMPLIDA: `service_role` con UPDATE concedido pudo alterar un evento. '
+        'El trigger es la ultima barrera del camino BYPASSRLS y no actuo.';
+    EXCEPTION WHEN restrict_violation THEN
+      NULL;  -- correcto: lo paro el trigger
+    END;
+    RESET ROLE;
+  END;
+  REVOKE UPDATE ON public.eventos FROM service_role;
+
+  SELECT regla_aplicada INTO v_regla FROM public.eventos WHERE id = v_id;
+  ASSERT v_regla = 'intacta',
+    format('El evento fue alterado por la via BYPASSRLS: regla_aplicada = %s', v_regla);
+  RAISE NOTICE '5 · Con BYPASSRLS y UPDATE concedido, el TRIGGER detiene la alteracion: ok';
 END
 $$;

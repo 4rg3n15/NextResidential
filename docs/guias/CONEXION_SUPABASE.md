@@ -473,16 +473,17 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] `supabase link` enlaza el proyecto correcto
 - [ ] `supabase db push` corre limpio sobre la base
 - [ ] Volver a ejecutarlo no produce error (idempotencia)
-- [ ] Existen las 31 tablas y las particiones de `eventos`
+- [ ] Existen las 31 tablas y las 10 particiones de `eventos`
 - [ ] Semillas aplicadas, con las **dos** copropiedades
 
 **Inmutabilidad e identidad de conexión (§12)**
-- [ ] `ALTER ROLE app_api LOGIN PASSWORD …` ejecutado, con contraseña generada fuera del repositorio
+- [ ] Sonda §12.1 ejecutada: `pg_has_role(current_user,'authenticated','MEMBER')` devuelve `true`
+- [ ] `CREATE ROLE app_api …` ejecutado, con contraseña generada fuera del repositorio
 - [ ] `app_api` sale `rolcanlogin=t` y `rolsuper/rolbypassrls/rolcreatedb/rolcreaterole=f`
 - [ ] `DATABASE_URL` y `DATABASE_POOLER_URL` de `apps/api` usan `app_api`, no `postgres`
-- [ ] Consulta 1 de §12.3 devuelve **0 filas** (nadie, dueño incluido, conserva escritura en append-only)
-- [ ] Consulta 2 de §12.3 devuelve **0 filas** (los dos triggers activos en cada tabla y partición)
-- [ ] Consulta 3 de §12.3 **falla** al intentar el `UPDATE` sobre un evento existente
+- [ ] Consulta 1 de §12.5 devuelve **0 filas** (nadie, dueño incluido, conserva escritura en append-only)
+- [ ] Consulta 2 de §12.5 devuelve **0 filas** (los dos triggers activos en cada tabla y partición)
+- [ ] Consulta 3 de §12.5 **falla** al intentar el `UPDATE` sobre un evento existente
 
 **Seguridad — ninguna de estas es opcional**
 - [ ] RLS **activa y forzada** en el 100 % de las tablas (§5.2)
@@ -508,48 +509,64 @@ Marca cada casilla antes de dar la conexión por buena.
 
 ---
 
-## 12. Rol de conexión de la API (`app_api`) · corrección del 2026-09-06
+## 12. Rol de conexión de la API (`app_api`) · procedimiento de operador
 
-La cadena de conexión que Supabase entrega por defecto usa el usuario **`postgres`**, que es el **dueño** de las tablas creadas por las migraciones. Conectar la API con ese rol anula la garantía de inmutabilidad de `eventos` (ADR-005): el dueño puede reconcederse cualquier privilegio que se le revoque.
+> **Corrección del 2026-09-06.** La migración `0017` creaba este rol y **falló** en Supabase gestionado: `ALTER ROLE … NOSUPERUSER NOBYPASSRLS`, `GRANT authenticated TO …`, `ALTER DEFAULT PRIVILEGES FOR ROLE …` y `COMMENT ON ROLE …` exigen privilegios que el rol `postgres` no tiene. Crear un rol de conexión es una operación de **operador**: necesita una contraseña, que jamás puede vivir en el repositorio. La migración ya no lo crea; lo **vigila** (§12.4).
+>
+> **La inmutabilidad de `eventos` no depende de este rol.** La sostienen el `REVOKE` al dueño y el trigger, ambos ya aplicados por `0017`. Este paso es defensa adicional: que la API no se conecte con el dueño de las tablas.
 
-La migración `0017` crea el rol **`app_api`** para sustituirlo. Nace **sin `LOGIN` y sin contraseña**, a propósito: falla cerrado, y la contraseña nunca puede vivir en el repositorio (§2.7 del contrato).
+### 12.1 Sonda previa · ¿es viable en tu proyecto?
 
-### 12.1 Habilitarlo (lo ejecutas tú, una vez)
-
-En el **SQL Editor** del panel, o por `psql` con la cadena de administrador:
+Una sola consulta decide. Ejecútala en el **SQL Editor**:
 
 ```sql
--- Genera una contraseña larga y aleatoria FUERA de este archivo y pégala aquí.
--- No la escribas en ningún fichero versionado.
-ALTER ROLE app_api LOGIN PASSWORD '<contraseña-generada>';
+SELECT current_user,
+       pg_has_role(current_user,'authenticated','MEMBER') AS puede_usar_authenticated;
 ```
 
-Comprueba que quedó como debe:
+- **`true`** → sigue con §12.2. El rol podrá heredar las 95 políticas RLS ya escritas.
+- **`false`** → **no continúes.** Sin esa pertenencia, `app_api` no vería ninguna fila y la API dejaría de funcionar. Repórtamelo y rediseñamos: la alternativa es apoyarse en los roles que Supabase ya provee, y la inmutabilidad sigue garantizada por el trigger mientras tanto.
+
+### 12.2 Creación (una sola vez, tú)
+
+```sql
+-- Genera una contraseña larga y aleatoria FUERA de este archivo.
+CREATE ROLE app_api LOGIN PASSWORD '<contraseña-generada>'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS INHERIT;
+
+GRANT authenticated TO app_api;          -- hereda las 95 políticas RLS
+GRANT USAGE ON SCHEMA public, app TO app_api;
+GRANT USAGE, CREATE ON SCHEMA pgboss TO app_api;   -- pg-boss crea sus propias tablas
+REVOKE CREATE ON SCHEMA public FROM app_api;       -- nada de DDL en el esquema de negocio
+```
+
+`NOSUPERUSER` y `NOBYPASSRLS` **sí** se admiten en `CREATE ROLE` —ahí solo se comprueba el caso afirmativo—, aunque no se puedan reafirmar después con `ALTER ROLE`. Por eso van aquí y no en una migración.
+
+Verifica:
 
 ```sql
 SELECT rolname, rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole
   FROM pg_roles WHERE rolname = 'app_api';
--- esperado: t | f | f | f | f
+-- esperado: app_api | t | f | f | f | f
 ```
 
-### 12.2 Cadena de conexión
-
-Toma la cadena del panel (**Connect**) y sustituye el usuario:
+### 12.3 Cadena de conexión
 
 | Vía | Usuario |
 |---|---|
-| Conexión directa (puerto 5432) | `app_api` |
+| Conexión directa (5432) | `app_api` |
 | Pooler Supavisor | `app_api.<PROJECT_REF>` — el pooler exige el *project ref* tras un punto |
 
-Las variables son `DATABASE_URL` y `DATABASE_POOLER_URL` en `apps/api/.env`. El Edge **no** abre conexión a PostgreSQL —usa SQLite y la API— así que no le afecta. **`postgres` deja de aparecer en cualquier `.env` de aplicación**; se reserva para migraciones y administración desde el panel.
+Variables `DATABASE_URL` y `DATABASE_POOLER_URL` de `apps/api`. El Edge no abre conexión a PostgreSQL. **`postgres` deja de aparecer en cualquier `.env` de aplicación.**
 
-### 12.3 Verificación del cierre (después de `supabase db push`)
+### 12.4 Vigilancia automática
 
-Las tres consultas que deben salir en cero o en verde. Son las mismas que la migración ejecuta como aserción; aquí sirven para comprobarlo desde fuera.
+A partir de `0017`, **cada** `supabase db push` comprueba contra `pg_roles` que, si `app_api` existe, no es superusuario, no omite RLS y no tiene DDL — y falla el despliegue si alguien lo cambió. Como el rol puede no existir, la comprobación es condicional: su ausencia no bloquea una garantía que no depende de él.
+
+### 12.5 Verificación de la inmutabilidad (tras `supabase db push`)
 
 ```sql
--- 1 · Nadie, DUEÑO INCLUIDO, conserva escritura sobre las tablas append-only.
---     Debe devolver 0 filas.
+-- 1 · Nadie, DUEÑO INCLUIDO, conserva escritura sobre las append-only. 0 filas.
 SELECT grantee, table_name, privilege_type
   FROM information_schema.role_table_grants
  WHERE table_schema = 'public'
@@ -557,8 +574,7 @@ SELECT grantee, table_name, privilege_type
    AND (table_name LIKE 'eventos%'
         OR table_name IN ('evidencias','auditoria_seguridad','purgas_retencion'));
 
--- 2 · Los dos triggers existen y están ACTIVOS en cada tabla y partición.
---     Debe devolver 0 filas.
+-- 2 · Los dos triggers existen y están ACTIVOS en cada tabla y partición. 0 filas.
 SELECT c.relname, tg.nombre AS trigger_ausente_o_desactivado
   FROM pg_class c
   JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -570,18 +586,12 @@ SELECT c.relname, tg.nombre AS trigger_ausente_o_desactivado
                     WHERE t.tgrelid = c.oid AND t.tgname = tg.nombre
                       AND t.tgenabled <> 'D');
 
--- 3 · Prueba de ejecución: como `postgres`, en el SQL Editor. DEBE fallar con
---     «Modificacion prohibida en public.eventos_YYYY_MM ... RN-03, CA-23, ADR-005».
---     Si tienes eventos: cambia el WHERE por uno que exista.
-UPDATE public.eventos SET regla_aplicada = 'PRUEBA' WHERE false;
+-- 3 · Prueba de ejecución. Sustituye <id> por el de un evento REAL.
+--     Debe fallar. Un UPDATE que no toque ninguna fila NO prueba nada: el
+--     trigger es FOR EACH ROW y no llega a dispararse.
+UPDATE public.eventos SET regla_aplicada = 'PRUEBA' WHERE id = '<id>';
 ```
 
-> La consulta 3 con `WHERE false` no toca ninguna fila y **aun así debe fallar**: el trigger es `FOR EACH ROW`, así que si no hay filas no dispara. Para que la prueba sea real necesita al menos un evento; hazla con el `id` de uno existente y confirma después que `regla_aplicada` no cambió.
+### 12.6 Riesgo residual
 
-### 12.4 Qué NO cambia
-
-Las llaves publicable y secreta siguen igual: PostgREST y Supabase Auth no usan esta cadena de conexión, sino los roles `anon`, `authenticated` y `service_role`. Este rol es para la **conexión directa a PostgreSQL** de la API NestJS y de pg-boss. La llave secreta sigue omitiendo RLS y sigue siendo el riesgo número uno.
-
-### 12.5 Riesgo residual
-
-`app_api` no puede modificar eventos por ninguna vía. `postgres` conserva `ALTER TABLE … DISABLE TRIGGER`: es un acto de DDL deliberado, no un `UPDATE` desde la aplicación, y el siguiente `supabase db push` lo detecta y falla. No uses el editor de tablas del panel sobre `eventos`, `evidencias`, `auditoria_seguridad` ni `purgas_retencion`: opera como `postgres` y está para lectura.
+`postgres` conserva `ALTER TABLE … DISABLE TRIGGER`: DDL deliberado, no un `UPDATE` desde el código, y el siguiente despliegue lo detecta. No uses el editor de tablas del panel sobre `eventos`, `evidencias`, `auditoria_seguridad` ni `purgas_retencion`: opera como `postgres` y está para lectura.

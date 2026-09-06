@@ -518,3 +518,61 @@ Alcanza a `eventos` y sus particiones —presentes y futuras: los triggers del p
 ## C.6 · Recuento de particiones
 
 No hay nada que revisar: `eventos` es la única tabla particionada. Los 80 y 41 observados son correctos y se reprodujeron localmente con las mismas cifras — 80 cuenta particiones de tabla **y de índice** (10 + 7×10), y 41 son las 31 tablas lógicas más las 10 particiones. La comprobación que lo zanja es `SELECT count(*) FROM pg_class WHERE relkind = 'p'`, que devuelve **1**. El «11 particiones» del informe anterior era el número que deja la suite de pruebas, no un despliegue limpio.
+
+---
+
+# Adenda 4 · El contenedor mentía
+**2026-09-06 · migraciones `0017` (reescrita) y `0018` · arnés `--modo-supabase`**
+
+## D.1 · Qué pasó
+
+La migración `0017` de la Adenda 3 **falló al aplicarse** en Supabase gestionado y revirtió entera. La causa inmediata: creaba el rol `app_api` con sentencias que exigen superusuario. La causa de fondo es la que importa, y es la que el usuario venía señalando: **mi entorno de verificación me daba superusuario y Supabase no**, así que una suite verde no significaba lo que yo decía que significaba.
+
+En vez de corregir sentencia por sentencia a medida que fallaban, construí un arnés que replica las capacidades reales de Supabase —rol dueño `NOSUPERUSER` + `CREATEROLE`— y pasé por él **todo** el esquema. Aparecieron tres defectos, no uno.
+
+## D.2 · Los tres defectos
+
+**1 · `0017` usaba cuatro sentencias privilegiadas, no una.**
+
+| Sentencia | Error | Causa real |
+|---|---|---|
+| `ALTER ROLE … NOSUPERUSER NOBYPASSRLS` | `permission denied to alter role` | PostgreSQL exige superusuario para **tocar** `superuser` y `bypassrls`, aunque sea para ponerlos en NO. No falla por el valor: falla por nombrarlos |
+| `GRANT authenticated TO app_api` | `permission denied to grant role` | Supabase documenta la dirección contraria: `grant mi_rol to authenticator` |
+| `ALTER DEFAULT PRIVILEGES FOR ROLE …` | `permission denied` | Exige pertenencia al rol nombrado |
+| `COMMENT ON ROLE …` | `permission denied` | No disponible sin superusuario |
+
+Confirmado además que `0001`–`0016` pasan limpias como no-superusuario: el problema estaba acotado a `0017`.
+
+**2 · El seed era inaplicable en Supabase.** `FORCE ROW LEVEL SECURITY` aplica las políticas **también al dueño**. El seed decía ejecutarse «con un rol con privilegio suficiente»; no existe tal rol. En el contenedor funcionaba porque el superusuario omite la RLS. En Supabase habría fallado con «new row violates row-level security policy» en la primera fila.
+
+**3 · Recursión infinita en `app.es_mi_vivienda` — el grave.** La función es `SECURITY DEFINER`, elegida así creyendo que evitaba la RLS. **No la evita:** `SECURITY DEFINER` cambia con qué identidad corre una función, no si se le aplica la RLS. La política de `residentes` llamaba a la función, la función lee `residentes`, la lectura reevaluaba la política. `stack depth limit exceeded`. En Supabase habría estallado en cuanto un residente abriera la app.
+
+## D.3 · Las correcciones
+
+- **`0017` reescrita.** Solo la garantía: `REVOKE` al dueño, trigger `BEFORE UPDATE` `ENABLE ALWAYS`, aserciones. Cero sentencias privilegiadas. El rol de conexión sale de la migración y pasa a `CONEXION_SUPABASE.md` §12 como procedimiento de operador — necesita una contraseña, que nunca puede estar en el repositorio. La migración lo **vigila**: si existe, verifica sus atributos contra `pg_roles` en cada despliegue y falla si no son los esperados, que es exactamente lo que se pidió cuando `ALTER ROLE` no es posible.
+- **`0018`**: política de `residentes` no recursiva, resuelta contra los claims. Mismo aislamiento, sin ciclo. Con aserción que impide reintroducirlo.
+- **Seed**: adopta por tramos la identidad que cada política exige. Efecto colateral: pasa a ser **prueba positiva** de la matriz RLS.
+
+## D.4 · Las capas, recontadas
+
+La Adenda 3 contaba mal. Frente al dueño hay **tres** barreras; frente a la llave secreta, **dos**:
+
+| Capa | Frente al dueño (`postgres`) | Frente a `service_role` (BYPASSRLS) |
+|---|---|---|
+| RLS: `eventos` sin política de `UPDATE`, en modo `FORCE` | **Sí** — afecta a cero filas | No — la omite |
+| `REVOKE UPDATE, DELETE, TRUNCATE` | **Sí** | **Sí** |
+| Trigger `BEFORE UPDATE` | Sí, si se reconcede el privilegio | **Sí — última barrera** |
+
+Demostrado por ejecución: con `service_role` y el `UPDATE` deliberadamente reconcedido, **el trigger detiene la alteración**. Es el escenario que hace del trigger algo más que redundancia, y ahora lo cubre la sección 5 de la prueba 40.
+
+## D.5 · Cómo se cierra la brecha del entorno
+
+`./supabase/verificar.sh --con-pruebas --modo-supabase` aplica el esquema con un rol dueño **no superusuario**, y con `service_role` llevando el `BYPASSRLS` que tiene en Supabase. En ese modo:
+
+- el `REVOKE` al dueño se demuestra **por ejecución**, no leyendo el ACL;
+- la RLS forzada se aplica de verdad, incluida al dueño;
+- la recursión de políticas se manifiesta en lugar de esconderse.
+
+Ambos modos se ejecutan: 18/18 migraciones, seed y suite completa verdes en los dos, con KPI-03 sobre 100 conexiones concurrentes reales. El modo por defecto sigue existiendo porque es más rápido; el fiel es el que decide.
+
+Queda declarado lo que **aún** no se puede verificar en local ([SUPUESTO] S-12, deuda D-12): que `postgres` pueda `GRANT authenticated TO app_api` en el proyecto real. Lo resuelve una sola consulta, la sonda de §12.1, antes de crear nada.

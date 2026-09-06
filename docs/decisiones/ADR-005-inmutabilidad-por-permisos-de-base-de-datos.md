@@ -94,3 +94,44 @@ Alcanza a `eventos` y sus particiones —presentes y futuras, porque los trigger
 ### Riesgo residual, declarado
 
 El dueño conserva `ALTER TABLE … DISABLE TRIGGER`. Ya no es un `UPDATE` desde el código sino un acto de DDL deliberado, y la aserción de `0017` lo detecta en el siguiente despliegue porque verifica `tgenabled` y no solo la existencia del trigger. Cerrarlo por completo exigiría que el dueño de las tablas no fuera `postgres`, lo que rompería `supabase db push`; queda registrado como deuda técnica en `docs/ESTADO_ETAPAS.md`.
+
+
+---
+
+## Enmienda 2 · Lo que la Enmienda 1 daba por supuesto
+**Fecha:** 2026-09-06 · **Origen:** la migración `0017` falló al aplicarse en Supabase gestionado
+
+La Enmienda 1 era correcta en el diagnóstico y equivocada en dos supuestos, ambos detectados al construir un entorno local que replica las capacidades reales de Supabase (rol dueño **no** superusuario).
+
+### Supuesto 1 · «Creamos un rol de conexión desde la migración»
+
+Falló, y no por una sentencia sino por cuatro:
+
+| Sentencia | Error | Causa |
+|---|---|---|
+| `ALTER ROLE … NOSUPERUSER NOBYPASSRLS` | `permission denied to alter role` | PostgreSQL exige superusuario para **tocar** los atributos `superuser` y `bypassrls`, aunque sea para ponerlos en NO. `CREATE ROLE` con esos mismos NO **sí** funciona: allí solo se comprueba el caso afirmativo |
+| `GRANT authenticated TO app_api` | `permission denied to grant role` | La documentación de Supabase concede un rol **propio** *a* un rol reservado (`grant mi_rol to authenticator`), que es la dirección contraria |
+| `ALTER DEFAULT PRIVILEGES FOR ROLE …` | `permission denied` | Exige pertenencia al rol nombrado |
+| `COMMENT ON ROLE …` | `permission denied` | No disponible sin superusuario |
+
+**Resolución:** crear el rol de conexión es una operación de **operador**, no de esquema — necesita una contraseña, que jamás puede estar en el repositorio. Sale de la migración y pasa a `CONEXION_SUPABASE.md` §12. La migración lo **vigila** en su lugar: si el rol existe, sus atributos se verifican contra `pg_roles` en cada despliegue y la migración falla si no son los esperados. No se puede reafirmar por `ALTER ROLE`; sí se puede exigir.
+
+**Y lo esencial:** la garantía de inmutabilidad **no depende de ese rol**. La sostienen el `REVOKE` y el trigger.
+
+### Supuesto 2 · «SECURITY DEFINER evita la RLS»
+
+No la evita. `SECURITY DEFINER` cambia **con qué identidad** corre una función, no **si** se le aplica la RLS. Y como todas las tablas llevan `FORCE ROW LEVEL SECURITY`, las políticas se aplican **también al dueño**. Solo la eluden un superusuario o un rol con `BYPASSRLS`.
+
+Esto tenía una consecuencia grave, invisible mientras la base local corriera como superusuario: `app.es_mi_vivienda()` es `SECURITY DEFINER` y lee `residentes`, cuya política la invoca de vuelta. **Recursión infinita** — `stack depth limit exceeded` — que habría estallado en Supabase en cuanto un residente consultara sus datos. Corregido en la migración `0018`.
+
+### Las capas, corregidas y cada una demostrada por ejecución
+
+La Enmienda 1 contaba dos capas y omitía la que más trabaja. Frente al **dueño** son tres; frente a la **llave secreta**, que omite RLS, quedan dos:
+
+| Capa | Frente al dueño (`postgres`) | Frente a `service_role` (BYPASSRLS) |
+|---|---|---|
+| RLS: `eventos` no tiene política de `UPDATE`, y `FORCE` alcanza al dueño | **Sí** — la sentencia afecta a cero filas | No — la omite |
+| `REVOKE UPDATE, DELETE, TRUNCATE` | **Sí** — `permission denied` | **Sí** |
+| Trigger `BEFORE UPDATE` `ENABLE ALWAYS` | Sí, si se reconcede el privilegio | **Sí — es la última barrera** |
+
+Comprobado: con `service_role` y el `UPDATE` deliberadamente reconcedido, **el trigger detiene la alteración**. Ese es el escenario que hace del trigger algo más que redundancia, y es el que prueba la sección 5 de `40_inmutabilidad_frente_al_dueno.sql`.

@@ -1538,3 +1538,41 @@ La tercera capa es la que quita el problema de raíz: el rol **`app_api`**, que 
 **Riesgo residual declarado:** `ALTER TABLE … DISABLE TRIGGER` sigue disponible para el dueño. La aserción de `0017` verifica `tgenabled`, no solo la existencia del trigger, así que el siguiente despliegue falla. Eliminarlo del todo exigiría que el dueño no fuera `postgres`, lo que rompería `supabase db push`.
 
 Migración `0017` · prueba `supabase/policies/tests/40_inmutabilidad_frente_al_dueno.sql` · procedimiento en `docs/guias/CONEXION_SUPABASE.md` §12.
+
+### D-23 · `SECURITY DEFINER` no evita la RLS, y por eso la política de `residentes` no puede preguntar por `residentes`
+
+**Hallazgo del 2026-09-06.** `app.es_mi_vivienda()` se declaró `SECURITY DEFINER` con la idea de que así esquivaría las políticas de la tabla que consulta. **No las esquiva.** `SECURITY DEFINER` cambia *con qué identidad* corre la función; no cambia *si* se le aplica la RLS. Y como todas las tablas llevan `FORCE ROW LEVEL SECURITY`, las políticas alcanzan **también al dueño**. Lo único que las elude es un superusuario o un rol con `BYPASSRLS`.
+
+De ahí salía un ciclo cerrado:
+
+```
+política residentes_lectura_residente
+  → app.puede_leer_residente()
+    → app.es_mi_vivienda()
+      → SELECT ... FROM public.residentes   ← reevalúa la política
+```
+
+`stack depth limit exceeded`. **Invisible durante toda la ETAPA 01** porque la base local corría como superusuario, que omite la RLS y por tanto nunca cierra el ciclo. En Supabase el dueño no es superusuario: habría fallado en la primera consulta de un residente.
+
+**La corrección no toca la función**, que sigue siendo el predicado correcto para las tablas que cuelgan de una vivienda (`vehiculos`, `autorizaciones`, `autorizacion_acompanantes`), donde no hay ciclo. Corrige la política **sobre `residentes`**, que es el único punto donde el predicado pregunta por la misma tabla que filtra — y donde la pregunta sobra: la fila ya dice de quién es.
+
+```sql
+USING (app.rol() = 'residente'
+       AND copropiedad_id = app.copropiedad_id()
+       AND persona_id     = app.persona_id())
+```
+
+Mismo aislamiento, resuelto contra los claims. **La política deja de ser recursiva porque deja de ser indirecta.**
+
+La regla general que se sigue de aquí, y que vale para las etapas siguientes: *el predicado de una política nunca debe leer, ni directa ni transitivamente, la tabla que esa política filtra*. La migración `0018` incorpora esa comprobación como aserción de despliegue.
+
+### D-24 · El seed actúa con la identidad que cada política exige, y eso lo convierte en prueba positiva
+
+Con `FORCE ROW LEVEL SECURITY` no existe «un rol con privilegio suficiente» para sembrar: las políticas alcanzan al dueño, y solo un superusuario o un `BYPASSRLS` las esquivan. En Supabase el seed corre como `postgres`, que no es ninguna de las dos cosas.
+
+El seed adopta por tramos la identidad que cada política pide —superadministrador para lo de plataforma (`copropiedades`, `edge_gateways`), administrador de cada copropiedad para su configuración— en vez de relajar ninguna política. Efecto colateral valioso: **el seed pasa a ser una prueba positiva de la matriz RLS**, complementaria a las pruebas negativas de aislamiento. Si una política se rompe, el seed deja de cargar.
+
+Dos consecuencias que no son obvias:
+
+1. **Un `INSERT … SELECT` bajo RLS inserta menos filas sin error.** `niveles_acceso` se poblaba con un `SELECT` sobre `copropiedades`; bajo el contexto de una copropiedad, ese `SELECT` solo ve una. No fallaba: creaba la mitad de las filas, y el problema aparecía mucho después, al insertar un residente de la copropiedad sin niveles. Se ejecuta ahora una vez por copropiedad, en su contexto.
+2. **Una sola sentencia no puede insertar filas de dos copropiedades.** Cada fila se valida contra el contexto activo. Los datos de la segunda copropiedad van en su propio tramo — no por estilo, sino porque es lo que hace que el seed **respete** el aislamiento que la suite prueba.

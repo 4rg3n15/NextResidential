@@ -130,7 +130,7 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 
 ### Cifras del esquema
 
-31 tablas lógicas · **10 particiones** de `eventos` en un despliegue limpio · 31 enumerados · 95 políticas RLS · **17 migraciones** · 17 guiones de reversión.
+31 tablas lógicas · **10 particiones** de `eventos` en un despliegue limpio · 31 enumerados · 95 políticas RLS · **18 migraciones** · 18 guiones de reversión.
 
 > **Precisión sobre el recuento de particiones (2026-09-06).** El informe de cierre decía «11 particiones»: era el número que deja la **suite de pruebas**, que crea una partición adicional a propósito para verificar que nace protegida. Un `supabase db push` limpio deja **10** — la ventana de `app.mantener_particiones_eventos(6, 3)`: seis meses atrás, el actual y tres adelante.
 >
@@ -153,6 +153,16 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 > los mismos roles de PostgreSQL y las políticas leen `request.jwt.claims`, que
 > es indiferente al algoritmo de firma.
 >
+> **SEGUNDA TANDA DE HALLAZGOS del 2026-09-06 · el contenedor mentía.** La migración `0017` falló al aplicarse en Supabase gestionado. Al construir un arnés local que replica sus capacidades reales —rol dueño **no** superusuario: `./supabase/verificar.sh --modo-supabase`— aparecieron **tres defectos que una suite verde había estado ocultando**:
+>
+> | # | Defecto | Por qué era invisible | Corrección |
+> |---|---|---|---|
+> | 1 | `0017` usaba 4 sentencias que exigen superusuario | El contenedor lo era | `0017` reescrita; el rol de conexión pasa a procedimiento de operador |
+> | 2 | El **seed** era inaplicable: `FORCE RLS` alcanza al dueño | Un superusuario omite la RLS | El seed fija contexto de claims por tramo |
+> | 3 | **Recursión infinita** en `app.es_mi_vivienda` | Ídem: sin RLS no hay ciclo | Migración `0018` |
+>
+> El tercero es el grave: `SECURITY DEFINER` **no** evita la RLS —solo cambia la identidad—, y con `FORCE` las políticas alcanzan al dueño. La política de `residentes` llamaba a una función que lee `residentes`. En Supabase habría estallado con «stack depth limit exceeded» en cuanto un residente consultara sus datos.
+
 > **HALLAZGO CRÍTICO del 2026-09-06 · cerrado por la migración `0017`.** La verificación contra el proyecto real detectó que `eventos` **no estaba protegida**: `REVOKE UPDATE, DELETE` alcanzaba a los roles de aplicación pero no al **dueño** de las tablas, que en Supabase es `postgres` — el usuario de la cadena de conexión por defecto. RN-03, CA-23 y ADR-005 quedaban sin garantía estructural. Peor: la aserción que debía detectarlo llevaba `AND grantee <> 'postgres'`, excluyendo justamente al rol del hallazgo. Cerrado con `REVOKE` al dueño (incluido `TRUNCATE`), trigger `BEFORE UPDATE`, rol de conexión dedicado `app_api` y una aserción que ya no excluye a nadie. Enmienda 1 del ADR-005 · D-22 · guía §12.
 
 > **Actualización del 2026-09-06.** Tras el cierre se incorporó la **política de retención** que el usuario fijó (P-12), como migración `0016`: plazos configurables por copropiedad, RN-11 convertida en cota superior por `CHECK`, y el libro append-only `purgas_retencion`. Los trabajos de purga son de las ETAPAS 06 y 14; aquí queda la política y dónde se acredita.
@@ -210,3 +220,5 @@ Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contr
 | D-08 | El dueño de las tablas (`postgres`) conserva `ALTER TABLE … DISABLE TRIGGER` sobre las append-only. Cerrarlo exigiría que el dueño no fuera `postgres`, lo que rompería `supabase db push` | ADR-005 Enmienda 1 | Mitigado por la aserción de `0017`; se reevalúa en la ETAPA 13 |
 | D-09 | La base local corre con un dueño **superusuario** y Supabase no. Un `REVOKE` al dueño no se puede demostrar por ejecución en el contenedor, solo leyendo el ACL | Hallazgo del 2026-09-06 | `verificar.sh` lo declara en cada ejecución; verificación real contra el proyecto antes de cerrar cada etapa |
 | D-10 | Las aserciones de las migraciones ya aplicadas (`0015`, `0016`) no se reejecutan: `supabase db push` solo aplica migraciones nuevas. Una corrección de aserción solo protege despliegues limpios | Hallazgo del 2026-09-06 | Toda corrección de garantía va en una migración **nueva**, nunca editando una aplicada |
+| D-11 | `tg_usuario_tenant` evalúa una invariante (D-02) consultando `roles_usuario` **bajo RLS**: su veredicto depende de la visibilidad del llamante. Es `DEFERRABLE INITIALLY DEFERRED`, así que corre en el `COMMIT` con el contexto que quede activo | Arnés `--modo-supabase` | ETAPA 03, al definir el contexto de sesión de la API. Mitigado en el seed restaurando el contexto antes del `COMMIT` ([SUPUESTO] S-11) |
+| D-12 | Que `postgres` pueda `GRANT authenticated TO app_api` es un supuesto sin verificar contra el proyecto real ([SUPUESTO] S-12). La documentación de Supabase concede en la dirección contraria | Enmienda 2 del ADR-005 | Sonda de `CONEXION_SUPABASE.md` §12.1, antes de crear el rol |

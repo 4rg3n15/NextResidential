@@ -158,49 +158,38 @@ BEGIN
 END
 $$;
 
--- 3 · Rol de aplicación dedicado para la conexión de la API --------------------
--- La API deja de conectarse como `postgres`. Este rol:
---   · NO es dueño de ninguna tabla  → no puede reconcederse privilegios (§2 arriba)
---   · NOBYPASSRLS                   → las 95 politicas RLS le aplican de verdad
---   · sin DDL                       → no puede crear, alterar ni soltar objetos
---   · hereda de `authenticated`     → reutiliza las 95 politicas ya escritas, que
---                                     resuelven por pertenencia de rol, sin
---                                     duplicar una sola politica
+-- 3 · El rol de conexión dedicado NO se crea aquí · verificado 2026-09-06 ------
 --
--- Nace SIN LOGIN y SIN CONTRASEÑA a proposito. Falla cerrado: no sirve para
--- conectarse hasta que el operador lo habilite deliberadamente fuera del
--- repositorio. La contraseña NUNCA va en una migracion (§2.7). El procedimiento
--- esta en docs/guias/CONEXION_SUPABASE.md §12.
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_api') THEN
-    CREATE ROLE app_api NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS INHERIT;
-  END IF;
-END
-$$;
-
--- Si el rol ya existia, se reafirman los atributos que importan: una migracion
--- no debe suponer que nadie los cambio a mano.
-ALTER ROLE app_api NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS INHERIT;
-
-GRANT authenticated TO app_api;
-GRANT USAGE ON SCHEMA public, app TO app_api;
-
--- Colas: pg-boss necesita DELETE sobre SUS tablas —borrar un trabajo terminado
--- no es borrar historial de negocio—. Se limita al esquema pgboss.
-GRANT USAGE ON SCHEMA pgboss TO app_api;
-GRANT ALL ON ALL TABLES    IN SCHEMA pgboss TO app_api;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA pgboss TO app_api;
-ALTER DEFAULT PRIVILEGES FOR ROLE app_mantenimiento IN SCHEMA pgboss
-  GRANT ALL ON TABLES TO app_api;
-
--- Y nada de DDL en el esquema de negocio.
-REVOKE CREATE ON SCHEMA public FROM app_api;
-
-COMMENT ON ROLE app_api IS
-  'Identidad de conexion de la API y los workers. Sustituye a `postgres` en la '
-  'cadena de conexion. Sin LOGIN hasta que el operador le asigne contraseña '
-  'fuera del repositorio (CONEXION_SUPABASE.md §12).';
+-- La versión anterior de esta migración creaba el rol `app_api`. FALLÓ en
+-- Supabase gestionado y revirtió la migración entera. Verificado despues contra
+-- un PostgreSQL local con un rol NOSUPERUSER + CREATEROLE que replica las
+-- capacidades del `postgres` de Supabase: fallaban CUATRO sentencias, no una.
+--
+--   ALTER ROLE ... NOSUPERUSER NOBYPASSRLS  → «permission denied to alter role».
+--       PostgreSQL exige superusuario para TOCAR los atributos `superuser` y
+--       `bypassrls`, aunque sea para ponerlos en NO. No falla por el valor:
+--       falla por nombrarlos. `CREATE ROLE` con esos mismos NO sí funciona,
+--       porque ahí solo se comprueba el caso afirmativo.
+--   GRANT authenticated TO app_api          → «permission denied to grant role».
+--       La documentación de Supabase concede un rol PROPIO *a* un rol reservado
+--       (`grant mi_rol to authenticator`), que es la dirección contraria.
+--   ALTER DEFAULT PRIVILEGES FOR ROLE ...   → «permission denied».
+--   COMMENT ON ROLE ...                     → «permission denied».
+--
+-- DECISIÓN: crear un rol de conexión es una operación de OPERADOR, no de
+-- esquema. Necesita una contraseña, que jamás puede vivir en el repositorio
+-- (§2.7), y depende de una capacidad —conceder `authenticated`— que solo el
+-- proyecto real puede responder. Ponerla en una migración convierte una mejora
+-- opcional en un bloqueo del despliegue.
+--
+-- LO QUE IMPORTA: la garantía de inmutabilidad NO depende de ese rol. La
+-- sostienen el REVOKE y el trigger de las secciones 1 y 2, y el trigger alcanza
+-- al dueño. `app_api` es defensa en profundidad sobre CON QUÉ IDENTIDAD se
+-- conecta la API, y su procedimiento está en CONEXION_SUPABASE.md §12.
+--
+-- Lo que sí hace esta migración es VIGILARLO: si el rol existe, sus atributos
+-- se verifican en cada despliegue contra `pg_roles` (sección 4c). No se puede
+-- reafirmar por ALTER ROLE, pero sí se puede exigir que sea correcto.
 
 -- 4 · Aserciones de despliegue -------------------------------------------------
 -- Si alguien revierte cualquiera de las tres capas, el despliegue FALLA.
@@ -239,11 +228,36 @@ BEGIN
     RAISE EXCEPTION 'ADR-005 incumplido: % triggers append-only ausentes o desactivados (%)', n, detalle;
   END IF;
 
-  -- (c) El rol de aplicacion no puede haber ganado superpoderes.
-  SELECT count(*) INTO n FROM pg_roles
-   WHERE rolname = 'app_api' AND (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb);
-  IF n > 0 THEN
-    RAISE EXCEPTION 'app_api no debe ser superusuario, ni omitir RLS, ni tener DDL';
+  -- (c) Si el rol de conexion dedicado existe, sus atributos deben ser los
+  --     esperados. No se pueden REAFIRMAR con ALTER ROLE sin ser superusuario,
+  --     asi que se VERIFICAN contra `pg_roles` y el despliegue falla si alguien
+  --     los cambio. La condicion `IF EXISTS` es deliberada: el rol lo crea el
+  --     operador (CONEXION_SUPABASE.md §12), y su ausencia no debe bloquear el
+  --     despliegue de una garantia que no depende de el.
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_api') THEN
+    SELECT count(*) INTO n FROM pg_roles
+     WHERE rolname = 'app_api' AND (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb);
+    IF n > 0 THEN
+      RAISE EXCEPTION
+        'app_api tiene atributos indebidos. Esperado: NOSUPERUSER, NOBYPASSRLS, '
+        'NOCREATEROLE, NOCREATEDB. Revisar CONEXION_SUPABASE.md §12.';
+    END IF;
+
+    -- Y tampoco puede haber ganado escritura sobre las tablas append-only:
+    -- la comprobacion (a) ya lo cubre, pero se nombra para que el motivo del
+    -- fallo sea legible si ocurre.
+    IF EXISTS (SELECT 1 FROM information_schema.role_table_grants
+                WHERE grantee = 'app_api' AND table_schema = 'public'
+                  AND privilege_type IN ('UPDATE','DELETE','TRUNCATE')
+                  AND (table_name LIKE 'eventos%'
+                       OR table_name IN ('evidencias','auditoria_seguridad','purgas_retencion'))) THEN
+      RAISE EXCEPTION 'app_api tiene escritura sobre tablas append-only';
+    END IF;
+
+    RAISE NOTICE 'app_api presente y con atributos correctos';
+  ELSE
+    RAISE NOTICE 'app_api no existe todavia: la crea el operador (CONEXION_SUPABASE.md §12). '
+                 'La inmutabilidad NO depende de ello.';
   END IF;
 
   RAISE NOTICE 'ADR-005 verificado sin excluir al dueño: append-only garantizado por permisos Y por trigger';

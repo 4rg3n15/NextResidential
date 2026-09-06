@@ -5,12 +5,26 @@
 -- Las referencias de credencial son del tipo `vault:...` — punteros a bóveda,
 -- nunca valores (RN-21, decisión D-09b).
 --
--- Se ejecuta con un rol con privilegio suficiente (migraciones / mantenimiento).
--- El contexto de sesión se fija explícitamente para que `creado_por` tenga
--- valor: en este esquema ninguna escritura es anónima (KPI-05, §4.3).
+-- Se ejecuta con el rol de migraciones. El contexto de sesión se fija
+-- explícitamente para que `creado_por` tenga valor: en este esquema ninguna
+-- escritura es anónima (KPI-05, §4.3).
+--
+-- CORRECCIÓN 2026-09-06. La versión anterior decía «se ejecuta con un rol con
+-- privilegio suficiente». No existe tal rol: todas las tablas llevan FORCE ROW
+-- LEVEL SECURITY, y `FORCE` aplica las políticas TAMBIÉN AL DUEÑO de la tabla.
+-- Solo un superusuario —o un rol con BYPASSRLS— las esquiva, y en Supabase el
+-- dueño (`postgres`) no es ninguna de las dos cosas. Sin el contexto de abajo,
+-- el seed falla con «new row violates row-level security policy».
+-- Pasó desapercibido porque la base local corría como superusuario.
 -- =============================================================================
 
 BEGIN;
+
+-- Contexto de superadministrador para el arranque. No es un privilegio especial:
+-- es la misma vía que usa la aplicación —claims del JWT—, con una identidad de
+-- plataforma. Es LOCAL, así que muere con la transacción.
+SET LOCAL request.jwt.claims =
+  '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002"}';
 
 -- Identidades de arranque ------------------------------------------------------
 -- usuario_sistema es la única fila cuyo creado_por se referencia a sí misma:
@@ -115,6 +129,14 @@ ON CONFLICT DO NOTHING;
 -- Catálogo de niveles de acceso · resolución de P-11 ---------------------------
 -- Catálogo, no booleano: arranca con dos valores y admite más sin migración.
 -- orden 1 = el más restrictivo, que es el que asigna el disparador por defecto.
+-- A partir de aquí, configuración de la copropiedad. La política de estas
+-- tablas exige `app.puede_administrar()`, que es rol `administrador` DE ESA
+-- copropiedad: el superadministrador crea copropiedades (HU-36) pero no
+-- administra su interior. Es deliberado, así que el seed adopta la identidad
+-- correcta en vez de relajar la política.
+SET LOCAL request.jwt.claims =
+  '{"rol":"administrador","usuario_id":"00000000-0000-4000-8000-000000000010","copropiedad_id":"10000000-0000-4000-8000-000000000001"}';
+
 INSERT INTO public.niveles_acceso (copropiedad_id, clave, nombre, descripcion, orden,
                                    permite_autorizar, creado_por, actualizado_por)
 SELECT c.id, v.clave, v.nombre, v.descripcion, v.orden, v.permite_autorizar,
@@ -136,9 +158,6 @@ VALUES
  ('30000000-0000-4000-8000-000000000042','10000000-0000-4000-8000-000000000001','Casa 42','B',
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
  ('30000000-0000-4000-8000-000000000089','10000000-0000-4000-8000-000000000001','Casa 89','C',
-  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
- -- Vivienda de la otra copropiedad, para las pruebas negativas.
- ('30000000-0000-4000-8000-000000000101','10000000-0000-4000-8000-000000000002','Lote 01','U',
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT (id) DO NOTHING;
 
@@ -170,9 +189,6 @@ VALUES
  -- Persona en lista negra: sirve para probar RN-06 tambien como acompanante.
  ('40000000-0000-4000-8000-000000000199','10000000-0000-4000-8000-000000000001','cedula','1000000199',
   'Persona No Autorizada',NULL,NULL,
-  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
- ('40000000-0000-4000-8000-000000000201','10000000-0000-4000-8000-000000000002','cedula','2000000201',
-  'Residente El Roble',NULL,NULL,
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT (id) DO NOTHING;
 
@@ -195,9 +211,6 @@ VALUES
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
  ('50000000-0000-4000-8000-000000000089','10000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000089','40000000-0000-4000-8000-000000000089','Propietario', true,
-  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
- ('50000000-0000-4000-8000-000000000101','10000000-0000-4000-8000-000000000002',
-  '30000000-0000-4000-8000-000000000101','40000000-0000-4000-8000-000000000201','Propietario', true,
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT (id) DO NOTHING;
 
@@ -218,12 +231,9 @@ VALUES
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
  ('10000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000042',
   '40000000-0000-4000-8000-000000000013','ABC1234','Toyota','RAV4','Gris', true,
-  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
+  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
  -- Misma placa en OTRA copropiedad: es legitimo, y lo demuestra la prueba de
  -- que el indice unico es por copropiedad y no global (decision D-05).
- ('10000000-0000-4000-8000-000000000002','30000000-0000-4000-8000-000000000101',
-  '40000000-0000-4000-8000-000000000201','ABC1234','Mazda','CX-5','Negro', true,
-  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT DO NOTHING;
 
 -- Visitantes y autorizaciones --------------------------------------------------
@@ -377,6 +387,12 @@ VALUES ('10000000-0000-4000-8000-000000000001','80000000-0000-4000-8000-00000000
         '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT DO NOTHING;
 
+-- Registrar un Edge es una acción de PLATAFORMA, no de la copropiedad: su
+-- política exige `app.es_superadmin()` (§8, ETAPA 12). El seed vuelve al
+-- contexto de superadministrador para este tramo y regresa después.
+SET LOCAL request.jwt.claims =
+  '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002"}';
+
 INSERT INTO public.edge_gateways (id, copropiedad_id, nombre, usuario_servicio_id, credencial_ref,
                                   creado_por, actualizado_por)
 VALUES ('a0000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001',
@@ -385,6 +401,9 @@ VALUES ('a0000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-00000000
 ON CONFLICT (id) DO NOTHING;
 
 -- Versión de reglas inicial ----------------------------------------------------
+SET LOCAL request.jwt.claims =
+  '{"rol":"administrador","usuario_id":"00000000-0000-4000-8000-000000000010","copropiedad_id":"10000000-0000-4000-8000-000000000001"}';
+
 INSERT INTO public.versiones_de_reglas (id, copropiedad_id, numero, hash, publicada_por,
                                         creado_por, actualizado_por)
 VALUES ('b0000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001',1,
@@ -408,5 +427,80 @@ VALUES
   'zona',4,'{"tipo":"zona","valida":["horario","aforo"]}'::jsonb,
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- Copropiedad B · «Parcelacion El Roble»
+--
+-- Va en su propio tramo, y no intercalada en los INSERT de la copropiedad A,
+-- porque con RLS forzada cada fila se valida contra el contexto de la sesión:
+-- una sola sentencia no puede insertar filas de dos copropiedades sin que una
+-- de las dos viole la política. Separarlas no es una comodidad de formato —
+-- es lo que hace que el seed **respete** el aislamiento que la suite prueba.
+-- =============================================================================
+SET LOCAL request.jwt.claims =
+  '{"rol":"administrador","usuario_id":"00000000-0000-4000-8000-000000000020","copropiedad_id":"10000000-0000-4000-8000-000000000002"}';
+
+-- Los niveles de acceso se crean POR COPROPIEDAD y con el contexto de esa
+-- copropiedad: la sentencia es un INSERT ... SELECT sobre `copropiedades`, y
+-- bajo RLS ese SELECT solo ve la copropiedad del contexto activo. Ejecutarla
+-- una sola vez no habría creado los niveles de B — sin error, con menos filas,
+-- y el fallo habría aparecido después al insertar su residente (P-11).
+INSERT INTO public.niveles_acceso (copropiedad_id, clave, nombre, descripcion, orden,
+                                   permite_autorizar, creado_por, actualizado_por)
+SELECT c.id, v.clave, v.nombre, v.descripcion, v.orden, v.permite_autorizar,
+       '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'
+  FROM public.copropiedades c
+ CROSS JOIN (VALUES
+   ('solo_ingreso','Solo ingreso','Entra y sale; no crea autorizaciones de visitante.', 1::smallint, false),
+   ('completo','Acceso completo','Gestiona vehiculos y autoriza visitantes de su vivienda.', 2::smallint, true)
+ ) AS v(clave, nombre, descripcion, orden, permite_autorizar)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.viviendas (id, copropiedad_id, identificador, manzana, creado_por, actualizado_por)
+VALUES
+ ('30000000-0000-4000-8000-000000000101','10000000-0000-4000-8000-000000000002','Lote 01','U',
+  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.personas (id, copropiedad_id, tipo_documento, numero_documento,
+                             nombre_completo, telefono, correo, creado_por, actualizado_por)
+VALUES
+ ('40000000-0000-4000-8000-000000000201','10000000-0000-4000-8000-000000000002','cedula','2000000201',
+  'Residente El Roble',NULL,NULL,
+  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.residentes (id, copropiedad_id, vivienda_id, persona_id, parentesco,
+                               es_titular, creado_por, actualizado_por)
+VALUES
+ ('50000000-0000-4000-8000-000000000101','10000000-0000-4000-8000-000000000002',
+  '30000000-0000-4000-8000-000000000101','40000000-0000-4000-8000-000000000201','Propietario', true,
+  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.vehiculos (copropiedad_id, vivienda_id, persona_id, placa, marca, modelo, color,
+                              es_principal, creado_por, actualizado_por)
+VALUES
+ ('10000000-0000-4000-8000-000000000002','30000000-0000-4000-8000-000000000101',
+  '40000000-0000-4000-8000-000000000201','ABC1234','Mazda','CX-5','Negro', true,
+  '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
+ON CONFLICT DO NOTHING;
+
+-- Antes de cerrar: se restaura el contexto de plataforma.
+--
+-- `tg_usuario_tenant` es un CONSTRAINT TRIGGER DEFERRABLE INITIALLY DEFERRED,
+-- así que se evalúa AQUÍ, en el COMMIT, con el contexto que quede activo — no
+-- con el que había al insertar la fila. Y su cuerpo consulta `roles_usuario`,
+-- que tiene RLS: con el contexto de la copropiedad B no ve el rol de
+-- superadministrador de `usuario_sistema` y la invariante D-02 se declara
+-- violada aunque se cumpla.
+--
+-- [SUPUESTO] S-11 · Esto es un defecto de diseño del disparador, no del seed:
+-- una invariante de integridad no debería depender de la visibilidad del
+-- llamante. Restaurar el contexto lo evita aquí, pero el defecto sigue vivo
+-- para la aplicación. Documentado en ESTADO_ETAPAS.md (deuda D-11) y a resolver
+-- en la ETAPA 03, donde se define el contexto de sesión de la API.
+SET LOCAL request.jwt.claims =
+  '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002"}';
 
 COMMIT;
