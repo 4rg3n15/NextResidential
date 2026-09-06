@@ -277,8 +277,16 @@ Todo el sistema debe funcionar completo contra `MockProvider`. Si el sistema nec
 ### ADR-04 · La integridad concurrente se resuelve en la base de datos
 Invariantes como "una placa activa por vivienda" (RN-04) se garantizan con **índice único parcial**, no con un `SELECT` previo en el código. KPI-03 exige 0 duplicados en 100 inserciones simultáneas: solo la base puede garantizarlo.
 
-### ADR-05 · Inmutabilidad de eventos por permisos de base de datos
-RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE` sobre `eventos` para todos los roles de aplicación. La inmutabilidad no puede depender de que el código "no lo haga".
+### ADR-05 · Inmutabilidad de eventos por permisos de base de datos **y por trigger**
+RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE, TRUNCATE` sobre `eventos` para todos los roles **y para el dueño de la tabla**, más un trigger `BEFORE UPDATE OR DELETE` que bloquea incluso a quien pueda reconcederse el privilegio. La inmutabilidad no puede depender de que el código "no lo haga".
+
+> **Corrección del 2026-09-06 · verificada contra el proyecto real.** La formulación anterior decía «para todos los roles de aplicación» y ahí estaba el hueco: en Supabase el **dueño** de las tablas es `postgres`, que es **el rol que trae la cadena de conexión por defecto**. Un `REVOKE` que no lo incluye deja intacta la vía por la que la API se conecta de verdad; se comprobó que `UPDATE public.eventos` tenía éxito. Además, **un `REVOKE` solo nunca basta contra el dueño**, porque puede reconcederse el privilegio.
+>
+> **Resolución, en capas:** (1) `REVOKE` también al dueño —efectivo en Supabase, donde `postgres` **no** es superusuario—; (2) trigger `BEFORE UPDATE`, que sí alcanza al dueño; (3) rol de conexión dedicado **`app_api`**, que no es dueño ni omite RLS, de modo que la API deja de conectarse como `postgres`; (4) aserción de despliegue que falla si se revierte cualquiera de las tres.
+>
+> **Riesgo residual declarado:** el dueño conserva `ALTER TABLE … DISABLE TRIGGER`. Es un acto de DDL deliberado, no un `UPDATE` desde el código, y la aserción lo detecta en el siguiente despliegue porque verifica `tgenabled`, no solo la existencia del trigger.
+>
+> Migración `0017` · prueba `supabase/policies/tests/40_inmutabilidad_frente_al_dueno.sql` · procedimiento en `docs/guias/CONEXION_SUPABASE.md` §12.
 
 ---
 
@@ -346,7 +354,7 @@ RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE` sobre `eventos` para to
 Requisitos no negociables del diseño:
 - `copropiedad_id` **NOT NULL** en toda tabla operativa: es la frontera del tenant.
 - **Sin borrado físico** donde hay historial: `estado` + `desactivado_en` (RN-19, CA-02, KPI-04), reforzado por trigger que impida el `DELETE`.
-- `eventos` inmutable por permisos (ADR-05, RN-03, CA-23).
+- `eventos` inmutable por permisos **y por trigger**, con el dueño de la tabla incluido en la revocación (ADR-05, RN-03, CA-23).
 - Auditoría en toda tabla: `creado_en`, `creado_por`, `actualizado_en`, `actualizado_por` (KPI-05).
 - Enumerados para resultados y motivos; `tstzrange` para vigencias con zona horaria; normalización explícita de placas y documentos.
 - **Índices únicos parciales** para invariantes concurrentes (ADR-04): único sobre `(copropiedad_id, placa)` filtrado por `activo = true` (KPI-02, KPI-03, CA-03).

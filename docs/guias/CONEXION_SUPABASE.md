@@ -476,6 +476,14 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] Existen las 31 tablas y las particiones de `eventos`
 - [ ] Semillas aplicadas, con las **dos** copropiedades
 
+**Inmutabilidad e identidad de conexión (§12)**
+- [ ] `ALTER ROLE app_api LOGIN PASSWORD …` ejecutado, con contraseña generada fuera del repositorio
+- [ ] `app_api` sale `rolcanlogin=t` y `rolsuper/rolbypassrls/rolcreatedb/rolcreaterole=f`
+- [ ] `DATABASE_URL` y `DATABASE_POOLER_URL` de `apps/api` usan `app_api`, no `postgres`
+- [ ] Consulta 1 de §12.3 devuelve **0 filas** (nadie, dueño incluido, conserva escritura en append-only)
+- [ ] Consulta 2 de §12.3 devuelve **0 filas** (los dos triggers activos en cada tabla y partición)
+- [ ] Consulta 3 de §12.3 **falla** al intentar el `UPDATE` sobre un evento existente
+
 **Seguridad — ninguna de estas es opcional**
 - [ ] RLS **activa y forzada** en el 100 % de las tablas (§5.2)
 - [ ] La consulta cruzada de §5.3 devuelve **0 filas**
@@ -497,3 +505,83 @@ Marca cada casilla antes de dar la conexión por buena.
 
 **Verificación final**
 - [ ] `./supabase/verificar.sh --con-pruebas` termina sin errores
+
+---
+
+## 12. Rol de conexión de la API (`app_api`) · corrección del 2026-09-06
+
+La cadena de conexión que Supabase entrega por defecto usa el usuario **`postgres`**, que es el **dueño** de las tablas creadas por las migraciones. Conectar la API con ese rol anula la garantía de inmutabilidad de `eventos` (ADR-005): el dueño puede reconcederse cualquier privilegio que se le revoque.
+
+La migración `0017` crea el rol **`app_api`** para sustituirlo. Nace **sin `LOGIN` y sin contraseña**, a propósito: falla cerrado, y la contraseña nunca puede vivir en el repositorio (§2.7 del contrato).
+
+### 12.1 Habilitarlo (lo ejecutas tú, una vez)
+
+En el **SQL Editor** del panel, o por `psql` con la cadena de administrador:
+
+```sql
+-- Genera una contraseña larga y aleatoria FUERA de este archivo y pégala aquí.
+-- No la escribas en ningún fichero versionado.
+ALTER ROLE app_api LOGIN PASSWORD '<contraseña-generada>';
+```
+
+Comprueba que quedó como debe:
+
+```sql
+SELECT rolname, rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole
+  FROM pg_roles WHERE rolname = 'app_api';
+-- esperado: t | f | f | f | f
+```
+
+### 12.2 Cadena de conexión
+
+Toma la cadena del panel (**Connect**) y sustituye el usuario:
+
+| Vía | Usuario |
+|---|---|
+| Conexión directa (puerto 5432) | `app_api` |
+| Pooler Supavisor | `app_api.<PROJECT_REF>` — el pooler exige el *project ref* tras un punto |
+
+Las variables son `DATABASE_URL` y `DATABASE_POOLER_URL` en `apps/api/.env`. El Edge **no** abre conexión a PostgreSQL —usa SQLite y la API— así que no le afecta. **`postgres` deja de aparecer en cualquier `.env` de aplicación**; se reserva para migraciones y administración desde el panel.
+
+### 12.3 Verificación del cierre (después de `supabase db push`)
+
+Las tres consultas que deben salir en cero o en verde. Son las mismas que la migración ejecuta como aserción; aquí sirven para comprobarlo desde fuera.
+
+```sql
+-- 1 · Nadie, DUEÑO INCLUIDO, conserva escritura sobre las tablas append-only.
+--     Debe devolver 0 filas.
+SELECT grantee, table_name, privilege_type
+  FROM information_schema.role_table_grants
+ WHERE table_schema = 'public'
+   AND privilege_type IN ('UPDATE','DELETE','TRUNCATE')
+   AND (table_name LIKE 'eventos%'
+        OR table_name IN ('evidencias','auditoria_seguridad','purgas_retencion'));
+
+-- 2 · Los dos triggers existen y están ACTIVOS en cada tabla y partición.
+--     Debe devolver 0 filas.
+SELECT c.relname, tg.nombre AS trigger_ausente_o_desactivado
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ CROSS JOIN (VALUES ('tg_prohibir_update'),('tg_prohibir_delete')) AS tg(nombre)
+ WHERE n.nspname = 'public' AND c.relkind IN ('r','p')
+   AND (c.relname LIKE 'eventos%'
+        OR c.relname IN ('evidencias','auditoria_seguridad','purgas_retencion'))
+   AND NOT EXISTS (SELECT 1 FROM pg_trigger t
+                    WHERE t.tgrelid = c.oid AND t.tgname = tg.nombre
+                      AND t.tgenabled <> 'D');
+
+-- 3 · Prueba de ejecución: como `postgres`, en el SQL Editor. DEBE fallar con
+--     «Modificacion prohibida en public.eventos_YYYY_MM ... RN-03, CA-23, ADR-005».
+--     Si tienes eventos: cambia el WHERE por uno que exista.
+UPDATE public.eventos SET regla_aplicada = 'PRUEBA' WHERE false;
+```
+
+> La consulta 3 con `WHERE false` no toca ninguna fila y **aun así debe fallar**: el trigger es `FOR EACH ROW`, así que si no hay filas no dispara. Para que la prueba sea real necesita al menos un evento; hazla con el `id` de uno existente y confirma después que `regla_aplicada` no cambió.
+
+### 12.4 Qué NO cambia
+
+Las llaves publicable y secreta siguen igual: PostgREST y Supabase Auth no usan esta cadena de conexión, sino los roles `anon`, `authenticated` y `service_role`. Este rol es para la **conexión directa a PostgreSQL** de la API NestJS y de pg-boss. La llave secreta sigue omitiendo RLS y sigue siendo el riesgo número uno.
+
+### 12.5 Riesgo residual
+
+`app_api` no puede modificar eventos por ninguna vía. `postgres` conserva `ALTER TABLE … DISABLE TRIGGER`: es un acto de DDL deliberado, no un `UPDATE` desde la aplicación, y el siguiente `supabase db push` lo detecta y falla. No uses el editor de tablas del panel sobre `eventos`, `evidencias`, `auditoria_seguridad` ni `purgas_retencion`: opera como `postgres` y está para lectura.

@@ -24,7 +24,7 @@ Un agregado sin setters impide la mutación **por la vía prevista**. No impide 
 | Alternativa | Por qué se descarta |
 |---|---|
 | **Solo agregado sin setters** | Protege la vía prevista. No protege del SQL directo, de una migración ni de un caso de uso futuro |
-| **Trigger que rechaza `UPDATE`/`DELETE`** | Mejor que nada, pero un trigger puede deshabilitarse (`ALTER TABLE ... DISABLE TRIGGER`) por quien tenga privilegio. El `REVOKE` obliga a un cambio explícito de permisos, que es auditable |
+| **Trigger que rechaza `UPDATE`/`DELETE`** | ~~Mejor que nada, pero un trigger puede deshabilitarse (`ALTER TABLE ... DISABLE TRIGGER`) por quien tenga privilegio. El `REVOKE` obliga a un cambio explícito de permisos, que es auditable~~ **Descarte erróneo — ver Enmienda 1.** El argumento es cierto pero incompleto: quien puede deshabilitar el trigger es el dueño, y el dueño también puede reconcederse el `REVOKE`. No eran alternativas excluyentes sino capas complementarias |
 | **Registro de auditoría paralelo** | Duplica el dato y traslada el problema: ¿quién garantiza la inmutabilidad del registro paralelo? |
 
 ## Consecuencias
@@ -48,3 +48,49 @@ Un agregado sin setters impide la mutación **por la vía prevista**. No impide 
 La prueba recorre los seis roles y la clave `service_role` —que omite RLS pero **no** omite los permisos de tabla—, y verifica que las dos operaciones son rechazadas en los siete casos.
 
 Se reejecuta en la ETAPA 13 como parte de la auditoría formal (KPI-24, CA-23).
+
+
+---
+
+## Enmienda 1 · El `REVOKE` no alcanzaba al dueño de la tabla
+**Fecha:** 2026-09-06 · **Origen:** verificación contra el proyecto Supabase real · **Migración:** `0017`
+
+### Qué falló
+
+La decisión decía «para todos los roles **de aplicación**». Esa frase parecía exhaustiva y no lo era: en Supabase el **dueño** de las tablas creadas por migraciones es `postgres`, y `postgres` es **el usuario que trae la cadena de conexión por defecto del proyecto**. Es decir, el rol excluido de la revocación era precisamente aquel con el que la API se conecta.
+
+Verificado sobre el esquema real: `UPDATE public.eventos SET regla_aplicada = 'ALTERADA'` **tuvo éxito**. RN-03, CA-23 y KPI-24 quedaban sin garantía estructural. El `DELETE` sí estaba cubierto, por el trigger `tg_prohibir_delete` de la migración `0013` — que existía por RN-19, no por este ADR.
+
+### Por qué el descarte del trigger fue un error de razonamiento
+
+La tabla de alternativas rechazó el trigger porque «puede deshabilitarse por quien tenga privilegio», y prefirió el `REVOKE` por ser auditable. El argumento es correcto en sí mismo pero se aplicó mal: **quien puede deshabilitar el trigger es el dueño, y el dueño puede igualmente reconcederse el privilegio revocado**. Ambas defensas tienen el mismo actor capaz de burlarlas; ninguna domina a la otra. Tratarlas como alternativas excluyentes fue el error. Son capas, y cada una cubre el modo de fallo de la otra:
+
+| Capa | Cubre | No cubre |
+|---|---|---|
+| `REVOKE` al dueño | El uso accidental desde el código de la aplicación | Que el dueño se reconceda el privilegio |
+| Trigger `BEFORE UPDATE` | Al dueño, y también a un superusuario | `ALTER TABLE … DISABLE TRIGGER` |
+| Rol `app_api` dedicado | Que la conexión de la API *sea* el dueño | Nada, si alguien vuelve a poner `postgres` en la cadena |
+| Aserción de despliegue | La reversión silenciosa de cualquiera de las tres | Una ventana entre la reversión y el siguiente despliegue |
+
+### Comprobaciones que sustentan la enmienda
+
+Ejecutadas sobre PostgreSQL 16, simulando la condición de Supabase con un dueño **no** superusuario:
+
+| Comprobación | Resultado |
+|---|---|
+| `REVOKE` a un dueño no-superusuario | **Surte efecto** — `permission denied for table` |
+| El dueño se reconcede el privilegio y reintenta | **Tiene éxito** — el `REVOKE` solo no basta |
+| Trigger `BEFORE UPDATE` frente al dueño | **Bloquea** |
+| `SET session_replication_role = 'replica'` como no-superusuario | **Denegado** — no es vía de evasión |
+| `ALTER TABLE … DISABLE TRIGGER` como dueño | **Permitido** — es el riesgo residual |
+| El `REVOKE` persiste en el ACL (`postgres=arDxt/postgres`) | Confirmado; `TRUNCATE` (`D`) sobrevivía y también se revoca |
+
+### Decisión enmendada
+
+**La inmutabilidad se implementa con `REVOKE UPDATE, DELETE, TRUNCATE` sobre las tablas append-only para todos los roles *y para el dueño*, MÁS un trigger `BEFORE UPDATE OR DELETE` marcado `ENABLE ALWAYS`, MÁS un rol de conexión dedicado que no es dueño, MÁS una aserción de despliegue que verifica las tres sin excluir a nadie.**
+
+Alcanza a `eventos` y sus particiones —presentes y futuras, porque los triggers del padre particionado se clonan—, `evidencias`, `auditoria_seguridad` y `purgas_retencion`.
+
+### Riesgo residual, declarado
+
+El dueño conserva `ALTER TABLE … DISABLE TRIGGER`. Ya no es un `UPDATE` desde el código sino un acto de DDL deliberado, y la aserción de `0017` lo detecta en el siguiente despliegue porque verifica `tgenabled` y no solo la existencia del trigger. Cerrarlo por completo exigiría que el dueño de las tablas no fuera `postgres`, lo que rompería `supabase db push`; queda registrado como deuda técnica en `docs/ESTADO_ETAPAS.md`.

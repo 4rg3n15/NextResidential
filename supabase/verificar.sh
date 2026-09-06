@@ -46,4 +46,27 @@ if [[ "${1:-}" == "--con-pruebas" ]]; then
   done
 fi
 
+# --- Fidelidad del entorno local frente a Supabase ---------------------------
+# Se imprime SIEMPRE. Una suite verde que no dice contra qué corrió da falsa
+# confianza: el hallazgo del rol `postgres` (migración 0017) sobrevivió a una
+# suite verde precisamente porque nadie declaraba esta diferencia.
+echo "--- fidelidad del entorno frente a Supabase ---"
+su_local=$(psql -d "$PGDATABASE" -Atqc "select rolsuper from pg_roles where rolname = current_user;")
+dueno=$(psql -d "$PGDATABASE" -Atqc "select pg_get_userbyid(relowner) from pg_class where relname='eventos';")
+echo "  rol de conexión      : ${PGUSER} (superusuario: ${su_local})"
+echo "  dueño de 'eventos'   : ${dueno}"
+if [[ "$su_local" == "t" ]]; then
+  cat <<'AVISO'
+  ATENCIÓN · el rol de conexión local es SUPERUSUARIO; en Supabase `postgres`
+  NO lo es. Un superusuario ignora los permisos de tabla, así que aquí NO se
+  puede demostrar por ejecución que un REVOKE surta efecto: eso se verifica
+  leyendo el ACL (prueba 40, sección 1). Lo que sí es demostración real es el
+  TRIGGER, que dispara también contra un superusuario (prueba 40, sección 2).
+  Garantías que este entorno NO puede demostrar ejecutando:
+    · que un REVOKE detenga al dueño de la tabla
+    · que `session_replication_role` esté vedado al rol de la aplicación
+  Ambas se comprueban contra el proyecto real antes de cerrar cada etapa.
+AVISO
+fi
+
 echo "verificación completa"

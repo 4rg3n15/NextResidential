@@ -139,3 +139,16 @@ superusuario: un superusuario omite RLS y la suite no probaría nada. Las de
 invariantes se ejecutan a propósito **como superusuario**, para demostrar que se
 cumplen aunque el actor omita RLS por completo — que es la situación de
 `service_role`.
+
+
+---
+
+## 4. El segundo agujero, ya cerrado: el dueño de la tabla
+
+La matriz de arriba describe políticas de **fila**. La inmutabilidad de `eventos` no es una política de fila sino un permiso de **tabla**, y ahí había un hueco distinto del de la llave secreta.
+
+`REVOKE UPDATE, DELETE` se aplicaba a los roles de aplicación pero no al **dueño**. En Supabase el dueño es `postgres`, que es el usuario de la cadena de conexión por defecto: la API se habría conectado justo con el rol exento. Verificado sobre el proyecto real — `UPDATE public.eventos` tenía éxito.
+
+Cerrado por la migración `0017` con cuatro capas: `REVOKE` al dueño (incluido `TRUNCATE`, que ningún trigger de fila intercepta), trigger `BEFORE UPDATE` marcado `ENABLE ALWAYS`, rol de conexión dedicado `app_api` que no es dueño ni omite RLS, y una aserción de despliegue que ya **no excluye a nadie** — la anterior llevaba `AND grantee <> 'postgres'`, que era exactamente mirar hacia otro lado.
+
+Riesgo residual: el dueño conserva `ALTER TABLE … DISABLE TRIGGER`. La aserción comprueba `tgenabled` y rompe el despliegue si ocurre.

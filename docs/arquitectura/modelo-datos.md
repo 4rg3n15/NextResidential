@@ -1514,3 +1514,27 @@ El coste es que corregir un dato erróneo exige un procedimiento explícito con 
 | 5 | **P-11** como catálogo | `niveles_acceso` en vez de enumerado; disparador que asigna el de menor `orden` |
 | 6 | **S-09** precisado | `continua_del_dia_anterior` y caso de prueba de límite para la ETAPA 07 |
 
+
+
+### D-22 · La inmutabilidad de `eventos` alcanza al DUEÑO de la tabla, y no solo por permisos
+
+**Hallazgo del 2026-09-06, verificado contra el proyecto Supabase real. Corrige D-20 y ADR-005.**
+
+La revocación de `UPDATE`/`DELETE` se aplicaba a `anon`, `authenticated`, `service_role` y `app_mantenimiento`. Faltaba el dueño de las tablas, que en Supabase es **`postgres`** — y `postgres` es **el usuario de la cadena de conexión que entrega el panel**. El rol excluido de la revocación era el rol con el que la API se conectaría.
+
+Lo no obvio son las **dos** cosas que hacen insuficiente la corrección ingenua:
+
+1. **Revocarle al dueño no basta**, porque puede reconcederse el privilegio. Es dueño: tiene la opción de concesión sobre sus propios objetos. Un `REVOKE` a secas es reversible por la misma persona a la que se le aplica.
+2. **Un trigger tampoco basta por sí solo**, porque el dueño puede desactivarlo. El ADR-005 original descartó el trigger por esa razón — y eligió el `REVOKE`, que tiene exactamente el mismo actor capaz de burlarlo. El error no fue elegir mal: fue tratarlas como alternativas.
+
+Las dos juntas sí sostienen la invariante, porque **cada una cubre el modo de fallo de la otra**: reconcederse el privilegio no sirve de nada mientras el trigger dispare, y desactivar el trigger no sirve mientras el privilegio esté revocado. Burlar la invariante exige **dos** actos de DDL deliberados, y la aserción de despliegue detecta cualquiera de los dos.
+
+La tercera capa es la que quita el problema de raíz: el rol **`app_api`**, que no es dueño y no omite RLS. Si la API nunca se conecta como dueño, no hay nada que reconceder ni que desactivar desde la aplicación.
+
+**Detalle que se descubrió al revisar el ACL y que faltaba en la revocación original:** `TRUNCATE`. Tras revocar `UPDATE` y `DELETE`, el ACL del dueño quedaba en `postgres=arDxt/postgres` — la `D` es `TRUNCATE`, que vacía la tabla entera **sin disparar ningún trigger `FOR EACH ROW`**. Un `DELETE` bloqueado y un `TRUNCATE` abierto dejan la misma tabla vacía.
+
+**Alcance:** `eventos` y todas sus particiones —presentes y futuras: los triggers del padre particionado se clonan automáticamente a las que cree `app.crear_particion_eventos`—, `evidencias`, `auditoria_seguridad` y `purgas_retencion`.
+
+**Riesgo residual declarado:** `ALTER TABLE … DISABLE TRIGGER` sigue disponible para el dueño. La aserción de `0017` verifica `tgenabled`, no solo la existencia del trigger, así que el siguiente despliegue falla. Eliminarlo del todo exigiría que el dueño no fuera `postgres`, lo que rompería `supabase db push`.
+
+Migración `0017` · prueba `supabase/policies/tests/40_inmutabilidad_frente_al_dueno.sql` · procedimiento en `docs/guias/CONEXION_SUPABASE.md` §12.

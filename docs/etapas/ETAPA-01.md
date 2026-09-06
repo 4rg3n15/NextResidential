@@ -458,3 +458,63 @@ La suite completa se reejecutó tras los cambios: **verde**, incluido KPI-03 con
 100 conexiones concurrentes reales. Era lo esperado —no se tocó SQL—, y por eso
 mismo se comprobó: la afirmación «esto no toca el esquema» vale más habiéndola
 puesto a prueba.
+
+---
+
+# Adenda 3 · Hallazgo de la verificación contra el proyecto real
+**2026-09-06 · migración `0017` · rama `etapa-01-modelo-datos-supabase`**
+
+## C.1 · Qué se encontró
+
+El usuario aplicó las migraciones sobre su proyecto Supabase y verificó. RLS salió activa y forzada sin excepciones. Pero `eventos` **no estaba protegida**: `information_schema.role_table_grants` devolvía `postgres` con `UPDATE` y `DELETE`.
+
+El informe de cierre de 01-B afirmaba que el único actor capaz de modificar eventos sería «un superusuario de PostgreSQL, que en Supabase no está disponible para la aplicación». **Esa afirmación era falsa**, y por dos motivos independientes:
+
+1. En Supabase, `postgres` es el **dueño** de las tablas creadas por migraciones. El dueño no necesita ser superusuario para tener privilegios sobre sus objetos.
+2. `postgres` es **el usuario de la cadena de conexión que entrega el panel**. No es un rol administrativo apartado: es el rol con el que la API se habría conectado.
+
+RN-03, CA-23, KPI-24 y ADR-005 quedaban sin garantía estructural. Verificado por ejecución: `UPDATE public.eventos SET regla_aplicada = 'ALTERADA'` tuvo éxito.
+
+**Alcance exacto del hueco:** solo `UPDATE`. El `DELETE` ya estaba bloqueado por `tg_prohibir_delete` (migración `0013`), que existía por RN-19 y no por ADR-005 — la protección venía de otra regla, por casualidad. Y el `UPDATE` era el peor de los dos: un `DELETE` deja un vacío detectable en la secuencia; un `UPDATE` reescribe la regla que decidió un acceso sin dejar rastro de que hubo cambio.
+
+## C.2 · Por qué la aserción no lo detectó
+
+La migración `0015` terminaba con una aserción que decía verificar ADR-005. Contenía esta línea:
+
+```sql
+AND grantee <> 'postgres'
+```
+
+Excluía del control exactamente al rol que resultó ser el problema. La aserción no falló porque estaba escrita para no poder fallar por ese motivo. La misma exclusión estaba en `0016` y en la prueba `20_inmutabilidad_eventos.sql`: se propagó por copia, sin que ninguna de las tres reexaminara el supuesto.
+
+## C.3 · Por qué la suite tampoco
+
+La prueba `20_inmutabilidad_eventos.sql` recorre los seis roles y verifica que `UPDATE` y `DELETE` fallan. Pasaba, y decía la verdad sobre lo que probaba. El defecto era de **alcance**: cada iteración empieza con `SET LOCAL ROLE authenticated`, así que la prueba nunca intentaba la operación con **la identidad tal como llega la conexión** — que es justamente lo que hace una cadena de conexión. Se probaban todos los caminos menos el que iba a usarse en producción.
+
+A eso se sumó una diferencia real del entorno, que ahora queda declarada: la base local corre con un dueño **superusuario** y Supabase no. Un superusuario ignora los permisos de tabla, así que un `REVOKE` al dueño **no se puede demostrar por ejecución** en el contenedor. Eso no ocultó este fallo —el `UPDATE` habría salido igual de bien— pero sí significa que la garantía del `REVOKE` solo se puede verificar aquí leyendo el ACL.
+
+## C.4 · La corrección
+
+Migración `0017`, en cuatro capas, porque **ninguna basta sola**: el dueño puede reconcederse un privilegio revocado, y puede desactivar un trigger. Juntas, cada una cubre el modo de fallo de la otra.
+
+| Capa | Qué cierra | Comprobado |
+|---|---|---|
+| `REVOKE UPDATE, DELETE, TRUNCATE` al dueño real | El uso desde el código de la aplicación. Efectivo en Supabase, donde `postgres` no es superusuario | Con un dueño no-superusuario: `permission denied for table` |
+| Trigger `BEFORE UPDATE` `ENABLE ALWAYS` | Al dueño y también a un superusuario | Bloquea; y `session_replication_role` está vedado al no-superusuario |
+| Rol `app_api` (no dueño, `NOBYPASSRLS`, sin DDL) | Que la conexión de la API *sea* el dueño | Nace sin `LOGIN` ni contraseña: falla cerrado |
+| Aserción sin exclusiones + `tgenabled` | La reversión silenciosa de cualquiera de las tres | Rompe el despliegue en las dos mutaciones probadas |
+
+`TRUNCATE` se incorporó al revisar el ACL: tras revocar `UPDATE` y `DELETE` quedaba `postgres=arDxt/postgres`, y esa `D` vacía la tabla entera **sin disparar ningún trigger `FOR EACH ROW`**.
+
+Alcanza a `eventos` y sus particiones —presentes y futuras: los triggers del padre particionado se clonan solos, comprobado sobre una partición creada después—, `evidencias`, `auditoria_seguridad` y `purgas_retencion`.
+
+## C.5 · Qué se hizo para que no se repita
+
+- **Prueba `40_inmutabilidad_frente_al_dueno.sql`**, que ataca por el camino que faltaba: sin `SET ROLE`, con la identidad de la conexión. Sometida a **mutación** —revertir el `REVOKE`, y desactivar el trigger— y falla en ambos casos, que es lo único que demuestra que una prueba sirve.
+- **`verificar.sh` declara la fidelidad del entorno en cada ejecución**: qué rol conecta, si es superusuario, quién es el dueño, y qué garantías **no** puede demostrar el contenedor. Una suite verde que no dice contra qué corrió es lo que permitió este fallo.
+- **Las tres exclusiones `grantee <> 'postgres'` eliminadas.**
+- **Regla nueva:** toda corrección de una garantía va en migración **nueva**. Editar `0015` no habría cambiado nada en el proyecto del usuario, porque `supabase db push` no reaplica lo ya aplicado (deuda D-10).
+
+## C.6 · Recuento de particiones
+
+No hay nada que revisar: `eventos` es la única tabla particionada. Los 80 y 41 observados son correctos y se reprodujeron localmente con las mismas cifras — 80 cuenta particiones de tabla **y de índice** (10 + 7×10), y 41 son las 31 tablas lógicas más las 10 particiones. La comprobación que lo zanja es `SELECT count(*) FROM pg_class WHERE relkind = 'p'`, que devuelve **1**. El «11 particiones» del informe anterior era el número que deja la suite de pruebas, no un despliegue limpio.

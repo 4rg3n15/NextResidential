@@ -81,8 +81,7 @@ BEGIN
     FROM information_schema.role_table_grants
    WHERE table_schema = 'public'
      AND table_name = split_part(v_nombre, ' ', 1)
-     AND privilege_type IN ('UPDATE','DELETE')
-     AND grantee <> 'postgres';
+     AND privilege_type IN ('UPDATE','DELETE');  -- sin excluir al dueño (0017)
 
   ASSERT n = 0,
     format('ADR-005: la particion recien creada conserva %s concesiones de UPDATE/DELETE', n);

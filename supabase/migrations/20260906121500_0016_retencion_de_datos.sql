@@ -177,6 +177,16 @@ REVOKE ALL ON public.purgas_retencion FROM PUBLIC, anon;
 GRANT SELECT, INSERT ON public.purgas_retencion TO authenticated, service_role;
 REVOKE UPDATE, DELETE, TRUNCATE ON public.purgas_retencion
   FROM PUBLIC, authenticated, service_role, app_mantenimiento;
+-- Y al dueño de la tabla (corrección 2026-09-06, ver migración 0017).
+DO $$
+DECLARE v_dueno text;
+BEGIN
+  SELECT pg_get_userbyid(c.relowner) INTO v_dueno FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname='public' AND c.relname='purgas_retencion';
+  EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public.purgas_retencion FROM %I', v_dueno);
+END
+$$;
 
 DROP TRIGGER IF EXISTS tg_prohibir_delete ON public.purgas_retencion;
 CREATE TRIGGER tg_prohibir_delete BEFORE DELETE ON public.purgas_retencion
@@ -189,7 +199,7 @@ BEGIN
   SELECT count(*) INTO n
     FROM information_schema.role_table_grants
    WHERE table_schema='public' AND table_name='purgas_retencion'
-     AND privilege_type IN ('UPDATE','DELETE') AND grantee <> 'postgres';
+     AND privilege_type IN ('UPDATE','DELETE','TRUNCATE');  -- sin excluir al dueño (0017)
   IF n > 0 THEN
     RAISE EXCEPTION 'purgas_retencion debe ser append-only: % concesiones indebidas', n;
   END IF;
