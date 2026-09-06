@@ -29,6 +29,12 @@ En Supabase, `auth.jwt()` es exactamente
 `current_setting('request.jwt.claims', true)::jsonb`. Se usa la forma larga para
 que el esquema y su suite corran igual sobre una base PostgreSQL vacía.
 
+> **Firma asimétrica: sin efecto aquí.** PostgREST rellena
+> `request.jwt.claims` **después** de verificar el token, y el algoritmo de
+> firma es indiferente para ese mecanismo. Estas políticas no cambian ni una
+> línea con las llaves de firma asimétricas. Ver
+> `docs/arquitectura/verificacion-jwt-asimetrica.md`.
+
 ---
 
 ## 2. Matriz
@@ -93,9 +99,10 @@ Operaciones: `R` SELECT · `I` INSERT · `U` UPDATE.
 
 ---
 
-## 3. El agujero conocido: `service_role`
+## 3. El agujero conocido: la llave secreta
 
-**La clave `service_role` de Supabase omite RLS por completo.** Toda la matriz
+**La llave secreta de Supabase (`sb_secret_…`, antes `service_role`) omite RLS
+por completo**, porque resuelve al rol `service_role`, que lleva `BYPASSRLS`. Toda la matriz
 anterior es papel mojado en cualquier ruta que la use, y hay tres que la usan
 por diseño: la ingesta de eventos, los trabajos de pg-boss y el Edge Gateway.
 
@@ -103,10 +110,11 @@ por diseño: la ingesta de eventos, los trabajos de pg-boss y el Edge Gateway.
 La contención tiene tres capas, y esta etapa entrega la primera:
 
 1. **Estructural.** Las restricciones y `CHECK` no dependen de RLS: se aplican
-   también a `service_role`. Y los `REVOKE UPDATE, DELETE` sobre `eventos`
-   **tampoco** se eluden con esa clave, porque son permisos de tabla, no
-   políticas de fila. Es exactamente la razón por la que ADR-005 usa `REVOKE`.
-2. **Aplicación** (ETAPA 03). Toda ruta con `service_role` valida
+   también a la llave secreta. Y los `REVOKE UPDATE, DELETE` sobre `eventos`
+   **tampoco** se eluden con ella: `BYPASSRLS` omite políticas de **fila**, no
+   privilegios de **tabla**. Es exactamente la razón por la que ADR-005 usa
+   `REVOKE`.
+2. **Aplicación** (ETAPA 03). Toda ruta con la llave secreta valida
    `copropiedad_id` explícitamente en el caso de uso.
 3. **Verificación** (ETAPAS 03 y 13). La suite recorre todos los endpoints por
    los dos caminos y rompe el build ante cualquier fuga.

@@ -357,8 +357,9 @@ Requisitos no negociables del diseño:
 *3 · Seeds.* Una copropiedad ficticia coherente con los mockups. Datos inventados; cero datos reales; cero secretos.
 
 *4 · `docs/guias/CONEXION_SUPABASE.md`* — paso a paso, asumiendo que el usuario **ya tiene credenciales**:
-- Dónde encontrar en el panel: *Project URL*, *anon key*, *service_role key*, *JWT secret*, cadena directa y de *pooler*.
-- Qué llave usa cada superficie y por qué: `anon` en web y móvil (sujeta a RLS); `service_role` **solo en servidor** (API, workers, Edge), nunca en un cliente, nunca en `NEXT_PUBLIC_*`, nunca compilada en Flutter.
+- Dónde encontrar en el panel: *Project URL*, **llave publicable** (`sb_publishable_…`), **llave secreta** (`sb_secret_…`), **URL del JWKS**, cadena directa y de *pooler*.
+- Qué llave usa cada superficie y por qué: la **publicable** en web y móvil (resuelve al rol `anon`, sujeta a RLS); la **secreta** **solo en servidor** (API, workers, Edge), nunca en un cliente, nunca en `NEXT_PUBLIC_*`, nunca compilada en Flutter.
+  > **Corrección del 2026-09-06.** El proyecto de Grupo Control usa el esquema nuevo: **no tiene `anon` ni `service_role` como llaves de API, ni secreto JWT compartido**. Los proyectos creados desde noviembre de 2025 ya no traen las llaves heredadas, y desde el 1 de octubre de 2025 los proyectos nuevos usan **firma asimétrica** por defecto. Lo que **no** cambia: los **roles de PostgreSQL** `anon`, `authenticated` y `service_role` siguen existiendo y las llaves resuelven a ellos, así que el esquema, los `GRANT`/`REVOKE` y las políticas RLS de la ETAPA 01 no se tocan. La llave secreta sigue omitiendo RLS: **el riesgo número uno no cambia, solo cambia el nombre de la variable**.
 - `.env.example` por aplicación, con la advertencia explícita de que todo `NEXT_PUBLIC_*` es público por definición y de que **todo lo compilado en Flutter es extraíble del binario**.
 - CLI: instalación, `supabase link`, aplicación de migraciones, verificación de que RLS quedó activa y **comprobación práctica del aislamiento** (una consulta cruzada entre copropiedades debe fallar).
 - Auth: MFA TOTP, expiración de tokens, *custom claims* de `copropiedad_id` y rol vía *auth hook*.
@@ -395,7 +396,9 @@ Herramientas: ESLint con **reglas de frontera** que rompan el build si `domain/`
 
 **Objetivo.** Cerrar el riesgo número uno del proyecto: la fuga de datos entre copropiedades.
 
-**Alcance.** Integración con Supabase Auth: verificación de JWT, *custom claims* de copropiedad y rol, refresco y revocación de sesión. Los **6 roles** implementados como guards declarativos y decoradores de permiso.
+**Alcance.** Integración con Supabase Auth: **verificación asimétrica del JWT contra el JWKS del proyecto** —nunca HS256 con secreto compartido, que este proyecto ya no tiene—, *custom claims* de copropiedad y rol, refresco y revocación de sesión. Los **6 roles** implementados como guards declarativos y decoradores de permiso.
+
+> **Diseño vinculante:** `docs/arquitectura/verificacion-jwt-asimetrica.md`, escrito en la ETAPA 01 y verificado contra la documentación oficial. Fija las reglas de verificación (algoritmo tomado de la clave y no del token, HS256 rechazado, TTL de caché de 10 min alineado con el edge de Supabase, fallo cerrado), el procedimiento de rotación sin caída con su margen de 20 minutos, y las consecuencias de la **expiración de 5 minutos** para Flutter (ETAPA 11), el canal de tiempo real (ETAPA 06) y el rate limiting. El Edge (ETAPA 12) **no** se ve afectado: usa la llave secreta, no un token de usuario.
 
 MFA TOTP obligatorio para roles administrativos (RN-20, CA-25): alta, verificación, códigos de recuperación de un solo uso almacenados en hash, y bloqueo del acceso hasta completar el segundo factor.
 

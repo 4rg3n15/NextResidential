@@ -15,14 +15,45 @@ nombres y las descripciones, jamás con los valores** (`CLAUDE.md` §2.7.1).
 
 ## 1. Qué necesitas del panel, y dónde está
 
+> **Esquema nuevo de llaves.** Los proyectos creados desde **noviembre de 2025**
+> ya no traen las llaves heredadas `anon` ni `service_role`, ni un secreto JWT
+> compartido. Desde el **1 de octubre de 2025** los proyectos nuevos usan
+> **firma asimétrica** por defecto. Esta guía describe ese esquema, que es el
+> del proyecto de Grupo Control. Las llaves heredadas siguen existiendo en
+> proyectos antiguos y se retiran a finales de 2026.
+
 | Dato | Ruta en el panel de Supabase | Se usa en |
 |---|---|---|
-| **Project URL** | Project Settings → API → Project URL | API, web, móvil |
-| **anon key** | Project Settings → API → Project API keys → `anon` `public` | Web y móvil, y la API cuando actúa en nombre del usuario |
-| **service_role key** | Project Settings → API → Project API keys → `service_role` `secret` | **Solo servidor**: API, workers, Edge |
-| **JWT Secret** | Project Settings → API → JWT Settings → JWT Secret | Verificación de tokens en la API |
+| **Project URL** | Project Settings → API | API, web, móvil |
+| **Llave publicable** `sb_publishable_…` | **Settings → API Keys** | Web y móvil, y la API cuando actúa en nombre del usuario |
+| **Llave secreta** `sb_secret_…` | **Settings → API Keys** | **Solo servidor**: API, workers, Edge |
+| **URL del JWKS** | **Project Settings → JWT Keys** | Verificación de tokens en la API |
 | **Cadena directa** | Project Settings → Database → Connection string → **URI** | Migraciones y trabajos de mantenimiento |
 | **Cadena de *pooler*** | Project Settings → Database → Connection pooling → **Connection string** | La aplicación en ejecución |
+
+**Settings → API Keys** las lista todas, heredadas o no. No hay ya una sección
+«API» separada para esto.
+
+### Las llaves nuevas no son JWT
+
+`sb_publishable_…` y `sb_secret_…` **no son tokens firmados**: no dependen del
+secreto del proyecto y no lo tocan. Dos consecuencias prácticas:
+
+- Se pueden crear **varias llaves secretas** y **revocar una sola** sin romper
+  las demás. Con `service_role` había que rotar el secreto JWT entero y con él
+  se caía todo lo conectado.
+- No caducan por sí solas ni arrastran una ventana de exposición de diez años,
+  que era el problema de las heredadas.
+
+### La URL del JWKS
+
+```
+https://<project-ref>.supabase.co/auth/v1/jwks
+```
+
+Responde también en `/auth/v1/.well-known/jwks.json`. Devuelve **solo claves
+públicas**: no hay nada secreto que proteger en ese endpoint, y por eso la
+verificación puede hacerse en cualquier servicio sin repartir secretos.
 
 ### Por qué la cadena directa y la de *pooler* no son intercambiables
 
@@ -38,28 +69,36 @@ distinta. **Migra por la directa; opera por el pooler.**
 
 | Superficie | Llave | Motivo |
 |---|---|---|
-| **Consola web** (`apps/web`) | `anon`, como `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Sujeta a RLS. Es pública por diseño |
-| **App Flutter** (`apps/mobile`) | `anon`, vía `--dart-define` | Ídem |
-| **API NestJS** (`apps/api`) | `anon` para actuar en nombre del usuario; `service_role` **solo** en rutas de servicio | La `anon` mantiene la segunda barrera de RLS activa |
-| **Edge Gateway** (`apps/edge`) | `service_role` | Opera sin usuario humano |
-| **Workers pg-boss** | `service_role` | Ídem |
+| **Consola web** (`apps/web`) | **publicable**, como `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Resuelve al rol `anon`: sujeta a RLS. Es pública por diseño |
+| **App Flutter** (`apps/mobile`) | **publicable**, vía `--dart-define` | Ídem |
+| **API NestJS** (`apps/api`) | **publicable** para actuar en nombre del usuario; **secreta** **solo** en rutas de servicio | La publicable mantiene activa la segunda barrera de RLS |
+| **Edge Gateway** (`apps/edge`) | **secreta**, preferiblemente **una por equipo** | Opera sin usuario humano. Al ser revocables por separado, comprometer un Edge no obliga a rotar el resto |
+| **Workers pg-boss** | **secreta** | Ídem |
 
 ### Las tres advertencias que hay que interiorizar
 
-1. **`service_role` OMITE RLS por completo.** No la limita ninguna política de
-   este esquema. Toda ruta que la use **debe** validar `copropiedad_id` en la
-   capa de aplicación (ETAPA 03). `CLAUDE.md` §2.7.6 lo llama el riesgo de
-   seguridad número uno del proyecto, y lo es.
+1. **La llave secreta OMITE RLS por completo.** Resuelve al rol `service_role`,
+   que lleva el atributo `BYPASSRLS`: no la limita ninguna política de este
+   esquema. Toda ruta que la use **debe** validar `copropiedad_id` en la capa de
+   aplicación (ETAPA 03). `CLAUDE.md` §2.7.6 lo llama el riesgo de seguridad
+   número uno del proyecto, y lo sigue siendo: **el cambio de nombre de la llave
+   no cambia el riesgo.**
 2. **Todo lo que empieza por `NEXT_PUBLIC_` es público por definición.** Se
-   compila en el paquete que llega al navegador. Poner ahí la `service_role`
+   compila en el paquete que llega al navegador. Poner ahí la llave **secreta**
    equivale a publicarla.
 3. **Todo lo compilado en un binario Flutter es extraíble del binario.** Un
    `strings` sobre el APK basta. En `apps/mobile` no va ningún secreto.
 
-> Lo que **sí** protege a `service_role`: los permisos de tabla. Los
-> `REVOKE UPDATE, DELETE` sobre `eventos` **no** se eluden con esa clave, porque
-> no son políticas de fila. Es exactamente la razón por la que ADR-005 usa
-> `REVOKE` y no RLS.
+> Lo que **sí** contiene a la llave secreta: los permisos de tabla. `BYPASSRLS`
+> omite políticas de **fila**, no privilegios de tabla. Los
+> `REVOKE UPDATE, DELETE` sobre `eventos` **no** se eluden con ella. Es
+> exactamente la razón por la que ADR-005 usa `REVOKE` y no RLS.
+>
+> **Nada del esquema de la ETAPA 01 cambia con las llaves nuevas.** Las 16
+> migraciones, los `GRANT`/`REVOKE` y las 95 políticas se declaran sobre los
+> **roles de PostgreSQL** —`anon`, `authenticated`, `service_role`—, que siguen
+> existiendo tal cual. Lo único que cambió es el nombre de las variables de
+> entorno y cómo se verifica la firma del token.
 
 ---
 
@@ -212,6 +251,15 @@ Se configuran con un **Auth Hook** de tipo *Custom Access Token* (Authentication
 La implementación del hook es de la **ETAPA 03**. Hasta entonces, los claims se
 fijan manualmente para las pruebas, como en §5.3.
 
+> **Verificado: los *custom claims* funcionan igual con firma asimétrica.** El
+> gancho se ejecuta **antes** de firmar el token y modifica su carga útil; el
+> algoritmo se aplica después. Son dos etapas independientes. Del lado de la
+> base tampoco cambia nada: PostgREST verifica el token —ahora contra JWKS— y
+> rellena `request.jwt.claims`; `auth.jwt()` es exactamente
+> `current_setting('request.jwt.claims', true)::jsonb`, que es lo que lee
+> nuestro `app.claims()`. **Las 95 políticas RLS siguen siendo válidas sin
+> tocar una línea.**
+
 ### 6.2 MFA TOTP
 
 Authentication → Providers → **Multi-Factor Authentication** → habilitar TOTP.
@@ -221,16 +269,43 @@ obligatoriedad no la impone Supabase: la impone el guard de la ETAPA 03, que
 bloquea el acceso hasta completar el segundo factor. `usuarios.mfa_habilitado`
 es una **proyección** para consulta, no la fuente de verdad.
 
-### 6.3 Expiración de tokens
+### 6.3 Expiración de tokens y verificación asimétrica
 
-Authentication → Settings. Recomendado: **access token 1 hora**, refresh token
-con rotación activada.
+Con firma asimétrica la expiración del token de acceso pasa a **5 minutos**, y
+Supabase desaconseja bajar de ahí. El valor efectivo es el que muestre
+Project Settings → Auth.
+
+> **Discrepancia en la documentación, dejada por escrito.** La guía general de
+> JWT sigue citando 3600 s como valor histórico por defecto, mientras el
+> material de llaves de firma describe los 5 minutos del esquema nuevo. **Manda
+> el panel del proyecto.** Este diseño asume 5 minutos: diseñar para el plazo
+> corto es seguro si resulta ser más largo; al revés, no.
+
+Lo que el plazo corto obliga a hacer bien está detallado en
+[`docs/arquitectura/verificacion-jwt-asimetrica.md`](../arquitectura/verificacion-jwt-asimetrica.md) §3.
+En una línea: **el Edge y los workers no se ven afectados** —usan la llave
+secreta, no un token de usuario—, pero la app Flutter debe refrescar **al volver
+a primer plano**, y el canal de tiempo real debe reenviar el token renovado al
+socket o la conexión se cae a los 5 minutos.
+
+**Verificación contra JWKS — reglas que no son negociables:**
+
+- El algoritmo se toma de la clave del JWKS seleccionada por `kid`, **nunca del
+  encabezado del token**. Aceptar el `alg` del token abre la confusión de
+  algoritmos.
+- **HS256 no se acepta.** No hay secreto compartido, y una biblioteca permisiva
+  convertiría cualquier clave pública conocida en secreto de firma válido.
+- Caché local del JWKS con **TTL de 10 minutos**, el mismo que el edge de
+  Supabase. Más alto significaría seguir aceptando una clave revocada más tiempo
+  del que la propia plataforma lo hace.
+- Si la caché caducó y el refresco falla, **se rechaza**. Fallar cerrado.
 
 > **Consecuencia que conviene tener presente:** los claims viajan en el token.
 > Si un residente cambia de vivienda, su token sigue diciendo lo anterior hasta
-> que se refresque. Por eso el predicado V (`app.es_mi_vivienda`) **no** usa un
-> claim de vivienda: consulta la tabla `residentes` en cada evaluación. Es la
-> única función `SECURITY DEFINER` del esquema, y está ahí por este motivo.
+> que se refresque —ahora, como mucho 5 minutos—. Aun así, el predicado V
+> (`app.es_mi_vivienda`) **no** usa un claim de vivienda: consulta la tabla
+> `residentes` en cada evaluación. Es la única función `SECURITY DEFINER` del
+> esquema, y está ahí por este motivo.
 
 ---
 
@@ -336,17 +411,48 @@ pasado el plazo no quedaría ni el dato ni constancia de haberlo suprimido.
 
 | Llave | Al rotarla se rompe | Orden de rotación |
 |---|---|---|
-| **`anon`** | Web y móvil dejan de autenticar | 1. Rotar en el panel · 2. Desplegar web con la nueva · 3. Publicar versión móvil · 4. **Esperar a que los clientes actualicen antes de revocar la anterior** |
-| **`service_role`** | API, workers y **todos los Edge** pierden acceso | 1. Rotar · 2. Desplegar API y workers · 3. Actualizar cada Edge **uno a uno**, verificando que reconcilia antes de pasar al siguiente |
-| **JWT Secret** | **Todas** las sesiones activas se invalidan | Ventana de mantenimiento anunciada. No es una rotación en caliente |
+| **Publicable** | Web y móvil dejan de autenticar | 1. Crear la nueva · 2. Desplegar web · 3. Publicar versión móvil · 4. **Esperar a que los clientes actualicen antes de revocar la anterior** |
+| **Secreta** | Solo lo que use **esa** llave | Se pueden tener varias y revocar una sola. **Con una llave por Edge, rotar un equipo no toca a los demás** — esa es la mejora frente a `service_role` |
+| **Llave de firma JWT** | **Nada, si se respeta el margen** | Rotación sin caída, ver abajo. Ya no invalida todas las sesiones como hacía el secreto JWT |
 | **Credenciales de dispositivo** | Solo el equipo afectado | Rotar en la bóveda; `dispositivos.credencial_ref` no cambia. **Ese es el motivo de que la base guarde una referencia y no la credencial** (D-09b) |
 | **Llave de cifrado biométrico** | Las plantillas cifradas con la anterior dejan de descifrarse | Cifrado de sobre con `algoritmo` versionado (D-10): descifrar con la vieja, recifrar con la nueva, y solo entonces retirar la vieja |
 
-**El Edge es el caso delicado**: opera sin conexión. Si rotas `service_role`
-mientras un Edge está en corte de WAN, al reconectar fallará la reconciliación y
-sus eventos quedarán en la bandeja local. No se pierden —para eso está la
-bandeja—, pero KPI-29 (reconciliación en menos de 5 minutos) no se cumplirá en
-esa ventana. **Rota cuando todos los Edge estén en línea.**
+### Rotación de la llave de firma, sin caída
+
+Supabase maneja cuatro estados —**Activa**, **En espera**, **Usada
+anteriormente** y **Revocada**— y no hace falta desplegar de nuevo ningún
+backend, porque todos leen el JWKS.
+
+1. Crear la clave nueva **en espera**. **Esperar 20 minutos.**
+2. Promoverla a **activa**. Los tokens nuevos se firman con ella; los antiguos
+   siguen validando contra la anterior.
+3. Esperar a que expiren los tokens en circulación: con 5 minutos de vigencia,
+   basta con 5 minutos y un margen.
+4. **Esperar 20 minutos desde el paso 2** y solo entonces **revocar** la
+   anterior.
+
+**De dónde salen los 20 minutos**, porque el número no es arbitrario:
+
+```
+10 min  caché del JWKS en el edge de Supabase
++ 10 min  nuestra caché local
+= 20 min  en el peor caso
+```
+
+Si nuestra caché local fuese de 30 minutos, el margen seguro pasaría a 40 y la
+recomendación oficial dejaría de protegernos. **Por eso el TTL local se fija en
+10 minutos y no más.**
+
+**El Edge sigue siendo el caso delicado**, aunque menos que antes: opera sin
+conexión. Si revocas la llave secreta de un Edge mientras está en corte de WAN,
+al reconectar fallará la reconciliación y sus eventos quedarán en la bandeja
+local. No se pierden —para eso está la bandeja—, pero KPI-29 (reconciliación en
+menos de 5 minutos) no se cumplirá en esa ventana. **Rota cuando ese Edge esté
+en línea.**
+
+La mejora del esquema nuevo es que ahora eso afecta **a un solo equipo**: con
+una llave secreta por Edge, revocar la de uno no toca a los demás. Con
+`service_role` había una única llave para todos.
 
 ---
 
@@ -356,10 +462,11 @@ Marca cada casilla antes de dar la conexión por buena.
 
 **Credenciales y entorno**
 - [ ] El proyecto Supabase está bajo cuenta corporativa de Grupo Control
-- [ ] `Project URL`, `anon`, `service_role`, `JWT Secret` y ambas cadenas de conexión, copiados del panel
+- [ ] `Project URL`, llave **publicable**, llave **secreta**, **URL del JWKS** y ambas cadenas de conexión, copiados del panel
 - [ ] Los cuatro `.env` creados a partir de sus `.env.example`
 - [ ] `git status` no muestra ningún `.env` ni `.env.local`
-- [ ] Ningún `NEXT_PUBLIC_*` contiene la `service_role`
+- [ ] Ningún `NEXT_PUBLIC_*` contiene la llave **secreta**
+- [ ] Ninguna variable contiene ya `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` ni `SUPABASE_JWT_SECRET`
 - [ ] `apps/mobile/.env` no contiene ningún secreto
 
 **Esquema**
@@ -377,6 +484,8 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] Ninguna fila de `dispositivos.credencial_ref` contiene algo que no empiece por `vault:` o `env:`
 - [ ] Bucket `evidencias` creado y **privado**
 - [ ] MFA TOTP habilitado en el proyecto
+- [ ] El JWKS responde y devuelve al menos una clave
+- [ ] La expiración del token confirmada en Project Settings → Auth
 
 **Operación**
 - [ ] Auth Hook de *custom claims* configurado (o anotado como tarea de la ETAPA 03)

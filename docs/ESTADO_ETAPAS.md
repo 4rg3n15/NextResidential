@@ -113,6 +113,7 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 | Semillas de dos copropiedades ficticias | `supabase/seed/seed.sql` | ✅ |
 | Verificador local, sin credenciales | `supabase/verificar.sh` | ✅ |
 | Guía de conexión | `docs/guias/CONEXION_SUPABASE.md` | ✅ |
+| Diseño de verificación asimétrica (insumo de la ETAPA 03) | `docs/arquitectura/verificacion-jwt-asimetrica.md` | ✅ |
 | `.env.example` por aplicación | `apps/*/.env.example` | ✅ |
 | Informe de cierre | `docs/etapas/ETAPA-01.md` | ✅ |
 
@@ -131,6 +132,15 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 
 31 tablas · 11 particiones de `eventos` · 31 enumerados · 95 políticas RLS · 16 migraciones · 16 guiones de reversión.
 
+> **Corrección del 2026-09-06 · esquema nuevo de llaves de Supabase.** El proyecto
+> no tiene `anon` ni `service_role` como llaves de API, ni secreto JWT compartido:
+> usa `sb_publishable_…`, `sb_secret_…` y **firma asimétrica verificada contra
+> JWKS**. Se corrigieron los cuatro `.env.example` y la guía de conexión, y se
+> escribió `docs/arquitectura/verificacion-jwt-asimetrica.md` como diseño
+> vinculante de la ETAPA 03. **Ninguna migración cambió**: las llaves resuelven a
+> los mismos roles de PostgreSQL y las políticas leen `request.jwt.claims`, que
+> es indiferente al algoritmo de firma.
+>
 > **Actualización del 2026-09-06.** Tras el cierre se incorporó la **política de retención** que el usuario fijó (P-12), como migración `0016`: plazos configurables por copropiedad, RN-11 convertida en cota superior por `CHECK`, y el libro append-only `purgas_retencion`. Los trabajos de purga son de las ETAPAS 06 y 14; aquí queda la política y dónde se acredita.
 
 ---

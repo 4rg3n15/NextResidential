@@ -1180,14 +1180,17 @@ Operaciones: `R` = SELECT · `I` = INSERT · `U` = UPDATE · `—` = sin acceso.
 
 Con 31 tablas y 6 roles la matriz tiene 186 celdas; las que no son `—` generan un par de pruebas cada una. Esa suite es el insumo de la ETAPA 03, que la amplía con el **segundo camino** —`service_role`— y la convierte en condición de aprobación del build (KPI-36, KPI-37).
 
-### 8.4 El agujero conocido: `service_role`
+### 8.4 El agujero conocido: la llave secreta
 
-**La clave `service_role` de Supabase omite RLS por completo.** Toda la matriz anterior es papel mojado en cualquier ruta que la use, y hay tres que la usan por diseño: la ingesta de eventos, los trabajos de pg-boss y el Edge Gateway.
+**La llave secreta de Supabase (`sb_secret_…`, antes `service_role`) omite RLS
+por completo**, porque resuelve al rol `service_role`, que lleva `BYPASSRLS`. Toda la matriz anterior es papel mojado en cualquier ruta que la use, y hay tres que la usan por diseño: la ingesta de eventos, los trabajos de pg-boss y el Edge Gateway.
 
 `CLAUDE.md` §2.7.6 lo llama el riesgo de seguridad número uno del proyecto, y con razón. La contención tiene tres capas, y este documento fija la primera:
 
-1. **Estructural (ETAPA 01).** Las restricciones y `CHECK` no dependen de RLS: se aplican también a `service_role`. Y los `REVOKE UPDATE, DELETE` sobre `eventos` **tampoco** se eluden con esa clave, porque son permisos de tabla, no políticas de fila. Es la razón por la que ADR-005 usa `REVOKE` y no una política RLS.
-2. **Aplicación (ETAPA 03).** Toda ruta que use `service_role` valida `copropiedad_id` explícitamente en el caso de uso, contra el contexto de tenant derivado de la identidad de servicio.
+1. **Estructural (ETAPA 01).** Las restricciones y `CHECK` no dependen de RLS: se aplican también a la llave secreta. Y los `REVOKE UPDATE, DELETE` sobre `eventos` **tampoco** se eluden con ella: `BYPASSRLS` omite políticas de **fila**, no privilegios de **tabla**. Es la razón por la que ADR-005 usa `REVOKE` y no una política RLS.
+2. **Aplicación (ETAPA 03).** Toda ruta que use la llave secreta valida `copropiedad_id` explícitamente en el caso de uso, contra el contexto de tenant derivado de la identidad de servicio.
+
+> **Nota de la corrección del 2026-09-06.** El proyecto usa el esquema nuevo de llaves: `sb_publishable_…` y `sb_secret_…` en lugar de `anon` y `service_role`, y firma asimétrica verificada contra JWKS en lugar de un secreto HS256 compartido. **Este esquema no cambia**: las llaves siguen resolviendo a los mismos **roles de PostgreSQL**, y las políticas leen `request.jwt.claims`, que PostgREST rellena tras verificar el token sea cual sea el algoritmo. Ver `verificacion-jwt-asimetrica.md`.
 3. **Verificación (ETAPAS 03 y 13).** La suite recorre todos los endpoints por los dos caminos y rompe el build ante cualquier fuga.
 
 **Consecuencia de diseño para la ETAPA 01-B:** ninguna función SQL que se cree lleva `SECURITY DEFINER` salvo justificación escrita, y las que la lleven fijan `search_path` explícitamente. `SECURITY INVOKER` es el valor por defecto y el que se usa (§2.7.4).

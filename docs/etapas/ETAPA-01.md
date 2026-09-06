@@ -33,7 +33,7 @@ Y el esquema se verificó de verdad. No contra una promesa: contra un PostgreSQL
 
 **La idempotencia de la reconciliación no descansa donde parecía.** PostgreSQL exige que el índice único de una tabla particionada incluya la clave de partición, así que sobre `eventos` solo cabe `UNIQUE (copropiedad_id, clave_idempotencia, ocurrido_en)` — que no detendría un reenvío con marca temporal recalculada tras un ajuste de reloj, justo el escenario que RN-17 quiere cubrir. Por eso la garantía real la aporta `bandeja_salida_edge`, sin particionar, con la restricción simple. El índice de `eventos` se conserva como segunda barrera. **Hay una prueba dedicada a este escenario exacto**, porque es el tipo de agujero que solo aparece en producción tras un corte largo.
 
-**La inmutabilidad se implementó con `REVOKE`, no con RLS, y eso importa.** La clave `service_role` de Supabase **omite RLS por completo**, y tres rutas la usan por diseño. Los permisos de tabla son la capa que esa clave no elude. Es exactamente la razón por la que ADR-005 pide `REVOKE UPDATE, DELETE` y no una política. Verificado: `UPDATE` y `DELETE` sobre `eventos` fallan con `permission denied` para los seis roles.
+**La inmutabilidad se implementó con `REVOKE`, no con RLS, y eso importa.** La llave secreta de Supabase **omite RLS por completo**, y tres rutas la usan por diseño. Los permisos de tabla son la capa que esa clave no elude. Es exactamente la razón por la que ADR-005 pide `REVOKE UPDATE, DELETE` y no una política. Verificado: `UPDATE` y `DELETE` sobre `eventos` fallan con `permission denied` para los seis roles.
 
 **Y se cubrió el punto donde esa garantía podía erosionarse en silencio.** Las particiones nuevas **no** heredan las revocaciones del padre. Si el mantenimiento mensual creara particiones sin aplicar el `REVOKE`, dentro de un mes los eventos volverían a ser mutables sin que nadie lo notara. Por eso el `REVOKE` vive **dentro** de la función que crea la partición, y la suite lo comprueba **sobre una partición recién creada**, no solo sobre la del mes en curso.
 
@@ -373,3 +373,88 @@ usuario con sus credenciales. Quedan además:
    plazos de retención. Es lo único que falta para dar P-12 por cerrado del todo.
 2. **Programar `app.mantener_particiones_eventos()`** mensualmente.
 3. Los trabajos de purga, cuando lleguen las ETAPAS 06 y 14.
+
+
+---
+
+# Adenda 2 · 2026-09-06 · esquema nuevo de llaves de Supabase
+
+El cliente confirmó que su proyecto usa el esquema nuevo: **no tiene `anon` ni
+`service_role` como llaves de API, ni secreto JWT compartido**. La firma es
+asimétrica y se verifica contra un endpoint JWKS.
+
+Verificado contra la documentación oficial antes de escribir nada. Fuentes en
+`docs/arquitectura/verificacion-jwt-asimetrica.md` §6.
+
+## B.1 · Lo que **no** cambia — y es casi todo
+
+**Las 16 migraciones no cambian ni una línea.** Conviene entender por qué,
+porque es la diferencia entre un cambio cosmético y uno de fondo:
+
+- Lo que cambió son las **llaves de API**. Los **roles de PostgreSQL** `anon`,
+  `authenticated` y `service_role` **siguen existiendo**, y las llaves nuevas
+  resuelven a ellos. La publicable actúa como `anon`; la secreta como
+  `service_role`, que conserva `BYPASSRLS`.
+- Nuestras 95 políticas no leen la llave: leen `request.jwt.claims`, que
+  PostgREST rellena **después** de verificar el token. El algoritmo de firma es
+  indiferente para ese mecanismo.
+- Los `GRANT` y `REVOKE` de la migración `0015` se declaran sobre roles, no
+  sobre llaves. `REVOKE UPDATE, DELETE ON eventos` sigue siendo la barrera que
+  la llave secreta **no** elude: `BYPASSRLS` omite políticas de **fila**, no
+  privilegios de **tabla**. ADR-005 se sostiene tal cual.
+- Los *custom claims* del auth hook funcionan igual: el gancho se ejecuta
+  **antes** de firmar y modifica la carga útil; el algoritmo se aplica después.
+
+**Y el riesgo número uno tampoco cambia.** La llave secreta omite RLS igual que
+lo hacía `service_role`. Cambió el nombre de la variable de entorno, no el
+riesgo ni la contención en tres capas.
+
+## B.2 · Lo que sí se corrigió
+
+| Archivo | Cambio |
+|---|---|
+| `apps/api/.env.example` | `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY` · `SUPABASE_SERVICE_ROLE_KEY` → `SUPABASE_SECRET_KEY` · `SUPABASE_JWT_SECRET` **eliminada**, sustituida por `SUPABASE_JWKS_URL` + TTL de caché |
+| `apps/web/.env.example` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| `apps/mobile/.env.example` | `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY` + nota sobre el refresco al volver a primer plano |
+| `apps/edge/.env.example` | Añadidas `SUPABASE_SECRET_KEY` y `SUPABASE_JWKS_URL`, con caché persistente para los cortes de WAN y la recomendación de **una llave secreta por Edge** |
+| `docs/guias/CONEXION_SUPABASE.md` | §1, §2, §6.3 y §10 reescritas: nombres nuevos, dónde se obtienen, verificación asimétrica y rotación sin caída |
+| `docs/arquitectura/verificacion-jwt-asimetrica.md` | **Nuevo.** Diseño vinculante de la ETAPA 03 |
+| `CLAUDE.md` §6 | ETAPA 01 y ETAPA 03 actualizadas |
+
+## B.3 · Tres cosas que salieron de verificar en vez de suponer
+
+1. **El margen de 20 minutos al rotar no es arbitrario**, y de entenderlo salió
+   una decisión: son los 10 minutos que Supabase cachea el JWKS en su edge más
+   los 10 de nuestra caché local. **Por eso nuestro TTL se fija en 10 minutos y
+   no más**: con 30, el margen seguro pasaría a 40 y la recomendación oficial
+   dejaría de protegernos.
+
+2. **La expiración de 5 minutos no afecta al Edge ni a los workers.** Usan la
+   llave secreta, no un token de usuario. La autonomía de 24 h (KPI-30) no
+   depende de ninguna sesión. Donde sí duele es en Flutter —por la suspensión,
+   no por el plazo— y en el canal de tiempo real, que debe reenviar el token
+   renovado al socket o la conexión se cae a los 5 minutos, justo lo que KPI-25
+   mide.
+
+3. **Una discrepancia en la propia documentación**, dejada por escrito en vez de
+   resuelta en silencio: la guía general de JWT sigue citando 3600 s como valor
+   por defecto, mientras el material de llaves de firma describe los 5 minutos
+   del esquema nuevo. Manda el panel del proyecto. Se diseñó para 5 minutos
+   porque diseñar para el plazo corto es seguro si resulta ser más largo; al
+   revés no.
+
+## B.4 · Un supuesto nuevo
+
+`[SUPUESTO]` **S-10** — un operador de central atiende un número **acotado** de
+copropiedades por turno. El claim `copropiedades` es un arreglo que viaja en
+cada petición y ahora se renueva doce veces más a menudo; se acota al turno
+activo, no al histórico. Si aparece un caso que lo desmienta, el alcance deja de
+ser un claim y pasa a resolverse con una consulta, a costa de una función
+`SECURITY DEFINER` más que habría que justificar por escrito.
+
+## B.5 · Verificación
+
+La suite completa se reejecutó tras los cambios: **verde**, incluido KPI-03 con
+100 conexiones concurrentes reales. Era lo esperado —no se tocó SQL—, y por eso
+mismo se comprobó: la afirmación «esto no toca el esquema» vale más habiéndola
+puesto a prueba.
