@@ -29,6 +29,12 @@ En Supabase, `auth.jwt()` es exactamente
 `current_setting('request.jwt.claims', true)::jsonb`. Se usa la forma larga para
 que el esquema y su suite corran igual sobre una base PostgreSQL vacía.
 
+> **Firma asimétrica: sin efecto aquí.** PostgREST rellena
+> `request.jwt.claims` **después** de verificar el token, y el algoritmo de
+> firma es indiferente para ese mecanismo. Estas políticas no cambian ni una
+> línea con las llaves de firma asimétricas. Ver
+> `docs/arquitectura/verificacion-jwt-asimetrica.md`.
+
 ---
 
 ## 2. Matriz
@@ -68,6 +74,7 @@ Operaciones: `R` SELECT · `I` INSERT · `U` UPDATE.
 | `alertas` | R ᴾ | R U ᵀ | R U ᵀ | R U ᴹ | — | R I ˢ |
 | `auditoria_seguridad` | **R ᴾ** | R ᵀ ⁶ | — | — | — | I |
 | `bandeja_salida_edge` | R ᴾ | R ᵀ | — | — | — | R I U ˢ |
+| `purgas_retencion` | R ᴾ | R ᵀ | — | — | — | **I ˢ** ⁷ |
 
 **Notas**
 
@@ -86,12 +93,16 @@ Operaciones: `R` SELECT · `I` INSERT · `U` UPDATE.
 6. El administrador ve los intentos **contra** su copropiedad
    (`copropiedad_id_objetivo`), no los que salieron de ella hacia otras: esos son
    del superadministrador, porque revelan actividad de un tenant a otro (D-14).
+7. `purgas_retencion` es **append-only**, como `eventos`, `evidencias` y
+   `auditoria_seguridad`: solo `INSERT`, y ni siquiera el rol de mantenimiento
+   conserva `UPDATE` o `DELETE` (D-21).
 
 ---
 
-## 3. El agujero conocido: `service_role`
+## 3. El agujero conocido: la llave secreta
 
-**La clave `service_role` de Supabase omite RLS por completo.** Toda la matriz
+**La llave secreta de Supabase (`sb_secret_…`, antes `service_role`) omite RLS
+por completo**, porque resuelve al rol `service_role`, que lleva `BYPASSRLS`. Toda la matriz
 anterior es papel mojado en cualquier ruta que la use, y hay tres que la usan
 por diseño: la ingesta de eventos, los trabajos de pg-boss y el Edge Gateway.
 
@@ -99,10 +110,11 @@ por diseño: la ingesta de eventos, los trabajos de pg-boss y el Edge Gateway.
 La contención tiene tres capas, y esta etapa entrega la primera:
 
 1. **Estructural.** Las restricciones y `CHECK` no dependen de RLS: se aplican
-   también a `service_role`. Y los `REVOKE UPDATE, DELETE` sobre `eventos`
-   **tampoco** se eluden con esa clave, porque son permisos de tabla, no
-   políticas de fila. Es exactamente la razón por la que ADR-005 usa `REVOKE`.
-2. **Aplicación** (ETAPA 03). Toda ruta con `service_role` valida
+   también a la llave secreta. Y los `REVOKE UPDATE, DELETE` sobre `eventos`
+   **tampoco** se eluden con ella: `BYPASSRLS` omite políticas de **fila**, no
+   privilegios de **tabla**. Es exactamente la razón por la que ADR-005 usa
+   `REVOKE`.
+2. **Aplicación** (ETAPA 03). Toda ruta con la llave secreta valida
    `copropiedad_id` explícitamente en el caso de uso.
 3. **Verificación** (ETAPAS 03 y 13). La suite recorre todos los endpoints por
    los dos caminos y rompe el build ante cualquier fuga.
@@ -127,3 +139,16 @@ superusuario: un superusuario omite RLS y la suite no probaría nada. Las de
 invariantes se ejecutan a propósito **como superusuario**, para demostrar que se
 cumplen aunque el actor omita RLS por completo — que es la situación de
 `service_role`.
+
+
+---
+
+## 4. El segundo agujero, ya cerrado: el dueño de la tabla
+
+La matriz de arriba describe políticas de **fila**. La inmutabilidad de `eventos` no es una política de fila sino un permiso de **tabla**, y ahí había un hueco distinto del de la llave secreta.
+
+`REVOKE UPDATE, DELETE` se aplicaba a los roles de aplicación pero no al **dueño**. En Supabase el dueño es `postgres`, que es el usuario de la cadena de conexión por defecto: la API se habría conectado justo con el rol exento. Verificado sobre el proyecto real — `UPDATE public.eventos` tenía éxito.
+
+Cerrado por la migración `0017` con cuatro capas: `REVOKE` al dueño (incluido `TRUNCATE`, que ningún trigger de fila intercepta), trigger `BEFORE UPDATE` marcado `ENABLE ALWAYS`, rol de conexión dedicado `app_api` que no es dueño ni omite RLS, y una aserción de despliegue que ya **no excluye a nadie** — la anterior llevaba `AND grantee <> 'postgres'`, que era exactamente mirar hacia otro lado.
+
+Riesgo residual: el dueño conserva `ALTER TABLE … DISABLE TRIGGER`. La aserción comprueba `tgenabled` y rompe el despliegue si ocurre.

@@ -35,16 +35,27 @@ GRANT ALL ON ALL TABLES    IN SCHEMA public TO app_mantenimiento;
 -- Se aplica al padre y a cada particion existente; las futuras lo reciben en
 -- app.crear_particion_eventos (migracion 0012).
 -- =============================================================================
+--
+-- CORRECCIÓN 2026-09-06 (misma que instala la migración 0017): la revocación
+-- alcanza también al DUEÑO de la tabla. En Supabase el dueño es `postgres`, el
+-- rol de la cadena de conexión por defecto, y sin esta línea conservaba UPDATE
+-- y DELETE sobre `eventos`. Se revoca al dueño real, no al literal 'postgres',
+-- para que valga igual en una base local y sobreviva a un cambio de propietario.
 DO $$
 DECLARE
   t text;
   append_only text[] := ARRAY['eventos','evidencias','auditoria_seguridad'];
   particion text;
+  v_dueno text;
 BEGIN
   FOREACH t IN ARRAY append_only LOOP
     EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM PUBLIC', t);
     EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM authenticated, service_role, app_mantenimiento', t);
     EXECUTE format('GRANT SELECT, INSERT ON public.%I TO authenticated, service_role', t);
+    SELECT pg_get_userbyid(c.relowner) INTO v_dueno FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname='public' AND c.relname = t;
+    EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM %I', t, v_dueno);
   END LOOP;
 
   FOR particion IN
@@ -56,6 +67,10 @@ BEGIN
     EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM PUBLIC', particion);
     EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM authenticated, service_role, app_mantenimiento', particion);
     EXECUTE format('GRANT SELECT, INSERT ON public.%I TO authenticated, service_role', particion);
+    SELECT pg_get_userbyid(c.relowner) INTO v_dueno FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname='public' AND c.relname = particion;
+    EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM %I', particion, v_dueno);
   END LOOP;
 END
 $$;
@@ -84,10 +99,15 @@ BEGIN
 END
 $$;
 
--- Verificación de ADR-005: ningún rol, ni siquiera el de mantenimiento, conserva
--- UPDATE o DELETE sobre las tablas append-only. El único actor capaz de
--- modificarlas es un superusuario de PostgreSQL, que en Supabase no está
--- disponible para la aplicación; ese es el riesgo residual documentado.
+-- Verificación de ADR-005: ningún rol conserva UPDATE o DELETE sobre las tablas
+-- append-only.
+--
+-- CORRECCIÓN 2026-09-06 (migración 0017). Esta aserción excluía al rol
+-- `postgres` (`AND grantee <> 'postgres'`), que es precisamente el dueño de las
+-- tablas y el rol de la cadena de conexión de Supabase: se verificaba todo
+-- menos al único actor que podía violar la regla. La exclusión se elimina aquí
+-- y la garantía real —REVOKE al dueño + trigger BEFORE UPDATE— la instala la
+-- migración 0017, que además vuelve a comprobar esto sin excluir a nadie.
 DO $$
 DECLARE n int; detalle text;
 BEGIN
@@ -95,8 +115,7 @@ BEGIN
     INTO n, detalle
     FROM information_schema.role_table_grants
    WHERE table_schema = 'public'
-     AND privilege_type IN ('UPDATE','DELETE')
-     AND grantee <> 'postgres'
+     AND privilege_type IN ('UPDATE','DELETE','TRUNCATE')
      AND (table_name LIKE 'eventos%' OR table_name IN ('evidencias','auditoria_seguridad'));
   IF n > 0 THEN
     RAISE EXCEPTION 'ADR-005 incumplido: % concesiones de UPDATE/DELETE sobre tablas append-only (%)', n, detalle;

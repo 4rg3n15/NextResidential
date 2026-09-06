@@ -240,6 +240,7 @@ Ninguna bloquea la ETAPA 01. Cada una tiene comportamiento conservador vigente h
 | **P-08** | Plataforma de despliegue de la API | Ninguno. La decisión no afecta al código si se respeta la frontera hexagonal | ETAPA 14 | Grupo Control |
 | **P-09** | ¿Existe compuerta de aprobación administrativa de autorizaciones? (C-03) | **No se construye.** El residente autoriza y la autorización nace vigente; el administrador puede revocar | ETAPA 05 | Grupo Control |
 | **P-10** | ¿Se quieren reservas de zonas con franja horaria y sin cobro? (C-04) | **No se construyen.** Solo «solicitar acceso» (HU-19) | ETAPA 07 | Grupo Control |
+| ~~**P-12**~~ **RESUELTO** *(2026-09-06)* | Política de retención de eventos, evidencia y plantillas — abierta en la ETAPA 01-B, no fijada en ningún insumo | **Eventos 24 meses · evidencia fotográfica 90 días · plantillas ligadas a la vigencia de su autorización.** Implementado como columnas configurables por copropiedad, con `CHECK (margen_supresion_plantilla <= '24 hours')` que mete RN-11 en el esquema como **cota superior**, y el libro append-only `purgas_retencion` que acredita el cumplimiento. **Sujeto a confirmación legal de Grupo Control** | — | Resuelto por el usuario · pendiente de visto bueno jurídico |
 | ~~**P-11**~~ **RESUELTO** *(2026-09-06)* | «Nivel de acceso» por residente | **Catálogo `niveles_acceso`**, no booleano ni enumerado: arranca con dos valores (`solo_ingreso`, `completo`) y admite más sin migración. Un disparador asigna el de menor `orden` —el más restrictivo— cuando el residente llega sin nivel. Solo el titular crea autorizaciones (RN-05) | — | Resuelto por el usuario |
 
 ---
@@ -268,7 +269,7 @@ código.
 |---|---|---|
 | `[CONTRADICCIÓN]` | **14** | **14 resueltas**, ninguna abierta |
 | `[SUPUESTO]` | **9** | 7 de la ETAPA 00 más S-08 y S-09 de la ETAPA 01. Todos con valor conservador; los de umbral, además, configurables por copropiedad |
-| `PENDIENTE DE DEFINICIÓN` | **11** — **1 resuelto** (P-11) | Los 10 abiertos tienen comportamiento conservador vigente; ninguno bloquea la ETAPA 02 |
+| `PENDIENTE DE DEFINICIÓN` | **12** — **2 resueltos** (P-11, P-12) | Los 10 abiertos tienen comportamiento conservador vigente; ninguno bloquea la ETAPA 02. P-12 queda sujeto a confirmación legal |
 | **Extensiones al contrato** | **1** | E-01 · `FUERA_DE_HORARIO`, aprobada |
 
 **Contradicciones por severidad:** **5 altas** (C-01, C-02, C-03, C-05, C-12) · **4 medias** (C-04, C-06, C-07, C-22) · **5 bajas** (C-11, C-14, C-15, C-23, C-26). Total 14.

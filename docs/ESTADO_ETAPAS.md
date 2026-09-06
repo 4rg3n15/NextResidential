@@ -17,7 +17,7 @@
 | **Etapa siguiente habilitada** | **ETAPA 02 — Andamiaje del monorepo y núcleo hexagonal** |
 | **Bloqueos activos** | Ninguno |
 | **Contradicciones abiertas** | Ninguna (14 registradas, 14 resueltas) |
-| **Decisiones pendientes** | 10 abiertas (P-11 resuelto) — ninguna bloquea la ETAPA 02 |
+| **Decisiones pendientes** | 10 abiertas (P-11 y P-12 resueltos) — ninguna bloquea la ETAPA 02 |
 | **Supuestos vigentes** | 9 — 7 de la ETAPA 00 más S-08 y S-09 |
 | **Extensiones al contrato** | 1 — E-01 `FUERA_DE_HORARIO`, aprobada |
 
@@ -107,12 +107,13 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 | Entregable | Ruta | Estado |
 |---|---|---|
 | Diseño del modelo de datos | `docs/arquitectura/modelo-datos.md` | ✅ |
-| 15 migraciones versionadas, idempotentes y reversibles | `supabase/migrations/` | ✅ |
+| 16 migraciones versionadas, idempotentes y reversibles | `supabase/migrations/` | ✅ |
 | Guiones de reversión, uno por migración | `supabase/reversion/` | ✅ |
 | Matriz RLS y suite de verificación | `supabase/policies/` | ✅ |
 | Semillas de dos copropiedades ficticias | `supabase/seed/seed.sql` | ✅ |
 | Verificador local, sin credenciales | `supabase/verificar.sh` | ✅ |
 | Guía de conexión | `docs/guias/CONEXION_SUPABASE.md` | ✅ |
+| Diseño de verificación asimétrica (insumo de la ETAPA 03) | `docs/arquitectura/verificacion-jwt-asimetrica.md` | ✅ |
 | `.env.example` por aplicación | `apps/*/.env.example` | ✅ |
 | Informe de cierre | `docs/etapas/ETAPA-01.md` | ✅ |
 
@@ -121,7 +122,7 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 | Criterio | Resultado |
 |---|---|
 | Las migraciones corren limpias sobre una base vacía | ✅ Verificado sobre PostgreSQL 16.13 |
-| RLS activa en el 100 % de las tablas | ✅ **40/40** (30 tablas + 10 particiones), activa **y forzada** |
+| RLS activa en el 100 % de las tablas | ✅ **42/42** (31 tablas + 11 particiones), activa **y forzada** |
 | Cada RN de integridad tiene contraparte estructural identificada | ✅ 22/22 · `modelo-datos.md` §10 |
 | *(añadido)* Idempotencia | ✅ Tres pasadas consecutivas sin error ni cambio |
 | *(añadido)* Reversibilidad | ✅ Ciclo completo aplicar → revertir → aplicar, 0 objetos residuales |
@@ -129,7 +130,42 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 
 ### Cifras del esquema
 
-30 tablas · 10 particiones de `eventos` · 30 enumerados · 93 políticas RLS · 94 índices únicos · 15 migraciones · 15 guiones de reversión.
+31 tablas lógicas · **10 particiones** de `eventos` en un despliegue limpio · 31 enumerados · 95 políticas RLS · **18 migraciones** · 18 guiones de reversión.
+
+> **Precisión sobre el recuento de particiones (2026-09-06).** El informe de cierre decía «11 particiones»: era el número que deja la **suite de pruebas**, que crea una partición adicional a propósito para verificar que nace protegida. Un `supabase db push` limpio deja **10** — la ventana de `app.mantener_particiones_eventos(6, 3)`: seis meses atrás, el actual y tres adelante.
+>
+> Si al consultar el proyecto real aparecen **80** y **41**, ambos números son correctos y no hay nada que revisar:
+>
+> | Consulta | Resultado | Por qué |
+> |---|---|---|
+> | `pg_class WHERE relispartition` | **80** | Cuenta particiones de tabla **y de índice**. `eventos` tiene 7 índices, y cada uno se particiona con ella: 10 tablas + 70 índices |
+> | `information_schema.tables … BASE TABLE` | **41** | 31 tablas lógicas + 10 particiones. Una partición es una tabla base a ojos de `information_schema` |
+> | `pg_class WHERE relkind='p'` | **1** | **`eventos` es la única tabla particionada.** Es la comprobación que zanja la duda |
+>
+> Reproducido localmente con las mismas cifras exactas.
+
+> **Corrección del 2026-09-06 · esquema nuevo de llaves de Supabase.** El proyecto
+> no tiene `anon` ni `service_role` como llaves de API, ni secreto JWT compartido:
+> usa `sb_publishable_…`, `sb_secret_…` y **firma asimétrica verificada contra
+> JWKS**. Se corrigieron los cuatro `.env.example` y la guía de conexión, y se
+> escribió `docs/arquitectura/verificacion-jwt-asimetrica.md` como diseño
+> vinculante de la ETAPA 03. **Ninguna migración cambió**: las llaves resuelven a
+> los mismos roles de PostgreSQL y las políticas leen `request.jwt.claims`, que
+> es indiferente al algoritmo de firma.
+>
+> **SEGUNDA TANDA DE HALLAZGOS del 2026-09-06 · el contenedor mentía.** La migración `0017` falló al aplicarse en Supabase gestionado. Al construir un arnés local que replica sus capacidades reales —rol dueño **no** superusuario: `./supabase/verificar.sh --modo-supabase`— aparecieron **tres defectos que una suite verde había estado ocultando**:
+>
+> | # | Defecto | Por qué era invisible | Corrección |
+> |---|---|---|---|
+> | 1 | `0017` usaba 4 sentencias que exigen superusuario | El contenedor lo era | `0017` reescrita; el rol de conexión pasa a procedimiento de operador |
+> | 2 | El **seed** era inaplicable: `FORCE RLS` alcanza al dueño | Un superusuario omite la RLS | El seed fija contexto de claims por tramo |
+> | 3 | **Recursión infinita** en `app.es_mi_vivienda` | Ídem: sin RLS no hay ciclo | Migración `0018` |
+>
+> El tercero es el grave: `SECURITY DEFINER` **no** evita la RLS —solo cambia la identidad—, y con `FORCE` las políticas alcanzan al dueño. La política de `residentes` llamaba a una función que lee `residentes`. En Supabase habría estallado con «stack depth limit exceeded» en cuanto un residente consultara sus datos.
+
+> **HALLAZGO CRÍTICO del 2026-09-06 · cerrado por la migración `0017`.** La verificación contra el proyecto real detectó que `eventos` **no estaba protegida**: `REVOKE UPDATE, DELETE` alcanzaba a los roles de aplicación pero no al **dueño** de las tablas, que en Supabase es `postgres` — el usuario de la cadena de conexión por defecto. RN-03, CA-23 y ADR-005 quedaban sin garantía estructural. Peor: la aserción que debía detectarlo llevaba `AND grantee <> 'postgres'`, excluyendo justamente al rol del hallazgo. Cerrado con `REVOKE` al dueño (incluido `TRUNCATE`), trigger `BEFORE UPDATE`, rol de conexión dedicado `app_api` y una aserción que ya no excluye a nadie. Enmienda 1 del ADR-005 · D-22 · guía §12.
+
+> **Actualización del 2026-09-06.** Tras el cierre se incorporó la **política de retención** que el usuario fijó (P-12), como migración `0016`: plazos configurables por copropiedad, RN-11 convertida en cota superior por `CHECK`, y el libro append-only `purgas_retencion`. Los trabajos de purga son de las ETAPAS 06 y 14; aquí queda la política y dónde se acredita.
 
 ---
 
@@ -181,3 +217,8 @@ Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contr
 | D-05 | El filtro de eventos del mockup no cubre HU-32 (falta fecha y vivienda; solo XLS) | M-08 | ETAPA 09 |
 | D-06 | La consola operativa del mockup fusiona portería y guardia virtual y omite 4 exigencias | C-12 | ETAPA 10 |
 | D-07 | 9 indicadores solo verificables con hardware; hasta entonces se reportan como «pendiente de hardware» | ADR-003 | ETAPA 15 |
+| D-08 | El dueño de las tablas (`postgres`) conserva `ALTER TABLE … DISABLE TRIGGER` sobre las append-only. Cerrarlo exigiría que el dueño no fuera `postgres`, lo que rompería `supabase db push` | ADR-005 Enmienda 1 | Mitigado por la aserción de `0017`; se reevalúa en la ETAPA 13 |
+| D-09 | La base local corre con un dueño **superusuario** y Supabase no. Un `REVOKE` al dueño no se puede demostrar por ejecución en el contenedor, solo leyendo el ACL | Hallazgo del 2026-09-06 | `verificar.sh` lo declara en cada ejecución; verificación real contra el proyecto antes de cerrar cada etapa |
+| D-10 | Las aserciones de las migraciones ya aplicadas (`0015`, `0016`) no se reejecutan: `supabase db push` solo aplica migraciones nuevas. Una corrección de aserción solo protege despliegues limpios | Hallazgo del 2026-09-06 | Toda corrección de garantía va en una migración **nueva**, nunca editando una aplicada |
+| D-11 | `tg_usuario_tenant` evalúa una invariante (D-02) consultando `roles_usuario` **bajo RLS**: su veredicto depende de la visibilidad del llamante. Es `DEFERRABLE INITIALLY DEFERRED`, así que corre en el `COMMIT` con el contexto que quede activo | Arnés `--modo-supabase` | ETAPA 03, al definir el contexto de sesión de la API. Mitigado en el seed restaurando el contexto antes del `COMMIT` ([SUPUESTO] S-11) |
+| D-12 | Que `postgres` pueda `GRANT authenticated TO app_api` es un supuesto sin verificar contra el proyecto real ([SUPUESTO] S-12). La documentación de Supabase concede en la dirección contraria | Enmienda 2 del ADR-005 | Sonda de `CONEXION_SUPABASE.md` §12.1, antes de crear el rol |

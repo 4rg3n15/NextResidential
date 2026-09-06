@@ -33,7 +33,7 @@ Y el esquema se verificó de verdad. No contra una promesa: contra un PostgreSQL
 
 **La idempotencia de la reconciliación no descansa donde parecía.** PostgreSQL exige que el índice único de una tabla particionada incluya la clave de partición, así que sobre `eventos` solo cabe `UNIQUE (copropiedad_id, clave_idempotencia, ocurrido_en)` — que no detendría un reenvío con marca temporal recalculada tras un ajuste de reloj, justo el escenario que RN-17 quiere cubrir. Por eso la garantía real la aporta `bandeja_salida_edge`, sin particionar, con la restricción simple. El índice de `eventos` se conserva como segunda barrera. **Hay una prueba dedicada a este escenario exacto**, porque es el tipo de agujero que solo aparece en producción tras un corte largo.
 
-**La inmutabilidad se implementó con `REVOKE`, no con RLS, y eso importa.** La clave `service_role` de Supabase **omite RLS por completo**, y tres rutas la usan por diseño. Los permisos de tabla son la capa que esa clave no elude. Es exactamente la razón por la que ADR-005 pide `REVOKE UPDATE, DELETE` y no una política. Verificado: `UPDATE` y `DELETE` sobre `eventos` fallan con `permission denied` para los seis roles.
+**La inmutabilidad se implementó con `REVOKE`, no con RLS, y eso importa.** La llave secreta de Supabase **omite RLS por completo**, y tres rutas la usan por diseño. Los permisos de tabla son la capa que esa clave no elude. Es exactamente la razón por la que ADR-005 pide `REVOKE UPDATE, DELETE` y no una política. Verificado: `UPDATE` y `DELETE` sobre `eventos` fallan con `permission denied` para los seis roles.
 
 **Y se cubrió el punto donde esa garantía podía erosionarse en silencio.** Las particiones nuevas **no** heredan las revocaciones del padre. Si el mantenimiento mensual creara particiones sin aplicar el `REVOKE`, dentro de un mes los eventos volverían a ser mutables sin que nadie lo notara. Por eso el `REVOKE` vive **dentro** de la función que crea la partición, y la suite lo comprueba **sobre una partición recién creada**, no solo sobre la del mes en curso.
 
@@ -140,7 +140,7 @@ Esta etapa produce SQL, no clases. La tabla traduce cada principio a su forma en
 | **RN-18, CA-18, CA-26** | Tablas y columnas listas | El escalamiento y la alerta son lógica de la ETAPA 06 |
 | **RN-22, CA-06** | `patrones_recurrencia` con sus restricciones | La evaluación del patrón es el motor de reglas, ETAPA 05 |
 | **KPI-29, KPI-30, KPI-31** | `bandeja_salida_edge` y `edge_gateways` listas | La reconciliación es la ETAPA 12 |
-| **Retención de eventos y evidencia** | `PENDIENTE DE DEFINICIÓN` nuevo | No está en ningún insumo. Afecta al principio de finalidad de la Ley 1581 y al coste. Propuesta a validar en `CONEXION_SUPABASE.md` §10 |
+| **Retención de eventos y evidencia** | **Resuelta** *(adenda)* | Plazos fijados por el usuario e implementados en la migración `0016`. Los trabajos de purga son de las ETAPAS 06 y 14 |
 
 ---
 
@@ -219,7 +219,7 @@ Contra el checklist de `CLAUDE.md` §2.7.
 |---|---|---|
 | D-08 | El **segundo camino de aislamiento** (`service_role`) no está cubierto: la base sola no puede | **ETAPA 03** |
 | D-09 | El mantenimiento de particiones necesita un trabajo pg-boss programado; hoy la función existe pero nadie la llama sola | ETAPA 02 (pg-boss) · 06 |
-| D-10 | La **política de retención** de eventos y evidencia no está definida en ningún insumo | Decisión de Grupo Control |
+| ~~D-10~~ | La **política de retención** de eventos y evidencia no está definida en ningún insumo | **Saldada el 2026-09-06** por decisión del usuario · ver adenda al final |
 | D-11 | El **Auth Hook de *custom claims*** está documentado pero no implementado: sin él, ninguna política concede acceso | **ETAPA 03** |
 
 ### Deuda saldada
@@ -252,8 +252,8 @@ Quedan **diez** abiertos, ninguno bloquea la ETAPA 02.
 3. **Ejecutar la comprobación práctica de aislamiento** de §5.3 de la guía contra el proyecto real. Si la consulta cruzada devuelve filas o el `INSERT` tiene éxito, **detener el despliegue**.
 4. **Crear el bucket `evidencias` como privado** y habilitar **MFA TOTP** en el proyecto (§7 y §6.2 de la guía).
 5. **Programar `app.mantener_particiones_eventos()` mensualmente**. Sin esto, dentro de tres meses la ingesta de eventos empezará a fallar — ruidosamente, que es lo que se quiso, pero fallará.
-6. **Decidir la política de retención** de eventos y evidencia (D-10). Afecta al principio de finalidad de la Ley 1581.
-7. **Corregir `CLAUDE.md` §2.2** para que enumere los nueve agregados raíz aprobados, y no seis.
+6. **Obtener el visto bueno de la asesoría jurídica** de Grupo Control sobre los tres plazos de retención, antes de producción.
+7. ~~Corregir `CLAUDE.md` §2.2~~ — **hecho el 2026-09-06** para que enumere los nueve agregados raíz aprobados, y no seis.
 8. Completar la **lista de verificación** de `CONEXION_SUPABASE.md` §11 antes de dar la conexión por buena.
 
 ---
@@ -276,3 +276,303 @@ Quedan **diez** abiertos, ninguno bloquea la ETAPA 02.
 **La ETAPA 01 queda CERRADA.** La Definición de Terminado se cumple y se amplía: las migraciones corren limpias sobre una base vacía, RLS está activa **y forzada** en el 100 % de las tablas, cada RN de integridad tiene su contraparte estructural identificada, y además el esquema resultó **idempotente**, **reversible de principio a fin** y capaz de sostener **KPI-03 con cien conexiones concurrentes reales**.
 
 **La ETAPA 02 queda habilitada.** El agente se detiene aquí y espera instrucción expresa, conforme a `CLAUDE.md` §2.1.1.
+
+
+---
+
+# Adenda · 2026-09-06
+
+Tres encargos posteriores al cierre, ejecutados sobre la misma rama. Ninguno
+reabre la etapa: dos son correcciones documentales y el tercero resuelve un
+pendiente que la propia etapa había abierto.
+
+## A.1 · `CLAUDE.md` §2.2 corregida — nueve agregados raíz
+
+El contrato seguía enumerando seis. Ahora lista los **nueve** en tabla, con las
+invariantes que cada uno sostiene, y con la resolución de **C-02** citada en el
+propio texto: por qué eran seis, qué declara la página 3 del diagrama, y qué
+cinco reglas de negocio se quedaban sin invariante sin `ListaNegra` ni
+`Dispositivo`. Se añadieron además los cuatro puertos de repositorio que
+faltaban y la cadena de precedencia del motor (`listaNegra > vigencia > patrón >
+zona`), que era vinculante y solo estaba en la auditoría.
+
+Importaba hacerlo ya: es el archivo que se carga en cada sesión, y un contrato
+desactualizado induce al error en la sesión siguiente, no en esta.
+
+## A.2 · Política de retención — decisión resuelta (P-12)
+
+Fijada por el usuario, **sujeta a confirmación legal de Grupo Control**:
+
+| Dato | Plazo | Fundamento |
+|---|---|---|
+| Eventos | **24 meses** | Sustentan la responsabilidad ante un incidente (PB-06); su finalidad sobrevive al hecho registrado. Dos ciclos anuales de administración, sin volverse archivo indefinido |
+| Evidencia fotográfica | **90 días** | Dato más sensible que el registro del acceso, y con finalidad que se agota antes: sustentar una reclamación inmediata. Minimización, Ley 1581 art. 4 lit. c |
+| Plantillas biométricas | **Ligadas a la vigencia de su autorización** | Ya lo exigía RN-11; ahora es estructural |
+
+**Migración `0016`.** Los tres plazos son **columnas de `copropiedades`**, no
+constantes: la retención puede variar por contrato o por exigencia de una
+autoridad, y un plazo escondido en el código no se audita ni se ajusta sin
+desplegar.
+
+Tres decisiones dentro de la decisión, que conviene no perder:
+
+1. **La ley entra en el esquema como cota superior, no como valor por defecto.**
+   `CHECK (margen_supresion_plantilla <= '24 hours')`: una copropiedad puede
+   configurar un margen **más corto** que el legal, nunca más largo. La
+   configuración no puede incumplir RN-11.
+2. **El evento sobrevive a su evidencia sin perder trazabilidad.** A los 90 días
+   se borra el objeto de Storage, pero la fila de `evidencias` permanece **con su
+   hash**. Se puede seguir demostrando qué imagen sustentó la decisión sin
+   conservar la imagen.
+3. **La purga de eventos no puede ser un `DELETE`.** Ningún rol lo tiene
+   concedido (ADR-005, D-20): se ejecuta soltando particiones mensuales enteras
+   con el rol de mantenimiento. Es, retrospectivamente, **un segundo motivo para
+   haber particionado por mes**, además del de consulta.
+
+**Y una tabla nueva: `purgas_retencion`,** libro append-only que acredita cada
+purga. Es tabla aparte y no columnas en `evidencias` porque esa tabla es
+append-only por permisos: marcar una fila como purgada exigiría conceder
+`UPDATE`, y eso abriría la puerta a editar el hash — justo lo que hace
+verificable la evidencia. Sin este libro, la retención sería **indemostrable**:
+pasado el plazo no quedaría ni el dato ni constancia de haberlo suprimido.
+
+`plantillas_biometricas` gana `autorizacion_id`, **nullable a propósito**: un
+residente también registra su rostro, y esa plantilla no nace de una
+autorización de visitante sino de su condición de residente. Son dos ciclos de
+vida legítimos y distintos. Cuando la columna tiene valor, un disparador impide
+programar la supresión más allá de `upper(vigencia) + margen`.
+
+**Lo que la adenda NO implementa:** los tres trabajos de purga. Son de las
+ETAPAS 06 y 14. Aquí queda la política, su cota legal y dónde se acredita.
+
+## A.3 · Verificación tras la adenda
+
+| Prueba | Resultado |
+|---|---|
+| 16 migraciones sobre base vacía | ✅ |
+| Idempotencia, dos pasadas adicionales | ✅ 0 fallos |
+| Reversibilidad, ciclo completo con `0016` | ✅ 16/16, **0 tablas residuales** |
+| RLS activa y forzada | ✅ **42/42** (31 tablas + 11 particiones) |
+| Margen de supresión más corto que el legal | ✅ Aceptado |
+| Margen de supresión **superior a 24 h** | ✅ **Rechazado por `CHECK`** |
+| Plantilla que sobrevive a su autorización | ✅ **Rechazada por disparador** |
+| Plantilla dentro del margen legal | ✅ Aceptada |
+| `purgas_retencion` append-only | ✅ `DELETE` rechazado |
+| Suite completa (aislamiento, invariantes, inmutabilidad, KPI-03) | ✅ Verde |
+
+**Cifras finales:** 31 tablas · 11 particiones · 31 enumerados · 95 políticas RLS
+· 16 migraciones · 16 guiones de reversión.
+
+## A.4 · Qué queda en manos del usuario
+
+Los puntos 1 a 4 de la lista de §9 —credenciales, `db push`, comprobación de
+aislamiento contra el proyecto real, bucket privado y MFA— los ejecuta el
+usuario con sus credenciales. Quedan además:
+
+1. **Visto bueno de la asesoría jurídica** de Grupo Control sobre los tres
+   plazos de retención. Es lo único que falta para dar P-12 por cerrado del todo.
+2. **Programar `app.mantener_particiones_eventos()`** mensualmente.
+3. Los trabajos de purga, cuando lleguen las ETAPAS 06 y 14.
+
+
+---
+
+# Adenda 2 · 2026-09-06 · esquema nuevo de llaves de Supabase
+
+El cliente confirmó que su proyecto usa el esquema nuevo: **no tiene `anon` ni
+`service_role` como llaves de API, ni secreto JWT compartido**. La firma es
+asimétrica y se verifica contra un endpoint JWKS.
+
+Verificado contra la documentación oficial antes de escribir nada. Fuentes en
+`docs/arquitectura/verificacion-jwt-asimetrica.md` §6.
+
+## B.1 · Lo que **no** cambia — y es casi todo
+
+**Las 16 migraciones no cambian ni una línea.** Conviene entender por qué,
+porque es la diferencia entre un cambio cosmético y uno de fondo:
+
+- Lo que cambió son las **llaves de API**. Los **roles de PostgreSQL** `anon`,
+  `authenticated` y `service_role` **siguen existiendo**, y las llaves nuevas
+  resuelven a ellos. La publicable actúa como `anon`; la secreta como
+  `service_role`, que conserva `BYPASSRLS`.
+- Nuestras 95 políticas no leen la llave: leen `request.jwt.claims`, que
+  PostgREST rellena **después** de verificar el token. El algoritmo de firma es
+  indiferente para ese mecanismo.
+- Los `GRANT` y `REVOKE` de la migración `0015` se declaran sobre roles, no
+  sobre llaves. `REVOKE UPDATE, DELETE ON eventos` sigue siendo la barrera que
+  la llave secreta **no** elude: `BYPASSRLS` omite políticas de **fila**, no
+  privilegios de **tabla**. ADR-005 se sostiene tal cual.
+- Los *custom claims* del auth hook funcionan igual: el gancho se ejecuta
+  **antes** de firmar y modifica la carga útil; el algoritmo se aplica después.
+
+**Y el riesgo número uno tampoco cambia.** La llave secreta omite RLS igual que
+lo hacía `service_role`. Cambió el nombre de la variable de entorno, no el
+riesgo ni la contención en tres capas.
+
+## B.2 · Lo que sí se corrigió
+
+| Archivo | Cambio |
+|---|---|
+| `apps/api/.env.example` | `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY` · `SUPABASE_SERVICE_ROLE_KEY` → `SUPABASE_SECRET_KEY` · `SUPABASE_JWT_SECRET` **eliminada**, sustituida por `SUPABASE_JWKS_URL` + TTL de caché |
+| `apps/web/.env.example` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| `apps/mobile/.env.example` | `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY` + nota sobre el refresco al volver a primer plano |
+| `apps/edge/.env.example` | Añadidas `SUPABASE_SECRET_KEY` y `SUPABASE_JWKS_URL`, con caché persistente para los cortes de WAN y la recomendación de **una llave secreta por Edge** |
+| `docs/guias/CONEXION_SUPABASE.md` | §1, §2, §6.3 y §10 reescritas: nombres nuevos, dónde se obtienen, verificación asimétrica y rotación sin caída |
+| `docs/arquitectura/verificacion-jwt-asimetrica.md` | **Nuevo.** Diseño vinculante de la ETAPA 03 |
+| `CLAUDE.md` §6 | ETAPA 01 y ETAPA 03 actualizadas |
+
+## B.3 · Tres cosas que salieron de verificar en vez de suponer
+
+1. **El margen de 20 minutos al rotar no es arbitrario**, y de entenderlo salió
+   una decisión: son los 10 minutos que Supabase cachea el JWKS en su edge más
+   los 10 de nuestra caché local. **Por eso nuestro TTL se fija en 10 minutos y
+   no más**: con 30, el margen seguro pasaría a 40 y la recomendación oficial
+   dejaría de protegernos.
+
+2. **La expiración de 5 minutos no afecta al Edge ni a los workers.** Usan la
+   llave secreta, no un token de usuario. La autonomía de 24 h (KPI-30) no
+   depende de ninguna sesión. Donde sí duele es en Flutter —por la suspensión,
+   no por el plazo— y en el canal de tiempo real, que debe reenviar el token
+   renovado al socket o la conexión se cae a los 5 minutos, justo lo que KPI-25
+   mide.
+
+3. **Una discrepancia en la propia documentación**, dejada por escrito en vez de
+   resuelta en silencio: la guía general de JWT sigue citando 3600 s como valor
+   por defecto, mientras el material de llaves de firma describe los 5 minutos
+   del esquema nuevo. Manda el panel del proyecto. Se diseñó para 5 minutos
+   porque diseñar para el plazo corto es seguro si resulta ser más largo; al
+   revés no.
+
+## B.4 · Un supuesto nuevo
+
+`[SUPUESTO]` **S-10** — un operador de central atiende un número **acotado** de
+copropiedades por turno. El claim `copropiedades` es un arreglo que viaja en
+cada petición y ahora se renueva doce veces más a menudo; se acota al turno
+activo, no al histórico. Si aparece un caso que lo desmienta, el alcance deja de
+ser un claim y pasa a resolverse con una consulta, a costa de una función
+`SECURITY DEFINER` más que habría que justificar por escrito.
+
+## B.5 · Verificación
+
+La suite completa se reejecutó tras los cambios: **verde**, incluido KPI-03 con
+100 conexiones concurrentes reales. Era lo esperado —no se tocó SQL—, y por eso
+mismo se comprobó: la afirmación «esto no toca el esquema» vale más habiéndola
+puesto a prueba.
+
+---
+
+# Adenda 3 · Hallazgo de la verificación contra el proyecto real
+**2026-09-06 · migración `0017` · rama `etapa-01-modelo-datos-supabase`**
+
+## C.1 · Qué se encontró
+
+El usuario aplicó las migraciones sobre su proyecto Supabase y verificó. RLS salió activa y forzada sin excepciones. Pero `eventos` **no estaba protegida**: `information_schema.role_table_grants` devolvía `postgres` con `UPDATE` y `DELETE`.
+
+El informe de cierre de 01-B afirmaba que el único actor capaz de modificar eventos sería «un superusuario de PostgreSQL, que en Supabase no está disponible para la aplicación». **Esa afirmación era falsa**, y por dos motivos independientes:
+
+1. En Supabase, `postgres` es el **dueño** de las tablas creadas por migraciones. El dueño no necesita ser superusuario para tener privilegios sobre sus objetos.
+2. `postgres` es **el usuario de la cadena de conexión que entrega el panel**. No es un rol administrativo apartado: es el rol con el que la API se habría conectado.
+
+RN-03, CA-23, KPI-24 y ADR-005 quedaban sin garantía estructural. Verificado por ejecución: `UPDATE public.eventos SET regla_aplicada = 'ALTERADA'` tuvo éxito.
+
+**Alcance exacto del hueco:** solo `UPDATE`. El `DELETE` ya estaba bloqueado por `tg_prohibir_delete` (migración `0013`), que existía por RN-19 y no por ADR-005 — la protección venía de otra regla, por casualidad. Y el `UPDATE` era el peor de los dos: un `DELETE` deja un vacío detectable en la secuencia; un `UPDATE` reescribe la regla que decidió un acceso sin dejar rastro de que hubo cambio.
+
+## C.2 · Por qué la aserción no lo detectó
+
+La migración `0015` terminaba con una aserción que decía verificar ADR-005. Contenía esta línea:
+
+```sql
+AND grantee <> 'postgres'
+```
+
+Excluía del control exactamente al rol que resultó ser el problema. La aserción no falló porque estaba escrita para no poder fallar por ese motivo. La misma exclusión estaba en `0016` y en la prueba `20_inmutabilidad_eventos.sql`: se propagó por copia, sin que ninguna de las tres reexaminara el supuesto.
+
+## C.3 · Por qué la suite tampoco
+
+La prueba `20_inmutabilidad_eventos.sql` recorre los seis roles y verifica que `UPDATE` y `DELETE` fallan. Pasaba, y decía la verdad sobre lo que probaba. El defecto era de **alcance**: cada iteración empieza con `SET LOCAL ROLE authenticated`, así que la prueba nunca intentaba la operación con **la identidad tal como llega la conexión** — que es justamente lo que hace una cadena de conexión. Se probaban todos los caminos menos el que iba a usarse en producción.
+
+A eso se sumó una diferencia real del entorno, que ahora queda declarada: la base local corre con un dueño **superusuario** y Supabase no. Un superusuario ignora los permisos de tabla, así que un `REVOKE` al dueño **no se puede demostrar por ejecución** en el contenedor. Eso no ocultó este fallo —el `UPDATE` habría salido igual de bien— pero sí significa que la garantía del `REVOKE` solo se puede verificar aquí leyendo el ACL.
+
+## C.4 · La corrección
+
+Migración `0017`, en cuatro capas, porque **ninguna basta sola**: el dueño puede reconcederse un privilegio revocado, y puede desactivar un trigger. Juntas, cada una cubre el modo de fallo de la otra.
+
+| Capa | Qué cierra | Comprobado |
+|---|---|---|
+| `REVOKE UPDATE, DELETE, TRUNCATE` al dueño real | El uso desde el código de la aplicación. Efectivo en Supabase, donde `postgres` no es superusuario | Con un dueño no-superusuario: `permission denied for table` |
+| Trigger `BEFORE UPDATE` `ENABLE ALWAYS` | Al dueño y también a un superusuario | Bloquea; y `session_replication_role` está vedado al no-superusuario |
+| Rol `app_api` (no dueño, `NOBYPASSRLS`, sin DDL) | Que la conexión de la API *sea* el dueño | Nace sin `LOGIN` ni contraseña: falla cerrado |
+| Aserción sin exclusiones + `tgenabled` | La reversión silenciosa de cualquiera de las tres | Rompe el despliegue en las dos mutaciones probadas |
+
+`TRUNCATE` se incorporó al revisar el ACL: tras revocar `UPDATE` y `DELETE` quedaba `postgres=arDxt/postgres`, y esa `D` vacía la tabla entera **sin disparar ningún trigger `FOR EACH ROW`**.
+
+Alcanza a `eventos` y sus particiones —presentes y futuras: los triggers del padre particionado se clonan solos, comprobado sobre una partición creada después—, `evidencias`, `auditoria_seguridad` y `purgas_retencion`.
+
+## C.5 · Qué se hizo para que no se repita
+
+- **Prueba `40_inmutabilidad_frente_al_dueno.sql`**, que ataca por el camino que faltaba: sin `SET ROLE`, con la identidad de la conexión. Sometida a **mutación** —revertir el `REVOKE`, y desactivar el trigger— y falla en ambos casos, que es lo único que demuestra que una prueba sirve.
+- **`verificar.sh` declara la fidelidad del entorno en cada ejecución**: qué rol conecta, si es superusuario, quién es el dueño, y qué garantías **no** puede demostrar el contenedor. Una suite verde que no dice contra qué corrió es lo que permitió este fallo.
+- **Las tres exclusiones `grantee <> 'postgres'` eliminadas.**
+- **Regla nueva:** toda corrección de una garantía va en migración **nueva**. Editar `0015` no habría cambiado nada en el proyecto del usuario, porque `supabase db push` no reaplica lo ya aplicado (deuda D-10).
+
+## C.6 · Recuento de particiones
+
+No hay nada que revisar: `eventos` es la única tabla particionada. Los 80 y 41 observados son correctos y se reprodujeron localmente con las mismas cifras — 80 cuenta particiones de tabla **y de índice** (10 + 7×10), y 41 son las 31 tablas lógicas más las 10 particiones. La comprobación que lo zanja es `SELECT count(*) FROM pg_class WHERE relkind = 'p'`, que devuelve **1**. El «11 particiones» del informe anterior era el número que deja la suite de pruebas, no un despliegue limpio.
+
+---
+
+# Adenda 4 · El contenedor mentía
+**2026-09-06 · migraciones `0017` (reescrita) y `0018` · arnés `--modo-supabase`**
+
+## D.1 · Qué pasó
+
+La migración `0017` de la Adenda 3 **falló al aplicarse** en Supabase gestionado y revirtió entera. La causa inmediata: creaba el rol `app_api` con sentencias que exigen superusuario. La causa de fondo es la que importa, y es la que el usuario venía señalando: **mi entorno de verificación me daba superusuario y Supabase no**, así que una suite verde no significaba lo que yo decía que significaba.
+
+En vez de corregir sentencia por sentencia a medida que fallaban, construí un arnés que replica las capacidades reales de Supabase —rol dueño `NOSUPERUSER` + `CREATEROLE`— y pasé por él **todo** el esquema. Aparecieron tres defectos, no uno.
+
+## D.2 · Los tres defectos
+
+**1 · `0017` usaba cuatro sentencias privilegiadas, no una.**
+
+| Sentencia | Error | Causa real |
+|---|---|---|
+| `ALTER ROLE … NOSUPERUSER NOBYPASSRLS` | `permission denied to alter role` | PostgreSQL exige superusuario para **tocar** `superuser` y `bypassrls`, aunque sea para ponerlos en NO. No falla por el valor: falla por nombrarlos |
+| `GRANT authenticated TO app_api` | `permission denied to grant role` | Supabase documenta la dirección contraria: `grant mi_rol to authenticator` |
+| `ALTER DEFAULT PRIVILEGES FOR ROLE …` | `permission denied` | Exige pertenencia al rol nombrado |
+| `COMMENT ON ROLE …` | `permission denied` | No disponible sin superusuario |
+
+Confirmado además que `0001`–`0016` pasan limpias como no-superusuario: el problema estaba acotado a `0017`.
+
+**2 · El seed era inaplicable en Supabase.** `FORCE ROW LEVEL SECURITY` aplica las políticas **también al dueño**. El seed decía ejecutarse «con un rol con privilegio suficiente»; no existe tal rol. En el contenedor funcionaba porque el superusuario omite la RLS. En Supabase habría fallado con «new row violates row-level security policy» en la primera fila.
+
+**3 · Recursión infinita en `app.es_mi_vivienda` — el grave.** La función es `SECURITY DEFINER`, elegida así creyendo que evitaba la RLS. **No la evita:** `SECURITY DEFINER` cambia con qué identidad corre una función, no si se le aplica la RLS. La política de `residentes` llamaba a la función, la función lee `residentes`, la lectura reevaluaba la política. `stack depth limit exceeded`. En Supabase habría estallado en cuanto un residente abriera la app.
+
+## D.3 · Las correcciones
+
+- **`0017` reescrita.** Solo la garantía: `REVOKE` al dueño, trigger `BEFORE UPDATE` `ENABLE ALWAYS`, aserciones. Cero sentencias privilegiadas. El rol de conexión sale de la migración y pasa a `CONEXION_SUPABASE.md` §12 como procedimiento de operador — necesita una contraseña, que nunca puede estar en el repositorio. La migración lo **vigila**: si existe, verifica sus atributos contra `pg_roles` en cada despliegue y falla si no son los esperados, que es exactamente lo que se pidió cuando `ALTER ROLE` no es posible.
+- **`0018`**: política de `residentes` no recursiva, resuelta contra los claims. Mismo aislamiento, sin ciclo. Con aserción que impide reintroducirlo.
+- **Seed**: adopta por tramos la identidad que cada política exige. Efecto colateral: pasa a ser **prueba positiva** de la matriz RLS.
+
+## D.4 · Las capas, recontadas
+
+La Adenda 3 contaba mal. Frente al dueño hay **tres** barreras; frente a la llave secreta, **dos**:
+
+| Capa | Frente al dueño (`postgres`) | Frente a `service_role` (BYPASSRLS) |
+|---|---|---|
+| RLS: `eventos` sin política de `UPDATE`, en modo `FORCE` | **Sí** — afecta a cero filas | No — la omite |
+| `REVOKE UPDATE, DELETE, TRUNCATE` | **Sí** | **Sí** |
+| Trigger `BEFORE UPDATE` | Sí, si se reconcede el privilegio | **Sí — última barrera** |
+
+Demostrado por ejecución: con `service_role` y el `UPDATE` deliberadamente reconcedido, **el trigger detiene la alteración**. Es el escenario que hace del trigger algo más que redundancia, y ahora lo cubre la sección 5 de la prueba 40.
+
+## D.5 · Cómo se cierra la brecha del entorno
+
+`./supabase/verificar.sh --con-pruebas --modo-supabase` aplica el esquema con un rol dueño **no superusuario**, y con `service_role` llevando el `BYPASSRLS` que tiene en Supabase. En ese modo:
+
+- el `REVOKE` al dueño se demuestra **por ejecución**, no leyendo el ACL;
+- la RLS forzada se aplica de verdad, incluida al dueño;
+- la recursión de políticas se manifiesta en lugar de esconderse.
+
+Ambos modos se ejecutan: 18/18 migraciones, seed y suite completa verdes en los dos, con KPI-03 sobre 100 conexiones concurrentes reales. El modo por defecto sigue existiendo porque es más rápido; el fiel es el que decide.
+
+Queda declarado lo que **aún** no se puede verificar en local ([SUPUESTO] S-12, deuda D-12): que `postgres` pueda `GRANT authenticated TO app_api` en el proyecto real. Lo resuelve una sola consulta, la sonda de §12.1, antes de crear nada.

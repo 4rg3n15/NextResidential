@@ -83,10 +83,31 @@ Cada módulo expone **solo** su API pública mediante un barril `index.ts`. Ning
 
 Dirección de dependencia: `presentación → aplicación → dominio ← infraestructura`. Ninguna flecha sale del dominio. El agregado nunca se serializa crudo al transporte: siempre DTO + mapeador.
 
-**Agregados raíz** (del diagrama, vinculantes): `Copropiedad` (frontera del tenant), `Vivienda`, `Autorización`, `Acceso` (inmutable), `Consentimiento`, `Zona`.
+**Agregados raíz — nueve** (del diagrama, vinculantes):
+
+| Agregado | Frontera de consistencia | Invariantes que sostiene |
+|---|---|---|
+| `Copropiedad` | Frontera del tenant | RN-15 |
+| `Vivienda` | Residentes y vehículos | RN-04, RN-13 |
+| `Autorización` | Vigencia, patrón, acompañantes, zonas | RN-01, RN-05, RN-22 |
+| `Acceso` | Inmutable: sin setters, sin update, sin delete | RN-02, RN-03, RN-17 |
+| `ConsentimientoBiometrico` | Titular, finalidad, versión de política, revocación | RN-09, RN-10 |
+| `PlantillaBiometrica` | Calidad, sincronización, supresión programada | RN-09, RN-11 |
+| `Zona` | Horario, aforo, controladores | RN-14 |
+| `ListaNegra` | Quién la crea y quién la levanta | RN-06, RN-07 |
+| `Dispositivo` | Credencial por referencia, latido, estado | RN-12, RN-21, CA-26 |
+
+> **`[CONTRADICCIÓN]` C-02 — resuelta, no reabrir.** Este contrato enumeraba **seis** agregados raíz citando el diagrama arquitectónico como fuente. La página 1 del diagrama muestra esos seis, pero **la página 3 —la vista dedicada precisamente a los agregados— declara nueve**, añadiendo `PlantillaBiometrica`, `ListaNegra` y `Dispositivo` con la anotación «raíz de agregado».
+>
+> **No era un desacuerdo de criterio: era un resumen incompleto de su propia fuente**, y el hueco tenía consecuencia funcional. Sin `ListaNegra` y sin `Dispositivo` como agregados, **cinco reglas de negocio se quedaban sin invariante que las sostuviera**: RN-06 y RN-07 (`PolíticaListaNegra` *aplica* la lista, no gobierna quién puede crearla ni levantarla, que es una invariante de agregado), RN-12, RN-21 y el criterio CA-26.
+>
+> **Resolución:** se adoptan los nueve. Aprobado por el cliente el 2026-09-06 e implementado en la ETAPA 01.
+> Detalle en `docs/auditoria/02-arquitectura.md` §2 · registro en `docs/auditoria/contradicciones-y-supuestos.md` C-02 · esquema en `docs/arquitectura/modelo-datos.md` §2.
+
 **Objetos de valor:** `Placa` (normalizada al construir), `Vigencia`, `PatrónRecurrencia`, `Aforo`, `ResultadoAcceso`, `VersiónDeReglas`.
-**Puertos:** repositorio (`ViviendaRepo`, `AutorizacionRepo`, `ZonaRepo`, `EventoRepo`, `ReglaRepo`), proveedor (`AccessPointProvider`, `PlateEventSource`, `FaceTemplateProvider`, `IntercomProvider`), soporte (`Reloj`, `GeneradorDeId`, `Notificador`, `AlmacenEvidencia`, `Bitácora`).
+**Puertos:** repositorio (`ViviendaRepo`, `AutorizacionRepo`, `ZonaRepo`, `EventoRepo`, `ReglaRepo`, **`ListaNegraRepo`**, **`DispositivoRepo`**, **`ConsentimientoRepo`**, **`PlantillaRepo`**), proveedor (`AccessPointProvider`, `PlateEventSource`, `FaceTemplateProvider`, `IntercomProvider`), soporte (`Reloj`, `GeneradorDeId`, `Notificador`, `AlmacenEvidencia`, `Bitácora`).
 **Políticas:** `PolíticaListaNegra` (precedencia absoluta, RN-06), `PolíticaZona` (RN-14), `PolíticaConsentimiento` (RN-09, RN-10).
+**Precedencia del motor de reglas**, vinculante (diagrama pág. 3): `listaNegra > vigencia > patrón > zona`. Se evalúan en orden, y la primera que niega determina el motivo del `ResultadoAcceso` — es lo que hace que un visitante en lista negra **con autorización vigente** produzca motivo `LISTA_NEGRA` y no `VIGENCIA_EXPIRADA` (CA-13).
 
 ### 2.3 SOLID — obligatorio y verificable
 
@@ -256,8 +277,16 @@ Todo el sistema debe funcionar completo contra `MockProvider`. Si el sistema nec
 ### ADR-04 · La integridad concurrente se resuelve en la base de datos
 Invariantes como "una placa activa por vivienda" (RN-04) se garantizan con **índice único parcial**, no con un `SELECT` previo en el código. KPI-03 exige 0 duplicados en 100 inserciones simultáneas: solo la base puede garantizarlo.
 
-### ADR-05 · Inmutabilidad de eventos por permisos de base de datos
-RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE` sobre `eventos` para todos los roles de aplicación. La inmutabilidad no puede depender de que el código "no lo haga".
+### ADR-05 · Inmutabilidad de eventos por permisos de base de datos **y por trigger**
+RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE, TRUNCATE` sobre `eventos` para todos los roles **y para el dueño de la tabla**, más un trigger `BEFORE UPDATE OR DELETE` que bloquea incluso a quien pueda reconcederse el privilegio. La inmutabilidad no puede depender de que el código "no lo haga".
+
+> **Corrección del 2026-09-06 · verificada contra el proyecto real.** La formulación anterior decía «para todos los roles de aplicación» y ahí estaba el hueco: en Supabase el **dueño** de las tablas es `postgres`, que es **el rol que trae la cadena de conexión por defecto**. Un `REVOKE` que no lo incluye deja intacta la vía por la que la API se conecta de verdad; se comprobó que `UPDATE public.eventos` tenía éxito. Además, **un `REVOKE` solo nunca basta contra el dueño**, porque puede reconcederse el privilegio.
+>
+> **Resolución, en capas:** (1) `REVOKE` también al dueño —efectivo en Supabase, donde `postgres` **no** es superusuario—; (2) trigger `BEFORE UPDATE`, que sí alcanza al dueño; (3) la RLS misma, que al no existir política de `UPDATE` sobre `eventos` y estar en modo `FORCE` alcanza también al dueño; (4) aserción de despliegue que falla si se revierte cualquiera. El rol de conexión dedicado **`app_api`** es defensa adicional y es un **procedimiento de operador**, no una migración: crearlo desde SQL versionado exige privilegios que Supabase no concede (Enmienda 2 del ADR-005).
+>
+> **Riesgo residual declarado:** el dueño conserva `ALTER TABLE … DISABLE TRIGGER`. Es un acto de DDL deliberado, no un `UPDATE` desde el código, y la aserción lo detecta en el siguiente despliegue porque verifica `tgenabled`, no solo la existencia del trigger.
+>
+> Migración `0017` · prueba `supabase/policies/tests/40_inmutabilidad_frente_al_dueno.sql` · procedimiento en `docs/guias/CONEXION_SUPABASE.md` §12.
 
 ---
 
@@ -325,7 +354,7 @@ RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE` sobre `eventos` para to
 Requisitos no negociables del diseño:
 - `copropiedad_id` **NOT NULL** en toda tabla operativa: es la frontera del tenant.
 - **Sin borrado físico** donde hay historial: `estado` + `desactivado_en` (RN-19, CA-02, KPI-04), reforzado por trigger que impida el `DELETE`.
-- `eventos` inmutable por permisos (ADR-05, RN-03, CA-23).
+- `eventos` inmutable por permisos **y por trigger**, con el dueño de la tabla incluido en la revocación (ADR-05, RN-03, CA-23).
 - Auditoría en toda tabla: `creado_en`, `creado_por`, `actualizado_en`, `actualizado_por` (KPI-05).
 - Enumerados para resultados y motivos; `tstzrange` para vigencias con zona horaria; normalización explícita de placas y documentos.
 - **Índices únicos parciales** para invariantes concurrentes (ADR-04): único sobre `(copropiedad_id, placa)` filtrado por `activo = true` (KPI-02, KPI-03, CA-03).
@@ -336,8 +365,9 @@ Requisitos no negociables del diseño:
 *3 · Seeds.* Una copropiedad ficticia coherente con los mockups. Datos inventados; cero datos reales; cero secretos.
 
 *4 · `docs/guias/CONEXION_SUPABASE.md`* — paso a paso, asumiendo que el usuario **ya tiene credenciales**:
-- Dónde encontrar en el panel: *Project URL*, *anon key*, *service_role key*, *JWT secret*, cadena directa y de *pooler*.
-- Qué llave usa cada superficie y por qué: `anon` en web y móvil (sujeta a RLS); `service_role` **solo en servidor** (API, workers, Edge), nunca en un cliente, nunca en `NEXT_PUBLIC_*`, nunca compilada en Flutter.
+- Dónde encontrar en el panel: *Project URL*, **llave publicable** (`sb_publishable_…`), **llave secreta** (`sb_secret_…`), **URL del JWKS**, cadena directa y de *pooler*.
+- Qué llave usa cada superficie y por qué: la **publicable** en web y móvil (resuelve al rol `anon`, sujeta a RLS); la **secreta** **solo en servidor** (API, workers, Edge), nunca en un cliente, nunca en `NEXT_PUBLIC_*`, nunca compilada en Flutter.
+  > **Corrección del 2026-09-06.** El proyecto de Grupo Control usa el esquema nuevo: **no tiene `anon` ni `service_role` como llaves de API, ni secreto JWT compartido**. Los proyectos creados desde noviembre de 2025 ya no traen las llaves heredadas, y desde el 1 de octubre de 2025 los proyectos nuevos usan **firma asimétrica** por defecto. Lo que **no** cambia: los **roles de PostgreSQL** `anon`, `authenticated` y `service_role` siguen existiendo y las llaves resuelven a ellos, así que el esquema, los `GRANT`/`REVOKE` y las políticas RLS de la ETAPA 01 no se tocan. La llave secreta sigue omitiendo RLS: **el riesgo número uno no cambia, solo cambia el nombre de la variable**.
 - `.env.example` por aplicación, con la advertencia explícita de que todo `NEXT_PUBLIC_*` es público por definición y de que **todo lo compilado en Flutter es extraíble del binario**.
 - CLI: instalación, `supabase link`, aplicación de migraciones, verificación de que RLS quedó activa y **comprobación práctica del aislamiento** (una consulta cruzada entre copropiedades debe fallar).
 - Auth: MFA TOTP, expiración de tokens, *custom claims* de `copropiedad_id` y rol vía *auth hook*.
@@ -374,7 +404,9 @@ Herramientas: ESLint con **reglas de frontera** que rompan el build si `domain/`
 
 **Objetivo.** Cerrar el riesgo número uno del proyecto: la fuga de datos entre copropiedades.
 
-**Alcance.** Integración con Supabase Auth: verificación de JWT, *custom claims* de copropiedad y rol, refresco y revocación de sesión. Los **6 roles** implementados como guards declarativos y decoradores de permiso.
+**Alcance.** Integración con Supabase Auth: **verificación asimétrica del JWT contra el JWKS del proyecto** —nunca HS256 con secreto compartido, que este proyecto ya no tiene—, *custom claims* de copropiedad y rol, refresco y revocación de sesión. Los **6 roles** implementados como guards declarativos y decoradores de permiso.
+
+> **Diseño vinculante:** `docs/arquitectura/verificacion-jwt-asimetrica.md`, escrito en la ETAPA 01 y verificado contra la documentación oficial. Fija las reglas de verificación (algoritmo tomado de la clave y no del token, HS256 rechazado, TTL de caché de 10 min alineado con el edge de Supabase, fallo cerrado), el procedimiento de rotación sin caída con su margen de 20 minutos, y las consecuencias de la **expiración de 5 minutos** para Flutter (ETAPA 11), el canal de tiempo real (ETAPA 06) y el rate limiting. El Edge (ETAPA 12) **no** se ve afectado: usa la llave secreta, no un token de usuario.
 
 MFA TOTP obligatorio para roles administrativos (RN-20, CA-25): alta, verificación, códigos de recuperación de un solo uso almacenados en hash, y bloqueo del acceso hasta completar el segundo factor.
 

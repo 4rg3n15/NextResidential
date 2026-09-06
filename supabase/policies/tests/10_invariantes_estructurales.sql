@@ -1,13 +1,20 @@
 -- =============================================================================
 -- Invariantes de nivel estructural
 --
--- Se ejecuta como superusuario A PROPÓSITO: demuestra que estas reglas se
--- cumplen aunque el actor omita RLS por completo, que es exactamente la
--- situación de `service_role` (modelo-datos.md §8.4).
+-- Se ejecuta con un actor que OMITE RLS a propósito: demuestra que estas reglas
+-- se cumplen aunque las políticas de fila no intervengan, que es exactamente la
+-- situación de la llave secreta (modelo-datos.md §8.4).
+--
+-- CORRECCIÓN 2026-09-06. Antes decía «se ejecuta como superusuario» y dependía
+-- de que el rol de la conexión lo fuera. Eso no es fiel: en Supabase nadie se
+-- conecta como superusuario. Ahora adopta explícitamente `service_role`, que es
+-- el rol que de verdad lleva BYPASSRLS. La prueba pasa a ejercitar el camino
+-- real en vez de uno que no existe en producción.
 -- =============================================================================
 
 \set ON_ERROR_STOP on
-SET request.jwt.claims = '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002"}';
+SET ROLE service_role;
+SET request.jwt.claims = '{"rol":"servicio","usuario_id":"00000000-0000-4000-8000-000000000002"}';
 
 -- RN-04 · CA-03 · KPI-02 — placa duplicada activa rechazada -------------------
 DO $$
@@ -266,7 +273,12 @@ BEGIN
   BEGIN
     DELETE FROM public.residentes WHERE id = '50000000-0000-4000-8000-000000000001';
     RAISE EXCEPTION 'RN-19 INCUMPLIDA: se borro fisicamente un residente';
-  EXCEPTION WHEN restrict_violation THEN
+  -- Dos barreras independientes, y la que salte primero depende del actor:
+  -- `insufficient_privilege` si el rol no tiene DELETE concedido (D-20, que es
+  -- el caso de todo rol de aplicación), `restrict_violation` si lo tiene y lo
+  -- detiene el disparador. Ambas cumplen RN-19; exigir solo una hacía que la
+  -- prueba dependiera de con qué rol se ejecutase.
+  EXCEPTION WHEN restrict_violation OR insufficient_privilege THEN
     RAISE NOTICE 'RN-19/CA-02 borrado fisico prohibido: ok';
   END;
 END
@@ -352,3 +364,86 @@ BEGIN
   RAISE NOTICE 'P-11 nivel de acceso por defecto = el mas restrictivo: ok';
 END
 $$;
+
+-- Retención (migración 0016) --------------------------------------------------
+
+-- La ley como cota superior: se puede configurar menos de 24 h, nunca más.
+DO $$
+BEGIN
+  UPDATE public.copropiedades SET margen_supresion_plantilla = interval '6 hours'
+   WHERE id = '10000000-0000-4000-8000-000000000001';
+  RAISE NOTICE 'RN-11 margen mas corto que el legal: aceptado, ok';
+
+  BEGIN
+    UPDATE public.copropiedades SET margen_supresion_plantilla = interval '48 hours'
+     WHERE id = '10000000-0000-4000-8000-000000000001';
+    RAISE EXCEPTION 'RN-11 INCUMPLIDA: se acepto un margen de supresion superior a 24 h';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'RN-11 margen superior al legal rechazado: ok';
+  END;
+
+  UPDATE public.copropiedades SET margen_supresion_plantilla = interval '24 hours'
+   WHERE id = '10000000-0000-4000-8000-000000000001';
+END
+$$;
+
+-- La plantilla no puede sobrevivir a la vigencia que la justifica.
+DO $$
+DECLARE v_consent uuid; v_fin timestamptz;
+BEGIN
+  SELECT upper(vigencia) INTO v_fin FROM public.autorizaciones
+   WHERE id = '70000000-0000-4000-8000-000000000001';
+
+  INSERT INTO public.consentimientos_biometricos
+    (copropiedad_id, persona_id, version_politica, canal, estado, otorgado_en,
+     creado_por, actualizado_por)
+  VALUES ('10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000102',
+          'v1.0','app','vigente', now(),
+          '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
+  RETURNING id INTO v_consent;
+
+  BEGIN
+    INSERT INTO public.plantillas_biometricas
+      (copropiedad_id, persona_id, consentimiento_id, autorizacion_id, calidad,
+       suprimir_en, creado_por, actualizado_por)
+    VALUES ('10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000102',
+            v_consent,'70000000-0000-4000-8000-000000000001', 0.95,
+            v_fin + interval '30 days',
+            '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002');
+    RAISE EXCEPTION 'Retencion INCUMPLIDA: la plantilla sobrevive a su autorizacion';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'retencion: plantilla mas alla de la vigencia rechazada, ok';
+  END;
+
+  -- Dentro del margen legal sí se acepta.
+  INSERT INTO public.plantillas_biometricas
+    (copropiedad_id, persona_id, consentimiento_id, autorizacion_id, calidad,
+     suprimir_en, creado_por, actualizado_por)
+  VALUES ('10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000102',
+          v_consent,'70000000-0000-4000-8000-000000000001', 0.95,
+          v_fin + interval '12 hours',
+          '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002');
+  RAISE NOTICE 'retencion: plantilla dentro del margen legal aceptada, ok';
+END
+$$;
+
+-- El libro de purgas es append-only, como eventos y evidencias.
+DO $$
+DECLARE v_id uuid;
+BEGIN
+  INSERT INTO public.purgas_retencion
+    (copropiedad_id, tipo, politica_aplicada, rango_hasta, objetos_afectados, creado_por)
+  VALUES ('10000000-0000-4000-8000-000000000001','evidencia', interval '90 days',
+          now() - interval '90 days', 17,'00000000-0000-4000-8000-000000000002')
+  RETURNING id INTO v_id;
+
+  BEGIN
+    DELETE FROM public.purgas_retencion WHERE id = v_id;
+    RAISE EXCEPTION 'El libro de purgas deberia ser append-only';
+  EXCEPTION WHEN restrict_violation OR insufficient_privilege THEN
+    RAISE NOTICE 'libro de purgas append-only: ok';
+  END;
+END
+$$;
+
+RESET ROLE;
