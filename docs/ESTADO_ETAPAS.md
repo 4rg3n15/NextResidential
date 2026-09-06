@@ -14,7 +14,7 @@
 | | |
 |---|---|
 | **Etapas cerradas** | **1 de 17** (ETAPA 00) |
-| **Etapa siguiente habilitada** | **ETAPA 01 — Modelo de datos y Supabase** |
+| **Etapa en curso** | **ETAPA 01 — Modelo de datos y Supabase** · paso **01-A entregado**, esperando aprobación del diseño |
 | **Bloqueos activos** | Ninguno |
 | **Contradicciones abiertas** | Ninguna (14 registradas, 14 resueltas) |
 | **Decisiones pendientes** | 11 — ninguna bloquea la ETAPA 01 |
@@ -27,7 +27,7 @@
 | Etapa | Nombre | Rama | Depende de | Estado | Informe |
 |---|---|---|---|---|---|
 | **00** | Auditoría documental y plan maestro | `etapa00` ⚠️ | — | **CERRADA** | [ETAPA-00](etapas/ETAPA-00.md) |
-| 01 | Modelo de datos y Supabase + guía de conexión | `etapa-01-modelo-datos-supabase` | 00 ✅ | **PENDIENTE** — habilitada | — |
+| 01 | Modelo de datos y Supabase + guía de conexión | `etapa-01-modelo-datos-supabase` | 00 ✅ | **EN CURSO** — 01-A entregado | [modelo-datos](arquitectura/modelo-datos.md) |
 | 02 | Andamiaje del monorepo y núcleo hexagonal | `etapa-02-andamiaje-monorepo` | 01 | PENDIENTE | — |
 | 03 | Auth, RBAC, MFA y aislamiento multiempresa | `etapa-03-auth-rbac-multiempresa` | 02 | PENDIENTE | — |
 | 04 | Padrón: viviendas, residentes, vehículos | `etapa-04-padron` | 03 | PENDIENTE | — |
@@ -86,9 +86,51 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 
 ---
 
-## Etapas 01 a 16 — `PENDIENTE`
+## ETAPA 01 — Modelo de datos y Supabase · **EN CURSO**
 
-Sin trabajo iniciado. La ETAPA 01 está habilitada.
+**Rama:** `etapa-01-modelo-datos-supabase` · **Base:** `etapa00` · **Ejecutada en dos pasos por indicación del usuario.**
+
+### Paso 01-A — Diseño para aprobación · **ENTREGADO** (2026-09-06)
+
+| Entregable | Ruta | Estado |
+|---|---|---|
+| Justificación de los nueve agregados | `docs/arquitectura/modelo-datos.md` §2 | ✅ |
+| ERD en Mermaid, cinco vistas por contexto | §3 | ✅ |
+| Convenciones comunes y 31 enumerados | §4, §5 | ✅ |
+| 29 tablas con columnas, tipos y restricciones | §6 | ✅ |
+| Índices de invariante y de consulta · particionamiento | §7 | ✅ |
+| Matriz de políticas RLS (29 tablas × 6 roles) | §8 | ✅ |
+| 21 decisiones no obvias justificadas | §9 | ✅ |
+| Trazabilidad regla → contraparte estructural | §10 | ✅ |
+
+**Sin SQL ejecutable, sin migraciones, sin seeds.** Por instrucción expresa del usuario.
+
+### Paso 01-B — Implementación · **BLOQUEADO** hasta aprobación del diseño
+
+Migraciones, políticas RLS como SQL, suite de pruebas positivas y negativas, semillas, `docs/guias/CONEXION_SUPABASE.md`, `.env.example` por aplicación e informe de cierre `docs/etapas/ETAPA-01.md`.
+
+**Decisiones que 01-B necesita** (detalle en `modelo-datos.md` §11):
+
+| # | Decisión | Efecto si no se resuelve |
+|---|---|---|
+| 1 | Aprobar los nueve agregados | Bloquea todo el esquema |
+| 2 | **D-18** — añadir `FUERA_DE_HORARIO` al enumerado de motivos y a `CLAUDE.md` §2.4 | CA-14 y CA-15 quedan indistinguibles en el evento |
+| 3 | **D-01** `personas` y **D-16** `edge_gateways`, tablas fuera del mínimo de §6 | Sin la primera, RN-06 no es aplicable; sin la segunda, KPI-31 no tiene dónde guardarse |
+| 4 | **P-11** — «nivel de acceso» del residente | El enumerado queda con dos valores supuestos |
+| 5 | Credenciales de Supabase, cuenta corporativa | 01-B no puede verificar que las migraciones corren limpias |
+
+### Supuestos nuevos introducidos por 01-A
+
+| ID | Supuesto | Valor conservador |
+|---|---|---|
+| **S-08** | Una persona es residente de una sola vivienda activa a la vez | Índice único parcial sobre `residentes` |
+| **S-09** | Los horarios de zona que cruzan medianoche se modelan como dos filas | `CHECK (hora_inicio < hora_fin)` |
+
+---
+
+## Etapas 02 a 16 — `PENDIENTE`
+
+Sin trabajo iniciado. La ETAPA 02 se habilita cuando la 01 quede cerrada.
 
 ### Insumos que la ETAPA 01 hereda de la 00
 
