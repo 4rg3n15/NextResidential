@@ -13,12 +13,13 @@
 
 | | |
 |---|---|
-| **Etapas cerradas** | **1 de 17** (ETAPA 00) |
-| **Etapa siguiente habilitada** | **ETAPA 01 — Modelo de datos y Supabase** |
+| **Etapas cerradas** | **2 de 17** (ETAPAS 00 y 01) |
+| **Etapa siguiente habilitada** | **ETAPA 02 — Andamiaje del monorepo y núcleo hexagonal** |
 | **Bloqueos activos** | Ninguno |
 | **Contradicciones abiertas** | Ninguna (14 registradas, 14 resueltas) |
-| **Decisiones pendientes** | 11 — ninguna bloquea la ETAPA 01 |
-| **Supuestos vigentes** | 7 — todos con valor conservador y configurable |
+| **Decisiones pendientes** | 10 abiertas (P-11 resuelto) — ninguna bloquea la ETAPA 02 |
+| **Supuestos vigentes** | 9 — 7 de la ETAPA 00 más S-08 y S-09 |
+| **Extensiones al contrato** | 1 — E-01 `FUERA_DE_HORARIO`, aprobada |
 
 ---
 
@@ -27,8 +28,8 @@
 | Etapa | Nombre | Rama | Depende de | Estado | Informe |
 |---|---|---|---|---|---|
 | **00** | Auditoría documental y plan maestro | `etapa00` ⚠️ | — | **CERRADA** | [ETAPA-00](etapas/ETAPA-00.md) |
-| 01 | Modelo de datos y Supabase + guía de conexión | `etapa-01-modelo-datos-supabase` | 00 ✅ | **PENDIENTE** — habilitada | — |
-| 02 | Andamiaje del monorepo y núcleo hexagonal | `etapa-02-andamiaje-monorepo` | 01 | PENDIENTE | — |
+| 01 | Modelo de datos y Supabase + guía de conexión | `etapa-01-modelo-datos-supabase` | 00 ✅ | **CERRADA** | [ETAPA-01](etapas/ETAPA-01.md) |
+| 02 | Andamiaje del monorepo y núcleo hexagonal | `etapa-02-andamiaje-monorepo` | 01 ✅ | **PENDIENTE** — habilitada | — |
 | 03 | Auth, RBAC, MFA y aislamiento multiempresa | `etapa-03-auth-rbac-multiempresa` | 02 | PENDIENTE | — |
 | 04 | Padrón: viviendas, residentes, vehículos | `etapa-04-padron` | 03 | PENDIENTE | — |
 | 05 | Autorizaciones y motor de reglas + MockProvider | `etapa-05-autorizaciones-motor-reglas` | 04 | PENDIENTE | — |
@@ -44,7 +45,17 @@
 | 15 | Integración real con hardware Hikvision | `etapa-15-integracion-hikvision` | 14 | **PENDIENTE — con precondición** | — |
 | 16 | Documentación técnica final y README | `etapa-16-documentacion-final` | 14 (ejecutable), 15 (definitiva) | PENDIENTE | — |
 
-> ⚠️ **Desviación de nomenclatura registrada.** `CLAUDE.md` §2.5 exige ramas `etapa-NN-slug`; la ETAPA 00 se ejecutó en **`etapa00`** por indicación expresa del usuario. Queda constancia. A partir de la ETAPA 01 se retoma la convención del contrato, salvo indicación en contrario.
+> ⚠️ **Desviación de nomenclatura registrada.** `CLAUDE.md` §2.5 exige ramas `etapa-NN-slug`; la ETAPA 00 se ejecutó en **`etapa00`** por indicación expresa del usuario. A partir de la ETAPA 01 se retomó la convención del contrato.
+>
+> **Regla de ramificación fijada por el usuario el 2026-09-06, vinculante en adelante:**
+> **cada rama de etapa se saca de `develop` actualizado, nunca de la rama de la etapa anterior.**
+> La rama de la ETAPA 01 se creó antes de esta instrucción, desde `etapa00`, y se
+> corrigió fusionando `develop` en ella (merge `61e8efd`, sin reescribir historia).
+> Procedimiento para la ETAPA 02 en adelante:
+> ```
+> git fetch origin && git checkout develop && git pull --ff-only
+> git checkout -b etapa-NN-slug
+> ```
 
 **Precondición de la ETAPA 15** (`CLAUDE.md` §6): se ejecuta **solo** cuando el usuario tenga acceso al equipo y entregue un prompt adicional con la documentación ISAPI del modelo concreto, IPs, credenciales y llaves de referencia.
 
@@ -86,9 +97,45 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 
 ---
 
-## Etapas 01 a 16 — `PENDIENTE`
+## ETAPA 01 — Modelo de datos y Supabase · **CERRADA**
 
-Sin trabajo iniciado. La ETAPA 01 está habilitada.
+**Rama:** `etapa-01-modelo-datos-supabase` · **Base:** `develop` · **Cierre:** 2026-09-06
+**Ejecutada en dos pasos por indicación del usuario:** 01-A diseño para aprobación, 01-B implementación.
+
+### Entregables
+
+| Entregable | Ruta | Estado |
+|---|---|---|
+| Diseño del modelo de datos | `docs/arquitectura/modelo-datos.md` | ✅ |
+| 15 migraciones versionadas, idempotentes y reversibles | `supabase/migrations/` | ✅ |
+| Guiones de reversión, uno por migración | `supabase/reversion/` | ✅ |
+| Matriz RLS y suite de verificación | `supabase/policies/` | ✅ |
+| Semillas de dos copropiedades ficticias | `supabase/seed/seed.sql` | ✅ |
+| Verificador local, sin credenciales | `supabase/verificar.sh` | ✅ |
+| Guía de conexión | `docs/guias/CONEXION_SUPABASE.md` | ✅ |
+| `.env.example` por aplicación | `apps/*/.env.example` | ✅ |
+| Informe de cierre | `docs/etapas/ETAPA-01.md` | ✅ |
+
+### Definición de Terminado
+
+| Criterio | Resultado |
+|---|---|
+| Las migraciones corren limpias sobre una base vacía | ✅ Verificado sobre PostgreSQL 16.13 |
+| RLS activa en el 100 % de las tablas | ✅ **40/40** (30 tablas + 10 particiones), activa **y forzada** |
+| Cada RN de integridad tiene contraparte estructural identificada | ✅ 22/22 · `modelo-datos.md` §10 |
+| *(añadido)* Idempotencia | ✅ Tres pasadas consecutivas sin error ni cambio |
+| *(añadido)* Reversibilidad | ✅ Ciclo completo aplicar → revertir → aplicar, 0 objetos residuales |
+| *(añadido)* KPI-03 | ✅ 100 inserciones concurrentes reales: 1 aceptada, 99 rechazadas, 1 fila |
+
+### Cifras del esquema
+
+30 tablas · 10 particiones de `eventos` · 30 enumerados · 93 políticas RLS · 94 índices únicos · 15 migraciones · 15 guiones de reversión.
+
+---
+
+## Etapas 02 a 16 — `PENDIENTE`
+
+Sin trabajo iniciado. La ETAPA 02 se habilita cuando la 01 quede cerrada.
 
 ### Insumos que la ETAPA 01 hereda de la 00
 

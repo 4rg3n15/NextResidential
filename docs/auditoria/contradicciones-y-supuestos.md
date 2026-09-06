@@ -219,6 +219,8 @@ Cada supuesto se marca `[SUPUESTO]` en el código donde se materialice, y todos 
 | **S-05** | Umbral de confianza de lectura de placa (CU-01 3a) | **0,85**, configurable por copropiedad | Por debajo, **no se decide automáticamente**: se envía a validación humana. La duda nunca abre | 05 · 15 | P-02 |
 | **S-06** | Umbral de latido para marcar un dispositivo caído (CA-26) | **3 latidos perdidos o 5 minutos**, configurable por tipo | Marcar caído de más es molesto; marcar de menos oculta un equipo muerto. Tres latidos absorbe una pérdida aislada sin ocultar una caída real | 06 | P-06 |
 | **S-07** | Definición de «acceso dudoso» como evento crítico (RN-18) | `ResultadoAcceso` igual a **`CONFIANZA_INSUFICIENTE` o `PLACA_DESCONOCIDA`** | Ambos escalan. Escalar de más satura al operador; escalar de menos deja pasar el caso que RN-18 quiere atrapar. Estos dos son los únicos resultados que denotan incertidumbre, no violación de regla | 06 | P-07 |
+| **S-08** *(ETAPA 01)* | Una persona es residente de una sola vivienda activa a la vez | Índice único parcial sobre `residentes (copropiedad_id, persona_id) WHERE estado='activo'` | El documento no lo dice. Permitir dos viviendas haría ambigua la vivienda destino de una autorización, y RN-05 dejaría de ser verificable | 04 | — |
+| **S-09** *(ETAPA 01)* | Los horarios de zona que cruzan medianoche se modelan como dos filas | `CHECK (hora_inicio < hora_fin)` + columna `continua_del_dia_anterior` | Permitir `hora_fin < hora_inicio` como marca de cruce mete un caso especial en la comparación del motor de reglas. **Precisado por el usuario al aprobar 01-A: el corte de medianoche NO reinicia el contador de aforo** — es artificio de representación, no cierre de jornada. Caso de prueba de límite obligatorio de la ETAPA 07 | 07 | — |
 
 ---
 
@@ -238,7 +240,25 @@ Ninguna bloquea la ETAPA 01. Cada una tiene comportamiento conservador vigente h
 | **P-08** | Plataforma de despliegue de la API | Ninguno. La decisión no afecta al código si se respeta la frontera hexagonal | ETAPA 14 | Grupo Control |
 | **P-09** | ¿Existe compuerta de aprobación administrativa de autorizaciones? (C-03) | **No se construye.** El residente autoriza y la autorización nace vigente; el administrador puede revocar | ETAPA 05 | Grupo Control |
 | **P-10** | ¿Se quieren reservas de zonas con franja horaria y sin cobro? (C-04) | **No se construyen.** Solo «solicitar acceso» (HU-19) | ETAPA 07 | Grupo Control |
-| **P-11** | «Nivel de acceso» por residente («Acceso Completo» / «Solo Ingreso», mockup M-2) | `Residente.nivelAcceso` con valor por defecto **el más restrictivo**; solo el titular de la vivienda crea autorizaciones (RN-05) | ETAPA 04 | Grupo Control |
+| ~~**P-11**~~ **RESUELTO** *(2026-09-06)* | «Nivel de acceso» por residente | **Catálogo `niveles_acceso`**, no booleano ni enumerado: arranca con dos valores (`solo_ingreso`, `completo`) y admite más sin migración. Un disparador asigna el de menor `orden` —el más restrictivo— cuando el residente llega sin nivel. Solo el titular crea autorizaciones (RN-05) | — | Resuelto por el usuario |
+
+---
+
+## 3 bis. Extensiones al contrato
+
+Cambios a `CLAUDE.md` solicitados por una etapa y **aprobados expresamente por el
+cliente**. Se registran aquí porque modifican el contrato de trabajo, no solo el
+código.
+
+### E-01 · Décimo motivo tipado `FUERA_DE_HORARIO` — **aprobada el 2026-09-06**
+
+| | |
+|---|---|
+| **Solicitada por** | ETAPA 01-A, decisión **D-18** |
+| **Qué cambia** | `CLAUDE.md` §2.4 pasa de nueve motivos enumerados a diez |
+| **Por qué** | CA-15 exige negar con motivo «fuera de horario» y ninguno de los nueve lo expresaba. `ZONA_NO_AUTORIZADA` es la falta de permiso sobre la zona (CU-05 alterno 2a); `AFORO_SUPERADO` es CA-14, un criterio distinto; `FUERA_DE_PATRON` es el patrón de recurrencia de la autorización (RN-22, CA-06), no el horario de la zona (RN-14, CA-15) |
+| **Riesgo que evita** | Colapsar CA-14 y CA-15 en un mismo motivo los haría indistinguibles en el evento, y la consola no podría decirle al residente por qué se le negó el paso |
+| **Dónde vive** | Enumerado `motivo_acceso` (migración `0002`) · `CLAUDE.md` §2.4 con la justificación · prueba de regresión en `supabase/policies/tests/10_invariantes_estructurales.sql` |
 
 ---
 
@@ -247,8 +267,9 @@ Ninguna bloquea la ETAPA 01. Cada una tiene comportamiento conservador vigente h
 | Categoría | Cantidad | Estado |
 |---|---|---|
 | `[CONTRADICCIÓN]` | **14** | **14 resueltas**, ninguna abierta |
-| `[SUPUESTO]` | **7** | Todos con valor conservador y configurable |
-| `PENDIENTE DE DEFINICIÓN` | **11** | Todos con comportamiento conservador vigente; **ninguno bloquea la ETAPA 01** |
+| `[SUPUESTO]` | **9** | 7 de la ETAPA 00 más S-08 y S-09 de la ETAPA 01. Todos con valor conservador; los de umbral, además, configurables por copropiedad |
+| `PENDIENTE DE DEFINICIÓN` | **11** — **1 resuelto** (P-11) | Los 10 abiertos tienen comportamiento conservador vigente; ninguno bloquea la ETAPA 02 |
+| **Extensiones al contrato** | **1** | E-01 · `FUERA_DE_HORARIO`, aprobada |
 
 **Contradicciones por severidad:** **5 altas** (C-01, C-02, C-03, C-05, C-12) · **4 medias** (C-04, C-06, C-07, C-22) · **5 bajas** (C-11, C-14, C-15, C-23, C-26). Total 14.
 
