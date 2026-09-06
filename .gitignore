@@ -1,0 +1,13 @@
+.env
+.env.*
+.DS_Store
+!.env.example
+*.pem
+*.key
+service-account*.json
+google-services.json
+GoogleService-Info.plist
+/coverage
+/dist
+/build
+*.sqlite
