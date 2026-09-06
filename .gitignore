@@ -11,3 +11,9 @@ GoogleService-Info.plist
 /dist
 /build
 *.sqlite
+# ETAPA 02 — monorepo
+node_modules/
+.turbo/
+dist/
+coverage/
+*.tsbuildinfo
