@@ -1,11 +1,19 @@
-# Modelo de datos · Diseño para aprobación
+# Modelo de datos
 
-> **ETAPA 01-A — diseño, no implementación.**
-> Este documento contiene el diseño del esquema para aprobación del usuario. **No hay SQL ejecutable, migraciones ni seeds**: eso es la ETAPA 01-B, que se ejecuta solo tras aprobación expresa de este diseño.
-> Los tipos y restricciones se expresan en notación PostgreSQL para que sean revisables sin ambigüedad, pero ningún fragmento es un artefacto ejecutable.
+> **Diseño aprobado el 2026-09-06 e implementado en la ETAPA 01-B.**
+> Este documento es la referencia de diseño; el esquema ejecutable vive en
+> `supabase/migrations/`. Ambos se mantienen sincronizados: si divergen, manda
+> la migración y este documento se corrige.
+>
+> **Cambios introducidos por las decisiones del usuario al aprobar 01-A:**
+> **P-11** — `nivel_acceso` deja de ser enumerado y pasa a ser el catálogo
+> `niveles_acceso` (§6.2), con lo que las tablas suben de 29 a **30** y los
+> enumerados bajan de 31 a **30**. **D-18** — `FUERA_DE_HORARIO` aprobado y
+> añadido a `CLAUDE.md` §2.4. **S-09** — precisado: el corte de medianoche
+> **no** reinicia el contador de aforo.
 
-- **Rama:** `etapa-01-modelo-datos-supabase` · **Base:** `etapa00` (ETAPA 00 cerrada)
-- **Fecha:** 2026-09-06
+- **Rama:** `etapa-01-modelo-datos-supabase` · **Base:** `develop`
+- **Fecha de diseño:** 2026-09-06 · **Aprobado e implementado:** 2026-09-06
 
 ---
 
@@ -102,7 +110,7 @@ Ese estado transitorio no es una anomalía a evitar: es el estado que el sistema
 
 ## §3. Diagrama entidad-relación
 
-Cinco vistas por contexto delimitado, siguiendo el mapa de contextos de la página 2 del diagrama arquitectónico. Un solo diagrama con veintinueve tablas sería ilegible y, peor, ocultaría precisamente lo que el mapa de contextos quiere mostrar: dónde están las fronteras.
+Cinco vistas por contexto delimitado, siguiendo el mapa de contextos de la página 2 del diagrama arquitectónico. Un solo diagrama con treinta tablas sería ilegible y, peor, ocultaría precisamente lo que el mapa de contextos quiere mostrar: dónde están las fronteras.
 
 ### 3.1 Frontera del tenant e identidad
 
@@ -499,7 +507,7 @@ erDiagram
 CHECK ( (estado = 'inactivo') = (desactivado_en IS NOT NULL) )
 ```
 
-Impide los dos estados incoherentes —inactivo sin fecha, y fecha sin inactivar— con una sola expresión. No es opcional ni delegable a la aplicación: es lo que hace que «desactivado» signifique lo mismo en las veintinueve tablas.
+Impide los dos estados incoherentes —inactivo sin fecha, y fecha sin inactivar— con una sola expresión. No es opcional ni delegable a la aplicación: es lo que hace que «desactivado» signifique lo mismo en las treinta tablas.
 
 **Todo `timestamptz`, nunca `timestamp`.** Cada copropiedad tiene su zona horaria y el Edge decide sin conexión con su propio reloj. Un `timestamp` sin zona haría irreconciliables los eventos de la reconciliación (CU-04) en el mejor caso, y silenciosamente erróneos en el peor.
 
@@ -547,7 +555,6 @@ Enumerados y no `text` con `CHECK`: un valor inesperado falla al escribir, la li
 | `estado_tenant` | `activa`, `suspendida`, `cancelada` | Diagrama, `Copropiedad.estado` |
 | `rol_usuario` | `superadministrador`, `administrador`, `portero`, `operador_central`, `residente`, `servicio` | §5 de requisitos — los **6** roles |
 | `tipo_documento` | `cedula`, `cedula_extranjeria`, `pasaporte`, `nit`, `otro` | Glosario · mockups (campo «CI») |
-| `nivel_acceso` | `solo_ingreso`, `completo` | Mockup M-2 · `PENDIENTE` **P-11** |
 | `estado_administrativo` | `al_dia`, `en_mora`, `suspendida` | PDF del reto §3 · `[SUPUESTO]` **S-01** |
 | `categoria_visitante` | `visitante`, `contratista`, `proveedor`, `servicio_domestico` | Mockups W-05 y M-4 · ver **D-03** |
 | `tipo_autorizacion` | `unica`, `recurrente` | PDF del reto · HU-07, HU-08 · ver **D-03** |
@@ -574,6 +581,8 @@ Enumerados y no `text` con `CHECK`: un valor inesperado falla al escribir, la li
 | `estado_recepcion` | `recibido`, `aplicado`, `descartado_duplicado` | CU-04 6a |
 | `tipo_evento_seguridad` | `acceso_cruzado`, `login_fallido`, `mfa_fallido`, `escalamiento_privilegio`, `rate_limit`, `firma_invalida` | RN-15 · KPI-38 · RNF-03.11 |
 | `tipo_evidencia` | `foto_completa`, `recorte_placa`, `captura_rostro`, `consentimiento` | Diagrama pág. 4, paso 2 · CU-02 |
+
+> **P-11 resuelto.** El nivel de acceso del residente **no** es un enumerado: es el catálogo `niveles_acceso` (§6.2). El usuario decidió que arranque con dos valores pero pueda crecer sin migración, con el más restrictivo por defecto. Por eso el catálogo tiene 30 tipos y no 31.
 
 ---
 
@@ -653,7 +662,7 @@ Solo se listan las columnas propias; las de §4 (identidad, tenant, auditoría, 
 | `persona_id` | `uuid NOT NULL REFERENCES personas(id)` | | |
 | `parentesco` | `text NULL` | | Mockup M-2 |
 | `es_titular` | `boolean NOT NULL DEFAULT false` | | Quién puede autorizar (RN-05) |
-| `nivel_acceso` | `nivel_acceso NOT NULL DEFAULT 'solo_ingreso'` | | `PENDIENTE` **P-11** · valor por defecto restrictivo |
+| `nivel_acceso_id` | `uuid NULL REFERENCES niveles_acceso` | | **P-11 resuelto**: catálogo, no enumerado. Un disparador lo completa con el de menor `orden` —el más restrictivo— cuando llega nulo |
 
 `UNIQUE (copropiedad_id, persona_id) WHERE estado = 'activo'` — una persona es residente de **una** vivienda activa a la vez. `[SUPUESTO]` **S-08**: el documento no lo dice; se elige lo restrictivo porque permitir dos viviendas haría ambigua la vivienda destino de una autorización.
 
@@ -780,7 +789,9 @@ HU-19. Su ausencia produce motivo `ZONA_NO_AUTORIZADA` (CU-05 2a).
 
 `UNIQUE (zona_id, dia_semana, hora_inicio)`. Contraparte estructural de CA-15.
 
-> **Nota.** El mockup W-06 muestra el Salón Social con horario «Vie-Dom 10:00 – 01:00», que cruza la medianoche. Con `CHECK (hora_inicio < hora_fin)` ese horario se modela como **dos filas** —viernes 10:00–23:59:59 y sábado 00:00–01:00—. La alternativa, permitir `hora_fin < hora_inicio` como marca de cruce, mete un caso especial en la comparación del motor de reglas. Se prefiere el modelo explícito. `[SUPUESTO]` **S-09**.
+> **Nota · `[SUPUESTO]` S-09, precisado al aprobarse 01-A.** El mockup W-06 muestra el Salón Social con horario «Vie-Dom 10:00 – 01:00», que cruza la medianoche. Con `CHECK (hora_inicio < hora_fin)` ese horario se modela como **dos filas** —viernes 10:00–23:59:59 y sábado 00:00–01:00—. La alternativa, permitir `hora_fin < hora_inicio` como marca de cruce, mete un caso especial en la comparación del motor de reglas. Se prefiere el modelo explícito.
+>
+> **El corte de medianoche es un artificio de representación, no un cierre de jornada: NO reinicia el contador de aforo.** La columna `continua_del_dia_anterior` marca la fila de continuación precisamente para que el motor no la confunda con una apertura nueva, y `politica_reinicio_aforo = 'cierre_horario'` reinicia al cierre de la **jornada** de la zona. Queda como **caso de prueba de límite obligatorio de la ETAPA 07**: aforo distinto de cero a las 23:59, mismo aforo a las 00:01.
 
 #### `zona_aforo` — tenant ✔ · **ver D-04**
 
@@ -1072,7 +1083,7 @@ La gestión de particiones exige privilegio de DDL, que **no** tiene ningún rol
 
 ## §8. Matriz de políticas RLS
 
-**RLS habilitada y forzada** (`ENABLE` + `FORCE ROW LEVEL SECURITY`) en las veintinueve tablas, sin excepción. `FORCE` importa: sin él, el propietario de la tabla elude sus propias políticas.
+**RLS habilitada y forzada** (`ENABLE` + `FORCE ROW LEVEL SECURITY`) en las treinta tablas, sin excepción. `FORCE` importa: sin él, el propietario de la tabla elude sus propias políticas.
 
 ### 8.1 Predicados de alcance
 
@@ -1085,6 +1096,9 @@ La gestión de particiones exige privilegio de DDL, que **no** tiene ningún rol
 | **S** | **T** derivado del `edge_gateways.usuario_servicio_id` | Identidad de servicio |
 
 ### 8.2 Matriz por tabla y rol
+
+> La matriz vigente, con `niveles_acceso` incluida y las notas por celda, vive
+> en `supabase/policies/README.md`. Se reproduce aquí en su forma de diseño.
 
 Operaciones: `R` = SELECT · `I` = INSERT · `U` = UPDATE · `—` = sin acceso.
 **`D` (DELETE) no se concede a ningún rol de aplicación en ninguna tabla** (RN-19, ADR-005).
@@ -1138,7 +1152,7 @@ Operaciones: `R` = SELECT · `I` = INSERT · `U` = UPDATE · `—` = sin acceso.
 - **Positiva:** el rol accede a una fila que le corresponde y la operación tiene éxito.
 - **Negativa:** el mismo rol intenta la misma operación sobre una fila de **otra** copropiedad y falla.
 
-Con 29 tablas y 6 roles la matriz tiene 174 celdas; las que no son `—` generan un par de pruebas cada una. Esa suite es el insumo de la ETAPA 03, que la amplía con el **segundo camino** —`service_role`— y la convierte en condición de aprobación del build (KPI-36, KPI-37).
+Con 30 tablas y 6 roles la matriz tiene 180 celdas; las que no son `—` generan un par de pruebas cada una. Esa suite es el insumo de la ETAPA 03, que la amplía con el **segundo camino** —`service_role`— y la convierte en condición de aprobación del build (KPI-36, KPI-37).
 
 ### 8.4 El agujero conocido: `service_role`
 
@@ -1338,7 +1352,7 @@ Sin esto, RN-16 y CA-21 —«el Edge decide con la última versión vigente del 
 
 Es la misma lógica de ADR-005 aplicada a la configuración: lo que se audita no puede mutar.
 
-### D-18 · El enumerado de motivos necesita un décimo valor · **requiere tu aprobación**
+### D-18 · El enumerado de motivos necesita un décimo valor · **APROBADA**
 
 `CLAUDE.md` §2.4 enumera nueve motivos tipados: `VIGENCIA_EXPIRADA`, `AFORO_SUPERADO`, `LISTA_NEGRA`, `ZONA_NO_AUTORIZADA`, `FUERA_DE_PATRON`, `SIN_CONSENTIMIENTO`, `PLACA_DESCONOCIDA`, `CONFIANZA_INSUFICIENTE`, `FALLO_TECNICO`.
 
@@ -1350,7 +1364,7 @@ Es la misma lógica de ADR-005 aplicada a la configuración: lo que se audita no
 
 Colapsar CA-15 en cualquiera de ellos haría indistinguibles dos criterios de aceptación que el documento separa deliberadamente, y la pantalla del mockup W-06 no podría decirle al residente por qué se le negó el paso.
 
-**Propuesta:** añadir **`FUERA_DE_HORARIO`** como décimo valor y actualizar `CLAUDE.md` §2.4. Es la única extensión al contrato que este diseño solicita.
+**Resolución.** Aprobada por el usuario el 2026-09-06. `FUERA_DE_HORARIO` es el décimo valor del enumerado `motivo_acceso` y `CLAUDE.md` §2.4 queda actualizado con la extensión y su justificación. Es la única extensión al contrato que esta etapa introdujo, y su prueba de regresión vive en `supabase/policies/tests/10_invariantes_estructurales.sql`.
 
 ### D-19 · La evidencia guarda ruta y hash, nunca URL
 
@@ -1417,41 +1431,35 @@ El coste es que corregir un dato erróneo exige un procedimiento explícito con 
 |---|---|
 | Justificación de los nueve agregados y su traducción a tablas | ✅ §2 |
 | ERD en Mermaid, cinco vistas por contexto | ✅ §3 |
-| Convenciones comunes y catálogo de 31 enumerados | ✅ §4, §5 |
-| 29 tablas con columnas, tipos y restricciones | ✅ §6 |
+| Convenciones comunes y catálogo de 30 enumerados | ✅ §4, §5 |
+| 30 tablas con columnas, tipos y restricciones | ✅ §6 |
 | Índices únicos de invariante e índices de consulta | ✅ §7 |
 | Estrategia de particionamiento e inmutabilidad | ✅ §7.3 |
-| Matriz RLS de 29 tablas × 6 roles | ✅ §8 |
+| Matriz RLS de 30 tablas × 6 roles | ✅ §8 |
 | 21 decisiones no obvias justificadas | ✅ §9 |
 | Trazabilidad regla → contraparte estructural | ✅ §10 |
 
-### Pendiente para 01-B, tras tu aprobación
+### Entregado en 01-B
 
 | Entregable | Ruta |
 |---|---|
-| Migraciones SQL versionadas, idempotentes y reversibles | `supabase/migrations/` |
-| Políticas RLS como SQL, una por celda de la matriz | `supabase/policies/` |
-| Suite de pruebas positivas y negativas por política | `supabase/policies/tests/` |
-| Semillas de una copropiedad ficticia coherente con los mockups | `supabase/seed/` |
+| 15 migraciones SQL versionadas, idempotentes y reversibles | `supabase/migrations/` |
+| Guiones de reversión, uno por migración | `supabase/reversion/` |
+| Matriz RLS revisable y suite de verificación | `supabase/policies/` |
+| Semillas de dos copropiedades ficticias | `supabase/seed/seed.sql` |
+| Verificador local, sin credenciales | `supabase/verificar.sh` |
 | Guía de conexión paso a paso | `docs/guias/CONEXION_SUPABASE.md` |
 | `.env.example` por aplicación, sin un solo valor | `apps/*/.env.example` |
-| Informe de cierre de etapa | `docs/etapas/ETAPA-01.md` |
+| Informe de cierre | `docs/etapas/ETAPA-01.md` |
 
-### Lo que necesito que decidas para poder ejecutar 01-B
+### Decisiones del usuario aplicadas
 
-| # | Decisión | Por qué bloquea |
+| # | Decisión | Cómo se materializó |
 |---|---|---|
-| 1 | **Aprobar o corregir los nueve agregados** (§2) | Es la base de la que se deriva todo el esquema |
-| 2 | **D-18 — añadir `FUERA_DE_HORARIO`** al enumerado de motivos y a `CLAUDE.md` §2.4 | Sin ese valor, CA-15 y CA-14 son indistinguibles en el evento |
-| 3 | **D-01 — aceptar la tabla `personas`** y **D-16 — `edge_gateways`**, ninguna de las dos en el mínimo de §6 | Sin `personas`, RN-06 no es aplicable; sin `edge_gateways`, KPI-31 no tiene dónde guardarse |
-| 4 | **P-11 — «nivel de acceso» del residente** | El enumerado `nivel_acceso` tiene hoy dos valores supuestos |
-| 5 | **Credenciales de Supabase**, cuenta corporativa | 01-B las necesita para verificar que las migraciones corren limpias |
+| 1 | Nueve agregados aprobados | §2 sin cambios |
+| 2 | **D-18** aprobada | `FUERA_DE_HORARIO` en el enumerado y en `CLAUDE.md` §2.4, con prueba de regresión |
+| 3 | **D-01** `personas` aprobada | Tabla creada, con la fuga por acompañantes cerrada estructuralmente |
+| 4 | **D-16** `edge_gateways` aprobada | Tabla creada, con identidad de servicio propia por equipo |
+| 5 | **P-11** como catálogo | `niveles_acceso` en vez de enumerado; disparador que asigna el de menor `orden` |
+| 6 | **S-09** precisado | `continua_del_dia_anterior` y caso de prueba de límite para la ETAPA 07 |
 
-**Supuestos nuevos que introduce esta etapa**, a añadir al registro de la ETAPA 00 cuando apruebes:
-
-| ID | Supuesto | Valor |
-|---|---|---|
-| **S-08** | Una persona es residente de una sola vivienda activa a la vez | Índice único parcial sobre `residentes` |
-| **S-09** | Los horarios de zona que cruzan medianoche se modelan como dos filas | `CHECK (hora_inicio < hora_fin)` |
-
-**Ninguna decisión pendiente de la ETAPA 00 bloqueó este diseño:** las cinco que podían hacerlo (P-02, P-04, P-05, P-06, P-07) se resolvieron como columnas configurables con valor conservador por defecto (**D-15**), que es la forma de avanzar sin inventar la decisión.
