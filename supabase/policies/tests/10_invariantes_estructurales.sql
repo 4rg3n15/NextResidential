@@ -352,3 +352,84 @@ BEGIN
   RAISE NOTICE 'P-11 nivel de acceso por defecto = el mas restrictivo: ok';
 END
 $$;
+
+-- Retención (migración 0016) --------------------------------------------------
+
+-- La ley como cota superior: se puede configurar menos de 24 h, nunca más.
+DO $$
+BEGIN
+  UPDATE public.copropiedades SET margen_supresion_plantilla = interval '6 hours'
+   WHERE id = '10000000-0000-4000-8000-000000000001';
+  RAISE NOTICE 'RN-11 margen mas corto que el legal: aceptado, ok';
+
+  BEGIN
+    UPDATE public.copropiedades SET margen_supresion_plantilla = interval '48 hours'
+     WHERE id = '10000000-0000-4000-8000-000000000001';
+    RAISE EXCEPTION 'RN-11 INCUMPLIDA: se acepto un margen de supresion superior a 24 h';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'RN-11 margen superior al legal rechazado: ok';
+  END;
+
+  UPDATE public.copropiedades SET margen_supresion_plantilla = interval '24 hours'
+   WHERE id = '10000000-0000-4000-8000-000000000001';
+END
+$$;
+
+-- La plantilla no puede sobrevivir a la vigencia que la justifica.
+DO $$
+DECLARE v_consent uuid; v_fin timestamptz;
+BEGIN
+  SELECT upper(vigencia) INTO v_fin FROM public.autorizaciones
+   WHERE id = '70000000-0000-4000-8000-000000000001';
+
+  INSERT INTO public.consentimientos_biometricos
+    (copropiedad_id, persona_id, version_politica, canal, estado, otorgado_en,
+     creado_por, actualizado_por)
+  VALUES ('10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000102',
+          'v1.0','app','vigente', now(),
+          '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
+  RETURNING id INTO v_consent;
+
+  BEGIN
+    INSERT INTO public.plantillas_biometricas
+      (copropiedad_id, persona_id, consentimiento_id, autorizacion_id, calidad,
+       suprimir_en, creado_por, actualizado_por)
+    VALUES ('10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000102',
+            v_consent,'70000000-0000-4000-8000-000000000001', 0.95,
+            v_fin + interval '30 days',
+            '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002');
+    RAISE EXCEPTION 'Retencion INCUMPLIDA: la plantilla sobrevive a su autorizacion';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'retencion: plantilla mas alla de la vigencia rechazada, ok';
+  END;
+
+  -- Dentro del margen legal sí se acepta.
+  INSERT INTO public.plantillas_biometricas
+    (copropiedad_id, persona_id, consentimiento_id, autorizacion_id, calidad,
+     suprimir_en, creado_por, actualizado_por)
+  VALUES ('10000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000102',
+          v_consent,'70000000-0000-4000-8000-000000000001', 0.95,
+          v_fin + interval '12 hours',
+          '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002');
+  RAISE NOTICE 'retencion: plantilla dentro del margen legal aceptada, ok';
+END
+$$;
+
+-- El libro de purgas es append-only, como eventos y evidencias.
+DO $$
+DECLARE v_id uuid;
+BEGIN
+  INSERT INTO public.purgas_retencion
+    (copropiedad_id, tipo, politica_aplicada, rango_hasta, objetos_afectados, creado_por)
+  VALUES ('10000000-0000-4000-8000-000000000001','evidencia', interval '90 days',
+          now() - interval '90 days', 17,'00000000-0000-4000-8000-000000000002')
+  RETURNING id INTO v_id;
+
+  BEGIN
+    DELETE FROM public.purgas_retencion WHERE id = v_id;
+    RAISE EXCEPTION 'El libro de purgas deberia ser append-only';
+  EXCEPTION WHEN restrict_violation THEN
+    RAISE NOTICE 'libro de purgas append-only: ok';
+  END;
+END
+$$;

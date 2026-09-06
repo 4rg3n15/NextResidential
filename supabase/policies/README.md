@@ -68,6 +68,7 @@ Operaciones: `R` SELECT · `I` INSERT · `U` UPDATE.
 | `alertas` | R ᴾ | R U ᵀ | R U ᵀ | R U ᴹ | — | R I ˢ |
 | `auditoria_seguridad` | **R ᴾ** | R ᵀ ⁶ | — | — | — | I |
 | `bandeja_salida_edge` | R ᴾ | R ᵀ | — | — | — | R I U ˢ |
+| `purgas_retencion` | R ᴾ | R ᵀ | — | — | — | **I ˢ** ⁷ |
 
 **Notas**
 
@@ -86,6 +87,9 @@ Operaciones: `R` SELECT · `I` INSERT · `U` UPDATE.
 6. El administrador ve los intentos **contra** su copropiedad
    (`copropiedad_id_objetivo`), no los que salieron de ella hacia otras: esos son
    del superadministrador, porque revelan actividad de un tenant a otro (D-14).
+7. `purgas_retencion` es **append-only**, como `eventos`, `evidencias` y
+   `auditoria_seguridad`: solo `INSERT`, y ni siquiera el rol de mantenimiento
+   conserva `UPDATE` o `DELETE` (D-21).
 
 ---
 

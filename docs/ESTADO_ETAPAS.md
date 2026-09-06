@@ -17,7 +17,7 @@
 | **Etapa siguiente habilitada** | **ETAPA 02 — Andamiaje del monorepo y núcleo hexagonal** |
 | **Bloqueos activos** | Ninguno |
 | **Contradicciones abiertas** | Ninguna (14 registradas, 14 resueltas) |
-| **Decisiones pendientes** | 10 abiertas (P-11 resuelto) — ninguna bloquea la ETAPA 02 |
+| **Decisiones pendientes** | 10 abiertas (P-11 y P-12 resueltos) — ninguna bloquea la ETAPA 02 |
 | **Supuestos vigentes** | 9 — 7 de la ETAPA 00 más S-08 y S-09 |
 | **Extensiones al contrato** | 1 — E-01 `FUERA_DE_HORARIO`, aprobada |
 
@@ -107,7 +107,7 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 | Entregable | Ruta | Estado |
 |---|---|---|
 | Diseño del modelo de datos | `docs/arquitectura/modelo-datos.md` | ✅ |
-| 15 migraciones versionadas, idempotentes y reversibles | `supabase/migrations/` | ✅ |
+| 16 migraciones versionadas, idempotentes y reversibles | `supabase/migrations/` | ✅ |
 | Guiones de reversión, uno por migración | `supabase/reversion/` | ✅ |
 | Matriz RLS y suite de verificación | `supabase/policies/` | ✅ |
 | Semillas de dos copropiedades ficticias | `supabase/seed/seed.sql` | ✅ |
@@ -121,7 +121,7 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 | Criterio | Resultado |
 |---|---|
 | Las migraciones corren limpias sobre una base vacía | ✅ Verificado sobre PostgreSQL 16.13 |
-| RLS activa en el 100 % de las tablas | ✅ **40/40** (30 tablas + 10 particiones), activa **y forzada** |
+| RLS activa en el 100 % de las tablas | ✅ **42/42** (31 tablas + 11 particiones), activa **y forzada** |
 | Cada RN de integridad tiene contraparte estructural identificada | ✅ 22/22 · `modelo-datos.md` §10 |
 | *(añadido)* Idempotencia | ✅ Tres pasadas consecutivas sin error ni cambio |
 | *(añadido)* Reversibilidad | ✅ Ciclo completo aplicar → revertir → aplicar, 0 objetos residuales |
@@ -129,7 +129,9 @@ Confirmado: **`KPI-19` no existe** · la entrada 21 figura como **`KP1-21`** · 
 
 ### Cifras del esquema
 
-30 tablas · 10 particiones de `eventos` · 30 enumerados · 93 políticas RLS · 94 índices únicos · 15 migraciones · 15 guiones de reversión.
+31 tablas · 11 particiones de `eventos` · 31 enumerados · 95 políticas RLS · 16 migraciones · 16 guiones de reversión.
+
+> **Actualización del 2026-09-06.** Tras el cierre se incorporó la **política de retención** que el usuario fijó (P-12), como migración `0016`: plazos configurables por copropiedad, RN-11 convertida en cota superior por `CHECK`, y el libro append-only `purgas_retencion`. Los trabajos de purga son de las ETAPAS 06 y 14; aquí queda la política y dónde se acredita.
 
 ---
 

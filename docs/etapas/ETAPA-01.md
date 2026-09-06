@@ -140,7 +140,7 @@ Esta etapa produce SQL, no clases. La tabla traduce cada principio a su forma en
 | **RN-18, CA-18, CA-26** | Tablas y columnas listas | El escalamiento y la alerta son lógica de la ETAPA 06 |
 | **RN-22, CA-06** | `patrones_recurrencia` con sus restricciones | La evaluación del patrón es el motor de reglas, ETAPA 05 |
 | **KPI-29, KPI-30, KPI-31** | `bandeja_salida_edge` y `edge_gateways` listas | La reconciliación es la ETAPA 12 |
-| **Retención de eventos y evidencia** | `PENDIENTE DE DEFINICIÓN` nuevo | No está en ningún insumo. Afecta al principio de finalidad de la Ley 1581 y al coste. Propuesta a validar en `CONEXION_SUPABASE.md` §10 |
+| **Retención de eventos y evidencia** | **Resuelta** *(adenda)* | Plazos fijados por el usuario e implementados en la migración `0016`. Los trabajos de purga son de las ETAPAS 06 y 14 |
 
 ---
 
@@ -219,7 +219,7 @@ Contra el checklist de `CLAUDE.md` §2.7.
 |---|---|---|
 | D-08 | El **segundo camino de aislamiento** (`service_role`) no está cubierto: la base sola no puede | **ETAPA 03** |
 | D-09 | El mantenimiento de particiones necesita un trabajo pg-boss programado; hoy la función existe pero nadie la llama sola | ETAPA 02 (pg-boss) · 06 |
-| D-10 | La **política de retención** de eventos y evidencia no está definida en ningún insumo | Decisión de Grupo Control |
+| ~~D-10~~ | La **política de retención** de eventos y evidencia no está definida en ningún insumo | **Saldada el 2026-09-06** por decisión del usuario · ver adenda al final |
 | D-11 | El **Auth Hook de *custom claims*** está documentado pero no implementado: sin él, ninguna política concede acceso | **ETAPA 03** |
 
 ### Deuda saldada
@@ -252,8 +252,8 @@ Quedan **diez** abiertos, ninguno bloquea la ETAPA 02.
 3. **Ejecutar la comprobación práctica de aislamiento** de §5.3 de la guía contra el proyecto real. Si la consulta cruzada devuelve filas o el `INSERT` tiene éxito, **detener el despliegue**.
 4. **Crear el bucket `evidencias` como privado** y habilitar **MFA TOTP** en el proyecto (§7 y §6.2 de la guía).
 5. **Programar `app.mantener_particiones_eventos()` mensualmente**. Sin esto, dentro de tres meses la ingesta de eventos empezará a fallar — ruidosamente, que es lo que se quiso, pero fallará.
-6. **Decidir la política de retención** de eventos y evidencia (D-10). Afecta al principio de finalidad de la Ley 1581.
-7. **Corregir `CLAUDE.md` §2.2** para que enumere los nueve agregados raíz aprobados, y no seis.
+6. **Obtener el visto bueno de la asesoría jurídica** de Grupo Control sobre los tres plazos de retención, antes de producción.
+7. ~~Corregir `CLAUDE.md` §2.2~~ — **hecho el 2026-09-06** para que enumere los nueve agregados raíz aprobados, y no seis.
 8. Completar la **lista de verificación** de `CONEXION_SUPABASE.md` §11 antes de dar la conexión por buena.
 
 ---
@@ -276,3 +276,100 @@ Quedan **diez** abiertos, ninguno bloquea la ETAPA 02.
 **La ETAPA 01 queda CERRADA.** La Definición de Terminado se cumple y se amplía: las migraciones corren limpias sobre una base vacía, RLS está activa **y forzada** en el 100 % de las tablas, cada RN de integridad tiene su contraparte estructural identificada, y además el esquema resultó **idempotente**, **reversible de principio a fin** y capaz de sostener **KPI-03 con cien conexiones concurrentes reales**.
 
 **La ETAPA 02 queda habilitada.** El agente se detiene aquí y espera instrucción expresa, conforme a `CLAUDE.md` §2.1.1.
+
+
+---
+
+# Adenda · 2026-09-06
+
+Tres encargos posteriores al cierre, ejecutados sobre la misma rama. Ninguno
+reabre la etapa: dos son correcciones documentales y el tercero resuelve un
+pendiente que la propia etapa había abierto.
+
+## A.1 · `CLAUDE.md` §2.2 corregida — nueve agregados raíz
+
+El contrato seguía enumerando seis. Ahora lista los **nueve** en tabla, con las
+invariantes que cada uno sostiene, y con la resolución de **C-02** citada en el
+propio texto: por qué eran seis, qué declara la página 3 del diagrama, y qué
+cinco reglas de negocio se quedaban sin invariante sin `ListaNegra` ni
+`Dispositivo`. Se añadieron además los cuatro puertos de repositorio que
+faltaban y la cadena de precedencia del motor (`listaNegra > vigencia > patrón >
+zona`), que era vinculante y solo estaba en la auditoría.
+
+Importaba hacerlo ya: es el archivo que se carga en cada sesión, y un contrato
+desactualizado induce al error en la sesión siguiente, no en esta.
+
+## A.2 · Política de retención — decisión resuelta (P-12)
+
+Fijada por el usuario, **sujeta a confirmación legal de Grupo Control**:
+
+| Dato | Plazo | Fundamento |
+|---|---|---|
+| Eventos | **24 meses** | Sustentan la responsabilidad ante un incidente (PB-06); su finalidad sobrevive al hecho registrado. Dos ciclos anuales de administración, sin volverse archivo indefinido |
+| Evidencia fotográfica | **90 días** | Dato más sensible que el registro del acceso, y con finalidad que se agota antes: sustentar una reclamación inmediata. Minimización, Ley 1581 art. 4 lit. c |
+| Plantillas biométricas | **Ligadas a la vigencia de su autorización** | Ya lo exigía RN-11; ahora es estructural |
+
+**Migración `0016`.** Los tres plazos son **columnas de `copropiedades`**, no
+constantes: la retención puede variar por contrato o por exigencia de una
+autoridad, y un plazo escondido en el código no se audita ni se ajusta sin
+desplegar.
+
+Tres decisiones dentro de la decisión, que conviene no perder:
+
+1. **La ley entra en el esquema como cota superior, no como valor por defecto.**
+   `CHECK (margen_supresion_plantilla <= '24 hours')`: una copropiedad puede
+   configurar un margen **más corto** que el legal, nunca más largo. La
+   configuración no puede incumplir RN-11.
+2. **El evento sobrevive a su evidencia sin perder trazabilidad.** A los 90 días
+   se borra el objeto de Storage, pero la fila de `evidencias` permanece **con su
+   hash**. Se puede seguir demostrando qué imagen sustentó la decisión sin
+   conservar la imagen.
+3. **La purga de eventos no puede ser un `DELETE`.** Ningún rol lo tiene
+   concedido (ADR-005, D-20): se ejecuta soltando particiones mensuales enteras
+   con el rol de mantenimiento. Es, retrospectivamente, **un segundo motivo para
+   haber particionado por mes**, además del de consulta.
+
+**Y una tabla nueva: `purgas_retencion`,** libro append-only que acredita cada
+purga. Es tabla aparte y no columnas en `evidencias` porque esa tabla es
+append-only por permisos: marcar una fila como purgada exigiría conceder
+`UPDATE`, y eso abriría la puerta a editar el hash — justo lo que hace
+verificable la evidencia. Sin este libro, la retención sería **indemostrable**:
+pasado el plazo no quedaría ni el dato ni constancia de haberlo suprimido.
+
+`plantillas_biometricas` gana `autorizacion_id`, **nullable a propósito**: un
+residente también registra su rostro, y esa plantilla no nace de una
+autorización de visitante sino de su condición de residente. Son dos ciclos de
+vida legítimos y distintos. Cuando la columna tiene valor, un disparador impide
+programar la supresión más allá de `upper(vigencia) + margen`.
+
+**Lo que la adenda NO implementa:** los tres trabajos de purga. Son de las
+ETAPAS 06 y 14. Aquí queda la política, su cota legal y dónde se acredita.
+
+## A.3 · Verificación tras la adenda
+
+| Prueba | Resultado |
+|---|---|
+| 16 migraciones sobre base vacía | ✅ |
+| Idempotencia, dos pasadas adicionales | ✅ 0 fallos |
+| Reversibilidad, ciclo completo con `0016` | ✅ 16/16, **0 tablas residuales** |
+| RLS activa y forzada | ✅ **42/42** (31 tablas + 11 particiones) |
+| Margen de supresión más corto que el legal | ✅ Aceptado |
+| Margen de supresión **superior a 24 h** | ✅ **Rechazado por `CHECK`** |
+| Plantilla que sobrevive a su autorización | ✅ **Rechazada por disparador** |
+| Plantilla dentro del margen legal | ✅ Aceptada |
+| `purgas_retencion` append-only | ✅ `DELETE` rechazado |
+| Suite completa (aislamiento, invariantes, inmutabilidad, KPI-03) | ✅ Verde |
+
+**Cifras finales:** 31 tablas · 11 particiones · 31 enumerados · 95 políticas RLS
+· 16 migraciones · 16 guiones de reversión.
+
+## A.4 · Qué queda en manos del usuario
+
+Los puntos 1 a 4 de la lista de §9 —credenciales, `db push`, comprobación de
+aislamiento contra el proyecto real, bucket privado y MFA— los ejecuta el
+usuario con sus credenciales. Quedan además:
+
+1. **Visto bueno de la asesoría jurídica** de Grupo Control sobre los tres
+   plazos de retención. Es lo único que falta para dar P-12 por cerrado del todo.
+2. **Programar `app.mantener_particiones_eventos()`** mensualmente.
+3. Los trabajos de purga, cuando lleguen las ETAPAS 06 y 14.

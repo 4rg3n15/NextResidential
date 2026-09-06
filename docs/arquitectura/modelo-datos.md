@@ -5,6 +5,13 @@
 > `supabase/migrations/`. Ambos se mantienen sincronizados: si divergen, manda
 > la migración y este documento se corrige.
 >
+> **Actualización del 2026-09-06 · política de retención resuelta.** El usuario
+> fijó los plazos (eventos 24 meses, evidencia 90 días, plantillas ligadas a la
+> vigencia de su autorización), **sujetos a confirmación legal de Grupo Control**.
+> Se implementaron como columnas configurables por copropiedad más el libro
+> `purgas_retencion`, con lo que las tablas suben a **31** y los enumerados a
+> **31**. Ver decisión **D-21**.
+>
 > **Cambios introducidos por las decisiones del usuario al aprobar 01-A:**
 > **P-11** — `nivel_acceso` deja de ser enumerado y pasa a ser el catálogo
 > `niveles_acceso` (§6.2), con lo que las tablas suben de 29 a **30** y los
@@ -110,7 +117,7 @@ Ese estado transitorio no es una anomalía a evitar: es el estado que el sistema
 
 ## §3. Diagrama entidad-relación
 
-Cinco vistas por contexto delimitado, siguiendo el mapa de contextos de la página 2 del diagrama arquitectónico. Un solo diagrama con treinta tablas sería ilegible y, peor, ocultaría precisamente lo que el mapa de contextos quiere mostrar: dónde están las fronteras.
+Cinco vistas por contexto delimitado, siguiendo el mapa de contextos de la página 2 del diagrama arquitectónico. Un solo diagrama con treinta y una tablas sería ilegible y, peor, ocultaría precisamente lo que el mapa de contextos quiere mostrar: dónde están las fronteras.
 
 ### 3.1 Frontera del tenant e identidad
 
@@ -581,6 +588,7 @@ Enumerados y no `text` con `CHECK`: un valor inesperado falla al escribir, la li
 | `estado_recepcion` | `recibido`, `aplicado`, `descartado_duplicado` | CU-04 6a |
 | `tipo_evento_seguridad` | `acceso_cruzado`, `login_fallido`, `mfa_fallido`, `escalamiento_privilegio`, `rate_limit`, `firma_invalida` | RN-15 · KPI-38 · RNF-03.11 |
 | `tipo_evidencia` | `foto_completa`, `recorte_placa`, `captura_rostro`, `consentimiento` | Diagrama pág. 4, paso 2 · CU-02 |
+| `tipo_purga` | `eventos`, `evidencia`, `plantilla_biometrica` | **D-21** · política de retención |
 
 > **P-11 resuelto.** El nivel de acceso del residente **no** es un enumerado: es el catálogo `niveles_acceso` (§6.2). El usuario decidió que arranque con dos valores pero pueda crecer sin migración, con el más restrictivo por defecto. Por eso el catálogo tiene 30 tipos y no 31.
 
@@ -606,6 +614,9 @@ Solo se listan las columnas propias; las de §4 (identidad, tenant, auditoría, 
 | `margen_cache_reglas` | `interval NOT NULL DEFAULT '24 hours'` | `CHECK > '0'` | `[SUPUESTO]` **S-03** · KPI-31 |
 | `umbral_latido_dispositivo` | `interval NOT NULL DEFAULT '5 minutes'` | `CHECK > '0'` | `[SUPUESTO]` **S-06** · CA-26 |
 | `plazo_consentimiento` | `interval NOT NULL DEFAULT '24 hours'` | `CHECK > '0'` | `[SUPUESTO]` **S-04** · CU-02 3a |
+| `retencion_eventos` | `interval NOT NULL DEFAULT '24 months'` | `CHECK > '0'` | **D-21** · Ley 1581, finalidad |
+| `retencion_evidencia` | `interval NOT NULL DEFAULT '90 days'` | `CHECK > '0'` | **D-21** · minimización |
+| `margen_supresion_plantilla` | `interval NOT NULL DEFAULT '24 hours'` | **`CHECK > '0' AND <= '24 hours'`** | **D-21** · RN-11 como **cota superior** |
 
 #### `usuarios` — tenant **NULL permitido** · auditoría ✔ · baja lógica ✔
 
@@ -838,7 +849,8 @@ UNIQUE (copropiedad_id, persona_id) WHERE estado = 'vigente'
 | `vector_cifrado` | `bytea NULL` | | Ver **D-10** |
 | `llave_ref` | `text NULL` | `CHECK (llave_ref ~ '^(env\|vault):[A-Za-z0-9_./-]+$')` | Referencia, nunca la llave |
 | `algoritmo` | `text NULL` | | Para rotación de cifrado |
-| `suprimir_en` | `timestamptz NOT NULL` | | RN-11 · programada al crear |
+| `autorizacion_id` | `uuid NULL REFERENCES autorizaciones` | | **D-21** · nulo para la plantilla de un residente, cuyo ciclo no lo fija una autorización |
+| `suprimir_en` | `timestamptz NOT NULL` | Disparador: `<= upper(vigencia) + margen` cuando hay autorización | RN-11 · **D-21** |
 | `suprimida_en` | `timestamptz NULL` | | CA-10 |
 | `estado` | `estado_plantilla NOT NULL DEFAULT 'pendiente_consentimiento'` | | CA-09 nombra este estado |
 
@@ -1023,6 +1035,20 @@ Sin columnas de baja lógica: un evento no se desactiva. Y sin `actualizado_en` 
 
 Tabla **no particionada** y con restricción única simple. Es la garantía real de RN-17, por el motivo que explica la decisión **D-11**.
 
+#### `purgas_retencion` — tenant ✔ · append-only · **ver D-21**
+
+| Columna | Tipo | Justificación |
+|---|---|---|
+| `tipo` | `tipo_purga NOT NULL` | Qué se purgó |
+| `politica_aplicada` | `interval NOT NULL` | El plazo vigente en el momento de purgar, no el actual |
+| `rango_desde`, `rango_hasta` | `timestamptz` | Ventana purgada |
+| `objetos_afectados` | `bigint NOT NULL` | `CHECK >= 0` |
+| `detalle` | `text NULL` | Particiones soltadas, rutas de Storage |
+| `ejecutado_en` | `timestamptz NOT NULL DEFAULT now()` | |
+| `creado_en`, `creado_por` | | Sin `actualizado_*`: no se edita |
+
+Sin este libro la retención sería **indemostrable**: pasado el plazo no quedaría ni el dato ni constancia de haberlo suprimido, y ante una reclamación no habría forma de acreditar cumplimiento.
+
 ---
 
 ## §7. Índices y su justificación
@@ -1083,7 +1109,7 @@ La gestión de particiones exige privilegio de DDL, que **no** tiene ningún rol
 
 ## §8. Matriz de políticas RLS
 
-**RLS habilitada y forzada** (`ENABLE` + `FORCE ROW LEVEL SECURITY`) en las treinta tablas, sin excepción. `FORCE` importa: sin él, el propietario de la tabla elude sus propias políticas.
+**RLS habilitada y forzada** (`ENABLE` + `FORCE ROW LEVEL SECURITY`) en las treinta y una tablas, sin excepción. `FORCE` importa: sin él, el propietario de la tabla elude sus propias políticas.
 
 ### 8.1 Predicados de alcance
 
@@ -1152,7 +1178,7 @@ Operaciones: `R` = SELECT · `I` = INSERT · `U` = UPDATE · `—` = sin acceso.
 - **Positiva:** el rol accede a una fila que le corresponde y la operación tiene éxito.
 - **Negativa:** el mismo rol intenta la misma operación sobre una fila de **otra** copropiedad y falla.
 
-Con 30 tablas y 6 roles la matriz tiene 180 celdas; las que no son `—` generan un par de pruebas cada una. Esa suite es el insumo de la ETAPA 03, que la amplía con el **segundo camino** —`service_role`— y la convierte en condición de aprobación del build (KPI-36, KPI-37).
+Con 31 tablas y 6 roles la matriz tiene 186 celdas; las que no son `—` generan un par de pruebas cada una. Esa suite es el insumo de la ETAPA 03, que la amplía con el **segundo camino** —`service_role`— y la convierte en condición de aprobación del build (KPI-36, KPI-37).
 
 ### 8.4 El agujero conocido: `service_role`
 
@@ -1380,6 +1406,26 @@ RN-19 prohíbe el borrado físico donde hay historial. Este diseño va un paso m
 
 El coste es que corregir un dato erróneo exige un procedimiento explícito con rol de mantenimiento y registro. Es el coste correcto para un sistema que abre puertas y responde por lo que registró. El trigger anti-`DELETE` que pide §6 se mantiene como segunda barrera para las tablas con historial.
 
+### D-21 · La retención es política configurable, con la ley como cota superior
+
+**Decisión del usuario del 2026-09-06, sujeta a confirmación legal de Grupo Control.** El documento de requisitos no fija retención en ninguna parte: el «principio de finalidad» de la Ley 1581 quedaba sin plazo, que es tanto como no tenerlo.
+
+| Dato | Plazo | Justificación |
+|---|---|---|
+| **Eventos** | **24 meses** | Sustentan la responsabilidad ante un incidente (PB-06) y su finalidad —trazabilidad del acceso— sobrevive al hecho registrado. 24 meses cubren dos ciclos anuales de administración sin volverse archivo indefinido |
+| **Evidencia fotográfica** | **90 días** | La fotografía es dato personal más sensible que el registro del acceso, y su finalidad —sustentar la decisión ante una reclamación inmediata— se agota mucho antes. Es minimización, Ley 1581 art. 4 lit. c |
+| **Plantillas biométricas** | **Ligadas a la vigencia de su autorización** | Ya lo exigía RN-11; ahora es estructural |
+
+**Tres consecuencias de diseño que no son obvias:**
+
+1. **La ley entra en el esquema como cota superior, no como valor.** `CHECK (margen_supresion_plantilla <= '24 hours')`: una copropiedad puede configurar un margen **más corto** que el legal, nunca más largo. La configuración no puede incumplir la norma.
+2. **El evento sobrevive a su evidencia, y sigue siendo trazable.** A los 90 días se borra el objeto de Storage, pero la fila de `evidencias` permanece **con su hash**. La trazabilidad fotográfica no depende de conservar la imagen: depende de poder demostrar qué imagen sustentó la decisión.
+3. **La purga de eventos no puede ser un `DELETE`.** Ningún rol lo tiene concedido (ADR-005, D-20). Se ejecuta soltando particiones mensuales enteras con el rol de mantenimiento — **y ese es, retrospectivamente, un segundo motivo para haber particionado por mes**, además del de consulta.
+
+**Por qué el libro de purgas es tabla aparte y no columnas en `evidencias`.** Porque `evidencias` es append-only por permisos: no admite marcar una fila como purgada. Añadir esa columna obligaría a conceder `UPDATE`, y eso abriría la puerta a editar el hash — justo lo que hace verificable la evidencia. El libro resuelve las dos cosas a la vez: la evidencia sigue siendo inmutable y la purga queda acreditada.
+
+**Lo que esta etapa NO implementa:** los tres trabajos de purga. Son de las ETAPAS 06 y 14. Aquí se fija la política, su cota legal y dónde se acredita el cumplimiento.
+
 ---
 
 ## §10. Trazabilidad: cada regla de integridad y su contraparte estructural
@@ -1418,6 +1464,8 @@ El coste es que corregir un dato erróneo exige un procedimiento explícito con 
 | **KPI-03** 0 duplicados en 100 inserciones | Índice único parcial (ADR-004) | 1 |
 | **KPI-05** auditoría de cambios | `creado_por`/`actualizado_por` **NOT NULL** (§4.3) | 1 |
 | **KPI-31** vigencia del caché | `cache_potencialmente_obsoleto` + `margen_cache_reglas` | 1 |
+| **Ley 1581 · finalidad** (D-21) | `retencion_eventos`, `retencion_evidencia` + libro `purgas_retencion` append-only | 1 |
+| **RN-11 como cota legal** (D-21) | `CHECK (margen_supresion_plantilla <= '24 hours')` + disparador que ata `suprimir_en` a la vigencia | 1+2 |
 
 **Las trece invariantes que `CLAUDE.md` §6 marca como no negociables tienen contraparte de nivel 1**, salvo RN-13 y las dos coherencias que cruzan tablas, que son nivel 2 por imposibilidad de expresarlas como restricción declarativa. Cada una está señalada arriba.
 
@@ -1431,11 +1479,11 @@ El coste es que corregir un dato erróneo exige un procedimiento explícito con 
 |---|---|
 | Justificación de los nueve agregados y su traducción a tablas | ✅ §2 |
 | ERD en Mermaid, cinco vistas por contexto | ✅ §3 |
-| Convenciones comunes y catálogo de 30 enumerados | ✅ §4, §5 |
-| 30 tablas con columnas, tipos y restricciones | ✅ §6 |
+| Convenciones comunes y catálogo de 31 enumerados | ✅ §4, §5 |
+| 31 tablas con columnas, tipos y restricciones | ✅ §6 |
 | Índices únicos de invariante e índices de consulta | ✅ §7 |
 | Estrategia de particionamiento e inmutabilidad | ✅ §7.3 |
-| Matriz RLS de 30 tablas × 6 roles | ✅ §8 |
+| Matriz RLS de 31 tablas × 6 roles | ✅ §8 |
 | 21 decisiones no obvias justificadas | ✅ §9 |
 | Trazabilidad regla → contraparte estructural | ✅ §10 |
 
@@ -1443,7 +1491,7 @@ El coste es que corregir un dato erróneo exige un procedimiento explícito con 
 
 | Entregable | Ruta |
 |---|---|
-| 15 migraciones SQL versionadas, idempotentes y reversibles | `supabase/migrations/` |
+| 16 migraciones SQL versionadas, idempotentes y reversibles | `supabase/migrations/` |
 | Guiones de reversión, uno por migración | `supabase/reversion/` |
 | Matriz RLS revisable y suite de verificación | `supabase/policies/` |
 | Semillas de dos copropiedades ficticias | `supabase/seed/seed.sql` |

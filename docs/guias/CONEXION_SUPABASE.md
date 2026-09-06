@@ -106,7 +106,7 @@ supabase link --project-ref <ref-del-proyecto>   # el ref esta en la URL del pan
 supabase db push
 ```
 
-Aplica en orden los 15 archivos de `supabase/migrations/`. Son **idempotentes**:
+Aplica en orden los 16 archivos de `supabase/migrations/`. Son **idempotentes**:
 volver a ejecutarlos sobre una base ya migrada no produce error ni cambio. Está
 verificado con tres pasadas consecutivas.
 
@@ -268,7 +268,7 @@ un segundo planificador con las mismas responsabilidades.
 
 | Esquema | Contenido |
 |---|---|
-| `public` | Las 30 tablas del modelo, con RLS activa y forzada |
+| `public` | Las 31 tablas del modelo, con RLS activa y forzada |
 | `app` | Funciones de contexto, disparadores y utilidades. Sin datos |
 | `pgboss` | Cola de trabajos. **Sin RLS por diseño**: el `copropiedad_id` viaja en la carga útil y el manejador lo valida en la capa de aplicación |
 
@@ -301,12 +301,36 @@ exacto donde la inmutabilidad podría erosionarse en silencio.
 Database → Backups. En el plan gratuito son diarios y de retención corta; para
 producción hace falta plan de pago con *Point-in-Time Recovery*.
 
-`PENDIENTE DE DEFINICIÓN`: la **política de retención de eventos y evidencia** no
-está definida en ningún insumo. Conviene fijarla antes de producción, porque
-afecta al principio de finalidad de la Ley 1581 y al coste de almacenamiento.
-Propuesta a validar: eventos 24 meses en línea y archivo posterior; evidencia
-fotográfica 12 meses; plantillas biométricas, lo que dure la vigencia más 24 h
-(eso sí está fijado, por RN-11).
+### Retención — **resuelta**, sujeta a confirmación legal
+
+| Dato | Plazo | Columna configurable |
+|---|---|---|
+| Eventos | **24 meses** | `copropiedades.retencion_eventos` |
+| Evidencia fotográfica | **90 días** | `copropiedades.retencion_evidencia` |
+| Plantillas biométricas | **Ligadas a la vigencia de su autorización** | `copropiedades.margen_supresion_plantilla`, acotada a 24 h por RN-11 |
+
+Los tres son columnas, no constantes: la retención puede variar por contrato o
+por exigencia de una autoridad, y un plazo escondido en el código no se puede
+auditar ni ajustar sin desplegar.
+
+**Cómo se purga cada uno** — los trabajos son de las ETAPAS 06 y 14; aquí queda
+el contrato:
+
+- **Eventos:** soltando particiones mensuales enteras con el rol de
+  mantenimiento. **No con `DELETE`**, que no está concedido a ningún rol
+  (ADR-005). Es un segundo motivo, además del de consulta, para haber
+  particionado por mes.
+- **Evidencia:** se borra el objeto de Storage y se registra en
+  `purgas_retencion`. **La fila de `evidencias` no se toca**: conserva ruta y
+  hash, de modo que el evento sigue siendo trazable sin conservar la imagen.
+- **Plantillas:** ya lo cubre el barrido de pg-boss sobre `suprimir_en`
+  (RN-11); la migración `0016` lo ata además a la vigencia con un disparador.
+
+**Toda purga se acredita** en el libro append-only `purgas_retencion`. Sin él,
+pasado el plazo no quedaría ni el dato ni constancia de haberlo suprimido.
+
+> **Pendiente:** visto bueno de la asesoría jurídica de Grupo Control sobre los
+> tres plazos, antes de producción.
 
 ### Rotación de llaves — qué se rompe y en qué orden
 
@@ -342,7 +366,7 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] `supabase link` enlaza el proyecto correcto
 - [ ] `supabase db push` corre limpio sobre la base
 - [ ] Volver a ejecutarlo no produce error (idempotencia)
-- [ ] Existen las 30 tablas y las particiones de `eventos`
+- [ ] Existen las 31 tablas y las particiones de `eventos`
 - [ ] Semillas aplicadas, con las **dos** copropiedades
 
 **Seguridad — ninguna de estas es opcional**
@@ -358,7 +382,8 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] Auth Hook de *custom claims* configurado (o anotado como tarea de la ETAPA 03)
 - [ ] Expiración de tokens revisada
 - [ ] `app.mantener_particiones_eventos()` programado mensualmente
-- [ ] Respaldos configurados y política de retención acordada
+- [ ] Respaldos configurados
+- [ ] Plazos de retención revisados por la asesoría jurídica de Grupo Control
 - [ ] Procedimiento de rotación leído por quien vaya a ejecutarlo
 
 **Verificación final**

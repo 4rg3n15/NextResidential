@@ -83,10 +83,31 @@ Cada módulo expone **solo** su API pública mediante un barril `index.ts`. Ning
 
 Dirección de dependencia: `presentación → aplicación → dominio ← infraestructura`. Ninguna flecha sale del dominio. El agregado nunca se serializa crudo al transporte: siempre DTO + mapeador.
 
-**Agregados raíz** (del diagrama, vinculantes): `Copropiedad` (frontera del tenant), `Vivienda`, `Autorización`, `Acceso` (inmutable), `Consentimiento`, `Zona`.
+**Agregados raíz — nueve** (del diagrama, vinculantes):
+
+| Agregado | Frontera de consistencia | Invariantes que sostiene |
+|---|---|---|
+| `Copropiedad` | Frontera del tenant | RN-15 |
+| `Vivienda` | Residentes y vehículos | RN-04, RN-13 |
+| `Autorización` | Vigencia, patrón, acompañantes, zonas | RN-01, RN-05, RN-22 |
+| `Acceso` | Inmutable: sin setters, sin update, sin delete | RN-02, RN-03, RN-17 |
+| `ConsentimientoBiometrico` | Titular, finalidad, versión de política, revocación | RN-09, RN-10 |
+| `PlantillaBiometrica` | Calidad, sincronización, supresión programada | RN-09, RN-11 |
+| `Zona` | Horario, aforo, controladores | RN-14 |
+| `ListaNegra` | Quién la crea y quién la levanta | RN-06, RN-07 |
+| `Dispositivo` | Credencial por referencia, latido, estado | RN-12, RN-21, CA-26 |
+
+> **`[CONTRADICCIÓN]` C-02 — resuelta, no reabrir.** Este contrato enumeraba **seis** agregados raíz citando el diagrama arquitectónico como fuente. La página 1 del diagrama muestra esos seis, pero **la página 3 —la vista dedicada precisamente a los agregados— declara nueve**, añadiendo `PlantillaBiometrica`, `ListaNegra` y `Dispositivo` con la anotación «raíz de agregado».
+>
+> **No era un desacuerdo de criterio: era un resumen incompleto de su propia fuente**, y el hueco tenía consecuencia funcional. Sin `ListaNegra` y sin `Dispositivo` como agregados, **cinco reglas de negocio se quedaban sin invariante que las sostuviera**: RN-06 y RN-07 (`PolíticaListaNegra` *aplica* la lista, no gobierna quién puede crearla ni levantarla, que es una invariante de agregado), RN-12, RN-21 y el criterio CA-26.
+>
+> **Resolución:** se adoptan los nueve. Aprobado por el cliente el 2026-09-06 e implementado en la ETAPA 01.
+> Detalle en `docs/auditoria/02-arquitectura.md` §2 · registro en `docs/auditoria/contradicciones-y-supuestos.md` C-02 · esquema en `docs/arquitectura/modelo-datos.md` §2.
+
 **Objetos de valor:** `Placa` (normalizada al construir), `Vigencia`, `PatrónRecurrencia`, `Aforo`, `ResultadoAcceso`, `VersiónDeReglas`.
-**Puertos:** repositorio (`ViviendaRepo`, `AutorizacionRepo`, `ZonaRepo`, `EventoRepo`, `ReglaRepo`), proveedor (`AccessPointProvider`, `PlateEventSource`, `FaceTemplateProvider`, `IntercomProvider`), soporte (`Reloj`, `GeneradorDeId`, `Notificador`, `AlmacenEvidencia`, `Bitácora`).
+**Puertos:** repositorio (`ViviendaRepo`, `AutorizacionRepo`, `ZonaRepo`, `EventoRepo`, `ReglaRepo`, **`ListaNegraRepo`**, **`DispositivoRepo`**, **`ConsentimientoRepo`**, **`PlantillaRepo`**), proveedor (`AccessPointProvider`, `PlateEventSource`, `FaceTemplateProvider`, `IntercomProvider`), soporte (`Reloj`, `GeneradorDeId`, `Notificador`, `AlmacenEvidencia`, `Bitácora`).
 **Políticas:** `PolíticaListaNegra` (precedencia absoluta, RN-06), `PolíticaZona` (RN-14), `PolíticaConsentimiento` (RN-09, RN-10).
+**Precedencia del motor de reglas**, vinculante (diagrama pág. 3): `listaNegra > vigencia > patrón > zona`. Se evalúan en orden, y la primera que niega determina el motivo del `ResultadoAcceso` — es lo que hace que un visitante en lista negra **con autorización vigente** produzca motivo `LISTA_NEGRA` y no `VIGENCIA_EXPIRADA` (CA-13).
 
 ### 2.3 SOLID — obligatorio y verificable
 
