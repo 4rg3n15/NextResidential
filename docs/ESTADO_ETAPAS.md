@@ -175,7 +175,11 @@ Monorepo pnpm + Turborepo, API NestJS que no arranca sin configuración completa
 
 > Verificación de la ETAPA 01 contra el proyecto real (2026-09-06): `pg_has_role(...,'authenticated','MEMBER')` → **true**, así que **D-12 queda cerrada** y el rol `app_api` es viable. `eventos` sin concesiones de UPDATE/DELETE y RLS activa y forzada: cero filas en ambas. La prueba de ejecución del `UPDATE` **quedó pendiente** por tabla de eventos vacía — es la única comprobación del cierre que no está demostrada por ejecución.
 
-## Etapas 03 a 16 — `PENDIENTE`
+## ETAPA 03 — Auth, RBAC, MFA y aislamiento multiempresa · **CERRADA**
+
+Verificación asimétrica del JWT contra JWKS (caché 10 min, suelo de refresco 60 s, HS256 rechazado), RBAC declarativo con denegación por defecto en los dos guards, MFA TOTP obligatorio para los tres roles administrativos, y barrera de aislamiento en la capa de aplicación además de la RLS. **Suite de aislamiento que enumera el enrutador** y recorre los cuatro caminos; rompe el build ante cualquier fuga, comprobado por mutación. 40 pruebas verdes; suite SQL verde en `--modo-supabase`. Corregido el defecto de la 02: `node dist/main.js` no leía `.env`. Informe en `docs/etapas/ETAPA-03.md`. Deudas nuevas: D-17 a D-19t, [SUPUESTO] S-14.
+
+## Etapas 04 a 16 — `PENDIENTE`
 
 Sin trabajo iniciado. La ETAPA 02 se habilita cuando la 01 quede cerrada.
 
