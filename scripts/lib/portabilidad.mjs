@@ -74,23 +74,108 @@ const DIVERGENTES = [
   ],
 ];
 
-const guiones = execFileSync('git', ['ls-files', '-z', '*.sh'], { encoding: 'utf8' })
+/**
+ * Un `.sh` no es la única superficie donde vive shell. Auditar solo esos dejaba
+ * fuera cuatro sitios donde una construcción divergente rompe igual — y donde
+ * además es más fácil que pase inadvertida, porque nadie los lee como código:
+ *
+ *   · los `scripts` de cada `package.json`, que ejecuta el intérprete del sistema
+ *   · los ganchos de `.husky/`, que no llevan extensión
+ *   · los bloques `run:` de los flujos de GitHub Actions
+ *   · el `Makefile`, si aparece
+ */
+const versionados = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
   .split('\0')
   .filter((f) => f.length > 0);
 
+/** Devuelve [{ archivo, linea, texto }] con el shell embebido de cada superficie. */
+const extraerShell = (archivo) => {
+  const contenido = readFileSync(archivo, 'utf8');
+  const filas = [];
+
+  if (archivo.endsWith('.sh') || archivo.startsWith('.husky/')) {
+    contenido.split('\n').forEach((texto, i) => filas.push({ linea: i + 1, texto }));
+    return filas;
+  }
+
+  if (archivo.endsWith('package.json')) {
+    // Se recorre el texto para conservar el número de línea real: un hallazgo
+    // sin línea obliga a buscarlo a mano, y eso hace que no se arregle.
+    let dentro = false;
+    contenido.split('\n').forEach((texto, i) => {
+      if (/^\s*"scripts"\s*:\s*\{/.test(texto)) {
+        dentro = true;
+        return;
+      }
+      if (dentro && /^\s*\}/.test(texto)) {
+        dentro = false;
+        return;
+      }
+      if (dentro) {
+        const m = texto.match(/^\s*"[^"]+"\s*:\s*"(.*)"\s*,?\s*$/);
+        if (m) filas.push({ linea: i + 1, texto: m[1].replace(/\\"/g, '"') });
+      }
+    });
+    return filas;
+  }
+
+  if (/^\.github\/workflows\/.*\.ya?ml$/.test(archivo)) {
+    // `run:` de una línea y `run: |` con bloque indentado.
+    const lineas = contenido.split('\n');
+    let sangriaBloque = null;
+    lineas.forEach((texto, i) => {
+      if (sangriaBloque !== null) {
+        const sangria = texto.match(/^(\s*)/)[1].length;
+        if (texto.trim() === '' || sangria >= sangriaBloque) {
+          filas.push({ linea: i + 1, texto });
+          return;
+        }
+        sangriaBloque = null;
+      }
+      const bloque = texto.match(/^(\s*)-?\s*run:\s*[|>][-+]?\s*$/);
+      if (bloque) {
+        sangriaBloque = bloque[1].length + 1;
+        return;
+      }
+      const enLinea = texto.match(/^\s*-?\s*run:\s*(.+)$/);
+      if (enLinea) filas.push({ linea: i + 1, texto: enLinea[1] });
+    });
+    return filas;
+  }
+
+  if (/(^|\/)Makefile$/.test(archivo)) {
+    contenido.split('\n').forEach((texto, i) => {
+      if (/^\t/.test(texto)) filas.push({ linea: i + 1, texto });
+    });
+    return filas;
+  }
+
+  return filas;
+};
+
+const SUPERFICIES = (f) =>
+  f.endsWith('.sh') ||
+  f.startsWith('.husky/') ||
+  f.endsWith('package.json') ||
+  /^\.github\/workflows\/.*\.ya?ml$/.test(f) ||
+  /(^|\/)Makefile$/.test(f);
+
+const auditados = versionados
+  .filter(SUPERFICIES)
+  .filter((f) => f !== 'scripts/lib/portabilidad.mjs');
+
 const hallazgos = [];
-for (const archivo of guiones) {
-  const lineas = readFileSync(archivo, 'utf8').split('\n');
-  lineas.forEach((linea, i) => {
-    // Los comentarios describen estas construcciones a propósito (este mismo
-    // fichero, y los encabezados que explican por qué se evitaron).
-    if (/^\s*#/.test(linea)) return;
+for (const archivo of auditados) {
+  for (const { linea, texto } of extraerShell(archivo)) {
+    // Los comentarios describen estas construcciones a propósito (los
+    // encabezados que explican por qué se evitaron).
+    if (/^\s*#/.test(texto)) continue;
     for (const [patron, problema, alternativa] of DIVERGENTES) {
-      if (patron.test(linea)) {
-        hallazgos.push({ archivo, linea: i + 1, texto: linea.trim(), problema, alternativa });
+      if (patron.test(texto)) {
+        hallazgos.push({ archivo, linea, texto: texto.trim(), problema, alternativa });
       }
     }
-  });
+  }
 }
 
 if (hallazgos.length > 0) {
@@ -105,4 +190,7 @@ if (hallazgos.length > 0) {
   }
   process.exit(1);
 }
-console.log(`portabilidad: ${guiones.length} guiones sin construcciones divergentes BSD/GNU`);
+console.log(
+  `portabilidad: ${auditados.length} superficies con shell sin construcciones divergentes BSD/GNU ` +
+    `(.sh, scripts de package.json, .husky/, run: de workflows, Makefile)`,
+);

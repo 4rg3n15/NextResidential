@@ -72,7 +72,21 @@ No es una preferencia de estilo. Tres veces seguidas una diferencia entre las do
 
 Además, **macOS trae bash 3.2 de fábrica**: nada de arreglos asociativos, `mapfile` ni `${x,,}`.
 
-`node scripts/lib/portabilidad.mjs` —parte del DoD y del pre-commit— revisa **todos** los `.sh` versionados contra la lista de construcciones divergentes: `xargs -r`, `paste -sd`, `bc`, `sed -i` sin sufijo vacío, `grep -P`, `readlink -f`, `stat -c`, `date -d`, `find -printf`, `sort -V`, coreutils exclusivas de GNU y las tres construcciones de bash 4. Arreglarlas una a una según fallan no cierra la clase; esto sí.
+### Versión del runtime
+
+Mover la verificación de shell a Node cierra la divergencia BSD/GNU y **abre otra**: el resultado pasa a depender de la versión de Node. La diferencia es que esta sí está **declarada y es reproducible**, y por eso se comprueba:
+
+| Dónde                             | Qué fija                                                       |
+| --------------------------------- | -------------------------------------------------------------- |
+| `.nvmrc`                          | Versión exacta; la misma que usa el CI vía `node-version-file` |
+| `engines` del `package.json` raíz | Rango admitido de Node y pnpm                                  |
+| `packageManager`                  | Versión exacta de pnpm, activada con `corepack enable`         |
+
+`node scripts/lib/verificar-entorno.mjs` —paso 1 del DoD y del CI— falla si el Node o el pnpm locales quedan fuera del rango, o si `.nvmrc` contradice a `engines`. Un parche distinto dentro del rango es un aviso, no un error.
+
+### Superficies auditadas
+
+`node scripts/lib/portabilidad.mjs` —parte del DoD y del pre-commit— revisa **cuatro superficies**, no solo los `.sh`: los propios `.sh`, los `scripts` de cada `package.json`, los ganchos de `.husky/` y los bloques `run:` de los flujos de GitHub Actions (más el `Makefile`, si aparece). Un `.sh` no es el único sitio donde vive shell, y en los otros tres es más fácil que una divergencia pase inadvertida porque nadie los lee como código. Se contrasta contra la lista de construcciones divergentes: `xargs -r`, `paste -sd`, `bc`, `sed -i` sin sufijo vacío, `grep -P`, `readlink -f`, `stat -c`, `date -d`, `find -printf`, `sort -V`, coreutils exclusivas de GNU y las tres construcciones de bash 4. Arreglarlas una a una según fallan no cierra la clase; esto sí.
 
 ## 6. Configuración
 

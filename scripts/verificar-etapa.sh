@@ -34,21 +34,32 @@ rm -rf packages/*/dist apps/*/dist .turbo packages/*/.turbo apps/*/.turbo
 rm -rf packages/*/coverage apps/*/coverage
 ok "dist, .turbo y coverage eliminados"
 
-paso "1 · instalación coherente con el lockfile"
+paso "1 · entorno dentro de lo declarado"
+# La verificación depende ahora de Node y no del shell. Eso cierra la
+# divergencia BSD/GNU y abre otra: la versión del runtime. La diferencia es que
+# esta SÍ está declarada —`.nvmrc` y `engines`— y el CI usa la misma.
+if salida_entorno=$(node scripts/lib/verificar-entorno.mjs 2>&1); then
+  ok "$(echo "$salida_entorno" | tail -1)"
+else
+  mal "Node o pnpm fuera del rango declarado"
+  echo "$salida_entorno" | sed 's/^/     /'
+fi
+
+paso "2 · instalación coherente con el lockfile"
 if pnpm install --frozen-lockfile >/dev/null 2>&1; then
   ok "pnpm install --frozen-lockfile"
 else
   mal "el lockfile no está sincronizado con los package.json"
 fi
 
-paso "2 · compilación desde cero"
+paso "3 · compilación desde cero"
 pnpm build >/dev/null 2>&1 && ok "pnpm build" || mal "pnpm build"
 
-paso "3 · lint y typecheck"
+paso "4 · lint y typecheck"
 pnpm lint      >/dev/null 2>&1 && ok "pnpm lint"      || mal "pnpm lint"
 pnpm typecheck >/dev/null 2>&1 && ok "pnpm typecheck" || mal "pnpm typecheck"
 
-paso "4 · suite completa"
+paso "5 · suite completa"
 salida_pruebas="$(mktemp)"
 pnpm test >"$salida_pruebas" 2>&1
 salida=$(cat "$salida_pruebas")
@@ -60,7 +71,7 @@ else
   ok "suite completa en verde"
 fi
 
-paso "5 · ningún fichero de prueba se quedó sin recoger"
+paso "6 · ningún fichero de prueba se quedó sin recoger"
 # Detecta el fichero que existe y NADIE ejecuta —patrón `include` que dejó de
 # alcanzarlo, paquete fuera de la corrida—: ahí no hay ningún rojo, la suite
 # informa «4 passed» y parece correcta. El fichero que sí se recoge y falla al
@@ -77,11 +88,19 @@ else
 fi
 rm -f "$salida_pruebas"
 
-paso "6 · umbrales de cobertura"
-pnpm test:cobertura >/dev/null 2>&1 && ok "cobertura por encima del umbral" \
-  || mal "cobertura por debajo del umbral"
+paso "7 · umbrales de cobertura por capa (§2.4)"
+# Se mide por CAPA, no en agregado: §2.4 exige 90 % en dominio y aplicación y
+# 70 % global, y un agregado alto puede esconder una capa por debajo — como
+# ocurrió con `aplicacion`, que estaba al 79 % sin que nadie lo midiera.
+if salida_cob=$(node scripts/lib/metricas.mjs 2>&1); then
+  echo "$salida_cob" | grep -E "^  (OK|BAJO)" | sed 's/^/   /'
+  ok "las tres capas cumplen su umbral"
+else
+  mal "alguna capa por debajo del umbral de §2.4"
+  echo "$salida_cob" | grep -E "^  (OK|BAJO)" | sed 's/^/     /'
+fi
 
-paso "7 · portabilidad de los guiones (macOS/BSD y CI/GNU)"
+paso "8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)"
 # El entorno de desarrollo objetivo es macOS; el CI de la ETAPA 14 correrá en
 # Linux. Los guiones deben funcionar en los dos, y eso se comprueba, no se
 # recuerda: tres veces una diferencia entre ambos cambió el resultado.
@@ -92,18 +111,27 @@ else
   echo "$salida_port" | head -12 | sed 's/^/     /'
 fi
 
-paso "8 · fronteras de arquitectura y secretos"
+paso "9 · pruebas negativas de los propios controles"
+# Un control que nadie ha visto fallar no está demostrado.
+if salida_neg=$(node scripts/lib/pruebas-negativas.mjs 2>&1); then
+  ok "$(echo "$salida_neg" | tail -1)"
+else
+  mal "algún control NO detecta su violación"
+  echo "$salida_neg" | grep "✗" | sed 's/^/     /'
+fi
+
+paso "10 · fronteras de arquitectura y secretos"
 ./scripts/verificar-frontera.sh >/dev/null 2>&1 && ok "fronteras (DoD ETAPA 02)" || mal "fronteras"
 ./scripts/escanear-secretos.sh  >/dev/null 2>&1 && ok "sin secretos"            || mal "secretos detectados"
 
 if [[ "$CON_BASE" == "1" ]]; then
-  paso "9 · esquema y aislamiento en --modo-supabase"
+  paso "11 · esquema y aislamiento en --modo-supabase"
   if ./supabase/verificar.sh --con-pruebas --modo-supabase >/tmp/ncr-sql.log 2>&1; then
     ok "migraciones, semillas y suite SQL"
   else
     mal "suite SQL (ver /tmp/ncr-sql.log)"
   fi
-  paso "10 · KPI-03 con base real"
+  paso "12 · KPI-03 con base real"
   if [[ -n "${DATABASE_URL_PRUEBAS:-}" ]]; then
     pnpm --filter @ncr/api exec vitest run test/concurrencia-padron.test.ts >/dev/null 2>&1 \
       && ok "100 inserciones concurrentes, 0 duplicados" || mal "KPI-03"

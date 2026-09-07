@@ -196,7 +196,10 @@ De ahí dos controles que el guion incorpora y que no son opcionales:
 
 - **Recuento de ficheros de prueba recogidos frente a los que hay en disco.** Detecta el fichero que existe y **nadie ejecuta** —un patrón `include` que dejó de alcanzarlo, un paquete fuera de la corrida—: ahí no hay ningún rojo, la suite informa «4 passed» y parece correcta.
 - **Instalación con `--frozen-lockfile`**, para que una dependencia instalada a mano y no declarada no pase inadvertida.
-- **Portabilidad BSD/GNU de todos los guiones.** El entorno de desarrollo objetivo es **macOS**; el CI de la ETAPA 14 correrá en **Linux**. Un guion que solo funciona en uno de los dos no verifica nada en el otro.
+- **Portabilidad BSD/GNU de las cuatro superficies con shell**: los `.sh`, los `scripts` de cada `package.json`, los ganchos de `.husky/` y los bloques `run:` de los flujos. El entorno de desarrollo objetivo es **macOS**; el CI corre en **Linux**. Un guion que solo funciona en uno de los dos no verifica nada en el otro.
+- **Cobertura medida POR CAPA**, no en agregado: §2.4 exige 90 % en dominio **y en aplicación**, y 70 % global. Un agregado alto esconde una capa por debajo — ocurrió: `aplicacion` estaba al 79 % sin que nadie lo midiera.
+- **Pruebas negativas de los propios controles.** Un control que nadie ha visto fallar no está demostrado; `scripts/lib/pruebas-negativas.mjs` introduce cada violación y exige que se detecte.
+- **Versión de Node y pnpm dentro de lo declarado** (`.nvmrc`, `engines`). La verificación depende de Node, así que el runtime también se comprueba.
 
 Y una regla de diseño derivada: **las pruebas resuelven los paquetes internos a su código fuente, nunca a su `dist/`.** Un artefacto intermedio puede envejecer; el fuente no.
 

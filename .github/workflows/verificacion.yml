@@ -1,0 +1,60 @@
+# Verificación de los CONTROLES, no del producto.
+#
+# El flujo completo de CI —build de las cuatro aplicaciones, PWA, escritorio,
+# despliegue— es la ETAPA 14. Este flujo se adelanta porque cubre algo que no
+# puede esperar: los controles que detectan falsos verdes solo protegen si
+# alguien comprueba que siguen detectando, y hasta ahora eso se hacía a mano.
+#
+# Corre en Linux (GNU) y macOS (BSD) a propósito: tres veces una diferencia
+# entre ambos cambió el resultado de una verificación.
+name: verificacion
+
+on:
+  push:
+    branches: [develop, main, 'etapa-**']
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  controles:
+    strategy:
+      fail-fast: false
+      matrix:
+        so: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.so }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Entorno dentro de lo declarado
+        run: node scripts/lib/verificar-entorno.mjs
+
+      - name: Instalación reproducible
+        run: pnpm install --frozen-lockfile
+
+      - name: Portabilidad BSD/GNU de todas las superficies con shell
+        run: node scripts/lib/portabilidad.mjs
+
+      - name: Escaneo de secretos
+        run: node scripts/lib/escanear-secretos.mjs
+
+      - name: Pruebas negativas de los controles
+        run: node scripts/lib/pruebas-negativas.mjs
+
+      - name: Compilación, lint y tipos
+        run: |
+          pnpm build
+          pnpm lint
+          pnpm typecheck
+
+      - name: Suite completa y umbrales de cobertura
+        run: node scripts/lib/metricas.mjs
+
+      - name: Fronteras de arquitectura (DoD ETAPA 02)
+        run: ./scripts/verificar-frontera.sh

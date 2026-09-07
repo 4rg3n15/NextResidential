@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.11.0 <23",
+    "pnpm": ">=9.15.0 <10"
   },
   "scripts": {
     "build": "turbo run build",
@@ -16,7 +17,9 @@
     "verificar": "pnpm lint && pnpm typecheck && pnpm test && pnpm secretos && pnpm portabilidad",
     "prepare": "husky",
     "verificar:etapa": "./scripts/verificar-etapa.sh",
-    "portabilidad": "node scripts/lib/portabilidad.mjs"
+    "portabilidad": "node scripts/lib/portabilidad.mjs",
+    "metricas": "node scripts/lib/metricas.mjs",
+    "entorno": "node scripts/lib/verificar-entorno.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.17.0",
