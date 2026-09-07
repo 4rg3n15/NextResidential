@@ -74,7 +74,7 @@ La pieza que justifica la etapa es la prueba de KPI-03: **100 inserciones concur
 
 **Mutación:** introducir un `DELETE` en el adaptador hace fallar la prueba de RN-19; desactivar la barrera de aislamiento hace fallar la suite multiempresa. Las dos se comprobaron.
 
-**Cobertura del dominio:** 99,15 % de líneas (umbral 90 %).
+**Cobertura — cifras recalculadas sin shell (2026-09-07).**
 
 ### Corrección del 2026-09-07 · el informe reportó 51 verdes y en el entorno del usuario fallaron 3
 
@@ -119,3 +119,96 @@ El CSV se limita en tamaño y rechaza bytes nulos en el DTO.
 ## 10. Rama y commits
 
 Rama `etapa-04-padron`, desde `develop` actualizado. Commit `etapa4 esquemas`.
+
+---
+
+# Adenda 2 · Cierre verificado de la ETAPA 04
+
+**2026-09-07 · sin avance de etapa**
+
+## E.1 · Métricas recalculadas sin shell
+
+La cifra «8 de 14» del cierre anterior salió de un **error de conteo en shell**: el `grep` capturaba solo el primer número de «1 failed | 4 passed (5)». Como ese mismo shell midió el resto del cierre, todo se recalculó con `scripts/lib/metricas.mjs`, que lee el **informe JSON del ejecutor** en vez de raspar la consola.
+
+**Desglose del «33 + 51» — ahora 33 + 61 = 94 pruebas en 15 ficheros:**
+
+| Fichero                                                     | Pruebas         |
+| ----------------------------------------------------------- | --------------- |
+| `packages/domain-core/src/compartido/resultado.test.ts`     | 6               |
+| `packages/domain-core/src/compartido/errores.test.ts`       | 3               |
+| `packages/domain-core/src/eventos/bus-en-memoria.test.ts`   | 3               |
+| `packages/domain-core/src/politicas/idempotencia.test.ts`   | 4               |
+| `packages/domain-core/src/tokens.test.ts`                   | 3               |
+| `packages/domain-core/src/padron/placa.test.ts`             | 7               |
+| `packages/domain-core/src/padron/vivienda.test.ts`          | 7               |
+| `apps/api/src/configuracion/esquema.test.ts`                | 4               |
+| `apps/api/src/comun/bitacora/bitacora-estructurada.test.ts` | 4               |
+| `apps/api/src/autenticacion/dominio/mfa.test.ts`            | 4               |
+| `apps/api/src/padron/aplicacion/carga-padron.test.ts`       | 8               |
+| `apps/api/src/padron/aplicacion/casos-de-uso.test.ts`       | **10 (nuevas)** |
+| `apps/api/test/aislamiento.e2e.test.ts`                     | 13              |
+| `apps/api/test/autenticacion.e2e.test.ts`                   | 16              |
+| `apps/api/test/concurrencia-padron.test.ts`                 | 2               |
+
+**Cobertura por capa (§2.4), medida por primera vez como el contrato la exige:**
+
+| Capa                                 | Líneas      | Ramas   | Funciones | Umbral |
+| ------------------------------------ | ----------- | ------- | --------- | ------ |
+| Dominio (`packages/domain-core/src`) | **97,09 %** | 98,90 % | 90,91 %   | 90 %   |
+| **Aplicación** (`**/aplicacion/**`)  | **99,11 %** | 92,31 % | 100 %     | 90 %   |
+| Global                               | **74,91 %** | 88,28 % | 83,33 %   | 70 %   |
+
+### Qué estaba mal en las cifras anteriores
+
+**Una cifra incompleta y un incumplimiento que nadie había medido.**
+
+- El informe decía «cobertura del dominio: 99,15 %». Ese número era el de Vitest **con sus exclusiones** (interfaces puras, que no compilan a código ejecutable). Medido sin exclusiones sobre todos los archivos del dominio, es **97,09 %**. Ninguno de los dos es falso; miden conjuntos distintos, y el informe no decía cuál.
+- **Lo serio:** §2.4 exige 90 % en dominio **y en aplicación**, y la capa de aplicación **nunca se midió**. Estaba en **79,11 %**, por debajo del umbral del contrato, con `casos-de-uso.ts` al 48 % —los caminos de error no se probaban—. Se añadieron 10 pruebas y quedó en 99,11 %. El umbral se comprueba ahora por capa en cada cierre.
+
+## E.2 · Auditoría de portabilidad ampliada a cuatro superficies
+
+`portabilidad.mjs` solo miraba `.sh`. Ahora audita también los `scripts` de cada `package.json`, los ganchos de `.husky/`, los bloques `run:` de los flujos —incluidos los `run: |` multilínea— y el `Makefile` si aparece. **Prueba de mutación:** una divergencia inyectada por superficie, las cuatro detectadas con fichero y línea.
+
+## E.3 · La versión del runtime, declarada y comprobada
+
+Mover la verificación a Node cierra la divergencia BSD/GNU y abre otra: el resultado depende de la versión de Node. La diferencia es que esta **sí está declarada**, y ahora también comprobada: `.nvmrc` (22.22.2), `engines` (`node >=22.11.0 <23`, `pnpm >=9.15.0 <10`), y `verificar-entorno.mjs` como paso 1 del DoD y del CI. Probado por mutación: con `engines.node: ">=99"` la verificación se detiene.
+
+## E.4 · Pruebas negativas automatizadas
+
+Las tres que se ejecutaban a mano —más una cuarta— viven en `scripts/lib/pruebas-negativas.mjs`, en el DoD y en `.github/workflows/verificacion.yml`, que corre en **Linux y macOS** a propósito:
+
+```
+▸ 1 · un secreto sintético bloquea el escaneo            ✓ detectado
+▸ 2 · una construcción BSD/GNU divergente rompe          ✓ detectada
+▸ 3 · un fichero de prueba no recogido dispara el paso   ✓ detectado
+▸ 4 · un Node fuera de `engines` detiene la verificación ✓ detectado
+```
+
+Cada sonda revierte su cambio en `finally` y se comprueba que el árbol queda limpio: una prueba negativa que deje residuos es peor que no tenerla. El secreto es **sintético** y su fichero se borra sin llegar nunca al índice.
+
+El flujo de CI completo —build de las cuatro aplicaciones, PWA, escritorio— sigue siendo la ETAPA 14. Este se adelanta porque cubre lo que no puede esperar: que los controles sigan detectando.
+
+## E.5 · DoD original, ejecutado
+
+| DoD                                                     | Origen                    | Resultado                                                          |
+| ------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------ |
+| 100 inserciones concurrentes, 0 duplicados              | ETAPA 04, KPI-03 / ADR-04 | `intentos: 100 · aceptados: 1 · rechazados: 99 · filas activas: 1` |
+| Suite de aislamiento multiempresa                       | ETAPA 03                  | 13 pruebas verdes                                                  |
+| Importar infraestructura desde `domain/` rompe el build | ETAPA 02                  | 6 violaciones inyectadas, 6 rechazadas                             |
+| La app no arranca sin `.env` completo                   | ETAPA 02                  | Abortada con `EX_CONFIG` (78), sin filtrar valores                 |
+| Esquema y RLS en `--modo-supabase`                      | ETAPA 01                  | 18/18 migraciones, 4 pruebas SQL, KPI-03 en base                   |
+
+La de concurrencia se ejecutó **a través del caso de uso** contra PostgreSQL real, no contra un doble.
+
+## E.6 · Veredicto de §2.8.0
+
+```
+✓ entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2
+✓ pnpm install --frozen-lockfile      ✓ build desde cero
+✓ lint   ✓ typecheck
+✓ 33 + 61 pruebas verdes              ✓ 15 de 15 ficheros recogidos
+✓ dominio 97,09 % · aplicación 99,11 % · global 74,91 %
+✓ portabilidad: 14 superficies        ✓ 4 controles detectan su violación
+✓ fronteras   ✓ sin secretos
+VERIFICACIÓN DE ETAPA: correcta
+```

@@ -131,7 +131,11 @@ importers:
 
   packages/domain-core: {}
 
-  packages/providers: {}
+  packages/providers:
+    dependencies:
+      '@ncr/domain-core':
+        specifier: workspace:*
+        version: link:../domain-core
 
 packages:
 

@@ -17,6 +17,8 @@ const configuracionParaContrato: Configuracion = {
   JWKS_REFRESCO_MINIMO_SEGUNDOS: 60,
   DATABASE_URL: 'no-aplica',
   DATABASE_POOLER_URL: 'no-aplica',
+  INGESTA_FIRMA_SECRETO: 'no-aplica-para-la-generacion-del-contrato',
+  INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 120,

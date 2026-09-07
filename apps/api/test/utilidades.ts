@@ -1,6 +1,8 @@
 import { generateKeyPair, SignJWT, exportJWK } from 'jose';
 import type { JWK } from 'jose';
 import { Test } from '@nestjs/testing';
+import express from 'express';
+import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
 import type { INestApplication } from '@nestjs/common';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
@@ -22,6 +24,8 @@ export const configuracionDePrueba: Configuracion = {
   JWKS_REFRESCO_MINIMO_SEGUNDOS: 60,
   DATABASE_URL: 'marcador',
   DATABASE_POOLER_URL: 'marcador',
+  INGESTA_FIRMA_SECRETO: 'secreto-de-ingesta-solo-para-pruebas-32+',
+  INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 100000, // el límite se prueba aparte; aquí estorbaría
@@ -101,7 +105,15 @@ export const crearApp = async (firmante: Firmante): Promise<INestApplication> =>
     })
     .compile();
 
-  const app = modulo.createNestApplication({ logger: false });
+  // `bodyParser: false` + el mismo `express.json({ verify })` de `main.ts`.
+  // Sin esto la suite probaría una tubería distinta de la de producción, y la
+  // firma del Alarm Server —que se calcula sobre el cuerpo CRUDO— no tendría
+  // cuerpo crudo que verificar.
+  const app = modulo.createNestApplication({ logger: false, bodyParser: false });
+  app.use(
+    express.json({ limit: configuracionDePrueba.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }),
+  );
+  app.use(express.urlencoded({ limit: configuracionDePrueba.LIMITE_PAYLOAD, extended: false }));
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );

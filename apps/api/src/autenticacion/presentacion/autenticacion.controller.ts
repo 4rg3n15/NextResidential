@@ -10,7 +10,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ServicioMfa } from '../infraestructura/mfa.servicio';
-import type { InscribirMfaDto, VerificarMfaDto } from './dtos';
+import { InscribirMfaDto, VerificarMfaDto } from './dtos';
 import { Roles, SinRecursoDeTenant } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../dominio/claims';

@@ -181,15 +181,25 @@ Verificación asimétrica del JWT contra JWKS (caché 10 min, suelo de refresco 
 
 ## ETAPA 04 — Padrón · **CERRADA**
 
-VO `Placa` normalizado al construir, agregado `Vivienda` con métodos de intención, primer adaptador PostgreSQL real y carga transaccional desde CSV. **KPI-03 verificado a través del caso de uso contra base real: 100 intentos concurrentes → 1 aceptado, 99 rechazados, 1 fila activa.** RN-19 sin borrado físico, probado por inspección del adaptador y sometido a mutación. 51 pruebas en la API, 33 en el dominio (99,15 % de cobertura). Informe en `docs/etapas/ETAPA-04.md`. Deudas nuevas: D-20t a D-23t, [SUPUESTO] S-15.
+VO `Placa` normalizado al construir, agregado `Vivienda` con métodos de intención, primer adaptador PostgreSQL real y carga transaccional desde CSV. **KPI-03 verificado a través del caso de uso contra base real: 100 intentos concurrentes → 1 aceptado, 99 rechazados, 1 fila activa.** RN-19 sin borrado físico, probado por inspección del adaptador y sometido a mutación. **94 pruebas en 15 ficheros** (33 dominio + 61 API), con cobertura medida **por capa**: dominio 97,09 %, aplicación 99,11 %, global 74,91 %. Informe en `docs/etapas/ETAPA-04.md`. Deudas nuevas: D-20t a D-23t, [SUPUESTO] S-15.
 
 > **Corrección del 2026-09-07.** El informe de cierre reportó 51 pruebas verdes y en el entorno del usuario fallaron 3: la suite de la API corría contra un `packages/domain-core/dist` de una etapa anterior, porque `dist` está en `.gitignore` y `pnpm --filter <app> test` no dispara `turbo`. Corregido resolviendo `@ncr/domain-core` al **código fuente** en las pruebas. Se añadió `./scripts/verificar-etapa.sh` como **requisito de DoD de toda etapa** (§2.8.0 del contrato): parte de artefactos limpios, instala con `--frozen-lockfile` y comprueba que **ningún fichero de prueba se quedó sin ejecutar** — un fichero que no carga no cuenta como fallo, desaparece del recuento.
 
+> **Cierre verificado del 2026-09-07 (Adenda 2).** Las cifras del cierre anterior se recalcularon **sin shell**, porque el «8 de 14» venía de un error de conteo y ese mismo shell midió el resto. Hallazgo serio: §2.4 exige 90 % también en **aplicación**, y esa capa **nunca se había medido** — estaba en 79,11 %, con `casos-de-uso.ts` al 48 %. Corregido a 99,11 % con 10 pruebas nuevas; el umbral se comprueba ahora por capa en cada cierre. Además: auditoría de portabilidad ampliada a **cuatro superficies** (`.sh`, `scripts` de `package.json`, `.husky/`, `run:` de workflows), versión de Node declarada en `.nvmrc`/`engines` y comprobada, y **pruebas negativas de los propios controles** automatizadas en el DoD y en CI (Linux y macOS).
+
 > **Requisito registrado para la ETAPA 14 (CI/CD):** la suite `./supabase/verificar.sh --con-pruebas --modo-supabase` y la prueba de concurrencia KPI-03 deben ejecutarse **en CI**, no en el entorno del usuario. Hoy se omiten sin base local, y esa omisión avisa pero no protege.
 
-## Etapas 05 a 16 — `PENDIENTE`
+## ETAPA 05 — Autorizaciones y motor de reglas · **CERRADA**
 
-Sin trabajo iniciado. La ETAPA 02 se habilita cuando la 01 quede cerrada.
+Motor de reglas como **función pura** `evaluarAcceso(contexto, reglas)`, con reloj inyectado, cero I/O y **100 % de cobertura de ramas** en `packages/domain-core/src/reglas/`. Precedencia vinculante `listaNegra > vigencia > patrón > zona` verificada con dos pruebas de CA-13. Agregado `Autorización` con `Vigencia` cerrado-abierta y `PatrónRecurrencia` con la zona horaria dentro del objeto de valor. Cuatro casos de uso y gestión de listas negras con RN-07 (quién veta ≠ quién levanta). `MockProvider` con los cuatro puertos, latencia, fallos, reintentos, duplicados y baja confianza, todo con generador **con semilla**. **KPI-11 comprobado por ejecución** (`scripts/lib/frontera-hardware.mjs`) en el verificador, en `verificar-frontera.sh` y en CI, con prueba negativa propia. Contrato de firma del Alarm Server (RNF-03.11): sin firma válida, 401. **206 pruebas en 25 ficheros**; cobertura por capa: dominio 99,29 % (ramas 100 %), aplicación 98,38 %, global 81,45 %. Informe en `docs/etapas/ETAPA-05.md`. [SUPUESTO] S-15 **cerrado**. Deudas nuevas: D-25 a D-28.
+
+> **Defecto de seguridad encontrado y corregido (D-24).** Los controladores de padrón y autenticación importaban sus DTOs con `import type`, lo que borra la clase al compilar y deja el `ValidationPipe` **inerte**: un POST con un tipo equivocado y un campo no declarado llegaba al manejador sin 400. Venía de las ETAPAS 03 y 04. Corregido, con `consistent-type-imports` desactivada en los controladores y una prueba de regresión (`validacion-dtos.e2e.test.ts`) verificada por mutación. Es el tercer caso de la misma familia: **un detalle del compilado que hace inerte un control sin ponerlo en rojo.**
+
+> **Corrección de los dos defectos del verificador reportados desde macOS.** El paso 9 comparaba el contenido en memoria en vez de preguntarle a git, e informaba «package.json quedó alterado» con el árbol limpio; ahora las sondas operan sobre un **clon temporal fuera del árbol** y el estado se compara con `git status --porcelain=v1` antes y después. El paso 10 se colgaba porque la sonda de arranque levantaba la API de verdad en un equipo con `.env` completo; ahora usa `NCR_IGNORAR_ENV_FILE=1` y **todos los pasos tienen límite de tiempo** (`scripts/lib/con-limite.mjs`, portable BSD/GNU).
+
+## Etapas 06 a 16 — `PENDIENTE`
+
+Sin trabajo iniciado. Cada etapa se habilita cuando la anterior queda cerrada.
 
 ### Insumos que la ETAPA 01 hereda de la 00
 

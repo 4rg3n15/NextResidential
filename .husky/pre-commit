@@ -2,3 +2,4 @@
 # dentro de node_modules y aborta el commit por un fichero que no es nuestro.
 pnpm exec lint-staged --config .lintstagedrc.json
 ./scripts/escanear-secretos.sh
+node scripts/lib/portabilidad.mjs
