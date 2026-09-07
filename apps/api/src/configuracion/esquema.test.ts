@@ -9,6 +9,9 @@ const completo = {
   DATABASE_URL: 'valor-de-prueba',
   DATABASE_POOLER_URL: 'valor-de-prueba',
   CORS_ALLOWED_ORIGINS: 'https://consola.ejemplo.co, https://admin.ejemplo.co',
+  // RNF-03.11: sin secreto de firma la ingesta aceptaría eventos de cualquiera,
+  // así que es obligatoria como las demás y su ausencia impide el arranque.
+  INGESTA_FIRMA_SECRETO: 'secreto-de-prueba-de-treinta-y-dos-o-mas',
 };
 
 describe('configuración (DoD ETAPA 02: sin .env completo no arranca)', () => {

@@ -67,17 +67,31 @@ describe('agregado Vivienda', () => {
     ).toBe(true);
   });
 
-  it('un solo titular activo', () => {
+  it('admite VARIOS titulares activos (S-15, resuelto por el cliente)', () => {
+    // Dos propietarios de la misma casa, ambos autorizando visitas: el caso
+    // habitual en copropiedades colombianas. El singular de CU-01 describe a
+    // quién se contacta en ese flujo, no el modelo del padrón.
     const v = nueva();
-    v.agregarResidente({ id: 'r1', personaId: 'p1', esTitular: true, estado: 'activo' });
     expect(
-      esFallo(v.agregarResidente({ id: 'r2', personaId: 'p2', esTitular: true, estado: 'activo' })),
+      esExito(v.agregarResidente({ id: 'r1', personaId: 'p1', esTitular: true, estado: 'activo' })),
+    ).toBe(true);
+    expect(
+      esExito(v.agregarResidente({ id: 'r2', personaId: 'p2', esTitular: true, estado: 'activo' })),
     ).toBe(true);
     expect(
       esExito(
         v.agregarResidente({ id: 'r3', personaId: 'p3', esTitular: false, estado: 'activo' }),
       ),
     ).toBe(true);
+    expect(v.titularesActivos).toHaveLength(2);
+  });
+
+  it('un titular dado de baja deja de contar como titular activo', () => {
+    const v = nueva();
+    v.agregarResidente({ id: 'r1', personaId: 'p1', esTitular: true, estado: 'activo' });
+    v.agregarResidente({ id: 'r2', personaId: 'p2', esTitular: true, estado: 'activo' });
+    v.desactivarResidente('r1', 'vendio su parte');
+    expect(v.titularesActivos.map((r) => r.id)).toEqual(['r2']);
   });
 
   it('rechaza placa ya activa en la vivienda, y la acepta tras la baja', () => {
@@ -126,5 +140,10 @@ describe('agregado Vivienda', () => {
     expect(esFallo(v.desactivarResidente('r1', 'otra vez'))).toBe(true);
     expect(esFallo(v.desactivarResidente('inexistente', 'x'))).toBe(true);
     expect(esFallo(v.desactivarVehiculo('inexistente', 'x'))).toBe(true);
+    expect(v.vehiculos).toHaveLength(1);
+    expect(esExito(v.desactivarVehiculo('x1', 'vendido'))).toBe(true);
+    // Sin borrado físico: el vehículo sigue en el agregado, inactivo (RN-19).
+    expect(v.vehiculos).toHaveLength(1);
+    expect(esFallo(v.desactivarVehiculo('x1', 'otra vez'))).toBe(true);
   });
 });

@@ -10,6 +10,7 @@ export type EstadoAdministrativo = 'al_dia' | 'en_mora' | 'suspendido';
 export interface Residente {
   readonly id: string;
   readonly personaId: string;
+  /** Puede haber varios titulares activos en la misma vivienda (S-15). */
   readonly esTitular: boolean;
   estado: EstadoRegistro;
 }
@@ -77,6 +78,16 @@ export class Vivienda {
   }
 
   /**
+   * Titulares activos. Son VARIOS por diseño (S-15, resuelto por el cliente el
+   * 2026-09-07): en copropiedades colombianas una casa suele tener dos
+   * propietarios y ambos autorizan visitas. El flujo de CU-01 elige a quién
+   * contactar entre ellos; esa elección es de la ETAPA 10, no del padrón.
+   */
+  get titularesActivos(): readonly Residente[] {
+    return this._residentes.filter((r) => r.esTitular && r.estado === 'activo');
+  }
+
+  /**
    * RN-19 / CA-02: **baja lógica, nunca borrado**. El motivo es obligatorio
    * porque una desactivación sin motivo es indistinguible de un error, y a los
    * seis meses nadie sabe si aquella vivienda se dio de baja o se perdió.
@@ -123,13 +134,12 @@ export class Vivienda {
         ),
       );
     }
-    // Un solo titular activo: dos titulares hacen ambigua la notificación de
-    // CU-01 («¿a quién se le pregunta?»).
-    if (residente.esTitular && this._residentes.some((r) => r.esTitular && r.estado === 'activo')) {
-      return fallo(
-        errorDominio('INVARIANTE_VIOLADA', 'La vivienda ya tiene un titular activo', 'RN-05'),
-      );
-    }
+    // VARIOS titulares activos por vivienda: resuelto por el cliente el
+    // 2026-09-07 ([SUPUESTO] S-15, cerrado). En copropiedades colombianas es
+    // habitual que una casa tenga dos propietarios y que ambos autoricen
+    // visitas. El singular de CU-01 —«se contacta al residente»— describe a
+    // quién se llama en ESE flujo, no el modelo del padrón. Restringirlo a uno
+    // habría impedido que el segundo propietario autorizara nada.
     this._residentes.push(residente);
     return exito(undefined);
   }

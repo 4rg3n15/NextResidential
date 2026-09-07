@@ -39,12 +39,27 @@ else
 fi
 limpiar
 
-echo "2 · la aplicación no arranca sin configuración completa"
+echo "2 · KPI-11 · el protocolo del fabricante no sale de packages/providers"
+if node scripts/lib/frontera-hardware.mjs; then
+  :
+else
+  echo "   ✗ el protocolo del fabricante se escapó del paquete"; fallos=1
+fi
+
+echo "3 · la aplicación no arranca sin configuración completa"
 if [ ! -f apps/api/dist/main.js ]; then
   echo "   (compilando)"; pnpm --filter @ncr/api build >/dev/null 2>&1
 fi
-salida=$(env -i PATH="$PATH" NODE_ENV=test node apps/api/dist/main.js 2>&1 || true)
-codigo=$(env -i PATH="$PATH" NODE_ENV=test node apps/api/dist/main.js >/dev/null 2>&1; echo $?)
+# `NCR_IGNORAR_ENV_FILE=1` hace la sonda determinista: sin él, en un equipo con
+# `apps/api/.env` completo la API ARRANCA y se queda escuchando, y el guion no
+# devuelve el control nunca. Era el cuelgue reportado en macOS.
+# El límite de tiempo es la red por si algún día vuelve a no terminar.
+sonda_arranque() {
+  env -i PATH="$PATH" NODE_ENV=test NCR_IGNORAR_ENV_FILE=1 \
+    node scripts/lib/con-limite.mjs 30 node apps/api/dist/main.js 2>&1
+}
+salida=$(sonda_arranque || true)
+sonda_arranque >/dev/null 2>&1; codigo=$?
 if [ "$codigo" -eq 78 ] && echo "$salida" | grep -q "no arranca"; then
   echo "   ✓ arranque abortado con EX_CONFIG (78) y motivo explícito"
 else

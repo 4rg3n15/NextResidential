@@ -73,6 +73,10 @@ const correr = (paquete, dir) => {
 const paquetes = [
   ['@ncr/domain-core', 'packages/domain-core'],
   ['@ncr/api', 'apps/api'],
+  // `@ncr/providers` entra desde la ETAPA 05: antes no tenía pruebas, y su
+  // ausencia aquí habría dejado 23 ficheros medidos de 24 en disco — el hueco
+  // exacto que el paso 6 existe para detectar.
+  ['@ncr/providers', 'packages/providers'],
 ];
 
 let totalPruebas = 0;

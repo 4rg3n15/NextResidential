@@ -14,7 +14,7 @@ import {
   RegistrarVehiculo,
 } from '../aplicacion/casos-de-uso';
 import { CargarPadronDesdeArchivo, analizarCsv } from '../aplicacion/carga-padron';
-import type { CargarPadronDto, DesactivarDto, RegistrarVehiculoDto } from './dtos';
+import { CargarPadronDto, DesactivarDto, RegistrarVehiculoDto } from './dtos';
 
 /**
  * Traduce protocolo a casos de uso. **Cero reglas de negocio** (§2.2): lo único

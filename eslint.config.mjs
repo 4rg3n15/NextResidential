@@ -69,7 +69,12 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         {
-          selector: "NewExpression[callee.name='Date']",
+          // Solo `new Date()` SIN argumentos: es la forma que LEE el reloj del
+          // sistema. `new Date(otra.getTime())` es una copia determinista, y el
+          // dominio la necesita para que un objeto de valor no comparta la
+          // referencia con quien se la pasó (inmutabilidad, §2.4). Prohibir las
+          // dos obligaría a sacar del dominio una operación que no hace I/O.
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
           message: 'Prohibido `new Date()` en el dominio: inyecta `Reloj` (§2.4).',
         },
         {
@@ -105,6 +110,22 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  {
+    // Los DTOs se importan como VALOR, nunca como tipo.
+    //
+    // Se descubrió el 2026-09-07: `import type { RegistrarVehiculoDto }` borra
+    // la clase al compilar, así que `design:paramtypes` queda en `Object` y el
+    // `ValidationPipe` DESISTE en silencio — devuelve el cuerpo sin validar.
+    // Comprobado: un POST con `codigo: 12345` y un campo no declarado llegaba
+    // al manejador en vez de recibir un 400. `consistent-type-imports` empujaba
+    // justo hacia esa forma, así que la regla se apaga donde hay decoradores;
+    // apagarla aquí es la única manera de que §2.7.3 sea cierta.
+    //
+    // La prueba `validacion-dtos.e2e.test.ts` lo verifica por ejecución: si
+    // alguien vuelve a poner `import type`, la suite se pone roja.
+    files: ['apps/api/src/**/*.controller.ts'],
+    rules: { '@typescript-eslint/consistent-type-imports': 'off' },
   },
   {
     // Las pruebas del dominio SÍ construyen instantes: es su trabajo fijar el

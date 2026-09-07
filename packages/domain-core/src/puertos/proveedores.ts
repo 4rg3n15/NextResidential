@@ -1,9 +1,11 @@
 /**
  * Puertos de proveedor. Aquí vive la frontera con el hardware.
  *
- * El dominio expresa INTENCIÓN, nunca protocolo: ADR-01 fija ISAPI TwoWayAudio,
- * y esa decisión no debe poder leerse desde aquí. Si algún día se cambia de
- * protocolo, esta interfaz no se entera — que es exactamente la prueba de OE-03.
+ * El dominio expresa INTENCIÓN, nunca protocolo. ADR-01 fija cuál se usa para
+ * el audio bidireccional, y esa decisión **no debe poder leerse desde aquí**:
+ * el verificador de KPI-11 lo comprueba, y por eso este comentario tampoco lo
+ * nombra. Si algún día se cambia de protocolo, esta interfaz no se entera — que
+ * es exactamente la prueba de OE-03.
  */
 export interface ResultadoAccionamiento {
   readonly aceptado: boolean;

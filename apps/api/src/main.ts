@@ -15,10 +15,21 @@ import { resolve } from 'node:path';
  * en cada caso. `override: false` mantiene la precedencia correcta: lo que ya
  * venga del entorno real —contenedor, CI— gana sobre el fichero.
  */
-cargarEnv({ path: resolve(__dirname, '..', '.env'), override: false });
+/**
+ * `NCR_IGNORAR_ENV_FILE=1` omite la lectura del fichero. Existe para que una
+ * comprobación pueda verificar de forma DETERMINISTA que la aplicación no
+ * arranca sin configuración: sin esta salida, la sonda del DoD depende de que
+ * la máquina no tenga `.env` —cierto en CI, falso en el equipo de cualquier
+ * desarrollador—, y allí el proceso arranca y se queda escuchando para siempre.
+ * No relaja nada: solo evita leer un fichero.
+ */
+if (process.env.NCR_IGNORAR_ENV_FILE !== '1') {
+  cargarEnv({ path: resolve(__dirname, '..', '.env'), override: false });
+}
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import express from 'express';
+import { guardarCuerpoCrudo } from './autorizaciones/presentacion/guardia-firma';
 import { AppModule } from './app.module';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
 import { aplicarSeguridad } from './seguridad';
@@ -43,7 +54,10 @@ async function arrancar(): Promise<void> {
 
   aplicarSeguridad(app, config);
   // Límite de tamaño de payload (§2.7.8), antes de cualquier ruta.
-  app.use(express.json({ limit: config.LIMITE_PAYLOAD }));
+  // `verify` guarda el cuerpo CRUDO antes de parsearlo: la firma del Alarm
+  // Server se calcula sobre los bytes que llegaron, y reserializar el JSON
+  // produciría otra cadena con la que ninguna firma cuadraría (RNF-03.11).
+  app.use(express.json({ limit: config.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
   app.use(express.urlencoded({ limit: config.LIMITE_PAYLOAD, extended: false }));
 
   app.useGlobalFilters(new FiltroGlobalDeExcepciones(bitacora));

@@ -58,3 +58,6 @@ jobs:
 
       - name: Fronteras de arquitectura (DoD ETAPA 02)
         run: ./scripts/verificar-frontera.sh
+
+      - name: KPI-11 · el protocolo del fabricante no sale de packages/providers
+        run: node scripts/lib/frontera-hardware.mjs

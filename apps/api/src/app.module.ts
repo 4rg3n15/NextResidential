@@ -8,6 +8,7 @@ import { GuardaDeAutenticacion } from './comun/guardas/autenticacion.guard';
 import { GuardaDeRoles } from './comun/guardas/roles.guard';
 import { MultiempresaModule } from './multiempresa/multiempresa.module';
 import { PadronModule } from './padron/padron.module';
+import { AutorizacionesModule } from './autorizaciones/autorizaciones.module';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
 import { NucleoModule } from './nucleo/nucleo.module';
@@ -29,6 +30,7 @@ export class AppModule {
         AutenticacionModule.registrar(),
         MultiempresaModule,
         PadronModule.registrar(),
+        AutorizacionesModule.registrar(),
         ThrottlerModule.forRoot([
           { ttl: config.THROTTLE_TTL_SEGUNDOS * 1000, limit: config.THROTTLE_LIMITE },
         ]),

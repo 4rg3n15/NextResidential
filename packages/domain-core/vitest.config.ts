@@ -14,6 +14,7 @@ export default defineConfig({
         'src/index.ts',
         'src/puertos/**', // interfaces puras
         'src/eventos/evento-de-dominio.ts',
+        'src/reglas/contexto.ts', // solo interfaces del contexto de evaluación
       ],
       // §2.4: 90 % en dominio. El umbral rompe la ejecución, no la comenta.
       thresholds: { lines: 90, functions: 90, branches: 90, statements: 90 },

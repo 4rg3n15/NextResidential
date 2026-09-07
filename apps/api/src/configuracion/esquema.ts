@@ -32,6 +32,17 @@ export const esquemaConfiguracion = z.object({
   /** Lista blanca explícita (§2.7.2). Nunca `*`, nunca `origin: true`. */
   CORS_ALLOWED_ORIGINS: noVacio('CORS_ALLOWED_ORIGINS'),
 
+  /**
+   * RNF-03.11 · Secreto de firma del Alarm Server. La ingesta de eventos de
+   * hardware es un endpoint sin sesión de usuario: lo único que acredita al
+   * emisor es esta firma, así que sin secreto no hay ingesta. Se exige aquí y
+   * no «cuando haga falta» porque §2.7.1 dice que la aplicación no arranca con
+   * la configuración incompleta. El valor vive en el entorno, nunca en código.
+   */
+  INGESTA_FIRMA_SECRETO: noVacio('INGESTA_FIRMA_SECRETO').min(32),
+  /** Ventana de frescura de la firma, en segundos: acota la repetición. */
+  INGESTA_VENTANA_SEGUNDOS: z.coerce.number().int().min(10).max(900).default(300),
+
   LIMITE_PAYLOAD: z.string().default('256kb'),
   THROTTLE_TTL_SEGUNDOS: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMITE: z.coerce.number().int().positive().default(120),
