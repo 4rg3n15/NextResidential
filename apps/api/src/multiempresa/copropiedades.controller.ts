@@ -1,0 +1,50 @@
+import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsUUID } from 'class-validator';
+import { Aislamiento } from './aislamiento';
+import { PermiteServicio, Roles } from '../comun/decoradores';
+import { Contexto } from '../comun/decoradores/contexto.decorator';
+import type { ContextoTenant } from '../autenticacion/dominio/claims';
+
+export class IngestaDto {
+  @IsUUID()
+  copropiedadId!: string;
+}
+
+/**
+ * La copropiedad es la frontera del tenant (RN-15), así que su lectura es el
+ * recurso mínimo sobre el que la suite de aislamiento puede probar los DOS
+ * caminos. El padrón y lo demás llegan en la ETAPA 04 y usarán exactamente
+ * este mismo patrón: `exigirAlcance` antes de tocar nada.
+ */
+@ApiTags('multiempresa')
+@ApiBearerAuth()
+@Controller('copropiedades')
+export class CopropiedadesController {
+  constructor(@Inject(Aislamiento) private readonly aislamiento: Aislamiento) {}
+
+  @Get(':id')
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central', 'residente')
+  @ApiOperation({ summary: 'Lee una copropiedad dentro del alcance del token' })
+  async leer(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ id: string; alcance: string }> {
+    await this.aislamiento.exigirAlcance(ctx, id, `copropiedades/${id}`);
+    return { id, alcance: ctx.rol };
+  }
+
+  @Post('ingesta')
+  @Roles('servicio', 'superadministrador')
+  @PermiteServicio()
+  @ApiOperation({ summary: 'Ruta de identidad de servicio: valida el tenant en la aplicación' })
+  async ingerir(
+    @Contexto() ctx: ContextoTenant,
+    @Body() dto: IngestaDto,
+  ): Promise<{ aceptado: true }> {
+    // La llave secreta OMITE la RLS: sin esta línea, el Edge podría escribir
+    // en cualquier copropiedad. Es el segundo camino de §2.7.6.
+    await this.aislamiento.exigirAlcanceDeServicio(ctx, dto.copropiedadId, 'copropiedades/ingesta');
+    return { aceptado: true };
+  }
+}

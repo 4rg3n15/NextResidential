@@ -163,3 +163,52 @@ END
 $$;
 
 RESET ROLE;
+
+-- =============================================================================
+-- Camino 2 · la LLAVE SECRETA (`service_role`, BYPASSRLS) · ETAPA 03
+--
+-- La RLS no protege este camino: por definición lo omite. Lo que se comprueba
+-- aquí es que esa omisión sea REAL y medible, porque de ella depende que la
+-- validación en la capa de aplicación sea obligatoria y no opcional.
+--
+-- Si algún día `service_role` dejara de ver a través de los tenants, alguien
+-- podría concluir que la barrera de aplicación sobra. Esta prueba fija el
+-- hecho: mientras devuelva más de una copropiedad, `Aislamiento.exigirAlcance`
+-- es la única barrera de esa ruta (§2.7.6, KPI-37).
+-- =============================================================================
+DO $$
+DECLARE visibles int;
+BEGIN
+  -- El total NO se puede contar desde la sesión de la migración: el dueño
+  -- también está sujeto a FORCE RLS y sin claims no ve nada. Se compara contra
+  -- las dos copropiedades que siembra el seed.
+  SET LOCAL ROLE service_role;
+  SET LOCAL request.jwt.claims =
+    '{"rol":"servicio","usuario_id":"00000000-0000-4000-8000-000000000014",
+      "copropiedad_id":"10000000-0000-4000-8000-000000000001"}';
+  SELECT count(*) INTO visibles FROM public.copropiedades;
+  RESET ROLE;
+
+  ASSERT visibles >= 2,
+    format('service_role deberia omitir la RLS y ver ambas copropiedades; ve %s', visibles);
+  RAISE NOTICE 'KPI-37 · la llave secreta OMITE la RLS (% copropiedades visibles con un claim '
+               'acotado a una): la barrera de esa ruta es la capa de aplicacion, no la base', visibles;
+END
+$$;
+
+-- Y el contraste: el mismo claim con el rol `authenticated` SÍ queda acotado.
+DO $$
+DECLARE visibles int;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  SET LOCAL request.jwt.claims =
+    '{"rol":"administrador","usuario_id":"00000000-0000-4000-8000-000000000010",
+      "copropiedad_id":"10000000-0000-4000-8000-000000000001"}';
+  SELECT count(*) INTO visibles FROM public.copropiedades;
+  RESET ROLE;
+
+  ASSERT visibles = 1,
+    format('El administrador deberia ver 1 copropiedad, ve %s', visibles);
+  RAISE NOTICE 'KPI-36 · el JWT de usuario queda acotado a su copropiedad: ok';
+END
+$$;

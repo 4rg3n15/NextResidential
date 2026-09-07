@@ -3,6 +3,8 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RELOJ } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
+import { Publico } from '../comun/decoradores';
+import { ProveedorDeJwks } from '../autenticacion/infraestructura/jwks';
 import type { Configuracion } from '../configuracion/esquema';
 
 /**
@@ -22,24 +24,30 @@ export class SaludController {
   constructor(
     @Inject(RELOJ) private readonly reloj: Reloj,
     @Inject(CONFIGURACION) private readonly config: Configuracion,
+    @Inject(ProveedorDeJwks) private readonly jwks: ProveedorDeJwks,
   ) {}
 
+  @Publico()
   @Get('health')
   @ApiOperation({ summary: 'El proceso está vivo' })
   salud(): { estado: string; momento: string } {
     return { estado: 'vivo', momento: this.reloj.ahora().toISOString() };
   }
 
+  @Publico()
   @Get('ready')
   @ApiOperation({ summary: 'La aplicación puede atender tráfico' })
-  listo(): { estado: string; dependencias: Record<string, string> } {
+  async listo(): Promise<{ estado: string; dependencias: Record<string, string> }> {
     // La configuración ya está validada si el proceso arrancó; se comprueba de
     // nuevo para que `/ready` no mienta si algo la dejó incompleta en caliente.
     const dependencias: Record<string, string> = {
       configuracion: this.config.origenesPermitidos.length > 0 ? 'ok' : 'incompleta',
-      jwks: 'pendiente-etapa-03',
+      // Sin JWKS la API no puede verificar ningún token: no está lista para
+      // atender tráfico, pero el proceso está sano. Por eso 503 y no una caída.
+      jwks: (await this.jwks.precalentar()) ? 'ok' : 'no-disponible',
+      postgres: 'no-conectado-etapa-04',
     };
-    if (dependencias.configuracion !== 'ok') {
+    if (dependencias.configuracion !== 'ok' || dependencias.jwks !== 'ok') {
       throw new ServiceUnavailableException({ estado: 'no-listo', dependencias });
     }
     return { estado: 'listo', dependencias };

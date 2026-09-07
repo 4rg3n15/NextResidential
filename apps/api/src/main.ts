@@ -1,4 +1,21 @@
 import 'reflect-metadata';
+import { config as cargarEnv } from 'dotenv';
+import { resolve } from 'node:path';
+
+/**
+ * CORRECCIÓN 2026-09-07 (defecto reportado al cerrar la ETAPA 02).
+ *
+ * `node dist/main.js` rechazaba todas las variables como `Required` aunque
+ * `apps/api/.env` existía y era correcto: nadie lo estaba leyendo. Nest **no**
+ * carga `.env` por sí solo, y el proyecto no usa `@nestjs/config`.
+ *
+ * Se resuelve la ruta desde `__dirname` y no desde el directorio de trabajo:
+ * el proceso puede arrancarse desde la raíz del monorepo, desde `apps/api` o
+ * desde un gestor de procesos, y `process.cwd()` daría un resultado distinto
+ * en cada caso. `override: false` mantiene la precedencia correcta: lo que ya
+ * venga del entorno real —contenedor, CI— gana sobre el fichero.
+ */
+cargarEnv({ path: resolve(__dirname, '..', '.env'), override: false });
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import express from 'express';

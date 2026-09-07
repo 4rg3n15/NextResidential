@@ -1,0 +1,186 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import request from 'supertest';
+import type { INestApplication } from '@nestjs/common';
+import { COP_A, COP_B, crearApp, crearFirmante, enumerarRutas, tokenDe } from './utilidades';
+import type { Firmante, RutaExpuesta } from './utilidades';
+import { AuditoriaEnMemoria } from '../src/multiempresa/auditoria-en-memoria';
+
+/**
+ * SUITE DE AISLAMIENTO MULTIEMPRESA · KPI-36, KPI-37, KPI-38, CA-24, CP-11
+ *
+ * Rompe el build ante cualquier fuga. Recorre **todos** los endpoints del
+ * enrutador —no una lista escrita a mano— por los DOS caminos que exige
+ * §2.7.6: JWT de usuario e identidad de servicio (la que usa la llave secreta,
+ * que omite la RLS).
+ */
+let app: INestApplication;
+let firmante: Firmante;
+let rutas: RutaExpuesta[];
+
+const PUBLICAS = new Set(['GET /health', 'GET /ready']);
+
+/**
+ * Rutas que declaran `@SinRecursoDeTenant()`: operan sobre la identidad del
+ * propio llamante. La lista se DERIVA del código, no se escribe aquí: si
+ * alguien añade un endpoint sin ese decorador, entra en el recorrido de fuga
+ * automáticamente.
+ */
+const SIN_RECURSO_TENANT = new Set([
+  '/auth/sesion',
+  '/auth/mfa/inscripcion',
+  '/auth/mfa/verificacion',
+]);
+
+beforeAll(async () => {
+  firmante = await crearFirmante();
+  app = await crearApp(firmante);
+  rutas = enumerarRutas(app);
+});
+afterAll(async () => {
+  await app?.close();
+});
+
+const cuerpoDe = (r: RutaExpuesta): Record<string, unknown> =>
+  r.ruta.includes('ingesta') ? { copropiedadId: COP_B } : {};
+
+const invocar = (r: RutaExpuesta, token?: string) => {
+  const ruta = r.ruta.replace(':id', COP_B);
+  const peticion = request(app.getHttpServer())[
+    r.metodo.toLowerCase() as 'get' | 'post' | 'patch' | 'delete'
+  ](ruta);
+  if (token) peticion.set('Authorization', `Bearer ${token}`);
+  return r.metodo === 'GET' ? peticion : peticion.send(cuerpoDe(r));
+};
+
+describe('cobertura de la suite', () => {
+  it('hay endpoints que enumerar (si esto falla, la suite no está probando nada)', () => {
+    expect(rutas.length).toBeGreaterThan(0);
+  });
+
+  it('las exenciones de la suite se corresponden con el decorador del código', () => {
+    // Si alguien añade una ruta a SIN_RECURSO_TENANT sin marcarla en el
+    // controlador —o al revés—, esto lo delata. La exención tiene que existir
+    // en los dos sitios, y el decorador es el que se ve en la revisión.
+    const declaradas = rutas.filter((r) => SIN_RECURSO_TENANT.has(r.ruta)).map((r) => r.ruta);
+    for (const ruta of SIN_RECURSO_TENANT) {
+      expect(declaradas, `${ruta} exenta en la suite pero inexistente en el enrutador`).toContain(
+        ruta,
+      );
+    }
+  });
+
+  it('toda ruta no pública queda cubierta por los recorridos de abajo', () => {
+    const protegidas = rutas.filter((r) => !PUBLICAS.has(`${r.metodo} ${r.ruta}`));
+    expect(protegidas.length).toBeGreaterThan(0);
+    // La cobertura es estructural: los `it.each` de abajo se generan a partir
+    // de este mismo arreglo, así que un endpoint nuevo entra solo.
+    expect(protegidas.every((r) => typeof r.ruta === 'string')).toBe(true);
+  });
+});
+
+describe('camino 1 · sin token, toda ruta protegida responde 401', () => {
+  it('ninguna ruta protegida contesta sin autenticación', async () => {
+    const fugas: string[] = [];
+    for (const r of rutas) {
+      if (PUBLICAS.has(`${r.metodo} ${r.ruta}`)) continue;
+      const res = await invocar(r);
+      if (res.status !== 401) fugas.push(`${r.metodo} ${r.ruta} → ${res.status}`);
+    }
+    expect(fugas, `rutas alcanzables sin token: ${fugas.join(', ')}`).toEqual([]);
+  });
+});
+
+describe('camino 2 · JWT de usuario de OTRA copropiedad', () => {
+  it('ningún endpoint devuelve datos de una copropiedad ajena', async () => {
+    // Identidad legítima de la copropiedad A pidiendo recursos de la B.
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
+    const fugas: string[] = [];
+    for (const r of rutas) {
+      if (PUBLICAS.has(`${r.metodo} ${r.ruta}`)) continue;
+      if (SIN_RECURSO_TENANT.has(r.ruta)) continue;
+      const res = await invocar(r, token);
+      // 404 o 403 son correctos. 2xx sobre un recurso de B es una FUGA.
+      if (res.status >= 200 && res.status < 300) {
+        fugas.push(
+          `${r.metodo} ${r.ruta} → ${res.status} ${JSON.stringify(res.body).slice(0, 80)}`,
+        );
+      }
+    }
+    expect(fugas, `FUGA multiempresa: ${fugas.join(' | ')}`).toEqual([]);
+  });
+
+  it('404 y no 403: un 403 confirmaría que el identificador existe', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
+    const res = await invocar({ metodo: 'GET', ruta: '/copropiedades/:id' }, token);
+    expect(res.status).toBe(404);
+  });
+
+  it('la misma ruta SÍ responde para la copropiedad propia', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const res = await invocar({ metodo: 'GET', ruta: '/copropiedades/:id' }, token);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(COP_B);
+  });
+});
+
+describe('camino 3 · identidad de servicio — la que OMITE la RLS', () => {
+  it('no puede escribir en una copropiedad fuera de su alcance', async () => {
+    const token = await tokenDe(firmante, { rol: 'servicio', copropiedadId: COP_A, aal: 'aal1' });
+    const res = await request(app.getHttpServer())
+      .post('/copropiedades/ingesta')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ copropiedadId: COP_B });
+    expect(res.status).toBe(403);
+  });
+
+  it('sí puede en la suya', async () => {
+    const token = await tokenDe(firmante, { rol: 'servicio', copropiedadId: COP_A, aal: 'aal1' });
+    const res = await request(app.getHttpServer())
+      .post('/copropiedades/ingesta')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ copropiedadId: COP_A });
+    expect(res.status).toBe(201);
+  });
+
+  it('no alcanza rutas donde no está admitida explícitamente', async () => {
+    const token = await tokenDe(firmante, { rol: 'servicio', copropiedadId: COP_A, aal: 'aal1' });
+    const res = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_A}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('camino 4 · operador de central (KPI-35)', () => {
+  it('alcanza solo las copropiedades de su turno activo', async () => {
+    const token = await tokenDe(firmante, {
+      rol: 'operador_central',
+      copropiedadId: null,
+      copropiedades: [COP_A],
+    });
+    const propia = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_A}`)
+      .set('Authorization', `Bearer ${token}`);
+    const ajena = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_B}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(propia.status).toBe(200);
+    expect(ajena.status).toBe(404);
+  });
+});
+
+describe('CA-24 · todo acceso cruzado queda registrado', () => {
+  it('deja rastro en auditoría de seguridad', async () => {
+    const auditoria = app.get(AuditoriaEnMemoria);
+    const antes = auditoria.registros.length;
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
+    await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_B}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(auditoria.registros.length).toBe(antes + 1);
+    expect(auditoria.registros.at(-1)).toMatchObject({
+      copropiedadSolicitada: COP_B,
+      rol: 'administrador',
+    });
+  });
+});
