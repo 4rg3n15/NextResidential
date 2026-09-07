@@ -54,6 +54,14 @@ El fallo esperado es un **valor**, no una excepción: `Resultado<T, ErrorDominio
 
 La cobertura excluye los archivos que solo declaran tipos: no compilan a código ejecutable y su 0 % no diría nada. Todo lo que tiene comportamiento se mide.
 
+## 5 bis. Cierre de etapa: la suite se ejecuta, no se recuerda
+
+`./scripts/verificar-etapa.sh` es obligatorio antes de escribir un informe (§2.8.0 del contrato). Borra `dist/`, `.turbo/` y `coverage/` antes de nada, instala con `--frozen-lockfile`, compila desde cero, corre lint, typecheck, la suite completa, la cobertura, las fronteras y el escaneo de secretos.
+
+**Las pruebas resuelven `@ncr/*` a su código fuente, no a su `dist/`.** Es una regla, no una comodidad: `dist` está en `.gitignore`, así que cada checkout tiene el suyo, y `pnpm --filter <app> test` no dispara `turbo` ni reconstruye nada. Una suite que consume un artefacto puede quedar desincronizada del código sin que nadie lo note — y cuando pasa, no falla con «módulo no encontrado» sino con un `undefined` en el único símbolo que faltaba.
+
+El control de **ficheros ejecutados frente a ficheros en disco** cubre un tercer camino distinto: un fichero que no carga no cuenta como fallo, simplemente desaparece del recuento.
+
 ## 6. Configuración
 
 `process.env` se lee **en un solo sitio**: `cargarConfiguracion`, invocada desde `main.ts` **antes** de construir la aplicación. Validarla dentro de una factoría de Nest la deja atrapada en el contenedor de inyección, que envuelve el fallo y hace perder el código de salida. Ningún otro archivo puede leer el entorno.

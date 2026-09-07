@@ -183,6 +183,8 @@ Verificación asimétrica del JWT contra JWKS (caché 10 min, suelo de refresco 
 
 VO `Placa` normalizado al construir, agregado `Vivienda` con métodos de intención, primer adaptador PostgreSQL real y carga transaccional desde CSV. **KPI-03 verificado a través del caso de uso contra base real: 100 intentos concurrentes → 1 aceptado, 99 rechazados, 1 fila activa.** RN-19 sin borrado físico, probado por inspección del adaptador y sometido a mutación. 51 pruebas en la API, 33 en el dominio (99,15 % de cobertura). Informe en `docs/etapas/ETAPA-04.md`. Deudas nuevas: D-20t a D-23t, [SUPUESTO] S-15.
 
+> **Corrección del 2026-09-07.** El informe de cierre reportó 51 pruebas verdes y en el entorno del usuario fallaron 3: la suite de la API corría contra un `packages/domain-core/dist` de una etapa anterior, porque `dist` está en `.gitignore` y `pnpm --filter <app> test` no dispara `turbo`. Corregido resolviendo `@ncr/domain-core` al **código fuente** en las pruebas. Se añadió `./scripts/verificar-etapa.sh` como **requisito de DoD de toda etapa** (§2.8.0 del contrato): parte de artefactos limpios, instala con `--frozen-lockfile` y comprueba que **ningún fichero de prueba se quedó sin ejecutar** — un fichero que no carga no cuenta como fallo, desaparece del recuento.
+
 > **Requisito registrado para la ETAPA 14 (CI/CD):** la suite `./supabase/verificar.sh --con-pruebas --modo-supabase` y la prueba de concurrencia KPI-03 deben ejecutarse **en CI**, no en el entorno del usuario. Hoy se omiten sin base local, y esa omisión avisa pero no protege.
 
 ## Etapas 05 a 16 — `PENDIENTE`

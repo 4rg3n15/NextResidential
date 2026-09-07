@@ -76,6 +76,16 @@ La pieza que justifica la etapa es la prueba de KPI-03: **100 inserciones concur
 
 **Cobertura del dominio:** 99,15 % de líneas (umbral 90 %).
 
+### Corrección del 2026-09-07 · el informe reportó 51 verdes y en el entorno del usuario fallaron 3
+
+El fallo era real y reproducible una vez entendido: `packages/domain-core/dist` está en `.gitignore`, así que cada checkout tiene el suyo, y `pnpm --filter @ncr/api test` **no dispara `turbo`**, por lo que no reconstruye el dominio. En este entorno el `dist` se había reconstruido durante el trabajo; en el del usuario era de la ETAPA 03 y no contenía los reexports del padrón. `Placa` llegaba `undefined` —no «módulo no encontrado»— así que fallaban exactamente las tres pruebas que la usan y pasaban las otras 48.
+
+No hubo dependencia circular: se descartó reproduciendo el fallo con un `dist` construido a partir del `index.ts` de la etapa anterior.
+
+**Corrección:** las pruebas de la API resuelven `@ncr/domain-core` a su **código fuente** mediante un alias de Vitest. Comprobado que con esa resolución la suite da 51 verdes **incluso con el `dist` obsoleto**: ya no existe artefacto intermedio que pueda envejecer.
+
+**Y una comprobación de honestidad:** `scripts/verificar-etapa.sh`, tal como se escribió primero, **no** habría detectado este fallo, porque borra y reconstruye `dist`. Se verificó ejecutándolo con el defecto presente: pasaba. Por eso se le añadió el control que sí cubre esta familia —recuento de ficheros de prueba ejecutados frente a los que hay en disco—, sometido a mutación: con un fichero que no carga, informa «solo 8 de 14» y falla.
+
 ## 7. Verificación de seguridad (§2.7)
 
 | #   | Medida                                    | Estado                                                                                                    |
