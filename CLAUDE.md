@@ -186,15 +186,17 @@ La ETAPA 13 **audita** esto; no lo introduce. Construir sin estas medidas y "ase
 
 El guion parte de un estado **limpio de artefactos** —borra `dist/`, `.turbo/` y `coverage/`— porque el modo de fallo que motivó la regla no es una prueba en rojo, sino un **verde que no se reproduce**:
 
-| Fecha    | Falso verde                                         | Causa                                                                                                                                                                      |
-| -------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ETAPA 03 | La validación de DTOs parecía activa y no lo estaba | El transformador de pruebas no emitía metadata de decoradores                                                                                                              |
-| ETAPA 04 | 51 verdes aquí, 3 rojas en el entorno del usuario   | La suite corría contra un `dist/` de una etapa anterior; `dist` está en `.gitignore`, así que cada checkout tiene el suyo, y `pnpm --filter <app> test` no dispara `turbo` |
+| Fecha    | Falso verde                                                     | Causa                                                                                                                                                                      |
+| -------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ETAPA 03 | La validación de DTOs parecía activa y no lo estaba             | El transformador de pruebas no emitía metadata de decoradores                                                                                                              |
+| ETAPA 04 | 51 verdes aquí, 3 rojas en el entorno del usuario               | La suite corría contra un `dist/` de una etapa anterior; `dist` está en `.gitignore`, así que cada checkout tiene el suyo, y `pnpm --filter <app> test` no dispara `turbo` |
+| ETAPA 04 | El propio control anti-falso-verde informaba «0 de 14» en macOS | `paste -sd+ \| bc`: sintaxis de GNU que BSD no acepta. El verificador producía un falso **negativo**                                                                       |
 
 De ahí dos controles que el guion incorpora y que no son opcionales:
 
-- **Recuento de ficheros de prueba ejecutados frente a los que hay en disco.** Un fichero que no _carga_ no aparece como fallo: desaparece del recuento y la suite informa «12 passed» en verde.
+- **Recuento de ficheros de prueba recogidos frente a los que hay en disco.** Detecta el fichero que existe y **nadie ejecuta** —un patrón `include` que dejó de alcanzarlo, un paquete fuera de la corrida—: ahí no hay ningún rojo, la suite informa «4 passed» y parece correcta.
 - **Instalación con `--frozen-lockfile`**, para que una dependencia instalada a mano y no declarada no pase inadvertida.
+- **Portabilidad BSD/GNU de todos los guiones.** El entorno de desarrollo objetivo es **macOS**; el CI de la ETAPA 14 correrá en **Linux**. Un guion que solo funciona en uno de los dos no verifica nada en el otro.
 
 Y una regla de diseño derivada: **las pruebas resuelven los paquetes internos a su código fuente, nunca a su `dist/`.** Un artefacto intermedio puede envejecer; el fuente no.
 

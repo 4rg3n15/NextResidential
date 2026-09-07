@@ -62,6 +62,18 @@ La cobertura excluye los archivos que solo declaran tipos: no compilan a código
 
 El control de **ficheros ejecutados frente a ficheros en disco** cubre un tercer camino distinto: un fichero que no carga no cuenta como fallo, simplemente desaparece del recuento.
 
+## 5 ter. Entorno objetivo y portabilidad de los guiones
+
+**El entorno de desarrollo objetivo es macOS.** Todo guion del repositorio debe ejecutarse ahí. Desde la ETAPA 14 el CI correrá en **Linux**, así que la exigencia es doble: **BSD y GNU**.
+
+No es una preferencia de estilo. Tres veces seguidas una diferencia entre las dos plataformas cambió el resultado de una verificación, y la tercera fue especialmente mala: el propio control contra falsos verdes informaba «0 de 14» en macOS por un `paste -sd+` que BSD no acepta.
+
+**Regla:** si algo necesita **aritmética, recorrer directorios o expresiones regulares no triviales**, va en Node —que se comporta igual en las dos plataformas y está garantizado en este monorepo—, no en shell. Los guiones `.sh` quedan como puntos de entrada delgados.
+
+Además, **macOS trae bash 3.2 de fábrica**: nada de arreglos asociativos, `mapfile` ni `${x,,}`.
+
+`node scripts/lib/portabilidad.mjs` —parte del DoD y del pre-commit— revisa **todos** los `.sh` versionados contra la lista de construcciones divergentes: `xargs -r`, `paste -sd`, `bc`, `sed -i` sin sufijo vacío, `grep -P`, `readlink -f`, `stat -c`, `date -d`, `find -printf`, `sort -V`, coreutils exclusivas de GNU y las tres construcciones de bash 4. Arreglarlas una a una según fallan no cierra la clase; esto sí.
+
 ## 6. Configuración
 
 `process.env` se lee **en un solo sitio**: `cargarConfiguracion`, invocada desde `main.ts` **antes** de construir la aplicación. Validarla dentro de una factoría de Nest la deja atrapada en el contenedor de inyección, que envuelve el fallo y hace perder el código de salida. Ningún otro archivo puede leer el entorno.

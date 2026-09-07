@@ -49,7 +49,9 @@ pnpm lint      >/dev/null 2>&1 && ok "pnpm lint"      || mal "pnpm lint"
 pnpm typecheck >/dev/null 2>&1 && ok "pnpm typecheck" || mal "pnpm typecheck"
 
 paso "4 · suite completa"
-salida=$(pnpm test 2>&1)
+salida_pruebas="$(mktemp)"
+pnpm test >"$salida_pruebas" 2>&1
+salida=$(cat "$salida_pruebas")
 echo "$salida" | grep -E "Tests +[0-9]" | sed 's/^/   /'
 if echo "$salida" | grep -qE "Tests +[0-9]+ failed|FAIL "; then
   mal "hay pruebas en rojo"
@@ -58,34 +60,50 @@ else
   ok "suite completa en verde"
 fi
 
-paso "5 · ningún fichero de prueba se quedó sin ejecutar"
-# Un fichero que no CARGA no aparece como fallo: desaparece del recuento, y la
-# suite informa «12 passed» en verde. Es un tercer camino al falso verde,
-# distinto del artefacto obsoleto, y este es el único control que lo detecta.
-en_disco=$(find apps packages -name '*.test.ts' -not -path '*/node_modules/*' -not -path '*/dist/*' | wc -l | tr -d ' ')
-recogidos=$(echo "$salida" | grep -oE "Test Files +[0-9]+ (passed|failed)" | grep -oE "[0-9]+" | paste -sd+ | bc 2>/dev/null || echo 0)
-if [[ "${recogidos:-0}" -ge "$en_disco" ]]; then
-  ok "$recogidos de $en_disco ficheros de prueba ejecutados"
+paso "5 · ningún fichero de prueba se quedó sin recoger"
+# Detecta el fichero que existe y NADIE ejecuta —patrón `include` que dejó de
+# alcanzarlo, paquete fuera de la corrida—: ahí no hay ningún rojo, la suite
+# informa «4 passed» y parece correcta. El fichero que sí se recoge y falla al
+# importar lo atrapa el paso 4, no este.
+#
+# El recuento y el recorrido de directorios se hacen en Node, no en shell: la
+# primera versión usaba `paste -sd+ | bc`, sintaxis de GNU, y en macOS —el
+# entorno de desarrollo objetivo— informaba «0 de 14». El control contra falsos
+# verdes producía él mismo un falso negativo.
+if veredicto=$(node scripts/lib/contar-pruebas.mjs "$salida_pruebas"); then
+  ok "${veredicto#OK }"
 else
-  mal "solo $recogidos de $en_disco ficheros de prueba llegaron a ejecutarse (alguno no carga)"
+  mal "${veredicto#FALLO }"
 fi
+rm -f "$salida_pruebas"
 
 paso "6 · umbrales de cobertura"
 pnpm test:cobertura >/dev/null 2>&1 && ok "cobertura por encima del umbral" \
   || mal "cobertura por debajo del umbral"
 
-paso "7 · fronteras de arquitectura y secretos"
+paso "7 · portabilidad de los guiones (macOS/BSD y CI/GNU)"
+# El entorno de desarrollo objetivo es macOS; el CI de la ETAPA 14 correrá en
+# Linux. Los guiones deben funcionar en los dos, y eso se comprueba, no se
+# recuerda: tres veces una diferencia entre ambos cambió el resultado.
+if salida_port=$(node scripts/lib/portabilidad.mjs 2>&1); then
+  ok "${salida_port}"
+else
+  mal "hay construcciones que divergen entre BSD y GNU"
+  echo "$salida_port" | head -12 | sed 's/^/     /'
+fi
+
+paso "8 · fronteras de arquitectura y secretos"
 ./scripts/verificar-frontera.sh >/dev/null 2>&1 && ok "fronteras (DoD ETAPA 02)" || mal "fronteras"
 ./scripts/escanear-secretos.sh  >/dev/null 2>&1 && ok "sin secretos"            || mal "secretos detectados"
 
 if [[ "$CON_BASE" == "1" ]]; then
-  paso "8 · esquema y aislamiento en --modo-supabase"
+  paso "9 · esquema y aislamiento en --modo-supabase"
   if ./supabase/verificar.sh --con-pruebas --modo-supabase >/tmp/ncr-sql.log 2>&1; then
     ok "migraciones, semillas y suite SQL"
   else
     mal "suite SQL (ver /tmp/ncr-sql.log)"
   fi
-  paso "9 · KPI-03 con base real"
+  paso "10 · KPI-03 con base real"
   if [[ -n "${DATABASE_URL_PRUEBAS:-}" ]]; then
     pnpm --filter @ncr/api exec vitest run test/concurrencia-padron.test.ts >/dev/null 2>&1 \
       && ok "100 inserciones concurrentes, 0 duplicados" || mal "KPI-03"
