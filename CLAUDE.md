@@ -1,4 +1,5 @@
 # PROMPT MAESTRO — NEXT CONTROL RESIDENCIAL
+
 ### Contrato de trabajo del agente de desarrollo · v3.0
 
 ---
@@ -7,13 +8,13 @@
 
 Este archivo se entrega **una sola vez** al agente al inicio de la sesión, o —mejor— se guarda como `CLAUDE.md` en la raíz del repositorio para que se cargue en cada sesión. A partir de ahí, el usuario avanza con comandos cortos:
 
-| Comando del usuario | Qué hace el agente |
-|---|---|
-| `EJECUTA ETAPA NN` | Ejecuta **esa etapa y solo esa**, entrega el informe y se detiene. |
-| `ESTADO` | Muestra `docs/ESTADO_ETAPAS.md`: qué está hecho, qué falta, qué quedó pendiente. |
-| `EXPLICA ETAPA NN` | Reexplica la etapa ya construida sin tocar código. |
-| `CORRIGE ETAPA NN: <detalle>` | Corrige dentro de la rama de esa etapa, sin avanzar a la siguiente. |
-| `AUDITA` | Ejecuta la verificación de seguridad de §2.7 sobre lo construido hasta ahora. |
+| Comando del usuario           | Qué hace el agente                                                               |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| `EJECUTA ETAPA NN`            | Ejecuta **esa etapa y solo esa**, entrega el informe y se detiene.               |
+| `ESTADO`                      | Muestra `docs/ESTADO_ETAPAS.md`: qué está hecho, qué falta, qué quedó pendiente. |
+| `EXPLICA ETAPA NN`            | Reexplica la etapa ya construida sin tocar código.                               |
+| `CORRIGE ETAPA NN: <detalle>` | Corrige dentro de la rama de esa etapa, sin avanzar a la siguiente.              |
+| `AUDITA`                      | Ejecuta la verificación de seguridad de §2.7 sobre lo construido hasta ahora.    |
 
 **Regla de oro:** el agente nunca avanza de etapa por iniciativa propia. Termina, informa y espera.
 
@@ -26,23 +27,24 @@ Este archivo se entrega **una sola vez** al agente al inicio de la sesión, o �
 **Qué es.** Next Control Residencial es una plataforma SaaS multiempresa de control de acceso para copropiedades (villas, parcelaciones, conjuntos), construida sobre hardware Hikvision. Unifica padrón, autorización de visitantes, LPR, reconocimiento facial, zonas comunes, guardia virtual y trazabilidad.
 
 **Principio rector, del que se deriva toda la arquitectura:**
+
 > **Next Control decide. El hardware ejecuta.**
-Si la cámara resuelve la apertura por su cuenta, el motor de reglas queda decorativo y se pierde la trazabilidad. La cámara opera en **modo evento**: reporta, no decide.
+> Si la cámara resuelve la apertura por su cuenta, el motor de reglas queda decorativo y se pierde la trazabilidad. La cámara opera en **modo evento**: reporta, no decide.
 
 **Inventario verificado del documento de requisitos (v1.0, 01/09/2026):**
 
-| Elemento | Cantidad real | Observación |
-|---|---|---|
-| Objetivos específicos (OE) | 8 | OE-01 a OE-08, secuencia completa |
-| Indicadores (KPI) | **37 entradas, no 38** | Falta `KPI-19`. La entrada 21 está escrita como **`KP1-21`** (uno numérico en lugar de la I). Corregir en el documento derivado; **no** alterar el original. |
-| Reglas de negocio (RN) | 22 | RN-01 a RN-22, completas |
-| Historias de usuario (HU) | 38 | HU-01 a HU-38, todas en estado *Pendiente* |
-| Casos de uso (CU) | 5 | CU-01 a CU-05 |
-| Criterios de aceptación (CA) | 26 | CA-01 a CA-26, formato Gherkin |
-| Problemas AS-IS (PB) | 6 | PB-01 a PB-06 |
-| Casos de prueba (CP) | 11 | CP-01 a CP-11 |
-| Roles del sistema | 6 | Superadministrador, Administrador, Portero/Seguridad, Operador de central, Residente, Servicio/Integración |
-| Términos de glosario | 22 | Lenguaje ubicuo del dominio |
+| Elemento                     | Cantidad real          | Observación                                                                                                                                                  |
+| ---------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Objetivos específicos (OE)   | 8                      | OE-01 a OE-08, secuencia completa                                                                                                                            |
+| Indicadores (KPI)            | **37 entradas, no 38** | Falta `KPI-19`. La entrada 21 está escrita como **`KP1-21`** (uno numérico en lugar de la I). Corregir en el documento derivado; **no** alterar el original. |
+| Reglas de negocio (RN)       | 22                     | RN-01 a RN-22, completas                                                                                                                                     |
+| Historias de usuario (HU)    | 38                     | HU-01 a HU-38, todas en estado _Pendiente_                                                                                                                   |
+| Casos de uso (CU)            | 5                      | CU-01 a CU-05                                                                                                                                                |
+| Criterios de aceptación (CA) | 26                     | CA-01 a CA-26, formato Gherkin                                                                                                                               |
+| Problemas AS-IS (PB)         | 6                      | PB-01 a PB-06                                                                                                                                                |
+| Casos de prueba (CP)         | 11                     | CP-01 a CP-11                                                                                                                                                |
+| Roles del sistema            | 6                      | Superadministrador, Administrador, Portero/Seguridad, Operador de central, Residente, Servicio/Integración                                                   |
+| Términos de glosario         | 22                     | Lenguaje ubicuo del dominio                                                                                                                                  |
 
 **Vacío conocido:** el documento **no tiene una sección formal de requisitos no funcionales**. Debe construirse en la ETAPA 00 derivándola de los KPI de latencia (09, 13, 25, 32, 33), disponibilidad (28-31) y seguridad (36-38).
 
@@ -60,7 +62,7 @@ Aplican a cada línea de código. No se repiten por etapa: se dan por incluidas 
 
 1. Nunca ejecutes una etapa que no se te pidió. Nada de "aprovecho y adelanto la siguiente".
 2. Nunca ejecutes una etapa si la anterior no está cerrada en `docs/ESTADO_ETAPAS.md`. Si falta una dependencia, dilo y detente; no improvises el trabajo faltante.
-3. Al terminar: informe (§2.8), actualización de `ESTADO_ETAPAS.md`, commit de cierre, **alto**.
+3. Al terminar: **verificación de cierre** (§2.8.0), informe (§2.8), actualización de `ESTADO_ETAPAS.md`, commit de cierre, **alto**.
 4. Decisión de negocio no resuelta → `PENDIENTE DE DEFINICIÓN`, comportamiento conservador (**denegar por defecto**), reporte en el informe. Nunca la inventes en silencio.
 5. Suposición tuya → marcada `[SUPUESTO]` en código y en informe.
 6. Conflicto entre fuentes → `[CONTRADICCIÓN]` con la resolución aplicada según §3.
@@ -73,33 +75,33 @@ Cada módulo expone **solo** su API pública mediante un barril `index.ts`. Ning
 
 **Cinco capas, según el diagrama arquitectónico del proyecto:**
 
-| Capa | Responsabilidad | Prohibiciones |
-|---|---|---|
-| **Presentación** (driving) | Traduce protocolo a casos de uso: controladores HTTP, DTOs, mapeadores, Alarm Server, workers programados. | Cero reglas de negocio. |
-| **Aplicación** | Orquesta casos de uso, transacciones, idempotencia, unidad de trabajo, aislamiento por copropiedad. Define los puertos. | **No decide accesos**: delega en el dominio. |
-| **Dominio** | El núcleo: agregados, objetos de valor, políticas, motor de reglas, eventos. **Idéntico en la nube y en el Edge.** | Cero I/O, cero NestJS, cero Supabase, cero HTTP. |
-| **Infraestructura** (driven) | Implementa los puertos: repositorios Supabase, pg-boss, storage, providers de hardware, notificaciones. | No define contratos; los cumple. |
-| **Física** | Hardware Hikvision. | **Ejecuta, nunca decide.** |
+| Capa                         | Responsabilidad                                                                                                         | Prohibiciones                                    |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **Presentación** (driving)   | Traduce protocolo a casos de uso: controladores HTTP, DTOs, mapeadores, Alarm Server, workers programados.              | Cero reglas de negocio.                          |
+| **Aplicación**               | Orquesta casos de uso, transacciones, idempotencia, unidad de trabajo, aislamiento por copropiedad. Define los puertos. | **No decide accesos**: delega en el dominio.     |
+| **Dominio**                  | El núcleo: agregados, objetos de valor, políticas, motor de reglas, eventos. **Idéntico en la nube y en el Edge.**      | Cero I/O, cero NestJS, cero Supabase, cero HTTP. |
+| **Infraestructura** (driven) | Implementa los puertos: repositorios Supabase, pg-boss, storage, providers de hardware, notificaciones.                 | No define contratos; los cumple.                 |
+| **Física**                   | Hardware Hikvision.                                                                                                     | **Ejecuta, nunca decide.**                       |
 
 Dirección de dependencia: `presentación → aplicación → dominio ← infraestructura`. Ninguna flecha sale del dominio. El agregado nunca se serializa crudo al transporte: siempre DTO + mapeador.
 
 **Agregados raíz — nueve** (del diagrama, vinculantes):
 
-| Agregado | Frontera de consistencia | Invariantes que sostiene |
-|---|---|---|
-| `Copropiedad` | Frontera del tenant | RN-15 |
-| `Vivienda` | Residentes y vehículos | RN-04, RN-13 |
-| `Autorización` | Vigencia, patrón, acompañantes, zonas | RN-01, RN-05, RN-22 |
-| `Acceso` | Inmutable: sin setters, sin update, sin delete | RN-02, RN-03, RN-17 |
-| `ConsentimientoBiometrico` | Titular, finalidad, versión de política, revocación | RN-09, RN-10 |
-| `PlantillaBiometrica` | Calidad, sincronización, supresión programada | RN-09, RN-11 |
-| `Zona` | Horario, aforo, controladores | RN-14 |
-| `ListaNegra` | Quién la crea y quién la levanta | RN-06, RN-07 |
-| `Dispositivo` | Credencial por referencia, latido, estado | RN-12, RN-21, CA-26 |
+| Agregado                   | Frontera de consistencia                            | Invariantes que sostiene |
+| -------------------------- | --------------------------------------------------- | ------------------------ |
+| `Copropiedad`              | Frontera del tenant                                 | RN-15                    |
+| `Vivienda`                 | Residentes y vehículos                              | RN-04, RN-13             |
+| `Autorización`             | Vigencia, patrón, acompañantes, zonas               | RN-01, RN-05, RN-22      |
+| `Acceso`                   | Inmutable: sin setters, sin update, sin delete      | RN-02, RN-03, RN-17      |
+| `ConsentimientoBiometrico` | Titular, finalidad, versión de política, revocación | RN-09, RN-10             |
+| `PlantillaBiometrica`      | Calidad, sincronización, supresión programada       | RN-09, RN-11             |
+| `Zona`                     | Horario, aforo, controladores                       | RN-14                    |
+| `ListaNegra`               | Quién la crea y quién la levanta                    | RN-06, RN-07             |
+| `Dispositivo`              | Credencial por referencia, latido, estado           | RN-12, RN-21, CA-26      |
 
 > **`[CONTRADICCIÓN]` C-02 — resuelta, no reabrir.** Este contrato enumeraba **seis** agregados raíz citando el diagrama arquitectónico como fuente. La página 1 del diagrama muestra esos seis, pero **la página 3 —la vista dedicada precisamente a los agregados— declara nueve**, añadiendo `PlantillaBiometrica`, `ListaNegra` y `Dispositivo` con la anotación «raíz de agregado».
 >
-> **No era un desacuerdo de criterio: era un resumen incompleto de su propia fuente**, y el hueco tenía consecuencia funcional. Sin `ListaNegra` y sin `Dispositivo` como agregados, **cinco reglas de negocio se quedaban sin invariante que las sostuviera**: RN-06 y RN-07 (`PolíticaListaNegra` *aplica* la lista, no gobierna quién puede crearla ni levantarla, que es una invariante de agregado), RN-12, RN-21 y el criterio CA-26.
+> **No era un desacuerdo de criterio: era un resumen incompleto de su propia fuente**, y el hueco tenía consecuencia funcional. Sin `ListaNegra` y sin `Dispositivo` como agregados, **cinco reglas de negocio se quedaban sin invariante que las sostuviera**: RN-06 y RN-07 (`PolíticaListaNegra` _aplica_ la lista, no gobierna quién puede crearla ni levantarla, que es una invariante de agregado), RN-12, RN-21 y el criterio CA-26.
 >
 > **Resolución:** se adoptan los nueve. Aprobado por el cliente el 2026-09-06 e implementado en la ETAPA 01.
 > Detalle en `docs/auditoria/02-arquitectura.md` §2 · registro en `docs/auditoria/contradicciones-y-supuestos.md` C-02 · esquema en `docs/arquitectura/modelo-datos.md` §2.
@@ -111,13 +113,13 @@ Dirección de dependencia: `presentación → aplicación → dominio ← infrae
 
 ### 2.3 SOLID — obligatorio y verificable
 
-| Principio | Materialización concreta | Verificación mecánica |
-|---|---|---|
-| **SRP** | Una clase, una razón de cambio. Un caso de uso, una operación de negocio. Prohibidos los *services* de 800 líneas. | Ningún archivo > 300 líneas; ninguna clase > 5 métodos públicos. |
-| **OCP** | Nuevas reglas = nuevas `Policy`/`Specification` componibles. Nuevo fabricante = nuevo adaptador. | Agregar una regla no produce diff en `MotorDeReglas`. |
-| **LSP** | `MockProvider` e `HikvisionProvider` intercambiables: la suite pasa con ambos sin cambiar una aserción. | KPI-12. |
-| **ISP** | Puertos pequeños y específicos, nunca un `HardwareService` monolítico. | Ningún adaptador lanza `NotImplemented`. |
-| **DIP** | El dominio declara interfaces; la infraestructura implementa; Nest inyecta por token. | `grep -r "supabase\|axios\|isapi" src/**/domain/` devuelve **0**. |
+| Principio | Materialización concreta                                                                                           | Verificación mecánica                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| **SRP**   | Una clase, una razón de cambio. Un caso de uso, una operación de negocio. Prohibidos los _services_ de 800 líneas. | Ningún archivo > 300 líneas; ninguna clase > 5 métodos públicos.  |
+| **OCP**   | Nuevas reglas = nuevas `Policy`/`Specification` componibles. Nuevo fabricante = nuevo adaptador.                   | Agregar una regla no produce diff en `MotorDeReglas`.             |
+| **LSP**   | `MockProvider` e `HikvisionProvider` intercambiables: la suite pasa con ambos sin cambiar una aserción.            | KPI-12.                                                           |
+| **ISP**   | Puertos pequeños y específicos, nunca un `HardwareService` monolítico.                                             | Ningún adaptador lanza `NotImplemented`.                          |
+| **DIP**   | El dominio declara interfaces; la infraestructura implementa; Nest inyecta por token.                              | `grep -r "supabase\|axios\|isapi" src/**/domain/` devuelve **0**. |
 
 Cada informe de etapa incluye una **tabla de cumplimiento SOLID** de los archivos creados, con una línea de justificación por principio.
 
@@ -125,7 +127,7 @@ Cada informe de etapa incluye una **tabla de cumplimiento SOLID** de los archivo
 
 - TypeScript estricto: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`. **Prohibido `any`** — usa `unknown` + validación.
 - **Funciones puras y lambdas** para toda evaluación, transformación y filtrado. El motor de reglas es `(contexto, reglas) => Decisión`, puro, con **reloj inyectado**: nunca `new Date()` dentro de la lógica.
-- Composición sobre herencia. Reglas componibles vía *Specification* con combinadores `and` / `or` / `not` como lambdas.
+- Composición sobre herencia. Reglas componibles vía _Specification_ con combinadores `and` / `or` / `not` como lambdas.
 - Inmutabilidad por defecto: `readonly`, VOs sin setters. Los agregados cambian por **métodos de intención** (`autorizacion.revocar(motivo, ahora)`), nunca por asignación externa.
 - Recursividad donde el dominio es recursivo (árboles de reglas, jerarquía de zonas), con caso base explícito y **profundidad acotada**. Jamás recursión sobre entrada no acotada del usuario.
 - Sin N+1: batch e índices desde el diseño.
@@ -148,20 +150,20 @@ Cada informe de etapa incluye una **tabla de cumplimiento SOLID** de los archivo
 
 ### 2.6 Stack fijo (no se negocia sin autorización explícita)
 
-| Capa | Tecnología |
-|---|---|
-| Base de datos, auth, storage, tiempo real | Supabase (PostgreSQL) |
-| API y lógica de negocio | NestJS + TypeScript estricto |
-| Colas y trabajos programados | pg-boss sobre el mismo PostgreSQL |
-| Consola web / escritorio | Next.js + TypeScript + **Tailwind CSS** + shadcn/ui, entregada como **PWA instalable** y empaquetada para escritorio |
-| Aplicación móvil | **Flutter** (Dart), iOS y Android |
-| Push | Firebase Cloud Messaging |
-| Edge Gateway | Node.js + TypeScript + SQLite |
-| Video de cámaras al navegador | go2rtc (RTSP → WebRTC) |
-| **Intercom** | **ISAPI TwoWayAudio** — ver ADR-01 en §4 |
-| Contratos | OpenAPI generado desde NestJS; cliente Dart **generado**, nunca escrito a mano |
-| CI/CD | GitHub Actions |
-| Observabilidad | Logs estructurados + Sentry |
+| Capa                                      | Tecnología                                                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Base de datos, auth, storage, tiempo real | Supabase (PostgreSQL)                                                                                                |
+| API y lógica de negocio                   | NestJS + TypeScript estricto                                                                                         |
+| Colas y trabajos programados              | pg-boss sobre el mismo PostgreSQL                                                                                    |
+| Consola web / escritorio                  | Next.js + TypeScript + **Tailwind CSS** + shadcn/ui, entregada como **PWA instalable** y empaquetada para escritorio |
+| Aplicación móvil                          | **Flutter** (Dart), iOS y Android                                                                                    |
+| Push                                      | Firebase Cloud Messaging                                                                                             |
+| Edge Gateway                              | Node.js + TypeScript + SQLite                                                                                        |
+| Video de cámaras al navegador             | go2rtc (RTSP → WebRTC)                                                                                               |
+| **Intercom**                              | **ISAPI TwoWayAudio** — ver ADR-01 en §4                                                                             |
+| Contratos                                 | OpenAPI generado desde NestJS; cliente Dart **generado**, nunca escrito a mano                                       |
+| CI/CD                                     | GitHub Actions                                                                                                       |
+| Observabilidad                            | Logs estructurados + Sentry                                                                                          |
 
 ### 2.7 Seguridad — línea base desde la ETAPA 01, no al final
 
@@ -171,21 +173,41 @@ La ETAPA 13 **audita** esto; no lo introduce. Construir sin estas medidas y "ase
 2. **CORS restrictivo.** Lista blanca explícita desde `CORS_ALLOWED_ORIGINS`. Nada de `origin: true` ni `*`. Métodos y cabeceras enumerados; `credentials: true` solo para orígenes propios.
 3. **Validación en el backend, siempre.** La del frontend es cortesía de UX; la real es la del servidor. `ValidationPipe` global con `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`. Todo DTO validado. Y además: **el DTO valida forma, el agregado valida verdad** — los invariantes de negocio viven en el dominio.
 4. **Anti inyección SQL.** Solo consultas parametrizadas o query builder; prohibida la concatenación de strings para armar SQL. Toda entrada de texto se **sanea y normaliza antes de persistirse**: recorte, normalización Unicode NFC, remoción de caracteres de control y bytes nulos, longitud máxima por campo, escape de HTML en campos que se rendericen. Las placas se normalizan en el objeto de valor. Si hace falta SQL crudo, va en función SQL versionada, parametrizada y `SECURITY INVOKER`.
-5. **Rate limiting obligatorio.** `@nestjs/throttler` global más límites endurecidos por ruta sensible: login, MFA, recuperación, creación de autorizaciones, ingesta de eventos, apertura manual y remota. Limita por **IP y por identidad**. Respuesta `429` con `Retry-After`. Los reintentos del Edge usan backoff exponencial con *jitter* para no chocar con el límite.
+5. **Rate limiting obligatorio.** `@nestjs/throttler` global más límites endurecidos por ruta sensible: login, MFA, recuperación, creación de autorizaciones, ingesta de eventos, apertura manual y remota. Limita por **IP y por identidad**. Respuesta `429` con `Retry-After`. Los reintentos del Edge usan backoff exponencial con _jitter_ para no chocar con el límite.
 6. **RLS activa y forzada en todas las tablas** (`FORCE ROW LEVEL SECURITY`), con `copropiedad_id` derivado de los claims del JWT. **Y además**: la clave `service_role` **omite RLS**, así que toda ruta que la use (Edge, workers, ingesta) valida la copropiedad **también en la capa de aplicación**. El aislamiento se prueba por los dos caminos (KPI-36, KPI-37, CA-24). Este es el riesgo de seguridad número uno del proyecto.
 7. **Content Security Policy.** Helmet en la API y CSP en la consola: `default-src 'self'`; `script-src 'self'` **con nonce por request**, sin `unsafe-inline` ni `unsafe-eval`; `object-src 'none'`; `frame-ancestors 'none'`; `base-uri 'self'`; `form-action 'self'`; `img-src`/`connect-src`/`media-src` acotados a orígenes propios, Supabase y el puente de video. Más HSTS, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` y `Permissions-Policy` restrictiva (cámara y micrófono solo donde se capturan).
-8. **Transversales.** HTTPS obligatorio. MFA TOTP para roles administrativos (RN-20). RBAC por *guard* declarativo, nunca `if (rol === 'admin')` disperso. Contraseñas y tokens jamás en logs. Evidencia en buckets privados con URLs firmadas de vida corta (RN-21). Tamaño máximo de payload. Carga de archivos validada por **tipo real**, no por extensión. Auditoría append-only garantizada por permisos de base de datos, no solo por código.
+8. **Transversales.** HTTPS obligatorio. MFA TOTP para roles administrativos (RN-20). RBAC por _guard_ declarativo, nunca `if (rol === 'admin')` disperso. Contraseñas y tokens jamás en logs. Evidencia en buckets privados con URLs firmadas de vida corta (RN-21). Tamaño máximo de payload. Carga de archivos validada por **tipo real**, no por extensión. Auditoría append-only garantizada por permisos de base de datos, no solo por código.
 
 ### 2.8 Informe de cierre de etapa
+
+#### 2.8.0 Verificación previa — obligatoria, por ejecución real
+
+**Antes de escribir una sola línea del informe** se ejecuta `./scripts/verificar-etapa.sh` y se pega su veredicto en la sección de pruebas. Si sale FALLIDA, la etapa **no se cierra**. No se reportan cifras de pruebas que no salgan de esa ejecución.
+
+El guion parte de un estado **limpio de artefactos** —borra `dist/`, `.turbo/` y `coverage/`— porque el modo de fallo que motivó la regla no es una prueba en rojo, sino un **verde que no se reproduce**:
+
+| Fecha    | Falso verde                                         | Causa                                                                                                                                                                      |
+| -------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ETAPA 03 | La validación de DTOs parecía activa y no lo estaba | El transformador de pruebas no emitía metadata de decoradores                                                                                                              |
+| ETAPA 04 | 51 verdes aquí, 3 rojas en el entorno del usuario   | La suite corría contra un `dist/` de una etapa anterior; `dist` está en `.gitignore`, así que cada checkout tiene el suyo, y `pnpm --filter <app> test` no dispara `turbo` |
+
+De ahí dos controles que el guion incorpora y que no son opcionales:
+
+- **Recuento de ficheros de prueba ejecutados frente a los que hay en disco.** Un fichero que no _carga_ no aparece como fallo: desaparece del recuento y la suite informa «12 passed» en verde.
+- **Instalación con `--frozen-lockfile`**, para que una dependencia instalada a mano y no declarada no pase inadvertida.
+
+Y una regla de diseño derivada: **las pruebas resuelven los paquetes internos a su código fuente, nunca a su `dist/`.** Un artefacto intermedio puede envejecer; el fuente no.
+
+---
 
 En el chat y en `docs/etapas/ETAPA-NN.md`:
 
 1. **Qué se construyó** — en prosa, no lista de archivos.
-2. **Cómo se organizó y por qué** — decisión por decisión. *Es la sección más importante:* el usuario debe entender la arquitectura leyendo solo esto.
+2. **Cómo se organizó y por qué** — decisión por decisión. _Es la sección más importante:_ el usuario debe entender la arquitectura leyendo solo esto.
 3. **Árbol de archivos** creados/modificados, una línea de propósito cada uno.
 4. **Tabla SOLID** (§2.3).
 5. **Trazabilidad** — OE, RN, HU, CU, CA, KPI y CP cubiertos; y los parcialmente cubiertos, con el motivo.
-6. **Pruebas** — qué se probó, cómo ejecutarlas, resultado, cobertura.
+6. **Pruebas** — qué se probó, cómo ejecutarlas, resultado, cobertura, y el **veredicto literal de §2.8.0**.
 7. **Verificación de seguridad** de la etapa, contra el checklist de §2.7.
 8. **Deuda técnica**, `[SUPUESTO]` y `PENDIENTE DE DEFINICIÓN` generados.
 9. **Qué debe hacer el usuario manualmente** (paneles, credenciales, dispositivos), en pasos numerados.
@@ -221,12 +243,12 @@ next-control-residencial/
 
 Se leen **en este orden**; cada uno se interpreta a la luz del anterior.
 
-| # | Archivo | Qué aporta | Autoridad |
-|---|---|---|---|
-| 1 | `Next_Control_Residencial___Reto_de_Desarrollo.pdf` | Solicitud, alcance comercial, criterios de evaluación con pesos, condiciones de PI y confidencialidad | **Máxima** — el "qué" y el "por qué" |
-| 2 | `Requisitos_Next_Control_Residencial_v1.docx` (y su equivalente `.md`) | Especificación formal verificable: OE, KPI, RN, HU, CU, CA, roles, glosario, stack, riesgos | **Máxima** — el detalle medible |
-| 3 | `..._Diagrama_Arquitectónico_-_1__Capas_DDD.pdf` + `..._Diagrama_Arquitectónico.json` | Capas, agregados, VOs, puertos, políticas, eventos | Alta — vinculante salvo contradicción con 1 y 2 |
-| 4 | `NexResidential.png` | Mockups de consolas web y app móvil | Vinculante en estructura y flujo; flexible en píxeles |
+| #   | Archivo                                                                               | Qué aporta                                                                                            | Autoridad                                             |
+| --- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| 1   | `Next_Control_Residencial___Reto_de_Desarrollo.pdf`                                   | Solicitud, alcance comercial, criterios de evaluación con pesos, condiciones de PI y confidencialidad | **Máxima** — el "qué" y el "por qué"                  |
+| 2   | `Requisitos_Next_Control_Residencial_v1.docx` (y su equivalente `.md`)                | Especificación formal verificable: OE, KPI, RN, HU, CU, CA, roles, glosario, stack, riesgos           | **Máxima** — el detalle medible                       |
+| 3   | `..._Diagrama_Arquitectónico_-_1__Capas_DDD.pdf` + `..._Diagrama_Arquitectónico.json` | Capas, agregados, VOs, puertos, políticas, eventos                                                    | Alta — vinculante salvo contradicción con 1 y 2       |
+| 4   | `NexResidential.png`                                                                  | Mockups de consolas web y app móvil                                                                   | Vinculante en estructura y flujo; flexible en píxeles |
 
 **Jerarquía ante conflicto:** PDF del reto → Requisitos → Arquitectura → Mockups.
 Nunca resuelvas un conflicto en silencio: documenta `[CONTRADICCIÓN]`, la resolución y su justificación.
@@ -245,17 +267,19 @@ Estas decisiones están **cerradas**. No las reabras ni propongas alternativas s
 **Decisión.** El audio bidireccional de la guardia virtual se implementa sobre **ISAPI TwoWayAudio** de Hikvision. Se descarta el camino SIP + Asterisk.
 
 **`[CONTRADICCIÓN]` — resuelta, no reabrir.**
-La §13.2 del documento de requisitos (tabla «Stack sugerido», fila *Intercom*) propone *«SIP hacia el videoportero, con puente WebRTC (LiveKit o Janus)»*, y la §13.4 lo señala como el mayor riesgo de cronograma del proyecto. El diagrama arquitectónico, en cambio, deja abiertas ambas rutas: *«ISAPI TwoWayAudio, o SIP con Asterisk si el modelo no lo soporta»*.
+La §13.2 del documento de requisitos (tabla «Stack sugerido», fila _Intercom_) propone _«SIP hacia el videoportero, con puente WebRTC (LiveKit o Janus)»_, y la §13.4 lo señala como el mayor riesgo de cronograma del proyecto. El diagrama arquitectónico, en cambio, deja abiertas ambas rutas: _«ISAPI TwoWayAudio, o SIP con Asterisk si el modelo no lo soporta»_.
 
 **Resolución:** prevalece **ISAPI TwoWayAudio**, por decisión expresa del cliente posterior a la redacción del documento. Esta decisión **sobrescribe** la sugerencia de §13.2, que era eso —una sugerencia dentro de una sección que el propio documento declara ajena al estándar de especificación—, no un requisito con criterio de verificación asociado. Ningún OE, RN, HU, CU ni CA exige SIP; los KPI comprometidos (KPI-32, KPI-33, CA-19, CA-20) son de latencia y trazabilidad, y son agnósticos al protocolo.
 
 **Obligaciones derivadas de esta resolución:**
+
 - La ETAPA 00 debe registrar esta contradicción en `docs/auditoria/contradicciones-y-supuestos.md` con su resolución y esta justificación, y formalizar el ADR-01 en `docs/decisiones/`.
 - Toda referencia a SIP, Asterisk, LiveKit o Janus queda **fuera del alcance de implementación**. No se construye, no se deja andamiaje para ello, no se menciona en el código.
 - El documento de requisitos original **no se modifica**: la corrección vive en el ADR y en el informe de auditoría. Si Grupo Control revisa el `.docx`, debe encontrar el ADR como el registro formal de por qué lo construido difiere de la sugerencia inicial.
 - La ruta SIP sobrevive únicamente como **contingencia documentada** (ver más abajo), realizable como adaptador nuevo detrás del mismo puerto.
 
 **Diseño resultante:**
+
 - El puerto `IntercomProvider` del dominio expone intención pura, sin protocolo: `abrirSesion(dispositivoId, operadorId)`, `enviarAudio(chunk)`, `recibirAudio()`, `cerrarSesion(motivo)`, `estadoSesion()`. El dominio no sabe qué es TwoWayAudio.
 - `HikvisionIntercomProvider` (etapa 15) implementa ese puerto: abre el canal por `/ISAPI/System/TwoWayAudio/channels/<id>/open`, transmite y recibe el flujo de audio con autenticación **Digest**, y lo cierra explícitamente. Maneja códec, muestreo y semiduplex/duplex completo según el modelo.
 - **Puente de intercom** (servicio en la nube o en el Edge, según latencia): traduce entre el flujo ISAPI y el navegador del operador vía WebSocket/WebRTC. El navegador **nunca** habla ISAPI (RN-12, RN-21).
@@ -263,21 +287,26 @@ La §13.2 del documento de requisitos (tabla «Stack sugerido», fila *Intercom*
 - La **apertura remota** no viaja por el canal de audio: es una orden independiente por `AccessPointProvider`, atribuida al operador y auditada (RN-08, CA-20).
 
 **Consecuencias que debes asumir:**
-- Un canal TwoWayAudio suele ser **exclusivo**: gestiona bloqueo por dispositivo, cola de espera y liberación con *timeout*, para que dos operadores no colisionen.
+
+- Un canal TwoWayAudio suele ser **exclusivo**: gestiona bloqueo por dispositivo, cola de espera y liberación con _timeout_, para que dos operadores no colisionen.
 - Objetivos medibles: audio y video < 2 s extremo a extremo (KPI-33, CA-19); apertura remota < 3 s (KPI-32, CA-20).
 - Semiduplex en algunos modelos: la consola debe indicar visualmente el turno de palabra.
 - **Contingencia** (no es plan A): si el modelo concreto no soporta TwoWayAudio o su latencia excede el umbral, la salida es **un adaptador nuevo** detrás del mismo puerto, sin tocar dominio, aplicación ni interfaz. Ese es precisamente el propósito del puerto.
 
 ### ADR-02 · Empaquetado de escritorio: **Tauri**
+
 Menor tamaño y menor superficie de ataque que Electron, con la misma base Next.js. Electron queda como alternativa documentada, no implementada.
 
 ### ADR-03 · El hardware va al final, y eso es una prueba, no una concesión
+
 Todo el sistema debe funcionar completo contra `MockProvider`. Si el sistema necesita hardware para demostrarse, el desacople falló y OE-03 no se cumple.
 
 ### ADR-04 · La integridad concurrente se resuelve en la base de datos
+
 Invariantes como "una placa activa por vivienda" (RN-04) se garantizan con **índice único parcial**, no con un `SELECT` previo en el código. KPI-03 exige 0 duplicados en 100 inserciones simultáneas: solo la base puede garantizarlo.
 
 ### ADR-05 · Inmutabilidad de eventos por permisos de base de datos **y por trigger**
+
 RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE, TRUNCATE` sobre `eventos` para todos los roles **y para el dueño de la tabla**, más un trigger `BEFORE UPDATE OR DELETE` que bloquea incluso a quien pueda reconcederse el privilegio. La inmutabilidad no puede depender de que el código "no lo haga".
 
 > **Corrección del 2026-09-06 · verificada contra el proyecto real.** La formulación anterior decía «para todos los roles de aplicación» y ahí estaba el hueco: en Supabase el **dueño** de las tablas es `postgres`, que es **el rol que trae la cadena de conexión por defecto**. Un `REVOKE` que no lo incluye deja intacta la vía por la que la API se conecta de verdad; se comprobó que `UPDATE public.eventos` tenía éxito. Además, **un `REVOKE` solo nunca basta contra el dueño**, porque puede reconcederse el privilegio.
@@ -292,25 +321,25 @@ RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE, TRUNCATE` sobre `evento
 
 ## §5. MAPA DE ETAPAS
 
-| Etapa | Nombre | Rama | Depende de | Demuestra |
-|---|---|---|---|---|
-| 00 | Auditoría documental y plan maestro | `etapa-00-auditoria-documental` | — | Comprensión verificada |
-| 01 | Modelo de datos y Supabase + guía de conexión | `etapa-01-modelo-datos-supabase` | 00 | OE-01, OE-08 (base) |
-| 02 | Andamiaje del monorepo y núcleo hexagonal | `etapa-02-andamiaje-monorepo` | 01 | Fronteras de arquitectura |
-| 03 | Auth, RBAC, MFA y aislamiento multiempresa | `etapa-03-auth-rbac-multiempresa` | 02 | OE-08 |
-| 04 | Padrón: viviendas, residentes, vehículos | `etapa-04-padron` | 03 | OE-01 |
-| 05 | Autorizaciones y motor de reglas + MockProvider | `etapa-05-autorizaciones-motor-reglas` | 04 | OE-02, OE-03 |
-| 06 | Eventos, auditoría inmutable, alertas, tiempo real | `etapa-06-eventos-auditoria` | 05 | OE-05 |
-| 07 | Zonas comunes: horario y aforo | `etapa-07-zonas-comunes` | 06 | CU-05 |
-| 08 | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento` | 06 | OE-04 |
-| 09 | Consola web de administración (Next.js + Tailwind) | `etapa-09-consola-administracion` | 07, 08 | Pantallas mínimas |
-| 10 | Consolas de portería y guardia virtual | `etapa-10-consolas-operativas` | 09 | OE-07 (sin hardware) |
-| 11 | App móvil Flutter del residente | `etapa-11-app-flutter-residente` | 09 | OE-02 extremo a extremo |
-| 12 | Edge Gateway: offline y reconciliación | `etapa-12-edge-gateway-offline` | 06 | OE-06 |
-| 13 | Auditoría de ciberseguridad y endurecimiento | `etapa-13-auditoria-seguridad` | 12 | KPI-36 a 38 |
-| 14 | Observabilidad, CI/CD, PWA instalable y escritorio | `etapa-14-cicd-pwa-escritorio` | 13 | Entregabilidad |
-| 15 | **Integración real con hardware Hikvision** | `etapa-15-integracion-hikvision` | 14 | OE-03, OE-07 reales |
-| 16 | **Documentación técnica final y README** | `etapa-16-documentacion-final` | 14 (ejecutable), 15 (definitiva) | Entregable documental completo |
+| Etapa | Nombre                                                        | Rama                                   | Depende de                       | Demuestra                      |
+| ----- | ------------------------------------------------------------- | -------------------------------------- | -------------------------------- | ------------------------------ |
+| 00    | Auditoría documental y plan maestro                           | `etapa-00-auditoria-documental`        | —                                | Comprensión verificada         |
+| 01    | Modelo de datos y Supabase + guía de conexión                 | `etapa-01-modelo-datos-supabase`       | 00                               | OE-01, OE-08 (base)            |
+| 02    | Andamiaje del monorepo y núcleo hexagonal                     | `etapa-02-andamiaje-monorepo`          | 01                               | Fronteras de arquitectura      |
+| 03    | Auth, RBAC, MFA y aislamiento multiempresa                    | `etapa-03-auth-rbac-multiempresa`      | 02                               | OE-08                          |
+| 04    | Padrón: viviendas, residentes, vehículos                      | `etapa-04-padron`                      | 03                               | OE-01                          |
+| 05    | Autorizaciones y motor de reglas + MockProvider               | `etapa-05-autorizaciones-motor-reglas` | 04                               | OE-02, OE-03                   |
+| 06    | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05                               | OE-05                          |
+| 07    | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06                               | CU-05                          |
+| 08    | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06                               | OE-04                          |
+| 09    | Consola web de administración (Next.js + Tailwind)            | `etapa-09-consola-administracion`      | 07, 08                           | Pantallas mínimas              |
+| 10    | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09                               | OE-07 (sin hardware)           |
+| 11    | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09                               | OE-02 extremo a extremo        |
+| 12    | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06                               | OE-06                          |
+| 13    | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12                               | KPI-36 a 38                    |
+| 14    | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13                               | Entregabilidad                 |
+| 15    | **Integración real con hardware Hikvision**                   | `etapa-15-integracion-hikvision`       | 14                               | OE-03, OE-07 reales            |
+| 16    | **Documentación técnica final y README**                      | `etapa-16-documentacion-final`         | 14 (ejecutable), 15 (definitiva) | Entregable documental completo |
 
 ---
 
@@ -321,13 +350,14 @@ RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE, TRUNCATE` sobre `evento
 ---
 
 ### ETAPA 00 — Auditoría documental y plan maestro
+
 `etapa-00-auditoria-documental` · **No se escribe código de producto.**
 
 **Objetivo.** Demostrar comprensión verificada de los cuatro insumos antes de tocar una línea de código, y producir el plan que gobierna las 15 etapas restantes.
 
 **Alcance — cuatro pasos, en este orden exacto:**
 
-**Paso 1 · Solicitud del proyecto (PDF del reto).** Lee completo. Tabula: misión; los 3 perfiles y lo que cada uno debe poder hacer; el núcleo funcional (LPR/ANPR, facial, control físico, zonas, motor de reglas, eventos y auditoría); el modelo de guardia virtual con su cadena *visitante → intercom → central → validación → apertura remota*; la tabla de integración Hikvision componente por componente; las pantallas mínimas de administración y de la app; los 3 hitos técnicos (prototipo funcional, prueba LPR real, prueba facial real); la matriz de evaluación con pesos; las obligaciones de PI y confidencialidad; y las exigencias de privacidad, seguridad y disponibilidad. Cierra explicando qué implica *"Next Control decide, el hardware ejecuta"* para cada capa de la arquitectura.
+**Paso 1 · Solicitud del proyecto (PDF del reto).** Lee completo. Tabula: misión; los 3 perfiles y lo que cada uno debe poder hacer; el núcleo funcional (LPR/ANPR, facial, control físico, zonas, motor de reglas, eventos y auditoría); el modelo de guardia virtual con su cadena _visitante → intercom → central → validación → apertura remota_; la tabla de integración Hikvision componente por componente; las pantallas mínimas de administración y de la app; los 3 hitos técnicos (prototipo funcional, prueba LPR real, prueba facial real); la matriz de evaluación con pesos; las obligaciones de PI y confidencialidad; y las exigencias de privacidad, seguridad y disponibilidad. Cierra explicando qué implica _"Next Control decide, el hardware ejecuta"_ para cada capa de la arquitectura.
 
 **Paso 2 · Requisitos, con verificación de legibilidad.** Lee el `.docx` (fuente original) y contrástalo con el `.md`. Produce un informe de legibilidad que reporte: codificación, BOM, tipo de salto de línea, tablas malformadas o truncadas, caracteres corruptos o backticks residuales dentro de celdas; **verificación de la numeración de los KPI** confirmando lo ya detectado (falta `KPI-19`; la entrada 21 aparece como `KP1-21`) y cualquier otra anomalía; inventario final verificado contra la tabla de §1; requisitos ambiguos o sin criterio de verificación; **propuesta de sección formal de requisitos no funcionales** derivada de los KPI de latencia, disponibilidad y seguridad; y contradicciones internas o con el PDF, marcadas y resueltas. **No modifiques el documento original**: las correcciones van en un derivado.
 
@@ -343,15 +373,17 @@ RN-03 y CA-23 se implementan con `REVOKE UPDATE, DELETE, TRUNCATE` sobre `evento
 ---
 
 ### ETAPA 01 — Modelo de datos y Supabase
+
 `etapa-01-modelo-datos-supabase`
 
 **Objetivo.** Un esquema que haga estructuralmente imposible violar las reglas de negocio, y una guía que permita al usuario conectar su proyecto Supabase sin ambigüedad.
 
 **Alcance.**
 
-*1 · Diseño.* Deriva el esquema desde los **agregados**, no desde las pantallas. Mínimo: `copropiedades` · `usuarios` y `roles_usuario` · `viviendas` · `residentes` · `vehiculos` · `visitantes` · `autorizaciones` · `autorizacion_acompanantes` · `patrones_recurrencia` · `zonas` · `zona_aforo` · `autorizaciones_zona` · `dispositivos` · `puntos_de_acceso` · `consentimientos_biometricos` · `plantillas_biometricas` (metadatos y estado de sincronización) · `listas_negras` · `reglas` y `versiones_de_reglas` · `eventos` (append-only, **particionada por mes**) · `evidencias` · `alertas` · `auditoria_seguridad` · `bandeja_salida_edge` con claves de idempotencia · esquema de pg-boss.
+_1 · Diseño._ Deriva el esquema desde los **agregados**, no desde las pantallas. Mínimo: `copropiedades` · `usuarios` y `roles_usuario` · `viviendas` · `residentes` · `vehiculos` · `visitantes` · `autorizaciones` · `autorizacion_acompanantes` · `patrones_recurrencia` · `zonas` · `zona_aforo` · `autorizaciones_zona` · `dispositivos` · `puntos_de_acceso` · `consentimientos_biometricos` · `plantillas_biometricas` (metadatos y estado de sincronización) · `listas_negras` · `reglas` y `versiones_de_reglas` · `eventos` (append-only, **particionada por mes**) · `evidencias` · `alertas` · `auditoria_seguridad` · `bandeja_salida_edge` con claves de idempotencia · esquema de pg-boss.
 
 Requisitos no negociables del diseño:
+
 - `copropiedad_id` **NOT NULL** en toda tabla operativa: es la frontera del tenant.
 - **Sin borrado físico** donde hay historial: `estado` + `desactivado_en` (RN-19, CA-02, KPI-04), reforzado por trigger que impida el `DELETE`.
 - `eventos` inmutable por permisos **y por trigger**, con el dueño de la tabla incluido en la revocación (ADR-05, RN-03, CA-23).
@@ -360,17 +392,18 @@ Requisitos no negociables del diseño:
 - **Índices únicos parciales** para invariantes concurrentes (ADR-04): único sobre `(copropiedad_id, placa)` filtrado por `activo = true` (KPI-02, KPI-03, CA-03).
 - Índices de consulta para los filtros reales de las pantallas: eventos por vivienda, persona, dispositivo y rango de fechas.
 
-*2 · Migraciones y RLS.* SQL versionado, idempotente y reversible en `supabase/migrations/`. RLS habilitada **y forzada** en todas las tablas, con política por rol derivada de los claims del JWT, y **prueba negativa por cada política**.
+_2 · Migraciones y RLS._ SQL versionado, idempotente y reversible en `supabase/migrations/`. RLS habilitada **y forzada** en todas las tablas, con política por rol derivada de los claims del JWT, y **prueba negativa por cada política**.
 
-*3 · Seeds.* Una copropiedad ficticia coherente con los mockups. Datos inventados; cero datos reales; cero secretos.
+_3 · Seeds._ Una copropiedad ficticia coherente con los mockups. Datos inventados; cero datos reales; cero secretos.
 
-*4 · `docs/guias/CONEXION_SUPABASE.md`* — paso a paso, asumiendo que el usuario **ya tiene credenciales**:
-- Dónde encontrar en el panel: *Project URL*, **llave publicable** (`sb_publishable_…`), **llave secreta** (`sb_secret_…`), **URL del JWKS**, cadena directa y de *pooler*.
+_4 · `docs/guias/CONEXION_SUPABASE.md`_ — paso a paso, asumiendo que el usuario **ya tiene credenciales**:
+
+- Dónde encontrar en el panel: _Project URL_, **llave publicable** (`sb_publishable_…`), **llave secreta** (`sb_secret_…`), **URL del JWKS**, cadena directa y de _pooler_.
 - Qué llave usa cada superficie y por qué: la **publicable** en web y móvil (resuelve al rol `anon`, sujeta a RLS); la **secreta** **solo en servidor** (API, workers, Edge), nunca en un cliente, nunca en `NEXT_PUBLIC_*`, nunca compilada en Flutter.
   > **Corrección del 2026-09-06.** El proyecto de Grupo Control usa el esquema nuevo: **no tiene `anon` ni `service_role` como llaves de API, ni secreto JWT compartido**. Los proyectos creados desde noviembre de 2025 ya no traen las llaves heredadas, y desde el 1 de octubre de 2025 los proyectos nuevos usan **firma asimétrica** por defecto. Lo que **no** cambia: los **roles de PostgreSQL** `anon`, `authenticated` y `service_role` siguen existiendo y las llaves resuelven a ellos, así que el esquema, los `GRANT`/`REVOKE` y las políticas RLS de la ETAPA 01 no se tocan. La llave secreta sigue omitiendo RLS: **el riesgo número uno no cambia, solo cambia el nombre de la variable**.
 - `.env.example` por aplicación, con la advertencia explícita de que todo `NEXT_PUBLIC_*` es público por definición y de que **todo lo compilado en Flutter es extraíble del binario**.
 - CLI: instalación, `supabase link`, aplicación de migraciones, verificación de que RLS quedó activa y **comprobación práctica del aislamiento** (una consulta cruzada entre copropiedades debe fallar).
-- Auth: MFA TOTP, expiración de tokens, *custom claims* de `copropiedad_id` y rol vía *auth hook*.
+- Auth: MFA TOTP, expiración de tokens, _custom claims_ de `copropiedad_id` y rol vía _auth hook_.
 - Storage: buckets privados de evidencia, políticas y URLs firmadas de vida corta.
 - Extensiones (`pgcrypto`, `pg_cron` si aplica) y esquema de pg-boss.
 - Backups, retención y **procedimiento de rotación de llaves**: qué se rompe y en qué orden se rota.
@@ -383,6 +416,7 @@ Requisitos no negociables del diseño:
 ---
 
 ### ETAPA 02 — Andamiaje del monorepo y núcleo hexagonal
+
 `etapa-02-andamiaje-monorepo`
 
 **Objetivo.** Que la arquitectura sea imposible de violar por accidente, porque el linter lo impide.
@@ -400,11 +434,12 @@ Herramientas: ESLint con **reglas de frontera** que rompan el build si `domain/`
 ---
 
 ### ETAPA 03 — Autenticación, RBAC, MFA y aislamiento multiempresa
+
 `etapa-03-auth-rbac-multiempresa`
 
 **Objetivo.** Cerrar el riesgo número uno del proyecto: la fuga de datos entre copropiedades.
 
-**Alcance.** Integración con Supabase Auth: **verificación asimétrica del JWT contra el JWKS del proyecto** —nunca HS256 con secreto compartido, que este proyecto ya no tiene—, *custom claims* de copropiedad y rol, refresco y revocación de sesión. Los **6 roles** implementados como guards declarativos y decoradores de permiso.
+**Alcance.** Integración con Supabase Auth: **verificación asimétrica del JWT contra el JWKS del proyecto** —nunca HS256 con secreto compartido, que este proyecto ya no tiene—, _custom claims_ de copropiedad y rol, refresco y revocación de sesión. Los **6 roles** implementados como guards declarativos y decoradores de permiso.
 
 > **Diseño vinculante:** `docs/arquitectura/verificacion-jwt-asimetrica.md`, escrito en la ETAPA 01 y verificado contra la documentación oficial. Fija las reglas de verificación (algoritmo tomado de la clave y no del token, HS256 rechazado, TTL de caché de 10 min alineado con el edge de Supabase, fallo cerrado), el procedimiento de rotación sin caída con su margen de 20 minutos, y las consecuencias de la **expiración de 5 minutos** para Flutter (ETAPA 11), el canal de tiempo real (ETAPA 06) y el rate limiting. El Edge (ETAPA 12) **no** se ve afectado: usa la llave secreta, no un token de usuario.
 
@@ -421,6 +456,7 @@ Rate limiting endurecido en login, MFA y recuperación.
 ---
 
 ### ETAPA 04 — Padrón
+
 `etapa-04-padron`
 
 **Objetivo.** La base sobre la que operan todas las reglas: OE-01.
@@ -436,6 +472,7 @@ Invariantes: una placa activa por vivienda (RN-04, CA-03); integridad referencia
 ---
 
 ### ETAPA 05 — Autorizaciones y motor de reglas
+
 `etapa-05-autorizaciones-motor-reglas`
 
 **Objetivo.** El corazón del producto: la decisión de acceso, pura y auditable, funcionando sin hardware.
@@ -457,6 +494,7 @@ Gestión de listas negras con control de quién puede crearlas y levantarlas (HU
 ---
 
 ### ETAPA 06 — Eventos, auditoría inmutable, alertas y tiempo real
+
 `etapa-06-eventos-auditoria`
 
 **Objetivo.** OE-05: que ningún acceso exista sin evento, y que ningún evento pueda alterarse.
@@ -474,6 +512,7 @@ Consulta, filtrado y exportación del historial en PDF/Excel/CSV (HU-32), como e
 ---
 
 ### ETAPA 07 — Zonas comunes
+
 `etapa-07-zonas-comunes`
 
 **Objetivo.** CU-05 completo: horario y aforo se respetan aunque la persona tenga permiso.
@@ -487,6 +526,7 @@ Consulta, filtrado y exportación del historial en PDF/Excel/CSV (HU-32), como e
 ---
 
 ### ETAPA 08 — Biometría con consentimiento
+
 `etapa-08-biometria-consentimiento`
 
 **Objetivo.** OE-04 con cumplimiento normativo real, no decorativo.
@@ -499,13 +539,14 @@ Pantalla de consentimiento del visitante. La plantilla vive en la terminal y cif
 
 **Entregable adicional.** `docs/seguridad/ciclo-vida-biometrico.md`: ciclo completo del dato bajo Ley 1581 de 2012, desde la captura hasta la supresión verificada.
 
-**Trazabilidad.** HU-11 a HU-15 · CA-08 a CA-11 · CP-06 · KPI-16 a KPI-18, KPI-20, KPI-21 *(la registrada como `KP1-21`)*.
+**Trazabilidad.** HU-11 a HU-15 · CA-08 a CA-11 · CP-06 · KPI-16 a KPI-18, KPI-20, KPI-21 _(la registrada como `KP1-21`)_.
 
 **DoD.** Es imposible sincronizar una plantilla sin consentimiento registrado, probado tanto por API como por ruta de servicio.
 
 ---
 
 ### ETAPA 09 — Consola web de administración
+
 `etapa-09-consola-administracion`
 
 **Objetivo.** Las pantallas mínimas de administración, fieles a los mockups.
@@ -521,15 +562,16 @@ Implementa el **preset Tailwind** derivado en la etapa 00. Estados vacío/cargan
 ---
 
 ### ETAPA 10 — Consolas operativas
+
 `etapa-10-consolas-operativas`
 
 **Objetivo.** OE-07 completo contra simulación; la parte física llega en la etapa 15.
 
 **Alcance.**
 
-*Portería:* evento actual con evidencia, vivienda destino y autorización; apertura o negación manual con **motivo obligatorio** —sin motivo no se ejecuta la apertura— (CA-16, CA-17, RN-08); historial inmediato; alertas y listas negras activas. HU-21 a HU-24.
+_Portería:_ evento actual con evidencia, vivienda destino y autorización; apertura o negación manual con **motivo obligatorio** —sin motivo no se ejecuta la apertura— (CA-16, CA-17, RN-08); historial inmediato; alertas y listas negras activas. HU-21 a HU-24.
 
-*Guardia virtual:* consola multiproyecto con conmutación entre copropiedades **sin fuga de datos** (KPI-35); cola de eventos con indicador de tiempo de espera; ficha de la vivienda; video en vivo; audio bidireccional tras `IntercomProvider` (ADR-01, implementación simulada en esta etapa); abrir/denegar atribuido al operador; contacto con el residente; escalamiento y alerta de emergencia. Manejo de los flujos alternos de CU-03: residente que no responde, residente que niega, operador ocupado en otra copropiedad, ausencia de operador disponible.
+_Guardia virtual:_ consola multiproyecto con conmutación entre copropiedades **sin fuga de datos** (KPI-35); cola de eventos con indicador de tiempo de espera; ficha de la vivienda; video en vivo; audio bidireccional tras `IntercomProvider` (ADR-01, implementación simulada en esta etapa); abrir/denegar atribuido al operador; contacto con el residente; escalamiento y alerta de emergencia. Manejo de los flujos alternos de CU-03: residente que no responde, residente que niega, operador ocupado en otra copropiedad, ausencia de operador disponible.
 
 Gestión de **exclusividad del canal de audio**: bloqueo por dispositivo, cola y liberación por timeout (consecuencia de ADR-01).
 
@@ -540,6 +582,7 @@ Gestión de **exclusividad del canal de audio**: bloqueo por dispositivo, cola y
 ---
 
 ### ETAPA 11 — Aplicación móvil Flutter del residente
+
 `etapa-11-app-flutter-residente`
 
 **Objetivo.** OE-02 de extremo a extremo. Es una de las piezas centrales del producto y pesa en la evaluación de UX.
@@ -555,6 +598,7 @@ Arquitectura limpia también en Dart (dominio, casos de uso, repositorios). **Cl
 ---
 
 ### ETAPA 12 — Edge Gateway
+
 `etapa-12-edge-gateway-offline`
 
 **Objetivo.** OE-06, el diferenciador técnico del producto.
@@ -570,6 +614,7 @@ Arquitectura limpia también en Dart (dominio, casos de uso, repositorios). **Cl
 ---
 
 ### ETAPA 13 — Auditoría de ciberseguridad y endurecimiento
+
 `etapa-13-auditoria-seguridad`
 
 **Objetivo.** Verificar y endurecer. **No introduce la seguridad por primera vez**: §2.7 la exigía desde la etapa 01.
@@ -578,7 +623,7 @@ Arquitectura limpia también en Dart (dominio, casos de uso, repositorios). **Cl
 
 - Inventario de secretos y confirmación de que ninguno está en el código **ni en el historial de Git**.
 - CORS verificado por origen, método y cabecera.
-- Validación de entrada en backend: *fuzzing* de DTOs, tipos inesperados, sobrecarga de tamaño, Unicode, bytes `NUL`, campos no declarados.
+- Validación de entrada en backend: _fuzzing_ de DTOs, tipos inesperados, sobrecarga de tamaño, Unicode, bytes `NUL`, campos no declarados.
 - Inyección SQL sobre **todos** los campos persistidos, y verificación del saneamiento previo al guardado.
 - Rate limiting bajo carga, y verificación de que el backoff del Edge no lo dispara.
 - **Matriz completa de RLS**, política por política, con prueba positiva y negativa, incluyendo las rutas `service_role`.
@@ -595,6 +640,7 @@ Arquitectura limpia también en Dart (dominio, casos de uso, repositorios). **Cl
 ---
 
 ### ETAPA 14 — Observabilidad, CI/CD, PWA y escritorio
+
 `etapa-14-cicd-pwa-escritorio`
 
 **Objetivo.** Que el sistema sea entregable, medible y verificable de forma automática.
@@ -612,7 +658,8 @@ GitHub Actions: lint; análisis estático de frontera de arquitectura (KPI-11); 
 
 ---
 
-### ETAPA 15 — Integración real con hardware Hikvision *(última, por diseño)*
+### ETAPA 15 — Integración real con hardware Hikvision _(última, por diseño)_
+
 `etapa-15-integracion-hikvision`
 
 **Objetivo.** Sustituir `MockProvider` por `HikvisionProvider` **sin tocar nada más**. Pesa el 25 % de la evaluación del proyecto.
@@ -622,6 +669,7 @@ GitHub Actions: lint; análisis estático de frontera de arquitectura (KPI-11); 
 **Regla dura.** Implementas adaptadores de puertos ya existentes. **Si necesitas modificar el dominio, la aplicación o la interfaz, es un defecto de diseño de las etapas anteriores: detente y repórtalo antes de tocar nada.** Esa verificación es, en sí misma, la prueba de OE-03.
 
 **Alcance.**
+
 - ISAPI sobre HTTP con **autenticación Digest**; único punto del sistema que toca hardware.
 - **Alarm Server HTTP** que recibe el POST multipart de la cámara: XML del evento, foto completa y recorte de placa. Normalización al contrato de evento ya definido en la etapa 05.
 - **Verificación de que la cámara opera en modo evento** —reporta sin accionar—. Si el modelo decide por su cuenta, es un hallazgo de bloqueo: repórtalo antes de continuar.
@@ -635,6 +683,7 @@ GitHub Actions: lint; análisis estático de frontera de arquitectura (KPI-11); 
 **Lo que ya debe estar listo desde la etapa 05 y solo se conecta aquí:** puertos estables, contrato de eventos normalizados, registro de dispositivos y credenciales por copropiedad (en variables de entorno o cifradas en base, **nunca en código**, RN-21), umbral de confianza de lectura configurable, y política de reintentos.
 
 **Entregable estrella: `docs/guias/INTEGRACION_HIKVISION.md`** — guía paso a paso, escrita para ejecutarse frente al equipo físico:
+
 1. Inventario y prerrequisitos: modelos, firmware mínimo, licencias, topología, VLAN, direccionamiento fijo, puertos requeridos en cada sentido.
 2. Acceso inicial a cada equipo, cambio de credenciales de fábrica y creación de usuario de servicio con privilegio mínimo.
 3. Configuración de la cámara LPR en **modo evento** y del Alarm Server apuntando al endpoint de ingesta, con el formato exacto del POST esperado y ejemplo de payload.
@@ -651,6 +700,7 @@ GitHub Actions: lint; análisis estático de frontera de arquitectura (KPI-11); 
 ---
 
 ### ETAPA 16 — Documentación técnica final y README
+
 `etapa-16-documentacion-final`
 
 **Objetivo.** Que cualquier ingeniero que llegue nuevo al proyecto —o cualquier evaluador de Grupo Control— pueda entenderlo, levantarlo y operarlo leyendo el repositorio, sin preguntarle nada a quien lo construyó. La documentación pesa el **10 % de la evaluación** del reto y es la única parte del entregable que se lee antes que el código.
@@ -659,9 +709,9 @@ GitHub Actions: lint; análisis estático de frontera de arquitectura (KPI-11); 
 
 **Alcance.**
 
-*1 · `README.md` en la raíz — el documento de entrada al proyecto.* Debe contener, en este orden:
+_1 · `README.md` en la raíz — el documento de entrada al proyecto._ Debe contener, en este orden:
 
-1. **Encabezado**: nombre, una frase de qué es, estado del proyecto, versión, y el principio rector (*Next Control decide, el hardware ejecuta*).
+1. **Encabezado**: nombre, una frase de qué es, estado del proyecto, versión, y el principio rector (_Next Control decide, el hardware ejecuta_).
 2. **Índice** navegable con anclas a cada sección, incluidas las subsecciones de segundo nivel. Verificado: ningún enlace roto, ningún ancla huérfana.
 3. **Qué resuelve** — el problema AS-IS (los 6 PB) y el beneficio esperado, en prosa breve.
 4. **Arquitectura** — las 5 capas, el diagrama en Mermaid, la estructura del monorepo comentada carpeta por carpeta, y el mapa de módulos con sus fronteras.
@@ -678,13 +728,13 @@ GitHub Actions: lint; análisis estático de frontera de arquitectura (KPI-11); 
 15. **Glosario** (ver punto 2).
 16. **Licencia y propiedad intelectual** — la cláusula de titularidad de Grupo Control y la restricción de reutilización.
 
-*2 · Glosario, dentro del README y con ancla propia.* Los 22 términos del documento de requisitos —copropiedad, vivienda, residente, visitante, autorización, autorización recurrente, acceso, apertura, evento, dispositivo, terminal facial, plantilla biométrica, consentimiento, vigencia, zona, aforo, lista negra, motor de reglas, Edge Gateway, proveedor, adaptador simulado, clave de idempotencia— **más los términos técnicos que introdujo la construcción**: agregado raíz, objeto de valor, puerto, adaptador, política, especificación, versión de reglas, bandeja de salida, RLS, ISAPI, TwoWayAudio, Digest, ONVIF, LPR/ANPR, RBAC, MFA, CSP. Cada entrada: definición en el contexto de este proyecto —no la genérica— y, cuando aplique, dónde vive en el código. Ordenado alfabéticamente y enlazado desde las secciones que usan cada término.
+_2 · Glosario, dentro del README y con ancla propia._ Los 22 términos del documento de requisitos —copropiedad, vivienda, residente, visitante, autorización, autorización recurrente, acceso, apertura, evento, dispositivo, terminal facial, plantilla biométrica, consentimiento, vigencia, zona, aforo, lista negra, motor de reglas, Edge Gateway, proveedor, adaptador simulado, clave de idempotencia— **más los términos técnicos que introdujo la construcción**: agregado raíz, objeto de valor, puerto, adaptador, política, especificación, versión de reglas, bandeja de salida, RLS, ISAPI, TwoWayAudio, Digest, ONVIF, LPR/ANPR, RBAC, MFA, CSP. Cada entrada: definición en el contexto de este proyecto —no la genérica— y, cuando aplique, dónde vive en el código. Ordenado alfabéticamente y enlazado desde las secciones que usan cada término.
 
-*3 · Índice general de la documentación* — `docs/README.md` que mapee todo `docs/` (auditoría, etapas, arquitectura, decisiones, seguridad, guías) con una línea de propósito por documento, para que nada quede enterrado.
+_3 · Índice general de la documentación_ — `docs/README.md` que mapee todo `docs/` (auditoría, etapas, arquitectura, decisiones, seguridad, guías) con una línea de propósito por documento, para que nada quede enterrado.
 
-*4 · Consolidación y verificación.* Revisa que las guías producidas en etapas anteriores sigan siendo correctas tras los cambios posteriores —una guía desactualizada es peor que ninguna—; que los 17 informes de etapa estén completos; que todo enlace interno resuelva; que no haya secretos, IPs reales ni credenciales en ningún documento; y que los diagramas Mermaid rendericen.
+_4 · Consolidación y verificación._ Revisa que las guías producidas en etapas anteriores sigan siendo correctas tras los cambios posteriores —una guía desactualizada es peor que ninguna—; que los 17 informes de etapa estén completos; que todo enlace interno resuelva; que no haya secretos, IPs reales ni credenciales en ningún documento; y que los diagramas Mermaid rendericen.
 
-*5 · Documentación de API.* OpenAPI publicado y navegable, con descripción por endpoint, códigos de error tipados y ejemplos de request/response.
+_5 · Documentación de API._ OpenAPI publicado y navegable, con descripción por endpoint, códigos de error tipados y ejemplos de request/response.
 
 **DoD.** Un ingeniero que nunca vio el proyecto clona el repositorio, sigue el README y llega a un sistema funcionando con datos de prueba, sin ayuda externa. El índice no tiene enlaces rotos. Ningún término del glosario aparece definido en dos lugares con redacciones distintas.
 

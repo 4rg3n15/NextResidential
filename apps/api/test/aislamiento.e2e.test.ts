@@ -184,3 +184,13 @@ describe('CA-24 · todo acceso cruzado queda registrado', () => {
     });
   });
 });
+
+describe('cobertura tras la ETAPA 04', () => {
+  it('los endpoints del padrón entraron solos en el recorrido', () => {
+    // La enumeración del enrutador funcionó: nadie añadió estas rutas a la
+    // suite a mano. Si el padrón hubiera filtrado, el recorrido de arriba ya
+    // habría roto el build.
+    const padron = rutas.filter((r) => r.ruta.startsWith('/padron'));
+    expect(padron.length).toBeGreaterThanOrEqual(4);
+  });
+});
