@@ -1,0 +1,49 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "SaludController_salud",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "El proceso está vivo",
+        "tags": ["salud"]
+      }
+    },
+    "/ready": {
+      "get": {
+        "operationId": "SaludController_listo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "La aplicación puede atender tráfico",
+        "tags": ["salud"]
+      }
+    }
+  },
+  "info": {
+    "title": "Next Control Residencial — API",
+    "description": "Next Control decide. El hardware ejecuta.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {}
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@ncr/edge",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"edge gateway: ETAPA 12\"",
+    "typecheck": "echo \"edge gateway: ETAPA 12\"",
+    "lint": "echo \"edge gateway: ETAPA 12\"",
+    "test": "echo \"edge gateway: ETAPA 12\""
+  }
+}

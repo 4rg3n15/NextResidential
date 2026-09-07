@@ -1,0 +1,11 @@
+{
+  "name": "@ncr/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"consola web: ETAPA 09\"",
+    "typecheck": "echo \"consola web: ETAPA 09\"",
+    "lint": "echo \"consola web: ETAPA 09\"",
+    "test": "echo \"consola web: ETAPA 09\""
+  }
+}
