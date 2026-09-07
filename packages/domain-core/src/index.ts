@@ -13,4 +13,6 @@ export * from './puertos/proveedores';
 export * from './eventos/evento-de-dominio';
 export * from './eventos/bus-en-memoria';
 export * from './politicas/idempotencia';
+export * from './padron/placa';
+export * from './padron/vivienda';
 export * from './tokens';
