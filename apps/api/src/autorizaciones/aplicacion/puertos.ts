@@ -1,4 +1,9 @@
-import type { Autorizacion, ContextoDeAcceso, VersionDeReglas } from '@ncr/domain-core';
+import type {
+  Autorizacion,
+  ContextoDeAcceso,
+  VersionDeReglas,
+  ZonaSolicitada,
+} from '@ncr/domain-core';
 
 /**
  * Puertos del módulo de autorizaciones. La aplicación los DEFINE; la
@@ -55,6 +60,21 @@ export interface SolicitudDeAcceso {
 export interface CargadorDeContexto {
   cargar(solicitud: SolicitudDeAcceso, ahora: Date): Promise<ContextoDeAcceso>;
 }
+
+/**
+ * Resuelve la zona que el motor necesita en el contexto — CU-05, ETAPA 07.
+ *
+ * Lo declara el CONSUMIDOR: el cargador de contexto necesita saber si la zona
+ * abre y si está llena, y no le importa quién se lo diga. El módulo de zonas lo
+ * satisface desde su repositorio, y la raíz de composición los une. Así el
+ * módulo de autorizaciones no aparece en ningún `import` del de zonas ni al
+ * revés (§2.2).
+ */
+export interface ResolutorDeZona {
+  resolver(copropiedadId: string, zonaId: string, ahora: Date): Promise<ZonaSolicitada | null>;
+}
+
+export const RESOLUTOR_DE_ZONA = Symbol.for('ncr.puerto.ResolutorDeZona');
 
 export const REPOSITORIO_AUTORIZACIONES = Symbol.for('ncr.puerto.RepositorioAutorizaciones');
 export const REPOSITORIO_LISTA_NEGRA = Symbol.for('ncr.puerto.RepositorioListaNegra');

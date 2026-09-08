@@ -7,6 +7,7 @@ import {
   configuracionDePrueba,
   crearApp,
   crearFirmante,
+  direccionDe,
   tokenDe,
 } from './utilidades';
 import type { Firmante } from './utilidades';
@@ -238,27 +239,28 @@ describe('flujo en vivo (SSE) y aislamiento', () => {
       copropiedadId: COP_A,
       copropiedades: [COP_A],
     });
-    const servidor = app.getHttpServer();
-
     // El flujo no termina solo: se corta en cuanto llega el primer mensaje.
-    const cuerpo = await new Promise<string>((resolver, rechazar) => {
-      const peticion = request(servidor)
-        .get(`/copropiedades/${COP_A}/eventos/flujo`)
-        .set('Authorization', `Bearer ${propio}`)
-        .buffer(false)
-        .parse((res, callback) => {
-          res.on('data', (trozo: Buffer) => {
-            resolver(trozo.toString('utf8'));
-            peticion.abort();
-            callback(null, null);
-          });
-          res.on('error', callback);
-        });
-      peticion.end((error) => {
-        // `abort()` produce un error esperado: ya tenemos lo que buscábamos.
-        if (error && !/aborted|ECONNRESET/i.test(String(error))) rechazar(error);
-      });
+    //
+    // Se habla por `fetch` con `AbortController` y no por `supertest`. Motivo,
+    // del 2026-09-08: `supertest` aborta la petición HTTP subyacente, y el
+    // `ECONNRESET` que Node emite después NO tiene manejador — salía como
+    // «Unhandled Error» del worker, con el aviso de Vitest de que puede
+    // producir falsos positivos. Antes quedaba tapado porque `supertest`
+    // cerraba el servidor al terminar; con el servidor vivo, aflora.
+    // `AbortController` corta el flujo sin dejar un error suelto.
+    const control = new AbortController();
+    const respuesta = await fetch(`${direccionDe(app)}/copropiedades/${COP_A}/eventos/flujo`, {
+      headers: { Authorization: `Bearer ${propio}`, Accept: 'text/event-stream' },
+      signal: control.signal,
     });
+    expect(respuesta.status).toBe(200);
+    if (respuesta.body === null) throw new Error('el flujo no devolvió cuerpo');
+
+    const lector = respuesta.body.getReader();
+    const { value } = await lector.read();
+    const cuerpo = new TextDecoder().decode(value);
+    await lector.cancel();
+    control.abort();
 
     expect(cuerpo).toContain('event: listo');
     expect(cuerpo).toContain(COP_A);

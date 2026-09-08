@@ -10,6 +10,7 @@ import { MultiempresaModule } from './multiempresa/multiempresa.module';
 import { PadronModule } from './padron/padron.module';
 import { AutorizacionesModule } from './autorizaciones/autorizaciones.module';
 import { EventosModule } from './eventos/eventos.module';
+import { ZonasModule } from './zonas/zonas.module';
 import { limitadorPorDispositivo } from './eventos/presentacion/limite-por-dispositivo';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
@@ -32,6 +33,7 @@ export class AppModule {
         AutenticacionModule.registrar(),
         MultiempresaModule,
         PadronModule.registrar(),
+        ZonasModule.registrar(),
         EventosModule.registrar(),
         AutorizacionesModule.registrar(),
         // Dos limitadores con NOMBRE, y cada uno cuenta por lo suyo: `default`

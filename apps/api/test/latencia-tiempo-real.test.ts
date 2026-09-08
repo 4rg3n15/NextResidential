@@ -82,10 +82,10 @@ const percentil = (valores: number[], p: number): number => {
 
 beforeAll(async () => {
   const firmante = await crearFirmante();
+  // `crearApp` ya deja el servidor escuchando en un puerto efímero: aquí hace
+  // falta un servidor HTTP de verdad porque se mide el socket, y desde el
+  // 2026-09-08 lo es en TODA la suite, no solo aquí.
   app = await crearApp(firmante);
-  // Servidor HTTP de verdad: el objetivo es medir el socket, y `supertest`
-  // sobre el manejador en memoria mediría otra cosa.
-  await app.listen(0);
   servidor = app.getHttpServer() as Server;
   const puerto = (servidor.address() as AddressInfo).port;
   base = `http://127.0.0.1:${puerto}`;
@@ -116,6 +116,16 @@ const abrirSuscriptor = async (
   const decodificador = new TextDecoder();
   let resto = '';
 
+  // El suscriptor no se da por abierto hasta que el servidor manda su primer
+  // mensaje (`event: listo`). Antes se esperaban 200 ms fijos «para que los
+  // flushHeaders llegaran»: un `sleep` que bajo carga se queda corto, y un
+  // suscriptor que se pierde la ráfaga hace fallar KPI-25 sin que la latencia
+  // tenga la culpa. Se espera por CONDICIÓN y con tope.
+  let confirmar: () => void = () => undefined;
+  const abierto = new Promise<void>((r) => {
+    confirmar = r;
+  });
+
   void (async () => {
     try {
       for (;;) {
@@ -126,6 +136,7 @@ const abrirSuscriptor = async (
         const bloques = resto.split('\n\n');
         resto = bloques.pop() ?? '';
         for (const bloque of bloques) {
+          if (bloque.includes('event: listo')) confirmar();
           if (!bloque.includes('event: alertas')) continue;
           const datos = bloque.split('\n').find((l) => l.startsWith('data: '));
           if (datos === undefined) continue;
@@ -140,6 +151,13 @@ const abrirSuscriptor = async (
     }
   })();
 
+  await Promise.race([
+    abierto,
+    new Promise<void>((_, rechazar) =>
+      setTimeout(() => rechazar(new Error('el flujo SSE no confirmó apertura en 10 s')), 10_000),
+    ),
+  ]);
+
   return () => control.abort();
 };
 
@@ -151,8 +169,8 @@ const medir = async (): Promise<Medicion> => {
   for (let i = 0; i < SUSCRIPTORES; i += 1) {
     cierres.push(await abrirSuscriptor(latencias, recibidas));
   }
-  // Un respiro para que los `flushHeaders` de todos lleguen antes de la ráfaga.
-  await new Promise((r) => setTimeout(r, 200));
+  // Sin respiro que valga: `abrirSuscriptor` ya solo vuelve cuando el flujo
+  // confirmó apertura, así que los SUSCRIPTORES están todos escuchando aquí.
 
   const enviados: string[] = [];
   // Ráfaga: los eventos salen sin esperar al anterior, que es como llegan

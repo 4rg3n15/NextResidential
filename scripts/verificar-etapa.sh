@@ -205,9 +205,33 @@ if [[ "$CON_BASE" == "1" ]]; then
     # Sobre una tabla vacía, un UPDATE que no falla tampoco prueba nada.
     con_base_o_omitida test/eventos-pg.test.ts \
       "UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)"
+    # ETAPA 07 · el aforo lo garantiza la base. En memoria esta prueba pasaría
+    # con cualquier implementación —JavaScript tiene un hilo y dos peticiones
+    # nunca coinciden—, así que solo cuenta ejecutada contra PostgreSQL real.
+    con_base_o_omitida test/aforo-concurrencia.test.ts \
+      "50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)"
   else
     echo "   – omitido: exporta DATABASE_URL_PRUEBAS para ejecutarlo"
   fi
+fi
+
+paso "14 · estabilidad: la suite da lo mismo tres veces seguidas"
+# AÑADIDO EN LA ETAPA 07, a petición del usuario. La primera ejecución de la
+# etapa falló con `socket hang up` en una prueba HTTP y la segunda pasó sin
+# tocar nada. Una prueba intermitente es peor que una rota: enseña a reejecutar
+# hasta el verde, y ese hábito acaba tapando defectos reales.
+#
+# Va al final porque es el paso más caro —ejecuta la suite entera varias veces,
+# sin caché de turbo— y así los fallos baratos salen antes. El número de
+# repeticiones se puede bajar con NCR_REPETICIONES para una vuelta rápida, pero
+# el cierre de etapa se hace con el valor por defecto.
+REPETICIONES="${NCR_REPETICIONES:-3}"
+if salida_est=$(con_limite "$LIMITE_LARGO" node scripts/lib/estabilidad.mjs --repeticiones "$REPETICIONES" 2>&1); then
+  echo "$salida_est" | grep -E "^   corrida" | sed 's/^/   /'
+  ok "${salida_est##*$'\n'}"
+else
+  echo "$salida_est" | grep -E "^   (corrida|✗)|^     " | head -20 | sed 's/^/   /'
+  mal "la suite no es reproducible entre corridas"
 fi
 
 echo

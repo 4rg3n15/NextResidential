@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-08 · al cierre de la **ETAPA 06**
+**Última actualización:** 2026-09-08 · al cierre de la **ETAPA 07**
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,15 +18,15 @@
 
 ## Resumen
 
-|                                |                                                                    |
-| ------------------------------ | ------------------------------------------------------------------ |
-| **Etapas cerradas**            | **6 de 17** (ETAPAS 00 a 05)                                       |
-| **Etapa siguiente habilitada** | **ETAPA 07 — Zonas comunes: horario y aforo**                      |
-| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                             |
-| **Decisiones pendientes**      | 8 abiertas — P-06 y P-07 resueltas en la ETAPA 06                  |
-| **Supuestos vigentes**         | 10 — los de etapas anteriores más S-16 (umbral de confianza 0,85)  |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                              |
+|                                |                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| **Etapas cerradas**            | **7 de 17** (ETAPAS 00 a 07)                                                  |
+| **Etapa siguiente habilitada** | **ETAPA 08 — Biometría: consentimiento, calidad y supresión**                 |
+| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado            |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                        |
+| **Decisiones pendientes**      | 7 abiertas — P-04 resuelta en la ETAPA 07                                     |
+| **Supuestos vigentes**         | 10 — S-09 **cerrado por implementación**; nuevo S-17 (zona común restringida) |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                         |
 
 ---
 
@@ -41,7 +41,7 @@
 | 04     | Padrón: viviendas, residentes, vehículos                      | `etapa-04-padron`                      | 03 ✅                            | **CERRADA**                      | [ETAPA-04](etapas/ETAPA-04.md) |
 | 05     | Autorizaciones y motor de reglas + MockProvider               | `etapa-05-autorizaciones-motor-reglas` | 04 ✅                            | **CERRADA**                      | [ETAPA-05](etapas/ETAPA-05.md) |
 | 06     | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05 ✅                            | **CERRADA**                      | [ETAPA-06](etapas/ETAPA-06.md) |
-| 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
+| 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06 ✅                            | **CERRADA**                      | [ETAPA-07](etapas/ETAPA-07.md) |
 | 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
 | 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07, 08                           | PENDIENTE                        | —                              |
 | 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09                               | PENDIENTE                        | —                              |
@@ -235,7 +235,58 @@ Vivió cinco etapas invisible porque las dos tablas estaban vacías: **una restr
 
 > **Tres correcciones al propio verificador.** (1) `supabase/verificar.sh` concedía la pertenencia a `authenticated` **antes** de aplicar las migraciones; en PostgreSQL 16 un rol con `CREATEROLE` que crea otro recibe sobre él una pertenencia implícita con `set_option = false` que **sustituye** a la anterior, así que en un clúster limpio la suite SQL no podía ni arrancar (`permission denied to set role`). Solo se veía en una máquina nueva: los roles son de ámbito de clúster y `DROP DATABASE` no los borra. (2) El paso de base real daba **verde con el servidor caído**, porque esas pruebas se omiten solas y el guion leía la omisión como éxito. Ahora comprueba la marca `OMITIDA`: una omisión no es un verde. (3) `metricas.mjs` imprimía «(sin resumen de cobertura)» y **seguía**: una ejecución informó «las tres capas cumplen su umbral» midiendo 21 archivos en vez de 83, con la capa de aplicación desaparecida. Ahora una capa sin medir es fallo.
 
-## Etapas 07 a 16 — `PENDIENTE`
+## ETAPA 07 — Zonas comunes: horario y aforo · **CERRADA**
+
+Agregado `Zona` con `Aforo`, `HorarioDeZona` y política de reinicio; casos de uso `ConfigurarZona`, `AutorizarZonaAVisitante`, `ValidarAforo` y `LiberarAforo`; adaptadores PostgreSQL y en memoria; superficie HTTP bajo `/copropiedades/:id/zonas`. La zona entra al contexto del motor **ya resuelta** por el puerto `ResolutorDeZona`: el motor no consulta nada, sigue siendo la función pura de la ETAPA 05. **538 pruebas en 47 ficheros**; cobertura por capa medida en el contenedor Linux: dominio 99,67 % (ramas 99,21 %), aplicación 97,82 %, global 88,30 %, y el paso 14 exige que tres corridas den lo mismo. Informe en `docs/etapas/ETAPA-07.md`.
+
+### El aforo lo garantiza la base, y la mutación demuestra por qué
+
+El adaptador ocupa una plaza con una sola sentencia:
+
+```
+UPDATE public.zona_aforo SET conteo_actual = conteo_actual + 1
+ WHERE copropiedad_id = $1 AND zona_id = $2 AND conteo_actual < aforo_maximo
+RETURNING conteo_actual
+```
+
+**Cero filas devueltas ES el aforo superado.** No hay `SELECT` previo, así que no hay ventana entre comprobar y ocupar. `test/aforo-concurrencia.test.ts` lanza **50 ingresos simultáneos por 50 conexiones distintas** sobre una zona de 10 plazas: entran 10, y los conteos devueltos son 1..10 sin repetirse.
+
+> **Lo que enseñó la mutación.** Sustituido el incremento atómico por una lectura seguida de una escritura, **los 50 entraron y los 50 recibieron `conteo = 1`**. Y el `CHECK (conteo_actual <= aforo_maximo)` **no lo detectó**: cada escritura fijaba un valor absoluto —1— que nunca supera el máximo. El `CHECK` impide la fila inválida; el incremento atómico impide la carrera. No son redundantes: son las dos mitades de la misma garantía, y solo una prueba con concurrencia real las distingue.
+
+La prueba está cableada en el **paso 13** de `verificar-etapa.sh`, junto a KPI-03 y la inmutabilidad de eventos, con la misma comprobación de `OMITIDA`. En memoria pasaría con cualquier implementación: JavaScript tiene un hilo y dos peticiones nunca coinciden.
+
+### S-09 cerrado: la medianoche no reinicia el contador
+
+Una jornada que cruza el día se modela con **dos franjas** enlazadas por `continua_del_dia_anterior` (migración `0007`, ETAPA 01). `HorarioDeZona.cierraJornada` solo reconoce cierre de jornada cuando una franja termina a las 24:00 **y no hay continuación al día siguiente**; si la hay, el corte es artificio de representación y `debeReiniciarAforo` devuelve `false`. Una fiesta de las 22:00 del sábado a la 01:00 del domingo no vacía el salón a medianoche.
+
+### P-04 resuelta y S-17 nuevo
+
+| ID   | Asunto                                                     | Resolución                                                                                                                                                                                                                                     |
+| ---- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P-04 | Reinicio del contador de aforo                             | **RESUELTA** — tres políticas por zona (`cierre_horario` por defecto, `manual`, `nunca`), columna `zonas.politica_reinicio_aforo`. Cubre CU-05 excepción 6a: salida no registrada por fallo de sensor no deja el contador inflado para siempre |
+| S-17 | Toda zona común exige permiso explícito de la autorización | Es lo que separa CA-15 (`FUERA_DE_HORARIO`) de `ZONA_NO_AUTORIZADA` (CU-05 alterno 2a). Las zonas de paso se modelan sin `zonaId` en la solicitud. Conservador: sin permiso, se deniega                                                        |
+
+### La prueba intermitente, resuelta antes de cerrar
+
+La primera ejecución del usuario falló con `socket hang up` en la primera prueba HTTP de zonas y la segunda pasó sin tocar nada. No se cerró la etapa hasta hacerla determinista, porque **una intermitente enseña a reejecutar hasta el verde**.
+
+**Causa, medida:** `crearApp` hacía `app.init()` y nunca `listen()`. `supertest`, si el servidor no escucha, lo levanta él en su constructor y lo **cierra** al terminar la petición. Instrumentado: **300 peticiones producían 300 `listen()` y 300 `close()`**, y el servidor terminaba sin escuchar; con `await app.listen(0)`, **un `listen()` y ningún `close()`**. La URL se fija en el constructor y la conexión se abre después: basta con que otra petición cierre el servidor en medio. Se descartó por ejecución la carrera de `keepAlive` —superagent manda `Connection: close`— y no hay temporizadores en `src/`. **No se reprodujo el fallo exacto en el contenedor** (ocho corridas completas y 120 ciclos de app nueva + primer golpe, todas verdes); lo que está medido es el mecanismo.
+
+**Lo que destapó el arreglo:** con el servidor vivo afloró un `Unhandled Error` (ECONNRESET tras el `abort()` de la prueba SSE) que el cierre de `supertest` venía ocultando. Reescrita con `fetch` + `AbortController`.
+
+**Revisión del resto de la suite:** el `sleep` de 200 ms de la medición KPI-25 pasa a espera por condición (`event: listo`); la placa de KPI-03 se generaba con los cuatro últimos dígitos del reloj —se repiten cada diez segundos, y en `vehiculos` no hay borrado— y las claves de `eventos-pg` con `Date.now()`: ambas con entropía real. Ese defecto **solo se ve ejecutando la suite dos veces**.
+
+### Paso 14 · control genérico contra intermitencias
+
+`scripts/lib/estabilidad.mjs` corre la suite **tres veces** y exige resultado idéntico: recuentos por paquete, ficheros, títulos en rojo y **errores no manejados**, que cuentan como fallo aunque las pruebas salgan verdes. Séptimo control con prueba negativa.
+
+> **Dos trampas del propio control, encontradas antes de confiar en él.** Sin `TURBO_FORCE` la segunda corrida es `cache hit, replaying logs`: reimprime los números sin ejecutar nada — el falso verde más redondo posible. Y los códigos de color de Vitest impedían reconocer una sola línea de recuento: comparar dos firmas vacías daba «idéntico». Ahora fuerza la ejecución y falla si no reconoce ningún recuento.
+
+### Hallazgo: `apps/api` lintaba solo `src`
+
+`"lint": "eslint src"` dejaba **`apps/api/test/` —diez ficheros— fuera de ESLint en CI**. Solo lo veía el gancho de pre-commit, que es local y se puede saltar con `--no-verify`. Se destapó al intentar el commit de esta etapa: dos errores que `pnpm lint` había dado por buenos. Corregido a `eslint src test`. Misma familia que los anteriores: **un control que existe y no alcanza lo que cree alcanzar.**
+
+## Etapas 08 a 16 — `PENDIENTE`
 
 Sin trabajo iniciado. Cada etapa se habilita cuando la anterior queda cerrada.
 
@@ -256,19 +307,19 @@ Sin trabajo iniciado. Cada etapa se habilita cuando la anterior queda cerrada.
 
 Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contradicciones-y-supuestos.md) §3.
 
-| ID   | Decisión                                                    | Bloquea a partir de              | Estado                                                               |
-| ---- | ----------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------- |
-| P-01 | Firma de documentos de cesión, confidencialidad y seguridad | _(condición contractual previa)_ | Abierta                                                              |
-| P-02 | Umbral de confianza de lectura de placa                     | ETAPA 15                         | Abierta — supuesto vigente: 0,85                                     |
-| P-03 | Plazo de respuesta al consentimiento                        | ETAPA 08                         | Abierta — supuesto vigente: 24 h                                     |
-| P-04 | Política de reinicio del contador de aforo                  | ETAPA 07                         | Abierta — supuesto vigente: cierre de horario                        |
-| P-05 | Margen de vigencia del caché de reglas                      | ETAPA 12                         | Abierta — supuesto vigente: 24 h                                     |
-| P-06 | Umbral de latido de dispositivo                             | ETAPA 06                         | **RESUELTA** (ETAPA 06) — 60 s / 1 tolerado / 300 s, por copropiedad |
-| P-07 | Definición de «acceso dudoso»                               | ETAPA 06                         | **RESUELTA** (ETAPA 06) — ante la duda, escalar a un humano          |
-| P-08 | Plataforma de despliegue de la API                          | ETAPA 14                         | Abierta                                                              |
-| P-09 | ¿Compuerta de aprobación administrativa?                    | ETAPA 05                         | Abierta — no se construye                                            |
-| P-10 | ¿Reservas de zonas sin cobro?                               | ETAPA 07                         | Abierta — no se construyen                                           |
-| P-11 | «Nivel de acceso» por residente                             | ETAPA 04                         | Abierta — valor por defecto restrictivo                              |
+| ID   | Decisión                                                    | Bloquea a partir de              | Estado                                                                          |
+| ---- | ----------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------- |
+| P-01 | Firma de documentos de cesión, confidencialidad y seguridad | _(condición contractual previa)_ | Abierta                                                                         |
+| P-02 | Umbral de confianza de lectura de placa                     | ETAPA 15                         | Abierta — supuesto vigente: 0,85                                                |
+| P-03 | Plazo de respuesta al consentimiento                        | ETAPA 08                         | Abierta — supuesto vigente: 24 h                                                |
+| P-04 | Política de reinicio del contador de aforo                  | ETAPA 07                         | **RESUELTA** (ETAPA 07) — tres políticas por zona; `cierre_horario` por defecto |
+| P-05 | Margen de vigencia del caché de reglas                      | ETAPA 12                         | Abierta — supuesto vigente: 24 h                                                |
+| P-06 | Umbral de latido de dispositivo                             | ETAPA 06                         | **RESUELTA** (ETAPA 06) — 60 s / 1 tolerado / 300 s, por copropiedad            |
+| P-07 | Definición de «acceso dudoso»                               | ETAPA 06                         | **RESUELTA** (ETAPA 06) — ante la duda, escalar a un humano                     |
+| P-08 | Plataforma de despliegue de la API                          | ETAPA 14                         | Abierta                                                                         |
+| P-09 | ¿Compuerta de aprobación administrativa?                    | ETAPA 05                         | Abierta — no se construye                                                       |
+| P-10 | ¿Reservas de zonas sin cobro?                               | ETAPA 07                         | Abierta — no se construyen                                                      |
+| P-11 | «Nivel de acceso» por residente                             | ETAPA 04                         | Abierta — valor por defecto restrictivo                                         |
 
 ---
 
@@ -290,6 +341,17 @@ Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contr
 | D-12 | Que `postgres` pueda `GRANT authenticated TO app_api` es un supuesto sin verificar contra el proyecto real ([SUPUESTO] S-12). La documentación de Supabase concede en la dirección contraria                                                      | Enmienda 2 del ADR-005  | Sonda de `CONEXION_SUPABASE.md` §12.1, antes de crear el rol                                                                           |
 
 ---
+
+## Deuda de la ETAPA 07
+
+| ID   | Deuda                                                                                                                                                                                      | Se salda en                                                                                                                            |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| D-34 | El control de fronteras no exige que un módulo importe a otro **por su barril**: `multiempresa` y `salud` alcanzan el interior de `autenticacion` con rutas profundas, y nada se pone rojo | ETAPA 13. La violación de esta etapa (`zonas` → interior de `autorizaciones`) ya está corregida a mano; falta el control que la impida |
+| D-35 | `RepositorioZonasPg` existe y se prueba contra base real, pero lo cableado en runtime es el doble en memoria                                                                               | Misma raíz que D-25: sin contraseña de PostgreSQL (D-17). La frontera es definitiva; cambia la fábrica y nada más                      |
+| D-36 | El reinicio por `cierre_horario` se **proyecta al leer** y se persiste al ocupar: una zona que nadie toca en un mes conserva su fila con el conteo antiguo hasta el siguiente ingreso      | ETAPA 14, con pg-boss: un trabajo programado que lo aplique sin depender de que alguien entre                                          |
+| D-37 | `LiberarAforo` no exige identificar a quién sale: el contador baja pero no consta qué plaza se liberó                                                                                      | ETAPA 10, cuando la portería registre la salida contra el evento de entrada                                                            |
+| D-38 | El paso 14 ejecuta la suite tres veces: el cierre de etapa pasa de ~40 s de pruebas a ~2 min                                                                                               | Precio aceptado. ETAPA 14: en CI puede repartirse entre trabajos en paralelo                                                           |
+| P-10 | «¿Reservas de zonas sin cobro?» sigue abierta: esta etapa construye **aforo y horario**, no reservas, aunque el mockup muestre «Reservas del día»                                          | Decisión del usuario. Fuera de alcance mientras no se resuelva                                                                         |
 
 ## Deuda de la ETAPA 06
 

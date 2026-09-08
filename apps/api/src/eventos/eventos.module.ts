@@ -7,8 +7,10 @@ import type { Configuracion } from '../configuracion/esquema';
 import {
   CargadorDeContextoConservador,
   DecidirAcceso,
+  RESOLUTOR_DE_ZONA,
   VersionDeReglasFija,
 } from '../autorizaciones';
+import type { ResolutorDeZona } from '../autorizaciones';
 import {
   CANAL_TIEMPO_REAL,
   MOTOR_DE_DECISION,
@@ -97,9 +99,20 @@ export class EventosModule {
         },
         {
           provide: MOTOR_DE_DECISION,
-          inject: [RELOJ, BITACORA],
-          useFactory: (reloj: Reloj, bitacora: Bitacora): MotorDeDecision => {
-            const cargador = new CargadorDeContextoConservador(new VersionDeReglasFija(), bitacora);
+          // ETAPA 07 · el resolutor de zona entra aquí, así que una solicitud
+          // que nombre una zona llega al motor con su horario y su aforo ya
+          // resueltos (CU-05). El motor sigue sin consultar nada.
+          inject: [RELOJ, BITACORA, RESOLUTOR_DE_ZONA],
+          useFactory: (
+            reloj: Reloj,
+            bitacora: Bitacora,
+            zonas: ResolutorDeZona,
+          ): MotorDeDecision => {
+            const cargador = new CargadorDeContextoConservador(
+              new VersionDeReglasFija(),
+              bitacora,
+              zonas,
+            );
             const decidir = new DecidirAcceso(cargador, reloj);
             return { decidir: (solicitud) => decidir.ejecutar(solicitud) };
           },
