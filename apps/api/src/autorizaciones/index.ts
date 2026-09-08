@@ -11,10 +11,15 @@
  * eventos habla con su propio puerto `MotorDeDecision` y no conoce este nombre.
  */
 export { DecidirAcceso } from './aplicacion/evaluar-acceso';
-export { CARGADOR_DE_CONTEXTO, REPOSITORIO_VERSION_REGLAS } from './aplicacion/puertos';
+export {
+  CARGADOR_DE_CONTEXTO,
+  REPOSITORIO_VERSION_REGLAS,
+  RESOLUTOR_DE_ZONA,
+} from './aplicacion/puertos';
 export type {
   CargadorDeContexto,
   RepositorioVersionDeReglas,
+  ResolutorDeZona,
   SolicitudDeAcceso,
 } from './aplicacion/puertos';
 export {

@@ -205,6 +205,11 @@ if [[ "$CON_BASE" == "1" ]]; then
     # Sobre una tabla vacía, un UPDATE que no falla tampoco prueba nada.
     con_base_o_omitida test/eventos-pg.test.ts \
       "UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)"
+    # ETAPA 07 · el aforo lo garantiza la base. En memoria esta prueba pasaría
+    # con cualquier implementación —JavaScript tiene un hilo y dos peticiones
+    # nunca coinciden—, así que solo cuenta ejecutada contra PostgreSQL real.
+    con_base_o_omitida test/aforo-concurrencia.test.ts \
+      "50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)"
   else
     echo "   – omitido: exporta DATABASE_URL_PRUEBAS para ejecutarlo"
   fi

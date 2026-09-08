@@ -3,6 +3,7 @@ import type { Bitacora, ContextoDeAcceso } from '@ncr/domain-core';
 import type {
   CargadorDeContexto,
   RepositorioVersionDeReglas,
+  ResolutorDeZona,
   SolicitudDeAcceso,
 } from '../aplicacion/puertos';
 
@@ -33,6 +34,12 @@ export class CargadorDeContextoConservador implements CargadorDeContexto {
   constructor(
     private readonly versiones: RepositorioVersionDeReglas,
     private readonly bitacora?: Bitacora,
+    /**
+     * ETAPA 07 · CU-05. Cuando la solicitud nombra una zona, es este puerto
+     * quien dice si abre y si está llena. El motor la recibe ya resuelta y no
+     * consulta nada: es lo que lo mantiene puro.
+     */
+    private readonly zonas?: ResolutorDeZona,
   ) {}
 
   /** Clave: `copropiedadId|dispositivoId`. Solo para pruebas y demostración. */
@@ -42,7 +49,8 @@ export class CargadorDeContextoConservador implements CargadorDeContexto {
 
   async cargar(solicitud: SolicitudDeAcceso, ahora: Date): Promise<ContextoDeAcceso> {
     const sembrado = this.sembrados.get(`${solicitud.copropiedadId}|${solicitud.dispositivoId}`);
-    if (sembrado !== undefined) return { ...sembrado, ahora };
+    if (sembrado !== undefined)
+      return { ...sembrado, ahora, zona: await this.zona(solicitud, ahora) };
 
     this.bitacora?.registrar('aviso', 'contexto de acceso sin origen de datos: se denegará', {
       copropiedadId: solicitud.copropiedadId,
@@ -63,11 +71,17 @@ export class CargadorDeContextoConservador implements CargadorDeContexto {
       placaLeida: solicitud.placaLeida,
       placaConocida: false,
       viviendaActiva: false,
-      zona: null,
+      zona: await this.zona(solicitud, ahora),
       confianza: solicitud.confianza,
       umbralDeConfianza: UMBRAL_DE_CONFIANZA_POR_DEFECTO,
       consentimientoVigente: false,
     };
+  }
+
+  /** `null` cuando la solicitud no nombra zona, o cuando no hay quien resuelva. */
+  private async zona(solicitud: SolicitudDeAcceso, ahora: Date): Promise<ContextoDeAcceso['zona']> {
+    if (solicitud.zonaId === null || this.zonas === undefined) return null;
+    return this.zonas.resolver(solicitud.copropiedadId, solicitud.zonaId, ahora);
   }
 }
 
