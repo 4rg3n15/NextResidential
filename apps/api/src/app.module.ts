@@ -11,6 +11,7 @@ import { PadronModule } from './padron';
 import { AutorizacionesModule } from './autorizaciones';
 import { EventosModule } from './eventos';
 import { ZonasModule } from './zonas';
+import { BiometriaModule } from './biometria';
 import { limitadorPorDispositivo } from './eventos';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
@@ -34,6 +35,7 @@ export class AppModule {
         MultiempresaModule,
         PadronModule.registrar(),
         ZonasModule.registrar(),
+        BiometriaModule.registrar(),
         EventosModule.registrar(),
         AutorizacionesModule.registrar(),
         // Dos limitadores con NOMBRE, y cada uno cuenta por lo suyo: `default`

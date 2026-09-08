@@ -12,6 +12,7 @@ const completo = {
   // RNF-03.11: sin secreto de firma la ingesta aceptaría eventos de cualquiera,
   // así que es obligatoria como las demás y su ausencia impide el arranque.
   INGESTA_FIRMA_SECRETO: 'secreto-de-prueba-de-treinta-y-dos-o-mas',
+  BIOMETRIA_LLAVE: 'llave-de-prueba-de-treinta-y-dos-o-mas',
 };
 
 describe('configuración (DoD ETAPA 02: sin .env completo no arranca)', () => {
@@ -50,5 +51,33 @@ describe('configuración (DoD ETAPA 02: sin .env completo no arranca)', () => {
     } catch (e) {
       expect((e as Error).message).not.toContain('valor-de-prueba');
     }
+  });
+});
+
+describe('biometría · la llave de cifrado es requisito de arranque (ETAPA 08)', () => {
+  it('sin BIOMETRIA_LLAVE la aplicación no arranca', () => {
+    const sinLlave: Record<string, unknown> = { ...completo };
+    delete sinLlave.BIOMETRIA_LLAVE;
+    expect(() => cargarConfiguracion(sinLlave)).toThrow();
+  });
+
+  it('una llave corta se rechaza: 32 caracteres es el mínimo', () => {
+    expect(() => cargarConfiguracion({ ...completo, BIOMETRIA_LLAVE: 'corta' })).toThrow();
+  });
+
+  it('BIOMETRIA_LLAVE_REF es una REFERENCIA, no la llave', () => {
+    // Si admitiera texto libre, alguien acabaría poniendo ahí el valor y la
+    // llave viajaría a la base en cada fila de plantilla (migración 0008).
+    expect(() =>
+      cargarConfiguracion({ ...completo, BIOMETRIA_LLAVE_REF: 'llave-secreta-en-claro' }),
+    ).toThrow();
+    expect(
+      cargarConfiguracion({ ...completo, BIOMETRIA_LLAVE_REF: 'vault:ncr/plantillas/v1' })
+        .BIOMETRIA_LLAVE_REF,
+    ).toBe('vault:ncr/plantillas/v1');
+  });
+
+  it('por defecto apunta a la variable de entorno', () => {
+    expect(cargarConfiguracion(completo).BIOMETRIA_LLAVE_REF).toBe('env:BIOMETRIA_LLAVE');
   });
 });
