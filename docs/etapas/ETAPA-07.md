@@ -449,8 +449,8 @@ PostgreSQL 16 con las migraciones y las semillas aplicadas:
 
 ▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
    alertas entregadas: 200 de 200
-   p50 / p95 / p99   : 2 / 5 / 8 ms
-   maximo            : 10 ms
+   p50 / p95 / p99   : 2 / 5 / 6 ms
+   maximo            : 12 ms
    umbral KPI-25     : 10000 ms
    ✓ KPI-25 con margen sobre el umbral
 
