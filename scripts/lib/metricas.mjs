@@ -82,11 +82,23 @@ const paquetes = [
 let totalPruebas = 0;
 let totalFicheros = 0;
 const coberturaPorCapa = { dominio: [], aplicacion: [], resto: [] };
+/**
+ * Paquetes cuya cobertura NO se pudo leer.
+ *
+ * Hallazgo del 2026-09-08: si la corrida de un paquete falla, este guion
+ * imprimía «(sin resumen de cobertura)» y **seguía**. El resultado fue un paso 7
+ * que informaba «las tres capas cumplen su umbral» midiendo 21 archivos en vez
+ * de 83, con la capa de aplicación desaparecida por completo — el mismo agujero
+ * que el paso existe para cerrar, esta vez un escalón más arriba: no era una
+ * capa por debajo del umbral, era una capa que nadie midió. Ahora es fallo.
+ */
+const sinMedir = [];
 
 for (const [paquete, dir] of paquetes) {
   const { informe, cobertura } = correr(paquete, dir);
   if (!informe) {
-    console.log(`\n## ${paquete}: sin informe`);
+    console.log(`\n## ${paquete}: SIN INFORME — la corrida no produjo resultados`);
+    sinMedir.push(`${paquete} (sin informe de pruebas)`);
     continue;
   }
   const suites = informe.testResults ?? [];
@@ -106,7 +118,8 @@ for (const [paquete, dir] of paquetes) {
   }
 
   if (!cobertura) {
-    console.log('   (sin resumen de cobertura)');
+    console.log('   SIN RESUMEN DE COBERTURA — este paquete no entra en la medición');
+    sinMedir.push(`${paquete} (sin resumen de cobertura)`);
     continue;
   }
   for (const [archivo, m] of Object.entries(cobertura)) {
@@ -152,7 +165,10 @@ const objetivos = [
 let incumple = 0;
 for (const [nombre, filas, umbral] of objetivos) {
   if (filas.length === 0) {
-    console.log(`  ${nombre}: sin archivos medidos`);
+    // Una capa sin archivos medidos NO es una capa que cumple: es una capa que
+    // nadie miró. Se cuenta como incumplimiento.
+    console.log(`  FALTA ${nombre}: SIN ARCHIVOS MEDIDOS`);
+    incumple += 1;
     continue;
   }
   const a = agregar(filas);
@@ -167,7 +183,13 @@ for (const [nombre, filas, umbral] of objetivos) {
 console.log(
   `\n## Totales\n   ficheros ejecutados: ${totalFicheros} de ${ficheros.length} en disco · pruebas: ${totalPruebas}`,
 );
+if (sinMedir.length > 0) {
+  console.log(`\n   ${sinMedir.length} paquete(s) QUEDARON FUERA de la medición:`);
+  for (const p of sinMedir) console.log(`     - ${p}`);
+  console.log('   Una capa sin medir no es una capa que cumple.');
+  process.exit(1);
+}
 if (incumple > 0) {
-  console.log(`\n   ${incumple} capa(s) por debajo del umbral de §2.4`);
+  console.log(`\n   ${incumple} capa(s) por debajo del umbral de §2.4 o sin medir`);
   process.exit(1);
 }
