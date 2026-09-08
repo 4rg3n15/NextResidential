@@ -2,11 +2,10 @@
 
 Plataforma SaaS multiempresa de control de acceso para copropiedades —villas, parcelaciones y unidades residenciales— construida sobre hardware Hikvision. Unifica padrón, autorización de visitantes, reconocimiento de placas (LPR), reconocimiento facial, zonas comunes, guardia virtual y trazabilidad completa de eventos.
 
-> **Principio rector del producto**
-> **Next Control decide. El hardware ejecuta.**
+> **Principio rector del producto** > **Next Control decide. El hardware ejecuta.**
 > La cámara opera en modo evento: reporta, no decide. Si el hardware resolviera la apertura por su cuenta, el motor de reglas quedaría decorativo y se perdería la trazabilidad que sostiene la auditoría.
 
-**Estado:** en desarrollo activo · 6 de 17 etapas cerradas · ETAPA 06 en ejecución
+**Estado:** en desarrollo activo · **8 de 17 etapas cerradas** · siguiente habilitada: ETAPA 09 (consola web)
 **Rama de integración:** `develop`
 **Documento de gobierno:** [`CLAUDE.md`](./CLAUDE.md) — contrato de trabajo v3.0
 
@@ -40,11 +39,11 @@ Next Control Residencial construye la capa de decisión propia: las reglas, los 
 
 **Tres perfiles de uso:**
 
-| Perfil | Superficie | Qué hace |
-|---|---|---|
-| Administrador | Consola web | Padrón, zonas, dispositivos, reglas, listas negras, informes y auditoría |
-| Portero / Operador de central | Consola operativa | Evento actual con evidencia, apertura manual con motivo, intercom, escalamiento |
-| Propietario / Residente | App móvil (Flutter) y PWA | Autoriza visitantes, registra placas, captura rostros, reserva zonas, consulta historial |
+| Perfil                        | Superficie                | Qué hace                                                                                 |
+| ----------------------------- | ------------------------- | ---------------------------------------------------------------------------------------- |
+| Administrador                 | Consola web               | Padrón, zonas, dispositivos, reglas, listas negras, informes y auditoría                 |
+| Portero / Operador de central | Consola operativa         | Evento actual con evidencia, apertura manual con motivo, intercom, escalamiento          |
+| Propietario / Residente       | App móvil (Flutter) y PWA | Autoriza visitantes, registra placas, captura rostros, reserva zonas, consulta historial |
 
 ---
 
@@ -54,45 +53,40 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 
 ### Etapas cerradas
 
-| # | Etapa | Qué dejó construido |
-|---|---|---|
-| **00** | Auditoría documental y plan maestro | Los cuatro insumos auditados y contrastados. 14 contradicciones resueltas, 12 requisitos no funcionales derivados, matriz de trazabilidad que asigna los 38 HU, 26 CA y 37 KPI a una etapa concreta |
-| **01** | Modelo de datos y Supabase | 31 tablas, 95 políticas RLS, 18 migraciones versionadas y aplicadas contra el proyecto real. Guía de conexión completa |
-| **02** | Andamiaje del monorepo y núcleo hexagonal | Monorepo pnpm + Turborepo, dominio puro como paquete con frontera que el linter hace cumplir, configuración validada al arranque, línea base de seguridad activa |
-| **03** | Autenticación, RBAC, MFA y aislamiento multiempresa | Verificación asimétrica de JWT contra JWKS, seis roles como guards declarativos, MFA TOTP obligatorio para administrativos, suite de aislamiento por cuatro caminos que rompe el build ante cualquier fuga |
-| **04** | Padrón | Agregado `Vivienda`, objeto de valor `Placa`, casos de uso de alta y baja, primer adaptador PostgreSQL real, carga transaccional desde CSV |
-| **05** | Autorizaciones y motor de reglas | Motor de reglas como función pura con 100 % de cobertura de ramas, `MockProvider` completo de los cuatro puertos, contrato de firma del Alarm Server, análisis estático que aísla el protocolo del fabricante |
+| #      | Etapa                                               | Qué dejó construido                                                                                                                                                                                                                                               |
+| ------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **00** | Auditoría documental y plan maestro                 | Los cuatro insumos auditados y contrastados. 14 contradicciones resueltas, 12 requisitos no funcionales derivados, matriz de trazabilidad que asigna los 38 HU, 26 CA y 37 KPI a una etapa concreta                                                               |
+| **01** | Modelo de datos y Supabase                          | 31 tablas, 95 políticas RLS, 18 migraciones versionadas y aplicadas contra el proyecto real. Guía de conexión completa                                                                                                                                            |
+| **02** | Andamiaje del monorepo y núcleo hexagonal           | Monorepo pnpm + Turborepo, dominio puro como paquete con frontera que el linter hace cumplir, configuración validada al arranque, línea base de seguridad activa                                                                                                  |
+| **03** | Autenticación, RBAC, MFA y aislamiento multiempresa | Verificación asimétrica de JWT contra JWKS, seis roles como guards declarativos, MFA TOTP obligatorio para administrativos, suite de aislamiento por cuatro caminos que rompe el build ante cualquier fuga                                                        |
+| **04** | Padrón                                              | Agregado `Vivienda`, objeto de valor `Placa`, casos de uso de alta y baja, primer adaptador PostgreSQL real, carga transaccional desde CSV                                                                                                                        |
+| **05** | Autorizaciones y motor de reglas                    | Motor de reglas como función pura con 100 % de cobertura de ramas, `MockProvider` completo de los cuatro puertos, contrato de firma del Alarm Server, análisis estático que aísla el protocolo del fabricante                                                     |
+| **06** | Eventos, auditoría inmutable, alertas y tiempo real | Agregado `Acceso` inmutable, ingesta idempotente, evidencia por URL firmada de vida corta, escalamiento automático a central, canal de tiempo real con **latencia medida bajo carga** (p99 de 8 ms contra un umbral de 10 s) y exportación del historial          |
+| **07** | Zonas comunes: horario y aforo                      | Agregado `Zona`. **El aforo lo garantiza la base**: incremento atómico donde cero filas devueltas es el aforo superado. El horario que cruza la medianoche no reinicia el contador                                                                                |
+| **08** | Biometría con consentimiento                        | Ciclo completo bajo Ley 1581 de 2012. Sin consentimiento vigente del **titular** no hay sincronización, con tres cerrojos estructurales. La revocación suprime en la misma transacción. El vector se cifra con AES-256-GCM y **ninguna operación permite leerlo** |
 
-**Métricas al cierre de la ETAPA 05:** 206 pruebas en 25 ficheros · dominio 99,33 % líneas / **100 % ramas** · aplicación 98,38 % · global 81,78 %
-
-### En ejecución
-
-| # | Etapa | Alcance |
-|---|---|---|
-| **06** | Eventos, auditoría inmutable, alertas y tiempo real | Agregado `Acceso` inmutable, ingesta idempotente, evidencia en bucket privado con URL firmada, escalamiento automático a central en menos de 10 s, canal de tiempo real con latencia medida bajo carga, exportación de historial |
+**Métricas al cierre de la ETAPA 08:** 645 pruebas en 53 ficheros · dominio 98,61 % líneas / 97,78 % ramas · aplicación 98,15 % · global 90,04 % (contenedor Linux)
 
 ### Próximas etapas
 
-| # | Etapa | Alcance |
-|---|---|---|
-| 07 | Zonas comunes | Agregado `Zona` con horario y aforo. El aforo se garantiza por restricción de base, no por código |
-| 08 | Biometría con consentimiento | Ciclo completo bajo Ley 1581 de 2012: captura, validación de calidad, consentimiento del titular, sincronización y supresión verificada |
-| 09 | Consola web de administración | Next.js + Tailwind. Dashboard, padrón, vehículos, visitantes, zonas, dispositivos, eventos e informes. Base de PWA |
-| 10 | Consolas operativas | Portería y guardia virtual multiproyecto, con video en vivo, intercom y apertura remota atribuida |
-| 11 | Aplicación móvil Flutter | Las ocho pantallas del residente, con cliente generado desde OpenAPI |
-| 12 | Edge Gateway | Operación autónoma sin conexión y reconciliación idempotente al reconectar |
-| 13 | Auditoría de ciberseguridad | Verificación y endurecimiento. No introduce la seguridad: la audita |
-| 14 | Observabilidad, CI/CD, PWA y escritorio | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio |
-| 15 | **Integración Hikvision** | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio |
-| 16 | Documentación técnica final | Consolidación, README definitivo, OpenAPI navegable |
+| #   | Etapa                                   | Alcance                                                                                                            |
+| --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 09  | Consola web de administración           | Next.js + Tailwind. Dashboard, padrón, vehículos, visitantes, zonas, dispositivos, eventos e informes. Base de PWA |
+| 10  | Consolas operativas                     | Portería y guardia virtual multiproyecto, con video en vivo, intercom y apertura remota atribuida                  |
+| 11  | Aplicación móvil Flutter                | Las ocho pantallas del residente, con cliente generado desde OpenAPI                                               |
+| 12  | Edge Gateway                            | Operación autónoma sin conexión y reconciliación idempotente al reconectar                                         |
+| 13  | Auditoría de ciberseguridad             | Verificación y endurecimiento. No introduce la seguridad: la audita                                                |
+| 14  | Observabilidad, CI/CD, PWA y escritorio | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio                              |
+| 15  | **Integración Hikvision**               | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio                          |
+| 16  | Documentación técnica final             | Consolidación, README definitivo, OpenAPI navegable                                                                |
 
 ### Pruebas con hardware
 
-| Momento | Requiere | Qué se prueba |
-|---|---|---|
-| Validación técnica temprana | Nada del sistema | Autenticación ISAPI, recepción de un evento de placa, accionamiento de relé |
-| Prueba LPR de punta a punta | ETAPA 10 cerrada | Registrar placa → detectar → validar → abrir talanquera → registrar evento |
-| Prueba facial y portería virtual | ETAPAS 11 y 15 | Foto desde la app → sincronizar terminal → reconocer → liberar acceso |
+| Momento                          | Requiere         | Qué se prueba                                                               |
+| -------------------------------- | ---------------- | --------------------------------------------------------------------------- |
+| Validación técnica temprana      | Nada del sistema | Autenticación ISAPI, recepción de un evento de placa, accionamiento de relé |
+| Prueba LPR de punta a punta      | ETAPA 10 cerrada | Registrar placa → detectar → validar → abrir talanquera → registrar evento  |
+| Prueba facial y portería virtual | ETAPAS 11 y 15   | Foto desde la app → sincronizar terminal → reconocer → liberar acceso       |
 
 ---
 
@@ -102,13 +96,13 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 
 ### Cinco capas
 
-| Capa | Responsabilidad | Prohibiciones |
-|---|---|---|
-| **Presentación** | Traduce protocolo a casos de uso: controladores, DTOs, Alarm Server, workers | Cero reglas de negocio |
-| **Aplicación** | Orquesta casos de uso, transacciones, idempotencia, aislamiento por copropiedad | No decide accesos: delega en el dominio |
-| **Dominio** | Agregados, objetos de valor, políticas, motor de reglas, eventos. Idéntico en la nube y en el Edge | Cero I/O, cero framework, cero base de datos |
-| **Infraestructura** | Implementa los puertos: repositorios, colas, storage, proveedores de hardware | No define contratos; los cumple |
-| **Física** | Hardware Hikvision | Ejecuta, nunca decide |
+| Capa                | Responsabilidad                                                                                    | Prohibiciones                                |
+| ------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Presentación**    | Traduce protocolo a casos de uso: controladores, DTOs, Alarm Server, workers                       | Cero reglas de negocio                       |
+| **Aplicación**      | Orquesta casos de uso, transacciones, idempotencia, aislamiento por copropiedad                    | No decide accesos: delega en el dominio      |
+| **Dominio**         | Agregados, objetos de valor, políticas, motor de reglas, eventos. Idéntico en la nube y en el Edge | Cero I/O, cero framework, cero base de datos |
+| **Infraestructura** | Implementa los puertos: repositorios, colas, storage, proveedores de hardware                      | No define contratos; los cumple              |
+| **Física**          | Hardware Hikvision                                                                                 | Ejecuta, nunca decide                        |
 
 La dirección de dependencia apunta siempre hacia adentro. **Ninguna flecha sale del dominio**, y eso no es una convención: el linter rompe la construcción si `domain/` importa infraestructura o si aparece un `any`.
 
@@ -138,18 +132,18 @@ Cada decisión sella la `VersiónDeReglas` con la que se tomó. Es lo que hará 
 
 ## 4. Stack tecnológico
 
-| Capa | Tecnología | Por qué |
-|---|---|---|
-| Base de datos, auth, storage, tiempo real | Supabase (PostgreSQL) | RLS nativa como segunda barrera de aislamiento |
-| API y lógica de negocio | NestJS + TypeScript estricto | Inyección de dependencias que hace natural el patrón de puertos |
-| Colas y trabajos programados | pg-boss | Sobre el mismo PostgreSQL: una pieza menos que operar |
-| Consola web / escritorio | Next.js + Tailwind + shadcn/ui | PWA instalable y empaquetado de escritorio desde una sola base |
-| Aplicación móvil | Flutter | iOS y Android desde un código |
-| Push | Firebase Cloud Messaging | |
-| Edge Gateway | Node.js + SQLite | Reutiliza el dominio sin modificarlo |
-| Video al navegador | go2rtc | RTSP → WebRTC |
-| Intercom | ISAPI TwoWayAudio | Ver ADR-001 |
-| Contratos | OpenAPI generado desde NestJS | El cliente Dart se genera, nunca se escribe a mano |
+| Capa                                      | Tecnología                     | Por qué                                                         |
+| ----------------------------------------- | ------------------------------ | --------------------------------------------------------------- |
+| Base de datos, auth, storage, tiempo real | Supabase (PostgreSQL)          | RLS nativa como segunda barrera de aislamiento                  |
+| API y lógica de negocio                   | NestJS + TypeScript estricto   | Inyección de dependencias que hace natural el patrón de puertos |
+| Colas y trabajos programados              | pg-boss                        | Sobre el mismo PostgreSQL: una pieza menos que operar           |
+| Consola web / escritorio                  | Next.js + Tailwind + shadcn/ui | PWA instalable y empaquetado de escritorio desde una sola base  |
+| Aplicación móvil                          | Flutter                        | iOS y Android desde un código                                   |
+| Push                                      | Firebase Cloud Messaging       |                                                                 |
+| Edge Gateway                              | Node.js + SQLite               | Reutiliza el dominio sin modificarlo                            |
+| Video al navegador                        | go2rtc                         | RTSP → WebRTC                                                   |
+| Intercom                                  | ISAPI TwoWayAudio              | Ver ADR-001                                                     |
+| Contratos                                 | OpenAPI generado desde NestJS  | El cliente Dart se genera, nunca se escribe a mano              |
 
 ---
 
@@ -254,21 +248,27 @@ pnpm --filter @ncr/providers test
 ./scripts/verificar-etapa.sh
 ```
 
-Once pasos, y ninguno es decorativo:
+Catorce pasos, y ninguno es decorativo. Con `--con-base` se añaden los tres que necesitan PostgreSQL:
 
-| Paso | Verifica |
-|---|---|
-| 0 | Borra artefactos: corre como un checkout nuevo |
-| 1 | Node y pnpm dentro de lo declarado |
-| 2 | Instalación coherente con el lockfile |
-| 3 | Compilación desde cero |
-| 4 | Lint y typecheck |
-| 5 | Suite completa en verde |
-| 6 | **Ningún fichero de prueba se quedó sin recoger** |
-| 7 | Umbrales de cobertura **por capa** |
-| 8 | Portabilidad de los guiones entre macOS/BSD y CI/GNU |
-| 9 | Pruebas negativas de los propios controles |
-| 10 | Fronteras de arquitectura, secretos y aislamiento del protocolo del fabricante |
+| Paso | Verifica                                                                                                                                     |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Borra artefactos: corre como un checkout nuevo                                                                                               |
+| 1    | Node y pnpm dentro de lo declarado                                                                                                           |
+| 2    | Instalación coherente con el lockfile                                                                                                        |
+| 3    | Compilación desde cero                                                                                                                       |
+| 4    | Lint y typecheck                                                                                                                             |
+| 5    | Suite completa en verde                                                                                                                      |
+| 6    | **Ningún fichero de prueba se quedó sin recoger**                                                                                            |
+| 7    | Umbrales de cobertura **por capa**                                                                                                           |
+| 8    | Portabilidad de los guiones entre macOS/BSD y CI/GNU                                                                                         |
+| 9    | Pruebas negativas de los propios controles                                                                                                   |
+| 10   | Fronteras de arquitectura, secretos, aislamiento del protocolo del fabricante y **fronteras de módulo** (a un módulo se entra por su barril) |
+| 11   | **Latencia del canal de tiempo real bajo carga** (KPI-25), medida y no supuesta                                                              |
+| 12   | Esquema, RLS y suite SQL en `--modo-supabase` _(requiere `--con-base`)_                                                                      |
+| 13   | Concurrencia real: 100 placas simultáneas, `UPDATE` sobre un evento y 50 ingresos sobre 10 plazas _(requiere `--con-base`)_                  |
+| 14   | **Estabilidad: la suite da lo mismo tres veces seguidas**                                                                                    |
+
+El paso 14 se añadió en la ETAPA 07 tras una prueba HTTP intermitente: **una prueba intermitente es peor que una rota**, porque enseña a reejecutar hasta el verde y ese hábito acaba tapando defectos reales. Compara recuentos, ficheros, títulos en rojo y errores no manejados, y fuerza la ejecución para que el caché de Turborepo no reimprima los números de la primera corrida sin ejecutar nada.
 
 Los pasos 6 y 9 existen por experiencia directa: un fichero que no carga desaparece del recuento sin ponerse en rojo, y un control que nadie ha visto fallar no está demostrado.
 
@@ -282,11 +282,11 @@ Introduce violaciones a propósito y exige que el linter las rechace: importacio
 
 ### Umbrales vigentes
 
-| Capa | Umbral | Actual |
-|---|---|---|
-| Dominio | 90 % | 99,33 % líneas · 100 % ramas |
-| Aplicación | 90 % | 98,38 % |
-| Global | 70 % | 81,78 % |
+| Capa       | Umbral | Actual                         |
+| ---------- | ------ | ------------------------------ |
+| Dominio    | 90 %   | 98,61 % líneas · 97,78 % ramas |
+| Aplicación | 90 %   | 98,15 %                        |
+| Global     | 70 %   | 90,04 %                        |
 
 La cobertura se comprueba **por capa** porque un agregado alto puede esconder una capa entera sin probar. Ocurrió: la capa de aplicación estaba al 79 % mientras el número global se veía bien.
 
@@ -294,7 +294,7 @@ La cobertura se comprueba **por capa** porque un agregado alto puede esconder un
 
 ## 8. Modelo de datos
 
-31 tablas, 95 políticas RLS, 18 migraciones. Detalle completo y diagrama entidad-relación en [`docs/arquitectura/modelo-datos.md`](./docs/arquitectura/modelo-datos.md).
+31 tablas, 95 políticas RLS, 22 migraciones. Detalle completo y diagrama entidad-relación en [`docs/arquitectura/modelo-datos.md`](./docs/arquitectura/modelo-datos.md).
 
 Cuatro principios de diseño:
 
@@ -312,22 +312,29 @@ Cuatro principios de diseño:
 
 La seguridad es condición de cada etapa desde la 01, no una etapa al final. La ETAPA 13 la audita; no la introduce.
 
-| Medida | Cómo está implementada |
-|---|---|
-| **Secretos** | Solo en variables de entorno, validadas al arranque. Escáner en pre-commit. Ningún valor en el repositorio |
-| **CORS** | Lista blanca explícita por variable. Nunca `*` ni `origin: true` |
-| **Validación** | `ValidationPipe` estricto con rechazo de campos no declarados. El DTO valida forma; el agregado valida verdad |
-| **Inyección SQL** | Solo consultas parametrizadas. Toda entrada se sanea y normaliza antes de persistirse |
-| **Rate limiting** | Global más límites endurecidos en login, MFA, ingesta y apertura remota |
-| **RLS** | Activa **y forzada** en todas las tablas, con `copropiedad_id` derivado de los claims |
-| **CSP** | `script-src 'self'` con nonce por request. Sin `unsafe-inline` ni `unsafe-eval` |
-| **MFA** | TOTP obligatorio en los tres roles administrativos, con códigos de recuperación en hash |
+| Medida              | Cómo está implementada                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Secretos**        | Solo en variables de entorno, validadas al arranque. Escáner en pre-commit. Ningún valor en el repositorio                                                                      |
+| **CORS**            | Lista blanca explícita por variable. Nunca `*` ni `origin: true`                                                                                                                |
+| **Validación**      | `ValidationPipe` estricto con rechazo de campos no declarados. El DTO valida forma; el agregado valida verdad                                                                   |
+| **Inyección SQL**   | Solo consultas parametrizadas. Toda entrada se sanea y normaliza antes de persistirse                                                                                           |
+| **Rate limiting**   | Global más límites endurecidos en login, MFA, ingesta y apertura remota                                                                                                         |
+| **RLS**             | Activa **y forzada** en todas las tablas, con `copropiedad_id` derivado de los claims                                                                                           |
+| **CSP**             | `script-src 'self'` con nonce por request. Sin `unsafe-inline` ni `unsafe-eval`                                                                                                 |
+| **MFA**             | TOTP obligatorio en los tres roles administrativos, con códigos de recuperación en hash                                                                                         |
+| **Dato biométrico** | Cifrado **autenticado** AES-256-GCM en la aplicación, nunca con la llave en la base. Lo que se persiste junto a la plantilla es una _referencia_ de llave, con CHECK de formato |
 
 ### El riesgo número uno: la llave secreta omite RLS
 
 El Edge Gateway, los workers y la ingesta de eventos usan la llave secreta por diseño, y esa llave **salta Row Level Security por completo**. Por eso el aislamiento se implementa **dos veces**: en RLS y en la capa de aplicación.
 
 La suite de la ETAPA 03 recorre todos los endpoints por los cuatro caminos —JWT propio, JWT de otra copropiedad, identidad de servicio y operador multiproyecto— y **rompe la construcción ante cualquier fuga**. La lista de endpoints se enumera del enrutador, no de una lista escrita a mano: un endpoint nuevo entra en el recorrido el día que se escribe.
+
+### El dato biométrico: la protección más fuerte es una operación que no existe
+
+No hay ruta HTTP, ni método de puerto, ni campo de DTO que devuelva un vector biométrico. La bóveda cifra al guardar y descifra **dentro del adaptador**, hacia la terminal. Para exponerlo habría que añadir la operación al puerto: una decisión visible en una revisión, no un descuido. Una prueba lo vigila enumerando el enrutador, no leyendo el código.
+
+Y sin consentimiento vigente **del titular** —el visitante, nunca el residente que lo invita— la plantilla no sale de la base: tres cerrojos estructurales, los tres verificados por mutación. El ciclo completo bajo la Ley 1581 de 2012, con lo que aún no se puede demostrar declarado como tal, está en [`docs/seguridad/ciclo-vida-biometrico.md`](./docs/seguridad/ciclo-vida-biometrico.md).
 
 ### Inmutabilidad de la auditoría
 
@@ -337,13 +344,13 @@ La tabla de eventos no admite `UPDATE` ni `DELETE`. Tres barreras superpuestas: 
 
 ## 10. Decisiones de arquitectura (ADR)
 
-| ID | Decisión | Estado |
-|---|---|---|
-| **ADR-001** | Intercom por **ISAPI TwoWayAudio**; se descarta SIP + Asterisk | Cerrada |
-| **ADR-002** | Empaquetado de escritorio con **Tauri** | Cerrada |
+| ID          | Decisión                                                                | Estado  |
+| ----------- | ----------------------------------------------------------------------- | ------- |
+| **ADR-001** | Intercom por **ISAPI TwoWayAudio**; se descarta SIP + Asterisk          | Cerrada |
+| **ADR-002** | Empaquetado de escritorio con **Tauri**                                 | Cerrada |
 | **ADR-003** | El hardware va al final. Todo el sistema funciona contra `MockProvider` | Cerrada |
-| **ADR-004** | La integridad concurrente se resuelve en la base de datos | Cerrada |
-| **ADR-005** | Inmutabilidad de eventos por permisos, no por código | Cerrada |
+| **ADR-004** | La integridad concurrente se resuelve en la base de datos               | Cerrada |
+| **ADR-005** | Inmutabilidad de eventos por permisos, no por código                    | Cerrada |
 
 Detalle en [`docs/decisiones/`](./docs/decisiones/).
 
@@ -353,10 +360,10 @@ Detalle en [`docs/decisiones/`](./docs/decisiones/).
 
 ## 11. Hallazgos relevantes del desarrollo
 
-Cinco defectos encontrados y corregidos que habrían llegado a producción. Se documentan porque explican por qué el método de verificación es el que es.
+Nueve defectos encontrados y corregidos que habrían llegado a producción. Se documentan porque explican por qué el método de verificación es el que es.
 
 **Recursión infinita en las políticas de seguridad.** Una función declarada `SECURITY DEFINER` para «evitar» RLS no la evitaba: cambia con qué identidad corre la función, no si se le aplica. La política de residentes llamaba a la función, la función leía la tabla de residentes, y la lectura reevaluaba la política. Habría reventado en cuanto el primer residente abriera la app.
-→ *Regla derivada: el predicado de una política nunca debe leer, ni directa ni transitivamente, la tabla que filtra.*
+→ _Regla derivada: el predicado de una política nunca debe leer, ni directa ni transitivamente, la tabla que filtra._
 
 **Fuga en la lista negra por acompañantes.** Sin una tabla de identidad compartida, una misma persona era tres cadenas de texto sin relación: bloqueada como visitante principal, admitida como acompañante.
 
@@ -366,7 +373,18 @@ Cinco defectos encontrados y corregidos que habrían llegado a producción. Se d
 
 **Un fichero de prueba que no carga desaparece del recuento.** No cuenta como fallo: la suite reportaba verde con menos ficheros ejecutados de los que existen en disco.
 
-Los tres últimos son la misma familia — *«la comprobación existe pero no comprueba nada»*. De ahí el paso 6 y las pruebas negativas del paso 9 del verificador.
+**Una clave ajena hacia una tabla append-only es imposible.** La comprobación de integridad referencial bloquea la fila referenciada, y ese bloqueo exige un privilegio que la inmutabilidad de la auditoría revoca. Toda inserción en `alertas` con `evento_id` habría fallado. Vivió cinco etapas invisible **porque las dos tablas estaban vacías**.
+→ _Regla derivada: una restricción que nunca se ejerce no se distingue de una que funciona._
+
+**El límite por IP habría descartado eventos de acceso en silencio.** El límite por ruta reconfiguraba el limitador global, que cuenta por IP; en un conjunto real todas las cámaras salen por el mismo enrutador. La prueba de carga lo encontró buscando otra cosa.
+
+**El fixture HTTP montaba y derribaba el servidor una vez por petición.** Medido: 300 peticiones producían 300 `listen()` y 300 `close()`. De ahí una prueba intermitente que «se arreglaba» reejecutando — el peor hábito que una suite puede enseñar.
+
+**La placa de la prueba de concurrencia se repetía cada diez segundos.** Usaba los cuatro últimos dígitos del reloj, y en `vehiculos` no hay borrado físico: la segunda corrida contra la misma base habría dado cero aceptados. Solo se ve ejecutando la suite dos veces, que es lo que ahora hace el paso 14.
+
+**Faltaba el cerrojo entre consentimiento y terminal.** Sincronizar no es cambiar el estado de la plantilla: es escribir la fila que dice que está en ESE equipo, y esa tabla no tenía disparador. Los dos cerrojos existentes vigilaban la puerta de al lado. Misma familia que la clave ajena imposible, esta vez sobre el dato más sensible del sistema.
+
+Varios son la misma familia — _«la comprobación existe pero no comprueba nada»_. De ahí el paso 6 y las pruebas negativas del paso 9 del verificador.
 
 ---
 
@@ -376,7 +394,7 @@ El proyecto se rige por una especificación formal con 8 objetivos específicos,
 
 La matriz consolidada —[`docs/auditoria/matriz-trazabilidad-consolidada.md`](./docs/auditoria/matriz-trazabilidad-consolidada.md)— asigna cada elemento a una etapa concreta y a la pantalla que lo expone. Ninguno queda huérfano.
 
-**Nota de honestidad sobre los indicadores:** nueve de los 37 dependen de hardware. Hasta la ETAPA 15 se reportan como *«verificado contra simulación, pendiente de hardware»*, nunca como cumplidos.
+**Nota de honestidad sobre los indicadores:** nueve de los 37 dependen de hardware. Hasta la ETAPA 15 se reportan como _«verificado contra simulación, pendiente de hardware»_, nunca como cumplidos.
 
 ---
 
@@ -399,47 +417,47 @@ La matriz consolidada —[`docs/auditoria/matriz-trazabilidad-consolidada.md`](.
 
 ### Dominio
 
-| Término | Significado en este proyecto |
-|---|---|
-| **Copropiedad** | Unidad residencial administrada. Es la frontera del tenant: todo dato operativo le pertenece |
-| **Vivienda** | Casa o apartamento. Agrupa residentes y vehículos |
-| **Residente** | Persona que habita una vivienda. Puede ser propietario o arrendatario |
-| **Persona** | Identidad compartida entre roles. Permite que la lista negra aplique a alguien sea cual sea el rol con el que se presente |
-| **Visitante** | Quien accede por autorización de un residente |
-| **Autorización** | Permiso con vigencia, acompañantes y zonas permitidas. Única o recurrente |
-| **Acceso** | Intento evaluado. Inmutable: sin modificación ni borrado |
-| **Evento** | Registro de todo intento, permitido o negado, con su evidencia |
-| **Zona** | Área común con horario, aforo y reglas propias |
-| **Aforo** | Máximo y conteo actual. El conteo nunca supera el máximo, garantizado por restricción |
-| **Lista negra** | Veto con precedencia absoluta sobre cualquier autorización vigente |
-| **Consentimiento** | Autorización expresa del titular para tratamiento biométrico, bajo Ley 1581 de 2012 |
-| **Plantilla biométrica** | Representación del rostro almacenada en la terminal. Nunca viaja al cliente |
-| **Vigencia** | Rango temporal con zona horaria durante el cual una autorización es válida |
-| **Motor de reglas** | Función pura que decide cada acceso |
-| **Versión de reglas** | Sello de con qué reglas se tomó una decisión. Clave para auditar lo decidido sin conexión |
+| Término                  | Significado en este proyecto                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **Copropiedad**          | Unidad residencial administrada. Es la frontera del tenant: todo dato operativo le pertenece                              |
+| **Vivienda**             | Casa o apartamento. Agrupa residentes y vehículos                                                                         |
+| **Residente**            | Persona que habita una vivienda. Puede ser propietario o arrendatario                                                     |
+| **Persona**              | Identidad compartida entre roles. Permite que la lista negra aplique a alguien sea cual sea el rol con el que se presente |
+| **Visitante**            | Quien accede por autorización de un residente                                                                             |
+| **Autorización**         | Permiso con vigencia, acompañantes y zonas permitidas. Única o recurrente                                                 |
+| **Acceso**               | Intento evaluado. Inmutable: sin modificación ni borrado                                                                  |
+| **Evento**               | Registro de todo intento, permitido o negado, con su evidencia                                                            |
+| **Zona**                 | Área común con horario, aforo y reglas propias                                                                            |
+| **Aforo**                | Máximo y conteo actual. El conteo nunca supera el máximo, garantizado por restricción                                     |
+| **Lista negra**          | Veto con precedencia absoluta sobre cualquier autorización vigente                                                        |
+| **Consentimiento**       | Autorización expresa del titular para tratamiento biométrico, bajo Ley 1581 de 2012                                       |
+| **Plantilla biométrica** | Representación del rostro almacenada en la terminal. Nunca viaja al cliente                                               |
+| **Vigencia**             | Rango temporal con zona horaria durante el cual una autorización es válida                                                |
+| **Motor de reglas**      | Función pura que decide cada acceso                                                                                       |
+| **Versión de reglas**    | Sello de con qué reglas se tomó una decisión. Clave para auditar lo decidido sin conexión                                 |
 
 ### Técnicos
 
-| Término | Significado |
-|---|---|
-| **Agregado raíz** | Entidad que define una frontera de consistencia transaccional y protege una invariante |
-| **Objeto de valor** | Tipo inmutable sin identidad propia, validado al construirse |
-| **Puerto** | Interfaz que el dominio declara y la infraestructura implementa |
-| **Adaptador** | Implementación concreta de un puerto |
-| **Política** | Regla componible que se pronuncia sobre un acceso, o se abstiene |
-| **Bandeja de salida** | Cola local del Edge con clave de idempotencia para reconciliar al reconectar |
-| **RLS** | Row Level Security. Filtrado por fila en PostgreSQL según la identidad de la conexión |
-| **JWKS** | Conjunto de claves públicas para verificar firmas de token sin secreto compartido |
-| **ISAPI** | Interfaz HTTP de Hikvision para comandar dispositivos |
-| **TwoWayAudio** | Canal de audio bidireccional de ISAPI, usado para el intercom |
-| **ONVIF** | Estándar de descubrimiento e interoperabilidad de dispositivos de video |
-| **LPR / ANPR** | Reconocimiento automático de placas |
-| **Digest Auth** | Esquema de autenticación HTTP que usan los equipos Hikvision |
-| **Edge Gateway** | Nodo local que mantiene la operación crítica ante caída de Internet |
-| **MockProvider** | Adaptador simulado que permite operar y probar el sistema completo sin hardware |
-| **RBAC** | Control de acceso basado en roles |
-| **MFA / TOTP** | Segundo factor de autenticación por código temporal |
-| **CSP** | Content Security Policy. Cabecera que restringe qué scripts puede ejecutar el navegador |
+| Término               | Significado                                                                             |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| **Agregado raíz**     | Entidad que define una frontera de consistencia transaccional y protege una invariante  |
+| **Objeto de valor**   | Tipo inmutable sin identidad propia, validado al construirse                            |
+| **Puerto**            | Interfaz que el dominio declara y la infraestructura implementa                         |
+| **Adaptador**         | Implementación concreta de un puerto                                                    |
+| **Política**          | Regla componible que se pronuncia sobre un acceso, o se abstiene                        |
+| **Bandeja de salida** | Cola local del Edge con clave de idempotencia para reconciliar al reconectar            |
+| **RLS**               | Row Level Security. Filtrado por fila en PostgreSQL según la identidad de la conexión   |
+| **JWKS**              | Conjunto de claves públicas para verificar firmas de token sin secreto compartido       |
+| **ISAPI**             | Interfaz HTTP de Hikvision para comandar dispositivos                                   |
+| **TwoWayAudio**       | Canal de audio bidireccional de ISAPI, usado para el intercom                           |
+| **ONVIF**             | Estándar de descubrimiento e interoperabilidad de dispositivos de video                 |
+| **LPR / ANPR**        | Reconocimiento automático de placas                                                     |
+| **Digest Auth**       | Esquema de autenticación HTTP que usan los equipos Hikvision                            |
+| **Edge Gateway**      | Nodo local que mantiene la operación crítica ante caída de Internet                     |
+| **MockProvider**      | Adaptador simulado que permite operar y probar el sistema completo sin hardware         |
+| **RBAC**              | Control de acceso basado en roles                                                       |
+| **MFA / TOTP**        | Segundo factor de autenticación por código temporal                                     |
+| **CSP**               | Content Security Policy. Cabecera que restringe qué scripts puede ejecutar el navegador |
 
 ---
 
