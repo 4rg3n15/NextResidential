@@ -4,10 +4,10 @@ import { IngestaController } from './presentacion/ingesta.controller';
 import { GuardiaDeFirmaDeIngesta } from './presentacion/guardia-firma';
 
 /**
- * Módulo de autorizaciones. En esta etapa expone la ingesta firmada; los casos
- * de uso se cablean contra sus repositorios en la ETAPA 06, cuando exista el
- * adaptador de persistencia de eventos. Se registran ahora los que no dependen
- * de la base para que la frontera esté puesta desde el principio.
+ * Módulo de autorizaciones. Expone la ingesta firmada, que desde la ETAPA 06
+ * decide y registra el evento: los casos de uso que necesita —`RegistrarAcceso`
+ * y el repositorio de dispositivos— los aporta `EventosModule`, que es
+ * `@Global`, así que aquí no hay que importarlo ni conocer su cableado.
  */
 @Module({})
 export class AutorizacionesModule {

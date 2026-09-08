@@ -71,5 +71,15 @@ else
   echo "   ✓ el fallo de arranque no filtra valores"
 fi
 
+# ADR-005 · ninguna clave ajena VIGENTE hacia una tabla append-only. La
+# comprobación de la clave ajena exige un bloqueo de fila que la revocación de
+# UPDATE/DELETE impide, así que la fila no se podría insertar jamás. Se añade en
+# la ETAPA 06, que fue la primera en insertar eventos y destaparlo.
+if salida=$(node scripts/lib/frontera-append-only.mjs 2>&1); then
+  echo "   ✓ $salida"
+else
+  echo "   ✗ clave ajena vigente hacia una tabla append-only"; echo "$salida" | sed 's/^/     /'; fallos=1
+fi
+
 [ "$fallos" -eq 0 ] && echo "DoD ETAPA 02: verificado" || echo "DoD ETAPA 02: INCUMPLIDO"
 exit $fallos

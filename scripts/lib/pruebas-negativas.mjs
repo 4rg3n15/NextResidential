@@ -153,7 +153,47 @@ try {
       : mal('la sonda dejó rastro en el banco');
   }
 
-  console.log('\n▸ 5 · un Node fuera de `engines` detiene la verificación');
+  console.log('\n▸ 5 · una clave ajena hacia una tabla append-only se detecta al escribirla');
+  {
+    // El defecto real de la ETAPA 01: `alertas_evento_fk` hacia `eventos`.
+    // Estuvo vigente cinco etapas sin que ninguna suite lo notara, porque una
+    // restricción que nunca se ejerce no se distingue de una que funciona.
+    const sonda = join(clon, 'supabase', 'migrations', '29990101000000_9999_sonda.sql');
+    mkdirSync(join(clon, 'supabase', 'migrations'), { recursive: true });
+    cpSync(join(raiz, 'supabase', 'migrations'), join(clon, 'supabase', 'migrations'), {
+      recursive: true,
+    });
+    enClon('node', ['scripts/lib/frontera-append-only.mjs']).codigo === 0
+      ? ok('la línea base del banco está limpia')
+      : mal('el banco NO parte de una línea base limpia');
+
+    writeFileSync(
+      sonda,
+      'CREATE TABLE public.sonda (\n' +
+        '  evento_id uuid NOT NULL,\n' +
+        '  evento_ocurrido_en timestamptz NOT NULL,\n' +
+        '  CONSTRAINT sonda_evento_fk FOREIGN KEY (evento_id, evento_ocurrido_en)\n' +
+        '    REFERENCES public.eventos(id, ocurrido_en)\n' +
+        ');\n',
+    );
+    const r = enClon('node', ['scripts/lib/frontera-append-only.mjs']);
+    if (r.codigo !== 0 && /sonda_evento_fk/.test(r.salida)) {
+      ok('detectada, con salida distinta de cero');
+    } else {
+      mal(`NO detectada (codigo ${r.codigo})`);
+    }
+
+    // Y la contraparte: retirada en una migración posterior, deja de serlo.
+    writeFileSync(
+      join(clon, 'supabase', 'migrations', '29990102000000_9999_sonda_retirada.sql'),
+      'ALTER TABLE public.sonda DROP CONSTRAINT IF EXISTS sonda_evento_fk;\n',
+    );
+    enClon('node', ['scripts/lib/frontera-append-only.mjs']).codigo === 0
+      ? ok('retirarla en una migración posterior la saca del recuento')
+      : mal('una restricción ya retirada se sigue contando');
+  }
+
+  console.log('\n▸ 6 · un Node fuera de `engines` detiene la verificación');
   {
     // Se altera el package.json DEL CLON, no el real.
     const pkg = JSON.parse(readFileSync(join(clon, 'package.json'), 'utf8'));
@@ -184,4 +224,4 @@ if (fallos > 0) {
   console.log(`\nPRUEBAS NEGATIVAS: ${fallos} comprobación(es) fallaron`);
   process.exit(1);
 }
-console.log('\nPRUEBAS NEGATIVAS: los 5 controles detectan su violación, sin tocar el árbol');
+console.log('\nPRUEBAS NEGATIVAS: los 6 controles detectan su violación, sin tocar el árbol');

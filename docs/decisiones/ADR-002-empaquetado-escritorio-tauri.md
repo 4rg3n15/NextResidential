@@ -17,11 +17,11 @@ La consola de escritorio la usa personal de portería y de central de monitoreo,
 
 ## Alternativas consideradas
 
-| Alternativa | Por qué se descarta |
-|---|---|
-| **Electron** | Empaqueta un Chromium completo: binario de cientos de megabytes y una superficie de ataque considerablemente mayor. Sobre una máquina de portería que abre talanqueras, esa superficie no es un detalle |
-| **Solo PWA, sin escritorio** | `CLAUDE.md` §2.6 y §7 exigen aplicación de escritorio empaquetada como entregable |
-| **Aplicación nativa por plataforma** | Multiplicaría el esfuerzo sin aportar nada: la consola es web y funciona bien como web |
+| Alternativa                          | Por qué se descarta                                                                                                                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Electron**                         | Empaqueta un Chromium completo: binario de cientos de megabytes y una superficie de ataque considerablemente mayor. Sobre una máquina de portería que abre talanqueras, esa superficie no es un detalle |
+| **Solo PWA, sin escritorio**         | `CLAUDE.md` §2.6 y §7 exigen aplicación de escritorio empaquetada como entregable                                                                                                                       |
+| **Aplicación nativa por plataforma** | Multiplicaría el esfuerzo sin aportar nada: la consola es web y funciona bien como web                                                                                                                  |
 
 ## Consecuencias
 

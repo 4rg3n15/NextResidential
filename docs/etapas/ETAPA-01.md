@@ -11,7 +11,7 @@
 
 Un esquema de base de datos que **hace estructuralmente imposible violar las reglas de negocio**, y la guía que permite conectarlo a un proyecto Supabase sin ambigüedad.
 
-El objetivo declarado de la etapa no era «crear las tablas». Era conseguir que la respuesta a *«¿podría alguien con acceso directo a la base violar esta regla?»* sea **no** en todas las reglas donde eso sea expresable. Treinta tablas, ciento setenta y un `CHECK`, ciento ochenta claves foráneas, noventa y cuatro índices únicos y sesenta y cuatro disparadores existen para eso, no para almacenar datos.
+El objetivo declarado de la etapa no era «crear las tablas». Era conseguir que la respuesta a _«¿podría alguien con acceso directo a la base violar esta regla?»_ sea **no** en todas las reglas donde eso sea expresable. Treinta tablas, ciento setenta y un `CHECK`, ciento ochenta claves foráneas, noventa y cuatro índices únicos y sesenta y cuatro disparadores existen para eso, no para almacenar datos.
 
 Hay un puñado de decisiones donde esa diferencia se ve con claridad. `RN-10` dice que el consentimiento biométrico lo otorga el visitante, no el residente que lo invita: en vez de validarlo en un caso de uso, se **eliminó la columna donde se escribiría la infracción** — no hay dónde registrar «el residente consintió por el visitante». `RN-21` dice que las credenciales de dispositivo nunca se exponen: la columna `credencial_ref` lleva un `CHECK` de formato que hace que **escribir una contraseña literal falle**. `CA-16` dice que sin motivo escrito el sistema no ejecuta la apertura: la restricción del evento hace que una apertura manual sin motivo **no pueda registrarse**, y como RN-02 obliga a que todo intento genere evento, lo que no puede registrarse no puede ocurrir.
 
@@ -21,7 +21,7 @@ Y el esquema se verificó de verdad. No contra una promesa: contra un PostgreSQL
 
 ## 2. Cómo se organizó y por qué
 
-*Esta es la sección que hay que leer si solo se va a leer una.*
+_Esta es la sección que hay que leer si solo se va a leer una._
 
 **Tres niveles de garantía, y una regla para repartir entre ellos.** Estructural (tipo, `NOT NULL`, `CHECK`, `UNIQUE`, permisos), procedural en base (disparador, política) y de aplicación (invariante del agregado). **Toda invariante que pueda violarse por concurrencia o por acceso directo va al nivel 1.** El nivel 3 no sustituye al 1; lo acompaña, porque es donde la regla se lee y se entiende. La tabla de trazabilidad de `modelo-datos.md` §10 dice, regla por regla, en qué nivel quedó y por qué.
 
@@ -29,7 +29,7 @@ Y el esquema se verificó de verdad. No contra una promesa: contra un PostgreSQL
 
 **Los supuestos abiertos se convirtieron en columnas, no en constantes.** `umbral_confianza_placa`, `margen_cache_reglas`, `umbral_latido_dispositivo`, `plazo_consentimiento` y `politica_contingencia_edge` viven en `copropiedades` con valor conservador por defecto. Un supuesto escondido en una constante es indistinguible de una decisión tomada; uno en una columna es visible, auditable, corregible sin desplegar y distinto por copropiedad. Cuando Grupo Control resuelva P-02 a P-07, la resolución será un `UPDATE`.
 
-**El contador de aforo se separó de la configuración de la zona, y no por estética.** Con el máximo en `zonas` y el conteo en otra tabla, `conteo_actual <= aforo_maximo` sería un cruce de dos tablas y solo podría garantizarse con un disparador. Juntos en la misma fila es un `CHECK`: RN-14 pasa de «el código lo respeta» a «la base no admite otro estado». Y de paso resuelve la contención de bloqueos —el contador es la fila más escrita en hora punta; la configuración, de las menos— y permite el incremento atómico sin consulta previa, donde cero filas devueltas *es* el aforo superado.
+**El contador de aforo se separó de la configuración de la zona, y no por estética.** Con el máximo en `zonas` y el conteo en otra tabla, `conteo_actual <= aforo_maximo` sería un cruce de dos tablas y solo podría garantizarse con un disparador. Juntos en la misma fila es un `CHECK`: RN-14 pasa de «el código lo respeta» a «la base no admite otro estado». Y de paso resuelve la contención de bloqueos —el contador es la fila más escrita en hora punta; la configuración, de las menos— y permite el incremento atómico sin consulta previa, donde cero filas devueltas _es_ el aforo superado.
 
 **La idempotencia de la reconciliación no descansa donde parecía.** PostgreSQL exige que el índice único de una tabla particionada incluya la clave de partición, así que sobre `eventos` solo cabe `UNIQUE (copropiedad_id, clave_idempotencia, ocurrido_en)` — que no detendría un reenvío con marca temporal recalculada tras un ajuste de reloj, justo el escenario que RN-17 quiere cubrir. Por eso la garantía real la aporta `bandeja_salida_edge`, sin particionar, con la restricción simple. El índice de `eventos` se conserva como segunda barrera. **Hay una prueba dedicada a este escenario exacto**, porque es el tipo de agujero que solo aparece en producción tras un corte largo.
 
@@ -41,7 +41,7 @@ Y el esquema se verificó de verdad. No contra una promesa: contra un PostgreSQL
 
 **Las políticas se escribieron sobre `current_setting('request.jwt.claims')` y no sobre `auth.jwt()`.** Son la misma cosa —`auth.jwt()` es un envoltorio de eso—, pero la forma larga hace que el esquema y su suite corran igual sobre un PostgreSQL vacío. El efecto práctico es que **esta etapa pudo verificarse sin credenciales de Supabase**, que es justo lo que el usuario pidió al decir que las cargaría él en `.env`.
 
-**La reversibilidad se resolvió fuera de `supabase/migrations/`.** El CLI de Supabase no tiene *down migrations*. Los guiones viven en `supabase/reversion/`, uno por migración, y el ciclo completo aplicar → revertir → aplicar se ejecutó de principio a fin: cero objetos residuales, y la suite verde otra vez al reaplicar. El de `eventos` exige confirmación explícita, porque revertirlo destruye un registro que RN-03 declara inmutable.
+**La reversibilidad se resolvió fuera de `supabase/migrations/`.** El CLI de Supabase no tiene _down migrations_. Los guiones viven en `supabase/reversion/`, uno por migración, y el ciclo completo aplicar → revertir → aplicar se ejecutó de principio a fin: cero objetos residuales, y la suite verde otra vez al reaplicar. El de `eventos` exige confirmación explícita, porque revertirlo destruye un registro que RN-03 declara inmutable.
 
 ---
 
@@ -95,13 +95,13 @@ CLAUDE.md                                (modificado) §2.4 con el décimo motiv
 
 Esta etapa produce SQL, no clases. La tabla traduce cada principio a su forma en un esquema relacional y señala dónde se verifica.
 
-| Principio | Materialización en el esquema | Verificación |
-|---|---|---|
-| **SRP** | Una tabla, una razón de cambio. Se separó `zona_aforo` de `zonas` porque el contador y la configuración cambian por motivos y a ritmos distintos; `consentimientos_biometricos` de `plantillas_biometricas` porque el consentimiento pertenece al titular y la plantilla al sistema; `puntos_de_acceso` de `dispositivos` porque «qué se abrió» y «qué equipo lo hizo» son cosas distintas | Ninguna tabla mezcla configuración de baja escritura con estado de alta escritura |
-| **OCP** | Extender no exige migrar: `niveles_acceso` es catálogo y no enumerado (P-11), `reglas.definicion` es `jsonb` y las reglas se publican por versión en vez de editarse | Añadir un nivel de acceso o una regla es un `INSERT`, no una migración |
-| **LSP** | Toda tabla operativa expone el mismo contrato: `copropiedad_id`, columnas de auditoría y —donde hay historial— baja lógica. Las políticas y los disparadores se generan en bucle sobre ese contrato | Los bucles de las migraciones `0013`, `0014` y `0015` recorren las tablas sin excepciones especiales |
-| **ISP** | Cada superficie ve lo que necesita y nada más: `dispositivos_operativos` sirve a portero y operador sin `host` ni `credencial_ref`; `autorizaciones_vigentes` da el estado derivado sin exponer el cálculo; ninguna política concede acceso a `vector_cifrado` | La prueba de aislamiento confirma que el residente ve 0 dispositivos |
-| **DIP** | El esquema no depende de Supabase: las políticas leen `current_setting('request.jwt.claims')`, que es lo que `auth.jwt()` envuelve. Supabase es un detalle de despliegue, no una dependencia del modelo | Las 15 migraciones y la suite completa corren sobre PostgreSQL 16 vacío, sin Supabase |
+| Principio | Materialización en el esquema                                                                                                                                                                                                                                                                                                                                                              | Verificación                                                                                         |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| **SRP**   | Una tabla, una razón de cambio. Se separó `zona_aforo` de `zonas` porque el contador y la configuración cambian por motivos y a ritmos distintos; `consentimientos_biometricos` de `plantillas_biometricas` porque el consentimiento pertenece al titular y la plantilla al sistema; `puntos_de_acceso` de `dispositivos` porque «qué se abrió» y «qué equipo lo hizo» son cosas distintas | Ninguna tabla mezcla configuración de baja escritura con estado de alta escritura                    |
+| **OCP**   | Extender no exige migrar: `niveles_acceso` es catálogo y no enumerado (P-11), `reglas.definicion` es `jsonb` y las reglas se publican por versión en vez de editarse                                                                                                                                                                                                                       | Añadir un nivel de acceso o una regla es un `INSERT`, no una migración                               |
+| **LSP**   | Toda tabla operativa expone el mismo contrato: `copropiedad_id`, columnas de auditoría y —donde hay historial— baja lógica. Las políticas y los disparadores se generan en bucle sobre ese contrato                                                                                                                                                                                        | Los bucles de las migraciones `0013`, `0014` y `0015` recorren las tablas sin excepciones especiales |
+| **ISP**   | Cada superficie ve lo que necesita y nada más: `dispositivos_operativos` sirve a portero y operador sin `host` ni `credencial_ref`; `autorizaciones_vigentes` da el estado derivado sin exponer el cálculo; ninguna política concede acceso a `vector_cifrado`                                                                                                                             | La prueba de aislamiento confirma que el residente ve 0 dispositivos                                 |
+| **DIP**   | El esquema no depende de Supabase: las políticas leen `current_setting('request.jwt.claims')`, que es lo que `auth.jwt()` envuelve. Supabase es un detalle de despliegue, no una dependencia del modelo                                                                                                                                                                                    | Las 15 migraciones y la suite completa corren sobre PostgreSQL 16 vacío, sin Supabase                |
 
 ---
 
@@ -109,38 +109,38 @@ Esta etapa produce SQL, no clases. La tabla traduce cada principio a su forma en
 
 ### Cubierto por completo
 
-| Elemento | Contraparte estructural |
-|---|---|
-| **RN-02** | `dispositivo_id`, `regla_aplicada`, `version_reglas` `NOT NULL` + `CHECK` de motivo |
-| **RN-03** | `REVOKE UPDATE, DELETE` en padre y particiones · sin columnas `actualizado_*` |
-| **RN-04** | `UNIQUE (copropiedad_id, placa) WHERE estado='activo'` |
-| **RN-05** | FK a `residentes` + disparador de coherencia + predicado V de RLS |
-| **RN-06** | Índices únicos parciales sobre `listas_negras`, por persona **y** por placa |
-| **RN-07** | Política de `INSERT`/`UPDATE` restringida a administrador y operador de central |
-| **RN-08** | `CHECK` de `tipo='manual'` con operador y motivo no vacío |
-| **RN-09** | FK `consentimiento_id NOT NULL` (nivel 1) + disparador de estado vigente (nivel 2) |
-| **RN-10** | **Ausencia** de columna que vincule el consentimiento a un residente |
-| **RN-11** | `suprimir_en NOT NULL` + índice del barrido + `CHECK` de vector nulo al suprimir |
-| **RN-12** | `credencial_ref` inaccesible por RLS a roles de interfaz + vista sin `host` |
-| **RN-13** | Disparador sobre `INSERT` en `autorizaciones` |
-| **RN-14** | `CHECK (conteo_actual <= aforo_maximo)` |
-| **RN-15** | `copropiedad_id NOT NULL` + RLS forzada + **FK compuestas** `(copropiedad_id, id)` |
-| **RN-16** | `version_reglas NOT NULL` + `decidido_por_edge` + versión monótona |
-| **RN-17** | `UNIQUE (copropiedad_id, clave_idempotencia)` en `bandeja_salida_edge` |
-| **RN-19** | Sin `DELETE` concedido a ningún rol + disparador anti-borrado |
-| **RN-21** | `CHECK (credencial_ref ~ '^(env\|vault):...')` |
-| **CA-02, CA-03, CA-09, CA-10, CA-14, CA-15, CA-16, CA-17, CA-23, CA-24** | Todas con contraparte estructural y prueba |
-| **KPI-01, KPI-02, KPI-03, KPI-04, KPI-05, KPI-24, KPI-31, KPI-36** | Base estructural puesta y verificada |
+| Elemento                                                                 | Contraparte estructural                                                             |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| **RN-02**                                                                | `dispositivo_id`, `regla_aplicada`, `version_reglas` `NOT NULL` + `CHECK` de motivo |
+| **RN-03**                                                                | `REVOKE UPDATE, DELETE` en padre y particiones · sin columnas `actualizado_*`       |
+| **RN-04**                                                                | `UNIQUE (copropiedad_id, placa) WHERE estado='activo'`                              |
+| **RN-05**                                                                | FK a `residentes` + disparador de coherencia + predicado V de RLS                   |
+| **RN-06**                                                                | Índices únicos parciales sobre `listas_negras`, por persona **y** por placa         |
+| **RN-07**                                                                | Política de `INSERT`/`UPDATE` restringida a administrador y operador de central     |
+| **RN-08**                                                                | `CHECK` de `tipo='manual'` con operador y motivo no vacío                           |
+| **RN-09**                                                                | FK `consentimiento_id NOT NULL` (nivel 1) + disparador de estado vigente (nivel 2)  |
+| **RN-10**                                                                | **Ausencia** de columna que vincule el consentimiento a un residente                |
+| **RN-11**                                                                | `suprimir_en NOT NULL` + índice del barrido + `CHECK` de vector nulo al suprimir    |
+| **RN-12**                                                                | `credencial_ref` inaccesible por RLS a roles de interfaz + vista sin `host`         |
+| **RN-13**                                                                | Disparador sobre `INSERT` en `autorizaciones`                                       |
+| **RN-14**                                                                | `CHECK (conteo_actual <= aforo_maximo)`                                             |
+| **RN-15**                                                                | `copropiedad_id NOT NULL` + RLS forzada + **FK compuestas** `(copropiedad_id, id)`  |
+| **RN-16**                                                                | `version_reglas NOT NULL` + `decidido_por_edge` + versión monótona                  |
+| **RN-17**                                                                | `UNIQUE (copropiedad_id, clave_idempotencia)` en `bandeja_salida_edge`              |
+| **RN-19**                                                                | Sin `DELETE` concedido a ningún rol + disparador anti-borrado                       |
+| **RN-21**                                                                | `CHECK (credencial_ref ~ '^(env\|vault):...')`                                      |
+| **CA-02, CA-03, CA-09, CA-10, CA-14, CA-15, CA-16, CA-17, CA-23, CA-24** | Todas con contraparte estructural y prueba                                          |
+| **KPI-01, KPI-02, KPI-03, KPI-04, KPI-05, KPI-24, KPI-31, KPI-36**       | Base estructural puesta y verificada                                                |
 
 ### Cubierto parcialmente, con motivo
 
-| Elemento | Estado | Motivo |
-|---|---|---|
-| **KPI-36, KPI-37, KPI-38** | Base puesta, **cobertura incompleta por diseño** | Esta etapa cubre el aislamiento por el camino del JWT. El **segundo camino —`service_role`, que omite RLS— es de la ETAPA 03**, en la capa de aplicación. La base sola no basta, y el `README.md` de `supabase/policies/` lo dice sin rodeos |
-| **RN-18, CA-18, CA-26** | Tablas y columnas listas | El escalamiento y la alerta son lógica de la ETAPA 06 |
-| **RN-22, CA-06** | `patrones_recurrencia` con sus restricciones | La evaluación del patrón es el motor de reglas, ETAPA 05 |
-| **KPI-29, KPI-30, KPI-31** | `bandeja_salida_edge` y `edge_gateways` listas | La reconciliación es la ETAPA 12 |
-| **Retención de eventos y evidencia** | **Resuelta** *(adenda)* | Plazos fijados por el usuario e implementados en la migración `0016`. Los trabajos de purga son de las ETAPAS 06 y 14 |
+| Elemento                             | Estado                                           | Motivo                                                                                                                                                                                                                                       |
+| ------------------------------------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **KPI-36, KPI-37, KPI-38**           | Base puesta, **cobertura incompleta por diseño** | Esta etapa cubre el aislamiento por el camino del JWT. El **segundo camino —`service_role`, que omite RLS— es de la ETAPA 03**, en la capa de aplicación. La base sola no basta, y el `README.md` de `supabase/policies/` lo dice sin rodeos |
+| **RN-18, CA-18, CA-26**              | Tablas y columnas listas                         | El escalamiento y la alerta son lógica de la ETAPA 06                                                                                                                                                                                        |
+| **RN-22, CA-06**                     | `patrones_recurrencia` con sus restricciones     | La evaluación del patrón es el motor de reglas, ETAPA 05                                                                                                                                                                                     |
+| **KPI-29, KPI-30, KPI-31**           | `bandeja_salida_edge` y `edge_gateways` listas   | La reconciliación es la ETAPA 12                                                                                                                                                                                                             |
+| **Retención de eventos y evidencia** | **Resuelta** _(adenda)_                          | Plazos fijados por el usuario e implementados en la migración `0016`. Los trabajos de purga son de las ETAPAS 06 y 14                                                                                                                        |
 
 ---
 
@@ -152,37 +152,37 @@ Esta etapa produce SQL, no clases. La tabla traduce cada principio a su forma en
 ./supabase/verificar.sh --con-pruebas
 ```
 
-| Prueba | Qué verifica | Resultado |
-|---|---|---|
-| **Migraciones sobre base vacía** | DoD principal | ✅ 15/15 limpias sobre PostgreSQL 16.13 |
-| **Idempotencia** | Reejecutar no rompe ni cambia | ✅ Tres pasadas consecutivas sin error |
-| **Reversibilidad** | Ciclo aplicar → revertir → aplicar | ✅ 15/15 revertidas, **0 tablas residuales**, suite verde al reaplicar |
-| **RLS activa y forzada** | DoD: 100 % de las tablas | ✅ **40/40** (30 tablas + 10 particiones) |
-| **Aislamiento — positiva** | El administrador ve lo suyo | ✅ |
-| **Aislamiento — negativa, 26 tablas** | Cero filas ajenas visibles | ✅ **0 fugas** |
-| **Aislamiento — escritura cruzada** | `INSERT` en otra copropiedad | ✅ Rechazado por RLS |
-| **Aislamiento — usuarios de plataforma (D-02)** | Las filas con tenant nulo solo para superadmin | ✅ 0 visibles |
-| **KPI-35 — operador multiproyecto** | Atiende dos copropiedades, y solo las de sus claims | ✅ |
-| **Alcance del residente** | 1 vivienda, sus vehículos, 0 dispositivos | ✅ |
-| **RN-04 / CA-03 / KPI-02** | Placa duplicada activa rechazada | ✅ |
-| **D-05** | La misma placa sí existe en otra copropiedad | ✅ |
-| **Normalización** | `abc-1234` rechazada por la base | ✅ |
-| **RN-14 / CA-14** | Aforo por encima del máximo, e incremento atómico con aforo lleno | ✅ 0 filas devueltas |
-| **CA-16 / CA-17** | Apertura manual sin motivo, y con motivo en blanco | ✅ Ambas rechazadas |
-| **Errores tipados** | Negar sin motivo | ✅ Rechazado |
-| **E-01 / D-18** | CA-14 y CA-15 distinguibles en el evento | ✅ Dos motivos distintos |
-| **RN-09 / CA-09** | Nivel 1 (FK) y nivel 2 (consentimiento no vigente) | ✅ Ambos bloquean |
-| **RN-05** | Autorizar hacia vivienda ajena | ✅ Rechazado |
-| **RN-13** | Vivienda inactiva: sin autorizaciones nuevas, con las vigentes conservadas | ✅ |
-| **RN-19 / CA-02** | Borrado físico | ✅ Rechazado |
-| **RN-17 / CA-22 / D-11** | Reenvío con `ocurrido_en` recalculado | ✅ Descartado por la bandeja |
-| **RN-21 / D-09b** | Credencial literal en `credencial_ref` | ✅ Rechazada |
-| **RN-16** | Versión de reglas no consecutiva | ✅ Rechazada |
-| **P-11** | Nivel por defecto del residente | ✅ El más restrictivo |
-| **ADR-005 / CA-23** | `UPDATE` y `DELETE` sobre eventos, **con los seis roles** | ✅ `permission denied` en los seis |
-| **ADR-005 en partición nueva** | Nace sin `UPDATE`/`DELETE` y con RLS forzada | ✅ |
-| **D-12** | Evento fuera de rango de particiones | ✅ Falla ruidosamente |
-| **KPI-03** | **100 inserciones concurrentes reales** | ✅ **1 aceptada · 99 rechazadas · 1 fila** |
+| Prueba                                          | Qué verifica                                                               | Resultado                                                              |
+| ----------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Migraciones sobre base vacía**                | DoD principal                                                              | ✅ 15/15 limpias sobre PostgreSQL 16.13                                |
+| **Idempotencia**                                | Reejecutar no rompe ni cambia                                              | ✅ Tres pasadas consecutivas sin error                                 |
+| **Reversibilidad**                              | Ciclo aplicar → revertir → aplicar                                         | ✅ 15/15 revertidas, **0 tablas residuales**, suite verde al reaplicar |
+| **RLS activa y forzada**                        | DoD: 100 % de las tablas                                                   | ✅ **40/40** (30 tablas + 10 particiones)                              |
+| **Aislamiento — positiva**                      | El administrador ve lo suyo                                                | ✅                                                                     |
+| **Aislamiento — negativa, 26 tablas**           | Cero filas ajenas visibles                                                 | ✅ **0 fugas**                                                         |
+| **Aislamiento — escritura cruzada**             | `INSERT` en otra copropiedad                                               | ✅ Rechazado por RLS                                                   |
+| **Aislamiento — usuarios de plataforma (D-02)** | Las filas con tenant nulo solo para superadmin                             | ✅ 0 visibles                                                          |
+| **KPI-35 — operador multiproyecto**             | Atiende dos copropiedades, y solo las de sus claims                        | ✅                                                                     |
+| **Alcance del residente**                       | 1 vivienda, sus vehículos, 0 dispositivos                                  | ✅                                                                     |
+| **RN-04 / CA-03 / KPI-02**                      | Placa duplicada activa rechazada                                           | ✅                                                                     |
+| **D-05**                                        | La misma placa sí existe en otra copropiedad                               | ✅                                                                     |
+| **Normalización**                               | `abc-1234` rechazada por la base                                           | ✅                                                                     |
+| **RN-14 / CA-14**                               | Aforo por encima del máximo, e incremento atómico con aforo lleno          | ✅ 0 filas devueltas                                                   |
+| **CA-16 / CA-17**                               | Apertura manual sin motivo, y con motivo en blanco                         | ✅ Ambas rechazadas                                                    |
+| **Errores tipados**                             | Negar sin motivo                                                           | ✅ Rechazado                                                           |
+| **E-01 / D-18**                                 | CA-14 y CA-15 distinguibles en el evento                                   | ✅ Dos motivos distintos                                               |
+| **RN-09 / CA-09**                               | Nivel 1 (FK) y nivel 2 (consentimiento no vigente)                         | ✅ Ambos bloquean                                                      |
+| **RN-05**                                       | Autorizar hacia vivienda ajena                                             | ✅ Rechazado                                                           |
+| **RN-13**                                       | Vivienda inactiva: sin autorizaciones nuevas, con las vigentes conservadas | ✅                                                                     |
+| **RN-19 / CA-02**                               | Borrado físico                                                             | ✅ Rechazado                                                           |
+| **RN-17 / CA-22 / D-11**                        | Reenvío con `ocurrido_en` recalculado                                      | ✅ Descartado por la bandeja                                           |
+| **RN-21 / D-09b**                               | Credencial literal en `credencial_ref`                                     | ✅ Rechazada                                                           |
+| **RN-16**                                       | Versión de reglas no consecutiva                                           | ✅ Rechazada                                                           |
+| **P-11**                                        | Nivel por defecto del residente                                            | ✅ El más restrictivo                                                  |
+| **ADR-005 / CA-23**                             | `UPDATE` y `DELETE` sobre eventos, **con los seis roles**                  | ✅ `permission denied` en los seis                                     |
+| **ADR-005 en partición nueva**                  | Nace sin `UPDATE`/`DELETE` y con RLS forzada                               | ✅                                                                     |
+| **D-12**                                        | Evento fuera de rango de particiones                                       | ✅ Falla ruidosamente                                                  |
+| **KPI-03**                                      | **100 inserciones concurrentes reales**                                    | ✅ **1 aceptada · 99 rechazadas · 1 fila**                             |
 
 **Cobertura de código:** no aplica; esta etapa no produce código de aplicación. El umbral del 90 % en `domain/` y `application/` empieza a medirse en la ETAPA 02.
 
@@ -192,16 +192,16 @@ Esta etapa produce SQL, no clases. La tabla traduce cada principio a su forma en
 
 Contra el checklist de `CLAUDE.md` §2.7.
 
-| # | Punto | Estado en esta etapa |
-|---|---|---|
-| 1 | **Secretos solo en variables de entorno** | ✅ Cero credenciales en migraciones, semillas o documentación. Las semillas usan dominios `.invalid` y referencias `vault:`. Y **la base lo impone**: `CHECK (credencial_ref ~ '^(env\|vault):...')` hace que una credencial literal falle |
-| 2 | CORS restrictivo | No aplica · nombre y advertencia en `apps/api/.env.example` |
-| 3 | Validación en el backend | Parcial · **el DTO valida forma, el agregado valida verdad, y la base valida lo que ninguno de los dos puede**: 171 `CHECK` |
-| 4 | **Anti inyección SQL** | ✅ Cero concatenación para armar SQL con entrada de usuario. El SQL dinámico de las migraciones usa `format(%I/%L)` sobre listas literales. **Ninguna función lleva `SECURITY DEFINER` salvo una**, con justificación escrita y `search_path` fijo |
-| 5 | Rate limiting | No aplica · nombres en `.env.example` |
-| 6 | **RLS activa y forzada** | ✅ **40/40**, con aserción que hace fallar la migración si no. **Con la salvedad declarada**: `service_role` omite RLS, y la contención de ese camino es de la ETAPA 03 |
-| 7 | CSP | No aplica |
-| 8 | **Transversales** | ✅ Evidencia en bucket privado con URL firmada de vida corta, y la tabla guarda ruta y hash, **nunca URL** · auditoría append-only **por permisos**, no por código · MFA documentado en la guía |
+| #   | Punto                                     | Estado en esta etapa                                                                                                                                                                                                                               |
+| --- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Secretos solo en variables de entorno** | ✅ Cero credenciales en migraciones, semillas o documentación. Las semillas usan dominios `.invalid` y referencias `vault:`. Y **la base lo impone**: `CHECK (credencial_ref ~ '^(env\|vault):...')` hace que una credencial literal falle         |
+| 2   | CORS restrictivo                          | No aplica · nombre y advertencia en `apps/api/.env.example`                                                                                                                                                                                        |
+| 3   | Validación en el backend                  | Parcial · **el DTO valida forma, el agregado valida verdad, y la base valida lo que ninguno de los dos puede**: 171 `CHECK`                                                                                                                        |
+| 4   | **Anti inyección SQL**                    | ✅ Cero concatenación para armar SQL con entrada de usuario. El SQL dinámico de las migraciones usa `format(%I/%L)` sobre listas literales. **Ninguna función lleva `SECURITY DEFINER` salvo una**, con justificación escrita y `search_path` fijo |
+| 5   | Rate limiting                             | No aplica · nombres en `.env.example`                                                                                                                                                                                                              |
+| 6   | **RLS activa y forzada**                  | ✅ **40/40**, con aserción que hace fallar la migración si no. **Con la salvedad declarada**: `service_role` omite RLS, y la contención de ese camino es de la ETAPA 03                                                                            |
+| 7   | CSP                                       | No aplica                                                                                                                                                                                                                                          |
+| 8   | **Transversales**                         | ✅ Evidencia en bucket privado con URL firmada de vida corta, y la tabla guarda ruta y hash, **nunca URL** · auditoría append-only **por permisos**, no por código · MFA documentado en la guía                                                    |
 
 **Hallazgos de esta etapa**
 
@@ -215,12 +215,12 @@ Contra el checklist de `CLAUDE.md` §2.7.
 
 ### Deuda nueva
 
-| ID | Deuda | Se salda en |
-|---|---|---|
-| D-08 | El **segundo camino de aislamiento** (`service_role`) no está cubierto: la base sola no puede | **ETAPA 03** |
-| D-09 | El mantenimiento de particiones necesita un trabajo pg-boss programado; hoy la función existe pero nadie la llama sola | ETAPA 02 (pg-boss) · 06 |
-| ~~D-10~~ | La **política de retención** de eventos y evidencia no está definida en ningún insumo | **Saldada el 2026-09-06** por decisión del usuario · ver adenda al final |
-| D-11 | El **Auth Hook de *custom claims*** está documentado pero no implementado: sin él, ninguna política concede acceso | **ETAPA 03** |
+| ID       | Deuda                                                                                                                  | Se salda en                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| D-08     | El **segundo camino de aislamiento** (`service_role`) no está cubierto: la base sola no puede                          | **ETAPA 03**                                                             |
+| D-09     | El mantenimiento de particiones necesita un trabajo pg-boss programado; hoy la función existe pero nadie la llama sola | ETAPA 02 (pg-boss) · 06                                                  |
+| ~~D-10~~ | La **política de retención** de eventos y evidencia no está definida en ningún insumo                                  | **Saldada el 2026-09-06** por decisión del usuario · ver adenda al final |
+| D-11     | El **Auth Hook de _custom claims_** está documentado pero no implementado: sin él, ninguna política concede acceso     | **ETAPA 03**                                                             |
 
 ### Deuda saldada
 
@@ -266,8 +266,8 @@ Quedan **diez** abiertos, ninguno bloquea la ETAPA 02.
 - **Commits:**
   - `969a426` — `docs(etapa-01/modelo-datos): disena el esquema para aprobacion (paso 01-A)`
   - `61e8efd` — `merge(etapa-01): incorpora develop actualizado`
-  - *(este)* — `feat(etapa-01/supabase): implementa el esquema, RLS, semillas y guia de conexion`
-  - *(cierre)* — `chore(etapa-01): cierre de etapa`
+  - _(este)_ — `feat(etapa-01/supabase): implementa el esquema, RLS, semillas y guia de conexion`
+  - _(cierre)_ — `chore(etapa-01): cierre de etapa`
 
 ---
 
@@ -276,7 +276,6 @@ Quedan **diez** abiertos, ninguno bloquea la ETAPA 02.
 **La ETAPA 01 queda CERRADA.** La Definición de Terminado se cumple y se amplía: las migraciones corren limpias sobre una base vacía, RLS está activa **y forzada** en el 100 % de las tablas, cada RN de integridad tiene su contraparte estructural identificada, y además el esquema resultó **idempotente**, **reversible de principio a fin** y capaz de sostener **KPI-03 con cien conexiones concurrentes reales**.
 
 **La ETAPA 02 queda habilitada.** El agente se detiene aquí y espera instrucción expresa, conforme a `CLAUDE.md` §2.1.1.
-
 
 ---
 
@@ -303,11 +302,11 @@ desactualizado induce al error en la sesión siguiente, no en esta.
 
 Fijada por el usuario, **sujeta a confirmación legal de Grupo Control**:
 
-| Dato | Plazo | Fundamento |
-|---|---|---|
-| Eventos | **24 meses** | Sustentan la responsabilidad ante un incidente (PB-06); su finalidad sobrevive al hecho registrado. Dos ciclos anuales de administración, sin volverse archivo indefinido |
-| Evidencia fotográfica | **90 días** | Dato más sensible que el registro del acceso, y con finalidad que se agota antes: sustentar una reclamación inmediata. Minimización, Ley 1581 art. 4 lit. c |
-| Plantillas biométricas | **Ligadas a la vigencia de su autorización** | Ya lo exigía RN-11; ahora es estructural |
+| Dato                   | Plazo                                        | Fundamento                                                                                                                                                                |
+| ---------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Eventos                | **24 meses**                                 | Sustentan la responsabilidad ante un incidente (PB-06); su finalidad sobrevive al hecho registrado. Dos ciclos anuales de administración, sin volverse archivo indefinido |
+| Evidencia fotográfica  | **90 días**                                  | Dato más sensible que el registro del acceso, y con finalidad que se agota antes: sustentar una reclamación inmediata. Minimización, Ley 1581 art. 4 lit. c               |
+| Plantillas biométricas | **Ligadas a la vigencia de su autorización** | Ya lo exigía RN-11; ahora es estructural                                                                                                                                  |
 
 **Migración `0016`.** Los tres plazos son **columnas de `copropiedades`**, no
 constantes: la retención puede variar por contrato o por exigencia de una
@@ -347,18 +346,18 @@ ETAPAS 06 y 14. Aquí queda la política, su cota legal y dónde se acredita.
 
 ## A.3 · Verificación tras la adenda
 
-| Prueba | Resultado |
-|---|---|
-| 16 migraciones sobre base vacía | ✅ |
-| Idempotencia, dos pasadas adicionales | ✅ 0 fallos |
-| Reversibilidad, ciclo completo con `0016` | ✅ 16/16, **0 tablas residuales** |
-| RLS activa y forzada | ✅ **42/42** (31 tablas + 11 particiones) |
-| Margen de supresión más corto que el legal | ✅ Aceptado |
-| Margen de supresión **superior a 24 h** | ✅ **Rechazado por `CHECK`** |
-| Plantilla que sobrevive a su autorización | ✅ **Rechazada por disparador** |
-| Plantilla dentro del margen legal | ✅ Aceptada |
-| `purgas_retencion` append-only | ✅ `DELETE` rechazado |
-| Suite completa (aislamiento, invariantes, inmutabilidad, KPI-03) | ✅ Verde |
+| Prueba                                                           | Resultado                                 |
+| ---------------------------------------------------------------- | ----------------------------------------- |
+| 16 migraciones sobre base vacía                                  | ✅                                        |
+| Idempotencia, dos pasadas adicionales                            | ✅ 0 fallos                               |
+| Reversibilidad, ciclo completo con `0016`                        | ✅ 16/16, **0 tablas residuales**         |
+| RLS activa y forzada                                             | ✅ **42/42** (31 tablas + 11 particiones) |
+| Margen de supresión más corto que el legal                       | ✅ Aceptado                               |
+| Margen de supresión **superior a 24 h**                          | ✅ **Rechazado por `CHECK`**              |
+| Plantilla que sobrevive a su autorización                        | ✅ **Rechazada por disparador**           |
+| Plantilla dentro del margen legal                                | ✅ Aceptada                               |
+| `purgas_retencion` append-only                                   | ✅ `DELETE` rechazado                     |
+| Suite completa (aislamiento, invariantes, inmutabilidad, KPI-03) | ✅ Verde                                  |
 
 **Cifras finales:** 31 tablas · 11 particiones · 31 enumerados · 95 políticas RLS
 · 16 migraciones · 16 guiones de reversión.
@@ -373,7 +372,6 @@ usuario con sus credenciales. Quedan además:
    plazos de retención. Es lo único que falta para dar P-12 por cerrado del todo.
 2. **Programar `app.mantener_particiones_eventos()`** mensualmente.
 3. Los trabajos de purga, cuando lleguen las ETAPAS 06 y 14.
-
 
 ---
 
@@ -402,7 +400,7 @@ porque es la diferencia entre un cambio cosmético y uno de fondo:
   sobre llaves. `REVOKE UPDATE, DELETE ON eventos` sigue siendo la barrera que
   la llave secreta **no** elude: `BYPASSRLS` omite políticas de **fila**, no
   privilegios de **tabla**. ADR-005 se sostiene tal cual.
-- Los *custom claims* del auth hook funcionan igual: el gancho se ejecuta
+- Los _custom claims_ del auth hook funcionan igual: el gancho se ejecuta
   **antes** de firmar y modifica la carga útil; el algoritmo se aplica después.
 
 **Y el riesgo número uno tampoco cambia.** La llave secreta omite RLS igual que
@@ -411,15 +409,15 @@ riesgo ni la contención en tres capas.
 
 ## B.2 · Lo que sí se corrigió
 
-| Archivo | Cambio |
-|---|---|
-| `apps/api/.env.example` | `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY` · `SUPABASE_SERVICE_ROLE_KEY` → `SUPABASE_SECRET_KEY` · `SUPABASE_JWT_SECRET` **eliminada**, sustituida por `SUPABASE_JWKS_URL` + TTL de caché |
-| `apps/web/.env.example` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
-| `apps/mobile/.env.example` | `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY` + nota sobre el refresco al volver a primer plano |
-| `apps/edge/.env.example` | Añadidas `SUPABASE_SECRET_KEY` y `SUPABASE_JWKS_URL`, con caché persistente para los cortes de WAN y la recomendación de **una llave secreta por Edge** |
-| `docs/guias/CONEXION_SUPABASE.md` | §1, §2, §6.3 y §10 reescritas: nombres nuevos, dónde se obtienen, verificación asimétrica y rotación sin caída |
-| `docs/arquitectura/verificacion-jwt-asimetrica.md` | **Nuevo.** Diseño vinculante de la ETAPA 03 |
-| `CLAUDE.md` §6 | ETAPA 01 y ETAPA 03 actualizadas |
+| Archivo                                            | Cambio                                                                                                                                                                                          |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env.example`                            | `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY` · `SUPABASE_SERVICE_ROLE_KEY` → `SUPABASE_SECRET_KEY` · `SUPABASE_JWT_SECRET` **eliminada**, sustituida por `SUPABASE_JWKS_URL` + TTL de caché |
+| `apps/web/.env.example`                            | `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                                                                                                                        |
+| `apps/mobile/.env.example`                         | `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY` + nota sobre el refresco al volver a primer plano                                                                                              |
+| `apps/edge/.env.example`                           | Añadidas `SUPABASE_SECRET_KEY` y `SUPABASE_JWKS_URL`, con caché persistente para los cortes de WAN y la recomendación de **una llave secreta por Edge**                                         |
+| `docs/guias/CONEXION_SUPABASE.md`                  | §1, §2, §6.3 y §10 reescritas: nombres nuevos, dónde se obtienen, verificación asimétrica y rotación sin caída                                                                                  |
+| `docs/arquitectura/verificacion-jwt-asimetrica.md` | **Nuevo.** Diseño vinculante de la ETAPA 03                                                                                                                                                     |
+| `CLAUDE.md` §6                                     | ETAPA 01 y ETAPA 03 actualizadas                                                                                                                                                                |
 
 ## B.3 · Tres cosas que salieron de verificar en vez de suponer
 
@@ -462,6 +460,7 @@ puesto a prueba.
 ---
 
 # Adenda 3 · Hallazgo de la verificación contra el proyecto real
+
 **2026-09-06 · migración `0017` · rama `etapa-01-modelo-datos-supabase`**
 
 ## C.1 · Qué se encontró
@@ -497,12 +496,12 @@ A eso se sumó una diferencia real del entorno, que ahora queda declarada: la ba
 
 Migración `0017`, en cuatro capas, porque **ninguna basta sola**: el dueño puede reconcederse un privilegio revocado, y puede desactivar un trigger. Juntas, cada una cubre el modo de fallo de la otra.
 
-| Capa | Qué cierra | Comprobado |
-|---|---|---|
-| `REVOKE UPDATE, DELETE, TRUNCATE` al dueño real | El uso desde el código de la aplicación. Efectivo en Supabase, donde `postgres` no es superusuario | Con un dueño no-superusuario: `permission denied for table` |
-| Trigger `BEFORE UPDATE` `ENABLE ALWAYS` | Al dueño y también a un superusuario | Bloquea; y `session_replication_role` está vedado al no-superusuario |
-| Rol `app_api` (no dueño, `NOBYPASSRLS`, sin DDL) | Que la conexión de la API *sea* el dueño | Nace sin `LOGIN` ni contraseña: falla cerrado |
-| Aserción sin exclusiones + `tgenabled` | La reversión silenciosa de cualquiera de las tres | Rompe el despliegue en las dos mutaciones probadas |
+| Capa                                             | Qué cierra                                                                                         | Comprobado                                                           |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `REVOKE UPDATE, DELETE, TRUNCATE` al dueño real  | El uso desde el código de la aplicación. Efectivo en Supabase, donde `postgres` no es superusuario | Con un dueño no-superusuario: `permission denied for table`          |
+| Trigger `BEFORE UPDATE` `ENABLE ALWAYS`          | Al dueño y también a un superusuario                                                               | Bloquea; y `session_replication_role` está vedado al no-superusuario |
+| Rol `app_api` (no dueño, `NOBYPASSRLS`, sin DDL) | Que la conexión de la API _sea_ el dueño                                                           | Nace sin `LOGIN` ni contraseña: falla cerrado                        |
+| Aserción sin exclusiones + `tgenabled`           | La reversión silenciosa de cualquiera de las tres                                                  | Rompe el despliegue en las dos mutaciones probadas                   |
 
 `TRUNCATE` se incorporó al revisar el ACL: tras revocar `UPDATE` y `DELETE` quedaba `postgres=arDxt/postgres`, y esa `D` vacía la tabla entera **sin disparar ningún trigger `FOR EACH ROW`**.
 
@@ -522,6 +521,7 @@ No hay nada que revisar: `eventos` es la única tabla particionada. Los 80 y 41 
 ---
 
 # Adenda 4 · El contenedor mentía
+
 **2026-09-06 · migraciones `0017` (reescrita) y `0018` · arnés `--modo-supabase`**
 
 ## D.1 · Qué pasó
@@ -534,12 +534,12 @@ En vez de corregir sentencia por sentencia a medida que fallaban, construí un a
 
 **1 · `0017` usaba cuatro sentencias privilegiadas, no una.**
 
-| Sentencia | Error | Causa real |
-|---|---|---|
+| Sentencia                              | Error                             | Causa real                                                                                                                                          |
+| -------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ALTER ROLE … NOSUPERUSER NOBYPASSRLS` | `permission denied to alter role` | PostgreSQL exige superusuario para **tocar** `superuser` y `bypassrls`, aunque sea para ponerlos en NO. No falla por el valor: falla por nombrarlos |
-| `GRANT authenticated TO app_api` | `permission denied to grant role` | Supabase documenta la dirección contraria: `grant mi_rol to authenticator` |
-| `ALTER DEFAULT PRIVILEGES FOR ROLE …` | `permission denied` | Exige pertenencia al rol nombrado |
-| `COMMENT ON ROLE …` | `permission denied` | No disponible sin superusuario |
+| `GRANT authenticated TO app_api`       | `permission denied to grant role` | Supabase documenta la dirección contraria: `grant mi_rol to authenticator`                                                                          |
+| `ALTER DEFAULT PRIVILEGES FOR ROLE …`  | `permission denied`               | Exige pertenencia al rol nombrado                                                                                                                   |
+| `COMMENT ON ROLE …`                    | `permission denied`               | No disponible sin superusuario                                                                                                                      |
 
 Confirmado además que `0001`–`0016` pasan limpias como no-superusuario: el problema estaba acotado a `0017`.
 
@@ -557,11 +557,11 @@ Confirmado además que `0001`–`0016` pasan limpias como no-superusuario: el pr
 
 La Adenda 3 contaba mal. Frente al dueño hay **tres** barreras; frente a la llave secreta, **dos**:
 
-| Capa | Frente al dueño (`postgres`) | Frente a `service_role` (BYPASSRLS) |
-|---|---|---|
-| RLS: `eventos` sin política de `UPDATE`, en modo `FORCE` | **Sí** — afecta a cero filas | No — la omite |
-| `REVOKE UPDATE, DELETE, TRUNCATE` | **Sí** | **Sí** |
-| Trigger `BEFORE UPDATE` | Sí, si se reconcede el privilegio | **Sí — última barrera** |
+| Capa                                                     | Frente al dueño (`postgres`)      | Frente a `service_role` (BYPASSRLS) |
+| -------------------------------------------------------- | --------------------------------- | ----------------------------------- |
+| RLS: `eventos` sin política de `UPDATE`, en modo `FORCE` | **Sí** — afecta a cero filas      | No — la omite                       |
+| `REVOKE UPDATE, DELETE, TRUNCATE`                        | **Sí**                            | **Sí**                              |
+| Trigger `BEFORE UPDATE`                                  | Sí, si se reconcede el privilegio | **Sí — última barrera**             |
 
 Demostrado por ejecución: con `service_role` y el `UPDATE` deliberadamente reconcedido, **el trigger detiene la alteración**. Es el escenario que hace del trigger algo más que redundancia, y ahora lo cubre la sección 5 de la prueba 40.
 

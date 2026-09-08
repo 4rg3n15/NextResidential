@@ -20,3 +20,7 @@ coverage/
 
 # CLI de Supabase
 supabase/.temp/
+
+# Medición de latencia del canal de tiempo real (ETAPA 06): se regenera en
+# cada ejecución de la suite y su valor depende de la máquina.
+.latencia-tiempo-real.json

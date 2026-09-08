@@ -9,12 +9,12 @@
 
 OE-07 exige que un operador externo al complejo converse con el visitante, autorice o niegue el ingreso y accione dispositivos. CU-03 detalla la cadena completa: el visitante pulsa el intercom, el evento se enruta a la cola del operador, se establece sesión de audio y vídeo, el operador verifica identidad, contacta al residente y ordena la apertura remota.
 
-El documento de requisitos, en su §13.4, califica esta pieza como **el mayor riesgo de cronograma del proyecto**: *«El intercom con audio y video es la pieza más difícil del proyecto. OE-07 depende de él y el puente SIP a WebRTC no es trivial. Es donde más tiempo se pierde.»*
+El documento de requisitos, en su §13.4, califica esta pieza como **el mayor riesgo de cronograma del proyecto**: _«El intercom con audio y video es la pieza más difícil del proyecto. OE-07 depende de él y el puente SIP a WebRTC no es trivial. Es donde más tiempo se pierde.»_
 
 Existían dos caminos con respaldo documental:
 
-- **§13.2 del documento de requisitos** proponía *«SIP hacia el videoportero, con puente WebRTC (LiveKit o Janus)»*, con el argumento de que *«los intercom Hikvision hablan SIP; el navegador del operador habla WebRTC»*.
-- **El diagrama arquitectónico** dejaba ambas rutas abiertas: la caja «Puente de intercom» dice literalmente *«ISAPI TwoWayAudio, o SIP con Asterisk si el modelo no lo soporta»*.
+- **§13.2 del documento de requisitos** proponía _«SIP hacia el videoportero, con puente WebRTC (LiveKit o Janus)»_, con el argumento de que _«los intercom Hikvision hablan SIP; el navegador del operador habla WebRTC»_.
+- **El diagrama arquitectónico** dejaba ambas rutas abiertas: la caja «Puente de intercom» dice literalmente _«ISAPI TwoWayAudio, o SIP con Asterisk si el modelo no lo soporta»_.
 
 ## Decisión
 
@@ -27,7 +27,7 @@ Es una **decisión expresa del cliente**, posterior a la redacción del document
 La sugerencia de §13.2 **no prevalece**, por tres razones acumulativas:
 
 1. La decisión del cliente es **posterior** a la redacción del documento.
-2. §13 **se declara a sí misma ajena al estándar de especificación**: *«Esta sección no forma parte del estándar de especificación de requisitos, pero se incorpora porque las decisiones de arquitectura condicionan directamente el cumplimiento de OE-03, OE-06 y OE-08.»* Es una sugerencia, no un requisito.
+2. §13 **se declara a sí misma ajena al estándar de especificación**: _«Esta sección no forma parte del estándar de especificación de requisitos, pero se incorpora porque las decisiones de arquitectura condicionan directamente el cumplimiento de OE-03, OE-06 y OE-08.»_ Es una sugerencia, no un requisito.
 3. **Ningún requisito verificable exige SIP.** Ningún OE, RN, HU, CU ni CA lo menciona. Los compromisos reales —KPI-32, KPI-33, CA-19, CA-20— son de latencia y trazabilidad, **agnósticos al protocolo**.
 
 El diagrama no contradice la decisión: la contiene como primera opción.
@@ -36,11 +36,11 @@ El diagrama no contradice la decisión: la contiene como primera opción.
 
 ## Alternativas consideradas
 
-| Alternativa | Por qué se descarta |
-|---|---|
-| **SIP + Asterisk / LiveKit / Janus** | Introduce un servidor de señalización, un plano de medios y un ciclo de vida de sesión SIP completos, para un caso de uso que no necesita interoperar con ninguna red telefónica. Es la ruta que §13.4 señala como sumidero de tiempo. No la exige ningún requisito |
-| **SDK móvil/nativo de Hikvision** | Es nativo por plataforma; obligaría a canales de plataforma en Flutter e introduciría dependencia binaria del fabricante en la capa equivocada. Contradice OE-03 |
-| **WebRTC directo contra el dispositivo** | El navegador hablaría con el hardware. Viola RN-12 de forma frontal |
+| Alternativa                              | Por qué se descarta                                                                                                                                                                                                                                                 |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SIP + Asterisk / LiveKit / Janus**     | Introduce un servidor de señalización, un plano de medios y un ciclo de vida de sesión SIP completos, para un caso de uso que no necesita interoperar con ninguna red telefónica. Es la ruta que §13.4 señala como sumidero de tiempo. No la exige ningún requisito |
+| **SDK móvil/nativo de Hikvision**        | Es nativo por plataforma; obligaría a canales de plataforma en Flutter e introduciría dependencia binaria del fabricante en la capa equivocada. Contradice OE-03                                                                                                    |
+| **WebRTC directo contra el dispositivo** | El navegador hablaría con el hardware. Viola RN-12 de forma frontal                                                                                                                                                                                                 |
 
 ## Diseño resultante
 
@@ -54,16 +54,16 @@ El diagrama no contradice la decisión: la contiene como primera opción.
 
 **Que se aceptan:**
 
-- **Exclusividad del canal.** Un canal TwoWayAudio suele ser exclusivo por dispositivo. Hay que gestionar bloqueo por dispositivo, cola de espera y liberación con *timeout*, para que dos operadores no colisionen. Se implementa simulado en la ETAPA 10 y real en la 15.
+- **Exclusividad del canal.** Un canal TwoWayAudio suele ser exclusivo por dispositivo. Hay que gestionar bloqueo por dispositivo, cola de espera y liberación con _timeout_, para que dos operadores no colisionen. Se implementa simulado en la ETAPA 10 y real en la 15.
 - **Semiduplex en algunos modelos.** La consola debe indicar visualmente el turno de palabra.
 - **Alcance de implementación cerrado.** Toda referencia a SIP, Asterisk, LiveKit o Janus queda fuera: no se construye, no se deja andamiaje, no se menciona en el código.
 
 **Objetivos medibles comprometidos:**
 
-| Objetivo | Umbral | Respaldo |
-|---|---|---|
-| Audio y vídeo extremo a extremo | **< 2 s** | KPI-33, CA-19 |
-| Apertura remota | **< 3 s** | KPI-32, CA-20 |
+| Objetivo                            | Umbral    | Respaldo      |
+| ----------------------------------- | --------- | ------------- |
+| Audio y vídeo extremo a extremo     | **< 2 s** | KPI-33, CA-19 |
+| Apertura remota                     | **< 3 s** | KPI-32, CA-20 |
 | Atribución de la acción al operador | **100 %** | KPI-34, RN-08 |
 
 ## Verificación

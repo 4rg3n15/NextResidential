@@ -18,11 +18,11 @@ El proyecto de Grupo Control se creó con el esquema nuevo: **no tiene `anon` ni
 `service_role` como llaves de API, ni secreto JWT compartido**. Conviene separar
 tres cosas que suelen confundirse porque comparten nombre.
 
-| Concepto | Antes | Ahora | ¿Cambia algo en lo construido? |
-|---|---|---|---|
-| **Llaves de API** | `anon` y `service_role`, que eran JWT firmados con el secreto del proyecto | `sb_publishable_…` y `sb_secret_…`, que **no son JWT** | Solo los nombres de variable en `.env` |
-| **Roles de PostgreSQL** | `anon`, `authenticated`, `service_role` | **Los mismos** | **Nada.** Las llaves siguen resolviendo a esos roles |
-| **Verificación de la firma del token de usuario** | HS256 con secreto compartido | **Asimétrica** (RS256/ES256) contra JWKS | Todo el diseño de la ETAPA 03 |
+| Concepto                                          | Antes                                                                      | Ahora                                                  | ¿Cambia algo en lo construido?                       |
+| ------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------- |
+| **Llaves de API**                                 | `anon` y `service_role`, que eran JWT firmados con el secreto del proyecto | `sb_publishable_…` y `sb_secret_…`, que **no son JWT** | Solo los nombres de variable en `.env`               |
+| **Roles de PostgreSQL**                           | `anon`, `authenticated`, `service_role`                                    | **Los mismos**                                         | **Nada.** Las llaves siguen resolviendo a esos roles |
+| **Verificación de la firma del token de usuario** | HS256 con secreto compartido                                               | **Asimétrica** (RS256/ES256) contra JWKS               | Todo el diseño de la ETAPA 03                        |
 
 ### 1.1 Lo que **no** hay que tocar
 
@@ -86,17 +86,17 @@ proyecto no usa llaves asimétricas, no devuelve ninguna.
 
 ### 2.3 Caché local y su TTL
 
-| Parámetro | Valor | Por qué |
-|---|---|---|
-| TTL de la caché local | **600 s (10 min)** | Es el mismo que el edge de Supabase cachea el JWKS. Ponerlo **más alto** significaría seguir aceptando tokens de una clave revocada más tiempo del que la propia plataforma lo hace |
-| Refresco reactivo ante `kid` desconocido | Sí, **una vez** | Es lo que permite adoptar una clave nueva antes de que venza el TTL |
-| Suelo entre refrescos reactivos | **60 s** | Sin él, un atacante fabrica tokens con `kid` inventado y provoca una descarga del JWKS **por petición**: amplificación de denegación de servicio contra el propio Auth |
-| Comportamiento al arrancar | Descarga al inicio; si falla, `/ready` responde 503 | La API no puede autenticar sin JWKS. Debe declararse no lista, no arrancar fingiendo salud |
-| Comportamiento si el refresco falla estando la caché caducada | **Rechazar**, no aceptar sin verificar | Fallar cerrado (§2.1.4 del contrato) |
+| Parámetro                                                     | Valor                                               | Por qué                                                                                                                                                                             |
+| ------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TTL de la caché local                                         | **600 s (10 min)**                                  | Es el mismo que el edge de Supabase cachea el JWKS. Ponerlo **más alto** significaría seguir aceptando tokens de una clave revocada más tiempo del que la propia plataforma lo hace |
+| Refresco reactivo ante `kid` desconocido                      | Sí, **una vez**                                     | Es lo que permite adoptar una clave nueva antes de que venza el TTL                                                                                                                 |
+| Suelo entre refrescos reactivos                               | **60 s**                                            | Sin él, un atacante fabrica tokens con `kid` inventado y provoca una descarga del JWKS **por petición**: amplificación de denegación de servicio contra el propio Auth              |
+| Comportamiento al arrancar                                    | Descarga al inicio; si falla, `/ready` responde 503 | La API no puede autenticar sin JWKS. Debe declararse no lista, no arrancar fingiendo salud                                                                                          |
+| Comportamiento si el refresco falla estando la caché caducada | **Rechazar**, no aceptar sin verificar              | Fallar cerrado (§2.1.4 del contrato)                                                                                                                                                |
 
 ### 2.4 Rotación de claves — y de dónde sale el margen de 20 minutos
 
-Supabase maneja cuatro estados: **Activa**, **En espera** *(standby)*,
+Supabase maneja cuatro estados: **Activa**, **En espera** _(standby)_,
 **Usada anteriormente** y **Revocada**. La rotación no exige desplegar de nuevo
 ningún backend, porque todos leen el JWKS.
 
@@ -118,7 +118,7 @@ local en 10 minutos y no más.**
 
 1. Crear la clave nueva en estado **en espera**. **Esperar 20 minutos.**
 2. Promoverla a **activa**. Los tokens nuevos se firman con ella; los antiguos
-   siguen validando contra la anterior, que pasa a *usada anteriormente*.
+   siguen validando contra la anterior, que pasa a _usada anteriormente_.
 3. Esperar a que expiren los tokens en circulación — con 5 minutos de vigencia,
    basta con esperar **5 minutos más un margen**, no una hora.
 4. **Esperar 20 minutos** desde el paso 2 y solo entonces **revocar** la
@@ -155,12 +155,12 @@ Con firma asimétrica, la expiración del token de acceso pasa a ser de
 
 Es donde más duele, y no por el plazo en sí sino por la **suspensión**.
 
-| Problema | Por qué aparece ahora | Qué debe hacer la ETAPA 11 |
-|---|---|---|
+| Problema                                                   | Por qué aparece ahora                                                                                          | Qué debe hacer la ETAPA 11                                                                                   |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | El temporizador de refresco no corre con la app suspendida | Con 60 min había holgura para volver y refrescar; con 5 min, casi cualquier retorno encuentra el token vencido | **Refrescar al volver a primer plano**, antes de la primera petición, no de forma perezosa al recibir un 401 |
-| Una petición sale con un token que caduca en vuelo | La ventana es 12 veces más estrecha | **Margen de refresco preventivo**: renovar si al token le quedan menos de 60 s |
-| La cola sin conexión se vacía con un token vencido | El modo sin conexión de HU-07 acumula operaciones | **Reautenticar antes de vaciar la cola**, no durante |
-| Reintentos en tormenta tras recuperar red | Muchas peticiones a la vez, todas con token vencido | **Un solo refresco en vuelo**, compartido; las demás esperan a que resuelva |
+| Una petición sale con un token que caduca en vuelo         | La ventana es 12 veces más estrecha                                                                            | **Margen de refresco preventivo**: renovar si al token le quedan menos de 60 s                               |
+| La cola sin conexión se vacía con un token vencido         | El modo sin conexión de HU-07 acumula operaciones                                                              | **Reautenticar antes de vaciar la cola**, no durante                                                         |
+| Reintentos en tormenta tras recuperar red                  | Muchas peticiones a la vez, todas con token vencido                                                            | **Un solo refresco en vuelo**, compartido; las demás esperan a que resuelva                                  |
 
 **KPI-10 (crear una autorización en menos de 60 s) no se ve afectado** si el
 refresco al volver a primer plano se hace bien: el usuario no debe ver nunca una
@@ -192,7 +192,7 @@ pero hay que hacerlo con la calibración a la vista.
 
 ## §4. Custom claims — verificado: no cambia nada
 
-**El *Custom Access Token Hook* funciona igual con llaves asimétricas.** El
+**El _Custom Access Token Hook_ funciona igual con llaves asimétricas.** El
 gancho se ejecuta **antes** de firmar el token y modifica su carga útil; el
 algoritmo de firma se aplica después. Son dos etapas independientes.
 
@@ -243,7 +243,7 @@ por turno. Se revisa si aparece un caso real que lo desmienta.
       vencimiento de la caché.
 - [ ] Prueba de que un `kid` desconocido no dispara más de un refresco por
       minuto.
-- [ ] Auth Hook de *custom claims* con los cinco claims, y prueba de que
+- [ ] Auth Hook de _custom claims_ con los cinco claims, y prueba de que
       `app.claims()` los recibe intactos.
 - [ ] Rate limiting calibrado para un refresco cada 5 minutos por identidad.
 - [ ] La suite de aislamiento de la ETAPA 03 recorre los **dos caminos**: token

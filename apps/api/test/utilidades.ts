@@ -29,6 +29,8 @@ export const configuracionDePrueba: Configuracion = {
   LIMITE_PAYLOAD: '256kb',
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 100000, // el límite se prueba aparte; aquí estorbaría
+  THROTTLE_DISPOSITIVO_LIMITE: 120,
+  THROTTLE_INGESTA_IP_LIMITE: 3000,
   origenesPermitidos: ['https://consola.invalid'],
 };
 

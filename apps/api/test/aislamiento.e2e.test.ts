@@ -43,8 +43,18 @@ afterAll(async () => {
 const cuerpoDe = (r: RutaExpuesta): Record<string, unknown> =>
   r.ruta.includes('ingesta') ? { copropiedadId: COP_B } : {};
 
+/**
+ * Identificador de relleno para los parámetros que NO son la copropiedad
+ * (`:eventoId`, `:alertaId`). Sin sustituirlos, la ruta llegaba con el literal
+ * `:alertaId`, el `ParseUUIDPipe` devolvía 400 y la prueba daba por buena una
+ * ruta que nunca llegó a su comprobación de alcance: cobertura aparente, no
+ * real. Con un UUID válido, la petición alcanza el manejador y es la barrera de
+ * aislamiento la que responde.
+ */
+const OTRO_ID = '00000000-0000-4000-8000-0000000000ff';
+
 const invocar = (r: RutaExpuesta, token?: string) => {
-  const ruta = r.ruta.replace(':id', COP_B);
+  const ruta = r.ruta.replace(':id', COP_B).replace(/:[A-Za-z]+/g, OTRO_ID);
   const peticion = request(app.getHttpServer())[
     r.metodo.toLowerCase() as 'get' | 'post' | 'patch' | 'delete'
   ](ruta);

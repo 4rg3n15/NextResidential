@@ -143,18 +143,68 @@ else
   mal "protocolo del fabricante o IP de dispositivo fuera de packages/providers (KPI-11)"
   echo "$salida_kpi11" | head -8 | sed 's/^/     /'
 fi
+# ADR-005 · una clave ajena hacia una tabla append-only NO se puede insertar
+# jamás: la comprobación exige un bloqueo de fila que la revocación impide. El
+# defecto vivió cinco etapas porque las tablas estaban vacías (ETAPA 06).
+if salida_append=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-append-only.mjs 2>&1); then
+  ok "$salida_append"
+else
+  mal "clave ajena vigente hacia una tabla append-only (ADR-005)"
+  echo "$salida_append" | head -10 | sed 's/^/     /'
+fi
+
+paso "11 · latencia del canal de tiempo real bajo carga (KPI-25)"
+# La cifra la produce `test/latencia-tiempo-real.test.ts`, que ya corrió en el
+# paso 5 con el resto de la suite: aquí solo se LEE lo que dejó escrito. Medir
+# aparte daría dos números para el mismo indicador, y el informe tendría que
+# elegir uno.
+if [[ -f .latencia-tiempo-real.json ]]; then
+  node -e '
+    const m = require("./.latencia-tiempo-real.json");
+    const linea = (t, v) => console.log(`   ${t.padEnd(18)}: ${v}`);
+    linea("alertas entregadas", `${m.recibidas} de ${m.esperadas}`);
+    linea("p50 / p95 / p99", `${m.p50} / ${m.p95} / ${m.p99} ms`);
+    linea("maximo", `${m.max} ms`);
+    linea("umbral KPI-25", `${m.umbralKpi25Ms} ms`);
+    process.exit(m.recibidas === m.esperadas && m.p99 < m.umbralKpi25Ms ? 0 : 1);
+  ' && ok "KPI-25 con margen sobre el umbral" || mal "KPI-25 sin margen o con entregas perdidas"
+else
+  mal "no hay medición de latencia: ¿corrió test/latencia-tiempo-real.test.ts?"
+fi
 
 if [[ "$CON_BASE" == "1" ]]; then
-  paso "11 · esquema y aislamiento en --modo-supabase"
+  paso "12 · esquema y aislamiento en --modo-supabase"
   if con_limite "$LIMITE_LARGO" ./supabase/verificar.sh --con-pruebas --modo-supabase >/tmp/ncr-sql.log 2>&1; then
     ok "migraciones, semillas y suite SQL"
   else
     mal "suite SQL (ver /tmp/ncr-sql.log)"
   fi
-  paso "12 · KPI-03 con base real"
+  paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base"
+  # Estas dos pruebas se OMITEN solas si no alcanzan la base, y una omisión no
+  # es un verde. Se comprueba la marca «OMITIDA» de su salida: sin esto, el
+  # paso daba «✓ UPDATE y DELETE rechazados» con el servidor caído — que es
+  # exactamente la familia de falso verde que este guion existe para impedir.
+  con_base_o_omitida() {
+    local fichero="$1" etiqueta="$2" salida
+    salida=$(con_limite "$LIMITE_LARGO" pnpm --filter @ncr/api exec vitest run "$fichero" 2>&1)
+    if [[ $? -ne 0 ]]; then
+      mal "$etiqueta"
+      echo "$salida" | grep -E "×|→" | head -5 | sed 's/^/     /'
+    elif echo "$salida" | grep -q "OMITIDA"; then
+      mal "$etiqueta — OMITIDA: no se alcanzó la base. Una omisión no es un verde."
+    else
+      ok "$etiqueta"
+    fi
+  }
+
   if [[ -n "${DATABASE_URL_PRUEBAS:-}" ]]; then
-    con_limite "$LIMITE_LARGO" pnpm --filter @ncr/api exec vitest run test/concurrencia-padron.test.ts >/dev/null 2>&1 \
-      && ok "100 inserciones concurrentes, 0 duplicados" || mal "KPI-03"
+    con_base_o_omitida test/concurrencia-padron.test.ts \
+      "100 inserciones concurrentes, 0 duplicados (KPI-03)"
+    # Cierra el pendiente que la ETAPA 01 dejó abierto: el UPDATE se intenta
+    # sobre una fila que EXISTE, insertada por el adaptador de la aplicación.
+    # Sobre una tabla vacía, un UPDATE que no falla tampoco prueba nada.
+    con_base_o_omitida test/eventos-pg.test.ts \
+      "UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)"
   else
     echo "   – omitido: exporta DATABASE_URL_PRUEBAS para ejecutarlo"
   fi

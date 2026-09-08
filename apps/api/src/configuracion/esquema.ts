@@ -46,6 +46,23 @@ export const esquemaConfiguracion = z.object({
   LIMITE_PAYLOAD: z.string().default('256kb'),
   THROTTLE_TTL_SEGUNDOS: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMITE: z.coerce.number().int().positive().default(120),
+
+  /**
+   * D-28 · Límites de la ingesta de hardware.
+   *
+   * `THROTTLE_DISPOSITIVO_LIMITE` es el tope por EQUIPO y por minuto: holgado
+   * para una cámara sana, corto en seco para una con el firmware colgado. Sin
+   * él, un equipo desbocado llenaría una tabla que no admite borrado.
+   *
+   * `THROTTLE_INGESTA_IP_LIMITE` es el tope por IP en las rutas de ingesta, y
+   * es alto A PROPÓSITO: todos los equipos de una copropiedad salen por el
+   * mismo enrutador, así que el tope global de 120/min los sumaría a todos y
+   * dejaría fuera a las cámaras sanas en cuanto el conjunto tuviera tráfico.
+   * Sigue existiendo como red contra una inundación, pero la identidad que
+   * gobierna aquí es el dispositivo firmante, no la IP compartida.
+   */
+  THROTTLE_DISPOSITIVO_LIMITE: z.coerce.number().int().positive().default(120),
+  THROTTLE_INGESTA_IP_LIMITE: z.coerce.number().int().positive().default(3000),
 });
 
 export type ConfiguracionCruda = z.infer<typeof esquemaConfiguracion>;

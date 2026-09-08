@@ -27,7 +27,7 @@ Y se cerró la Definición de Terminado: las treinta y ocho historias, los veint
 
 ## 2. Cómo se organizó y por qué
 
-*Esta es la sección que hay que leer si solo se va a leer una.*
+_Esta es la sección que hay que leer si solo se va a leer una._
 
 **El orden de lectura no fue negociable, y eso importa.** Los insumos se leyeron en el orden que fija `CLAUDE.md` §3 —reto, requisitos, arquitectura, mockups— porque cada uno se interpreta a la luz del anterior. Leer los mockups antes que los requisitos habría llevado a construir el flujo de aprobación administrativa que los mockups dibujan, sin advertir que contradice el objetivo específico número dos. El orden es lo que convierte una discrepancia en una contradicción detectable.
 
@@ -37,7 +37,7 @@ Y se cerró la Definición de Terminado: las treinta y ocho historias, los veint
 
 **La matriz de trazabilidad se organizó por elemento, no por etapa.** Hay una tabla para las reglas, otra para las historias, otra para los criterios, otra para los indicadores, y cada una termina con un **reparto por etapa cuya suma se verifica**. Una matriz organizada por etapas habría sido más cómoda de leer y completamente inútil para lo que la Definición de Terminado exige: demostrar que nada quedó huérfano. La suma es la prueba.
 
-**Los indicadores se etiquetaron por dependencia de hardware.** Nueve de los treinta y siete solo pueden cerrarse con el equipo físico delante. Están marcados y asignados a la ETAPA 15. La consecuencia práctica es una regla de honestidad para los informes intermedios: hasta esa etapa se reportan como *«verificado contra simulación, pendiente de hardware»*, nunca como cumplidos. Sin esa distinción, el proyecto podría llegar a la etapa 14 creyendo que tiene treinta y siete indicadores verdes cuando tiene veintiocho.
+**Los indicadores se etiquetaron por dependencia de hardware.** Nueve de los treinta y siete solo pueden cerrarse con el equipo físico delante. Están marcados y asignados a la ETAPA 15. La consecuencia práctica es una regla de honestidad para los informes intermedios: hasta esa etapa se reportan como _«verificado contra simulación, pendiente de hardware»_, nunca como cumplidos. Sin esa distinción, el proyecto podría llegar a la etapa 14 creyendo que tiene treinta y siete indicadores verdes cuando tiene veintiocho.
 
 **Los requisitos no funcionales se derivaron, no se inventaron.** Cada uno de los doce apunta al indicador o a la regla que lo respalda. Hay una sola excepción, y está señalada: **RNF-03.11, la validación de firma del Alarm Server**. Procede exclusivamente del paso 2 del flujo de CU-01 del diagrama, donde dice «valida firma», y ningún indicador ni regla lo respaldaba. Se elevó a requisito formal porque sin él el endpoint de ingesta aceptaría eventos de acceso de cualquiera que alcance la URL —lo que permitiría fabricar aperturas y falsear la auditoría completa—. Es el hallazgo de seguridad más importante de esta etapa, y salió de una caja de un diagrama.
 
@@ -92,13 +92,13 @@ docs/arquitectura/  ·  docs/seguridad/  ·  docs/guias/       Creados vacíos; 
 
 **No se escribió código de producto en esta etapa**, por lo que no hay archivos que evaluar. La tabla que exige `CLAUDE.md` §2.8.4 se rellena con las **decisiones de esta etapa que determinan cómo se materializará cada principio**, y con dónde se verificará.
 
-| Principio | Decisión de la ETAPA 00 que lo determina | Dónde se verifica |
-|---|---|---|
-| **SRP** | Siete documentos con una responsabilidad cada uno: cuatro auditan un insumo, tres consolidan una dimensión transversal. Ningún documento diagnostica y resuelve a la vez —la resolución vive centralizada—. En el plan: se adoptaron **nueve agregados** en lugar de seis porque `ListaNegra` y `Dispositivo` tienen razones de cambio propias, y `ConsentimientoBiometrico` y `PlantillaBiometrica` se mantienen separados porque sus ciclos de vida son distintos | ETAPAS 01–08 · límite de 300 líneas y 5 métodos públicos |
-| **OCP** | Se fijó que las políticas del motor se construyen como `Specification` componibles con combinadores `and`/`or`/`not`, y se declaró vinculante la cadena de precedencia `listaNegra > vigencia > patrón > zona` hallada en la página 3 del diagrama. Agregar una regla no debe producir diff en `MotorDeReglas` | ETAPA 05 |
-| **LSP** | Se resolvió C-07 estableciendo que `MockProvider` **es** el proveedor alternativo que demuestra la sustituibilidad, y que la suite debe pasar con ambas implementaciones **sin cambiar una aserción** | ETAPAS 05 y 15 · KPI-12 |
-| **ISP** | Se verificó que los cuatro puertos de proveedor del diagrama están segregados por capacidad y no fundidos en un `HardwareService`. Se detectaron cuatro repositorios faltantes y se añadieron como puertos pequeños y específicos, no como un repositorio genérico | ETAPAS 01, 05, 08 · ningún adaptador lanza `NotImplemented` |
-| **DIP** | Se validó que ninguna flecha sale del dominio y que la única entrada es «implementa los puertos — inversión de dependencias». Se confirmó que ADR-001 mantiene el protocolo fuera del dominio, verificado en tres puntos independientes del diagrama | ETAPA 02 · el build falla si `domain/` importa infraestructura · KPI-11 |
+| Principio | Decisión de la ETAPA 00 que lo determina                                                                                                                                                                                                                                                                                                                                                                                                                            | Dónde se verifica                                                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **SRP**   | Siete documentos con una responsabilidad cada uno: cuatro auditan un insumo, tres consolidan una dimensión transversal. Ningún documento diagnostica y resuelve a la vez —la resolución vive centralizada—. En el plan: se adoptaron **nueve agregados** en lugar de seis porque `ListaNegra` y `Dispositivo` tienen razones de cambio propias, y `ConsentimientoBiometrico` y `PlantillaBiometrica` se mantienen separados porque sus ciclos de vida son distintos | ETAPAS 01–08 · límite de 300 líneas y 5 métodos públicos                |
+| **OCP**   | Se fijó que las políticas del motor se construyen como `Specification` componibles con combinadores `and`/`or`/`not`, y se declaró vinculante la cadena de precedencia `listaNegra > vigencia > patrón > zona` hallada en la página 3 del diagrama. Agregar una regla no debe producir diff en `MotorDeReglas`                                                                                                                                                      | ETAPA 05                                                                |
+| **LSP**   | Se resolvió C-07 estableciendo que `MockProvider` **es** el proveedor alternativo que demuestra la sustituibilidad, y que la suite debe pasar con ambas implementaciones **sin cambiar una aserción**                                                                                                                                                                                                                                                               | ETAPAS 05 y 15 · KPI-12                                                 |
+| **ISP**   | Se verificó que los cuatro puertos de proveedor del diagrama están segregados por capacidad y no fundidos en un `HardwareService`. Se detectaron cuatro repositorios faltantes y se añadieron como puertos pequeños y específicos, no como un repositorio genérico                                                                                                                                                                                                  | ETAPAS 01, 05, 08 · ningún adaptador lanza `NotImplemented`             |
+| **DIP**   | Se validó que ninguna flecha sale del dominio y que la única entrada es «implementa los puertos — inversión de dependencias». Se confirmó que ADR-001 mantiene el protocolo fuera del dominio, verificado en tres puntos independientes del diagrama                                                                                                                                                                                                                | ETAPA 02 · el build falla si `domain/` importa infraestructura · KPI-11 |
 
 ---
 
@@ -106,29 +106,29 @@ docs/arquitectura/  ·  docs/seguridad/  ·  docs/guias/       Creados vacíos; 
 
 ### Cubierto por completo
 
-| Elemento | Cobertura |
-|---|---|
-| **8 OE** | Los ocho con reglas, historias, casos, criterios, indicadores, casos de prueba, etapas y pantallas asignados |
-| **22 RN** | Las veintidós con mecanismo de implementación y etapa. Cero huérfanas |
-| **38 HU** | Las treinta y ocho con etapa, pantalla y criterio que las verifica |
-| **5 CU** | Los cinco con etapa, incluidos **todos** sus flujos alternos y excepciones |
-| **26 CA** | Los veintiséis con etapa que los cierra y método de verificación |
-| **37 KPI** | Los treinta y siete con etapa, fuente de medición y requisito no funcional de respaldo |
-| **11 CP** | Los once con etapa y elementos que cubren |
-| **6 PB** | Los seis con la solución que los elimina y su etapa |
-| **6 roles** | Los seis reconciliados con los 3 perfiles del PDF del reto (C-26) |
-| **22 términos de glosario** | Verificados; se ampliarán con vocabulario técnico en la ETAPA 16 |
-| **5 ADR** | Los cinco formalizados con contexto, alternativas, consecuencias, verificación y contingencia |
+| Elemento                    | Cobertura                                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **8 OE**                    | Los ocho con reglas, historias, casos, criterios, indicadores, casos de prueba, etapas y pantallas asignados |
+| **22 RN**                   | Las veintidós con mecanismo de implementación y etapa. Cero huérfanas                                        |
+| **38 HU**                   | Las treinta y ocho con etapa, pantalla y criterio que las verifica                                           |
+| **5 CU**                    | Los cinco con etapa, incluidos **todos** sus flujos alternos y excepciones                                   |
+| **26 CA**                   | Los veintiséis con etapa que los cierra y método de verificación                                             |
+| **37 KPI**                  | Los treinta y siete con etapa, fuente de medición y requisito no funcional de respaldo                       |
+| **11 CP**                   | Los once con etapa y elementos que cubren                                                                    |
+| **6 PB**                    | Los seis con la solución que los elimina y su etapa                                                          |
+| **6 roles**                 | Los seis reconciliados con los 3 perfiles del PDF del reto (C-26)                                            |
+| **22 términos de glosario** | Verificados; se ampliarán con vocabulario técnico en la ETAPA 16                                             |
+| **5 ADR**                   | Los cinco formalizados con contexto, alternativas, consecuencias, verificación y contingencia                |
 
 ### Cubierto parcialmente, con motivo
 
-| Elemento | Estado | Motivo |
-|---|---|---|
-| **KPI-19** | **No aplicable** | No existe en el documento original. Identificador reservado; ningún artefacto debe usarlo |
-| **9 KPI dependientes de hardware** (13, 14, 17, 18, 22, 26, 27, 32, 33) | Asignados, **no verificables** hasta la ETAPA 15 | ADR-003. Hasta entonces se reportan como «pendiente de hardware» |
-| **KPI-07 y KPI-15** | Sin requisito no funcional | Son funcionales puros: los cubren RN-01, RN-22 y RN-14 con pruebas de comportamiento |
-| **2 pantallas** (captura de rostro, consentimiento del visitante) | Especificadas, **no dibujadas** | No existen en el mockup (M-02, M-03). Se diseñan en la ETAPA 08 |
-| **11 decisiones de negocio** | Con comportamiento conservador vigente | Requieren decisión de Grupo Control. Ninguna bloquea la ETAPA 01 |
+| Elemento                                                                | Estado                                           | Motivo                                                                                    |
+| ----------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| **KPI-19**                                                              | **No aplicable**                                 | No existe en el documento original. Identificador reservado; ningún artefacto debe usarlo |
+| **9 KPI dependientes de hardware** (13, 14, 17, 18, 22, 26, 27, 32, 33) | Asignados, **no verificables** hasta la ETAPA 15 | ADR-003. Hasta entonces se reportan como «pendiente de hardware»                          |
+| **KPI-07 y KPI-15**                                                     | Sin requisito no funcional                       | Son funcionales puros: los cubren RN-01, RN-22 y RN-14 con pruebas de comportamiento      |
+| **2 pantallas** (captura de rostro, consentimiento del visitante)       | Especificadas, **no dibujadas**                  | No existen en el mockup (M-02, M-03). Se diseñan en la ETAPA 08                           |
+| **11 decisiones de negocio**                                            | Con comportamiento conservador vigente           | Requieren decisión de Grupo Control. Ninguna bloquea la ETAPA 01                          |
 
 ---
 
@@ -136,21 +136,21 @@ docs/arquitectura/  ·  docs/seguridad/  ·  docs/guias/       Creados vacíos; 
 
 Esta etapa no produce código, pero sí produce **afirmaciones verificables**. Todas se comprobaron mecánicamente.
 
-| Verificación | Método | Resultado |
-|---|---|---|
-| Fidelidad de `Requisitos.md` frente al `.docx` | Extracción de `word/document.xml` preservando fronteras de celda; normalización de sintaxis Markdown y Unicode NFC; comparación palabra a palabra con `difflib` | **Similitud 1,0000 · 0 diferencias de contenido.** Las 79 divergencias del crudo son artefactos de conversión |
-| Numeración de identificadores | Expresión regular sobre el texto completo, conteo de únicos por serie | OE 8 · KPI 36 + `KP1-21` = **37** · RN 22 · HU 38 · CU 5 · CA 26 · PB 6 · CP 11. **Coincide con la línea base de `CLAUDE.md` §1** |
-| **Ausencia de `KPI-19`** | Búsqueda directa del identificador | **Confirmada.** Cero ocurrencias |
-| **Grafía `KP1-21`** | Búsqueda de la variante con uno numérico | **Confirmada.** Una única ocurrencia |
-| Codificación de `Requisitos.md` | Inspección de bytes: BOM, saltos de línea, `NUL`, categoría Unicode, forma de normalización | UTF-8 **con BOM** · LF puro · 0 `NUL` · 0 caracteres de control · NFC · sin mojibake |
-| Integridad de tablas | Conteo de columnas por fila en las 24 tablas | **24/24 consistentes.** Ninguna malformada ni truncada |
-| Backticks residuales | Búsqueda de la secuencia `` ` ` `` en celdas | **4 ocurrencias localizadas** (KPI-13, 17, 26, 35) |
-| Términos de glosario | Conteo de filas de la tabla §11 | **22**, coincide con la línea base |
-| Estructura del diagrama JSON | Recorrido de `pages[].items` y extracción de `textAreas` | **4 páginas · 91 formas · 25 conectores.** Texto íntegro extraído |
-| Legibilidad del PDF de capas DDD | Extracción de texto | Íntegro, sin pérdida |
-| Paleta del mockup | Análisis de frecuencia sobre píxeles con S > 0,35 y V > 0,25, agrupados por H/S/V | Primario `#E63946` · éxito `#10B981` · superficie oscura `#040407`/`#252542` · lienzo `#F8F9FA` |
-| **Contraste de accesibilidad** | Cálculo sobre el primario | `#E63946` sobre blanco ≈ **3,9:1 — insuficiente para texto normal AA**. Regla derivada en `03-mockups.md` §5.6 |
-| Cierre de la Definición de Terminado | Reparto por etapa y suma en las tres tablas | HU **38/38** · CA **26/26** · KPI **37/37** |
+| Verificación                                   | Método                                                                                                                                                          | Resultado                                                                                                                         |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Fidelidad de `Requisitos.md` frente al `.docx` | Extracción de `word/document.xml` preservando fronteras de celda; normalización de sintaxis Markdown y Unicode NFC; comparación palabra a palabra con `difflib` | **Similitud 1,0000 · 0 diferencias de contenido.** Las 79 divergencias del crudo son artefactos de conversión                     |
+| Numeración de identificadores                  | Expresión regular sobre el texto completo, conteo de únicos por serie                                                                                           | OE 8 · KPI 36 + `KP1-21` = **37** · RN 22 · HU 38 · CU 5 · CA 26 · PB 6 · CP 11. **Coincide con la línea base de `CLAUDE.md` §1** |
+| **Ausencia de `KPI-19`**                       | Búsqueda directa del identificador                                                                                                                              | **Confirmada.** Cero ocurrencias                                                                                                  |
+| **Grafía `KP1-21`**                            | Búsqueda de la variante con uno numérico                                                                                                                        | **Confirmada.** Una única ocurrencia                                                                                              |
+| Codificación de `Requisitos.md`                | Inspección de bytes: BOM, saltos de línea, `NUL`, categoría Unicode, forma de normalización                                                                     | UTF-8 **con BOM** · LF puro · 0 `NUL` · 0 caracteres de control · NFC · sin mojibake                                              |
+| Integridad de tablas                           | Conteo de columnas por fila en las 24 tablas                                                                                                                    | **24/24 consistentes.** Ninguna malformada ni truncada                                                                            |
+| Backticks residuales                           | Búsqueda de la secuencia `` ` ` `` en celdas                                                                                                                    | **4 ocurrencias localizadas** (KPI-13, 17, 26, 35)                                                                                |
+| Términos de glosario                           | Conteo de filas de la tabla §11                                                                                                                                 | **22**, coincide con la línea base                                                                                                |
+| Estructura del diagrama JSON                   | Recorrido de `pages[].items` y extracción de `textAreas`                                                                                                        | **4 páginas · 91 formas · 25 conectores.** Texto íntegro extraído                                                                 |
+| Legibilidad del PDF de capas DDD               | Extracción de texto                                                                                                                                             | Íntegro, sin pérdida                                                                                                              |
+| Paleta del mockup                              | Análisis de frecuencia sobre píxeles con S > 0,35 y V > 0,25, agrupados por H/S/V                                                                               | Primario `#E63946` · éxito `#10B981` · superficie oscura `#040407`/`#252542` · lienzo `#F8F9FA`                                   |
+| **Contraste de accesibilidad**                 | Cálculo sobre el primario                                                                                                                                       | `#E63946` sobre blanco ≈ **3,9:1 — insuficiente para texto normal AA**. Regla derivada en `03-mockups.md` §5.6                    |
+| Cierre de la Definición de Terminado           | Reparto por etapa y suma en las tres tablas                                                                                                                     | HU **38/38** · CA **26/26** · KPI **37/37**                                                                                       |
 
 **Cómo reproducirlas.** Los comandos usados son extracción con `python3` sobre `docs/insumos/`. Se documentarán como script reutilizable en la ETAPA 02, junto con el resto del utillaje del repositorio.
 
@@ -162,19 +162,19 @@ Esta etapa no produce código, pero sí produce **afirmaciones verificables**. T
 
 Contrastada contra el checklist de `CLAUDE.md` §2.7. La mayoría de los puntos no aplica todavía —no hay aplicación—, pero tres sí, y uno produjo un hallazgo.
 
-| # | Punto de §2.7 | Estado en esta etapa |
-|---|---|---|
-| 1 | **Secretos solo en variables de entorno** | ✅ **Verificado.** Los siete documentos producidos no contienen credenciales, llaves, IP reales, URLs de Supabase ni tokens. Las IP citadas (`192.168.1.101`) proceden del mockup y se citan como **hallazgo**, no como configuración. El correo `admin@urbanizacionmira.com` del mockup es de ejemplo ficticio |
-| 2 | CORS restrictivo | No aplica |
-| 3 | Validación en el backend | No aplica · **especificado** en RNF-03.6 |
-| 4 | Anti inyección SQL | No aplica · **especificado** en RNF-03.7 |
-| 5 | Rate limiting | No aplica · **especificado** en RNF-03.8 |
-| 6 | RLS activa y forzada | No aplica · **especificado** en RNF-03.9, y señalado como el riesgo número uno del proyecto |
-| 7 | Content Security Policy | No aplica · **especificado** en RNF-03.10 |
-| 8 | Transversales | No aplica · **especificados** en RNF-03.12 a RNF-03.14 |
+| #   | Punto de §2.7                             | Estado en esta etapa                                                                                                                                                                                                                                                                                            |
+| --- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Secretos solo en variables de entorno** | ✅ **Verificado.** Los siete documentos producidos no contienen credenciales, llaves, IP reales, URLs de Supabase ni tokens. Las IP citadas (`192.168.1.101`) proceden del mockup y se citan como **hallazgo**, no como configuración. El correo `admin@urbanizacionmira.com` del mockup es de ejemplo ficticio |
+| 2   | CORS restrictivo                          | No aplica                                                                                                                                                                                                                                                                                                       |
+| 3   | Validación en el backend                  | No aplica · **especificado** en RNF-03.6                                                                                                                                                                                                                                                                        |
+| 4   | Anti inyección SQL                        | No aplica · **especificado** en RNF-03.7                                                                                                                                                                                                                                                                        |
+| 5   | Rate limiting                             | No aplica · **especificado** en RNF-03.8                                                                                                                                                                                                                                                                        |
+| 6   | RLS activa y forzada                      | No aplica · **especificado** en RNF-03.9, y señalado como el riesgo número uno del proyecto                                                                                                                                                                                                                     |
+| 7   | Content Security Policy                   | No aplica · **especificado** en RNF-03.10                                                                                                                                                                                                                                                                       |
+| 8   | Transversales                             | No aplica · **especificados** en RNF-03.12 a RNF-03.14                                                                                                                                                                                                                                                          |
 
 **Hallazgo de seguridad de esta etapa · RNF-03.11 — autenticación del Alarm Server.**
-El paso 2 del flujo de CU-01 del diagrama dice *«valida firma»*. Ningún indicador, regla de negocio ni criterio de aceptación lo respaldaba. Sin esa validación, el endpoint que recibe los eventos de la cámara aceptaría eventos de acceso de **cualquiera que alcance la URL**, permitiendo fabricar aperturas y falsear la auditoría completa —lo que anularía OE-05 y OE-03 a la vez—. Se elevó a requisito no funcional formal; el contrato se define en la ETAPA 05 y se implementa en la 15.
+El paso 2 del flujo de CU-01 del diagrama dice _«valida firma»_. Ningún indicador, regla de negocio ni criterio de aceptación lo respaldaba. Sin esa validación, el endpoint que recibe los eventos de la cámara aceptaría eventos de acceso de **cualquiera que alcance la URL**, permitiendo fabricar aperturas y falsear la auditoría completa —lo que anularía OE-05 y OE-03 a la vez—. Se elevó a requisito no funcional formal; el contrato se define en la ETAPA 05 y se implementa en la 15.
 
 **Nota sobre el repositorio.** `.gitignore` cubre `.env*`, `*.pem`, `*.key`, `service-account*.json`, `google-services.json`, `GoogleService-Info.plist`, `/coverage`, `/dist`, `/build` y `*.sqlite` desde antes de esta etapa. No se detectó ningún secreto en el historial de Git.
 
@@ -184,27 +184,27 @@ El paso 2 del flujo de CU-01 del diagrama dice *«valida firma»*. Ningún indic
 
 ### Deuda técnica generada
 
-| ID | Deuda | Se salda en |
-|---|---|---|
+| ID   | Deuda                                                                        | Se salda en                                                 |
+| ---- | ---------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | D-01 | `CLAUDE.md` §2.2 declara 6 agregados raíz donde el diagrama declara 9 (C-02) | Corrección del contrato — **requiere decisión del usuario** |
-| D-02 | Dos pantallas inexistentes: captura de rostro y consentimiento del visitante | ETAPA 08 (diseño) · 11 (implementación) |
-| D-03 | Los 5 estados obligatorios no están diseñados en ninguna de las 18 pantallas | ETAPAS 09, 10, 11 |
-| D-04 | HU-03 sin punto de entrada en la interfaz | ETAPA 09 |
-| D-05 | El filtro de eventos del mockup no cubre HU-32 | ETAPA 09 |
-| D-06 | La consola operativa fusiona dos roles y omite 4 exigencias verificables | ETAPA 10 |
-| D-07 | 9 indicadores solo verificables con hardware | ETAPA 15 |
+| D-02 | Dos pantallas inexistentes: captura de rostro y consentimiento del visitante | ETAPA 08 (diseño) · 11 (implementación)                     |
+| D-03 | Los 5 estados obligatorios no están diseñados en ninguna de las 18 pantallas | ETAPAS 09, 10, 11                                           |
+| D-04 | HU-03 sin punto de entrada en la interfaz                                    | ETAPA 09                                                    |
+| D-05 | El filtro de eventos del mockup no cubre HU-32                               | ETAPA 09                                                    |
+| D-06 | La consola operativa fusiona dos roles y omite 4 exigencias verificables     | ETAPA 10                                                    |
+| D-07 | 9 indicadores solo verificables con hardware                                 | ETAPA 15                                                    |
 
 ### `[SUPUESTO]` · 7
 
-| ID | Supuesto | Valor |
-|---|---|---|
-| S-01 | `estadoAdministrativo` es leído, no calculado por Next Control | Campo alimentado externamente |
-| S-02 | Percentil de medición de latencias | **p95** (+ p50 y p99) |
-| S-03 | Margen de vigencia del caché de reglas | **24 h** |
-| S-04 | Plazo de respuesta al consentimiento | **24 h o inicio de vigencia** |
-| S-05 | Umbral de confianza de lectura de placa | **0,85** |
-| S-06 | Umbral de latido de dispositivo | **3 latidos o 5 min** |
-| S-07 | Definición de «acceso dudoso» | `CONFIANZA_INSUFICIENTE` o `PLACA_DESCONOCIDA` |
+| ID   | Supuesto                                                       | Valor                                          |
+| ---- | -------------------------------------------------------------- | ---------------------------------------------- |
+| S-01 | `estadoAdministrativo` es leído, no calculado por Next Control | Campo alimentado externamente                  |
+| S-02 | Percentil de medición de latencias                             | **p95** (+ p50 y p99)                          |
+| S-03 | Margen de vigencia del caché de reglas                         | **24 h**                                       |
+| S-04 | Plazo de respuesta al consentimiento                           | **24 h o inicio de vigencia**                  |
+| S-05 | Umbral de confianza de lectura de placa                        | **0,85**                                       |
+| S-06 | Umbral de latido de dispositivo                                | **3 latidos o 5 min**                          |
+| S-07 | Definición de «acceso dudoso»                                  | `CONFIANZA_INSUFICIENTE` o `PLACA_DESCONOCIDA` |
 
 Todos configurables, ninguno constante escondida.
 
@@ -212,9 +212,9 @@ Todos configurables, ninguno constante escondida.
 
 P-01 a P-11, detallados en `contradicciones-y-supuestos.md` §3. **Ninguno bloquea la ETAPA 01.** Los tres que más afectan al producto:
 
-- **P-09** — ¿existe compuerta de aprobación administrativa de autorizaciones? *Por defecto: no se construye.* Determina si OE-02 se cumple o queda en enunciado.
-- **P-10** — ¿se quieren reservas de zonas sin cobro? *Por defecto: no se construyen.*
-- **P-11** — ¿qué significa «nivel de acceso» por residente? *Por defecto: el más restrictivo.*
+- **P-09** — ¿existe compuerta de aprobación administrativa de autorizaciones? _Por defecto: no se construye._ Determina si OE-02 se cumple o queda en enunciado.
+- **P-10** — ¿se quieren reservas de zonas sin cobro? _Por defecto: no se construyen._
+- **P-11** — ¿qué significa «nivel de acceso» por residente? _Por defecto: el más restrictivo._
 
 ---
 
@@ -224,7 +224,7 @@ Ordenado por urgencia. Los puntos 1 y 2 son previos a la ETAPA 01; el resto pued
 
 1. **Revisar y aprobar la resolución de C-02** (nueve agregados raíz en lugar de seis). Es la única contradicción que cambia el modelo de dominio, y la ETAPA 01 deriva el esquema de los agregados. Si se aprueba, conviene corregir `CLAUDE.md` §2.2 para que el contrato y la implementación no diverjan. **Bloquea el diseño definitivo del esquema.**
 
-2. **Tener a mano las credenciales del proyecto Supabase**, bajo cuenta corporativa de Grupo Control (PDF del reto §8). La ETAPA 01 produce la guía de conexión asumiendo que ya existen. Concretamente hará falta: *Project URL*, *anon key*, *service_role key*, *JWT secret*, cadena de conexión directa y de *pooler*.
+2. **Tener a mano las credenciales del proyecto Supabase**, bajo cuenta corporativa de Grupo Control (PDF del reto §8). La ETAPA 01 produce la guía de conexión asumiendo que ya existen. Concretamente hará falta: _Project URL_, _anon key_, _service_role key_, _JWT secret_, cadena de conexión directa y de _pooler_.
 
 3. **Decidir P-09, P-10 y P-11** — las tres decisiones de producto que cambian qué se construye. P-11 se necesita en la ETAPA 04, P-09 en la 05 y P-10 en la 07. Hasta entonces rige el comportamiento conservador.
 
