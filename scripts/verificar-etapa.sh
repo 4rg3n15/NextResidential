@@ -215,6 +215,25 @@ if [[ "$CON_BASE" == "1" ]]; then
   fi
 fi
 
+paso "14 · estabilidad: la suite da lo mismo tres veces seguidas"
+# AÑADIDO EN LA ETAPA 07, a petición del usuario. La primera ejecución de la
+# etapa falló con `socket hang up` en una prueba HTTP y la segunda pasó sin
+# tocar nada. Una prueba intermitente es peor que una rota: enseña a reejecutar
+# hasta el verde, y ese hábito acaba tapando defectos reales.
+#
+# Va al final porque es el paso más caro —ejecuta la suite entera varias veces,
+# sin caché de turbo— y así los fallos baratos salen antes. El número de
+# repeticiones se puede bajar con NCR_REPETICIONES para una vuelta rápida, pero
+# el cierre de etapa se hace con el valor por defecto.
+REPETICIONES="${NCR_REPETICIONES:-3}"
+if salida_est=$(con_limite "$LIMITE_LARGO" node scripts/lib/estabilidad.mjs --repeticiones "$REPETICIONES" 2>&1); then
+  echo "$salida_est" | grep -E "^   corrida" | sed 's/^/   /'
+  ok "${salida_est##*$'\n'}"
+else
+  echo "$salida_est" | grep -E "^   (corrida|✗)|^     " | head -20 | sed 's/^/   /'
+  mal "la suite no es reproducible entre corridas"
+fi
+
 echo
 if [[ "$fallos" -eq 0 ]]; then
   echo "VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe"

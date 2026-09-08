@@ -120,7 +120,46 @@ export const crearApp = async (firmante: Firmante): Promise<INestApplication> =>
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
   await app.init();
+
+  /**
+   * El servidor escucha AQUÍ, una sola vez, y el fixture es dueño de su ciclo
+   * de vida. No es un detalle de estilo: es la corrección de una prueba
+   * intermitente (`socket hang up`, 2026-09-08).
+   *
+   * `supertest` es un cliente, pero si el servidor que recibe no está
+   * escuchando se comporta como uno: en su constructor hace
+   * `if (!app.address()) this._server = app.listen(0)` y, al terminar la
+   * petición, `server.close()`. Medido: con `app.init()` a secas, **300
+   * peticiones producen 300 `listen()` y 300 `close()`** —un socket de escucha
+   * nuevo, en un puerto efímero distinto, montado y derribado por cada
+   * petición— y el servidor queda sin escuchar al final. Con esta línea, 300
+   * peticiones producen **un `listen()` y ningún `close()`**.
+   *
+   * Cientos de bind/close por fichero, en paralelo con los demás ficheros de la
+   * suite, es una carrera esperando a ocurrir: la URL se fija en el constructor
+   * de `supertest` y la conexión se abre después, así que basta con que otra
+   * petición cierre el servidor en medio para que el cliente encuentre el
+   * socket muerto. Eso es exactamente `socket hang up`, y explica por qué solo
+   * aparecía a veces y por qué reejecutar «lo arreglaba».
+   *
+   * Con el servidor escuchando de antemano, `app.address()` nunca es nulo,
+   * `supertest` no monta ni derriba nada y la única forma de cerrar el
+   * servidor es el `app.close()` del `afterAll`.
+   */
+  await app.listen(0);
   return app;
+};
+
+/**
+ * Dirección real del servidor de pruebas.
+ *
+ * Existe porque `crearApp` ya deja el servidor escuchando: lo que antes había
+ * que montar a mano para hablar por socket, ahora se pregunta.
+ */
+export const direccionDe = (app: INestApplication): string => {
+  const direccion = (app.getHttpServer() as { address(): { port: number } | null }).address();
+  if (direccion === null) throw new Error('el servidor de pruebas no está escuchando');
+  return `http://127.0.0.1:${direccion.port}`;
 };
 
 /**

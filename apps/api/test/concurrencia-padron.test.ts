@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { Placa, esExito } from '@ncr/domain-core';
 import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-pg';
@@ -79,7 +80,18 @@ describe('KPI-03 · integridad concurrente en la base (ADR-04)', () => {
       );
       return;
     }
-    const placa = `CC${Date.now().toString().slice(-4)}X`;
+    // Placa ÚNICA por ejecución, con entropía de verdad.
+    //
+    // Antes era `CC${Date.now().toString().slice(-4)}X`: los cuatro últimos
+    // dígitos del reloj en milisegundos se repiten cada diez segundos, así que
+    // dos corridas seguidas contra la misma base podían toparse con la fila que
+    // dejó la anterior — y como en `vehiculos` no hay borrado físico (RN-19),
+    // esa fila no se va. La prueba habría dado 0 aceptados en vez de 1 sin que
+    // nada estuviera roto. Lo destapó la revisión de intermitencias del
+    // 2026-09-08, al pasar la suite a ejecutarse tres veces seguidas.
+    const alfabeto = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const azar = Array.from(randomBytes(5), (b) => alfabeto[b % alfabeto.length]).join('');
+    const placa = `C${azar}`;
     const p = Placa.crear(placa);
     expect(esExito(p)).toBe(true);
 

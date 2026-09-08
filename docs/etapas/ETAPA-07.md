@@ -194,7 +194,14 @@ apps/api/package.json                               (modificado) lint alcanza ta
 
 apps/api/test/aforo-concurrencia.test.ts   50 ingresos por 50 conexiones reales contra PostgreSQL
 apps/api/test/zonas.e2e.test.ts            CU-05 por HTTP, incluidas las dos pruebas de aislamiento
-scripts/verificar-etapa.sh                 (modificado) paso 13 ejecuta la prueba de concurrencia
+scripts/lib/estabilidad.mjs                CONTROL NUEVO: la suite tres veces, resultado idéntico
+scripts/lib/pruebas-negativas.mjs          (modificado) séptima prueba negativa: la suite intermitente
+scripts/verificar-etapa.sh                 (modificado) paso 13 (concurrencia de aforo) y paso 14 (estabilidad)
+apps/api/test/utilidades.ts                (modificado) `crearApp` escucha: fin del bind/close por petición
+apps/api/test/latencia-tiempo-real.test.ts (modificado) espera por condición, no por 200 ms fijos
+apps/api/test/eventos.e2e.test.ts          (modificado) SSE por fetch+AbortController: sin error suelto
+apps/api/test/concurrencia-padron.test.ts  (modificado) placa única por corrida, no por reloj
+apps/api/test/eventos-pg.test.ts           (modificado) claves únicas por corrida
 docs/ESTADO_ETAPAS.md                      (modificado) cabecera, mapa, ficha 07, P-04, deuda
 docs/auditoria/contradicciones-y-supuestos.md (modificado) S-09 implementado, P-04 resuelta
 docs/etapas/ETAPA-07.md                    este informe
@@ -275,6 +282,99 @@ escritura era, por separado, perfectamente válida.
 Es la respuesta a la pregunta de si el incremento atómico era redundante con el `CHECK`. No
 lo era. El adaptador se restauró tras el experimento.
 
+### La prueba intermitente, y por qué no se cerró la etapa sin resolverla
+
+La primera ejecución del usuario en macOS falló en `zonas · CU-05 por HTTP > lista las zonas
+con su aforo y su disponibilidad (HU-19)` con **`socket hang up`**; la segunda pasó sin
+tocar nada. El usuario lo detuvo con el argumento correcto: **una prueba intermitente es
+peor que una rota**, porque enseña a reejecutar hasta el verde y ese hábito termina tapando
+defectos reales.
+
+#### Causa, medida y no supuesta
+
+El fixture `crearApp` hacía `await app.init()` y **nunca `listen()`**. `supertest` es un
+cliente, pero cuando el servidor que recibe no está escuchando se comporta como uno: en su
+constructor ejecuta `if (!app.address()) this._server = app.listen(0)` y, al terminar la
+petición, `if (server && server._handle) server.close(...)` (`supertest/lib/test.js`).
+
+Instrumentando `listen` y `close` sobre un servidor idéntico al del fixture:
+
+| Fixture                              | `listen()` | `close()` | Puerto al terminar |
+| ------------------------------------ | ---------- | --------- | ------------------ |
+| `app.init()` a secas — lo que había  | **300**    | **300**   | ninguno            |
+| `app.init()` + `await app.listen(0)` | **1**      | **0**     | el asignado        |
+
+300 peticiones producían **300 sockets de escucha montados y derribados**, cada uno en un
+puerto efímero distinto, y el servidor terminaba sin escuchar. Multiplicado por los diez
+ficheros de la suite, con `aislamiento.e2e.test.ts` recorriendo todos los endpoints con dos
+identidades, son miles de bind/close en paralelo.
+
+Ahí está la carrera: `supertest` fija la URL **en el constructor** y abre la conexión
+**después**, así que basta con que otra petición cierre el servidor en ese hueco para que el
+cliente encuentre el socket muerto. Eso es `socket hang up`, aparece solo a veces, y
+reejecutar «lo arregla».
+
+Se descartaron por ejecución dos hipótesis previas, que conviene dejar escritas para no
+volver a recorrerlas: el cliente **no** reutiliza conexiones —superagent manda
+`Connection: close`, comprobado: tres peticiones, tres conexiones nuevas—, así que la
+carrera clásica de `keepAlive` del cliente contra el `keepAliveTimeout` de 5 s del servidor
+no aplica aquí. Y no hay temporizadores ni ganchos de ciclo de vida en `src/` que pudieran
+disparar un error asíncrono suelto.
+
+**Honestamente:** no se consiguió reproducir el fallo exacto en este contenedor —ocho
+corridas completas de la suite, 120 ciclos de «app nueva + primer golpe» y sondas de
+solapamiento, todas verdes—. Lo que sí está medido es el mecanismo, y es
+suficientemente grave por sí mismo: un fixture que monta y derriba el servidor una vez por
+petición no es determinista, lo produzca o no en esta máquina.
+
+#### Lo que el arreglo destapó
+
+Con el servidor vivo durante todo el fichero, afloró un **error sin manejar** que antes
+quedaba tapado: la prueba SSE de `eventos.e2e.test.ts` abortaba la petición de `supertest`
+y el `ECONNRESET` que Node emite después no tenía a nadie escuchando. Vitest lo reportaba
+como `Unhandled Error` con su propia advertencia —«This might cause false positive tests»—
+y **el cierre del servidor por parte de `supertest` lo estaba ocultando**. Reescrita con
+`fetch` y `AbortController`, como ya hacía la prueba de latencia.
+
+#### Revisión del resto de la suite, con el mismo criterio
+
+- **Todos** los ficheros e2e usaban `crearApp`, así que todos tenían el defecto: se corrige
+  en un solo sitio. `latencia-tiempo-real.test.ts` era el único que ya hacía `listen(0)`
+  explícito —porque medía el socket—, lo que corrobora el diagnóstico; se le retiró el
+  `listen` duplicado.
+- **Espera por tiempo en vez de por condición.** La medición de KPI-25 dormía 200 ms fijos
+  «para que los `flushHeaders` de los 25 suscriptores llegaran». Bajo carga ese plazo se
+  queda corto y un suscriptor que se pierde la ráfaga hace fallar KPI-25 sin que la latencia
+  tenga culpa. Ahora `abrirSuscriptor` **solo vuelve cuando el flujo confirma apertura**
+  (`event: listo`), con tope de 10 s. El `sleep` desapareció.
+- **Datos que colisionan entre corridas.** `concurrencia-padron.test.ts` generaba la placa
+  con los cuatro últimos dígitos del reloj en milisegundos: se repiten **cada diez
+  segundos**, y como en `vehiculos` no hay borrado físico (RN-19) la fila de la corrida
+  anterior sigue ahí. Dos corridas seguidas contra la misma base habrían dado 0 aceptados en
+  vez de 1. Mismo problema en las claves de `eventos-pg.test.ts`. Ambos con entropía real
+  ahora. **Este defecto solo se ve si se ejecuta la suite dos veces**, que es exactamente lo
+  que el control nuevo hace.
+
+#### El control genérico: paso 14
+
+`scripts/lib/estabilidad.mjs` ejecuta la suite **tres veces** y exige que el resultado sea
+idéntico. La firma que compara no es «pasó / no pasó»: lleva el recuento por paquete, el de
+ficheros, los títulos de lo que falló y **los errores no manejados**, que cuentan como fallo
+aunque las pruebas salgan verdes.
+
+> **La trampa de este control, comprobada antes de confiar en él.** Sin `TURBO_FORCE`, la
+> segunda corrida informa `cache hit, replaying logs` y **reimprime los números de la
+> primera sin ejecutar una sola prueba**: tres corridas idénticas, ninguna ejecutada. Habría
+> sido el falso verde más redondo del repositorio. El guion fuerza la ejecución.
+>
+> Y una segunda, encontrada al estrenarlo: los códigos de color de Vitest partían `Tests` de
+> su número, no casaba ninguna línea, y comparar dos firmas vacías daba «idéntico». Ahora,
+> si no reconoce ningún recuento, **falla**.
+
+Es el **séptimo control con prueba negativa**: `pruebas-negativas.mjs` le da una suite que
+alterna verde y rojo entre corridas y exige que la detecte, y otra estable que debe pasar
+—un control que rechazara todo tampoco serviría—.
+
 ### Pruebas de límite exigidas por el DoD
 
 | Límite             | Prueba                                                                               |
@@ -339,7 +439,7 @@ PostgreSQL 16 con las migraciones y las semillas aplicadas:
    ✓ portabilidad: 15 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
 
 ▸ 9 · pruebas negativas de los propios controles
-   ✓ PRUEBAS NEGATIVAS: los 6 controles detectan su violación, sin tocar el árbol
+   ✓ PRUEBAS NEGATIVAS: los 7 controles detectan su violación, sin tocar el árbol
 
 ▸ 10 · fronteras de arquitectura y secretos
    ✓ fronteras (DoD ETAPA 02)
@@ -349,8 +449,8 @@ PostgreSQL 16 con las migraciones y las semillas aplicadas:
 
 ▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
    alertas entregadas: 200 de 200
-   p50 / p95 / p99   : 2 / 4 / 10 ms
-   maximo            : 25 ms
+   p50 / p95 / p99   : 2 / 5 / 8 ms
+   maximo            : 10 ms
    umbral KPI-25     : 10000 ms
    ✓ KPI-25 con margen sobre el umbral
 
@@ -362,10 +462,16 @@ PostgreSQL 16 con las migraciones y las semillas aplicadas:
    ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
    ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
 
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 256 passed (256) · @ncr/domain-core:test: Tests 258 passed (258) · @ncr/providers:test: Tests 24 passed (24)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 256 passed (256) · @ncr/domain-core:test: Tests 258 passed (258) · @ncr/providers:test: Tests 24 passed (24)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 256 passed (256) · @ncr/domain-core:test: Tests 258 passed (258) · @ncr/providers:test: Tests 24 passed (24)
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+
 VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
 ```
 
-**538 pruebas en 47 ficheros.** Cobertura por capa, medida en el contenedor Linux: dominio
+**538 pruebas en 47 ficheros**, con el paso 14 exigiendo que las tres corridas den lo mismo. Cobertura por capa, medida en el contenedor Linux: dominio
 99,67 % de líneas y 99,21 % de ramas, aplicación 97,82 %, global 88,30 %. Los umbrales de
 §2.4 son 90 % en dominio y aplicación y 70 % global.
 
@@ -418,12 +524,13 @@ la corrección de tres líneas sino el control que impide que vuelvan a aparecer
 
 ### Deuda nueva
 
-| ID   | Deuda                                                                                                                                   | Se salda en                                                                         |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| D-34 | El control de fronteras no exige que un módulo importe a otro por su barril                                                             | ETAPA 13                                                                            |
-| D-35 | `RepositorioZonasPg` existe y se prueba contra base real, pero lo cableado en runtime es el doble en memoria                            | Misma raíz que D-25 y D-17: sin contraseña de PostgreSQL. La frontera es definitiva |
-| D-36 | El reinicio por `cierre_horario` se proyecta al leer y se persiste al ocupar: una zona intocada durante un mes conserva la fila antigua | ETAPA 14, con pg-boss                                                               |
-| D-37 | `LiberarAforo` no identifica a quién sale                                                                                               | ETAPA 10                                                                            |
+| ID   | Deuda                                                                                                                                                 | Se salda en                                                                         |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| D-34 | El control de fronteras no exige que un módulo importe a otro por su barril                                                                           | ETAPA 13                                                                            |
+| D-35 | `RepositorioZonasPg` existe y se prueba contra base real, pero lo cableado en runtime es el doble en memoria                                          | Misma raíz que D-25 y D-17: sin contraseña de PostgreSQL. La frontera es definitiva |
+| D-36 | El reinicio por `cierre_horario` se proyecta al leer y se persiste al ocupar: una zona intocada durante un mes conserva la fila antigua               | ETAPA 14, con pg-boss                                                               |
+| D-37 | `LiberarAforo` no identifica a quién sale                                                                                                             | ETAPA 10                                                                            |
+| D-38 | El paso 14 ejecuta la suite tres veces: el cierre de etapa pasa de ~40 s de pruebas a ~2 min. Es el precio de no volver a cerrar con una intermitente | ETAPA 14: en CI puede repartirse entre trabajos en paralelo                         |
 
 ### Supuesto nuevo
 

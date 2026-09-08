@@ -19,7 +19,15 @@
  *     git. Ahora se usa `git diff --quiet`, que es la fuente de verdad.
  */
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync, mkdirSync, rmSync, readFileSync, cpSync } from 'node:fs';
+import {
+  writeFileSync,
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  cpSync,
+  chmodSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -202,6 +210,56 @@ try {
     const r = enClon('node', ['scripts/lib/verificar-entorno.mjs']);
     r.codigo !== 0 ? ok('detectado') : mal('NO detectado');
   }
+  console.log('\n▸ 7 · una suite intermitente NO pasa por estable');
+  {
+    /**
+     * Sonda de la ETAPA 07. El control de estabilidad ejecuta una orden varias
+     * veces y compara; aquí la orden es un guion que **alterna** su resultado,
+     * que es la forma exacta de la prueba intermitente que motivó el control.
+     *
+     * Se sustituye la suite por un guion en vez de invocar Vitest tres veces:
+     * lo que se pone a prueba es la comparación de firmas, y hacerlo contra la
+     * suite real costaría minutos en cada verificación sin comprobar nada más.
+     * El análisis de la salida de Vitest lo ejercita el paso real.
+     */
+    const contador = join(banco, 'contador');
+    const inestable = join(banco, 'suite-inestable.sh');
+    writeFileSync(
+      inestable,
+      [
+        '#!/usr/bin/env bash',
+        `n=$(cat "${contador}" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador}"`,
+        'if [ $((n % 2)) -eq 0 ]; then',
+        '  echo "   Tests  85 passed (85)"; exit 0',
+        'else',
+        '  echo "   × zonas · CU-05 por HTTP > lista las zonas"',
+        '  echo "   Tests  1 failed | 84 passed (85)"; exit 1',
+        'fi',
+      ].join('\n'),
+    );
+    chmodSync(inestable, 0o755);
+
+    const r = correr('node', [
+      'scripts/lib/estabilidad.mjs',
+      '--repeticiones',
+      '2',
+      '--comando',
+      inestable,
+    ]);
+    r.codigo !== 0 && /NO coincide|terminó en rojo/.test(r.salida)
+      ? ok('detectada: dos corridas con resultado distinto son un fallo')
+      : mal(`NO detectada (codigo ${r.codigo})`);
+
+    // Y el reverso: un control que fallara siempre tampoco serviría de nada.
+    const estable = join(banco, 'suite-estable.sh');
+    writeFileSync(estable, '#!/usr/bin/env bash\necho "   Tests  85 passed (85)"\nexit 0\n');
+    chmodSync(estable, 0o755);
+    correr('node', ['scripts/lib/estabilidad.mjs', '--repeticiones', '2', '--comando', estable])
+      .codigo === 0
+      ? ok('una suite reproducible sí pasa')
+      : mal('el control rechaza una suite que es estable');
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -224,4 +282,4 @@ if (fallos > 0) {
   console.log(`\nPRUEBAS NEGATIVAS: ${fallos} comprobación(es) fallaron`);
   process.exit(1);
 }
-console.log('\nPRUEBAS NEGATIVAS: los 6 controles detectan su violación, sin tocar el árbol');
+console.log('\nPRUEBAS NEGATIVAS: los 7 controles detectan su violación, sin tocar el árbol');

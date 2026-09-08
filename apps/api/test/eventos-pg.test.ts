@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { Acceso, FiltroDeEventos, VersionDeReglas, esExito } from '@ncr/domain-core';
 import type { HechoDeAcceso } from '@ncr/domain-core';
@@ -21,6 +22,16 @@ import { RepositorioEventosPg } from '../src/eventos/infraestructura/repositorio
  * Se OMITE —no falla— sin `DATABASE_URL_PRUEBAS`. Cuando se omite, lo dice.
  * La ETAPA 14 la lleva a CI, donde deja de poder omitirse.
  */
+/**
+ * Sello único por EJECUCIÓN, no por milisegundo.
+ *
+ * `Date.now()` bastaba mientras la suite corría una vez; desde que el paso 14
+ * la ejecuta tres veces seguidas contra la misma base, dos corridas pueden
+ * caer en el mismo milisegundo y chocar con las filas que dejó la anterior —y
+ * en `eventos` no hay borrado (RN-03), así que esas filas no se van.
+ */
+const CORRIDA = randomBytes(6).toString('hex');
+
 const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 const COP_AJENA = '10000000-0000-4000-8000-000000000002';
@@ -56,7 +67,7 @@ const acceso = (extra: Partial<HechoDeAcceso> = {}): Acceso => {
     viviendaId,
     placaDetectada: 'ABC123',
     confianza: 0.97,
-    claveIdempotencia: `pg-prueba-${Date.now()}-${secuencia}`,
+    claveIdempotencia: `pg-prueba-${CORRIDA}-${secuencia}`,
     ...extra,
   };
   const a = Acceso.desdeDecision(hecho, permitir(version(hecho.copropiedadId), 'prueba.permite'));
@@ -169,7 +180,7 @@ describe('RepositorioEventosPg · consulta y paginación', () => {
   it('filtra por rango y pagina por cursor sin repetir ni saltar filas', async () => {
     if (omitida()) return;
     const repo = new RepositorioEventosPg(pool as Pool, claims());
-    const marca = `lote-${Date.now()}`;
+    const marca = `lote-${CORRIDA}`;
     for (let i = 0; i < 5; i += 1) {
       await repo.anexar(acceso({ claveIdempotencia: `${marca}-${i}` }), actorId);
     }

@@ -237,7 +237,7 @@ Vivió cinco etapas invisible porque las dos tablas estaban vacías: **una restr
 
 ## ETAPA 07 — Zonas comunes: horario y aforo · **CERRADA**
 
-Agregado `Zona` con `Aforo`, `HorarioDeZona` y política de reinicio; casos de uso `ConfigurarZona`, `AutorizarZonaAVisitante`, `ValidarAforo` y `LiberarAforo`; adaptadores PostgreSQL y en memoria; superficie HTTP bajo `/copropiedades/:id/zonas`. La zona entra al contexto del motor **ya resuelta** por el puerto `ResolutorDeZona`: el motor no consulta nada, sigue siendo la función pura de la ETAPA 05. **538 pruebas en 47 ficheros**; cobertura por capa medida en el contenedor Linux: dominio 99,67 % (ramas 99,21 %), aplicación 97,82 %, global 88,30 %. Informe en `docs/etapas/ETAPA-07.md`.
+Agregado `Zona` con `Aforo`, `HorarioDeZona` y política de reinicio; casos de uso `ConfigurarZona`, `AutorizarZonaAVisitante`, `ValidarAforo` y `LiberarAforo`; adaptadores PostgreSQL y en memoria; superficie HTTP bajo `/copropiedades/:id/zonas`. La zona entra al contexto del motor **ya resuelta** por el puerto `ResolutorDeZona`: el motor no consulta nada, sigue siendo la función pura de la ETAPA 05. **538 pruebas en 47 ficheros**; cobertura por capa medida en el contenedor Linux: dominio 99,67 % (ramas 99,21 %), aplicación 97,82 %, global 88,30 %, y el paso 14 exige que tres corridas den lo mismo. Informe en `docs/etapas/ETAPA-07.md`.
 
 ### El aforo lo garantiza la base, y la mutación demuestra por qué
 
@@ -265,6 +265,22 @@ Una jornada que cruza el día se modela con **dos franjas** enlazadas por `conti
 | ---- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P-04 | Reinicio del contador de aforo                             | **RESUELTA** — tres políticas por zona (`cierre_horario` por defecto, `manual`, `nunca`), columna `zonas.politica_reinicio_aforo`. Cubre CU-05 excepción 6a: salida no registrada por fallo de sensor no deja el contador inflado para siempre |
 | S-17 | Toda zona común exige permiso explícito de la autorización | Es lo que separa CA-15 (`FUERA_DE_HORARIO`) de `ZONA_NO_AUTORIZADA` (CU-05 alterno 2a). Las zonas de paso se modelan sin `zonaId` en la solicitud. Conservador: sin permiso, se deniega                                                        |
+
+### La prueba intermitente, resuelta antes de cerrar
+
+La primera ejecución del usuario falló con `socket hang up` en la primera prueba HTTP de zonas y la segunda pasó sin tocar nada. No se cerró la etapa hasta hacerla determinista, porque **una intermitente enseña a reejecutar hasta el verde**.
+
+**Causa, medida:** `crearApp` hacía `app.init()` y nunca `listen()`. `supertest`, si el servidor no escucha, lo levanta él en su constructor y lo **cierra** al terminar la petición. Instrumentado: **300 peticiones producían 300 `listen()` y 300 `close()`**, y el servidor terminaba sin escuchar; con `await app.listen(0)`, **un `listen()` y ningún `close()`**. La URL se fija en el constructor y la conexión se abre después: basta con que otra petición cierre el servidor en medio. Se descartó por ejecución la carrera de `keepAlive` —superagent manda `Connection: close`— y no hay temporizadores en `src/`. **No se reprodujo el fallo exacto en el contenedor** (ocho corridas completas y 120 ciclos de app nueva + primer golpe, todas verdes); lo que está medido es el mecanismo.
+
+**Lo que destapó el arreglo:** con el servidor vivo afloró un `Unhandled Error` (ECONNRESET tras el `abort()` de la prueba SSE) que el cierre de `supertest` venía ocultando. Reescrita con `fetch` + `AbortController`.
+
+**Revisión del resto de la suite:** el `sleep` de 200 ms de la medición KPI-25 pasa a espera por condición (`event: listo`); la placa de KPI-03 se generaba con los cuatro últimos dígitos del reloj —se repiten cada diez segundos, y en `vehiculos` no hay borrado— y las claves de `eventos-pg` con `Date.now()`: ambas con entropía real. Ese defecto **solo se ve ejecutando la suite dos veces**.
+
+### Paso 14 · control genérico contra intermitencias
+
+`scripts/lib/estabilidad.mjs` corre la suite **tres veces** y exige resultado idéntico: recuentos por paquete, ficheros, títulos en rojo y **errores no manejados**, que cuentan como fallo aunque las pruebas salgan verdes. Séptimo control con prueba negativa.
+
+> **Dos trampas del propio control, encontradas antes de confiar en él.** Sin `TURBO_FORCE` la segunda corrida es `cache hit, replaying logs`: reimprime los números sin ejecutar nada — el falso verde más redondo posible. Y los códigos de color de Vitest impedían reconocer una sola línea de recuento: comparar dos firmas vacías daba «idéntico». Ahora fuerza la ejecución y falla si no reconoce ningún recuento.
 
 ### Hallazgo: `apps/api` lintaba solo `src`
 
@@ -334,6 +350,7 @@ Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contr
 | D-35 | `RepositorioZonasPg` existe y se prueba contra base real, pero lo cableado en runtime es el doble en memoria                                                                               | Misma raíz que D-25: sin contraseña de PostgreSQL (D-17). La frontera es definitiva; cambia la fábrica y nada más                      |
 | D-36 | El reinicio por `cierre_horario` se **proyecta al leer** y se persiste al ocupar: una zona que nadie toca en un mes conserva su fila con el conteo antiguo hasta el siguiente ingreso      | ETAPA 14, con pg-boss: un trabajo programado que lo aplique sin depender de que alguien entre                                          |
 | D-37 | `LiberarAforo` no exige identificar a quién sale: el contador baja pero no consta qué plaza se liberó                                                                                      | ETAPA 10, cuando la portería registre la salida contra el evento de entrada                                                            |
+| D-38 | El paso 14 ejecuta la suite tres veces: el cierre de etapa pasa de ~40 s de pruebas a ~2 min                                                                                               | Precio aceptado. ETAPA 14: en CI puede repartirse entre trabajos en paralelo                                                           |
 | P-10 | «¿Reservas de zonas sin cobro?» sigue abierta: esta etapa construye **aforo y horario**, no reservas, aunque el mockup muestre «Reservas del día»                                          | Decisión del usuario. Fuera de alcance mientras no se resuelva                                                                         |
 
 ## Deuda de la ETAPA 06
