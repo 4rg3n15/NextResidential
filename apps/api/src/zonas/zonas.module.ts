@@ -2,8 +2,10 @@ import { Global, Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { RELOJ } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
-import { RESOLUTOR_DE_ZONA } from '../autorizaciones/aplicacion/puertos';
-import type { ResolutorDeZona } from '../autorizaciones/aplicacion/puertos';
+// Por el barril del módulo, nunca por su interior (§2.2): lo único que zonas
+// sabe de autorizaciones es que declara este puerto y qué forma tiene.
+import { RESOLUTOR_DE_ZONA } from '../autorizaciones';
+import type { ResolutorDeZona } from '../autorizaciones';
 import { REPOSITORIO_AUTORIZACIONES_ZONA, REPOSITORIO_ZONAS } from './aplicacion/puertos';
 import type { RepositorioAutorizacionesZona, RepositorioZonas } from './aplicacion/puertos';
 import {
