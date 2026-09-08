@@ -9,6 +9,8 @@ import { GuardaDeRoles } from './comun/guardas/roles.guard';
 import { MultiempresaModule } from './multiempresa/multiempresa.module';
 import { PadronModule } from './padron/padron.module';
 import { AutorizacionesModule } from './autorizaciones/autorizaciones.module';
+import { EventosModule } from './eventos/eventos.module';
+import { limitadorPorDispositivo } from './eventos/presentacion/limite-por-dispositivo';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
 import { NucleoModule } from './nucleo/nucleo.module';
@@ -30,9 +32,19 @@ export class AppModule {
         AutenticacionModule.registrar(),
         MultiempresaModule,
         PadronModule.registrar(),
+        EventosModule.registrar(),
         AutorizacionesModule.registrar(),
+        // Dos limitadores con NOMBRE, y cada uno cuenta por lo suyo: `default`
+        // por IP —el de siempre— y `dispositivo` por equipo firmante (D-28).
+        // Uno solo no sirve: en la ingesta todos los equipos comparten IP, y el
+        // tope por IP los suma a todos. La prueba de carga lo demostró.
         ThrottlerModule.forRoot([
-          { ttl: config.THROTTLE_TTL_SEGUNDOS * 1000, limit: config.THROTTLE_LIMITE },
+          {
+            name: 'default',
+            ttl: config.THROTTLE_TTL_SEGUNDOS * 1000,
+            limit: config.THROTTLE_LIMITE,
+          },
+          limitadorPorDispositivo(config.THROTTLE_DISPOSITIVO_LIMITE),
         ]),
       ],
       controllers: [SaludController],

@@ -9,7 +9,7 @@
 
 La integración real con hardware Hikvision pesa el **25 %** de la evaluación del proyecto. La intuición sugeriría abordarla temprano, para reducir riesgo. El orden de construcción sugerido en §13.5 del documento de requisitos, de hecho, coloca la integración con cámara y talanquera en la fase 3 de 8.
 
-Sin embargo, OE-03 exige algo más fuerte que «integrar»: exige que *«la lógica de negocio y la interfaz no dependan de un fabricante»*, y lo verifica así: *«Ninguna llamada a ISAPI ni dirección de dispositivo existe fuera de la capa de proveedor; **la suite de pruebas corre completa con un adaptador simulado, sin hardware conectado**»*.
+Sin embargo, OE-03 exige algo más fuerte que «integrar»: exige que _«la lógica de negocio y la interfaz no dependan de un fabricante»_, y lo verifica así: _«Ninguna llamada a ISAPI ni dirección de dispositivo existe fuera de la capa de proveedor; **la suite de pruebas corre completa con un adaptador simulado, sin hardware conectado**»_.
 
 ## Decisión
 
@@ -19,10 +19,10 @@ Sin embargo, OE-03 exige algo más fuerte que «integrar»: exige que *«la lóg
 
 ## Alternativas consideradas
 
-| Alternativa | Por qué se descarta |
-|---|---|
+| Alternativa                                                 | Por qué se descarta                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Integrar hardware temprano (fase 3, como sugiere §13.5)** | Acopla el diseño al fabricante justo cuando el dominio aún es maleable. El riesgo que reduce —«¿funcionará el equipo?»— se compensa dejando la verificación de modo evento como primera tarea de la ETAPA 15, con procedimiento de bloqueo si falla |
-| **Desarrollo en paralelo contra hardware y Mock** | Duplica el esfuerzo de prueba y crea la tentación de «arreglarlo en el adaptador», que es exactamente cómo se filtra el vocabulario del fabricante al dominio |
+| **Desarrollo en paralelo contra hardware y Mock**           | Duplica el esfuerzo de prueba y crea la tentación de «arreglarlo en el adaptador», que es exactamente cómo se filtra el vocabulario del fabricante al dominio                                                                                       |
 
 ## Consecuencias
 
@@ -34,7 +34,7 @@ Sin embargo, OE-03 exige algo más fuerte que «integrar»: exige que *«la lóg
 
 **Que hay que asumir:**
 
-- **Nueve de los 37 indicadores solo pueden cerrarse con hardware real**: KPI-13, 14, 17, 18, 22, 26, 27, 32 y 33. Hasta la ETAPA 15 se reportan como *«verificado contra simulación, pendiente de hardware»* — **nunca como cumplidos**.
+- **Nueve de los 37 indicadores solo pueden cerrarse con hardware real**: KPI-13, 14, 17, 18, 22, 26, 27, 32 y 33. Hasta la ETAPA 15 se reportan como _«verificado contra simulación, pendiente de hardware»_ — **nunca como cumplidos**.
 - El riesgo de que el modelo concreto no opere en modo evento se concentra al final. Se mitiga haciendo de esa verificación la **primera tarea** de la ETAPA 15, con procedimiento de hallazgo de bloqueo si el equipo decide por su cuenta.
 
 ## Verificación

@@ -22,14 +22,14 @@ nombres y las descripciones, jamás con los valores** (`CLAUDE.md` §2.7.1).
 > del proyecto de Grupo Control. Las llaves heredadas siguen existiendo en
 > proyectos antiguos y se retiran a finales de 2026.
 
-| Dato | Ruta en el panel de Supabase | Se usa en |
-|---|---|---|
-| **Project URL** | Project Settings → API | API, web, móvil |
-| **Llave publicable** `sb_publishable_…` | **Settings → API Keys** | Web y móvil, y la API cuando actúa en nombre del usuario |
-| **Llave secreta** `sb_secret_…` | **Settings → API Keys** | **Solo servidor**: API, workers, Edge |
-| **URL del JWKS** | **Project Settings → JWT Keys** | Verificación de tokens en la API |
-| **Cadena directa** | Project Settings → Database → Connection string → **URI** | Migraciones y trabajos de mantenimiento |
-| **Cadena de *pooler*** | Project Settings → Database → Connection pooling → **Connection string** | La aplicación en ejecución |
+| Dato                                    | Ruta en el panel de Supabase                                             | Se usa en                                                |
+| --------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------- |
+| **Project URL**                         | Project Settings → API                                                   | API, web, móvil                                          |
+| **Llave publicable** `sb_publishable_…` | **Settings → API Keys**                                                  | Web y móvil, y la API cuando actúa en nombre del usuario |
+| **Llave secreta** `sb_secret_…`         | **Settings → API Keys**                                                  | **Solo servidor**: API, workers, Edge                    |
+| **URL del JWKS**                        | **Project Settings → JWT Keys**                                          | Verificación de tokens en la API                         |
+| **Cadena directa**                      | Project Settings → Database → Connection string → **URI**                | Migraciones y trabajos de mantenimiento                  |
+| **Cadena de _pooler_**                  | Project Settings → Database → Connection pooling → **Connection string** | La aplicación en ejecución                               |
 
 **Settings → API Keys** las lista todas, heredadas o no. No hay ya una sección
 «API» separada para esto.
@@ -55,7 +55,7 @@ Responde también en `/auth/v1/.well-known/jwks.json`. Devuelve **solo claves
 públicas**: no hay nada secreto que proteger en ese endpoint, y por eso la
 verificación puede hacerse en cualquier servicio sin repartir secretos.
 
-### Por qué la cadena directa y la de *pooler* no son intercambiables
+### Por qué la cadena directa y la de _pooler_ no son intercambiables
 
 La de **pooler** multiplexa conexiones en modo transacción. Es lo que quieres
 para una API con muchas peticiones cortas, y es lo que **no** quieres para
@@ -67,13 +67,13 @@ distinta. **Migra por la directa; opera por el pooler.**
 
 ## 2. Qué llave usa cada superficie, y por qué
 
-| Superficie | Llave | Motivo |
-|---|---|---|
-| **Consola web** (`apps/web`) | **publicable**, como `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Resuelve al rol `anon`: sujeta a RLS. Es pública por diseño |
-| **App Flutter** (`apps/mobile`) | **publicable**, vía `--dart-define` | Ídem |
-| **API NestJS** (`apps/api`) | **publicable** para actuar en nombre del usuario; **secreta** **solo** en rutas de servicio | La publicable mantiene activa la segunda barrera de RLS |
-| **Edge Gateway** (`apps/edge`) | **secreta**, preferiblemente **una por equipo** | Opera sin usuario humano. Al ser revocables por separado, comprometer un Edge no obliga a rotar el resto |
-| **Workers pg-boss** | **secreta** | Ídem |
+| Superficie                      | Llave                                                                                       | Motivo                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Consola web** (`apps/web`)    | **publicable**, como `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                                 | Resuelve al rol `anon`: sujeta a RLS. Es pública por diseño                                              |
+| **App Flutter** (`apps/mobile`) | **publicable**, vía `--dart-define`                                                         | Ídem                                                                                                     |
+| **API NestJS** (`apps/api`)     | **publicable** para actuar en nombre del usuario; **secreta** **solo** en rutas de servicio | La publicable mantiene activa la segunda barrera de RLS                                                  |
+| **Edge Gateway** (`apps/edge`)  | **secreta**, preferiblemente **una por equipo**                                             | Opera sin usuario humano. Al ser revocables por separado, comprometer un Edge no obliga a rotar el resto |
+| **Workers pg-boss**             | **secreta**                                                                                 | Ídem                                                                                                     |
 
 ### Las tres advertencias que hay que interiorizar
 
@@ -149,7 +149,7 @@ Aplica en orden los 16 archivos de `supabase/migrations/`. Son **idempotentes**:
 volver a ejecutarlos sobre una base ya migrada no produce error ni cambio. Está
 verificado con tres pasadas consecutivas.
 
-**Sobre la reversión.** El CLI de Supabase no tiene *down migrations*. La
+**Sobre la reversión.** El CLI de Supabase no tiene _down migrations_. La
 reversibilidad que exige `CLAUDE.md` §6 vive en `supabase/reversion/`, con un
 guion por migración que se aplica manualmente en orden descendente. Ver
 `supabase/reversion/README.md`. El de `eventos` exige confirmación explícita
@@ -231,27 +231,27 @@ Ambas deben fallar con `permission denied for table eventos` (ADR-005, CA-23).
 
 ## 6. Autenticación
 
-### 6.1 *Custom claims* de copropiedad y rol
+### 6.1 _Custom claims_ de copropiedad y rol
 
 Todo el aislamiento de este esquema depende de que el JWT lleve `copropiedad_id`
 y `rol`. Sin ellos, `app.copropiedad_id()` devuelve `NULL` y **ninguna política
 concede acceso** — el sistema falla cerrado, que es el comportamiento correcto.
 
-Se configuran con un **Auth Hook** de tipo *Custom Access Token* (Authentication
+Se configuran con un **Auth Hook** de tipo _Custom Access Token_ (Authentication
 → Hooks). El hook debe añadir, leyendo de `public.roles_usuario`:
 
-| Claim | Contenido |
-|---|---|
-| `usuario_id` | `usuarios.id` |
-| `persona_id` | `usuarios.persona_id` — necesario para el predicado V del residente |
-| `rol` | El rol activo del usuario |
-| `copropiedad_id` | La copropiedad del contexto actual |
-| `copropiedades` | **Arreglo** de copropiedades que atiende — solo para el operador de central (HU-25, KPI-35) |
+| Claim            | Contenido                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| `usuario_id`     | `usuarios.id`                                                                               |
+| `persona_id`     | `usuarios.persona_id` — necesario para el predicado V del residente                         |
+| `rol`            | El rol activo del usuario                                                                   |
+| `copropiedad_id` | La copropiedad del contexto actual                                                          |
+| `copropiedades`  | **Arreglo** de copropiedades que atiende — solo para el operador de central (HU-25, KPI-35) |
 
 La implementación del hook es de la **ETAPA 03**. Hasta entonces, los claims se
 fijan manualmente para las pruebas, como en §5.3.
 
-> **Verificado: los *custom claims* funcionan igual con firma asimétrica.** El
+> **Verificado: los _custom claims_ funcionan igual con firma asimétrica.** El
 > gancho se ejecuta **antes** de firmar el token y modifica su carga útil; el
 > algoritmo se aplica después. Son dos etapas independientes. Del lado de la
 > base tampoco cambia nada: PostgREST verifica el token —ahora contra JWKS— y
@@ -331,20 +331,20 @@ una promesa sin comprobación.
 
 Las migraciones crean lo necesario. Solo hay que confirmarlo:
 
-| Extensión | Para qué | La crea |
-|---|---|---|
+| Extensión  | Para qué                                          | La crea          |
+| ---------- | ------------------------------------------------- | ---------------- |
 | `pgcrypto` | `gen_random_uuid()` en todas las claves primarias | Migración `0001` |
-| `citext` | Correos comparables sin distinguir mayúsculas | Migración `0001` |
+| `citext`   | Correos comparables sin distinguir mayúsculas     | Migración `0001` |
 
 **`pg_cron` no se usa.** Los trabajos programados —supresión biométrica (RN-11),
 mantenimiento de particiones, reintentos de sincronización— corren sobre
 **pg-boss**, que es el stack fijado en `CLAUDE.md` §2.6. Añadir `pg_cron` sería
 un segundo planificador con las mismas responsabilidades.
 
-| Esquema | Contenido |
-|---|---|
-| `public` | Las 31 tablas del modelo, con RLS activa y forzada |
-| `app` | Funciones de contexto, disparadores y utilidades. Sin datos |
+| Esquema  | Contenido                                                                                                                              |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `public` | Las 31 tablas del modelo, con RLS activa y forzada                                                                                     |
+| `app`    | Funciones de contexto, disparadores y utilidades. Sin datos                                                                            |
 | `pgboss` | Cola de trabajos. **Sin RLS por diseño**: el `copropiedad_id` viaja en la carga útil y el manejador lo valida en la capa de aplicación |
 
 ---
@@ -374,14 +374,14 @@ exacto donde la inmutabilidad podría erosionarse en silencio.
 ### Respaldos
 
 Database → Backups. En el plan gratuito son diarios y de retención corta; para
-producción hace falta plan de pago con *Point-in-Time Recovery*.
+producción hace falta plan de pago con _Point-in-Time Recovery_.
 
 ### Retención — **resuelta**, sujeta a confirmación legal
 
-| Dato | Plazo | Columna configurable |
-|---|---|---|
-| Eventos | **24 meses** | `copropiedades.retencion_eventos` |
-| Evidencia fotográfica | **90 días** | `copropiedades.retencion_evidencia` |
+| Dato                   | Plazo                                        | Columna configurable                                                 |
+| ---------------------- | -------------------------------------------- | -------------------------------------------------------------------- |
+| Eventos                | **24 meses**                                 | `copropiedades.retencion_eventos`                                    |
+| Evidencia fotográfica  | **90 días**                                  | `copropiedades.retencion_evidencia`                                  |
 | Plantillas biométricas | **Ligadas a la vigencia de su autorización** | `copropiedades.margen_supresion_plantilla`, acotada a 24 h por RN-11 |
 
 Los tres son columnas, no constantes: la retención puede variar por contrato o
@@ -409,13 +409,13 @@ pasado el plazo no quedaría ni el dato ni constancia de haberlo suprimido.
 
 ### Rotación de llaves — qué se rompe y en qué orden
 
-| Llave | Al rotarla se rompe | Orden de rotación |
-|---|---|---|
-| **Publicable** | Web y móvil dejan de autenticar | 1. Crear la nueva · 2. Desplegar web · 3. Publicar versión móvil · 4. **Esperar a que los clientes actualicen antes de revocar la anterior** |
-| **Secreta** | Solo lo que use **esa** llave | Se pueden tener varias y revocar una sola. **Con una llave por Edge, rotar un equipo no toca a los demás** — esa es la mejora frente a `service_role` |
-| **Llave de firma JWT** | **Nada, si se respeta el margen** | Rotación sin caída, ver abajo. Ya no invalida todas las sesiones como hacía el secreto JWT |
-| **Credenciales de dispositivo** | Solo el equipo afectado | Rotar en la bóveda; `dispositivos.credencial_ref` no cambia. **Ese es el motivo de que la base guarde una referencia y no la credencial** (D-09b) |
-| **Llave de cifrado biométrico** | Las plantillas cifradas con la anterior dejan de descifrarse | Cifrado de sobre con `algoritmo` versionado (D-10): descifrar con la vieja, recifrar con la nueva, y solo entonces retirar la vieja |
+| Llave                           | Al rotarla se rompe                                          | Orden de rotación                                                                                                                                     |
+| ------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Publicable**                  | Web y móvil dejan de autenticar                              | 1. Crear la nueva · 2. Desplegar web · 3. Publicar versión móvil · 4. **Esperar a que los clientes actualicen antes de revocar la anterior**          |
+| **Secreta**                     | Solo lo que use **esa** llave                                | Se pueden tener varias y revocar una sola. **Con una llave por Edge, rotar un equipo no toca a los demás** — esa es la mejora frente a `service_role` |
+| **Llave de firma JWT**          | **Nada, si se respeta el margen**                            | Rotación sin caída, ver abajo. Ya no invalida todas las sesiones como hacía el secreto JWT                                                            |
+| **Credenciales de dispositivo** | Solo el equipo afectado                                      | Rotar en la bóveda; `dispositivos.credencial_ref` no cambia. **Ese es el motivo de que la base guarde una referencia y no la credencial** (D-09b)     |
+| **Llave de cifrado biométrico** | Las plantillas cifradas con la anterior dejan de descifrarse | Cifrado de sobre con `algoritmo` versionado (D-10): descifrar con la vieja, recifrar con la nueva, y solo entonces retirar la vieja                   |
 
 ### Rotación de la llave de firma, sin caída
 
@@ -461,6 +461,7 @@ una llave secreta por Edge, revocar la de uno no toca a los demás. Con
 Marca cada casilla antes de dar la conexión por buena.
 
 **Credenciales y entorno**
+
 - [ ] El proyecto Supabase está bajo cuenta corporativa de Grupo Control
 - [ ] `Project URL`, llave **publicable**, llave **secreta**, **URL del JWKS** y ambas cadenas de conexión, copiados del panel
 - [ ] Los cuatro `.env` creados a partir de sus `.env.example`
@@ -470,6 +471,7 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] `apps/mobile/.env` no contiene ningún secreto
 
 **Esquema**
+
 - [ ] `supabase link` enlaza el proyecto correcto
 - [ ] `supabase db push` corre limpio sobre la base
 - [ ] Volver a ejecutarlo no produce error (idempotencia)
@@ -477,6 +479,7 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] Semillas aplicadas, con las **dos** copropiedades
 
 **Inmutabilidad e identidad de conexión (§12)**
+
 - [ ] Sonda §12.1 ejecutada: `pg_has_role(current_user,'authenticated','MEMBER')` devuelve `true`
 - [ ] `CREATE ROLE app_api …` ejecutado, con contraseña generada fuera del repositorio
 - [ ] `app_api` sale `rolcanlogin=t` y `rolsuper/rolbypassrls/rolcreatedb/rolcreaterole=f`
@@ -486,6 +489,7 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] Consulta 3 de §12.5 **falla** al intentar el `UPDATE` sobre un evento existente
 
 **Seguridad — ninguna de estas es opcional**
+
 - [ ] RLS **activa y forzada** en el 100 % de las tablas (§5.2)
 - [ ] La consulta cruzada de §5.3 devuelve **0 filas**
 - [ ] El `INSERT` cruzado de §5.3 **falla**
@@ -497,7 +501,8 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] La expiración del token confirmada en Project Settings → Auth
 
 **Operación**
-- [ ] Auth Hook de *custom claims* configurado (o anotado como tarea de la ETAPA 03)
+
+- [ ] Auth Hook de _custom claims_ configurado (o anotado como tarea de la ETAPA 03)
 - [ ] Expiración de tokens revisada
 - [ ] `app.mantener_particiones_eventos()` programado mensualmente
 - [ ] Respaldos configurados
@@ -505,6 +510,7 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] Procedimiento de rotación leído por quien vaya a ejecutarlo
 
 **Verificación final**
+
 - [ ] `./supabase/verificar.sh --con-pruebas` termina sin errores
 
 ---
@@ -552,10 +558,10 @@ SELECT rolname, rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole
 
 ### 12.3 Cadena de conexión
 
-| Vía | Usuario |
-|---|---|
-| Conexión directa (5432) | `app_api` |
-| Pooler Supavisor | `app_api.<PROJECT_REF>` — el pooler exige el *project ref* tras un punto |
+| Vía                     | Usuario                                                                  |
+| ----------------------- | ------------------------------------------------------------------------ |
+| Conexión directa (5432) | `app_api`                                                                |
+| Pooler Supavisor        | `app_api.<PROJECT_REF>` — el pooler exige el _project ref_ tras un punto |
 
 Variables `DATABASE_URL` y `DATABASE_POOLER_URL` de `apps/api`. El Edge no abre conexión a PostgreSQL. **`postgres` deja de aparecer en cualquier `.env` de aplicación.**
 

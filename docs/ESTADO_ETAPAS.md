@@ -1,7 +1,14 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-06 · al cierre de la **ETAPA 00**
+**Última actualización:** 2026-09-08 · al cierre de la **ETAPA 06**
+
+> **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
+> etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
+> su ficha de detalle. La cabecera se quedó congelada en el estado de la ETAPA 00
+> durante seis etapas —decía «2 de 17 cerradas» con cuatro fichas más marcadas
+> `CERRADA` unos párrafos más abajo— porque nadie la tenía asignada. Ahora está
+> asignada: sin este apartado actualizado, la etapa no se cierra.
 
 **Cómo se lee este documento.** Es la única fuente de verdad sobre qué está hecho. `CLAUDE.md` §2.1.2 lo hace vinculante: **una etapa no se ejecuta si la anterior no está cerrada aquí.**
 
@@ -11,15 +18,15 @@
 
 ## Resumen
 
-|                                |                                                                   |
-| ------------------------------ | ----------------------------------------------------------------- |
-| **Etapas cerradas**            | **2 de 17** (ETAPAS 00 y 01)                                      |
-| **Etapa siguiente habilitada** | **ETAPA 03 — Auth, RBAC, MFA y aislamiento multiempresa**         |
-| **Bloqueos activos**           | Ninguno                                                           |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                            |
-| **Decisiones pendientes**      | 10 abiertas (P-11 y P-12 resueltos) — ninguna bloquea la ETAPA 02 |
-| **Supuestos vigentes**         | 9 — 7 de la ETAPA 00 más S-08 y S-09                              |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                             |
+|                                |                                                                    |
+| ------------------------------ | ------------------------------------------------------------------ |
+| **Etapas cerradas**            | **6 de 17** (ETAPAS 00 a 05)                                       |
+| **Etapa siguiente habilitada** | **ETAPA 07 — Zonas comunes: horario y aforo**                      |
+| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                             |
+| **Decisiones pendientes**      | 8 abiertas — P-06 y P-07 resueltas en la ETAPA 06                  |
+| **Supuestos vigentes**         | 10 — los de etapas anteriores más S-16 (umbral de confianza 0,85)  |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                              |
 
 ---
 
@@ -29,17 +36,17 @@
 | ------ | ------------------------------------------------------------- | -------------------------------------- | -------------------------------- | -------------------------------- | ------------------------------ |
 | **00** | Auditoría documental y plan maestro                           | `etapa00` ⚠️                           | —                                | **CERRADA**                      | [ETAPA-00](etapas/ETAPA-00.md) |
 | 01     | Modelo de datos y Supabase + guía de conexión                 | `etapa-01-modelo-datos-supabase`       | 00 ✅                            | **CERRADA**                      | [ETAPA-01](etapas/ETAPA-01.md) |
-| 02     | Andamiaje del monorepo y núcleo hexagonal                     | `etapa-02-andamiaje-monorepo`          | 01 ✅                            | **PENDIENTE** — habilitada       | —                              |
-| 03     | Auth, RBAC, MFA y aislamiento multiempresa                    | `etapa-03-auth-rbac-multiempresa`      | 02                               | PENDIENTE                        | —                              |
-| 04     | Padrón: viviendas, residentes, vehículos                      | `etapa-04-padron`                      | 03                               | PENDIENTE                        | —                              |
-| 05     | Autorizaciones y motor de reglas + MockProvider               | `etapa-05-autorizaciones-motor-reglas` | 04                               | PENDIENTE                        | —                              |
-| 06     | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05                               | PENDIENTE                        | —                              |
-| 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06                               | PENDIENTE                        | —                              |
-| 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06                               | PENDIENTE                        | —                              |
+| 02     | Andamiaje del monorepo y núcleo hexagonal                     | `etapa-02-andamiaje-monorepo`          | 01 ✅                            | **CERRADA**                      | [ETAPA-02](etapas/ETAPA-02.md) |
+| 03     | Auth, RBAC, MFA y aislamiento multiempresa                    | `etapa-03-auth-rbac-multiempresa`      | 02 ✅                            | **CERRADA**                      | [ETAPA-03](etapas/ETAPA-03.md) |
+| 04     | Padrón: viviendas, residentes, vehículos                      | `etapa-04-padron`                      | 03 ✅                            | **CERRADA**                      | [ETAPA-04](etapas/ETAPA-04.md) |
+| 05     | Autorizaciones y motor de reglas + MockProvider               | `etapa-05-autorizaciones-motor-reglas` | 04 ✅                            | **CERRADA**                      | [ETAPA-05](etapas/ETAPA-05.md) |
+| 06     | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05 ✅                            | **CERRADA**                      | [ETAPA-06](etapas/ETAPA-06.md) |
+| 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
+| 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
 | 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07, 08                           | PENDIENTE                        | —                              |
 | 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09                               | PENDIENTE                        | —                              |
 | 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09                               | PENDIENTE                        | —                              |
-| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06                               | PENDIENTE                        | —                              |
+| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
 | 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12                               | PENDIENTE                        | —                              |
 | 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13                               | PENDIENTE                        | —                              |
 | 15     | Integración real con hardware Hikvision                       | `etapa-15-integracion-hikvision`       | 14                               | **PENDIENTE — con precondición** | —                              |
@@ -191,13 +198,44 @@ VO `Placa` normalizado al construir, agregado `Vivienda` con métodos de intenci
 
 ## ETAPA 05 — Autorizaciones y motor de reglas · **CERRADA**
 
-Motor de reglas como **función pura** `evaluarAcceso(contexto, reglas)`, con reloj inyectado, cero I/O y **100 % de cobertura de ramas** en `packages/domain-core/src/reglas/`. Precedencia vinculante `listaNegra > vigencia > patrón > zona` verificada con dos pruebas de CA-13. Agregado `Autorización` con `Vigencia` cerrado-abierta y `PatrónRecurrencia` con la zona horaria dentro del objeto de valor. Cuatro casos de uso y gestión de listas negras con RN-07 (quién veta ≠ quién levanta). `MockProvider` con los cuatro puertos, latencia, fallos, reintentos, duplicados y baja confianza, todo con generador **con semilla**. **KPI-11 comprobado por ejecución** (`scripts/lib/frontera-hardware.mjs`) en el verificador, en `verificar-frontera.sh` y en CI, con prueba negativa propia. Contrato de firma del Alarm Server (RNF-03.11): sin firma válida, 401. **206 pruebas en 25 ficheros**; cobertura por capa: dominio 99,29 % (ramas 100 %), aplicación 98,38 %, global 81,45 %. Informe en `docs/etapas/ETAPA-05.md`. [SUPUESTO] S-15 **cerrado**. Deudas nuevas: D-25 a D-28.
+Motor de reglas como **función pura** `evaluarAcceso(contexto, reglas)`, con reloj inyectado, cero I/O y **100 % de cobertura de ramas** en `packages/domain-core/src/reglas/`. Precedencia vinculante `listaNegra > vigencia > patrón > zona` verificada con dos pruebas de CA-13. Agregado `Autorización` con `Vigencia` cerrado-abierta y `PatrónRecurrencia` con la zona horaria dentro del objeto de valor. Cuatro casos de uso y gestión de listas negras con RN-07 (quién veta ≠ quién levanta). `MockProvider` con los cuatro puertos, latencia, fallos, reintentos, duplicados y baja confianza, todo con generador **con semilla**. **KPI-11 comprobado por ejecución** (`scripts/lib/frontera-hardware.mjs`) en el verificador, en `verificar-frontera.sh` y en CI, con prueba negativa propia. Contrato de firma del Alarm Server (RNF-03.11): sin firma válida, 401. **206 pruebas en 25 ficheros**; cobertura por capa: dominio 99,29 % (ramas 100 %), aplicación 98,38 %, global **81,45 % medido en el contenedor Linux**. La ejecución posterior del usuario en macOS dio **81,78 %**; las dos son válidas y la diferencia no es un error: la cobertura global depende de qué ficheros recorre la corrida y de la máquina que la ejecuta. Se anota el entorno junto a la cifra para que la próxima comparación no parezca una discrepancia. Informe en `docs/etapas/ETAPA-05.md`. [SUPUESTO] S-15 **cerrado**. Deudas nuevas: D-25 a D-28.
 
 > **Defecto de seguridad encontrado y corregido (D-24).** Los controladores de padrón y autenticación importaban sus DTOs con `import type`, lo que borra la clase al compilar y deja el `ValidationPipe` **inerte**: un POST con un tipo equivocado y un campo no declarado llegaba al manejador sin 400. Venía de las ETAPAS 03 y 04. Corregido, con `consistent-type-imports` desactivada en los controladores y una prueba de regresión (`validacion-dtos.e2e.test.ts`) verificada por mutación. Es el tercer caso de la misma familia: **un detalle del compilado que hace inerte un control sin ponerlo en rojo.**
 
 > **Corrección de los dos defectos del verificador reportados desde macOS.** El paso 9 comparaba el contenido en memoria en vez de preguntarle a git, e informaba «package.json quedó alterado» con el árbol limpio; ahora las sondas operan sobre un **clon temporal fuera del árbol** y el estado se compara con `git status --porcelain=v1` antes y después. El paso 10 se colgaba porque la sonda de arranque levantaba la API de verdad en un equipo con `.env` completo; ahora usa `NCR_IGNORAR_ENV_FILE=1` y **todos los pasos tienen límite de tiempo** (`scripts/lib/con-limite.mjs`, portable BSD/GNU).
 
-## Etapas 06 a 16 — `PENDIENTE`
+## ETAPA 06 — Eventos, auditoría inmutable, alertas y tiempo real · **CERRADA**
+
+Agregado `Acceso` **inmutable** —congelado, sin un solo método que cambie su estado, con una prueba que enumera su prototipo y se pone roja si alguien añade uno—. Cierra **D-27**: la ingesta ya no solo acredita la firma, decide y persiste el camino entero (clave → decisión → evento → alerta → escalamiento → aviso). Idempotencia real por el libro `recepciones_evento` (migración **0019**), no particionado: el índice único de `eventos` debe incluir `ocurrido_en`, que **no es estable entre reintentos**, así que no podía deduplicar lo que el Edge reenvía. Histórico con filtro completo (cubre el hueco D-05 del mockup), paginación **por conjunto de claves** y exportación a CSV, Excel y PDF **sin dependencias nuevas**. Evidencia por URL firmada de vida corta (RN-21). **409 pruebas en 40 ficheros**; cobertura por capa medida en el contenedor Linux: dominio 99,58 % (ramas 100 %), aplicación 97,67 %, global 85,11 %. Informe en `docs/etapas/ETAPA-06.md`.
+
+### El pendiente de la ETAPA 01, **cerrado por ejecución**
+
+El cierre de la 01 anotó que la prueba del `UPDATE` sobre `eventos` quedaba sin hacer por tabla vacía. Ahora hay filas: `test/eventos-pg.test.ts` inserta un evento **por el adaptador de la aplicación**, intenta el `UPDATE` y el `DELETE` con el rol de conexión —dueño **no** superusuario, como en Supabase— y exige que ambos sean rechazados y que la fila siga intacta.
+
+**Verificado por mutación:** con el trigger desactivado y el `UPDATE` reconcedido, la prueba se pone roja. El experimento dejó además un dato útil que ADR-005 afirmaba sin demostrar: **la RLS sí es la tercera capa** —el `UPDATE` afectó a 0 filas y la fila sobrevivió intacta—, pero **no lanza**, solo no hace nada. Por eso la prueba exige un error y no solo una fila sin alterar: un no-op silencioso no es «rechazar la operación» (CA-23).
+
+### Hallazgo: una clave ajena hacia una tabla append-only es imposible
+
+`alertas_evento_fk` (migración 0011) apuntaba a `eventos`. La comprobación de integridad referencial bloquea la fila referenciada con `SELECT … FOR KEY SHARE`, y PostgreSQL exige para ese bloqueo el privilegio UPDATE o DELETE **además** del SELECT — que ADR-005 revoca a todos, dueño incluido. Toda inserción en `alertas` con `evento_id` habría fallado con «permission denied for table eventos».
+
+Vivió cinco etapas invisible porque las dos tablas estaban vacías: **una restricción que nunca se ejerce no se distingue de una que funciona.** Es la cuarta de la misma familia. Corregido en la migración **0021**, que también arregla el gemelo `consent_evidencia_fk` → `evidencias` (lo destapó su propia aserción general) y deja `scripts/lib/frontera-append-only.mjs` como **sexto control con prueba negativa**, que lo detecta al escribir la migración y no al aplicarla.
+
+### P-06 y P-07, resueltas
+
+| ID   | Decisión                      | Resolución del usuario (2026-09-07)                                                                                                                                                               |
+| ---- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P-06 | Umbral de latido              | Conservador y **configurable por copropiedad** (migración 0020): latido cada 60 s, 1 latido tolerado, caído a los 300 s. Tres estados —`saludable`, `degradado`, `caido`— y solo el último alerta |
+| P-07 | Definición de «acceso dudoso» | **Escalar en vez de decidir.** No es un motivo concreto: es toda decisión que el motor no pudo cerrar con certeza (4 casos enumerados en `politica-alertas.ts`), y su consecuencia es un humano   |
+
+### KPI-25 medido bajo carga, no supuesto
+
+200 eventos en ráfaga con 25 consolas SSE conectadas: **200/200 entregadas**, p50 2 ms, p95 5 ms, p99 9 ms, máximo 15 ms, contra un umbral de 10 000 ms. Detalle, escalera de contingencia y procedimiento para medir Supabase Realtime cuando haya credenciales: `docs/arquitectura/tiempo-real-y-contingencia.md`.
+
+> **La prueba de carga encontró un defecto que no era la latencia.** La primera ejecución entregó **120 de 200** —exactamente el límite del `throttler` por IP— con 200 dispositivos distintos saliendo por una sola IP. El `@Throttle({ default: … })` de la ruta reconfigura el limitador `default` para **todos** los guards, incluido el global, que cuenta por IP. Era el defecto que el propio comentario del código decía evitar. En un conjunto real todas las cámaras comparten enrutador: el tope las habría sumado a todas y habría empezado a rechazar eventos en silencio. Corregido con dos limitadores **con nombre** (`default` por IP, `dispositivo` por equipo firmante), cerrando D-28.
+
+> **Dos correcciones al propio verificador.** (1) `supabase/verificar.sh` concedía la pertenencia a `authenticated` **antes** de aplicar las migraciones; en PostgreSQL 16 un rol con `CREATEROLE` que crea otro recibe sobre él una pertenencia implícita con `set_option = false` que **sustituye** a la anterior, así que en un clúster limpio la suite SQL no podía ni arrancar (`permission denied to set role`). Solo se veía en una máquina nueva: los roles son de ámbito de clúster y `DROP DATABASE` no los borra. (2) El paso de base real daba **verde con el servidor caído**, porque esas pruebas se omiten solas y el guion leía la omisión como éxito. Ahora comprueba la marca `OMITIDA`: una omisión no es un verde.
+
+## Etapas 07 a 16 — `PENDIENTE`
 
 Sin trabajo iniciado. Cada etapa se habilita cuando la anterior queda cerrada.
 
@@ -218,19 +256,19 @@ Sin trabajo iniciado. Cada etapa se habilita cuando la anterior queda cerrada.
 
 Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contradicciones-y-supuestos.md) §3.
 
-| ID   | Decisión                                                    | Bloquea a partir de              | Estado                                        |
-| ---- | ----------------------------------------------------------- | -------------------------------- | --------------------------------------------- |
-| P-01 | Firma de documentos de cesión, confidencialidad y seguridad | _(condición contractual previa)_ | Abierta                                       |
-| P-02 | Umbral de confianza de lectura de placa                     | ETAPA 15                         | Abierta — supuesto vigente: 0,85              |
-| P-03 | Plazo de respuesta al consentimiento                        | ETAPA 08                         | Abierta — supuesto vigente: 24 h              |
-| P-04 | Política de reinicio del contador de aforo                  | ETAPA 07                         | Abierta — supuesto vigente: cierre de horario |
-| P-05 | Margen de vigencia del caché de reglas                      | ETAPA 12                         | Abierta — supuesto vigente: 24 h              |
-| P-06 | Umbral de latido de dispositivo                             | ETAPA 06                         | Abierta — supuesto vigente: 3 latidos o 5 min |
-| P-07 | Definición de «acceso dudoso»                               | ETAPA 06                         | Abierta — supuesto vigente: 2 motivos tipados |
-| P-08 | Plataforma de despliegue de la API                          | ETAPA 14                         | Abierta                                       |
-| P-09 | ¿Compuerta de aprobación administrativa?                    | ETAPA 05                         | Abierta — no se construye                     |
-| P-10 | ¿Reservas de zonas sin cobro?                               | ETAPA 07                         | Abierta — no se construyen                    |
-| P-11 | «Nivel de acceso» por residente                             | ETAPA 04                         | Abierta — valor por defecto restrictivo       |
+| ID   | Decisión                                                    | Bloquea a partir de              | Estado                                                               |
+| ---- | ----------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------- |
+| P-01 | Firma de documentos de cesión, confidencialidad y seguridad | _(condición contractual previa)_ | Abierta                                                              |
+| P-02 | Umbral de confianza de lectura de placa                     | ETAPA 15                         | Abierta — supuesto vigente: 0,85                                     |
+| P-03 | Plazo de respuesta al consentimiento                        | ETAPA 08                         | Abierta — supuesto vigente: 24 h                                     |
+| P-04 | Política de reinicio del contador de aforo                  | ETAPA 07                         | Abierta — supuesto vigente: cierre de horario                        |
+| P-05 | Margen de vigencia del caché de reglas                      | ETAPA 12                         | Abierta — supuesto vigente: 24 h                                     |
+| P-06 | Umbral de latido de dispositivo                             | ETAPA 06                         | **RESUELTA** (ETAPA 06) — 60 s / 1 tolerado / 300 s, por copropiedad |
+| P-07 | Definición de «acceso dudoso»                               | ETAPA 06                         | **RESUELTA** (ETAPA 06) — ante la duda, escalar a un humano          |
+| P-08 | Plataforma de despliegue de la API                          | ETAPA 14                         | Abierta                                                              |
+| P-09 | ¿Compuerta de aprobación administrativa?                    | ETAPA 05                         | Abierta — no se construye                                            |
+| P-10 | ¿Reservas de zonas sin cobro?                               | ETAPA 07                         | Abierta — no se construyen                                           |
+| P-11 | «Nivel de acceso» por residente                             | ETAPA 04                         | Abierta — valor por defecto restrictivo                              |
 
 ---
 
@@ -250,3 +288,19 @@ Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contr
 | D-10 | Las aserciones de las migraciones ya aplicadas (`0015`, `0016`) no se reejecutan: `supabase db push` solo aplica migraciones nuevas. Una corrección de aserción solo protege despliegues limpios                                                  | Hallazgo del 2026-09-06 | Toda corrección de garantía va en una migración **nueva**, nunca editando una aplicada                                                 |
 | D-11 | `tg_usuario_tenant` evalúa una invariante (D-02) consultando `roles_usuario` **bajo RLS**: su veredicto depende de la visibilidad del llamante. Es `DEFERRABLE INITIALLY DEFERRED`, así que corre en el `COMMIT` con el contexto que quede activo | Arnés `--modo-supabase` | ETAPA 03, al definir el contexto de sesión de la API. Mitigado en el seed restaurando el contexto antes del `COMMIT` ([SUPUESTO] S-11) |
 | D-12 | Que `postgres` pueda `GRANT authenticated TO app_api` es un supuesto sin verificar contra el proyecto real ([SUPUESTO] S-12). La documentación de Supabase concede en la dirección contraria                                                      | Enmienda 2 del ADR-005  | Sonda de `CONEXION_SUPABASE.md` §12.1, antes de crear el rol                                                                           |
+
+---
+
+## Deuda de la ETAPA 06
+
+| ID    | Deuda                                                                                                                                                                                               | Estado / se salda en                                                                                                                                            |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-25  | Autorizaciones y listas negras sin adaptador PostgreSQL                                                                                                                                             | **Sigue abierta.** Sin contraseña (D-17). La FRONTERA quedó definitiva: `RepositorioEventosPg` cumple el mismo puerto que el doble y se prueba contra base real |
+| D-27  | La ingesta aceptaba el evento sin persistirlo ni decidirlo                                                                                                                                          | **CERRADA** en la ETAPA 06                                                                                                                                      |
+| D-28  | Rate limiting por dispositivo en la ingesta                                                                                                                                                         | **CERRADA** en la ETAPA 06, con el defecto del limitador `default` corregido                                                                                    |
+| D-21t | Claims por petición al repositorio                                                                                                                                                                  | **CERRADA de facto**: `RepositorioEventosPg` recibe los claims por constructor y fija `request.jwt.claims` en la misma conexión que ejecuta la sentencia        |
+| D-29  | `CanalEnProceso` reparte solo entre los suscriptores de SU proceso: con más de una instancia de API, un operador conectado a la B no ve lo publicado por la A                                       | ETAPA 14 — peldaño 1 de la escalera de contingencia (`LISTEN/NOTIFY`)                                                                                           |
+| D-30  | El notificador push deja constancia y encola, pero no envía: FCM exige el registro de tokens del dispositivo del residente                                                                          | ETAPA 11                                                                                                                                                        |
+| D-31  | `VigilarLatidos` es una operación idempotente sin planificador: nadie la invoca todavía                                                                                                             | ETAPA 14 (pg-boss)                                                                                                                                              |
+| D-32  | El trigger que sustituye a las claves ajenas retiradas comprueba existencia **sin bloqueo de fila**: no protege de una referencia a una fila insertada en una transacción concurrente sin confirmar | Riesgo residual declarado. Consecuencia nula mientras no se borren eventos; se reevalúa en la ETAPA 13                                                          |
+| D-33  | La exportación tiene tope de 10 000 filas y declara el truncado por cabecera; la consola debe mostrarlo                                                                                             | ETAPA 09                                                                                                                                                        |

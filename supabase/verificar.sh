@@ -54,13 +54,6 @@ if [[ "$MODO_SUPABASE" == "1" ]]; then
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='${APLICADOR}') THEN
         CREATE ROLE ${APLICADOR} LOGIN NOSUPERUSER CREATEROLE NOCREATEDB NOBYPASSRLS INHERIT;
       END IF; END \$\$;" >/dev/null
-  # La suite de RLS necesita `SET ROLE authenticated`. En Supabase eso depende
-  # de que `postgres` sea miembro de esos roles — [SUPUESTO] S-12, comprobable
-  # en el proyecto real con:
-  #   SELECT pg_has_role('postgres','authenticated','MEMBER');
-  # Aquí se concede explícitamente para que la suite pueda correr; si en el
-  # proyecto real diera `false`, habría que revisar el diseño de la ETAPA 03.
-  psql -d postgres -Atqc "GRANT anon, authenticated, service_role TO ${APLICADOR};" >/dev/null 2>&1 || true
   psql -d postgres -Atqc "CREATE DATABASE ${PGDATABASE} OWNER ${APLICADOR};" >/dev/null
   # En Supabase el rol `postgres` SÍ puede instalar extensiones (supautils). Se
   # preinstalan para no confundir esa capacidad con una restricción real.
@@ -76,6 +69,28 @@ for f in supabase/migrations/*.sql; do
   psql -d "$PGDATABASE" -U "$APLICADOR" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null
   echo "ok"
 done
+
+# --- SET ROLE para la suite de RLS ------------------------------------------
+# La suite necesita `SET ROLE authenticated`. En Supabase eso depende de que el
+# rol de conexión sea MIEMBRO de esos roles — [SUPUESTO] S-12, comprobable en el
+# proyecto real con `SELECT pg_has_role('postgres','authenticated','MEMBER')`,
+# que dio `true` el 2026-09-06.
+#
+# LA CONCESIÓN VA AQUÍ, DESPUÉS DE LAS MIGRACIONES, Y CON `WITH SET TRUE`.
+# Antes se hacía antes de aplicarlas y la suite fallaba en un clúster limpio con
+# «permission denied to set role "authenticated"». La causa es un cambio de
+# PostgreSQL 16: cuando un rol con CREATEROLE crea otro rol —y `anon` y
+# `authenticated` los crea la migración 0001— recibe sobre él una pertenencia
+# implícita con ADMIN pero con `set_option = false`, que SUSTITUYE a la
+# concesión previa. El resultado es una membresía que no permite `SET ROLE`.
+#
+# Solo se veía en un clúster nuevo: los roles son de ámbito de clúster y
+# `DROP DATABASE` no los borra, así que en una máquina donde ya existían la
+# migración no los creaba y la concesión sobrevivía. Es el mismo patrón de las
+# tres veces anteriores —un detalle del entorno que hace inerte un control—,
+# aquí en la dirección contraria: no daba un verde falso, dejaba la suite sin
+# poder correr.
+psql -d postgres -Atqc "GRANT anon, authenticated, service_role TO ${APLICADOR} WITH SET TRUE;" >/dev/null 2>&1 || true
 
 if [[ "${1:-}" == "--con-semillas" || "${1:-}" == "--con-pruebas" ]]; then
   printf '  %-62s' "seed.sql"

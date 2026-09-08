@@ -22,6 +22,8 @@ const configuracionParaContrato: Configuracion = {
   LIMITE_PAYLOAD: '256kb',
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 120,
+  THROTTLE_DISPOSITIVO_LIMITE: 120,
+  THROTTLE_INGESTA_IP_LIMITE: 3000,
   origenesPermitidos: ['https://generacion-de-contrato.invalid'],
 };
 

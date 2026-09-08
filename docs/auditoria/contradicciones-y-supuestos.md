@@ -3,6 +3,7 @@
 **Registro único y autoritativo** de todo lo que la ETAPA 00 no pudo resolver leyendo los insumos, o que resolvió eligiendo entre fuentes en conflicto.
 
 **Reglas que gobiernan este documento** (`CLAUDE.md` §2.1):
+
 - Decisión de negocio no resuelta → `PENDIENTE DE DEFINICIÓN`, **comportamiento conservador (denegar por defecto)**, reportada. Nunca inventada en silencio.
 - Suposición del agente → marcada `[SUPUESTO]` en código y en informe.
 - Conflicto entre fuentes → `[CONTRADICCIÓN]` con la resolución aplicada según la jerarquía de §3.
@@ -18,14 +19,14 @@
 
 ### C-01 · Protocolo del intercom — **Alta**
 
-| | |
-|---|---|
-| **Fuente A** | Requisitos §13.2, tabla «Stack sugerido», fila *Intercom*: *«SIP hacia el videoportero, con puente WebRTC (LiveKit o Janus)»*. §13.4 lo declara el mayor riesgo de cronograma |
-| **Fuente B** | Diagrama arquitectónico, caja «Puente de intercom»: *«ISAPI TwoWayAudio, o SIP con Asterisk si el modelo no lo soporta»* — deja ambas rutas abiertas |
-| **Fuente C** | `CLAUDE.md` ADR-01: ISAPI TwoWayAudio, decisión expresa del cliente |
-| **Resolución** | Prevalece **ISAPI TwoWayAudio** |
+|                |                                                                                                                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | Requisitos §13.2, tabla «Stack sugerido», fila _Intercom_: _«SIP hacia el videoportero, con puente WebRTC (LiveKit o Janus)»_. §13.4 lo declara el mayor riesgo de cronograma |
+| **Fuente B**   | Diagrama arquitectónico, caja «Puente de intercom»: _«ISAPI TwoWayAudio, o SIP con Asterisk si el modelo no lo soporta»_ — deja ambas rutas abiertas                          |
+| **Fuente C**   | `CLAUDE.md` ADR-01: ISAPI TwoWayAudio, decisión expresa del cliente                                                                                                           |
+| **Resolución** | Prevalece **ISAPI TwoWayAudio**                                                                                                                                               |
 
-**Justificación.** La decisión del cliente es posterior a la redacción del documento. Además, §13 se declara a sí misma ajena al estándar de especificación (*«Esta sección no forma parte del estándar de especificación de requisitos…»*), y la propuesta SIP **no tiene criterio de verificación asociado**: ningún OE, RN, HU, CU ni CA exige SIP. Los compromisos reales —KPI-32, KPI-33, CA-19, CA-20— son de latencia y trazabilidad, agnósticos al protocolo. El diagrama no contradice la decisión: la contiene como primera opción.
+**Justificación.** La decisión del cliente es posterior a la redacción del documento. Además, §13 se declara a sí misma ajena al estándar de especificación (_«Esta sección no forma parte del estándar de especificación de requisitos…»_), y la propuesta SIP **no tiene criterio de verificación asociado**: ningún OE, RN, HU, CU ni CA exige SIP. Los compromisos reales —KPI-32, KPI-33, CA-19, CA-20— son de latencia y trazabilidad, agnósticos al protocolo. El diagrama no contradice la decisión: la contiene como primera opción.
 
 **Obligaciones derivadas.** Toda referencia a SIP, Asterisk, LiveKit o Janus queda **fuera del alcance de implementación**: no se construye, no se deja andamiaje, no se menciona en el código. SIP sobrevive únicamente como contingencia documentada, realizable como adaptador nuevo tras el mismo puerto. El `.docx` original **no se modifica**.
 **Formalizada en:** `docs/decisiones/ADR-001-intercom-isapi-twowayaudio.md` · **Afecta a:** ETAPAS 10, 15
@@ -34,13 +35,13 @@
 
 ### C-02 · Número de agregados raíz: seis frente a nueve — **Alta**
 
-| | |
-|---|---|
-| **Fuente A** | `CLAUDE.md` §2.2: seis agregados raíz «del diagrama, vinculantes» — `Copropiedad`, `Vivienda`, `Autorización`, `Acceso`, `Consentimiento`, `Zona`. Coincide con la página 1 del diagrama |
-| **Fuente B** | Diagrama, **página 3 «Agregados y objetos de valor»**: nueve, añadiendo `PlantillaBiometrica`, **`ListaNegra` «raíz de agregado»** y **`Dispositivo` «raíz de agregado»** |
-| **Resolución** | Se adoptan **nueve agregados raíz** |
+|                |                                                                                                                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | `CLAUDE.md` §2.2: seis agregados raíz «del diagrama, vinculantes» — `Copropiedad`, `Vivienda`, `Autorización`, `Acceso`, `Consentimiento`, `Zona`. Coincide con la página 1 del diagrama |
+| **Fuente B**   | Diagrama, **página 3 «Agregados y objetos de valor»**: nueve, añadiendo `PlantillaBiometrica`, **`ListaNegra` «raíz de agregado»** y **`Dispositivo` «raíz de agregado»**                |
+| **Resolución** | Se adoptan **nueve agregados raíz**                                                                                                                                                      |
 
-**Justificación.** No es desacuerdo de criterio: `CLAUDE.md` declara que su lista proviene del diagrama, y la vista del diagrama dedicada precisamente a los agregados declara tres más. La lista del contrato es un resumen de la página 1, no el inventario completo. **Y el hueco tiene consecuencia funcional:** sin `ListaNegra` y sin `Dispositivo`, cinco reglas se quedan sin invariante que las sostenga —RN-06, RN-07, RN-12, RN-21— y CA-26 no tiene dónde vivir. `PolíticaListaNegra` *aplica* la lista; no gobierna quién puede crearla ni levantarla, que es una invariante de agregado (RN-07).
+**Justificación.** No es desacuerdo de criterio: `CLAUDE.md` declara que su lista proviene del diagrama, y la vista del diagrama dedicada precisamente a los agregados declara tres más. La lista del contrato es un resumen de la página 1, no el inventario completo. **Y el hueco tiene consecuencia funcional:** sin `ListaNegra` y sin `Dispositivo`, cinco reglas se quedan sin invariante que las sostenga —RN-06, RN-07, RN-12, RN-21— y CA-26 no tiene dónde vivir. `PolíticaListaNegra` _aplica_ la lista; no gobierna quién puede crearla ni levantarla, que es una invariante de agregado (RN-07).
 
 **Acción.** Se propone al usuario la corrección de `CLAUDE.md` §2.2. Entretanto se construye con nueve y se documenta. Se añaden además los puertos faltantes: `ListaNegraRepo`, `DispositivoRepo`, `ConsentimientoRepo`, `PlantillaRepo`.
 **Detalle en:** `02-arquitectura.md` §2 · **Afecta a:** ETAPAS 01, 05, 06, 08
@@ -49,11 +50,11 @@
 
 ### C-03 · Aprobación administrativa de autorizaciones — **Alta**
 
-| | |
-|---|---|
-| **Fuente A** | OE-02: la autorización del residente *«se propague al motor de reglas **sin intervención de portería**»*. KPI-06 exige ≥ 95 % de ingresos autónomos. PB-01 identifica la dependencia de un tercero como el problema a eliminar |
-| **Fuente B** | Mockup W-05: ciclo `Pendiente → Aprobada / Denegada` con botones **Aprobar** y **Rechazar** operados por el administrador |
-| **Resolución** | **No se construye compuerta de aprobación** |
+|                |                                                                                                                                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Fuente A**   | OE-02: la autorización del residente _«se propague al motor de reglas **sin intervención de portería**»_. KPI-06 exige ≥ 95 % de ingresos autónomos. PB-01 identifica la dependencia de un tercero como el problema a eliminar |
+| **Fuente B**   | Mockup W-05: ciclo `Pendiente → Aprobada / Denegada` con botones **Aprobar** y **Rechazar** operados por el administrador                                                                                                      |
+| **Resolución** | **No se construye compuerta de aprobación**                                                                                                                                                                                    |
 
 **Justificación.** Jerarquía Requisitos > Mockups. Ninguna HU, RN, CU ni CA menciona una aprobación administrativa. Y una compuerta humana hace **inalcanzable** KPI-06 cuando el administrador no está disponible —reintroduciendo exactamente PB-01, el problema que el proyecto viene a resolver—.
 
@@ -64,24 +65,24 @@
 
 ### C-04 · Reservas de zonas comunes — **Media**
 
-| | |
-|---|---|
-| **Fuente A** | Alcance **excluido**: *«Reservas de zonas comunes con cobro o pago en línea»*. Alcance **incluido**: *«Zonas comunes con horario, aforo y reglas configurables»* — sin mencionar reservas. HU-18, HU-19 y HU-20 no hablan de agendar |
-| **Fuente B** | Mockup W-06 «Reservas de Hoy» con estados Confirmada/Pendiente; mockup M-5 «Mis Reservas Activas» y botón «Solicitar Acceso» |
-| **Resolución** | Las **reservas no se construyen**. Se implementa **solicitud de acceso a zona** (HU-19) |
+|                |                                                                                                                                                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Fuente A**   | Alcance **excluido**: _«Reservas de zonas comunes con cobro o pago en línea»_. Alcance **incluido**: _«Zonas comunes con horario, aforo y reglas configurables»_ — sin mencionar reservas. HU-18, HU-19 y HU-20 no hablan de agendar |
+| **Fuente B**   | Mockup W-06 «Reservas de Hoy» con estados Confirmada/Pendiente; mockup M-5 «Mis Reservas Activas» y botón «Solicitar Acceso»                                                                                                         |
+| **Resolución** | Las **reservas no se construyen**. Se implementa **solicitud de acceso a zona** (HU-19)                                                                                                                                              |
 
-**Justificación.** El alcance excluye reservas *con cobro*; el alcance incluido no menciona reservas *sin cobro*. Ante el silencio, manda lo que sí tiene HU: HU-19 pide *autorizar acceso*, no agendar franja. Construir una agenda con confirmación sería ampliar el alcance por iniciativa propia.
+**Justificación.** El alcance excluye reservas _con cobro_; el alcance incluido no menciona reservas _sin cobro_. Ante el silencio, manda lo que sí tiene HU: HU-19 pide _autorizar acceso_, no agendar franja. Construir una agenda con confirmación sería ampliar el alcance por iniciativa propia.
 **Deriva en:** `PENDIENTE DE DEFINICIÓN` **P-10** · **Afecta a:** ETAPAS 07, 09, 11
 
 ---
 
 ### C-05 · Selector de rol en el login — **Alta**
 
-| | |
-|---|---|
-| **Fuente A** | RN-15 y la ETAPA 03: rol y `copropiedad_id` provienen de los *custom claims* del JWT. RN-20 y CA-25 exigen MFA para roles administrativos. Requisitos §12 lista *«Login **y selección de copropiedad**»*. El sistema tiene **6 roles** |
-| **Fuente B** | Mockup W-01: chips «TIPO DE USUARIO» con **3 roles elegibles por el usuario**, sin paso MFA y sin selector de copropiedad |
-| **Resolución** | **El selector se elimina.** Login único; el rol se deriva del token |
+|                |                                                                                                                                                                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | RN-15 y la ETAPA 03: rol y `copropiedad_id` provienen de los _custom claims_ del JWT. RN-20 y CA-25 exigen MFA para roles administrativos. Requisitos §12 lista _«Login **y selección de copropiedad**»_. El sistema tiene **6 roles** |
+| **Fuente B**   | Mockup W-01: chips «TIPO DE USUARIO» con **3 roles elegibles por el usuario**, sin paso MFA y sin selector de copropiedad                                                                                                              |
+| **Resolución** | **El selector se elimina.** Login único; el rol se deriva del token                                                                                                                                                                    |
 
 **Justificación.** Dos problemas independientes. Primero, **el rol no se elige, se deriva**: un selector en el cliente sugiere que la elección influye en los permisos y crea superficie de confusión sin aportar nada. Segundo, faltan tres roles (Superadministrador, Operador de central, Servicio/Integración) y dos pasos obligatorios.
 
@@ -92,11 +93,11 @@
 
 ### C-06 · Acompañantes: contador frente a lista nominal — **Media**
 
-| | |
-|---|---|
-| **Fuente A** | HU-09: *«registrar acompañantes»*. Diagrama pág. 3: `acompanantes: Acompanante[]` — colección de entidades con identidad. RN-02 exige que el evento registre el actor |
-| **Fuente B** | Mockup M-4: control «Número de acompañantes» con contador `−` / `+` |
-| **Resolución** | **Lista nominal** con nombre y documento por acompañante |
+|                |                                                                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | HU-09: _«registrar acompañantes»_. Diagrama pág. 3: `acompanantes: Acompanante[]` — colección de entidades con identidad. RN-02 exige que el evento registre el actor |
+| **Fuente B**   | Mockup M-4: control «Número de acompañantes» con contador `−` / `+`                                                                                                   |
+| **Resolución** | **Lista nominal** con nombre y documento por acompañante                                                                                                              |
 
 **Justificación.** Un contador no permite auditar quién entró, y RN-02 exige actor en el evento. El contador se conserva como **atajo de interfaz** que despliega N filas. Coherente con CU-01, donde los acompañantes entran en el mismo vehículo pero cada persona genera su propio registro de acceso.
 **Afecta a:** ETAPAS 05, 11
@@ -105,37 +106,37 @@
 
 ### C-07 · KPI-12: meta frente a fuente de medición — **Media**
 
-| | |
-|---|---|
-| **Fuente A** | KPI-12, **meta**: *«Suite completa verde con adaptadores simulados»* |
-| **Fuente B** | KPI-12, **fuente de medición**: *«Ejecución en CI con otros dispositivos de otro proveedor»*. El alcance excluido prohíbe implementar adaptadores de otros fabricantes |
-| **Resolución** | Manda la **meta**. La fuente correcta es la ejecución de la suite completa contra `MockProvider`, sin hardware |
+|                |                                                                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | KPI-12, **meta**: _«Suite completa verde con adaptadores simulados»_                                                                                                   |
+| **Fuente B**   | KPI-12, **fuente de medición**: _«Ejecución en CI con otros dispositivos de otro proveedor»_. El alcance excluido prohíbe implementar adaptadores de otros fabricantes |
+| **Resolución** | Manda la **meta**. La fuente correcta es la ejecución de la suite completa contra `MockProvider`, sin hardware                                                         |
 
-**Justificación.** La fuente de medición se contradice con el propio alcance del proyecto. **`MockProvider` *es* el «otro proveedor»** que demuestra la sustituibilidad: dos implementaciones del mismo puerto, la suite verde con ambas, sin cambiar una aserción. Eso es el principio de sustitución de Liskov, que es lo que KPI-12 pretende medir.
+**Justificación.** La fuente de medición se contradice con el propio alcance del proyecto. **`MockProvider` _es_ el «otro proveedor»** que demuestra la sustituibilidad: dos implementaciones del mismo puerto, la suite verde con ambas, sin cambiar una aserción. Eso es el principio de sustitución de Liskov, que es lo que KPI-12 pretende medir.
 **Afecta a:** ETAPAS 05, 14
 
 ---
 
 ### C-11 · Direcciones IP de dispositivo visibles en el navegador — **Baja**
 
-| | |
-|---|---|
-| **Fuente A** | RN-21: *«Las credenciales y secretos de dispositivos nunca se exponen al frontend ni a la aplicación móvil»*. KPI-11: cero referencias a IP de dispositivo fuera de la capa de proveedor |
-| **Fuente B** | Mockup W-07: cada tarjeta de dispositivo muestra su IP (`192.168.1.101`…) |
-| **Resolución** | Se mantiene la visibilidad, **restringida por rol** |
+|                |                                                                                                                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | RN-21: _«Las credenciales y secretos de dispositivos nunca se exponen al frontend ni a la aplicación móvil»_. KPI-11: cero referencias a IP de dispositivo fuera de la capa de proveedor |
+| **Fuente B**   | Mockup W-07: cada tarjeta de dispositivo muestra su IP (`192.168.1.101`…)                                                                                                                |
+| **Resolución** | Se mantiene la visibilidad, **restringida por rol**                                                                                                                                      |
 
-**Justificación, en tres partes.** (1) **KPI-11 no se incumple**: se refiere a referencias *en código fuente*; una IP leída de la base y renderizada no lo es, y el análisis estático seguirá dando cero. (2) **RN-21 no se incumple**: una IP no es una credencial; `credencialRef` **nunca** viaja al navegador, ni enmascarada. (3) **Pero es endurecimiento razonable**: la IP se muestra solo a Administrador y Superadministrador, nunca a Portero ni a Operador de central, y nunca en logs ni en mensajes de error.
+**Justificación, en tres partes.** (1) **KPI-11 no se incumple**: se refiere a referencias _en código fuente_; una IP leída de la base y renderizada no lo es, y el análisis estático seguirá dando cero. (2) **RN-21 no se incumple**: una IP no es una credencial; `credencialRef` **nunca** viaja al navegador, ni enmascarada. (3) **Pero es endurecimiento razonable**: la IP se muestra solo a Administrador y Superadministrador, nunca a Portero ni a Operador de central, y nunca en logs ni en mensajes de error.
 **Afecta a:** ETAPAS 09, 13
 
 ---
 
 ### C-12 · La consola operativa omite cuatro exigencias verificables — **Alta**
 
-| | |
-|---|---|
-| **Fuente A** | RN-08 y CA-16: sin motivo escrito, la apertura **no se ejecuta**. HU-25 y KPI-35: multiproyecto. HU-26, CA-19 y ADR-01: intercom con audio. CU-03 alterno 3a: cola con tiempo de espera |
-| **Fuente B** | Mockup W-09: una sola consola, con vídeo pero sin audio, sin conmutador de copropiedad, sin cola y con **ABRIR/DENEGAR que actúan directamente, sin pedir motivo** |
-| **Resolución** | El mockup es base visual, no especificación completa. Se **separan dos superficies** y se añaden los cuatro elementos |
+|                |                                                                                                                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | RN-08 y CA-16: sin motivo escrito, la apertura **no se ejecuta**. HU-25 y KPI-35: multiproyecto. HU-26, CA-19 y ADR-01: intercom con audio. CU-03 alterno 3a: cola con tiempo de espera |
+| **Fuente B**   | Mockup W-09: una sola consola, con vídeo pero sin audio, sin conmutador de copropiedad, sin cola y con **ABRIR/DENEGAR que actúan directamente, sin pedir motivo**                      |
+| **Resolución** | El mockup es base visual, no especificación completa. Se **separan dos superficies** y se añaden los cuatro elementos                                                                   |
 
 **Justificación.** Tal como está dibujada, la consola **incumple un criterio de aceptación** (CA-16) y hace indemostrable un indicador (KPI-35). Además fusiona dos roles con permisos y contexto distintos: el Portero es presencial y de una sola copropiedad; el Operador de central es remoto y multiproyecto. `W-09a` (Portería) y `W-09b` (Guardia virtual) se construyen por separado en la ETAPA 10, esta última con exclusividad de canal, cola y conmutador.
 **Afecta a:** ETAPA 10
@@ -144,10 +145,10 @@
 
 ### C-14 · Tres denominaciones de marca — **Baja**
 
-| | |
-|---|---|
-| **Fuentes** | «NextResidential» (login del mockup) · «Next Control · RESIDENCIAL» (barra lateral) · «Next Control Residencial» (documentos) · «Nex Control Residential» (cabecera del `.docx`) · pie «© 2025 Next Control» y «Versión 4.2.1-Prod» |
-| **Resolución** | El producto se denomina **Next Control Residencial**. El repositorio conserva `NextResidential` |
+|                |                                                                                                                                                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Fuentes**    | «NextResidential» (login del mockup) · «Next Control · RESIDENCIAL» (barra lateral) · «Next Control Residencial» (documentos) · «Nex Control Residential» (cabecera del `.docx`) · pie «© 2025 Next Control» y «Versión 4.2.1-Prod» |
+| **Resolución** | El producto se denomina **Next Control Residencial**. El repositorio conserva `NextResidential`                                                                                                                                      |
 
 El bloque de marca de la interfaz muestra «Next Control» con «RESIDENCIAL» como descriptor secundario. El número de versión se toma del `package.json` en tiempo de construcción; la versión ficticia «4.2.1-Prod» no llega al entregable.
 **Afecta a:** ETAPAS 09, 11, 16
@@ -156,11 +157,11 @@ El bloque de marca de la interfaz muestra «Next Control» con «RESIDENCIAL» c
 
 ### C-15 · Plataforma de despliegue de la API — **Baja**
 
-| | |
-|---|---|
-| **Fuente A** | Requisitos §13.2: *«Railway o Fly.io — continuidad con la infraestructura que ya usas»* |
-| **Fuente B** | `CLAUDE.md` §2.6 fija el stack completo y **no menciona plataforma de despliegue** |
-| **Resolución** | **`PENDIENTE DE DEFINICIÓN` P-08.** No bloquea ninguna etapa hasta la 14 |
+|                |                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------- |
+| **Fuente A**   | Requisitos §13.2: _«Railway o Fly.io — continuidad con la infraestructura que ya usas»_ |
+| **Fuente B**   | `CLAUDE.md` §2.6 fija el stack completo y **no menciona plataforma de despliegue**      |
+| **Resolución** | **`PENDIENTE DE DEFINICIÓN` P-08.** No bloquea ninguna etapa hasta la 14                |
 
 Requisito no negociable sea cual sea la elección: la cuenta debe ser **corporativa de Grupo Control**, nunca personal (PDF del reto §8).
 **Afecta a:** ETAPA 14
@@ -169,11 +170,11 @@ Requisito no negociable sea cual sea la elección: la cuenta debe ser **corporat
 
 ### C-22 · KPI-01 frente a RN-13 — **Media**
 
-| | |
-|---|---|
-| **Fuente A** | KPI-01: *«0 residentes sin vivienda activa»* |
-| **Fuente B** | RN-13: una vivienda puede quedar **inactiva** conservando sus autorizaciones vigentes. RN-19 prohíbe el borrado físico |
-| **Resolución** | KPI-01 se lee como indicador de **integridad referencial**: *«0 residentes **activos** sin vivienda asociada»* |
+|                |                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | KPI-01: _«0 residentes sin vivienda activa»_                                                                           |
+| **Fuente B**   | RN-13: una vivienda puede quedar **inactiva** conservando sus autorizaciones vigentes. RN-19 prohíbe el borrado físico |
+| **Resolución** | KPI-01 se lee como indicador de **integridad referencial**: _«0 residentes **activos** sin vivienda asociada»_         |
 
 **Justificación.** Tal como está redactado, desactivar una vivienda con residentes incumpliría KPI-01 **por diseño** —el propio RN-13 lo provocaría—. La intención del indicador, evidente por su nombre («Integridad referencial») y por su fuente de medición («Consulta de huérfanos»), es detectar **huérfanos**: residentes cuyo `vivienda_id` no resuelve. La desactivación propaga el estado; no rompe la referencia.
 **Afecta a:** ETAPAS 01, 04
@@ -182,11 +183,11 @@ Requisito no negociable sea cual sea la elección: la cuenta debe ser **corporat
 
 ### C-23 · Superficie del residente: móvil o PWA — **Baja**
 
-| | |
-|---|---|
-| **Fuente A** | PDF del reto §1: *«Aplicación móvil o PWA muy sencilla»* |
-| **Fuente B** | Requisitos: **Flutter (iOS y Android)**, confirmado en el alcance incluido y en §13.3 |
-| **Resolución** | **Ambas cosas.** Flutter para el residente; PWA instalable para las consolas web |
+|                |                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------- |
+| **Fuente A**   | PDF del reto §1: _«Aplicación móvil o PWA muy sencilla»_                              |
+| **Fuente B**   | Requisitos: **Flutter (iOS y Android)**, confirmado en el alcance incluido y en §13.3 |
+| **Resolución** | **Ambas cosas.** Flutter para el residente; PWA instalable para las consolas web      |
 
 No es contradicción sino precisión progresiva: el reto abre la opción, los requisitos la cierran. `CLAUDE.md` §2.6 confirma las dos superficies.
 **Afecta a:** ETAPAS 09, 11, 14
@@ -195,13 +196,13 @@ No es contradicción sino precisión progresiva: el reto abre la opción, los re
 
 ### C-26 · Tres perfiles frente a seis roles — **Baja**
 
-| | |
-|---|---|
-| **Fuente A** | PDF del reto §1: 3 perfiles (Administrador, Portero/Seguridad, Propietario/Residente) |
-| **Fuente B** | Requisitos §5: 6 roles (añade Superadministrador, Operador de central, Servicio/Integración) |
-| **Resolución** | **Se construyen los 6 roles**, agrupados en las 3 superficies de producto |
+|                |                                                                                              |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| **Fuente A**   | PDF del reto §1: 3 perfiles (Administrador, Portero/Seguridad, Propietario/Residente)        |
+| **Fuente B**   | Requisitos §5: 6 roles (añade Superadministrador, Operador de central, Servicio/Integración) |
+| **Resolución** | **Se construyen los 6 roles**, agrupados en las 3 superficies de producto                    |
 
-**Justificación.** Granularidad distinta, no conflicto. Los 3 perfiles son las tres *superficies* (administración, operación, residente); los 6 roles son el modelo de autorización. El Operador de central lo introduce el propio PDF en su §4; el Superadministrador es lo que hace posible el multiempresa que el PDF exige; Servicio/Integración es una identidad no humana necesaria para el Edge.
+**Justificación.** Granularidad distinta, no conflicto. Los 3 perfiles son las tres _superficies_ (administración, operación, residente); los 6 roles son el modelo de autorización. El Operador de central lo introduce el propio PDF en su §4; el Superadministrador es lo que hace posible el multiempresa que el PDF exige; Servicio/Integración es una identidad no humana necesaria para el Edge.
 **Afecta a:** ETAPAS 03, 09, 10
 
 ---
@@ -210,17 +211,17 @@ No es contradicción sino precisión progresiva: el reto abre la opción, los re
 
 Cada supuesto se marca `[SUPUESTO]` en el código donde se materialice, y todos son **configurables**, no constantes escondidas.
 
-| ID | Supuesto | Valor adoptado | Por qué es el conservador | Etapa | Resuelve |
-|---|---|---|---|---|---|
-| **S-01** | «Estado administrativo» como entrada del motor de reglas (PDF del reto §3) coexistiendo con la exclusión de facturación | `Vivienda.estadoAdministrativo` es un **campo alimentado externamente**; Next Control lo **lee**, no lo **calcula** | Ignorar la dimensión rompería el motor que el PDF pide; construir cartera excedería el alcance. Leer sin calcular respeta ambos | 04 · 05 | — |
-| **S-02** | Percentil de medición de las latencias comprometidas | **p95**, reportando también p50 y p99 | Un promedio esconde la cola larga, que es la que arruina la experiencia | 14 | — |
-| **S-03** | Margen de vigencia del caché de reglas del Edge (KPI-31) | **24 h**, configurable | Alineado con KPI-30 (autonomía de 24 h). Superado el margen, el evento se marca como decidido con reglas potencialmente obsoletas | 12 | P-05 |
-| **S-04** | Plazo de respuesta del visitante al consentimiento (CU-02 3a) | **24 h o el inicio de la vigencia, lo que ocurra primero** | Vencido el plazo, la autorización queda vigente **solo por placa**, sin acceso facial: se deniega la vía biométrica, no se concede | 08 | P-03 |
-| **S-05** | Umbral de confianza de lectura de placa (CU-01 3a) | **0,85**, configurable por copropiedad | Por debajo, **no se decide automáticamente**: se envía a validación humana. La duda nunca abre | 05 · 15 | P-02 |
-| **S-06** | Umbral de latido para marcar un dispositivo caído (CA-26) | **3 latidos perdidos o 5 minutos**, configurable por tipo | Marcar caído de más es molesto; marcar de menos oculta un equipo muerto. Tres latidos absorbe una pérdida aislada sin ocultar una caída real | 06 | P-06 |
-| **S-07** | Definición de «acceso dudoso» como evento crítico (RN-18) | `ResultadoAcceso` igual a **`CONFIANZA_INSUFICIENTE` o `PLACA_DESCONOCIDA`** | Ambos escalan. Escalar de más satura al operador; escalar de menos deja pasar el caso que RN-18 quiere atrapar. Estos dos son los únicos resultados que denotan incertidumbre, no violación de regla | 06 | P-07 |
-| **S-08** *(ETAPA 01)* | Una persona es residente de una sola vivienda activa a la vez | Índice único parcial sobre `residentes (copropiedad_id, persona_id) WHERE estado='activo'` | El documento no lo dice. Permitir dos viviendas haría ambigua la vivienda destino de una autorización, y RN-05 dejaría de ser verificable | 04 | — |
-| **S-09** *(ETAPA 01)* | Los horarios de zona que cruzan medianoche se modelan como dos filas | `CHECK (hora_inicio < hora_fin)` + columna `continua_del_dia_anterior` | Permitir `hora_fin < hora_inicio` como marca de cruce mete un caso especial en la comparación del motor de reglas. **Precisado por el usuario al aprobar 01-A: el corte de medianoche NO reinicia el contador de aforo** — es artificio de representación, no cierre de jornada. Caso de prueba de límite obligatorio de la ETAPA 07 | 07 | — |
+| ID                    | Supuesto                                                                                                                | Valor adoptado                                                                                                      | Por qué es el conservador                                                                                                                                                                                                                                                                                                            | Etapa   | Resuelve |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | -------- |
+| **S-01**              | «Estado administrativo» como entrada del motor de reglas (PDF del reto §3) coexistiendo con la exclusión de facturación | `Vivienda.estadoAdministrativo` es un **campo alimentado externamente**; Next Control lo **lee**, no lo **calcula** | Ignorar la dimensión rompería el motor que el PDF pide; construir cartera excedería el alcance. Leer sin calcular respeta ambos                                                                                                                                                                                                      | 04 · 05 | —        |
+| **S-02**              | Percentil de medición de las latencias comprometidas                                                                    | **p95**, reportando también p50 y p99                                                                               | Un promedio esconde la cola larga, que es la que arruina la experiencia                                                                                                                                                                                                                                                              | 14      | —        |
+| **S-03**              | Margen de vigencia del caché de reglas del Edge (KPI-31)                                                                | **24 h**, configurable                                                                                              | Alineado con KPI-30 (autonomía de 24 h). Superado el margen, el evento se marca como decidido con reglas potencialmente obsoletas                                                                                                                                                                                                    | 12      | P-05     |
+| **S-04**              | Plazo de respuesta del visitante al consentimiento (CU-02 3a)                                                           | **24 h o el inicio de la vigencia, lo que ocurra primero**                                                          | Vencido el plazo, la autorización queda vigente **solo por placa**, sin acceso facial: se deniega la vía biométrica, no se concede                                                                                                                                                                                                   | 08      | P-03     |
+| **S-05**              | Umbral de confianza de lectura de placa (CU-01 3a)                                                                      | **0,85**, configurable por copropiedad                                                                              | Por debajo, **no se decide automáticamente**: se envía a validación humana. La duda nunca abre                                                                                                                                                                                                                                       | 05 · 15 | P-02     |
+| **S-06**              | Umbral de latido para marcar un dispositivo caído (CA-26)                                                               | **3 latidos perdidos o 5 minutos**, configurable por tipo                                                           | Marcar caído de más es molesto; marcar de menos oculta un equipo muerto. Tres latidos absorbe una pérdida aislada sin ocultar una caída real                                                                                                                                                                                         | 06      | P-06     |
+| **S-07**              | Definición de «acceso dudoso» como evento crítico (RN-18)                                                               | `ResultadoAcceso` igual a **`CONFIANZA_INSUFICIENTE` o `PLACA_DESCONOCIDA`**                                        | Ambos escalan. Escalar de más satura al operador; escalar de menos deja pasar el caso que RN-18 quiere atrapar. Estos dos son los únicos resultados que denotan incertidumbre, no violación de regla                                                                                                                                 | 06      | P-07     |
+| **S-08** _(ETAPA 01)_ | Una persona es residente de una sola vivienda activa a la vez                                                           | Índice único parcial sobre `residentes (copropiedad_id, persona_id) WHERE estado='activo'`                          | El documento no lo dice. Permitir dos viviendas haría ambigua la vivienda destino de una autorización, y RN-05 dejaría de ser verificable                                                                                                                                                                                            | 04      | —        |
+| **S-09** _(ETAPA 01)_ | Los horarios de zona que cruzan medianoche se modelan como dos filas                                                    | `CHECK (hora_inicio < hora_fin)` + columna `continua_del_dia_anterior`                                              | Permitir `hora_fin < hora_inicio` como marca de cruce mete un caso especial en la comparación del motor de reglas. **Precisado por el usuario al aprobar 01-A: el corte de medianoche NO reinicia el contador de aforo** — es artificio de representación, no cierre de jornada. Caso de prueba de límite obligatorio de la ETAPA 07 | 07      | —        |
 
 ---
 
@@ -228,20 +229,20 @@ Cada supuesto se marca `[SUPUESTO]` en el código donde se materialice, y todos 
 
 Ninguna bloquea la ETAPA 01. Cada una tiene comportamiento conservador vigente hasta que el usuario decida.
 
-| ID | Decisión pendiente | Comportamiento conservador vigente | Bloquea a partir de | Quién decide |
-|---|---|---|---|---|
-| **P-01** | Firma de los documentos de cesión de derechos patrimoniales, confidencialidad y seguridad de la información (PDF del reto §8) | El desarrollo continúa; el repositorio, las cuentas y las llaves se crean bajo control de **Grupo Control** desde el inicio | *(no bloquea técnicamente; es condición contractual previa según el PDF)* | Grupo Control · asesoría jurídica |
-| **P-02** | Umbral de confianza de lectura de placa | `[SUPUESTO]` S-05 = **0,85**. Por debajo: validación humana, nunca apertura automática | ETAPA 15 (calibración con la cámara real) | Grupo Control · área técnica |
-| **P-03** | Plazo de respuesta al consentimiento del visitante | `[SUPUESTO]` S-04 = **24 h o inicio de vigencia** | ETAPA 08 | Grupo Control · asesoría jurídica |
-| **P-04** | Política horaria de reinicio del contador de aforo ante salida no registrada (CU-05 6a) | Reinicio a cero al **cierre del horario** de la zona, con evento de auditoría y alerta si el conteo descartado era distinto de cero | ETAPA 07 | Administrador de la copropiedad piloto |
-| **P-05** | Margen de vigencia del caché de reglas | `[SUPUESTO]` S-03 = **24 h** | ETAPA 12 | Grupo Control |
-| **P-06** | Umbral de latido de dispositivo | `[SUPUESTO]` S-06 = **3 latidos o 5 min** | ETAPA 06 | Área técnica |
-| **P-07** | Qué constituye un «acceso dudoso» (RN-18) | `[SUPUESTO]` S-07 = `CONFIANZA_INSUFICIENTE` o `PLACA_DESCONOCIDA` | ETAPA 06 | Grupo Control |
-| **P-08** | Plataforma de despliegue de la API | Ninguno. La decisión no afecta al código si se respeta la frontera hexagonal | ETAPA 14 | Grupo Control |
-| **P-09** | ¿Existe compuerta de aprobación administrativa de autorizaciones? (C-03) | **No se construye.** El residente autoriza y la autorización nace vigente; el administrador puede revocar | ETAPA 05 | Grupo Control |
-| **P-10** | ¿Se quieren reservas de zonas con franja horaria y sin cobro? (C-04) | **No se construyen.** Solo «solicitar acceso» (HU-19) | ETAPA 07 | Grupo Control |
-| ~~**P-12**~~ **RESUELTO** *(2026-09-06)* | Política de retención de eventos, evidencia y plantillas — abierta en la ETAPA 01-B, no fijada en ningún insumo | **Eventos 24 meses · evidencia fotográfica 90 días · plantillas ligadas a la vigencia de su autorización.** Implementado como columnas configurables por copropiedad, con `CHECK (margen_supresion_plantilla <= '24 hours')` que mete RN-11 en el esquema como **cota superior**, y el libro append-only `purgas_retencion` que acredita el cumplimiento. **Sujeto a confirmación legal de Grupo Control** | — | Resuelto por el usuario · pendiente de visto bueno jurídico |
-| ~~**P-11**~~ **RESUELTO** *(2026-09-06)* | «Nivel de acceso» por residente | **Catálogo `niveles_acceso`**, no booleano ni enumerado: arranca con dos valores (`solo_ingreso`, `completo`) y admite más sin migración. Un disparador asigna el de menor `orden` —el más restrictivo— cuando el residente llega sin nivel. Solo el titular crea autorizaciones (RN-05) | — | Resuelto por el usuario |
+| ID                                       | Decisión pendiente                                                                                                            | Comportamiento conservador vigente                                                                                                                                                                                                                                                                                                                                                                         | Bloquea a partir de                                                       | Quién decide                                                |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **P-01**                                 | Firma de los documentos de cesión de derechos patrimoniales, confidencialidad y seguridad de la información (PDF del reto §8) | El desarrollo continúa; el repositorio, las cuentas y las llaves se crean bajo control de **Grupo Control** desde el inicio                                                                                                                                                                                                                                                                                | _(no bloquea técnicamente; es condición contractual previa según el PDF)_ | Grupo Control · asesoría jurídica                           |
+| **P-02**                                 | Umbral de confianza de lectura de placa                                                                                       | `[SUPUESTO]` S-05 = **0,85**. Por debajo: validación humana, nunca apertura automática                                                                                                                                                                                                                                                                                                                     | ETAPA 15 (calibración con la cámara real)                                 | Grupo Control · área técnica                                |
+| **P-03**                                 | Plazo de respuesta al consentimiento del visitante                                                                            | `[SUPUESTO]` S-04 = **24 h o inicio de vigencia**                                                                                                                                                                                                                                                                                                                                                          | ETAPA 08                                                                  | Grupo Control · asesoría jurídica                           |
+| **P-04**                                 | Política horaria de reinicio del contador de aforo ante salida no registrada (CU-05 6a)                                       | Reinicio a cero al **cierre del horario** de la zona, con evento de auditoría y alerta si el conteo descartado era distinto de cero                                                                                                                                                                                                                                                                        | ETAPA 07                                                                  | Administrador de la copropiedad piloto                      |
+| **P-05**                                 | Margen de vigencia del caché de reglas                                                                                        | `[SUPUESTO]` S-03 = **24 h**                                                                                                                                                                                                                                                                                                                                                                               | ETAPA 12                                                                  | Grupo Control                                               |
+| **P-06**                                 | Umbral de latido de dispositivo                                                                                               | `[SUPUESTO]` S-06 = **3 latidos o 5 min**                                                                                                                                                                                                                                                                                                                                                                  | ETAPA 06                                                                  | Área técnica                                                |
+| **P-07**                                 | Qué constituye un «acceso dudoso» (RN-18)                                                                                     | `[SUPUESTO]` S-07 = `CONFIANZA_INSUFICIENTE` o `PLACA_DESCONOCIDA`                                                                                                                                                                                                                                                                                                                                         | ETAPA 06                                                                  | Grupo Control                                               |
+| **P-08**                                 | Plataforma de despliegue de la API                                                                                            | Ninguno. La decisión no afecta al código si se respeta la frontera hexagonal                                                                                                                                                                                                                                                                                                                               | ETAPA 14                                                                  | Grupo Control                                               |
+| **P-09**                                 | ¿Existe compuerta de aprobación administrativa de autorizaciones? (C-03)                                                      | **No se construye.** El residente autoriza y la autorización nace vigente; el administrador puede revocar                                                                                                                                                                                                                                                                                                  | ETAPA 05                                                                  | Grupo Control                                               |
+| **P-10**                                 | ¿Se quieren reservas de zonas con franja horaria y sin cobro? (C-04)                                                          | **No se construyen.** Solo «solicitar acceso» (HU-19)                                                                                                                                                                                                                                                                                                                                                      | ETAPA 07                                                                  | Grupo Control                                               |
+| ~~**P-12**~~ **RESUELTO** _(2026-09-06)_ | Política de retención de eventos, evidencia y plantillas — abierta en la ETAPA 01-B, no fijada en ningún insumo               | **Eventos 24 meses · evidencia fotográfica 90 días · plantillas ligadas a la vigencia de su autorización.** Implementado como columnas configurables por copropiedad, con `CHECK (margen_supresion_plantilla <= '24 hours')` que mete RN-11 en el esquema como **cota superior**, y el libro append-only `purgas_retencion` que acredita el cumplimiento. **Sujeto a confirmación legal de Grupo Control** | —                                                                         | Resuelto por el usuario · pendiente de visto bueno jurídico |
+| ~~**P-11**~~ **RESUELTO** _(2026-09-06)_ | «Nivel de acceso» por residente                                                                                               | **Catálogo `niveles_acceso`**, no booleano ni enumerado: arranca con dos valores (`solo_ingreso`, `completo`) y admite más sin migración. Un disparador asigna el de menor `orden` —el más restrictivo— cuando el residente llega sin nivel. Solo el titular crea autorizaciones (RN-05)                                                                                                                   | —                                                                         | Resuelto por el usuario                                     |
 
 ---
 
@@ -253,24 +254,24 @@ código.
 
 ### E-01 · Décimo motivo tipado `FUERA_DE_HORARIO` — **aprobada el 2026-09-06**
 
-| | |
-|---|---|
-| **Solicitada por** | ETAPA 01-A, decisión **D-18** |
-| **Qué cambia** | `CLAUDE.md` §2.4 pasa de nueve motivos enumerados a diez |
-| **Por qué** | CA-15 exige negar con motivo «fuera de horario» y ninguno de los nueve lo expresaba. `ZONA_NO_AUTORIZADA` es la falta de permiso sobre la zona (CU-05 alterno 2a); `AFORO_SUPERADO` es CA-14, un criterio distinto; `FUERA_DE_PATRON` es el patrón de recurrencia de la autorización (RN-22, CA-06), no el horario de la zona (RN-14, CA-15) |
-| **Riesgo que evita** | Colapsar CA-14 y CA-15 en un mismo motivo los haría indistinguibles en el evento, y la consola no podría decirle al residente por qué se le negó el paso |
-| **Dónde vive** | Enumerado `motivo_acceso` (migración `0002`) · `CLAUDE.md` §2.4 con la justificación · prueba de regresión en `supabase/policies/tests/10_invariantes_estructurales.sql` |
+|                      |                                                                                                                                                                                                                                                                                                                                              |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Solicitada por**   | ETAPA 01-A, decisión **D-18**                                                                                                                                                                                                                                                                                                                |
+| **Qué cambia**       | `CLAUDE.md` §2.4 pasa de nueve motivos enumerados a diez                                                                                                                                                                                                                                                                                     |
+| **Por qué**          | CA-15 exige negar con motivo «fuera de horario» y ninguno de los nueve lo expresaba. `ZONA_NO_AUTORIZADA` es la falta de permiso sobre la zona (CU-05 alterno 2a); `AFORO_SUPERADO` es CA-14, un criterio distinto; `FUERA_DE_PATRON` es el patrón de recurrencia de la autorización (RN-22, CA-06), no el horario de la zona (RN-14, CA-15) |
+| **Riesgo que evita** | Colapsar CA-14 y CA-15 en un mismo motivo los haría indistinguibles en el evento, y la consola no podría decirle al residente por qué se le negó el paso                                                                                                                                                                                     |
+| **Dónde vive**       | Enumerado `motivo_acceso` (migración `0002`) · `CLAUDE.md` §2.4 con la justificación · prueba de regresión en `supabase/policies/tests/10_invariantes_estructurales.sql`                                                                                                                                                                     |
 
 ---
 
 ## 4. Resumen
 
-| Categoría | Cantidad | Estado |
-|---|---|---|
-| `[CONTRADICCIÓN]` | **14** | **14 resueltas**, ninguna abierta |
-| `[SUPUESTO]` | **9** | 7 de la ETAPA 00 más S-08 y S-09 de la ETAPA 01. Todos con valor conservador; los de umbral, además, configurables por copropiedad |
-| `PENDIENTE DE DEFINICIÓN` | **12** — **2 resueltos** (P-11, P-12) | Los 10 abiertos tienen comportamiento conservador vigente; ninguno bloquea la ETAPA 02. P-12 queda sujeto a confirmación legal |
-| **Extensiones al contrato** | **1** | E-01 · `FUERA_DE_HORARIO`, aprobada |
+| Categoría                   | Cantidad                              | Estado                                                                                                                             |
+| --------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `[CONTRADICCIÓN]`           | **14**                                | **14 resueltas**, ninguna abierta                                                                                                  |
+| `[SUPUESTO]`                | **9**                                 | 7 de la ETAPA 00 más S-08 y S-09 de la ETAPA 01. Todos con valor conservador; los de umbral, además, configurables por copropiedad |
+| `PENDIENTE DE DEFINICIÓN`   | **12** — **2 resueltos** (P-11, P-12) | Los 10 abiertos tienen comportamiento conservador vigente; ninguno bloquea la ETAPA 02. P-12 queda sujeto a confirmación legal     |
+| **Extensiones al contrato** | **1**                                 | E-01 · `FUERA_DE_HORARIO`, aprobada                                                                                                |
 
 **Contradicciones por severidad:** **5 altas** (C-01, C-02, C-03, C-05, C-12) · **4 medias** (C-04, C-06, C-07, C-22) · **5 bajas** (C-11, C-14, C-15, C-23, C-26). Total 14.
 

@@ -71,10 +71,12 @@ describe('ingesta de eventos de hardware', () => {
 
   it('con firma válida: 202 y clave de idempotencia del dominio (RN-17)', async () => {
     const r = await enviar(evento, firmado(evento)).expect(202);
-    expect(r.body).toEqual({
-      aceptado: true,
-      claveIdempotencia: `${COP_A}:disp-talanquera-1:placa:ev-000123`,
-    });
+    expect(r.body.aceptado).toBe(true);
+    expect(r.body.claveIdempotencia).toBe(`${COP_A}:disp-talanquera-1:placa:ev-000123`);
+    // Desde la ETAPA 06 la respuesta lleva además el evento registrado: el
+    // endpoint ya no solo acredita la firma, decide y persiste (D-27).
+    expect(r.body.eventoId).toBeTypeOf('string');
+    expect(r.body.duplicado).toBe(false);
   });
 
   it('firmado pero con el cuerpo mal formado: 400, no 202', async () => {
