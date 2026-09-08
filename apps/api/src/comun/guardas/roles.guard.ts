@@ -2,7 +2,7 @@ import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import type { ContextoTenant, Rol } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant, Rol } from '../../autenticacion';
 import { CLAVE_PUBLICO, CLAVE_ROLES, CLAVE_SERVICIO } from '../decoradores';
 import { CLAVE_CONTEXTO } from '../decoradores/contexto.decorator';
 

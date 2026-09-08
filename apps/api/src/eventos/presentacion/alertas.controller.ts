@@ -15,7 +15,7 @@ import type { Alerta, Reloj } from '@ncr/domain-core';
 import { RELOJ } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
-import type { ContextoTenant } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { REPOSITORIO_ALERTAS } from '../aplicacion/puertos';
 import type { RepositorioAlertas } from '../aplicacion/puertos';

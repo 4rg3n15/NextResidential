@@ -134,6 +134,16 @@ fi
 
 paso "10 · fronteras de arquitectura y secretos"
 con_limite "$LIMITE_MEDIO" ./scripts/verificar-frontera.sh >/dev/null 2>&1 && ok "fronteras (DoD ETAPA 02)" || mal "fronteras"
+# ETAPA 08 · frontera DE MÓDULO, que es otra cosa: la anterior vigila que el
+# dominio no importe infraestructura; esta, que a un módulo se entre por su
+# barril (§2.2). Nadie lo comprobaba, y había 35 importaciones entrando por
+# dentro (D-34).
+if salida_mod=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-modulos.mjs 2>&1); then
+  ok "${salida_mod#OK }"
+else
+  mal "un módulo se importa por dentro y no por su barril (§2.2)"
+  echo "$salida_mod" | head -8 | sed 's/^/     /'
+fi
 con_limite "$LIMITE_CORTO" ./scripts/escanear-secretos.sh >/dev/null 2>&1 && ok "sin secretos" || mal "secretos detectados"
 # KPI-11 · la sustitución de MockProvider por HikvisionProvider en la ETAPA 15
 # solo es posible si nadie fuera de `packages/providers` conoce el protocolo.

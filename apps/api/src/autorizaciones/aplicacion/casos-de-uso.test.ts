@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Autorizacion, ContextoDeAcceso, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { VersionDeReglas, esExito, esFallo } from '@ncr/domain-core';
-import type { ContextoTenant } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../../autenticacion';
 import { AgregarAcompanante, CrearAutorizacion, RevocarAutorizacion } from './casos-de-uso';
 import { LevantarListaNegra, VetarEnListaNegra } from './listas-negras';
 import { DecidirAcceso } from './evaluar-acceso';

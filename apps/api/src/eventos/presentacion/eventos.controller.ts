@@ -14,7 +14,7 @@ import type { Response } from 'express';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
-import type { ContextoTenant } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import {
   ConsultarEventos,

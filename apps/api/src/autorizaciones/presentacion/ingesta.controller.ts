@@ -5,12 +5,12 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import { BITACORA, RELOJ } from '@ncr/domain-core';
 import { Publico, SinRecursoDeTenant } from '../../comun/decoradores';
-import { RegistrarAcceso } from '../../eventos/aplicacion/registrar-acceso';
-import { REPOSITORIO_DISPOSITIVOS } from '../../eventos/aplicacion/puertos';
-import type { RepositorioDispositivos } from '../../eventos/aplicacion/puertos';
+import { RegistrarAcceso } from '../../eventos';
+import { REPOSITORIO_DISPOSITIVOS } from '../../eventos';
+import type { RepositorioDispositivos } from '../../eventos';
 import { GuardiaDeFirmaDeIngesta } from './guardia-firma';
 import { EventoIngestaDto } from './dtos';
-import { LatidoDto } from '../../eventos/presentacion/dtos';
+import { LatidoDto } from '../../eventos';
 
 /**
  * Identidad con la que se atribuyen los eventos de hardware.

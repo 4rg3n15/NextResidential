@@ -1,7 +1,7 @@
 import { Placa } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { errorDominio, exito, fallo } from '@ncr/domain-core';
-import type { ContextoTenant } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../../autenticacion';
 import type { RepositorioPadron } from './puertos';
 
 /**

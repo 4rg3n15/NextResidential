@@ -29,7 +29,7 @@ if (process.env.NCR_IGNORAR_ENV_FILE !== '1') {
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import express from 'express';
-import { guardarCuerpoCrudo } from './autorizaciones/presentacion/guardia-firma';
+import { guardarCuerpoCrudo } from './autorizaciones';
 import { AppModule } from './app.module';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
 import { aplicarSeguridad } from './seguridad';

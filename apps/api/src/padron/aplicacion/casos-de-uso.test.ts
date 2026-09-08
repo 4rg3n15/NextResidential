@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { esFallo } from '@ncr/domain-core';
 import { DesactivarVehiculo, DesactivarVivienda, RegistrarVehiculo } from './casos-de-uso';
 import type { RepositorioPadron } from './puertos';
-import type { ContextoTenant } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../../autenticacion';
 
 const ctx: ContextoTenant = {
   usuarioId: 'u1',

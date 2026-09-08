@@ -22,6 +22,10 @@ export type {
   ResolutorDeZona,
   SolicitudDeAcceso,
 } from './aplicacion/puertos';
+export { AutorizacionesModule } from './autorizaciones.module';
+// `main.ts` la necesita para montar el `express.json({ verify })` que guarda el
+// cuerpo crudo sobre el que se calcula la firma del Alarm Server.
+export { guardarCuerpoCrudo } from './presentacion/guardia-firma';
 export {
   CargadorDeContextoConservador,
   UMBRAL_DE_CONFIANZA_POR_DEFECTO,
