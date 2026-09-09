@@ -71,7 +71,7 @@
             }
           },
           "401": {
-            "description": "Token ausente, caducado o inválido",
+            "description": "Token ausente, caducado o inválido. También cuando un rol administrativo presenta un token `aal1`: está autenticado, pero no habilitado (RN-20, CA-25).",
             "content": {
               "application/json": {
                 "schema": {
@@ -87,110 +87,6 @@
           }
         ],
         "summary": "Identidad y alcance del token presentado",
-        "tags": [
-          "autenticacion"
-        ]
-      }
-    },
-    "/auth/mfa/inscripcion": {
-      "post": {
-        "operationId": "AutenticacionController_inscribir",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InscribirMfaDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InscripcionMfaDto"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "5 intentos por minuto (§2.7.5)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorApiDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Alta de TOTP; devuelve los códigos de recuperación una sola vez",
-        "tags": [
-          "autenticacion"
-        ]
-      }
-    },
-    "/auth/mfa/verificacion": {
-      "post": {
-        "operationId": "AutenticacionController_verificar",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerificarMfaDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VerificacionMfaDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Mismo mensaje para código erróneo y para inscripción inexistente",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorApiDto"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "5 intentos por minuto (§2.7.5)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorApiDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Verifica un TOTP o consume un código de recuperación",
         "tags": [
           "autenticacion"
         ]
@@ -1821,75 +1717,6 @@
           "estado",
           "correlacion",
           "mensaje"
-        ]
-      },
-      "InscribirMfaDto": {
-        "type": "object",
-        "properties": {
-          "correo": {
-            "type": "string",
-            "minLength": 5,
-            "maxLength": 254,
-            "description": "Correo del titular; aparece en la aplicación de autenticación",
-            "example": "admin@copropiedad.example"
-          }
-        },
-        "required": [
-          "correo"
-        ]
-      },
-      "InscripcionMfaDto": {
-        "type": "object",
-        "properties": {
-          "uriOtpauth": {
-            "type": "string",
-            "description": "URI otpauth:// para el código QR. No se vuelve a mostrar.",
-            "example": "otpauth://totp/..."
-          },
-          "codigosDeRecuperacion": {
-            "description": "Códigos de recuperación de un solo uso. Se entregan UNA vez y se guardan en hash: si el usuario los pierde, hay que reinscribir.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "uriOtpauth",
-          "codigosDeRecuperacion"
-        ]
-      },
-      "VerificarMfaDto": {
-        "type": "object",
-        "properties": {
-          "codigo": {
-            "type": "string",
-            "minLength": 6,
-            "maxLength": 11,
-            "description": "TOTP de 6 dígitos, o código de recuperación con la forma XXXXX-XXXXX",
-            "example": "123456"
-          }
-        },
-        "required": [
-          "codigo"
-        ]
-      },
-      "VerificacionMfaDto": {
-        "type": "object",
-        "properties": {
-          "verificado": {
-            "type": "boolean",
-            "example": true
-          },
-          "codigosRestantes": {
-            "type": "number",
-            "example": 7,
-            "description": "Códigos de recuperación aún sin consumir"
-          }
-        },
-        "required": [
-          "verificado",
-          "codigosRestantes"
         ]
       },
       "CopropiedadDto": {

@@ -55,40 +55,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/mfa/inscripcion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Alta de TOTP; devuelve los códigos de recuperación una sola vez */
-        post: operations["AutenticacionController_inscribir"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/mfa/verificacion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Verifica un TOTP o consume un código de recuperación */
-        post: operations["AutenticacionController_verificar"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/copropiedades/{id}": {
         parameters: {
             query?: never;
@@ -650,38 +616,6 @@ export interface components {
             /** @description Detalle para el cliente en 4xx. En 5xx es siempre «Error interno»: el mensaje original no sale, porque suele llevar nombres de tabla o fragmentos de consulta. */
             mensaje: string | components["schemas"]["DetalleDeErrorDto"];
         };
-        InscribirMfaDto: {
-            /**
-             * @description Correo del titular; aparece en la aplicación de autenticación
-             * @example admin@copropiedad.example
-             */
-            correo: string;
-        };
-        InscripcionMfaDto: {
-            /**
-             * @description URI otpauth:// para el código QR. No se vuelve a mostrar.
-             * @example otpauth://totp/...
-             */
-            uriOtpauth: string;
-            /** @description Códigos de recuperación de un solo uso. Se entregan UNA vez y se guardan en hash: si el usuario los pierde, hay que reinscribir. */
-            codigosDeRecuperacion: string[];
-        };
-        VerificarMfaDto: {
-            /**
-             * @description TOTP de 6 dígitos, o código de recuperación con la forma XXXXX-XXXXX
-             * @example 123456
-             */
-            codigo: string;
-        };
-        VerificacionMfaDto: {
-            /** @example true */
-            verificado: boolean;
-            /**
-             * @description Códigos de recuperación aún sin consumir
-             * @example 7
-             */
-            codigosRestantes: number;
-        };
         CopropiedadDto: {
             /** Format: uuid */
             id: string;
@@ -1020,81 +954,8 @@ export interface operations {
                     "application/json": components["schemas"]["SesionDto"];
                 };
             };
-            /** @description Token ausente, caducado o inválido */
+            /** @description Token ausente, caducado o inválido. También cuando un rol administrativo presenta un token `aal1`: está autenticado, pero no habilitado (RN-20, CA-25). */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorApiDto"];
-                };
-            };
-        };
-    };
-    AutenticacionController_inscribir: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InscribirMfaDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InscripcionMfaDto"];
-                };
-            };
-            /** @description 5 intentos por minuto (§2.7.5) */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorApiDto"];
-                };
-            };
-        };
-    };
-    AutenticacionController_verificar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VerificarMfaDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VerificacionMfaDto"];
-                };
-            };
-            /** @description Mismo mensaje para código erróneo y para inscripción inexistente */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorApiDto"];
-                };
-            };
-            /** @description 5 intentos por minuto (§2.7.5) */
-            429: {
                 headers: {
                     [name: string]: unknown;
                 };

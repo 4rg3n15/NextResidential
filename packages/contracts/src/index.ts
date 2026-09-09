@@ -35,8 +35,6 @@ export type PaginaDeEventos = Esquemas['PaginaDeEventosDto'];
 export type AlertaExpuesta = Esquemas['AlertaExpuestaDto'];
 export type ErrorApi = Esquemas['ErrorApiDto'];
 export type Copropiedad = Esquemas['CopropiedadDto'];
-export type InscripcionMfa = Esquemas['InscripcionMfaDto'];
-export type VerificacionMfa = Esquemas['VerificacionMfaDto'];
 
 /**
  * Motivo de denegación, tomado del contrato y no de una lista paralela.

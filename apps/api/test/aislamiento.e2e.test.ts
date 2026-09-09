@@ -25,11 +25,7 @@ const PUBLICAS = new Set(['GET /health', 'GET /ready']);
  * alguien añade un endpoint sin ese decorador, entra en el recorrido de fuga
  * automáticamente.
  */
-const SIN_RECURSO_TENANT = new Set([
-  '/auth/sesion',
-  '/auth/mfa/inscripcion',
-  '/auth/mfa/verificacion',
-]);
+const SIN_RECURSO_TENANT = new Set(['/auth/sesion']);
 
 beforeAll(async () => {
   firmante = await crearFirmante();

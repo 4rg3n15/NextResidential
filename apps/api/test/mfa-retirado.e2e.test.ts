@@ -1,0 +1,84 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import request from 'supertest';
+import type { INestApplication } from '@nestjs/common';
+import { COP_A, crearApp, crearFirmante, enumerarRutas, tokenDe } from './utilidades';
+import type { Firmante } from './utilidades';
+
+/**
+ * ADR-008 · el segundo factor lo emite **solo** Supabase Auth.
+ *
+ * Esta suite fija la retirada de `/auth/mfa/*`, y lo hace por dos vías porque
+ * una sola no bastaría:
+ *
+ *  - **Las rutas no existen en el enrutador.** Comprobar solo el 404 no
+ *    distinguiría «la ruta no existe» de «la ruta existe y el guard la
+ *    rechaza», que es exactamente el estado anterior: protegida e inalcanzable.
+ *  - **El mecanismo que queda sigue siendo obligatorio.** Retirar las rutas no
+ *    puede relajar RN-20: un rol administrativo con `aal1` sigue sin entrar.
+ *    Sin esta segunda mitad, la retirada podría haber abierto un agujero y la
+ *    suite lo habría dado por bueno.
+ */
+let app: INestApplication;
+let firmante: Firmante;
+
+beforeAll(async () => {
+  firmante = await crearFirmante();
+  app = await crearApp(firmante);
+});
+afterAll(async () => {
+  await app?.close();
+});
+
+describe('las rutas de MFA propias ya no existen', () => {
+  it('el enrutador no expone ninguna ruta bajo /auth/mfa', () => {
+    const mfa = enumerarRutas(app).filter((r) => r.ruta.startsWith('/auth/mfa'));
+    expect(mfa, `siguen expuestas: ${mfa.map((r) => r.ruta).join(', ')}`).toEqual([]);
+  });
+
+  it('/auth solo expone la lectura de la sesión', () => {
+    const auth = enumerarRutas(app).filter((r) => r.ruta.startsWith('/auth'));
+    expect(auth.map((r) => `${r.metodo} ${r.ruta}`)).toEqual(['GET /auth/sesion']);
+  });
+
+  it('un POST a la ruta retirada devuelve 404, no 401 ni 403', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
+    const res = await request(app.getHttpServer())
+      .post('/auth/mfa/verificacion')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ codigo: '123456' });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('la retirada NO relaja RN-20 ni CA-25', () => {
+  it.each(['superadministrador', 'administrador', 'operador_central'] as const)(
+    '%s con aal1 sigue sin entrar',
+    async (rol) => {
+      const token = await tokenDe(firmante, { rol, aal: 'aal1', copropiedades: [COP_A] });
+      const res = await request(app.getHttpServer())
+        .get('/auth/sesion')
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(401);
+    },
+  );
+
+  it('con aal2 sí entra, y la sesión declara el segundo factor verificado', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
+    const res = await request(app.getHttpServer())
+      .get('/auth/sesion')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.mfaVerificado).toBe(true);
+  });
+
+  it('portero y residente no necesitan segundo factor', async () => {
+    for (const rol of ['portero', 'residente'] as const) {
+      const token = await tokenDe(firmante, { rol, aal: 'aal1', copropiedadId: COP_A });
+      const res = await request(app.getHttpServer())
+        .get('/auth/sesion')
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.status, rol).toBe(200);
+      expect(res.body.mfaVerificado, rol).toBe(false);
+    }
+  });
+});

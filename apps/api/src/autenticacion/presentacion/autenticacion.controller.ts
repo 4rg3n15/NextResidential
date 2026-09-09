@@ -1,52 +1,56 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Inject,
-  Post,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { Controller, Get } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { ServicioMfa } from '../infraestructura/mfa.servicio';
-import { InscribirMfaDto, VerificarMfaDto } from './dtos';
-import { InscripcionMfaDto, SesionDto, VerificacionMfaDto } from './respuestas';
-import { ErrorApiDto } from '../../comun/respuestas';
 import { Roles, SinRecursoDeTenant } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../dominio/claims';
 import { ROLES_ADMINISTRATIVOS } from '../dominio/claims';
+import { SesionDto } from './respuestas';
+import { ErrorApiDto } from '../../comun/respuestas';
 
 /**
- * Rutas de sesión y segundo factor.
+ * Identidad y alcance del token presentado.
  *
- * El límite endurecido de §2.7.5 se aplica AQUÍ y no solo globalmente: seis
- * dígitos son 10^6 combinaciones, y con el límite global de 120/min un atacante
- * las recorrería en horas. Con 5 intentos por minuto, en siglos.
+ * **Aquí ya no hay rutas de segundo factor, y esa es la decisión (ADR-008).**
+ * Hasta la ETAPA 09-A este controlador exponía `/auth/mfa/inscripcion` y
+ * `/auth/mfa/verificacion` con TOTP propio. Eran **inalcanzables**: el guard de
+ * autenticación exige `aal2` antes de que actúe el de roles, y las dos rutas
+ * exigían rol administrativo, así que un administrador sin segundo factor no
+ * podía llegar a inscribirlo. Y aunque hubiera podido, verificar ahí no habría
+ * cambiado el `aal` del token —lo emite Supabase—, con lo que tampoco habría
+ * desbloqueado nada.
+ *
+ * Mantener dos fuentes de verdad para el segundo factor es pedir un incidente:
+ * una diría que el usuario tiene MFA y la otra que no, y la que decide es la
+ * que emite el claim. Supabase Auth es la autoritativa; lo demás se retira en
+ * vez de quedarse protegido e inalcanzable, que en la auditoría de la ETAPA 13
+ * habría sido un hallazgo seguro.
+ *
+ * `ROLES_ADMINISTRATIVOS` sigue aquí porque es el conjunto que `aal2` protege:
+ * lo aplica el guard, no una ruta.
  */
 @ApiTags('autenticacion')
 @ApiBearerAuth()
-// Todo este controlador opera sobre la identidad del propio llamante: no
-// devuelve ni escribe datos de ninguna copropiedad.
+// Opera sobre la identidad del propio llamante: no devuelve ni escribe datos de
+// ninguna copropiedad.
 @SinRecursoDeTenant()
 @Controller('auth')
 export class AutenticacionController {
-  constructor(@Inject(ServicioMfa) private readonly mfa: ServicioMfa) {}
-
   @Get('sesion')
   @Roles(...ROLES_ADMINISTRATIVOS, 'portero', 'residente')
   @ApiOperation({ summary: 'Identidad y alcance del token presentado' })
   @ApiOkResponse({ type: SesionDto })
-  @ApiUnauthorizedResponse({ type: ErrorApiDto, description: 'Token ausente, caducado o inválido' })
+  @ApiUnauthorizedResponse({
+    type: ErrorApiDto,
+    description:
+      'Token ausente, caducado o inválido. También cuando un rol administrativo presenta ' +
+      'un token `aal1`: está autenticado, pero no habilitado (RN-20, CA-25).',
+  })
   sesion(@Contexto() ctx: ContextoTenant): SesionDto {
     return {
       usuarioId: ctx.usuarioId,
@@ -55,35 +59,5 @@ export class AutenticacionController {
       copropiedadesAtendidas: [...ctx.copropiedadesAtendidas],
       mfaVerificado: ctx.mfaVerificado,
     };
-  }
-
-  @Post('mfa/inscripcion')
-  @Roles(...ROLES_ADMINISTRATIVOS)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Alta de TOTP; devuelve los códigos de recuperación una sola vez' })
-  @ApiCreatedResponse({ type: InscripcionMfaDto })
-  @ApiTooManyRequestsResponse({ type: ErrorApiDto, description: '5 intentos por minuto (§2.7.5)' })
-  inscribir(@Contexto() ctx: ContextoTenant, @Body() dto: InscribirMfaDto): InscripcionMfaDto {
-    const { uriOtpauth, codigos } = this.mfa.inscribir(ctx.usuarioId, dto.correo);
-    return { uriOtpauth, codigosDeRecuperacion: codigos };
-  }
-
-  @Post('mfa/verificacion')
-  @HttpCode(200)
-  @Roles(...ROLES_ADMINISTRATIVOS)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Verifica un TOTP o consume un código de recuperación' })
-  @ApiOkResponse({ type: VerificacionMfaDto })
-  @ApiUnauthorizedResponse({
-    type: ErrorApiDto,
-    description: 'Mismo mensaje para código erróneo y para inscripción inexistente',
-  })
-  @ApiTooManyRequestsResponse({ type: ErrorApiDto, description: '5 intentos por minuto (§2.7.5)' })
-  verificar(@Contexto() ctx: ContextoTenant, @Body() dto: VerificarMfaDto): VerificacionMfaDto {
-    if (!this.mfa.verificar(ctx.usuarioId, dto.codigo)) {
-      // Mismo mensaje para código erróneo y para inscripción inexistente.
-      throw new UnauthorizedException('Código no válido');
-    }
-    return { verificado: true, codigosRestantes: this.mfa.codigosRestantes(ctx.usuarioId) };
   }
 }

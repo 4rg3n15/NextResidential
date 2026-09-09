@@ -1,5 +1,17 @@
 # ETAPA 03 — Autenticación, RBAC, MFA y aislamiento multiempresa
 
+> **CORRECCIÓN POSTERIOR · 2026-09-09 (ETAPA 09-A) · [ADR-008](../decisiones/ADR-008-supabase-auth-como-mecanismo-autoritativo-de-mfa.md).**
+> Las rutas `/auth/mfa/inscripcion` y `/auth/mfa/verificacion` que describe este
+> informe, junto con `ServicioMfa` y el módulo de dominio `mfa.ts`, **se han
+> retirado**. Eran inalcanzables: el guard de autenticación exige `aal2` antes de
+> que actúe el de roles, y las dos exigían rol administrativo. Y verificar allí
+> no cambiaba el `aal` del token, que lo emite Supabase.
+>
+> **Lo que este informe describe sigue vigente en todo lo demás**, incluido lo
+> esencial: RN-20 y CA-25 los hace cumplir el guard de autenticación con el
+> claim `aal2`, exactamente como aquí se explica. Lo retirado es una segunda
+> implementación que no participaba en esa regla.
+
 **Rama `etapa-03-auth-rbac-multiempresa` · desde `develop` actualizado · 2026-09-07**
 
 ## 1. Qué se construyó

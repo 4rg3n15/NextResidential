@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { ROLES } from '../dominio/claims';
 
 /**
- * DTOs de salida de sesión y segundo factor.
+ * DTO de salida de la sesión.
  *
  * La consola decide con estos tres datos qué superficie enseña y si debe
  * empujar al usuario al paso de MFA. Que estuvieran sin tipar obligaba a la
@@ -36,26 +36,4 @@ export class SesionDto {
       'la consola debe llevar al paso de segundo factor mientras sea false.',
   })
   mfaVerificado!: boolean;
-}
-
-export class InscripcionMfaDto {
-  @ApiProperty({
-    description: 'URI otpauth:// para el código QR. No se vuelve a mostrar.',
-    example: 'otpauth://totp/...',
-  })
-  uriOtpauth!: string;
-
-  @ApiProperty({
-    type: [String],
-    description:
-      'Códigos de recuperación de un solo uso. Se entregan UNA vez y se guardan ' +
-      'en hash: si el usuario los pierde, hay que reinscribir.',
-  })
-  codigosDeRecuperacion!: string[];
-}
-
-export class VerificacionMfaDto {
-  @ApiProperty({ example: true }) verificado!: boolean;
-  @ApiProperty({ example: 7, description: 'Códigos de recuperación aún sin consumir' })
-  codigosRestantes!: number;
 }
