@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ROLES } from '../autenticacion/dominio/claims';
+import { ROLES } from '../autenticacion';
 
 export class CopropiedadDto {
   @ApiProperty({ format: 'uuid' }) id!: string;

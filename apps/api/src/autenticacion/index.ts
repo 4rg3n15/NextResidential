@@ -13,7 +13,12 @@
  * de su capa de presentación.
  */
 export { AutenticacionModule } from './autenticacion.module';
-export { ROLES_ADMINISTRATIVOS, alcanzaCopropiedad, exigeSegundoFactor } from './dominio/claims';
+export {
+  ROLES,
+  ROLES_ADMINISTRATIVOS,
+  alcanzaCopropiedad,
+  exigeSegundoFactor,
+} from './dominio/claims';
 export type { ContextoTenant, Rol } from './dominio/claims';
 export { RechazoDeAutenticacion } from './dominio/errores';
 export { VerificadorDeJwt } from './infraestructura/verificador-jwt';

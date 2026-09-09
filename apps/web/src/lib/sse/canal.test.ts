@@ -11,7 +11,10 @@ import type { EventoRegistrado } from '@ncr/contracts';
  * operador cree que no pasa nada; uno que reintenta sin retroceso convierte una
  * caída de la API en una tormenta de reconexiones.
  */
-class FuenteFalsa implements Partial<EventSource> {
+// Doble de `EventSource`, no una implementación parcial: declarar
+// `implements Partial<EventSource>` obliga a cuadrar la firma sobrecargada de
+// `addEventListener`, que aquí no aporta nada y solo estorba.
+class FuenteFalsa {
   static abiertas: FuenteFalsa[] = [];
   readonly oyentes = new Map<string, ((m: MessageEvent<string>) => void)[]>();
   onerror: ((e: Event) => void) | null = null;

@@ -16,6 +16,14 @@
  * NO es módulo —`comun`, `nucleo`, `configuracion`— es fontanería compartida
  * sin dominio propio, y §2.2 no le pone frontera.
  *
+ * CONSECUENCIA QUE HAY QUE CONOCER, y que esta etapa pagó: **crear una carpeta
+ * con nombre de capa dentro de la fontanería la convierte en módulo**. Al
+ * añadir `comun/presentacion/` para un DTO compartido, `comun` pasó a contar
+ * como módulo y aparecieron 32 violaciones de golpe —las mismas importaciones
+ * de siempre, ahora ilegales—. El control tenía razón: o `comun` es fontanería
+ * y no lleva capas, o es un módulo y se entra por su barril. Se eligió lo
+ * primero, y el DTO vive en `comun/respuestas.ts`.
+ *
  * POR QUÉ IMPORTA, más allá del purismo: una importación profunda ata dos
  * módulos por un detalle interno. El día que ese detalle se mueve, rompe a
  * distancia; y el barril deja de significar «esto es lo que expongo».

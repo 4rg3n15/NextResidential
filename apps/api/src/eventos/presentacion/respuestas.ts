@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { TIPOS_DE_EVENTO } from '@ncr/domain-core';
-import { ENUM_MOTIVO_ACCESO } from '../../comun/presentacion/respuestas';
+import { ENUM_MOTIVO_ACCESO } from '../../comun/respuestas';
 
 /**
  * DTOs de salida de eventos y alertas.

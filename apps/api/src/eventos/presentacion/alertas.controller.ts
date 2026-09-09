@@ -29,7 +29,7 @@ import { REPOSITORIO_ALERTAS } from '../aplicacion/puertos';
 import type { RepositorioAlertas } from '../aplicacion/puertos';
 import { NotasDeAlertaDto } from './dtos';
 import { AlertaExpuestaDto } from './respuestas';
-import { ErrorApiDto } from '../../comun/presentacion/respuestas';
+import { ErrorApiDto } from '../../comun/respuestas';
 
 /**
  * Cola de alertas del operador de central — RN-18, CA-18, KPI-25.

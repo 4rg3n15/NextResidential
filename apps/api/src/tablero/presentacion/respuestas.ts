@@ -99,7 +99,7 @@ export class AccesosPorHoraDto {
 
 export class DispositivoDelTableroDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
-  @ApiProperty({ example: 'Talanquera Portería Principal' }) nombre!: string;
+  @ApiProperty({ type: String, example: 'Talanquera portería principal' }) nombre!: string;
 
   @ApiProperty({ enum: ['camara_lpr', 'terminal_facial', 'rele', 'intercom', 'controlador_io'] })
   tipo!: string;

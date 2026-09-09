@@ -32,7 +32,7 @@ import type { EventoRegistrado, PaginaDeEventos } from '../aplicacion/puertos';
 import { CanalEnProceso } from '../infraestructura/canal-en-proceso';
 import { ConsultaEventosDto, ExportacionEventosDto } from './dtos';
 import { PaginaDeEventosDto, UrlDeEvidenciaDto } from './respuestas';
-import { ErrorApiDto } from '../../comun/presentacion/respuestas';
+import { ErrorApiDto } from '../../comun/respuestas';
 import { aCsv, aExcel, aPdf } from './formatos';
 
 /**

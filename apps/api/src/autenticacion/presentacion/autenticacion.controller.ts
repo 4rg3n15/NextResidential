@@ -20,7 +20,7 @@ import {
 import { ServicioMfa } from '../infraestructura/mfa.servicio';
 import { InscribirMfaDto, VerificarMfaDto } from './dtos';
 import { InscripcionMfaDto, SesionDto, VerificacionMfaDto } from './respuestas';
-import { ErrorApiDto } from '../../comun/presentacion/respuestas';
+import { ErrorApiDto } from '../../comun/respuestas';
 import { Roles, SinRecursoDeTenant } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../dominio/claims';

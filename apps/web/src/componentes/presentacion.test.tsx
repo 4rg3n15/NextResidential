@@ -11,13 +11,13 @@ import { IndicadorDeCanal } from './cabecera';
 
 const dispositivo = (parcial: Partial<DispositivoDelTablero> = {}): DispositivoDelTablero => ({
   id: 'd1',
-  nombre: 'Cámara LPR Portería',
+  nombre: 'Cámara de placas · portería',
   tipo: 'camara_lpr',
   zonaId: null,
-  host: '10.0.0.5',
+  host: 'lpr-porteria.invalid',
   puerto: 80,
-  modelo: 'DS-2CD',
-  firmware: 'V5.7',
+  modelo: 'modelo-de-prueba',
+  firmware: 'v0.0.0-prueba',
   estado: 'saludable',
   ultimoLatido: '2026-09-09T12:00:00Z',
   ultimaSincronizacion: null,
@@ -88,7 +88,7 @@ describe('FilaDeDispositivo · tres estados, no dos', () => {
         <FilaDeDispositivo dispositivo={dispositivo({ host: null })} />
       </ul>,
     );
-    expect(screen.queryByText(/10\.0\.0\.5/)).toBeNull();
+    expect(screen.queryByText(/lpr-porteria\.invalid/)).toBeNull();
   });
 
   it('nunca pinta nada que se parezca a una credencial', () => {

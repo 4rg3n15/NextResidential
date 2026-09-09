@@ -14,7 +14,7 @@ import { PermiteServicio, Roles } from '../comun/decoradores';
 import { Contexto } from '../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../autenticacion';
 import { CopropiedadDto, IngestaAceptadaDto } from './respuestas';
-import { ErrorApiDto } from '../comun/presentacion/respuestas';
+import { ErrorApiDto } from '../comun/respuestas';
 
 export class IngestaDto {
   @IsUUID()

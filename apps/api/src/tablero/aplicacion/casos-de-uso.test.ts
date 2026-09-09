@@ -63,10 +63,10 @@ const equipo = (nombre: string, ultimoLatido: Date | null): DispositivoDelTabler
   nombre,
   tipo: 'camara_lpr',
   zonaId: null,
-  host: '10.0.0.10',
+  host: 'equipo-de-prueba.invalid',
   puerto: 80,
-  modelo: 'DS-2CD',
-  firmware: 'V5.7.3',
+  modelo: 'modelo-de-prueba',
+  firmware: 'v0.0.0-prueba',
   ultimoLatido,
   ultimaSincronizacion: null,
 });

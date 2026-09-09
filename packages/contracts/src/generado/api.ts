@@ -916,7 +916,7 @@ export interface components {
         DispositivoDelTableroDto: {
             /** Format: uuid */
             id: string;
-            /** @example Talanquera Portería Principal */
+            /** @example Talanquera portería principal */
             nombre: string;
             /** @enum {string} */
             tipo: "camara_lpr" | "terminal_facial" | "rele" | "intercom" | "controlador_io";

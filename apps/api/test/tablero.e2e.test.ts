@@ -22,7 +22,7 @@ let app: INestApplication;
 let firmante: Firmante;
 let repo: RepositorioTableroEnMemoria;
 
-const CREDENCIAL = 'vault:hikvision/porteria-principal';
+const CREDENCIAL = 'vault:equipos/porteria-principal';
 
 beforeAll(async () => {
   firmante = await crearFirmante();
@@ -38,13 +38,13 @@ beforeAll(async () => {
   repo.declararVisitantes(COP_A, { autorizacionesDelDia: 34, dentroAhora: 8 });
   repo.declararDispositivo(COP_A, {
     id: '20000000-0000-4000-8000-000000000001',
-    nombre: 'Cámara LPR Portería Principal',
+    nombre: 'Cámara de placas · portería principal',
     tipo: 'camara_lpr',
     zonaId: null,
-    host: '10.20.30.40',
+    host: 'lpr-porteria.invalid',
     puerto: 80,
-    modelo: 'DS-2CD7A26G0',
-    firmware: 'V5.7.3',
+    modelo: 'modelo-de-prueba',
+    firmware: 'v0.0.0-prueba',
     ultimoLatido: null,
     ultimaSincronizacion: null,
   });
@@ -114,9 +114,9 @@ describe('GET /copropiedades/:id/tablero/dispositivos', () => {
       .get(`/copropiedades/${COP_A}/tablero/dispositivos`)
       .set('Authorization', `Bearer ${await comoAdmin()}`);
     expect(res.body.dispositivos[0]).toMatchObject({
-      host: '10.20.30.40',
+      host: 'lpr-porteria.invalid',
       puerto: 80,
-      firmware: 'V5.7.3',
+      firmware: 'v0.0.0-prueba',
     });
   });
 
@@ -128,10 +128,10 @@ describe('GET /copropiedades/:id/tablero/dispositivos', () => {
       nombre: 'Terminal Facial Peatonal',
       tipo: 'terminal_facial',
       zonaId: null,
-      host: '10.20.30.41',
+      host: 'facial-peatonal.invalid',
       puerto: 80,
-      modelo: 'DS-K1T671',
-      firmware: 'V3.2.1',
+      modelo: 'modelo-de-prueba-2',
+      firmware: 'v0.0.0-prueba-2',
       ultimoLatido: new Date(),
       ultimaSincronizacion: null,
       // @ts-expect-error el puerto NO tiene este campo: se inyecta a la fuerza
