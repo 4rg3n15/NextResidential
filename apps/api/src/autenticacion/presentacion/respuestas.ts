@@ -17,6 +17,7 @@ export class SesionDto {
   rol!: string;
 
   @ApiProperty({
+    type: String,
     format: 'uuid',
     nullable: true,
     description: 'Copropiedad del usuario; null en el operador de central, que atiende varias',

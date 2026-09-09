@@ -28,12 +28,12 @@ export class EventoRegistradoDto {
   motivo!: string | null;
 
   @ApiProperty({ enum: ['placa', 'facial', 'manual', 'remoto', 'tarjeta'] }) metodo!: string;
-  @ApiProperty({ format: 'uuid', nullable: true }) personaId!: string | null;
-  @ApiProperty({ format: 'uuid', nullable: true }) viviendaId!: string | null;
-  @ApiProperty({ format: 'uuid', nullable: true }) zonaId!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) personaId!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) viviendaId!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) zonaId!: string | null;
   @ApiProperty({ format: 'uuid' }) dispositivoId!: string;
-  @ApiProperty({ nullable: true, example: 'ABC123' }) placaDetectada!: string | null;
-  @ApiProperty({ nullable: true, minimum: 0, maximum: 1 }) confianza!: number | null;
+  @ApiProperty({ type: String, nullable: true, example: 'ABC123' }) placaDetectada!: string | null;
+  @ApiProperty({ type: Number, nullable: true, minimum: 0, maximum: 1 }) confianza!: number | null;
   @ApiProperty({ description: 'Regla que determinó el resultado' }) reglaAplicada!: string;
 
   @ApiProperty({
@@ -41,9 +41,9 @@ export class EventoRegistradoDto {
   })
   versionReglas!: number;
 
-  @ApiProperty({ format: 'uuid', nullable: true }) operadorId!: string | null;
-  @ApiProperty({ nullable: true }) motivoManual!: string | null;
-  @ApiProperty({ format: 'uuid', nullable: true }) evidenciaId!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) operadorId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) motivoManual!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) evidenciaId!: string | null;
 
   @ApiProperty({
     description: 'Resuelto localmente por el Edge con caché de reglas (RN-16, CA-21, KPI-31)',
@@ -55,6 +55,7 @@ export class PaginaDeEventosDto {
   @ApiProperty({ type: [EventoRegistradoDto] }) filas!: EventoRegistradoDto[];
 
   @ApiProperty({
+    type: String,
     nullable: true,
     description: 'Cursor opaco de la siguiente página; null cuando no hay más',
   })
@@ -88,15 +89,16 @@ export class AlertaExpuestaDto {
   @ApiProperty({ enum: ['informativa', 'media', 'alta', 'critica'] }) severidad!: string;
   @ApiProperty({ enum: ['abierta', 'en_atencion', 'resuelta'] }) estado!: string;
   @ApiProperty({ format: 'date-time' }) generadaEn!: string;
-  @ApiProperty({ format: 'date-time', nullable: true }) escaladaEn!: string | null;
-  @ApiProperty({ format: 'uuid', nullable: true }) eventoId!: string | null;
-  @ApiProperty({ format: 'uuid', nullable: true }) dispositivoId!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) escaladaEn!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) eventoId!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) dispositivoId!: string | null;
 
   @ApiProperty({
+    type: Boolean,
     nullable: true,
     description: 'KPI-25 medido, no supuesto: null mientras no se haya escalado',
   })
   escaladaDentroDelPlazo!: boolean | null;
 
-  @ApiProperty({ nullable: true }) notas!: string | null;
+  @ApiProperty({ type: String, nullable: true }) notas!: string | null;
 }

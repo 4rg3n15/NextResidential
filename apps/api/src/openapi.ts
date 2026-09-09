@@ -50,7 +50,12 @@ async function generar(): Promise<void> {
       .addBearerAuth()
       .build(),
   );
-  const destino = resolve(__dirname, '../../../packages/contracts/openapi.json');
+  // `NCR_DESTINO_OPENAPI` permite escribir a un temporal sin tocar el árbol:
+  // lo usa `scripts/lib/contrato-desfasado.mjs` para comparar sin modificar
+  // nada, que es la disciplina que ya siguen las pruebas negativas.
+  const destino =
+    process.env.NCR_DESTINO_OPENAPI ??
+    resolve(__dirname, '../../../packages/contracts/openapi.json');
   mkdirSync(dirname(destino), { recursive: true });
   writeFileSync(destino, JSON.stringify(documento, null, 2));
   await app.close();

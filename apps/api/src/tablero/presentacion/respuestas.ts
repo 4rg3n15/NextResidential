@@ -62,6 +62,7 @@ export class ConteosDeAlertasDto {
   @ApiProperty({ example: 3 }) pendientes!: number;
 
   @ApiProperty({
+    type: String,
     enum: ['informativa', 'media', 'alta', 'critica'],
     nullable: true,
     description: 'Severidad más grave entre las pendientes; null si no hay ninguna',
@@ -103,9 +104,10 @@ export class DispositivoDelTableroDto {
   @ApiProperty({ enum: ['camara_lpr', 'terminal_facial', 'rele', 'intercom', 'controlador_io'] })
   tipo!: string;
 
-  @ApiProperty({ format: 'uuid', nullable: true }) zonaId!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) zonaId!: string | null;
 
   @ApiProperty({
+    type: String,
     nullable: true,
     description:
       'IP o FQDN del equipo. Solo se rellena para roles administrativos (C-11); ' +
@@ -113,9 +115,9 @@ export class DispositivoDelTableroDto {
   })
   host!: string | null;
 
-  @ApiProperty({ nullable: true }) puerto!: number | null;
-  @ApiProperty({ nullable: true }) modelo!: string | null;
-  @ApiProperty({ nullable: true }) firmware!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) puerto!: number | null;
+  @ApiProperty({ type: String, nullable: true }) modelo!: string | null;
+  @ApiProperty({ type: String, nullable: true }) firmware!: string | null;
 
   @ApiProperty({
     enum: ['saludable', 'degradado', 'caido'],
@@ -125,9 +127,11 @@ export class DispositivoDelTableroDto {
   })
   estado!: 'saludable' | 'degradado' | 'caido';
 
-  @ApiProperty({ format: 'date-time', nullable: true }) ultimoLatido!: string | null;
-  @ApiProperty({ format: 'date-time', nullable: true }) ultimaSincronizacion!: string | null;
-  @ApiProperty({ nullable: true }) segundosSinLatir!: number | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) ultimoLatido!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) ultimaSincronizacion!:
+    | string
+    | null;
+  @ApiProperty({ type: Number, nullable: true }) segundosSinLatir!: number | null;
 }
 
 export class EstadoDeDispositivosDto {

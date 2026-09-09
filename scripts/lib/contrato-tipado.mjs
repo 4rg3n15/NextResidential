@@ -17,7 +17,11 @@
  *  2. El esquema no puede resolver a un objeto sin propiedades: un DTO sin
  *     `@ApiProperty` genera `{ type: 'object' }`, que en TypeScript vuelve a ser
  *     tan inútil como `unknown`.
- *  3. Las exenciones se declaran AQUÍ, con su etapa, y **caducan solas**: si una
+ *  3. Ninguna propiedad del esquema puede quedarse sin `type`. Es la regla que
+ *     el propio contrato destapó: `@ApiProperty({ nullable: true })` sin `type:`
+ *     genera un esquema sin tipo, que `openapi-typescript` traduce a
+ *     `Record<string, never>`. El DTO parecía tipado y no lo estaba.
+ *  4. Las exenciones se declaran AQUÍ, con su etapa, y **caducan solas**: si una
  *     ruta exenta deja de existir o pasa a estar tipada, el control falla y
  *     obliga a quitarla de la lista. Una lista de excepciones que nadie poda es
  *     una lista que acaba tapando lo que debía vigilar.
@@ -76,18 +80,70 @@ const resolver = (esquema, profundidad = 0) => {
   return esquema;
 };
 
+/**
+ * ¿La propiedad declara un tipo escalar utilizable?
+ *
+ * ESTA es la comprobación que faltaba y que el propio contrato destapó al
+ * generarse por primera vez: `@ApiProperty({ nullable: true })` sin `type:`
+ * produce un esquema **sin `type`**, y `openapi-typescript` lo traduce a
+ * `Record<string, never>`. El campo queda declarado, el DTO tiene propiedades y
+ * la regla 2 daba verde — mientras la consola recibía un tipo tan inservible
+ * como `unknown`. Veintiocho campos estaban así.
+ */
+const escalarUtil = (e) =>
+  typeof e.type === 'string' ||
+  typeof e.enum !== 'undefined' ||
+  Array.isArray(e.oneOf) ||
+  Array.isArray(e.allOf) ||
+  Array.isArray(e.anyOf);
+
+/** Un `$ref` que no resuelve dentro del documento rompe al generador. */
+const refColgante = (esquema, profundidad = 0) => {
+  if (esquema === undefined || esquema === null || profundidad > 6) return false;
+  if (typeof esquema.$ref === 'string') {
+    const destino = resolver(esquema);
+    // No basta con que ESTE `$ref` resuelva: el colgante puede estar dentro de
+    // lo que apunta. Sin descender, la sonda daba verde sobre un contrato que
+    // hacía abortar al generador.
+    return destino === undefined ? true : refColgante(destino, profundidad + 1);
+  }
+  const hijos = [
+    esquema.items,
+    ...Object.values(esquema.properties ?? {}),
+    ...(esquema.oneOf ?? []),
+    ...(esquema.allOf ?? []),
+    ...(esquema.anyOf ?? []),
+  ].filter((x) => x !== undefined && x !== null);
+  return hijos.some((h) => refColgante(h, profundidad + 1));
+};
+
 /** ¿El esquema aporta forma, o es un `object` vacío que vuelve a ser `unknown`? */
-const tieneForma = (esquema) => {
+const tieneForma = (esquema, profundidad = 0) => {
   const e = resolver(esquema);
-  if (e === undefined || e === null) return false;
-  if (e.type === 'array') return tieneForma(e.items);
-  if (Array.isArray(e.oneOf) || Array.isArray(e.allOf) || Array.isArray(e.anyOf)) return true;
-  if (typeof e.format === 'string' || typeof e.enum !== 'undefined') return true;
+  if (e === undefined || e === null || profundidad > 6) return false;
+  if (e.type === 'array') return tieneForma(e.items, profundidad + 1);
+  // Una composición vale por sus miembros, no por existir. Un `$ref` colgando
+  // dentro de un `oneOf` daba verde aquí y hacía **abortar al generador**:
+  // el contrato estaba roto y el control decía que no. Ahora se entra.
+  const composicion = e.oneOf ?? e.allOf ?? e.anyOf;
+  if (Array.isArray(composicion)) {
+    return composicion.length > 0 && composicion.every((m) => tieneForma(m, profundidad + 1));
+  }
   if (e.type === 'object' || e.properties !== undefined) {
     if (e.additionalProperties !== undefined && e.additionalProperties !== false) return true;
-    return Object.keys(e.properties ?? {}).length > 0;
+    const propiedades = Object.entries(e.properties ?? {});
+    if (propiedades.length === 0) return false;
+    // Regla 4: cada propiedad tiene que aportar forma ella misma. Recursión
+    // acotada a 6 niveles (§2.4): estos esquemas anidan tres como mucho.
+    return propiedades.every(([, v]) => {
+      const p = resolver(v);
+      if (p === undefined || p === null) return false;
+      if (p.type === 'object' || p.properties !== undefined) return tieneForma(p, profundidad + 1);
+      if (p.type === 'array') return tieneForma(p, profundidad + 1);
+      return escalarUtil(p);
+    });
   }
-  return typeof e.type === 'string';
+  return escalarUtil(e);
 };
 
 const problemas = [];
@@ -104,6 +160,14 @@ for (const [ruta, operaciones] of Object.entries(documento.paths ?? {})) {
     const tipada = respuestas.some(([, r]) =>
       Object.values(r.content ?? {}).some((medio) => tieneForma(medio.schema)),
     );
+
+    for (const [codigo, r] of Object.entries(operacion.responses ?? {})) {
+      for (const medio of Object.values(r.content ?? {})) {
+        if (refColgante(medio.schema)) {
+          problemas.push(`${clave} · respuesta ${codigo} con un $ref que no resuelve`);
+        }
+      }
+    }
 
     if (tipada && EXENTAS.has(clave)) {
       problemas.push(

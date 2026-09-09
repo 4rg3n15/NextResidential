@@ -1641,7 +1641,7 @@
             "description": "Rol derivado de los claims, no elegido"
           },
           "copropiedadId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true,
             "description": "Copropiedad del usuario; null en el operador de central, que atiende varias"
@@ -1659,6 +1659,34 @@
           }
         },
         "required": ["usuarioId", "rol", "copropiedadId", "copropiedadesAtendidas", "mfaVerificado"]
+      },
+      "DetalleDeErrorDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Un mensaje, o el arreglo que devuelve el ValidationPipe con un renglón por campo rechazado. La consola muestra el arreglo campo a campo; una cadena, tal cual."
+          },
+          "error": {
+            "type": "string",
+            "example": "Bad Request"
+          },
+          "statusCode": {
+            "type": "number",
+            "example": 400
+          }
+        },
+        "required": ["message"]
       },
       "ErrorApiDto": {
         "type": "object",
@@ -1679,7 +1707,7 @@
                 "type": "string"
               },
               {
-                "type": "object"
+                "$ref": "#/components/schemas/DetalleDeErrorDto"
               }
             ],
             "description": "Detalle para el cliente en 4xx. En 5xx es siempre «Error interno»: el mensaje original no sale, porque suele llevar nombres de tabla o fragmentos de consulta."
@@ -1689,7 +1717,16 @@
       },
       "InscribirMfaDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "correo": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 254,
+            "description": "Correo del titular; aparece en la aplicación de autenticación",
+            "example": "admin@copropiedad.example"
+          }
+        },
+        "required": ["correo"]
       },
       "InscripcionMfaDto": {
         "type": "object",
@@ -1711,7 +1748,16 @@
       },
       "VerificarMfaDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 11,
+            "description": "TOTP de 6 dígitos, o código de recuperación con la forma XXXXX-XXXXX",
+            "example": "123456"
+          }
+        },
+        "required": ["codigo"]
       },
       "VerificacionMfaDto": {
         "type": "object",
@@ -1963,17 +2009,17 @@
             "enum": ["placa", "facial", "manual", "remoto", "tarjeta"]
           },
           "personaId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true
           },
           "viviendaId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true
           },
           "zonaId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true
           },
@@ -1982,12 +2028,12 @@
             "format": "uuid"
           },
           "placaDetectada": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "example": "ABC123"
           },
           "confianza": {
-            "type": "object",
+            "type": "number",
             "nullable": true,
             "minimum": 0,
             "maximum": 1
@@ -2001,16 +2047,16 @@
             "description": "Versión de reglas con la que se decidió; hace auditable la decisión del Edge"
           },
           "operadorId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true
           },
           "motivoManual": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "evidenciaId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true
           },
@@ -2051,7 +2097,7 @@
             }
           },
           "siguiente": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "Cursor opaco de la siguiente página; null cuando no hay más"
           }
@@ -2099,27 +2145,27 @@
             "format": "date-time"
           },
           "escaladaEn": {
-            "type": "object",
+            "type": "string",
             "format": "date-time",
             "nullable": true
           },
           "eventoId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true
           },
           "dispositivoId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true
           },
           "escaladaDentroDelPlazo": {
-            "type": "object",
+            "type": "boolean",
             "nullable": true,
             "description": "KPI-25 medido, no supuesto: null mientras no se haya escalado"
           },
           "notas": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           }
         },
@@ -2355,25 +2401,25 @@
             "enum": ["camara_lpr", "terminal_facial", "rele", "intercom", "controlador_io"]
           },
           "zonaId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true
           },
           "host": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "IP o FQDN del equipo. Solo se rellena para roles administrativos (C-11); para el resto llega null. NUNCA sale la credencial ni su referencia (RN-21)."
           },
           "puerto": {
-            "type": "object",
+            "type": "number",
             "nullable": true
           },
           "modelo": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "firmware": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "estado": {
@@ -2382,17 +2428,17 @@
             "description": "Derivado del último latido contra el umbral de la copropiedad (migración 0020), no leído de la columna estado_salud, que puede ir por detrás."
           },
           "ultimoLatido": {
-            "type": "object",
+            "type": "string",
             "format": "date-time",
             "nullable": true
           },
           "ultimaSincronizacion": {
-            "type": "object",
+            "type": "string",
             "format": "date-time",
             "nullable": true
           },
           "segundosSinLatir": {
-            "type": "object",
+            "type": "number",
             "nullable": true
           }
         },
