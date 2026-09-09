@@ -193,7 +193,7 @@ Dos hallazgos de las propias pruebas, antes de llegar al verificador:
 
 ### Veredicto literal de §2.8.0
 
-Ejecución del 2026-09-09 tras la cuarta ronda, con base PostgreSQL local (`--con-base`):
+Ejecución del 2026-09-09 tras corregir el `503` intermitente, con base PostgreSQL local (`--con-base`). El paso 5 no desglosa por paquete porque turbo sirvió de caché; el desglose está en el paso 14, que corre tres veces sin caché.
 
 ```
 ▸ 4 · lint y typecheck
@@ -201,20 +201,15 @@ Ejecución del 2026-09-09 tras la cuarta ronda, con base PostgreSQL local (`--co
    ✓ pnpm typecheck
 
 ▸ 5 · suite completa
-   @ncr/providers:test:       Tests  24 passed (24)
-   @ncr/config:test:       Tests  39 passed (39)
-   @ncr/domain-core:test:       Tests  328 passed (328)
-   @ncr/web:test:       Tests  134 passed (134)
-   @ncr/api:test:       Tests  363 passed (363)
    ✓ suite completa en verde
 
 ▸ 6 · ningún fichero de prueba se quedó sin recoger
-   ✓ 74 de 74 ficheros de prueba ejecutados
+   ✓ 76 de 76 ficheros de prueba ejecutados
 
 ▸ 7 · umbrales de cobertura por capa (§2.4)
      OK   dominio (packages/domain-core/src): lineas 98.66 % · ramas 97.67 % · funciones 98.72 % (umbral 90 %, 28 archivos)
      OK   aplicacion (**/aplicacion/**): lineas 98.28 % · ramas 91.46 % · funciones 98.36 % (umbral 90 %, 20 archivos)
-     OK   global: lineas 77.12 % · ramas 87.28 % · funciones 85.47 % (umbral 70 %, 185 archivos)
+     OK   global: lineas 77.51 % · ramas 87.32 % · funciones 85.94 % (umbral 70 %, 187 archivos)
    ✓ las tres capas cumplen su umbral
 
 ▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
@@ -236,7 +231,7 @@ Ejecución del 2026-09-09 tras la cuarta ronda, con base PostgreSQL local (`--co
 
 ▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
    alertas entregadas: 200 de 200
-   p50 / p95 / p99   : 2 / 5 / 8 ms
+   p50 / p95 / p99   : 2 / 4 / 7 ms
    maximo            : 11 ms
    umbral KPI-25     : 10000 ms
    ✓ KPI-25 con margen sobre el umbral
@@ -254,9 +249,9 @@ Ejecución del 2026-09-09 tras la cuarta ronda, con base PostgreSQL local (`--co
    ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
 
 ▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
-      corrida 1/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 134 passed (134)
-      corrida 2/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 134 passed (134)
-      corrida 3/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 134 passed (134)
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 160 passed (160)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 160 passed (160)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 160 passed (160)
    ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
 
 VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
@@ -521,3 +516,6 @@ Ahora usa Zod como la API, y `instrumentation.ts` la valida al arrancar el proce
 | `1e2cd39` | Arranque en frío (0023-0025) y la prueba que lo recorre entero              |
 | `3ed32e5` | El informe del arranque en frío y el hueco entre las dos suites             |
 | `77a821b` | Inscripción del segundo factor, códigos de recuperación, NIT (0026), sonda 11 |
+| `876daee` | P-14 redefinido, enmienda del ADR-008 y DT-12                                  |
+| `dadc741` | Veredicto de la cuarta ronda, en verde y contra base                           |
+| `59cdaf2` | El `503` intermitente de la inscripción y §2.7.1 en la consola                 |
