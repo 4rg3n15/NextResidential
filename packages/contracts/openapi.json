@@ -18,7 +18,9 @@
           }
         },
         "summary": "El proceso está vivo",
-        "tags": ["salud"]
+        "tags": [
+          "salud"
+        ]
       }
     },
     "/ready": {
@@ -48,7 +50,9 @@
           }
         },
         "summary": "La aplicación puede atender tráfico",
-        "tags": ["salud"]
+        "tags": [
+          "salud"
+        ]
       }
     },
     "/auth/sesion": {
@@ -83,7 +87,9 @@
           }
         ],
         "summary": "Identidad y alcance del token presentado",
-        "tags": ["autenticacion"]
+        "tags": [
+          "autenticacion"
+        ]
       }
     },
     "/auth/mfa/inscripcion": {
@@ -128,7 +134,9 @@
           }
         ],
         "summary": "Alta de TOTP; devuelve los códigos de recuperación una sola vez",
-        "tags": ["autenticacion"]
+        "tags": [
+          "autenticacion"
+        ]
       }
     },
     "/auth/mfa/verificacion": {
@@ -183,7 +191,9 @@
           }
         ],
         "summary": "Verifica un TOTP o consume un código de recuperación",
-        "tags": ["autenticacion"]
+        "tags": [
+          "autenticacion"
+        ]
       }
     },
     "/copropiedades/{id}": {
@@ -227,7 +237,9 @@
           }
         ],
         "summary": "Lee una copropiedad dentro del alcance del token",
-        "tags": ["multiempresa"]
+        "tags": [
+          "multiempresa"
+        ]
       }
     },
     "/copropiedades/ingesta": {
@@ -272,7 +284,9 @@
           }
         ],
         "summary": "Ruta de identidad de servicio: valida el tenant en la aplicación",
-        "tags": ["multiempresa"]
+        "tags": [
+          "multiempresa"
+        ]
       }
     },
     "/padron/vehiculos": {
@@ -300,7 +314,9 @@
           }
         ],
         "summary": "Registra un vehículo; la placa única activa la garantiza la base",
-        "tags": ["padron"]
+        "tags": [
+          "padron"
+        ]
       }
     },
     "/padron/vehiculos/{id}/desactivacion": {
@@ -337,7 +353,9 @@
           }
         ],
         "summary": "Baja lógica del vehículo; el motivo es obligatorio (RN-19)",
-        "tags": ["padron"]
+        "tags": [
+          "padron"
+        ]
       }
     },
     "/padron/viviendas/{id}/desactivacion": {
@@ -374,7 +392,9 @@
           }
         ],
         "summary": "Baja lógica de la vivienda; conserva su historial (RN-19, CA-02)",
-        "tags": ["padron"]
+        "tags": [
+          "padron"
+        ]
       }
     },
     "/padron/carga": {
@@ -402,7 +422,9 @@
           }
         ],
         "summary": "Carga transaccional desde CSV con reporte de errores por fila (HU-03)",
-        "tags": ["padron"]
+        "tags": [
+          "padron"
+        ]
       }
     },
     "/copropiedades/{id}/zonas": {
@@ -429,7 +451,9 @@
           }
         ],
         "summary": "Zonas con su aforo y su disponibilidad de ahora mismo (HU-19)",
-        "tags": ["zonas"]
+        "tags": [
+          "zonas"
+        ]
       }
     },
     "/copropiedades/{id}/zonas/{zonaId}/configuracion": {
@@ -474,7 +498,9 @@
           }
         ],
         "summary": "Configura horario, aforo, normas y apertura de la zona (HU-18)",
-        "tags": ["zonas"]
+        "tags": [
+          "zonas"
+        ]
       }
     },
     "/copropiedades/{id}/zonas/{zonaId}/ingresos": {
@@ -509,7 +535,9 @@
           }
         ],
         "summary": "Ocupa una plaza; el aforo lo garantiza la base (CU-05, CA-14, CA-15)",
-        "tags": ["zonas"]
+        "tags": [
+          "zonas"
+        ]
       }
     },
     "/copropiedades/{id}/zonas/{zonaId}/salidas": {
@@ -544,7 +572,9 @@
           }
         ],
         "summary": "Libera una plaza; nunca baja de cero (CU-05 6a)",
-        "tags": ["zonas"]
+        "tags": [
+          "zonas"
+        ]
       }
     },
     "/copropiedades/{id}/zonas/{zonaId}/autorizaciones": {
@@ -589,7 +619,9 @@
           }
         ],
         "summary": "Da permiso sobre la zona a una autorización (HU-19, HU-20)",
-        "tags": ["zonas"]
+        "tags": [
+          "zonas"
+        ]
       }
     },
     "/copropiedades/{id}/biometria/capturas": {
@@ -626,7 +658,9 @@
           }
         ],
         "summary": "Valida la calidad y solicita el consentimiento al TITULAR (CU-02, CA-08)",
-        "tags": ["biometria"]
+        "tags": [
+          "biometria"
+        ]
       }
     },
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}": {
@@ -661,7 +695,9 @@
           }
         ],
         "summary": "Estado de un consentimiento, sin dato biométrico alguno",
-        "tags": ["biometria"]
+        "tags": [
+          "biometria"
+        ]
       }
     },
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta": {
@@ -706,7 +742,9 @@
           }
         ],
         "summary": "El TITULAR acepta o rechaza. Nadie responde por él (RN-10)",
-        "tags": ["biometria"]
+        "tags": [
+          "biometria"
+        ]
       }
     },
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/revocacion": {
@@ -741,7 +779,9 @@
           }
         ],
         "summary": "Revocación del titular: supresión inmediata (RN-11, CA-11)",
-        "tags": ["biometria"]
+        "tags": [
+          "biometria"
+        ]
       }
     },
     "/copropiedades/{id}/biometria/plantillas/{plantillaId}/sincronizacion": {
@@ -786,7 +826,9 @@
           }
         ],
         "summary": "Empuja la plantilla a una terminal, si hay consentimiento (RN-09)",
-        "tags": ["biometria"]
+        "tags": [
+          "biometria"
+        ]
       }
     },
     "/copropiedades/{id}/biometria/barrido": {
@@ -813,7 +855,9 @@
           }
         ],
         "summary": "Supresión de las vencidas y retirada de terminales (RN-11, KPI-21)",
-        "tags": ["biometria"]
+        "tags": [
+          "biometria"
+        ]
       }
     },
     "/copropiedades/{id}/eventos": {
@@ -883,7 +927,13 @@
             "required": false,
             "in": "query",
             "schema": {
-              "enum": ["ingreso", "salida", "denegado", "alerta", "manual"],
+              "enum": [
+                "ingreso",
+                "salida",
+                "denegado",
+                "alerta",
+                "manual"
+              ],
               "type": "string"
             }
           },
@@ -892,7 +942,10 @@
             "required": false,
             "in": "query",
             "schema": {
-              "enum": ["permitido", "negado"],
+              "enum": [
+                "permitido",
+                "negado"
+              ],
               "type": "string"
             }
           },
@@ -964,7 +1017,9 @@
           }
         ],
         "summary": "Historial filtrado y paginado por cursor (HU-32)",
-        "tags": ["eventos"]
+        "tags": [
+          "eventos"
+        ]
       }
     },
     "/copropiedades/{id}/eventos/exportacion": {
@@ -1034,7 +1089,13 @@
             "required": false,
             "in": "query",
             "schema": {
-              "enum": ["ingreso", "salida", "denegado", "alerta", "manual"],
+              "enum": [
+                "ingreso",
+                "salida",
+                "denegado",
+                "alerta",
+                "manual"
+              ],
               "type": "string"
             }
           },
@@ -1043,7 +1104,10 @@
             "required": false,
             "in": "query",
             "schema": {
-              "enum": ["permitido", "negado"],
+              "enum": [
+                "permitido",
+                "negado"
+              ],
               "type": "string"
             }
           },
@@ -1091,7 +1155,11 @@
             "required": true,
             "in": "query",
             "schema": {
-              "enum": ["csv", "excel", "pdf"],
+              "enum": [
+                "csv",
+                "excel",
+                "pdf"
+              ],
               "type": "string"
             }
           }
@@ -1147,7 +1215,9 @@
           }
         ],
         "summary": "Exporta el historial en CSV, Excel o PDF (HU-32)",
-        "tags": ["eventos"]
+        "tags": [
+          "eventos"
+        ]
       }
     },
     "/copropiedades/{id}/eventos/{eventoId}/evidencia": {
@@ -1199,7 +1269,9 @@
           }
         ],
         "summary": "URL firmada de vida corta a la evidencia (RN-21)",
-        "tags": ["eventos"]
+        "tags": [
+          "eventos"
+        ]
       }
     },
     "/copropiedades/{id}/eventos/flujo": {
@@ -1244,7 +1316,9 @@
           }
         ],
         "summary": "Flujo de eventos y alertas en vivo (SSE)",
-        "tags": ["eventos"]
+        "tags": [
+          "eventos"
+        ]
       }
     },
     "/copropiedades/{id}/alertas": {
@@ -1291,7 +1365,9 @@
           }
         ],
         "summary": "Alertas abiertas y en atención, con su cumplimiento de KPI-25",
-        "tags": ["alertas"]
+        "tags": [
+          "alertas"
+        ]
       }
     },
     "/copropiedades/{id}/alertas/{alertaId}/atencion": {
@@ -1353,7 +1429,9 @@
           }
         ],
         "summary": "El operador toma la alerta; queda atribuida a él",
-        "tags": ["alertas"]
+        "tags": [
+          "alertas"
+        ]
       }
     },
     "/copropiedades/{id}/alertas/{alertaId}/resolucion": {
@@ -1415,7 +1493,9 @@
           }
         ],
         "summary": "Cierra la alerta; las notas son obligatorias",
-        "tags": ["alertas"]
+        "tags": [
+          "alertas"
+        ]
       }
     },
     "/ingesta/eventos": {
@@ -1439,7 +1519,9 @@
           }
         },
         "summary": "Recibe un evento firmado del Alarm Server, lo decide y lo registra",
-        "tags": ["ingesta"]
+        "tags": [
+          "ingesta"
+        ]
       }
     },
     "/ingesta/latidos": {
@@ -1462,7 +1544,9 @@
           }
         },
         "summary": "Registra el latido de un dispositivo (CA-26)",
-        "tags": ["ingesta"]
+        "tags": [
+          "ingesta"
+        ]
       }
     },
     "/copropiedades/{id}/tablero/indicadores": {
@@ -1496,7 +1580,9 @@
           }
         ],
         "summary": "Las cuatro tarjetas de indicadores del tablero (HU-38)",
-        "tags": ["tablero"]
+        "tags": [
+          "tablero"
+        ]
       }
     },
     "/copropiedades/{id}/tablero/accesos-por-hora": {
@@ -1530,7 +1616,9 @@
           }
         ],
         "summary": "Histograma de accesos del día en la zona de la copropiedad",
-        "tags": ["tablero"]
+        "tags": [
+          "tablero"
+        ]
       }
     },
     "/copropiedades/{id}/tablero/dispositivos": {
@@ -1564,7 +1652,9 @@
           }
         ],
         "summary": "Estado en línea de los dispositivos por su latido (CA-26, RN-12)",
-        "tags": ["tablero"]
+        "tags": [
+          "tablero"
+        ]
       }
     }
   },
@@ -1597,7 +1687,10 @@
             "format": "date-time"
           }
         },
-        "required": ["estado", "momento"]
+        "required": [
+          "estado",
+          "momento"
+        ]
       },
       "ListoDto": {
         "type": "object",
@@ -1619,7 +1712,10 @@
             }
           }
         },
-        "required": ["estado", "dependencias"]
+        "required": [
+          "estado",
+          "dependencias"
+        ]
       },
       "SesionDto": {
         "type": "object",
@@ -1658,7 +1754,13 @@
             "description": "aal2 en el token. Los roles administrativos no operan sin él (RN-20, CA-25): la consola debe llevar al paso de segundo factor mientras sea false."
           }
         },
-        "required": ["usuarioId", "rol", "copropiedadId", "copropiedadesAtendidas", "mfaVerificado"]
+        "required": [
+          "usuarioId",
+          "rol",
+          "copropiedadId",
+          "copropiedadesAtendidas",
+          "mfaVerificado"
+        ]
       },
       "DetalleDeErrorDto": {
         "type": "object",
@@ -1686,7 +1788,9 @@
             "example": 400
           }
         },
-        "required": ["message"]
+        "required": [
+          "message"
+        ]
       },
       "ErrorApiDto": {
         "type": "object",
@@ -1713,7 +1817,11 @@
             "description": "Detalle para el cliente en 4xx. En 5xx es siempre «Error interno»: el mensaje original no sale, porque suele llevar nombres de tabla o fragmentos de consulta."
           }
         },
-        "required": ["estado", "correlacion", "mensaje"]
+        "required": [
+          "estado",
+          "correlacion",
+          "mensaje"
+        ]
       },
       "InscribirMfaDto": {
         "type": "object",
@@ -1726,7 +1834,9 @@
             "example": "admin@copropiedad.example"
           }
         },
-        "required": ["correo"]
+        "required": [
+          "correo"
+        ]
       },
       "InscripcionMfaDto": {
         "type": "object",
@@ -1744,7 +1854,10 @@
             }
           }
         },
-        "required": ["uriOtpauth", "codigosDeRecuperacion"]
+        "required": [
+          "uriOtpauth",
+          "codigosDeRecuperacion"
+        ]
       },
       "VerificarMfaDto": {
         "type": "object",
@@ -1757,7 +1870,9 @@
             "example": "123456"
           }
         },
-        "required": ["codigo"]
+        "required": [
+          "codigo"
+        ]
       },
       "VerificacionMfaDto": {
         "type": "object",
@@ -1772,7 +1887,10 @@
             "description": "Códigos de recuperación aún sin consumir"
           }
         },
-        "required": ["verificado", "codigosRestantes"]
+        "required": [
+          "verificado",
+          "codigosRestantes"
+        ]
       },
       "CopropiedadDto": {
         "type": "object",
@@ -1794,7 +1912,10 @@
             "description": "Rol con el que el llamante alcanza esta copropiedad"
           }
         },
-        "required": ["id", "alcance"]
+        "required": [
+          "id",
+          "alcance"
+        ]
       },
       "IngestaDto": {
         "type": "object",
@@ -1808,7 +1929,9 @@
             "example": true
           }
         },
-        "required": ["aceptado"]
+        "required": [
+          "aceptado"
+        ]
       },
       "RegistrarVehiculoDto": {
         "type": "object",
@@ -1840,7 +1963,11 @@
             "description": "Continúa la franja del día anterior tras la medianoche"
           }
         },
-        "required": ["dia", "minutoInicio", "minutoFin"]
+        "required": [
+          "dia",
+          "minutoInicio",
+          "minutoFin"
+        ]
       },
       "ConfigurarZonaDto": {
         "type": "object",
@@ -1860,7 +1987,11 @@
           },
           "politicaReinicio": {
             "type": "string",
-            "enum": ["cierre_horario", "manual", "nunca"]
+            "enum": [
+              "cierre_horario",
+              "manual",
+              "nunca"
+            ]
           },
           "normas": {
             "type": "array",
@@ -1881,7 +2012,9 @@
             "type": "string"
           }
         },
-        "required": ["autorizacionId"]
+        "required": [
+          "autorizacionId"
+        ]
       },
       "MedidasDto": {
         "type": "object",
@@ -1907,7 +2040,12 @@
             "maximum": 1
           }
         },
-        "required": ["rostrosDetectados", "nitidez", "iluminacion", "proporcionRostro"]
+        "required": [
+          "rostrosDetectados",
+          "nitidez",
+          "iluminacion",
+          "proporcionRostro"
+        ]
       },
       "CapturarRostroDto": {
         "type": "object",
@@ -1932,14 +2070,27 @@
           },
           "canal": {
             "type": "string",
-            "enum": ["app", "sms", "correo", "whatsapp", "presencial"]
+            "enum": [
+              "app",
+              "sms",
+              "correo",
+              "whatsapp",
+              "presencial"
+            ]
           },
           "suprimirEn": {
             "type": "string",
             "description": "Instante de supresión programada (RN-11)"
           }
         },
-        "required": ["titularId", "medidas", "vector", "versionPolitica", "canal", "suprimirEn"]
+        "required": [
+          "titularId",
+          "medidas",
+          "vector",
+          "versionPolitica",
+          "canal",
+          "suprimirEn"
+        ]
       },
       "ResponderConsentimientoDto": {
         "type": "object",
@@ -1953,7 +2104,9 @@
             "description": "Evidencia de la aceptación (RN-09)"
           }
         },
-        "required": ["acepta"]
+        "required": [
+          "acepta"
+        ]
       },
       "SincronizarPlantillaDto": {
         "type": "object",
@@ -1962,7 +2115,9 @@
             "type": "string"
           }
         },
-        "required": ["dispositivoId"]
+        "required": [
+          "dispositivoId"
+        ]
       },
       "EventoRegistradoDto": {
         "type": "object",
@@ -1981,11 +2136,20 @@
           },
           "tipo": {
             "type": "string",
-            "enum": ["ingreso", "salida", "denegado", "alerta", "manual"]
+            "enum": [
+              "ingreso",
+              "salida",
+              "denegado",
+              "alerta",
+              "manual"
+            ]
           },
           "resultado": {
             "type": "string",
-            "enum": ["permitido", "negado"]
+            "enum": [
+              "permitido",
+              "negado"
+            ]
           },
           "motivo": {
             "type": "string",
@@ -2006,7 +2170,13 @@
           },
           "metodo": {
             "type": "string",
-            "enum": ["placa", "facial", "manual", "remoto", "tarjeta"]
+            "enum": [
+              "placa",
+              "facial",
+              "manual",
+              "remoto",
+              "tarjeta"
+            ]
           },
           "personaId": {
             "type": "string",
@@ -2102,7 +2272,10 @@
             "description": "Cursor opaco de la siguiente página; null cuando no hay más"
           }
         },
-        "required": ["filas", "siguiente"]
+        "required": [
+          "filas",
+          "siguiente"
+        ]
       },
       "UrlDeEvidenciaDto": {
         "type": "object",
@@ -2112,7 +2285,9 @@
             "description": "URL firmada de vida corta (120 s) al bucket privado. No se cachea ni se persiste: el enlace acaba en el historial del navegador y ahí sigue siendo válido (RN-21)."
           }
         },
-        "required": ["url"]
+        "required": [
+          "url"
+        ]
       },
       "AlertaExpuestaDto": {
         "type": "object",
@@ -2134,11 +2309,20 @@
           },
           "severidad": {
             "type": "string",
-            "enum": ["informativa", "media", "alta", "critica"]
+            "enum": [
+              "informativa",
+              "media",
+              "alta",
+              "critica"
+            ]
           },
           "estado": {
             "type": "string",
-            "enum": ["abierta", "en_atencion", "resuelta"]
+            "enum": [
+              "abierta",
+              "en_atencion",
+              "resuelta"
+            ]
           },
           "generadaEn": {
             "type": "string",
@@ -2189,7 +2373,9 @@
             "type": "string"
           }
         },
-        "required": ["notas"]
+        "required": [
+          "notas"
+        ]
       },
       "EventoIngestaDto": {
         "type": "object",
@@ -2202,7 +2388,13 @@
           },
           "metodo": {
             "type": "string",
-            "enum": ["placa", "facial", "manual", "remoto", "tarjeta"]
+            "enum": [
+              "placa",
+              "facial",
+              "manual",
+              "remoto",
+              "tarjeta"
+            ]
           },
           "personaId": {
             "type": "string"
@@ -2240,7 +2432,10 @@
             "type": "string"
           }
         },
-        "required": ["copropiedadId", "dispositivoId"]
+        "required": [
+          "copropiedadId",
+          "dispositivoId"
+        ]
       },
       "ConteosDelPadronDto": {
         "type": "object",
@@ -2283,7 +2478,10 @@
             "description": "Ingresos menos salidas del día. Aproximación declarada: una salida puede no registrarse por fallo de sensor (CU-05, excepción 6a). Nunca es negativo."
           }
         },
-        "required": ["autorizacionesDelDia", "dentroAhora"]
+        "required": [
+          "autorizacionesDelDia",
+          "dentroAhora"
+        ]
       },
       "ConteosDeAlertasDto": {
         "type": "object",
@@ -2294,12 +2492,20 @@
           },
           "severidadMaxima": {
             "type": "string",
-            "enum": ["informativa", "media", "alta", "critica"],
+            "enum": [
+              "informativa",
+              "media",
+              "alta",
+              "critica"
+            ],
             "nullable": true,
             "description": "Severidad más grave entre las pendientes; null si no hay ninguna"
           }
         },
-        "required": ["pendientes", "severidadMaxima"]
+        "required": [
+          "pendientes",
+          "severidadMaxima"
+        ]
       },
       "VentanaDelDiaDto": {
         "type": "object",
@@ -2320,7 +2526,11 @@
             "description": "Zona horaria de la copropiedad con la que se calculó «hoy». Se declara para que la consola no vuelva a interpretarlo con la zona del navegador."
           }
         },
-        "required": ["desde", "hasta", "zonaHoraria"]
+        "required": [
+          "desde",
+          "hasta",
+          "zonaHoraria"
+        ]
       },
       "IndicadoresDto": {
         "type": "object",
@@ -2338,7 +2548,12 @@
             "$ref": "#/components/schemas/VentanaDelDiaDto"
           }
         },
-        "required": ["padron", "visitantes", "alertas", "ventana"]
+        "required": [
+          "padron",
+          "visitantes",
+          "alertas",
+          "ventana"
+        ]
       },
       "FranjaDeAccesosDto": {
         "type": "object",
@@ -2358,7 +2573,11 @@
             "example": 1
           }
         },
-        "required": ["hora", "permitidos", "negados"]
+        "required": [
+          "hora",
+          "permitidos",
+          "negados"
+        ]
       },
       "AccesosPorHoraDto": {
         "type": "object",
@@ -2383,7 +2602,12 @@
             "format": "date-time"
           }
         },
-        "required": ["franjas", "zonaHoraria", "desde", "hasta"]
+        "required": [
+          "franjas",
+          "zonaHoraria",
+          "desde",
+          "hasta"
+        ]
       },
       "DispositivoDelTableroDto": {
         "type": "object",
@@ -2398,7 +2622,13 @@
           },
           "tipo": {
             "type": "string",
-            "enum": ["camara_lpr", "terminal_facial", "rele", "intercom", "controlador_io"]
+            "enum": [
+              "camara_lpr",
+              "terminal_facial",
+              "rele",
+              "intercom",
+              "controlador_io"
+            ]
           },
           "zonaId": {
             "type": "string",
@@ -2424,7 +2654,11 @@
           },
           "estado": {
             "type": "string",
-            "enum": ["saludable", "degradado", "caido"],
+            "enum": [
+              "saludable",
+              "degradado",
+              "caido"
+            ],
             "description": "Derivado del último latido contra el umbral de la copropiedad (migración 0020), no leído de la columna estado_salud, que puede ir por detrás."
           },
           "ultimoLatido": {
@@ -2479,7 +2713,12 @@
             "example": 0
           }
         },
-        "required": ["dispositivos", "saludables", "degradados", "caidos"]
+        "required": [
+          "dispositivos",
+          "saludables",
+          "degradados",
+          "caidos"
+        ]
       }
     }
   }
