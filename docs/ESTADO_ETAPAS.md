@@ -125,7 +125,7 @@ La primera ejecución salió **FALLIDA** y sus tres hallazgos eran reales: `comu
 
 ### Lo que usted debe ejecutar antes de la 09-B
 
-Las migraciones `0023` y `0024`, el SMTP y la plantilla de correo, el Auth Hook de claims y el primer superadministrador. Todo en pasos numerados en [`docs/guias/RECUPERACION_Y_USUARIOS.md`](guias/RECUPERACION_Y_USUARIOS.md).
+Las migraciones `0023` a `0026`, el SMTP y la plantilla de correo, el Auth Hook de claims, el primer superadministrador y **la inscripción de su propio segundo factor desde la consola** — sin ese último paso, ningún rol administrativo entra. Todo en pasos numerados en [`docs/guias/RECUPERACION_Y_USUARIOS.md`](guias/RECUPERACION_Y_USUARIOS.md).
 
 ---
 

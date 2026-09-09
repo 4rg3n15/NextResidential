@@ -196,6 +196,8 @@ curl -s "$SUPABASE_URL/auth/v1/factors/<factor-id>/verify" \
 
 La respuesta del paso 3 trae ya un token con `aal2`. La llave que aparece aquí es la **publicable**: no hay ninguna secreta en este camino, y no debe haberla — es el titular autenticándose, no un administrador actuando por él.
 
+> **`SUPABASE_SECRET_KEY` y este paso.** La inscripción **no** la necesita: viaja con el token del titular y la llave publicable. La necesita solo el canje de un código de recuperación, porque retirar un factor es una operación de administración. La API ya la exige para arrancar desde la ETAPA 03, así que si no está definida el problema aparece antes, al levantar el servicio.
+
 > **P-14, redefinido y cerrado.** Se declaró como «no hay pantalla de inscripción en la consola» y se resolvió diciendo que era una operación del panel. **No lo era**: el panel no inscribe factores, así que el pendiente no describía una comodidad ausente sino un sistema inaccesible. La pantalla existe desde esta versión y el pendiente queda cerrado.
 
 ### B.7 · Los demás roles, para la ETAPA 10
@@ -238,7 +240,7 @@ Crea una base vacía, aplica las migraciones **sin semillas**, ejecuta el aprovi
 
 ## Lista de comprobación
 
-- [ ] Migraciones `0023`, `0024` y `0025` aplicadas.
+- [ ] Migraciones `0023`, `0024`, `0025` y `0026` aplicadas.
 - [ ] SMTP propio configurado, con SPF y DKIM en el dominio remitente.
 - [ ] `Site URL` y las dos `Redirect URLs` de `/acceso/nueva-contrasena`.
 - [ ] Plantilla de _Reset Password_ usando `token_hash`, **no** `ConfirmationURL`.
@@ -249,5 +251,7 @@ Crea una base vacía, aplica las migraciones **sin semillas**, ejecuta el aprovi
 - [ ] Primera copropiedad registrada con `registrar-copropiedad.mjs`.
 - [ ] Auth Hook de _custom claims_ activo y apuntando a `public.custom_access_token_hook`.
 - [ ] Primer superadministrador aprovisionado y capaz de cargar `/tablero`.
-- [ ] TOTP activado en el proyecto y factor inscrito por el titular.
+- [ ] TOTP activado en el proyecto y factor inscrito por el titular **desde la consola** (§B.6).
+- [ ] Códigos de recuperación entregados y guardados; se muestran una sola vez.
+- [ ] `./supabase/arranque-en-frio.sh` en verde contra una base local: es el camino entero, hasta «la API le abre».
 - [ ] `SUPABASE_SECRET_KEY` fuera del entorno al terminar.

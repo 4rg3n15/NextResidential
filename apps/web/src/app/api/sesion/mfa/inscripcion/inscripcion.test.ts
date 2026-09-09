@@ -68,13 +68,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const llamadaDeAlta = (): [string, { headers: Record<string, string>; body?: string }] => {
-  const alta = fetchFalso.mock.calls.find(
-    ([url, o]: [string, { method?: string }]) =>
-      url.endsWith('/auth/v1/factors') && o.method === 'POST',
-  );
+type Llamada = [string, { method?: string; headers: Record<string, string>; body?: string }];
+const llamadas = (): Llamada[] => fetchFalso.mock.calls as unknown as Llamada[];
+
+const llamadaDeAlta = (): Llamada => {
+  const alta = llamadas().find(([url, o]) => url.endsWith('/auth/v1/factors') && o.method === 'POST');
   expect(alta).toBeDefined();
-  return alta as [string, { headers: Record<string, string>; body?: string }];
+  return alta as Llamada;
 };
 
 describe('la inscripción opera sobre la propia sesión y sobre ninguna otra', () => {
@@ -115,8 +115,8 @@ describe('la inscripción opera sobre la propia sesión y sobre ninguna otra', (
         }),
     );
     await ruta.POST();
-    const borrado = fetchFalso.mock.calls.find(
-      ([url, o]: [string, { method?: string }]) => url.includes('a-medias') && o.method === 'DELETE',
+    const borrado = llamadas().find(
+      ([url, o]) => url.includes('a-medias') && o.method === 'DELETE',
     );
     expect(borrado).toBeDefined();
   });

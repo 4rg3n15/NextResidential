@@ -120,6 +120,12 @@ Por eso `/api/**` es **solo red**, sin lectura ni escritura de caché. Los está
 | `apps/api/src/comun/respuestas.ts`                                         | `ErrorApiDto`, `DetalleDeErrorDto` y el enumerado de motivos                    |
 | `apps/api/src/{autenticacion,eventos,multiempresa,salud}/**/respuestas.ts` | DTOs de salida de los controladores que consume la 09-A                         |
 | `apps/api/test/tablero.e2e.test.ts`                                        | 9 pruebas, incluida la que exige que la credencial no salga                     |
+| `apps/api/src/autenticacion/dominio/codigos-recuperacion.ts`               | Generación, hash SHA-256 y cotejo en tiempo constante. Función pura              |
+| `apps/api/src/autenticacion/aplicacion/puertos.ts`                         | `RepositorioCodigosMfa` y `AdministradorDeFactores`                              |
+| `apps/api/src/autenticacion/infraestructura/{codigos-mfa-en-memoria,factores-supabase}.ts` | Adaptadores: almacén y retirada de factores                       |
+| `apps/api/test/{codigos-recuperacion,arranque-en-frio}.e2e.test.ts`        | Consumo único, aislamiento entre usuarios; y «esta sesión ENTRA»                 |
+| `supabase/migrations/…_0026_nit_y_codigos_mfa.sql`                         | Normalización del NIT y tabla de códigos (solo el hash), con RLS forzada         |
+| `supabase/arranque-en-frio.sh`                                             | Base vacía → migraciones → aprovisionamiento → claims reales volcados            |
 
 ### Contratos y verificación
 
@@ -144,7 +150,8 @@ Por eso `/api/**` es **solo red**, sin lectura ni escritura de caché. Los está
 | `apps/web/src/lib/sse/*`                                | Canal en vivo, política de reconexión y contexto de estado                     |
 | `apps/web/src/lib/{motivos,navegacion,cn}.ts`           | Los diez motivos en español, navegación por rol, composición de clases         |
 | `apps/web/src/app/api/{sesion,ncr}/**`                  | BFF: sesión, segundo factor, estado y proxy hacia la API                       |
-| `apps/web/src/app/acceso/**`                            | W-01, sin selector de rol y con paso de segundo factor                         |
+| `apps/web/src/app/acceso/**`                            | W-01: credenciales → **inscripción** → segundo factor → códigos de recuperación |
+| `apps/web/src/app/api/sesion/mfa/inscripcion/route.ts`  | Alta del factor sobre la propia sesión; la identidad sale de la cookie          |
 | `apps/web/src/app/(consola)/tablero/**`                 | W-02                                                                           |
 | `apps/web/src/componentes/**`                           | Catálogo: KPI, tabla, dispositivo, distintivo, modal con motivo, estados       |
 | `apps/web/public/{manifest.webmanifest,sw.js,iconos/*}` | Base de PWA                                                                    |
@@ -351,6 +358,37 @@ Cada una es correcta para lo suyo. El hueco estaba justo entre ambas, y esa form
 
 ---
 
+## 6.quinquies · El segundo factor, y el pendiente que describía mal el problema
+
+Con las migraciones aplicadas, la copropiedad creada y el superadministrador vinculado, el sistema **seguía siendo inaccesible**: no había forma de inscribir el TOTP que el guard exige.
+
+**P-14 estaba mal declarado, y ese es el hallazgo.** Decía «no hay pantalla de inscripción en la consola» y lo resolvía con «hoy se hace desde el panel». Esa salida no existe: el panel de Supabase, en `Authentication → Users`, solo ofrece _Remove MFA factors_; `Account → Security` es la cuenta del operador del panel, no la del usuario de la aplicación. Y hace bien en no ofrecerlo — un factor cuyo secreto pasó por manos de un tercero no es un segundo factor. El pendiente describía una comodidad ausente cuando lo que describía era un sistema en el que **ningún rol administrativo podía entrar**.
+
+**La pantalla.** Inscripción sobre la propia sesión: QR, la clave en texto para quien no puede escanear —una portería sin cámara, un gestor de contraseñas de escritorio— y el código de verificación. La petición de alta **no lleva ningún identificador de usuario**: el servidor lo toma de la cookie `httpOnly`. No es una comprobación que se pueda olvidar; es que no existe el dato con el que equivocarse, y hay una prueba que se rompe si alguien lo añade.
+
+**Códigos de recuperación.** Supabase no los ofrece —su respuesta a perder el teléfono es tener varios factores, que no sirve si solo había uno—, así que los emite la API: diez, entregados una sola vez, guardados **solo como hash**, comparados en tiempo constante y de un solo uso garantizado por el `DELETE` que consume, no por el `SELECT` que comprueba. Un código **no da acceso**: retira el factor perdido para poder inscribir otro. El `aal2` sigue emitiéndolo Supabase (ADR-008).
+
+**Y también existe la vía por API**, que es la que el cliente preguntaba: contraseña → `POST /auth/v1/factors` → `challenge` → `verify`, con la llave **publicable** y el token del propio titular. La consola hace exactamente esas tres llamadas. Queda escrita en la guía para desbloquearse sin navegador.
+
+### El arranque en frío llega ahora hasta «alguien puede entrar»
+
+El guion se paraba en «la base emite claims», que no es lo mismo. Quien decide si se entra es el guard de la API, que es TypeScript y no SQL. Ahora el guion **vuelca los claims que la base produjo de verdad** y una suite los mete por el stack HTTP completo: `aal2` entra, `aal1` no entra —RN-20 no se relajó por comodidad de arranque—, y la ruta de recuperación sí es alcanzable con `aal1`, que es la excepción declarada sin la cual quien pierde el teléfono se queda fuera para siempre.
+
+**Sonda 11 de las pruebas negativas**, sin necesidad de PostgreSQL porque lo que se pone a prueba es la suite y no la base: con claims bien formados pasa entera; con el rol cambiado se rompe; sin fichero **se omite y la omisión queda escrita en la salida**, que es lo que el paso 12b comprueba. Una suite que se omite en silencio es un verde que no ejercitó nada.
+
+### Dos defectos más de la familia, uno dentro de las propias pruebas
+
+| Defecto                                                                | Cómo se veía                                                                                                                                                |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| El reinicio del limitador entre pruebas hacía `Object.keys` sobre un `Map` | Devuelve `[]` siempre: el reinicio existía y no reiniciaba nada. La suite se llenaba de `429` sin decir por qué. Ahora se comprueba la **forma** antes de usarla |
+| La ruta de inscripción devolvía `400` con el proveedor caído          | «Tu petición está mal» cuando no había nada mal en su petición, y la consola no podía ofrecer reintentar. El estado sale del motivo, no de «lo que no sea 429» |
+
+### El NIT rechazaba el formato colombiano
+
+`^[0-9]{5,15}$` no admite `900123456-7`, que es como se escribe. Migración `0026`: normalización en la base —el dígito de verificación se conserva, los puntos y espacios no—, `CHECK` que admite la forma con guion, y **validación previa en los guiones**, para que un formato equivocado produzca una instrucción y no un error crudo de restricción que hace parecer rota la guía.
+
+---
+
 ## 7 · Verificación de seguridad (§2.7)
 
 | #   | Medida                   | Estado en esta etapa                                                                                                                                                                                             |
@@ -370,15 +408,20 @@ Cada una es correcta para lo suyo. El hueco estaba justo entre ambas, y esa form
 
 | Id        | Asunto                                                                                                                                                                                                                                                                                                                                                          | Estado                                                                                                                |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **D-39**  | `/auth/mfa/inscripcion` y `/auth/mfa/verificacion` son **inalcanzables para los roles administrativos**: el guard exige `aal2` antes que el guard de roles, y esos endpoints exigen rol administrativo. Un administrador sin segundo factor no puede llegar a inscribirlo. Además, verificar ahí no cambiaría el `aal` del token, así que no desbloquearía nada | **Abierto** · reportado, no corregido: decidir cuál de los dos MFA es el autoritativo es una decisión de arquitectura |
+| **D-39**  | `/auth/mfa/inscripcion` y `/auth/mfa/verificacion` son **inalcanzables para los roles administrativos**: el guard exige `aal2` antes que el guard de roles, y esos endpoints exigen rol administrativo. Un administrador sin segundo factor no puede llegar a inscribirlo. Además, verificar ahí no cambiaría el `aal` del token, así que no desbloquearía nada | **Resuelto** · retiradas. Supabase Auth es el mecanismo autoritativo ([ADR-008](../decisiones/ADR-008-supabase-auth-como-mecanismo-autoritativo-de-mfa.md)) |
 | **D-40**  | El relleno rojo con etiqueta blanca no alcanza AA (4,168 medido). Resuelto con `marca.boton` = `#DC3341` bajo la salida que prevé §5.6                                                                                                                                                                                                                          | **Resuelto**, sujeto a su confirmación                                                                                |
 | **D-41**  | El fichero generado del cliente no se formatea ni se lintea. Descubierto porque el gancho de pre-commit lo reformateó y `contrato:desfasado` rompió el build al commit siguiente                                                                                                                                                                                | **Resuelto** · en `.prettierignore` y en los `ignores` de ESLint                                                      |
 | **S-19**  | `[SUPUESTO]` «Dentro ahora» se deriva del histórico como ingresos menos salidas del día, acotado a cero. Una salida puede no registrarse por fallo de sensor (CU-05, excepción 6a), así que es una aproximación **declarada** en el contrato                                                                                                                    | Vigente                                                                                                               |
 | **S-20**  | `[SUPUESTO]` «Visitantes hoy» cuenta autorizaciones **activas cuya vigencia se cruza con el día local**, no las creadas hoy: el mockup cuenta visitas, no altas                                                                                                                                                                                                 | Vigente                                                                                                               |
 | **P-13**  | `PENDIENTE DE DEFINICIÓN` El operador de central toma la **primera** copropiedad de su turno para que el tablero no le quede inservible. El selector real llega con la ETAPA 10                                                                                                                                                                                 | Abierto                                                                                                               |
+| **P-14**  | `PENDIENTE` **redefinido y cerrado.** Se declaró como «falta la pantalla de inscripción» y se resolvió con «se hace desde el panel». El panel no inscribe factores: el pendiente ocultaba un sistema inaccesible. La pantalla existe y opera solo sobre la propia sesión                                                                            | **Cerrado**                                                                                                           |
+| **D-43**  | El arranque en frío no podía escribir la primera fila: `creado_por` es `NOT NULL` y sobre una base vacía no hay a quién atribuirla                                                                                                                                                                                                               | **Resuelto** · migración `0025`, actor de sistema explícito; ninguna restricción se debilitó                          |
+| **D-44**  | El `CHECK` del NIT rechazaba `900123456-7`, que es el formato real                                                                                                                                                                                                                                                                               | **Resuelto** · migración `0026` y validación previa en los guiones                                                    |
+| **D-45**  | Nadie podía inscribir el segundo factor: el panel de Supabase solo los retira                                                                                                                                                                                                                                                                    | **Resuelto** · pantalla de inscripción y códigos de recuperación                                                      |
 | **DT-09** | Sin fuente web: se usa la pila del sistema. Autoalojar Inter entra con el empaquetado de la ETAPA 14; traerla de un CDN abriría `font-src` y `style-src` a un origen externo                                                                                                                                                                                    | Aceptada                                                                                                              |
 | **DT-10** | El adaptador vigente del tablero es el de memoria (D-17). Los conteos del padrón salen en cero porque no hay adaptador en memoria del padrón: una carencia **visible en pantalla**, preferible a un número inventado                                                                                                                                            | Aceptada                                                                                                              |
 | **DT-11** | `jsdom` no implementa `<dialog>`. Se rellena `showModal`/`close` para probar la lógica; **el atrapado del foco, el Escape y la inercia del fondo no quedan cubiertos** por estas pruebas                                                                                                                                                                        | Declarada                                                                                                             |
+| **DT-12** | **Configuración externa sin verificar — la familia «dos suites que se solapan y dejan un intervalo».** Ya aparecieron tres: el gancho de claims, el arranque en frío y la inscripción del factor. Quedan al menos cuatro del mismo tipo, todas con la misma forma: la API prueba su puerto con un doble y la base prueba sus filas, y nadie comprueba el recurso real de la plataforma. **Buckets de evidencia** (que el bucket exista y sea privado, y que un `GET` sin firma lo rechace de verdad — hoy se prueba la fila `evidencias`, no el bucket); **FCM** (credencial de servicio válida y envío real; hoy es un doble); **SMTP y la plantilla de recuperación** con su URL de redirección, recién configurados y nunca ejercitados de punta a punta; **Supabase Realtime** frente al canal SSE propio, que es el que se mide hoy. Diagnóstico declarado antes de la ETAPA 10; la comprobación se construye allí | Declarada |
 
 ---
 
@@ -388,7 +431,7 @@ Cada una es correcta para lo suyo. El hueco estaba justo entre ambas, y esa form
 2. **Levantar la API** (`pnpm --filter @ncr/api start:dev`) y la consola (`pnpm --filter @ncr/web dev`, puerto 3100).
 3. **Comprobar la CSP en el navegador**: abrir la consola de desarrollo y confirmar que no hay violaciones. Es lo único de §2.7.7 que no se puede verificar sin navegador.
 4. **Instalar la PWA** desde el menú del navegador y confirmar que arranca en modo independiente y que, sin red, aparece la página de «sin conexión» y no un tablero con cifras viejas.
-5. **Revisar el segundo factor**: hoy va por Supabase Auth (`/auth/v1/factors`), porque es lo que emite el `aal2` que exige el guard. La inscripción del factor se hace desde el panel de Supabase; ver D-39.
+5. **Inscribir su segundo factor desde la consola**: active TOTP una vez en el panel (`Authentication → Providers → Multi-Factor Authentication`), entre en `/acceso` con su correo y contraseña, y la consola le mostrará el QR y le entregará los diez códigos de recuperación. **Guárdelos**: se muestran una sola vez. El paso a paso, y la vía equivalente por API, en [`docs/guias/RECUPERACION_Y_USUARIOS.md`](../guias/RECUPERACION_Y_USUARIOS.md) §B.6.
 6. **Confirmar la variante `marca.boton`** (#DC3341) para el relleno de botones con etiqueta blanca, o indicar si prefiere conservar `#E63946` subiendo la etiqueta a ≥ 18,66 px en negrita.
 
 ---
@@ -405,3 +448,7 @@ Cada una es correcta para lo suyo. El hueco estaba justo entre ambas, y esa form
 | `297a259` | 49 pruebas de lo que falla en silencio; dos controles que no veían `.tsx`  |
 | `579931e` | ADR-006 (datos y estado) y ADR-007 (cliente generado)                      |
 | `1746730` | Los tres defectos que cazó la primera ejecución del verificador            |
+| `c407265` | Segunda ronda: el fallo del CI y la revisión de las diez sondas             |
+| `1e2cd39` | Arranque en frío (0023-0025) y la prueba que lo recorre entero              |
+| `3ed32e5` | El informe del arranque en frío y el hueco entre las dos suites             |
+| `77a821b` | Inscripción del segundo factor, códigos de recuperación, NIT (0026), sonda 11 |
