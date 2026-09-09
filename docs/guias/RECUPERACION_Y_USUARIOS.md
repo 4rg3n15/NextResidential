@@ -196,6 +196,8 @@ curl -s "$SUPABASE_URL/auth/v1/factors/<factor-id>/verify" \
 
 La respuesta del paso 3 trae ya un token con `aal2`. La llave que aparece aquí es la **publicable**: no hay ninguna secreta en este camino, y no debe haberla — es el titular autenticándose, no un administrador actuando por él.
 
+> **Si la pantalla no muestra el QR.** Pulse «Volver a intentarlo»: la inscripción se rehace entera y descarta la anterior. Si vuelve a fallar, el registro del servidor de la consola nombra ya la causa —`estadoDelProveedor` y `codigoDelProveedor`— en vez de un `503` a secas.
+
 > **`SUPABASE_SECRET_KEY` y este paso.** La inscripción **no** la necesita: viaja con el token del titular y la llave publicable. La necesita solo el canje de un código de recuperación, porque retirar un factor es una operación de administración. La API ya la exige para arrancar desde la ETAPA 03, así que si no está definida el problema aparece antes, al levantar el servicio.
 
 > **P-14, redefinido y cerrado.** Se declaró como «no hay pantalla de inscripción en la consola» y se resolvió diciendo que era una operación del panel. **No lo era**: el panel no inscribe factores, así que el pendiente no describía una comodidad ausente sino un sistema inaccesible. La pantalla existe desde esta versión y el pendiente queda cerrado.
@@ -255,3 +257,4 @@ Crea una base vacía, aplica las migraciones **sin semillas**, ejecuta el aprovi
 - [ ] Códigos de recuperación entregados y guardados; se muestran una sola vez.
 - [ ] `./supabase/arranque-en-frio.sh` en verde contra una base local: es el camino entero, hasta «la API le abre».
 - [ ] `SUPABASE_SECRET_KEY` fuera del entorno al terminar.
+- [ ] La consola arranca sin quejarse: con el entorno incompleto se detiene con código 78 y dice qué falta.

@@ -406,6 +406,56 @@ El guion se paraba en «la base emite claims», que no es lo mismo. Quien decide
 
 ---
 
+## 6.sexies · El 503 intermitente del camino de acceso
+
+Reportado desde el proyecto real, con el registro que lo delata:
+
+```
+POST /api/sesion/mfa/inscripcion 503 in 840ms
+POST /api/sesion/mfa/inscripcion 200 in 849ms
+```
+
+La primera falla, la segunda funciona, y la pantalla se queda con el error de la primera: mensaje rojo, ningún QR. El sistema funcionaba y la inscripción era imposible.
+
+### Por qué había dos llamadas, y por qué una fallaba
+
+**Dos, porque el navegador hace dos.** `reactStrictMode: true` en `next.config.mjs`, que es lo correcto: en desarrollo React monta, limpia y vuelve a montar para descubrir efectos que no toleran repetirse. Este no lo toleraba. En producción no habría modo estricto, pero sí un doble clic o un reintento, que producen exactamente lo mismo.
+
+**Una fallaba porque la inscripción es leer-y-borrar-y-crear, sin atomicidad.** Cada petición lista los factores del titular, borra los que estén a medio inscribir y crea uno nuevo con un nombre **fijo**. Dos a la vez: las dos leen la lista vacía, las dos crean con el mismo nombre y el proveedor rechaza la segunda. El otro orden es peor todavía —la segunda borra el factor que la primera acaba de crear y devuelve un QR de un factor que ya no existe—, y ese sí habría sido un fallo silencioso.
+
+**Y ese rechazo se contaba mal.** `exigirOk` plegaba en `SERVICIO_NO_DISPONIBLE` todo lo que no fuera 400/401/403/429. Un 422 de «ya existe un factor con ese nombre» —recuperable, y que el proveedor explica en su `error_code`— llegaba a la pantalla como «no se pudo contactar con el servicio de identidad»: un mensaje que manda a investigar la red cuando el problema era nuestro.
+
+**Lo que impidió diagnosticarlo desde el registro** es que no había registro. La ruta traducía el fallo a un número y descartaba la causa, así que en el log solo quedaba `503`. Es la misma familia de siempre en otra forma: no un control que no comprueba, sino un fallo que no deja rastro.
+
+### Las tres correcciones, y por qué son tres
+
+| Capa       | Corrección                                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ruta       | **Una inscripción por titular a la vez.** Las peticiones concurrentes comparten la misma y reciben la misma respuesta. La clave es un hash del token, nunca el token       |
+| Cliente    | Un conflicto de nombre se **reintenta una vez** con otro nombre. Es la red de seguridad para varias instancias, donde un mapa en memoria no alcanza                       |
+| Traducción | 409/422 deja de ser «servicio no disponible»: tiene motivo propio, mensaje propio y se **registra con el estado y el `error_code` del proveedor** —nunca el cuerpo—        |
+
+No es reintentar más veces: es **no hacer dos veces la misma operación**. El reintento cubre lo que el deduplicado por proceso no puede cubrir.
+
+### Y la pantalla, que es la mitad que dejaba al usuario fuera
+
+Aunque el servidor se hubiera arreglado solo, la pantalla habría seguido inservible: pintaba el error del primer intento y descartaba el QR del segundo. Dos reglas:
+
+1. **El último intento manda.** Cada petición se numera y solo se aplica la respuesta del intento vigente. Una respuesta tardía de un intento superado se descarta entera — ni su error, ni su QR.
+2. **El éxito limpia.** Al recibir el QR se borra el error, sea de quien sea. Un mensaje de fallo junto a un QR válido hace que el titular no confíe en lo que sí funciona.
+
+Y una tercera cosa que faltaba: **sin QR ya no se muestra el campo del código**. Un campo donde teclear algo que no se puede obtener era la pantalla que el cliente describió. En su lugar hay el motivo y un botón para reintentar.
+
+Las cuatro correcciones se comprobaron **por mutación**: sin el deduplicado, las dos pruebas que describen el síntoma se ponen rojas; sin la limpieza del error y sin el descarte del intento superado, las suyas también.
+
+### La consola ya no arranca con el entorno incompleto (§2.7.1)
+
+Esto no causó el `503` —la configuración del cliente era correcta—, pero lo destapó: `apps/web` comprobaba **presencia** de tres variables, de forma perezosa, en la primera petición que las necesitara. Un entorno a medias no se manifestaba como «la consola no arranca» sino como un `503` en mitad del acceso, que es el peor sitio para descubrirlo.
+
+Ahora usa Zod como la API, y `instrumentation.ts` la valida al arrancar el proceso: si algo falta o tiene mal la forma, imprime el motivo y sale con **78 (`EX_CONFIG`)** — el código que distingue «mal configurado» de «se ha caído», para que un supervisor deje de reintentar. Presencia no es validez: se comprueban esquema y forma, se exige `https` fuera de local, y **una llave `sb_secret_` en la consola impide arrancar** con el motivo escrito — sería la llave que omite la RLS en el proceso que atiende al navegador (§2.7.6). Los mensajes nombran la variable y nunca su valor.
+
+---
+
 ## 7 · Verificación de seguridad (§2.7)
 
 | #   | Medida                   | Estado en esta etapa                                                                                                                                                                                             |
@@ -439,6 +489,8 @@ El guion se paraba en «la base emite claims», que no es lo mismo. Quien decide
 | **DT-10** | El adaptador vigente del tablero es el de memoria (D-17). Los conteos del padrón salen en cero porque no hay adaptador en memoria del padrón: una carencia **visible en pantalla**, preferible a un número inventado                                                                                                                                            | Aceptada                                                                                                              |
 | **DT-11** | `jsdom` no implementa `<dialog>`. Se rellena `showModal`/`close` para probar la lógica; **el atrapado del foco, el Escape y la inercia del fondo no quedan cubiertos** por estas pruebas                                                                                                                                                                        | Declarada                                                                                                             |
 | **DT-12** | **Configuración externa sin verificar — la familia «dos suites que se solapan y dejan un intervalo».** Ya aparecieron tres: el gancho de claims, el arranque en frío y la inscripción del factor. Quedan al menos cuatro del mismo tipo, todas con la misma forma: la API prueba su puerto con un doble y la base prueba sus filas, y nadie comprueba el recurso real de la plataforma. **Buckets de evidencia** (que el bucket exista y sea privado, y que un `GET` sin firma lo rechace de verdad — hoy se prueba la fila `evidencias`, no el bucket); **FCM** (credencial de servicio válida y envío real; hoy es un doble); **SMTP y la plantilla de recuperación** con su URL de redirección, recién configurados y nunca ejercitados de punta a punta; **Supabase Realtime** frente al canal SSE propio, que es el que se mide hoy. Diagnóstico declarado antes de la ETAPA 10; la comprobación se construye allí | Declarada |
+| **D-46**  | `503` intermitente al inscribir el segundo factor: dos peticiones concurrentes creaban el factor con el mismo nombre fijo, el proveedor rechazaba una con 422 y la traducción la convertía en «servicio no disponible». La pantalla se quedaba con el error del intento fallido                                                                    | **Resuelto** · una inscripción por titular a la vez, reintento por conflicto, motivo propio y registro con causa |
+| **D-47**  | `apps/web` no validaba su configuración al arrancar: comprobaba presencia, de forma perezosa. Un entorno incompleto aparecía como un `503` en mitad del acceso                                                                                                                                                                                   | **Resuelto** · Zod e `instrumentation.ts`, salida con código 78                                                  |
 
 ---
 

@@ -1,4 +1,5 @@
 import 'server-only';
+import { randomBytes } from 'node:crypto';
 import { configuracion } from '../configuracion';
 
 /**
@@ -32,13 +33,37 @@ export type MotivoDeFalloDeAcceso =
   | 'SESION_EXPIRADA'
   | 'ENLACE_NO_VALIDO'
   | 'CONTRASENA_DEBIL'
+  /**
+   * El proveedor rechaza inscribir porque ya existe un factor con ese nombre.
+   * Tiene motivo propio porque **es recuperable** —se reintenta— y porque
+   * plegarlo en `SERVICIO_NO_DISPONIBLE` fue el defecto que dejó la pantalla
+   * de inscripción inservible: al titular se le decía «no se pudo contactar
+   * con el servicio de identidad» cuando el servicio había contestado, y de
+   * hecho había contestado que ya había un factor.
+   */
+  | 'FACTOR_DUPLICADO'
   | 'SERVICIO_NO_DISPONIBLE';
+
+/**
+ * Rastro del fallo para el diagnóstico, **sin cuerpo de respuesta**.
+ *
+ * Solo el estado HTTP y el `error_code` del proveedor, que son enumerados
+ * suyos y no datos del titular. Sin esto, un `503` en el camino de acceso no
+ * se puede investigar: fue exactamente lo que ocurrió — el registro decía
+ * «503» y no había forma de saber si era la red, un 422 o una respuesta
+ * incompleta.
+ */
+export interface DetalleDeFallo {
+  readonly estado?: number | undefined;
+  readonly codigo?: string | undefined;
+}
 
 export class FalloDeAcceso extends Error {
   constructor(
     readonly motivo: MotivoDeFalloDeAcceso,
     /** Segundos que pide esperar el 429, si el servidor los declara. */
     readonly reintentarEn?: number,
+    readonly detalle: DetalleDeFallo = {},
   ) {
     super(motivo);
     this.name = 'FalloDeAcceso';
@@ -134,16 +159,63 @@ const pedir = async (ruta: string, opciones: RequestInit): Promise<Response> => 
   }
 };
 
-const exigirOk = (respuesta: Response, siInvalido: MotivoDeFalloDeAcceso): void => {
+/**
+ * Código de error del proveedor, y **nada más del cuerpo**.
+ *
+ * GoTrue enumera sus errores (`error_code`), y ese enumerado es lo único que
+ * hace falta para distinguir «ya existe ese factor» de «el servicio no
+ * responde». El resto del cuerpo no se lee ni se registra: es la regla de
+ * §2.7.8, y aquí además el cuerpo de un error de autenticación puede llevar
+ * el correo del titular.
+ */
+const codigoDelProveedor = async (respuesta: Response): Promise<string | undefined> => {
+  try {
+    const cuerpo = (await respuesta.json()) as { error_code?: unknown; code?: unknown };
+    for (const candidato of [cuerpo.error_code, cuerpo.code]) {
+      if (typeof candidato === 'string' && candidato.length > 0 && candidato.length <= 64) {
+        return candidato;
+      }
+    }
+  } catch {
+    // Un cuerpo que no es JSON no es un problema: el estado ya informa.
+  }
+  return undefined;
+};
+
+/**
+ * Traduce la respuesta del proveedor a un motivo tipado.
+ *
+ * **El caso 409/422 no es «servicio no disponible».** La versión anterior
+ * plegaba en `SERVICIO_NO_DISPONIBLE` todo lo que no fuera 400/401/403/429, y
+ * un 422 de «ya existe un factor con ese nombre» —que es recuperable y que el
+ * propio proveedor explica— llegaba a la pantalla como «no se pudo contactar
+ * con el servicio de identidad». Un mensaje que describe mal el fallo cuesta
+ * más que no tener mensaje: manda a investigar la red cuando el problema era
+ * nuestro.
+ */
+const exigirOk = async (respuesta: Response, siInvalido: MotivoDeFalloDeAcceso): Promise<void> => {
   if (respuesta.ok) return;
-  if (respuesta.status === 429) {
+  const estado = respuesta.status;
+  if (estado === 429) {
     const espera = Number(respuesta.headers.get('retry-after') ?? '60');
-    throw new FalloDeAcceso('DEMASIADOS_INTENTOS', Number.isFinite(espera) ? espera : 60);
+    throw new FalloDeAcceso('DEMASIADOS_INTENTOS', Number.isFinite(espera) ? espera : 60, {
+      estado,
+    });
   }
-  if (respuesta.status === 400 || respuesta.status === 401 || respuesta.status === 403) {
-    throw new FalloDeAcceso(siInvalido);
+  const codigo = await codigoDelProveedor(respuesta);
+  if (estado === 409 || estado === 422) {
+    // 422 es el estado con el que GoTrue rechaza un nombre de factor repetido.
+    // Se mira además el código, para no llamar «duplicado» a cualquier 422.
+    const duplicado = codigo === undefined || /conflict|exist|duplicate/i.test(codigo);
+    throw new FalloDeAcceso(duplicado ? 'FACTOR_DUPLICADO' : siInvalido, undefined, {
+      estado,
+      codigo,
+    });
   }
-  throw new FalloDeAcceso('SERVICIO_NO_DISPONIBLE');
+  if (estado === 400 || estado === 401 || estado === 403) {
+    throw new FalloDeAcceso(siInvalido, undefined, { estado, codigo });
+  }
+  throw new FalloDeAcceso('SERVICIO_NO_DISPONIBLE', undefined, { estado, codigo });
 };
 
 /** Factores TOTP ya inscritos y verificados por el titular. */
@@ -168,7 +240,7 @@ export const iniciarSesion = async (
     headers: cabeceras(),
     body: JSON.stringify({ email: correo, password: contrasena }),
   });
-  exigirOk(respuesta, 'CREDENCIALES_INVALIDAS');
+  await exigirOk(respuesta, 'CREDENCIALES_INVALIDAS');
   const sesion = aSesion((await respuesta.json()) as RespuestaToken, null);
   if (sesion.nivel === 'aal2') return sesion;
   return { ...sesion, factorPendienteId: await factorTotp(sesion.accessToken) };
@@ -180,7 +252,7 @@ export const refrescarSesion = async (refreshToken: string): Promise<SesionSupab
     headers: cabeceras(),
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
-  exigirOk(respuesta, 'SESION_EXPIRADA');
+  await exigirOk(respuesta, 'SESION_EXPIRADA');
   return aSesion((await respuesta.json()) as RespuestaToken, null);
 };
 
@@ -198,7 +270,7 @@ export const verificarSegundoFactor = async (
     method: 'POST',
     headers: cabeceras(accessToken),
   });
-  exigirOk(desafio, 'FACTOR_INVALIDO');
+  await exigirOk(desafio, 'FACTOR_INVALIDO');
   const { id: challengeId } = (await desafio.json()) as { id: string };
 
   const verificacion = await pedir(`/auth/v1/factors/${factorId}/verify`, {
@@ -206,7 +278,7 @@ export const verificarSegundoFactor = async (
     headers: cabeceras(accessToken),
     body: JSON.stringify({ challenge_id: challengeId, code: codigo }),
   });
-  exigirOk(verificacion, 'FACTOR_INVALIDO');
+  await exigirOk(verificacion, 'FACTOR_INVALIDO');
   return aSesion((await verificacion.json()) as RespuestaToken, null);
 };
 
@@ -260,7 +332,7 @@ export const canjearTokenDeRecuperacion = async (tokenHash: string): Promise<Ses
     headers: cabeceras(),
     body: JSON.stringify({ type: 'recovery', token_hash: tokenHash }),
   });
-  exigirOk(respuesta, 'ENLACE_NO_VALIDO');
+  await exigirOk(respuesta, 'ENLACE_NO_VALIDO');
   return aSesion((await respuesta.json()) as RespuestaToken, null);
 };
 
@@ -276,7 +348,7 @@ export const cambiarContrasena = async (accessToken: string, contrasena: string)
   // del usuario es distinta: ahí hay que elegir otra contraseña, no pedir otro
   // correo.
   if (respuesta.status === 422) throw new FalloDeAcceso('CONTRASENA_DEBIL');
-  exigirOk(respuesta, 'ENLACE_NO_VALIDO');
+  await exigirOk(respuesta, 'ENLACE_NO_VALIDO');
 };
 
 export interface InscripcionDeFactor {
@@ -286,6 +358,53 @@ export interface InscripcionDeFactor {
   /** El secreto en texto, para quien no puede escanear. */
   readonly secreto: string;
 }
+
+/** Retira los factores a medio inscribir: leer y borrar, sin atomicidad. */
+const retirarNoVerificados = async (accessToken: string): Promise<void> => {
+  const existentes = await pedir('/auth/v1/factors', {
+    method: 'GET',
+    headers: cabeceras(accessToken),
+  });
+  if (!existentes.ok) return;
+  const cuerpo = (await existentes.json()) as { totp?: Factor[]; all?: Factor[] };
+  for (const factor of cuerpo.totp ?? cuerpo.all ?? []) {
+    if (factor.status !== 'verified') {
+      await pedir(`/auth/v1/factors/${factor.id}`, {
+        method: 'DELETE',
+        headers: cabeceras(accessToken),
+      }).catch(() => undefined);
+    }
+  }
+};
+
+const altaDeFactor = async (
+  accessToken: string,
+  nombreAmistoso: string,
+): Promise<InscripcionDeFactor> => {
+  const respuesta = await pedir('/auth/v1/factors', {
+    method: 'POST',
+    headers: cabeceras(accessToken),
+    body: JSON.stringify({ factor_type: 'totp', friendly_name: nombreAmistoso }),
+  });
+  await exigirOk(respuesta, 'FACTOR_INVALIDO');
+
+  const cuerpo = (await respuesta.json()) as {
+    id?: string;
+    totp?: { qr_code?: string; secret?: string };
+  };
+  if (typeof cuerpo.id !== 'string' || cuerpo.totp === undefined) {
+    // Se marca con un código propio: un 503 sin causa fue lo que hizo que este
+    // fallo tardara en entenderse.
+    throw new FalloDeAcceso('SERVICIO_NO_DISPONIBLE', undefined, {
+      codigo: 'respuesta_de_alta_incompleta',
+    });
+  }
+  return {
+    factorId: cuerpo.id,
+    qr: cuerpo.totp.qr_code ?? '',
+    secreto: cuerpo.totp.secret ?? '',
+  };
+};
 
 /**
  * Inscribe un factor TOTP **con la sesión del propio titular**.
@@ -301,46 +420,40 @@ export interface InscripcionDeFactor {
  * pestaña basta—, y Supabase rechaza inscribir con un nombre repetido, así que
  * sin esta limpieza el segundo intento fallaría sin explicación.
  */
+/**
+ * **La limpieza es leer-y-borrar, así que dos intentos simultáneos se pisan.**
+ * Ocurrió en el arranque del cliente: en desarrollo el modo estricto de React
+ * invoca dos veces el efecto, las dos altas viajaron con el mismo nombre y el
+ * proveedor rechazó una con 422. El reintento de abajo cubre el caso; la
+ * defensa principal es la de la ruta, que atiende una sola inscripción por
+ * titular a la vez.
+ */
 export const inscribirFactorTotp = async (
   accessToken: string,
   nombreAmistoso = 'Next Control Residencial',
 ): Promise<InscripcionDeFactor> => {
-  const existentes = await pedir('/auth/v1/factors', {
-    method: 'GET',
-    headers: cabeceras(accessToken),
-  });
-  if (existentes.ok) {
-    const cuerpo = (await existentes.json()) as { totp?: Factor[]; all?: Factor[] };
-    for (const factor of cuerpo.totp ?? cuerpo.all ?? []) {
-      if (factor.status !== 'verified') {
-        await pedir(`/auth/v1/factors/${factor.id}`, {
-          method: 'DELETE',
-          headers: cabeceras(accessToken),
-        }).catch(() => undefined);
-      }
-    }
+  await retirarNoVerificados(accessToken);
+  try {
+    return await altaDeFactor(accessToken, nombreAmistoso);
+  } catch (e) {
+    if (!(e instanceof FalloDeAcceso) || e.motivo !== 'FACTOR_DUPLICADO') throw e;
+    // Un nombre repetido significa que otro intento del MISMO titular llegó
+    // primero —la limpieza de arriba es leer-y-borrar, y dos intentos a la vez
+    // se pisan—. Se limpia otra vez y se reintenta con un nombre distinto: el
+    // titular no tiene por qué enterarse de una carrera nuestra. **Un solo
+    // reintento**, porque si el segundo también choca ya no es una carrera y
+    // repetir solo alargaría la espera.
+    await retirarNoVerificados(accessToken);
+    return await altaDeFactor(accessToken, `${nombreAmistoso} (${sufijoDeReintento()})`);
   }
-
-  const respuesta = await pedir('/auth/v1/factors', {
-    method: 'POST',
-    headers: cabeceras(accessToken),
-    body: JSON.stringify({ factor_type: 'totp', friendly_name: nombreAmistoso }),
-  });
-  exigirOk(respuesta, 'FACTOR_INVALIDO');
-
-  const cuerpo = (await respuesta.json()) as {
-    id?: string;
-    totp?: { qr_code?: string; secret?: string };
-  };
-  if (typeof cuerpo.id !== 'string' || cuerpo.totp === undefined) {
-    throw new FalloDeAcceso('SERVICIO_NO_DISPONIBLE');
-  }
-  return {
-    factorId: cuerpo.id,
-    qr: cuerpo.totp.qr_code ?? '',
-    secreto: cuerpo.totp.secret ?? '',
-  };
 };
+
+/**
+ * Sufijo del nombre en el reintento. Corto, legible y sin reloj: el nombre es
+ * metadato del proveedor, no algo que el titular teclee, y una marca de tiempo
+ * haría la función impura sin ganar nada.
+ */
+const sufijoDeReintento = (): string => randomBytes(2).toString('hex');
 
 /** Factores TOTP del titular, para saber si hay algo que inscribir. */
 export const factoresDe = async (

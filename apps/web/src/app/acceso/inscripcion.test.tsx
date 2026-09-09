@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { InscripcionDeFactor } from './inscripcion-factor';
 import { CodigosDeRecuperacion } from './codigos-recuperacion';
@@ -88,5 +89,76 @@ describe('códigos de recuperación', () => {
     await screen.findByRole('alert');
     fireEvent.click(screen.getByRole('button', { name: /entrar a la consola/i }));
     expect(terminar).toHaveBeenCalledOnce();
+  });
+});
+
+/**
+ * EL FALLO QUE REPORTÓ EL CLIENTE, del lado de la pantalla.
+ *
+ * El servidor devolvió `503` y después `200` con el QR. La pantalla se quedó
+ * con el mensaje rojo del primer intento y no pintó el código del segundo: un
+ * fallo transitorio dejaba la inscripción imposible aunque el sistema
+ * funcionara. Aquí se fijan las dos reglas que lo corrigen — **el último
+ * intento manda** y **el éxito limpia el error**— y la salida que faltaba:
+ * cuando no hay QR, hay un botón para reintentar y no un campo de código
+ * inservible.
+ */
+const diferida = <T,>(): { promesa: Promise<T>; resolver: (v: T) => void } => {
+  let resolver!: (v: T) => void;
+  const promesa = new Promise<T>((r) => {
+    resolver = r;
+  });
+  return { promesa, resolver };
+};
+
+const conQr = (id = 'nuevo'): Response =>
+  new Response(JSON.stringify({ qr: `<svg id="${id}"/>`, secreto: 'JBSW Y3DP' }), { status: 200 });
+
+const conFallo = (): Response =>
+  new Response(JSON.stringify({ mensaje: 'No se pudo contactar con el servicio de identidad.' }), {
+    status: 503,
+  });
+
+describe('un fallo transitorio no deja la pantalla inservible', () => {
+  it('sin QR no se muestra el campo de código: se muestra cómo reintentar', async () => {
+    fetchFalso.mockResolvedValue(conFallo());
+    render(<InscripcionDeFactor alVerificar={() => undefined} alCancelar={() => undefined} />);
+
+    await screen.findByRole('alert');
+    // Un campo donde teclear un código que no se puede obtener es la pantalla
+    // que el cliente describió.
+    expect(screen.queryByLabelText(/código de verificación/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /volver a intentarlo/i })).toBeTruthy();
+  });
+
+  it('el reintento con éxito BORRA el error y pinta el QR', async () => {
+    fetchFalso.mockResolvedValueOnce(conFallo()).mockResolvedValue(conQr());
+    render(<InscripcionDeFactor alVerificar={() => undefined} alCancelar={() => undefined} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /volver a intentarlo/i }));
+
+    await waitFor(() => expect(screen.getByRole('img', { hidden: true })).toBeTruthy());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('la respuesta TARDÍA de un intento superado no pinta su error sobre el QR', async () => {
+    // El caso del cliente, tal cual: el modo estricto de React monta, limpia y
+    // vuelve a montar, así que salen DOS peticiones. La que falla vuelve
+    // después de la que funciona. Antes, esa respuesta tardía pintaba el
+    // mensaje rojo encima de un QR perfectamente válido.
+    const tardia = diferida<Response>();
+    fetchFalso.mockReturnValueOnce(tardia.promesa).mockResolvedValue(conQr());
+    render(<InscripcionDeFactor alVerificar={() => undefined} alCancelar={() => undefined} />, {
+      wrapper: StrictMode,
+    });
+
+    await waitFor(() => expect(screen.getByRole('img', { hidden: true })).toBeTruthy());
+    expect(fetchFalso).toHaveBeenCalledTimes(2);
+
+    tardia.resolver(conFallo());
+    await new Promise((listo) => setTimeout(listo, 0));
+
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('img', { hidden: true })).toBeTruthy();
   });
 });

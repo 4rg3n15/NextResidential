@@ -137,3 +137,107 @@ describe('la inscripción opera sobre la propia sesión y sobre ninguna otra', (
     expect(JSON.stringify(await res.json())).not.toContain('ECONNREFUSED');
   });
 });
+
+/**
+ * EL FALLO QUE REPORTÓ EL CLIENTE, reproducido.
+ *
+ * En el registro se veían dos peticiones seguidas: `503` y luego `200`. Las dos
+ * las hace el navegador —el modo estricto de React invoca el efecto dos veces
+ * en desarrollo, y un doble clic hace lo mismo en producción—, y las dos
+ * entraban aquí a la vez. Cada una lee los factores, borra los que están a
+ * medio inscribir y crea uno nuevo: leer y borrar sin atomicidad. La segunda
+ * choca con el nombre ya tomado, el proveedor responde 422 y la consola lo
+ * traducía a «no se pudo contactar con el servicio de identidad».
+ *
+ * Estas pruebas fijan la corrección donde importa: **dos peticiones
+ * simultáneas del mismo titular producen UNA sola inscripción**, y ninguna de
+ * las dos recibe un error.
+ */
+describe('dos inscripciones simultáneas del mismo titular', () => {
+  /**
+   * Doble de GoTrue con estado: guarda los factores por nombre, rechaza con
+   * 422 el nombre ya tomado y los borra de verdad. Un doble sin estado no
+   * podría distinguir «choqué porque otro intento va a la vez» de «choqué
+   * siempre», que es justo lo que hay que distinguir aquí.
+   */
+  const conProveedorConEstado = (): void => {
+    const factores = new Map<string, { id: string; friendly_name: string; status: string }>();
+    let siguiente = 0;
+    fetchFalso.mockImplementation(async (url: string, o: { method?: string; body?: string }) => {
+      const metodo = o.method ?? 'GET';
+      if (url.endsWith('/auth/v1/factors') && metodo === 'GET') {
+        return new Response(JSON.stringify({ totp: [...factores.values()] }), { status: 200 });
+      }
+      if (url.endsWith('/auth/v1/factors') && metodo === 'POST') {
+        const nombre = (JSON.parse(o.body ?? '{}') as { friendly_name?: string }).friendly_name;
+        // Latencia real del proveedor: sin ella las dos peticiones se
+        // serializan solas y la carrera no se reproduce.
+        await new Promise((listo) => setTimeout(listo, 20));
+        if ([...factores.values()].some((f) => f.friendly_name === nombre)) {
+          // Lo que GoTrue responde a un nombre de factor repetido.
+          return new Response(JSON.stringify({ error_code: 'mfa_factor_name_conflict' }), {
+            status: 422,
+          });
+        }
+        siguiente += 1;
+        const id = `factor-${siguiente}`;
+        factores.set(id, { id, friendly_name: nombre ?? '', status: 'unverified' });
+        return new Response(
+          JSON.stringify({ id, totp: { qr_code: `<svg id="${id}"/>`, secret: 'JBSWY3DP' } }),
+          { status: 200 },
+        );
+      }
+      const borrado = /\/factors\/([^/]+)$/.exec(url);
+      if (borrado?.[1] !== undefined && metodo === 'DELETE') {
+        factores.delete(borrado[1]);
+        return new Response('{}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+  };
+
+  const altasPedidas = (): number =>
+    llamadas().filter(([url, o]) => url.endsWith('/auth/v1/factors') && o.method === 'POST').length;
+
+  it('las dos reciben 200 y el mismo QR: nadie ve un 503', async () => {
+    conProveedorConEstado();
+    const [una, otra] = await Promise.all([ruta.POST(), ruta.POST()]);
+    expect([una.status, otra.status]).toEqual([200, 200]);
+    expect(await una.json()).toEqual(await otra.json());
+  });
+
+  it('el proveedor recibe UNA sola alta, no dos', async () => {
+    // Es la corrección de fondo. Reintentar más veces habría escondido la
+    // carrera; lo que se arregla es no hacer dos veces la misma operación.
+    conProveedorConEstado();
+    await Promise.all([ruta.POST(), ruta.POST()]);
+    expect(altasPedidas()).toBe(1);
+  });
+
+  it('terminada la primera, una inscripción posterior SÍ vuelve a pedir alta', async () => {
+    // El deduplicado dura lo que dura la petición. Si persistiera, quien
+    // reintentara más tarde recibiría un QR viejo de un factor ya borrado.
+    conProveedorConEstado();
+    const primera = await ruta.POST();
+    const antes = altasPedidas();
+    const segunda = await ruta.POST();
+    expect(altasPedidas()).toBe(antes + 1);
+    // Y el QR es de un factor NUEVO: el anterior se retiró en la limpieza.
+    expect(await segunda.json()).not.toEqual(await primera.json());
+  });
+
+  it('un conflicto que no es carrera se reintenta una vez y se rinde con 409', async () => {
+    // Si el segundo intento también choca, ya no es una carrera: se responde
+    // con el motivo real —409, «ya había una inscripción en curso»— y no con
+    // un 503 que manda a investigar la red.
+    fetchFalso.mockImplementation(async (url: string, o: { method?: string }) =>
+      url.endsWith('/auth/v1/factors') && (o.method ?? 'GET') === 'POST'
+        ? new Response(JSON.stringify({ error_code: 'mfa_factor_name_conflict' }), { status: 422 })
+        : new Response(JSON.stringify({ totp: [] }), { status: 200 }),
+    );
+    const res = await ruta.POST();
+    expect(res.status).toBe(409);
+    expect(altasPedidas()).toBe(2);
+    expect(JSON.stringify(await res.json())).not.toContain('contactar');
+  });
+});

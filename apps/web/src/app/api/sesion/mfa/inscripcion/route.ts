@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 import { leerSesion, marcarFactorPendiente } from '@/lib/sesion/cookies';
 import { FalloDeAcceso, inscribirFactorTotp } from '@/lib/sesion/supabase-auth';
+import type { InscripcionDeFactor } from '@/lib/sesion/supabase-auth';
 import { textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
+import { registrar } from '@/lib/registro';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,6 +25,48 @@ export const runtime = 'nodejs';
  * una comprobación que se pueda olvidar — es que no existe el dato con el que
  * equivocarse.
  */
+
+/**
+ * UNA INSCRIPCIÓN POR TITULAR A LA VEZ.
+ *
+ * El defecto que lo motivó, reportado desde el proyecto real: dos POST casi
+ * simultáneos, el primero `503` y el segundo `200`. El cliente los provoca
+ * —en desarrollo el modo estricto de React invoca dos veces el efecto, y un
+ * doble clic o un reintento hacen lo mismo en producción—, y los dos entraban
+ * aquí a la vez. Cada uno lee los factores del titular, borra los que estén a
+ * medio inscribir y crea uno nuevo: **leer y borrar sin atomicidad**. El que
+ * llega segundo choca con el nombre ya tomado y el proveedor lo rechaza; peor
+ * todavía, el que llega segundo puede borrar el factor que el primero acaba de
+ * crear y devolver un QR que ya no existe.
+ *
+ * La salida no es reintentar más veces: es **no hacer dos veces la misma
+ * operación**. Las peticiones concurrentes del mismo titular comparten una
+ * única inscripción y reciben la misma respuesta.
+ *
+ * La clave es un HASH del token, no el token: este mapa vive en memoria del
+ * proceso y un token en una estructura de larga vida es un token que acaba en
+ * un volcado. Y se limpia al terminar, así que no crece.
+ *
+ * Es memoria de un proceso, no un candado distribuido: con varias instancias
+ * detrás de un balanceador dos titulares podrían coincidir en instancias
+ * distintas. El reintento de `inscribirFactorTotp` cubre ese resto — son las
+ * dos capas, no una.
+ */
+const enCurso = new Map<string, Promise<InscripcionDeFactor>>();
+
+const claveDe = (accessToken: string): string =>
+  createHash('sha256').update(accessToken).digest('hex').slice(0, 32);
+
+const inscribirUnaVez = async (accessToken: string): Promise<InscripcionDeFactor> => {
+  const clave = claveDe(accessToken);
+  const yaEnCurso = enCurso.get(clave);
+  if (yaEnCurso !== undefined) return await yaEnCurso;
+
+  const tarea = inscribirFactorTotp(accessToken).finally(() => enCurso.delete(clave));
+  enCurso.set(clave, tarea);
+  return await tarea;
+};
+
 export const POST = async (): Promise<NextResponse> => {
   const sesion = await leerSesion();
   if (sesion === null || sesion.accessToken === '') {
@@ -29,7 +74,7 @@ export const POST = async (): Promise<NextResponse> => {
   }
 
   try {
-    const inscripcion = await inscribirFactorTotp(sesion.accessToken);
+    const inscripcion = await inscribirUnaVez(sesion.accessToken);
     // El factor recién inscrito pasa a ser el pendiente de verificar, para que
     // `/api/sesion/mfa` —que ya existía— cierre el paso sin duplicar código.
     await marcarFactorPendiente(inscripcion.factorId);
@@ -44,10 +89,21 @@ export const POST = async (): Promise<NextResponse> => {
         DEMASIADOS_INTENTOS: 429,
         SERVICIO_NO_DISPONIBLE: 503,
         SESION_EXPIRADA: 401,
+        FACTOR_DUPLICADO: 409,
       };
       const estado = estados[e.motivo] ?? 400;
+      // Con causa. Un `503` sin más en el camino de acceso no se investiga.
+      registrar(estado >= 500 ? 'error' : 'aviso', 'inscripcion de factor rechazada', {
+        motivo: e.motivo,
+        estadoDelProveedor: e.detalle.estado,
+        codigoDelProveedor: e.detalle.codigo,
+        estado,
+      });
       return NextResponse.json({ mensaje: textoDeFalloDeAcceso(e.motivo) }, { status: estado });
     }
+    registrar('error', 'inscripcion de factor: fallo inesperado', {
+      clase: e instanceof Error ? e.name : typeof e,
+    });
     return NextResponse.json(
       { mensaje: textoDeFalloDeAcceso('SERVICIO_NO_DISPONIBLE') },
       { status: 503 },

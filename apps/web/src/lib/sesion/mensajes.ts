@@ -18,6 +18,8 @@ const TEXTOS: Readonly<Record<MotivoDeFalloDeAcceso, string>> = {
     'El enlace ya se usó o caducó. Los enlaces de recuperación son de un solo uso: pide uno nuevo.',
   CONTRASENA_DEBIL:
     'La contraseña no cumple la política de seguridad. Usa al menos 12 caracteres, con mayúsculas, minúsculas y dígitos.',
+  FACTOR_DUPLICADO:
+    'Ya había una inscripción en curso para esta cuenta. Vuelve a intentarlo: se descartará la anterior.',
   SERVICIO_NO_DISPONIBLE:
     'No se pudo contactar con el servicio de identidad. Inténtalo en unos minutos.',
 };

@@ -122,6 +122,8 @@ La primera ejecución salió **FALLIDA** y sus tres hallazgos eran reales: `comu
 | **D-44** · el `CHECK` del NIT rechazaba el formato colombiano `900123456-7`                           | **Resuelto** · migración `0026`, normalización en la base y validación previa en los guiones  |
 | **D-45** · nadie podía inscribir el segundo factor: el panel no lo ofrece (P-14)                      | **Resuelto** · pantalla de inscripción + códigos de recuperación de un solo uso               |
 | Arranque en frío verificable de punta a punta, hasta «alguien puede entrar»                           | **Construido** · `supabase/arranque-en-frio.sh` + suite `arranque-en-frio.e2e`, sonda 11      |
+| **D-46** · `503` intermitente al inscribir el factor; la pantalla se quedaba con el error                | **Resuelto** · una inscripción por titular a la vez; el éxito limpia el error                 |
+| **D-47** · `apps/web` no validaba su configuración al arrancar                                          | **Resuelto** · Zod + `instrumentation.ts`, salida con código 78 (`EX_CONFIG`)                 |
 
 ### Lo que usted debe ejecutar antes de la 09-B
 
