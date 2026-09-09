@@ -174,4 +174,23 @@ END
 $$;
 SQL
 
+# ===== Los claims REALES salen a un fichero =================================
+# El criterio de éxito no es «tiene un rol»: es «alguien puede entrar». Esa
+# última parte la decide el guard de la API, que es TypeScript, así que aquí se
+# vuelcan los claims que la base acaba de producir y la suite de la API los
+# usa tal cual. Sin este puente, la prueba se quedaba justo antes del único
+# criterio que importa.
+# Ruta ABSOLUTA a propósito. La suite que consume este fichero corre con `cwd`
+# en `apps/api`, así que una ruta relativa haría que cada uno mirase un sitio
+# distinto y la suite se omitiera en silencio — un verde vacío.
+DESTINO="${NCR_CLAIMS_ARRANQUE:-$PWD/.arranque-en-frio.json}"
+case "$DESTINO" in /*) ;; *) DESTINO="$PWD/$DESTINO" ;; esac
+psql -U "$APLICADOR" -Atq -v ON_ERROR_STOP=1 > "$DESTINO" <<'SQL'
+SET ROLE supabase_auth_admin;
+SELECT public.custom_access_token_hook(
+  jsonb_build_object('user_id', '00000000-0000-4000-8000-0000000000f1',
+                     'claims', jsonb_build_object('aud','authenticated'))) -> 'claims';
+SQL
+echo "▸ claims reales volcados en $DESTINO"
+
 echo "ARRANQUE EN FRÍO: correcto — base vacía lleva a un superadministrador con claims válidos"

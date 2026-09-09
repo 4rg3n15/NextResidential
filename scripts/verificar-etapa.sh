@@ -213,6 +213,19 @@ if [[ "$CON_BASE" == "1" ]]; then
   # menos esto, y el usuario se lo encontró desplegando.
   if con_limite "$LIMITE_LARGO" ./supabase/arranque-en-frio.sh >/tmp/ncr-arranque.log 2>&1; then
     ok "una base recién migrada llega a un superadministrador con claims válidos"
+    # El último tramo: «puede entrar», que lo decide el guard de la API con los
+    # claims que la base acaba de producir. Se ejecuta AQUÍ, con el fichero de
+    # claims recién escrito; si se dejara para el paso 5 el fichero podría ser
+    # de una corrida anterior — un artefacto que envejece, otra vez.
+    if NCR_CLAIMS_ARRANQUE="$PWD/.arranque-en-frio.json" \
+       con_limite "$LIMITE_MEDIO" pnpm --filter @ncr/api exec vitest run \
+         test/arranque-en-frio.e2e.test.ts >/tmp/ncr-entra.log 2>&1 &&
+       ! grep -q "skipped" /tmp/ncr-entra.log; then
+      ok "y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1"
+    else
+      mal "el superadministrador aprovisionado no puede entrar (ver /tmp/ncr-entra.log)"
+      grep -E "×|→|skipped" /tmp/ncr-entra.log | head -5 | sed 's/^/     /'
+    fi
   else
     mal "el arranque en frío está roto (ver /tmp/ncr-arranque.log)"
     grep -E "ERROR|ASSERT" /tmp/ncr-arranque.log | head -5 | sed 's/^/     /'

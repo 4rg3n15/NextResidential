@@ -129,6 +129,100 @@
         ]
       }
     },
+    "/auth/mfa/codigos": {
+      "post": {
+        "operationId": "AutenticacionController_generarCodigos",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodigosDeRecuperacionDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "5 por minuto (§2.7.5)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Genera los códigos de recuperación del segundo factor",
+        "tags": [
+          "autenticacion"
+        ]
+      }
+    },
+    "/auth/mfa/recuperacion": {
+      "post": {
+        "operationId": "AutenticacionController_recuperarFactor",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecuperarFactorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecuperacionDeFactorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Código no válido o ya usado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "5 por minuto (§2.7.5)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retira el factor perdido con un código de recuperación",
+        "tags": [
+          "autenticacion"
+        ]
+      }
+    },
     "/copropiedades/{id}": {
       "get": {
         "operationId": "CopropiedadesController_leer",
@@ -1767,6 +1861,63 @@
         },
         "required": [
           "registrado"
+        ]
+      },
+      "CodigosDeRecuperacionDto": {
+        "type": "object",
+        "properties": {
+          "codigos": {
+            "description": "Códigos de un solo uso, en claro. Se entregan UNA vez: solo se guarda su hash. No dan acceso — autorizan a retirar el factor perdido para inscribir otro.",
+            "example": [
+              "A1B2C-D3E4F",
+              "09876-54321"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cantidad": {
+            "type": "number",
+            "example": 10
+          }
+        },
+        "required": [
+          "codigos",
+          "cantidad"
+        ]
+      },
+      "RecuperarFactorDto": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "minLength": 11,
+            "maxLength": 11,
+            "description": "Código de recuperación con la forma XXXXX-XXXXX",
+            "example": "A1B2C-D3E4F"
+          }
+        },
+        "required": [
+          "codigo"
+        ]
+      },
+      "RecuperacionDeFactorDto": {
+        "type": "object",
+        "properties": {
+          "factoresRetirados": {
+            "type": "number",
+            "example": 1,
+            "description": "Factores TOTP verificados que se retiraron. Ya se puede inscribir uno nuevo."
+          },
+          "codigosRestantes": {
+            "type": "number",
+            "description": "Códigos de recuperación que quedan sin usar"
+          }
+        },
+        "required": [
+          "factoresRetirados",
+          "codigosRestantes"
         ]
       },
       "CopropiedadDto": {

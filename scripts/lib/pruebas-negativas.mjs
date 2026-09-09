@@ -30,8 +30,9 @@ import {
   chmodSync,
   symlinkSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createRequire } from 'node:module';
 
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
@@ -445,6 +446,75 @@ try {
         : mal(`un contrato desfasado NO se detecta (codigo ${r2.codigo})`);
     }
   }
+
+  console.log('\n▸ 11 · el último tramo del arranque en frío: «alguien puede entrar»');
+  {
+    /**
+     * QUÉ CONTROLA ESTA SONDA. `supabase/arranque-en-frio.sh` comprueba que la
+     * base produce claims; `apps/api/test/arranque-en-frio.e2e.test.ts`
+     * comprueba lo siguiente —que con esos claims la API **abre**—, que es el
+     * criterio que faltaba: «tiene un rol» no es «puede entrar».
+     *
+     * La sonda NO necesita PostgreSQL, y es deliberado: lo que se pone a prueba
+     * es la suite, no la base. Se le dan claims sintéticos bien formados (debe
+     * pasar), claims con el rol cambiado (debe romperse) y ningún fichero (debe
+     * OMITIRSE, y la omisión debe ser visible para el guardián del paso 12b de
+     * `verificar-etapa.sh`).
+     *
+     * El tercer caso es el importante: una suite que se omite en silencio es
+     * verde sin haber ejercitado nada, que es justo el modo de fallo de §2.8.0.
+     */
+    const apiDir = join(raiz, 'apps', 'api');
+    // `node_modules/.bin/vitest` es un envoltorio de shell, no JavaScript:
+    // pasárselo a `node` da un SyntaxError. Se resuelve el punto de entrada
+    // real del paquete, igual que hace `contrato-desfasado.mjs` con
+    // `openapi-typescript` por exactamente el mismo motivo.
+    const vitest = join(
+      dirname(createRequire(join(apiDir, 'package.json')).resolve('vitest/package.json')),
+      'vitest.mjs',
+    );
+    const suite = 'test/arranque-en-frio.e2e.test.ts';
+    const correrSuite = (fichero) =>
+      correr('node', [vitest, 'run', suite], {
+        cwd: apiDir,
+        timeout: 300_000,
+        env: { ...process.env, NCR_CLAIMS_ARRANQUE: fichero, CI: '1' },
+      });
+
+    const legitimo = join(banco, 'claims-arranque.json');
+    const claimsBase = {
+      aud: 'authenticated',
+      rol: 'superadministrador',
+      usuario_id: 'f1e541fc-0000-4000-8000-0000000000f1',
+      copropiedad_id: null,
+    };
+    writeFileSync(legitimo, JSON.stringify(claimsBase));
+
+    const base = correrSuite(legitimo);
+    if (base.codigo === 0 && /5 passed/.test(base.salida) && !/skipped/.test(base.salida)) {
+      ok('con claims bien formados, la suite corre entera y la API abre');
+    } else {
+      mal(`la suite no parte de un estado sano (codigo ${base.codigo})`);
+      console.log(base.salida.split('\n').slice(-8).join('\n'));
+    }
+
+    const mutado = join(banco, 'claims-mutados.json');
+    writeFileSync(mutado, JSON.stringify({ ...claimsBase, rol: 'residente' }));
+    correrSuite(mutado).codigo !== 0
+      ? ok('unos claims con el rol equivocado rompen la suite')
+      : mal('la suite acepta claims con el rol equivocado: no comprueba lo que dice');
+
+    const ausente = join(banco, 'claims-que-no-existen.json');
+    const sinFichero = correrSuite(ausente);
+    /skipped/.test(sinFichero.salida)
+      ? ok('sin claims la suite se OMITE, y la omisión queda escrita en la salida')
+      : mal('sin claims la suite no declara su omisión: sería un verde vacío');
+    // El guardián del paso 12b es literalmente este `grep`: se ejercita aquí
+    // para que no dependa de que alguien lea la salida.
+    /skipped/.test(sinFichero.salida) && !/skipped/.test(base.salida)
+      ? ok('el guardián distingue la corrida real de la omitida')
+      : mal('el guardián no distingue una omisión de una corrida real');
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -468,6 +538,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 10 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 11 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

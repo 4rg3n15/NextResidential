@@ -155,15 +155,48 @@ El guion **valida antes de escribir**: si el UUID no existe, se detiene y le ens
 
 Comprobación: inicie sesión en la consola. No verá el token en las cookies —es `httpOnly`, y así debe ser—; la comprobación real es que `/tablero` carga en vez de redirigir a `/acceso`. Si redirige, el token no lleva `rol`.
 
-### B.6 · Inscribir el segundo factor — lo hace el titular
+### B.6 · Inscribir el segundo factor — lo hace el titular, desde la consola
 
-Los tres roles administrativos **no entran sin `aal2`** (RN-20, CA-25). Es el guard de la API quien lo exige, así que sin este paso el usuario se autentica y no puede hacer nada.
+Los tres roles administrativos **no entran sin `aal2`** (RN-20, CA-25). Lo exige el guard de la API, así que sin este paso el usuario se autentica y no puede hacer nada.
 
-1. Panel → **Authentication → Providers → Multi-Factor Authentication**: active **TOTP**.
-2. El titular inscribe su factor desde **su propia sesión**, con su aplicación de autenticación.
-3. **Nadie más debería poder inscribir el factor de otra persona**, y por eso la consola no lo ofrece.
+**El panel de Supabase no sirve para esto**, y no es un descuido suyo: en `Authentication → Users` solo ofrece _Remove MFA factors_, y `Account → Security` es su propia cuenta de Supabase, no la del usuario de la aplicación. Un factor que otra persona inscribe no es un segundo factor —el secreto habría pasado por sus manos—, así que la plataforma no lo permite y hace bien.
 
-> **Pendiente declarado (P-14).** Una pantalla de inscripción de TOTP dentro de la consola no está construida. Hasta entonces, la inscripción es una operación del panel.
+1. Panel → **Authentication → Providers → Multi-Factor Authentication**: active **TOTP**. Una vez por proyecto.
+2. Entre a la consola en `/acceso` con su correo y contraseña.
+3. La consola detecta que no tiene ningún factor verificado y **muestra la pantalla de inscripción**: código QR, la clave en texto para quien no puede escanear, y el campo del código de verificación.
+4. Escanee con su aplicación de autenticación, escriba el código de seis dígitos y confirme.
+5. La consola le entrega **diez códigos de recuperación, una sola vez**. Guárdelos: son la única vía si pierde el teléfono. No dan acceso —sirven para retirar el factor perdido y configurar otro—; cada uno funciona una vez.
+6. Entra a la consola con la sesión ya elevada a `aal2`.
+
+Nadie inscribe el factor de otra persona: la petición de alta no lleva ningún identificador de usuario, y el servidor toma la identidad de la cookie `httpOnly`. No es una comprobación que se pueda olvidar; es que no existe el dato con el que equivocarse.
+
+#### Si prefiere hacerlo por API
+
+Existe, y es la vía de Supabase Auth directamente. La consola hace exactamente estas tres llamadas. Sirve para desbloquearse sin depender del navegador:
+
+```bash
+# 1 · Contraseña → token aal1
+TOKEN=$(curl -s "$SUPABASE_URL/auth/v1/token?grant_type=password" \
+  -H "apikey: $SUPABASE_PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
+  -d '{"email":"...","password":"..."}' | jq -r .access_token)
+
+# 2 · Alta del factor: devuelve el `id`, el QR y el secreto
+curl -s "$SUPABASE_URL/auth/v1/factors" -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"factor_type":"totp","friendly_name":"Next Control Residencial"}'
+
+# 3 · Desafío y verificación con el código de la aplicación de autenticación
+curl -s "$SUPABASE_URL/auth/v1/factors/<factor-id>/challenge" \
+  -H "apikey: $SUPABASE_PUBLISHABLE_KEY" -H "Authorization: Bearer $TOKEN" -X POST
+curl -s "$SUPABASE_URL/auth/v1/factors/<factor-id>/verify" \
+  -H "apikey: $SUPABASE_PUBLISHABLE_KEY" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"challenge_id":"<challenge-id>","code":"123456"}'
+```
+
+La respuesta del paso 3 trae ya un token con `aal2`. La llave que aparece aquí es la **publicable**: no hay ninguna secreta en este camino, y no debe haberla — es el titular autenticándose, no un administrador actuando por él.
+
+> **P-14, redefinido y cerrado.** Se declaró como «no hay pantalla de inscripción en la consola» y se resolvió diciendo que era una operación del panel. **No lo era**: el panel no inscribe factores, así que el pendiente no describía una comodidad ausente sino un sistema inaccesible. La pantalla existe desde esta versión y el pendiente queda cerrado.
 
 ### B.7 · Los demás roles, para la ETAPA 10
 

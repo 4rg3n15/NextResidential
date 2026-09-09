@@ -52,7 +52,21 @@ export interface SesionSupabase {
   /** `aal1` mientras falte el segundo factor; `aal2` cuando ya se verificó. */
   readonly nivel: 'aal1' | 'aal2';
   readonly factorPendienteId: string | null;
+  /** Rol del claim, para saber si este usuario NECESITA segundo factor. */
+  readonly rol: string | null;
 }
+
+/**
+ * Los tres roles que RN-20 obliga a proteger con segundo factor.
+ *
+ * La lista se repite aquí a propósito y no se importa de la API: la consola no
+ * comparte código con el backend, y quien hace cumplir la regla sigue siendo el
+ * guard. Si las dos se separaran, el síntoma sería una pantalla de inscripción
+ * que no aparece cuando debería —molesto— y nunca un acceso indebido, porque la
+ * API rechazaría igual. La interfaz oculta; no protege.
+ */
+export const exigeSegundoFactor = (rol: string | null): boolean =>
+  rol === 'superadministrador' || rol === 'administrador' || rol === 'operador_central';
 
 interface RespuestaToken {
   access_token?: string;
@@ -76,19 +90,23 @@ const cabeceras = (token?: string): HeadersInit => {
   };
 };
 
-/** El `aal` sale del propio token: es lo que la API va a verificar. */
-const nivelDelToken = (accessToken: string): 'aal1' | 'aal2' => {
+/** `aal` y `rol` salen del propio token: es lo que la API va a verificar. */
+const claimsDelToken = (accessToken: string): { nivel: 'aal1' | 'aal2'; rol: string | null } => {
   const carga = accessToken.split('.')[1];
-  if (carga === undefined) return 'aal1';
+  if (carga === undefined) return { nivel: 'aal1', rol: null };
   try {
     const json = JSON.parse(Buffer.from(carga, 'base64url').toString('utf8')) as {
       aal?: unknown;
+      rol?: unknown;
     };
-    return json.aal === 'aal2' ? 'aal2' : 'aal1';
+    return {
+      nivel: json.aal === 'aal2' ? 'aal2' : 'aal1',
+      rol: typeof json.rol === 'string' ? json.rol : null,
+    };
   } catch {
     // Un token que no se puede leer se trata como el nivel MÁS BAJO, no como
     // el más alto: fallar cerrado (§2.1.4).
-    return 'aal1';
+    return { nivel: 'aal1', rol: null };
   }
 };
 
@@ -102,13 +120,8 @@ const aSesion = (cuerpo: RespuestaToken, factorPendienteId: string | null): Sesi
     typeof cuerpo.expires_at === 'number'
       ? cuerpo.expires_at
       : Math.floor(Date.now() / 1000) + (cuerpo.expires_in ?? 3600);
-  return {
-    accessToken,
-    refreshToken,
-    expiraEn,
-    nivel: nivelDelToken(accessToken),
-    factorPendienteId,
-  };
+  const { nivel, rol } = claimsDelToken(accessToken);
+  return { accessToken, refreshToken, expiraEn, nivel, rol, factorPendienteId };
 };
 
 const pedir = async (ruta: string, opciones: RequestInit): Promise<Response> => {
@@ -264,6 +277,86 @@ export const cambiarContrasena = async (accessToken: string, contrasena: string)
   // correo.
   if (respuesta.status === 422) throw new FalloDeAcceso('CONTRASENA_DEBIL');
   exigirOk(respuesta, 'ENLACE_NO_VALIDO');
+};
+
+export interface InscripcionDeFactor {
+  readonly factorId: string;
+  /** SVG del código QR que devuelve Supabase, listo para un `<img src>`. */
+  readonly qr: string;
+  /** El secreto en texto, para quien no puede escanear. */
+  readonly secreto: string;
+}
+
+/**
+ * Inscribe un factor TOTP **con la sesión del propio titular**.
+ *
+ * Funciona con una sesión `aal1`, y ese es el punto: quien todavía no tiene
+ * segundo factor no puede presentar otra cosa. Es también la razón de que esto
+ * viva en la consola y no en el panel de Supabase — el panel solo ofrece
+ * RETIRAR factores de un usuario, no darlos de alta, y hace bien: un factor
+ * inscrito por un tercero no es un segundo factor.
+ *
+ * Antes de inscribir se retiran los factores **no verificados** que hubiera.
+ * Se acumulan cuando alguien empieza la inscripción y la abandona —cerrar la
+ * pestaña basta—, y Supabase rechaza inscribir con un nombre repetido, así que
+ * sin esta limpieza el segundo intento fallaría sin explicación.
+ */
+export const inscribirFactorTotp = async (
+  accessToken: string,
+  nombreAmistoso = 'Next Control Residencial',
+): Promise<InscripcionDeFactor> => {
+  const existentes = await pedir('/auth/v1/factors', {
+    method: 'GET',
+    headers: cabeceras(accessToken),
+  });
+  if (existentes.ok) {
+    const cuerpo = (await existentes.json()) as { totp?: Factor[]; all?: Factor[] };
+    for (const factor of cuerpo.totp ?? cuerpo.all ?? []) {
+      if (factor.status !== 'verified') {
+        await pedir(`/auth/v1/factors/${factor.id}`, {
+          method: 'DELETE',
+          headers: cabeceras(accessToken),
+        }).catch(() => undefined);
+      }
+    }
+  }
+
+  const respuesta = await pedir('/auth/v1/factors', {
+    method: 'POST',
+    headers: cabeceras(accessToken),
+    body: JSON.stringify({ factor_type: 'totp', friendly_name: nombreAmistoso }),
+  });
+  exigirOk(respuesta, 'FACTOR_INVALIDO');
+
+  const cuerpo = (await respuesta.json()) as {
+    id?: string;
+    totp?: { qr_code?: string; secret?: string };
+  };
+  if (typeof cuerpo.id !== 'string' || cuerpo.totp === undefined) {
+    throw new FalloDeAcceso('SERVICIO_NO_DISPONIBLE');
+  }
+  return {
+    factorId: cuerpo.id,
+    qr: cuerpo.totp.qr_code ?? '',
+    secreto: cuerpo.totp.secret ?? '',
+  };
+};
+
+/** Factores TOTP del titular, para saber si hay algo que inscribir. */
+export const factoresDe = async (
+  accessToken: string,
+): Promise<{ readonly verificados: number; readonly total: number }> => {
+  const respuesta = await pedir('/auth/v1/factors', {
+    method: 'GET',
+    headers: cabeceras(accessToken),
+  });
+  if (!respuesta.ok) return { verificados: 0, total: 0 };
+  const cuerpo = (await respuesta.json()) as { totp?: Factor[]; all?: Factor[] };
+  const factores = (cuerpo.totp ?? cuerpo.all ?? []).filter((f) => f.factor_type === 'totp');
+  return {
+    verificados: factores.filter((f) => f.status === 'verified').length,
+    total: factores.length,
+  };
 };
 
 export const cerrarSesionRemota = async (accessToken: string): Promise<void> => {

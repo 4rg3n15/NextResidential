@@ -6,9 +6,11 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
+import { CodigosDeRecuperacion } from './codigos-recuperacion';
+import { InscripcionDeFactor } from './inscripcion-factor';
 import type { ResultadoDeAcceso } from '@/app/api/sesion/route';
 
-type Paso = 'credenciales' | 'segundo-factor';
+type Paso = 'credenciales' | 'inscripcion' | 'segundo-factor' | 'codigos';
 
 /**
  * Formulario de acceso en dos pasos.
@@ -61,6 +63,31 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
       setEnviando(false);
     }
   };
+
+  if (paso === 'inscripcion') {
+    return (
+      <InscripcionDeFactor
+        className={className}
+        alVerificar={() => setPaso('codigos')}
+        alCancelar={() => {
+          setPaso('credenciales');
+          setError(undefined);
+        }}
+      />
+    );
+  }
+
+  if (paso === 'codigos') {
+    return (
+      <CodigosDeRecuperacion
+        className={className}
+        alTerminar={() => {
+          router.replace('/');
+          router.refresh();
+        }}
+      />
+    );
+  }
 
   if (paso === 'segundo-factor') {
     return (
@@ -120,8 +147,8 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
       onSubmit={(e) => {
         e.preventDefault();
         void enviar('/api/sesion', { correo, contrasena }, (r) => {
-          if (r.siguiente === 'segundo-factor') {
-            setPaso('segundo-factor');
+          if (r.siguiente === 'segundo-factor' || r.siguiente === 'inscripcion') {
+            setPaso(r.siguiente);
             setContrasena('');
             return;
           }

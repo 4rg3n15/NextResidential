@@ -72,6 +72,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/mfa/codigos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Genera los códigos de recuperación del segundo factor */
+        post: operations["AutenticacionController_generarCodigos"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/recuperacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retira el factor perdido con un código de recuperación */
+        post: operations["AutenticacionController_recuperarFactor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}": {
         parameters: {
             query?: never;
@@ -640,6 +674,34 @@ export interface components {
              */
             registrado: boolean;
         };
+        CodigosDeRecuperacionDto: {
+            /**
+             * @description Códigos de un solo uso, en claro. Se entregan UNA vez: solo se guarda su hash. No dan acceso — autorizan a retirar el factor perdido para inscribir otro.
+             * @example [
+             *       "A1B2C-D3E4F",
+             *       "09876-54321"
+             *     ]
+             */
+            codigos: string[];
+            /** @example 10 */
+            cantidad: number;
+        };
+        RecuperarFactorDto: {
+            /**
+             * @description Código de recuperación con la forma XXXXX-XXXXX
+             * @example A1B2C-D3E4F
+             */
+            codigo: string;
+        };
+        RecuperacionDeFactorDto: {
+            /**
+             * @description Factores TOTP verificados que se retiraron. Ya se puede inscribir uno nuevo.
+             * @example 1
+             */
+            factoresRetirados: number;
+            /** @description Códigos de recuperación que quedan sin usar */
+            codigosRestantes: number;
+        };
         CopropiedadDto: {
             /** Format: uuid */
             id: string;
@@ -1004,6 +1066,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RestablecimientoRegistradoDto"];
+                };
+            };
+            /** @description 5 por minuto (§2.7.5) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    AutenticacionController_generarCodigos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodigosDeRecuperacionDto"];
+                };
+            };
+            /** @description 5 por minuto (§2.7.5) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    AutenticacionController_recuperarFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecuperarFactorDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecuperacionDeFactorDto"];
+                };
+            };
+            /** @description Código no válido o ya usado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
                 };
             };
             /** @description 5 por minuto (§2.7.5) */

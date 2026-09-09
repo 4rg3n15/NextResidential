@@ -25,14 +25,19 @@ const PUBLICAS = new Set(['GET /health', 'GET /ready']);
  * alguien añade un endpoint sin ese decorador, entra en el recorrido de fuga
  * automáticamente.
  */
-const SIN_RECURSO_TENANT = new Set(['/auth/sesion', '/auth/restablecimiento']);
+const SIN_RECURSO_TENANT = new Set([
+  '/auth/sesion',
+  '/auth/restablecimiento',
+  '/auth/mfa/codigos',
+  '/auth/mfa/recuperacion',
+]);
 
 /**
  * Rutas que declaran `@SinSegundoFactor()`: alcanzables con `aal1` por un rol
  * administrativo. **La lista es de UNA**, y esta suite existe para que siga
  * siéndolo: ampliarla es relajar RN-20, y tiene que verse en el diff.
  */
-const SIN_SEGUNDO_FACTOR = new Set(['/auth/restablecimiento']);
+const SIN_SEGUNDO_FACTOR = new Set(['/auth/restablecimiento', '/auth/mfa/recuperacion']);
 
 beforeAll(async () => {
   firmante = await crearFirmante();
@@ -199,7 +204,7 @@ describe('CA-24 · todo acceso cruzado queda registrado', () => {
 });
 
 describe('la exención del segundo factor no crece sin que nadie lo vea', () => {
-  it('solo /auth/restablecimiento es alcanzable con aal1 por un rol administrativo', async () => {
+  it('solo las rutas declaradas son alcanzables con aal1 por un rol administrativo', async () => {
     const token = await tokenDe(firmante, {
       rol: 'administrador',
       copropiedadId: COP_A,

@@ -112,7 +112,16 @@ La primera ejecución salió **FALLIDA** y sus tres hallazgos eran reales: `comu
 | Recuperación de contraseña, con respuesta uniforme y doble limitador                                                                            | **Construida** · [guía](guias/RECUPERACION_Y_USUARIOS.md)                                                   |
 | Aprovisionamiento del primer superadministrador y de los demás roles                                                                            | **Documentado** · `scripts/aprovisionar-rol.mjs` + guía                                                     |
 
-**Pendiente declarado (P-14):** no hay pantalla de inscripción de TOTP en la consola. Hoy el titular inscribe su factor desde el panel de Supabase; nadie debería poder inscribir el de otra persona, así que la pantalla —si se construye— tiene que operar sobre la propia sesión.
+**P-14 · redefinido y CERRADO.** Se declaró como «no hay pantalla de inscripción de TOTP en la consola» y se resolvió con «hoy el titular la inscribe desde el panel de Supabase». **Esa salida no existía**: el panel solo ofrece _Remove MFA factors_ para los usuarios de la aplicación, y `Account → Security` es la cuenta de Supabase del operador, no la del usuario. El pendiente no describía una comodidad ausente sino un sistema inaccesible: ningún rol administrativo podía llegar a `aal2` y la API le respondía 401 en todo. La pantalla existe desde esta ronda y opera **solo sobre la propia sesión** — la petición de alta no lleva identificador de usuario y el servidor lo toma de la cookie `httpOnly`.
+
+### Tercera y cuarta ronda (2026-09-09)
+
+| Asunto                                                                                                | Estado                                                                                        |
+| ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **D-43** · el arranque en frío no podía escribir: `creado_por` es `NOT NULL` y no había quién firmara | **Resuelto** · migración `0025`, actor de sistema explícito y trazable; nada se relajó        |
+| **D-44** · el `CHECK` del NIT rechazaba el formato colombiano `900123456-7`                           | **Resuelto** · migración `0026`, normalización en la base y validación previa en los guiones  |
+| **D-45** · nadie podía inscribir el segundo factor: el panel no lo ofrece (P-14)                      | **Resuelto** · pantalla de inscripción + códigos de recuperación de un solo uso               |
+| Arranque en frío verificable de punta a punta, hasta «alguien puede entrar»                           | **Construido** · `supabase/arranque-en-frio.sh` + suite `arranque-en-frio.e2e`, sonda 11      |
 
 ### Lo que usted debe ejecutar antes de la 09-B
 

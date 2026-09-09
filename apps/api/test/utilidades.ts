@@ -1,6 +1,7 @@
 import { generateKeyPair, SignJWT, exportJWK } from 'jose';
 import type { JWK } from 'jose';
 import { Test } from '@nestjs/testing';
+import type { TestingModuleBuilder } from '@nestjs/testing';
 import express from 'express';
 import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
 import type { INestApplication } from '@nestjs/common';
@@ -96,10 +97,21 @@ export const tokenDe = async (f: Firmante, id: Identidad): Promise<string> =>
     aal: id.aal ?? 'aal2',
   });
 
-export const crearApp = async (firmante: Firmante): Promise<INestApplication> => {
-  const modulo = await Test.createTestingModule({
+/**
+ * `sustituir` permite a una suite cambiar un proveedor concreto sin duplicar
+ * este fixture. Se añadió en la ETAPA 09-A para poder probar la recuperación
+ * del segundo factor sin llamar a Supabase: lo que se sustituye es el PUERTO
+ * `AdministradorDeFactores`, no el controlador, así que lo que se ejercita
+ * sigue siendo el camino real.
+ */
+export const crearApp = async (
+  firmante: Firmante,
+  sustituir?: (constructor: TestingModuleBuilder) => TestingModuleBuilder,
+): Promise<INestApplication> => {
+  const base = Test.createTestingModule({
     imports: [AppModule.conConfiguracion(configuracionDePrueba)],
-  })
+  });
+  const modulo = await (sustituir === undefined ? base : sustituir(base))
     .overrideProvider(ProveedorDeJwks)
     .useValue({
       // `obtener()` devuelve la función que `jose` usa para resolver la clave

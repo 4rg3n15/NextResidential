@@ -1,8 +1,18 @@
-import { Controller, Get, HttpCode, Inject, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Post,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
@@ -16,7 +26,19 @@ import { REGISTRO_AUDITORIA } from '../../multiempresa/aislamiento';
 import type { RegistroDeAuditoria } from '../../multiempresa/aislamiento';
 import type { ContextoTenant } from '../dominio/claims';
 import { ROLES_ADMINISTRATIVOS } from '../dominio/claims';
-import { RestablecimientoRegistradoDto, SesionDto } from './respuestas';
+import {
+  CodigosDeRecuperacionDto,
+  RecuperacionDeFactorDto,
+  RestablecimientoRegistradoDto,
+  SesionDto,
+} from './respuestas';
+import { RecuperarFactorDto } from './dtos';
+import {
+  ADMINISTRADOR_DE_FACTORES,
+  REPOSITORIO_CODIGOS_MFA,
+} from '../aplicacion/puertos';
+import type { AdministradorDeFactores, RepositorioCodigosMfa } from '../aplicacion/puertos';
+import { casarCodigo, generarCodigosDeRecuperacion } from '../dominio/codigos-recuperacion';
 import { ErrorApiDto } from '../../comun/respuestas';
 
 /**
@@ -47,7 +69,11 @@ import { ErrorApiDto } from '../../comun/respuestas';
 @SinRecursoDeTenant()
 @Controller('auth')
 export class AutenticacionController {
-  constructor(@Inject(REGISTRO_AUDITORIA) private readonly auditoria: RegistroDeAuditoria) {}
+  constructor(
+    @Inject(REGISTRO_AUDITORIA) private readonly auditoria: RegistroDeAuditoria,
+    @Inject(REPOSITORIO_CODIGOS_MFA) private readonly codigos: RepositorioCodigosMfa,
+    @Inject(ADMINISTRADOR_DE_FACTORES) private readonly factores: AdministradorDeFactores,
+  ) {}
 
   @Get('sesion')
   @Roles(...ROLES_ADMINISTRATIVOS, 'portero', 'residente')
@@ -111,5 +137,87 @@ export class AutenticacionController {
       ip: peticion.ip ?? null,
       userAgent: peticion.headers['user-agent'] ?? null,
     });
+  }
+
+  /**
+   * Genera los códigos de recuperación del segundo factor. Se entregan **una
+   * vez**: de aquí en adelante solo existe su hash.
+   *
+   * **Exige `aal2`, y por eso no lleva exención.** Solo se llama justo después
+   * de inscribir y verificar el factor, cuando la sesión ya está elevada. Que
+   * un `aal1` pudiera pedir códigos convertiría la contraseña en la única
+   * barrera: quien la robara se emitiría su propia llave de recuperación.
+   *
+   * Regenerar deja sin valor los anteriores. Es deliberado: un juego apuntado
+   * en un papel de hace dos años no debe seguir abriendo la puerta.
+   */
+  @Post('mfa/codigos')
+  @Roles(...ROLES_ADMINISTRATIVOS, 'portero', 'residente')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Genera los códigos de recuperación del segundo factor' })
+  @ApiCreatedResponse({ type: CodigosDeRecuperacionDto })
+  @ApiTooManyRequestsResponse({ type: ErrorApiDto, description: '5 por minuto (§2.7.5)' })
+  async generarCodigos(@Contexto() ctx: ContextoTenant): Promise<CodigosDeRecuperacionDto> {
+    const { codigos, hashes } = generarCodigosDeRecuperacion();
+    await this.codigos.reemplazar(ctx.usuarioId, hashes, ctx.usuarioId);
+    return { codigos: [...codigos], cantidad: codigos.length };
+  }
+
+  /**
+   * Consume un código de recuperación y **retira el factor perdido**.
+   *
+   * Lo que este endpoint NO hace: dar acceso. No puede — el `aal2` lo emite
+   * Supabase (ADR-008) y aquí no se emite ningún token. Lo que hace es
+   * desbloquear la reinscripción de quien perdió el teléfono, que es el hueco
+   * que Supabase no cubre: su respuesta a ese caso es tener varios factores
+   * inscritos, lo que no sirve si solo había uno.
+   *
+   * **`@SinSegundoFactor()` y por qué es inevitable.** Quien perdió el factor
+   * solo puede presentar una sesión `aal1`. Exigir `aal2` aquí sería pedirle
+   * justo lo que ha perdido — el mismo callejón sin salida que hizo
+   * inalcanzables las rutas de MFA que ADR-008 retiró. La ruta no expone ningún
+   * recurso de copropiedad y solo actúa sobre el propio llamante.
+   *
+   * El límite es de cinco por minuto: son 40 bits de entropía por código, así
+   * que adivinar uno a ese ritmo lleva del orden de cien mil años.
+   */
+  @Post('mfa/recuperacion')
+  @HttpCode(200)
+  @Roles(...ROLES_ADMINISTRATIVOS, 'portero', 'residente')
+  @SinSegundoFactor()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Retira el factor perdido con un código de recuperación' })
+  @ApiOkResponse({ type: RecuperacionDeFactorDto })
+  @ApiUnauthorizedResponse({ type: ErrorApiDto, description: 'Código no válido o ya usado' })
+  @ApiTooManyRequestsResponse({ type: ErrorApiDto, description: '5 por minuto (§2.7.5)' })
+  async recuperarFactor(
+    @Contexto() ctx: ContextoTenant,
+    @Body() dto: RecuperarFactorDto,
+    @Req() peticion: Request,
+  ): Promise<RecuperacionDeFactorDto> {
+    const vigentes = await this.codigos.hashesVigentes(ctx.usuarioId);
+    const hash = casarCodigo(dto.codigo, vigentes);
+
+    // Mismo mensaje para «no existe», «ya se usó» y «no hay códigos». Distinguir
+    // los tres le diría a quien prueba códigos si va por buen camino.
+    const invalido = new UnauthorizedException('Código de recuperación no válido');
+    if (hash === null) throw invalido;
+
+    // El consumo decide: si otra petición simultánea se adelantó, aquí devuelve
+    // `false`. La unicidad del uso NO se apoya en la comprobación de arriba.
+    if (!(await this.codigos.consumir(ctx.usuarioId, hash, peticion.ip ?? null))) throw invalido;
+
+    const factoresRetirados = await this.factores.retirarFactoresVerificados(ctx.usuarioId);
+    await this.auditoria.registrarRestablecimiento({
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol,
+      ip: peticion.ip ?? null,
+      userAgent: peticion.headers['user-agent'] ?? null,
+    });
+
+    return {
+      factoresRetirados,
+      codigosRestantes: (await this.codigos.hashesVigentes(ctx.usuarioId)).length,
+    };
   }
 }

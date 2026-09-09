@@ -30,3 +30,6 @@ supabase/.temp/
 next-env.d.ts
 .vercel/
 *.tsbuildinfo
+
+# Claims que produce ./supabase/arranque-en-frio.sh; dependen de la base local.
+.arranque-en-frio.json
