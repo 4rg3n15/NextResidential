@@ -20,6 +20,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import {
+  existsSync,
   writeFileSync,
   mkdtempSync,
   mkdirSync,
@@ -137,6 +138,22 @@ try {
     const r = correr('node', ['scripts/lib/contar-pruebas.mjs', salidaFalsa]);
     if (r.codigo !== 0 && /recogidos/.test(r.salida)) ok('detectado, con salida distinta de cero');
     else mal(`NO detectado (codigo ${r.codigo}): ${r.salida.trim()}`);
+
+    /**
+     * MITAD POSITIVA, añadida en la revisión del 2026-09-09.
+     *
+     * Sin ella, un `contar-pruebas.mjs` que fallara SIEMPRE —por un cambio en
+     * el recorrido de directorios, por un error al arrancar— habría dejado
+     * esta sonda en verde sin comprobar nada: solo se exigía que fallara.
+     * Un control que no distingue el caso legítimo del ilegítimo no es un
+     * control, es una constante.
+     */
+    const salidaCompleta = join(banco, 'salida-completa.txt');
+    writeFileSync(salidaCompleta, 'Test Files  9999 passed (9999)\nTests  1 passed (1)\n');
+    const positiva = correr('node', ['scripts/lib/contar-pruebas.mjs', salidaCompleta]);
+    positiva.codigo === 0 && /ficheros de prueba ejecutados/.test(positiva.salida)
+      ? ok('una corrida que sí recoge todos los ficheros pasa el control')
+      : mal(`el control rechaza una corrida completa (codigo ${positiva.codigo})`);
   }
 
   console.log(
@@ -212,7 +229,23 @@ try {
     pkg.engines.node = '>=99.0.0';
     writeFileSync(join(clon, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
     const r = enClon('node', ['scripts/lib/verificar-entorno.mjs']);
-    r.codigo !== 0 ? ok('detectado') : mal('NO detectado');
+    /**
+     * Se exige el MOTIVO, no solo el código de salida. Era la sonda más débil
+     * de las diez (revisión del 2026-09-09): comprobaba únicamente
+     * `codigo !== 0`, así que cualquier fallo ajeno —un `.nvmrc` que no
+     * llegara al clon, un error al arrancar— la habría dado por buena. Habría
+     * informado «detectado» sin que el control hubiera detectado nada.
+     */
+    r.codigo !== 0 && /99\.0\.0|engines|node/i.test(r.salida)
+      ? ok('detectado, y por el motivo correcto')
+      : mal(`NO detectado (codigo ${r.codigo}): ${r.salida.trim().slice(0, 120)}`);
+
+    // Mitad positiva: con el `engines` original, el mismo clon pasa. Sin esto,
+    // un control que fallara siempre seguiría figurando como verde.
+    writeFileSync(join(clon, 'package.json'), readFileSync(join(raiz, 'package.json'), 'utf8'));
+    enClon('node', ['scripts/lib/verificar-entorno.mjs']).codigo === 0
+      ? ok('con el `engines` real, el mismo entorno pasa')
+      : mal('el control rechaza un entorno que sí cumple');
   }
   console.log('\n▸ 7 · una suite intermitente NO pasa por estable');
   {
@@ -333,9 +366,44 @@ try {
 
   console.log('\n▸ 10 · un cliente generado que se quedó atrás rompe la verificación');
   {
+    /**
+     * LA SONDA MONTA SU PROPIO ESCENARIO, incluido el artefacto compilado.
+     *
+     * Defecto reportado desde el CI el 2026-09-09, y es la undécima aparición
+     * de la familia «la comprobación existe pero no comprueba lo que crees»:
+     * `contrato-desfasado.mjs` necesita `apps/api/dist/openapi.js` para
+     * regenerar el contrato desde los controladores, y ese fichero está en
+     * `.gitignore`. En el equipo de desarrollo existía porque
+     * `verificar-etapa.sh` compila en el paso 3, mucho antes de llegar a estas
+     * sondas en el paso 9. En el CI, en cambio, «Pruebas negativas» corre
+     * ANTES de «Compilación, lint y tipos», así que sobre un checkout limpio
+     * no había nada que ejecutar.
+     *
+     * El fallo fue RUIDOSO —«el espejo no reproduce el estado al día»— porque
+     * la sonda comprueba su línea base antes de mutar nada. Sin esa
+     * comprobación previa habría dado verde sin ejercitar el control, que es
+     * lo que hay que evitar. Aun así, un control que solo funciona cuando
+     * alguien compiló antes no es un control: aquí se compila si hace falta.
+     *
+     * `--filter "@ncr/api..."` arrastra las dependencias del paquete, así que
+     * `@ncr/domain-core` y `@ncr/providers` entran solos.
+     */
+    const artefacto = join(raiz, 'apps', 'api', 'dist', 'openapi.js');
+    if (!existsSync(artefacto)) {
+      console.log('   · sin apps/api/dist: se compila para poder montar el escenario');
+      const compilacion = correr('pnpm', ['--filter', '@ncr/api...', 'build'], {
+        timeout: 600_000,
+      });
+      if (compilacion.codigo !== 0 || !existsSync(artefacto)) {
+        mal('no se pudo compilar la API: la sonda no puede montar su escenario');
+        console.log(compilacion.salida.split('\n').slice(-6).join('\n'));
+      }
+    }
+
     // Espejo del repositorio hecho con ENLACES a lo pesado —`node_modules` y
-    // `apps/api/dist`— y copia de los dos ficheros generados. Así la sonda
-    // puede mutarlos sin acercarse al árbol de trabajo y sin recompilar.
+    // `apps/`, que incluye el `dist` recién asegurado— y copia de los dos
+    // ficheros generados. Así la sonda puede mutarlos sin acercarse al árbol
+    // de trabajo y sin volver a compilar.
     const espejo = join(banco, 'espejo');
     mkdirSync(join(espejo, 'packages', 'contracts', 'src', 'generado'), { recursive: true });
     symlinkSync(join(raiz, 'node_modules'), join(espejo, 'node_modules'), 'dir');
@@ -399,4 +467,7 @@ if (fallos > 0) {
   console.log(`\nPRUEBAS NEGATIVAS: ${fallos} comprobación(es) fallaron`);
   process.exit(1);
 }
-console.log('\nPRUEBAS NEGATIVAS: los 10 controles detectan su violación, sin tocar el árbol');
+console.log(
+  '\nPRUEBAS NEGATIVAS: los 10 controles detectan su violación y aceptan el caso legítimo, ' +
+    'sin tocar el árbol',
+);
