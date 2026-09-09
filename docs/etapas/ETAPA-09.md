@@ -193,33 +193,35 @@ Dos hallazgos de las propias pruebas, antes de llegar al verificador:
 
 ### Veredicto literal de §2.8.0
 
+Ejecución del 2026-09-09 tras la cuarta ronda, con base PostgreSQL local (`--con-base`):
+
 ```
 ▸ 4 · lint y typecheck
    ✓ pnpm lint
    ✓ pnpm typecheck
 
 ▸ 5 · suite completa
-   @ncr/config:test:       Tests  39 passed (39)
    @ncr/providers:test:       Tests  24 passed (24)
+   @ncr/config:test:       Tests  39 passed (39)
    @ncr/domain-core:test:       Tests  328 passed (328)
-   @ncr/web:test:       Tests  121 passed (121)
-   @ncr/api:test:       Tests  338 passed (338)
+   @ncr/web:test:       Tests  134 passed (134)
+   @ncr/api:test:       Tests  363 passed (363)
    ✓ suite completa en verde
 
 ▸ 6 · ningún fichero de prueba se quedó sin recoger
-   ✓ 69 de 69 ficheros de prueba ejecutados
+   ✓ 74 de 74 ficheros de prueba ejecutados
 
 ▸ 7 · umbrales de cobertura por capa (§2.4)
      OK   dominio (packages/domain-core/src): lineas 98.66 % · ramas 97.67 % · funciones 98.72 % (umbral 90 %, 28 archivos)
-     OK   aplicacion (**/aplicacion/**): lineas 98.28 % · ramas 91.46 % · funciones 98.36 % (umbral 90 %, 19 archivos)
-     OK   global: lineas 74.48 % · ramas 87.34 % · funciones 85.95 % (umbral 70 %, 177 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 98.28 % · ramas 91.46 % · funciones 98.36 % (umbral 90 %, 20 archivos)
+     OK   global: lineas 77.12 % · ramas 87.28 % · funciones 85.47 % (umbral 70 %, 185 archivos)
    ✓ las tres capas cumplen su umbral
 
 ▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
-   ✓ portabilidad: 15 superficies con shell sin construcciones divergentes BSD/GNU
+   ✓ portabilidad: 16 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
 
 ▸ 9 · pruebas negativas de los propios controles
-   ✓ PRUEBAS NEGATIVAS: los 10 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ PRUEBAS NEGATIVAS: los 11 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
 
 ▸ 10 · fronteras de arquitectura y secretos
    ✓ fronteras (DoD ETAPA 02)
@@ -229,17 +231,32 @@ Dos hallazgos de las propias pruebas, antes de llegar al verificador:
    ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 4 tablas vigiladas)
 
 ▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
-   ✓ 16 de 33 operaciones con respuesta tipada; 17 exentas con etapa declarada
+   ✓ 18 de 35 operaciones con respuesta tipada; 17 exentas con etapa declarada
    ✓ contrato y cliente generado al día respecto de los controladores
 
 ▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
    alertas entregadas: 200 de 200
-   p50 / p95 / p99   : 3 / 5 / 7 ms
-   maximo            : 16 ms
+   p50 / p95 / p99   : 2 / 5 / 8 ms
+   maximo            : 11 ms
    umbral KPI-25     : 10000 ms
    ✓ KPI-25 con margen sobre el umbral
 
+▸ 12 · esquema y aislamiento en --modo-supabase
+   ✓ migraciones, semillas y suite SQL
+
+▸ 12b · arranque en frío: base vacía → migraciones → superadministrador
+   ✓ una base recién migrada llega a un superadministrador con claims válidos
+   ✓ y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1
+
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+   ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
+
 ▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 134 passed (134)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 134 passed (134)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 134 passed (134)
    ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
 
 VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
