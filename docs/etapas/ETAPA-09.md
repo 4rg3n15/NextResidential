@@ -194,25 +194,25 @@ Dos hallazgos de las propias pruebas, antes de llegar al verificador:
 ▸ 5 · suite completa
    @ncr/config:test:       Tests  39 passed (39)
    @ncr/providers:test:       Tests  24 passed (24)
-   @ncr/web:test:       Tests  104 passed (104)
    @ncr/domain-core:test:       Tests  328 passed (328)
-   @ncr/api:test:       Tests  327 passed (327)
+   @ncr/web:test:       Tests  121 passed (121)
+   @ncr/api:test:       Tests  338 passed (338)
    ✓ suite completa en verde
 
 ▸ 6 · ningún fichero de prueba se quedó sin recoger
-   ✓ 66 de 66 ficheros de prueba ejecutados
+   ✓ 69 de 69 ficheros de prueba ejecutados
 
 ▸ 7 · umbrales de cobertura por capa (§2.4)
      OK   dominio (packages/domain-core/src): lineas 98.66 % · ramas 97.67 % · funciones 98.72 % (umbral 90 %, 28 archivos)
      OK   aplicacion (**/aplicacion/**): lineas 98.28 % · ramas 91.46 % · funciones 98.36 % (umbral 90 %, 19 archivos)
-     OK   global: lineas 76.24 % · ramas 87.86 % · funciones 85.97 % (umbral 70 %, 172 archivos)
+     OK   global: lineas 74.48 % · ramas 87.34 % · funciones 85.95 % (umbral 70 %, 177 archivos)
    ✓ las tres capas cumplen su umbral
 
 ▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
    ✓ portabilidad: 15 superficies con shell sin construcciones divergentes BSD/GNU
 
 ▸ 9 · pruebas negativas de los propios controles
-   ✓ PRUEBAS NEGATIVAS: los 10 controles detectan su violación, sin tocar el árbol
+   ✓ PRUEBAS NEGATIVAS: los 10 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
 
 ▸ 10 · fronteras de arquitectura y secretos
    ✓ fronteras (DoD ETAPA 02)
@@ -222,13 +222,13 @@ Dos hallazgos de las propias pruebas, antes de llegar al verificador:
    ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 4 tablas vigiladas)
 
 ▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
-   ✓ 17 de 34 operaciones con respuesta tipada; 17 exentas con etapa declarada
+   ✓ 16 de 33 operaciones con respuesta tipada; 17 exentas con etapa declarada
    ✓ contrato y cliente generado al día respecto de los controladores
 
 ▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
    alertas entregadas: 200 de 200
-   p50 / p95 / p99   : 2 / 4 / 7 ms
-   maximo            : 11 ms
+   p50 / p95 / p99   : 3 / 5 / 7 ms
+   maximo            : 16 ms
    umbral KPI-25     : 10000 ms
    ✓ KPI-25 con margen sobre el umbral
 
@@ -243,6 +243,70 @@ VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
 1. Crear `comun/presentacion/` para un DTO compartido convirtió `comun` en módulo a ojos de `frontera-modulos` —`esModulo` se deriva de la estructura, y basta una carpeta con nombre de capa—: 32 violaciones de golpe, las importaciones de siempre ahora ilegales. El control tenía razón: o `comun` es fontanería y no lleva capas, o es un módulo y se entra por su barril. Se eligió lo primero.
 2. KPI-11: los datos de prueba del tablero traían IPs con forma de direccionamiento real y el nombre del fabricante en una referencia de bóveda. Un dato de prueba con forma de topología real acaba copiado en un fichero de configuración.
 3. `FuenteFalsa implements Partial<EventSource>` no compilaba: es un doble, no una implementación parcial.
+
+### 6.bis · Segunda ronda: el CI, y lo que la revisión destapó
+
+El cierre de 09-A pasó en macOS y **falló en el CI**, en las cuatro
+comprobaciones y siempre en la misma sonda: la décima, la que esta etapa añadió.
+
+**Qué necesitaba el espejo que en CI no existía.** `contrato-desfasado.mjs`
+regenera el contrato ejecutando `apps/api/dist/openapi.js`, que está en
+`.gitignore`. En el equipo de desarrollo existía porque `verificar-etapa.sh`
+compila en el paso 3, seis pasos antes de las sondas; en el flujo del CI,
+«Pruebas negativas» corre **antes** de «Compilación, lint y tipos», así que
+sobre un checkout limpio no había nada que ejecutar. Reproducido en local
+borrando el `dist`: mismo mensaje, palabra por palabra.
+
+El fallo fue **ruidoso** —«el espejo no reproduce el estado al día»— porque la
+sonda comprueba su línea base antes de mutar nada. Sin esa comprobación previa
+habría dado verde sin ejercitar el control. Aun así, un control que solo
+funciona si alguien compiló antes no es un control: **la sonda compila lo que
+necesita**, y se verificó con el árbol sin ningún artefacto.
+
+**La revisión de las otras nueve, con el mismo criterio, encontró tres cosas:**
+
+| Hallazgo                                        | Por qué pasaba en vacío                                                                                                                                                                                                                                                                |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sonda 6** · era la más débil de las diez      | Solo exigía `codigo !== 0`. Un `.nvmrc` que no llegara al clon, o un fallo al arrancar, la habrían dado por buena: habría informado «detectado» sin que el control detectara nada. Ahora exige el motivo y comprueba también el caso legítimo                                          |
+| **Sonda 3** · sin mitad positiva                | Solo exigía que el control fallara. Un `contar-pruebas.mjs` que fallara siempre habría seguido en verde                                                                                                                                                                                |
+| **`metricas.mjs`** · tenía el dato y no actuaba | Imprimía «66 de 66 ficheros» y se limitaba a enseñarlo. `contar-pruebas.mjs` sí falla ante el descuadre, pero **no corría en el CI**: allí un fichero de prueba que nadie ejecutara salía impreso en el informe y verde en el resultado, y quien mira un CI en verde no lee las cifras |
+
+Las tres correcciones se comprobaron **por mutación**: con los controles rotos a
+propósito, las sondas 3 y 6 se ponen rojas donde antes daban verde, y un fichero
+de prueba huérfano rompe `metricas`.
+
+**Y una cuarta, por otra vía.** Cuatro controles se probaban en «Pruebas
+negativas» —donde se comprueba que detectan su violación— pero **no se
+ejecutaban nunca contra el repositorio**: `frontera-modulos`,
+`frontera-append-only`, `contrato-tipado` y `contrato-desfasado`. Entran como
+pasos del flujo.
+
+---
+
+## 6.ter · Lo añadido tras la revisión del cliente
+
+**Contraste.** `#DC3341` aprobado. Las cifras de `03-mockups.md` §5.6 quedan
+corregidas con las medidas reales, y con la explicación de dónde salía el
+«≈ 3,9»: era `#E63946` contra el **lienzo** (3,954), no contra el blanco de
+tarjeta (4,168). El que sí estaba mal era el «≈ 4,4» del texto blanco sobre
+relleno, que medido da 4,168.
+
+**D-39 · `/auth/mfa/*` retirado** (ADR-008). Se elimina el vertical completo,
+no solo las rutas: dejar `ServicioMfa` sin exponer habría sido código muerto y
+la ETAPA 13 lo marcaría igual. RN-20 y CA-25 no se tocan.
+
+**Recuperación de contraseña.** Solicitud, correo de un solo uso y página de
+contraseña nueva, con respuesta uniforme —mismo texto, mismo código y mismo
+camino de ejecución exista o no la cuenta— y dos limitadores, por IP y por
+identidad. El canje del token ocurre en el servidor.
+
+**El gancho de _custom claims_ que faltaba (migración 0024).** La guía de
+conexión lo describía y lo dejaba anotado como trabajo de la ETAPA 03; al
+construir el acceso se comprobó que **nunca llegó a escribirse**. Ningún token
+de Supabase llevaba `rol` ni `copropiedad_id`, así que el sistema fallaba
+cerrado —correcto— y era **inutilizable**: nadie podía entrar a la consola. Es
+el hueco de backend más grande que esta etapa encontró, y no se veía desde
+ninguna prueba porque la suite firma sus propios tokens.
 
 ---
 

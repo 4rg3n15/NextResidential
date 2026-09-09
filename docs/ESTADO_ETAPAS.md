@@ -96,13 +96,27 @@ Viviendas, vehículos, visitantes y autorizaciones, zonas comunes, dispositivos 
 
 ### Verificación
 
-`./scripts/verificar-etapa.sh` → **correcta**. 822 pruebas en 66 ficheros, 66 de 66 recogidos. Cobertura: dominio 98,66 % · aplicación 98,28 % · global 76,24 %. KPI-25: 200 de 200 alertas, p99 de 7 ms.
+`./scripts/verificar-etapa.sh` → **correcta**, desde artefactos limpios. 850 pruebas en 69 ficheros, 69 de 69 recogidos. Cobertura: dominio 98,66 % · aplicación 98,28 % · global 74,48 %. KPI-25: 200 de 200 alertas, p99 de 7 ms.
 
 La primera ejecución salió **FALLIDA** y sus tres hallazgos eran reales: `comun` convertido en módulo por una carpeta con nombre de capa, datos de prueba con forma de topología real (KPI-11), y un doble de `EventSource` que no compilaba. Los tres corregidos.
 
-### Defecto abierto
+### Segunda ronda (2026-09-09), tras la revisión del cliente
 
-**D-39 · el alta de segundo factor es inalcanzable para los roles administrativos.** El guard de autenticación exige `aal2` antes de que actúe el guard de roles, y `/auth/mfa/inscripcion` y `/auth/mfa/verificacion` exigen rol administrativo: un administrador sin MFA no puede llegar a inscribirlo. Además, verificar ahí no cambiaría el `aal` del token —lo emite Supabase—, así que tampoco desbloquearía nada. La consola usa por eso el MFA de Supabase Auth. **Cuál de los dos mecanismos es el autoritativo es una decisión de arquitectura y se reporta sin tocarla.**
+| Asunto                                                                                                                                          | Estado                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| CI en rojo: la sonda 10 dependía de `apps/api/dist`, que no existe en un checkout limpio                                                        | **Resuelto** · la sonda compila lo que necesita                                                             |
+| Revisión de las otras nueve: sondas 3 y 6 sin mitad positiva; `metricas.mjs` no fallaba ante el descuadre; cuatro controles nunca corrían en CI | **Resuelto** · las tres correcciones comprobadas por mutación                                               |
+| Contraste `#DC3341`                                                                                                                             | **Aprobado** · cifras de `03-mockups.md` §5.6 corregidas con las medidas reales                             |
+| **D-39** · `/auth/mfa/*` inalcanzable                                                                                                           | **Resuelto** · retirado ([ADR-008](decisiones/ADR-008-supabase-auth-como-mecanismo-autoritativo-de-mfa.md)) |
+| **D-42** · el Auth Hook de _custom claims_ no existía; sin él nadie puede entrar a la consola                                                   | **Resuelto** · migración `0024`                                                                             |
+| Recuperación de contraseña, con respuesta uniforme y doble limitador                                                                            | **Construida** · [guía](guias/RECUPERACION_Y_USUARIOS.md)                                                   |
+| Aprovisionamiento del primer superadministrador y de los demás roles                                                                            | **Documentado** · `scripts/aprovisionar-rol.mjs` + guía                                                     |
+
+**Pendiente declarado (P-14):** no hay pantalla de inscripción de TOTP en la consola. Hoy el titular inscribe su factor desde el panel de Supabase; nadie debería poder inscribir el de otra persona, así que la pantalla —si se construye— tiene que operar sobre la propia sesión.
+
+### Lo que usted debe ejecutar antes de la 09-B
+
+Las migraciones `0023` y `0024`, el SMTP y la plantilla de correo, el Auth Hook de claims y el primer superadministrador. Todo en pasos numerados en [`docs/guias/RECUPERACION_Y_USUARIOS.md`](guias/RECUPERACION_Y_USUARIOS.md).
 
 ---
 
