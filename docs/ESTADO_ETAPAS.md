@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-08 · al cierre de la **ETAPA 08**
+**Última actualización:** 2026-09-09 · al cierre de la **ETAPA 09-A**
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,15 +18,16 @@
 
 ## Resumen
 
-|                                |                                                                         |
-| ------------------------------ | ----------------------------------------------------------------------- |
-| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08)                                            |
-| **Etapa siguiente habilitada** | **ETAPA 09 — Consola web de administración** (la 12 también habilitada) |
-| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado      |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                  |
-| **Decisiones pendientes**      | 7 abiertas — P-03 con supuesto vigente y ya configurable                |
-| **Supuestos vigentes**         | 11 — nuevo S-18 (umbrales de calidad de captura, inyectables)           |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                   |
+|                                |                                                                      |
+| ------------------------------ | -------------------------------------------------------------------- |
+| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08) · la **09 está en curso: 09-A cerrada** |
+| **Etapa siguiente habilitada** | **ETAPA 09-B — resto de pantallas** (la 12 sigue habilitada)         |
+| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado   |
+| **Defectos abiertos**          | D-39 — el alta de MFA es inalcanzable para roles administrativos     |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                               |
+| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)        |
+| **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)          |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                |
 
 ---
 
@@ -43,7 +44,7 @@
 | 06     | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05 ✅                            | **CERRADA**                      | [ETAPA-06](etapas/ETAPA-06.md) |
 | 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06 ✅                            | **CERRADA**                      | [ETAPA-07](etapas/ETAPA-07.md) |
 | 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                            | **CERRADA**                      | [ETAPA-08](etapas/ETAPA-08.md) |
-| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **PENDIENTE** — habilitada       | —                              |
+| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **EN CURSO** — 09-A cerrada      | [ETAPA-09](etapas/ETAPA-09.md) |
 | 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09                               | PENDIENTE                        | —                              |
 | 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09                               | PENDIENTE                        | —                              |
 | 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
@@ -65,6 +66,43 @@
 > ```
 
 **Precondición de la ETAPA 15** (`CLAUDE.md` §6): se ejecuta **solo** cuando el usuario tenga acceso al equipo y entregue un prompt adicional con la documentación ISAPI del modelo concreto, IPs, credenciales y llaves de referencia.
+
+---
+
+## ETAPA 09 — Consola web de administración · **EN CURSO** (09-A cerrada)
+
+**Rama:** `etapa-09-consola-administracion` · **Cierre de 09-A:** 2026-09-09 · **Informe:** [`etapas/ETAPA-09.md`](etapas/ETAPA-09.md)
+
+La etapa se ejecuta en dos partes por indicación del usuario. **09-A está cerrada y verificada**; 09-B queda pendiente.
+
+### Entregables de 09-A
+
+| Entregable                                              | Ruta                                            | Estado |
+| ------------------------------------------------------- | ----------------------------------------------- | ------ |
+| Preset Tailwind compartido y verificación de contraste  | `packages/config/src/`                          | ✅     |
+| Sistema de componentes sobre el catálogo del mockup     | `apps/web/src/componentes/`                     | ✅     |
+| Marco, barra lateral y cabecera con visibilidad por rol | `apps/web/src/componentes/`, `app/(consola)/`   | ✅     |
+| Acceso multi-rol con segundo factor (W-01)              | `apps/web/src/app/acceso/`                      | ✅     |
+| Dashboard operativo (W-02)                              | `apps/web/src/app/(consola)/tablero/`           | ✅     |
+| Base de PWA: manifiesto, iconos y service worker        | `apps/web/public/`                              | ✅     |
+| Endpoints del tablero en la API                         | `apps/api/src/tablero/`                         | ✅     |
+| Tipos de respuesta en OpenAPI y sus controles           | `apps/api/src/**/respuestas.ts`, `scripts/lib/` | ✅     |
+| Cliente generado desde el contrato                      | `packages/contracts/src/generado/`              | ✅     |
+| ADR-006 (datos y estado) y ADR-007 (cliente generado)   | `docs/decisiones/`                              | ✅     |
+
+### Pendiente en 09-B
+
+Viviendas, vehículos, visitantes y autorizaciones, zonas comunes, dispositivos y sincronización, eventos y alertas, informes y auditoría, y el buscador global de la cabecera —hoy deshabilitado con su motivo—.
+
+### Verificación
+
+`./scripts/verificar-etapa.sh` → **correcta**. 822 pruebas en 66 ficheros, 66 de 66 recogidos. Cobertura: dominio 98,66 % · aplicación 98,28 % · global 76,24 %. KPI-25: 200 de 200 alertas, p99 de 7 ms.
+
+La primera ejecución salió **FALLIDA** y sus tres hallazgos eran reales: `comun` convertido en módulo por una carpeta con nombre de capa, datos de prueba con forma de topología real (KPI-11), y un doble de `EventSource` que no compilaba. Los tres corregidos.
+
+### Defecto abierto
+
+**D-39 · el alta de segundo factor es inalcanzable para los roles administrativos.** El guard de autenticación exige `aal2` antes de que actúe el guard de roles, y `/auth/mfa/inscripcion` y `/auth/mfa/verificacion` exigen rol administrativo: un administrador sin MFA no puede llegar a inscribirlo. Además, verificar ahí no cambiaría el `aal` del token —lo emite Supabase—, así que tampoco desbloquearía nada. La consola usa por eso el MFA de Supabase Auth. **Cuál de los dos mecanismos es el autoritativo es una decisión de arquitectura y se reporta sin tocarla.**
 
 ---
 
