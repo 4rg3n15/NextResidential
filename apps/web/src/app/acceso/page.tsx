@@ -5,7 +5,7 @@ import { sesionActual } from '@/lib/sesion/servidor';
 import { rutaInicialDe } from '@/lib/navegacion';
 import type { Rol } from '@ncr/contracts';
 import { FormularioDeAcceso } from './formulario-acceso';
-import { version } from '../../../package.json';
+import { MarcoDeAcceso } from './marco';
 
 export const metadata: Metadata = { title: 'Acceso' };
 export const dynamic = 'force-dynamic';
@@ -28,32 +28,9 @@ const Acceso = async (): Promise<JSX.Element> => {
   if (sesion !== null) redirect(rutaInicialDe(sesion.rol as Rol));
 
   return (
-    <main id="contenido" className="grid min-h-dvh lg:grid-cols-[minmax(0,26rem)_1fr]">
-      {/* Panel de marca. En pantallas estrechas se reduce a una cabecera: el
-          mockup lo dibuja a pantalla completa y ahí no cabe. */}
-      <aside className="superficie-oscura flex flex-col justify-between bg-oscuro px-8 py-8 text-texto-invertido lg:px-10 lg:py-12">
-        <div>
-          <p className="text-titulo font-bold">Next Control</p>
-          <p className="text-etiqueta uppercase text-texto-invertidoApagado">Residencial</p>
-        </div>
-        <p className="mt-8 hidden max-w-xs text-cuerpo text-texto-invertidoApagado lg:block">
-          Seguridad inteligente residencial. Next Control decide; el hardware ejecuta.
-        </p>
-        <p className="mt-8 text-secundario text-texto-invertidoApagado">
-          © {new Date().getFullYear()} Grupo Control · versión {version}
-        </p>
-      </aside>
-
-      <section className="flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
-          <h1 className="text-titulo">Iniciar sesión</h1>
-          <p className="mt-1 text-cuerpo text-texto-apagado">
-            Accede con el correo de tu copropiedad.
-          </p>
-          <FormularioDeAcceso className="mt-8" />
-        </div>
-      </section>
-    </main>
+    <MarcoDeAcceso titulo="Iniciar sesión" descripcion="Accede con el correo de tu copropiedad.">
+      <FormularioDeAcceso className="mt-8" />
+    </MarcoDeAcceso>
   );
 };
 

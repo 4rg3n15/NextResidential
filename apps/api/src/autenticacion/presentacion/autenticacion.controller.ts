@@ -1,16 +1,22 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpCode, Inject, Post, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import {
   ApiBearerAuth,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { Roles, SinRecursoDeTenant } from '../../comun/decoradores';
+import { Roles, SinRecursoDeTenant, SinSegundoFactor } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
+import { REGISTRO_AUDITORIA } from '../../multiempresa/aislamiento';
+import type { RegistroDeAuditoria } from '../../multiempresa/aislamiento';
 import type { ContextoTenant } from '../dominio/claims';
 import { ROLES_ADMINISTRATIVOS } from '../dominio/claims';
-import { SesionDto } from './respuestas';
+import { RestablecimientoRegistradoDto, SesionDto } from './respuestas';
 import { ErrorApiDto } from '../../comun/respuestas';
 
 /**
@@ -41,6 +47,8 @@ import { ErrorApiDto } from '../../comun/respuestas';
 @SinRecursoDeTenant()
 @Controller('auth')
 export class AutenticacionController {
+  constructor(@Inject(REGISTRO_AUDITORIA) private readonly auditoria: RegistroDeAuditoria) {}
+
   @Get('sesion')
   @Roles(...ROLES_ADMINISTRATIVOS, 'portero', 'residente')
   @ApiOperation({ summary: 'Identidad y alcance del token presentado' })
@@ -59,5 +67,49 @@ export class AutenticacionController {
       copropiedadesAtendidas: [...ctx.copropiedadesAtendidas],
       mfaVerificado: ctx.mfaVerificado,
     };
+  }
+
+  /**
+   * Deja constancia de que el llamante acaba de restablecer su contraseña.
+   *
+   * **El cambio de contraseña NO pasa por aquí.** Lo ejecuta Supabase Auth,
+   * que es el proveedor autoritativo (ADR-008). Lo que pasa por aquí es el
+   * rastro: un cambio de credencial es un hecho auditable (§2.7.8), y si la
+   * única huella viviera en los registros de Supabase quedaría fuera del
+   * sistema que el operador audita durante un incidente.
+   *
+   * **`@SinSegundoFactor()` y por qué.** Tras restablecer, la sesión que emite
+   * el proveedor es `aal1`: el usuario acaba de demostrar el control del buzón,
+   * no el del segundo factor. Sin la exención, un administrador nunca podría
+   * registrar su propio restablecimiento — el mismo callejón sin salida que
+   * hizo inalcanzables las rutas de MFA retiradas en ADR-008. La ruta no expone
+   * ningún recurso de copropiedad ni permite operar: solo escribe sobre quien
+   * llama.
+   *
+   * **Idempotente y sin cuerpo.** No recibe nada del cliente: la identidad sale
+   * del token verificado. Un cuerpo con «quién restableció» sería un cuerpo que
+   * el cliente controla, y la auditoría dejaría de significar nada.
+   */
+  @Post('restablecimiento')
+  @HttpCode(204)
+  @Roles(...ROLES_ADMINISTRATIVOS, 'portero', 'residente')
+  @SinSegundoFactor()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Registra en auditoría el restablecimiento de la propia contraseña' })
+  @ApiNoContentResponse({ type: RestablecimientoRegistradoDto })
+  @ApiTooManyRequestsResponse({ type: ErrorApiDto, description: '5 por minuto (§2.7.5)' })
+  async registrarRestablecimiento(
+    @Contexto() ctx: ContextoTenant,
+    @Req() peticion: Request,
+  ): Promise<void> {
+    await this.auditoria.registrarRestablecimiento({
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol,
+      // `ip` y `user-agent` son del transporte, así que se leen aquí y no en el
+      // caso de uso. Se admiten nulos: detrás de un proxy pueden no llegar, y
+      // un registro sin IP sigue siendo mejor que ningún registro.
+      ip: peticion.ip ?? null,
+      userAgent: peticion.headers['user-agent'] ?? null,
+    });
   }
 }

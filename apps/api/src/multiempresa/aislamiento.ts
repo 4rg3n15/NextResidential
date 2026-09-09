@@ -11,6 +11,20 @@ export interface RegistroDeAuditoria {
     copropiedadSolicitada: string;
     recurso: string;
   }): Promise<void>;
+
+  /**
+   * Rastro del cambio de credencial (migración 0023, §2.7.8).
+   *
+   * Método propio y no uno genérico `registrar(tipo, ...)`: cada evento de
+   * seguridad tiene su forma, y un método que acepta cualquier tipo acaba
+   * recibiendo cadenas libres que nadie puede filtrar después.
+   */
+  registrarRestablecimiento(entrada: {
+    usuarioId: string;
+    rol: string;
+    ip: string | null;
+    userAgent: string | null;
+  }): Promise<void>;
 }
 
 export const REGISTRO_AUDITORIA = Symbol.for('ncr.puerto.RegistroDeAuditoria');

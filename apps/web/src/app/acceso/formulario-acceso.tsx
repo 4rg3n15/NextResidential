@@ -1,6 +1,7 @@
 'use client';
 
 import type { JSX } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Boton } from '@/componentes/ui/boton';
@@ -170,8 +171,12 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
           Iniciar sesión
         </Boton>
         <p className="text-secundario text-texto-apagado">
-          ¿Olvidaste la contraseña? Escribe al administrador de tu copropiedad: la recuperación se
-          gestiona desde el panel de identidad, no desde aquí.
+          <Link
+            href="/acceso/recuperacion"
+            className="font-medium text-marca-texto underline underline-offset-2"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
         </p>
       </div>
     </form>

@@ -92,6 +92,43 @@
         ]
       }
     },
+    "/auth/restablecimiento": {
+      "post": {
+        "operationId": "AutenticacionController_registrarRestablecimiento",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestablecimientoRegistradoDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "5 por minuto (§2.7.5)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registra en auditoría el restablecimiento de la propia contraseña",
+        "tags": [
+          "autenticacion"
+        ]
+      }
+    },
     "/copropiedades/{id}": {
       "get": {
         "operationId": "CopropiedadesController_leer",
@@ -1717,6 +1754,19 @@
           "estado",
           "correlacion",
           "mensaje"
+        ]
+      },
+      "RestablecimientoRegistradoDto": {
+        "type": "object",
+        "properties": {
+          "registrado": {
+            "type": "boolean",
+            "example": true,
+            "description": "Siempre true; la respuesta es 204 sin cuerpo"
+          }
+        },
+        "required": [
+          "registrado"
         ]
       },
       "CopropiedadDto": {

@@ -19,6 +19,14 @@ export class AuditoriaEnMemoria implements RegistroDeAuditoria {
     recurso: string;
   }[] = [];
 
+  /** Restablecimientos, aparte: la consulta del operador los filtra por tipo. */
+  readonly restablecimientos: {
+    usuarioId: string;
+    rol: string;
+    ip: string | null;
+    userAgent: string | null;
+  }[] = [];
+
   async registrarAccesoCruzado(entrada: {
     usuarioId: string;
     rol: string;
@@ -26,5 +34,14 @@ export class AuditoriaEnMemoria implements RegistroDeAuditoria {
     recurso: string;
   }): Promise<void> {
     this.registros.push(entrada);
+  }
+
+  async registrarRestablecimiento(entrada: {
+    usuarioId: string;
+    rol: string;
+    ip: string | null;
+    userAgent: string | null;
+  }): Promise<void> {
+    this.restablecimientos.push(entrada);
   }
 }

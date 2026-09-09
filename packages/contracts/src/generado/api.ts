@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/restablecimiento": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Registra en auditoría el restablecimiento de la propia contraseña */
+        post: operations["AutenticacionController_registrarRestablecimiento"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}": {
         parameters: {
             query?: never;
@@ -616,6 +633,13 @@ export interface components {
             /** @description Detalle para el cliente en 4xx. En 5xx es siempre «Error interno»: el mensaje original no sale, porque suele llevar nombres de tabla o fragmentos de consulta. */
             mensaje: string | components["schemas"]["DetalleDeErrorDto"];
         };
+        RestablecimientoRegistradoDto: {
+            /**
+             * @description Siempre true; la respuesta es 204 sin cuerpo
+             * @example true
+             */
+            registrado: boolean;
+        };
         CopropiedadDto: {
             /** Format: uuid */
             id: string;
@@ -956,6 +980,34 @@ export interface operations {
             };
             /** @description Token ausente, caducado o inválido. También cuando un rol administrativo presenta un token `aal1`: está autenticado, pero no habilitado (RN-20, CA-25). */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    AutenticacionController_registrarRestablecimiento: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestablecimientoRegistradoDto"];
+                };
+            };
+            /** @description 5 por minuto (§2.7.5) */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -37,3 +37,17 @@ export class SesionDto {
   })
   mfaVerificado!: boolean;
 }
+
+/**
+ * El registro de restablecimiento responde **204 sin cuerpo**: no hay nada que
+ * devolver, y devolver algo invitaría a que la consola lo interpretara. Se
+ * declara igualmente para que el contrato no tenga una operación sin tipo.
+ */
+export class RestablecimientoRegistradoDto {
+  @ApiProperty({
+    type: Boolean,
+    example: true,
+    description: 'Siempre true; la respuesta es 204 sin cuerpo',
+  })
+  registrado!: boolean;
+}

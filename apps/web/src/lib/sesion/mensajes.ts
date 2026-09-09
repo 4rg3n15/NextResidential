@@ -14,6 +14,10 @@ const TEXTOS: Readonly<Record<MotivoDeFalloDeAcceso, string>> = {
   DEMASIADOS_INTENTOS: 'Demasiados intentos. Espera un momento antes de volver a probar.',
   FACTOR_INVALIDO: 'El código no es válido o ya caducó. Genera uno nuevo e inténtalo otra vez.',
   SESION_EXPIRADA: 'La sesión expiró. Vuelve a iniciar sesión.',
+  ENLACE_NO_VALIDO:
+    'El enlace ya se usó o caducó. Los enlaces de recuperación son de un solo uso: pide uno nuevo.',
+  CONTRASENA_DEBIL:
+    'La contraseña no cumple la política de seguridad. Usa al menos 12 caracteres, con mayúsculas, minúsculas y dígitos.',
   SERVICIO_NO_DISPONIBLE:
     'No se pudo contactar con el servicio de identidad. Inténtalo en unos minutos.',
 };

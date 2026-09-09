@@ -8,7 +8,7 @@ import { VerificadorDeJwt } from '../../autenticacion';
 import { RechazoDeAutenticacion } from '../../autenticacion';
 import type { ContextoTenant } from '../../autenticacion';
 import { exigeSegundoFactor } from '../../autenticacion';
-import { CLAVE_PUBLICO } from '../decoradores';
+import { CLAVE_PUBLICO, CLAVE_SIN_SEGUNDO_FACTOR } from '../decoradores';
 import { CLAVE_CONTEXTO } from '../decoradores/contexto.decorator';
 
 /**
@@ -49,7 +49,14 @@ export class GuardaDeAutenticacion implements CanActivate {
       // NO habilitado. Se rechaza aquí y no en el guard de roles para que la
       // regla no dependa de que cada ruta se acuerde de declararla.
       const mfaVerificado = claims.aal === 'aal2';
-      if (exigeSegundoFactor(claims.rol) && !mfaVerificado) {
+      // La exención es por RUTA y se lee del decorador, nunca del token: si
+      // dependiera de algo que trae el cliente, el cliente podría concedérsela.
+      const admiteAal1 =
+        this.reflector.getAllAndOverride<boolean>(CLAVE_SIN_SEGUNDO_FACTOR, [
+          contexto.getHandler(),
+          contexto.getClass(),
+        ]) === true;
+      if (exigeSegundoFactor(claims.rol) && !mfaVerificado && !admiteAal1) {
         throw new RechazoDeAutenticacion('SEGUNDO_FACTOR_REQUERIDO');
       }
 

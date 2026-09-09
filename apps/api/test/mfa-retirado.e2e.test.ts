@@ -35,9 +35,14 @@ describe('las rutas de MFA propias ya no existen', () => {
     expect(mfa, `siguen expuestas: ${mfa.map((r) => r.ruta).join(', ')}`).toEqual([]);
   });
 
-  it('/auth solo expone la lectura de la sesión', () => {
-    const auth = enumerarRutas(app).filter((r) => r.ruta.startsWith('/auth'));
-    expect(auth.map((r) => `${r.metodo} ${r.ruta}`)).toEqual(['GET /auth/sesion']);
+  it('/auth expone exactamente dos rutas, y ninguna es de segundo factor', () => {
+    // La lista es exhaustiva a propósito: comprobar solo que «no hay /auth/mfa»
+    // dejaría entrar cualquier otra ruta nueva sin que nadie la revisara.
+    const auth = enumerarRutas(app)
+      .filter((r) => r.ruta.startsWith('/auth'))
+      .map((r) => `${r.metodo} ${r.ruta}`)
+      .sort();
+    expect(auth).toEqual(['GET /auth/sesion', 'POST /auth/restablecimiento']);
   });
 
   it('un POST a la ruta retirada devuelve 404, no 401 ni 403', async () => {

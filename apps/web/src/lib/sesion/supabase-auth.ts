@@ -30,6 +30,8 @@ export type MotivoDeFalloDeAcceso =
   | 'DEMASIADOS_INTENTOS'
   | 'FACTOR_INVALIDO'
   | 'SESION_EXPIRADA'
+  | 'ENLACE_NO_VALIDO'
+  | 'CONTRASENA_DEBIL'
   | 'SERVICIO_NO_DISPONIBLE';
 
 export class FalloDeAcceso extends Error {
@@ -193,6 +195,75 @@ export const verificarSegundoFactor = async (
   });
   exigirOk(verificacion, 'FACTOR_INVALIDO');
   return aSesion((await verificacion.json()) as RespuestaToken, null);
+};
+
+/**
+ * Solicita el correo de recuperación.
+ *
+ * **Devuelve `void` pase lo que pase, y eso es la decisión.** Supabase responde
+ * igual exista o no la cuenta —por diseño—, pero un fallo de red o un 500 sí
+ * se distinguirían desde fuera si los propagáramos: el atacante mediría el
+ * tiempo o el código y sabría qué correos existen. Aquí se traga todo salvo el
+ * límite de peticiones, que el usuario necesita conocer para no seguir
+ * intentándolo.
+ */
+export const solicitarRecuperacion = async (
+  correo: string,
+  urlDeRedireccion: string,
+): Promise<void> => {
+  try {
+    const respuesta = await pedir('/auth/v1/recover', {
+      method: 'POST',
+      headers: cabeceras(),
+      body: JSON.stringify({ email: correo, options: { redirectTo: urlDeRedireccion } }),
+    });
+    if (respuesta.status === 429) {
+      const espera = Number(respuesta.headers.get('retry-after') ?? '60');
+      throw new FalloDeAcceso('DEMASIADOS_INTENTOS', Number.isFinite(espera) ? espera : 60);
+    }
+  } catch (e) {
+    if (e instanceof FalloDeAcceso && e.motivo === 'DEMASIADOS_INTENTOS') throw e;
+    // Cualquier otro fallo se silencia a propósito: propagarlo permitiría
+    // distinguir «este correo existe» de «este correo no existe» por el
+    // comportamiento, que es justo lo que la respuesta uniforme evita.
+  }
+};
+
+/**
+ * Canjea el `token_hash` del enlace del correo por una sesión de recuperación.
+ *
+ * Se usa el flujo de `token_hash` y no el de fragmento (`#access_token=…`)
+ * porque el token del fragmento **nunca llega al servidor**: se queda en el
+ * navegador, y la consola tendría que manipularlo en JavaScript, que es
+ * exactamente lo que el patrón BFF evita. Con `token_hash` el canje ocurre en
+ * el servidor y el resultado va directo a la cookie `httpOnly`.
+ *
+ * El enlace es de **un solo uso**: Supabase invalida el hash al canjearlo, así
+ * que un segundo intento con el mismo enlace falla. No hay que implementarlo.
+ */
+export const canjearTokenDeRecuperacion = async (tokenHash: string): Promise<SesionSupabase> => {
+  const respuesta = await pedir('/auth/v1/verify', {
+    method: 'POST',
+    headers: cabeceras(),
+    body: JSON.stringify({ type: 'recovery', token_hash: tokenHash }),
+  });
+  exigirOk(respuesta, 'ENLACE_NO_VALIDO');
+  return aSesion((await respuesta.json()) as RespuestaToken, null);
+};
+
+/** Fija la contraseña nueva con la sesión de recuperación ya canjeada. */
+export const cambiarContrasena = async (accessToken: string, contrasena: string): Promise<void> => {
+  const respuesta = await pedir('/auth/v1/user', {
+    method: 'PUT',
+    headers: cabeceras(accessToken),
+    body: JSON.stringify({ password: contrasena }),
+  });
+  // 422 es la respuesta de Supabase a una contraseña que no cumple su política
+  // —longitud, complejidad—. Se distingue del enlace caducado porque la salida
+  // del usuario es distinta: ahí hay que elegir otra contraseña, no pedir otro
+  // correo.
+  if (respuesta.status === 422) throw new FalloDeAcceso('CONTRASENA_DEBIL');
+  exigirOk(respuesta, 'ENLACE_NO_VALIDO');
 };
 
 export const cerrarSesionRemota = async (accessToken: string): Promise<void> => {
