@@ -308,6 +308,47 @@ cerrado —correcto— y era **inutilizable**: nadie podía entrar a la consola.
 el hueco de backend más grande que esta etapa encontró, y no se veía desde
 ninguna prueba porque la suite firma sus propios tokens.
 
+## 6.quater · El arranque en frío, y por qué doce controles no lo vieron
+
+El despliegue real falló en dos puntos encadenados: no había ninguna copropiedad que pasarle al guion, y el guion no podía crear el primer usuario porque `creado_por` es `NOT NULL`.
+
+**El ciclo.** KPI-05 exige columnas de auditoría en toda tabla operativa, y son claves ajenas a `usuarios`:
+
+```
+copropiedades.creado_por  →  usuarios
+usuarios.creado_por       →  usuarios      (a sí misma)
+roles_usuario.creado_por  →  usuarios
+```
+
+Sobre una base vacía no hay nada a lo que apuntar. El único modo de romperlo es una fila de `usuarios` que se referencie a sí misma.
+
+**La respuesta a la pregunta del cliente: el mecanismo existía, y estaba en el sitio equivocado.** `supabase/seed/seed.sql` lo resuelve —y bien—: fija `request.jwt.claims` con una identidad de plataforma, que es la misma vía que usa la aplicación y no un privilegio especial, y crea el actor autorreferenciado. Pero lo hace **dentro del fichero de datos de demostración**, en la misma transacción que crea «Urbanización Mira», sus viviendas y sus residentes. En producción nadie ejecuta ese fichero. La identidad que el sistema necesita para existir estaba atrapada en un fichero cuyo propósito son datos falsos.
+
+**Por qué ninguna prueba lo delataba, que es lo que importa.** No es que las pruebas se salten el camino: es que **entre las dos suites cubrían todo menos el único camino que un despliegue recorre**.
+
+| Suite                              | Qué hace                                         | Por qué no ve esto                                                           |
+| ---------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------- |
+| SQL (`verificar.sh --con-pruebas`) | Migraciones → **semillas** → políticas           | Corre siempre después del seed, así que siempre encuentra el actor ya creado |
+| API (`vitest`)                     | Firma sus propios tokens, adaptadores en memoria | Nunca toca la base: no hay `creado_por` que violar                           |
+
+Cada una es correcta para lo suyo. El hueco estaba justo entre ambas, y esa forma —«dos controles que se solapan y dejan un hueco en el medio»— es la variante que faltaba en la lista de este proyecto.
+
+**La corrección.** Migración `0025`: el actor de sistema pasa a ser infraestructura, con identificador fijo, y las funciones de aprovisionamiento se ejecutan **en una sola transacción**. Eso último no es un detalle de estilo: `tg_usuario_tenant` es `DEFERRABLE INITIALLY DEFERRED` y se comprueba al commit, así que el usuario y su rol deben escribirse juntos — y cada petición REST es una transacción distinta. El guion antiguo no podía funcionar **ni arreglando `creado_por`**.
+
+**Ninguna restricción se debilitó.** Las columnas siguen siendo `NOT NULL`; lo que hay es un actor explícito y trazable, y las filas de arranque quedan atribuidas a él.
+
+**Tres defectos más, que solo aparecen ejecutando:**
+
+| Defecto                                                                      | Cómo se veía                                                                                                                   |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `0024` daba por hecho el rol `supabase_auth_admin`                           | En un clúster desnudo no existe: la migración abortaba en su primer `GRANT`. Lo aporta la plataforma, igual que `service_role` |
+| La aserción de `0025` medía **visibilidad RLS**, no existencia               | Decía «no existe el actor de sistema» mientras un `INSERT` posterior chocaba con su clave primaria                             |
+| La validación de `arranque_vincular_usuario` leía antes de fijar el contexto | Respondía «no existe esa copropiedad» sobre una que sí existía — el mismo mensaje engañoso que originó todo esto               |
+
+**La prueba.** `supabase/arranque-en-frio.sh` recorre base vacía → migraciones sin semillas → aprovisionamiento → claims válidos, y comprueba también que la base parte vacía de verdad, que ninguna columna de auditoría perdió su `NOT NULL` —con una única excepción declarada, `auditoria_seguridad.creado_por`, que caduca sola—, que un identificador inexistente se rechaza con causa, que repetir no duplica y que el gancho no fabrica `aal`. Cuatro mutaciones comprobadas. Es el paso **12b** de `verificar-etapa.sh --con-base`.
+
+---
+
 ---
 
 ## 7 · Verificación de seguridad (§2.7)
