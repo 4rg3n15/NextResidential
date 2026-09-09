@@ -260,6 +260,48 @@ try {
       ? ok('una suite reproducible sí pasa')
       : mal('el control rechaza una suite que es estable');
   }
+  console.log('\n▸ 8 · entrar en un módulo por dentro, y no por su barril, se detecta');
+  {
+    /**
+     * Sonda de la ETAPA 08 (D-34). Se construye un árbol SINTÉTICO —dos módulos
+     * y nada más— en vez de usar el clon del repositorio.
+     *
+     * Motivo, aprendido al escribirla: el clon es de HEAD, que todavía traía
+     * las 35 violaciones que esta etapa corrige, así que la comprobación de la
+     * vía legítima salía roja por culpa de ficheros ajenos a la sonda. Un
+     * control se prueba contra un caso aislado, no contra el ruido del árbol.
+     */
+    const arbol = join(banco, 'frontera');
+    const src = join(arbol, 'apps', 'api', 'src');
+    const padronApp = join(src, 'padron', 'aplicacion');
+    const autDominio = join(src, 'autenticacion', 'dominio');
+    mkdirSync(padronApp, { recursive: true });
+    mkdirSync(autDominio, { recursive: true });
+    writeFileSync(join(autDominio, 'claims.ts'), 'export type X = string;\n');
+
+    const conImport = (especificador) =>
+      writeFileSync(
+        join(padronApp, 'sonda-frontera.ts'),
+        `import type { X } from '${especificador}';\nexport type Y = X;\n`,
+      );
+
+    conImport('../../autenticacion/dominio/claims');
+    const r = correr('node', ['scripts/lib/frontera-modulos.mjs', arbol]);
+    r.codigo !== 0 && /sonda-frontera/.test(r.salida)
+      ? ok('detectada, con salida distinta de cero')
+      : mal(`NO detectada (codigo ${r.codigo})`);
+
+    // Y el barril sí se acepta: un control que rechazara también la vía
+    // legítima obligaría a desactivarlo, que es la peor forma de no tenerlo.
+    writeFileSync(
+      join(src, 'autenticacion', 'index.ts'),
+      "export type { X } from './dominio/claims';\n",
+    );
+    conImport('../../autenticacion');
+    correr('node', ['scripts/lib/frontera-modulos.mjs', arbol]).codigo === 0
+      ? ok('entrar por el barril no es una violación')
+      : mal('el control rechaza la vía legítima');
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -282,4 +324,4 @@ if (fallos > 0) {
   console.log(`\nPRUEBAS NEGATIVAS: ${fallos} comprobación(es) fallaron`);
   process.exit(1);
 }
-console.log('\nPRUEBAS NEGATIVAS: los 7 controles detectan su violación, sin tocar el árbol');
+console.log('\nPRUEBAS NEGATIVAS: los 8 controles detectan su violación, sin tocar el árbol');

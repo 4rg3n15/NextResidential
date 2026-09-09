@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import type { Rol } from '../../autenticacion/dominio/claims';
+import type { Rol } from '../../autenticacion';
 
 export const CLAVE_PUBLICO = 'ncr:publico';
 export const CLAVE_ROLES = 'ncr:roles';

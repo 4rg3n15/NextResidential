@@ -1,8 +1,8 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
-import type { ContextoTenant } from '../autenticacion/dominio/claims';
-import { alcanzaCopropiedad } from '../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../autenticacion';
+import { alcanzaCopropiedad } from '../autenticacion';
 
 export interface RegistroDeAuditoria {
   registrarAccesoCruzado(entrada: {

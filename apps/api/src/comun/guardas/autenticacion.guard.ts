@@ -4,10 +4,10 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
-import { VerificadorDeJwt } from '../../autenticacion/infraestructura/verificador-jwt';
-import { RechazoDeAutenticacion } from '../../autenticacion/dominio/errores';
-import type { ContextoTenant } from '../../autenticacion/dominio/claims';
-import { exigeSegundoFactor } from '../../autenticacion/dominio/claims';
+import { VerificadorDeJwt } from '../../autenticacion';
+import { RechazoDeAutenticacion } from '../../autenticacion';
+import type { ContextoTenant } from '../../autenticacion';
+import { exigeSegundoFactor } from '../../autenticacion';
 import { CLAVE_PUBLICO } from '../decoradores';
 import { CLAVE_CONTEXTO } from '../decoradores/contexto.decorator';
 

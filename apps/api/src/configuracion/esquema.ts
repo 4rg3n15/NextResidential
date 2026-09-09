@@ -43,6 +43,27 @@ export const esquemaConfiguracion = z.object({
   /** Ventana de frescura de la firma, en segundos: acota la repetición. */
   INGESTA_VENTANA_SEGUNDOS: z.coerce.number().int().min(10).max(900).default(300),
 
+  /**
+   * ETAPA 08 · Llave de cifrado de las plantillas biométricas (D-10).
+   *
+   * Se exige al arrancar, como el secreto de la ingesta: una API que levanta
+   * sin llave y falla al guardar la primera plantilla habría dejado que alguien
+   * capturara el rostro de un visitante para nada. Y no se cifra «cuando haya
+   * llave»: el vector se cifra siempre o no se guarda.
+   *
+   * `BIOMETRIA_LLAVE_REF` es lo ÚNICO que se persiste junto a la plantilla —la
+   * migración 0008 lo exige con formato `env:` o `vault:`—. La llave misma no
+   * toca la base: si viviera ahí, quien lea la base leería la llave y el
+   * cifrado no protegería de la fuga que importa.
+   */
+  BIOMETRIA_LLAVE: noVacio('BIOMETRIA_LLAVE').min(32),
+  BIOMETRIA_LLAVE_REF: z
+    .string()
+    .regex(/^(env|vault):[A-Za-z0-9_./-]+$/, 'BIOMETRIA_LLAVE_REF es una referencia, no la llave')
+    .default('env:BIOMETRIA_LLAVE'),
+  /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
+  BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
+
   LIMITE_PAYLOAD: z.string().default('256kb'),
   THROTTLE_TTL_SEGUNDOS: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMITE: z.coerce.number().int().positive().default(120),

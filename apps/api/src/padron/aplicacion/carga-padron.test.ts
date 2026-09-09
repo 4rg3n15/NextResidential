@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CargarPadronDesdeArchivo, analizarCsv } from './carga-padron';
 import type { RepositorioPadron } from './puertos';
-import type { ContextoTenant } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../../autenticacion';
 
 const ctx: ContextoTenant = {
   usuarioId: 'u1',

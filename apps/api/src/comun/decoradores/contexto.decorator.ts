@@ -1,7 +1,7 @@
 import { createParamDecorator } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
-import type { ContextoTenant } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../../autenticacion';
 
 export const CLAVE_CONTEXTO = 'ncrContexto';
 

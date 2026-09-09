@@ -4,7 +4,7 @@ import { IsUUID } from 'class-validator';
 import { Aislamiento } from './aislamiento';
 import { PermiteServicio, Roles } from '../comun/decoradores';
 import { Contexto } from '../comun/decoradores/contexto.decorator';
-import type { ContextoTenant } from '../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../autenticacion';
 
 export class IngestaDto {
   @IsUUID()

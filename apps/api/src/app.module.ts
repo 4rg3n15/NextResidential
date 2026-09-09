@@ -3,15 +3,16 @@ import type { DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ConfiguracionModule } from './configuracion/configuracion.module';
-import { AutenticacionModule } from './autenticacion/autenticacion.module';
+import { AutenticacionModule } from './autenticacion';
 import { GuardaDeAutenticacion } from './comun/guardas/autenticacion.guard';
 import { GuardaDeRoles } from './comun/guardas/roles.guard';
 import { MultiempresaModule } from './multiempresa/multiempresa.module';
-import { PadronModule } from './padron/padron.module';
-import { AutorizacionesModule } from './autorizaciones/autorizaciones.module';
-import { EventosModule } from './eventos/eventos.module';
-import { ZonasModule } from './zonas/zonas.module';
-import { limitadorPorDispositivo } from './eventos/presentacion/limite-por-dispositivo';
+import { PadronModule } from './padron';
+import { AutorizacionesModule } from './autorizaciones';
+import { EventosModule } from './eventos';
+import { ZonasModule } from './zonas';
+import { BiometriaModule } from './biometria';
+import { limitadorPorDispositivo } from './eventos';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
 import { NucleoModule } from './nucleo/nucleo.module';
@@ -34,6 +35,7 @@ export class AppModule {
         MultiempresaModule,
         PadronModule.registrar(),
         ZonasModule.registrar(),
+        BiometriaModule.registrar(),
         EventosModule.registrar(),
         AutorizacionesModule.registrar(),
         // Dos limitadores con NOMBRE, y cada uno cuenta por lo suyo: `default`

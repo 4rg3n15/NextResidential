@@ -1,7 +1,7 @@
 import { Placa } from '@ncr/domain-core';
 import { esExito } from '@ncr/domain-core';
 import type { RepositorioPadron } from './puertos';
-import type { ContextoTenant } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant } from '../../autenticacion';
 
 /**
  * Carga de padrón desde archivo (HU-03).

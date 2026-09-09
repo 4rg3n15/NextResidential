@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-08 · al cierre de la **ETAPA 07**
+**Última actualización:** 2026-09-08 · al cierre de la **ETAPA 08**
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,15 +18,15 @@
 
 ## Resumen
 
-|                                |                                                                               |
-| ------------------------------ | ----------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **7 de 17** (ETAPAS 00 a 07)                                                  |
-| **Etapa siguiente habilitada** | **ETAPA 08 — Biometría: consentimiento, calidad y supresión**                 |
-| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado            |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                        |
-| **Decisiones pendientes**      | 7 abiertas — P-04 resuelta en la ETAPA 07                                     |
-| **Supuestos vigentes**         | 10 — S-09 **cerrado por implementación**; nuevo S-17 (zona común restringida) |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                         |
+|                                |                                                                         |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08)                                            |
+| **Etapa siguiente habilitada** | **ETAPA 09 — Consola web de administración** (la 12 también habilitada) |
+| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado      |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                  |
+| **Decisiones pendientes**      | 7 abiertas — P-03 con supuesto vigente y ya configurable                |
+| **Supuestos vigentes**         | 11 — nuevo S-18 (umbrales de calidad de captura, inyectables)           |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                   |
 
 ---
 
@@ -42,8 +42,8 @@
 | 05     | Autorizaciones y motor de reglas + MockProvider               | `etapa-05-autorizaciones-motor-reglas` | 04 ✅                            | **CERRADA**                      | [ETAPA-05](etapas/ETAPA-05.md) |
 | 06     | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05 ✅                            | **CERRADA**                      | [ETAPA-06](etapas/ETAPA-06.md) |
 | 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06 ✅                            | **CERRADA**                      | [ETAPA-07](etapas/ETAPA-07.md) |
-| 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
-| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07, 08                           | PENDIENTE                        | —                              |
+| 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                            | **CERRADA**                      | [ETAPA-08](etapas/ETAPA-08.md) |
+| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **PENDIENTE** — habilitada       | —                              |
 | 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09                               | PENDIENTE                        | —                              |
 | 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09                               | PENDIENTE                        | —                              |
 | 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
@@ -286,7 +286,33 @@ La primera ejecución del usuario falló con `socket hang up` en la primera prue
 
 `"lint": "eslint src"` dejaba **`apps/api/test/` —diez ficheros— fuera de ESLint en CI**. Solo lo veía el gancho de pre-commit, que es local y se puede saltar con `--no-verify`. Se destapó al intentar el commit de esta etapa: dos errores que `pnpm lint` había dado por buenos. Corregido a `eslint src test`. Misma familia que los anteriores: **un control que existe y no alcanza lo que cree alcanzar.**
 
-## Etapas 08 a 16 — `PENDIENTE`
+## ETAPA 08 — Biometría con consentimiento · **CERRADA**
+
+Ciclo completo del dato más sensible del sistema: captura, calidad, consentimiento del **titular**, sincronización, supresión y retirada de cada terminal. Agregados `ConsentimientoBiometrico` y `PlantillaBiometrica`, `PolíticaConsentimiento` (§2.2), cinco casos de uso, bóveda AES-256-GCM y superficie HTTP contra `MockProvider` (ADR-03). **645 pruebas en 53 ficheros**; cobertura por capa en el contenedor Linux: dominio 98,61 % (ramas 97,78 %), aplicación 98,15 %, global 90,04 %. Informe en `docs/etapas/ETAPA-08.md`; entregable en `docs/seguridad/ciclo-vida-biometrico.md`.
+
+### RN-10 no se cumple con un `if`, sino con una ausencia
+
+No hay columna donde escribir «el residente consintió por él» (D-08), no existe el método `delegar` —una prueba enumera el prototipo y falla si alguien lo añade— y `quienResponde` sale del token, nunca del cuerpo: si lo pusiera el cliente, la regla sería una casilla que cualquiera marca.
+
+### El cerrojo que faltaba, quinta aparición de la misma familia
+
+Sincronizar no es cambiar el estado de la plantilla: es escribir la fila que dice que está en **ESE equipo**. `plantilla_sincronizaciones` no tenía disparador, así que esa fila se insertaba con el consentimiento pendiente, rechazado o revocado. Los dos cerrojos de la ETAPA 01 vigilaban la puerta de al lado, y no se veía **porque no había filas que la cruzaran** — como la clave ajena imposible de la ETAPA 06, esta vez sobre el dato más sensible. Migración `0022`: ahora son tres niveles, los tres verificados por mutación.
+
+### El vector no sale porque no hay operación que lo saque
+
+`BovedaDePlantillas` no ofrece `leerVector`. Se cifra al guardar y se descifra dentro del adaptador, hacia la terminal. Exponerlo exigiría **añadir la operación al puerto**, que es una decisión visible en una revisión y no un descuido. Una prueba e2e lo vigila enumerando el enrutador, no leyendo el código. GCM y no CBC porque hace falta autenticar: sin etiqueta, quien escriba en la base sustituye la plantilla de un visitante por la suya y el lector la acepta.
+
+### Tres defectos propios, encontrados por la prueba y por la mutación
+
+1. El encolado de la retirada usaba `'pendiente'` y **el cerrojo nuevo lo rechazaba**: dos garantías escritas la misma tarde chocando. El error era del encolado —ahí `'pendiente'` significa «pendiente de sincronizar»—. La cola de retirada no necesita estado: es derivable, y un estado derivable que se persiste acaba desincronizado de su origen.
+2. La prueba de la cota legal **daba verde con el CHECK retirado**: la hacía sobre la plantilla de un visitante, donde otro disparador la salvaba. Probaba otro control creyendo probar este.
+3. Sincronizar contra una terminal desconocida devolvía **500**. Un lector apagado es un fallo técnico (503, con el equipo nombrado); confundirlo con el 403 del consentimiento acusa al visitante de algo que no hizo.
+
+### D-34 cerrado: eran 35, no tres
+
+La cuenta de la ETAPA 07 salió de un `grep` que solo veía `../<modulo>/<capa>` y se dejaba fuera todos los `../../`. `scripts/lib/frontera-modulos.mjs` es el control, octavo con prueba negativa; qué cuenta como módulo se deriva de la estructura, así que `biometria` quedó cubierto el día que se creó.
+
+## Etapas 09 a 16 — `PENDIENTE`
 
 Sin trabajo iniciado. Cada etapa se habilita cuando la anterior queda cerrada.
 
@@ -341,6 +367,17 @@ Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contr
 | D-12 | Que `postgres` pueda `GRANT authenticated TO app_api` es un supuesto sin verificar contra el proyecto real ([SUPUESTO] S-12). La documentación de Supabase concede en la dirección contraria                                                      | Enmienda 2 del ADR-005  | Sonda de `CONEXION_SUPABASE.md` §12.1, antes de crear el rol                                                                           |
 
 ---
+
+## Deuda de la ETAPA 08
+
+| ID   | Deuda                                                                                                         | Se salda en                                                 |
+| ---- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| D-34 | Importaciones que entran en un módulo por dentro y no por su barril                                           | **CERRADA** en la ETAPA 08, con control y prueba negativa   |
+| D-39 | Repositorios de biometría y almacén de sobres cifrados, en memoria                                            | Misma raíz que D-25, D-35 y D-17. La frontera es definitiva |
+| D-40 | `BarrerPlantillasVencidas` sin planificador: hoy se invoca por su ruta HTTP                                   | ETAPA 14, con pg-boss                                       |
+| D-41 | La derivación de la llave es `sha256` del secreto; procede una KDF con sal por copropiedad                    | ETAPA 13, con el procedimiento de rotación                  |
+| D-42 | El sistema no distingue a un menor de edad, cuyo dato biométrico exige consentimiento del representante legal | Decisión de Grupo Control antes de producción               |
+| D-43 | `LatidoDto` cruza de `eventos` a `autorizaciones`: el controlador de ingesta vive en el módulo equivocado     | ETAPA 15                                                    |
 
 ## Deuda de la ETAPA 07
 

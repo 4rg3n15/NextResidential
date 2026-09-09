@@ -4,7 +4,7 @@ import { RELOJ } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import { Publico } from '../comun/decoradores';
-import { ProveedorDeJwks } from '../autenticacion/infraestructura/jwks';
+import { ProveedorDeJwks } from '../autenticacion';
 import type { Configuracion } from '../configuracion/esquema';
 
 /**

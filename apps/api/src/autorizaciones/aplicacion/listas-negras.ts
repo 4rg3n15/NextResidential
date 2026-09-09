@@ -1,7 +1,7 @@
 import type { ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
 import { errorDominio, exito, fallo } from '@ncr/domain-core';
-import type { ContextoTenant, Rol } from '../../autenticacion/dominio/claims';
-import { alcanzaCopropiedad } from '../../autenticacion/dominio/claims';
+import type { ContextoTenant, Rol } from '../../autenticacion';
+import { alcanzaCopropiedad } from '../../autenticacion';
 import type { RepositorioListaNegra } from './puertos';
 
 /**
