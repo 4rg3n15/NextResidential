@@ -5,33 +5,35 @@
  * LO QUE ESTE GUION NO HACE, y no es una limitación sino el diseño:
  *
  *  - **No crea usuarios ni contraseñas.** El alta la hace una persona en el
- *    panel de Supabase, o el propio usuario por invitación. Una contraseña
- *    generada por una herramienta acaba en el historial del intérprete de
- *    órdenes, en un registro de CI o en una captura de pantalla.
- *  - **No lee ningún secreto de un fichero del repositorio.** Las credenciales
- *    salen del entorno: `SUPABASE_URL` y `SUPABASE_SECRET_KEY`. Si falta
- *    alguna, el guion se detiene antes de hacer nada.
- *  - **No inscribe el segundo factor.** Eso lo hace el titular desde su
- *    aplicación de autenticación (ADR-008); nadie más debería poder.
+ *    panel, o el propio usuario por invitación. Una contraseña generada por una
+ *    herramienta acaba en el historial del intérprete de órdenes, en un
+ *    registro de CI o en una captura de pantalla.
+ *  - **No lee ningún secreto de un fichero del repositorio.** Sale del entorno.
+ *  - **No inscribe el segundo factor.** Lo hace el titular desde su propia
+ *    sesión (ADR-008); nadie más debería poder.
  *
- * Lo que sí hace: enlazar la identidad de Supabase con `public.usuarios` y
- * darle una fila en `public.roles_usuario`, que es lo que el gancho de claims
- * de la migración 0024 lee para emitir `rol` y `copropiedad_id`.
+ * POR QUÉ LLAMA A UNA FUNCIÓN Y NO INSERTA. La versión anterior escribía en
+ * `usuarios` y `roles_usuario` con dos peticiones REST, y fallaba con
+ * `creado_por` nulo. Corregir esa columna no habría bastado:
  *
- * Usa la llave SECRETA, que OMITE la RLS. Por eso es un guion de operador que
- * se ejecuta a mano y no un endpoint: §2.7.6 exige que toda ruta que use esa
- * llave valide la copropiedad en la capa de aplicación, y aquí quien valida es
- * la persona que lo ejecuta.
+ *  1. `creado_por` y `actualizado_por` son NOT NULL en las tres tablas del
+ *     arranque, y son claves ajenas a `usuarios`. Sobre una base vacía no hay
+ *     ningún usuario al que apuntar: es un ciclo, y lo rompe el **actor de
+ *     sistema** de la migración 0025.
+ *  2. `tg_usuario_tenant` es un disparador de restricción DEFERRABLE INITIALLY
+ *     DEFERRED, o sea que se comprueba **al commit**. El usuario y su rol
+ *     tienen que escribirse en la MISMA transacción, y cada petición REST es
+ *     una transacción distinta. Desde aquí no se podía.
+ *
+ * Por eso la escritura vive en `arranque_vincular_usuario` y este guion es
+ * transporte y validación de argumentos.
  *
  *   SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
  *   node scripts/aprovisionar-rol.mjs \
- *     --correo admin@copropiedad.com \
- *     --rol administrador \
- *     --copropiedad 00000000-0000-4000-8000-000000000001 \
- *     --nombre "Nombre Apellido"
- *
- * El superadministrador se aprovisiona SIN `--copropiedad`.
+ *     --correo admin@copropiedad.com --rol administrador \
+ *     --copropiedad <uuid> --nombre "Nombre Apellido"
  */
+import { crearCliente, exigirCopropiedad, leerArgumentos, morir } from './lib/supabase-admin.mjs';
 
 const ROLES = [
   'superadministrador',
@@ -41,83 +43,38 @@ const ROLES = [
   'residente',
   'servicio',
 ];
-
-const leerArgumentos = (argv) => {
-  const args = {};
-  for (let i = 0; i < argv.length; i += 1) {
-    const actual = argv[i];
-    if (!actual.startsWith('--')) continue;
-    const siguiente = argv[i + 1];
-    args[actual.slice(2)] =
-      siguiente !== undefined && !siguiente.startsWith('--') ? siguiente : 'true';
-  }
-  return args;
-};
-
-const morir = (mensaje) => {
-  console.error(`\n✗ ${mensaje}\n`);
-  process.exit(1);
-};
-
-const entorno = (nombre) => {
-  const valor = process.env[nombre];
-  if (valor === undefined || valor.trim() === '') {
-    morir(
-      `Falta la variable de entorno ${nombre}. No se lee de ningún fichero del ` +
-        'repositorio a propósito: expórtala en la sesión donde ejecutes esto.',
-    );
-  }
-  return valor.replace(/\/+$/, '');
-};
+const EXIGEN_MFA = new Set(['superadministrador', 'administrador', 'operador_central']);
 
 const args = leerArgumentos(process.argv.slice(2));
 const correo = args.correo;
 const rol = args.rol;
-const copropiedad = args.copropiedad ?? null;
+const copropiedad = args.copropiedad;
 const nombre = args.nombre ?? correo;
 
 if (correo === undefined || rol === undefined) {
-  morir('Uso: --correo <correo> --rol <rol> [--copropiedad <uuid>] [--nombre "..."]');
+  morir('Uso: --correo <correo> --rol <rol> --copropiedad <uuid> [--nombre "..."]');
 }
-if (!ROLES.includes(rol)) morir(`Rol no válido: «${rol}». Válidos: ${ROLES.join(', ')}`);
-if (rol !== 'superadministrador' && copropiedad === null) {
-  morir(`El rol «${rol}» necesita --copropiedad. Solo el superadministrador va sin ella.`);
+if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) morir(`«${correo}» no tiene forma de correo.`);
+if (!ROLES.includes(rol)) morir(`Rol no válido: «${rol}».\n  Válidos: ${ROLES.join(', ')}`);
+if (copropiedad === undefined) {
+  morir(
+    'Falta --copropiedad.\n' +
+      '  También el superadministrador la necesita: `roles_usuario.copropiedad_id` es NOT NULL.\n' +
+      '  No lo ata a ella — su alcance real es global y lo resuelve `app.es_superadmin()`,\n' +
+      '  y su `usuarios.copropiedad_id` queda nulo.',
+  );
 }
 
-const SUPABASE_URL = entorno('SUPABASE_URL');
-const SECRETO = entorno('SUPABASE_SECRET_KEY');
+const cliente = crearCliente();
 
-const cabeceras = {
-  apikey: SECRETO,
-  Authorization: `Bearer ${SECRETO}`,
-  'Content-Type': 'application/json',
-};
-
-const pedir = async (ruta, opciones = {}) => {
-  const respuesta = await fetch(`${SUPABASE_URL}${ruta}`, {
-    ...opciones,
-    headers: { ...cabeceras, ...(opciones.headers ?? {}) },
-  });
-  if (!respuesta.ok) {
-    const cuerpo = await respuesta.text();
-    // El cuerpo puede traer detalles; la llave NUNCA se imprime.
-    morir(`${opciones.method ?? 'GET'} ${ruta} → ${respuesta.status}\n  ${cuerpo.slice(0, 400)}`);
-  }
-  const texto = await respuesta.text();
-  return texto === '' ? null : JSON.parse(texto);
-};
+// Los argumentos se validan ANTES de escribir nada. El fallo que motivó esta
+// versión fue llegar hasta el INSERT con un identificador que no existía.
+await exigirCopropiedad(cliente, copropiedad);
 
 console.log(`\n▸ Aprovisionando «${correo}» como ${rol}`);
 
-// 1 · La identidad TIENE que existir ya. Si no existe, se dice qué hacer y se
-//     para: crearla aquí implicaría inventar una contraseña.
-const listado = await pedir(
-  `/auth/v1/admin/users?filter=${encodeURIComponent(correo)}&per_page=200`,
-);
-const usuarios = Array.isArray(listado?.users) ? listado.users : [];
-const identidad = usuarios.find((u) => (u.email ?? '').toLowerCase() === correo.toLowerCase());
-
-if (identidad === undefined) {
+const identidad = await cliente.identidadPorCorreo(correo);
+if (identidad === null) {
   morir(
     `No existe ninguna identidad con el correo «${correo}» en Supabase Auth.\n` +
       '  Créala primero en Authentication → Users → Add user (o envíale una invitación).\n' +
@@ -126,75 +83,19 @@ if (identidad === undefined) {
 }
 console.log(`   ✓ identidad encontrada: ${identidad.id}`);
 
-// 2 · Fila en `public.usuarios`, enlazada por `auth_user_id`.
-const existentes = await pedir(
-  `/rest/v1/usuarios?auth_user_id=eq.${identidad.id}&select=id,estado`,
-);
-let usuarioId = existentes?.[0]?.id ?? null;
+const usuarioId = await cliente.rpc('arranque_vincular_usuario', {
+  p_auth_user_id: identidad.id,
+  p_correo: correo,
+  p_nombre: nombre,
+  p_rol: rol,
+  p_copropiedad_id: copropiedad,
+});
 
-if (usuarioId === null) {
-  const creado = await pedir('/rest/v1/usuarios', {
-    method: 'POST',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify([
-      {
-        auth_user_id: identidad.id,
-        correo,
-        nombre,
-        copropiedad_id: copropiedad,
-        // `creado_por` y `actualizado_por` son NOT NULL y apuntan a un usuario.
-        // El primero del sistema se apunta a sí mismo: no hay nadie anterior.
-        creado_por: null,
-        actualizado_por: null,
-      },
-    ]),
-  });
-  usuarioId = creado?.[0]?.id;
-  if (usuarioId === undefined) morir('No se pudo crear la fila en public.usuarios');
-  await pedir(`/rest/v1/usuarios?id=eq.${usuarioId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ creado_por: usuarioId, actualizado_por: usuarioId }),
-  });
-  console.log(`   ✓ public.usuarios creado: ${usuarioId}`);
-} else {
-  console.log(`   · public.usuarios ya existía: ${usuarioId}`);
-}
-
-// 3 · Rol. Idempotente: si ya lo tiene vigente, no se duplica.
-const rolesActuales = await pedir(
-  `/rest/v1/roles_usuario?usuario_id=eq.${usuarioId}&rol=eq.${rol}&estado=eq.activo&select=id` +
-    (copropiedad === null ? '' : `&copropiedad_id=eq.${copropiedad}`),
-);
-
-if ((rolesActuales ?? []).length > 0) {
-  console.log('   · el rol ya estaba asignado y vigente; nada que hacer');
-} else {
-  if (copropiedad === null) {
-    morir(
-      'El superadministrador también necesita una fila en roles_usuario, y esa tabla\n' +
-        '  exige copropiedad_id NOT NULL. Pásale --copropiedad con cualquiera de las\n' +
-        '  copropiedades activas: su alcance real es global y lo resuelve app.es_superadmin().',
-    );
-  }
-  await pedir('/rest/v1/roles_usuario', {
-    method: 'POST',
-    body: JSON.stringify([
-      {
-        usuario_id: usuarioId,
-        copropiedad_id: copropiedad,
-        rol,
-        creado_por: usuarioId,
-        actualizado_por: usuarioId,
-      },
-    ]),
-  });
-  console.log(`   ✓ rol ${rol} asignado`);
-}
-
+console.log(`   ✓ public.usuarios + roles_usuario: ${usuarioId}`);
 console.log(
-  '\n▸ Listo. El gancho de claims (migración 0024) emitirá `rol` y `copropiedad_id`\n' +
-    '  en el PRÓXIMO token: si la persona tenía sesión abierta, tiene que volver a entrar.\n' +
-    (['superadministrador', 'administrador', 'operador_central'].includes(rol)
+  '\n▸ Listo. El gancho de claims (migración 0024) emitirá `rol` y `copropiedad_id` en el\n' +
+    '  PRÓXIMO token: si la persona tenía sesión abierta, tiene que volver a entrar.\n' +
+    (EXIGEN_MFA.has(rol)
       ? '  Este rol EXIGE segundo factor (RN-20): sin él, la API responderá 401.\n'
       : ''),
 );

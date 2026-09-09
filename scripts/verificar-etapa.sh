@@ -206,6 +206,18 @@ if [[ "$CON_BASE" == "1" ]]; then
   else
     mal "suite SQL (ver /tmp/ncr-sql.log)"
   fi
+  paso "12b · arranque en frío: base vacía → migraciones → superadministrador"
+  # ETAPA 09-A · el camino que un despliegue recorre de verdad y que ninguna
+  # suite tocaba: la SQL corre después de las semillas y la de la API firma sus
+  # propios tokens contra adaptadores en memoria. Entre las dos cubrían todo
+  # menos esto, y el usuario se lo encontró desplegando.
+  if con_limite "$LIMITE_LARGO" ./supabase/arranque-en-frio.sh >/tmp/ncr-arranque.log 2>&1; then
+    ok "una base recién migrada llega a un superadministrador con claims válidos"
+  else
+    mal "el arranque en frío está roto (ver /tmp/ncr-arranque.log)"
+    grep -E "ERROR|ASSERT" /tmp/ncr-arranque.log | head -5 | sed 's/^/     /'
+  fi
+
   paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base"
   # Estas dos pruebas se OMITEN solas si no alcanzan la base, y una omisión no
   # es un verde. Se comprueba la marca «OMITIDA» de su salida: sin esto, el

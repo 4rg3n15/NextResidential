@@ -47,6 +47,17 @@ psql -d postgres -Atqc "DO \$\$ BEGIN
     ALTER ROLE service_role BYPASSRLS;
   END \$\$;" >/dev/null 2>&1 || true
 
+# `supabase_auth_admin` es el rol con el que GoTrue se conecta, y es quien
+# ejecuta el gancho de claims (migración 0024). Igual que `service_role`, lo
+# trae la PLATAFORMA: no lo puede crear una migración —sería una migración
+# inventándose un rol del proveedor— y sin él la 0024 aborta en su primer
+# GRANT. Se descubrió al reproducir el arranque en frío el 2026-09-09.
+psql -d postgres -Atqc "DO \$\$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='supabase_auth_admin') THEN
+      CREATE ROLE supabase_auth_admin NOLOGIN;
+    END IF;
+  END \$\$;" >/dev/null 2>&1 || true
+
 APLICADOR="$PGUSER"
 if [[ "$MODO_SUPABASE" == "1" ]]; then
   APLICADOR=sb_postgres_sim
@@ -90,7 +101,7 @@ done
 # tres veces anteriores —un detalle del entorno que hace inerte un control—,
 # aquí en la dirección contraria: no daba un verde falso, dejaba la suite sin
 # poder correr.
-psql -d postgres -Atqc "GRANT anon, authenticated, service_role TO ${APLICADOR} WITH SET TRUE;" >/dev/null 2>&1 || true
+psql -d postgres -Atqc "GRANT anon, authenticated, service_role, supabase_auth_admin TO ${APLICADOR} WITH SET TRUE;" >/dev/null 2>&1 || true
 
 if [[ "${1:-}" == "--con-semillas" || "${1:-}" == "--con-pruebas" ]]; then
   printf '  %-62s' "seed.sql"
