@@ -35,7 +35,7 @@ const buscar = (dir, prueba, acc = []) => {
 };
 
 const ficheros = ['apps', 'packages']
-  .flatMap((d) => buscar(join(raiz, d), (f) => /\.(test|spec)\.ts$/.test(f)))
+  .flatMap((d) => buscar(join(raiz, d), (f) => /\.(test|spec)\.tsx?$/.test(f)))
   .sort();
 
 console.log(`## Ficheros de prueba en disco: ${ficheros.length}\n`);
@@ -77,6 +77,13 @@ const paquetes = [
   // ausencia aquí habría dejado 23 ficheros medidos de 24 en disco — el hueco
   // exacto que el paso 6 existe para detectar.
   ['@ncr/providers', 'packages/providers'],
+  // ETAPA 09 · el preset compartido y la consola. `@ncr/config` trae la
+  // verificación de contraste de AA, que es una comprobación de producto y no
+  // un detalle de estilo; `@ncr/web`, la lógica del canal, la CSP y los
+  // estados. Dejarlos fuera habría reproducido el hueco de `@ncr/providers`:
+  // ficheros de prueba en disco que nadie mide.
+  ['@ncr/config', 'packages/config'],
+  ['@ncr/web', 'apps/web'],
 ];
 
 let totalPruebas = 0;
