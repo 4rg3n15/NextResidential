@@ -2,3 +2,5 @@ dist
 coverage
 pnpm-lock.yaml
 supabase/migrations
+packages/contracts/openapi.json
+packages/contracts/src/generado

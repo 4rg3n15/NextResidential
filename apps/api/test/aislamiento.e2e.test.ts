@@ -25,11 +25,14 @@ const PUBLICAS = new Set(['GET /health', 'GET /ready']);
  * alguien añade un endpoint sin ese decorador, entra en el recorrido de fuga
  * automáticamente.
  */
-const SIN_RECURSO_TENANT = new Set([
-  '/auth/sesion',
-  '/auth/mfa/inscripcion',
-  '/auth/mfa/verificacion',
-]);
+const SIN_RECURSO_TENANT = new Set(['/auth/sesion', '/auth/restablecimiento']);
+
+/**
+ * Rutas que declaran `@SinSegundoFactor()`: alcanzables con `aal1` por un rol
+ * administrativo. **La lista es de UNA**, y esta suite existe para que siga
+ * siéndolo: ampliarla es relajar RN-20, y tiene que verse en el diff.
+ */
+const SIN_SEGUNDO_FACTOR = new Set(['/auth/restablecimiento']);
 
 beforeAll(async () => {
   firmante = await crearFirmante();
@@ -192,6 +195,54 @@ describe('CA-24 · todo acceso cruzado queda registrado', () => {
       copropiedadSolicitada: COP_B,
       rol: 'administrador',
     });
+  });
+});
+
+describe('la exención del segundo factor no crece sin que nadie lo vea', () => {
+  it('solo /auth/restablecimiento es alcanzable con aal1 por un rol administrativo', async () => {
+    const token = await tokenDe(firmante, {
+      rol: 'administrador',
+      copropiedadId: COP_A,
+      aal: 'aal1',
+    });
+    const alcanzables: string[] = [];
+    for (const r of rutas) {
+      if (PUBLICAS.has(`${r.metodo} ${r.ruta}`)) continue;
+      const res = await invocar(r, token);
+      // 401 es lo esperado para un administrativo con aal1. Cualquier otra cosa
+      // significa que la ruta lo dejó pasar el guard de autenticación.
+      if (res.status !== 401) alcanzables.push(r.ruta);
+    }
+    expect(new Set(alcanzables)).toEqual(SIN_SEGUNDO_FACTOR);
+  });
+
+  it('con aal1 un administrador NO alcanza ninguna ruta de copropiedad', async () => {
+    const token = await tokenDe(firmante, {
+      rol: 'administrador',
+      copropiedadId: COP_A,
+      aal: 'aal1',
+    });
+    const res = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_A}/tablero/indicadores`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('cobertura tras la ETAPA 09-A', () => {
+  it('los endpoints del tablero entraron solos en el recorrido', () => {
+    // Confirmación explícita de lo que la ETAPA 09-A añadió: tres rutas de
+    // lectura bajo `copropiedades/:id`. Nadie las escribió en esta suite; los
+    // recorridos de arriba las atacaron con un token de OTRA copropiedad y
+    // ninguna devolvió 2xx. Si mañana alguien monta el tablero fuera de
+    // `copropiedades/:id`, esto se pone rojo antes que la fuga.
+    const tablero = rutas.filter((r) => r.ruta.includes('/tablero/'));
+    expect(tablero.map((r) => r.ruta).sort()).toEqual([
+      '/copropiedades/:id/tablero/accesos-por-hora',
+      '/copropiedades/:id/tablero/dispositivos',
+      '/copropiedades/:id/tablero/indicadores',
+    ]);
+    expect(tablero.every((r) => !SIN_RECURSO_TENANT.has(r.ruta))).toBe(true);
   });
 });
 

@@ -26,7 +26,19 @@ const PROHIBIDO_EN_DOMINIO = [
 ];
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '**/.turbo/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '**/.turbo/**',
+      '**/.next/**',
+      // Código GENERADO desde el contrato (§2.6). Formatearlo o corregirlo lo
+      // desincroniza del generador y `contrato:desfasado` rompe el build en el
+      // commit siguiente — ocurrió con el gancho de prettier el 2026-09-09.
+      '**/src/generado/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

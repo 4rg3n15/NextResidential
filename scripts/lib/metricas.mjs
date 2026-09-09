@@ -35,7 +35,7 @@ const buscar = (dir, prueba, acc = []) => {
 };
 
 const ficheros = ['apps', 'packages']
-  .flatMap((d) => buscar(join(raiz, d), (f) => /\.(test|spec)\.ts$/.test(f)))
+  .flatMap((d) => buscar(join(raiz, d), (f) => /\.(test|spec)\.tsx?$/.test(f)))
   .sort();
 
 console.log(`## Ficheros de prueba en disco: ${ficheros.length}\n`);
@@ -77,6 +77,13 @@ const paquetes = [
   // ausencia aquí habría dejado 23 ficheros medidos de 24 en disco — el hueco
   // exacto que el paso 6 existe para detectar.
   ['@ncr/providers', 'packages/providers'],
+  // ETAPA 09 · el preset compartido y la consola. `@ncr/config` trae la
+  // verificación de contraste de AA, que es una comprobación de producto y no
+  // un detalle de estilo; `@ncr/web`, la lógica del canal, la CSP y los
+  // estados. Dejarlos fuera habría reproducido el hueco de `@ncr/providers`:
+  // ficheros de prueba en disco que nadie mide.
+  ['@ncr/config', 'packages/config'],
+  ['@ncr/web', 'apps/web'],
 ];
 
 let totalPruebas = 0;
@@ -93,6 +100,8 @@ const coberturaPorCapa = { dominio: [], aplicacion: [], resto: [] };
  * capa por debajo del umbral, era una capa que nadie midió. Ahora es fallo.
  */
 const sinMedir = [];
+/** Rutas relativas de los ficheros que SÍ se ejecutaron, para nombrar los que no. */
+const ficherosMedidos = [];
 
 for (const [paquete, dir] of paquetes) {
   const { informe, cobertura } = correr(paquete, dir);
@@ -112,9 +121,9 @@ for (const [paquete, dir] of paquetes) {
   );
   for (const s of suites) {
     const n = (s.assertionResults ?? []).length;
-    console.log(
-      `     ${String(n).padStart(3)}  ${relative(raiz, s.name ?? s.testFilePath ?? '?')}`,
-    );
+    const ruta = relative(raiz, s.name ?? s.testFilePath ?? '?');
+    ficherosMedidos.push(ruta);
+    console.log(`     ${String(n).padStart(3)}  ${ruta}`);
   }
 
   if (!cobertura) {
@@ -183,6 +192,26 @@ for (const [nombre, filas, umbral] of objetivos) {
 console.log(
   `\n## Totales\n   ficheros ejecutados: ${totalFicheros} de ${ficheros.length} en disco · pruebas: ${totalPruebas}`,
 );
+
+/**
+ * El descuadre de ficheros ahora FALLA, no solo se imprime.
+ *
+ * Hallazgo de la revisión del 2026-09-09, misma familia que el resto: este
+ * guion tenía los dos números —los de disco y los ejecutados— y se limitaba a
+ * enseñarlos. `contar-pruebas.mjs` sí falla ante el descuadre, pero no corría
+ * en el CI; así que allí un fichero de prueba que nadie ejecutara habría salido
+ * impreso en el informe y verde en el resultado. Quien mira un CI en verde no
+ * lee las cifras.
+ */
+if (totalFicheros < ficheros.length) {
+  const medidos = new Set(ficherosMedidos);
+  console.log(
+    `\n   ${ficheros.length - totalFicheros} fichero(s) de prueba en disco que NADIE ejecutó:`,
+  );
+  for (const f of ficheros) if (!medidos.has(f)) console.log(`     - ${f}`);
+  console.log('   Un fichero que no se recoge no deja ningún rojo: por eso esto es un fallo.');
+  process.exit(1);
+}
 if (sinMedir.length > 0) {
   console.log(`\n   ${sinMedir.length} paquete(s) QUEDARON FUERA de la medición:`);
   for (const p of sinMedir) console.log(`     - ${p}`);

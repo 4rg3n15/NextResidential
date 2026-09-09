@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
-import { crearApp, crearFirmante, tokenDe } from './utilidades';
+import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
+
+/** Identificador de relleno: el pipe actúa antes de que se busque la alerta. */
+const ALERTA = '00000000-0000-4000-8000-0000000000aa';
 
 /**
  * §2.7.3 · El `ValidationPipe` está ACTIVO, comprobado por ejecución.
@@ -25,7 +28,7 @@ describe('validación de DTOs activa en toda superficie con @Body()', () => {
   beforeAll(async () => {
     const firmante = await crearFirmante();
     app = await crearApp(firmante);
-    admin = await tokenDe(firmante, { rol: 'administrador' });
+    admin = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
   });
   afterAll(async () => {
     await app.close();
@@ -34,9 +37,17 @@ describe('validación de DTOs activa en toda superficie con @Body()', () => {
   const post = (ruta: string, cuerpo: unknown) =>
     request(app.getHttpServer()).post(ruta).set('authorization', `Bearer ${admin}`).send(cuerpo);
 
-  it('MFA · tipo equivocado y campo no declarado → 400', async () => {
-    await post('/auth/mfa/verificacion', { codigo: 123456 }).expect(400);
-    await post('/auth/mfa/verificacion', { codigo: '123456', colado: 'x' }).expect(400);
+  /**
+   * Antes esta comprobación iba contra `/auth/mfa/verificacion`. Esa ruta se
+   * retiró en la ETAPA 09-A (ADR-008), así que la superficie de `eventos`
+   * ocupa su lugar: lo que importa no es la ruta concreta sino que el pipe
+   * esté activo en MÓDULOS DISTINTOS, porque el defecto que originó esta
+   * prueba se introduce fichero a fichero.
+   */
+  it('alertas · tipo equivocado y campo no declarado → 400', async () => {
+    const ruta = `/copropiedades/${COP_A}/alertas/${ALERTA}/resolucion`;
+    await post(ruta, { notas: 12345 }).expect(400);
+    await post(ruta, { notas: 'motivo suficiente', colado: 'x' }).expect(400);
   });
 
   it('padrón · vehículo con identificadores no válidos → 400', async () => {

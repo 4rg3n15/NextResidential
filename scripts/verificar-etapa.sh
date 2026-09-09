@@ -163,6 +163,23 @@ else
   echo "$salida_append" | head -10 | sed 's/^/     /'
 fi
 
+paso "10b · el contrato OpenAPI tiene tipos y el cliente generado está al día"
+# ETAPA 09-A · el cliente de la consola se GENERA (§2.6), y un generado que
+# nadie regenera describe la API de la semana pasada sin dar ningún error.
+# Los dos controles son la contraparte mecánica de esa regla.
+if salida_tipado=$(con_limite "$LIMITE_CORTO" node scripts/lib/contrato-tipado.mjs 2>&1); then
+  ok "${salida_tipado#OK }"
+else
+  mal "hay operaciones sin respuesta tipada en el contrato (el cliente recibiría unknown)"
+  echo "$salida_tipado" | head -10 | sed 's/^/     /'
+fi
+if salida_desf=$(con_limite "$LIMITE_MEDIO" node scripts/lib/contrato-desfasado.mjs 2>&1); then
+  ok "${salida_desf#OK }"
+else
+  mal "el contrato o el cliente generado están desfasados respecto del código"
+  echo "$salida_desf" | head -8 | sed 's/^/     /'
+fi
+
 paso "11 · latencia del canal de tiempo real bajo carga (KPI-25)"
 # La cifra la produce `test/latencia-tiempo-real.test.ts`, que ya corrió en el
 # paso 5 con el resto de la suite: aquí solo se LEE lo que dejó escrito. Medir

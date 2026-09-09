@@ -40,3 +40,25 @@ export const CLAVE_SIN_RECURSO_TENANT = 'ncr:sin_recurso_tenant';
  */
 export const SinRecursoDeTenant = (): MethodDecorator & ClassDecorator =>
   SetMetadata(CLAVE_SIN_RECURSO_TENANT, true);
+
+export const CLAVE_SIN_SEGUNDO_FACTOR = 'ncr:sin_segundo_factor';
+
+/**
+ * Declara que la ruta es alcanzable **antes** de completar el segundo factor.
+ *
+ * Existe por un caso concreto y no debe crecer: tras restablecer la contraseña,
+ * la sesión que emite el proveedor de identidad es `aal1` —el usuario acaba de
+ * demostrar el control del buzón, no el del segundo factor—, y el rastro del
+ * cambio de credencial tiene que quedar registrado en ese momento. Sin esta
+ * exención, un administrador nunca podría dejar constancia de su propio
+ * restablecimiento: exactamente el mismo callejón sin salida que hizo
+ * inalcanzables las rutas de MFA retiradas en ADR-008.
+ *
+ * **No relaja RN-20.** La ruta que la lleva no expone ningún recurso de
+ * copropiedad ni permite operar: solo escribe un registro de auditoría sobre el
+ * propio llamante. Cualquier otra ruta sigue exigiendo `aal2` a los roles
+ * administrativos, y la suite de aislamiento comprueba QUÉ rutas la declaran,
+ * para que ampliarla sea un cambio visible en el diff y no un descuido.
+ */
+export const SinSegundoFactor = (): MethodDecorator & ClassDecorator =>
+  SetMetadata(CLAVE_SIN_SEGUNDO_FACTOR, true);

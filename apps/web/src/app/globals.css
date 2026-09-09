@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Fuentes: `Inter` si el equipo la tiene, y si no la pila del sistema.
+ *
+ * No se carga ninguna fuente web a propósito. Traerla de un CDN obligaría a
+ * abrir `font-src` y `style-src` a un origen externo en la CSP, y la propia
+ * §2.7.7 acota esas directivas a orígenes propios. Autoalojarla es lo correcto
+ * y entra con el empaquetado de la ETAPA 14; hasta entonces, la pila del
+ * sistema respeta la misma métrica geométrica sin abrir superficie.
+ */
+:root {
+  --fuente-inter: 'Inter', 'Inter var';
+  --fuente-mono: 'JetBrains Mono', 'SFMono-Regular', 'Menlo';
+}
+
+@layer base {
+  html {
+    /* Dígitos tabulares en toda la consola: horas, placas y aforos alinean en
+       columna. Con proporcionales, una tabla de horas queda en diente de sierra. */
+    font-feature-settings: 'tnum' 1, 'cv05' 1;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-lienzo text-cuerpo text-texto antialiased;
+  }
+
+  /* Foco visible SIEMPRE, en todo elemento interactivo (§5.6.3). El navegador
+     lo trae; lo que se hace aquí es unificarlo con el filete de marca y
+     asegurar que ningún `outline-none` suelto lo elimine sin sustituto. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-marca-texto ring-offset-2 ring-offset-lienzo;
+  }
+
+  /* Sobre superficie oscura el anillo rojo se pierde: allí va blanco. */
+  .superficie-oscura :focus-visible {
+    @apply ring-white ring-offset-oscuro;
+  }
+}
+
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* Enlace de salto: invisible hasta que recibe foco. Sin él, quien navega con
+     teclado recorre los nueve elementos del panel lateral en cada página. */
+  .salto-al-contenido:focus {
+    @apply not-sr-only fixed left-4 top-4 z-50 rounded-boton bg-marca-boton px-4 py-2 text-white;
+  }
+}
+
+/**
+ * §5.6.5 · movimiento reducido. Se respeta de forma global y no componente a
+ * componente: una animación que alguien olvide marcar es exactamente la que
+ * provoca el malestar que la preferencia intenta evitar.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

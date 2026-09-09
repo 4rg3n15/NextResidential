@@ -20,6 +20,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import {
+  existsSync,
   writeFileSync,
   mkdtempSync,
   mkdirSync,
@@ -27,9 +28,13 @@ import {
   readFileSync,
   cpSync,
   chmodSync,
+  symlinkSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+const CONTRATO = 'packages/contracts/openapi.json';
+const CLIENTE = 'packages/contracts/src/generado/api.ts';
 
 const raiz = process.cwd();
 let fallos = 0;
@@ -133,6 +138,22 @@ try {
     const r = correr('node', ['scripts/lib/contar-pruebas.mjs', salidaFalsa]);
     if (r.codigo !== 0 && /recogidos/.test(r.salida)) ok('detectado, con salida distinta de cero');
     else mal(`NO detectado (codigo ${r.codigo}): ${r.salida.trim()}`);
+
+    /**
+     * MITAD POSITIVA, añadida en la revisión del 2026-09-09.
+     *
+     * Sin ella, un `contar-pruebas.mjs` que fallara SIEMPRE —por un cambio en
+     * el recorrido de directorios, por un error al arrancar— habría dejado
+     * esta sonda en verde sin comprobar nada: solo se exigía que fallara.
+     * Un control que no distingue el caso legítimo del ilegítimo no es un
+     * control, es una constante.
+     */
+    const salidaCompleta = join(banco, 'salida-completa.txt');
+    writeFileSync(salidaCompleta, 'Test Files  9999 passed (9999)\nTests  1 passed (1)\n');
+    const positiva = correr('node', ['scripts/lib/contar-pruebas.mjs', salidaCompleta]);
+    positiva.codigo === 0 && /ficheros de prueba ejecutados/.test(positiva.salida)
+      ? ok('una corrida que sí recoge todos los ficheros pasa el control')
+      : mal(`el control rechaza una corrida completa (codigo ${positiva.codigo})`);
   }
 
   console.log(
@@ -208,7 +229,23 @@ try {
     pkg.engines.node = '>=99.0.0';
     writeFileSync(join(clon, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
     const r = enClon('node', ['scripts/lib/verificar-entorno.mjs']);
-    r.codigo !== 0 ? ok('detectado') : mal('NO detectado');
+    /**
+     * Se exige el MOTIVO, no solo el código de salida. Era la sonda más débil
+     * de las diez (revisión del 2026-09-09): comprobaba únicamente
+     * `codigo !== 0`, así que cualquier fallo ajeno —un `.nvmrc` que no
+     * llegara al clon, un error al arrancar— la habría dado por buena. Habría
+     * informado «detectado» sin que el control hubiera detectado nada.
+     */
+    r.codigo !== 0 && /99\.0\.0|engines|node/i.test(r.salida)
+      ? ok('detectado, y por el motivo correcto')
+      : mal(`NO detectado (codigo ${r.codigo}): ${r.salida.trim().slice(0, 120)}`);
+
+    // Mitad positiva: con el `engines` original, el mismo clon pasa. Sin esto,
+    // un control que fallara siempre seguiría figurando como verde.
+    writeFileSync(join(clon, 'package.json'), readFileSync(join(raiz, 'package.json'), 'utf8'));
+    enClon('node', ['scripts/lib/verificar-entorno.mjs']).codigo === 0
+      ? ok('con el `engines` real, el mismo entorno pasa')
+      : mal('el control rechaza un entorno que sí cumple');
   }
   console.log('\n▸ 7 · una suite intermitente NO pasa por estable');
   {
@@ -302,6 +339,112 @@ try {
       ? ok('entrar por el barril no es una violación')
       : mal('el control rechaza la vía legítima');
   }
+  console.log('\n▸ 9 · una respuesta sin tipo en el contrato rompe la verificación');
+  {
+    // El defecto que motivó el control: `@ApiOkResponse` ausente deja la
+    // respuesta sin esquema y el cliente generado la recibe como `unknown`.
+    // Aquí se reproduce sobre una COPIA del contrato, sin tocar el árbol.
+    const contrato = JSON.parse(readFileSync(join(raiz, CONTRATO), 'utf8'));
+    const [primera] = Object.keys(contrato.paths);
+    const operacion = Object.values(contrato.paths[primera])[0];
+    for (const codigo of Object.keys(operacion.responses)) {
+      if (codigo.startsWith('2')) operacion.responses[codigo] = { description: 'sin esquema' };
+    }
+    const mutado = join(banco, 'contrato-sin-tipo.json');
+    writeFileSync(mutado, JSON.stringify(contrato));
+    const r = correr('node', ['scripts/lib/contrato-tipado.mjs', mutado]);
+    r.codigo !== 0 && /sin respuesta tipada/.test(r.salida)
+      ? ok('detectada, con salida distinta de cero')
+      : mal(`NO detectada (codigo ${r.codigo})`);
+
+    // Y el contrato real SÍ se acepta: un control que rechazara también lo
+    // correcto obligaría a desactivarlo.
+    correr('node', ['scripts/lib/contrato-tipado.mjs', join(raiz, CONTRATO)]).codigo === 0
+      ? ok('el contrato versionado pasa el control')
+      : mal('el control rechaza el contrato versionado');
+  }
+
+  console.log('\n▸ 10 · un cliente generado que se quedó atrás rompe la verificación');
+  {
+    /**
+     * LA SONDA MONTA SU PROPIO ESCENARIO, incluido el artefacto compilado.
+     *
+     * Defecto reportado desde el CI el 2026-09-09, y es la undécima aparición
+     * de la familia «la comprobación existe pero no comprueba lo que crees»:
+     * `contrato-desfasado.mjs` necesita `apps/api/dist/openapi.js` para
+     * regenerar el contrato desde los controladores, y ese fichero está en
+     * `.gitignore`. En el equipo de desarrollo existía porque
+     * `verificar-etapa.sh` compila en el paso 3, mucho antes de llegar a estas
+     * sondas en el paso 9. En el CI, en cambio, «Pruebas negativas» corre
+     * ANTES de «Compilación, lint y tipos», así que sobre un checkout limpio
+     * no había nada que ejecutar.
+     *
+     * El fallo fue RUIDOSO —«el espejo no reproduce el estado al día»— porque
+     * la sonda comprueba su línea base antes de mutar nada. Sin esa
+     * comprobación previa habría dado verde sin ejercitar el control, que es
+     * lo que hay que evitar. Aun así, un control que solo funciona cuando
+     * alguien compiló antes no es un control: aquí se compila si hace falta.
+     *
+     * `--filter "@ncr/api..."` arrastra las dependencias del paquete, así que
+     * `@ncr/domain-core` y `@ncr/providers` entran solos.
+     */
+    const artefacto = join(raiz, 'apps', 'api', 'dist', 'openapi.js');
+    if (!existsSync(artefacto)) {
+      console.log('   · sin apps/api/dist: se compila para poder montar el escenario');
+      const compilacion = correr('pnpm', ['--filter', '@ncr/api...', 'build'], {
+        timeout: 600_000,
+      });
+      if (compilacion.codigo !== 0 || !existsSync(artefacto)) {
+        mal('no se pudo compilar la API: la sonda no puede montar su escenario');
+        console.log(compilacion.salida.split('\n').slice(-6).join('\n'));
+      }
+    }
+
+    // Espejo del repositorio hecho con ENLACES a lo pesado —`node_modules` y
+    // `apps/`, que incluye el `dist` recién asegurado— y copia de los dos
+    // ficheros generados. Así la sonda puede mutarlos sin acercarse al árbol
+    // de trabajo y sin volver a compilar.
+    const espejo = join(banco, 'espejo');
+    mkdirSync(join(espejo, 'packages', 'contracts', 'src', 'generado'), { recursive: true });
+    symlinkSync(join(raiz, 'node_modules'), join(espejo, 'node_modules'), 'dir');
+    symlinkSync(join(raiz, 'apps'), join(espejo, 'apps'), 'dir');
+    symlinkSync(
+      join(raiz, 'packages', 'contracts', 'node_modules'),
+      join(espejo, 'packages', 'contracts', 'node_modules'),
+      'dir',
+    );
+    cpSync(
+      join(raiz, 'packages', 'contracts', 'package.json'),
+      join(espejo, 'packages', 'contracts', 'package.json'),
+    );
+    cpSync(join(raiz, CONTRATO), join(espejo, CONTRATO));
+    cpSync(join(raiz, CLIENTE), join(espejo, CLIENTE));
+    cpSync(join(raiz, 'scripts'), join(espejo, 'scripts'), { recursive: true });
+
+    const enEspejo = () => correr('node', ['scripts/lib/contrato-desfasado.mjs'], { cwd: espejo });
+    if (enEspejo().codigo !== 0) {
+      mal('el espejo no reproduce el estado al día: la sonda no puede concluir nada');
+    } else {
+      ok('el espejo parte de un estado al día');
+      writeFileSync(
+        join(espejo, CLIENTE),
+        `${readFileSync(join(espejo, CLIENTE), 'utf8')}\n// editado a mano\n`,
+      );
+      const r = enEspejo();
+      r.codigo !== 0 && /no coincide con el contrato/.test(r.salida)
+        ? ok('un cliente editado a mano se detecta')
+        : mal(`un cliente editado a mano NO se detecta (codigo ${r.codigo})`);
+
+      cpSync(join(raiz, CLIENTE), join(espejo, CLIENTE));
+      const contrato = JSON.parse(readFileSync(join(espejo, CONTRATO), 'utf8'));
+      delete contrato.paths[Object.keys(contrato.paths).at(-1)];
+      writeFileSync(join(espejo, CONTRATO), JSON.stringify(contrato, null, 2));
+      const r2 = enEspejo();
+      r2.codigo !== 0 && /desfasado respecto de los controladores/.test(r2.salida)
+        ? ok('un contrato que perdió una ruta se detecta')
+        : mal(`un contrato desfasado NO se detecta (codigo ${r2.codigo})`);
+    }
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -324,4 +467,7 @@ if (fallos > 0) {
   console.log(`\nPRUEBAS NEGATIVAS: ${fallos} comprobación(es) fallaron`);
   process.exit(1);
 }
-console.log('\nPRUEBAS NEGATIVAS: los 8 controles detectan su violación, sin tocar el árbol');
+console.log(
+  '\nPRUEBAS NEGATIVAS: los 10 controles detectan su violación y aceptan el caso legítimo, ' +
+    'sin tocar el árbol',
+);

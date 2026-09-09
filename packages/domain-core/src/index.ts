@@ -37,3 +37,4 @@ export * from './reglas/contexto';
 export * from './reglas/politicas';
 export * from './reglas/motor';
 export * from './tokens';
+export * from './tiempo/ventana-del-dia';

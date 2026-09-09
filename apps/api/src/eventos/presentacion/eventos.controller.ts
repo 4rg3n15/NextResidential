@@ -9,7 +9,14 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Response } from 'express';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
@@ -24,6 +31,8 @@ import {
 import type { EventoRegistrado, PaginaDeEventos } from '../aplicacion/puertos';
 import { CanalEnProceso } from '../infraestructura/canal-en-proceso';
 import { ConsultaEventosDto, ExportacionEventosDto } from './dtos';
+import { PaginaDeEventosDto, UrlDeEvidenciaDto } from './respuestas';
+import { ErrorApiDto } from '../../comun/respuestas';
 import { aCsv, aExcel, aPdf } from './formatos';
 
 /**
@@ -55,6 +64,11 @@ export class EventosController {
   @Get()
   @Roles('administrador', 'superadministrador', 'portero', 'operador_central')
   @ApiOperation({ summary: 'Historial filtrado y paginado por cursor (HU-32)' })
+  @ApiOkResponse({ type: PaginaDeEventosDto })
+  @ApiNotFoundResponse({
+    type: ErrorApiDto,
+    description: 'Copropiedad fuera del alcance del token',
+  })
   async historial(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
@@ -67,6 +81,15 @@ export class EventosController {
   @Get('exportacion')
   @Roles('administrador', 'superadministrador', 'operador_central')
   @ApiOperation({ summary: 'Exporta el historial en CSV, Excel o PDF (HU-32)' })
+  // Respuesta binaria: se declaran los tipos de medio en vez de un esquema. Un
+  // `type:` aquí mentiría —el cuerpo no es JSON— y el cliente generado
+  // intentaría deserializarlo.
+  @ApiProduces('text/csv', 'application/vnd.ms-excel', 'application/pdf')
+  @ApiOkResponse({
+    description: 'Fichero del informe. La cabecera X-NCR-Truncado dice si está completo.',
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiNotFoundResponse({ type: ErrorApiDto })
   async exportacion(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
@@ -94,6 +117,8 @@ export class EventosController {
   @Get(':eventoId/evidencia')
   @Roles('administrador', 'superadministrador', 'portero', 'operador_central')
   @ApiOperation({ summary: 'URL firmada de vida corta a la evidencia (RN-21)' })
+  @ApiOkResponse({ type: UrlDeEvidenciaDto })
+  @ApiNotFoundResponse({ type: ErrorApiDto, description: 'Sin evidencia, o evento inexistente' })
   async urlDeEvidencia(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
@@ -123,6 +148,15 @@ export class EventosController {
   @Get('flujo')
   @Roles('administrador', 'superadministrador', 'portero', 'operador_central')
   @ApiOperation({ summary: 'Flujo de eventos y alertas en vivo (SSE)' })
+  @ApiProduces('text/event-stream')
+  @ApiOkResponse({
+    description:
+      'Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado y ' +
+      '«alertas» por cada escalamiento. La carga de cada mensaje es un EventoRegistradoDto ' +
+      'o un AlertaExpuestaDto según el tema.',
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiNotFoundResponse({ type: ErrorApiDto })
   async flujo(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,

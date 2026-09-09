@@ -393,7 +393,8 @@ Extraída por frecuencia sobre píxeles con saturación > 0,35 y valor > 0,25.
 | **Primario / acento**         | `#E63946`                         | dominante (H 355°, S 0,75, V 0,90) | Botones primarios, elemento activo del menú, distintivos de placa, alertas críticas, logotipo |
 | Primario claro                | `#EA6973`                         | alto                               | Estados _hover_ y variantes suaves                                                            |
 | Primario suave (fondo)        | `#FEF3F3`                         | —                                  | Fondo de distintivos y avisos                                                                 |
-| Primario oscuro               | `#A23037`                         | bajo                               | Estados presionados                                                                           |
+| Primario oscuro               | `#A23037`                         | bajo                               | **Texto pequeño, enlaces y bordes** (6,967 : 1) y estados presionados                         |
+| **Primario de relleno**       | `#DC3341`                         | derivado (ETAPA 09-A)              | Relleno sólido **con etiqueta blanca** (4,572 : 1). Ver la corrección de §5.6.1               |
 | **Éxito**                     | `#10B981`                         | alto                               | Botones «Aprobar», distintivos Autorizado/Permitido, EN LÍNEA, barras de aforo con holgura    |
 | Éxito suave                   | `#D1FAE5` aprox.                  | —                                  | Fondo de distintivos de éxito                                                                 |
 | **Advertencia**               | `#F59E0B`                         | medio                              | Distintivos Pendiente, «Alerta Activa»                                                        |
@@ -448,11 +449,27 @@ La monoespaciada para placas no es decorativa: evita la confusión entre `0`/`O`
 
 ### 5.6 Accesibilidad — verificaciones obligatorias en la ETAPA 09
 
-1. **Contraste.** `#E63946` sobre blanco da ≈ 3,9:1 — **insuficiente para texto normal en AA** (exige 4,5:1). Cumple para texto grande (≥ 18,66 px negrita o ≥ 24 px) y para componentes de interfaz (3:1). **Regla:** el rojo de marca solo se usa como texto sobre blanco en tamaños grandes o en negrita; para texto pequeño se usa `#A23037` (≈ 6,4:1). Sobre relleno sólido rojo, el texto va en blanco (≈ 4,4:1 — verificar por componente y oscurecer el relleno si no alcanza).
-2. **Color nunca como único portador de significado.** Permitido/Denegado, En línea/Falla y aforo lleno llevan además icono y texto.
-3. **Foco visible** en todo elemento interactivo, con el filete rojo de marca sobre fondo claro y blanco sobre fondo oscuro.
-4. **Objetivos táctiles** de 44 × 44 px mínimo en móvil; los controles `−`/`+` de acompañantes del mockup están por debajo.
-5. **Movimiento reducido** respetando `prefers-reduced-motion` en las barras del panel y en las actualizaciones en vivo.
+1. **Contraste.** Ver la tabla de medidas de más abajo. **Regla:** el rojo de marca `#E63946` no se usa como texto sobre fondo claro salvo en tamaño grande (≥ 18,66 px negrita o ≥ 24 px); para texto pequeño, enlaces y bordes se usa `#A23037`. Sobre relleno sólido con etiqueta blanca se usa `#DC3341`, no `#E63946`.
+
+> **CORRECCIÓN DEL 2026-09-09 · cifras medidas en la ETAPA 09-A.**
+>
+> Este apartado traía tres razones estimadas. La ETAPA 09-A las calculó con la fórmula de WCAG 2.1 —`packages/config/src/contraste.ts`, con 39 pruebas sobre los pares reales de la consola— y dos no coincidían. Se corrigen aquí para que nadie herede la estimación:
+>
+> | Par                                | Estimado aquí | **Medido** | AA texto normal (4,5:1) |
+> | ---------------------------------- | ------------- | ---------- | ----------------------- |
+> | `#E63946` sobre **blanco**         | ≈ 3,9 : 1     | **4,168**  | no cumple               |
+> | `#E63946` sobre **lienzo**         | —             | **3,954**  | no cumple               |
+> | `#A23037` sobre blanco             | ≈ 6,4 : 1     | **6,967**  | cumple                  |
+> | Blanco **sobre relleno** `#E63946` | ≈ 4,4 : 1     | **4,168**  | **no cumple**           |
+> | Blanco sobre relleno `#DC3341`     | —             | **4,572**  | cumple                  |
+>
+> **De dónde salía el ≈ 3,9.** No era un error de cálculo: es el valor de `#E63946` contra el **lienzo** `#F8F9FA` (3,954), no contra el blanco de tarjeta (4,168). La conclusión no cambia —los dos están por debajo de 4,5— pero el número sí, y conviene saber contra qué fondo se midió cada uno.
+>
+> **El cuarto par es el que obligaba a decidir.** «≈ 4,4» sugería estar al borde; medido da **4,168**, claramente por debajo, y es el par de la etiqueta de un botón primario. Se aplica la salida que este mismo apartado ya preveía —«oscurecer el relleno si no alcanza»—: **`marca.boton` = `#DC3341`** (4,572 : 1), el oscurecimiento más pequeño que alcanza el umbral y a **1,097 : 1** del original, es decir, el mismo tono a ojo.
+>
+> **La identidad no cambia.** `#E63946` se conserva intacto y sigue siendo el color dominante de la pantalla, porque va donde no hay texto pequeño encima: filete del elemento activo de la barra lateral, pastillas de icono, barras del histograma y distintivos sobre `marca.suave`. Ahí AA pide 3 : 1 como componente de interfaz, y 4,168 lo supera con margen.
+>
+> Aprobado por el cliente el 2026-09-09. 2. **Color nunca como único portador de significado.** Permitido/Denegado, En línea/Falla y aforo lleno llevan además icono y texto. 3. **Foco visible** en todo elemento interactivo, con el filete rojo de marca sobre fondo claro y blanco sobre fondo oscuro. 4. **Objetivos táctiles** de 44 × 44 px mínimo en móvil; los controles `−`/`+` de acompañantes del mockup están por debajo. 5. **Movimiento reducido** respetando `prefers-reduced-motion` en las barras del panel y en las actualizaciones en vivo.
 
 ### 5.7 Identidad de marca — inconsistencia detectada
 

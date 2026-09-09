@@ -10,7 +10,15 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Alerta, Reloj } from '@ncr/domain-core';
 import { RELOJ } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
@@ -20,20 +28,8 @@ import { Aislamiento } from '../../multiempresa/aislamiento';
 import { REPOSITORIO_ALERTAS } from '../aplicacion/puertos';
 import type { RepositorioAlertas } from '../aplicacion/puertos';
 import { NotasDeAlertaDto } from './dtos';
-
-interface AlertaExpuesta {
-  readonly id: string;
-  readonly tipo: string;
-  readonly severidad: string;
-  readonly estado: string;
-  readonly generadaEn: string;
-  readonly escaladaEn: string | null;
-  readonly eventoId: string | null;
-  readonly dispositivoId: string | null;
-  /** KPI-25 medido, no supuesto: `null` mientras no se haya escalado. */
-  readonly escaladaDentroDelPlazo: boolean | null;
-  readonly notas: string | null;
-}
+import { AlertaExpuestaDto } from './respuestas';
+import { ErrorApiDto } from '../../comun/respuestas';
 
 /**
  * Cola de alertas del operador de central — RN-18, CA-18, KPI-25.
@@ -55,10 +51,12 @@ export class AlertasController {
   @Get()
   @Roles('operador_central', 'administrador', 'superadministrador', 'portero')
   @ApiOperation({ summary: 'Alertas abiertas y en atención, con su cumplimiento de KPI-25' })
+  @ApiOkResponse({ type: [AlertaExpuestaDto] })
+  @ApiNotFoundResponse({ type: ErrorApiDto })
   async abiertas(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
-  ): Promise<readonly AlertaExpuesta[]> {
+  ): Promise<readonly AlertaExpuestaDto[]> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'alertas');
     return (await this.alertas.abiertasDe(copropiedadId)).map(exponer);
   }
@@ -66,11 +64,14 @@ export class AlertasController {
   @Post(':alertaId/atencion')
   @Roles('operador_central', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'El operador toma la alerta; queda atribuida a él' })
+  @ApiCreatedResponse({ type: AlertaExpuestaDto })
+  @ApiConflictResponse({ type: ErrorApiDto, description: 'La alerta ya está atendida o resuelta' })
+  @ApiNotFoundResponse({ type: ErrorApiDto })
   async atender(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('alertaId', ParseUUIDPipe) alertaId: string,
-  ): Promise<AlertaExpuesta> {
+  ): Promise<AlertaExpuestaDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'alertas/atencion');
     const alerta = await this.buscar(copropiedadId, alertaId);
 
@@ -83,12 +84,14 @@ export class AlertasController {
   @Post(':alertaId/resolucion')
   @Roles('operador_central', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Cierra la alerta; las notas son obligatorias' })
+  @ApiCreatedResponse({ type: AlertaExpuestaDto })
+  @ApiNotFoundResponse({ type: ErrorApiDto })
   async resolver(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('alertaId', ParseUUIDPipe) alertaId: string,
     @Body() dto: NotasDeAlertaDto,
-  ): Promise<AlertaExpuesta> {
+  ): Promise<AlertaExpuestaDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'alertas/resolucion');
     const alerta = await this.buscar(copropiedadId, alertaId);
 
@@ -105,7 +108,7 @@ export class AlertasController {
   }
 }
 
-const exponer = (a: Alerta): AlertaExpuesta => ({
+const exponer = (a: Alerta): AlertaExpuestaDto => ({
   id: a.id,
   tipo: a.tipo,
   severidad: a.severidad,

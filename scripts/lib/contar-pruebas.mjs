@@ -19,6 +19,11 @@
  * mecanismo anti-falso-verde producía un falso negativo. Aritmética y recorrido
  * de directorios se hacen aquí, donde se comportan igual en las dos plataformas.
  *
+ * ETAPA 09 · el recorrido incluye también `.tsx`. La consola prueba
+ * componentes, y con el patrón anterior una prueba de componente que dejara de
+ * recogerse habría desaparecido del recuento sin dejar ningún rojo — que es
+ * exactamente lo que este control existe para impedir.
+ *
  * Uso: node contar-pruebas.mjs <fichero-con-la-salida-de-vitest>
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -38,7 +43,7 @@ const enDisco = (dir, acumulado = []) => {
     if (IGNORADOS.has(e.name)) continue;
     const ruta = join(dir, e.name);
     if (e.isDirectory()) enDisco(ruta, acumulado);
-    else if (/\.(test|spec)\.ts$/.test(e.name)) acumulado.push(ruta);
+    else if (/\.(test|spec)\.tsx?$/.test(e.name)) acumulado.push(ruta);
   }
   return acumulado;
 };
@@ -81,7 +86,7 @@ if (recogidos >= ficheros.length && ficheros.length > 0) {
 }
 console.log(
   `FALLO solo ${recogidos} de ${ficheros.length} ficheros de prueba fueron recogidos ` +
-    `(hay ficheros *.test.ts que nadie ejecuta: revisar los patrones \`include\` y ` +
+    `(hay ficheros *.test.ts/.tsx que nadie ejecuta: revisar los patrones \`include\` y ` +
     `que todos los paquetes entren en la corrida)`,
 );
 process.exit(1);

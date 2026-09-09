@@ -8,6 +8,11 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --max-warnings=0",
+    "generar": "openapi-typescript openapi.json -o src/generado/api.ts",
     "test": "echo \"sin pruebas todavia\""
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.5.2",
+    "typescript": "5.7.2"
   }
 }

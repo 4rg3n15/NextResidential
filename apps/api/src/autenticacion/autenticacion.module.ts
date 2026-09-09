@@ -4,7 +4,6 @@ import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { ProveedorDeJwks } from './infraestructura/jwks';
 import { VerificadorDeJwt } from './infraestructura/verificador-jwt';
-import { ServicioMfa } from './infraestructura/mfa.servicio';
 import { AutenticacionController } from './presentacion/autenticacion.controller';
 
 /**
@@ -23,7 +22,6 @@ export class AutenticacionModule {
       module: AutenticacionModule,
       controllers: [AutenticacionController],
       providers: [
-        ServicioMfa,
         {
           provide: ProveedorDeJwks,
           inject: [CONFIGURACION],
@@ -45,7 +43,7 @@ export class AutenticacionModule {
             }),
         },
       ],
-      exports: [ProveedorDeJwks, VerificadorDeJwt, ServicioMfa],
+      exports: [ProveedorDeJwks, VerificadorDeJwt],
     };
   }
 }
