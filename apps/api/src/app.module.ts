@@ -12,6 +12,7 @@ import { AutorizacionesModule } from './autorizaciones';
 import { EventosModule } from './eventos';
 import { ZonasModule } from './zonas';
 import { BiometriaModule } from './biometria';
+import { TableroModule } from './tablero';
 import { limitadorPorDispositivo } from './eventos';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
@@ -38,6 +39,8 @@ export class AppModule {
         BiometriaModule.registrar(),
         EventosModule.registrar(),
         AutorizacionesModule.registrar(),
+        // Después de eventos: el tablero lee por los puertos que aquel publica.
+        TableroModule.registrar(),
         // Dos limitadores con NOMBRE, y cada uno cuenta por lo suyo: `default`
         // por IP —el de siempre— y `dispositivo` por equipo firmante (D-28).
         // Uno solo no sirve: en la ingesta todos los equipos comparten IP, y el

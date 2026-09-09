@@ -19,6 +19,8 @@
     "verificar:etapa": "./scripts/verificar-etapa.sh",
     "portabilidad": "node scripts/lib/portabilidad.mjs",
     "metricas": "node scripts/lib/metricas.mjs",
+    "contrato": "pnpm --filter @ncr/api build && pnpm --filter @ncr/api openapi",
+    "contrato:tipado": "node scripts/lib/contrato-tipado.mjs",
     "entorno": "node scripts/lib/verificar-entorno.mjs"
   },
   "devDependencies": {

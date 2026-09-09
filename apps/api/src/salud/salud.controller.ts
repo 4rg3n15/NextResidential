@@ -1,11 +1,17 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { RELOJ } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import { Publico } from '../comun/decoradores';
 import { ProveedorDeJwks } from '../autenticacion';
 import type { Configuracion } from '../configuracion/esquema';
+import { ListoDto, SaludDto } from './respuestas';
 
 /**
  * `/health` y `/ready` son cosas distintas y por eso son dos rutas.
@@ -30,14 +36,21 @@ export class SaludController {
   @Publico()
   @Get('health')
   @ApiOperation({ summary: 'El proceso está vivo' })
-  salud(): { estado: string; momento: string } {
+  @ApiOkResponse({ type: SaludDto })
+  salud(): SaludDto {
     return { estado: 'vivo', momento: this.reloj.ahora().toISOString() };
   }
 
   @Publico()
   @Get('ready')
   @ApiOperation({ summary: 'La aplicación puede atender tráfico' })
-  async listo(): Promise<{ estado: string; dependencias: Record<string, string> }> {
+  @ApiOkResponse({ type: ListoDto })
+  @ApiServiceUnavailableResponse({
+    type: ListoDto,
+    description:
+      'Falta una dependencia. El proceso está sano: sacar del balanceador, no reiniciar.',
+  })
+  async listo(): Promise<ListoDto> {
     // La configuración ya está validada si el proceso arrancó; se comprueba de
     // nuevo para que `/ready` no mienta si algo la dejó incompleta en caliente.
     const dependencias: Record<string, string> = {

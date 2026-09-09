@@ -195,6 +195,23 @@ describe('CA-24 · todo acceso cruzado queda registrado', () => {
   });
 });
 
+describe('cobertura tras la ETAPA 09-A', () => {
+  it('los endpoints del tablero entraron solos en el recorrido', () => {
+    // Confirmación explícita de lo que la ETAPA 09-A añadió: tres rutas de
+    // lectura bajo `copropiedades/:id`. Nadie las escribió en esta suite; los
+    // recorridos de arriba las atacaron con un token de OTRA copropiedad y
+    // ninguna devolvió 2xx. Si mañana alguien monta el tablero fuera de
+    // `copropiedades/:id`, esto se pone rojo antes que la fuga.
+    const tablero = rutas.filter((r) => r.ruta.includes('/tablero/'));
+    expect(tablero.map((r) => r.ruta).sort()).toEqual([
+      '/copropiedades/:id/tablero/accesos-por-hora',
+      '/copropiedades/:id/tablero/dispositivos',
+      '/copropiedades/:id/tablero/indicadores',
+    ]);
+    expect(tablero.every((r) => !SIN_RECURSO_TENANT.has(r.ruta))).toBe(true);
+  });
+});
+
 describe('cobertura tras la ETAPA 04', () => {
   it('los endpoints del padrón entraron solos en el recorrido', () => {
     // La enumeración del enrutador funcionó: nadie añadió estas rutas a la
