@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { COP_A, COP_B, crearApp, crearFirmante, enumerarRutas, tokenDe } from './utilidades';
 import type { Firmante, RutaExpuesta } from './utilidades';
-import { AuditoriaEnMemoria } from '../src/multiempresa/auditoria-en-memoria';
+import { AuditoriaEnMemoria } from '../src/comun/auditoria';
 
 /**
  * SUITE DE AISLAMIENTO MULTIEMPRESA · KPI-36, KPI-37, KPI-38, CA-24, CP-11

@@ -10,6 +10,7 @@ import {
 } from '@ncr/domain-core';
 import type { Bitacora, GeneradorDeId, Reloj, UnidadDeTrabajo } from '@ncr/domain-core';
 import { BitacoraEstructurada } from '../comun/bitacora/bitacora-estructurada';
+import { AuditoriaEnMemoria, REGISTRO_AUDITORIA } from '../comun/auditoria';
 
 /**
  * Cableado de los puertos de soporte (§2.3, DIP).
@@ -43,6 +44,8 @@ class UnidadDeTrabajoSinTransaccion implements UnidadDeTrabajo {
 @Global()
 @Module({
   providers: [
+    AuditoriaEnMemoria,
+    { provide: REGISTRO_AUDITORIA, useExisting: AuditoriaEnMemoria },
     { provide: RELOJ, useValue: relojDelSistema },
     { provide: GENERADOR_DE_ID, useValue: generadorUuid },
     { provide: BITACORA, useFactory: (): Bitacora => new BitacoraEstructurada() },
@@ -63,6 +66,14 @@ class UnidadDeTrabajoSinTransaccion implements UnidadDeTrabajo {
       useFactory: (bitacora: Bitacora) => new UnidadDeTrabajoSinTransaccion(bitacora),
     },
   ],
-  exports: [RELOJ, GENERADOR_DE_ID, BITACORA, BUS_DE_EVENTOS, UNIDAD_DE_TRABAJO],
+  exports: [
+    AuditoriaEnMemoria,
+    REGISTRO_AUDITORIA,
+    RELOJ,
+    GENERADOR_DE_ID,
+    BITACORA,
+    BUS_DE_EVENTOS,
+    UNIDAD_DE_TRABAJO,
+  ],
 })
 export class NucleoModule {}

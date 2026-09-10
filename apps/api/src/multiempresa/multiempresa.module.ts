@@ -1,6 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { Aislamiento, REGISTRO_AUDITORIA } from './aislamiento';
-import { AuditoriaEnMemoria } from './auditoria-en-memoria';
+import { Aislamiento } from './aislamiento';
 import { CopropiedadesController } from './copropiedades.controller';
 
 /**
@@ -12,11 +11,11 @@ import { CopropiedadesController } from './copropiedades.controller';
 @Global()
 @Module({
   controllers: [CopropiedadesController],
-  providers: [
-    AuditoriaEnMemoria,
-    { provide: REGISTRO_AUDITORIA, useExisting: AuditoriaEnMemoria },
-    Aislamiento,
-  ],
-  exports: [Aislamiento, REGISTRO_AUDITORIA, AuditoriaEnMemoria],
+  // El puerto de auditoría ya NO se provee aquí: lo comparten dos módulos, así
+  // que vive en el núcleo (`comun/auditoria` + `NucleoModule`). Proveerlo aquí
+  // obligaba a `autenticacion` a alcanzar un `@Global()` que no le llegaba, y
+  // el proceso no arrancaba.
+  providers: [Aislamiento],
+  exports: [Aislamiento],
 })
 export class MultiempresaModule {}

@@ -22,8 +22,8 @@ import {
 } from '@nestjs/swagger';
 import { Roles, SinRecursoDeTenant, SinSegundoFactor } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
-import { REGISTRO_AUDITORIA } from '../../multiempresa/aislamiento';
-import type { RegistroDeAuditoria } from '../../multiempresa/aislamiento';
+import { REGISTRO_AUDITORIA } from '../../comun/auditoria';
+import type { RegistroDeAuditoria } from '../../comun/auditoria';
 import type { ContextoTenant } from '../dominio/claims';
 import { ROLES_ADMINISTRATIVOS } from '../dominio/claims';
 import {

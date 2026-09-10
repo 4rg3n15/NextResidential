@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { RegistroDeAuditoria } from './aislamiento';
+import type { RegistroDeAuditoria } from './registro';
 
 /**
  * Adaptador transitorio de `auditoria_seguridad`.
