@@ -276,7 +276,7 @@ Dos hallazgos de las propias pruebas, antes de llegar al verificador:
 
 ### Veredicto literal de §2.8.0
 
-Ejecución del **2026-09-10**, con `MFA_OBLIGATORIO` ya en el esquema de las dos aplicaciones y el camino del navegador ampliado a su paso 5. PostgreSQL local (`--con-base`) y `DATABASE_URL_PRUEBAS` exportada.
+Ejecución del **2026-09-10**, al cierre de la **ETAPA 09-B**: las siete pantallas, el backend que faltaba detrás y la carga XLSX. PostgreSQL local (`--con-base`) con la migración `0027` aplicada.
 
 ```
 
@@ -300,17 +300,17 @@ Ejecución del **2026-09-10**, con `MFA_OBLIGATORIO` ya en el esquema de las dos
    @ncr/providers:test:       Tests  24 passed (24)
    @ncr/config:test:       Tests  39 passed (39)
    @ncr/domain-core:test:       Tests  328 passed (328)
-   @ncr/web:test:       Tests  168 passed (168)
-   @ncr/api:test:       Tests  370 passed (370)
+   @ncr/web:test:       Tests  186 passed (186)
+   @ncr/api:test:       Tests  398 passed (398)
    ✓ suite completa en verde
 
 ▸ 6 · ningún fichero de prueba se quedó sin recoger
-   ✓ 78 de 78 ficheros de prueba ejecutados
+   ✓ 82 de 82 ficheros de prueba ejecutados
 
 ▸ 7 · umbrales de cobertura por capa (§2.4)
-     OK   dominio (packages/domain-core/src): lineas 98.66 % · ramas 97.67 % · funciones 98.72 % (umbral 90 %, 28 archivos)
-     OK   aplicacion (**/aplicacion/**): lineas 98.28 % · ramas 91.46 % · funciones 98.36 % (umbral 90 %, 20 archivos)
-     OK   global: lineas 77.98 % · ramas 87.55 % · funciones 86.07 % (umbral 70 %, 190 archivos)
+     OK   dominio (packages/domain-core/src): lineas 97.75 % · ramas 97.67 % · funciones 98.09 % (umbral 90 %, 28 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 97.42 % · ramas 91.65 % · funciones 97.92 % (umbral 90 %, 22 archivos)
+     OK   global: lineas 74.49 % · ramas 84.56 % · funciones 75.81 % (umbral 70 %, 225 archivos)
    ✓ las tres capas cumplen su umbral
 
 ▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
@@ -327,13 +327,13 @@ Ejecución del **2026-09-10**, con `MFA_OBLIGATORIO` ya en el esquema de las dos
    ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 4 tablas vigiladas)
 
 ▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
-   ✓ 18 de 35 operaciones con respuesta tipada; 17 exentas con etapa declarada
+   ✓ 41 de 49 operaciones con respuesta tipada; 8 exentas con etapa declarada
    ✓ contrato y cliente generado al día respecto de los controladores
 
 ▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
    alertas entregadas: 200 de 200
-   p50 / p95 / p99   : 2 / 4 / 7 ms
-   maximo            : 11 ms
+   p50 / p95 / p99   : 2 / 4 / 8 ms
+   maximo            : 10 ms
    umbral KPI-25     : 10000 ms
    ✓ KPI-25 con margen sobre el umbral
 
@@ -353,9 +353,9 @@ Ejecución del **2026-09-10**, con `MFA_OBLIGATORIO` ya en el esquema de las dos
    ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
 
 ▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
-      corrida 1/3: codigo 0 · @ncr/api:test: Tests 370 passed (370) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 168 passed (168)
-      corrida 2/3: codigo 0 · @ncr/api:test: Tests 370 passed (370) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 168 passed (168)
-      corrida 3/3: codigo 0 · @ncr/api:test: Tests 370 passed (370) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 168 passed (168)
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 398 passed (398) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 186 passed (186)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 398 passed (398) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 186 passed (186)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 398 passed (398) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 186 passed (186)
    ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
 
 ▸ 15 · ningún paso declarado se quedó sin ejecutar
@@ -363,6 +363,8 @@ Ejecución del **2026-09-10**, con `MFA_OBLIGATORIO` ya en el esquema de las dos
 
 VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
 ```
+
+**Dos ejecuciones anteriores salieron FALLIDAS y las dos tenían razón.** La primera, por KPI-11: el texto de las órdenes de dispositivo nombraba al fabricante fuera de `packages/providers`, y el fixture de las pruebas de pantalla traía `10.0.0.5` como host —el mismo hallazgo de la 09-A, un dato de prueba con forma de topología real—. La segunda, por el paso 12c: con la barra lateral apuntando ya a siete pantallas nuevas, Next precargaba las nueve rutas y las precargas abortadas dejaban tres «Failed to fetch RSC payload» en la consola del navegador. Ninguna de las dos la habría visto una prueba unitaria.
 
 **La primera ejecución salió FALLIDA**, y sus tres hallazgos eran reales:
 
@@ -815,3 +817,10 @@ Y el camino del navegador lo recorre entero en su paso 5: levanta **otra API y o
 | `f06050e` | Sexta ronda: contrato canónico, el paso que no salía, la contraseña literal   |
 | `4441933` | `MFA_OBLIGATORIO`: el interruptor temporal del segundo factor (D-56, D-57)    |
 | `c9ed654` | Veredicto literal de la séptima ronda, en verde y contra base                 |
+| `e3d6a9f` | 09-B · visitantes, zonas tipadas, dispositivos e informes en la API           |
+| `2da56c6` | 09-B · viviendas y vehículos; el CUERPO de la petición también lleva tipo     |
+| `2441d74` | 09-B · visitantes, zonas comunes y dispositivos                               |
+| `4e34e95` | 09-B · eventos, informes y la carga de padrón desde XLSX                      |
+| `d3bf1bf` | 09-B · las siete pantallas se montan en pruebas, y dos defectos que destapó   |
+| `91cffd4` | 09-B · KPI-11: ni el nombre del fabricante ni una IP con forma real           |
+| `c98587a` | 09-B · sin precarga en la barra lateral (cero errores de consola)             |
