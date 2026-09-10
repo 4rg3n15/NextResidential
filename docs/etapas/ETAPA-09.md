@@ -276,7 +276,7 @@ Dos hallazgos de las propias pruebas, antes de llegar al verificador:
 
 ### Veredicto literal de §2.8.0
 
-Ejecución del **2026-09-10**, al cierre de la **ETAPA 09-B**: las siete pantallas, el backend que faltaba detrás y la carga XLSX. PostgreSQL local (`--con-base`) con la migración `0027` aplicada.
+Ejecución del **2026-09-10**, al cierre de la **ETAPA 09-B** con los dos requisitos que faltaban por ejercer —los cinco estados y la accesibilidad estructural— ya probados. PostgreSQL local (`--con-base`) con la migración `0027` aplicada.
 
 ```
 
@@ -297,20 +297,20 @@ Ejecución del **2026-09-10**, al cierre de la **ETAPA 09-B**: las siete pantall
    ✓ pnpm typecheck
 
 ▸ 5 · suite completa
-   @ncr/providers:test:       Tests  24 passed (24)
    @ncr/config:test:       Tests  39 passed (39)
+   @ncr/providers:test:       Tests  24 passed (24)
    @ncr/domain-core:test:       Tests  328 passed (328)
-   @ncr/web:test:       Tests  186 passed (186)
+   @ncr/web:test:       Tests  239 passed (239)
    @ncr/api:test:       Tests  398 passed (398)
    ✓ suite completa en verde
 
 ▸ 6 · ningún fichero de prueba se quedó sin recoger
-   ✓ 82 de 82 ficheros de prueba ejecutados
+   ✓ 84 de 84 ficheros de prueba ejecutados
 
 ▸ 7 · umbrales de cobertura por capa (§2.4)
      OK   dominio (packages/domain-core/src): lineas 97.75 % · ramas 97.67 % · funciones 98.09 % (umbral 90 %, 28 archivos)
      OK   aplicacion (**/aplicacion/**): lineas 97.42 % · ramas 91.65 % · funciones 97.92 % (umbral 90 %, 22 archivos)
-     OK   global: lineas 74.49 % · ramas 84.56 % · funciones 75.81 % (umbral 70 %, 225 archivos)
+     OK   global: lineas 75.19 % · ramas 85.81 % · funciones 76.16 % (umbral 70 %, 225 archivos)
    ✓ las tres capas cumplen su umbral
 
 ▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
@@ -332,7 +332,7 @@ Ejecución del **2026-09-10**, al cierre de la **ETAPA 09-B**: las siete pantall
 
 ▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
    alertas entregadas: 200 de 200
-   p50 / p95 / p99   : 2 / 4 / 8 ms
+   p50 / p95 / p99   : 2 / 4 / 6 ms
    maximo            : 10 ms
    umbral KPI-25     : 10000 ms
    ✓ KPI-25 con margen sobre el umbral
@@ -353,9 +353,9 @@ Ejecución del **2026-09-10**, al cierre de la **ETAPA 09-B**: las siete pantall
    ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
 
 ▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
-      corrida 1/3: codigo 0 · @ncr/api:test: Tests 398 passed (398) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 186 passed (186)
-      corrida 2/3: codigo 0 · @ncr/api:test: Tests 398 passed (398) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 186 passed (186)
-      corrida 3/3: codigo 0 · @ncr/api:test: Tests 398 passed (398) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 186 passed (186)
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 398 passed (398) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 239 passed (239)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 398 passed (398) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 239 passed (239)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 398 passed (398) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 239 passed (239)
    ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
 
 ▸ 15 · ningún paso declarado se quedó sin ejecutar
