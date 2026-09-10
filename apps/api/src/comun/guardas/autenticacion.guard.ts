@@ -1,5 +1,10 @@
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { BITACORA } from '@ncr/domain-core';
@@ -103,15 +108,50 @@ export class GuardaDeAutenticacion implements CanActivate {
       peticion[CLAVE_CONTEXTO] = ctx;
       return true;
     } catch (e) {
-      const motivo = e instanceof RechazoDeAutenticacion ? e.motivo : 'FIRMA_INVALIDA';
-      this.bitacora.registrar('aviso', 'autenticacion rechazada', {
+      /**
+       * **Un error que no es un rechazo NO se disfraza de rechazo.**
+       *
+       * Aquí decía `FIRMA_INVALIDA` para todo lo que no fuera un
+       * `RechazoDeAutenticacion`, y esa línea es la que costó tres rondas de
+       * trabajo: con el JWKS en 404 la bitácora repetía «firma inválida» en
+       * cada intento, y la firma no tenía nada de malo — no había ninguna
+       * clave con la que comprobarla. El registro debe decir qué pasó, no una
+       * hipótesis sobre qué pasó.
+       */
+      const motivo = e instanceof RechazoDeAutenticacion ? e.motivo : 'ERROR_INESPERADO';
+      const esFalloDelServidor = motivo === 'JWKS_NO_DISPONIBLE' || motivo === 'ERROR_INESPERADO';
+
+      this.bitacora.registrar(esFalloDelServidor ? 'error' : 'aviso', 'autenticacion rechazada', {
         motivo,
         ruta: peticion.url,
         metodo: peticion.method,
+        // Solo para lo inesperado, y solo la clase y el texto del error: nunca
+        // el token, nunca la cabecera. Sin esto, «inesperado» no se diagnostica.
+        ...(motivo === 'ERROR_INESPERADO' && e instanceof Error
+          ? { error: `${e.name}: ${e.message}` }
+          : {}),
+        ...(motivo === 'JWKS_NO_DISPONIBLE'
+          ? { remedio: 'revisa SUPABASE_JWKS_URL y consulta /ready' }
+          : {}),
       });
-      // Al cliente, un único mensaje. El motivo queda en la bitácora: decirle
-      // a quien prueba tokens si falló la firma o la expiración le ahorra
-      // trabajo de sondeo.
+
+      /**
+       * Y tampoco se le miente al cliente. Un JWKS caído no es un token malo:
+       * el cliente no tiene nada que corregir, y responderle 401 le dice que
+       * vuelva a autenticarse —que es justo lo que no va a funcionar—. Se
+       * responde 503, que es lo que de verdad ocurre y lo que ya publica
+       * `/ready`. No revela nada: es un estado global del servicio, no una
+       * distinción token a token que sirva para sondear.
+       */
+      if (esFalloDelServidor) {
+        throw new ServiceUnavailableException(
+          'La API no puede verificar sesiones en este momento. Consulta /ready.',
+        );
+      }
+
+      // Para lo demás, al cliente un único mensaje. El motivo queda en la
+      // bitácora: decirle a quien prueba tokens si falló la firma o la
+      // expiración le ahorra trabajo de sondeo.
       throw new UnauthorizedException('No autenticado');
     }
   }

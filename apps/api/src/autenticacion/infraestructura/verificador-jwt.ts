@@ -15,6 +15,14 @@ import type { Claims } from '../dominio/claims';
  */
 const ALGORITMOS_ADMITIDOS = ['RS256', 'RS512', 'ES256', 'ES512', 'EdDSA'] as const;
 
+/**
+ * Un fallo de red al descargar el JWKS llega como `TypeError: fetch failed`
+ * —DNS, conexión rechazada, TLS—, sin ninguna clase de `jose` que lo envuelva.
+ * Sin este reconocimiento acabaría también en «firma inválida».
+ */
+const esFalloDeRed = (e: unknown): boolean =>
+  e instanceof TypeError && /fetch failed|network|ENOTFOUND|ECONNREFUSED/i.test(e.message);
+
 export interface OpcionesVerificacion {
   readonly emisor: string;
   readonly audiencia: string;
@@ -56,7 +64,20 @@ export class VerificadorDeJwt {
     if (e instanceof errors.JWKSNoMatchingKey) return new RechazoDeAutenticacion('KID_DESCONOCIDO');
     if (e instanceof errors.JOSEAlgNotAllowed)
       return new RechazoDeAutenticacion('ALGORITMO_NO_ADMITIDO');
-    if (e instanceof errors.JWKSTimeout || e instanceof errors.JWKSMultipleMatchingKeys) {
+    /**
+     * Fallos del JWKS, no del token. `JWKSInvalid` es el que devuelve `jose`
+     * cuando la descarga no da 200 —el caso de `/auth/v1/jwks`, que responde
+     * 404— y también cuando el documento no es un JWKS. Antes caía en el
+     * «todo lo demás» de abajo y se registraba como `FIRMA_INVALIDA`: la
+     * bitácora afirmaba que la firma del token estaba rota cuando lo que
+     * pasaba es que no había ni una clave con la que comprobarla.
+     */
+    if (
+      e instanceof errors.JWKSTimeout ||
+      e instanceof errors.JWKSMultipleMatchingKeys ||
+      e instanceof errors.JWKSInvalid ||
+      esFalloDeRed(e)
+    ) {
       return new RechazoDeAutenticacion('JWKS_NO_DISPONIBLE');
     }
     if (e instanceof errors.JWTClaimValidationFailed) {

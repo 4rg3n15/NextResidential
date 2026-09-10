@@ -81,3 +81,58 @@ describe('biometría · la llave de cifrado es requisito de arranque (ETAPA 08)'
     expect(cargarConfiguracion(completo).BIOMETRIA_LLAVE_REF).toBe('env:BIOMETRIA_LLAVE');
   });
 });
+
+/**
+ * D-61 · el `.env` sin salto de línea final.
+ *
+ * El cliente añadió `MFA_OBLIGATORIO=false` a un fichero que no terminaba en
+ * `\n`. Las dos líneas se fundieron: `INGESTA_FIRMA_SECRETO` quedó con
+ * `…-32MFA_OBLIGATORIO=false` de valor y `MFA_OBLIGATORIO` **nunca llegó a
+ * existir**. La aplicación arrancó tan contenta con un secreto corrupto, porque
+ * `min(32)` solo mira la longitud y el valor pegado la superaba de sobra.
+ */
+describe('valores con forma imposible', () => {
+  it('detecta el nombre de otra variable pegado dentro de un valor', () => {
+    const entorno = {
+      ...completo,
+      INGESTA_FIRMA_SECRETO: `${completo.INGESTA_FIRMA_SECRETO}MFA_OBLIGATORIO=false`,
+    };
+    expect(() => cargarConfiguracion(entorno as NodeJS.ProcessEnv)).toThrow(
+      /INGESTA_FIRMA_SECRETO/,
+    );
+    // El mensaje tiene que nombrar la causa REAL, no la consecuencia: quien lo
+    // lea debe ir al salto de línea, no a contar caracteres del secreto.
+    expect(() => cargarConfiguracion(entorno as NodeJS.ProcessEnv)).toThrow(/salto de línea/);
+  });
+
+  it('nombra también la variable que se perdió por el camino', () => {
+    const entorno = {
+      ...completo,
+      INGESTA_FIRMA_SECRETO: `${completo.INGESTA_FIRMA_SECRETO}MFA_OBLIGATORIO=false`,
+    };
+    expect(() => cargarConfiguracion(entorno as NodeJS.ProcessEnv)).toThrow(/MFA_OBLIGATORIO/);
+  });
+
+  it('un secreto con espacios o saltos de línea no arranca', () => {
+    for (const roto of [
+      'a'.repeat(20) + ' ' + 'b'.repeat(20),
+      'c'.repeat(20) + '\n' + 'd'.repeat(20),
+    ]) {
+      expect(() =>
+        cargarConfiguracion({ ...completo, BIOMETRIA_LLAVE: roto } as NodeJS.ProcessEnv),
+      ).toThrow(/BIOMETRIA_LLAVE/);
+    }
+  });
+
+  it('no hay falso positivo: una URL con parámetros en minúscula pasa', () => {
+    // `?sslmode=require` se parece a una variable pegada solo si se busca
+    // cualquier `algo=`. Se buscan los nombres de ESTE esquema, que son en
+    // mayúsculas, y por eso una cadena de conexión legítima no salta.
+    expect(() =>
+      cargarConfiguracion({
+        ...completo,
+        DATABASE_URL: 'postgresql://u:p@host:5432/db?sslmode=require&application_name=ncr',
+      } as NodeJS.ProcessEnv),
+    ).not.toThrow();
+  });
+});

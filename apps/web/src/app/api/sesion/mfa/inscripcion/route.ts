@@ -102,7 +102,7 @@ export const POST = async (): Promise<NextResponse> => {
           estado: 409,
         });
         return NextResponse.json(
-          { siguiente: 'segundo-factor', mensaje: textoDeFalloDeAcceso(e.motivo) },
+          { siguiente: 'segundo-factor', mensaje: textoDeFalloDeAcceso(e.motivo, e.detalle) },
           { status: 409 },
         );
       }
@@ -128,7 +128,10 @@ export const POST = async (): Promise<NextResponse> => {
         codigoDelProveedor: e.detalle.codigo,
         estado,
       });
-      return NextResponse.json({ mensaje: textoDeFalloDeAcceso(e.motivo) }, { status: estado });
+      return NextResponse.json(
+        { mensaje: textoDeFalloDeAcceso(e.motivo, e.detalle) },
+        { status: estado },
+      );
     }
     registrar('error', 'inscripcion de factor: fallo inesperado', {
       clase: e instanceof Error ? e.name : typeof e,

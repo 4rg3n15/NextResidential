@@ -49,7 +49,20 @@ export type MotivoDeFalloDeAcceso =
    * está en pantalla. La salida no es un mensaje, es **llevarle a verificar**.
    */
   | 'SEGUNDO_FACTOR_YA_INSCRITO'
-  | 'SERVICIO_NO_DISPONIBLE';
+  /**
+   * **No se pudo contactar**: la petición ni siquiera obtuvo respuesta —red
+   * caída, DNS, TLS—. Es lo único que este motivo debe significar.
+   */
+  | 'SERVICIO_NO_DISPONIBLE'
+  /**
+   * **Contestó, y contestó un error.** Motivo aparte de `SERVICIO_NO_DISPONIBLE`
+   * porque son observaciones distintas y llevan a sitios distintos: «no
+   * contesta» manda a mirar la red, y un 500 manda a mirar el servicio. Se
+   * plegaban en uno solo, y el mensaje resultante afirmaba que no se había
+   * podido contactar con un servicio que había respondido — la misma clase de
+   * mentira que el diagnóstico inventado sobre el segundo factor.
+   */
+  | 'SERVICIO_RESPONDIO_ERROR';
 
 /**
  * Rastro del fallo para el diagnóstico, **sin cuerpo de respuesta**.
@@ -229,7 +242,9 @@ const exigirOk = async (respuesta: Response, siInvalido: MotivoDeFalloDeAcceso):
   if (estado === 400 || estado === 401 || estado === 403) {
     throw new FalloDeAcceso(siInvalido, undefined, { estado, codigo });
   }
-  throw new FalloDeAcceso('SERVICIO_NO_DISPONIBLE', undefined, { estado, codigo });
+  // Contestó. No sabemos por qué falló y no vamos a inventarlo: se transmite
+  // el estado que respondió, que es lo único que consta.
+  throw new FalloDeAcceso('SERVICIO_RESPONDIO_ERROR', undefined, { estado, codigo });
 };
 
 /**

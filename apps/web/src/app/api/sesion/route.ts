@@ -12,7 +12,7 @@ import {
   exigeSegundoFactor,
   iniciarSesion,
 } from '@/lib/sesion/supabase-auth';
-import { textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
+import { estadoDeFalloDeAcceso, textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
 import { configuracion } from '@/lib/configuracion';
 import { registrar } from '@/lib/registro';
 
@@ -152,11 +152,14 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
     });
   } catch (e) {
     if (e instanceof FalloDeAcceso) {
-      const estado = e.motivo === 'DEMASIADOS_INTENTOS' ? 429 : 401;
+      const estado = estadoDeFalloDeAcceso(e.motivo, 401);
       const cabeceras =
         e.reintentarEn === undefined ? undefined : { 'Retry-After': String(e.reintentarEn) };
       return NextResponse.json(
-        { mensaje: textoDeFalloDeAcceso(e.motivo), reintentarEn: e.reintentarEn ?? null },
+        {
+          mensaje: textoDeFalloDeAcceso(e.motivo, e.detalle),
+          reintentarEn: e.reintentarEn ?? null,
+        },
         cabeceras === undefined ? { status: estado } : { status: estado, headers: cabeceras },
       );
     }

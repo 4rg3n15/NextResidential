@@ -46,6 +46,28 @@ export const describir = (e: EstadoDeJwks): string =>
 
 type ConjuntoRemoto = ReturnType<typeof createRemoteJWKSet>;
 
+/**
+ * ¿El JWKS contestó?
+ *
+ * La distinción que importa no es qué clase de error lanzó `jose`, sino si
+ * llegamos a inspeccionar el documento. `jose` responde «no hay clave que
+ * coincida» o «hay varias» **después** de descargarlo: eso es una respuesta
+ * sobre el token. Cualquier otra cosa —404, DNS, TLS, tiempo agotado, un JSON
+ * que no es un JWKS— es que no hubo documento, y eso es un fallo del servicio.
+ *
+ * Se clasifica así, y no por la clase de la excepción, porque `jose` lanza un
+ * `JOSEError` GENÉRICO —`ERR_JOSE_GENERIC`, «Expected 200 OK from the JSON Web
+ * Key Set HTTP response»— cuando la descarga no da 200. Es indistinguible por
+ * tipo de un fallo de firma, y confiar en el tipo es lo que hizo que un 404 se
+ * registrara como `FIRMA_INVALIDA` durante toda la ETAPA 09. Comprobado contra
+ * jose 5.9.6, no supuesto.
+ */
+const esRespuestaSobreLaClave = (e: unknown): boolean =>
+  e instanceof Error &&
+  /no applicable key|multiple matching keys|JWKSNoMatchingKey|JWKSMultipleMatchingKeys/i.test(
+    `${e.name} ${e.message}`,
+  );
+
 export class ProveedorDeJwks {
   private conjunto: ConjuntoRemoto | null = null;
   private ultimoIntento = 0;
@@ -63,8 +85,27 @@ export class ProveedorDeJwks {
    * claves es precisamente donde se cometen los errores que esta clase intenta
    * evitar. Lo que sí es nuestro es la CONFIGURACIÓN de los plazos.
    */
+  /**
+   * La función de resolución que usa el verificador, **envuelta**: el
+   * proveedor es el dueño del JWKS, así que es quien tiene que decir cuándo el
+   * fallo es del JWKS y no del token. Sin esta envoltura, el verificador
+   * tendría que reconocer la taxonomía interna de `jose` —que no es estable
+   * entre versiones y que ya nos engañó una vez— para no llamar «firma rota» a
+   * un endpoint caído.
+   */
   obtener(): JWTVerifyGetKey {
-    return this.conjuntoRemoto();
+    const conjunto = this.conjuntoRemoto();
+    return async (encabezado, token) => {
+      try {
+        return await conjunto(encabezado, token);
+      } catch (e) {
+        if (esRespuestaSobreLaClave(e)) throw e;
+        throw new RechazoDeAutenticacion(
+          'JWKS_NO_DISPONIBLE',
+          e instanceof Error ? `${e.name}: ${e.message}` : undefined,
+        );
+      }
+    };
   }
 
   private conjuntoRemoto(): ConjuntoRemoto {
@@ -119,9 +160,7 @@ export class ProveedorDeJwks {
       // La única excepción que acredita que el documento se descargó y se pudo
       // inspeccionar es «no coincide ninguna clave». Cualquier otra —404, DNS,
       // tiempo agotado, JSON inválido— es que no se llegó al documento.
-      const esNoCoincide =
-        e instanceof Error && /no applicable key|JWKSNoMatchingKey/i.test(`${e.name} ${e.message}`);
-      if (!esNoCoincide) {
+      if (!esRespuestaSobreLaClave(e)) {
         return {
           estado: 'inalcanzable',
           detalle: e instanceof Error ? `${e.name}: ${e.message}` : 'error desconocido',
