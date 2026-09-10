@@ -193,7 +193,7 @@ Dos hallazgos de las propias pruebas, antes de llegar al verificador:
 
 ### Veredicto literal de §2.8.0
 
-Ejecución del **2026-09-10**, tras cerrar los cuatro fallos de la sexta ronda, con PostgreSQL local (`--con-base`) y `DATABASE_URL_PRUEBAS` exportada. Es la primera corrida en la que **el paso 12c aparece** —el camino del navegador— y la primera con el paso 15, que cuenta los pasos ejecutados contra los declarados.
+Ejecución del **2026-09-10**, con `MFA_OBLIGATORIO` ya en el esquema de las dos aplicaciones y el camino del navegador ampliado a su paso 5. PostgreSQL local (`--con-base`) y `DATABASE_URL_PRUEBAS` exportada.
 
 ```
 
@@ -214,20 +214,20 @@ Ejecución del **2026-09-10**, tras cerrar los cuatro fallos de la sexta ronda, 
    ✓ pnpm typecheck
 
 ▸ 5 · suite completa
-   @ncr/config:test:       Tests  39 passed (39)
    @ncr/providers:test:       Tests  24 passed (24)
+   @ncr/config:test:       Tests  39 passed (39)
    @ncr/domain-core:test:       Tests  328 passed (328)
-   @ncr/web:test:       Tests  161 passed (161)
-   @ncr/api:test:       Tests  363 passed (363)
+   @ncr/web:test:       Tests  168 passed (168)
+   @ncr/api:test:       Tests  370 passed (370)
    ✓ suite completa en verde
 
 ▸ 6 · ningún fichero de prueba se quedó sin recoger
-   ✓ 76 de 76 ficheros de prueba ejecutados
+   ✓ 78 de 78 ficheros de prueba ejecutados
 
 ▸ 7 · umbrales de cobertura por capa (§2.4)
      OK   dominio (packages/domain-core/src): lineas 98.66 % · ramas 97.67 % · funciones 98.72 % (umbral 90 %, 28 archivos)
      OK   aplicacion (**/aplicacion/**): lineas 98.28 % · ramas 91.46 % · funciones 98.36 % (umbral 90 %, 20 archivos)
-     OK   global: lineas 77.47 % · ramas 87.18 % · funciones 85.97 % (umbral 70 %, 189 archivos)
+     OK   global: lineas 77.98 % · ramas 87.55 % · funciones 86.07 % (umbral 70 %, 190 archivos)
    ✓ las tres capas cumplen su umbral
 
 ▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
@@ -250,7 +250,7 @@ Ejecución del **2026-09-10**, tras cerrar los cuatro fallos de la sexta ronda, 
 ▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
    alertas entregadas: 200 de 200
    p50 / p95 / p99   : 2 / 4 / 7 ms
-   maximo            : 10 ms
+   maximo            : 11 ms
    umbral KPI-25     : 10000 ms
    ✓ KPI-25 con margen sobre el umbral
 
@@ -270,9 +270,9 @@ Ejecución del **2026-09-10**, tras cerrar los cuatro fallos de la sexta ronda, 
    ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
 
 ▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
-      corrida 1/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 161 passed (161)
-      corrida 2/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 161 passed (161)
-      corrida 3/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 161 passed (161)
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 370 passed (370) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 168 passed (168)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 370 passed (370) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 168 passed (168)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 370 passed (370) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 168 passed (168)
    ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
 
 ▸ 15 · ningún paso declarado se quedó sin ejecutar
