@@ -65,6 +65,20 @@ export const BarraLateral = ({
             <li key={e.clave}>
               <Link
                 href={e.ruta}
+                /**
+                 * **Sin precarga, y no es una micro-optimización.** Las nueve
+                 * pantallas son `force-dynamic`: se renderizan por petición
+                 * contra la API con la sesión de quien mira, así que precargar
+                 * no ahorra nada —el servidor tiene que hacer el trabajo igual—
+                 * y en cambio dispara ocho peticiones autenticadas cada vez que
+                 * alguien abre cualquier vista.
+                 *
+                 * Además producía errores reales en el navegador: al cambiar de
+                 * página, las precargas en vuelo se abortan y Next las registra
+                 * como «Failed to fetch RSC payload». Lo detectó el recorrido
+                 * del camino completo, que exige CERO errores de consola.
+                 */
+                prefetch={false}
                 aria-current={activo ? 'page' : undefined}
                 className={cn(
                   'relative flex items-center rounded-boton px-3 py-2.5 text-cuerpo transition-colors',
