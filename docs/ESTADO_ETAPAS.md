@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-10 · al cierre de la **ETAPA 09-A** (sexta ronda de correcciones)
+**Última actualización:** 2026-09-10 · al cierre de la **ETAPA 09-A** (séptima ronda de correcciones)
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -142,6 +142,16 @@ La abrió el verificador en macOS, no el producto. Los cuatro comparten raíz: *
 | **D-55** · `arranque-en-frio.sh` no declaraba su conexión y solo funcionaba con las variables ya exportadas | **Resuelto** · fija y exporta los mismos valores por defecto que `verificar.sh`            |
 
 Pruebas negativas: **13** (dos nuevas, sondas 12 y 13).
+
+### Séptima ronda (2026-09-10) — el segundo factor, y el interruptor que pidió el cliente
+
+| Asunto                                                                                                                                | Estado                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **D-56** · el código de seis dígitos correcto devolvía al login **sin decir por qué**: la API rechazaba el token y la consola callaba | **Resuelto** · se registran el estado y los NOMBRES de los claims del token (nunca sus valores) |
+| **D-57** · `MFA_OBLIGATORIO`, interruptor temporal del segundo factor, a petición del cliente                                         | **Vigente** · desviación declarada de RN-20, CA-25 y §2.7.8; por defecto `true`                 |
+| Que no salga el QR y pidan el código: **no es un defecto**                                                                            | Esa cuenta ya tiene un factor verificado; se retira en el panel (Remove MFA factors)            |
+
+El interruptor se prueba en **las dos posiciones** —que encendido siga exigiendo el segundo factor es lo que nadie comprueba— y se recorre en el navegador: paso 5 del camino de acceso, con otra API y otra consola levantadas con la variable puesta.
 
 ### Lo que usted debe ejecutar antes de la 09-B
 

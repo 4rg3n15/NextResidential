@@ -9,6 +9,8 @@ import { RechazoDeAutenticacion } from '../../autenticacion';
 import type { ContextoTenant } from '../../autenticacion';
 import { exigeSegundoFactor } from '../../autenticacion';
 import { CLAVE_PUBLICO, CLAVE_SIN_SEGUNDO_FACTOR } from '../decoradores';
+import { POLITICA_MFA } from './politica-mfa';
+import type { PoliticaMfa } from './politica-mfa';
 import { CLAVE_CONTEXTO } from '../decoradores/contexto.decorator';
 
 /**
@@ -26,7 +28,16 @@ export class GuardaDeAutenticacion implements CanActivate {
     @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(VerificadorDeJwt) private readonly verificador: VerificadorDeJwt,
     @Inject(BITACORA) private readonly bitacora: Bitacora,
+    @Inject(POLITICA_MFA) private readonly politicaMfa: PoliticaMfa,
   ) {}
+
+  /**
+   * Se avisa UNA vez por proceso, no en cada petición: con el interruptor
+   * puesto, un aviso por llamada ahogaría la bitácora justo cuando hace falta
+   * leerla. Una vez basta para que quede constancia de con qué política
+   * arrancó este proceso.
+   */
+  private avisoDeMfaDesactivado = false;
 
   async canActivate(contexto: ExecutionContext): Promise<boolean> {
     const publico = this.reflector.getAllAndOverride<boolean>(CLAVE_PUBLICO, [
@@ -57,7 +68,28 @@ export class GuardaDeAutenticacion implements CanActivate {
           contexto.getClass(),
         ]) === true;
       if (exigeSegundoFactor(claims.rol) && !mfaVerificado && !admiteAal1) {
-        throw new RechazoDeAutenticacion('SEGUNDO_FACTOR_REQUERIDO');
+        /**
+         * DESVIACIÓN DECLARADA · `MFA_OBLIGATORIO=false`. El rol administrativo
+         * pasa con `aal1`. Todo lo demás sigue en pie: firma verificada contra
+         * el JWKS, rol, copropiedad y aislamiento. `mfaVerificado` conserva su
+         * valor REAL —`false`—, así que ninguna ruta que mire ese campo cree
+         * que hubo segundo factor: la desviación no se propaga disfrazada.
+         */
+        if (this.politicaMfa.obligatorio) {
+          throw new RechazoDeAutenticacion('SEGUNDO_FACTOR_REQUERIDO');
+        }
+        if (!this.avisoDeMfaDesactivado) {
+          this.avisoDeMfaDesactivado = true;
+          this.bitacora.registrar(
+            'aviso',
+            'MFA DESACTIVADO: se acepta aal1 en rol administrativo',
+            {
+              rol: claims.rol,
+              variable: 'MFA_OBLIGATORIO=false',
+              contrato: 'RN-20 / CA-25 / §2.7.8 — desviación temporal',
+            },
+          );
+        }
       }
 
       const ctx: ContextoTenant = {

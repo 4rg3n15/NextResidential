@@ -105,6 +105,25 @@ const base = z.object({
    */
   COOKIE_SEGURA: z.enum(['true', 'false']).optional(),
 
+  /**
+   * **INTERRUPTOR TEMPORAL DEL SEGUNDO FACTOR — desviación declarada de §2.7.8
+   * y de RN-20 / CA-25.** El mismo nombre y el mismo valor por defecto que en
+   * la API, a propósito: es una sola decisión escrita en dos procesos, y dos
+   * nombres distintos garantizarían que algún día solo se cambie uno.
+   *
+   * Puesto a `false`, la consola lleva al tablero en cuanto la contraseña es
+   * correcta, sin ofrecer inscripción ni verificación. **La API tiene que
+   * llevar el mismo valor**: si esta lo apaga y aquella no, el tablero pedirá
+   * una sesión que la API rechaza y el usuario volverá al login sin
+   * explicación. Ese caso concreto se detecta y se explica en la ruta de
+   * acceso en vez de dejarlo en un rebote mudo.
+   */
+  MFA_OBLIGATORIO: z
+    .enum(['true', 'false'], {
+      errorMap: () => ({ message: "MFA_OBLIGATORIO admite solo 'true' o 'false'" }),
+    })
+    .default('true'),
+
   /** Puente de video de la ETAPA 10. Vacío o ausente significa «todavía no». */
   PUENTE_VIDEO_URL: z
     .union([urlAbsoluta('PUENTE_VIDEO_URL'), z.literal('')])
@@ -135,7 +154,11 @@ export const esquemaConfiguracion = base.superRefine((datos, ctx) => {
       });
     }
   }
-  if (datos.NODE_ENV === 'production' && datos.COOKIE_SEGURA === 'false' && !esLocal(datos.API_URL)) {
+  if (
+    datos.NODE_ENV === 'production' &&
+    datos.COOKIE_SEGURA === 'false' &&
+    !esLocal(datos.API_URL)
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['COOKIE_SEGURA'],
@@ -178,6 +201,7 @@ export interface Configuracion {
   readonly supabaseUrl: string;
   readonly supabasePublishableKey: string;
   readonly cookieSegura: boolean;
+  readonly mfaObligatorio: boolean;
   readonly puenteVideoUrl: string | undefined;
 }
 
@@ -200,9 +224,11 @@ const leer = (entorno: NodeJS.ProcessEnv): Configuracion => {
     supabasePublishableKey: datos.SUPABASE_PUBLISHABLE_KEY,
     // En producción la cookie va `Secure` siempre. En desarrollo sobre
     // http://localhost el navegador la rechazaría y no habría sesión.
-    cookieSegura: datos.COOKIE_SEGURA === undefined
-      ? datos.NODE_ENV === 'production'
-      : datos.COOKIE_SEGURA === 'true',
+    cookieSegura:
+      datos.COOKIE_SEGURA === undefined
+        ? datos.NODE_ENV === 'production'
+        : datos.COOKIE_SEGURA === 'true',
+    mfaObligatorio: datos.MFA_OBLIGATORIO === 'true',
     puenteVideoUrl: datos.PUENTE_VIDEO_URL,
   };
 };

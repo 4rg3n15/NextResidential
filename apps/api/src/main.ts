@@ -66,6 +66,19 @@ async function arrancar(): Promise<void> {
 
   await app.listen(config.PORT);
   bitacora.registrar('info', 'API arrancada', { puerto: config.PORT, entorno: config.NODE_ENV });
+
+  /**
+   * El interruptor del segundo factor se anuncia AL ARRANCAR, no solo cuando
+   * se usa. Un despliegue con MFA desactivado tiene que decirlo en la primera
+   * línea de su registro: lo que no se anuncia al arrancar se queda puesto.
+   */
+  if (!config.MFA_OBLIGATORIO) {
+    bitacora.registrar('aviso', 'SEGUNDO FACTOR DESACTIVADO (MFA_OBLIGATORIO=false)', {
+      efecto: 'los roles administrativos entran con aal1; contraseña y RBAC siguen exigiéndose',
+      contrato: 'desviación temporal de RN-20, CA-25 y §2.7.8',
+      revertir: 'quita MFA_OBLIGATORIO del entorno o ponlo a true',
+    });
+  }
 }
 
 arrancar().catch((error: unknown) => {

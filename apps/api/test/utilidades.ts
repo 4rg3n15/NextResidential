@@ -21,6 +21,11 @@ export const configuracionDePrueba: Configuracion = {
   SUPABASE_PUBLISHABLE_KEY: 'marcador',
   SUPABASE_SECRET_KEY: 'marcador',
   SUPABASE_JWKS_URL: 'https://proyecto-de-prueba.invalid/auth/v1/jwks',
+  // La suite corre con la regla del contrato EN VIGOR. El interruptor tiene sus
+  // propias pruebas, que lo apagan explícitamente: si el valor por defecto de
+  // la suite fuera `false`, las 363 pruebas dejarían de comprobar RN-20 sin que
+  // nadie lo notara — que es como se pierde un control.
+  MFA_OBLIGATORIO: true,
   JWKS_CACHE_TTL_SEGUNDOS: 600,
   JWKS_REFRESCO_MINIMO_SEGUNDOS: 60,
   DATABASE_URL: 'marcador',
@@ -107,9 +112,23 @@ export const tokenDe = async (f: Firmante, id: Identidad): Promise<string> =>
 export const crearApp = async (
   firmante: Firmante,
   sustituir?: (constructor: TestingModuleBuilder) => TestingModuleBuilder,
+  /**
+   * Variaciones de CONFIGURACIÓN, no de proveedores. Sustituir el proveedor de
+   * la política de MFA probaría el guard pero no el cableado que va de la
+   * variable de entorno al guard, que es justo donde un interruptor de
+   * seguridad se rompe: el esquema la lee, el módulo no la pasa, y el guard
+   * recibe el valor por defecto sin que nadie lo note.
+   */
+  configuracion?: Partial<Configuracion>,
 ): Promise<INestApplication> => {
   const base = Test.createTestingModule({
-    imports: [AppModule.conConfiguracion(configuracionDePrueba)],
+    imports: [
+      AppModule.conConfiguracion(
+        configuracion === undefined
+          ? configuracionDePrueba
+          : { ...configuracionDePrueba, ...configuracion },
+      ),
+    ],
   });
   const modulo = await (sustituir === undefined ? base : sustituir(base))
     .overrideProvider(ProveedorDeJwks)

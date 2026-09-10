@@ -4,6 +4,7 @@ import type { Rol } from '@ncr/contracts';
 import { sesionActual } from '@/lib/sesion/servidor';
 import { MarcoDeConsola } from '@/componentes/marco-consola';
 import { ProveedorDeConsultas } from '@/lib/api/proveedor';
+import { configuracion } from '@/lib/configuracion';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,21 @@ const LayoutDeConsola = async ({
   return (
     <ProveedorDeConsultas>
       <MarcoDeConsola sesion={sesion} rol={sesion.rol as Rol}>
+        {/*
+          DESVIACIÓN DECLARADA, VISIBLE EN PANTALLA. Un interruptor de seguridad
+          que solo se ve en un fichero `.env` se queda puesto: nadie lee el
+          entorno de un despliegue que funciona. Aquí lo ve quien usa la
+          consola, en cada pantalla, hasta que se quite.
+        */}
+        {configuracion().mfaObligatorio ? null : (
+          <p
+            role="status"
+            className="mb-4 rounded-md border border-marca-boton bg-marca-boton/10 px-4 py-2 text-sm text-marca-boton"
+          >
+            <strong>Segundo factor desactivado</strong> (`MFA_OBLIGATORIO=false`). Modo de ensayo:
+            se entra solo con contraseña. RN-20 exige restituirlo antes de operar.
+          </p>
+        )}
         {children}
       </MarcoDeConsola>
     </ProveedorDeConsultas>

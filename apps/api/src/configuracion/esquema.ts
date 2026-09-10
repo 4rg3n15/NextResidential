@@ -23,6 +23,35 @@ export const esquemaConfiguracion = z.object({
   SUPABASE_SECRET_KEY: noVacio('SUPABASE_SECRET_KEY'),
   SUPABASE_JWKS_URL: noVacio('SUPABASE_JWKS_URL').url(),
 
+  /**
+   * **INTERRUPTOR TEMPORAL DEL SEGUNDO FACTOR — desviación declarada de §2.7.8
+   * y de RN-20 / CA-25.**
+   *
+   * Por defecto `true`: el comportamiento del contrato no cambia salvo que
+   * alguien escriba la variable con todas sus letras. Puesto a `false`, el
+   * guard acepta un token `aal1` de un rol administrativo, y **eso es todo lo
+   * que hace**: no desactiva la autenticación, ni la verificación asimétrica
+   * del JWT, ni el RBAC, ni el aislamiento por copropiedad. Sigue haciendo
+   * falta usuario y contraseña válidos, y el token sigue verificándose contra
+   * el JWKS del proyecto.
+   *
+   * Existe porque el cliente lo pidió para poder ensayar la consola mientras se
+   * termina de cerrar el camino del segundo factor contra su proyecto real. No
+   * es una opción de despliegue: la API lo grita al arrancar y lo deja escrito
+   * en la bitácora la primera vez que deja pasar un `aal1`, para que nadie se
+   * lo encuentre puesto sin saberlo.
+   *
+   * Se lee como cadena y se transforma a booleano a propósito: `Boolean('false')`
+   * es `true`, y ese es el clásico interruptor de seguridad que queda encendido
+   * creyendo que está apagado.
+   */
+  MFA_OBLIGATORIO: z
+    .enum(['true', 'false'], {
+      errorMap: () => ({ message: "MFA_OBLIGATORIO admite solo 'true' o 'false'" }),
+    })
+    .default('true')
+    .transform((v) => v === 'true'),
+
   JWKS_CACHE_TTL_SEGUNDOS: z.coerce.number().int().min(60).max(3600).default(600),
   JWKS_REFRESCO_MINIMO_SEGUNDOS: z.coerce.number().int().min(10).default(60),
 

@@ -437,6 +437,73 @@ const principal = async () => {
   writeFileSync('/tmp/ncr-camino-red.log', trazas.join('\n'));
   console.log('   · trazas de red en /tmp/ncr-camino-red.log');
 
+  /**
+   * ── El interruptor, recorrido también en el navegador ────────────────────
+   *
+   * `MFA_OBLIGATORIO=false` es una desviación declarada del contrato, y una
+   * desviación que solo se prueba con dobles no está probada: lo que el cliente
+   * necesita saber es que **entra al tablero con la contraseña**, en un
+   * navegador, contra los dos procesos reales. Se levantan otra API y otra
+   * consola con la variable puesta, porque se lee al arrancar —que es
+   * justamente lo que hay que verificar— y no se puede cambiar en caliente.
+   */
+  paso('5 · con MFA_OBLIGATORIO=false: la contraseña sola entra al tablero');
+  const puertoApiSinMfa = await puertoLibre();
+  const puertoWebSinMfa = await puertoLibre();
+  lanzar('node', ['dist/main.js'], {
+    cwd: resolve(raiz, 'apps/api'),
+    env: { ...entornoDeApi(doble, puertoApiSinMfa), MFA_OBLIGATORIO: 'false' },
+    detached: true,
+    nombre: 'api-sin-mfa',
+  });
+  if (!(await esperar(`http://127.0.0.1:${puertoApiSinMfa}/health`, 'la API sin MFA'))) return;
+
+  const entornoWebSinMfa = {
+    ...entornoWeb,
+    API_URL: `http://127.0.0.1:${puertoApiSinMfa}`,
+    MFA_OBLIGATORIO: 'false',
+  };
+  // Se reutiliza la compilación anterior: estas variables se leen en tiempo de
+  // ejecución en el servidor, no se hornean en el paquete del navegador.
+  lanzar('node', [binDeNext, 'start', '-p', String(puertoWebSinMfa)], {
+    cwd: resolve(raiz, 'apps/web'),
+    env: entornoWebSinMfa,
+    detached: true,
+    nombre: 'web-sin-mfa',
+  });
+  const baseSinMfa = `http://127.0.0.1:${puertoWebSinMfa}`;
+  if (!(await esperar(`${baseSinMfa}/acceso`, 'la consola sin MFA'))) return;
+
+  const contextoSinMfa = await navegador.newContext({ viewport: { width: 1280, height: 900 } });
+  const paginaSinMfa = await contextoSinMfa.newPage();
+  const erroresSinMfa = [];
+  paginaSinMfa.on('console', (m) => {
+    if (m.type() === 'error') erroresSinMfa.push(m.text());
+  });
+  await paginaSinMfa.goto(`${baseSinMfa}/acceso`, { waitUntil: 'networkidle' });
+  await paginaSinMfa.fill('input[name="correo"]', USUARIO.correo);
+  await paginaSinMfa.fill('input[name="contrasena"]', USUARIO.contrasena);
+  await paginaSinMfa.click('button[type="submit"]');
+  await paginaSinMfa.waitForURL(/\/tablero/, { timeout: 30_000 });
+  ok('la contraseña sola llega al tablero, sin QR y sin código de seis dígitos');
+
+  await paginaSinMfa.waitForSelector('main, [role="main"]', { timeout: 30_000 });
+  const textoSinMfa = await paginaSinMfa.locator('body').innerText();
+  afirmar(
+    !/volver a intentarlo|no se pudo|sin conexión/i.test(textoSinMfa),
+    'el tablero renderiza sin estado de error',
+  );
+  // La desviación tiene que VERSE. Un interruptor de seguridad invisible se
+  // queda puesto: nadie lee el entorno de un despliegue que funciona.
+  afirmar(
+    /Segundo factor desactivado/i.test(textoSinMfa),
+    'la consola avisa en pantalla de que el segundo factor está desactivado',
+  );
+  afirmar(
+    erroresSinMfa.length === 0,
+    `sin errores de consola en el navegador (${erroresSinMfa.length})`,
+  );
+
   await navegador.close();
   await doble.cerrar();
 };
@@ -457,6 +524,9 @@ principal()
       console.log(`CAMINO DE ACCESO: ${fallos} comprobación(es) fallaron`);
       process.exit(1);
     }
-    console.log('CAMINO DE ACCESO: contraseña → factor → QR pintado → aal2 → tablero, completo');
+    console.log(
+      'CAMINO DE ACCESO: contraseña → factor → QR pintado → aal2 → tablero, completo; ' +
+        'y con MFA_OBLIGATORIO=false, la contraseña sola',
+    );
     process.exit(0);
   });

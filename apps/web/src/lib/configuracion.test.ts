@@ -55,9 +55,9 @@ describe('lo que hace fallar el arranque', () => {
   });
 
   it('SUPABASE_URL por http fuera de localhost se rechaza', () => {
-    expect(problemasDe({ ...COMPLETO, SUPABASE_URL: 'http://proyecto.supabase.co' }).join(' ')).toContain(
-      'https',
-    );
+    expect(
+      problemasDe({ ...COMPLETO, SUPABASE_URL: 'http://proyecto.supabase.co' }).join(' '),
+    ).toContain('https');
   });
 
   it('pero la pila local de Supabase por http sí vale', () => {
@@ -100,7 +100,11 @@ describe('lo que hace fallar el arranque', () => {
   it('COOKIE_SEGURA=false vale en local y NO fuera de local', () => {
     // El interruptor existe para poder servir la consola compilada sobre http
     // en el propio equipo. Fuera de ahí sería mandar la sesión en claro.
-    const local = { ...COMPLETO, NODE_ENV: 'production' as const, API_URL: 'http://127.0.0.1:3000' };
+    const local = {
+      ...COMPLETO,
+      NODE_ENV: 'production' as const,
+      API_URL: 'http://127.0.0.1:3000',
+    };
     expect(validarEntorno({ ...local, COOKIE_SEGURA: 'false' }).cookieSegura).toBe(false);
     expect(
       problemasDe({
@@ -110,6 +114,27 @@ describe('lo que hace fallar el arranque', () => {
         COOKIE_SEGURA: 'false',
       }).join(' '),
     ).toContain('bucle local');
+  });
+
+  it('MFA_OBLIGATORIO viene puesto salvo que se apague EXPLÍCITAMENTE', () => {
+    // El valor por defecto es lo que protege: un entorno que no menciona la
+    // variable conserva la regla del contrato (RN-20). Y se comprueba también
+    // la cadena 'false', porque `Boolean('false')` es `true` y ese es el
+    // clásico interruptor que queda encendido creyendo que está apagado.
+    expect(validarEntorno(COMPLETO).mfaObligatorio).toBe(true);
+    expect(validarEntorno({ ...COMPLETO, MFA_OBLIGATORIO: 'true' }).mfaObligatorio).toBe(true);
+    expect(validarEntorno({ ...COMPLETO, MFA_OBLIGATORIO: 'false' }).mfaObligatorio).toBe(false);
+  });
+
+  it('un valor que no es true ni false NO se interpreta: la consola no arranca', () => {
+    // «0», «no», «off» o un espacio de más son las formas habituales de creer
+    // que se apagó algo. Cualquiera de ellas debe detener el proceso con un
+    // mensaje, nunca resolverse en silencio a un lado u otro.
+    for (const valor of ['0', 'no', 'off', 'False ']) {
+      expect(problemasDe({ ...COMPLETO, MFA_OBLIGATORIO: valor }).join(' ')).toContain(
+        'MFA_OBLIGATORIO',
+      );
+    }
   });
 
   it('el mensaje NO incluye el valor recibido', () => {

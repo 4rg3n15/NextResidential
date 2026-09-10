@@ -204,6 +204,48 @@ La respuesta del paso 3 trae ya un token con `aal2`. La llave que aparece aquí 
 
 > **P-14, redefinido y cerrado.** Se declaró como «no hay pantalla de inscripción en la consola» y se resolvió diciendo que era una operación del panel. **No lo era**: el panel no inscribe factores, así que el pendiente no describía una comodidad ausente sino un sistema inaccesible. La pantalla existe desde esta versión y el pendiente queda cerrado.
 
+### B.6.bis · Entrar solo con contraseña — interruptor TEMPORAL del segundo factor
+
+> **Esto es una desviación declarada de RN-20, CA-25 y §2.7.8.** Existe porque usted la pidió para poder ensayar la consola, y está pensada para quitarse. Mientras esté puesta, la consola lo avisa en pantalla en todas las vistas.
+
+**Qué hace exactamente.** El guard de la API acepta un token `aal1` de un rol administrativo. **Nada más.** Siguen exigiéndose la contraseña, la verificación de la firma del token contra el JWKS del proyecto, el rol y el aislamiento por copropiedad. No es «entrar sin autenticarse»: es «entrar sin el segundo paso».
+
+**Cómo se pone.** Una línea en **los dos** entornos — el mismo nombre a propósito:
+
+```bash
+# apps/api/.env  (o las variables del servicio de la API)
+MFA_OBLIGATORIO=false
+
+# apps/web/.env.local  (o las variables del servicio de la consola)
+MFA_OBLIGATORIO=false
+```
+
+Reinicie los dos procesos: la variable se lee **al arrancar**. La API escribirá en su registro, en la primera línea:
+
+```
+SEGUNDO FACTOR DESACTIVADO (MFA_OBLIGATORIO=false)
+```
+
+**Si solo la pone en uno.** La consola lo detecta al entrar y responde con el nombre de la variable que falta, en vez de llevarle a un tablero que le devuelve al login. Ese rebote mudo era el síntoma que motivó todo esto.
+
+**Cómo se quita.** Borre la línea de los dos entornos —o póngala a `true`— y reinicie. El valor por defecto es `true`: un entorno que no la menciona aplica el contrato. Cualquier otro valor (`0`, `no`, `off`) **detiene el arranque** con el motivo escrito; no se interpreta en silencio.
+
+**Qué NO arregla.** El camino del segundo factor sigue como estaba: si su cuenta tiene ya un factor verificado, seguirá teniéndolo. Cuando quiera retomarlo, quite la variable y siga B.6.
+
+### B.6.ter · «Meto el código de seis dígitos y vuelvo al login»
+
+Dos hechos distintos, y solo uno es un defecto:
+
+1. **No sale el QR y le piden el código directamente.** Es lo correcto: esa cuenta **ya tiene un factor TOTP verificado**, así que toca _verificar_, no _inscribir_. Para volver a ver el QR, retire el factor: panel → **Authentication → Users** → su usuario → **Remove MFA factors**.
+2. **El código correcto le devuelve al login.** Eso es que la API rechaza el token nuevo. La consola ya no se lo calla: en su registro aparece
+
+   ```
+   la API rechazó la sesión: la consola volverá al acceso
+     estado: 401   claims: aal,aud,email,exp,iat,sub
+   ```
+
+   Los **nombres** de los claims son el diagnóstico —nunca sus valores, nunca el token—. Si en esa lista **no aparece `rol`**, el gancho de claims no está activo: vuelva a **B.5**. Es, con diferencia, la causa más frecuente. Si `rol` está y el estado sigue siendo 401, mire la bitácora de la API: dirá `SEGUNDO_FACTOR_REQUERIDO` (nivel `aal1`) o `FIRMA_INVALIDA` (JWKS mal apuntado).
+
 ### B.7 · Los demás roles, para la ETAPA 10
 
 ```bash
