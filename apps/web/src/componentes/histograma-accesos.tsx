@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { AccesosPorHora } from '@ncr/contracts';
 import { cn } from '@/lib/cn';
+import { claseDeAlto } from '@/lib/proporcion';
 
 /**
  * «Accesos por hora» — barras del día, W-02.
@@ -45,18 +46,23 @@ export const HistogramaDeAccesos = ({ datos }: { readonly datos: AccesosPorHora 
             <div key={f.hora} className="flex h-full flex-1 flex-col justify-end gap-px">
               {f.negados > 0 ? (
                 <div
-                  className="w-full rounded-t-sm bg-peligro"
-                  style={{ height: `${(f.negados / maximo) * 100}%` }}
+                  className={cn(
+                    'w-full rounded-t-sm bg-peligro',
+                    claseDeAlto((f.negados / maximo) * 100),
+                  )}
                 />
               ) : null}
               {f.permitidos > 0 ? (
                 <div
-                  className={cn('w-full bg-marca', f.negados === 0 && 'rounded-t-sm')}
-                  style={{ height: `${(f.permitidos / maximo) * 100}%` }}
+                  className={cn(
+                    'w-full bg-marca',
+                    f.negados === 0 && 'rounded-t-sm',
+                    claseDeAlto((f.permitidos / maximo) * 100),
+                  )}
                 />
               ) : null}
               {suma === 0 ? (
-                <div className="h-px w-full bg-borde" style={{ height: `${alto}%` }} />
+                <div className={cn('h-px w-full bg-borde', claseDeAlto(alto))} />
               ) : null}
             </div>
           );

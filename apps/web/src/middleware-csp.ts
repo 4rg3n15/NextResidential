@@ -62,6 +62,26 @@ export const construirCsp = ({
       ...(desarrollo ? ["'unsafe-eval'"] : []),
     ],
     ['style-src', "'self'", `'nonce-${nonce}'`],
+    /**
+     * **`style-src-elem` relajado SOLO en desarrollo, y solo él.**
+     *
+     * `next dev` inyecta el CSS con el cargador de webpack, que crea etiquetas
+     * `<style>` desde el cliente y **no conoce nuestro nonce**: son las tres
+     * violaciones que aparecían en `/acceso` en cada carga. Comprobado con el
+     * evento `securitypolicyviolation`, que las sitúa en `webpack-internal`,
+     * no en código nuestro; en la consola COMPILADA el CSS sale como fichero
+     * externo y no hay ninguna.
+     *
+     * Lo que hace que esta excepción sea aceptable es lo que NO relaja:
+     * `style-src-attr` no se declara, así que hereda de `style-src`, que sigue
+     * estricto **también en desarrollo**. Es decir, los atributos `style="…"`
+     * siguen bloqueados mientras se desarrolla — y ese es precisamente el
+     * control que destapó que nuestros propios gráficos los emitían. Relajar
+     * `style-src` entero habría apagado el control que encontró el defecto.
+     *
+     * En producción no aparece ninguna de las dos, y hay prueba que lo exige.
+     */
+    ...(desarrollo ? [['style-src-elem', "'self'", `'nonce-${nonce}'`, "'unsafe-inline'"]] : []),
     // La evidencia llega por URL firmada de vida corta desde el bucket privado,
     // que es el origen de la API. `data:` para los iconos embebidos del PWA.
     ['img-src', "'self'", 'data:', 'blob:', ...conexiones.slice(1)],

@@ -7,6 +7,8 @@ import { Distintivo } from '@/componentes/ui/distintivo';
 import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
 import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi } from '@/lib/api/cliente';
+import { cn } from '@/lib/cn';
+import { claseDeAncho } from '@/lib/proporcion';
 import { useZonas } from '@/lib/api/consultas';
 import { franjaEnTexto } from './horario';
 
@@ -109,14 +111,14 @@ const TarjetaDeZona = ({ zona }: { readonly zona: Zona }): JSX.Element => {
             aria-label={`Ocupación ${porcentaje}% de ${zona.aforoMaximo} plazas`}
           >
             <div
-              className={
+              className={cn(
                 tono === 'peligro'
                   ? 'h-full bg-peligro'
                   : tono === 'aviso'
                     ? 'h-full bg-aviso'
-                    : 'h-full bg-exito'
-              }
-              style={{ width: `${porcentaje}%` }}
+                    : 'h-full bg-exito',
+                claseDeAncho(porcentaje),
+              )}
             />
           </div>
         </div>

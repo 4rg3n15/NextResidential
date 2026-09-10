@@ -1,5 +1,7 @@
 import type { JSX } from 'react';
 import type { PuntoDeFrecuencia } from '@ncr/contracts';
+import { cn } from '@/lib/cn';
+import { claseDeAlto } from '@/lib/proporcion';
 
 /**
  * Gráfico de frecuencia semanal — W-10.
@@ -41,8 +43,12 @@ export const GraficoDeFrecuencia = ({
           >
             <span className="text-distintivo tabular-nums text-texto-apagado">{p.total}</span>
             <div
-              className="w-full rounded-t bg-marca"
-              style={{ height: `${Math.max(4, Math.round((p.total / maximo) * 100))}%` }}
+              className={cn(
+                'w-full rounded-t bg-marca',
+                // El suelo del 4 % es deliberado: una semana con un solo acceso
+                // debe verse, no desaparecer contra el eje.
+                claseDeAlto(Math.max(4, (p.total / maximo) * 100)),
+              )}
               role="img"
               aria-label={`Semana del ${p.semana}: ${p.total} accesos`}
             />

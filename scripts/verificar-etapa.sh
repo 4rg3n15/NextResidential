@@ -158,6 +158,16 @@ else
   mal "protocolo del fabricante o IP de dispositivo fuera de packages/providers (KPI-11)"
   echo "$salida_kpi11" | head -8 | sed 's/^/     /'
 fi
+# D-63 · la CSP de la consola rechaza los atributos `style`, y las barras del
+# tablero los emitían: salían a cero y nadie lo veía. jsdom no aplica CSP y el
+# recorrido del navegador visitaba el tablero sin datos — dos suites que se
+# solapan y dejan el intervalo justo donde vivía el defecto (DT-12).
+if salida_csp=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-csp.mjs 2>&1); then
+  ok "${salida_csp#OK }"
+else
+  mal "atributo \`style\` en la consola: la CSP lo rechaza (§2.7.7)"
+  echo "$salida_csp" | head -8 | sed 's/^/     /'
+fi
 # ADR-005 · una clave ajena hacia una tabla append-only NO se puede insertar
 # jamás: la comprobación exige un bloqueo de fila que la revocación impide. El
 # defecto vivió cinco etapas porque las tablas estaban vacías (ETAPA 06).

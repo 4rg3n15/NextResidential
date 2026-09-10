@@ -103,3 +103,35 @@ describe('construirCsp en desarrollo', () => {
     expect(csp(PRODUCCION)).not.toContain('unsafe-eval');
   });
 });
+
+/**
+ * D-63 · las tres violaciones de `/acceso`, y el defecto que destaparon.
+ */
+describe('style-src: lo que se relaja y lo que no', () => {
+  it('en producción NO hay unsafe-inline en ninguna directiva de estilo', () => {
+    const csp = construirCsp({ nonce: 'n', desarrollo: false });
+    expect(csp).not.toContain('unsafe-inline');
+    expect(csp).not.toContain('style-src-elem');
+  });
+
+  it('en desarrollo se relaja style-src-elem, y SOLO él', () => {
+    // `next dev` inyecta el CSS con el cargador de webpack, que crea etiquetas
+    // <style> sin conocer nuestro nonce. Es un fallo de la herramienta, no del
+    // producto: la consola compilada no produce ninguna.
+    const csp = construirCsp({ nonce: 'n', desarrollo: true });
+    expect(csp).toContain("style-src-elem 'self' 'nonce-n' 'unsafe-inline'");
+  });
+
+  it('y los ATRIBUTOS style siguen bloqueados también en desarrollo', () => {
+    /**
+     * Lo que hace aceptable la excepción de arriba. `style-src-attr` no se
+     * declara, así que hereda de `style-src`, que sigue estricto. Ese es el
+     * control que destapó que los gráficos del tablero emitían
+     * `style="height:37%"` y salían a cero en producción: relajar `style-src`
+     * entero habría apagado justo el control que encontró el defecto.
+     */
+    const csp = construirCsp({ nonce: 'n', desarrollo: true });
+    expect(csp).not.toContain('style-src-attr');
+    expect(csp).toContain("style-src 'self' 'nonce-n';");
+  });
+});

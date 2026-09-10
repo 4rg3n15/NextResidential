@@ -211,6 +211,30 @@ try {
       : mal('la sonda dejó rastro en el banco');
   }
 
+  console.log('\n▸ 4b · un atributo `style` en la consola rompe el build (D-63, §2.7.7)');
+  {
+    /**
+     * El control cuya ausencia dejó las barras del tablero a cero en
+     * producción: la CSP rechaza `style="height:37%"`, jsdom no aplica CSP y el
+     * recorrido del navegador visitaba el tablero sin datos. Aquí se introduce
+     * la violación a propósito y se exige que se detecte.
+     */
+    const sonda = join(clon, 'apps', 'web', 'src', 'componentes', 'sonda-csp.tsx');
+    mkdirSync(join(clon, 'apps', 'web', 'src', 'componentes'), { recursive: true });
+    const base = enClon('node', ['scripts/lib/frontera-csp.mjs']).salida;
+    writeFileSync(sonda, 'export const S = () => <div style={{ height: `50%` }} />;\n');
+    const r = enClon('node', ['scripts/lib/frontera-csp.mjs']);
+    if (r.codigo !== 0 && /sonda-csp/.test(r.salida)) {
+      ok('detectado el atributo `style`, con salida distinta de cero');
+    } else {
+      mal(`NO detectado (codigo ${r.codigo})`);
+    }
+    rmSync(sonda, { force: true });
+    enClon('node', ['scripts/lib/frontera-csp.mjs']).salida === base
+      ? ok('el banco de pruebas vuelve a su línea base')
+      : mal('la sonda dejó rastro en el banco');
+  }
+
   console.log('\n▸ 5 · una clave ajena hacia una tabla append-only se detecta al escribirla');
   {
     // El defecto real de la ETAPA 01: `alertas_evento_fk` hacia `eventos`.
@@ -621,6 +645,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 13 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 14 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );
