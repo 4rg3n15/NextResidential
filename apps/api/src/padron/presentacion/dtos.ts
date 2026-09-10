@@ -8,29 +8,60 @@ import {
   Length,
   Matches,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
- * El DTO valida FORMA; el agregado valida VERDAD (§2.7.3). Aquí no se
- * normaliza la placa: eso lo hace el VO `Placa`, que es el único punto donde
- * puede hacerse sin que dos caminos de entrada produzcan formas distintas.
+ * DTOs de ENTRADA del padrón.
+ *
+ * **Dos decoradores por campo, y los dos hacen falta.** `class-validator`
+ * decide qué se acepta en tiempo de ejecución; `@ApiProperty` decide qué sabe
+ * el contrato. Sin el segundo, `openapi.json` describe el cuerpo como un objeto
+ * SIN propiedades y el cliente generado lo traduce a `Record<string, never>`:
+ * la consola no puede escribir ese cuerpo, y si lo fuerza con un `as`, el día
+ * que un campo se renombre nadie se entera. Es exactamente el defecto que la
+ * ETAPA 09-A encontró en las RESPUESTAS; aquí estaba en los cuerpos.
+ *
+ * El DTO valida FORMA; el agregado valida VERDAD (§2.7.3). Aquí no se normaliza
+ * la placa: eso lo hace el VO `Placa`, el único punto donde puede hacerse sin
+ * que dos caminos de entrada produzcan formas distintas.
  */
 export class RegistrarVehiculoDto {
-  @IsUUID() viviendaId!: string;
-  @IsString() @Length(4, 16) placa!: string;
-  @IsOptional() @IsUUID() personaId?: string;
-  @IsOptional() @IsString() @Length(1, 60) marca?: string;
-  @IsOptional() @IsString() @Length(1, 60) modelo?: string;
-  @IsOptional() @IsString() @Length(1, 30) color?: string;
+  @ApiProperty({ type: String, format: 'uuid' }) @IsUUID() viviendaId!: string;
+
+  @ApiProperty({ type: String, minLength: 4, maxLength: 16, example: 'ABC123' })
+  @IsString()
+  @Length(4, 16)
+  placa!: string;
+
+  @ApiPropertyOptional({ type: String, format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  personaId?: string;
+
+  @ApiPropertyOptional({ type: String }) @IsOptional() @IsString() @Length(1, 60) marca?: string;
+  @ApiPropertyOptional({ type: String }) @IsOptional() @IsString() @Length(1, 60) modelo?: string;
+  @ApiPropertyOptional({ type: String }) @IsOptional() @IsString() @Length(1, 30) color?: string;
+
   /** Catálogo cerrado de la migración `0027`; sin valor, `automovil`. */
+  @ApiPropertyOptional({ type: String, enum: ['automovil', 'motocicleta', 'bicicleta', 'otro'] })
   @IsOptional()
   @IsIn(['automovil', 'motocicleta', 'bicicleta', 'otro'])
   tipo?: 'automovil' | 'motocicleta' | 'bicicleta' | 'otro';
 }
 
 export class RegistrarViviendaDto {
-  @IsString() @Length(1, 60) identificador!: string;
-  @IsOptional() @IsString() @Length(1, 60) manzana?: string;
-  @IsOptional() @IsString() @Length(1, 200) direccion?: string;
+  @ApiProperty({ type: String, minLength: 1, maxLength: 60, example: 'Casa 12' })
+  @IsString()
+  @Length(1, 60)
+  identificador!: string;
+
+  @ApiPropertyOptional({ type: String }) @IsOptional() @IsString() @Length(1, 60) manzana?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  @Length(1, 200)
+  direccion?: string;
 }
 
 /**
@@ -48,6 +79,11 @@ export class RegistrarViviendaDto {
  * desproporcionado se rechaza sin reservar memoria para él.
  */
 export class CargarPadronXlsxDto {
+  @ApiProperty({
+    type: String,
+    format: 'byte',
+    description: 'Hoja .xlsx en base64. Se valida el TIPO REAL por firma, nunca la extensión.',
+  })
   @IsBase64()
   @Length(1, 340_000)
   xlsxBase64!: string;
@@ -55,10 +91,19 @@ export class CargarPadronXlsxDto {
 
 export class DesactivarDto {
   /** RN-19: sin motivo no hay baja. El mínimo evita el «.» como motivo. */
-  @IsString() @Length(3, 300) motivo!: string;
+  @ApiProperty({
+    type: String,
+    minLength: 3,
+    maxLength: 300,
+    description: 'Obligatorio (RN-19). Queda en la auditoría junto al actor y no se puede editar.',
+  })
+  @IsString()
+  @Length(3, 300)
+  motivo!: string;
 }
 
 export class CargarPadronDto {
+  @ApiProperty({ type: String, description: 'Contenido CSV con cabecera; sin bytes nulos.' })
   @IsString()
   @Length(1, 1_000_000)
   @Matches(/^[^\0]*$/, { message: 'el contenido no admite bytes nulos' })
@@ -66,8 +111,13 @@ export class CargarPadronDto {
 }
 
 export class RegistrarResidenteDto {
-  @IsUUID() viviendaId!: string;
-  @IsUUID() personaId!: string;
-  @IsOptional() @IsBoolean() esTitular?: boolean;
-  @IsOptional() @IsString() @Length(1, 60) parentesco?: string;
+  @ApiProperty({ type: String, format: 'uuid' }) @IsUUID() viviendaId!: string;
+  @ApiProperty({ type: String, format: 'uuid' }) @IsUUID() personaId!: string;
+  @ApiPropertyOptional({ type: Boolean }) @IsOptional() @IsBoolean() esTitular?: boolean;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  @Length(1, 60)
+  parentesco?: string;
 }

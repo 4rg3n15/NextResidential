@@ -36,6 +36,27 @@ export type AlertaExpuesta = Esquemas['AlertaExpuestaDto'];
 export type ErrorApi = Esquemas['ErrorApiDto'];
 export type Copropiedad = Esquemas['CopropiedadDto'];
 
+/* ETAPA 09-B · las siete pantallas restantes. Los alias existen para que la
+ * consola no escriba `components['schemas']['…Dto']` en cada import: el tipo
+ * sigue viniendo del contrato generado, así que un campo que la API deje de
+ * devolver rompe la compilación igual. */
+export type PaginaDeViviendas = Esquemas['PaginaDeViviendasDto'];
+export type Vivienda = Esquemas['ViviendaDto'];
+export type Vehiculo = Esquemas['VehiculoDto'];
+export type Autorizacion = Esquemas['AutorizacionDto'];
+export type PatronDeAutorizacion = Esquemas['PatronDto'];
+export type Zona = Esquemas['ZonaDto'];
+export type FranjaDeZona = Esquemas['FranjaDto'];
+export type Pendientes = Esquemas['PendientesDto'];
+export type ResultadoDeOperacion = Esquemas['ResultadoDeOperacionDto'];
+export type Informe = Esquemas['InformeDto'];
+export type FilaDeInforme = Esquemas['FilaDeInformeDto'];
+export type PuntoDeFrecuencia = Esquemas['PuntoDeFrecuenciaDto'];
+/** Los cuatro tipos del mockup, tomados del contrato y no reescritos a mano. */
+export type TipoDeInforme = Informe['tipo'];
+export type EstadoDeRegistro = Vivienda['estado'];
+export type ResultadoDeCarga = Esquemas['ResultadoDeCargaDto'];
+
 /**
  * Motivo de denegación, tomado del contrato y no de una lista paralela.
  *

@@ -841,7 +841,14 @@ export interface components {
         AcompananteAgregadoDto: {
             agregado: boolean;
         };
-        AgregarAcompananteDto: Record<string, never>;
+        AgregarAcompananteDto: {
+            /**
+             * Format: uuid
+             * @description El acompañante entra por su PROPIA identidad, para que la lista negra lo alcance (D-01).
+             */
+            personaId: string;
+            nombre: string;
+        };
         AlertaExpuestaDto: {
             /** Format: uuid */
             id: string;
@@ -906,8 +913,17 @@ export interface components {
             /** @description Instante de supresión programada (RN-11) */
             suprimirEn: string;
         };
-        CargarPadronDto: Record<string, never>;
-        CargarPadronXlsxDto: Record<string, never>;
+        CargarPadronDto: {
+            /** @description Contenido CSV con cabecera; sin bytes nulos. */
+            csv: string;
+        };
+        CargarPadronXlsxDto: {
+            /**
+             * Format: byte
+             * @description Hoja .xlsx en base64. Se valida el TIPO REAL por firma, nunca la extensión.
+             */
+            xlsxBase64: string;
+        };
         CodigosDeRecuperacionDto: {
             /**
              * @description Códigos de un solo uso, en claro. Se entregan UNA vez: solo se guarda su hash. No dan acceso — autorizan a retirar el factor perdido para inscribir otro.
@@ -974,8 +990,27 @@ export interface components {
              */
             alcance: "superadministrador" | "administrador" | "portero" | "operador_central" | "residente" | "servicio";
         };
-        CrearAutorizacionDto: Record<string, never>;
-        DesactivarDto: Record<string, never>;
+        CrearAutorizacionDto: {
+            /** Format: uuid */
+            viviendaId: string;
+            /**
+             * Format: uuid
+             * @description Persona que visita.
+             */
+            personaId: string;
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
+            zonasPermitidas?: string[];
+            maximoAcompanantes?: number;
+            /** @description Su presencia es lo único que distingue una recurrente de una única (HU-09). */
+            patron?: components["schemas"]["PatronDeEntradaDto"];
+        };
+        DesactivarDto: {
+            /** @description Obligatorio (RN-19). Queda en la auditoría junto al actor y no se puede editar. */
+            motivo: string;
+        };
         DetalleDeErrorDto: {
             /** @description Un mensaje, o el arreglo que devuelve el ValidationPipe con un renglón por campo rechazado. La consola muestra el arreglo campo a campo; una cadena, tal cual. */
             message: string | string[];
@@ -1151,7 +1186,10 @@ export interface components {
             /** @example true */
             aceptado: boolean;
         };
-        IngestaDto: Record<string, never>;
+        IngestaDto: {
+            /** Format: uuid */
+            copropiedadId: string;
+        };
         LatidoDto: {
             copropiedadId: string;
             dispositivoId: string;
@@ -1188,6 +1226,28 @@ export interface components {
         PaginaDeViviendasDto: {
             totales: components["schemas"]["TotalesDeViviendasDto"];
             viviendas: components["schemas"]["ViviendaDto"][];
+        };
+        PatronDeEntradaDto: {
+            /**
+             * @description Días de la semana, 0..6 con domingo = 0 (RN-22).
+             * @example [
+             *       1,
+             *       2,
+             *       3,
+             *       4,
+             *       5
+             *     ]
+             */
+            dias: number[];
+            /** @example 480 */
+            minutoInicio: number;
+            /** @example 1080 */
+            minutoFin: number;
+            /**
+             * @description Desfase UTC en minutos de la copropiedad; el patrón es local, no UTC.
+             * @example -300
+             */
+            desplazamientoUtcMinutos: number;
         };
         PatronDto: {
             /** @description Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio). */
@@ -1226,9 +1286,33 @@ export interface components {
              */
             codigo: string;
         };
-        RegistrarResidenteDto: Record<string, never>;
-        RegistrarVehiculoDto: Record<string, never>;
-        RegistrarViviendaDto: Record<string, never>;
+        RegistrarResidenteDto: {
+            /** Format: uuid */
+            viviendaId: string;
+            /** Format: uuid */
+            personaId: string;
+            esTitular?: boolean;
+            parentesco?: string;
+        };
+        RegistrarVehiculoDto: {
+            /** Format: uuid */
+            viviendaId: string;
+            /** @example ABC123 */
+            placa: string;
+            /** Format: uuid */
+            personaId?: string;
+            marca?: string;
+            modelo?: string;
+            color?: string;
+            /** @enum {string} */
+            tipo?: "automovil" | "motocicleta" | "bicicleta" | "otro";
+        };
+        RegistrarViviendaDto: {
+            /** @example Casa 12 */
+            identificador: string;
+            manzana?: string;
+            direccion?: string;
+        };
         ReservaDelDiaDto: {
             /** Format: uuid */
             id: string;
@@ -1271,7 +1355,9 @@ export interface components {
         RevocacionDto: {
             revocada: boolean;
         };
-        RevocarAutorizacionDto: Record<string, never>;
+        RevocarAutorizacionDto: {
+            motivo: string;
+        };
         SaludDto: {
             /** @example vivo */
             estado: string;

@@ -21,7 +21,15 @@
  *     el propio contrato destapó: `@ApiProperty({ nullable: true })` sin `type:`
  *     genera un esquema sin tipo, que `openapi-typescript` traduce a
  *     `Record<string, never>`. El DTO parecía tipado y no lo estaba.
- *  4. Las exenciones se declaran AQUÍ, con su etapa, y **caducan solas**: si una
+ *  4. **El CUERPO de la petición también lleva tipo.** Añadido en la ETAPA
+ *     09-B, y por el mismo defecto que motivó la regla 2, encontrado esta vez
+ *     en el otro sentido: un DTO de entrada con solo decoradores de
+ *     `class-validator` genera un esquema sin propiedades, así que el cliente
+ *     generado tipa el cuerpo como `Record<string, never>` y **la consola no
+ *     puede escribirlo**. El síntoma no fue un error de contrato: fue no poder
+ *     enviar el formulario de una vivienda. Solo se exige donde hay cuerpo
+ *     declarado; una operación sin cuerpo no lo necesita.
+ *  5. Las exenciones se declaran AQUÍ, con su etapa, y **caducan solas**: si una
  *     ruta exenta deja de existir o pasa a estar tipada, el control falla y
  *     obliga a quitarla de la lista. Una lista de excepciones que nadie poda es
  *     una lista que acaba tapando lo que debía vigilar.
@@ -169,6 +177,18 @@ for (const [ruta, operaciones] of Object.entries(documento.paths ?? {})) {
       problemas.push(
         `${clave} · ya declara su respuesta: sobra la exención «${EXENTAS.get(clave)}»`,
       );
+    }
+    const cuerpo = operacion.requestBody?.content?.['application/json']?.schema;
+    if (cuerpo !== undefined) {
+      const esquema = resolver(cuerpo);
+      const propiedades = Object.keys(esquema?.properties ?? {});
+      if (propiedades.length === 0) {
+        problemas.push(
+          `${clave} · el CUERPO no declara propiedades. Añade @ApiProperty a cada campo del DTO ` +
+            'de entrada: sin ellas el cliente generado lo tipa como `Record<string, never>` y la ' +
+            'consola no puede enviarlo.',
+        );
+      }
     }
     if (!tipada && !EXENTAS.has(clave)) {
       problemas.push(

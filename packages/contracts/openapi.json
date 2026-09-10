@@ -2470,7 +2470,22 @@
       },
       "AgregarAcompananteDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "personaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "El acompañante entra por su PROPIA identidad, para que la lista negra lo alcance (D-01)."
+          },
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "personaId",
+          "nombre"
+        ]
       },
       "AlertaExpuestaDto": {
         "type": "object",
@@ -2705,11 +2720,28 @@
       },
       "CargarPadronDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "csv": {
+            "type": "string",
+            "description": "Contenido CSV con cabecera; sin bytes nulos."
+          }
+        },
+        "required": [
+          "csv"
+        ]
       },
       "CargarPadronXlsxDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "xlsxBase64": {
+            "type": "string",
+            "format": "byte",
+            "description": "Hoja .xlsx en base64. Se valida el TIPO REAL por firma, nunca la extensión."
+          }
+        },
+        "required": [
+          "xlsxBase64"
+        ]
       },
       "CodigosDeRecuperacionDto": {
         "type": "object",
@@ -2879,11 +2911,65 @@
       },
       "CrearAutorizacionDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "personaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Persona que visita."
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "zonasPermitidas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "maximoAcompanantes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 50
+          },
+          "patron": {
+            "description": "Su presencia es lo único que distingue una recurrente de una única (HU-09).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PatronDeEntradaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "viviendaId",
+          "personaId",
+          "desde",
+          "hasta"
+        ]
       },
       "DesactivarDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300,
+            "description": "Obligatorio (RN-19). Queda en la auditoría junto al actor y no se puede editar."
+          }
+        },
+        "required": [
+          "motivo"
+        ]
       },
       "DetalleDeErrorDto": {
         "type": "object",
@@ -3464,7 +3550,15 @@
       },
       "IngestaDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "copropiedadId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "copropiedadId"
+        ]
       },
       "LatidoDto": {
         "type": "object",
@@ -3586,6 +3680,48 @@
           "viviendas"
         ]
       },
+      "PatronDeEntradaDto": {
+        "type": "object",
+        "properties": {
+          "dias": {
+            "description": "Días de la semana, 0..6 con domingo = 0 (RN-22).",
+            "example": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "minutoInicio": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1440,
+            "example": 480
+          },
+          "minutoFin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1440,
+            "example": 1080
+          },
+          "desplazamientoUtcMinutos": {
+            "type": "number",
+            "description": "Desfase UTC en minutos de la copropiedad; el patrón es local, no UTC.",
+            "example": -300
+          }
+        },
+        "required": [
+          "dias",
+          "minutoInicio",
+          "minutoFin",
+          "desplazamientoUtcMinutos"
+        ]
+      },
       "PatronDto": {
         "type": "object",
         "properties": {
@@ -3689,15 +3825,87 @@
       },
       "RegistrarResidenteDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "personaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "esTitular": {
+            "type": "boolean"
+          },
+          "parentesco": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "viviendaId",
+          "personaId"
+        ]
       },
       "RegistrarVehiculoDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "placa": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 16,
+            "example": "ABC123"
+          },
+          "personaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "marca": {
+            "type": "string"
+          },
+          "modelo": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "automovil",
+              "motocicleta",
+              "bicicleta",
+              "otro"
+            ]
+          }
+        },
+        "required": [
+          "viviendaId",
+          "placa"
+        ]
       },
       "RegistrarViviendaDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "identificador": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Casa 12"
+          },
+          "manzana": {
+            "type": "string"
+          },
+          "direccion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "identificador"
+        ]
       },
       "ReservaDelDiaDto": {
         "type": "object",
@@ -3830,7 +4038,16 @@
       },
       "RevocarAutorizacionDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
+        ]
       },
       "SaludDto": {
         "type": "object",

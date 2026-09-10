@@ -6,6 +6,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiProperty,
   ApiTags,
 } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
@@ -17,6 +18,7 @@ import { CopropiedadDto, IngestaAceptadaDto } from './respuestas';
 import { ErrorApiDto } from '../comun/respuestas';
 
 export class IngestaDto {
+  @ApiProperty({ type: String, format: 'uuid' })
   @IsUUID()
   copropiedadId!: string;
 }
