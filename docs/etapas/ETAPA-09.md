@@ -21,6 +21,16 @@ En la API se añadieron el **módulo `tablero`** —tres casos de uso de lectura
 
 ---
 
+### 1.bis · ETAPA 09-B — las siete pantallas restantes
+
+Se construyeron **viviendas, vehículos, visitantes, zonas comunes, dispositivos, eventos e informes**, sobre el sistema de diseño y los componentes de 09-A. Y con ellas apareció lo que faltaba detrás: la 09-A había construido el tablero, que es solo lectura, así que ninguna pantalla había necesitado todavía **escribir** ni **listar** nada del padrón. La mitad de esta etapa es backend que no existía.
+
+Dos piezas específicas: la **carga de padrón desde XLSX** —con un lector escrito a mano, sin dependencias, que abre exactamente dos entradas del ZIP— y el cierre del control de contrato de 09-A, que se queda **sin ninguna exención pendiente de esta etapa**.
+
+Y una que **no** se construyó: la marca de menor de edad y su representante legal (D-42). No se improvisó porque no existe: la ETAPA 08 la dejó registrada como _decisión de Grupo Control antes de producción_ y el esquema no tiene esas columnas. Está en §8 y en §9.
+
+---
+
 ## 2 · Cómo se organizó y por qué
 
 ### 2.1 · El navegador habla solo con su propio origen (patrón BFF)
@@ -101,6 +111,32 @@ Por eso `/api/**` es **solo red**, sin lectura ni escritura de caché. Los está
 
 ---
 
+### 2.9 · Lo que la 09-B decidió, decisión por decisión
+
+**Las lecturas van bajo `copropiedades/:id`; las escrituras derivan la copropiedad del token.** No es una inconsistencia: es la respuesta a dos preguntas distintas. El identificador en la ruta es lo que la suite de aislamiento recorre para intentar la fuga, así que cada `GET` nuevo entra en el barrido **sin que nadie lo inscriba**. En una escritura, en cambio, un `copropiedadId` en el cuerpo sería un campo con el que equivocarse, y la forma de equivocarse es escribir en el tenant de otro: ahí ese campo no existe.
+
+**Los totales salen de la misma consulta que las filas.** Traerlos aparte abre una ventana en la que la lista y el contador se contradicen —«3 activas» sobre una tabla de cuatro—, y ese desajuste no lo ve nadie hasta que alguien lo cuenta a mano.
+
+**La vivienda inactiva conserva sus autorizaciones vigentes, y la interfaz lo dice.** RN-13 lo exige y una tabla no lo dice sola: «inactiva» se lee como «ya no deja entrar a nadie», y es falso. El número va junto al estado y el diálogo de baja lo repite antes de confirmar.
+
+**La placa se normaliza rechazando, no limpiando, y la pantalla lo hace visible.** Mientras se escribe se muestra en qué se va a convertir; si el dominio la rechaza, el mensaje se muestra **tal como llega**. «Solo admite letras y dígitos» y «entre 5 y 8 caracteres tras normalizar» llevan a arreglos distintos; un genérico «placa inválida» los borraría.
+
+**En zonas, la interfaz refleja y no calcula.** La barra de ocupación pinta el número que vino. Restar ingresos de salidas aquí sería una segunda verdad que se separa de la primera en cuanto entren dos personas a la vez —y el aforo lo garantiza una restricción de la base, no un `if`—.
+
+**El horario que cruza medianoche se escribe como lo que es.** Una zona abierta de 22:00 a 02:00 son dos franjas encadenadas; la segunda llega marcada como continuación. Pintarlas como dos horarios sueltos haría leer «cierra a medianoche», y **el contador de aforo no se reinicia ahí**.
+
+**Las credenciales de dispositivo no se ocultan: no llegan.** El puerto del tablero no tiene ese campo y el tipo generado desde el contrato tampoco, así que un descuido en la pantalla **no compilaría**. Es la diferencia entre filtrar un dato y no tenerlo (RN-21).
+
+**Las acciones sobre equipos encolan y auditan; no tocan hardware.** Eso es la ETAPA 15, y ADR-03 exige que el sistema funcione antes sin él. Pero un botón que no hace nada es peor que ninguno: quien lo pulsa cree que sincronizó. Aquí la respuesta dice «orden registrada», el equipo pasa a «sincronizando» y la bitácora guarda quién la ordenó.
+
+**Los cuatro informes salen del mismo hecho.** Una lectura de eventos y cuatro formas de agregarla, no cuatro consultas: es lo que impide que dos informes del mismo día se contradigan, que es el problema real de los sistemas de informes.
+
+**El informe dice lo que no sabe.** El mockup pide filtrar por «Residentes / Visitas» y el evento **no registra esa distinción**. En vez de un filtro que aparenta funcionar, la API devuelve una nota y la pantalla la muestra (D-58).
+
+**El lector de XLSX se escribió a mano.** Una biblioteca genérica trae la superficie del formato entero —fórmulas, macros, enlaces externos— cuando hacen falta celdas de texto de una hoja. Este abre dos entradas del ZIP, valida el **tipo real** por firma y no por extensión, y acota tamaño, número de entradas, razón de compresión, filas y columnas; rechaza `DOCTYPE` y `ENTITY` sin expandirlos. Se prueba **por lo que rechaza**.
+
+---
+
 ## 3 · Árbol de ficheros
 
 ### Backend (API)
@@ -158,6 +194,26 @@ Por eso `/api/**` es **solo red**, sin lectura ni escritura de caché. Los está
 
 ---
 
+### 3.bis · Ficheros de la 09-B
+
+| Fichero                                                                                            | Propósito                                                                     |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `supabase/migrations/…0027_tipo_de_vehiculo.sql`                                                   | `tipo` de vehículo: hueco real del padrón, catálogo cerrado                   |
+| `apps/api/src/padron/infraestructura/xlsx.ts`                                                      | Lector XLSX acotado, sin dependencias, con sus límites juntos y con nombre    |
+| `apps/api/src/padron/presentacion/respuestas.ts`                                                   | DTOs de salida del padrón                                                     |
+| `apps/api/src/padron/presentacion/padron-copropiedad.controller.ts`                                | Lecturas bajo `copropiedades/:id` — entran solas en el barrido de aislamiento |
+| `apps/api/src/autorizaciones/infraestructura/repositorio-autorizaciones-pg.ts`                     | Primer adaptador de persistencia del agregado `Autorización`                  |
+| `apps/api/src/autorizaciones/presentacion/autorizaciones.controller.ts`                            | Visitantes: listar, crear, revocar, acompañantes                              |
+| `apps/api/src/tablero/aplicacion/operaciones-de-dispositivo.ts`                                    | Puerto de órdenes sobre equipos; el adaptador real entra en la ETAPA 15       |
+| `apps/api/src/eventos/aplicacion/informes.ts`                                                      | Los cuatro informes, sobre el mismo hecho                                     |
+| `apps/web/src/componentes/encabezado-pantalla.tsx`                                                 | Encabezado común; se repetía siete veces                                      |
+| `apps/web/src/componentes/dialogo-formulario.tsx`                                                  | Diálogo de alta; **no** se fusiona con el de confirmación (ver §4)            |
+| `apps/web/src/componentes/grafico-frecuencia.tsx`                                                  | Gráfico accesible, sin `canvas` ni biblioteca                                 |
+| `apps/web/src/app/(consola)/copropiedad.ts`                                                        | La copropiedad sale del token, en un solo sitio para las siete pantallas      |
+| `apps/web/src/app/(consola)/{viviendas,vehiculos,visitantes,zonas,dispositivos,eventos,informes}/` | Las siete pantallas                                                           |
+
+---
+
 ## 4 · Cumplimiento SOLID
 
 | Principio | Materialización en esta etapa                                                                                                                                             | Verificación                                     |
@@ -170,6 +226,20 @@ Por eso `/api/**` es **solo red**, sin lectura ni escritura de caché. Los está
 
 ---
 
+### 4.bis · SOLID en la 09-B
+
+| Principio | Dónde se ve en esta etapa                                                                                                                                                               |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SRP**   | `xlsx.ts` analiza un binario y no sabe qué es un padrón; `carga-padron.ts` valida filas y no sabe qué es un ZIP. Cambian por motivos distintos.                                         |
+| **OCP**   | El XLSX entró como **otro adaptador de formato** sin tocar el caso de uso de carga, que era lo que la ETAPA 04 prometió al separarlos.                                                  |
+| **LSP**   | `RepositorioAutorizacionesPg` cumple el puerto que la ETAPA 05 definió contra dobles; ninguna prueba del motor de reglas cambió.                                                        |
+| **ISP**   | El modelo de LECTURA de autorizaciones es un puerto aparte del repositorio del agregado: la pantalla necesita nombres y el agregado no los usa para decidir nada.                       |
+| **DIP**   | Las órdenes sobre equipos van contra `OperacionesDeDispositivo`; hoy lo cumple un adaptador en memoria y en la ETAPA 15 lo cumplirá el de Hikvision, sin tocar controlador ni pantalla. |
+
+**Dos componentes nuevos, los dos al sistema.** `DialogoDeFormulario` no se fusionó con `DialogoDeConfirmacion` a propósito: confirmar una baja **obliga a un motivo** (RN-19) y unificarlos habría vuelto ese campo opcional —y con él, la garantía—.
+
+---
+
 ## 5 · Trazabilidad
 
 **Cubierto en esta etapa:** HU-36 y HU-37 (acceso multi-rol y segundo factor) · HU-38 (dashboard operativo) · CA-25 (MFA obligatorio para roles administrativos, por `aal2`) · RN-12 y CA-26 (estado del dispositivo por latido) · RN-15 (aislamiento: las tres rutas nuevas entran solas en el recorrido) · RN-20 (segundo factor) · RN-21 (la credencial no sale de la API) · KPI-14 (pantallas mínimas de administración, la parte 09-A) · KPI-25 (canal en vivo consumido, medido en el paso 11).
@@ -177,6 +247,19 @@ Por eso `/api/**` es **solo red**, sin lectura ni escritura de caché. Los está
 **Parcialmente cubierto:** HU-01 a HU-04, HU-18, HU-32 y HU-35 — sus pantallas son **09-B**; esta etapa deja el marco, el catálogo de componentes y el cliente tipado sobre los que se montan. KPI-35 (conmutación entre copropiedades sin fuga) — la clave de consulta ya la contempla, pero la conmutación se construye en la ETAPA 10 y allí se prueba.
 
 **Deliberadamente fuera:** M-01/C-05 resuelto quitando el selector de rol; el buscador global queda deshabilitado con su motivo porque busca casas, placas y residentes, que son 09-B.
+
+---
+
+### 5.bis · Trazabilidad de la 09-B
+
+**Cubiertos:** HU-01 a HU-05 (viviendas, residentes, vehículos) · HU-03 (carga XLSX) · HU-07 a HU-10 (autorizaciones, acompañantes, revocación) · HU-16, HU-17 (activas e historial) · HU-18 a HU-20 (zonas) · HU-32 (informes y exportación) · HU-35 (alertas) · HU-36 (dispositivos) · RN-04, RN-13, RN-19, RN-21, RN-22 · CA-02, CA-03, CA-14, CA-15, CA-18, CA-23 · CU-05 (visualización).
+
+**Parcialmente cubiertos, con su motivo:**
+
+- **«Residentes / Visitas» del mockup (W-10).** El evento no registra si la persona era residente o visitante; el informe lo dice en vez de fingir el filtro (**D-58**).
+- **Reservas del día (W-06).** No hay módulo de reservas (P-15). La lista sale vacía **y explicada**.
+- **Menores y representante legal (D-42).** No construido: no existe en el esquema y es una decisión pendiente de Grupo Control.
+- **Ejecución de las órdenes sobre equipos.** Encoladas y auditadas; la ejecución contra hardware es la ETAPA 15 (ADR-03).
 
 ---
 
@@ -613,6 +696,16 @@ Y el camino del navegador lo recorre entero en su paso 5: levanta **otra API y o
 
 ---
 
+## 6.decies · ETAPA 09-B — lo que se probó y el defecto que apareció al probarlo
+
+**El defecto de esta etapa lo destapó el primer formulario.** Los DTOs de **entrada** llevaban solo decoradores de `class-validator`, así que el contrato describía el cuerpo como un objeto **sin propiedades** y el cliente generado lo tipaba como `Record<string, never>`: la consola no podía enviarlo. Es exactamente el defecto que la 09-A encontró en las **respuestas**, en el otro sentido, y el control de contrato no lo miraba. Corregido en los DTOs **y en el control**: donde hay cuerpo declarado, debe tener propiedades (**D-59**).
+
+**El lector de XLSX se prueba por lo que rechaza**, que es lo que justifica haberlo escrito: un archivo que no es un ZIP —rechazado por su contenido, no por su nombre—, un XML con `DOCTYPE`/`ENTITY`, una razón de compresión desproporcionada rechazada **antes** de descomprimir, y un libro sin primera hoja. Diez pruebas.
+
+**En la consola se prueba lo que la interfaz AFIRMA**, no la maquetación: que la vista previa de la placa no borra lo desconocido, que el patrón de una recurrente se puede leer, que una franja que cruza medianoche **dice** que el aforo no se reinicia, y que el gráfico es legible sin verlo.
+
+---
+
 ## 7 · Verificación de seguridad (§2.7)
 
 | #   | Medida                   | Estado en esta etapa                                                                                                                                                                                                                                                                   |
@@ -662,6 +755,19 @@ Y el camino del navegador lo recorre entero en su paso 5: levanta **otra API y o
 
 ---
 
+### 8.bis · Deuda declarada en la 09-B
+
+| Id        | Asunto                                                                                                                                                                                            | Estado                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **D-58**  | El evento no distingue residente de visitante, así que el filtro «Residentes / Visitas» del mockup no se puede cumplir. El informe lo declara en `notas` en vez de aparentarlo                    | Declarada · el cruce con el padrón entra en la ETAPA 10 |
+| **D-59**  | Los DTOs de ENTRADA no declaraban propiedades en el contrato: el cliente generado tipaba el cuerpo como `Record<string, never>` y la consola no podía enviarlo                                    | **Resuelto** · `@ApiProperty` y el control ampliado     |
+| **DT-14** | Las órdenes sobre equipos viven en una cola **en memoria**: se pierden al reiniciar. La traza no —va a la bitácora—. La tabla de órdenes la diseña la ETAPA 15 con el protocolo real delante      | Aceptada                                                |
+| **DT-15** | `maximoAcompanantes` no se persiste: es una política, no un hecho, y se rehidrata con el valor por defecto del agregado. Una autorización antigua no queda con un límite distinto al de una nueva | Declarada                                               |
+| **P-15**  | `PENDIENTE DE DEFINICIÓN` No hay módulo de reservas de zonas comunes. La pantalla muestra la lista vacía **con su explicación**, no un «0 reservas» que afirmaría algo que el sistema no sabe     | Abierto                                                 |
+| **D-42**  | Menores de edad y representante legal: **no construido**. No existe en el esquema y la ETAPA 08 lo dejó como decisión de Grupo Control. No se improvisó                                           | Abierto · decisión del cliente                          |
+
+---
+
 ## 9 · Qué debe hacer usted manualmente
 
 1. **Copiar `apps/web/.env.example` a `apps/web/.env.local`** y completar `API_URL`, `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`. Ninguna lleva `NEXT_PUBLIC_`: si alguna lo llevara, acabaría en el paquete del navegador.
@@ -670,6 +776,16 @@ Y el camino del navegador lo recorre entero en su paso 5: levanta **otra API y o
 4. **Instalar la PWA** desde el menú del navegador y confirmar que arranca en modo independiente y que, sin red, aparece la página de «sin conexión» y no un tablero con cifras viejas.
 5. **Inscribir su segundo factor desde la consola**: active TOTP una vez en el panel (`Authentication → Providers → Multi-Factor Authentication`), entre en `/acceso` con su correo y contraseña, y la consola le mostrará el QR y le entregará los diez códigos de recuperación. **Guárdelos**: se muestran una sola vez. El paso a paso, y la vía equivalente por API, en [`docs/guias/RECUPERACION_Y_USUARIOS.md`](../guias/RECUPERACION_Y_USUARIOS.md) §B.6.
 6. **Confirmar la variante `marca.boton`** (#DC3341) para el relleno de botones con etiqueta blanca, o indicar si prefiere conservar `#E63946` subiendo la etiqueta a ≥ 18,66 px en negrita.
+
+---
+
+### 9.bis · Qué debe hacer usted en la 09-B
+
+1. **Aplicar la migración `0027`** (tipo de vehículo) con el mismo procedimiento que las anteriores.
+2. **Decidir sobre D-42 (menores).** Sin esa decisión no hay marca de menor ni consentimiento del representante legal, y la ETAPA 13 lo va a mirar. No se ha improvisado nada.
+3. **Comprobar en pantalla** —es lo que le corresponde verificar— que: el directorio de viviendas trae totales y que una vivienda inactiva muestra sus autorizaciones vigentes; que la placa se previsualiza al escribirla y que un error del dominio llega con su texto; que una autorización recurrente enseña su patrón; que una zona con horario nocturno lo describe como continuación; que ningún equipo muestra credencial alguna; y que la exportación de eventos descarga en los tres formatos.
+4. **Cargar un XLSX de prueba** con una fila mala a propósito: debe rechazar la carga **entera** y enumerar los errores por fila.
+5. **DB-01 y DB-02 siguen abiertas** y bloquean la ETAPA 13: reactivar el segundo factor y diagnosticar el token sin `rol`.
 
 ---
 

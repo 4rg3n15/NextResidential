@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-10 · al cierre de la **ETAPA 09-A** (séptima ronda de correcciones)
+**Última actualización:** 2026-09-10 · **ETAPA 09-B construida**
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,16 +18,16 @@
 
 ## Resumen
 
-|                                |                                                                      |
-| ------------------------------ | -------------------------------------------------------------------- |
-| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08) · la **09 está en curso: 09-A cerrada** |
-| **Etapa siguiente habilitada** | **ETAPA 09-B — resto de pantallas** (la 12 sigue habilitada)         |
-| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado   |
-| **Defectos abiertos**          | D-39 — el alta de MFA es inalcanzable para roles administrativos     |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                               |
-| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)        |
-| **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)          |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                |
+|                                |                                                                    |
+| ------------------------------ | ------------------------------------------------------------------ |
+| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08) · la **09: 09-A y 09-B construidas**  |
+| **Etapa siguiente habilitada** | **ETAPA 10 — consolas operativas** (la 12 sigue habilitada)        |
+| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado |
+| **Defectos abiertos**          | D-39 — el alta de MFA es inalcanzable para roles administrativos   |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                             |
+| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)      |
+| **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)        |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                              |
 
 ---
 
@@ -152,6 +152,18 @@ Pruebas negativas: **13** (dos nuevas, sondas 12 y 13).
 | Que no salga el QR y pidan el código: **no es un defecto**                                                                            | Esa cuenta ya tiene un factor verificado; se retira en el panel (Remove MFA factors)            |
 
 El interruptor se prueba en **las dos posiciones** —que encendido siga exigiendo el segundo factor es lo que nadie comprueba— y se recorre en el navegador: paso 5 del camino de acceso, con otra API y otra consola levantadas con la variable puesta.
+
+### ETAPA 09-B (2026-09-10) — las siete pantallas restantes
+
+| Entregable                                                                                              | Estado                                                                                           |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Viviendas · Vehículos · Visitantes · Zonas · Dispositivos · Eventos · Informes                          | **Construidas**, sobre el sistema de diseño de 09-A                                              |
+| Backend que no existía: listar y escribir padrón, persistir autorizaciones, órdenes de equipo, informes | **Construido** · las lecturas bajo `copropiedades/:id` entran solas en el barrido de aislamiento |
+| Carga de padrón XLSX (D-20t)                                                                            | **Construida** · lector propio, tipo real por firma, límites acotados, todo o nada               |
+| Control de contrato de 09-A                                                                             | **Sin exenciones de esta etapa** · 41 de 49 operaciones tipadas y el CUERPO también (D-59)       |
+| Menores y representante legal (D-42)                                                                    | **NO construido**, y dicho: no existe en el esquema; decisión de Grupo Control                   |
+
+Migración nueva: **`0027`** (tipo de vehículo). Hay que aplicarla.
 
 ### Deuda BLOQUEANTE de la ETAPA 13 — no es una decisión permanente
 
