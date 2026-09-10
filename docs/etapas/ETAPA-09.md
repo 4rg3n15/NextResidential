@@ -833,3 +833,187 @@ Zonas comunes es la única sin ningún control, y está declarado: refleja aforo
 | `ebd8f47` | 09-B · veredicto literal, en verde y contra base                              |
 | `2ec5e60` | 09-B · los cinco estados y la accesibilidad AA, ejercidos en las siete        |
 | `62926c3` | 09-B · veredicto con los dos requisitos ya ejercidos                          |
+
+---
+
+## Ronda de auditoría y corrección · 2026-09-10
+
+> Esta ronda **no construye etapa nueva**. Audita y corrige lo existente antes de que continúe el desarrollo, a petición del cliente.
+
+### 1 · Qué se construyó
+
+Nueve etapas cerradas, diecinueve pasos de verificación, más de mil pruebas en verde — y nadie podía entrar al sistema. Esta ronda averigua por qué, lo corrige, y cierra la clase de fallo que lo permitió.
+
+El bloqueante era una sola línea: `SUPABASE_JWKS_URL` apuntaba a `https://<ref>.supabase.co/auth/v1/jwks`, una ruta que **no existe**. Devuelve `404 page not found`, la API se quedaba sin ninguna clave pública y rechazaba **todos** los tokens. Estaba así en los dos `.env.example`, en las dos guías y en el documento de diseño de la verificación asimétrica, desde que se escribieron. La ruta real —verificada contra la documentación oficial de Supabase, no por analogía— es `/auth/v1/.well-known/jwks.json`.
+
+Lo que hizo que sobreviviera nueve etapas es lo que de verdad importa: **el doble de `e2e/doble-gotrue.mjs` servía el JWKS en la ruta equivocada**. El doble se había construido con la forma del error, así que el camino de extremo a extremo pasaba en verde mientras el proyecto real rechazaba todo. Es DT-12 en su forma más pura, y ésta fue su decimocuarta aparición.
+
+Alrededor de eso: el segundo factor restituido y su interruptor retirado del árbol; los mensajes de error obligados a decir lo observado y no una hipótesis; comprobaciones de arranque que hablan con los recursos reales; la validación de entorno endurecida contra el `.env` sin salto de línea final; y dos defectos que aparecieron de camino —un JWKS que responde vacío y unos gráficos que la CSP dejaba a cero— con sus controles para que no vuelvan.
+
+### 2 · Cómo se organizó y por qué
+
+**La sonda del JWKS no estaba rota; lo que faltaba era quien la consultara.** La sospecha de partida era que `/ready` daba verde con un JWKS en 404. Se reprodujo levantando la API contra un servidor que devuelve exactamente `404 page not found`, y `/ready` responde **503**. Nunca dio verde. El hueco era otro y peor: la sonda existía, funcionaba, y **nada la miraba** hasta que alguien hacía `curl`. De ahí `arranque/recursos-externos.ts`: el proceso habla con cada recurso configurado **al levantar** y lo dice con nombre y remedio. No tumba el proceso —una dependencia externa que parpadea no debe provocar reinicios en cadena, y para eso está `/ready`—, pero deja de ser un fallo que descubre el usuario en su primera petición.
+
+**Al probar la ruta correcta apareció un fallo peor.** Un proyecto sin llaves asimétricas responde `200 {"keys":[]}`, y `jose` contesta igualmente «no hay clave que coincida»: la sonda daba **verde** con un JWKS del que no se puede verificar ni un token. Hay endpoint, hay JSON válido, y no funciona nada. La sonda ahora inspecciona el documento y exige **al menos una clave**, y devuelve un estado con nombre —`inalcanzable`, `sin-claves`, `en-espera`— porque los tres piden acciones distintas: el entorno, el panel, o esperar.
+
+**La mentira de los mensajes nacía en la API, no en la consola.** `traducir()` colapsaba en `FIRMA_INVALIDA` todo lo que no reconociera, y `jose` lanza un `JOSEError` **genérico** cuando la descarga no da 200 — indistinguible por tipo de un fallo de firma. Comprobado contra jose 5.9.6, no supuesto. La corrección no es reconocer una clase más: es que **clasifique el proveedor**, que es el dueño del JWKS, y por un criterio que no depende de la taxonomía interna de la biblioteca —si llegamos a inspeccionar el documento, la respuesta es sobre el token; si no, es del servicio—. Y un fallo del servidor se responde **503, no 401**: un 401 le dice al cliente que reintente unas credenciales que están bien.
+
+**El interruptor de MFA se retira, no se restituye.** Volver a poner `MFA_OBLIGATORIO=true` habría dejado en el árbol un modo que debilita RN-20 a una variable de distancia. Se fue entero. Y las pruebas del interruptor no se borran: se **invierten**. De los dos modos de fallo de un control de seguridad el peligroso no es que apagado no apague —eso se descubre enseguida— sino que **encendido no encienda**, y ese sigue existiendo. Tres capas levantan los procesos **con** la variable puesta y exigen que no pase nada.
+
+**La CSP resultó ser dos cosas distintas.** Las tres violaciones de `/acceso` se capturaron con el evento `securitypolicyviolation`, que las sitúa en `webpack-internal`: es el cargador de CSS de `next dev`, que crea etiquetas `<style>` sin conocer nuestro nonce. En la consola compilada no hay ninguna. Se relaja `style-src-elem` **solo en desarrollo** — y no `style-src`, que sigue estricto también ahí. Esa distinción no es cosmética: `style-src` gobierna los **atributos** `style`, y ese control es el que destapó el defecto de verdad — que nuestros propios gráficos los emitían y **las barras salen a cero en producción**. Relajar `style-src` entero habría apagado justo el control que encontró el defecto.
+
+**La validación de entorno mira ahora la forma, no solo la longitud.** Un secreto no lleva espacios ni caracteres de control; si los lleva, el valor se partió o se pegó. Y se detecta el caso concreto: un valor que contiene **el nombre de otra variable del esquema** seguido de `=`. Se buscan solo nuestros propios nombres, que es lo que evita el falso positivo con un `?sslmode=require` dentro de una cadena de conexión.
+
+### 3 · Árbol de archivos
+
+| Archivo                                                   | Propósito                                                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `apps/api/src/arranque/recursos-externos.ts`              | Marco de comprobación al arrancar: estado con nombre, remedio, límite de tiempo            |
+| `apps/api/src/arranque/recursos.ts`                       | JWKS, bucket privado de evidencia y ciclo de recuperación, cada uno contra el recurso real |
+| `apps/api/src/arranque/sonda-postgres.ts`                 | `SELECT 1` con pool propio de una conexión                                                 |
+| `apps/api/src/arranque/recursos.test.ts`                  | Diez pruebas: bucket público, `GET` sin firmar, recuperación nunca verificada              |
+| `apps/api/src/autenticacion/infraestructura/jwks.ts`      | Sonda que exige claves utilizables; clasifica sus propios fallos                           |
+| `apps/api/src/autenticacion/infraestructura/jwks.test.ts` | Contra un servidor HTTP **real**, no un doble: el doble fue el problema                    |
+| `apps/api/src/salud/salud.controller.test.ts`             | Las tres sondas de `/ready`, vistas ponerse en rojo                                        |
+| `apps/api/src/configuracion/esquema.ts`                   | `secreto()` con forma; `detectarVariablePegada()`                                          |
+| `apps/web/src/lib/proporcion.ts`                          | Clases estáticas en vez de atributo `style`                                                |
+| `apps/web/src/lib/sesion/mensajes.ts`                     | La regla del cliente, y el estado HTTP honesto                                             |
+| `scripts/lib/comparar-entorno.mjs`                        | `pnpm entorno:diff` — su `.env` contra el `.example`, sin imprimir valores                 |
+| `scripts/lib/frontera-csp.mjs`                            | Ningún atributo `style` en la consola                                                      |
+| `docs/guias/VERIFICACION_CONTRA_SU_PROYECTO.md`           | Qué comprobar, qué salida esperar, qué significa si es otra                                |
+
+Retirados: `apps/api/src/comun/guardas/politica-mfa.ts` · `apps/api/test/mfa-interruptor.e2e.test.ts` (→ `mfa-obligatorio.e2e.test.ts`) · `apps/web/src/app/api/sesion/interruptor-mfa.test.ts` (→ `mfa-obligatorio.test.ts`).
+
+### 4 · Cumplimiento SOLID
+
+| Principio | Cómo se materializa aquí                                                                                                                                                                                 |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SRP**   | `recursos-externos.ts` orquesta y registra; `recursos.ts` sabe de cada recurso; `sonda-postgres.ts` solo consulta. Ningún fichero pasa de 300 líneas                                                     |
+| **OCP**   | Añadir un recurso es añadir un `RecursoExterno` a la lista de `main.ts`: cero diff en el marco                                                                                                           |
+| **LSP**   | `SondaDePostgres` tiene implementación real y doble de pruebas, intercambiables sin tocar una aserción de `/ready`                                                                                       |
+| **ISP**   | `RecursoExterno` es un método. La sonda del JWKS no recibe la configuración entera para responder a una pregunta de sí o no — el mismo argumento que justificaba `POLITICA_MFA`, ahora sin la desviación |
+| **DIP**   | `SaludController` depende de `SondaDePostgres`, interfaz inyectada por token; `pg` solo aparece en la implementación                                                                                     |
+
+### 5 · Trazabilidad
+
+**Restituidos:** RN-20 y CA-25 (segundo factor sin excepción). **Reforzados:** §2.7.1 (forma del entorno), §2.7.6 (el token vuelve a verificarse: sin JWKS no había aislamiento que derivar), §2.7.7 (CSP: atributos `style` fuera), §2.7.8 (bucket privado comprobado, no declarado). **KPI-38** deja de tener el hallazgo abierto que DB-01 anticipaba para la ETAPA 13.
+
+**Parcial y dicho:** BE-01, el ciclo de recuperación, construido y **sin verificar** por falta de permisos de SMTP en el panel. DB-02, el claim `rol`, reducido a una comprobación del cliente contra su proyecto.
+
+### 6 · Pruebas
+
+**Veredicto literal de §2.8.0**, de la ejecución de `./scripts/verificar-etapa.sh` sobre este árbol:
+
+```
+▸ 0 · borrando artefactos de compilación (así corre un checkout nuevo)
+   ✓ dist, .turbo y coverage eliminados
+
+▸ 1 · entorno dentro de lo declarado
+   ✓ entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2
+
+▸ 2 · instalación coherente con el lockfile
+   ✓ pnpm install --frozen-lockfile
+
+▸ 3 · compilación desde cero
+   ✓ pnpm build
+
+▸ 4 · lint y typecheck
+   ✓ pnpm lint
+   ✓ pnpm typecheck
+
+▸ 5 · suite completa
+   @ncr/config:test:       Tests  39 passed (39)
+   @ncr/providers:test:       Tests  24 passed (24)
+   @ncr/domain-core:test:       Tests  328 passed (328)
+   @ncr/web:test:       Tests  249 passed (249)
+   @ncr/api:test:       Tests  415 passed | 5 skipped (420)
+   ✓ suite completa en verde
+
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 89 de 89 ficheros de prueba ejecutados
+
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     OK   dominio (packages/domain-core/src): lineas 97.75 % · ramas 97.67 % · funciones 98.09 % (umbral 90 %, 28 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 97.42 % · ramas 91.65 % · funciones 97.92 % (umbral 90 %, 22 archivos)
+     OK   global: lineas 73.87 % · ramas 85.94 % · funciones 76.19 % (umbral 70 %, 228 archivos)
+   ✓ las tres capas cumplen su umbral
+
+▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
+   ✓ portabilidad: 16 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
+
+▸ 9 · pruebas negativas de los propios controles
+   ✓ PRUEBAS NEGATIVAS: los 14 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+
+▸ 10 · fronteras de arquitectura y secretos
+   ✓ fronteras (DoD ETAPA 02)
+   ✓ frontera-modulos: 7 módulos (autenticacion, autorizaciones, biometria, eventos, padron, tablero, zonas) y ninguna importación entra por dentro
+   ✓ sin secretos
+   ✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers/
+   ✓ ningún atributo `style` en la consola (105 ficheros, §2.7.7)
+   ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 4 tablas vigiladas)
+
+▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
+   ✓ 41 de 49 operaciones con respuesta tipada; 8 exentas con etapa declarada
+   ✓ contrato y cliente generado al día respecto de los controladores
+
+▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
+   alertas entregadas: 200 de 200
+   p50 / p95 / p99   : 2 / 6 / 9 ms
+   maximo            : 11 ms
+   umbral KPI-25     : 10000 ms
+   ✓ KPI-25 con margen sobre el umbral
+
+▸ 12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero
+   ✓ el camino completo se recorre en el navegador
+
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 415 passed | 5 skipped (420) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 249 passed (249)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 415 passed | 5 skipped (420) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 249 passed (249)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 415 passed | 5 skipped (420) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 249 passed (249)
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 16 de 19 pasos ejecutados; 3 exentos por necesitar --con-base
+
+VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
+```
+
+Además, y fuera de la suite porque tocan procesos reales: `/ready` contra un JWKS en 404 (**503**, `jwks: inalcanzable`) y contra uno vacío (**503**, `jwks: sin-claves`); el arranque de la API con los tres recursos rotos, que los nombra con remedio; y `pnpm entorno:diff` contra un `.env` con el defecto exacto del cliente, que lo detecta.
+
+### 7 · Verificación de seguridad
+
+| §2.7                         | Estado                                                                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1 · Secretos y configuración | **Mejorado** · forma del secreto y variable engullida detienen el arranque                                                     |
+| 2 · CORS                     | Sin cambios; el origen de la redirección de recuperación se valida contra la lista                                             |
+| 3 · Validación en backend    | Sin cambios                                                                                                                    |
+| 4 · Anti inyección           | Sin cambios                                                                                                                    |
+| 5 · Rate limiting            | Sin cambios                                                                                                                    |
+| 6 · RLS y aislamiento        | **Restituido de hecho**: sin verificación de firma no había claims de los que derivar la copropiedad                           |
+| 7 · CSP                      | **Corregido** · atributos `style` fuera del código, control mecánico, y producción sin `unsafe-inline` con prueba que lo exige |
+| 8 · Transversales            | **MFA sin excepción** · bucket de evidencia comprobado privado, no declarado privado                                           |
+
+### 8 · Deuda técnica
+
+**Nueva, y declarada:** el `.env.example` de la API lista variables que el esquema Zod **no valida** (`PGBOSS_SCHEMA`, `DEVICE_VAULT_*`, `LOG_LEVEL`, `SENTRY_DSN`, `BIOMETRIC_KEY_REF`, `BIOMETRIC_ALGORITHM`). No es un fallo activo —no se leen— pero `pnpm entorno:diff` las exigirá al cliente sin que sirvan de nada. **Registrada, no corregida**: decidir cuáles se implementan y cuáles se borran es trabajo de las etapas que las declararon.
+
+**Nueva:** cinco módulos crean cada uno su propio `Pool` de PostgreSQL. La sonda añade un sexto, de una conexión y a propósito. Consolidarlos es refactor de infraestructura, fuera del alcance de una ronda de corrección.
+
+**DT-12 reducida a dos:** quedan **FCM** —doble, y la ETAPA 11 es su dueña— y **Supabase Realtime frente al canal SSE propio**, que es el que se mide hoy.
+
+### 9 · Qué debe hacer usted
+
+Todo, en orden y con la salida esperada de cada paso, en **`docs/guias/VERIFICACION_CONTRA_SU_PROYECTO.md`**. Lo imprescindible: corregir `SUPABASE_JWKS_URL` en su `.env`, comprobar que el endpoint devuelve claves y no `{"keys":[]}`, retirar su factor MFA a medias en el panel para recorrer la inscripción desde cero, y ejecutar `pnpm entorno:diff`.
+
+### 10 · Rama y commits
+
+Rama `etapa-09-consola-administracion`, sin etapa nueva.
+
+| Commit    | Asunto                                                                         |
+| --------- | ------------------------------------------------------------------------------ |
+| `afeb11b` | La URL del JWKS no existía, y el doble la imitaba                              |
+| `8fba1e0` | Los mensajes decían una causa, no lo observado                                 |
+| `863aac5` | Retira el interruptor `MFA_OBLIGATORIO`, entero                                |
+| `be232ce` | Las tres violaciones eran del `next dev`; el defecto real estaba en las barras |
+| `1af9b9c` | `/ready` publicaba una cadena fija por PostgreSQL                              |
+| `e7628fc` | La ronda de auditoría, y la guía para verificarla contra el proyecto real      |
