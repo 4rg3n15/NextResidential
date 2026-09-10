@@ -5,7 +5,6 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ConfiguracionModule } from './configuracion/configuracion.module';
 import { AutenticacionModule } from './autenticacion';
 import { GuardaDeAutenticacion } from './comun/guardas/autenticacion.guard';
-import { POLITICA_MFA } from './comun/guardas/politica-mfa';
 import { GuardaDeRoles } from './comun/guardas/roles.guard';
 import { MultiempresaModule } from './multiempresa/multiempresa.module';
 import { PadronModule } from './padron';
@@ -83,11 +82,6 @@ export class AppModule {
         // El ORDEN importa y es deliberado: límite → autenticación → roles.
         // Poner el throttler primero hace que un ataque de fuerza bruta se
         // corte ANTES de verificar firmas, que es la parte cara.
-        // La política del segundo factor se resuelve AQUÍ, junto al guard que la
-        // aplica, y no como proveedor global: D-50 dejó claro que un `@Global()`
-        // no alcanza de forma fiable a los módulos ya registrados, y un guard
-        // que recibe `undefined` donde espera su política fallaría abierto.
-        { provide: POLITICA_MFA, useValue: { obligatorio: config.MFA_OBLIGATORIO } },
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: GuardaDeAutenticacion },
         { provide: APP_GUARD, useClass: GuardaDeRoles },

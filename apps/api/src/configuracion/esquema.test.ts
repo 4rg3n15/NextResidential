@@ -85,17 +85,22 @@ describe('biometría · la llave de cifrado es requisito de arranque (ETAPA 08)'
 /**
  * D-61 · el `.env` sin salto de línea final.
  *
- * El cliente añadió `MFA_OBLIGATORIO=false` a un fichero que no terminaba en
- * `\n`. Las dos líneas se fundieron: `INGESTA_FIRMA_SECRETO` quedó con
- * `…-32MFA_OBLIGATORIO=false` de valor y `MFA_OBLIGATORIO` **nunca llegó a
- * existir**. La aplicación arrancó tan contenta con un secreto corrupto, porque
- * `min(32)` solo mira la longitud y el valor pegado la superaba de sobra.
+ * El cliente añadió una variable a un fichero que no terminaba en `\n`. Las dos
+ * líneas se fundieron: `INGESTA_FIRMA_SECRETO` se quedó con el nombre de la
+ * otra pegado al valor, y **la otra nunca llegó a existir**. La aplicación
+ * arrancó tan contenta con un secreto corrupto, porque `min(32)` solo mira la
+ * longitud y el valor pegado la superaba de sobra.
+ *
+ * La variable del caso real era `MFA_OBLIGATORIO`, que ya no existe —se retiró
+ * con el interruptor—. La prueba usa una vigente a propósito: comprueba el
+ * MECANISMO, y escrita contra un nombre muerto pasaría en vacío sin que nadie
+ * lo notara. Es la misma clase de defecto que el resto de esta ronda persigue.
  */
 describe('valores con forma imposible', () => {
   it('detecta el nombre de otra variable pegado dentro de un valor', () => {
     const entorno = {
       ...completo,
-      INGESTA_FIRMA_SECRETO: `${completo.INGESTA_FIRMA_SECRETO}MFA_OBLIGATORIO=false`,
+      INGESTA_FIRMA_SECRETO: `${completo.INGESTA_FIRMA_SECRETO}EVIDENCIA_BUCKET=evidencia`,
     };
     expect(() => cargarConfiguracion(entorno as NodeJS.ProcessEnv)).toThrow(
       /INGESTA_FIRMA_SECRETO/,
@@ -108,9 +113,9 @@ describe('valores con forma imposible', () => {
   it('nombra también la variable que se perdió por el camino', () => {
     const entorno = {
       ...completo,
-      INGESTA_FIRMA_SECRETO: `${completo.INGESTA_FIRMA_SECRETO}MFA_OBLIGATORIO=false`,
+      INGESTA_FIRMA_SECRETO: `${completo.INGESTA_FIRMA_SECRETO}EVIDENCIA_BUCKET=evidencia`,
     };
-    expect(() => cargarConfiguracion(entorno as NodeJS.ProcessEnv)).toThrow(/MFA_OBLIGATORIO/);
+    expect(() => cargarConfiguracion(entorno as NodeJS.ProcessEnv)).toThrow(/EVIDENCIA_BUCKET/);
   });
 
   it('un secreto con espacios o saltos de línea no arranca', () => {

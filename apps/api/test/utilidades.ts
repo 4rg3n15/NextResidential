@@ -25,7 +25,6 @@ export const configuracionDePrueba: Configuracion = {
   // propias pruebas, que lo apagan explícitamente: si el valor por defecto de
   // la suite fuera `false`, las 363 pruebas dejarían de comprobar RN-20 sin que
   // nadie lo notara — que es como se pierde un control.
-  MFA_OBLIGATORIO: true,
   JWKS_CACHE_TTL_SEGUNDOS: 600,
   JWKS_REFRESCO_MINIMO_SEGUNDOS: 60,
   DATABASE_URL: 'marcador',

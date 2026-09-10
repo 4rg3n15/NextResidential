@@ -3,17 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RutaAcceso from './route';
 
 /**
- * `MFA_OBLIGATORIO` en la consola · las dos posiciones del interruptor.
+ * La consola exige el segundo factor, y **ningún entorno la convence de lo
+ * contrario** (RN-20, CA-25).
  *
- * Lo que importa comprobar no es solo que apagado deje entrar. Es que:
+ * Esta suite se llamaba `interruptor-mfa` y probaba las dos posiciones de
+ * `MFA_OBLIGATORIO`. El interruptor se retiró el 2026-09-10, entero: variable,
+ * ramas, mensajes y `.env.example`. Lo que se conserva es la mitad que sigue
+ * importando —**que encendido, encienda**—: una consola que cree aplicar RN-20
+ * sin aplicarla es peor que no tener la regla, porque nadie prueba lo que da
+ * por hecho.
  *
- *  - **Encendido —el valor por defecto— siga exigiendo el segundo factor.** Un
- *    interruptor que no enciende es peor que no tenerlo: la consola creería
- *    estar aplicando RN-20 sin aplicarla, y nadie prueba lo que da por hecho.
- *  - **Apagado no mande a nadie a una pantalla que rebota.** Si la API todavía
- *    exige `aal2`, entrar al tablero devolvería al login sin explicación — que
- *    es el síntoma exacto que motivó este interruptor. La consola lo detecta
- *    ANTES y dice qué variable falta.
+ * Y se añade el control que impide que el interruptor vuelva por la puerta de
+ * atrás: con la variable puesta en el entorno, el comportamiento no cambia.
  */
 const ENTORNO_BASE = {
   API_URL: 'http://api.invalid',
@@ -123,21 +124,18 @@ describe('con el valor por defecto la regla sigue en vigor', () => {
   });
 });
 
-describe('con MFA_OBLIGATORIO=false', () => {
-  it('la contraseña correcta lleva directamente a la consola', async () => {
+describe('el entorno no puede relajar la regla', () => {
+  it('con MFA_OBLIGATORIO=false en el entorno, sigue pidiendo el segundo factor', async () => {
+    /**
+     * El control anti-regresión del interruptor retirado. Se pone la variable
+     * con el valor que antes la apagaba: hoy la configuración ni la conoce, así
+     * que el destino tiene que seguir siendo el segundo factor. Si alguien la
+     * reintrodujera, esta prueba fallaría y habría que venir aquí a decir por
+     * qué se vuelve a debilitar RN-20.
+     */
     await preparar({ MFA_OBLIGATORIO: 'false' }, true);
     const res = await entrar();
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ siguiente: 'consola' });
-  });
-
-  it('si la API SÍ lo exige, se dice qué falta en vez de rebotar al login', async () => {
-    await preparar({ MFA_OBLIGATORIO: 'false' }, false);
-    const res = await entrar();
-    expect(res.status).toBe(409);
-    const cuerpo = (await res.json()) as { mensaje: string };
-    expect(cuerpo.mensaje).toContain('MFA_OBLIGATORIO');
-    expect(cuerpo.mensaje).toContain('API');
+    expect(await res.json()).toEqual({ siguiente: 'segundo-factor' });
   });
 
   it('unas credenciales equivocadas siguen sin entrar', async () => {

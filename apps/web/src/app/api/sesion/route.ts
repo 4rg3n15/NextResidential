@@ -13,8 +13,6 @@ import {
   iniciarSesion,
 } from '@/lib/sesion/supabase-auth';
 import { estadoDeFalloDeAcceso, textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
-import { configuracion } from '@/lib/configuracion';
-import { registrar } from '@/lib/registro';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -66,31 +64,6 @@ const leerCredenciales = async (peticion: NextRequest): Promise<Credenciales | n
   return { correo, contrasena };
 };
 
-/**
- * Devuelve el texto del problema si la API **no** acepta este token, o `null`
- * si lo acepta. No interpreta el token: le pregunta a la API, que es la
- * autoridad, exactamente como hace `sesionActual`.
- */
-const razonPorLaQueLaApiRechaza = async (accessToken: string): Promise<string | null> => {
-  const { apiUrl } = configuracion();
-  try {
-    const respuesta = await fetch(`${apiUrl}/auth/sesion`, {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
-      cache: 'no-store',
-    });
-    if (respuesta.ok) return null;
-    if (respuesta.status === 401) {
-      return (
-        'La consola tiene el segundo factor desactivado, pero la API sigue exigiéndolo. ' +
-        'Pon MFA_OBLIGATORIO=false también en el entorno de la API y reiníciala.'
-      );
-    }
-    return `La API respondió ${respuesta.status} al comprobar la sesión.`;
-  } catch {
-    return 'La API de Next Control no responde. Comprueba que está levantada y que API_URL apunta a ella.';
-  }
-};
-
 export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
   const credenciales = await leerCredenciales(peticion);
   if (credenciales === null) {
@@ -112,26 +85,6 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
 
     if (sesion.nivel === 'aal2') {
       await marcarFactorPendiente(null);
-      return NextResponse.json<ResultadoDeAcceso>({ siguiente: 'consola' });
-    }
-
-    /**
-     * DESVIACIÓN DECLARADA · `MFA_OBLIGATORIO=false`. Con la contraseña
-     * verificada se entra directamente, sin inscribir ni verificar factor.
-     *
-     * Antes de mandar a nadie al tablero se comprueba que **la API opine lo
-     * mismo**. Si solo se apagó aquí, el tablero pediría una sesión que la API
-     * rechaza y el usuario volvería al login sin una palabra —que es
-     * exactamente el síntoma que motivó este interruptor—. Vale más un mensaje
-     * que nombra la variable que falta.
-     */
-    if (!configuracion().mfaObligatorio) {
-      await marcarFactorPendiente(null);
-      const motivo = await razonPorLaQueLaApiRechaza(sesion.accessToken);
-      if (motivo !== null) {
-        registrar('error', 'la API no acepta la sesión sin segundo factor', { motivo });
-        return NextResponse.json({ mensaje: motivo }, { status: 409 });
-      }
       return NextResponse.json<ResultadoDeAcceso>({ siguiente: 'consola' });
     }
 

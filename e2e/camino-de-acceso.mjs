@@ -438,70 +438,84 @@ const principal = async () => {
   console.log('   · trazas de red en /tmp/ncr-camino-red.log');
 
   /**
-   * ── El interruptor, recorrido también en el navegador ────────────────────
+   * ── El interruptor retirado, comprobado en el navegador ──────────────────
    *
-   * `MFA_OBLIGATORIO=false` es una desviación declarada del contrato, y una
-   * desviación que solo se prueba con dobles no está probada: lo que el cliente
-   * necesita saber es que **entra al tablero con la contraseña**, en un
-   * navegador, contra los dos procesos reales. Se levantan otra API y otra
-   * consola con la variable puesta, porque se lee al arrancar —que es
-   * justamente lo que hay que verificar— y no se puede cambiar en caliente.
+   * Aquí se recorría `MFA_OBLIGATORIO=false`, la desviación declarada que
+   * dejaba entrar con la contraseña sola. Se retiró entera el 2026-09-10.
+   *
+   * El paso no se borra: se **invierte**. Se levantan otra API y otra consola
+   * con la variable puesta —el valor que antes la apagaba— y se comprueba que
+   * no pasa nada: se sigue pidiendo el segundo factor y el tablero sigue sin
+   * alcanzarse con la contraseña. Borrarlo habría dejado sin vigilancia
+   * precisamente el camino por el que un interruptor así vuelve: alguien
+   * reintroduce la variable, nadie lo nota, y el despliegue entra en
+   * producción con RN-20 debilitada.
+   *
+   * Se hace con procesos nuevos porque la configuración se lee al arrancar, que
+   * es justo lo que hay que verificar.
    */
-  paso('5 · con MFA_OBLIGATORIO=false: la contraseña sola entra al tablero');
-  const puertoApiSinMfa = await puertoLibre();
-  const puertoWebSinMfa = await puertoLibre();
+  paso('5 · con MFA_OBLIGATORIO=false en el entorno: la regla NO se relaja');
+  const puertoApiConVariable = await puertoLibre();
+  const puertoWebConVariable = await puertoLibre();
   lanzar('node', ['dist/main.js'], {
     cwd: resolve(raiz, 'apps/api'),
-    env: { ...entornoDeApi(doble, puertoApiSinMfa), MFA_OBLIGATORIO: 'false' },
+    env: { ...entornoDeApi(doble, puertoApiConVariable), MFA_OBLIGATORIO: 'false' },
     detached: true,
-    nombre: 'api-sin-mfa',
+    nombre: 'api-con-variable-retirada',
   });
-  if (!(await esperar(`http://127.0.0.1:${puertoApiSinMfa}/health`, 'la API sin MFA'))) return;
+  if (!(await esperar(`http://127.0.0.1:${puertoApiConVariable}/health`, 'la API'))) return;
 
-  const entornoWebSinMfa = {
-    ...entornoWeb,
-    API_URL: `http://127.0.0.1:${puertoApiSinMfa}`,
-    MFA_OBLIGATORIO: 'false',
-  };
-  // Se reutiliza la compilación anterior: estas variables se leen en tiempo de
-  // ejecución en el servidor, no se hornean en el paquete del navegador.
-  lanzar('node', [binDeNext, 'start', '-p', String(puertoWebSinMfa)], {
+  lanzar('node', [binDeNext, 'start', '-p', String(puertoWebConVariable)], {
     cwd: resolve(raiz, 'apps/web'),
-    env: entornoWebSinMfa,
+    env: {
+      ...entornoWeb,
+      API_URL: `http://127.0.0.1:${puertoApiConVariable}`,
+      MFA_OBLIGATORIO: 'false',
+    },
     detached: true,
-    nombre: 'web-sin-mfa',
+    nombre: 'web-con-variable-retirada',
   });
-  const baseSinMfa = `http://127.0.0.1:${puertoWebSinMfa}`;
-  if (!(await esperar(`${baseSinMfa}/acceso`, 'la consola sin MFA'))) return;
+  const baseConVariable = `http://127.0.0.1:${puertoWebConVariable}`;
+  if (!(await esperar(`${baseConVariable}/acceso`, 'la consola'))) return;
 
-  const contextoSinMfa = await navegador.newContext({ viewport: { width: 1280, height: 900 } });
-  const paginaSinMfa = await contextoSinMfa.newPage();
-  const erroresSinMfa = [];
-  paginaSinMfa.on('console', (m) => {
-    if (m.type() === 'error') erroresSinMfa.push(m.text());
+  const contextoConVariable = await navegador.newContext({
+    viewport: { width: 1280, height: 900 },
   });
-  await paginaSinMfa.goto(`${baseSinMfa}/acceso`, { waitUntil: 'networkidle' });
-  await paginaSinMfa.fill('input[name="correo"]', USUARIO.correo);
-  await paginaSinMfa.fill('input[name="contrasena"]', USUARIO.contrasena);
-  await paginaSinMfa.click('button[type="submit"]');
-  await paginaSinMfa.waitForURL(/\/tablero/, { timeout: 30_000 });
-  ok('la contraseña sola llega al tablero, sin QR y sin código de seis dígitos');
+  const paginaConVariable = await contextoConVariable.newPage();
+  const erroresConVariable = [];
+  paginaConVariable.on('console', (m) => {
+    if (m.type() === 'error') erroresConVariable.push(m.text());
+  });
+  await paginaConVariable.goto(`${baseConVariable}/acceso`, { waitUntil: 'networkidle' });
+  await paginaConVariable.fill('input[name="correo"]', USUARIO.correo);
+  await paginaConVariable.fill('input[name="contrasena"]', USUARIO.contrasena);
+  await paginaConVariable.click('button[type="submit"]');
 
-  await paginaSinMfa.waitForSelector('main, [role="main"]', { timeout: 30_000 });
-  const textoSinMfa = await paginaSinMfa.locator('body').innerText();
+  // La contraseña correcta lleva al segundo factor, NO al tablero. Se espera a
+  // que aparezca el campo del código: si en su lugar llegara al tablero, la
+  // espera vencería y el paso fallaría, que es lo que debe ocurrir.
+  await paginaConVariable.waitForURL(/\/acceso/, { timeout: 30_000 });
+  // El usuario ya tiene factor verificado del paso 3, así que la pantalla que
+  // debe salir es la de verificación. Se espera por su título Y por el campo:
+  // el título solo diría que se pintó algo, el campo dice que es el correcto.
+  await paginaConVariable.waitForSelector('text=Verificación en dos pasos', { timeout: 30_000 });
+  await paginaConVariable.waitForSelector('input[name="codigo"]', { timeout: 30_000 });
+  ok('la contraseña sola NO entra: se sigue pidiendo el segundo factor');
   afirmar(
-    !/volver a intentarlo|no se pudo|sin conexión/i.test(textoSinMfa),
-    'el tablero renderiza sin estado de error',
+    !/\/tablero/.test(paginaConVariable.url()),
+    `no se alcanzó el tablero (URL: ${new URL(paginaConVariable.url()).pathname})`,
   );
-  // La desviación tiene que VERSE. Un interruptor de seguridad invisible se
-  // queda puesto: nadie lee el entorno de un despliegue que funciona.
+
+  // Y el aviso de «segundo factor desactivado» ya no existe en ninguna pantalla:
+  // el interruptor no dejó ni el cartel.
+  const textoConVariable = await paginaConVariable.locator('body').innerText();
   afirmar(
-    /Segundo factor desactivado/i.test(textoSinMfa),
-    'la consola avisa en pantalla de que el segundo factor está desactivado',
+    !/Segundo factor desactivado|MFA_OBLIGATORIO/i.test(textoConVariable),
+    'no queda ni rastro del interruptor en la interfaz',
   );
   afirmar(
-    erroresSinMfa.length === 0,
-    `sin errores de consola en el navegador (${erroresSinMfa.length})`,
+    erroresConVariable.length === 0,
+    `sin errores de consola en el navegador (${erroresConVariable.length})`,
   );
 
   await navegador.close();
@@ -526,7 +540,7 @@ principal()
     }
     console.log(
       'CAMINO DE ACCESO: contraseña → factor → QR pintado → aal2 → tablero, completo; ' +
-        'y con MFA_OBLIGATORIO=false, la contraseña sola',
+        'y con MFA_OBLIGATORIO=false en el entorno, la regla NO se relaja',
     );
     process.exit(0);
   });

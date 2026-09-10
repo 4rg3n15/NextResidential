@@ -116,23 +116,21 @@ describe('lo que hace fallar el arranque', () => {
     ).toContain('bucle local');
   });
 
-  it('MFA_OBLIGATORIO viene puesto salvo que se apague EXPLÍCITAMENTE', () => {
-    // El valor por defecto es lo que protege: un entorno que no menciona la
-    // variable conserva la regla del contrato (RN-20). Y se comprueba también
-    // la cadena 'false', porque `Boolean('false')` es `true` y ese es el
-    // clásico interruptor que queda encendido creyendo que está apagado.
-    expect(validarEntorno(COMPLETO).mfaObligatorio).toBe(true);
-    expect(validarEntorno({ ...COMPLETO, MFA_OBLIGATORIO: 'true' }).mfaObligatorio).toBe(true);
-    expect(validarEntorno({ ...COMPLETO, MFA_OBLIGATORIO: 'false' }).mfaObligatorio).toBe(false);
-  });
-
   it('un valor que no es true ni false NO se interpreta: la consola no arranca', () => {
     // «0», «no», «off» o un espacio de más son las formas habituales de creer
     // que se apagó algo. Cualquiera de ellas debe detener el proceso con un
-    // mensaje, nunca resolverse en silencio a un lado u otro.
+    // mensaje, nunca resolverse en silencio a un lado u otro. `Boolean('false')`
+    // es `true`, y ese es el clásico interruptor que queda encendido creyendo
+    // que está apagado.
+    //
+    // Esta comprobación se escribió contra `MFA_OBLIGATORIO`, que ya no existe
+    // —el interruptor se retiró el 2026-09-10—, y se reapunta a una variable
+    // vigente en vez de borrarse: lo que prueba es el TRATO de los booleanos de
+    // entorno, no aquella variable. Escrita contra un nombre muerto habría
+    // seguido en verde sin comprobar nada.
     for (const valor of ['0', 'no', 'off', 'False ']) {
-      expect(problemasDe({ ...COMPLETO, MFA_OBLIGATORIO: valor }).join(' ')).toContain(
-        'MFA_OBLIGATORIO',
+      expect(problemasDe({ ...COMPLETO, COOKIE_SEGURA: valor }).join(' ')).toContain(
+        'COOKIE_SEGURA',
       );
     }
   });
