@@ -69,8 +69,13 @@ export interface Informe {
   readonly notas: readonly string[];
 }
 
-/** Tope de filas en la vista previa. La exportación completa va por su ruta. */
-const TOPE_DE_VISTA_PREVIA = 500;
+/**
+ * Tope de filas de la vista previa. Es el máximo que `FiltroDeEventos` admite
+ * por página (200) y no un número elegido aquí: pedir más no daba un informe
+ * más largo, daba un rechazo del dominio. El conjunto completo va por la
+ * exportación, que tiene su propia ruta y su cabecera de truncado.
+ */
+const TOPE_DE_VISTA_PREVIA = 200;
 
 const lunesDe = (fecha: Date): string => {
   const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
