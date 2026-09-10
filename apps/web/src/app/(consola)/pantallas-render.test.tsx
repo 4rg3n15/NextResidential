@@ -100,7 +100,10 @@ const DISPOSITIVO = {
   nombre: 'Talanquera principal',
   tipo: 'camara_lpr',
   zonaId: null,
-  host: '10.0.0.5',
+  // Nombre de equipo y NO una IP: KPI-11 prohíbe direccionamiento con forma
+  // real fuera de `packages/providers`, y un dato de prueba con esa forma acaba
+  // copiado en un fichero de configuración. Ya ocurrió en la 09-A.
+  host: 'talanquera.equipo.invalid',
   puerto: 80,
   modelo: 'Modelo X',
   firmware: 'v1.2',
@@ -230,7 +233,7 @@ describe('dispositivos', () => {
   it('muestra inventario y estado «sincronizando» cuando hay una orden encolada', async () => {
     montar(<PantallaDeDispositivos copropiedadId={COP} />);
     await waitFor(() => expect(screen.getByText('Talanquera principal')).toBeDefined());
-    expect(screen.getByText('10.0.0.5:80')).toBeDefined();
+    expect(screen.getByText('talanquera.equipo.invalid:80')).toBeDefined();
     await waitFor(() => expect(screen.getByText('Sincronizando')).toBeDefined());
   });
 
@@ -243,7 +246,7 @@ describe('dispositivos', () => {
     // de bóveda entre los datos del equipo.
     const tabla = screen.getByRole('table').textContent ?? '';
     expect(tabla).not.toMatch(/vault:|env:|contrase|secret|password/i);
-    expect(tabla).toContain('10.0.0.5');
+    expect(tabla).toContain('talanquera.equipo.invalid');
   });
 });
 

@@ -11,7 +11,7 @@ import type {
 /**
  * Adaptador de operaciones **sin hardware** (ADR-03). Registra la intención en
  * la bitácora —quién, qué equipo, qué operación— y la mantiene pendiente hasta
- * que el adaptador Hikvision de la ETAPA 15 la consuma.
+ * que el adaptador del fabricante, en la ETAPA 15, la consuma.
  *
  * La cola vive en memoria a propósito y está declarado como deuda: persistirla
  * exigiría una tabla de órdenes que la ETAPA 15 va a diseñar con el protocolo
@@ -45,7 +45,7 @@ export class OperacionesEnMemoria implements OperacionesDeDispositivo {
       estado: 'sincronizando',
       detalle:
         'Orden registrada y atribuida. La ejecución contra el equipo llega con la ' +
-        'integración Hikvision (ETAPA 15); hasta entonces no se contacta ningún hardware.',
+        'integración de hardware (ETAPA 15); hasta entonces no se contacta ningún equipo.',
     };
   }
 
