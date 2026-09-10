@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-09 · al cierre de la **ETAPA 09-A**
+**Última actualización:** 2026-09-10 · al cierre de la **ETAPA 09-A** (sexta ronda de correcciones)
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -116,18 +116,32 @@ La primera ejecución salió **FALLIDA** y sus tres hallazgos eran reales: `comu
 
 ### Tercera y cuarta ronda (2026-09-09)
 
-| Asunto                                                                                                | Estado                                                                                        |
-| ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **D-43** · el arranque en frío no podía escribir: `creado_por` es `NOT NULL` y no había quién firmara | **Resuelto** · migración `0025`, actor de sistema explícito y trazable; nada se relajó        |
-| **D-44** · el `CHECK` del NIT rechazaba el formato colombiano `900123456-7`                           | **Resuelto** · migración `0026`, normalización en la base y validación previa en los guiones  |
-| **D-45** · nadie podía inscribir el segundo factor: el panel no lo ofrece (P-14)                      | **Resuelto** · pantalla de inscripción + códigos de recuperación de un solo uso               |
-| Arranque en frío verificable de punta a punta, hasta «alguien puede entrar»                           | **Construido** · `supabase/arranque-en-frio.sh` + suite `arranque-en-frio.e2e`, sonda 11      |
-| **D-46** · `503` intermitente al inscribir el factor; la pantalla se quedaba con el error                | **Resuelto** · una inscripción por titular a la vez; el éxito limpia el error                 |
-| **D-47** · `apps/web` no validaba su configuración al arrancar                                          | **Resuelto** · Zod + `instrumentation.ts`, salida con código 78 (`EX_CONFIG`)                 |
-| **D-48** · ciclo cerrado del segundo factor (`insufficient_aal`)                                        | **Resuelto** · los factores se leen del usuario; GoTrue no expone `GET /factors`              |
-| **D-49** · el QR no se pintaba (SVG en crudo en un `<img src>`)                                         | **Resuelto** · normalizado a `data:image/svg+xml;base64`                                      |
-| **D-50** · **la API no arrancaba en producción** y 363 pruebas no lo veían                              | **Resuelto** · el puerto de auditoría pasa al núcleo                                          |
-| El camino completo, recorrido en navegador                                                              | **Construido** · `e2e/camino-de-acceso.mjs`, paso 12c del verificador                         |
+| Asunto                                                                                                | Estado                                                                                       |
+| ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **D-43** · el arranque en frío no podía escribir: `creado_por` es `NOT NULL` y no había quién firmara | **Resuelto** · migración `0025`, actor de sistema explícito y trazable; nada se relajó       |
+| **D-44** · el `CHECK` del NIT rechazaba el formato colombiano `900123456-7`                           | **Resuelto** · migración `0026`, normalización en la base y validación previa en los guiones |
+| **D-45** · nadie podía inscribir el segundo factor: el panel no lo ofrece (P-14)                      | **Resuelto** · pantalla de inscripción + códigos de recuperación de un solo uso              |
+| Arranque en frío verificable de punta a punta, hasta «alguien puede entrar»                           | **Construido** · `supabase/arranque-en-frio.sh` + suite `arranque-en-frio.e2e`, sonda 11     |
+| **D-46** · `503` intermitente al inscribir el factor; la pantalla se quedaba con el error             | **Resuelto** · una inscripción por titular a la vez; el éxito limpia el error                |
+| **D-47** · `apps/web` no validaba su configuración al arrancar                                        | **Resuelto** · Zod + `instrumentation.ts`, salida con código 78 (`EX_CONFIG`)                |
+| **D-48** · ciclo cerrado del segundo factor (`insufficient_aal`)                                      | **Resuelto** · los factores se leen del usuario; GoTrue no expone `GET /factors`             |
+| **D-49** · el QR no se pintaba (SVG en crudo en un `<img src>`)                                       | **Resuelto** · normalizado a `data:image/svg+xml;base64`                                     |
+| **D-50** · **la API no arrancaba en producción** y 363 pruebas no lo veían                            | **Resuelto** · el puerto de auditoría pasa al núcleo                                         |
+| El camino completo, recorrido en navegador                                                            | **Construido** · `e2e/camino-de-acceso.mjs`, paso 12c del verificador                        |
+
+### Sexta ronda (2026-09-10) — cuatro fallos del propio verificador
+
+La abrió el verificador en macOS, no el producto. Los cuatro comparten raíz: **un control que concluye sobre un estado que no es el actual**.
+
+| Asunto                                                                                                      | Estado                                                                                     |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **D-54** · contraseña literal en `e2e/doble-gotrue.mjs`. No es una credencial viva; §2.5 no distingue       | **Resuelto** · se sortea en cada corrida. Nada que rotar; el historial empujado no se toca |
+| **D-51** · «contrato desfasado» que no había cambiado: 35 rutas idénticas en otro orden, por D-50           | **Resuelto** · el documento se emite en orden canónico; regenerado y confirmado            |
+| **D-52** · dos sondas del paso 9: el mensaje «dejó rastro» era un diagnóstico falso del hallazgo D-54       | **Resuelto** · línea base antes de mutar; el banco refleja el árbol de trabajo completo    |
+| **D-53** · el paso **12c** no fallaba ni se omitía: **no salía**, encerrado en el bloque `--con-base`       | **Resuelto** · 12c fuera del bloque, Chromium portable y **paso 15** que cuenta los pasos  |
+| **D-55** · `arranque-en-frio.sh` no declaraba su conexión y solo funcionaba con las variables ya exportadas | **Resuelto** · fija y exporta los mismos valores por defecto que `verificar.sh`            |
+
+Pruebas negativas: **13** (dos nuevas, sondas 12 y 13).
 
 ### Lo que usted debe ejecutar antes de la 09-B
 

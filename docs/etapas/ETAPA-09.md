@@ -105,27 +105,27 @@ Por eso `/api/**` es **solo red**, sin lectura ni escritura de caché. Los está
 
 ### Backend (API)
 
-| Fichero                                                                    | Propósito                                                                       |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `packages/domain-core/src/tiempo/ventana-del-dia.ts`                       | «Hoy» según la zona de la copropiedad; función pura con instante inyectado      |
-| `packages/domain-core/src/tiempo/ventana-del-dia.test.ts`                  | 10 pruebas: husos, cambios de horario, bordes de medianoche                     |
-| `apps/api/src/tablero/aplicacion/puertos.ts`                               | `RepositorioTablero` y sus proyecciones. **Sin `credencialRef`**                |
-| `apps/api/src/tablero/aplicacion/casos-de-uso.ts`                          | `ConsultarIndicadores`, `ConsultarAccesosPorHora`, `ConsultarDispositivos`      |
-| `apps/api/src/tablero/aplicacion/casos-de-uso.test.ts`                     | 14 pruebas de las dos reglas: ventana del día y estado por latido               |
-| `apps/api/src/tablero/infraestructura/repositorio-tablero-pg.ts`           | Adaptador PostgreSQL, todo parametrizado, columnas enumeradas                   |
-| `apps/api/src/tablero/infraestructura/repositorio-tablero-en-memoria.ts`   | Adaptador vigente (D-17); se apoya en los repositorios de eventos por su barril |
-| `apps/api/src/tablero/presentacion/tablero.controller.ts`                  | Tres rutas bajo `copropiedades/:id/tablero`                                     |
-| `apps/api/src/tablero/presentacion/respuestas.ts`                          | DTOs de salida del tablero                                                      |
-| `apps/api/src/tablero/{tablero.module.ts,index.ts}`                        | Raíz de composición y barril                                                    |
-| `apps/api/src/comun/respuestas.ts`                                         | `ErrorApiDto`, `DetalleDeErrorDto` y el enumerado de motivos                    |
-| `apps/api/src/{autenticacion,eventos,multiempresa,salud}/**/respuestas.ts` | DTOs de salida de los controladores que consume la 09-A                         |
-| `apps/api/test/tablero.e2e.test.ts`                                        | 9 pruebas, incluida la que exige que la credencial no salga                     |
-| `apps/api/src/autenticacion/dominio/codigos-recuperacion.ts`               | Generación, hash SHA-256 y cotejo en tiempo constante. Función pura              |
-| `apps/api/src/autenticacion/aplicacion/puertos.ts`                         | `RepositorioCodigosMfa` y `AdministradorDeFactores`                              |
-| `apps/api/src/autenticacion/infraestructura/{codigos-mfa-en-memoria,factores-supabase}.ts` | Adaptadores: almacén y retirada de factores                       |
-| `apps/api/test/{codigos-recuperacion,arranque-en-frio}.e2e.test.ts`        | Consumo único, aislamiento entre usuarios; y «esta sesión ENTRA»                 |
-| `supabase/migrations/…_0026_nit_y_codigos_mfa.sql`                         | Normalización del NIT y tabla de códigos (solo el hash), con RLS forzada         |
-| `supabase/arranque-en-frio.sh`                                             | Base vacía → migraciones → aprovisionamiento → claims reales volcados            |
+| Fichero                                                                                    | Propósito                                                                       |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `packages/domain-core/src/tiempo/ventana-del-dia.ts`                                       | «Hoy» según la zona de la copropiedad; función pura con instante inyectado      |
+| `packages/domain-core/src/tiempo/ventana-del-dia.test.ts`                                  | 10 pruebas: husos, cambios de horario, bordes de medianoche                     |
+| `apps/api/src/tablero/aplicacion/puertos.ts`                                               | `RepositorioTablero` y sus proyecciones. **Sin `credencialRef`**                |
+| `apps/api/src/tablero/aplicacion/casos-de-uso.ts`                                          | `ConsultarIndicadores`, `ConsultarAccesosPorHora`, `ConsultarDispositivos`      |
+| `apps/api/src/tablero/aplicacion/casos-de-uso.test.ts`                                     | 14 pruebas de las dos reglas: ventana del día y estado por latido               |
+| `apps/api/src/tablero/infraestructura/repositorio-tablero-pg.ts`                           | Adaptador PostgreSQL, todo parametrizado, columnas enumeradas                   |
+| `apps/api/src/tablero/infraestructura/repositorio-tablero-en-memoria.ts`                   | Adaptador vigente (D-17); se apoya en los repositorios de eventos por su barril |
+| `apps/api/src/tablero/presentacion/tablero.controller.ts`                                  | Tres rutas bajo `copropiedades/:id/tablero`                                     |
+| `apps/api/src/tablero/presentacion/respuestas.ts`                                          | DTOs de salida del tablero                                                      |
+| `apps/api/src/tablero/{tablero.module.ts,index.ts}`                                        | Raíz de composición y barril                                                    |
+| `apps/api/src/comun/respuestas.ts`                                                         | `ErrorApiDto`, `DetalleDeErrorDto` y el enumerado de motivos                    |
+| `apps/api/src/{autenticacion,eventos,multiempresa,salud}/**/respuestas.ts`                 | DTOs de salida de los controladores que consume la 09-A                         |
+| `apps/api/test/tablero.e2e.test.ts`                                                        | 9 pruebas, incluida la que exige que la credencial no salga                     |
+| `apps/api/src/autenticacion/dominio/codigos-recuperacion.ts`                               | Generación, hash SHA-256 y cotejo en tiempo constante. Función pura             |
+| `apps/api/src/autenticacion/aplicacion/puertos.ts`                                         | `RepositorioCodigosMfa` y `AdministradorDeFactores`                             |
+| `apps/api/src/autenticacion/infraestructura/{codigos-mfa-en-memoria,factores-supabase}.ts` | Adaptadores: almacén y retirada de factores                                     |
+| `apps/api/test/{codigos-recuperacion,arranque-en-frio}.e2e.test.ts`                        | Consumo único, aislamiento entre usuarios; y «esta sesión ENTRA»                |
+| `supabase/migrations/…_0026_nit_y_codigos_mfa.sql`                                         | Normalización del NIT y tabla de códigos (solo el hash), con RLS forzada        |
+| `supabase/arranque-en-frio.sh`                                                             | Base vacía → migraciones → aprovisionamiento → claims reales volcados           |
 
 ### Contratos y verificación
 
@@ -138,23 +138,23 @@ Por eso `/api/**` es **solo red**, sin lectura ni escritura de caché. Los está
 
 ### Consola
 
-| Fichero                                                 | Propósito                                                                      |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `packages/config/src/tailwind-preset.ts`                | Paleta, tipografía, densidad, radios. Con el hallazgo de contraste documentado |
-| `packages/config/src/contraste.ts`                      | Fórmula WCAG 2.1, pura                                                         |
-| `packages/config/src/contraste.test.ts`                 | 39 pruebas sobre los pares reales de la consola                                |
-| `apps/web/src/middleware.ts` · `middleware-csp.ts`      | CSP con nonce por petición; la política se prueba como cadena                  |
-| `apps/web/src/lib/configuracion.ts`                     | Configuración `server-only`, validada; ninguna variable pública                |
-| `apps/web/src/lib/sesion/*`                             | Cookies `httpOnly`, cliente de identidad, renovación anticipada                |
-| `apps/web/src/lib/api/*`                                | Cliente tipado, proveedor de consultas y las cuatro del tablero                |
-| `apps/web/src/lib/sse/*`                                | Canal en vivo, política de reconexión y contexto de estado                     |
-| `apps/web/src/lib/{motivos,navegacion,cn}.ts`           | Los diez motivos en español, navegación por rol, composición de clases         |
-| `apps/web/src/app/api/{sesion,ncr}/**`                  | BFF: sesión, segundo factor, estado y proxy hacia la API                       |
+| Fichero                                                 | Propósito                                                                       |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `packages/config/src/tailwind-preset.ts`                | Paleta, tipografía, densidad, radios. Con el hallazgo de contraste documentado  |
+| `packages/config/src/contraste.ts`                      | Fórmula WCAG 2.1, pura                                                          |
+| `packages/config/src/contraste.test.ts`                 | 39 pruebas sobre los pares reales de la consola                                 |
+| `apps/web/src/middleware.ts` · `middleware-csp.ts`      | CSP con nonce por petición; la política se prueba como cadena                   |
+| `apps/web/src/lib/configuracion.ts`                     | Configuración `server-only`, validada; ninguna variable pública                 |
+| `apps/web/src/lib/sesion/*`                             | Cookies `httpOnly`, cliente de identidad, renovación anticipada                 |
+| `apps/web/src/lib/api/*`                                | Cliente tipado, proveedor de consultas y las cuatro del tablero                 |
+| `apps/web/src/lib/sse/*`                                | Canal en vivo, política de reconexión y contexto de estado                      |
+| `apps/web/src/lib/{motivos,navegacion,cn}.ts`           | Los diez motivos en español, navegación por rol, composición de clases          |
+| `apps/web/src/app/api/{sesion,ncr}/**`                  | BFF: sesión, segundo factor, estado y proxy hacia la API                        |
 | `apps/web/src/app/acceso/**`                            | W-01: credenciales → **inscripción** → segundo factor → códigos de recuperación |
 | `apps/web/src/app/api/sesion/mfa/inscripcion/route.ts`  | Alta del factor sobre la propia sesión; la identidad sale de la cookie          |
-| `apps/web/src/app/(consola)/tablero/**`                 | W-02                                                                           |
-| `apps/web/src/componentes/**`                           | Catálogo: KPI, tabla, dispositivo, distintivo, modal con motivo, estados       |
-| `apps/web/public/{manifest.webmanifest,sw.js,iconos/*}` | Base de PWA                                                                    |
+| `apps/web/src/app/(consola)/tablero/**`                 | W-02                                                                            |
+| `apps/web/src/componentes/**`                           | Catálogo: KPI, tabla, dispositivo, distintivo, modal con motivo, estados        |
+| `apps/web/public/{manifest.webmanifest,sw.js,iconos/*}` | Base de PWA                                                                     |
 
 ---
 
@@ -193,14 +193,32 @@ Dos hallazgos de las propias pruebas, antes de llegar al verificador:
 
 ### Veredicto literal de §2.8.0
 
-Ejecución del 2026-09-09 tras corregir el `503` intermitente, con base PostgreSQL local (`--con-base`). El paso 5 no desglosa por paquete porque turbo sirvió de caché; el desglose está en el paso 14, que corre tres veces sin caché.
+Ejecución del **2026-09-10**, tras cerrar los cuatro fallos de la sexta ronda, con PostgreSQL local (`--con-base`) y `DATABASE_URL_PRUEBAS` exportada. Es la primera corrida en la que **el paso 12c aparece** —el camino del navegador— y la primera con el paso 15, que cuenta los pasos ejecutados contra los declarados.
 
 ```
+
+▸ 0 · borrando artefactos de compilación (así corre un checkout nuevo)
+   ✓ dist, .turbo y coverage eliminados
+
+▸ 1 · entorno dentro de lo declarado
+   ✓ entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2
+
+▸ 2 · instalación coherente con el lockfile
+   ✓ pnpm install --frozen-lockfile
+
+▸ 3 · compilación desde cero
+   ✓ pnpm build
+
 ▸ 4 · lint y typecheck
    ✓ pnpm lint
    ✓ pnpm typecheck
 
 ▸ 5 · suite completa
+   @ncr/config:test:       Tests  39 passed (39)
+   @ncr/providers:test:       Tests  24 passed (24)
+   @ncr/domain-core:test:       Tests  328 passed (328)
+   @ncr/web:test:       Tests  161 passed (161)
+   @ncr/api:test:       Tests  363 passed (363)
    ✓ suite completa en verde
 
 ▸ 6 · ningún fichero de prueba se quedó sin recoger
@@ -209,14 +227,14 @@ Ejecución del 2026-09-09 tras corregir el `503` intermitente, con base PostgreS
 ▸ 7 · umbrales de cobertura por capa (§2.4)
      OK   dominio (packages/domain-core/src): lineas 98.66 % · ramas 97.67 % · funciones 98.72 % (umbral 90 %, 28 archivos)
      OK   aplicacion (**/aplicacion/**): lineas 98.28 % · ramas 91.46 % · funciones 98.36 % (umbral 90 %, 20 archivos)
-     OK   global: lineas 77.51 % · ramas 87.32 % · funciones 85.94 % (umbral 70 %, 187 archivos)
+     OK   global: lineas 77.47 % · ramas 87.18 % · funciones 85.97 % (umbral 70 %, 189 archivos)
    ✓ las tres capas cumplen su umbral
 
 ▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
    ✓ portabilidad: 16 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
 
 ▸ 9 · pruebas negativas de los propios controles
-   ✓ PRUEBAS NEGATIVAS: los 11 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ PRUEBAS NEGATIVAS: los 13 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
 
 ▸ 10 · fronteras de arquitectura y secretos
    ✓ fronteras (DoD ETAPA 02)
@@ -232,27 +250,33 @@ Ejecución del 2026-09-09 tras corregir el `503` intermitente, con base PostgreS
 ▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
    alertas entregadas: 200 de 200
    p50 / p95 / p99   : 2 / 4 / 7 ms
-   maximo            : 11 ms
+   maximo            : 10 ms
    umbral KPI-25     : 10000 ms
    ✓ KPI-25 con margen sobre el umbral
 
-▸ 12 · esquema y aislamiento en --modo-supabase
+▸ 12 · esquema y aislamiento en --modo-supabase (requiere --con-base)
    ✓ migraciones, semillas y suite SQL
 
-▸ 12b · arranque en frío: base vacía → migraciones → superadministrador
+▸ 12b · arranque en frío: base vacía → migraciones → superadministrador (requiere --con-base)
    ✓ una base recién migrada llega a un superadministrador con claims válidos
    ✓ y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1
 
-▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base
+▸ 12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero
+   ✓ el camino completo se recorre en el navegador
+
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)
    ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
    ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
    ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
 
 ▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
-      corrida 1/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 160 passed (160)
-      corrida 2/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 160 passed (160)
-      corrida 3/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 160 passed (160)
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 161 passed (161)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 161 passed (161)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 363 passed (363) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 161 passed (161)
    ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 19 de 19 pasos ejecutados
 
 VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
 ```
@@ -390,10 +414,10 @@ El guion se paraba en «la base emite claims», que no es lo mismo. Quien decide
 
 ### Dos defectos más de la familia, uno dentro de las propias pruebas
 
-| Defecto                                                                | Cómo se veía                                                                                                                                                |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Defecto                                                                    | Cómo se veía                                                                                                                                                     |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | El reinicio del limitador entre pruebas hacía `Object.keys` sobre un `Map` | Devuelve `[]` siempre: el reinicio existía y no reiniciaba nada. La suite se llenaba de `429` sin decir por qué. Ahora se comprueba la **forma** antes de usarla |
-| La ruta de inscripción devolvía `400` con el proveedor caído          | «Tu petición está mal» cuando no había nada mal en su petición, y la consola no podía ofrecer reintentar. El estado sale del motivo, no de «lo que no sea 429» |
+| La ruta de inscripción devolvía `400` con el proveedor caído               | «Tu petición está mal» cuando no había nada mal en su petición, y la consola no podía ofrecer reintentar. El estado sale del motivo, no de «lo que no sea 429»   |
 
 ### El NIT rechazaba el formato colombiano
 
@@ -424,11 +448,11 @@ La primera falla, la segunda funciona, y la pantalla se queda con el error de la
 
 ### Las tres correcciones, y por qué son tres
 
-| Capa       | Corrección                                                                                                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Ruta       | **Una inscripción por titular a la vez.** Las peticiones concurrentes comparten la misma y reciben la misma respuesta. La clave es un hash del token, nunca el token       |
-| Cliente    | Un conflicto de nombre se **reintenta una vez** con otro nombre. Es la red de seguridad para varias instancias, donde un mapa en memoria no alcanza                       |
-| Traducción | 409/422 deja de ser «servicio no disponible»: tiene motivo propio, mensaje propio y se **registra con el estado y el `error_code` del proveedor** —nunca el cuerpo—        |
+| Capa       | Corrección                                                                                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ruta       | **Una inscripción por titular a la vez.** Las peticiones concurrentes comparten la misma y reciben la misma respuesta. La clave es un hash del token, nunca el token |
+| Cliente    | Un conflicto de nombre se **reintenta una vez** con otro nombre. Es la red de seguridad para varias instancias, donde un mapa en memoria no alcanza                  |
+| Traducción | 409/422 deja de ser «servicio no disponible»: tiene motivo propio, mensaje propio y se **registra con el estado y el `error_code` del proveedor** —nunca el cuerpo—  |
 
 No es reintentar más veces: es **no hacer dos veces la misma operación**. El reintento cubre lo que el deduplicado por proceso no puede cubrir.
 
@@ -459,11 +483,11 @@ Cuatro rondas seguidas sobre lo mismo, cada corrección destapando el siguiente 
 
 `GET /auth/v1/factors` **no existe en GoTrue**. Los factores viven en el objeto del usuario. La consola pedía esa ruta, recibía un 404, y el código lo interpretaba como «este usuario no tiene ningún factor». De ese único error salieron tres de los cuatro síntomas:
 
-| Síntoma reportado                                                    | Qué era en realidad                                                                                                                                     |
-| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `403 insufficient_aal` al inscribir                                  | La consola mandaba a inscribir a quien **ya tenía un factor verificado**. Supabase exige `aal2` para añadir un segundo: el ciclo cerrado                    |
-| «El código no es válido o ya caducó»                                 | El código nunca llegó a evaluarse. El rechazo era por nivel de sesión, y el mensaje acusaba al titular de un fallo que no era suyo                        |
-| El factor «a medias» y el acceso rechazado después                   | La limpieza de factores sin verificar tampoco limpiaba nada: leía de la misma ruta inexistente                                                            |
+| Síntoma reportado                                  | Qué era en realidad                                                                                                                      |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `403 insufficient_aal` al inscribir                | La consola mandaba a inscribir a quien **ya tenía un factor verificado**. Supabase exige `aal2` para añadir un segundo: el ciclo cerrado |
+| «El código no es válido o ya caducó»               | El código nunca llegó a evaluarse. El rechazo era por nivel de sesión, y el mensaje acusaba al titular de un fallo que no era suyo       |
+| El factor «a medias» y el acceso rechazado después | La limpieza de factores sin verificar tampoco limpiaba nada: leía de la misma ruta inexistente                                           |
 
 **La afirmación de §B.6 era medio falsa y hay que decirlo.** Escribí que «la inscripción de TOTP funciona con la sesión `aal1` del propio titular». Es cierto **solo para el primer factor**: en cuanto hay uno verificado, añadir otro exige `aal2`. La guía está corregida.
 
@@ -512,6 +536,45 @@ Es el paso **12c** de `verificar-etapa.sh`, y sin Chromium **no se omite en sile
 
 ---
 
+## 6.octies · Cuatro fallos del propio verificador, y el que no salía
+
+La sexta ronda no la abrió un defecto del producto: la abrió **el verificador**, corriendo en macOS y dando FALLIDA por cuatro motivos. Los cuatro comparten una raíz —**un control que concluye sobre un estado que no es el actual**— y uno de ellos es el peor de la familia: un control que no aparece.
+
+### 1 · El secreto era real, y el gancho no lo vio porque no pasó por él
+
+`e2e/doble-gotrue.mjs` traía una contraseña literal para su usuario de prueba. No es una credencial viva —es un doble local, el correo es `@ejemplo.invalid`— pero **§2.5 no distingue**, y la regla de trabajo del cliente tampoco: ninguna contraseña se inventa ni se versiona. El escáner tenía razón.
+
+Lo que importa más que la línea: el gancho de pre-commit **funciona** —se comprobó introduciendo una violación sintética, y bloquea el commit—, luego ese commit no pasó por él. La contraseña ahora se **sortea en cada corrida** y no existe fuera del proceso.
+
+Y antes de afirmar que no hay que tocar el historial, se recorrió: `git log -S` sobre **todo** el historial buscando valores con forma de llave —`sb_secret_…`, `sb_publishable_…`, claves privadas— devuelve **cero coincidencias con valor**; las nueve apariciones del prefijo son nombres de variable, reglas de validación y documentación. No hay nada que rotar ni que extirpar, y el historial empujado no se reescribe (§2.5).
+
+### 2 · El contrato «desfasado» que no había cambiado
+
+`pnpm contrato` producía 238 líneas de diferencia sobre `openapi.json`: **las mismas 35 rutas, el mismo contenido, otro orden**. Swagger las emite en el orden en que Nest registró los módulos, y mover el puerto de auditoría a `NucleoModule` —lo que hizo arrancar la API en producción, D-50— cambió ese orden.
+
+Por qué en este entorno salió verde: **la última corrida completa era anterior a ese commit**. Ahí está la respuesta honesta a «uno de los dos no mide el estado real»: medía el estado real de un árbol que ya no era el que se empujó. Y el control tenía además un defecto propio: comparar byte a byte un artefacto cuyo orden depende del orden de registro de módulos convierte cualquier reordenamiento en una falsa alarma, y una falsa alarma repetida entrena a ignorar el control. El documento se emite ahora **en orden canónico** (`paths`, `components`, `tags` ordenados): a partir de aquí el fichero depende solo de la forma de la API (**D-51**).
+
+### 3 · Las dos sondas del paso 9: ninguna dejaba rastro
+
+- «La sonda dejó rastro en el banco» era **un diagnóstico falso**. La sonda 1 limpiaba lo suyo y volvía a escanear esperando cero; el escaneo daba uno porque el repositorio tenía el hallazgo del punto 1. El mensaje mandaba a buscar el defecto donde no estaba. Las sondas 1 y 2 toman ahora **línea base antes de mutar**, como ya hacía la 5, y distinguen «el banco arrastra mi residuo» de «el repositorio tiene un hallazgo real».
+- «El espejo no reproduce el estado al día» era **consecuencia** del punto 2: el espejo copia el contrato versionado, y si el versionado está desfasado la sonda no puede concluir nada. Verde en cuanto se regeneró el contrato. Además, el banco se construía clonando `HEAD` y copiando tres ficheros sueltos del árbol: ahora **refleja el árbol de trabajo completo**, que es lo que se está verificando (**D-52**).
+
+### 4 · El paso 12c no fallaba ni se omitía: no salía
+
+Nació **dentro del bloque `--con-base`**. Sin base de datos no se ejecutaba, y como no se ejecutaba tampoco imprimía su omisión. La afirmación «sin Chromium no se omite en silencio» era cierta del guardián, y el guardián **no llegaba a correr**; encima miraba `/opt/pw-browsers`, una ruta de Linux, con el entorno de desarrollo objetivo en macOS. Tres correcciones:
+
+1. **12c sale del bloque `--con-base`**, donde nunca debió estar: el camino del navegador no toca PostgreSQL —usa un doble de GoTrue y los adaptadores en memoria— y corre siempre.
+2. **El guardián de Chromium vive dentro del propio comando**, resuelve `NCR_CHROMIUM`, `PLAYWRIGHT_BROWSERS_PATH`, `/opt/pw-browsers` y el registro propio de Playwright, y es **lo primero que se comprueba**: sin navegador falla en un segundo con el comando de instalación, en vez de descubrirlo tras compilar la consola.
+3. **Paso 15 nuevo: `pasos-ejecutados.mjs`.** Compara los `paso "…"` declarados en el guion con los realmente ejecutados y nombra los que faltan. Los que necesitan base lo dicen **en su propia etiqueta** —`(requiere --con-base)`—, de modo que la exención se lee en la salida y no es un número escondido. Un paso ausente no daba ningún rojo: daba una salida más corta, y una salida más corta se lee como «todo bien» (**D-53**).
+
+### 5 · Y uno más, encontrado al reproducir: el arranque en frío no declaraba su conexión
+
+`arranque-en-frio.sh` documenta `PGHOST`/`PGPORT` y los fijaba **solo dentro del guion hijo**; un `export` de un hijo no vuelve al padre, así que sus propios `psql` hablaban con la instalación por defecto del sistema. Funcionaba únicamente si el operador ya tenía esas variables en su entorno —que es como funcionaba aquí y por qué nunca se vio—. Un guion cuya reproducibilidad depende de algo que no declara no prueba reproducibilidad. Ahora fija los mismos valores por defecto y los exporta (**D-55**).
+
+Y los tres controles nuevos pasan por mutación, como el resto: sondas **12** (un paso declarado que no se ejecuta se nombra y rompe la verificación; y la exención de `--con-base` distingue las dos corridas) y **13** (sin Chromium el camino falla explícitamente). Las pruebas negativas son ahora **13**.
+
+---
+
 ## 7 · Verificación de seguridad (§2.7)
 
 | #   | Medida                   | Estado en esta etapa                                                                                                                                                                                             |
@@ -529,28 +592,33 @@ Es el paso **12c** de `verificar-etapa.sh`, y sin Chromium **no se omite en sile
 
 ## 8 · Deuda técnica, supuestos y pendientes
 
-| Id        | Asunto                                                                                                                                                                                                                                                                                                                                                          | Estado                                                                                                                |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **D-39**  | `/auth/mfa/inscripcion` y `/auth/mfa/verificacion` son **inalcanzables para los roles administrativos**: el guard exige `aal2` antes que el guard de roles, y esos endpoints exigen rol administrativo. Un administrador sin segundo factor no puede llegar a inscribirlo. Además, verificar ahí no cambiaría el `aal` del token, así que no desbloquearía nada | **Resuelto** · retiradas. Supabase Auth es el mecanismo autoritativo ([ADR-008](../decisiones/ADR-008-supabase-auth-como-mecanismo-autoritativo-de-mfa.md)) |
-| **D-40**  | El relleno rojo con etiqueta blanca no alcanza AA (4,168 medido). Resuelto con `marca.boton` = `#DC3341` bajo la salida que prevé §5.6                                                                                                                                                                                                                          | **Resuelto**, sujeto a su confirmación                                                                                |
-| **D-41**  | El fichero generado del cliente no se formatea ni se lintea. Descubierto porque el gancho de pre-commit lo reformateó y `contrato:desfasado` rompió el build al commit siguiente                                                                                                                                                                                | **Resuelto** · en `.prettierignore` y en los `ignores` de ESLint                                                      |
-| **S-19**  | `[SUPUESTO]` «Dentro ahora» se deriva del histórico como ingresos menos salidas del día, acotado a cero. Una salida puede no registrarse por fallo de sensor (CU-05, excepción 6a), así que es una aproximación **declarada** en el contrato                                                                                                                    | Vigente                                                                                                               |
-| **S-20**  | `[SUPUESTO]` «Visitantes hoy» cuenta autorizaciones **activas cuya vigencia se cruza con el día local**, no las creadas hoy: el mockup cuenta visitas, no altas                                                                                                                                                                                                 | Vigente                                                                                                               |
-| **P-13**  | `PENDIENTE DE DEFINICIÓN` El operador de central toma la **primera** copropiedad de su turno para que el tablero no le quede inservible. El selector real llega con la ETAPA 10                                                                                                                                                                                 | Abierto                                                                                                               |
-| **P-14**  | `PENDIENTE` **redefinido y cerrado.** Se declaró como «falta la pantalla de inscripción» y se resolvió con «se hace desde el panel». El panel no inscribe factores: el pendiente ocultaba un sistema inaccesible. La pantalla existe y opera solo sobre la propia sesión                                                                            | **Cerrado**                                                                                                           |
-| **D-43**  | El arranque en frío no podía escribir la primera fila: `creado_por` es `NOT NULL` y sobre una base vacía no hay a quién atribuirla                                                                                                                                                                                                               | **Resuelto** · migración `0025`, actor de sistema explícito; ninguna restricción se debilitó                          |
-| **D-44**  | El `CHECK` del NIT rechazaba `900123456-7`, que es el formato real                                                                                                                                                                                                                                                                               | **Resuelto** · migración `0026` y validación previa en los guiones                                                    |
-| **D-45**  | Nadie podía inscribir el segundo factor: el panel de Supabase solo los retira                                                                                                                                                                                                                                                                    | **Resuelto** · pantalla de inscripción y códigos de recuperación                                                      |
-| **DT-09** | Sin fuente web: se usa la pila del sistema. Autoalojar Inter entra con el empaquetado de la ETAPA 14; traerla de un CDN abriría `font-src` y `style-src` a un origen externo                                                                                                                                                                                    | Aceptada                                                                                                              |
-| **DT-10** | El adaptador vigente del tablero es el de memoria (D-17). Los conteos del padrón salen en cero porque no hay adaptador en memoria del padrón: una carencia **visible en pantalla**, preferible a un número inventado                                                                                                                                            | Aceptada                                                                                                              |
-| **DT-11** | `jsdom` no implementa `<dialog>`. Se rellena `showModal`/`close` para probar la lógica; **el atrapado del foco, el Escape y la inercia del fondo no quedan cubiertos** por estas pruebas                                                                                                                                                                        | Declarada                                                                                                             |
-| **DT-12** | **Configuración externa sin verificar — la familia «dos suites que se solapan y dejan un intervalo».** Ya aparecieron tres: el gancho de claims, el arranque en frío y la inscripción del factor. Quedan al menos cuatro del mismo tipo, todas con la misma forma: la API prueba su puerto con un doble y la base prueba sus filas, y nadie comprueba el recurso real de la plataforma. **Buckets de evidencia** (que el bucket exista y sea privado, y que un `GET` sin firma lo rechace de verdad — hoy se prueba la fila `evidencias`, no el bucket); **FCM** (credencial de servicio válida y envío real; hoy es un doble); **SMTP y la plantilla de recuperación** con su URL de redirección, recién configurados y nunca ejercitados de punta a punta; **Supabase Realtime** frente al canal SSE propio, que es el que se mide hoy. Diagnóstico declarado antes de la ETAPA 10; la comprobación se construye allí | Declarada |
-| **D-46**  | `503` intermitente al inscribir el segundo factor: dos peticiones concurrentes creaban el factor con el mismo nombre fijo, el proveedor rechazaba una con 422 y la traducción la convertía en «servicio no disponible». La pantalla se quedaba con el error del intento fallido                                                                    | **Resuelto** · una inscripción por titular a la vez, reintento por conflicto, motivo propio y registro con causa |
-| **D-47**  | `apps/web` no validaba su configuración al arrancar: comprobaba presencia, de forma perezosa. Un entorno incompleto aparecía como un `503` en mitad del acceso                                                                                                                                                                                   | **Resuelto** · Zod e `instrumentation.ts`, salida con código 78                                                  |
-| **D-48**  | Ciclo cerrado del segundo factor: se listaban los factores contra `GET /auth/v1/factors`, que GoTrue no expone; el 404 se leía como «no tiene factores» y la consola mandaba a inscribir a quien ya tenía uno verificado (`403 insufficient_aal`)                          | **Resuelto** · se leen de `GET /auth/v1/user` y la lectura falla cerrado    |
-| **D-49**  | El QR no se pintaba: `qr_code` llega como SVG en crudo y un `<img src>` no lo carga                                                                                                                                                                                          | **Resuelto** · normalizado a `data:image/svg+xml;base64`                   |
-| **D-50**  | **La API no arrancaba en producción**: el puerto de auditoría no alcanzaba a `AutenticacionController`, y las 363 pruebas no lo veían porque el arnés monta un grafo de módulos distinto                                                                                     | **Resuelto** · el puerto vive en `comun/auditoria`, lo provee `NucleoModule` |
-| **DT-13** | `multiempresa/aislamiento.ts` toma tipos del barril de `autenticacion`, así que un import explícito entre esos módulos cerraría un ciclo de `require`. Hoy no hace falta; si hiciera, la salida es mover también ese vocabulario al núcleo                                    | Declarada                                                                   |
+| Id        | Asunto                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Estado                                                                                                                                                      |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D-39**  | `/auth/mfa/inscripcion` y `/auth/mfa/verificacion` son **inalcanzables para los roles administrativos**: el guard exige `aal2` antes que el guard de roles, y esos endpoints exigen rol administrativo. Un administrador sin segundo factor no puede llegar a inscribirlo. Además, verificar ahí no cambiaría el `aal` del token, así que no desbloquearía nada                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | **Resuelto** · retiradas. Supabase Auth es el mecanismo autoritativo ([ADR-008](../decisiones/ADR-008-supabase-auth-como-mecanismo-autoritativo-de-mfa.md)) |
+| **D-40**  | El relleno rojo con etiqueta blanca no alcanza AA (4,168 medido). Resuelto con `marca.boton` = `#DC3341` bajo la salida que prevé §5.6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | **Resuelto**, sujeto a su confirmación                                                                                                                      |
+| **D-41**  | El fichero generado del cliente no se formatea ni se lintea. Descubierto porque el gancho de pre-commit lo reformateó y `contrato:desfasado` rompió el build al commit siguiente                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | **Resuelto** · en `.prettierignore` y en los `ignores` de ESLint                                                                                            |
+| **S-19**  | `[SUPUESTO]` «Dentro ahora» se deriva del histórico como ingresos menos salidas del día, acotado a cero. Una salida puede no registrarse por fallo de sensor (CU-05, excepción 6a), así que es una aproximación **declarada** en el contrato                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Vigente                                                                                                                                                     |
+| **S-20**  | `[SUPUESTO]` «Visitantes hoy» cuenta autorizaciones **activas cuya vigencia se cruza con el día local**, no las creadas hoy: el mockup cuenta visitas, no altas                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Vigente                                                                                                                                                     |
+| **P-13**  | `PENDIENTE DE DEFINICIÓN` El operador de central toma la **primera** copropiedad de su turno para que el tablero no le quede inservible. El selector real llega con la ETAPA 10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Abierto                                                                                                                                                     |
+| **P-14**  | `PENDIENTE` **redefinido y cerrado.** Se declaró como «falta la pantalla de inscripción» y se resolvió con «se hace desde el panel». El panel no inscribe factores: el pendiente ocultaba un sistema inaccesible. La pantalla existe y opera solo sobre la propia sesión                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | **Cerrado**                                                                                                                                                 |
+| **D-43**  | El arranque en frío no podía escribir la primera fila: `creado_por` es `NOT NULL` y sobre una base vacía no hay a quién atribuirla                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | **Resuelto** · migración `0025`, actor de sistema explícito; ninguna restricción se debilitó                                                                |
+| **D-44**  | El `CHECK` del NIT rechazaba `900123456-7`, que es el formato real                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | **Resuelto** · migración `0026` y validación previa en los guiones                                                                                          |
+| **D-45**  | Nadie podía inscribir el segundo factor: el panel de Supabase solo los retira                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | **Resuelto** · pantalla de inscripción y códigos de recuperación                                                                                            |
+| **DT-09** | Sin fuente web: se usa la pila del sistema. Autoalojar Inter entra con el empaquetado de la ETAPA 14; traerla de un CDN abriría `font-src` y `style-src` a un origen externo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Aceptada                                                                                                                                                    |
+| **DT-10** | El adaptador vigente del tablero es el de memoria (D-17). Los conteos del padrón salen en cero porque no hay adaptador en memoria del padrón: una carencia **visible en pantalla**, preferible a un número inventado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Aceptada                                                                                                                                                    |
+| **DT-11** | `jsdom` no implementa `<dialog>`. Se rellena `showModal`/`close` para probar la lógica; **el atrapado del foco, el Escape y la inercia del fondo no quedan cubiertos** por estas pruebas                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Declarada                                                                                                                                                   |
+| **DT-12** | **Configuración externa sin verificar — la familia «dos suites que se solapan y dejan un intervalo».** Ya aparecieron tres: el gancho de claims, el arranque en frío y la inscripción del factor. Quedan al menos cuatro del mismo tipo, todas con la misma forma: la API prueba su puerto con un doble y la base prueba sus filas, y nadie comprueba el recurso real de la plataforma. **Buckets de evidencia** (que el bucket exista y sea privado, y que un `GET` sin firma lo rechace de verdad — hoy se prueba la fila `evidencias`, no el bucket); **FCM** (credencial de servicio válida y envío real; hoy es un doble); **SMTP y la plantilla de recuperación** con su URL de redirección, recién configurados y nunca ejercitados de punta a punta; **Supabase Realtime** frente al canal SSE propio, que es el que se mide hoy. Diagnóstico declarado antes de la ETAPA 10; la comprobación se construye allí | Declarada                                                                                                                                                   |
+| **D-46**  | `503` intermitente al inscribir el segundo factor: dos peticiones concurrentes creaban el factor con el mismo nombre fijo, el proveedor rechazaba una con 422 y la traducción la convertía en «servicio no disponible». La pantalla se quedaba con el error del intento fallido                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | **Resuelto** · una inscripción por titular a la vez, reintento por conflicto, motivo propio y registro con causa                                            |
+| **D-47**  | `apps/web` no validaba su configuración al arrancar: comprobaba presencia, de forma perezosa. Un entorno incompleto aparecía como un `503` en mitad del acceso                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | **Resuelto** · Zod e `instrumentation.ts`, salida con código 78                                                                                             |
+| **D-48**  | Ciclo cerrado del segundo factor: se listaban los factores contra `GET /auth/v1/factors`, que GoTrue no expone; el 404 se leía como «no tiene factores» y la consola mandaba a inscribir a quien ya tenía uno verificado (`403 insufficient_aal`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | **Resuelto** · se leen de `GET /auth/v1/user` y la lectura falla cerrado                                                                                    |
+| **D-49**  | El QR no se pintaba: `qr_code` llega como SVG en crudo y un `<img src>` no lo carga                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **Resuelto** · normalizado a `data:image/svg+xml;base64`                                                                                                    |
+| **D-50**  | **La API no arrancaba en producción**: el puerto de auditoría no alcanzaba a `AutenticacionController`, y las 363 pruebas no lo veían porque el arnés monta un grafo de módulos distinto                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | **Resuelto** · el puerto vive en `comun/auditoria`, lo provee `NucleoModule`                                                                                |
+| **D-51**  | `openapi.json` se emitía en el orden de registro de los módulos, así que reordenar el grafo —D-50— producía 238 líneas de diferencia sin un solo cambio de contrato, y el control de desfase lo denunciaba como cambio real                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | **Resuelto** · documento en orden canónico; el fichero depende solo de la forma de la API                                                                   |
+| **D-52**  | El banco de las pruebas negativas clonaba `HEAD` y copiaba tres ficheros del árbol; las sondas 1 y 2 no tomaban línea base, así que un hallazgo REAL del repositorio se informaba como «la sonda dejó rastro»                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | **Resuelto** · el banco refleja el árbol completo y las sondas parten de línea base                                                                         |
+| **D-53**  | El paso **12c** vivía dentro del bloque `--con-base`: sin base no se ejecutaba **ni se omitía**, no salía en la salida. Lo detectó el usuario leyendo y echándolo en falta                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | **Resuelto** · 12c fuera del bloque, guardián de Chromium portable y paso 15 de recuento                                                                    |
+| **D-54**  | Contraseña literal en `e2e/doble-gotrue.mjs`. No era una credencial viva, pero §2.5 no distingue. El gancho de pre-commit funciona: ese commit no pasó por él                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | **Resuelto** · se sortea en cada corrida; nada que rotar, historial empujado intacto                                                                        |
+| **D-55**  | `arranque-en-frio.sh` no declaraba su conexión: fijaba `PGHOST`/`PGPORT` solo en el guion hijo, así que sus `psql` iban a la instalación por defecto del sistema y solo funcionaba con las variables ya en el entorno                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | **Resuelto** · fija y exporta los mismos valores por defecto                                                                                                |
+| **DT-13** | `multiempresa/aislamiento.ts` toma tipos del barril de `autenticacion`, así que un import explícito entre esos módulos cerraría un ciclo de `require`. Hoy no hace falta; si hiciera, la salida es mover también ese vocabulario al núcleo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Declarada                                                                                                                                                   |
 
 ---
 
@@ -569,18 +637,23 @@ Es el paso **12c** de `verificar-etapa.sh`, y sin Chromium **no se omite en sile
 
 **Rama:** `etapa-09-consola-administracion`, sacada de `develop` actualizado.
 
-| Commit    | Contenido                                                                  |
-| --------- | -------------------------------------------------------------------------- |
-| `5030194` | Módulo `tablero`, tipos de respuesta en OpenAPI y el control que los exige |
-| `d279066` | Cliente generado en `packages/contracts` y los dos controles de contrato   |
-| `109d15a` | Preset compartido, marco de la consola, acceso con MFA y tablero           |
-| `297a259` | 49 pruebas de lo que falla en silencio; dos controles que no veían `.tsx`  |
-| `579931e` | ADR-006 (datos y estado) y ADR-007 (cliente generado)                      |
-| `1746730` | Los tres defectos que cazó la primera ejecución del verificador            |
-| `c407265` | Segunda ronda: el fallo del CI y la revisión de las diez sondas             |
-| `1e2cd39` | Arranque en frío (0023-0025) y la prueba que lo recorre entero              |
-| `3ed32e5` | El informe del arranque en frío y el hueco entre las dos suites             |
+| Commit    | Contenido                                                                     |
+| --------- | ----------------------------------------------------------------------------- |
+| `5030194` | Módulo `tablero`, tipos de respuesta en OpenAPI y el control que los exige    |
+| `d279066` | Cliente generado en `packages/contracts` y los dos controles de contrato      |
+| `109d15a` | Preset compartido, marco de la consola, acceso con MFA y tablero              |
+| `297a259` | 49 pruebas de lo que falla en silencio; dos controles que no veían `.tsx`     |
+| `579931e` | ADR-006 (datos y estado) y ADR-007 (cliente generado)                         |
+| `1746730` | Los tres defectos que cazó la primera ejecución del verificador               |
+| `c407265` | Segunda ronda: el fallo del CI y la revisión de las diez sondas               |
+| `1e2cd39` | Arranque en frío (0023-0025) y la prueba que lo recorre entero                |
+| `3ed32e5` | El informe del arranque en frío y el hueco entre las dos suites               |
 | `77a821b` | Inscripción del segundo factor, códigos de recuperación, NIT (0026), sonda 11 |
-| `876daee` | P-14 redefinido, enmienda del ADR-008 y DT-12                                  |
-| `dadc741` | Veredicto de la cuarta ronda, en verde y contra base                           |
-| `59cdaf2` | El `503` intermitente de la inscripción y §2.7.1 en la consola                 |
+| `876daee` | P-14 redefinido, enmienda del ADR-008 y DT-12                                 |
+| `dadc741` | Veredicto de la cuarta ronda, en verde y contra base                          |
+| `59cdaf2` | El `503` intermitente de la inscripción y §2.7.1 en la consola                |
+| `3d14e2a` | Veredicto en verde tras corregir el `503` de la inscripción                   |
+| `1cf1325` | Los factores se leen del usuario; GoTrue no expone `GET /factors`             |
+| `05cf156` | La API no arrancaba en producción; el camino completo por navegador           |
+| `0702d6f` | El camino integrado como paso 12c del verificador                             |
+| _(este)_  | Sexta ronda: contrato canónico, el paso que no salía, la contraseña literal   |

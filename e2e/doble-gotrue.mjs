@@ -28,13 +28,20 @@
  * Así el camino es real de punta a punta sin tocar la red.
  */
 import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
 import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import { authenticator } from 'otplib';
 
+/**
+ * La contraseña se SORTEA en cada corrida y no se versiona. No es cosmética:
+ * §2.5 prohíbe cualquier credencial literal en el repositorio, y el escáner de
+ * secretos —con razón— señaló la que había aquí. Que sea efímera además elimina
+ * la tentación de reutilizarla en otro sitio: no existe fuera de este proceso.
+ */
 export const USUARIO = {
   id: 'b66d71f7-91ea-4adc-b067-7629714e992d',
   correo: 'superadmin@ejemplo.invalid',
-  contrasena: 'Contrasena-De-Prueba-1',
+  contrasena: `Ncr-${randomBytes(12).toString('base64url')}`,
   rol: 'superadministrador',
   copropiedadId: null,
 };

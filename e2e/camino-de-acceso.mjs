@@ -23,8 +23,8 @@
  *    QR» sino `naturalWidth > 0`: que el navegador lo decodificó y lo pintó.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { existsSync, writeFileSync, readdirSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
@@ -53,6 +53,49 @@ const puertoLibre = () =>
       s.close(() => listo(port));
     });
   });
+
+/**
+ * Chromium del entorno, en las dos plataformas del proyecto: macOS para
+ * desarrollo, Linux para CI. Se prefiere el que ya está instalado —descargar
+ * navegadores en cada corrida no es una prueba, es una descarga— y si no hay
+ * ninguno se deja que Playwright resuelva por su registro propio, que es lo
+ * habitual tras `playwright install`.
+ */
+const chromiumDelEntorno = () => {
+  const raices = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers'].filter(
+    (r) => typeof r === 'string' && r.length > 0 && existsSync(r),
+  );
+  for (const base of raices) {
+    for (const carpeta of readdirSync(base).filter((d) => d.startsWith('chromium'))) {
+      const candidatos = [
+        join(base, carpeta, 'chrome-linux', 'chrome'),
+        join(base, carpeta, 'chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+        join(base, carpeta, 'chrome'),
+      ];
+      const hallado = candidatos.find((ruta) => existsSync(ruta));
+      if (hallado !== undefined) return hallado;
+    }
+  }
+  return undefined; // que lo resuelva Playwright con su propio registro
+};
+
+/**
+ * ¿Hay navegador? Tres respuestas, y las tres importan:
+ *   · una ruta   → ese ejecutable, sin descargar nada;
+ *   · `undefined`→ no hay uno explícito pero Playwright tiene el suyo instalado;
+ *   · `null`     → NO hay ninguno, y eso es un fallo, nunca un salto silencioso.
+ */
+const navegadorDisponible = () => {
+  const explicito = process.env.NCR_CHROMIUM;
+  if (explicito !== undefined && explicito !== '') return existsSync(explicito) ? explicito : null;
+  const delEntorno = chromiumDelEntorno();
+  if (delEntorno !== undefined) return delEntorno;
+  try {
+    return existsSync(chromium.executablePath()) ? undefined : null;
+  } catch {
+    return null;
+  }
+};
 
 const esperar = async (url, etiqueta, intentos = 120) => {
   for (let i = 0; i < intentos; i += 1) {
@@ -132,7 +175,24 @@ const entornoDeApi = (doble, puerto) => ({
 });
 
 const principal = async () => {
-  paso('0 · doble de Supabase Auth con la semántica real del proveedor');
+  /**
+   * LO PRIMERO ES EL NAVEGADOR, antes de levantar un solo proceso. Sin esto la
+   * falta de Chromium se descubría después de compilar la consola —minuto y
+   * medio— y, peor, el guardián que la declaraba vivía en el guion de shell
+   * mirando una ruta de Linux: en macOS el paso no se ejecutaba ni se omitía,
+   * simplemente no salía. Aquí la ausencia es un fallo inmediato y explícito.
+   */
+  paso('0 · Chromium con el que recorrer el camino');
+  const ejecutable = navegadorDisponible();
+  if (ejecutable === null) {
+    mal('no hay Chromium instalado: el camino del navegador NO se ha verificado');
+    console.log('     instálalo con `pnpm exec playwright install chromium`');
+    console.log('     o apunta al que ya tengas con NCR_CHROMIUM=/ruta/al/chrome');
+    return;
+  }
+  ok(ejecutable ?? 'el que resuelve Playwright por su registro');
+
+  paso('0b · doble de Supabase Auth con la semántica real del proveedor');
   const doble = await arrancarDobleGotrue();
   ok(`escuchando en ${doble.url}`);
 
@@ -208,14 +268,25 @@ const principal = async () => {
    * y descargar navegadores en cada corrida no es una prueba, es una descarga.
    * `NCR_CHROMIUM` permite apuntarlo en otra máquina.
    */
-  const ejecutable =
-    process.env.NCR_CHROMIUM ??
-    ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium/chrome'].find(
-      (ruta) => existsSync(ruta),
+  let navegador;
+  try {
+    navegador = await chromium.launch(
+      ejecutable === undefined ? {} : { executablePath: ejecutable },
     );
-  const navegador = await chromium.launch(
-    ejecutable === undefined ? {} : { executablePath: ejecutable },
-  );
+  } catch (e) {
+    /**
+     * Sin navegador NO hay verde: se dice qué falta y qué comando lo resuelve.
+     * El guion que llama a este comprueba el código de salida, así que una
+     * ausencia de Chromium sale como fallo y no como silencio — que es
+     * justamente lo que ocurría cuando el guardián vivía en el shell y miraba
+     * una ruta de Linux estando el desarrollo en macOS.
+     */
+    mal('no hay Chromium con el que recorrer el camino');
+    console.log('     instala uno con `pnpm exec playwright install chromium`');
+    console.log('     o apunta al que ya tengas con NCR_CHROMIUM=/ruta/al/chrome');
+    console.log(`     detalle: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+    return;
+  }
   const contexto = await navegador.newContext({ viewport: { width: 1280, height: 900 } });
   const pagina = await contexto.newPage();
   const errores = [];

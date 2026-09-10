@@ -83,17 +83,41 @@ const banco = mkdtempSync(join(tmpdir(), 'ncr-negativas-'));
 const clon = join(banco, 'repo');
 try {
   correr('git', ['clone', '--quiet', '--no-hardlinks', '--depth', '1', raiz, clon]);
-  // El clon necesita los guiones tal como están AHORA, no como estén en HEAD:
-  // se está verificando el árbol de trabajo, no el último commit.
-  mkdirSync(join(clon, 'scripts', 'lib'), { recursive: true });
-  cpSync(join(raiz, 'scripts', 'lib'), join(clon, 'scripts', 'lib'), { recursive: true });
-  cpSync(join(raiz, 'package.json'), join(clon, 'package.json'));
-  cpSync(join(raiz, '.nvmrc'), join(clon, '.nvmrc'));
+  /**
+   * EL BANCO REFLEJA EL ÁRBOL DE TRABAJO, NO `HEAD`.
+   *
+   * Antes se copiaban tres cosas sueltas —`scripts/lib`, `package.json`,
+   * `.nvmrc`— y el resto del banco quedaba en el último commit. Eso convierte
+   * al banco en un artefacto que envejece: una corrección hecha en el árbol no
+   * se veía aquí, y la sonda concluía sobre un estado que ya no existe. Es la
+   * misma familia de fallo que motivó `contrato-desfasado.mjs`.
+   *
+   * Se copian TODOS los ficheros versionados tal como están ahora. El índice
+   * del clon sigue siendo el de `HEAD`, que es lo que `git ls-files` necesita
+   * para que las sondas vean lo mismo que ve el control real.
+   */
+  for (const relativo of correr('git', ['ls-files', '-z']).salida.split('\0')) {
+    if (relativo.length === 0) continue;
+    const origen = join(raiz, relativo);
+    if (!existsSync(origen)) continue;
+    mkdirSync(dirname(join(clon, relativo)), { recursive: true });
+    cpSync(origen, join(clon, relativo));
+  }
 
   const enClon = (cmd, args) => correr(cmd, args, { cwd: clon });
 
   console.log('\n▸ 1 · un secreto sintético bloquea el escaneo');
   {
+    /**
+     * LÍNEA BASE PRIMERO. Sin esto, un hallazgo REAL del repositorio se
+     * informaba como «la sonda dejó rastro en el banco»: un diagnóstico falso
+     * que manda a buscar el defecto donde no está. Ocurrió —había una
+     * contraseña literal en `e2e/doble-gotrue.mjs`— y costó una ronda.
+     */
+    enClon('node', ['scripts/lib/escanear-secretos.mjs']).codigo === 0
+      ? ok('la línea base del banco está limpia')
+      : mal('el banco NO parte de una línea base limpia: el repositorio tiene un hallazgo real');
+
     // Valor SINTÉTICO con forma de llave secreta, en el clon temporal. Nunca
     // toca el repositorio real ni su índice.
     writeFileSync(
@@ -114,6 +138,10 @@ try {
 
   console.log('\n▸ 2 · una construcción BSD/GNU divergente rompe la verificación');
   {
+    enClon('node', ['scripts/lib/portabilidad.mjs']).codigo === 0
+      ? ok('la línea base del banco está limpia')
+      : mal('el banco NO parte de una línea base limpia: el repositorio tiene un hallazgo real');
+
     writeFileSync(
       join(clon, 'sonda-portabilidad.sh'),
       '#!/usr/bin/env bash\necho x | xargs -r echo\n',
@@ -515,6 +543,61 @@ try {
       ? ok('el guardián distingue la corrida real de la omitida')
       : mal('el guardián no distingue una omisión de una corrida real');
   }
+
+  console.log('\n▸ 12 · un paso declarado que NO se ejecuta se detecta');
+  {
+    /**
+     * El defecto de la sexta ronda: «12c · el camino del NAVEGADOR» estaba
+     * dentro del bloque que exige base de datos, así que sin ella no se
+     * ejecutaba ni se omitía — no salía. Ningún rojo: una salida más corta.
+     * Lo cazó el usuario leyendo la salida; esto lo caza el guion.
+     */
+    const declarados = readFileSync(join(raiz, 'scripts', 'verificar-etapa.sh'), 'utf8')
+      .split('\n')
+      .map((linea) => /^\s*paso "([^"]+)"/.exec(linea))
+      .filter((m) => m !== null)
+      .map((m) => m[1]);
+    const sinBase = declarados.filter((e) => !/\(requiere --con-base\)/.test(e));
+
+    const completo = join(banco, 'pasos-completos.txt');
+    writeFileSync(completo, `${sinBase.join('\n')}\n`);
+    const r0 = correr('node', ['scripts/lib/pasos-ejecutados.mjs', completo]);
+    r0.codigo === 0
+      ? ok('una corrida que ejecuta todos los pasos pasa el control')
+      : mal(`el control no acepta el caso legítimo (codigo ${r0.codigo}): ${r0.salida}`);
+
+    const objetivo = sinBase.find((e) => e.startsWith('12c')) ?? sinBase[sinBase.length - 1];
+    const mutilado = join(banco, 'pasos-sin-12c.txt');
+    writeFileSync(mutilado, `${sinBase.filter((e) => e !== objetivo).join('\n')}\n`);
+    const r1 = correr('node', ['scripts/lib/pasos-ejecutados.mjs', mutilado]);
+    r1.codigo !== 0 && r1.salida.includes(objetivo)
+      ? ok('un paso que no llegó a ejecutarse se nombra y rompe la verificación')
+      : mal(`un paso ausente pasa inadvertido (codigo ${r1.codigo})`);
+
+    // Y la exención tiene que ser real, no una coartada: los pasos con base
+    // NO pueden exigirse en una corrida sin ella.
+    const conBase = declarados.filter((e) => /\(requiere --con-base\)/.test(e));
+    const r2 = correr('node', ['scripts/lib/pasos-ejecutados.mjs', completo, '--con-base']);
+    conBase.length > 0 && r2.codigo !== 0
+      ? ok('con --con-base sí se exigen los pasos que necesitan base')
+      : mal('la exención de --con-base no distingue las dos corridas');
+  }
+
+  console.log('\n▸ 13 · sin Chromium, el camino del navegador NO pasa por verde');
+  {
+    /**
+     * «Sin Chromium no se omite en silencio» era una afirmación mía, y era
+     * falsa: el guardián miraba `/opt/pw-browsers`, una ruta de Linux, con el
+     * entorno de desarrollo objetivo en macOS. Aquí se ejerce de verdad.
+     */
+    const r = correr('node', ['e2e/camino-de-acceso.mjs'], {
+      timeout: 120_000,
+      env: { ...process.env, NCR_CHROMIUM: join(banco, 'chromium-que-no-existe') },
+    });
+    r.codigo !== 0 && /no hay Chromium/.test(r.salida)
+      ? ok('la ausencia de navegador es un fallo explícito, no un salto')
+      : mal(`sin navegador el camino no falla como debe (codigo ${r.codigo})`);
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -538,6 +621,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 11 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 13 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

@@ -4,74 +4,6 @@
  */
 
 export interface paths {
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** El proceso está vivo */
-        get: operations["SaludController_salud"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/ready": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** La aplicación puede atender tráfico */
-        get: operations["SaludController_listo"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/sesion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Identidad y alcance del token presentado */
-        get: operations["AutenticacionController_sesion"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/restablecimiento": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Registra en auditoría el restablecimiento de la propia contraseña */
-        post: operations["AutenticacionController_registrarRestablecimiento"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/auth/mfa/codigos": {
         parameters: {
             query?: never;
@@ -106,15 +38,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}": {
+    "/auth/restablecimiento": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Lee una copropiedad dentro del alcance del token */
-        get: operations["CopropiedadesController_leer"];
+        get?: never;
+        put?: never;
+        /** Registra en auditoría el restablecimiento de la propia contraseña */
+        post: operations["AutenticacionController_registrarRestablecimiento"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sesion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Identidad y alcance del token presentado */
+        get: operations["AutenticacionController_sesion"];
         put?: never;
         post?: never;
         delete?: never;
@@ -140,83 +89,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/padron/vehiculos": {
+    "/copropiedades/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** Registra un vehículo; la placa única activa la garantiza la base */
-        post: operations["PadronController_registrarVehiculo"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/vehiculos/{id}/desactivacion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Baja lógica del vehículo; el motivo es obligatorio (RN-19) */
-        post: operations["PadronController_desactivarVehiculo"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/viviendas/{id}/desactivacion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Baja lógica de la vivienda; conserva su historial (RN-19, CA-02) */
-        post: operations["PadronController_desactivarVivienda"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/carga": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Carga transaccional desde CSV con reporte de errores por fila (HU-03) */
-        post: operations["PadronController_cargar"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/zonas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Zonas con su aforo y su disponibilidad de ahora mismo (HU-19) */
-        get: operations["ZonasController_listar"];
+        /** Lee una copropiedad dentro del alcance del token */
+        get: operations["CopropiedadesController_leer"];
         put?: never;
         post?: never;
         delete?: never;
@@ -225,24 +106,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/zonas/{zonaId}/configuracion": {
+    "/copropiedades/{id}/alertas": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Alertas abiertas y en atención, con su cumplimiento de KPI-25 */
+        get: operations["AlertasController_abiertas"];
         put?: never;
-        /** Configura horario, aforo, normas y apertura de la zona (HU-18) */
-        post: operations["ZonasController_configuracion"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/zonas/{zonaId}/ingresos": {
+    "/copropiedades/{id}/alertas/{alertaId}/atencion": {
         parameters: {
             query?: never;
             header?: never;
@@ -251,15 +132,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ocupa una plaza; el aforo lo garantiza la base (CU-05, CA-14, CA-15) */
-        post: operations["ZonasController_ingreso"];
+        /** El operador toma la alerta; queda atribuida a él */
+        post: operations["AlertasController_atender"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/zonas/{zonaId}/salidas": {
+    "/copropiedades/{id}/alertas/{alertaId}/resolucion": {
         parameters: {
             query?: never;
             header?: never;
@@ -268,15 +149,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Libera una plaza; nunca baja de cero (CU-05 6a) */
-        post: operations["ZonasController_salida"];
+        /** Cierra la alerta; las notas son obligatorias */
+        post: operations["AlertasController_resolver"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/zonas/{zonaId}/autorizaciones": {
+    "/copropiedades/{id}/biometria/barrido": {
         parameters: {
             query?: never;
             header?: never;
@@ -285,8 +166,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Da permiso sobre la zona a una autorización (HU-19, HU-20) */
-        post: operations["ZonasController_permiso"];
+        /** Supresión de las vencidas y retirada de terminales (RN-11, KPI-21) */
+        post: operations["BiometriaController_ejecutarBarrido"];
         delete?: never;
         options?: never;
         head?: never;
@@ -378,23 +259,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/biometria/barrido": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Supresión de las vencidas y retirada de terminales (RN-11, KPI-21) */
-        post: operations["BiometriaController_ejecutarBarrido"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/copropiedades/{id}/eventos": {
         parameters: {
             query?: never;
@@ -429,23 +293,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/eventos/{eventoId}/evidencia": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** URL firmada de vida corta a la evidencia (RN-21) */
-        get: operations["EventosController_urlDeEvidencia"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/copropiedades/{id}/eventos/flujo": {
         parameters: {
             query?: never;
@@ -463,15 +310,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/alertas": {
+    "/copropiedades/{id}/eventos/{eventoId}/evidencia": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Alertas abiertas y en atención, con su cumplimiento de KPI-25 */
-        get: operations["AlertasController_abiertas"];
+        /** URL firmada de vida corta a la evidencia (RN-21) */
+        get: operations["EventosController_urlDeEvidencia"];
         put?: never;
         post?: never;
         delete?: never;
@@ -480,24 +327,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/alertas/{alertaId}/atencion": {
+    "/copropiedades/{id}/tablero/accesos-por-hora": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Histograma de accesos del día en la zona de la copropiedad */
+        get: operations["TableroController_leerAccesosPorHora"];
         put?: never;
-        /** El operador toma la alerta; queda atribuida a él */
-        post: operations["AlertasController_atender"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/alertas/{alertaId}/resolucion": {
+    "/copropiedades/{id}/tablero/dispositivos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado en línea de los dispositivos por su latido (CA-26, RN-12) */
+        get: operations["TableroController_leerDispositivos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/tablero/indicadores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Las cuatro tarjetas de indicadores del tablero (HU-38) */
+        get: operations["TableroController_leerIndicadores"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/zonas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Zonas con su aforo y su disponibilidad de ahora mismo (HU-19) */
+        get: operations["ZonasController_listar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/zonas/{zonaId}/autorizaciones": {
         parameters: {
             query?: never;
             header?: never;
@@ -506,8 +404,76 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cierra la alerta; las notas son obligatorias */
-        post: operations["AlertasController_resolver"];
+        /** Da permiso sobre la zona a una autorización (HU-19, HU-20) */
+        post: operations["ZonasController_permiso"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/zonas/{zonaId}/configuracion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Configura horario, aforo, normas y apertura de la zona (HU-18) */
+        post: operations["ZonasController_configuracion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/zonas/{zonaId}/ingresos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ocupa una plaza; el aforo lo garantiza la base (CU-05, CA-14, CA-15) */
+        post: operations["ZonasController_ingreso"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/zonas/{zonaId}/salidas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Libera una plaza; nunca baja de cero (CU-05 6a) */
+        post: operations["ZonasController_salida"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El proceso está vivo */
+        get: operations["SaludController_salud"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -551,49 +517,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/tablero/indicadores": {
+    "/padron/carga": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Las cuatro tarjetas de indicadores del tablero (HU-38) */
-        get: operations["TableroController_leerIndicadores"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** Carga transaccional desde CSV con reporte de errores por fila (HU-03) */
+        post: operations["PadronController_cargar"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/tablero/accesos-por-hora": {
+    "/padron/vehiculos": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Histograma de accesos del día en la zona de la copropiedad */
-        get: operations["TableroController_leerAccesosPorHora"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** Registra un vehículo; la placa única activa la garantiza la base */
+        post: operations["PadronController_registrarVehiculo"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/tablero/dispositivos": {
+    "/padron/vehiculos/{id}/desactivacion": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Estado en línea de los dispositivos por su latido (CA-26, RN-12) */
-        get: operations["TableroController_leerDispositivos"];
+        get?: never;
+        put?: never;
+        /** Baja lógica del vehículo; el motivo es obligatorio (RN-19) */
+        post: operations["PadronController_desactivarVehiculo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/padron/viviendas/{id}/desactivacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Baja lógica de la vivienda; conserva su historial (RN-19, CA-02) */
+        post: operations["PadronController_desactivarVivienda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La aplicación puede atender tráfico */
+        get: operations["SaludController_listo"];
         put?: never;
         post?: never;
         delete?: never;
@@ -606,146 +606,39 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        SaludDto: {
-            /** @example vivo */
-            estado: string;
+        AccesosPorHoraDto: {
+            /** @description Siempre 24 franjas, incluidas las de cero: el eje lo fija el servidor */
+            franjas: components["schemas"]["FranjaDeAccesosDto"][];
+            /** @example America/Bogota */
+            zonaHoraria: string;
             /** Format: date-time */
-            momento: string;
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
         };
-        ListoDto: {
-            /** @example listo */
-            estado: string;
-            /**
-             * @description Estado por dependencia. Un 503 devuelve esta misma forma con el detalle.
-             * @example {
-             *       "configuracion": "ok",
-             *       "jwks": "ok",
-             *       "postgres": "no-conectado-etapa-04"
-             *     }
-             */
-            dependencias: {
-                [key: string]: string;
-            };
-        };
-        SesionDto: {
-            /** Format: uuid */
-            usuarioId: string;
-            /**
-             * @description Rol derivado de los claims, no elegido
-             * @enum {string}
-             */
-            rol: "superadministrador" | "administrador" | "portero" | "operador_central" | "residente" | "servicio";
-            /**
-             * Format: uuid
-             * @description Copropiedad del usuario; null en el operador de central, que atiende varias
-             */
-            copropiedadId: string | null;
-            /** @description Alcance del operador de central, acotado a su turno activo (KPI-35) */
-            copropiedadesAtendidas: string[];
-            /** @description aal2 en el token. Los roles administrativos no operan sin él (RN-20, CA-25): la consola debe llevar al paso de segundo factor mientras sea false. */
-            mfaVerificado: boolean;
-        };
-        DetalleDeErrorDto: {
-            /** @description Un mensaje, o el arreglo que devuelve el ValidationPipe con un renglón por campo rechazado. La consola muestra el arreglo campo a campo; una cadena, tal cual. */
-            message: string | string[];
-            /** @example Bad Request */
-            error?: string;
-            /** @example 400 */
-            statusCode?: number;
-        };
-        ErrorApiDto: {
-            /**
-             * @description Código HTTP, repetido en el cuerpo
-             * @example 404
-             */
-            estado: number;
-            /**
-             * @description Identificador de correlación para seguir la petición en la bitácora
-             * @example a1b2c3d4
-             */
-            correlacion: string;
-            /** @description Detalle para el cliente en 4xx. En 5xx es siempre «Error interno»: el mensaje original no sale, porque suele llevar nombres de tabla o fragmentos de consulta. */
-            mensaje: string | components["schemas"]["DetalleDeErrorDto"];
-        };
-        RestablecimientoRegistradoDto: {
-            /**
-             * @description Siempre true; la respuesta es 204 sin cuerpo
-             * @example true
-             */
-            registrado: boolean;
-        };
-        CodigosDeRecuperacionDto: {
-            /**
-             * @description Códigos de un solo uso, en claro. Se entregan UNA vez: solo se guarda su hash. No dan acceso — autorizan a retirar el factor perdido para inscribir otro.
-             * @example [
-             *       "A1B2C-D3E4F",
-             *       "09876-54321"
-             *     ]
-             */
-            codigos: string[];
-            /** @example 10 */
-            cantidad: number;
-        };
-        RecuperarFactorDto: {
-            /**
-             * @description Código de recuperación con la forma XXXXX-XXXXX
-             * @example A1B2C-D3E4F
-             */
-            codigo: string;
-        };
-        RecuperacionDeFactorDto: {
-            /**
-             * @description Factores TOTP verificados que se retiraron. Ya se puede inscribir uno nuevo.
-             * @example 1
-             */
-            factoresRetirados: number;
-            /** @description Códigos de recuperación que quedan sin usar */
-            codigosRestantes: number;
-        };
-        CopropiedadDto: {
+        AlertaExpuestaDto: {
             /** Format: uuid */
             id: string;
-            /**
-             * @description Rol con el que el llamante alcanza esta copropiedad
-             * @enum {string}
-             */
-            alcance: "superadministrador" | "administrador" | "portero" | "operador_central" | "residente" | "servicio";
-        };
-        IngestaDto: Record<string, never>;
-        IngestaAceptadaDto: {
-            /** @example true */
-            aceptado: boolean;
-        };
-        RegistrarVehiculoDto: Record<string, never>;
-        DesactivarDto: Record<string, never>;
-        CargarPadronDto: Record<string, never>;
-        FranjaDto: {
-            /** @description 0 = domingo … 6 = sábado */
-            dia: number;
-            minutoInicio: number;
-            minutoFin: number;
-            /** @description Continúa la franja del día anterior tras la medianoche */
-            continuaDelDiaAnterior?: boolean;
-        };
-        ConfigurarZonaDto: {
-            nombre?: string;
-            /** @description Aforo máximo simultáneo (RN-14) */
-            aforoMaximo?: number;
-            horario?: components["schemas"]["FranjaDto"][];
             /** @enum {string} */
-            politicaReinicio?: "cierre_horario" | "manual" | "nunca";
-            normas?: string[];
-            /** @description Cierre manual del operador, sin presencia física (PB-04) */
-            abierta?: boolean;
+            tipo: "lista_negra" | "sabotaje" | "dispositivo_caido" | "acceso_dudoso" | "panico" | "apertura_fallida";
+            /** @enum {string} */
+            severidad: "informativa" | "media" | "alta" | "critica";
+            /** @enum {string} */
+            estado: "abierta" | "en_atencion" | "resuelta";
+            /** Format: date-time */
+            generadaEn: string;
+            /** Format: date-time */
+            escaladaEn: string | null;
+            /** Format: uuid */
+            eventoId: string | null;
+            /** Format: uuid */
+            dispositivoId: string | null;
+            /** @description KPI-25 medido, no supuesto: null mientras no se haya escalado */
+            escaladaDentroDelPlazo: boolean | null;
+            notas: string | null;
         };
         AutorizarZonaDto: {
             autorizacionId: string;
-        };
-        MedidasDto: {
-            rostrosDetectados: number;
-            nitidez: number;
-            iluminacion: number;
-            proporcionRostro: number;
         };
         CapturarRostroDto: {
             /** @description El TITULAR del dato: el visitante (RN-10) */
@@ -761,14 +654,139 @@ export interface components {
             /** @description Instante de supresión programada (RN-11) */
             suprimirEn: string;
         };
-        ResponderConsentimientoDto: {
-            /** @description true acepta, false rechaza. Lo responde el TITULAR. */
-            acepta: boolean;
-            /** @description Evidencia de la aceptación (RN-09) */
-            evidenciaId?: string;
+        CargarPadronDto: Record<string, never>;
+        CodigosDeRecuperacionDto: {
+            /**
+             * @description Códigos de un solo uso, en claro. Se entregan UNA vez: solo se guarda su hash. No dan acceso — autorizan a retirar el factor perdido para inscribir otro.
+             * @example [
+             *       "A1B2C-D3E4F",
+             *       "09876-54321"
+             *     ]
+             */
+            codigos: string[];
+            /** @example 10 */
+            cantidad: number;
         };
-        SincronizarPlantillaDto: {
+        ConfigurarZonaDto: {
+            nombre?: string;
+            /** @description Aforo máximo simultáneo (RN-14) */
+            aforoMaximo?: number;
+            horario?: components["schemas"]["FranjaDto"][];
+            /** @enum {string} */
+            politicaReinicio?: "cierre_horario" | "manual" | "nunca";
+            normas?: string[];
+            /** @description Cierre manual del operador, sin presencia física (PB-04) */
+            abierta?: boolean;
+        };
+        ConteosDeAlertasDto: {
+            /** @example 3 */
+            pendientes: number;
+            /**
+             * @description Severidad más grave entre las pendientes; null si no hay ninguna
+             * @enum {string|null}
+             */
+            severidadMaxima: "informativa" | "media" | "alta" | "critica" | null;
+        };
+        ConteosDeVisitantesDto: {
+            /**
+             * @description Autorizaciones activas que se cruzan con el día local
+             * @example 34
+             */
+            autorizacionesDelDia: number;
+            /**
+             * @description Ingresos menos salidas del día. Aproximación declarada: una salida puede no registrarse por fallo de sensor (CU-05, excepción 6a). Nunca es negativo.
+             * @example 8
+             */
+            dentroAhora: number;
+        };
+        ConteosDelPadronDto: {
+            /** @example 247 */
+            residentesActivos: number;
+            /** @example 4 */
+            residentesAltaEnVentana: number;
+            /** @example 183 */
+            vehiculosActivos: number;
+            /** @example 12 */
+            vehiculosAltaEnVentana: number;
+        };
+        CopropiedadDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description Rol con el que el llamante alcanza esta copropiedad
+             * @enum {string}
+             */
+            alcance: "superadministrador" | "administrador" | "portero" | "operador_central" | "residente" | "servicio";
+        };
+        DesactivarDto: Record<string, never>;
+        DetalleDeErrorDto: {
+            /** @description Un mensaje, o el arreglo que devuelve el ValidationPipe con un renglón por campo rechazado. La consola muestra el arreglo campo a campo; una cadena, tal cual. */
+            message: string | string[];
+            /** @example Bad Request */
+            error?: string;
+            /** @example 400 */
+            statusCode?: number;
+        };
+        DispositivoDelTableroDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Talanquera portería principal */
+            nombre: string;
+            /** @enum {string} */
+            tipo: "camara_lpr" | "terminal_facial" | "rele" | "intercom" | "controlador_io";
+            /** Format: uuid */
+            zonaId: string | null;
+            /** @description IP o FQDN del equipo. Solo se rellena para roles administrativos (C-11); para el resto llega null. NUNCA sale la credencial ni su referencia (RN-21). */
+            host: string | null;
+            puerto: number | null;
+            modelo: string | null;
+            firmware: string | null;
+            /**
+             * @description Derivado del último latido contra el umbral de la copropiedad (migración 0020), no leído de la columna estado_salud, que puede ir por detrás.
+             * @enum {string}
+             */
+            estado: "saludable" | "degradado" | "caido";
+            /** Format: date-time */
+            ultimoLatido: string | null;
+            /** Format: date-time */
+            ultimaSincronizacion: string | null;
+            segundosSinLatir: number | null;
+        };
+        ErrorApiDto: {
+            /**
+             * @description Código HTTP, repetido en el cuerpo
+             * @example 404
+             */
+            estado: number;
+            /**
+             * @description Identificador de correlación para seguir la petición en la bitácora
+             * @example a1b2c3d4
+             */
+            correlacion: string;
+            /** @description Detalle para el cliente en 4xx. En 5xx es siempre «Error interno»: el mensaje original no sale, porque suele llevar nombres de tabla o fragmentos de consulta. */
+            mensaje: string | components["schemas"]["DetalleDeErrorDto"];
+        };
+        EstadoDeDispositivosDto: {
+            dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
+            /** @example 3 */
+            saludables: number;
+            /** @example 1 */
+            degradados: number;
+            /** @example 0 */
+            caidos: number;
+        };
+        EventoIngestaDto: {
+            copropiedadId: string;
             dispositivoId: string;
+            /** @enum {string} */
+            metodo: "placa" | "facial" | "manual" | "remoto" | "tarjeta";
+            personaId?: string;
+            placaLeida?: string;
+            zonaId?: string;
+            /** @description Confianza de la lectura, 0..1 */
+            confianzaCentesimas: number;
+            /** @description Identificador del evento en el equipo (RN-17) */
+            referenciaExterna: string;
         };
         EventoRegistradoDto: {
             /** Format: uuid */
@@ -811,86 +829,126 @@ export interface components {
             /** @description Resuelto localmente por el Edge con caché de reglas (RN-16, CA-21, KPI-31) */
             decididoPorEdge: boolean;
         };
+        FranjaDeAccesosDto: {
+            /** @description Hora local de la copropiedad */
+            hora: number;
+            /** @example 12 */
+            permitidos: number;
+            /** @example 1 */
+            negados: number;
+        };
+        FranjaDto: {
+            /** @description 0 = domingo … 6 = sábado */
+            dia: number;
+            minutoInicio: number;
+            minutoFin: number;
+            /** @description Continúa la franja del día anterior tras la medianoche */
+            continuaDelDiaAnterior?: boolean;
+        };
+        IndicadoresDto: {
+            padron: components["schemas"]["ConteosDelPadronDto"];
+            visitantes: components["schemas"]["ConteosDeVisitantesDto"];
+            alertas: components["schemas"]["ConteosDeAlertasDto"];
+            ventana: components["schemas"]["VentanaDelDiaDto"];
+        };
+        IngestaAceptadaDto: {
+            /** @example true */
+            aceptado: boolean;
+        };
+        IngestaDto: Record<string, never>;
+        LatidoDto: {
+            copropiedadId: string;
+            dispositivoId: string;
+        };
+        ListoDto: {
+            /** @example listo */
+            estado: string;
+            /**
+             * @description Estado por dependencia. Un 503 devuelve esta misma forma con el detalle.
+             * @example {
+             *       "configuracion": "ok",
+             *       "jwks": "ok",
+             *       "postgres": "no-conectado-etapa-04"
+             *     }
+             */
+            dependencias: {
+                [key: string]: string;
+            };
+        };
+        MedidasDto: {
+            rostrosDetectados: number;
+            nitidez: number;
+            iluminacion: number;
+            proporcionRostro: number;
+        };
+        NotasDeAlertaDto: {
+            notas: string;
+        };
         PaginaDeEventosDto: {
             filas: components["schemas"]["EventoRegistradoDto"][];
             /** @description Cursor opaco de la siguiente página; null cuando no hay más */
             siguiente: string | null;
         };
+        RecuperacionDeFactorDto: {
+            /**
+             * @description Factores TOTP verificados que se retiraron. Ya se puede inscribir uno nuevo.
+             * @example 1
+             */
+            factoresRetirados: number;
+            /** @description Códigos de recuperación que quedan sin usar */
+            codigosRestantes: number;
+        };
+        RecuperarFactorDto: {
+            /**
+             * @description Código de recuperación con la forma XXXXX-XXXXX
+             * @example A1B2C-D3E4F
+             */
+            codigo: string;
+        };
+        RegistrarVehiculoDto: Record<string, never>;
+        ResponderConsentimientoDto: {
+            /** @description true acepta, false rechaza. Lo responde el TITULAR. */
+            acepta: boolean;
+            /** @description Evidencia de la aceptación (RN-09) */
+            evidenciaId?: string;
+        };
+        RestablecimientoRegistradoDto: {
+            /**
+             * @description Siempre true; la respuesta es 204 sin cuerpo
+             * @example true
+             */
+            registrado: boolean;
+        };
+        SaludDto: {
+            /** @example vivo */
+            estado: string;
+            /** Format: date-time */
+            momento: string;
+        };
+        SesionDto: {
+            /** Format: uuid */
+            usuarioId: string;
+            /**
+             * @description Rol derivado de los claims, no elegido
+             * @enum {string}
+             */
+            rol: "superadministrador" | "administrador" | "portero" | "operador_central" | "residente" | "servicio";
+            /**
+             * Format: uuid
+             * @description Copropiedad del usuario; null en el operador de central, que atiende varias
+             */
+            copropiedadId: string | null;
+            /** @description Alcance del operador de central, acotado a su turno activo (KPI-35) */
+            copropiedadesAtendidas: string[];
+            /** @description aal2 en el token. Los roles administrativos no operan sin él (RN-20, CA-25): la consola debe llevar al paso de segundo factor mientras sea false. */
+            mfaVerificado: boolean;
+        };
+        SincronizarPlantillaDto: {
+            dispositivoId: string;
+        };
         UrlDeEvidenciaDto: {
             /** @description URL firmada de vida corta (120 s) al bucket privado. No se cachea ni se persiste: el enlace acaba en el historial del navegador y ahí sigue siendo válido (RN-21). */
             url: string;
-        };
-        AlertaExpuestaDto: {
-            /** Format: uuid */
-            id: string;
-            /** @enum {string} */
-            tipo: "lista_negra" | "sabotaje" | "dispositivo_caido" | "acceso_dudoso" | "panico" | "apertura_fallida";
-            /** @enum {string} */
-            severidad: "informativa" | "media" | "alta" | "critica";
-            /** @enum {string} */
-            estado: "abierta" | "en_atencion" | "resuelta";
-            /** Format: date-time */
-            generadaEn: string;
-            /** Format: date-time */
-            escaladaEn: string | null;
-            /** Format: uuid */
-            eventoId: string | null;
-            /** Format: uuid */
-            dispositivoId: string | null;
-            /** @description KPI-25 medido, no supuesto: null mientras no se haya escalado */
-            escaladaDentroDelPlazo: boolean | null;
-            notas: string | null;
-        };
-        NotasDeAlertaDto: {
-            notas: string;
-        };
-        EventoIngestaDto: {
-            copropiedadId: string;
-            dispositivoId: string;
-            /** @enum {string} */
-            metodo: "placa" | "facial" | "manual" | "remoto" | "tarjeta";
-            personaId?: string;
-            placaLeida?: string;
-            zonaId?: string;
-            /** @description Confianza de la lectura, 0..1 */
-            confianzaCentesimas: number;
-            /** @description Identificador del evento en el equipo (RN-17) */
-            referenciaExterna: string;
-        };
-        LatidoDto: {
-            copropiedadId: string;
-            dispositivoId: string;
-        };
-        ConteosDelPadronDto: {
-            /** @example 247 */
-            residentesActivos: number;
-            /** @example 4 */
-            residentesAltaEnVentana: number;
-            /** @example 183 */
-            vehiculosActivos: number;
-            /** @example 12 */
-            vehiculosAltaEnVentana: number;
-        };
-        ConteosDeVisitantesDto: {
-            /**
-             * @description Autorizaciones activas que se cruzan con el día local
-             * @example 34
-             */
-            autorizacionesDelDia: number;
-            /**
-             * @description Ingresos menos salidas del día. Aproximación declarada: una salida puede no registrarse por fallo de sensor (CU-05, excepción 6a). Nunca es negativo.
-             * @example 8
-             */
-            dentroAhora: number;
-        };
-        ConteosDeAlertasDto: {
-            /** @example 3 */
-            pendientes: number;
-            /**
-             * @description Severidad más grave entre las pendientes; null si no hay ninguna
-             * @enum {string|null}
-             */
-            severidadMaxima: "informativa" | "media" | "alta" | "critica" | null;
         };
         VentanaDelDiaDto: {
             /**
@@ -909,64 +967,6 @@ export interface components {
              */
             zonaHoraria: string;
         };
-        IndicadoresDto: {
-            padron: components["schemas"]["ConteosDelPadronDto"];
-            visitantes: components["schemas"]["ConteosDeVisitantesDto"];
-            alertas: components["schemas"]["ConteosDeAlertasDto"];
-            ventana: components["schemas"]["VentanaDelDiaDto"];
-        };
-        FranjaDeAccesosDto: {
-            /** @description Hora local de la copropiedad */
-            hora: number;
-            /** @example 12 */
-            permitidos: number;
-            /** @example 1 */
-            negados: number;
-        };
-        AccesosPorHoraDto: {
-            /** @description Siempre 24 franjas, incluidas las de cero: el eje lo fija el servidor */
-            franjas: components["schemas"]["FranjaDeAccesosDto"][];
-            /** @example America/Bogota */
-            zonaHoraria: string;
-            /** Format: date-time */
-            desde: string;
-            /** Format: date-time */
-            hasta: string;
-        };
-        DispositivoDelTableroDto: {
-            /** Format: uuid */
-            id: string;
-            /** @example Talanquera portería principal */
-            nombre: string;
-            /** @enum {string} */
-            tipo: "camara_lpr" | "terminal_facial" | "rele" | "intercom" | "controlador_io";
-            /** Format: uuid */
-            zonaId: string | null;
-            /** @description IP o FQDN del equipo. Solo se rellena para roles administrativos (C-11); para el resto llega null. NUNCA sale la credencial ni su referencia (RN-21). */
-            host: string | null;
-            puerto: number | null;
-            modelo: string | null;
-            firmware: string | null;
-            /**
-             * @description Derivado del último latido contra el umbral de la copropiedad (migración 0020), no leído de la columna estado_salud, que puede ir por detrás.
-             * @enum {string}
-             */
-            estado: "saludable" | "degradado" | "caido";
-            /** Format: date-time */
-            ultimoLatido: string | null;
-            /** Format: date-time */
-            ultimaSincronizacion: string | null;
-            segundosSinLatir: number | null;
-        };
-        EstadoDeDispositivosDto: {
-            dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
-            /** @example 3 */
-            saludables: number;
-            /** @example 1 */
-            degradados: number;
-            /** @example 0 */
-            caidos: number;
-        };
     };
     responses: never;
     parameters: never;
@@ -976,109 +976,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    SaludController_salud: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SaludDto"];
-                };
-            };
-        };
-    };
-    SaludController_listo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListoDto"];
-                };
-            };
-            /** @description Falta una dependencia. El proceso está sano: sacar del balanceador, no reiniciar. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListoDto"];
-                };
-            };
-        };
-    };
-    AutenticacionController_sesion: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SesionDto"];
-                };
-            };
-            /** @description Token ausente, caducado o inválido. También cuando un rol administrativo presenta un token `aal1`: está autenticado, pero no habilitado (RN-20, CA-25). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorApiDto"];
-                };
-            };
-        };
-    };
-    AutenticacionController_registrarRestablecimiento: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RestablecimientoRegistradoDto"];
-                };
-            };
-            /** @description 5 por minuto (§2.7.5) */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorApiDto"];
-                };
-            };
-        };
-    };
     AutenticacionController_generarCodigos: {
         parameters: {
             query?: never;
@@ -1148,13 +1045,39 @@ export interface operations {
             };
         };
     };
-    CopropiedadesController_leer: {
+    AutenticacionController_registrarRestablecimiento: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestablecimientoRegistradoDto"];
+                };
             };
+            /** @description 5 por minuto (§2.7.5) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    AutenticacionController_sesion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -1164,11 +1087,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CopropiedadDto"];
+                    "application/json": components["schemas"]["SesionDto"];
                 };
             };
-            /** @description 404 y no 403 a propósito: un 403 confirmaría que el identificador existe, y esa confirmación ya permite enumerar recursos ajenos contando respuestas. */
-            404: {
+            /** @description Token ausente, caducado o inválido. También cuando un rol administrativo presenta un token `aal1`: está autenticado, pero no habilitado (RN-20, CA-25). */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1210,95 +1133,7 @@ export interface operations {
             };
         };
     };
-    PadronController_registrarVehiculo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegistrarVehiculoDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PadronController_desactivarVehiculo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DesactivarDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PadronController_desactivarVivienda: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DesactivarDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PadronController_cargar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CargarPadronDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ZonasController_listar: {
+    CopropiedadesController_leer: {
         parameters: {
             query?: never;
             header?: never;
@@ -1313,41 +1148,57 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CopropiedadDto"];
+                };
             };
-        };
-    };
-    ZonasController_configuracion: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                zonaId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConfigurarZonaDto"];
-            };
-        };
-        responses: {
-            201: {
+            /** @description 404 y no 403 a propósito: un 403 confirmaría que el identificador existe, y esa confirmación ya permite enumerar recursos ajenos contando respuestas. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
             };
         };
     };
-    ZonasController_ingreso: {
+    AlertasController_abiertas: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 id: string;
-                zonaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertaExpuestaDto"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    AlertasController_atender: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                alertaId: string;
             };
             cookie?: never;
         };
@@ -1357,45 +1208,73 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AlertaExpuestaDto"];
+                };
             };
-        };
-    };
-    ZonasController_salida: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                zonaId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description La alerta ya está atendida o resuelta */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
             };
         };
     };
-    ZonasController_permiso: {
+    AlertasController_resolver: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 id: string;
-                zonaId: string;
+                alertaId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutorizarZonaDto"];
+                "application/json": components["schemas"]["NotasDeAlertaDto"];
             };
         };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertaExpuestaDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    BiometriaController_ejecutarBarrido: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             201: {
                 headers: {
@@ -1516,25 +1395,6 @@ export interface operations {
             };
         };
     };
-    BiometriaController_ejecutarBarrido: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     EventosController_historial: {
         parameters: {
             query: {
@@ -1630,6 +1490,36 @@ export interface operations {
             };
         };
     };
+    EventosController_flujo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado y «alertas» por cada escalamiento. La carga de cada mensaje es un EventoRegistradoDto o un AlertaExpuestaDto según el tema. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
     EventosController_urlDeEvidencia: {
         parameters: {
             query?: never;
@@ -1661,37 +1551,7 @@ export interface operations {
             };
         };
     };
-    EventosController_flujo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado y «alertas» por cada escalamiento. La carga de cada mensaje es un EventoRegistradoDto o un AlertaExpuestaDto según el tema. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/event-stream": string;
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/event-stream": components["schemas"]["ErrorApiDto"];
-                };
-            };
-        };
-    };
-    AlertasController_abiertas: {
+    TableroController_leerAccesosPorHora: {
         parameters: {
             query?: never;
             header?: never;
@@ -1707,71 +1567,85 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AlertaExpuestaDto"][];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorApiDto"];
+                    "application/json": components["schemas"]["AccesosPorHoraDto"];
                 };
             };
         };
     };
-    AlertasController_atender: {
+    TableroController_leerDispositivos: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 id: string;
-                alertaId: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AlertaExpuestaDto"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorApiDto"];
-                };
-            };
-            /** @description La alerta ya está atendida o resuelta */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorApiDto"];
+                    "application/json": components["schemas"]["EstadoDeDispositivosDto"];
                 };
             };
         };
     };
-    AlertasController_resolver: {
+    TableroController_leerIndicadores: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 id: string;
-                alertaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicadoresDto"];
+                };
+            };
+        };
+    };
+    ZonasController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ZonasController_permiso: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                zonaId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NotasDeAlertaDto"];
+                "application/json": components["schemas"]["AutorizarZonaDto"];
             };
         };
         responses: {
@@ -1779,16 +1653,89 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["AlertaExpuestaDto"];
-                };
+                content?: never;
             };
-            404: {
+        };
+    };
+    ZonasController_configuracion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                zonaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigurarZonaDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ZonasController_ingreso: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                zonaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ZonasController_salida: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                zonaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SaludController_salud: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorApiDto"];
+                    "application/json": components["schemas"]["SaludDto"];
                 };
             };
         };
@@ -1835,55 +1782,99 @@ export interface operations {
             };
         };
     };
-    TableroController_leerIndicadores: {
+    PadronController_cargar: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CargarPadronDto"];
+            };
+        };
         responses: {
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["IndicadoresDto"];
-                };
+                content?: never;
             };
         };
     };
-    TableroController_leerAccesosPorHora: {
+    PadronController_registrarVehiculo: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarVehiculoDto"];
+            };
+        };
         responses: {
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["AccesosPorHoraDto"];
-                };
+                content?: never;
             };
         };
     };
-    TableroController_leerDispositivos: {
+    PadronController_desactivarVehiculo: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 id: string;
             };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesactivarDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PadronController_desactivarVivienda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesactivarDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SaludController_listo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -1893,7 +1884,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EstadoDeDispositivosDto"];
+                    "application/json": components["schemas"]["ListoDto"];
+                };
+            };
+            /** @description Falta una dependencia. El proceso está sano: sacar del balanceador, no reiniciar. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListoDto"];
                 };
             };
         };

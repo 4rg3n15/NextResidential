@@ -24,6 +24,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Los MISMOS valores por defecto que `verificar.sh`, y exportados aquí.
+# Antes solo los fijaba el guion hijo, y un `export` de un hijo no vuelve al
+# padre: los `psql` de este fichero acababan hablando con la instalación por
+# defecto del sistema —otro socket, otro puerto— y el guion solo funcionaba si
+# el operador tenía ya las variables en su entorno. Un guion que depende de
+# algo que no declara no es reproducible, que es justo lo que pretende probar.
+export PGHOST="${PGHOST:-/var/tmp/ncr/sock}"
+export PGPORT="${PGPORT:-55432}"
+export PGUSER="${PGUSER:-postgres}"
 export PGDATABASE="${PGDATABASE_ARRANQUE:-ncr_arranque}"
 APLICADOR=sb_postgres_sim
 
