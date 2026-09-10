@@ -696,4 +696,6 @@ Y el camino del navegador lo recorre entero en su paso 5: levanta **otra API y o
 | `1cf1325` | Los factores se leen del usuario; GoTrue no expone `GET /factors`             |
 | `05cf156` | La API no arrancaba en producción; el camino completo por navegador           |
 | `0702d6f` | El camino integrado como paso 12c del verificador                             |
-| _(este)_  | Sexta ronda: contrato canónico, el paso que no salía, la contraseña literal   |
+| `f06050e` | Sexta ronda: contrato canónico, el paso que no salía, la contraseña literal   |
+| `4441933` | `MFA_OBLIGATORIO`: el interruptor temporal del segundo factor (D-56, D-57)    |
+| `c9ed654` | Veredicto literal de la séptima ronda, en verde y contra base                 |
