@@ -832,3 +832,6 @@ Zonas comunes es la única sin ningún control, y está declarado: refleja aforo
 | `d3bf1bf` | 09-B · las siete pantallas se montan en pruebas, y dos defectos que destapó   |
 | `91cffd4` | 09-B · KPI-11: ni el nombre del fabricante ni una IP con forma real           |
 | `c98587a` | 09-B · sin precarga en la barra lateral (cero errores de consola)             |
+| `ebd8f47` | 09-B · veredicto literal, en verde y contra base                              |
+| `2ec5e60` | 09-B · los cinco estados y la accesibilidad AA, ejercidos en las siete        |
+| `62926c3` | 09-B · veredicto con los dos requisitos ya ejercidos                          |
