@@ -153,6 +153,15 @@ Pruebas negativas: **13** (dos nuevas, sondas 12 y 13).
 
 El interruptor se prueba en **las dos posiciones** —que encendido siga exigiendo el segundo factor es lo que nadie comprueba— y se recorre en el navegador: paso 5 del camino de acceso, con otra API y otra consola levantadas con la variable puesta.
 
+### Deuda BLOQUEANTE de la ETAPA 13 — no es una decisión permanente
+
+| Id        | Asunto                                                                                                                                                                                                                                                                                                                                                                                                       | Estado                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| **DB-01** | **`MFA_OBLIGATORIO=false` debe volver a `true` antes de la ETAPA 13.** RN-20 y CA-25 exigen segundo factor en los tres roles administrativos, y la auditoría de seguridad (§2.7.8, KPI-38) lo marcará como hallazgo abierto mientras esté apagado. Se puso a petición del cliente, en modo de ensayo, con fecha de caducidad                                                                                 | **Abierta · bloquea el cierre de la 13** |
+| **DB-02** | **Diagnóstico pendiente: el token sin `rol` en el proyecto real.** El interruptor lo esconde —con `aal1` aceptado, la consola entra igual— pero **no lo resuelve**: si el gancho de claims no emite `rol` y `copropiedad_id`, el aislamiento por copropiedad no tiene de dónde derivarse. Hay que confirmar contra el proyecto real, con el registro que la consola emite ahora, si el token trae `rol` o no | **Abierta · bloquea el cierre de la 13** |
+
+> **Por qué DB-02 es lo serio de los dos.** Que no haya segundo factor es una regla relajada a propósito y con constancia. Que el token no traiga `rol` sería otra cosa: el guard derivaría el alcance de unos claims incompletos, y §2.7.6 llama a eso el riesgo número uno del proyecto. Hasta confirmarlo contra el proyecto real, se da por **no verificado**.
+
 ### Lo que usted debe ejecutar antes de la 09-B
 
 Las migraciones `0023` a `0026`, el SMTP y la plantilla de correo, el Auth Hook de claims, el primer superadministrador y **la inscripción de su propio segundo factor desde la consola** — sin ese último paso, ningún rol administrativo entra. Todo en pasos numerados en [`docs/guias/RECUPERACION_Y_USUARIOS.md`](guias/RECUPERACION_Y_USUARIOS.md).

@@ -13,6 +13,22 @@ nombres y las descripciones, jamás con los valores** (`CLAUDE.md` §2.7.1).
 
 ---
 
+## Qué fichero de entorno lee cada aplicación
+
+Escrito porque no lo estaba, y costó una ronda: un `.env` correcto en la raíz que nadie leía.
+
+| Aplicación | Ficheros que lee, por orden de precedencia                                             | Quién los carga        |
+| ---------- | -------------------------------------------------------------------------------------- | ---------------------- |
+| `apps/api` | el entorno real → `apps/api/.env` → **`.env` de la raíz del monorepo**                 | `dotenv`, en `main.ts` |
+| `apps/web` | el entorno real → `apps/web/.env.local` → `apps/web/.env.<NODE_ENV>` → `apps/web/.env` | Next.js, de serie      |
+
+Dos consecuencias que conviene tener presentes:
+
+- **La API sí lee el `.env` de la raíz; la consola no.** Next resuelve sus ficheros dentro del directorio de la aplicación y no admite otro sitio. Si prefiere un único fichero para todo, póngalo en la raíz para la API y **enlace** o copie el de la consola: `ln -s ../../.env apps/web/.env`.
+- **Lo específico gana sobre lo común**, y el entorno real gana sobre los dos. Así una variable de despliegue nunca queda tapada por un fichero olvidado en el disco.
+
+Si a la consola le falta una variable, el mensaje con el que se detiene enumera exactamente estos ficheros.
+
 ## 1. Qué necesitas del panel, y dónde está
 
 > **Esquema nuevo de llaves.** Los proyectos creados desde **noviembre de 2025**

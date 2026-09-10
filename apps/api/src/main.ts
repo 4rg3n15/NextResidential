@@ -23,8 +23,21 @@ import { resolve } from 'node:path';
  * desarrollador—, y allí el proceso arranca y se queda escuchando para siempre.
  * No relaja nada: solo evita leer un fichero.
  */
+/**
+ * **DOS FICHEROS, EN ESTE ORDEN, Y NINGUNA SORPRESA** (nota del cliente,
+ * 2026-09-10). Cada aplicación leía un sitio distinto y no estaba escrito en
+ * ninguna parte: el `.env` del cliente estaba en la raíz y la API miraba solo
+ * `apps/api/.env`, así que el fichero existía, era correcto y nadie lo leía —el
+ * mismo defecto que la corrección de arriba resolvió para otra ruta—.
+ *
+ * Ahora se leen los dos: primero el de la aplicación, después el de la raíz, y
+ * como `override: false` conserva lo primero que se fijó, **lo específico gana
+ * sobre lo común** y el entorno real —contenedor, CI— gana sobre los dos. La
+ * tabla de qué lee cada aplicación está en `docs/guias/CONEXION_SUPABASE.md`.
+ */
 if (process.env.NCR_IGNORAR_ENV_FILE !== '1') {
   cargarEnv({ path: resolve(__dirname, '..', '.env'), override: false });
+  cargarEnv({ path: resolve(__dirname, '..', '..', '..', '.env'), override: false });
 }
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';

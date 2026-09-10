@@ -6,6 +6,7 @@ import type { Configuracion } from '../configuracion/esquema';
 import { REPOSITORIO_PADRON } from './aplicacion/puertos';
 import { RepositorioPadronPg } from './infraestructura/repositorio-pg';
 import { PadronController } from './presentacion/padron.controller';
+import { PadronDeCopropiedadController } from './presentacion/padron-copropiedad.controller';
 
 /**
  * Un `Pool` por proceso, no por petición: abrir una conexión por petición
@@ -22,7 +23,7 @@ export class PadronModule {
   static registrar(): DynamicModule {
     return {
       module: PadronModule,
-      controllers: [PadronController],
+      controllers: [PadronController, PadronDeCopropiedadController],
       providers: [
         {
           provide: Pool,

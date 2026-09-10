@@ -189,7 +189,11 @@ export class ConfiguracionIncompleta extends Error {
     super(
       `Configuración de la consola inválida; el proceso no arranca (§2.7.1):\n  - ${problemas.join(
         '\n  - ',
-      )}\n\nCopia apps/web/.env.example a apps/web/.env.local y complétalo. ` +
+      )}\n\nLa consola lee, por orden de precedencia: apps/web/.env.local, ` +
+        'apps/web/.env.production o .env.development según NODE_ENV, y apps/web/.env. ' +
+        'NO lee el .env de la raíz del monorepo — eso lo carga la API, que sí mira los dos ' +
+        '(apps/api/.env y el de la raíz).\n' +
+        'Copia apps/web/.env.example a apps/web/.env.local y complétalo. ' +
         'Jamás con valores en el repositorio.',
     );
     this.name = 'ConfiguracionIncompleta';
