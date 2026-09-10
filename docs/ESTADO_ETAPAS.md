@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-10 · **ETAPA 09-B construida**
+**Última actualización:** 2026-09-10 · **ETAPA 09-B construida** · ronda de auditoría y corrección
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,16 +18,16 @@
 
 ## Resumen
 
-|                                |                                                                    |
-| ------------------------------ | ------------------------------------------------------------------ |
-| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08) · la **09: 09-A y 09-B construidas**  |
-| **Etapa siguiente habilitada** | **ETAPA 10 — consolas operativas** (la 12 sigue habilitada)        |
-| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado |
-| **Defectos abiertos**          | D-39 — el alta de MFA es inalcanzable para roles administrativos   |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                             |
-| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)      |
-| **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)        |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                              |
+|                                |                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08) · la **09: 09-A y 09-B construidas**                                               |
+| **Etapa siguiente habilitada** | **ETAPA 10 — consolas operativas** (la 12 sigue habilitada)                                                     |
+| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
+| **Defectos abiertos**          | Ninguno. D-60 a D-63 corregidos en la ronda del 2026-09-10                                                      |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
+| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
+| **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)                                                     |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                           |
 
 ---
 
@@ -145,11 +145,11 @@ Pruebas negativas: **13** (dos nuevas, sondas 12 y 13).
 
 ### Séptima ronda (2026-09-10) — el segundo factor, y el interruptor que pidió el cliente
 
-| Asunto                                                                                                                                | Estado                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| **D-56** · el código de seis dígitos correcto devolvía al login **sin decir por qué**: la API rechazaba el token y la consola callaba | **Resuelto** · se registran el estado y los NOMBRES de los claims del token (nunca sus valores) |
-| **D-57** · `MFA_OBLIGATORIO`, interruptor temporal del segundo factor, a petición del cliente                                         | **Vigente** · desviación declarada de RN-20, CA-25 y §2.7.8; por defecto `true`                 |
-| Que no salga el QR y pidan el código: **no es un defecto**                                                                            | Esa cuenta ya tiene un factor verificado; se retira en el panel (Remove MFA factors)            |
+| Asunto                                                                                                                                | Estado                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **D-56** · el código de seis dígitos correcto devolvía al login **sin decir por qué**: la API rechazaba el token y la consola callaba | **Resuelto** · se registran el estado y los NOMBRES de los claims del token (nunca sus valores)                  |
+| **D-57** · `MFA_OBLIGATORIO`, interruptor temporal del segundo factor, a petición del cliente                                         | **RETIRADO** el 2026-09-10 · variable, ramas del guard, mensajes y `.env.example`; tres controles anti-regresión |
+| Que no salga el QR y pidan el código: **no es un defecto**                                                                            | Esa cuenta ya tiene un factor verificado; se retira en el panel (Remove MFA factors)                             |
 
 El interruptor se prueba en **las dos posiciones** —que encendido siga exigiendo el segundo factor es lo que nadie comprueba— y se recorre en el navegador: paso 5 del camino de acceso, con otra API y otra consola levantadas con la variable puesta.
 
@@ -165,14 +165,35 @@ El interruptor se prueba en **las dos posiciones** —que encendido siga exigien
 
 Migración nueva: **`0027`** (tipo de vehículo). Hay que aplicarla.
 
+### Ronda de auditoría y corrección · 2026-09-10
+
+Nueve etapas cerradas, 19 pasos de verificación, más de mil pruebas en verde — y **nadie podía entrar al sistema**. Esto es lo que había.
+
+| Id        | Defecto                                                                                                                                                                                                                                                                                                                                                                                                                   | Estado                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **D-60**  | **La URL del JWKS no existía.** `/auth/v1/jwks` devuelve `404 page not found`; la ruta real es `/auth/v1/.well-known/jwks.json`. La API se quedaba sin ninguna clave y rechazaba **todos** los tokens. Verificado contra la documentación oficial de Supabase. **Sobrevivió a nueve etapas porque el doble de `e2e/doble-gotrue.mjs` servía el JWKS en la ruta equivocada**: el doble se construyó con la forma del error | **Corregido**                                                                                                      |
+| **D-60b** | **Un JWKS que responde no es un JWKS que sirve.** Un proyecto sin llaves asimétricas devuelve `200 {"keys":[]}`; la sonda lo daba por bueno y ningún token podía verificarse                                                                                                                                                                                                                                              | **Corregido** · la sonda exige al menos una clave                                                                  |
+| **D-61**  | **El `.env` sin salto de línea final.** `INGESTA_FIRMA_SECRETO` se quedó con `MFA_OBLIGATORIO=false` pegado al valor: la variable quedó corrupta, la otra nunca existió, y la aplicación arrancó igual porque `min(32)` solo mira longitud                                                                                                                                                                                | **Corregido** · secretos con forma, detección de variable engullida, y `pnpm entorno:diff`                         |
+| **D-62**  | **Los mensajes de error decían una causa, no lo observado.** Un 401 por JWKS caído se registraba como `FIRMA_INVALIDA` y la consola lo traducía a «pon `MFA_OBLIGATORIO=false` en la API». Estaba puesto. **Tres rondas de trabajo persiguiendo una causa inexistente**                                                                                                                                                   | **Corregido** · el proveedor clasifica sus fallos, 503 en vez de 401, y la regla aplicada a todas las traducciones |
+| **D-63**  | **Los gráficos del tablero emitían `style="height:37%"`, que la CSP rechaza: las barras salían a CERO en producción.** No lo vio nadie porque jsdom no aplica CSP y el recorrido del navegador visita el tablero sin datos                                                                                                                                                                                                | **Corregido** · clases estáticas + control `frontera-csp.mjs` con prueba negativa                                  |
+| **D-64**  | **`/ready` publicaba `postgres: 'no-conectado-etapa-04'`**, una cadena fija de cinco etapas atrás, y respondía 200 sin tocar la base                                                                                                                                                                                                                                                                                      | **Corregido** · `SELECT 1` real, y el 503 se decide sobre todas las dependencias                                   |
+
+> **Sobre la sonda del JWKS, que era la sospecha principal.** No estaba rota: con un 404 `/ready` **sí** devuelve 503, comprobado contra un servidor real. Lo que no existía era **nadie que la consultara**. De ahí las comprobaciones de arranque: el proceso habla con el recurso real al levantar y lo dice con nombre y remedio, en vez de fallar en la primera petición del usuario.
+
+### Bloqueo de ENTORNO — no es deuda de código
+
+| Id        | Asunto                                                                                                                                                                                                                                                                                                                                              | Estado                                     |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **BE-01** | **SMTP y URLs de redirección de recuperación.** El cliente no tiene permisos para configurarlos en el panel de Supabase; está en gestión. El ciclo está **construido y documentado**, y la comprobación de arranque **nunca informa `ok`**: declara explícitamente que el SMTP no es observable desde la API y que el ciclo queda **SIN VERIFICAR** | **Abierto · fuera del alcance del código** |
+
 ### Deuda BLOQUEANTE de la ETAPA 13 — no es una decisión permanente
 
-| Id        | Asunto                                                                                                                                                                                                                                                                                                                                                                                                       | Estado                                   |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| **DB-01** | **`MFA_OBLIGATORIO=false` debe volver a `true` antes de la ETAPA 13.** RN-20 y CA-25 exigen segundo factor en los tres roles administrativos, y la auditoría de seguridad (§2.7.8, KPI-38) lo marcará como hallazgo abierto mientras esté apagado. Se puso a petición del cliente, en modo de ensayo, con fecha de caducidad                                                                                 | **Abierta · bloquea el cierre de la 13** |
-| **DB-02** | **Diagnóstico pendiente: el token sin `rol` en el proyecto real.** El interruptor lo esconde —con `aal1` aceptado, la consola entra igual— pero **no lo resuelve**: si el gancho de claims no emite `rol` y `copropiedad_id`, el aislamiento por copropiedad no tiene de dónde derivarse. Hay que confirmar contra el proyecto real, con el registro que la consola emite ahora, si el token trae `rol` o no | **Abierta · bloquea el cierre de la 13** |
+| Id        | Asunto                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Estado                                                |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| **DB-01** | **`MFA_OBLIGATORIO` retirado del código el 2026-09-10.** No vuelve a `true`: desaparece. Variable, rama del guard, token `POLITICA_MFA`, aviso de arranque, cartel de la consola, rama de la ruta de sesión y los dos `.env.example`. Un modo que debilita un requisito formal y sobrevive en el árbol acaba activado en producción por accidente. Tres controles anti-regresión levantan los procesos **con** la variable puesta y exigen que no pase nada                                                                                        | **CERRADA**                                           |
+| **DB-02** | **El token sin `rol`: diagnóstico distinto de D-60, y todavía sin ejercer contra el proyecto real.** Con el JWKS en 404 **ningún** token llegaba a inspeccionarse, así que el síntoma «el token no trae `rol`» no podía observarse: era una consecuencia del bloqueante, no una causa aparte. El camino del navegador demuestra que con claims bien formados el ciclo entero funciona. Lo que falta es confirmarlo **contra el proyecto del cliente**, con el gancho de claims aplicado: paso 5 de `docs/guias/VERIFICACION_CONTRA_SU_PROYECTO.md` | **Abierta · reducida a una comprobación del cliente** |
 
-> **Por qué DB-02 es lo serio de los dos.** Que no haya segundo factor es una regla relajada a propósito y con constancia. Que el token no traiga `rol` sería otra cosa: el guard derivaría el alcance de unos claims incompletos, y §2.7.6 llama a eso el riesgo número uno del proyecto. Hasta confirmarlo contra el proyecto real, se da por **no verificado**.
+> **Por qué DB-02 sigue abierta aunque DB-01 se cerrara.** Que el token no traiga `rol` es lo serio: el guard derivaría el alcance de unos claims incompletos, y §2.7.6 llama a eso el riesgo número uno del proyecto. Con el JWKS corregido es muy probable que el síntoma desaparezca —era el mismo bloqueante— pero **probable no es verificado**, y esta ronda se hizo sin credenciales del proyecto real. Se da por **no verificado** hasta que el cliente ejecute el paso 5 de la guía.
 
 ### Lo que usted debe ejecutar antes de la 09-B
 

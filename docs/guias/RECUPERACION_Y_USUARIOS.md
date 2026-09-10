@@ -204,33 +204,15 @@ La respuesta del paso 3 trae ya un token con `aal2`. La llave que aparece aquí 
 
 > **P-14, redefinido y cerrado.** Se declaró como «no hay pantalla de inscripción en la consola» y se resolvió diciendo que era una operación del panel. **No lo era**: el panel no inscribe factores, así que el pendiente no describía una comodidad ausente sino un sistema inaccesible. La pantalla existe desde esta versión y el pendiente queda cerrado.
 
-### B.6.bis · Entrar solo con contraseña — interruptor TEMPORAL del segundo factor
+### B.6.bis · El interruptor del segundo factor, RETIRADO
 
-> **Esto es una desviación declarada de RN-20, CA-25 y §2.7.8.** Existe porque usted la pidió para poder ensayar la consola, y está pensada para quitarse. Mientras esté puesta, la consola lo avisa en pantalla en todas las vistas.
+> **Ya no existe.** Esta sección explicaba cómo poner `MFA_OBLIGATORIO=false` para entrar solo con contraseña. La variable se retiró del código el **2026-09-10**, entera: no queda ni con valor por defecto.
 
-**Qué hace exactamente.** El guard de la API acepta un token `aal1` de un rol administrativo. **Nada más.** Siguen exigiéndose la contraseña, la verificación de la firma del token contra el JWKS del proyecto, el rol y el aislamiento por copropiedad. No es «entrar sin autenticarse»: es «entrar sin el segundo paso».
+**Por qué se puso y por qué se fue.** Se introdujo para desbloquearle mientras se cerraba el camino del segundo factor. El bloqueo era **otro**: la URL del JWKS estaba mal (`/auth/v1/jwks`, que devuelve 404), la API no obtenía ninguna clave pública y rechazaba **todos** los tokens. Corregida la URL, el ciclo completo funciona —inscripción desde cero, QR, códigos de recuperación, sesión `aal2`, tablero— y el interruptor dejó de tener motivo.
 
-**Cómo se pone.** Una línea en **los dos** entornos — el mismo nombre a propósito:
+**Si la tiene puesta en su `.env`, quítela.** No hace nada: la configuración ya no la conoce. Pero `pnpm entorno:diff` se la señalará como variable que no está en el `.example`, y conviene que su fichero no acumule líneas muertas.
 
-```bash
-# apps/api/.env  (o las variables del servicio de la API)
-MFA_OBLIGATORIO=false
-
-# apps/web/.env.local  (o las variables del servicio de la consola)
-MFA_OBLIGATORIO=false
-```
-
-Reinicie los dos procesos: la variable se lee **al arrancar**. La API escribirá en su registro, en la primera línea:
-
-```
-SEGUNDO FACTOR DESACTIVADO (MFA_OBLIGATORIO=false)
-```
-
-**Si solo la pone en uno.** La consola lo detecta al entrar y responde con el nombre de la variable que falta, en vez de llevarle a un tablero que le devuelve al login. Ese rebote mudo era el síntoma que motivó todo esto.
-
-**Cómo se quita.** Borre la línea de los dos entornos —o póngala a `true`— y reinicie. El valor por defecto es `true`: un entorno que no la menciona aplica el contrato. Cualquier otro valor (`0`, `no`, `off`) **detiene el arranque** con el motivo escrito; no se interpreta en silencio.
-
-**Qué NO arregla.** El camino del segundo factor sigue como estaba: si su cuenta tiene ya un factor verificado, seguirá teniéndolo. Cuando quiera retomarlo, quite la variable y siga B.6.
+**Si alguien la reintroduce, tres controles la cazan**: la suite de la API, la de la consola y el paso 5 del camino del navegador levantan los procesos **con** la variable puesta y exigen que el segundo factor se siga pidiendo.
 
 ### B.6.ter · «Meto el código de seis dígitos y vuelvo al login»
 
