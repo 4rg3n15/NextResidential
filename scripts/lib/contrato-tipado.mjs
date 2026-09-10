@@ -40,15 +40,11 @@ import { resolve } from 'node:path';
  * entra con la pantalla que lo consume.
  */
 const EXENTAS = new Map([
-  ['POST /padron/vehiculos', 'ETAPA 09-B · pantalla de vehículos'],
-  ['POST /padron/vehiculos/{id}/desactivacion', 'ETAPA 09-B · pantalla de vehículos'],
-  ['POST /padron/viviendas/{id}/desactivacion', 'ETAPA 09-B · pantalla de viviendas'],
-  ['POST /padron/carga', 'ETAPA 09-B · carga de padrón (HU-03)'],
-  ['GET /copropiedades/{id}/zonas', 'ETAPA 09-B · pantalla de zonas comunes'],
-  ['POST /copropiedades/{id}/zonas/{zonaId}/configuracion', 'ETAPA 09-B · pantalla de zonas'],
-  ['POST /copropiedades/{id}/zonas/{zonaId}/ingresos', 'ETAPA 10 · consola operativa'],
-  ['POST /copropiedades/{id}/zonas/{zonaId}/salidas', 'ETAPA 10 · consola operativa'],
-  ['POST /copropiedades/{id}/zonas/{zonaId}/autorizaciones', 'ETAPA 09-B · pantalla de visitantes'],
+  // La ETAPA 09-B vació su parte de esta lista: las nueve rutas que llevaban
+  // «ETAPA 09-B» ya declaran su respuesta con un DTO decorado, y con ellas se
+  // fueron también las dos de zonas que la 10 iba a heredar. Lo que queda es
+  // exclusivamente lo que NINGUNA interfaz consume todavía.
+
   ['POST /copropiedades/{id}/biometria/capturas', 'ETAPA 11 · captura desde la app'],
   ['GET /copropiedades/{id}/biometria/consentimientos/{consentimientoId}', 'ETAPA 11'],
   ['POST /copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta', 'ETAPA 11'],

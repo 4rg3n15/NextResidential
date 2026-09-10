@@ -13,6 +13,9 @@ import { REPOSITORIO_TABLERO } from './aplicacion/puertos';
 import type { RepositorioTablero } from './aplicacion/puertos';
 import { RepositorioTableroEnMemoria } from './infraestructura/repositorio-tablero-en-memoria';
 import { TableroController } from './presentacion/tablero.controller';
+import { DispositivosController } from './presentacion/dispositivos.controller';
+import { OPERACIONES_DE_DISPOSITIVO } from './aplicacion/operaciones-de-dispositivo';
+import { OperacionesEnMemoria } from './infraestructura/operaciones-en-memoria';
 
 /**
  * Raíz de composición del tablero.
@@ -28,8 +31,10 @@ export class TableroModule {
   static registrar(): DynamicModule {
     return {
       module: TableroModule,
-      controllers: [TableroController],
+      controllers: [TableroController, DispositivosController],
       providers: [
+        OperacionesEnMemoria,
+        { provide: OPERACIONES_DE_DISPOSITIVO, useExisting: OperacionesEnMemoria },
         {
           provide: REPOSITORIO_TABLERO,
           inject: [REPOSITORIO_EVENTOS, REPOSITORIO_ALERTAS],

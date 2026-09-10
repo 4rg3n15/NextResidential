@@ -19,6 +19,47 @@ export interface RepositorioAutorizaciones {
   vigentesDePersona(copropiedadId: string, personaId: string): Promise<readonly Autorizacion[]>;
 }
 
+/**
+ * **Modelo de LECTURA de la pantalla de visitantes.** Es un puerto aparte del
+ * repositorio del agregado, y esa separación es deliberada: lo que la pantalla
+ * necesita —el nombre del visitante, el identificador de la vivienda, los
+ * acompañantes por nombre— no son datos del agregado sino de tres tablas
+ * vecinas. Meterlos en `RepositorioAutorizaciones` obligaría al agregado a
+ * cargar con información que no usa para decidir nada.
+ */
+export interface PatronExpuesto {
+  /** Días 0..6 con domingo = 0, el vocabulario del dominio. */
+  readonly dias: readonly number[];
+  readonly horaInicio: string;
+  readonly horaFin: string;
+}
+
+export interface AutorizacionEnLista {
+  readonly id: string;
+  readonly viviendaId: string;
+  readonly vivienda: string;
+  readonly visitante: string;
+  readonly documento: string;
+  readonly desde: string;
+  readonly hasta: string;
+  readonly tipo: 'unica' | 'recurrente';
+  readonly estado: 'activa' | 'revocada';
+  readonly placa: string | null;
+  readonly acompanantes: readonly string[];
+  readonly patron: PatronExpuesto | null;
+  readonly revocadaEn: string | null;
+  readonly motivoRevocacion: string | null;
+}
+
+export interface RepositorioDeConsultaDeAutorizaciones {
+  listar(
+    copropiedadId: string,
+    solo: 'activas' | 'historial',
+  ): Promise<readonly AutorizacionEnLista[]>;
+}
+
+export const CONSULTA_AUTORIZACIONES = Symbol.for('ncr.puerto.ConsultaDeAutorizaciones');
+
 export interface EntradaListaNegra {
   readonly id: string;
   readonly copropiedadId: string;

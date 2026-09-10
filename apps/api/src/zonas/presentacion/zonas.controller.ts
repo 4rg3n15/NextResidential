@@ -10,7 +10,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Aforo, FranjaHoraria, HorarioDeZona } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado, Zona } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
@@ -26,20 +26,7 @@ import {
   ValidarAforo,
 } from '../aplicacion/casos-de-uso';
 import { AutorizarZonaDto, ConfigurarZonaDto } from './dtos';
-
-interface ZonaExpuesta {
-  readonly id: string;
-  readonly nombre: string;
-  readonly tipo: string;
-  readonly abierta: boolean;
-  readonly politicaReinicio: string;
-  readonly normas: readonly string[];
-  readonly aforoMaximo: number;
-  readonly aforoActual: number;
-  readonly aforoDisponible: number;
-  readonly dentroDeHorario: boolean;
-  readonly aforoCompleto: boolean;
-}
+import { ConteoDto, PermisoDeZonaDto, VeredictoDeIngresoDto, ZonaDto } from './respuestas';
 
 /**
  * Zonas comunes — HU-18, HU-19, HU-20, CU-05.
@@ -64,10 +51,11 @@ export class ZonasController {
   @Get()
   @Roles('administrador', 'superadministrador', 'portero', 'operador_central', 'residente')
   @ApiOperation({ summary: 'Zonas con su aforo y su disponibilidad de ahora mismo (HU-19)' })
+  @ApiOkResponse({ type: [ZonaDto] })
   async listar(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
-  ): Promise<readonly ZonaExpuesta[]> {
+  ): Promise<ZonaDto[]> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'zonas');
     const ahora = new Date();
     return (await this.zonas.listar(copropiedadId)).map((z) => exponer(z, ahora));
@@ -76,12 +64,13 @@ export class ZonasController {
   @Post(':zonaId/configuracion')
   @Roles('administrador', 'superadministrador')
   @ApiOperation({ summary: 'Configura horario, aforo, normas y apertura de la zona (HU-18)' })
+  @ApiOkResponse({ type: ZonaDto })
   async configuracion(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('zonaId', ParseUUIDPipe) zonaId: string,
     @Body() dto: ConfigurarZonaDto,
-  ): Promise<ZonaExpuesta> {
+  ): Promise<ZonaDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'zonas/configuracion');
 
     const zona = await this.zonas.porId(copropiedadId, zonaId);
@@ -127,11 +116,12 @@ export class ZonasController {
   @ApiOperation({
     summary: 'Ocupa una plaza; el aforo lo garantiza la base (CU-05, CA-14, CA-15)',
   })
+  @ApiOkResponse({ type: VeredictoDeIngresoDto })
   async ingreso(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('zonaId', ParseUUIDPipe) zonaId: string,
-  ): Promise<{ admitido: boolean; conteo?: number; motivo?: string }> {
+  ): Promise<VeredictoDeIngresoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'zonas/ingresos');
 
     const veredicto = await this.validar.ejecutar(copropiedadId, zonaId);
@@ -139,18 +129,19 @@ export class ZonasController {
     // y su respuesta es una decisión de negocio que además va a un evento
     // (RN-02). Un 409 la convertiría en un fallo del llamante.
     return veredicto.admitido
-      ? { admitido: true, conteo: veredicto.conteo }
-      : { admitido: false, motivo: veredicto.motivo };
+      ? { admitido: true, conteo: veredicto.conteo, motivo: null }
+      : { admitido: false, conteo: null, motivo: veredicto.motivo };
   }
 
   @Post(':zonaId/salidas')
   @Roles('portero', 'operador_central', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Libera una plaza; nunca baja de cero (CU-05 6a)' })
+  @ApiOkResponse({ type: ConteoDto })
   async salida(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('zonaId', ParseUUIDPipe) zonaId: string,
-  ): Promise<{ conteo: number }> {
+  ): Promise<ConteoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'zonas/salidas');
     return { conteo: await this.liberar.ejecutar(copropiedadId, zonaId) };
   }
@@ -158,12 +149,13 @@ export class ZonasController {
   @Post(':zonaId/autorizaciones')
   @Roles('administrador', 'superadministrador', 'residente')
   @ApiOperation({ summary: 'Da permiso sobre la zona a una autorización (HU-19, HU-20)' })
+  @ApiOkResponse({ type: PermisoDeZonaDto })
   async permiso(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('zonaId', ParseUUIDPipe) zonaId: string,
     @Body() dto: AutorizarZonaDto,
-  ): Promise<{ zonaId: string }> {
+  ): Promise<PermisoDeZonaDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'zonas/autorizaciones');
     return desenvolver(
       await this.autorizar.ejecutar(copropiedadId, dto.autorizacionId, zonaId, ctx.usuarioId),
@@ -172,7 +164,7 @@ export class ZonasController {
 }
 
 /** El agregado NO se serializa crudo (§2.2): sale un DTO. */
-const exponer = (zona: Zona, ahora: Date): ZonaExpuesta => {
+const exponer = (zona: Zona, ahora: Date): ZonaDto => {
   const alDia = zona.conAforoAlDia(ahora);
   const disponibilidad = zona.disponibilidadEn(ahora);
   return {
@@ -181,12 +173,26 @@ const exponer = (zona: Zona, ahora: Date): ZonaExpuesta => {
     tipo: alDia.tipo,
     abierta: alDia.abierta,
     politicaReinicio: alDia.politicaReinicio,
-    normas: alDia.normas,
+    normas: [...alDia.normas],
     aforoMaximo: alDia.aforo.maximo,
     aforoActual: alDia.aforo.actual,
     aforoDisponible: alDia.aforo.disponible,
     dentroDeHorario: disponibilidad.dentroDeHorario,
     aforoCompleto: disponibilidad.aforoCompleto,
+    // El horario SALE, y no es un adorno: una franja con
+    // `continuaDelDiaAnterior` es lo que distingue «cierra a medianoche» de
+    // «sigue abierta hasta las 02:00», y la pantalla tiene que poder decirlo.
+    horario: alDia.horario.franjas.map((f) => ({
+      dia: f.dia,
+      minutoInicio: f.minutoInicio,
+      minutoFin: f.minutoFin,
+      continuaDelDiaAnterior: f.continuaDelDiaAnterior,
+    })),
+    desplazamientoUtcMinutos: alDia.horario.desplazamientoUtcMinutos,
+    // P-15: no hay módulo de reservas todavía. Se devuelve vacío en vez de
+    // omitir el campo: un campo ausente obligaría a la consola a adivinar si
+    // es que no hay reservas o si es que la API es de otra versión.
+    reservasDelDia: [],
   };
 };
 

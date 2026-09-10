@@ -439,6 +439,209 @@
         ]
       }
     },
+    "/copropiedades/{id}/autorizaciones": {
+      "get": {
+        "operationId": "AutorizacionesController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ver",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "activas",
+                "historial"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AutorizacionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Autorizaciones activas o historial completo (HU-16, HU-17)",
+        "tags": [
+          "autorizaciones"
+        ]
+      },
+      "post": {
+        "operationId": "AutorizacionesController_crearAutorizacion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearAutorizacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdAutorizacionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crea una autorización, única o recurrente (HU-07, HU-09, RN-22)",
+        "tags": [
+          "autorizaciones"
+        ]
+      }
+    },
+    "/copropiedades/{id}/autorizaciones/{autorizacionId}/acompanantes": {
+      "post": {
+        "operationId": "AutorizacionesController_agregarAcompanante",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgregarAcompananteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcompananteAgregadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Añade un acompañante por su propia identidad (HU-08, D-01)",
+        "tags": [
+          "autorizaciones"
+        ]
+      }
+    },
+    "/copropiedades/{id}/autorizaciones/{autorizacionId}/revocacion": {
+      "post": {
+        "operationId": "AutorizacionesController_revocar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevocarAutorizacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevocacionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoca con motivo obligatorio; no borra (HU-10, RN-19)",
+        "tags": [
+          "autorizaciones"
+        ]
+      }
+    },
     "/copropiedades/{id}/biometria/barrido": {
       "post": {
         "operationId": "BiometriaController_ejecutarBarrido",
@@ -672,6 +875,174 @@
         "summary": "Empuja la plantilla a una terminal, si hay consentimiento (RN-09)",
         "tags": [
           "biometria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/dispositivos/pendientes": {
+      "get": {
+        "operationId": "DispositivosController_pendientes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendientesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Equipos con una orden sin ejecutar (se muestran «sincronizando»)",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/dispositivos/{dispositivoId}/configuracion": {
+      "post": {
+        "operationId": "DispositivosController_configurar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeOperacionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Encola la reconfiguración del equipo, atribuida a quien la pide",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/dispositivos/{dispositivoId}/reinicio": {
+      "post": {
+        "operationId": "DispositivosController_reiniciar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeOperacionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Encola el reinicio del equipo; queda auditado quién lo ordenó",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/dispositivos/{dispositivoId}/sincronizacion": {
+      "post": {
+        "operationId": "DispositivosController_sincronizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeOperacionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Encola la sincronización de plantillas y reglas del equipo",
+        "tags": [
+          "dispositivos"
         ]
       }
     },
@@ -1136,6 +1507,183 @@
         ]
       }
     },
+    "/copropiedades/{id}/informes": {
+      "get": {
+        "operationId": "InformesController_generar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "accesos_por_periodo",
+                "visitantes_frecuentes",
+                "uso_de_zonas",
+                "auditoria_de_sistema"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InformeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa y frecuencia semanal de los cuatro informes (HU-32)",
+        "tags": [
+          "informes"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/vehiculos": {
+      "get": {
+        "operationId": "PadronDeCopropiedadController_vehiculos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VehiculoDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vehículos con su vivienda y su propietario (HU-04, HU-05)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/viviendas": {
+      "get": {
+        "operationId": "PadronDeCopropiedadController_viviendas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "activo",
+                "inactivo"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "busqueda",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaDeViviendasDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Directorio de viviendas con totales de activas e inactivas (HU-01, RN-13)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
     "/copropiedades/{id}/tablero/accesos-por-hora": {
       "get": {
         "operationId": "TableroController_leerAccesosPorHora",
@@ -1259,7 +1807,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ZonaDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1305,8 +1863,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermisoDeZonaDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1352,8 +1917,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZonaDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1389,8 +1961,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VeredictoDeIngresoDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1426,8 +2005,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConteoDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1529,8 +2115,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1539,6 +2132,80 @@
           }
         ],
         "summary": "Carga transaccional desde CSV con reporte de errores por fila (HU-03)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/padron/carga/xlsx": {
+      "post": {
+        "operationId": "PadronController_cargarXlsx",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CargarPadronXlsxDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Carga transaccional desde XLSX validando el TIPO REAL del archivo (HU-03, D-20t)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/padron/residentes": {
+      "post": {
+        "operationId": "PadronController_registrarResidente",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarResidenteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdCreadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vincula una persona a una vivienda como residente (HU-02)",
         "tags": [
           "padron"
         ]
@@ -1559,8 +2226,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdCreadoDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1598,8 +2272,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BajaDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1608,6 +2289,43 @@
           }
         ],
         "summary": "Baja lógica del vehículo; el motivo es obligatorio (RN-19)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/padron/viviendas": {
+      "post": {
+        "operationId": "PadronController_registrarVivienda",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarViviendaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdCreadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alta de vivienda; el identificador único activo lo garantiza la base",
         "tags": [
           "padron"
         ]
@@ -1637,8 +2355,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BajaDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1732,6 +2457,21 @@
           "hasta"
         ]
       },
+      "AcompananteAgregadoDto": {
+        "type": "object",
+        "properties": {
+          "agregado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "agregado"
+        ]
+      },
+      "AgregarAcompananteDto": {
+        "type": "object",
+        "properties": {}
+      },
       "AlertaExpuestaDto": {
         "type": "object",
         "properties": {
@@ -1809,6 +2549,93 @@
           "notas"
         ]
       },
+      "AutorizacionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vivienda": {
+            "type": "string"
+          },
+          "visitante": {
+            "type": "string"
+          },
+          "documento": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "unica",
+              "recurrente"
+            ]
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activa",
+              "revocada"
+            ]
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true
+          },
+          "acompanantes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "patron": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PatronDto"
+              }
+            ]
+          },
+          "revocadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "motivoRevocacion": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "viviendaId",
+          "vivienda",
+          "visitante",
+          "documento",
+          "desde",
+          "hasta",
+          "tipo",
+          "estado",
+          "placa",
+          "acompanantes",
+          "patron",
+          "revocadaEn",
+          "motivoRevocacion"
+        ]
+      },
       "AutorizarZonaDto": {
         "type": "object",
         "properties": {
@@ -1818,6 +2645,17 @@
         },
         "required": [
           "autorizacionId"
+        ]
+      },
+      "BajaDto": {
+        "type": "object",
+        "properties": {
+          "desactivado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "desactivado"
         ]
       },
       "CapturarRostroDto": {
@@ -1866,6 +2704,10 @@
         ]
       },
       "CargarPadronDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CargarPadronXlsxDto": {
         "type": "object",
         "properties": {}
       },
@@ -1928,6 +2770,17 @@
             "description": "Cierre manual del operador, sin presencia física (PB-04)"
           }
         }
+      },
+      "ConteoDto": {
+        "type": "object",
+        "properties": {
+          "conteo": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "conteo"
+        ]
       },
       "ConteosDeAlertasDto": {
         "type": "object",
@@ -2023,6 +2876,10 @@
           "id",
           "alcance"
         ]
+      },
+      "CrearAutorizacionDto": {
+        "type": "object",
+        "properties": {}
       },
       "DesactivarDto": {
         "type": "object",
@@ -2169,6 +3026,21 @@
           "estado",
           "correlacion",
           "mensaje"
+        ]
+      },
+      "ErrorDeFilaDto": {
+        "type": "object",
+        "properties": {
+          "fila": {
+            "type": "number"
+          },
+          "motivo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fila",
+          "motivo"
         ]
       },
       "EstadoDeDispositivosDto": {
@@ -2383,6 +3255,47 @@
           "decididoPorEdge"
         ]
       },
+      "FilaDeInformeDto": {
+        "type": "object",
+        "properties": {
+          "momento": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "titular": {
+            "type": "string"
+          },
+          "vivienda": {
+            "type": "string"
+          },
+          "dispositivo": {
+            "type": "string"
+          },
+          "metodo": {
+            "type": "string",
+            "description": "Placa, rostro, tarjeta… (columna MÉTODO del mockup)"
+          },
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "permitido",
+              "negado"
+            ]
+          },
+          "detalle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "momento",
+          "titular",
+          "vivienda",
+          "dispositivo",
+          "metodo",
+          "resultado",
+          "detalle"
+        ]
+      },
       "FranjaDeAccesosDto": {
         "type": "object",
         "properties": {
@@ -2412,7 +3325,7 @@
         "properties": {
           "dia": {
             "type": "number",
-            "description": "0 = domingo … 6 = sábado"
+            "description": "Día 0..6 con domingo = 0."
           },
           "minutoInicio": {
             "type": "number"
@@ -2422,13 +3335,38 @@
           },
           "continuaDelDiaAnterior": {
             "type": "boolean",
-            "description": "Continúa la franja del día anterior tras la medianoche"
+            "description": "La franja viene del día anterior: una zona abierta de 22:00 a 02:00 son DOS franjas encadenadas, no una que reinicia a medianoche. El contador de aforo no se reinicia con el cambio de día (CU-05)."
           }
         },
         "required": [
           "dia",
           "minutoInicio",
-          "minutoFin"
+          "minutoFin",
+          "continuaDelDiaAnterior"
+        ]
+      },
+      "IdAutorizacionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "IdCreadoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
         ]
       },
       "IndicadoresDto": {
@@ -2452,6 +3390,64 @@
           "visitantes",
           "alertas",
           "ventana"
+        ]
+      },
+      "InformeDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "accesos_por_periodo",
+              "visitantes_frecuentes",
+              "uso_de_zonas",
+              "auditoria_de_sistema"
+            ]
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "number"
+          },
+          "filas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilaDeInformeDto"
+            }
+          },
+          "frecuencia": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PuntoDeFrecuenciaDto"
+            }
+          },
+          "truncado": {
+            "type": "boolean",
+            "description": "Se alcanzó el tope de la vista previa; la exportación trae el conjunto completo."
+          },
+          "notas": {
+            "description": "Limitaciones reales del informe, para mostrarlas en pantalla en vez de fingirlas.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "tipo",
+          "desde",
+          "hasta",
+          "total",
+          "filas",
+          "frecuencia",
+          "truncado",
+          "notas"
         ]
       },
       "IngestaAceptadaDto": {
@@ -2572,6 +3568,92 @@
           "siguiente"
         ]
       },
+      "PaginaDeViviendasDto": {
+        "type": "object",
+        "properties": {
+          "totales": {
+            "$ref": "#/components/schemas/TotalesDeViviendasDto"
+          },
+          "viviendas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViviendaDto"
+            }
+          }
+        },
+        "required": [
+          "totales",
+          "viviendas"
+        ]
+      },
+      "PatronDto": {
+        "type": "object",
+        "properties": {
+          "dias": {
+            "description": "Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio).",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "horaInicio": {
+            "type": "string",
+            "example": "08:00"
+          },
+          "horaFin": {
+            "type": "string",
+            "example": "18:00"
+          }
+        },
+        "required": [
+          "dias",
+          "horaInicio",
+          "horaFin"
+        ]
+      },
+      "PendientesDto": {
+        "type": "object",
+        "properties": {
+          "dispositivos": {
+            "description": "Identificadores de equipos con una orden sin ejecutar: se muestran «sincronizando».",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "dispositivos"
+        ]
+      },
+      "PermisoDeZonaDto": {
+        "type": "object",
+        "properties": {
+          "zonaId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "zonaId"
+        ]
+      },
+      "PuntoDeFrecuenciaDto": {
+        "type": "object",
+        "properties": {
+          "semana": {
+            "type": "string",
+            "description": "Lunes de la semana ISO, YYYY-MM-DD"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "semana",
+          "total"
+        ]
+      },
       "RecuperacionDeFactorDto": {
         "type": "object",
         "properties": {
@@ -2605,9 +3687,47 @@
           "codigo"
         ]
       },
+      "RegistrarResidenteDto": {
+        "type": "object",
+        "properties": {}
+      },
       "RegistrarVehiculoDto": {
         "type": "object",
         "properties": {}
+      },
+      "RegistrarViviendaDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ReservaDelDiaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "titular": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "personas": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "titular",
+          "desde",
+          "hasta",
+          "personas"
+        ]
       },
       "ResponderConsentimientoDto": {
         "type": "object",
@@ -2637,6 +3757,80 @@
         "required": [
           "registrado"
         ]
+      },
+      "ResultadoDeCargaDto": {
+        "type": "object",
+        "properties": {
+          "aceptadas": {
+            "type": "number"
+          },
+          "errores": {
+            "description": "Errores fila a fila. Si hay uno solo, `aplicada` es falso: la carga es atómica.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErrorDeFilaDto"
+            }
+          },
+          "aplicada": {
+            "type": "boolean",
+            "description": "Verdadero solo si entró el padrón ENTERO. Una carga a medias no existe (HU-03)."
+          },
+          "filasLeidas": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "aceptadas",
+          "errores",
+          "aplicada",
+          "filasLeidas"
+        ]
+      },
+      "ResultadoDeOperacionDto": {
+        "type": "object",
+        "properties": {
+          "encolada": {
+            "type": "boolean"
+          },
+          "operacion": {
+            "type": "string",
+            "enum": [
+              "configuracion",
+              "sincronizacion",
+              "reinicio"
+            ]
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "sincronizando"
+            ]
+          },
+          "detalle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "encolada",
+          "operacion",
+          "estado",
+          "detalle"
+        ]
+      },
+      "RevocacionDto": {
+        "type": "object",
+        "properties": {
+          "revocada": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revocada"
+        ]
+      },
+      "RevocarAutorizacionDto": {
+        "type": "object",
+        "properties": {}
       },
       "SaludDto": {
         "type": "object",
@@ -2711,6 +3905,21 @@
           "dispositivoId"
         ]
       },
+      "TotalesDeViviendasDto": {
+        "type": "object",
+        "properties": {
+          "activas": {
+            "type": "number"
+          },
+          "inactivas": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "activas",
+          "inactivas"
+        ]
+      },
       "UrlDeEvidenciaDto": {
         "type": "object",
         "properties": {
@@ -2721,6 +3930,75 @@
         },
         "required": [
           "url"
+        ]
+      },
+      "VehiculoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "placa": {
+            "type": "string"
+          },
+          "marca": {
+            "type": "string",
+            "nullable": true
+          },
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "automovil",
+              "motocicleta",
+              "bicicleta",
+              "otro"
+            ]
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "inactivo"
+            ]
+          },
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "viviendaIdentificador": {
+            "type": "string"
+          },
+          "propietarioId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "propietarioNombre": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "placa",
+          "marca",
+          "modelo",
+          "color",
+          "tipo",
+          "estado",
+          "viviendaId",
+          "viviendaIdentificador",
+          "propietarioId",
+          "propietarioNombre"
         ]
       },
       "VentanaDelDiaDto": {
@@ -2746,6 +4024,163 @@
           "desde",
           "hasta",
           "zonaHoraria"
+        ]
+      },
+      "VeredictoDeIngresoDto": {
+        "type": "object",
+        "properties": {
+          "admitido": {
+            "type": "boolean"
+          },
+          "conteo": {
+            "type": "number",
+            "nullable": true
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "admitido",
+          "conteo",
+          "motivo"
+        ]
+      },
+      "ViviendaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "identificador": {
+            "type": "string"
+          },
+          "manzana": {
+            "type": "string",
+            "nullable": true
+          },
+          "direccion": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "inactivo"
+            ]
+          },
+          "estadoAdministrativo": {
+            "type": "string"
+          },
+          "residentes": {
+            "type": "number"
+          },
+          "vehiculos": {
+            "type": "number"
+          },
+          "autorizacionesVigentes": {
+            "type": "number",
+            "description": "Autorizaciones vigentes que la vivienda conserva. RN-13: una vivienda inactiva no genera autorizaciones nuevas pero conserva las vigentes."
+          },
+          "desactivadaEn": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivoDesactivacion": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "identificador",
+          "manzana",
+          "direccion",
+          "estado",
+          "estadoAdministrativo",
+          "residentes",
+          "vehiculos",
+          "autorizacionesVigentes",
+          "desactivadaEn",
+          "motivoDesactivacion"
+        ]
+      },
+      "ZonaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "abierta": {
+            "type": "boolean"
+          },
+          "politicaReinicio": {
+            "type": "string"
+          },
+          "normas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aforoMaximo": {
+            "type": "number"
+          },
+          "aforoActual": {
+            "type": "number"
+          },
+          "aforoDisponible": {
+            "type": "number"
+          },
+          "dentroDeHorario": {
+            "type": "boolean"
+          },
+          "aforoCompleto": {
+            "type": "boolean"
+          },
+          "horario": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FranjaDto"
+            }
+          },
+          "desplazamientoUtcMinutos": {
+            "type": "number",
+            "description": "Minutos de desfase UTC del horario de la zona."
+          },
+          "reservasDelDia": {
+            "description": "Reservas del día. Vacío mientras no exista el módulo de reservas (P-15): la pantalla muestra el estado vacío, que es información honesta, y no un número inventado.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReservaDelDiaDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "tipo",
+          "abierta",
+          "politicaReinicio",
+          "normas",
+          "aforoMaximo",
+          "aforoActual",
+          "aforoDisponible",
+          "dentroDeHorario",
+          "aforoCompleto",
+          "horario",
+          "desplazamientoUtcMinutos",
+          "reservasDelDia"
         ]
       }
     }

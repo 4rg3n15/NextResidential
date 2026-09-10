@@ -157,6 +157,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/autorizaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Autorizaciones activas o historial completo (HU-16, HU-17) */
+        get: operations["AutorizacionesController_listar"];
+        put?: never;
+        /** Crea una autorización, única o recurrente (HU-07, HU-09, RN-22) */
+        post: operations["AutorizacionesController_crearAutorizacion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/autorizaciones/{autorizacionId}/acompanantes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Añade un acompañante por su propia identidad (HU-08, D-01) */
+        post: operations["AutorizacionesController_agregarAcompanante"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/autorizaciones/{autorizacionId}/revocacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoca con motivo obligatorio; no borra (HU-10, RN-19) */
+        post: operations["AutorizacionesController_revocar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/biometria/barrido": {
         parameters: {
             query?: never;
@@ -259,6 +311,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/dispositivos/pendientes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Equipos con una orden sin ejecutar (se muestran «sincronizando») */
+        get: operations["DispositivosController_pendientes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/dispositivos/{dispositivoId}/configuracion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encola la reconfiguración del equipo, atribuida a quien la pide */
+        post: operations["DispositivosController_configurar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/dispositivos/{dispositivoId}/reinicio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encola el reinicio del equipo; queda auditado quién lo ordenó */
+        post: operations["DispositivosController_reiniciar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/dispositivos/{dispositivoId}/sincronizacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encola la sincronización de plantillas y reglas del equipo */
+        post: operations["DispositivosController_sincronizar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/eventos": {
         parameters: {
             query?: never;
@@ -319,6 +439,57 @@ export interface paths {
         };
         /** URL firmada de vida corta a la evidencia (RN-21) */
         get: operations["EventosController_urlDeEvidencia"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/informes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vista previa y frecuencia semanal de los cuatro informes (HU-32) */
+        get: operations["InformesController_generar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/padron/vehiculos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vehículos con su vivienda y su propietario (HU-04, HU-05) */
+        get: operations["PadronDeCopropiedadController_vehiculos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/padron/viviendas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Directorio de viviendas con totales de activas e inactivas (HU-01, RN-13) */
+        get: operations["PadronDeCopropiedadController_viviendas"];
         put?: never;
         post?: never;
         delete?: never;
@@ -534,6 +705,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/padron/carga/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Carga transaccional desde XLSX validando el TIPO REAL del archivo (HU-03, D-20t) */
+        post: operations["PadronController_cargarXlsx"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/padron/residentes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vincula una persona a una vivienda como residente (HU-02) */
+        post: operations["PadronController_registrarResidente"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/padron/vehiculos": {
         parameters: {
             query?: never;
@@ -562,6 +767,23 @@ export interface paths {
         put?: never;
         /** Baja lógica del vehículo; el motivo es obligatorio (RN-19) */
         post: operations["PadronController_desactivarVehiculo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/padron/viviendas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Alta de vivienda; el identificador único activo lo garantiza la base */
+        post: operations["PadronController_registrarVivienda"];
         delete?: never;
         options?: never;
         head?: never;
@@ -616,6 +838,10 @@ export interface components {
             /** Format: date-time */
             hasta: string;
         };
+        AcompananteAgregadoDto: {
+            agregado: boolean;
+        };
+        AgregarAcompananteDto: Record<string, never>;
         AlertaExpuestaDto: {
             /** Format: uuid */
             id: string;
@@ -637,8 +863,34 @@ export interface components {
             escaladaDentroDelPlazo: boolean | null;
             notas: string | null;
         };
+        AutorizacionDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            viviendaId: string;
+            vivienda: string;
+            visitante: string;
+            documento: string;
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
+            /** @enum {string} */
+            tipo: "unica" | "recurrente";
+            /** @enum {string} */
+            estado: "activa" | "revocada";
+            placa: string | null;
+            acompanantes: string[];
+            patron: components["schemas"]["PatronDto"] | null;
+            /** Format: date-time */
+            revocadaEn: string | null;
+            motivoRevocacion: string | null;
+        };
         AutorizarZonaDto: {
             autorizacionId: string;
+        };
+        BajaDto: {
+            desactivado: boolean;
         };
         CapturarRostroDto: {
             /** @description El TITULAR del dato: el visitante (RN-10) */
@@ -655,6 +907,7 @@ export interface components {
             suprimirEn: string;
         };
         CargarPadronDto: Record<string, never>;
+        CargarPadronXlsxDto: Record<string, never>;
         CodigosDeRecuperacionDto: {
             /**
              * @description Códigos de un solo uso, en claro. Se entregan UNA vez: solo se guarda su hash. No dan acceso — autorizan a retirar el factor perdido para inscribir otro.
@@ -677,6 +930,9 @@ export interface components {
             normas?: string[];
             /** @description Cierre manual del operador, sin presencia física (PB-04) */
             abierta?: boolean;
+        };
+        ConteoDto: {
+            conteo: number;
         };
         ConteosDeAlertasDto: {
             /** @example 3 */
@@ -718,6 +974,7 @@ export interface components {
              */
             alcance: "superadministrador" | "administrador" | "portero" | "operador_central" | "residente" | "servicio";
         };
+        CrearAutorizacionDto: Record<string, never>;
         DesactivarDto: Record<string, never>;
         DetalleDeErrorDto: {
             /** @description Un mensaje, o el arreglo que devuelve el ValidationPipe con un renglón por campo rechazado. La consola muestra el arreglo campo a campo; una cadena, tal cual. */
@@ -765,6 +1022,10 @@ export interface components {
             correlacion: string;
             /** @description Detalle para el cliente en 4xx. En 5xx es siempre «Error interno»: el mensaje original no sale, porque suele llevar nombres de tabla o fragmentos de consulta. */
             mensaje: string | components["schemas"]["DetalleDeErrorDto"];
+        };
+        ErrorDeFilaDto: {
+            fila: number;
+            motivo: string;
         };
         EstadoDeDispositivosDto: {
             dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
@@ -829,6 +1090,18 @@ export interface components {
             /** @description Resuelto localmente por el Edge con caché de reglas (RN-16, CA-21, KPI-31) */
             decididoPorEdge: boolean;
         };
+        FilaDeInformeDto: {
+            /** Format: date-time */
+            momento: string;
+            titular: string;
+            vivienda: string;
+            dispositivo: string;
+            /** @description Placa, rostro, tarjeta… (columna MÉTODO del mockup) */
+            metodo: string;
+            /** @enum {string} */
+            resultado: "permitido" | "negado";
+            detalle: string;
+        };
         FranjaDeAccesosDto: {
             /** @description Hora local de la copropiedad */
             hora: number;
@@ -838,18 +1111,41 @@ export interface components {
             negados: number;
         };
         FranjaDto: {
-            /** @description 0 = domingo … 6 = sábado */
+            /** @description Día 0..6 con domingo = 0. */
             dia: number;
             minutoInicio: number;
             minutoFin: number;
-            /** @description Continúa la franja del día anterior tras la medianoche */
-            continuaDelDiaAnterior?: boolean;
+            /** @description La franja viene del día anterior: una zona abierta de 22:00 a 02:00 son DOS franjas encadenadas, no una que reinicia a medianoche. El contador de aforo no se reinicia con el cambio de día (CU-05). */
+            continuaDelDiaAnterior: boolean;
+        };
+        IdAutorizacionDto: {
+            /** Format: uuid */
+            id: string;
+        };
+        IdCreadoDto: {
+            /** Format: uuid */
+            id: string;
         };
         IndicadoresDto: {
             padron: components["schemas"]["ConteosDelPadronDto"];
             visitantes: components["schemas"]["ConteosDeVisitantesDto"];
             alertas: components["schemas"]["ConteosDeAlertasDto"];
             ventana: components["schemas"]["VentanaDelDiaDto"];
+        };
+        InformeDto: {
+            /** @enum {string} */
+            tipo: "accesos_por_periodo" | "visitantes_frecuentes" | "uso_de_zonas" | "auditoria_de_sistema";
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
+            total: number;
+            filas: components["schemas"]["FilaDeInformeDto"][];
+            frecuencia: components["schemas"]["PuntoDeFrecuenciaDto"][];
+            /** @description Se alcanzó el tope de la vista previa; la exportación trae el conjunto completo. */
+            truncado: boolean;
+            /** @description Limitaciones reales del informe, para mostrarlas en pantalla en vez de fingirlas. */
+            notas: string[];
         };
         IngestaAceptadaDto: {
             /** @example true */
@@ -889,6 +1185,31 @@ export interface components {
             /** @description Cursor opaco de la siguiente página; null cuando no hay más */
             siguiente: string | null;
         };
+        PaginaDeViviendasDto: {
+            totales: components["schemas"]["TotalesDeViviendasDto"];
+            viviendas: components["schemas"]["ViviendaDto"][];
+        };
+        PatronDto: {
+            /** @description Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio). */
+            dias: number[];
+            /** @example 08:00 */
+            horaInicio: string;
+            /** @example 18:00 */
+            horaFin: string;
+        };
+        PendientesDto: {
+            /** @description Identificadores de equipos con una orden sin ejecutar: se muestran «sincronizando». */
+            dispositivos: string[];
+        };
+        PermisoDeZonaDto: {
+            /** Format: uuid */
+            zonaId: string;
+        };
+        PuntoDeFrecuenciaDto: {
+            /** @description Lunes de la semana ISO, YYYY-MM-DD */
+            semana: string;
+            total: number;
+        };
         RecuperacionDeFactorDto: {
             /**
              * @description Factores TOTP verificados que se retiraron. Ya se puede inscribir uno nuevo.
@@ -905,7 +1226,19 @@ export interface components {
              */
             codigo: string;
         };
+        RegistrarResidenteDto: Record<string, never>;
         RegistrarVehiculoDto: Record<string, never>;
+        RegistrarViviendaDto: Record<string, never>;
+        ReservaDelDiaDto: {
+            /** Format: uuid */
+            id: string;
+            titular: string;
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
+            personas: number;
+        };
         ResponderConsentimientoDto: {
             /** @description true acepta, false rechaza. Lo responde el TITULAR. */
             acepta: boolean;
@@ -919,6 +1252,26 @@ export interface components {
              */
             registrado: boolean;
         };
+        ResultadoDeCargaDto: {
+            aceptadas: number;
+            /** @description Errores fila a fila. Si hay uno solo, `aplicada` es falso: la carga es atómica. */
+            errores: components["schemas"]["ErrorDeFilaDto"][];
+            /** @description Verdadero solo si entró el padrón ENTERO. Una carga a medias no existe (HU-03). */
+            aplicada: boolean;
+            filasLeidas: number;
+        };
+        ResultadoDeOperacionDto: {
+            encolada: boolean;
+            /** @enum {string} */
+            operacion: "configuracion" | "sincronizacion" | "reinicio";
+            /** @enum {string} */
+            estado: "sincronizando";
+            detalle: string;
+        };
+        RevocacionDto: {
+            revocada: boolean;
+        };
+        RevocarAutorizacionDto: Record<string, never>;
         SaludDto: {
             /** @example vivo */
             estado: string;
@@ -946,9 +1299,31 @@ export interface components {
         SincronizarPlantillaDto: {
             dispositivoId: string;
         };
+        TotalesDeViviendasDto: {
+            activas: number;
+            inactivas: number;
+        };
         UrlDeEvidenciaDto: {
             /** @description URL firmada de vida corta (120 s) al bucket privado. No se cachea ni se persiste: el enlace acaba en el historial del navegador y ahí sigue siendo válido (RN-21). */
             url: string;
+        };
+        VehiculoDto: {
+            /** Format: uuid */
+            id: string;
+            placa: string;
+            marca: string | null;
+            modelo: string | null;
+            color: string | null;
+            /** @enum {string} */
+            tipo: "automovil" | "motocicleta" | "bicicleta" | "otro";
+            /** @enum {string} */
+            estado: "activo" | "inactivo";
+            /** Format: uuid */
+            viviendaId: string;
+            viviendaIdentificador: string;
+            /** Format: uuid */
+            propietarioId: string | null;
+            propietarioNombre: string | null;
         };
         VentanaDelDiaDto: {
             /**
@@ -966,6 +1341,46 @@ export interface components {
              * @example America/Bogota
              */
             zonaHoraria: string;
+        };
+        VeredictoDeIngresoDto: {
+            admitido: boolean;
+            conteo: number | null;
+            motivo: string | null;
+        };
+        ViviendaDto: {
+            /** Format: uuid */
+            id: string;
+            identificador: string;
+            manzana: string | null;
+            direccion: string | null;
+            /** @enum {string} */
+            estado: "activo" | "inactivo";
+            estadoAdministrativo: string;
+            residentes: number;
+            vehiculos: number;
+            /** @description Autorizaciones vigentes que la vivienda conserva. RN-13: una vivienda inactiva no genera autorizaciones nuevas pero conserva las vigentes. */
+            autorizacionesVigentes: number;
+            desactivadaEn: string | null;
+            motivoDesactivacion: string | null;
+        };
+        ZonaDto: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            tipo: string;
+            abierta: boolean;
+            politicaReinicio: string;
+            normas: string[];
+            aforoMaximo: number;
+            aforoActual: number;
+            aforoDisponible: number;
+            dentroDeHorario: boolean;
+            aforoCompleto: boolean;
+            horario: components["schemas"]["FranjaDto"][];
+            /** @description Minutos de desfase UTC del horario de la zona. */
+            desplazamientoUtcMinutos: number;
+            /** @description Reservas del día. Vacío mientras no exista el módulo de reservas (P-15): la pantalla muestra el estado vacío, que es información honesta, y no un número inventado. */
+            reservasDelDia: components["schemas"]["ReservaDelDiaDto"][];
         };
     };
     responses: never;
@@ -1265,6 +1680,106 @@ export interface operations {
             };
         };
     };
+    AutorizacionesController_listar: {
+        parameters: {
+            query?: {
+                ver?: "activas" | "historial";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutorizacionDto"][];
+                };
+            };
+        };
+    };
+    AutorizacionesController_crearAutorizacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrearAutorizacionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdAutorizacionDto"];
+                };
+            };
+        };
+    };
+    AutorizacionesController_agregarAcompanante: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgregarAcompananteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcompananteAgregadoDto"];
+                };
+            };
+        };
+    };
+    AutorizacionesController_revocar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevocarAutorizacionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevocacionDto"];
+                };
+            };
+        };
+    };
     BiometriaController_ejecutarBarrido: {
         parameters: {
             query?: never;
@@ -1392,6 +1907,93 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    DispositivosController_pendientes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendientesDto"];
+                };
+            };
+        };
+    };
+    DispositivosController_configurar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeOperacionDto"];
+                };
+            };
+        };
+    };
+    DispositivosController_reiniciar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeOperacionDto"];
+                };
+            };
+        };
+    };
+    DispositivosController_sincronizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeOperacionDto"];
+                };
             };
         };
     };
@@ -1551,6 +2153,78 @@ export interface operations {
             };
         };
     };
+    InformesController_generar: {
+        parameters: {
+            query: {
+                desde: string;
+                hasta: string;
+                tipo?: "accesos_por_periodo" | "visitantes_frecuentes" | "uso_de_zonas" | "auditoria_de_sistema";
+                viviendaId?: string;
+                dispositivoId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InformeDto"];
+                };
+            };
+        };
+    };
+    PadronDeCopropiedadController_vehiculos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehiculoDto"][];
+                };
+            };
+        };
+    };
+    PadronDeCopropiedadController_viviendas: {
+        parameters: {
+            query?: {
+                estado?: "activo" | "inactivo";
+                busqueda?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaDeViviendasDto"];
+                };
+            };
+        };
+    };
     TableroController_leerAccesosPorHora: {
         parameters: {
             query?: never;
@@ -1629,7 +2303,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ZonaDto"][];
+                };
             };
         };
     };
@@ -1649,11 +2325,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PermisoDeZonaDto"];
+                };
             };
         };
     };
@@ -1673,11 +2351,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ZonaDto"];
+                };
             };
         };
     };
@@ -1693,11 +2373,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VeredictoDeIngresoDto"];
+                };
             };
         };
     };
@@ -1713,11 +2395,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ConteoDto"];
+                };
             };
         };
     };
@@ -1795,11 +2479,59 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeCargaDto"];
+                };
+            };
+        };
+    };
+    PadronController_cargarXlsx: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CargarPadronXlsxDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeCargaDto"];
+                };
+            };
+        };
+    };
+    PadronController_registrarResidente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarResidenteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdCreadoDto"];
+                };
             };
         };
     };
@@ -1816,11 +2548,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["IdCreadoDto"];
+                };
             };
         };
     };
@@ -1839,11 +2573,36 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BajaDto"];
+                };
+            };
+        };
+    };
+    PadronController_registrarVivienda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarViviendaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdCreadoDto"];
+                };
             };
         };
     };
@@ -1862,11 +2621,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BajaDto"];
+                };
             };
         };
     };
