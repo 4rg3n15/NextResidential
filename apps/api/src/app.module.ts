@@ -18,6 +18,7 @@ import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
 import { NucleoModule } from './nucleo/nucleo.module';
 import { SaludController } from './salud/salud.controller';
+import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
 
 /**
  * El límite de peticiones es GLOBAL desde el primer día (§2.7.5). Ponerlo solo
@@ -82,6 +83,13 @@ export class AppModule {
         // El ORDEN importa y es deliberado: límite → autenticación → roles.
         // Poner el throttler primero hace que un ataque de fuerza bruta se
         // corte ANTES de verificar firmas, que es la parte cara.
+        // La sonda de la base se registra aquí, junto al controlador de salud
+        // que la consulta, y no dentro de un módulo de dominio: `/ready` no
+        // pertenece a ningún módulo de negocio.
+        {
+          provide: SONDA_POSTGRES,
+          useValue: new SondaDePostgresPg(config.DATABASE_POOLER_URL),
+        },
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: GuardaDeAutenticacion },
         { provide: APP_GUARD, useClass: GuardaDeRoles },

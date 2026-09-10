@@ -7,6 +7,7 @@ import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-f
 import type { INestApplication } from '@nestjs/common';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
+import { SONDA_POSTGRES } from '../src/arranque/sonda-postgres';
 import { ProveedorDeJwks } from '../src/autenticacion/infraestructura/jwks';
 import type { Configuracion } from '../src/configuracion/esquema';
 import type { Rol } from '../src/autenticacion/dominio/claims';
@@ -138,6 +139,19 @@ export const crearApp = async (
       sondear: async () => ({ estado: 'ok', claves: 1 }),
       disponible: true,
     })
+    /**
+     * La sonda de PostgreSQL, con doble. La suite no tiene base —los
+     * repositorios de estos módulos son los de memoria— y sin este reemplazo
+     * `/ready` respondería 503 en todas las pruebas.
+     *
+     * Que quede dicho, porque es exactamente el patrón que esta ronda persigue:
+     * **este doble no demuestra nada sobre la base real.** Lo que sí la toca es
+     * la comprobación de arranque de `main.ts` y el `/ready` del proceso
+     * desplegado, que ejecutan un `SELECT 1` de verdad. Un doble aquí evita que
+     * la suite dependa de una base; no sustituye a esa comprobación.
+     */
+    .overrideProvider(SONDA_POSTGRES)
+    .useValue({ comprobar: async () => ({ estado: 'ok', detalle: 'doble de pruebas' }) })
     .compile();
 
   // `bodyParser: false` + el mismo `express.json({ verify })` de `main.ts`.

@@ -11,6 +11,8 @@ import { CONFIGURACION } from '../configuracion/configuracion.module';
 import { Publico } from '../comun/decoradores';
 import { ProveedorDeJwks, describirEstadoDeJwks } from '../autenticacion';
 import type { Configuracion } from '../configuracion/esquema';
+import { SONDA_POSTGRES } from '../arranque/sonda-postgres';
+import type { SondaDePostgres } from '../arranque/sonda-postgres';
 import { ListoDto, SaludDto } from './respuestas';
 
 /**
@@ -31,6 +33,7 @@ export class SaludController {
     @Inject(RELOJ) private readonly reloj: Reloj,
     @Inject(CONFIGURACION) private readonly config: Configuracion,
     @Inject(ProveedorDeJwks) private readonly jwks: ProveedorDeJwks,
+    @Inject(SONDA_POSTGRES) private readonly postgres: SondaDePostgres,
   ) {}
 
   @Publico()
@@ -63,9 +66,17 @@ export class SaludController {
       // de la mañana necesita saber si arregla el entorno o el panel. El
       // detalle del error no viaja: `/ready` es pública.
       jwks: describirEstadoDeJwks(await this.jwks.sondear()),
-      postgres: 'no-conectado-etapa-04',
+      /**
+       * **Aquí había una cadena fija.** `'no-conectado-etapa-04'`, escrita
+       * cinco etapas atrás, y `/ready` respondía 200 igualmente. Desde la
+       * ETAPA 04 hay repositorios PostgreSQL en cinco módulos: la API sí
+       * depende de la base, y esto declaraba «listo» sin haberla tocado. Es la
+       * misma familia que el JWKS — una sonda que no sonda—, y por eso se
+       * revisó al mismo tiempo.
+       */
+      postgres: (await this.postgres.comprobar()).estado === 'ok' ? 'ok' : 'no-disponible',
     };
-    if (dependencias.configuracion !== 'ok' || dependencias.jwks !== 'ok') {
+    if (Object.values(dependencias).some((estado) => estado !== 'ok')) {
       throw new ServiceUnavailableException({ estado: 'no-listo', dependencias });
     }
     return { estado: 'listo', dependencias };

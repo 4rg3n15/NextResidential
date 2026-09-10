@@ -54,6 +54,8 @@ import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { ProveedorDeJwks } from './autenticacion';
 import { comprobarRecursosExternos } from './arranque/recursos-externos';
+import { SONDA_POSTGRES, recursoBaseDeDatos } from './arranque/sonda-postgres';
+import type { SondaDePostgres } from './arranque/sonda-postgres';
 import {
   recursoBucketDeEvidencia,
   recursoJwks,
@@ -97,6 +99,7 @@ async function arrancar(): Promise<void> {
   await comprobarRecursosExternos(
     [
       recursoJwks(app.get(ProveedorDeJwks)),
+      recursoBaseDeDatos(app.get<SondaDePostgres>(SONDA_POSTGRES)),
       recursoBucketDeEvidencia({
         supabaseUrl: config.SUPABASE_URL,
         llaveSecreta: config.SUPABASE_SECRET_KEY,
