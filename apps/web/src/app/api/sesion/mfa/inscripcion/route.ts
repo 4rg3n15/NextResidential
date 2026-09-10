@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { leerSesion, marcarFactorPendiente } from '@/lib/sesion/cookies';
-import { FalloDeAcceso, inscribirFactorTotp } from '@/lib/sesion/supabase-auth';
+import { FalloDeAcceso, factoresDelTitular, inscribirFactorTotp } from '@/lib/sesion/supabase-auth';
 import type { InscripcionDeFactor } from '@/lib/sesion/supabase-auth';
 import { textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
 import { registrar } from '@/lib/registro';
@@ -80,6 +80,34 @@ export const POST = async (): Promise<NextResponse> => {
     await marcarFactorPendiente(inscripcion.factorId);
     return NextResponse.json({ qr: inscripcion.qr, secreto: inscripcion.secreto });
   } catch (e) {
+    // Un intento fallido NO deja residuo: sin esto, la cookie seguía apuntando
+    // a un factor que no llegó a existir y el paso de verificación pedía un
+    // código para nada. Fue parte del estado inconsistente que el cliente
+    // describió — «el factor quedó a medias».
+    await marcarFactorPendiente(null);
+
+    if (e instanceof FalloDeAcceso && e.motivo === 'SEGUNDO_FACTOR_YA_INSCRITO') {
+      /**
+       * Este caso NO es un error del usuario, así que no se le devuelve como
+       * tal: se le devuelve el camino. Ya tiene un factor verificado, de modo
+       * que lo que le falta es verificarlo, no inscribir otro. La consola
+       * cambia de paso sola.
+       */
+      const verificado = (await factoresDelTitular(sesion.accessToken).catch(() => [])).find(
+        (f) => f.status === 'verified',
+      );
+      if (verificado !== undefined) {
+        await marcarFactorPendiente(verificado.id);
+        registrar('aviso', 'inscripcion innecesaria: el titular ya tiene factor verificado', {
+          estado: 409,
+        });
+        return NextResponse.json(
+          { siguiente: 'segundo-factor', mensaje: textoDeFalloDeAcceso(e.motivo) },
+          { status: 409 },
+        );
+      }
+    }
+
     if (e instanceof FalloDeAcceso) {
       // El estado sale del MOTIVO, no de «lo que no sea 429 es 400». Con la
       // regla anterior, el proveedor caído se le presentaba al titular como un
@@ -90,6 +118,7 @@ export const POST = async (): Promise<NextResponse> => {
         SERVICIO_NO_DISPONIBLE: 503,
         SESION_EXPIRADA: 401,
         FACTOR_DUPLICADO: 409,
+        SEGUNDO_FACTOR_YA_INSCRITO: 409,
       };
       const estado = estados[e.motivo] ?? 400;
       // Con causa. Un `503` sin más en el camino de acceso no se investiga.

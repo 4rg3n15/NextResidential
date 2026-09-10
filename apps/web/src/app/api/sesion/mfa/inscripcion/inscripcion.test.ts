@@ -39,9 +39,12 @@ vi.mock('next/headers', () => ({
 
 /** Sin factores previos y con una inscripción que el proveedor acepta. */
 const proveedorNormal = (): ReturnType<typeof vi.fn> =>
-  vi.fn(async (url: string, opciones: { method?: string }) => {
-    if (url.endsWith('/auth/v1/factors') && (opciones.method ?? 'GET') === 'GET') {
-      return new Response(JSON.stringify({ totp: [] }), { status: 200 });
+  vi.fn(async (url: string) => {
+    // Los factores se leen del USUARIO: GoTrue no expone `GET /factors`. El
+    // doble anterior fingía esa ruta y por eso estas pruebas no vieron nunca
+    // el 404 que recibía el código real.
+    if (url.endsWith('/auth/v1/user')) {
+      return new Response(JSON.stringify({ factors: [] }), { status: 200 });
     }
     return new Response(
       JSON.stringify({ id: 'factor-nuevo', totp: { qr_code: '<svg/>', secret: 'JBSWY3DP' } }),
@@ -97,9 +100,15 @@ describe('la inscripción opera sobre la propia sesión y sobre ninguna otra', (
     expect(fetchFalso).not.toHaveBeenCalled();
   });
 
-  it('devuelve el QR y el secreto en texto, que es la vía de quien no puede escanear', async () => {
+  it('el QR sale como `data:` pintable, no como el marcado en crudo del proveedor', async () => {
+    // GoTrue devuelve `qr_code` como SVG en crudo. Puesto tal cual en un `src`
+    // el navegador no pinta nada y enseña el texto alternativo, que es lo que
+    // el cliente vio. Aquí se fija la normalización.
     const res = await ruta.POST();
-    expect(await res.json()).toEqual({ qr: '<svg/>', secreto: 'JBSWY3DP' });
+    const datos = (await res.json()) as { qr: string; secreto: string };
+    expect(datos.secreto).toBe('JBSWY3DP');
+    expect(datos.qr.startsWith('data:image/svg+xml;base64,')).toBe(true);
+    expect(Buffer.from(datos.qr.split(',')[1] ?? '', 'base64').toString('utf8')).toBe('<svg/>');
   });
 
   it('deja el factor marcado como pendiente para que la verificación pueda cerrar el paso', async () => {
@@ -110,9 +119,12 @@ describe('la inscripción opera sobre la propia sesión y sobre ninguna otra', (
   it('un factor a medio inscribir se retira antes, para no dejar dos secretos vivos', async () => {
     fetchFalso.mockImplementationOnce(
       async () =>
-        new Response(JSON.stringify({ totp: [{ id: 'a-medias', status: 'unverified' }] }), {
-          status: 200,
-        }),
+        new Response(
+          JSON.stringify({
+            factors: [{ id: 'a-medias', status: 'unverified', factor_type: 'totp' }],
+          }),
+          { status: 200 },
+        ),
     );
     await ruta.POST();
     const borrado = llamadas().find(
@@ -122,9 +134,9 @@ describe('la inscripción opera sobre la propia sesión y sobre ninguna otra', (
   });
 
   it('el límite del proveedor se traslada como 429, no se disfraza de fallo genérico', async () => {
-    fetchFalso.mockImplementation(async (url: string, o: { method?: string }) =>
-      url.endsWith('/auth/v1/factors') && (o.method ?? 'GET') === 'GET'
-        ? new Response(JSON.stringify({ totp: [] }), { status: 200 })
+    fetchFalso.mockImplementation(async (url: string) =>
+      url.endsWith('/auth/v1/user')
+        ? new Response(JSON.stringify({ factors: [] }), { status: 200 })
         : new Response('{}', { status: 429 }),
     );
     expect((await ruta.POST()).status).toBe(429);
@@ -165,8 +177,13 @@ describe('dos inscripciones simultáneas del mismo titular', () => {
     let siguiente = 0;
     fetchFalso.mockImplementation(async (url: string, o: { method?: string; body?: string }) => {
       const metodo = o.method ?? 'GET';
-      if (url.endsWith('/auth/v1/factors') && metodo === 'GET') {
-        return new Response(JSON.stringify({ totp: [...factores.values()] }), { status: 200 });
+      if (url.endsWith('/auth/v1/user')) {
+        return new Response(
+          JSON.stringify({
+            factors: [...factores.values()].map((f) => ({ ...f, factor_type: 'totp' })),
+          }),
+          { status: 200 },
+        );
       }
       if (url.endsWith('/auth/v1/factors') && metodo === 'POST') {
         const nombre = (JSON.parse(o.body ?? '{}') as { friendly_name?: string }).friendly_name;
@@ -233,7 +250,7 @@ describe('dos inscripciones simultáneas del mismo titular', () => {
     fetchFalso.mockImplementation(async (url: string, o: { method?: string }) =>
       url.endsWith('/auth/v1/factors') && (o.method ?? 'GET') === 'POST'
         ? new Response(JSON.stringify({ error_code: 'mfa_factor_name_conflict' }), { status: 422 })
-        : new Response(JSON.stringify({ totp: [] }), { status: 200 }),
+        : new Response(JSON.stringify({ factors: [] }), { status: 200 }),
     );
     const res = await ruta.POST();
     expect(res.status).toBe(409);

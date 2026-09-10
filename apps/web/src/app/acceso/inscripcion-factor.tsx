@@ -29,10 +29,13 @@ export const InscripcionDeFactor = ({
   className,
   alVerificar,
   alCancelar,
+  alYaInscrito,
 }: {
   readonly className?: string | undefined;
   readonly alVerificar: () => void;
   readonly alCancelar: () => void;
+  /** El titular ya tenía un factor verificado: hay que llevarle a verificar. */
+  readonly alYaInscrito: () => void;
 }): JSX.Element => {
   const [qr, setQr] = useState<string | null>(null);
   const [secreto, setSecreto] = useState('');
@@ -75,10 +78,22 @@ export const InscripcionDeFactor = ({
 
     void fetch('/api/sesion/mfa/inscripcion', { method: 'POST', credentials: 'same-origin' })
       .then(async (r) => {
-        const datos = (await r.json()) as { qr?: string; secreto?: string; mensaje?: string };
+        const datos = (await r.json()) as {
+          qr?: string;
+          secreto?: string;
+          mensaje?: string;
+          siguiente?: string;
+        };
         // Respuesta de un intento superado: se descarta entera. No se pinta su
         // error ni su QR.
         if (intento !== intentoVigente.current) return;
+        // No hay nada que inscribir porque ya hay factor: no es un error que
+        // mostrar, es un paso que cambiar. Dejar aquí al titular con un mensaje
+        // sería dejarle dando vueltas, que es lo que pasó.
+        if (r.status === 409 && datos.siguiente === 'segundo-factor') {
+          alYaInscrito();
+          return;
+        }
         if (!r.ok) {
           setError(datos.mensaje ?? 'No se pudo iniciar la inscripción.');
           return;
@@ -94,7 +109,7 @@ export const InscripcionDeFactor = ({
       .finally(() => {
         if (intento === intentoVigente.current) setCargando(false);
       });
-  }, []);
+  }, [alYaInscrito]);
 
   useEffect(() => {
     pedirInscripcion();
@@ -161,15 +176,28 @@ export const InscripcionDeFactor = ({
           </div>
         ) : (
           <>
-            <div className="flex justify-center rounded-tarjeta border border-borde bg-white p-4">
-              {/* Supabase devuelve el QR como SVG en un `data:`; `img-src` de la
-                  CSP admite `data:` justamente para esto. */}
-              <img
-                src={qr}
-                alt="Código QR para la aplicación de autenticación"
-                className="h-44 w-44"
-              />
-            </div>
+            {qr === '' ? (
+              /**
+               * Sin imagen utilizable NO se pinta un `<img>` roto: se enseña la
+               * clave, que es la vía que funciona. El QR llegó a fallar por su
+               * formato —marcado SVG en crudo donde el `src` espera una URL— y
+               * lo que el titular veía era el texto alternativo.
+               */
+              <p className="rounded-tarjeta border border-borde bg-lienzo px-4 py-3 text-secundario text-texto-apagado">
+                No se pudo dibujar el código QR. Usa la clave de abajo: escríbela en tu aplicación
+                de autenticación.
+              </p>
+            ) : (
+              <div className="flex justify-center rounded-tarjeta border border-borde bg-white p-4">
+                {/* El QR llega ya normalizado a `data:`; `img-src` de la CSP
+                    admite `data:` justamente para esto. */}
+                <img
+                  src={qr}
+                  alt="Código QR para la aplicación de autenticación"
+                  className="h-44 w-44"
+                />
+              </div>
+            )}
 
             {secreto === '' ? null : (
               <div className="rounded-tarjeta border border-borde bg-lienzo p-3">

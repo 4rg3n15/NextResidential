@@ -69,6 +69,7 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
       <InscripcionDeFactor
         className={className}
         alVerificar={() => setPaso('codigos')}
+        alYaInscrito={() => setPaso('segundo-factor')}
         alCancelar={() => {
           setPaso('credenciales');
           setError(undefined);

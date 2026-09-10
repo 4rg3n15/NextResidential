@@ -63,8 +63,12 @@ describe('iniciarSesion', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) =>
-        url.includes('/factors')
-          ? respuestaJson({ totp: [{ id: 'f1', status: 'verified', factor_type: 'totp' }] })
+        // GoTrue NO tiene `GET /factors`: los factores viven en el usuario.
+        // El doble anterior fingía una ruta inexistente, así que estas pruebas
+        // pasaban mientras el código real recibía un 404 y lo leía como «este
+        // usuario no tiene factores».
+        url.includes('/user')
+          ? respuestaJson({ factors: [{ id: 'f1', status: 'verified', factor_type: 'totp' }] })
           : respuestaJson({ access_token: tokenCon('aal1'), refresh_token: 'r1', expires_in: 300 }),
       ),
     );
@@ -79,8 +83,8 @@ describe('iniciarSesion', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) =>
-        url.includes('/factors')
-          ? respuestaJson({ totp: [{ id: 'f1', status: 'unverified', factor_type: 'totp' }] })
+        url.includes('/user')
+          ? respuestaJson({ factors: [{ id: 'f1', status: 'unverified', factor_type: 'totp' }] })
           : respuestaJson({ access_token: tokenCon('aal1'), refresh_token: 'r1', expires_in: 300 }),
       ),
     );
@@ -136,8 +140,8 @@ describe('iniciarSesion', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) =>
-        url.includes('/factors')
-          ? respuestaJson({ totp: [] })
+        url.includes('/user')
+          ? respuestaJson({ factors: [] })
           : respuestaJson({ access_token: 'no-es-un-jwt', refresh_token: 'r', expires_in: 60 }),
       ),
     );

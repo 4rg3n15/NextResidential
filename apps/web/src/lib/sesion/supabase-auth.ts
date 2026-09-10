@@ -42,6 +42,13 @@ export type MotivoDeFalloDeAcceso =
    * hecho había contestado que ya había un factor.
    */
   | 'FACTOR_DUPLICADO'
+  /**
+   * El titular **ya tiene un factor verificado**, así que el proveedor exige
+   * `aal2` para inscribir otro y responde 403 `insufficient_aal`. No es un
+   * fallo del usuario ni un código equivocado: es que la pantalla equivocada
+   * está en pantalla. La salida no es un mensaje, es **llevarle a verificar**.
+   */
+  | 'SEGUNDO_FACTOR_YA_INSCRITO'
   | 'SERVICIO_NO_DISPONIBLE';
 
 /**
@@ -212,22 +219,50 @@ const exigirOk = async (respuesta: Response, siInvalido: MotivoDeFalloDeAcceso):
       codigo,
     });
   }
+  if (estado === 403 && codigo === 'insufficient_aal') {
+    // El proveedor está diciendo algo muy concreto: «ya tienes un factor
+    // verificado, para añadir otro preséntame aal2». Contarlo como
+    // `FACTOR_INVALIDO` era acusar al usuario de teclear mal un código que
+    // nunca llegó a evaluarse.
+    throw new FalloDeAcceso('SEGUNDO_FACTOR_YA_INSCRITO', undefined, { estado, codigo });
+  }
   if (estado === 400 || estado === 401 || estado === 403) {
     throw new FalloDeAcceso(siInvalido, undefined, { estado, codigo });
   }
   throw new FalloDeAcceso('SERVICIO_NO_DISPONIBLE', undefined, { estado, codigo });
 };
 
-/** Factores TOTP ya inscritos y verificados por el titular. */
-const factorTotp = async (accessToken: string): Promise<string | null> => {
-  const respuesta = await pedir('/auth/v1/factors', {
+/**
+ * Factores del titular, leídos de `GET /auth/v1/user`.
+ *
+ * **GoTrue no expone `GET /auth/v1/factors`, y ahí estaba el fallo de fondo.**
+ * Se consultaba esa ruta, no existe, la respuesta no era `ok` y el código lo
+ * interpretaba como «este usuario no tiene ningún factor». De ahí salía todo lo
+ * demás: la consola mandaba a inscribir a quien ya tenía un factor verificado,
+ * el proveedor respondía 403 `insufficient_aal` —para añadir un segundo factor
+ * exige `aal2`— y la pantalla lo contaba como «el código no es válido». La
+ * limpieza de factores a medias tampoco limpiaba nada, por lo mismo.
+ *
+ * Los factores viven en el objeto del usuario (`factors[]`), que es lo que
+ * `listFactors()` del SDK lee por debajo.
+ *
+ * **Falla cerrado.** Si la lista no se puede leer, esto lanza en vez de
+ * devolver «no hay factores». Suponer que no hay ninguno fue exactamente el
+ * defecto: una respuesta que no se entiende no es una respuesta vacía.
+ */
+export const factoresDelTitular = async (accessToken: string): Promise<readonly Factor[]> => {
+  const respuesta = await pedir('/auth/v1/user', {
     method: 'GET',
     headers: cabeceras(accessToken),
   });
-  if (!respuesta.ok) return null;
-  const cuerpo = (await respuesta.json()) as { totp?: Factor[]; all?: Factor[] };
-  const candidatos = cuerpo.totp ?? cuerpo.all ?? [];
-  const verificado = candidatos.find((f) => f.factor_type === 'totp' && f.status === 'verified');
+  await exigirOk(respuesta, 'SESION_EXPIRADA');
+  const cuerpo = (await respuesta.json()) as { factors?: Factor[] };
+  return (cuerpo.factors ?? []).filter((f) => f.factor_type === 'totp');
+};
+
+/** Factor TOTP ya verificado, que es el que habilita el paso de verificación. */
+const factorTotp = async (accessToken: string): Promise<string | null> => {
+  const verificado = (await factoresDelTitular(accessToken)).find((f) => f.status === 'verified');
   return verificado?.id ?? null;
 };
 
@@ -243,6 +278,10 @@ export const iniciarSesion = async (
   await exigirOk(respuesta, 'CREDENCIALES_INVALIDAS');
   const sesion = aSesion((await respuesta.json()) as RespuestaToken, null);
   if (sesion.nivel === 'aal2') return sesion;
+  // Si la lista de factores no se puede leer, `factorTotp` lanza y el acceso
+  // falla con un motivo. Antes devolvía `null` y la consola mandaba a inscribir
+  // a alguien que ya tenía factor: el callejón sin salida que bloqueó al
+  // cliente durante una ronda entera.
   return { ...sesion, factorPendienteId: await factorTotp(sesion.accessToken) };
 };
 
@@ -351,23 +390,49 @@ export const cambiarContrasena = async (accessToken: string, contrasena: string)
   await exigirOk(respuesta, 'ENLACE_NO_VALIDO');
 };
 
+/**
+ * Normaliza el código QR a algo que un `<img src>` pueda **pintar de verdad**.
+ *
+ * El defecto que lo motivó: GoTrue devuelve `totp.qr_code` como **marcado SVG
+ * en crudo** —`<svg …>…</svg>`—, no como una URL. Puesto tal cual en un `src`,
+ * el navegador no tiene nada que cargar y muestra el texto alternativo. La
+ * respuesta traía el QR y la pantalla no lo pintaba: por eso la comprobación
+ * útil no es «la respuesta trae un QR» sino «el navegador lo muestra».
+ *
+ * Se envuelve en un `data:` URI en base64 en vez de insertar el SVG en el DOM.
+ * Es lo que lo hace seguro: dentro de un `<img>`, un SVG **no ejecuta scripts**
+ * ni carga recursos externos, así que aunque el proveedor devolviera marcado
+ * hostil no habría nada que ejecutar. Insertarlo con `dangerouslySetInnerHTML`
+ * sí lo habría permitido. La CSP ya admite `data:` en `img-src` para los
+ * iconos de la PWA: no hace falta abrir nada.
+ *
+ * Un formato que no se reconoce devuelve cadena vacía, y la pantalla enseña la
+ * clave en texto. Nunca un `<img>` roto.
+ */
+export const imagenDeQr = (qr: string): string => {
+  const limpio = qr.trim();
+  if (limpio === '') return '';
+  if (limpio.startsWith('data:image/')) return limpio;
+  if (limpio.startsWith('<svg') || limpio.startsWith('<?xml')) {
+    return `data:image/svg+xml;base64,${Buffer.from(limpio, 'utf8').toString('base64')}`;
+  }
+  return '';
+};
+
 export interface InscripcionDeFactor {
   readonly factorId: string;
-  /** SVG del código QR que devuelve Supabase, listo para un `<img src>`. */
+  /** QR ya normalizado a `data:`, listo para un `<img src>`. Vacío si no se pudo. */
   readonly qr: string;
   /** El secreto en texto, para quien no puede escanear. */
   readonly secreto: string;
 }
 
 /** Retira los factores a medio inscribir: leer y borrar, sin atomicidad. */
-const retirarNoVerificados = async (accessToken: string): Promise<void> => {
-  const existentes = await pedir('/auth/v1/factors', {
-    method: 'GET',
-    headers: cabeceras(accessToken),
-  });
-  if (!existentes.ok) return;
-  const cuerpo = (await existentes.json()) as { totp?: Factor[]; all?: Factor[] };
-  for (const factor of cuerpo.totp ?? cuerpo.all ?? []) {
+const retirarNoVerificados = async (
+  accessToken: string,
+  factores: readonly Factor[],
+): Promise<void> => {
+  for (const factor of factores) {
     if (factor.status !== 'verified') {
       await pedir(`/auth/v1/factors/${factor.id}`, {
         method: 'DELETE',
@@ -401,7 +466,7 @@ const altaDeFactor = async (
   }
   return {
     factorId: cuerpo.id,
-    qr: cuerpo.totp.qr_code ?? '',
+    qr: imagenDeQr(cuerpo.totp.qr_code ?? ''),
     secreto: cuerpo.totp.secret ?? '',
   };
 };
@@ -432,7 +497,18 @@ export const inscribirFactorTotp = async (
   accessToken: string,
   nombreAmistoso = 'Next Control Residencial',
 ): Promise<InscripcionDeFactor> => {
-  await retirarNoVerificados(accessToken);
+  // Se pregunta ANTES de intentar. Quien ya tiene un factor verificado no
+  // necesita inscribir otro: necesita verificar el que tiene. Intentarlo y
+  // traducir el 403 sería llegar al mismo sitio dando un rodeo, y dejando
+  // rastro en el proveedor.
+  // La lista se lee UNA vez y sirve para las dos decisiones. Leerla dos veces
+  // no solo costaba una vuelta de red: abría una ventana en la que las dos
+  // lecturas podían discrepar.
+  const factores = await factoresDelTitular(accessToken);
+  if (factores.some((f) => f.status === 'verified')) {
+    throw new FalloDeAcceso('SEGUNDO_FACTOR_YA_INSCRITO', undefined, { codigo: 'ya_verificado' });
+  }
+  await retirarNoVerificados(accessToken, factores);
   try {
     return await altaDeFactor(accessToken, nombreAmistoso);
   } catch (e) {
@@ -443,7 +519,7 @@ export const inscribirFactorTotp = async (
     // titular no tiene por qué enterarse de una carrera nuestra. **Un solo
     // reintento**, porque si el segundo también choca ya no es una carrera y
     // repetir solo alargaría la espera.
-    await retirarNoVerificados(accessToken);
+    await retirarNoVerificados(accessToken, await factoresDelTitular(accessToken));
     return await altaDeFactor(accessToken, `${nombreAmistoso} (${sufijoDeReintento()})`);
   }
 };
@@ -459,13 +535,7 @@ const sufijoDeReintento = (): string => randomBytes(2).toString('hex');
 export const factoresDe = async (
   accessToken: string,
 ): Promise<{ readonly verificados: number; readonly total: number }> => {
-  const respuesta = await pedir('/auth/v1/factors', {
-    method: 'GET',
-    headers: cabeceras(accessToken),
-  });
-  if (!respuesta.ok) return { verificados: 0, total: 0 };
-  const cuerpo = (await respuesta.json()) as { totp?: Factor[]; all?: Factor[] };
-  const factores = (cuerpo.totp ?? cuerpo.all ?? []).filter((f) => f.factor_type === 'totp');
+  const factores = await factoresDelTitular(accessToken);
   return {
     verificados: factores.filter((f) => f.status === 'verified').length,
     total: factores.length,
