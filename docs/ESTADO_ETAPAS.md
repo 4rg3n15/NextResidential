@@ -124,6 +124,10 @@ La primera ejecución salió **FALLIDA** y sus tres hallazgos eran reales: `comu
 | Arranque en frío verificable de punta a punta, hasta «alguien puede entrar»                           | **Construido** · `supabase/arranque-en-frio.sh` + suite `arranque-en-frio.e2e`, sonda 11      |
 | **D-46** · `503` intermitente al inscribir el factor; la pantalla se quedaba con el error                | **Resuelto** · una inscripción por titular a la vez; el éxito limpia el error                 |
 | **D-47** · `apps/web` no validaba su configuración al arrancar                                          | **Resuelto** · Zod + `instrumentation.ts`, salida con código 78 (`EX_CONFIG`)                 |
+| **D-48** · ciclo cerrado del segundo factor (`insufficient_aal`)                                        | **Resuelto** · los factores se leen del usuario; GoTrue no expone `GET /factors`              |
+| **D-49** · el QR no se pintaba (SVG en crudo en un `<img src>`)                                         | **Resuelto** · normalizado a `data:image/svg+xml;base64`                                      |
+| **D-50** · **la API no arrancaba en producción** y 363 pruebas no lo veían                              | **Resuelto** · el puerto de auditoría pasa al núcleo                                          |
+| El camino completo, recorrido en navegador                                                              | **Construido** · `e2e/camino-de-acceso.mjs`, paso 12c del verificador                         |
 
 ### Lo que usted debe ejecutar antes de la 09-B
 

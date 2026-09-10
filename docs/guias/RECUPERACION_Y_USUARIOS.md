@@ -159,6 +159,8 @@ Comprobación: inicie sesión en la consola. No verá el token en las cookies �
 
 Los tres roles administrativos **no entran sin `aal2`** (RN-20, CA-25). Lo exige el guard de la API, así que sin este paso el usuario se autentica y no puede hacer nada.
 
+> **Corrección (2026-09-10).** Esta guía afirmaba que «la inscripción de TOTP funciona con la sesión `aal1` del propio titular». Es cierto **solo para el primer factor**: en cuanto hay uno verificado, Supabase exige `aal2` para añadir otro y responde `403 insufficient_aal`. La consola ya lo detecta y lleva a **verificar** en vez de a inscribir. Si necesita empezar de cero, en el panel → **Authentication → Users → Remove MFA factors**, y vuelva al paso 2.
+
 **El panel de Supabase no sirve para esto**, y no es un descuido suyo: en `Authentication → Users` solo ofrece _Remove MFA factors_, y `Account → Security` es su propia cuenta de Supabase, no la del usuario de la aplicación. Un factor que otra persona inscribe no es un segundo factor —el secreto habría pasado por sus manos—, así que la plataforma no lo permite y hace bien.
 
 1. Panel → **Authentication → Providers → Multi-Factor Authentication**: active **TOTP**. Una vez por proyecto.

@@ -75,7 +75,11 @@ export const arrancarDobleGotrue = async () => {
     })
       .setProtectedHeader({ alg: 'RS256', kid: 'doble' })
       .setSubject(USUARIO.id)
-      .setIssuer(emisor)
+      // El emisor que la API espera es `<SUPABASE_URL>/auth/v1`, derivado de la
+      // URL del proyecto. Firmar con la URL a secas producía `EMISOR_INVALIDO`
+      // y un 401 en `/auth/mfa/codigos`: el mismo síntoma que el cliente vio
+      // por otra causa, esta vez del doble.
+      .setIssuer(`${emisor}/auth/v1`)
       .setAudience('authenticated')
       .setIssuedAt()
       .setExpirationTime('10m')

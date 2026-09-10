@@ -451,6 +451,67 @@ Ahora usa Zod como la API, y `instrumentation.ts` la valida al arrancar el proce
 
 ---
 
+## 6.septies · El ciclo cerrado del segundo factor, y el camino recorrido entero
+
+Cuatro rondas seguidas sobre lo mismo, cada corrección destapando el siguiente eslabón. El diagnóstico de fondo es uno solo y lo dijo el cliente: **nadie había recorrido el camino completo**. Lo que sigue son los defectos, y después la medida que impide que vuelva a pasar.
+
+### La raíz común: se listaban los factores contra una ruta que no existe
+
+`GET /auth/v1/factors` **no existe en GoTrue**. Los factores viven en el objeto del usuario. La consola pedía esa ruta, recibía un 404, y el código lo interpretaba como «este usuario no tiene ningún factor». De ese único error salieron tres de los cuatro síntomas:
+
+| Síntoma reportado                                                    | Qué era en realidad                                                                                                                                     |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `403 insufficient_aal` al inscribir                                  | La consola mandaba a inscribir a quien **ya tenía un factor verificado**. Supabase exige `aal2` para añadir un segundo: el ciclo cerrado                    |
+| «El código no es válido o ya caducó»                                 | El código nunca llegó a evaluarse. El rechazo era por nivel de sesión, y el mensaje acusaba al titular de un fallo que no era suyo                        |
+| El factor «a medias» y el acceso rechazado después                   | La limpieza de factores sin verificar tampoco limpiaba nada: leía de la misma ruta inexistente                                                            |
+
+**La afirmación de §B.6 era medio falsa y hay que decirlo.** Escribí que «la inscripción de TOTP funciona con la sesión `aal1` del propio titular». Es cierto **solo para el primer factor**: en cuanto hay uno verificado, añadir otro exige `aal2`. La guía está corregida.
+
+**Correcciones.** Los factores se leen de `GET /auth/v1/user` (`factors[]`), y esa lectura **falla cerrado**: si no se puede leer, se lanza, en vez de asumir que no hay ninguno — asumirlo fue el defecto. `insufficient_aal` tiene motivo propio y la ruta responde `409` con `siguiente: 'segundo-factor'`, así que la pantalla **cambia de paso sola** en lugar de dejar al titular dando vueltas. Y una inscripción fallida ya no deja residuo: se limpia la marca del factor pendiente.
+
+### El QR: la respuesta lo traía y el navegador no lo pintaba
+
+No era la CSP —`img-src` ya admitía `data:` para los iconos de la PWA—. Era el formato: **GoTrue devuelve `qr_code` como marcado SVG en crudo**, y un `<img src="<svg …">` no tiene nada que cargar, así que el navegador enseña el texto alternativo. Se normaliza a `data:image/svg+xml;base64`, que además es la opción segura: dentro de un `<img>`, un SVG no ejecuta scripts ni carga recursos externos, cosa que insertarlo en el DOM sí permitiría. Sin imagen utilizable ya no se pinta un `<img>` roto: se enseña la clave.
+
+### El `503` de los códigos de recuperación
+
+`/api/ncr/auth/mfa/codigos` es la ruta correcta del BFF; el `503` era **la API sin responder**. El proxy lo traducía a un número y descartaba la causa, así que en el registro solo quedaba `503` y parecía una ruta inexistente. Ahora registra ruta y causa, y el mensaje dice qué comprobar. La pantalla de códigos aplica además la regla del último intento: cada llamada **invalida el juego anterior**, así que pintar una respuesta que no sea la última sería entregar diez códigos que ya no abren nada — y se descubriría el día de perder el teléfono.
+
+### Y el defecto que solo aparece recorriendo el camino: **la API no arrancaba**
+
+Al levantar el proceso real, `node dist/main.js` moría:
+
+```
+Nest can't resolve dependencies of the AutenticacionController (?, …)
+```
+
+`AutenticacionController` inyecta el puerto de auditoría, que `multiempresa` proveía como módulo `@Global()`. No bastaba. Y las **363 pruebas seguían en verde**, porque `Test.createTestingModule` envuelve `AppModule` en un módulo raíz propio y allí los globales alcanzan a todo: el arnés cubría un grafo de módulos que el proceso real no puede construir. Un puerto que comparten dos módulos no pertenece a ninguno de los dos — vive en `comun/auditoria` y lo provee `NucleoModule`.
+
+### La medida: `e2e/camino-de-acceso.mjs`
+
+Levanta la **API real** y la **consola compilada** —`next build` + `next start`, no `next dev`— contra un doble de Supabase Auth que reproduce la semántica del proveedor, incluidas las tres cosas que costaron una ronda cada una: no existe `GET /factors`, inscribir con `aal1` teniendo un factor verificado da `403 insufficient_aal`, y `qr_code` viene en crudo. Y conduce **Chromium**:
+
+```
+✓ la contraseña lleva a la inscripción del factor
+✓ el navegador PINTA el QR (210×210, data:image/svg+xml;base64…)
+✓ la clave en texto está disponible para quien no puede escanear
+✓ la API entrega los 10 códigos de recuperación (10)
+✓ la sesión `aal2` entra al tablero
+✓ lleva a VERIFICAR, no a inscribir de nuevo
+✓ queda UN solo factor verificado: la inscripción no dejó residuo
+✓ ninguna petición del propio origen falló · sin errores de consola
+```
+
+Tres decisiones que lo hacen valer:
+
+1. **Contra la consola compilada.** En desarrollo, el sobreimpreso de Next inyecta estilos en línea que la CSP rechaza; comprobar ahí obligaría a tolerar violaciones, que es como un control deja de controlar. Compilada, el navegador no se queja de nada.
+2. **La prueba cabe dentro de la CSP del producto.** `waitForFunction` evalúa una cadena como JavaScript y la política lo prohíbe; se espera con localizadores. La prueba se adapta a la política, no al revés.
+3. **Ninguna comprobación pasa en vacío.** La de los códigos llegó a fallar por su propia prisa —leía la lista antes de que llegara— y la siguiente pasaba sobre cero elementos. Las dos corregidas: se espera lo que se va a afirmar, y afirmar sobre una lista vacía es un fallo.
+
+Es el paso **12c** de `verificar-etapa.sh`, y sin Chromium **no se omite en silencio**: se marca fallo.
+
+---
+
 ## 7 · Verificación de seguridad (§2.7)
 
 | #   | Medida                   | Estado en esta etapa                                                                                                                                                                                             |
@@ -486,6 +547,10 @@ Ahora usa Zod como la API, y `instrumentation.ts` la valida al arrancar el proce
 | **DT-12** | **Configuración externa sin verificar — la familia «dos suites que se solapan y dejan un intervalo».** Ya aparecieron tres: el gancho de claims, el arranque en frío y la inscripción del factor. Quedan al menos cuatro del mismo tipo, todas con la misma forma: la API prueba su puerto con un doble y la base prueba sus filas, y nadie comprueba el recurso real de la plataforma. **Buckets de evidencia** (que el bucket exista y sea privado, y que un `GET` sin firma lo rechace de verdad — hoy se prueba la fila `evidencias`, no el bucket); **FCM** (credencial de servicio válida y envío real; hoy es un doble); **SMTP y la plantilla de recuperación** con su URL de redirección, recién configurados y nunca ejercitados de punta a punta; **Supabase Realtime** frente al canal SSE propio, que es el que se mide hoy. Diagnóstico declarado antes de la ETAPA 10; la comprobación se construye allí | Declarada |
 | **D-46**  | `503` intermitente al inscribir el segundo factor: dos peticiones concurrentes creaban el factor con el mismo nombre fijo, el proveedor rechazaba una con 422 y la traducción la convertía en «servicio no disponible». La pantalla se quedaba con el error del intento fallido                                                                    | **Resuelto** · una inscripción por titular a la vez, reintento por conflicto, motivo propio y registro con causa |
 | **D-47**  | `apps/web` no validaba su configuración al arrancar: comprobaba presencia, de forma perezosa. Un entorno incompleto aparecía como un `503` en mitad del acceso                                                                                                                                                                                   | **Resuelto** · Zod e `instrumentation.ts`, salida con código 78                                                  |
+| **D-48**  | Ciclo cerrado del segundo factor: se listaban los factores contra `GET /auth/v1/factors`, que GoTrue no expone; el 404 se leía como «no tiene factores» y la consola mandaba a inscribir a quien ya tenía uno verificado (`403 insufficient_aal`)                          | **Resuelto** · se leen de `GET /auth/v1/user` y la lectura falla cerrado    |
+| **D-49**  | El QR no se pintaba: `qr_code` llega como SVG en crudo y un `<img src>` no lo carga                                                                                                                                                                                          | **Resuelto** · normalizado a `data:image/svg+xml;base64`                   |
+| **D-50**  | **La API no arrancaba en producción**: el puerto de auditoría no alcanzaba a `AutenticacionController`, y las 363 pruebas no lo veían porque el arnés monta un grafo de módulos distinto                                                                                     | **Resuelto** · el puerto vive en `comun/auditoria`, lo provee `NucleoModule` |
+| **DT-13** | `multiempresa/aislamiento.ts` toma tipos del barril de `autenticacion`, así que un import explícito entre esos módulos cerraría un ciclo de `require`. Hoy no hace falta; si hiciera, la salida es mover también ese vocabulario al núcleo                                    | Declarada                                                                   |
 
 ---
 

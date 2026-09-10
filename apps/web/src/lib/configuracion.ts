@@ -92,6 +92,19 @@ const base = z.object({
       '(sb_publishable_…); la secreta omite la RLS y no puede vivir aquí (§2.7.6)',
   ),
 
+  /**
+   * Fuerza el atributo `Secure` de las cookies de sesión. **Solo para servir
+   * en local sobre `http`**, donde el navegador rechazaría una cookie `Secure`
+   * y no habría sesión — es lo que permite recorrer el camino completo en el
+   * navegador contra la consola compilada.
+   *
+   * El valor por defecto lo decide `NODE_ENV`, y bajarlo en producción solo se
+   * admite si la API es de bucle local: si no, esto sería un interruptor para
+   * mandar la sesión en claro por la red, y ningún despliegue debe tenerlo a
+   * mano.
+   */
+  COOKIE_SEGURA: z.enum(['true', 'false']).optional(),
+
   /** Puente de video de la ETAPA 10. Vacío o ausente significa «todavía no». */
   PUENTE_VIDEO_URL: z
     .union([urlAbsoluta('PUENTE_VIDEO_URL'), z.literal('')])
@@ -122,15 +135,28 @@ export const esquemaConfiguracion = base.superRefine((datos, ctx) => {
       });
     }
   }
+  if (datos.NODE_ENV === 'production' && datos.COOKIE_SEGURA === 'false' && !esLocal(datos.API_URL)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['COOKIE_SEGURA'],
+      message:
+        'COOKIE_SEGURA=false solo se admite contra una API de bucle local: fuera de ahí manda la ' +
+        'sesión sin `Secure` por la red (§2.7.8)',
+    });
+  }
   if (
     datos.NODE_ENV === 'production' &&
     partesDe(datos.API_URL) !== null &&
-    !esHttps(datos.API_URL)
+    !esHttps(datos.API_URL) &&
+    // Bucle local exento: una consola compilada servida en el propio equipo no
+    // manda nada por la red. Es lo que permite recorrer el camino completo en
+    // el navegador contra la superficie que de verdad se despliega.
+    !esLocal(datos.API_URL)
   ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['API_URL'],
-      message: 'API_URL debe usar https en producción (§2.7.8)',
+      message: 'API_URL debe usar https en producción, salvo en bucle local (§2.7.8)',
     });
   }
 });
@@ -174,7 +200,9 @@ const leer = (entorno: NodeJS.ProcessEnv): Configuracion => {
     supabasePublishableKey: datos.SUPABASE_PUBLISHABLE_KEY,
     // En producción la cookie va `Secure` siempre. En desarrollo sobre
     // http://localhost el navegador la rechazaría y no habría sesión.
-    cookieSegura: datos.NODE_ENV === 'production',
+    cookieSegura: datos.COOKIE_SEGURA === undefined
+      ? datos.NODE_ENV === 'production'
+      : datos.COOKIE_SEGURA === 'true',
     puenteVideoUrl: datos.PUENTE_VIDEO_URL,
   };
 };

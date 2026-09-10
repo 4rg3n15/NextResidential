@@ -97,6 +97,21 @@ describe('lo que hace fallar el arranque', () => {
     expect(validarEntorno(COMPLETO).cookieSegura).toBe(false);
   });
 
+  it('COOKIE_SEGURA=false vale en local y NO fuera de local', () => {
+    // El interruptor existe para poder servir la consola compilada sobre http
+    // en el propio equipo. Fuera de ahí sería mandar la sesión en claro.
+    const local = { ...COMPLETO, NODE_ENV: 'production' as const, API_URL: 'http://127.0.0.1:3000' };
+    expect(validarEntorno({ ...local, COOKIE_SEGURA: 'false' }).cookieSegura).toBe(false);
+    expect(
+      problemasDe({
+        ...COMPLETO,
+        NODE_ENV: 'production',
+        API_URL: 'https://api.ejemplo.co',
+        COOKIE_SEGURA: 'false',
+      }).join(' '),
+    ).toContain('bucle local');
+  });
+
   it('el mensaje NO incluye el valor recibido', () => {
     // Un fallo de arranque que vuelca el entorno es un fallo de arranque que
     // publica una llave en los registros (§2.7.8).

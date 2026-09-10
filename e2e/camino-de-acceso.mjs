@@ -23,7 +23,7 @@
  *    QR» sino `naturalWidth > 0`: que el navegador lo decodificó y lo pintó.
  */
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
@@ -71,7 +71,16 @@ const esperar = async (url, etiqueta, intentos = 120) => {
   return false;
 };
 
+/** La salida COMPLETA de cada proceso, a disco: ocho líneas no diagnostican. */
+const volcarADisco = () => {
+  for (const { nombre, salida } of procesos) {
+    writeFileSync(`/tmp/ncr-camino-${nombre}.log`, salida.join(''));
+  }
+  console.log('   · salida completa en /tmp/ncr-camino-{api,web}.log');
+};
+
 const volcarProcesos = () => {
+  volcarADisco();
   for (const { nombre, salida } of procesos) {
     const lineas = salida
       .join('')
@@ -147,7 +156,7 @@ const principal = async () => {
   if (!(await esperar(`http://127.0.0.1:${puertoApi}/health`, 'la API'))) return;
   ok(`API en http://127.0.0.1:${puertoApi}`);
 
-  paso('2 · consola real (next dev, con el modo estricto de React activo)');
+  paso('2 · consola COMPILADA (next build + start), que es lo que se despliega');
   // El binario de Next se resuelve desde el paquete real: con pnpm no hay
   // `node_modules/next` en la raíz, y `node_modules/.bin/next` es un envoltorio
   // de shell que `node` no puede ejecutar — el mismo tropiezo que la sonda 11.
@@ -155,15 +164,36 @@ const principal = async () => {
     dirname(createRequire(resolve(raiz, 'apps/web/package.json')).resolve('next/package.json')),
     'dist/bin/next',
   );
-  lanzar('node', [binDeNext, 'dev', '-p', String(puertoWeb)], {
+  const entornoWeb = {
+    ...process.env,
+    NODE_ENV: 'production',
+    API_URL: `http://127.0.0.1:${puertoApi}`,
+    SUPABASE_URL: doble.url,
+    SUPABASE_PUBLISHABLE_KEY: 'publicable-de-prueba',
+    // La consola compilada se sirve por http en el propio equipo: con `Secure`
+    // el navegador descartaría la cookie y no habría sesión que recorrer.
+    COOKIE_SEGURA: 'false',
+  };
+  /**
+   * Se compila y se sirve el resultado, **no `next dev`**. Es más lento y es lo
+   * correcto: en desarrollo, el sobreimpreso de Next inyecta estilos en línea
+   * que la CSP —con nonce y sin `unsafe-inline`— rechaza, y esas violaciones
+   * son ruido de una superficie que nadie despliega. Comprobar la CSP contra
+   * `dev` obligaría a tolerar violaciones, que es cómo un control deja de
+   * controlar. Aquí, si el navegador se queja, la queja es real.
+   */
+  console.log('   · compilando la consola');
+  await new Promise((listo, falla) => {
+    const b = spawn('node', [binDeNext, 'build'], {
+      cwd: resolve(raiz, 'apps/web'),
+      env: entornoWeb,
+      stdio: 'ignore',
+    });
+    b.on('exit', (c) => (c === 0 ? listo() : falla(new Error('build de la consola'))));
+  });
+  lanzar('node', [binDeNext, 'start', '-p', String(puertoWeb)], {
     cwd: resolve(raiz, 'apps/web'),
-    env: {
-      ...process.env,
-      NODE_ENV: 'development',
-      API_URL: `http://127.0.0.1:${puertoApi}`,
-      SUPABASE_URL: doble.url,
-      SUPABASE_PUBLISHABLE_KEY: 'publicable-de-prueba',
-    },
+    env: entornoWeb,
     detached: true,
     nombre: 'web',
   });
@@ -191,6 +221,26 @@ const principal = async () => {
   const errores = [];
   pagina.on('console', (m) => {
     if (m.type() === 'error') errores.push(m.text());
+  });
+  /** Respuestas del propio origen que no son 2xx: el rastro que faltaba. */
+  const respuestasMalas = [];
+  const trazas = [];
+  pagina.on('response', (r) => {
+    if (!r.url().includes('/api/')) return;
+    if (r.status() >= 400) {
+      respuestasMalas.push(`${r.status()} ${r.request().method()} ${new URL(r.url()).pathname}`);
+    }
+    // Rastro de TODA respuesta del propio origen, con un trozo del cuerpo. Sin
+    // esto, un 2xx con el cuerpo equivocado es indistinguible de un 2xx bueno,
+    // y depurar el paso de los códigos costó tres corridas por no tenerlo.
+    void r
+      .text()
+      .then((t) => {
+        trazas.push(
+          `${r.status()} ${r.request().method()} ${new URL(r.url()).pathname} :: ${t.slice(0, 120)}`,
+        );
+      })
+      .catch(() => undefined);
   });
 
   await pagina.goto(`${base}/acceso`, { waitUntil: 'networkidle' });
@@ -227,14 +277,48 @@ const principal = async () => {
 
   // ── Códigos de recuperación ──────────────────────────────────────────────
   await pagina.waitForSelector('text=Guarda tus códigos de recuperación', { timeout: 30_000 });
-  const codigos = await pagina.locator('ul li').allInnerTexts();
+  /**
+   * Se ESPERA a que la lista llegue. El encabezado se pinta de inmediato y los
+   * códigos vienen de una petición, así que leer la lista aquí mismo la
+   * encontraba vacía: la comprobación fallaba por su propia prisa, y la
+   * siguiente —«tienen la forma esperada»— pasaba en vacío sobre cero
+   * elementos. Es la familia de defectos que este proyecto lleva contando, esta
+   * vez dentro de la propia prueba. Se espera la lista o el error, y nunca se
+   * afirma sobre una lista vacía.
+   */
+  // Se espera con localizadores, NO con `waitForFunction`: esa evalúa una
+  // cadena como JavaScript y la CSP de la consola lo prohíbe —sin
+  // `unsafe-eval`, que es justo lo que queremos—. La prueba tiene que caber
+  // dentro de la política que el producto impone, no al revés.
+  /**
+   * Se espera EXACTAMENTE lo que se va a afirmar: el décimo código. Correr una
+   * carrera contra `[role="alert"]` hacía que cualquier región de aviso ya
+   * presente en la página resolviera la espera de inmediato y la lista se
+   * leyera vacía — la prueba culpaba al producto de su propia prisa. Si esto
+   * agota el plazo, se dice por qué en vez de seguir con una lista vacía.
+   */
+  const listaLlego = await pagina
+    .locator('ul li')
+    .nth(9)
+    .waitFor({ timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!listaLlego) {
+    const aviso = await pagina
+      .locator('[role="alert"]')
+      .first()
+      .innerText()
+      .catch(() => '(sin aviso en pantalla)');
+    mal(`los códigos no llegaron a la pantalla: ${aviso}`);
+  }
+  const codigos = (await pagina.locator('ul li').allInnerTexts()).map((c) => c.trim());
   afirmar(
     codigos.length === 10,
     `la API entrega los 10 códigos de recuperación (${codigos.length})`,
   );
   afirmar(
-    codigos.every((c) => /^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(c.trim())),
-    'los códigos tienen la forma esperada',
+    codigos.length > 0 && codigos.every((c) => /^[A-F0-9]{5}-[A-F0-9]{5}$/.test(c)),
+    'los códigos tienen la forma esperada (y la comprobación no pasa en vacío)',
   );
 
   await pagina.check('input[type="checkbox"]');
@@ -242,10 +326,15 @@ const principal = async () => {
 
   // ── Tablero ──────────────────────────────────────────────────────────────
   await pagina.waitForURL(/\/tablero/, { timeout: 30_000 });
-  await pagina.waitForSelector('h1', { timeout: 30_000 });
   afirmar(pagina.url().includes('/tablero'), 'la sesión `aal2` entra al tablero');
-  const encabezado = await pagina.locator('h1').first().innerText();
-  afirmar(encabezado.trim().length > 0, `el tablero renderiza («${encabezado.trim()}»)`);
+  // Se espera CONTENIDO, no una etiqueta concreta: comprobar `h1` ataba la
+  // prueba a la maquetación en vez de al hecho de que la página cargó.
+  await pagina.waitForSelector('main, [role="main"]', { timeout: 30_000 });
+  const texto = await pagina.locator('body').innerText();
+  afirmar(
+    !/volver a intentarlo|no se pudo|sin conexión/i.test(texto),
+    'el tablero renderiza sin estado de error',
+  );
 
   // ── La vuelta: volver a entrar NO debe pedir inscribir otra vez ──────────
   paso('4 · segunda entrada: con el factor ya verificado');
@@ -268,8 +357,14 @@ const principal = async () => {
     doble.factores().filter((f) => f.status === 'verified').length === 1,
     'queda UN solo factor verificado: la inscripción no dejó residuo',
   );
+  afirmar(
+    respuestasMalas.length === 0,
+    `ninguna petición del propio origen falló (${respuestasMalas.join(', ') || 'ninguna'})`,
+  );
   afirmar(errores.length === 0, `sin errores de consola en el navegador (${errores.length})`);
   if (errores.length > 0) errores.slice(0, 5).forEach((e) => console.log(`     · ${e}`));
+  writeFileSync('/tmp/ncr-camino-red.log', trazas.join('\n'));
+  console.log('   · trazas de red en /tmp/ncr-camino-red.log');
 
   await navegador.close();
   await doble.cerrar();
@@ -281,6 +376,10 @@ principal()
     volcarProcesos();
   })
   .finally(() => {
+    // La salida completa SIEMPRE queda en disco, pase o falle. Guardarla solo
+    // en el camino de excepción fue lo que obligó a repetir corridas enteras
+    // para leer una línea.
+    volcarADisco();
     cerrarTodo();
     console.log('');
     if (fallos > 0) {

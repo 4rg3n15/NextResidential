@@ -231,7 +231,26 @@ if [[ "$CON_BASE" == "1" ]]; then
     grep -E "ERROR|ASSERT" /tmp/ncr-arranque.log | head -5 | sed 's/^/     /'
   fi
 
-  paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base"
+  paso "12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero"
+# ETAPA 09-A · el intervalo de DT-12, cerrado. `arranque-en-frio` llega hasta
+# «la API acepta estos claims»; las pruebas de la consola usan dobles por
+# módulo. Entre las dos quedaba el camino que recorre una persona, y ahí
+# vivieron cuatro rondas de defectos: el gancho de claims, el arranque en frío,
+# la carrera del 503 y el QR que no se pintaba. Esto levanta la API y la consola
+# COMPILADA contra un doble de GoTrue con su semántica real y conduce Chromium.
+if [[ -x "$(command -v node)" ]] && [[ -d /opt/pw-browsers ]]; then
+  if con_limite "$LIMITE_LARGO" node e2e/camino-de-acceso.mjs >/tmp/ncr-camino.log 2>&1; then
+    ok "el camino completo se recorre en el navegador"
+  else
+    mal "el camino del navegador está roto (ver /tmp/ncr-camino.log)"
+    grep -E "✗" /tmp/ncr-camino.log | head -5 | sed 's/^/     /'
+  fi
+else
+  # Una omisión NO es un verde: se dice, y se dice qué falta.
+  mal "camino del navegador OMITIDO: falta Chromium (PLAYWRIGHT_BROWSERS_PATH)"
+fi
+
+paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base"
   # Estas dos pruebas se OMITEN solas si no alcanzan la base, y una omisión no
   # es un verde. Se comprueba la marca «OMITIDA» de su salida: sin esto, el
   # paso daba «✓ UPDATE y DELETE rechazados» con el servidor caído — que es

@@ -1,7 +1,7 @@
 'use client';
 
 import type { JSX } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Boton } from '@/componentes/ui/boton';
 
 /**
@@ -32,11 +32,22 @@ export const CodigosDeRecuperacion = ({
   const [guardados, setGuardados] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
+  /**
+   * **El último intento manda, y aquí importa más que en cualquier otra
+   * pantalla.** El modo estricto de React lanza dos peticiones, y cada llamada
+   * a `/auth/mfa/codigos` **invalida el juego anterior**: solo el último
+   * conjunto emitido sirve. Si se pintara la respuesta que llegue primero, el
+   * titular podría estar apuntando diez códigos que ya no abren nada — y lo
+   * descubriría el día que pierda el teléfono, que es el peor momento posible.
+   */
+  const intentoVigente = useRef(0);
+
   useEffect(() => {
-    let vivo = true;
+    const intento = intentoVigente.current + 1;
+    intentoVigente.current = intento;
     void fetch('/api/ncr/auth/mfa/codigos', { method: 'POST', credentials: 'same-origin' })
       .then(async (r) => {
-        if (!vivo) return;
+        if (intento !== intentoVigente.current) return;
         if (!r.ok) {
           // No es un bloqueo: el segundo factor ya está activo y se puede
           // entrar. Los códigos se regeneran después desde el perfil.
@@ -47,10 +58,12 @@ export const CodigosDeRecuperacion = ({
         setCodigos(datos.codigos ?? []);
       })
       .catch(() => {
-        if (vivo) setError('No se pudieron generar los códigos.');
+        if (intento === intentoVigente.current) {
+          setError('No se pudieron generar los códigos.');
+        }
       });
     return () => {
-      vivo = false;
+      intentoVigente.current += 1;
     };
   }, []);
 
