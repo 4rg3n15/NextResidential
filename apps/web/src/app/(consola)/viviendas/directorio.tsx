@@ -15,6 +15,7 @@ import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useViviendas } from '@/lib/api/consultas';
+import { CargaDePadron } from './carga-de-padron';
 
 /**
  * Directorio de viviendas.
@@ -186,7 +187,12 @@ export const DirectorioDeViviendas = ({
             </>
           )
         }
-        acciones={<Boton onClick={() => setAlta(true)}>Nueva vivienda</Boton>}
+        acciones={
+          <>
+            <CargaDePadron alTerminar={() => void refrescar()} />
+            <Boton onClick={() => setAlta(true)}>Nueva vivienda</Boton>
+          </>
+        }
       />
 
       <TablaDeDatos
