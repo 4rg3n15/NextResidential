@@ -9,7 +9,7 @@ import { RELOJ } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import { Publico } from '../comun/decoradores';
-import { ProveedorDeJwks } from '../autenticacion';
+import { ProveedorDeJwks, describirEstadoDeJwks } from '../autenticacion';
 import type { Configuracion } from '../configuracion/esquema';
 import { ListoDto, SaludDto } from './respuestas';
 
@@ -57,7 +57,12 @@ export class SaludController {
       configuracion: this.config.origenesPermitidos.length > 0 ? 'ok' : 'incompleta',
       // Sin JWKS la API no puede verificar ningún token: no está lista para
       // atender tráfico, pero el proceso está sano. Por eso 503 y no una caída.
-      jwks: (await this.jwks.precalentar()) ? 'ok' : 'no-disponible',
+      //
+      // El estado se publica con su NOMBRE —`inalcanzable`, `sin-claves`— y no
+      // como un «no-disponible» genérico: quien mira esta respuesta a las tres
+      // de la mañana necesita saber si arregla el entorno o el panel. El
+      // detalle del error no viaja: `/ready` es pública.
+      jwks: describirEstadoDeJwks(await this.jwks.sondear()),
       postgres: 'no-conectado-etapa-04',
     };
     if (dependencias.configuracion !== 'ok' || dependencias.jwks !== 'ok') {

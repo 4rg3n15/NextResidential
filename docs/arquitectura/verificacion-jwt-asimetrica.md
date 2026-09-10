@@ -56,12 +56,38 @@ La verificación del token en la API, y las consecuencias de una expiración de
 ### 2.1 El endpoint
 
 ```
-https://<project-ref>.supabase.co/auth/v1/jwks
+https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
 ```
 
-Responde también en `/auth/v1/.well-known/jwks.json`. Devuelve un objeto JWKS
-con **solo las claves públicas** de las llaves de firma asimétricas. Si el
-proyecto no usa llaves asimétricas, no devuelve ninguna.
+Esa es la ruta, y es la única. Devuelve un objeto JWKS con **solo las claves
+públicas** de las llaves de firma asimétricas.
+
+> **Corrección del 2026-09-10 · D-60, bloqueante mientras estuvo puesta.** Este
+> documento daba como canónica `https://<ref>.supabase.co/auth/v1/jwks` y
+> relegaba la buena a un «responde también en». Es al revés, y no es un matiz:
+> **`/auth/v1/jwks` no existe**. Devuelve `404 page not found`, la API se queda
+> sin ninguna clave y rechaza **todos** los tokens. Nadie podía autenticarse, y
+> llevaba así desde que se escribió el documento.
+>
+> Verificado contra la fuente primaria, no por analogía: la documentación
+> oficial de Supabase (`supabase/supabase`, `apps/docs/content/guides/auth/jwts.mdx`)
+> documenta un único endpoint, `GET https://project-id.supabase.co/auth/v1/.well-known/jwks.json`,
+> y **no menciona `/auth/v1/jwks` en ninguna parte**.
+>
+> El error sobrevivió a nueve etapas y a más de mil pruebas porque el doble de
+> `e2e/doble-gotrue.mjs` servía el JWKS en la ruta equivocada: se había
+> construido con la forma del error. Es el patrón DT-12 —la API prueba su
+> puerto contra un doble y nadie toca el recurso real— y esta fue su
+> decimocuarta aparición. El doble ahora responde **solo** en la ruta real, y
+> devuelve 404 en la otra.
+
+### 2.1.1 Un JWKS que responde no es un JWKS que sirve
+
+Si el proyecto no tiene llaves asimétricas habilitadas, el endpoint responde
+**200 con `{"keys":[]}`** —así lo documenta Supabase—. Es el peor de los casos
+para quien vigila: hay endpoint, hay respuesta, hay JSON válido, y no se puede
+verificar ni un token. Por eso la sonda de disponibilidad exige **al menos una
+clave utilizable**, no solo que la descarga funcione (§2.3 y `/ready`).
 
 ### 2.2 Reglas de verificación — vinculantes
 

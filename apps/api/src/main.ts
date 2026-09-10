@@ -52,6 +52,13 @@ import { BitacoraEstructurada } from './comun/bitacora/bitacora-estructurada';
 import { AdaptadorDeBitacoraNest } from './comun/bitacora/adaptador-nest';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
+import { ProveedorDeJwks } from './autenticacion';
+import { comprobarRecursosExternos } from './arranque/recursos-externos';
+import {
+  recursoBucketDeEvidencia,
+  recursoJwks,
+  recursoRecuperacionDeContrasena,
+} from './arranque/recursos';
 
 async function arrancar(): Promise<void> {
   // Primero la configuración, antes de construir nada: si falta una variable,
@@ -79,6 +86,29 @@ async function arrancar(): Promise<void> {
 
   await app.listen(config.PORT);
   bitacora.registrar('info', 'API arrancada', { puerto: config.PORT, entorno: config.NODE_ENV });
+
+  /**
+   * Los recursos externos se comprueban AL ARRANCAR, hablando con el recurso
+   * real (DT-12). Se hace después de `listen` a propósito: si se hiciera antes,
+   * un endpoint lento retrasaría la apertura del puerto y el orquestador daría
+   * el despliegue por muerto. Aquí el proceso ya responde `/health`, y `/ready`
+   * sigue siendo quien decide si entra tráfico.
+   */
+  await comprobarRecursosExternos(
+    [
+      recursoJwks(app.get(ProveedorDeJwks)),
+      recursoBucketDeEvidencia({
+        supabaseUrl: config.SUPABASE_URL,
+        llaveSecreta: config.SUPABASE_SECRET_KEY,
+        bucket: config.EVIDENCIA_BUCKET,
+      }),
+      recursoRecuperacionDeContrasena({
+        urlDeRedireccion: config.RECUPERACION_URL_REDIRECCION,
+        origenesPermitidos: config.origenesPermitidos,
+      }),
+    ],
+    bitacora,
+  );
 
   /**
    * El interruptor del segundo factor se anuncia AL ARRANCAR, no solo cuando

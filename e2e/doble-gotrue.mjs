@@ -122,7 +122,18 @@ export const arrancarDobleGotrue = async () => {
     const cuerpo = await cuerpoDe(peticion);
     const sesion = sesionDe(peticion);
 
-    if (ruta === '/auth/v1/jwks') return responder(200, { keys: [jwk] });
+    /**
+     * El doble sirve el JWKS **solo** en la ruta real de Supabase. Antes lo
+     * servía en `/auth/v1/jwks`, que no existe en la plataforma: el doble se
+     * había construido con la forma del error, así que el camino e2e pasaba en
+     * verde mientras el proyecto real rechazaba todos los tokens. Un doble que
+     * responde donde el original no responde no prueba nada (DT-12).
+     */
+    if (ruta === '/auth/v1/.well-known/jwks.json') return responder(200, { keys: [jwk] });
+    if (ruta === '/auth/v1/jwks') {
+      respuesta.writeHead(404, { 'content-type': 'text/plain' });
+      return respuesta.end('404 page not found');
+    }
 
     if (ruta === '/auth/v1/token' && peticion.method === 'POST') {
       if (url.searchParams.get('grant_type') === 'refresh_token') {
@@ -226,7 +237,7 @@ export const arrancarDobleGotrue = async () => {
 
   return {
     url: emisor,
-    jwksUrl: `${emisor}/auth/v1/jwks`,
+    jwksUrl: `${emisor}/auth/v1/.well-known/jwks.json`,
     factores: () => factores.map((f) => ({ ...f })),
     cerrar: () => new Promise((listo) => servidor.close(listo)),
   };

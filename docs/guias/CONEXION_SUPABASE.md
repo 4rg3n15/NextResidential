@@ -64,12 +64,36 @@ secreto del proyecto y no lo tocan. Dos consecuencias prácticas:
 ### La URL del JWKS
 
 ```
-https://<project-ref>.supabase.co/auth/v1/jwks
+https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
 ```
 
-Responde también en `/auth/v1/.well-known/jwks.json`. Devuelve **solo claves
-públicas**: no hay nada secreto que proteger en ese endpoint, y por eso la
-verificación puede hacerse en cualquier servicio sin repartir secretos.
+Devuelve **solo claves públicas**: no hay nada secreto que proteger en ese
+endpoint, y por eso la verificación puede hacerse en cualquier servicio sin
+repartir secretos.
+
+> **Ojo con la ruta (D-60).** `https://<ref>.supabase.co/auth/v1/jwks` —sin
+> `.well-known`— **no existe**: devuelve `404 page not found`. Esta guía la dio
+> por buena hasta el 2026-09-10, y mientras lo hizo la API se quedaba sin
+> claves y rechazaba todos los tokens con `FIRMA_INVALIDA`. Si al pegar la
+> variable ve `/auth/v1/jwks`, está copiando el error.
+>
+> **Compruébelo antes de seguir**, con su `<project-ref>`:
+>
+> ```bash
+> curl -s -o /dev/null -w '%{http_code}\n' \
+>   "https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json"
+> ```
+>
+> Esperado: **`200`**. Y el contenido importa tanto como el código:
+>
+> ```bash
+> curl -s "https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json"
+> ```
+>
+> Esperado: un objeto con **al menos una clave** en `keys`. Si responde
+> `{"keys":[]}`, el endpoint está vivo pero el proyecto **no tiene llaves
+> asimétricas habilitadas** y no podrá verificarse ni un token: vaya a
+> _Project Settings › JWT Keys_ y migre a llave asimétrica antes de continuar.
 
 ### Por qué la cadena directa y la de _pooler_ no son intercambiables
 

@@ -14,13 +14,36 @@ import { z } from 'zod';
  */
 const noVacio = (nombre: string) => z.string().trim().min(1, `${nombre} es obligatoria`);
 
+/**
+ * Un secreto tiene forma, y comprobar solo su LONGITUD deja pasar basura.
+ *
+ * El caso que motivó esto: un `.env` que no terminaba en salto de línea recibió
+ * una variable más al final y el valor quedó como
+ * `…secreto-realMFA_OBLIGATORIO=false`. Tenía más de 32 caracteres, así que
+ * `min(32)` lo aceptó, la API arrancó con un secreto de ingesta corrupto y con
+ * la otra variable **desaparecida** —nunca llegó a existir—. Ninguna firma del
+ * Alarm Server habría cuadrado jamás, y el diagnóstico habría sido «el hardware
+ * firma mal».
+ *
+ * Un secreto no lleva espacios ni caracteres de control: si los lleva, el valor
+ * se partió o se pegó, y en ninguno de los dos casos es el secreto que alguien
+ * quiso poner.
+ */
+const secreto = (nombre: string, minimo: number) =>
+  noVacio(nombre)
+    .min(minimo, `${nombre} debe tener al menos ${minimo} caracteres`)
+    // eslint-disable-next-line no-control-regex
+    .refine((v) => !/[\s\u0000-\u001f\u007f]/.test(v), {
+      message: `${nombre} contiene espacios o caracteres de control: el valor está partido o pegado a otro`,
+    });
+
 export const esquemaConfiguracion = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
 
   SUPABASE_URL: noVacio('SUPABASE_URL').url(),
-  SUPABASE_PUBLISHABLE_KEY: noVacio('SUPABASE_PUBLISHABLE_KEY'),
-  SUPABASE_SECRET_KEY: noVacio('SUPABASE_SECRET_KEY'),
+  SUPABASE_PUBLISHABLE_KEY: secreto('SUPABASE_PUBLISHABLE_KEY', 8),
+  SUPABASE_SECRET_KEY: secreto('SUPABASE_SECRET_KEY', 8),
   SUPABASE_JWKS_URL: noVacio('SUPABASE_JWKS_URL').url(),
 
   /**
@@ -68,7 +91,7 @@ export const esquemaConfiguracion = z.object({
    * no «cuando haga falta» porque §2.7.1 dice que la aplicación no arranca con
    * la configuración incompleta. El valor vive en el entorno, nunca en código.
    */
-  INGESTA_FIRMA_SECRETO: noVacio('INGESTA_FIRMA_SECRETO').min(32),
+  INGESTA_FIRMA_SECRETO: secreto('INGESTA_FIRMA_SECRETO', 32),
   /** Ventana de frescura de la firma, en segundos: acota la repetición. */
   INGESTA_VENTANA_SEGUNDOS: z.coerce.number().int().min(10).max(900).default(300),
 
@@ -85,7 +108,7 @@ export const esquemaConfiguracion = z.object({
    * toca la base: si viviera ahí, quien lea la base leería la llave y el
    * cifrado no protegería de la fuga que importa.
    */
-  BIOMETRIA_LLAVE: noVacio('BIOMETRIA_LLAVE').min(32),
+  BIOMETRIA_LLAVE: secreto('BIOMETRIA_LLAVE', 32),
   BIOMETRIA_LLAVE_REF: z
     .string()
     .regex(/^(env|vault):[A-Za-z0-9_./-]+$/, 'BIOMETRIA_LLAVE_REF es una referencia, no la llave')
@@ -94,6 +117,29 @@ export const esquemaConfiguracion = z.object({
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 
   LIMITE_PAYLOAD: z.string().default('256kb'),
+
+  /**
+   * Bucket privado de evidencia (RN-21). Opcional mientras el almacén sea el
+   * provisional en memoria; en cuanto se declara, el arranque comprueba que
+   * existe, que es privado y que un `GET` sin firmar se rechaza de verdad.
+   */
+  EVIDENCIA_BUCKET: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9-]{1,62}$/, 'EVIDENCIA_BUCKET no tiene forma de nombre de bucket')
+    .optional(),
+
+  /**
+   * A dónde vuelve el enlace del correo de recuperación. Opcional porque el
+   * SMTP y la plantilla se configuran en el panel de Supabase y este despliegue
+   * puede no tenerlos todavía; si se declara, el arranque exige que su origen
+   * esté entre los admitidos por CORS.
+   */
+  RECUPERACION_URL_REDIRECCION: z
+    .string()
+    .trim()
+    .url('RECUPERACION_URL_REDIRECCION debe ser una URL absoluta')
+    .optional(),
   THROTTLE_TTL_SEGUNDOS: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMITE: z.coerce.number().int().positive().default(120),
 
@@ -135,7 +181,44 @@ export class ErrorDeConfiguracion extends Error {
  * ni se incluye en el mensaje de error: un fallo de arranque no puede volcar
  * una llave a los logs (§2.7.8).
  */
+/**
+ * Detecta el `.env` sin salto de línea final.
+ *
+ * Cuando un fichero no termina en `\n` y se le añade una línea, las dos se
+ * funden: `INGESTA_FIRMA_SECRETO=abc` + `MFA_OBLIGATORIO=false` produce un
+ * único par cuyo valor es `abcMFA_OBLIGATORIO=false`. El resultado es doblemente
+ * malo —un valor corrupto y una variable que nunca existió— y lo peor es que
+ * no tiene por qué violar ninguna regla de longitud ni de formato.
+ *
+ * Lo que sí es inconfundible es que el valor de una variable contenga **el
+ * nombre de otra variable de este mismo esquema** seguido de `=`. Ningún
+ * secreto, ninguna URL y ningún origen legítimo lo hacen. Buscar solo nuestros
+ * propios nombres es lo que evita los falsos positivos: un `?sslmode=require`
+ * dentro de `DATABASE_URL` no se parece a esto.
+ */
+const nombresDelEsquema = Object.keys(esquemaConfiguracion.shape);
+
+export const detectarVariablePegada = (entorno: NodeJS.ProcessEnv): readonly string[] =>
+  nombresDelEsquema.flatMap((clave) => {
+    const valor = entorno[clave];
+    if (typeof valor !== 'string' || valor.length === 0) return [];
+    const pegada = nombresDelEsquema.find((otra) => otra !== clave && valor.includes(`${otra}=`));
+    return pegada === undefined
+      ? []
+      : [
+          `${clave}: su valor contiene «${pegada}=» pegado al final. Es el síntoma de un fichero ` +
+            `.env que no termina en salto de línea: ${clave} quedó corrupta y ${pegada} nunca llegó ` +
+            'a definirse. Añade el salto de línea y vuelve a arrancar',
+        ];
+  });
+
 export const cargarConfiguracion = (entorno: NodeJS.ProcessEnv): Configuracion => {
+  // Se comprueba ANTES del esquema: el mensaje que explica la causa real vale
+  // más que un «no tiene al menos 32 caracteres» sobre un valor que sí los
+  // tiene, y que dejaría al lector buscando en el sitio equivocado.
+  const pegadas = detectarVariablePegada(entorno);
+  if (pegadas.length > 0) throw new ErrorDeConfiguracion(pegadas);
+
   const analisis = esquemaConfiguracion.safeParse(entorno);
   if (!analisis.success) {
     throw new ErrorDeConfiguracion(

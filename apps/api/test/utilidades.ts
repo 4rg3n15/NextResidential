@@ -20,7 +20,7 @@ export const configuracionDePrueba: Configuracion = {
   SUPABASE_URL: 'https://proyecto-de-prueba.invalid',
   SUPABASE_PUBLISHABLE_KEY: 'marcador',
   SUPABASE_SECRET_KEY: 'marcador',
-  SUPABASE_JWKS_URL: 'https://proyecto-de-prueba.invalid/auth/v1/jwks',
+  SUPABASE_JWKS_URL: 'https://proyecto-de-prueba.invalid/auth/v1/.well-known/jwks.json',
   // La suite corre con la regla del contrato EN VIGOR. El interruptor tiene sus
   // propias pruebas, que lo apagan explícitamente: si el valor por defecto de
   // la suite fuera `false`, las 363 pruebas dejarían de comprobar RN-20 sin que
@@ -136,7 +136,7 @@ export const crearApp = async (
       // `obtener()` devuelve la función que `jose` usa para resolver la clave
       // a partir del encabezado. Aquí resuelve siempre a la pública local.
       obtener: () => async () => firmante.clavePublica,
-      precalentar: async () => true,
+      sondear: async () => ({ estado: 'ok', claves: 1 }),
       disponible: true,
     })
     .compile();

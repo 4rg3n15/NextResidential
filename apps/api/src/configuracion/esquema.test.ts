@@ -5,7 +5,7 @@ const completo = {
   SUPABASE_URL: 'https://ref.supabase.co',
   SUPABASE_PUBLISHABLE_KEY: 'valor-de-prueba',
   SUPABASE_SECRET_KEY: 'valor-de-prueba',
-  SUPABASE_JWKS_URL: 'https://ref.supabase.co/auth/v1/jwks',
+  SUPABASE_JWKS_URL: 'https://ref.supabase.co/auth/v1/.well-known/jwks.json',
   DATABASE_URL: 'valor-de-prueba',
   DATABASE_POOLER_URL: 'valor-de-prueba',
   CORS_ALLOWED_ORIGINS: 'https://consola.ejemplo.co, https://admin.ejemplo.co',
