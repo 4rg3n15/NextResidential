@@ -207,6 +207,16 @@ else
   mal "atributo \`style\` en la consola: la CSP lo rechaza (§2.7.7)"
   echo "$salida_csp" | head -8 | sed 's/^/     /'
 fi
+# BLOQUE 6 · el modo oscuro se rompe por un color literal que alguien dejó
+# suelto: `bg-white` junto a `text-texto` se ve bien en claro y en oscuro deja
+# etiqueta clara sobre fondo blanco. Todo color tiene que salir de un token con
+# pareja medida en los dos temas (`packages/config/src/temas.ts`).
+if salida_tema=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-tema.mjs 2>&1); then
+  ok "${salida_tema#OK }"
+else
+  mal "color fuera del sistema de temas: no tiene pareja que medir en oscuro"
+  echo "$salida_tema" | head -8 | sed 's/^/     /'
+fi
 # ADR-005 · una clave ajena hacia una tabla append-only NO se puede insertar
 # jamás: la comprobación exige un bloqueo de fila que la revocación impide. El
 # defecto vivió cinco etapas porque las tablas estaban vacías (ETAPA 06).

@@ -46,3 +46,79 @@ export class AlcanceDeCopropiedadesDto {
   })
   alcanceGlobal!: boolean;
 }
+
+/**
+ * Configuración de una copropiedad: lo editable, lo de solo lectura, y **qué
+ * puede tocar el llamante**.
+ *
+ * `editables` viaja en la respuesta a propósito. La alternativa —que la consola
+ * reprodujera la tabla de permisos— garantiza que las dos se separen: el día
+ * que un ajuste cambie de rol, la consola seguiría pintando el campo abierto y
+ * el servidor devolviendo 422. Aquí la regla se declara una vez, en la API, y
+ * la consola la obedece.
+ */
+export class ConfiguracionDeCopropiedadDto {
+  @ApiProperty({ example: 'Urbanización Mira' }) nombre!: string;
+  @ApiProperty({ example: 'America/Bogota' }) zonaHoraria!: string;
+
+  @ApiProperty({
+    example: 0.85,
+    description:
+      'Por debajo de este valor la lectura de placa NO decide sola: escala al portero ' +
+      '(CU-01, excepción 3a). Sólo el superadministrador lo cambia.',
+  })
+  umbralConfianzaPlaca!: number;
+
+  @ApiProperty({
+    enum: ['denegar', 'escalar_portero'],
+    description:
+      'Respuesta del Edge cuando la regla no está en su caché (RN-16). «denegar» es el ' +
+      'valor conservador que impone §2.1.4.',
+  })
+  politicaContingenciaEdge!: string;
+
+  @ApiProperty({ example: 5 }) umbralLatidoMinutos!: number;
+
+  @ApiProperty({ description: 'Solo lectura: identidad fiscal, con índice único.' })
+  nit!: string;
+
+  @ApiProperty({ description: 'Solo lectura: suspender un tenant no es configurar.' })
+  estado!: string;
+
+  @ApiProperty({
+    example: 24,
+    description: 'Solo lectura: cota legal de la Ley 1581 de 2012, no valor por defecto.',
+  })
+  plazoConsentimientoHoras!: number;
+
+  @ApiProperty({
+    example: 24,
+    description: 'Solo lectura: sostiene el marcado de decisión con caché obsoleto (KPI-31).',
+  })
+  margenCacheReglasHoras!: number;
+
+  @ApiProperty({ example: 3 }) versionReglasActual!: number;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Ajustes que ESTE rol puede cambiar. La consola deshabilita el resto.',
+  })
+  editables!: string[];
+}
+
+export class RechazoDeAjusteDto {
+  @ApiProperty({ example: 'umbralConfianzaPlaca' }) clave!: string;
+  @ApiProperty({ example: 'debe estar entre 0,500 y 1,000' }) motivo!: string;
+}
+
+export class ConfiguracionRechazadaDto {
+  @ApiProperty({ example: 422 }) codigo!: number;
+
+  @ApiProperty({
+    type: [RechazoDeAjusteDto],
+    description:
+      'TODOS los rechazos, no el primero: quien corrige un formulario necesita ver los ' +
+      'cinco errores de una vez, no descubrirlos de uno en uno.',
+  })
+  rechazos!: RechazoDeAjusteDto[];
+}

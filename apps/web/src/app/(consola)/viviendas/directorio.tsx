@@ -215,7 +215,7 @@ export const DirectorioDeViviendas = ({
                 onChange={(e) => setBusqueda(e.target.value)}
                 placeholder="Identificador, manzana o dirección"
                 aria-label="Buscar viviendas en el padrón"
-                className="w-64 rounded-campo border border-borde bg-white px-2 py-1.5 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+                className="w-64 rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
               />
             </label>
             <label className="flex items-center gap-2 text-secundario">
@@ -223,7 +223,7 @@ export const DirectorioDeViviendas = ({
               <select
                 value={estado}
                 onChange={(e) => setEstado(e.target.value as '' | 'activo' | 'inactivo')}
-                className="rounded-campo border border-borde bg-white px-2 py-1.5 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
               >
                 <option value="">Todas</option>
                 <option value="activo">Activas</option>

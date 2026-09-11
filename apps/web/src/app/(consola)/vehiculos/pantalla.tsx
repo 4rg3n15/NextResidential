@@ -241,7 +241,7 @@ export const PantallaDeVehiculos = ({
           <select
             value={viviendaId}
             onChange={(e) => setViviendaId(e.target.value)}
-            className="w-full rounded-campo border border-borde bg-white px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+            className="w-full rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
           >
             <option value="">Selecciona una vivienda activa</option>
             {(viviendas.data?.viviendas ?? []).map((v) => (
@@ -256,7 +256,7 @@ export const PantallaDeVehiculos = ({
           <select
             value={tipo}
             onChange={(e) => setTipo(e.target.value as (typeof TIPOS)[number]['valor'])}
-            className="w-full rounded-campo border border-borde bg-white px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+            className="w-full rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
           >
             {TIPOS.map((t) => (
               <option key={t.valor} value={t.valor}>

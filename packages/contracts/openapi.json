@@ -905,6 +905,116 @@
         ]
       }
     },
+    "/copropiedades/{id}/configuracion": {
+      "get": {
+        "operationId": "CopropiedadesController_leerConfiguracion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionDeCopropiedadDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Fuera del alcance del token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lee la configuración de una copropiedad del alcance",
+        "tags": [
+          "multiempresa"
+        ]
+      },
+      "patch": {
+        "operationId": "CopropiedadesController_cambiarConfiguracion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiosDeConfiguracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionDeCopropiedadDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Fuera del alcance del token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ajuste no editable por este rol, o valor fuera de los límites de negocio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionRechazadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia la configuración editable y lo anota en auditoria_seguridad",
+        "tags": [
+          "multiempresa"
+        ]
+      }
+    },
     "/copropiedades/{id}/dispositivos/pendientes": {
       "get": {
         "operationId": "DispositivosController_pendientes",
@@ -2720,6 +2830,34 @@
           "desactivado"
         ]
       },
+      "CambiosDeConfiguracionDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Urbanización Mira"
+          },
+          "zonaHoraria": {
+            "type": "string",
+            "example": "America/Bogota"
+          },
+          "umbralConfianzaPlaca": {
+            "type": "number",
+            "example": 0.85
+          },
+          "politicaContingenciaEdge": {
+            "type": "string",
+            "enum": [
+              "denegar",
+              "escalar_portero"
+            ]
+          },
+          "umbralLatidoMinutos": {
+            "type": "number",
+            "example": 5
+          }
+        }
+      },
       "CapturarRostroDto": {
         "type": "object",
         "properties": {
@@ -2812,6 +2950,98 @@
         "required": [
           "codigos",
           "cantidad"
+        ]
+      },
+      "ConfiguracionDeCopropiedadDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Urbanización Mira"
+          },
+          "zonaHoraria": {
+            "type": "string",
+            "example": "America/Bogota"
+          },
+          "umbralConfianzaPlaca": {
+            "type": "number",
+            "example": 0.85,
+            "description": "Por debajo de este valor la lectura de placa NO decide sola: escala al portero (CU-01, excepción 3a). Sólo el superadministrador lo cambia."
+          },
+          "politicaContingenciaEdge": {
+            "type": "string",
+            "enum": [
+              "denegar",
+              "escalar_portero"
+            ],
+            "description": "Respuesta del Edge cuando la regla no está en su caché (RN-16). «denegar» es el valor conservador que impone §2.1.4."
+          },
+          "umbralLatidoMinutos": {
+            "type": "number",
+            "example": 5
+          },
+          "nit": {
+            "type": "string",
+            "description": "Solo lectura: identidad fiscal, con índice único."
+          },
+          "estado": {
+            "type": "string",
+            "description": "Solo lectura: suspender un tenant no es configurar."
+          },
+          "plazoConsentimientoHoras": {
+            "type": "number",
+            "example": 24,
+            "description": "Solo lectura: cota legal de la Ley 1581 de 2012, no valor por defecto."
+          },
+          "margenCacheReglasHoras": {
+            "type": "number",
+            "example": 24,
+            "description": "Solo lectura: sostiene el marcado de decisión con caché obsoleto (KPI-31)."
+          },
+          "versionReglasActual": {
+            "type": "number",
+            "example": 3
+          },
+          "editables": {
+            "description": "Ajustes que ESTE rol puede cambiar. La consola deshabilita el resto.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "nombre",
+          "zonaHoraria",
+          "umbralConfianzaPlaca",
+          "politicaContingenciaEdge",
+          "umbralLatidoMinutos",
+          "nit",
+          "estado",
+          "plazoConsentimientoHoras",
+          "margenCacheReglasHoras",
+          "versionReglasActual",
+          "editables"
+        ]
+      },
+      "ConfiguracionRechazadaDto": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "number",
+            "example": 422
+          },
+          "rechazos": {
+            "description": "TODOS los rechazos, no el primero: quien corrige un formulario necesita ver los cinco errores de una vez, no descubrirlos de uno en uno.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RechazoDeAjusteDto"
+            }
+          }
+        },
+        "required": [
+          "codigo",
+          "rechazos"
         ]
       },
       "ConfigurarZonaDto": {
@@ -3858,6 +4088,23 @@
         "required": [
           "semana",
           "total"
+        ]
+      },
+      "RechazoDeAjusteDto": {
+        "type": "object",
+        "properties": {
+          "clave": {
+            "type": "string",
+            "example": "umbralConfianzaPlaca"
+          },
+          "motivo": {
+            "type": "string",
+            "example": "debe estar entre 0,500 y 1,000"
+          }
+        },
+        "required": [
+          "clave",
+          "motivo"
         ]
       },
       "RecuperacionDeFactorDto": {

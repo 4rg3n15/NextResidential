@@ -28,8 +28,11 @@ const Acceso = async (): Promise<JSX.Element> => {
   if (sesion !== null) redirect(rutaInicialDe(sesion.rol as Rol));
 
   return (
-    <MarcoDeAcceso titulo="Iniciar sesión" descripcion="Accede con el correo de tu copropiedad.">
-      <FormularioDeAcceso className="mt-8" />
+    <MarcoDeAcceso
+      titulo="Bienvenido"
+      descripcion="Accede con el correo de tu copropiedad. El sistema te lleva a la superficie que corresponde a tu rol."
+    >
+      <FormularioDeAcceso />
     </MarcoDeAcceso>
   );
 };

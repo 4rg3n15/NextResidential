@@ -120,10 +120,22 @@ export const recursoBucketDeEvidencia = (opciones: {
       };
     }
 
-    // Segunda mitad: que la privacidad se cumpla, no solo que esté declarada.
-    // Se pide un objeto que no existe SIN credencial: si el bucket fuese
-    // público, Storage respondería 404 «objeto no encontrado»; siendo privado,
-    // responde 400/401/403 porque ni siquiera llega a mirar si existe.
+    /**
+     * Segunda mitad: que la privacidad se cumpla, no solo que esté declarada.
+     * Se pide un objeto SIN credencial; siendo privado, Storage responde
+     * 400/401/403 porque ni siquiera llega a mirar si existe.
+     *
+     * **Lo que esta sonda NO puede demostrar, dicho aquí para que nadie lea el
+     * verde como más de lo que es.** El objeto que pide no existe, así que un
+     * bucket declarado privado pero con una política permisiva sobre
+     * `storage.objects` respondería 404 y pasaría. Demostrar el negativo exige
+     * un objeto REAL, y subir uno en cada arranque de la API sería escribir en
+     * el almacén de evidencia cada vez que el proceso se reinicia.
+     *
+     * Esa comprobación existe y es un procedimiento de operador:
+     * `scripts/verificar-bucket-evidencia.mjs`, documentado en
+     * `docs/guias/CONEXION_SUPABASE.md` §7.2.
+     */
     let anonima: Response;
     try {
       anonima = await pedir(
@@ -145,7 +157,9 @@ export const recursoBucketDeEvidencia = (opciones: {
 
     return {
       estado: 'ok',
-      detalle: `bucket «${bucket}» existe, es privado, y un GET sin firmar responde ${anonima.status}`,
+      detalle:
+        `bucket «${bucket}» existe, es privado, y un GET sin firmar responde ${anonima.status} ` +
+        '(sobre objeto inexistente; el negativo con objeto real lo ejerce scripts/verificar-bucket-evidencia.mjs)',
     };
   },
 });

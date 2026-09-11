@@ -17,6 +17,9 @@ import {
 } from '../src/multiempresa/repositorio-copropiedades';
 import type { Configuracion } from '../src/configuracion/esquema';
 import type { Rol } from '../src/autenticacion/dominio/claims';
+import { BITACORA } from '@ncr/domain-core';
+import type { Bitacora } from '@ncr/domain-core';
+import { FiltroGlobalDeExcepciones } from '../src/comun/filtros/filtro-global';
 
 export const COP_A = '10000000-0000-4000-8000-000000000001';
 export const COP_B = '10000000-0000-4000-8000-000000000002';
@@ -196,6 +199,20 @@ export const crearApp = async (
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
+  /**
+   * EL MISMO FILTRO GLOBAL QUE PRODUCCIÓN.
+   *
+   * Faltaba, y la consecuencia no era teórica: `main.ts` envuelve todo error en
+   * `{ estado, correlacion, mensaje }`, mientras que aquí salía el cuerpo por
+   * defecto de Nest. Es decir, **toda aserción de esta suite sobre un cuerpo de
+   * error estaba comprobando una forma que el despliegue no produce**, y una
+   * pantalla escrita contra lo que la suite ve habría leído el campo
+   * equivocado en producción sin que nada fallara en verde.
+   *
+   * Apareció al montar el 422 de configuración (bloque 7), que es el primer
+   * error cuyo CUERPO la consola necesita —los rechazos por campo—.
+   */
+  app.useGlobalFilters(new FiltroGlobalDeExcepciones(app.get<Bitacora>(BITACORA)));
   await app.init();
 
   /**

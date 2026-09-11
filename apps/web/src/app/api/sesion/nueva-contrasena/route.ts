@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { configuracion } from '@/lib/configuracion';
 import { borrarSesion, guardarSesion, marcarFactorPendiente } from '@/lib/sesion/cookies';
+import { contrasenaValida, motivoDeRechazo } from '@/lib/politica-contrasena';
 import {
   FalloDeAcceso,
   cambiarContrasena,
@@ -27,8 +28,6 @@ export const runtime = 'nodejs';
  * `@SinSegundoFactor()`: la sesión de recuperación es `aal1`.
  */
 const POR_IP = new Limitador({ permitidos: 20, ventanaMs: 15 * 60_000 });
-
-const LONGITUD_MINIMA = 12;
 
 export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
   const limite = POR_IP.consultar(ipDe(peticion.headers));
@@ -56,15 +55,21 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
       { status: 400 },
     );
   }
-  // La política real la impone Supabase; esto solo evita el viaje cuando la
-  // contraseña es obviamente insuficiente, y da un mensaje mejor.
-  if (
-    typeof contrasena !== 'string' ||
-    contrasena.length < LONGITUD_MINIMA ||
-    contrasena.length > 256
-  ) {
+  /**
+   * La política se comprueba AQUÍ y con el mismo módulo que usa el formulario.
+   *
+   * Supabase también la impone por su cuenta, y ese es justamente el motivo de
+   * que este control exista y no sobre: si los dos umbrales difieren, el
+   * usuario ve nuestra pantalla aceptando y la respuesta de Supabase
+   * rechazando, con dos textos distintos y sin saber a cuál hacer caso. Los
+   * pasos para alinear el panel están en `RECUPERACION_Y_USUARIOS.md` §A.4.
+   *
+   * La validación del cliente es cortesía de UX; la que cuenta es esta (§2.7.3).
+   */
+  if (typeof contrasena !== 'string' || !contrasenaValida(contrasena)) {
+    const detalle = typeof contrasena === 'string' ? motivoDeRechazo(contrasena) : null;
     return NextResponse.json(
-      { mensaje: textoDeFalloDeAcceso('CONTRASENA_DEBIL') },
+      { mensaje: detalle ?? textoDeFalloDeAcceso('CONTRASENA_DEBIL') },
       { status: 400 },
     );
   }

@@ -152,7 +152,24 @@ export const TablaDeDatos = <T,>({
                     key={claveDeFila(fila)}
                     className={cn(
                       'h-fila border-b border-borde-suave last:border-b-0',
-                      alPulsarFila !== undefined && 'cursor-pointer hover:bg-lienzo',
+                      /**
+                       * El reposo se transiciona y el `hover` se limita a los
+                       * punteros finos.
+                       *
+                       * `@media (hover: hover) and (pointer: fine)` no es
+                       * ceremonia: en una tableta —y la portería usa
+                       * tabletas— el toque dispara `hover`, así que la fila se
+                       * quedaba resaltada después de tocarla, como si
+                       * estuviera seleccionada. Resaltar lo que no lo está es
+                       * peor que no resaltar nada.
+                       *
+                       * 100 ms: por debajo no se percibe, por encima el
+                       * resaltado va por detrás del cursor al recorrer la
+                       * tabla.
+                       */
+                      'transition-colors duration-100 ease-salida motion-reduce:transition-none',
+                      alPulsarFila !== undefined &&
+                        'cursor-pointer [@media(hover:hover)and(pointer:fine)]:hover:bg-lienzo',
                     )}
                     {...(alPulsarFila === undefined
                       ? {}

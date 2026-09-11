@@ -106,7 +106,7 @@ export const DialogoDeConfirmacion = ({
               onChange={(e) => setMotivo(e.target.value)}
               aria-describedby={`${idMotivo}-ayuda`}
               aria-invalid={motivo.length > 0 && !suficiente}
-              className="w-full rounded-campo border border-borde bg-white p-3 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+              className="w-full rounded-campo border border-borde bg-campo p-3 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
               placeholder="Describe por qué se toma esta decisión"
             />
             <p id={`${idMotivo}-ayuda`} className="text-secundario text-texto-apagado">

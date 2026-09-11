@@ -6,9 +6,18 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
+import { cn } from '@/lib/cn';
+import { REQUISITOS, contrasenaValida, requisitosCumplidos } from '@/lib/politica-contrasena';
 
-/** Misma longitud mínima que valida el servidor, para no prometer de menos. */
-export const LONGITUD_MINIMA = 12;
+/**
+ * La política vive en UN solo módulo, compartido con el servidor.
+ *
+ * Aquí había una constante y en la ruta del servidor otra igual, cada una con
+ * un comentario diciendo que coincidía con la otra. Dos números que hay que
+ * acordarse de mover a la vez acaban separándose, y entonces el usuario lee una
+ * regla en pantalla y recibe otra en la respuesta.
+ */
+export { LONGITUD_MINIMA } from '@/lib/politica-contrasena';
 
 /**
  * Establecimiento de la contraseña nueva.
@@ -50,7 +59,8 @@ export const FormularioDeNuevaContrasena = ({
     );
   }
 
-  const suficiente = contrasena.length >= LONGITUD_MINIMA;
+  const cumplidos = requisitosCumplidos(contrasena);
+  const suficiente = contrasenaValida(contrasena);
   const coinciden = contrasena === repetida;
 
   return (
@@ -93,9 +103,47 @@ export const FormularioDeNuevaContrasena = ({
           autoFocus
           value={contrasena}
           onChange={(e) => setContrasena(e.target.value)}
-          ayuda={`Al menos ${LONGITUD_MINIMA} caracteres. No reutilices la anterior.`}
+          ayuda="No reutilices la anterior."
           error={error}
+          aria-describedby="requisitos-contrasena"
         />
+        {/**
+         * Los cinco requisitos, marcándose en vivo.
+         *
+         * Se muestran TODOS desde el principio en vez de ir reprochando uno
+         * cada vez: decir «falta una mayúscula», y al corregirlo «falta un
+         * número», obliga a descubrir la regla a base de intentos.
+         *
+         * `aria-live="polite"` y no `assertive`: el lector anuncia el cambio al
+         * terminar de teclear, sin interrumpir cada pulsación. Y el estado no
+         * se transmite solo por color —hay un símbolo y texto—, porque §5.6.2
+         * lo exige y porque el verde y el gris son el mismo gris para quien no
+         * distingue el verde.
+         */}
+        <ul id="requisitos-contrasena" aria-live="polite" className="space-y-1">
+          {REQUISITOS.map((r) => {
+            const cumple = cumplidos[r.clave];
+            return (
+              <li key={r.clave} className="flex items-center gap-2 text-secundario">
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none transition-colors duration-150 motion-reduce:transition-none',
+                    cumple
+                      ? 'border-exito bg-exito-suave text-exito'
+                      : 'border-borde text-texto-apagado',
+                  )}
+                >
+                  {cumple ? '✓' : ''}
+                </span>
+                <span className={cumple ? 'text-texto' : 'text-texto-apagado'}>
+                  {r.texto}
+                  <span className="sr-only">{cumple ? ' · cumplido' : ' · pendiente'}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
         <Campo
           etiqueta="Repite la contraseña"
           name="repetida"

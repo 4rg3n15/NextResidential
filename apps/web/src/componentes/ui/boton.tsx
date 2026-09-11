@@ -21,8 +21,14 @@ export type TamanoDeBoton = 'sm' | 'md' | 'lg';
 const VARIANTES: Readonly<Record<VarianteDeBoton, string>> = {
   primario: 'bg-marca-boton text-white hover:bg-marca-presionado active:bg-marca-presionado',
   peligro: 'bg-peligro-boton text-white hover:bg-marca-presionado active:bg-marca-presionado',
-  exito: 'bg-exito text-white hover:bg-exito-texto active:bg-exito-texto',
-  secundario: 'bg-white text-texto border border-borde hover:bg-borde-suave',
+  // `bg-exito` (#10B981) con etiqueta blanca daba **2,537 : 1** — menos de la
+  // mitad de lo que AA exige, y llevaba nueve pantallas en el tema CLARO sin
+  // que nadie lo viera, porque ese par no estaba declarado en ninguna parte.
+  // Lo destapó declarar las parejas fondo/texto en `packages/config/temas.ts`.
+  exito: 'bg-exito-boton text-white hover:bg-exito-presionado active:bg-exito-presionado',
+  // `bg-campo` y no `bg-white`: en oscuro, un blanco literal junto a
+  // `text-texto` —que sí se aclara— produce etiqueta clara sobre fondo blanco.
+  secundario: 'bg-campo text-texto border border-borde hover:bg-borde-suave',
   fantasma: 'bg-transparent text-texto-apagado hover:bg-borde-suave hover:text-texto',
 };
 
@@ -63,7 +69,24 @@ export const Boton = forwardRef<HTMLButtonElement, PropiedadesDeBoton>(function 
       disabled={disabled === true || cargando}
       className={cn(
         'inline-flex items-center justify-center rounded-boton font-medium',
-        'transition-colors duration-150 motion-reduce:transition-none',
+        /**
+         * **`active:scale-[0.97]` — el botón responde a la pulsación.**
+         *
+         * Es el detalle que más separa una interfaz que «se siente» de una que
+         * solo funciona: sin él, entre pulsar y que ocurra algo no hay ninguna
+         * señal de que el sistema oyó. Con él, la confirmación es instantánea
+         * aunque la petición tarde.
+         *
+         * 0,97 y no 0,9: tiene que percibirse, no verse. Se anima `transform`
+         * y `colors` —las dos propiedades que la GPU resuelve sin recalcular
+         * disposición ni repintar—, nunca `all`.
+         *
+         * 150 ms con la curva de salida propia: por debajo de 100 no se
+         * percibe como movimiento, por encima de 200 el botón parece pastoso.
+         */
+        'transition-[transform,background-color,color,border-color] duration-150 ease-salida',
+        'active:scale-[0.97] disabled:active:scale-100',
+        'motion-reduce:transition-none motion-reduce:active:scale-100',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto focus-visible:ring-offset-2',
         'disabled:cursor-not-allowed disabled:opacity-50',
         VARIANTES[variante],

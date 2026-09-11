@@ -9,6 +9,7 @@ import { PantallaDeZonas } from './zonas/pantalla';
 import { PantallaDeDispositivos } from './dispositivos/pantalla';
 import { PantallaDeEventos } from './eventos/pantalla';
 import { PantallaDeInformes } from './informes/pantalla';
+import { FormularioDeConfiguracion } from './configuracion/formulario';
 
 /**
  * **Los cinco estados de §6, en las SIETE pantallas.**
@@ -47,7 +48,7 @@ const Envoltura = ({ children }: { readonly children: ReactNode }): JSX.Element 
 };
 
 /**
- * Las siete, con el nombre con el que se las nombra en el informe. `informes`
+ * Las OCHO, con el nombre con el que se las nombra en el informe. `informes`
  * no consulta al abrirse —es una consulta cara y se pide con un botón—, así
  * que su caso lleva la pulsación.
  */
@@ -63,6 +64,10 @@ const PANTALLAS: readonly {
   { nombre: 'dispositivos', montar: () => <PantallaDeDispositivos copropiedadId={COP} /> },
   { nombre: 'eventos', montar: () => <PantallaDeEventos copropiedadId={COP} /> },
   { nombre: 'informes', montar: () => <PantallaDeInformes copropiedadId={COP} />, pedir: true },
+  // Bloque 7: la configuración dejó de ser una pantalla de lectura, así que
+  // entra en la misma batería. Un formulario que falla en blanco es peor que
+  // una tabla que falla en blanco: parece que no hay nada que configurar.
+  { nombre: 'configuración', montar: () => <FormularioDeConfiguracion copropiedadId={COP} /> },
 ];
 
 const montarYPedir = async (pantalla: (typeof PANTALLAS)[number]): Promise<void> => {

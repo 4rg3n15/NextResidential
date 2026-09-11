@@ -1,4 +1,6 @@
 import type { JSX, ReactNode } from 'react';
+import { ConmutadorDeTema } from '@/componentes/conmutador-tema';
+import { ShieldCheck } from 'lucide-react';
 import paquete from '../../../package.json';
 
 /**
@@ -17,8 +19,18 @@ import paquete from '../../../package.json';
  * no era cosmético: esa síntesis impide que el módulo se trate como un JSON
  * estático, y bastaba con leer el campo del objeto para que dejara de hacer
  * falta.
+ *
+ * **Lo que NO lleva, y es una decisión tomada:** el selector «TIPO DE USUARIO»
+ * del mockup. Lo eliminó la contradicción C-05 por dos motivos independientes:
+ * el rol no se elige, se deriva de los claims del token, y el selector sugiere
+ * lo contrario; y además el mockup solo ofrecía tres de los seis roles. El
+ * cliente lo reconfirmó el 2026-09-11: manda la resolución, se corrige el
+ * mockup.
  */
 const { version } = paquete;
+
+const CORREO_SOPORTE = 'soporte@grupocontrol.co';
+
 export const MarcoDeAcceso = ({
   titulo,
   descripcion,
@@ -31,22 +43,69 @@ export const MarcoDeAcceso = ({
   <main id="contenido" className="grid min-h-dvh lg:grid-cols-[minmax(0,26rem)_1fr]">
     <aside className="superficie-oscura flex flex-col justify-between bg-oscuro px-8 py-8 text-texto-invertido lg:px-10 lg:py-12">
       <div>
-        <p className="text-titulo font-bold">Next Control</p>
-        <p className="text-etiqueta uppercase text-texto-invertidoApagado">Residencial</p>
+        {/**
+         * Bloque de marca. El escudo es Lucide `shield-check` (ISC, ADR-013):
+         * dice de qué va el producto —control de acceso— sin recurrir a un
+         * candado, que en una pantalla de entrada se lee como «estás fuera».
+         */}
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="flex h-10 w-10 items-center justify-center rounded-boton bg-marca text-white"
+          >
+            <ShieldCheck className="h-6 w-6" strokeWidth={1.75} />
+          </span>
+          <div>
+            <p className="text-titulo font-bold leading-none">Next Control</p>
+            <p className="mt-1 text-etiqueta uppercase tracking-wide text-texto-invertidoApagado">
+              Residencial
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-10 hidden max-w-xs text-seccion font-medium leading-snug lg:block">
+          Seguridad inteligente residencial.
+        </p>
+        <p className="mt-3 hidden max-w-xs text-cuerpo text-texto-invertidoApagado lg:block">
+          Next Control decide; el hardware ejecuta. Cada apertura queda registrada con quién, qué
+          regla la permitió y con qué versión se decidió.
+        </p>
       </div>
-      <p className="mt-8 hidden max-w-xs text-cuerpo text-texto-invertidoApagado lg:block">
-        Seguridad inteligente residencial. Next Control decide; el hardware ejecuta.
-      </p>
-      <p className="mt-8 text-secundario text-texto-invertidoApagado">
-        © {new Date().getFullYear()} Grupo Control · versión {version}
-      </p>
+
+      <div className="mt-8 space-y-3">
+        {/**
+         * Pie de contacto — W-01 del mockup. Es lo que necesita quien no puede
+         * entrar: sin proveedor de correo configurado todavía, el
+         * restablecimiento depende de que alguien conteste.
+         */}
+        <p className="text-secundario text-texto-invertidoApagado">
+          ¿Problemas para entrar?{' '}
+          <a
+            href={`mailto:${CORREO_SOPORTE}`}
+            className="font-medium text-texto-invertido underline underline-offset-2 decoration-texto-invertidoApagado transition-colors duration-150 ease-out hover:decoration-texto-invertido motion-reduce:transition-none"
+          >
+            {CORREO_SOPORTE}
+          </a>
+        </p>
+        <p className="text-secundario text-texto-invertidoApagado">
+          © {new Date().getFullYear()} Grupo Control · versión {version}
+        </p>
+      </div>
     </aside>
 
-    <section className="flex items-center justify-center px-6 py-12">
+    <section className="relative flex items-center justify-center px-6 py-12">
+      {/*
+        El conmutador de tema también aquí: quien entra de noche a una portería
+        no debería tener que autenticarse contra una pantalla blanca para poder
+        cambiarla después.
+      */}
+      <div className="absolute right-6 top-6">
+        <ConmutadorDeTema />
+      </div>
       <div className="w-full max-w-sm">
-        <h1 className="text-titulo">{titulo}</h1>
+        <h1 className="text-titulo text-texto">{titulo}</h1>
         <p className="mt-1 text-cuerpo text-texto-apagado">{descripcion}</p>
-        {children}
+        <div className="mt-6">{children}</div>
       </div>
     </section>
   </main>

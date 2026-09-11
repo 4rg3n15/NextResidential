@@ -3,16 +3,21 @@
 @tailwind utilities;
 
 /**
- * Fuentes: `Inter` si el equipo la tiene, y si no la pila del sistema.
+ * Tipografía: **Helvetica o derivada, sin descargar ninguna.**
+ *
+ * `--fuente-base` es el primer eslabón de la pila que declara el preset —Inter,
+ * Helvetica Neue, Helvetica, Arial y la pila nativa—. Está aquí, y no en el
+ * preset, porque es el punto de enganche: cuando la ETAPA 14 autoaloje Inter
+ * con el empaquetado, se cambia este valor y las tres superficies la reciben.
  *
  * No se carga ninguna fuente web a propósito. Traerla de un CDN obligaría a
- * abrir `font-src` y `style-src` a un origen externo en la CSP, y la propia
- * §2.7.7 acota esas directivas a orígenes propios. Autoalojarla es lo correcto
- * y entra con el empaquetado de la ETAPA 14; hasta entonces, la pila del
- * sistema respeta la misma métrica geométrica sin abrir superficie.
+ * abrir `font-src` y `style-src` a un origen externo en la CSP, y §2.7.7 acota
+ * esas directivas a orígenes propios; autoalojarla hoy añadiría una descarga al
+ * arranque sin resolver nada, porque Helvetica Neue, Helvetica y Arial ya están
+ * en el equipo y comparten la métrica geométrica.
  */
 :root {
-  --fuente-inter: 'Inter', 'Inter var';
+  --fuente-base: 'Inter', 'Inter var';
   --fuente-mono: 'JetBrains Mono', 'SFMono-Regular', 'Menlo';
 }
 
@@ -59,6 +64,27 @@
   .salto-al-contenido:focus {
     @apply not-sr-only fixed left-4 top-4 z-50 rounded-boton bg-marca-boton px-4 py-2 text-white;
   }
+}
+
+/**
+ * Transición del cambio de tema.
+ *
+ * Sólo el fondo y el color del texto, sólo 140 ms y sólo cuando el cambio lo
+ * dispara el conmutador —`data-cambiando-tema` lo pone y lo quita él—. Si la
+ * transición estuviera siempre activa, cada `:hover` de fila y cada foco
+ * arrastrarían 140 ms de retardo en toda la consola, que es justo lo contrario
+ * de lo que se busca: la respuesta a una pulsación tiene que ser inmediata.
+ *
+ * Sin ella el cambio es un corte seco de pantalla completa, que es el momento
+ * más brusco que puede tener una interfaz de escritorio.
+ */
+html[data-cambiando-tema] *,
+html[data-cambiando-tema] *::before,
+html[data-cambiando-tema] *::after {
+  transition:
+    background-color 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    color 140ms cubic-bezier(0.23, 1, 0.32, 1) !important;
 }
 
 /**

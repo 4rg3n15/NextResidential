@@ -22,7 +22,30 @@ export interface ElementoDeNavegacion {
   readonly roles: readonly Rol[];
   /** Etapa que la construye; `null` si ya está disponible. */
   readonly pendienteDeEtapa: string | null;
+  /**
+   * Nombre del icono de Lucide (ADR-013). Va en la tabla y no en el componente
+   * para que añadir una entrada sea una línea y no dos ficheros — que es como
+   * acaban existiendo elementos sin icono.
+   */
+  readonly icono: NombreDeIcono;
 }
+
+/**
+ * Los iconos se enumeran a propósito en vez de aceptar cualquier cadena: un
+ * nombre mal escrito sería un hueco silencioso en la barra, y así no compila.
+ */
+export const ICONOS_DE_NAVEGACION = [
+  'LayoutDashboard',
+  'Building2',
+  'Car',
+  'UserRoundCheck',
+  'Trees',
+  'Cpu',
+  'ScrollText',
+  'FileBarChart',
+  'Settings',
+] as const;
+export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 
 const ADMINISTRACION: readonly Rol[] = ['superadministrador', 'administrador'];
 const OPERACION: readonly Rol[] = [
@@ -39,6 +62,7 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     ruta: '/tablero',
     roles: OPERACION,
     pendienteDeEtapa: null,
+    icono: 'LayoutDashboard',
   },
   {
     clave: 'viviendas',
@@ -46,6 +70,7 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     ruta: '/viviendas',
     roles: ADMINISTRACION,
     pendienteDeEtapa: null,
+    icono: 'Building2',
   },
   {
     clave: 'vehiculos',
@@ -53,6 +78,7 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     ruta: '/vehiculos',
     roles: ADMINISTRACION,
     pendienteDeEtapa: null,
+    icono: 'Car',
   },
   {
     clave: 'visitantes',
@@ -60,6 +86,7 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     ruta: '/visitantes',
     roles: OPERACION,
     pendienteDeEtapa: null,
+    icono: 'UserRoundCheck',
   },
   {
     clave: 'zonas',
@@ -67,6 +94,7 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     ruta: '/zonas',
     roles: OPERACION,
     pendienteDeEtapa: null,
+    icono: 'Trees',
   },
   {
     clave: 'dispositivos',
@@ -74,6 +102,7 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     ruta: '/dispositivos',
     roles: ADMINISTRACION,
     pendienteDeEtapa: null,
+    icono: 'Cpu',
   },
   {
     clave: 'eventos',
@@ -81,6 +110,7 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     ruta: '/eventos',
     roles: OPERACION,
     pendienteDeEtapa: null,
+    icono: 'ScrollText',
   },
   {
     clave: 'informes',
@@ -88,13 +118,15 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     ruta: '/informes',
     roles: ADMINISTRACION,
     pendienteDeEtapa: null,
+    icono: 'FileBarChart',
   },
   {
     clave: 'configuracion',
     etiqueta: 'Configuración',
     ruta: '/configuracion',
     roles: ADMINISTRACION,
-    pendienteDeEtapa: '09-B',
+    pendienteDeEtapa: null,
+    icono: 'Settings',
   },
 ];
 

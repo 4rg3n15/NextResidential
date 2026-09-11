@@ -235,6 +235,36 @@ try {
       : mal('la sonda dejó rastro en el banco');
   }
 
+  console.log('\n▸ 4b-bis · un color literal se escapa del sistema de temas (bloque 6)');
+  {
+    /**
+     * El fallo que este control impide es el de siempre en modo oscuro: un
+     * `bg-white` que en claro se ve perfecto —el fondo de tarjeta ES blanco— y
+     * en oscuro queda con la etiqueta clara encima. Había catorce en los
+     * formularios de la consola y ninguna prueba los veía, porque en claro no
+     * fallan.
+     */
+    const sonda = join(clon, 'apps', 'web', 'src', 'componentes', 'sonda-tema.tsx');
+    const base = enClon('node', ['scripts/lib/frontera-tema.mjs']).salida;
+
+    for (const [clase, etiqueta] of [
+      ['bg-white', 'blanco literal'],
+      ['dark:bg-gray-900', 'variante `dark:` suelta'],
+      ['bg-[#101010]', 'hexadecimal en la clase'],
+    ]) {
+      writeFileSync(sonda, `export const S = () => <div className="${clase}" />;\n`);
+      const r = enClon('node', ['scripts/lib/frontera-tema.mjs']);
+      r.codigo !== 0 && /sonda-tema/.test(r.salida)
+        ? ok(`detectado: ${etiqueta}`)
+        : mal(`${etiqueta} NO detectado (codigo ${r.codigo})`);
+    }
+
+    rmSync(sonda, { force: true });
+    enClon('node', ['scripts/lib/frontera-tema.mjs']).salida === base
+      ? ok('el banco de pruebas vuelve a su línea base')
+      : mal('la sonda dejó rastro en el banco');
+  }
+
   console.log('\n▸ 4c · volver a `tsc -p` deja que un `dist/` VIEJO compile una app (D-65)');
   {
     /**

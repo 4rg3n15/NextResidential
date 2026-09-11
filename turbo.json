@@ -2,7 +2,14 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
   "tasks": {
-    "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "@ncr/edge#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "typecheck": { "dependsOn": ["^build"] },
     "lint": {},
     "test": { "dependsOn": ["^build"] },

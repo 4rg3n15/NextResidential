@@ -90,7 +90,7 @@ export const CargaDePadron = ({ alTerminar }: { readonly alTerminar: () => void 
               setResultado(null);
               setError(undefined);
             }}
-            className="w-full rounded-campo border border-borde bg-white px-3 py-2 text-cuerpo"
+            className="w-full rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo"
           />
           <span className="block text-secundario text-texto-apagado">
             Hasta 180 kB. El servidor comprueba el contenido del archivo, no su extensión.

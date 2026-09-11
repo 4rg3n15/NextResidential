@@ -60,47 +60,39 @@
  * Contra blanco da 4,168 : 1, muy por encima del 3 : 1 que AA pide a un
  * componente de interfaz.
  *
- * `contraste.test.ts` comprueba los quince pares reales de la consola. Si
- * alguien aclara un color, la prueba dice cuál y cuánto le falta.
+ * `temas.test.ts` comprueba las parejas reales de la consola, en los DOS temas.
+ * Si alguien aclara un color, la prueba dice cuál, sobre qué fondo y cuánto le
+ * falta.
  */
 
-/** Paleta cruda. Se exporta aparte para que la ETAPA 11 la traduzca a Dart. */
-export const paleta = {
-  marca: {
-    DEFAULT: '#E63946',
-    claro: '#EA6973',
-    suave: '#FEF3F3',
-    oscuro: '#A23037',
-    /** Alias semántico de `oscuro`: el que se usa para TEXTO pequeño (AA). */
-    texto: '#A23037',
-    /** Relleno sólido CON etiqueta blanca encima. Ver el hallazgo de arriba. */
-    boton: '#DC3341',
-    presionado: '#8A2930',
-  },
-  exito: { DEFAULT: '#10B981', suave: '#D1FAE5', texto: '#047857' },
-  aviso: { DEFAULT: '#F59E0B', suave: '#FEF3C7', texto: '#B45309' },
-  peligro: { DEFAULT: '#E63946', suave: '#FEF3F3', texto: '#A23037', boton: '#DC3341' },
-  neutro: { DEFAULT: '#6B7280', suave: '#F3F4F6', texto: '#4B5563' },
-  /** Barra lateral, cabecera de guardia virtual, panel de marca del login. */
-  oscuro: {
-    DEFAULT: '#0B0B12',
-    profundo: '#040407',
-    elevado: '#252542',
-    secundario: '#11111E',
-    borde: '#2A2A3D',
-  },
-  lienzo: '#F8F9FA',
-  tarjeta: '#FFFFFF',
-  borde: { DEFAULT: '#E5E7EB', suave: '#F3F4F6' },
-  texto: {
-    DEFAULT: '#111827',
-    fuerte: '#1E1E1E',
-    apagado: '#6B7280',
-    /** Sobre superficie oscura. */
-    invertido: '#F8F9FA',
-    invertidoApagado: '#9CA3AF',
-  },
-} as const;
+import type { ColoresDeTailwind } from './temas';
+import { TEMAS, TEMA_CLARO, TEMA_OSCURO, coloresDelPreset, variablesDeTema } from './temas';
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * MODO OSCURO · lo que cambia aquí y por qué no cambia nada en las pantallas
+ *
+ * Los colores ya no son hexadecimales: son `rgb(var(--ncr-…) / <alpha-value>)`.
+ * Las variables las declara este mismo preset en la capa base, una vez por
+ * tema, y el tema activo lo elige `data-tema` en `<html>`.
+ *
+ * La consecuencia buscada es que **ninguna de las dieciocho vistas cambia de
+ * clase**: `bg-tarjeta` sigue escribiéndose igual y en oscuro vale otra cosa.
+ * La alternativa —un `dark:` junto a cada color— reparte la decisión entre
+ * cientos de sitios, y basta olvidarlo en uno para que quede un panel blanco
+ * en mitad de la pantalla oscura.
+ *
+ * Las parejas fondo/texto y su verificación AA en LOS DOS temas viven en
+ * `temas.ts` y `temas.test.ts`.
+ */
+
+/**
+ * Paleta cruda del tema claro. Se mantiene el nombre `paleta` porque es el que
+ * la ETAPA 11 traducirá a `ThemeData`; para el modo oscuro, esa traducción
+ * necesita además `TEMA_OSCURO`.
+ */
+export const paleta = TEMA_CLARO;
+export { TEMAS, TEMA_CLARO, TEMA_OSCURO };
 
 /**
  * Escala tipográfica del mockup. Los tamaños salen medidos; los pesos, del
@@ -120,12 +112,41 @@ export const tipografia = {
 export const presetTailwind = {
   theme: {
     extend: {
-      colors: paleta,
+      colors: coloresDelPreset() as ColoresDeTailwind,
       fontFamily: {
-        // Inter con `tnum`: las horas, las placas y los aforos alinean en
-        // columna. Con dígitos proporcionales una tabla de horas queda en
-        // diente de sierra y cuesta leerla de un vistazo.
-        sans: ['var(--fuente-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        /**
+         * Helvetica y sus derivadas, por este orden y sin descargar ninguna.
+         *
+         * Inter primero porque es la derivada contemporánea de la Helvetica y
+         * la única de la lista con `tnum` y `cv05`: dígitos de ancho fijo —las
+         * horas, las placas y los aforos alinean en columna, que con dígitos
+         * proporcionales quedarían en diente de sierra— y una `l` con cola que
+         * la distingue del `1` y de la `I`. En una consola donde una placa
+         * decide una apertura, eso no es tipografía de gusto.
+         *
+         * Después Helvetica Neue (macOS), Helvetica y Arial (Windows), que son
+         * la misma métrica geométrica y están YA en el equipo. Y al final la
+         * pila nativa.
+         *
+         * **No se carga ninguna fuente web, a propósito.** Traerla de un CDN
+         * obligaría a abrir `font-src` y `style-src` a un origen externo, y
+         * §2.7.7 acota esas directivas a orígenes propios; autoalojarla añade
+         * una descarga bloqueante al arranque. La variable `--fuente-base` deja
+         * el enganche listo para cuando la ETAPA 14 autoaloje Inter con el
+         * empaquetado.
+         */
+        sans: [
+          'var(--fuente-base)',
+          'Inter',
+          '"Inter var"',
+          '"Helvetica Neue"',
+          'Helvetica',
+          'Arial',
+          'system-ui',
+          '-apple-system',
+          '"Segoe UI"',
+          'sans-serif',
+        ],
         // La monoespaciada para PLACAS no es decorativa: evita confundir 0/O y
         // 1/I en el dato que decide una apertura.
         mono: ['var(--fuente-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
@@ -148,8 +169,10 @@ export const presetTailwind = {
         // Casi planas a propósito: la jerarquía se construye con borde y fondo,
         // no con elevación. El panel lateral oscuro es el único contraste
         // fuerte de la pantalla, y competir con él la emborrona.
-        tarjeta: '0 1px 2px 0 rgb(17 24 39 / 0.04)',
-        flotante: '0 4px 16px -2px rgb(17 24 39 / 0.10)',
+        // El color va por variable: en oscuro una sombra gris azulada no se
+        // ve, y la que hace falta es negra y algo más marcada.
+        tarjeta: '0 1px 2px 0 rgb(var(--ncr-sombra) / var(--ncr-sombra-tarjeta))',
+        flotante: '0 4px 16px -2px rgb(var(--ncr-sombra) / var(--ncr-sombra-flotante))',
       },
       keyframes: {
         entrada: {
@@ -157,15 +180,132 @@ export const presetTailwind = {
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         latido: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.35' } },
+        /**
+         * Despliegue de un panel anclado a su disparador —el buscador global,
+         * un menú—. Se traslada **4 px y no 12**: el panel aparece pegado a lo
+         * que lo abrió, así que el recorrido solo tiene que insinuar de dónde
+         * sale. Un desplazamiento largo aquí lee como que el panel «viene de
+         * otro sitio», que es mentira sobre su origen.
+         *
+         * Escala desde 0,98 y no desde 0,9 por lo mismo: a 0,9 el texto se ve
+         * crecer y se lee dos veces.
+         */
+        desplegar: {
+          '0%': { opacity: '0', transform: 'translateY(-4px) scale(0.98)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
       },
       animation: {
         // `prefers-reduced-motion` se respeta en la hoja global, no aquí: una
         // animación declarada en el preset la usan tres superficies y solo una
         // sabe en qué contenedor vive.
-        entrada: 'entrada 160ms ease-out',
+        entrada: 'entrada 160ms cubic-bezier(0.23, 1, 0.32, 1)',
         latido: 'latido 2s ease-in-out infinite',
+        /**
+         * 120 ms: por debajo de 100 no se percibe como movimiento —aparece y
+         * ya— y por encima de 200 el panel se interpone entre el usuario y lo
+         * que quería ver. `ease-out` porque es una ENTRADA: arranca rápido y
+         * frena, que es como se percibe una respuesta inmediata. `ease-in`
+         * aquí —el error más repetido en animación de interfaz— haría que
+         * pareciera que el panel tarda en reaccionar a la pulsación.
+         */
+        desplegar: 'desplegar 120ms cubic-bezier(0.23, 1, 0.32, 1)',
+      },
+      /**
+       * Curvas de aceleración propias.
+       *
+       * Las de CSS —`ease-out`, `ease-in-out`— son deliberadamente suaves y por
+       * eso se quedan cortas: el movimiento se percibe blando, «de plantilla».
+       * Estas son las mismas curvas con más carácter, y la diferencia se nota
+       * sobre todo en los primeros milisegundos, que es cuando el usuario está
+       * mirando.
+       *
+       * `salida` para ENTRADAS —un panel que aparece, un menú que se despliega—:
+       * arranca deprisa y frena, que es como se percibe una respuesta
+       * inmediata. Nunca `ease-in` en interfaz: retrasa el movimiento justo en
+       * el instante que el usuario observa, y hace que 200 ms parezcan 400.
+       *
+       * `entradaSalida` para lo que se MUEVE en pantalla sin aparecer ni
+       * desaparecer.
+       */
+      transitionTimingFunction: {
+        salida: 'cubic-bezier(0.23, 1, 0.32, 1)',
+        entradaSalida: 'cubic-bezier(0.77, 0, 0.175, 1)',
       },
       ringWidth: { foco: '2px' },
     },
   },
+  /**
+   * Las variables de tema, emitidas en la capa base.
+   *
+   * Se declaran aquí y no en `globals.css` porque la fuente de verdad es
+   * `temas.ts`: escritas a mano en una hoja de estilos, un token añadido al
+   * preset y olvidado en el CSS produce una clase que existe, compila y no
+   * pinta. Recorriendo el tema no puede pasar, y `temas.test.ts` lo comprueba
+   * token a token.
+   *
+   * **El orden de los cuatro bloques importa y es deliberado.** Todos tienen la
+   * misma especificidad, así que decide el último que coincide:
+   *
+   *   1 · `:root`                       — claro, el valor por defecto.
+   *   2 · `@media (prefers-color-scheme: dark)` sobre `:root:not([data-tema='claro'])`
+   *                                      — oscuro para quien lo tiene puesto en
+   *                                        el sistema y todavía no ha elegido.
+   *                                        Es lo que hace que el tema sea
+   *                                        correcto **sin JavaScript**.
+   *   3 · `:root[data-tema='claro']`     — la elección explícita de claro gana
+   *                                        sobre la preferencia del sistema.
+   *                                        Sin este bloque, quien tiene el
+   *                                        sistema en oscuro no podría forzar
+   *                                        el claro: el `@media` lo pisaría.
+   *   4 · `:root[data-tema='oscuro']`    — la elección explícita de oscuro.
+   *
+   * `color-scheme` va en CSS y no en JavaScript a propósito: fija el color de
+   * las barras de desplazamiento y de los controles nativos, y ponerlo desde el
+   * guion obligaría a escribir un atributo `style`, que la CSP de §2.7.7
+   * rechaza por no llevar `unsafe-inline`.
+   *
+   * El `plugin` se declara como objeto plano con `handler`, que es la forma que
+   * Tailwind acepta sin pasar por `tailwindcss/plugin`: este paquete sigue sin
+   * importar `tailwindcss`, como exige la cabecera del fichero.
+   */
+  plugins: [
+    {
+      handler: ({ addBase }: { addBase: (estilos: EstilosBase) => void }): void => {
+        addBase({
+          ':root': {
+            ...variablesDeTema(TEMA_CLARO),
+            'color-scheme': 'light',
+            '--ncr-sombra-tarjeta': '0.04',
+            '--ncr-sombra-flotante': '0.10',
+          },
+          '@media (prefers-color-scheme: dark)': {
+            ":root:not([data-tema='claro'])": {
+              ...variablesDeTema(TEMA_OSCURO),
+              'color-scheme': 'dark',
+              '--ncr-sombra-tarjeta': '0.32',
+              '--ncr-sombra-flotante': '0.48',
+            },
+          },
+          ":root[data-tema='claro']": {
+            ...variablesDeTema(TEMA_CLARO),
+            'color-scheme': 'light',
+            '--ncr-sombra-tarjeta': '0.04',
+            '--ncr-sombra-flotante': '0.10',
+          },
+          ":root[data-tema='oscuro']": {
+            ...variablesDeTema(TEMA_OSCURO),
+            'color-scheme': 'dark',
+            '--ncr-sombra-tarjeta': '0.32',
+            '--ncr-sombra-flotante': '0.48',
+          },
+        });
+      },
+    },
+  ],
 } as const;
+
+/** Forma mínima de lo que `addBase` acepta, sin importar los tipos de Tailwind. */
+type EstilosBase = Readonly<
+  Record<string, Readonly<Record<string, string | Record<string, string>>>>
+>;

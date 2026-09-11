@@ -130,8 +130,16 @@ export const useViviendas = (
    * compilar en vez de mandar un filtro que el backend ignora en silencio.
    */
   filtro: { readonly estado: '' | EstadoDeRegistro; readonly busqueda: string },
+  /**
+   * `false` impide que la consulta salga. Existe por el buscador global, que
+   * vive en la cabecera de TODAS las pantallas: sin esta puerta disparaba dos
+   * peticiones en cada carga —y con la copropiedad vacía, contra una URL mal
+   * formada— aunque nadie hubiera escrito nada.
+   */
+  habilitada = true,
 ): UseQueryResult<PaginaDeViviendas> =>
   useQuery({
+    enabled: habilitada && copropiedadId !== '',
     queryKey: clavesDe09B.viviendas(copropiedadId, filtro.estado, filtro.busqueda),
     queryFn: async () =>
       desenvolver(
@@ -147,8 +155,12 @@ export const useViviendas = (
       ),
   });
 
-export const useVehiculos = (copropiedadId: string): UseQueryResult<Vehiculo[]> =>
+export const useVehiculos = (
+  copropiedadId: string,
+  habilitada = true,
+): UseQueryResult<Vehiculo[]> =>
   useQuery({
+    enabled: habilitada && copropiedadId !== '',
     queryKey: clavesDe09B.vehiculos(copropiedadId),
     queryFn: async () =>
       desenvolver(
