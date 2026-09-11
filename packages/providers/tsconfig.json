@@ -4,8 +4,14 @@
     "outDir": "dist",
     "rootDir": "src",
     "module": "CommonJS",
-    "moduleResolution": "Node"
+    "moduleResolution": "Node",
+    "composite": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    {
+      "path": "../domain-core"
+    }
+  ]
 }

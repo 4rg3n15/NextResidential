@@ -70,6 +70,30 @@ else
 fi
 
 paso "3 · compilación desde cero"
+# D-65 · ORDEN DELIBERADO: primero CADA APLICACIÓN POR SEPARADO, después la raíz.
+#
+# Al revés no sirve de nada, y así estuvo hasta el 2026-09-11. `pnpm build` pasa
+# por turbo, que construye las dependencias en orden y deja todos los `dist/`
+# frescos; después de eso, un build por paquete pasa aunque el paquete no sepa
+# construir sus dependencias — porque ya están construidas. La verificación
+# daba verde y `pnpm --filter @ncr/api build` fallaba en el equipo del usuario
+# con un `TS2339` sobre un método que SÍ existía en el dominio: el `dist/` de
+# `@ncr/domain-core` era anterior a la etapa que lo añadió.
+#
+# Es la misma familia que el falso verde de la ETAPA 04 —`dist` está en
+# `.gitignore`, así que cada checkout tiene el suyo y envejece por su cuenta— y
+# la regla de §2.8.0 («las pruebas resuelven los paquetes internos a su código
+# fuente, nunca a su `dist/`») se había aplicado a las PRUEBAS y no al BUILD.
+#
+# Partiendo del paso 0, aquí no hay ningún `dist/`: si una aplicación no arrastra
+# sus dependencias, falla, y falla aquí en vez de en el equipo de quien la use.
+for app in api edge; do
+  if [[ -f "apps/$app/package.json" ]] && grep -q '"build"' "apps/$app/package.json"; then
+    con_limite "$LIMITE_MEDIO" pnpm --filter "@ncr/$app" build >/dev/null 2>&1 \
+      && ok "@ncr/$app construye SOLO, sin que nadie le prepare las dependencias" \
+      || mal "@ncr/$app no construye por sí solo: depende de un dist/ que alguien haya dejado ahí"
+  fi
+done
 con_limite "$LIMITE_MEDIO" pnpm build >/dev/null 2>&1 && ok "pnpm build" || mal "pnpm build"
 
 paso "4 · lint y typecheck"

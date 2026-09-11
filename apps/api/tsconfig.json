@@ -10,5 +10,13 @@
     "strictPropertyInitialization": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    {
+      "path": "../../packages/domain-core"
+    },
+    {
+      "path": "../../packages/providers"
+    }
+  ]
 }

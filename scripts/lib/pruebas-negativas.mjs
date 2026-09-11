@@ -235,6 +235,61 @@ try {
       : mal('la sonda dejó rastro en el banco');
   }
 
+  console.log('\n▸ 4c · un `dist/` VIEJO de un paquete interno no puede compilar una app (D-65)');
+  {
+    /**
+     * El defecto exacto que reportó el usuario: `pnpm --filter @ncr/api build`
+     * daba `TS2339: Property 'rehidratar' does not exist`, sobre un método que
+     * SÍ existía en el dominio. El `dist/` de `@ncr/domain-core` era de antes
+     * de la etapa que lo añadió, y la API compila contra ese `dist/`, no contra
+     * el fuente.
+     *
+     * Aquí se construye el dominio, se le AÑADE un método al fuente **sin
+     * reconstruirlo** —es decir, se envejece el `dist/` a propósito— y se exige
+     * que la app que lo usa siga compilando: con `tsc -b` y referencias de
+     * proyecto, la dependencia se reconstruye sola. Si alguien volviera a
+     * `tsc -p`, esto falla.
+     *
+     * La distinción con el paso 3 del verificador importa: aquél parte de CERO
+     * `dist/` y detecta el caso «no arrastra dependencias»; éste detecta el
+     * caso «hay dist, pero es viejo», que es el que da un error incomprensible
+     * en vez de un «módulo no encontrado».
+     */
+    const dominio = join(clon, 'packages', 'domain-core');
+    const marcador = join(dominio, 'src', 'sonda-envejecida.ts');
+    const barril = join(dominio, 'src', 'index.ts');
+
+    // 1 · dist construido SIN el símbolo nuevo.
+    const previo = enClon('pnpm', ['--filter', '@ncr/domain-core', 'build']);
+    if (previo.codigo !== 0) {
+      mal('no se pudo preparar el banco (build del dominio)');
+    } else {
+      // 2 · se añade el símbolo al FUENTE y se exporta, sin reconstruir.
+      writeFileSync(marcador, 'export const sondaEnvejecida = (): number => 42;\n');
+      const barrilOriginal = readFileSync(barril, 'utf8');
+      writeFileSync(barril, `${barrilOriginal}export * from './sonda-envejecida';\n`);
+
+      // 3 · una app que lo usa debe compilar igual: `tsc -b` reconstruye.
+      const consumidor = join(clon, 'apps', 'api', 'src', 'sonda-envejecida-uso.ts');
+      writeFileSync(
+        consumidor,
+        "import { sondaEnvejecida } from '@ncr/domain-core';\nexport const x = sondaEnvejecida();\n",
+      );
+      const r = enClon('pnpm', ['--filter', '@ncr/api', 'build']);
+      if (r.codigo === 0) {
+        ok('la app reconstruye la dependencia envejecida y compila');
+      } else {
+        mal('un dist/ viejo rompe el build por paquete (¿se volvió a `tsc -p`?)');
+        console.log(
+          `     ${(r.salida || '').split('\n').filter((l) => /error TS/.test(l))[0] ?? ''}`,
+        );
+      }
+      rmSync(consumidor, { force: true });
+      rmSync(marcador, { force: true });
+      writeFileSync(barril, barrilOriginal);
+    }
+  }
+
   console.log('\n▸ 5 · una clave ajena hacia una tabla append-only se detecta al escribirla');
   {
     // El defecto real de la ETAPA 01: `alertas_evento_fk` hacia `eventos`.
@@ -645,6 +700,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 14 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 15 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );
