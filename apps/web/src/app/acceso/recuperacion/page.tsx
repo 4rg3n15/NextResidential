@@ -10,7 +10,7 @@ const Recuperacion = (): JSX.Element => (
     titulo="Recuperar contraseña"
     descripcion="Te enviamos un enlace de un solo uso al correo de tu cuenta."
   >
-    <FormularioDeRecuperacion className="mt-8" />
+    <FormularioDeRecuperacion />
   </MarcoDeAcceso>
 );
 

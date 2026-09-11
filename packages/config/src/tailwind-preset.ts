@@ -157,6 +157,20 @@ export const presetTailwind = {
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         latido: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.35' } },
+        /**
+         * Despliegue de un panel anclado a su disparador —el buscador global,
+         * un menú—. Se traslada **4 px y no 12**: el panel aparece pegado a lo
+         * que lo abrió, así que el recorrido solo tiene que insinuar de dónde
+         * sale. Un desplazamiento largo aquí lee como que el panel «viene de
+         * otro sitio», que es mentira sobre su origen.
+         *
+         * Escala desde 0,98 y no desde 0,9 por lo mismo: a 0,9 el texto se ve
+         * crecer y se lee dos veces.
+         */
+        desplegar: {
+          '0%': { opacity: '0', transform: 'translateY(-4px) scale(0.98)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
       },
       animation: {
         // `prefers-reduced-motion` se respeta en la hoja global, no aquí: una
@@ -164,6 +178,15 @@ export const presetTailwind = {
         // sabe en qué contenedor vive.
         entrada: 'entrada 160ms ease-out',
         latido: 'latido 2s ease-in-out infinite',
+        /**
+         * 120 ms: por debajo de 100 no se percibe como movimiento —aparece y
+         * ya— y por encima de 200 el panel se interpone entre el usuario y lo
+         * que quería ver. `ease-out` porque es una ENTRADA: arranca rápido y
+         * frena, que es como se percibe una respuesta inmediata. `ease-in`
+         * aquí —el error más repetido en animación de interfaz— haría que
+         * pareciera que el panel tarda en reaccionar a la pulsación.
+         */
+        desplegar: 'desplegar 120ms ease-out',
       },
       ringWidth: { foco: '2px' },
     },

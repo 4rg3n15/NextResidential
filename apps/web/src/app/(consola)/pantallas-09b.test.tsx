@@ -4,7 +4,7 @@ import { vistaPreviaDePlaca } from './vehiculos/normalizar-placa';
 import { patronEnTexto } from './visitantes/patron';
 import { franjaEnTexto } from './zonas/horario';
 import { GraficoDeFrecuencia } from '@/componentes/grafico-frecuencia';
-import { NAVEGACION } from '@/lib/navegacion';
+import { ICONOS_DE_NAVEGACION, NAVEGACION } from '@/lib/navegacion';
 
 /**
  * Lo que estas pruebas protegen NO es la maquetación: es lo que la interfaz
@@ -84,8 +84,18 @@ describe('el gráfico de frecuencia es legible sin verlo', () => {
 });
 
 describe('la navegación ya no promete pantallas que no existen', () => {
-  it('las siete de la 09-B están disponibles y solo Configuración queda pendiente', () => {
+  it('NINGUNA entrada del menú promete una pantalla que no existe', () => {
+    // Configuración era la última pendiente y se construyó en este bloque. La
+    // prueba no se borra al vaciarse: es la que impide que vuelva a añadirse
+    // una entrada muerta al menú sin que nadie lo note.
     const pendientes = NAVEGACION.filter((e) => e.pendienteDeEtapa !== null).map((e) => e.clave);
-    expect(pendientes).toEqual(['configuracion']);
+    expect(pendientes).toEqual([]);
+  });
+
+  it('cada entrada declara su icono, y el icono existe en Lucide (ADR-013)', () => {
+    // Un nombre mal escrito sería un hueco silencioso en la barra lateral.
+    for (const e of NAVEGACION) {
+      expect(ICONOS_DE_NAVEGACION, `${e.clave} sin icono válido`).toContain(e.icono);
+    }
   });
 });

@@ -49,7 +49,19 @@ const base = () => ({
   path: '/',
 });
 
-export const guardarSesion = async (sesion: SesionAlmacenada): Promise<void> => {
+/**
+ * Días que vive la cookie de refresco cuando el usuario marca «Recordar sesión
+ * en este equipo». Sin marcarla, la cookie es **de sesión de navegador**: muere
+ * al cerrarlo.
+ *
+ * Que el interruptor haga algo de verdad importa. El mockup lo dibuja, y un
+ * interruptor decorativo es peor que ninguno: promete una decisión sobre la
+ * permanencia de la sesión en un equipo compartido —la portería es exactamente
+ * eso— y no la cumple.
+ */
+const DIAS_RECORDADO = 30;
+
+export const guardarSesion = async (sesion: SesionAlmacenada, recordar = false): Promise<void> => {
   const almacen = await cookies();
   // La cookie de acceso caduca CON el token. Una cookie que vive más que su
   // contenido produce el peor de los estados: la consola cree que hay sesión,
@@ -59,15 +71,11 @@ export const guardarSesion = async (sesion: SesionAlmacenada): Promise<void> => 
     expires: new Date(sesion.expiraEn * 1000),
   });
   // La de refresco vive más: es la que permite renovar sin volver a pedir
-  // contraseña. 30 días, que es lo que dura «recordar sesión en este equipo».
-  almacen.set(COOKIE_REFRESCO, sesion.refreshToken, {
-    ...base(),
-    maxAge: 60 * 60 * 24 * 30,
-  });
-  almacen.set(COOKIE_EXPIRA, String(sesion.expiraEn), {
-    ...base(),
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  // contraseña.
+  // Sin `maxAge` la cookie es de sesión: el navegador la borra al cerrarse.
+  const permanencia = recordar ? { maxAge: 60 * 60 * 24 * DIAS_RECORDADO } : {};
+  almacen.set(COOKIE_REFRESCO, sesion.refreshToken, { ...base(), ...permanencia });
+  almacen.set(COOKIE_EXPIRA, String(sesion.expiraEn), { ...base(), ...permanencia });
 };
 
 export const leerSesion = async (): Promise<SesionAlmacenada | null> => {

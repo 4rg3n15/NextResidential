@@ -32,12 +32,21 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
   const [contrasena, setContrasena] = useState('');
   const [codigo, setCodigo] = useState('');
   const [verContrasena, setVerContrasena] = useState(false);
+  const [recordar, setRecordar] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [enviando, setEnviando] = useState(false);
 
   const enviar = async (
     url: string,
-    cuerpo: Record<string, string>,
+    /**
+     * `boolean` además de `string`, y no por comodidad: el servidor lee
+     * `recordar === true`. Enviarlo como `'true'` habría dejado el interruptor
+     * DECORATIVO —el caso exacto que su propio comentario dice evitar— sin que
+     * nada fallara: la petición va bien, la sesión se crea y la permanencia es
+     * siempre la corta. Un defecto que ninguna prueba de tipos veía mientras la
+     * firma aceptara solo cadenas.
+     */
+    cuerpo: Record<string, string | boolean>,
     alTerminar: (r: ResultadoDeAcceso) => void,
   ): Promise<void> => {
     setEnviando(true);
@@ -147,7 +156,7 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
       className={className}
       onSubmit={(e) => {
         e.preventDefault();
-        void enviar('/api/sesion', { correo, contrasena }, (r) => {
+        void enviar('/api/sesion', { correo, contrasena, recordar }, (r) => {
           if (r.siguiente === 'segundo-factor' || r.siguiente === 'inscripcion') {
             setPaso(r.siguiente);
             setContrasena('');
@@ -190,6 +199,41 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
             </Boton>
           }
         />
+        {/**
+         * «Recordar sesión en este equipo» — W-01 del mockup.
+         *
+         * **Hace algo de verdad.** Marcado, la cookie de refresco vive 30
+         * días; sin marcar, es de sesión de navegador y muere al cerrarlo. Un
+         * interruptor decorativo habría sido peor que ninguno: promete una
+         * decisión sobre la permanencia en un equipo compartido —la portería
+         * es exactamente eso— y no la cumple.
+         *
+         * Se dibuja como interruptor, como el mockup, pero el elemento es un
+         * `<input type="checkbox">` de verdad: conserva el foco, la barra
+         * espaciadora y el anuncio del lector de pantalla sin reimplementar
+         * nada.
+         */}
+        <label className="flex cursor-pointer items-center gap-3 py-1">
+          <span className="relative inline-flex shrink-0">
+            <input
+              type="checkbox"
+              name="recordar"
+              checked={recordar}
+              onChange={(e) => setRecordar(e.target.checked)}
+              className="peer h-6 w-10 cursor-pointer appearance-none rounded-full bg-borde transition-colors duration-150 ease-out checked:bg-marca-boton focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca focus-visible:ring-offset-2 motion-reduce:transition-none"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-tarjeta shadow-tarjeta transition-transform duration-150 ease-out peer-checked:translate-x-4 motion-reduce:transition-none"
+            />
+          </span>
+          <span className="text-cuerpo text-texto">
+            Recordar sesión en este equipo
+            <span className="block text-secundario text-texto-apagado">
+              No lo marques en un equipo compartido.
+            </span>
+          </span>
+        </label>
         <Boton
           type="submit"
           anchoCompleto

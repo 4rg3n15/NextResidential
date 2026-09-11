@@ -33,7 +33,7 @@ const NuevaContrasena = async ({
           : 'Elige una contraseña nueva para tu cuenta.'
       }
     >
-      <FormularioDeNuevaContrasena tokenHash={tokenHash} className="mt-8" />
+      <FormularioDeNuevaContrasena tokenHash={tokenHash} />
     </MarcoDeAcceso>
   );
 };

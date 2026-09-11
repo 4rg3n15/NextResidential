@@ -65,7 +65,28 @@ El flujo ya está construido en la consola (`/acceso/recuperacion` y `/acceso/nu
 ### A.4 · Caducidad y política de contraseña
 
 1. Panel → **Authentication → Providers → Email**: ponga **Email OTP Expiration** en `3600` (una hora). Es el plazo del enlace de recuperación.
-2. Panel → **Authentication → Policies** (o _Password Settings_): fije la longitud mínima en **12** y active los requisitos de complejidad. La consola valida 12 en el cliente y en el servidor; si el panel exigiera más, el usuario vería el mensaje de Supabase y no el nuestro.
+2. Panel → **Authentication → Policies** → _Password Settings_, y déjelo **exactamente así**:
+
+   - **Minimum password length:** `8`
+   - **Password Requirements:** `Lowercase, uppercase letters, digits and symbols`
+
+   Esos dos valores son la misma política que `apps/web/src/lib/politica-contrasena.ts`
+   aplica en el cliente y en el servidor: mínimo 8, con mayúscula, minúscula,
+   número y carácter especial.
+
+   > **Por qué hay que alinearlos y no basta con el nuestro.** Supabase valida
+   > por su cuenta al cambiar la contraseña. Si su umbral fuera distinto, el
+   > usuario vería nuestra pantalla aceptando y la respuesta de Supabase
+   > rechazando, con dos textos distintos y sin saber a cuál hacer caso. Es el
+   > modo de fallo más desesperante posible: la interfaz le dice que está bien
+   > y el sistema le dice que no.
+
+   > **Nota de criterio.** La política anterior eran 12 caracteres sin reglas de
+   > composición. La actual la fijó el cliente el 2026-09-11. Queda dicho que la
+   > longitud aporta más entropía que la composición —ocho con símbolo son más
+   > débiles que doce sin él— y que por eso el formulario sigue mostrando los
+   > cinco requisitos en vivo en vez de dar por buena cualquiera que pase el
+   > umbral.
 
 ### A.5 · Comprobación
 
@@ -228,7 +249,103 @@ Dos hechos distintos, y solo uno es un defecto:
 
    Los **nombres** de los claims son el diagnóstico —nunca sus valores, nunca el token—. Si en esa lista **no aparece `rol`**, el gancho de claims no está activo: vuelva a **B.5**. Es, con diferencia, la causa más frecuente. Si `rol` está y el estado sigue siendo 401, mire la bitácora de la API: dirá `SEGUNDO_FACTOR_REQUERIDO` (nivel `aal1`) o `FIRMA_INVALIDA` (JWKS mal apuntado).
 
-### B.7 · Los demás roles, para la ETAPA 10
+### B.7 · Las tres cuentas de prueba del bloque 2 · ETAPA 09-B
+
+Lo que sigue es el procedimiento exacto para las tres cuentas con las que
+recorrer el sistema. **Usted crea las identidades y las contraseñas en el panel;
+los guiones solo les dan rol.** Ni aquí ni en el repositorio hay credenciales.
+
+#### Paso 1 · Crear las identidades — en el panel, usted
+
+Panel → **Authentication → Users → Add user → Create new user**. Marque
+**Auto Confirm User** para no depender del correo, que todavía no hay SMTP.
+
+| Cuenta             | Correo             | Contraseña                     |
+| ------------------ | ------------------ | ------------------------------ |
+| Superadministrador | el suyo, ya existe | la que ya tiene                |
+| Portero            | el que decida      | la que decida, cumpliendo §A.4 |
+| Residente          | el que decida      | la que decida, cumpliendo §A.4 |
+
+Recuerde la política: **mínimo 8, con mayúscula, minúscula, número y carácter
+especial** — la misma que valida la consola y la que el panel debe tener
+configurada (§A.4). Si el panel rechaza una contraseña que la consola aceptaría,
+los dos valores no están alineados.
+
+#### Paso 2 · Averiguar el identificador de la copropiedad
+
+```bash
+node scripts/listar-copropiedades.mjs
+```
+
+Imprime las activas con su nombre y su `id`. Si no hay ninguna, cree la primera
+con §B.3.
+
+#### Paso 3 · Dar rol a cada identidad
+
+```bash
+# Portero. Sin segundo factor obligatorio: entra con aal1 y le basta.
+node scripts/aprovisionar-rol.mjs --correo '<correo-del-portero>' --rol portero \
+  --copropiedad '<uuid>' --nombre 'Portería Principal'
+
+# Residente. No tiene consola web todavía: su superficie es la app de la ETAPA 11.
+node scripts/aprovisionar-rol.mjs --correo '<correo-del-residente>' --rol residente \
+  --copropiedad '<uuid>' --nombre 'Residente de prueba'
+```
+
+El guion **valida antes de escribir**: si la identidad no existe en Supabase
+Auth, se detiene y le dice que la cree usted; si el UUID de copropiedad no
+existe, le enseña las que sí. No crea usuarios, no genera contraseñas y no
+inscribe segundos factores.
+
+#### Paso 4 · Comprobar que quedó bien
+
+Entre con cada cuenta y confirme, exactamente, esto:
+
+| Cuenta             | Qué debe pasar                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------- |
+| Superadministrador | Pide segundo factor · selector con **todas** las copropiedades · alcanza las nueve pantallas         |
+| Portero            | **No** pide segundo factor · entra · el menú le muestra solo lo suyo, sin Viviendas ni Configuración |
+| Residente          | **No** pide segundo factor · aterriza en `/sin-consola`, que le explica que su app llega en la 11    |
+
+Si el portero viera Viviendas o Configuración en el menú, la tabla de
+navegación y el guard de la API habrían discrepado — dígamelo, porque eso es un
+defecto y no una configuración.
+
+#### Paso 5 · Verificar el aislamiento, sin fiarse de la interfaz
+
+La interfaz oculta; no protege. El aislamiento real se comprueba contra la API:
+
+```bash
+# Con la sesión del PORTERO abierta en el navegador, en la consola del navegador:
+await fetch('/api/ncr/copropiedades').then((r) => r.json())
+```
+
+**Salida esperada:** un objeto con **una sola** copropiedad —la suya— y
+`alcanceGlobal: false`. Si trajera dos, es una fuga y hay que pararlo todo.
+
+```bash
+# Y pidiendo explícitamente la ajena, con su UUID:
+await fetch('/api/ncr/copropiedades/<uuid-de-la-otra>').then((r) => r.status)
+```
+
+**Salida esperada: `404`.** No 403: un 403 confirmaría que el identificador
+existe, y contando respuestas se podría enumerar lo ajeno.
+
+Con la sesión del **residente**, lo mismo, y además:
+
+```bash
+await fetch('/api/ncr/copropiedades/<la-suya>/padron/viviendas').then((r) => r.status)
+```
+
+**Salida esperada: `403`.** Hoy el padrón es exclusivo de administración, así
+que un residente no ve **ninguna** vivienda, ni la suya. El filtrado por
+vivienda propia se construye en la ETAPA 11, cuando su app lo necesite; hay una
+prueba en la suite de aislamiento que se pondrá roja el día que alguien abra
+esas rutas sin añadir el filtro.
+
+---
+
+### B.7.bis · Los demás roles, para la ETAPA 10
 
 ```bash
 node scripts/aprovisionar-rol.mjs --correo 'porteria@...' --rol portero \

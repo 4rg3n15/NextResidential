@@ -32,6 +32,8 @@ export const runtime = 'nodejs';
 interface Credenciales {
   correo: string;
   contrasena: string;
+  /** «Recordar sesión en este equipo». Decide la permanencia de la cookie. */
+  recordar: boolean;
 }
 
 export type ResultadoDeAcceso =
@@ -56,12 +58,14 @@ const leerCredenciales = async (peticion: NextRequest): Promise<Credenciales | n
     return null;
   }
   if (typeof cuerpo !== 'object' || cuerpo === null) return null;
-  const { correo, contrasena } = cuerpo as Record<string, unknown>;
+  const { correo, contrasena, recordar } = cuerpo as Record<string, unknown>;
   if (!esCorreo(correo)) return null;
   if (typeof contrasena !== 'string' || contrasena.length === 0 || contrasena.length > 256) {
     return null;
   }
-  return { correo, contrasena };
+  // Ausente o con cualquier otro valor se lee como `false`: la permanencia es
+  // lo que hay que pedir explícitamente, no lo que se concede por omisión.
+  return { correo, contrasena, recordar: recordar === true };
 };
 
 export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
@@ -77,11 +81,14 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
 
   try {
     const sesion = await iniciarSesion(credenciales.correo, credenciales.contrasena);
-    await guardarSesion({
-      accessToken: sesion.accessToken,
-      refreshToken: sesion.refreshToken,
-      expiraEn: sesion.expiraEn,
-    });
+    await guardarSesion(
+      {
+        accessToken: sesion.accessToken,
+        refreshToken: sesion.refreshToken,
+        expiraEn: sesion.expiraEn,
+      },
+      credenciales.recordar,
+    );
 
     if (sesion.nivel === 'aal2') {
       await marcarFactorPendiente(null);

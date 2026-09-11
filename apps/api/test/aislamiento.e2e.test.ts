@@ -298,6 +298,146 @@ describe('camino 4 · operador de central (KPI-35)', () => {
   });
 });
 
+describe('camino 5 · portero y residente — las cuentas de prueba del bloque 2', () => {
+  /**
+   * Los dos roles que el cliente aprovisiona para recorrer el sistema. Se
+   * prueban aparte del recorrido genérico porque cada uno tiene su propia
+   * forma de fallar, y ninguna se parece a la del administrador:
+   *
+   *  - El **portero** entra con `aal1` —no se le exige segundo factor— y ese
+   *    es justamente el camino por el que una barrera podría dejarlo pasar a
+   *    otra copropiedad: la del MFA no le aplica, así que la del tenant es la
+   *    única que le queda.
+   *  - El **residente** no tiene consola, así que es fácil dar por hecho que
+   *    tampoco tiene superficie que aislar. La tiene: su token alcanza la API
+   *    igual que cualquier otro.
+   */
+  const ajenaPara = async (rol: 'portero' | 'residente') => {
+    const token = await tokenDe(firmante, { rol, copropiedadId: COP_A, aal: 'aal1' });
+    return request(app.getHttpServer())
+      .get(`/copropiedades/${COP_B}`)
+      .set('Authorization', `Bearer ${token}`);
+  };
+
+  it('un portero de la A no alcanza NINGÚN recurso de la B', async () => {
+    const token = await tokenDe(firmante, { rol: 'portero', copropiedadId: COP_A, aal: 'aal1' });
+    const fugas: string[] = [];
+    for (const r of rutas) {
+      if (PUBLICAS.has(`${r.metodo} ${r.ruta}`)) continue;
+      if (SIN_RECURSO_TENANT.has(r.ruta)) continue;
+      if (CON_ALCANCE_PROPIO.has(r.ruta)) continue;
+      const res = await invocar(r, token);
+      if (res.status >= 200 && res.status < 300)
+        fugas.push(`${r.metodo} ${r.ruta} → ${res.status}`);
+    }
+    expect(fugas, `FUGA por el camino del portero: ${fugas.join(' | ')}`).toEqual([]);
+  });
+
+  it('y su catálogo trae solo la suya', async () => {
+    const token = await tokenDe(firmante, { rol: 'portero', copropiedadId: COP_A, aal: 'aal1' });
+    const res = await request(app.getHttpServer())
+      .get('/copropiedades')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.body.copropiedades.map((c: { id: string }) => c.id)).toEqual([COP_A]);
+    expect(JSON.stringify(res.body)).not.toContain(COP_B);
+  });
+
+  it('el portero entra SIN segundo factor: `aal1` le basta (RN-20 no le aplica)', async () => {
+    const token = await tokenDe(firmante, { rol: 'portero', copropiedadId: COP_A, aal: 'aal1' });
+    const res = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_A}`)
+      .set('Authorization', `Bearer ${token}`);
+    // Si esto fuera 401, el portero de la copropiedad piloto no podría entrar
+    // a la consola de portería y nadie sabría por qué.
+    expect(res.status).toBe(200);
+  });
+
+  it('un residente de la A no alcanza ningún recurso de la B', async () => {
+    const res = await ajenaPara('residente');
+    expect(res.status).toBe(404);
+  });
+
+  it('y tampoco el portero, con el mismo 404 y no un 403', async () => {
+    // 403 confirmaría que el identificador existe, que es lo que el 404 oculta.
+    const res = await ajenaPara('portero');
+    expect(res.status).toBe(404);
+  });
+
+  it('el residente sin vivienda asignada recibe catálogo VACÍO, no el de todos', async () => {
+    const token = await tokenDe(firmante, { rol: 'residente', copropiedadId: null, aal: 'aal1' });
+    const res = await request(app.getHttpServer())
+      .get('/copropiedades')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.body.copropiedades).toEqual([]);
+    expect(res.body.alcanceGlobal).toBe(false);
+  });
+
+  it('ni el portero ni el residente tienen alcance global', async () => {
+    for (const rol of ['portero', 'residente'] as const) {
+      const token = await tokenDe(firmante, { rol, copropiedadId: COP_A, aal: 'aal1' });
+      const res = await request(app.getHttpServer())
+        .get('/copropiedades')
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.body.alcanceGlobal, rol).toBe(false);
+    }
+  });
+});
+
+describe('camino 6 · el residente y la frontera de la VIVIENDA', () => {
+  /**
+   * «Un residente no ve nada de otra vivienda.» Hoy se cumple por una razón
+   * más fuerte —y más estrecha— que un filtro: **ninguna ruta le devuelve
+   * viviendas**. El padrón entero es `@Roles('administrador',
+   * 'superadministrador')`, así que un residente recibe 403 antes de que haya
+   * nada que filtrar.
+   *
+   * Conviene decirlo con precisión en vez de presumir un filtro por vivienda
+   * que no existe: la ETAPA 11 abre la app del residente, y ese día habrá que
+   * construirlo de verdad. Esta prueba es la que hará que no se olvide — el
+   * día que alguien añada `'residente'` a una ruta de padrón sin filtrar por
+   * su vivienda, se pone roja y dice por qué.
+   */
+  const RUTAS_DE_PADRON = [
+    'GET /copropiedades/:id/padron/viviendas',
+    'GET /copropiedades/:id/padron/vehiculos',
+  ];
+
+  it('el residente NO alcanza el padrón, ni el de su propia copropiedad', async () => {
+    const token = await tokenDe(firmante, { rol: 'residente', copropiedadId: COP_A, aal: 'aal1' });
+    for (const ruta of RUTAS_DE_PADRON) {
+      const res = await request(app.getHttpServer())
+        .get(ruta.split(' ')[1]!.replace(':id', COP_A))
+        .set('Authorization', `Bearer ${token}`);
+      // 403 del guard de roles: no es un recurso ajeno, es una superficie que
+      // su rol no tiene. Distinto del 404 de otra copropiedad, a propósito.
+      expect(res.status, ruta).toBe(403);
+    }
+  });
+
+  it('si alguien abre el padrón al residente, esta prueba lo obliga a filtrar por vivienda', async () => {
+    /**
+     * El control no es el 403 de arriba: es este. Comprueba que las rutas de
+     * padrón siguen SIN admitir al residente. El día que se le abran —ETAPA
+     * 11— fallará, y quien la arregle tendrá que sustituirla por la prueba de
+     * que solo ve su vivienda, que es el trabajo real.
+     */
+    const token = await tokenDe(firmante, { rol: 'residente', copropiedadId: COP_A, aal: 'aal1' });
+    const abiertas: string[] = [];
+    for (const r of rutas) {
+      if (!r.ruta.includes('/padron')) continue;
+      if (r.metodo !== 'GET') continue;
+      const res = await invocar({ metodo: r.metodo, ruta: r.ruta.replace(':id', COP_A) }, token);
+      if (res.status !== 403) abiertas.push(`${r.metodo} ${r.ruta} → ${res.status}`);
+    }
+    expect(
+      abiertas,
+      'Hay padrón alcanzable por un residente. Si es deliberado (ETAPA 11), ' +
+        'sustituye esta prueba por la de que solo ve SU vivienda: ' +
+        abiertas.join(' | '),
+    ).toEqual([]);
+  });
+});
+
 describe('CA-24 · todo acceso cruzado queda registrado', () => {
   it('deja rastro en auditoría de seguridad', async () => {
     const auditoria = app.get(AuditoriaEnMemoria);
