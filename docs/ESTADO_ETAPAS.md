@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-10 · **ETAPA 09-B construida** · ronda de auditoría y corrección
+**Última actualización:** 2026-09-11 · **ETAPA 09-B construida** · bloques 6, 7 y 8 (modo oscuro, configuración editable, bucket de evidencia)
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -195,6 +195,52 @@ Nueve etapas cerradas, 19 pasos de verificación, más de mil pruebas en verde �
 | **DB-02** | **CERRADA el 2026-09-11, por el camino ejercido.** La duda era si el token del proyecto real llevaba `rol`. Lo llevaba: la bitácora de la consola del cliente enumera `rol` y `copropiedad_id` entre los claims recibidos, así que el gancho `0024` está activo y hace su trabajo. Y el camino completo se ejerce en los pasos **12b y 12c** del verificador —base vacía → migraciones → superadministrador → sesión aceptada con `aal2` y rechazada con `aal1`, y el recorrido del navegador hasta el tablero—. **Lo que el token traía bien era `rol`; lo que estaba roto era otra cosa**: `copropiedad_id` nulo en el superadministrador, que la consola leía como «sin permiso». Eso es D-67, no DB-02 | **CERRADA** |
 
 > **Por qué DB-02 estuvo abierta tanto tiempo, y qué la cerró.** Se dio por «no verificada» porque la ronda anterior se hizo sin credenciales del proyecto real, y eso era correcto. La cerró el propio síntoma del cliente: su bitácora enumeraba los claims y `rol` estaba ahí. El diagnóstico previo — Que el token no traiga `rol` es lo serio: el guard derivaría el alcance de unos claims incompletos, y §2.7.6 llama a eso el riesgo número uno del proyecto. Con el JWKS corregido es muy probable que el síntoma desaparezca —era el mismo bloqueante— pero **probable no es verificado**, y esta ronda se hizo sin credenciales del proyecto real. Se da por **no verificado** hasta que el cliente ejecute el paso 5 de la guía.
+
+### Bloques 6, 7 y 8 · 2026-09-11
+
+| Bloque | Entregable                                                                                                            | Estado                                                                                                        |
+| ------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **6**  | Modo oscuro declarado como **parejas fondo/texto** en `packages/config/src/temas.ts`, medidas en los DOS temas        | **Construido** · [ADR-014](decisiones/ADR-014-modo-oscuro-por-parejas-de-tokens.md)                           |
+| 6      | Conmutador de tres posiciones —sistema, claro, oscuro— que recuerda la elección, **sin destello**                     | Construido · atributo desde el servidor por cookie; `@media` sin JavaScript                                   |
+| 6      | Tipografía Helvetica y derivadas, con respaldo nativo y **sin descargar ninguna fuente**                              | Construido                                                                                                    |
+| 6      | `scripts/lib/frontera-tema.mjs` · rompe la construcción ante cualquier color fuera del sistema                        | Construido · cinco sondas negativas observadas en rojo                                                        |
+| **7**  | Configuración editable, con la tabla de permisos declarada **una vez** y publicada por la API en `editables`          | **Construido**                                                                                                |
+| 7      | Validación en servidor además de cliente: 422 con TODOS los motivos, 400 del `ValidationPipe` ante campo no declarado | Construido · probado en la suite de aislamiento                                                               |
+| 7      | Cada cambio efectivo en `auditoria_seguridad`, **en la misma transacción que el `UPDATE`**                            | Construido · migración **`0028`** (hay que aplicarla)                                                         |
+| 7      | Lo no editable, en solo lectura **con el motivo visible**: cota legal, integridad, trazabilidad                       | Construido                                                                                                    |
+| **8**  | Bucket privado de evidencia: pasos, declaración y verificación **por ejercicio**                                      | Procedimiento entregado · `docs/guias/CONEXION_SUPABASE.md` §7.1 y §7.2                                       |
+| 8      | `scripts/verificar-bucket-evidencia.mjs` · sube objeto real, lo niega sin firma, lo sirve con firma, lo borra         | Construido                                                                                                    |
+| 8      | Aclaración escrita del flujo biométrico de punta a punta                                                              | [`docs/arquitectura/flujo-biometrico-de-punta-a-punta.md`](arquitectura/flujo-biometrico-de-punta-a-punta.md) |
+
+**Hallazgo del bloque 6 · el tema claro tenía un fallo de AA en producción.**
+`bg-exito text-white` —la variante «éxito» del botón— daba **2,537 : 1**, menos de
+la mitad de lo que AA exige, y llevaba nueve pantallas dado por verificado. No lo
+vio la suite anterior porque medía colores sueltos contra superficies sueltas y
+ese par no estaba declarado. Corregido con `exito.boton` = `#0A855C`.
+
+**Hallazgo del bloque 7 · el banco de pruebas de la API no era el de producción.**
+`crearApp` no registraba el filtro global de `main.ts`, así que **toda aserción de
+la suite sobre un cuerpo de error comprobaba una forma que el despliegue no
+produce**. Apareció al montar el 422 de configuración, que es el primer error cuyo
+cuerpo la consola necesita leer. Ya está registrado; de 460 pruebas, la única que
+cambió fue la que se acababa de escribir contra la forma equivocada.
+
+**Precisión del bloque 8, para que no se lea de más.** Crear el bucket **no**
+hace que la evidencia persista por sí solo: falta el adaptador
+`AlmacenEvidenciaSupabase` detrás del puerto que ya existe. Lo que el bucket sí
+cierra hoy es el primero de los cuatro recursos de DT-12 y el `SIN-CONFIGURAR`
+del arranque. El detalle, sin adornos, en el documento de flujo biométrico.
+
+### Lo que usted debe ejecutar tras los bloques 6-8
+
+1. Aplicar la migración **`0028`** (`supabase db push` o el procedimiento de §4.3
+   de la guía de conexión). Sin ella, un cambio de configuración hace `ROLLBACK`
+   al intentar auditarlo — y eso es lo correcto: antes que guardar sin rastro.
+2. Crear el bucket privado de evidencia siguiendo
+   `docs/guias/CONEXION_SUPABASE.md` §7.1, y declarar `EVIDENCIA_BUCKET` en
+   `apps/api/.env`.
+3. Ejecutar `node scripts/verificar-bucket-evidencia.mjs` con sus credenciales
+   exportadas en la sesión (§7.2). La salida esperada está en la guía.
 
 ### Lo que usted debe ejecutar antes de la 09-B
 

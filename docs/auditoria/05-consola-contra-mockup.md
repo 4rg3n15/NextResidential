@@ -157,3 +157,71 @@ vigilar para un atajo de navegación.
 | Consola de portería y guardia virtual (W-09)            | ETAPA 10, y son **dos** superficies, no una (C-12)                      |
 | Superficie del residente                                | ETAPA 11, con Flutter                                                   |
 | Gestión de usuarios y restablecimientos                 | Bloque 4 de esta etapa: propuesta escrita antes de construir            |
+
+---
+
+## 4 · Modo oscuro: los cinco estados revisados en oscuro, no solo el camino feliz
+
+El mockup dibuja un único tema. Lo que sigue es la revisión del oscuro vista por
+vista, con el criterio de §5.6: **cada combinación de fondo y texto que aparece
+en pantalla está declarada como pareja en `packages/config/src/temas.ts` y medida
+en los dos temas** por `temas.test.ts`. No hay «revisado a ojo» en esta tabla:
+donde dice que cumple, hay una prueba que se pone roja si alguien aclara el color.
+
+### 4.1 Los cinco estados, y qué tokens usa cada uno
+
+| Estado                   | Tokens                                       | Parejas que lo cubren                                          |
+| ------------------------ | -------------------------------------------- | -------------------------------------------------------------- |
+| **Vacío**                | `texto`, `texto.apagado` sobre `tarjeta`     | «texto principal sobre tarjeta», «texto apagado sobre tarjeta» |
+| **Cargando** (esqueleto) | `borde.suave` sobre `tarjeta`                | — ver nota                                                     |
+| **Error**                | `peligro.texto` + botón secundario (`campo`) | «mensaje de error de campo», «botón secundario»                |
+| **Sin permiso**          | `aviso.texto` sobre `tarjeta`                | «aviso de segundo factor en la cabecera»                       |
+| **No encontrado**        | `texto.apagado` sobre `tarjeta`              | «texto apagado sobre tarjeta»                                  |
+| **Sin conexión**         | `aviso.texto` + botón secundario             | las dos anteriores                                             |
+
+**Nota sobre el esqueleto.** `borde.suave` sobre `tarjeta` da 1,07 : 1 en claro y
+1,30 : 1 en oscuro. No se declara como pareja porque no es texto ni un componente
+que porte estado: es un marcador de carga, y AA 1.4.11 no lo alcanza. Se deja
+**medido y fuera**, que no es lo mismo que no haberlo mirado. En oscuro, además,
+se ve algo mejor que en claro.
+
+### 4.2 Los dos fallos que el modo oscuro habría producido, y que no produce
+
+1. **Los catorce campos de formulario.** `<input>` y `<select>` de eventos,
+   informes, vehículos, viviendas, carga de padrón, visitantes y el diálogo de
+   confirmación llevaban `bg-white` literal junto a `text-texto`. En claro no se
+   nota —el fondo de tarjeta ES blanco— y en oscuro habría dado texto claro sobre
+   fondo blanco **en todos los formularios a la vez**. Resuelto con el token
+   `campo`, y `scripts/lib/frontera-tema.mjs` impide que vuelva.
+2. **El botón secundario.** Mismo caso, y es el botón de «Reintentar» de tres de
+   los cinco estados: el fallo habría caído justo en las pantallas de error.
+
+### 4.3 Lo que el modo oscuro destapó del tema CLARO
+
+`bg-exito text-white` —la variante «éxito» del botón— daba **2,537 : 1**, menos
+de la mitad de lo que AA exige para texto normal, y llevaba nueve pantallas dado
+por verificado. No lo vio la suite anterior porque medía colores sueltos contra
+superficies sueltas, y ese par no estaba en ninguna lista. Corregido con
+`exito.boton` = `#0A855C` (4,643 : 1), el mismo recurso que ya se había aplicado
+al rojo de marca.
+
+### 4.4 Superficies que NO se invierten, y por qué
+
+La barra lateral y el panel de marca del acceso son oscuros **en los dos temas**:
+son la identidad del producto, no una consecuencia del tema. Lo que cambia es su
+relación con el lienzo — en oscuro sube de `#0B0B12` a `#15151F` para quedar
+entre el fondo y la tarjeta, porque si conservara su valor se fundiría con el
+lienzo y la consola perdería su estructura de tres planos. Se le añade filete
+derecho por el mismo motivo.
+
+Los rellenos saturados con etiqueta blanca —los cuatro botones sólidos— valen lo
+mismo en ambos temas: ese par no depende del fondo de la página.
+
+### 4.5 Sin destello
+
+El atributo `data-tema` sale **del servidor**, de una cookie que escribe el
+conmutador. Con la preferencia en «sistema» no se escribe atributo y manda
+`@media (prefers-color-scheme: dark)`, que el navegador aplica antes de pintar.
+Las dos vías son anteriores al primer fotograma; el guion en línea, con nonce,
+cubre el único caso que la cookie no ve: una página servida desde la caché del
+service worker.

@@ -365,6 +365,76 @@ El `hash_sha256` permite verificar que el objeto servido es el mismo que sustent
 la decisión. Sin él, la «trazabilidad fotográfica» que pide el PDF del reto sería
 una promesa sin comprobación.
 
+### 7.1 Crearlo, paso a paso
+
+Hasta que este bucket exista, la API arranca con este aviso y **la evidencia se
+guarda en memoria del proceso y se pierde al reiniciar**:
+
+```
+SIN-CONFIGURAR: bucket privado de evidencia — EVIDENCIA_BUCKET no está definida
+```
+
+1. **Panel → Storage → New bucket.**
+   - _Name_: `evidencias`.
+   - **«Public bucket» sin marcar.** Es la casilla que decide todo lo demás: un
+     bucket público sirve cualquier objeto a cualquiera que adivine la ruta, y
+     la evidencia de un acceso es prueba.
+   - _Restrict file size_: 10 MB. Una foto de placa o de rostro no pasa de ahí,
+     y el límite es la primera defensa contra una subida abusiva.
+   - _Allowed MIME types_: `image/jpeg, image/png`. El tipo REAL se valida
+     además en la API (§2.7.8: por contenido, no por extensión); esto es la
+     segunda barrera, no la única.
+2. **No añadas ninguna política de acceso.** Un bucket privado sin políticas es
+   inalcanzable para `anon` y para `authenticated`, que es exactamente lo que se
+   busca: la evidencia sale **sólo** por URL firmada que emite la API con la
+   llave secreta.
+3. Declara el nombre en el entorno de la API (`apps/api/.env`), nunca en el
+   repositorio:
+
+   ```
+   EVIDENCIA_BUCKET=evidencias
+   ```
+
+4. Reinicia la API. El aviso de arranque tiene que cambiar a `OK: bucket
+privado de evidencia`.
+
+### 7.2 Verificarlo **por ejercicio**, no por inspección
+
+Que el panel muestre el bucket como privado es una declaración. Lo que hay que
+comprobar es que un `GET` sin firmar **falla de verdad**, y para eso hace falta
+un objeto que exista: si se pide un objeto inexistente, un bucket público
+responde 404 igual que uno privado y la comprobación pasa sin demostrar nada.
+
+```bash
+SUPABASE_URL=https://<tu-proyecto>.supabase.co \
+SUPABASE_SECRET_KEY=sb_secret_… \
+EVIDENCIA_BUCKET=evidencias \
+  node scripts/verificar-bucket-evidencia.mjs
+```
+
+El guion sube una sonda con la llave secreta, la pide **sin credencial** —tiene
+que fallar—, la pide con **URL firmada de 60 s** —tiene que funcionar— y la
+borra. Las dos mitades importan: sin la segunda, un bucket roto de forma que
+nadie pueda leerlo pasaría por seguro.
+
+Salida esperada:
+
+```
+Bucket de evidencia «evidencias»
+
+  ✓ el bucket existe y se declara privado
+  ✓ sonda subida con la llave secreta
+  ✓ un GET sin firmar sobre un objeto que EXISTE responde 400
+  ✓ con URL firmada de 60 s, el objeto se lee correctamente
+  ✓ sonda borrada
+
+✓ bucket privado verificado por ejercicio: escribe con llave, niega sin firma, sirve con firma.
+```
+
+El código de la tercera línea puede ser `400`, `401` o `403` según la versión de
+Storage; **lo único inaceptable es `200`**. Si sale `200`, hay una política sobre
+`storage.objects` concediendo `SELECT` a `anon`: quítala antes de seguir.
+
 ---
 
 ## 8. Extensiones y esquemas
