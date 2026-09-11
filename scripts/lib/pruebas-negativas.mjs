@@ -235,58 +235,56 @@ try {
       : mal('la sonda dejó rastro en el banco');
   }
 
-  console.log('\n▸ 4c · un `dist/` VIEJO de un paquete interno no puede compilar una app (D-65)');
+  console.log('\n▸ 4c · volver a `tsc -p` deja que un `dist/` VIEJO compile una app (D-65)');
   {
     /**
-     * El defecto exacto que reportó el usuario: `pnpm --filter @ncr/api build`
-     * daba `TS2339: Property 'rehidratar' does not exist`, sobre un método que
-     * SÍ existía en el dominio. El `dist/` de `@ncr/domain-core` era de antes
-     * de la etapa que lo añadió, y la API compila contra ese `dist/`, no contra
-     * el fuente.
+     * El defecto que reportó el usuario: `pnpm --filter @ncr/api build` daba
+     * `TS2339: Property 'rehidratar' does not exist` sobre un método que SÍ
+     * existía en el dominio y SÍ se exportaba —los dos llegaron en el mismo
+     * commit—. La API compila contra el `dist/` de `@ncr/domain-core`, y con
+     * `tsc -p` ese `dist/` puede ser de cualquier etapa anterior.
      *
-     * Aquí se construye el dominio, se le AÑADE un método al fuente **sin
-     * reconstruirlo** —es decir, se envejece el `dist/` a propósito— y se exige
-     * que la app que lo usa siga compilando: con `tsc -b` y referencias de
-     * proyecto, la dependencia se reconstruye sola. Si alguien volviera a
-     * `tsc -p`, esto falla.
-     *
-     * La distinción con el paso 3 del verificador importa: aquél parte de CERO
-     * `dist/` y detecta el caso «no arrastra dependencias»; éste detecta el
-     * caso «hay dist, pero es viejo», que es el que da un error incomprensible
-     * en vez de un «módulo no encontrado».
+     * **Por qué esta sonda comprueba configuración y no compila.** El banco es
+     * una copia de los ficheros versionados **sin `node_modules`**: aquí no hay
+     * `tsc` que ejecutar. La comprobación de extremo a extremo es el paso 3 del
+     * verificador, que construye cada aplicación por separado partiendo de cero
+     * `dist/`. Esto guarda la invariante que lo hace posible, y es lo que falla
+     * si alguien vuelve a `tsc -p` o quita una referencia.
      */
-    const dominio = join(clon, 'packages', 'domain-core');
-    const marcador = join(dominio, 'src', 'sonda-envejecida.ts');
-    const barril = join(dominio, 'src', 'index.ts');
+    const tsconfigApi = join(clon, 'apps', 'api', 'tsconfig.json');
+    const pkgApi = join(clon, 'apps', 'api', 'package.json');
+    const tsconfigOriginal = readFileSync(tsconfigApi, 'utf8');
+    const pkgOriginal = readFileSync(pkgApi, 'utf8');
 
-    // 1 · dist construido SIN el símbolo nuevo.
-    const previo = enClon('pnpm', ['--filter', '@ncr/domain-core', 'build']);
-    if (previo.codigo !== 0) {
-      mal('no se pudo preparar el banco (build del dominio)');
+    const base = enClon('node', ['scripts/lib/frontera-construccion.mjs']);
+    if (base.codigo !== 0) {
+      mal('el banco no parte de una línea base limpia');
     } else {
-      // 2 · se añade el símbolo al FUENTE y se exporta, sin reconstruir.
-      writeFileSync(marcador, 'export const sondaEnvejecida = (): number => 42;\n');
-      const barrilOriginal = readFileSync(barril, 'utf8');
-      writeFileSync(barril, `${barrilOriginal}export * from './sonda-envejecida';\n`);
+      ok('la configuración versionada pasa el control');
 
-      // 3 · una app que lo usa debe compilar igual: `tsc -b` reconstruye.
-      const consumidor = join(clon, 'apps', 'api', 'src', 'sonda-envejecida-uso.ts');
-      writeFileSync(
-        consumidor,
-        "import { sondaEnvejecida } from '@ncr/domain-core';\nexport const x = sondaEnvejecida();\n",
+      // Violación 1: el script vuelve a `tsc -p`.
+      writeFileSync(pkgApi, pkgOriginal.replace('tsc -b tsconfig.json', 'tsc -p tsconfig.json'));
+      const conTscP = enClon('node', ['scripts/lib/frontera-construccion.mjs']);
+      conTscP.codigo !== 0 && /tsc -p/.test(conTscP.salida)
+        ? ok('`tsc -p` se detecta y nombra el script')
+        : mal(`\`tsc -p\` NO detectado (codigo ${conTscP.codigo})`);
+      writeFileSync(pkgApi, pkgOriginal);
+
+      // Violación 2: desaparece la referencia al dominio.
+      const sinReferencia = JSON.parse(tsconfigOriginal);
+      sinReferencia.references = (sinReferencia.references ?? []).filter(
+        (r) => !r.path.includes('domain-core'),
       );
-      const r = enClon('pnpm', ['--filter', '@ncr/api', 'build']);
-      if (r.codigo === 0) {
-        ok('la app reconstruye la dependencia envejecida y compila');
-      } else {
-        mal('un dist/ viejo rompe el build por paquete (¿se volvió a `tsc -p`?)');
-        console.log(
-          `     ${(r.salida || '').split('\n').filter((l) => /error TS/.test(l))[0] ?? ''}`,
-        );
-      }
-      rmSync(consumidor, { force: true });
-      rmSync(marcador, { force: true });
-      writeFileSync(barril, barrilOriginal);
+      writeFileSync(tsconfigApi, JSON.stringify(sinReferencia, null, 2));
+      const sinRef = enClon('node', ['scripts/lib/frontera-construccion.mjs']);
+      sinRef.codigo !== 0 && /domain-core/.test(sinRef.salida)
+        ? ok('una referencia que falta se detecta y se nombra')
+        : mal(`la referencia ausente NO se detecta (codigo ${sinRef.codigo})`);
+      writeFileSync(tsconfigApi, tsconfigOriginal);
+
+      enClon('node', ['scripts/lib/frontera-construccion.mjs']).codigo === 0
+        ? ok('el banco de pruebas vuelve a su línea base')
+        : mal('la sonda dejó rastro en el banco');
     }
   }
 

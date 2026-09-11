@@ -95,6 +95,15 @@ for app in api edge; do
   fi
 done
 con_limite "$LIMITE_MEDIO" pnpm build >/dev/null 2>&1 && ok "pnpm build" || mal "pnpm build"
+# Y la invariante que hace posible lo anterior, comprobada aparte: el bucle de
+# arriba solo detecta la regresión si alguien la introduce Y el paso llega a
+# correr con los `dist/` ya borrados. Esto la detecta siempre.
+if salida_constr=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-construccion.mjs 2>&1); then
+  ok "${salida_constr#OK }"
+else
+  mal "una aplicación puede compilar contra un dist/ desfasado (D-65)"
+  echo "$salida_constr" | head -8 | sed 's/^/     /'
+fi
 
 paso "4 · lint y typecheck"
 con_limite "$LIMITE_MEDIO" pnpm lint      >/dev/null 2>&1 && ok "pnpm lint"      || mal "pnpm lint"
