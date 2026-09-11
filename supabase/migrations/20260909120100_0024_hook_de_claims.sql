@@ -140,6 +140,23 @@ COMMENT ON FUNCTION public.custom_access_token_hook IS
   'rol, copropiedad_id y copropiedades al JWT. NO toca `aal` (ADR-008).';
 
 -- ===== Permisos ==============================================================
+-- `supabase_auth_admin` es el rol con el que GoTrue se conecta y el unico que
+-- debe poder ejecutar el gancho. Lo trae la PLATAFORMA: una migracion que lo
+-- creara estaria inventandose un rol del proveedor. Si falta, se para aqui con
+-- un motivo legible en vez de morir en el primer GRANT — que es lo que pasaba
+-- al reproducir el arranque en frio sobre un cluster desnudo.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN
+    RAISE EXCEPTION
+      '0024: no existe el rol supabase_auth_admin. Lo aporta la plataforma '
+      '(Supabase lo trae de fabrica); en un cluster propio hay que crearlo antes '
+      'de aplicar esta migracion: CREATE ROLE supabase_auth_admin NOLOGIN;'
+      USING ERRCODE = 'undefined_object';
+  END IF;
+END
+$$;
+
 -- Solo `supabase_auth_admin` la ejecuta. Si `authenticated` pudiera invocarla,
 -- cualquier usuario podria pedirle los claims de otro pasandole su `user_id`.
 REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) FROM PUBLIC;

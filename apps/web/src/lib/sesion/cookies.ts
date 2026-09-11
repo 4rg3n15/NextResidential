@@ -22,6 +22,18 @@ export const COOKIE_REFRESCO = 'ncr_refresco';
 export const COOKIE_EXPIRA = 'ncr_expira';
 /** Marca legible por el servidor para saber si hay un segundo factor pendiente. */
 export const COOKIE_FACTOR_PENDIENTE = 'ncr_factor';
+/**
+ * Copropiedad elegida por quien alcanza varias (superadministrador, operador de
+ * central). Es una PREFERENCIA, no una credencial: el servidor la contrasta
+ * siempre contra el catálogo que devuelve la API, así que una cookie manipulada
+ * no amplía el alcance, solo se descarta.
+ *
+ * `httpOnly` igual que las demás, por la regla de 09-A: nada de la sesión se
+ * expone a JavaScript, ni siquiera lo que no es secreto. Dos reglas distintas
+ * para dos cookies del mismo flujo acaban en que alguien aplica la floja a la
+ * que no tocaba.
+ */
+export const COOKIE_COPROPIEDAD = 'ncr_copropiedad';
 
 export interface SesionAlmacenada {
   readonly accessToken: string;
@@ -69,7 +81,13 @@ export const leerSesion = async (): Promise<SesionAlmacenada | null> => {
 
 export const borrarSesion = async (): Promise<void> => {
   const almacen = await cookies();
-  for (const nombre of [COOKIE_ACCESO, COOKIE_REFRESCO, COOKIE_EXPIRA, COOKIE_FACTOR_PENDIENTE]) {
+  for (const nombre of [
+    COOKIE_ACCESO,
+    COOKIE_REFRESCO,
+    COOKIE_EXPIRA,
+    COOKIE_FACTOR_PENDIENTE,
+    COOKIE_COPROPIEDAD,
+  ]) {
     almacen.delete(nombre);
   }
 };
@@ -83,4 +101,15 @@ export const marcarFactorPendiente = async (factorId: string | null): Promise<vo
 export const factorPendiente = async (): Promise<string | null> => {
   const almacen = await cookies();
   return almacen.get(COOKIE_FACTOR_PENDIENTE)?.value ?? null;
+};
+
+/** Preferencia de copropiedad. No concede nada: el servidor la valida. */
+export const guardarCopropiedadElegida = async (id: string): Promise<void> => {
+  const almacen = await cookies();
+  almacen.set(COOKIE_COPROPIEDAD, id, { ...base(), maxAge: 60 * 60 * 24 * 30 });
+};
+
+export const copropiedadElegida = async (): Promise<string | null> => {
+  const almacen = await cookies();
+  return almacen.get(COOKIE_COPROPIEDAD)?.value ?? null;
 };

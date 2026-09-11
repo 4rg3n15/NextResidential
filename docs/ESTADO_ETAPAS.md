@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-09 · al cierre de la **ETAPA 09-A**
+**Última actualización:** 2026-09-10 · **ETAPA 09-B construida** · ronda de auditoría y corrección
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,16 +18,16 @@
 
 ## Resumen
 
-|                                |                                                                      |
-| ------------------------------ | -------------------------------------------------------------------- |
-| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08) · la **09 está en curso: 09-A cerrada** |
-| **Etapa siguiente habilitada** | **ETAPA 09-B — resto de pantallas** (la 12 sigue habilitada)         |
-| **Bloqueos activos**           | Ninguno. Sin contraseña de PostgreSQL en runtime (D-17), declarado   |
-| **Defectos abiertos**          | D-39 — el alta de MFA es inalcanzable para roles administrativos     |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                               |
-| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)        |
-| **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)          |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                |
+|                                |                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08) · la **09: 09-A y 09-B construidas**                                               |
+| **Etapa siguiente habilitada** | **ETAPA 10 — consolas operativas** (la 12 sigue habilitada)                                                     |
+| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
+| **Defectos abiertos**          | Ninguno. D-60 a D-63 corregidos en la ronda del 2026-09-10                                                      |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
+| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
+| **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)                                                     |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                           |
 
 ---
 
@@ -112,11 +112,93 @@ La primera ejecución salió **FALLIDA** y sus tres hallazgos eran reales: `comu
 | Recuperación de contraseña, con respuesta uniforme y doble limitador                                                                            | **Construida** · [guía](guias/RECUPERACION_Y_USUARIOS.md)                                                   |
 | Aprovisionamiento del primer superadministrador y de los demás roles                                                                            | **Documentado** · `scripts/aprovisionar-rol.mjs` + guía                                                     |
 
-**Pendiente declarado (P-14):** no hay pantalla de inscripción de TOTP en la consola. Hoy el titular inscribe su factor desde el panel de Supabase; nadie debería poder inscribir el de otra persona, así que la pantalla —si se construye— tiene que operar sobre la propia sesión.
+**P-14 · redefinido y CERRADO.** Se declaró como «no hay pantalla de inscripción de TOTP en la consola» y se resolvió con «hoy el titular la inscribe desde el panel de Supabase». **Esa salida no existía**: el panel solo ofrece _Remove MFA factors_ para los usuarios de la aplicación, y `Account → Security` es la cuenta de Supabase del operador, no la del usuario. El pendiente no describía una comodidad ausente sino un sistema inaccesible: ningún rol administrativo podía llegar a `aal2` y la API le respondía 401 en todo. La pantalla existe desde esta ronda y opera **solo sobre la propia sesión** — la petición de alta no lleva identificador de usuario y el servidor lo toma de la cookie `httpOnly`.
+
+### Tercera y cuarta ronda (2026-09-09)
+
+| Asunto                                                                                                | Estado                                                                                       |
+| ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **D-43** · el arranque en frío no podía escribir: `creado_por` es `NOT NULL` y no había quién firmara | **Resuelto** · migración `0025`, actor de sistema explícito y trazable; nada se relajó       |
+| **D-44** · el `CHECK` del NIT rechazaba el formato colombiano `900123456-7`                           | **Resuelto** · migración `0026`, normalización en la base y validación previa en los guiones |
+| **D-45** · nadie podía inscribir el segundo factor: el panel no lo ofrece (P-14)                      | **Resuelto** · pantalla de inscripción + códigos de recuperación de un solo uso              |
+| Arranque en frío verificable de punta a punta, hasta «alguien puede entrar»                           | **Construido** · `supabase/arranque-en-frio.sh` + suite `arranque-en-frio.e2e`, sonda 11     |
+| **D-46** · `503` intermitente al inscribir el factor; la pantalla se quedaba con el error             | **Resuelto** · una inscripción por titular a la vez; el éxito limpia el error                |
+| **D-47** · `apps/web` no validaba su configuración al arrancar                                        | **Resuelto** · Zod + `instrumentation.ts`, salida con código 78 (`EX_CONFIG`)                |
+| **D-48** · ciclo cerrado del segundo factor (`insufficient_aal`)                                      | **Resuelto** · los factores se leen del usuario; GoTrue no expone `GET /factors`             |
+| **D-49** · el QR no se pintaba (SVG en crudo en un `<img src>`)                                       | **Resuelto** · normalizado a `data:image/svg+xml;base64`                                     |
+| **D-50** · **la API no arrancaba en producción** y 363 pruebas no lo veían                            | **Resuelto** · el puerto de auditoría pasa al núcleo                                         |
+| El camino completo, recorrido en navegador                                                            | **Construido** · `e2e/camino-de-acceso.mjs`, paso 12c del verificador                        |
+
+### Sexta ronda (2026-09-10) — cuatro fallos del propio verificador
+
+La abrió el verificador en macOS, no el producto. Los cuatro comparten raíz: **un control que concluye sobre un estado que no es el actual**.
+
+| Asunto                                                                                                      | Estado                                                                                     |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **D-54** · contraseña literal en `e2e/doble-gotrue.mjs`. No es una credencial viva; §2.5 no distingue       | **Resuelto** · se sortea en cada corrida. Nada que rotar; el historial empujado no se toca |
+| **D-51** · «contrato desfasado» que no había cambiado: 35 rutas idénticas en otro orden, por D-50           | **Resuelto** · el documento se emite en orden canónico; regenerado y confirmado            |
+| **D-52** · dos sondas del paso 9: el mensaje «dejó rastro» era un diagnóstico falso del hallazgo D-54       | **Resuelto** · línea base antes de mutar; el banco refleja el árbol de trabajo completo    |
+| **D-53** · el paso **12c** no fallaba ni se omitía: **no salía**, encerrado en el bloque `--con-base`       | **Resuelto** · 12c fuera del bloque, Chromium portable y **paso 15** que cuenta los pasos  |
+| **D-55** · `arranque-en-frio.sh` no declaraba su conexión y solo funcionaba con las variables ya exportadas | **Resuelto** · fija y exporta los mismos valores por defecto que `verificar.sh`            |
+
+Pruebas negativas: **13** (dos nuevas, sondas 12 y 13).
+
+### Séptima ronda (2026-09-10) — el segundo factor, y el interruptor que pidió el cliente
+
+| Asunto                                                                                                                                | Estado                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **D-56** · el código de seis dígitos correcto devolvía al login **sin decir por qué**: la API rechazaba el token y la consola callaba | **Resuelto** · se registran el estado y los NOMBRES de los claims del token (nunca sus valores)                  |
+| **D-57** · `MFA_OBLIGATORIO`, interruptor temporal del segundo factor, a petición del cliente                                         | **RETIRADO** el 2026-09-10 · variable, ramas del guard, mensajes y `.env.example`; tres controles anti-regresión |
+| Que no salga el QR y pidan el código: **no es un defecto**                                                                            | Esa cuenta ya tiene un factor verificado; se retira en el panel (Remove MFA factors)                             |
+
+El interruptor se prueba en **las dos posiciones** —que encendido siga exigiendo el segundo factor es lo que nadie comprueba— y se recorre en el navegador: paso 5 del camino de acceso, con otra API y otra consola levantadas con la variable puesta.
+
+### ETAPA 09-B (2026-09-10) — las siete pantallas restantes
+
+| Entregable                                                                                              | Estado                                                                                           |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Viviendas · Vehículos · Visitantes · Zonas · Dispositivos · Eventos · Informes                          | **Construidas**, sobre el sistema de diseño de 09-A                                              |
+| Backend que no existía: listar y escribir padrón, persistir autorizaciones, órdenes de equipo, informes | **Construido** · las lecturas bajo `copropiedades/:id` entran solas en el barrido de aislamiento |
+| Carga de padrón XLSX (D-20t)                                                                            | **Construida** · lector propio, tipo real por firma, límites acotados, todo o nada               |
+| Control de contrato de 09-A                                                                             | **Sin exenciones de esta etapa** · 41 de 49 operaciones tipadas y el CUERPO también (D-59)       |
+| Menores y representante legal (D-42)                                                                    | **NO construido**, y dicho: no existe en el esquema; decisión de Grupo Control                   |
+
+Migración nueva: **`0027`** (tipo de vehículo). Hay que aplicarla.
+
+### Ronda de auditoría y corrección · 2026-09-10
+
+Nueve etapas cerradas, 19 pasos de verificación, más de mil pruebas en verde — y **nadie podía entrar al sistema**. Esto es lo que había.
+
+| Id        | Defecto                                                                                                                                                                                                                                                                                                                                                                                                                   | Estado                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **D-60**  | **La URL del JWKS no existía.** `/auth/v1/jwks` devuelve `404 page not found`; la ruta real es `/auth/v1/.well-known/jwks.json`. La API se quedaba sin ninguna clave y rechazaba **todos** los tokens. Verificado contra la documentación oficial de Supabase. **Sobrevivió a nueve etapas porque el doble de `e2e/doble-gotrue.mjs` servía el JWKS en la ruta equivocada**: el doble se construyó con la forma del error | **Corregido**                                                                                                           |
+| **D-60b** | **Un JWKS que responde no es un JWKS que sirve.** Un proyecto sin llaves asimétricas devuelve `200 {"keys":[]}`; la sonda lo daba por bueno y ningún token podía verificarse                                                                                                                                                                                                                                              | **Corregido** · la sonda exige al menos una clave                                                                       |
+| **D-61**  | **El `.env` sin salto de línea final.** `INGESTA_FIRMA_SECRETO` se quedó con `MFA_OBLIGATORIO=false` pegado al valor: la variable quedó corrupta, la otra nunca existió, y la aplicación arrancó igual porque `min(32)` solo mira longitud                                                                                                                                                                                | **Corregido** · secretos con forma, detección de variable engullida, y `pnpm entorno:diff`                              |
+| **D-62**  | **Los mensajes de error decían una causa, no lo observado.** Un 401 por JWKS caído se registraba como `FIRMA_INVALIDA` y la consola lo traducía a «pon `MFA_OBLIGATORIO=false` en la API». Estaba puesto. **Tres rondas de trabajo persiguiendo una causa inexistente**                                                                                                                                                   | **Corregido** · el proveedor clasifica sus fallos, 503 en vez de 401, y la regla aplicada a todas las traducciones      |
+| **D-63**  | **Los gráficos del tablero emitían `style="height:37%"`, que la CSP rechaza: las barras salían a CERO en producción.** No lo vio nadie porque jsdom no aplica CSP y el recorrido del navegador visita el tablero sin datos                                                                                                                                                                                                | **Corregido** · clases estáticas + control `frontera-csp.mjs` con prueba negativa                                       |
+| **D-65**  | **La API compilaba contra el `dist/` de un paquete interno, que podía ser de otra etapa.** `pnpm --filter @ncr/api build` daba `TS2339` sobre un método que sí existía en el dominio y sí se exportaba. **El paso 3 del verificador construía solo por la raíz**, donde turbo deja los `dist/` frescos, así que nunca podía verlo. Decimoquinta aparición de DT-12                                                        | **Corregido** · referencias de proyecto y `tsc -b`; paso 3 reordenado y `frontera-construccion.mjs` con prueba negativa |
+| **D-64**  | **`/ready` publicaba `postgres: 'no-conectado-etapa-04'`**, una cadena fija de cinco etapas atrás, y respondía 200 sin tocar la base                                                                                                                                                                                                                                                                                      | **Corregido** · `SELECT 1` real, y el 503 se decide sobre todas las dependencias                                        |
+
+> **Sobre la sonda del JWKS, que era la sospecha principal.** No estaba rota: con un 404 `/ready` **sí** devuelve 503, comprobado contra un servidor real. Lo que no existía era **nadie que la consultara**. De ahí las comprobaciones de arranque: el proceso habla con el recurso real al levantar y lo dice con nombre y remedio, en vez de fallar en la primera petición del usuario.
+
+### Bloqueo de ENTORNO — no es deuda de código
+
+| Id        | Asunto                                                                                                                                                                                                                                                                                                                                              | Estado                                     |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **BE-01** | **SMTP y URLs de redirección de recuperación.** El cliente no tiene permisos para configurarlos en el panel de Supabase; está en gestión. El ciclo está **construido y documentado**, y la comprobación de arranque **nunca informa `ok`**: declara explícitamente que el SMTP no es observable desde la API y que el ciclo queda **SIN VERIFICAR** | **Abierto · fuera del alcance del código** |
+
+### Deuda BLOQUEANTE de la ETAPA 13 — no es una decisión permanente
+
+| Id        | Asunto                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Estado      |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| **DB-01** | **`MFA_OBLIGATORIO` retirado del código el 2026-09-10.** No vuelve a `true`: desaparece. Variable, rama del guard, token `POLITICA_MFA`, aviso de arranque, cartel de la consola, rama de la ruta de sesión y los dos `.env.example`. Un modo que debilita un requisito formal y sobrevive en el árbol acaba activado en producción por accidente. Tres controles anti-regresión levantan los procesos **con** la variable puesta y exigen que no pase nada                                                                                                                                                                                                                                                | **CERRADA** |
+| **DB-02** | **CERRADA el 2026-09-11, por el camino ejercido.** La duda era si el token del proyecto real llevaba `rol`. Lo llevaba: la bitácora de la consola del cliente enumera `rol` y `copropiedad_id` entre los claims recibidos, así que el gancho `0024` está activo y hace su trabajo. Y el camino completo se ejerce en los pasos **12b y 12c** del verificador —base vacía → migraciones → superadministrador → sesión aceptada con `aal2` y rechazada con `aal1`, y el recorrido del navegador hasta el tablero—. **Lo que el token traía bien era `rol`; lo que estaba roto era otra cosa**: `copropiedad_id` nulo en el superadministrador, que la consola leía como «sin permiso». Eso es D-67, no DB-02 | **CERRADA** |
+
+> **Por qué DB-02 estuvo abierta tanto tiempo, y qué la cerró.** Se dio por «no verificada» porque la ronda anterior se hizo sin credenciales del proyecto real, y eso era correcto. La cerró el propio síntoma del cliente: su bitácora enumeraba los claims y `rol` estaba ahí. El diagnóstico previo — Que el token no traiga `rol` es lo serio: el guard derivaría el alcance de unos claims incompletos, y §2.7.6 llama a eso el riesgo número uno del proyecto. Con el JWKS corregido es muy probable que el síntoma desaparezca —era el mismo bloqueante— pero **probable no es verificado**, y esta ronda se hizo sin credenciales del proyecto real. Se da por **no verificado** hasta que el cliente ejecute el paso 5 de la guía.
 
 ### Lo que usted debe ejecutar antes de la 09-B
 
-Las migraciones `0023` y `0024`, el SMTP y la plantilla de correo, el Auth Hook de claims y el primer superadministrador. Todo en pasos numerados en [`docs/guias/RECUPERACION_Y_USUARIOS.md`](guias/RECUPERACION_Y_USUARIOS.md).
+Las migraciones `0023` a `0026`, el SMTP y la plantilla de correo, el Auth Hook de claims, el primer superadministrador y **la inscripción de su propio segundo factor desde la consola** — sin ese último paso, ningún rol administrativo entra. Todo en pasos numerados en [`docs/guias/RECUPERACION_Y_USUARIOS.md`](guias/RECUPERACION_Y_USUARIOS.md).
 
 ---
 

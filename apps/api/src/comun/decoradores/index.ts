@@ -41,6 +41,33 @@ export const CLAVE_SIN_RECURSO_TENANT = 'ncr:sin_recurso_tenant';
 export const SinRecursoDeTenant = (): MethodDecorator & ClassDecorator =>
   SetMetadata(CLAVE_SIN_RECURSO_TENANT, true);
 
+export const CLAVE_ALCANCE_DEL_LLAMANTE = 'ncr:alcance_del_llamante';
+
+/**
+ * Declara que la ruta **devuelve exactamente el alcance del llamante** y no
+ * recibe ningún identificador de copropiedad por el que filtrar.
+ *
+ * Es distinto de `@SinRecursoDeTenant()`: aquella no expone recurso alguno de
+ * copropiedad; esta expone copropiedades, pero solo las que el llamante ya
+ * alcanza. `GET /copropiedades` es el caso, y existe porque el
+ * superadministrador no pertenece a ninguna: sin enumerar, no hay forma de
+ * ofrecerle elegir.
+ *
+ * **Por qué necesita marca propia.** El recorrido genérico de la suite de
+ * aislamiento pide un recurso de OTRA copropiedad y trata cualquier 2xx como
+ * fuga. Aquí no hay identificador que sustituir, así que ese recorrido no
+ * puede juzgarla: respondería 200 siempre y lo llamaría fuga, o se la saltaría
+ * y no la comprobaría nadie.
+ *
+ * **Y la marca NO es una exención.** La suite exige que toda ruta marcada
+ * tenga su comprobación dedicada —qué devuelve exactamente para cada rol— y
+ * rompe el build si alguien añade el decorador sin añadirla. Exentar en
+ * silencio justo el endpoint que enumera tenants sería el peor agujero
+ * posible.
+ */
+export const AlcanceDelLlamante = (): MethodDecorator & ClassDecorator =>
+  SetMetadata(CLAVE_ALCANCE_DEL_LLAMANTE, true);
+
 export const CLAVE_SIN_SEGUNDO_FACTOR = 'ncr:sin_segundo_factor';
 
 /**

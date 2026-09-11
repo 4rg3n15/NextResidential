@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { esFallo } from '@ncr/domain-core';
-import { DesactivarVehiculo, DesactivarVivienda, RegistrarVehiculo } from './casos-de-uso';
+import {
+  DesactivarVehiculo,
+  DesactivarVivienda,
+  ListarVehiculos,
+  ListarViviendas,
+  RegistrarResidente,
+  RegistrarVehiculo,
+  RegistrarVivienda,
+} from './casos-de-uso';
 import type { RepositorioPadron } from './puertos';
 import type { ContextoTenant } from '../../autenticacion';
 
@@ -21,6 +29,11 @@ const repo = (parcial: Partial<RepositorioPadron> = {}): RepositorioPadron => {
     registrarResidente: vi.fn().mockResolvedValue({ id: 'r1' }),
     desactivarVivienda: vi.fn().mockResolvedValue(true),
     contarVehiculosActivos: vi.fn().mockResolvedValue(0),
+    registrarVivienda: vi.fn().mockResolvedValue({ tipo: 'registrada', id: 'viv-9' }),
+    listarViviendas: vi
+      .fn()
+      .mockResolvedValue({ totales: { activas: 2, inactivas: 1 }, viviendas: [] }),
+    listarVehiculos: vi.fn().mockResolvedValue([]),
     enTransaccion: async (op) => op(base),
     ...parcial,
   };
@@ -124,5 +137,88 @@ describe('DesactivarVivienda · RN-19', () => {
 
     const sinCop = await new DesactivarVivienda(repo()).ejecutar(sinTenant, 'viv-1', 'demolida');
     expect(esFallo(sinCop) && sinCop.error.codigo).toBe('OPERACION_NO_PERMITIDA');
+  });
+});
+
+describe('RegistrarVivienda', () => {
+  it('recorta el identificador y lo pasa limpio al repositorio', async () => {
+    const registrar = vi.fn().mockResolvedValue({ tipo: 'registrada', id: 'viv-7' });
+    const r = await new RegistrarVivienda(repo({ registrarVivienda: registrar })).ejecutar(ctx, {
+      identificador: '  Casa 12  ',
+    });
+    expect(r.ok && r.valor.id).toBe('viv-7');
+    expect(registrar.mock.calls[0]![0].identificador).toBe('Casa 12');
+  });
+
+  it('un identificador vacío se rechaza aquí y no llega a la base', async () => {
+    const registrar = vi.fn();
+    const r = await new RegistrarVivienda(repo({ registrarVivienda: registrar })).ejecutar(ctx, {
+      identificador: '   ',
+    });
+    expect(esFallo(r)).toBe(true);
+    expect(registrar).not.toHaveBeenCalled();
+  });
+
+  it('el choque de identificador lo decide la BASE, y se traduce a conflicto', async () => {
+    // No hay `SELECT` previo: quien decide es el índice único parcial (ADR-04),
+    // y por eso este caso de uso solo traduce el discriminador que recibe.
+    const r = await new RegistrarVivienda(
+      repo({ registrarVivienda: vi.fn().mockResolvedValue({ tipo: 'identificador_duplicado' }) }),
+    ).ejecutar(ctx, { identificador: 'Casa 12' });
+    expect(esFallo(r) && r.error.codigo).toBe('CONFLICTO_DE_CONCURRENCIA');
+  });
+
+  it('una identidad sin copropiedad no crea nada (RN-15)', async () => {
+    const registrar = vi.fn();
+    const r = await new RegistrarVivienda(repo({ registrarVivienda: registrar })).ejecutar(
+      sinTenant,
+      { identificador: 'Casa 12' },
+    );
+    expect(esFallo(r)).toBe(true);
+    expect(registrar).not.toHaveBeenCalled();
+  });
+});
+
+describe('RegistrarResidente', () => {
+  it('vincula la persona a la vivienda con el actor de la sesión', async () => {
+    const registrar = vi.fn().mockResolvedValue({ id: 'res-1' });
+    const r = await new RegistrarResidente(repo({ registrarResidente: registrar })).ejecutar(ctx, {
+      viviendaId: 'viv-1',
+      personaId: 'per-1',
+    });
+    expect(r.ok && r.valor.id).toBe('res-1');
+    expect(registrar.mock.calls[0]![0].actorId).toBe('u1');
+    // La copropiedad sale del CONTEXTO y nunca de la entrada.
+    expect(registrar.mock.calls[0]![0].copropiedadId).toBe('cop-1');
+  });
+
+  it('un duplicado se traduce a conflicto, no a un `null` silencioso', async () => {
+    const r = await new RegistrarResidente(
+      repo({ registrarResidente: vi.fn().mockResolvedValue(null) }),
+    ).ejecutar(ctx, { viviendaId: 'viv-1', personaId: 'per-1' });
+    expect(esFallo(r) && r.error.codigo).toBe('CONFLICTO_DE_CONCURRENCIA');
+  });
+});
+
+describe('las lecturas del padrón', () => {
+  it('los totales viajan tal cual, sin recalcularse en la aplicación', async () => {
+    const r = await new ListarViviendas(repo()).ejecutar('cop-1', {});
+    expect(r.ok && r.valor.totales).toEqual({ activas: 2, inactivas: 1 });
+  });
+
+  it('el filtro llega ENTERO al repositorio: quien filtra es la consulta SQL', async () => {
+    const listar = vi
+      .fn()
+      .mockResolvedValue({ totales: { activas: 0, inactivas: 0 }, viviendas: [] });
+    await new ListarViviendas(repo({ listarViviendas: listar })).ejecutar('cop-1', {
+      estado: 'inactivo',
+      busqueda: 'Casa',
+    });
+    expect(listar.mock.calls[0]![1]).toEqual({ estado: 'inactivo', busqueda: 'Casa' });
+  });
+
+  it('la lista de vehículos se devuelve sin transformar', async () => {
+    const r = await new ListarVehiculos(repo()).ejecutar('cop-1');
+    expect(r.ok && r.valor).toEqual([]);
   });
 });

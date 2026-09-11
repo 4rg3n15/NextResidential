@@ -9,6 +9,8 @@ import { Boton } from './ui/boton';
 import { Distintivo } from './ui/distintivo';
 import { NOMBRE_DE_ROL } from '@/lib/navegacion';
 import type { EstadoDelCanal } from '@/lib/sse/canal';
+import type { AlcanceActivo } from '@/app/(consola)/copropiedad';
+import { SelectorDeCopropiedad } from './selector-copropiedad';
 
 /**
  * Cabecera: buscador global, estado del canal en vivo y menú de usuario.
@@ -26,9 +28,11 @@ import type { EstadoDelCanal } from '@/lib/sse/canal';
 export const Cabecera = ({
   sesion,
   estadoDelCanal,
+  alcance,
 }: {
   readonly sesion: Sesion;
   readonly estadoDelCanal: EstadoDelCanal;
+  readonly alcance: AlcanceActivo;
 }): JSX.Element => {
   const router = useRouter();
   const [cerrando, setCerrando] = useState(false);
@@ -44,6 +48,11 @@ export const Cabecera = ({
 
   return (
     <header className="flex h-cabecera items-center gap-4 border-b border-borde bg-tarjeta px-6">
+      <SelectorDeCopropiedad
+        disponibles={alcance.disponibles}
+        activa={alcance.copropiedadId}
+        alcanceGlobal={alcance.alcanceGlobal}
+      />
       <div className="min-w-0 flex-1">
         <label htmlFor="buscador-global" className="sr-only">
           Buscar casa, placa o residente

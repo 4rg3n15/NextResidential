@@ -22,4 +22,5 @@ export {
 export type { ContextoTenant, Rol } from './dominio/claims';
 export { RechazoDeAutenticacion } from './dominio/errores';
 export { VerificadorDeJwt } from './infraestructura/verificador-jwt';
-export { ProveedorDeJwks } from './infraestructura/jwks';
+export { ProveedorDeJwks, describir as describirEstadoDeJwks } from './infraestructura/jwks';
+export type { EstadoDeJwks } from './infraestructura/jwks';

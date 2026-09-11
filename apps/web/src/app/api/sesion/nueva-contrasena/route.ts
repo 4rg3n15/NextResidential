@@ -7,7 +7,7 @@ import {
   cambiarContrasena,
   canjearTokenDeRecuperacion,
 } from '@/lib/sesion/supabase-auth';
-import { textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
+import { estadoDeFalloDeAcceso, textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
 import { Limitador, ipDe } from '@/lib/limitador';
 
 export const dynamic = 'force-dynamic';
@@ -85,8 +85,11 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
     // un fallo dejaría al usuario con una sesión aal1 que no pidió.
     await borrarSesion();
     if (e instanceof FalloDeAcceso) {
-      const estado = e.motivo === 'DEMASIADOS_INTENTOS' ? 429 : 400;
-      return NextResponse.json({ mensaje: textoDeFalloDeAcceso(e.motivo) }, { status: estado });
+      const estado = estadoDeFalloDeAcceso(e.motivo, 400);
+      return NextResponse.json(
+        { mensaje: textoDeFalloDeAcceso(e.motivo, e.detalle) },
+        { status: estado },
+      );
     }
     return NextResponse.json(
       { mensaje: textoDeFalloDeAcceso('SERVICIO_NO_DISPONIBLE') },

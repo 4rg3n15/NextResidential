@@ -21,7 +21,15 @@
  *     el propio contrato destapó: `@ApiProperty({ nullable: true })` sin `type:`
  *     genera un esquema sin tipo, que `openapi-typescript` traduce a
  *     `Record<string, never>`. El DTO parecía tipado y no lo estaba.
- *  4. Las exenciones se declaran AQUÍ, con su etapa, y **caducan solas**: si una
+ *  4. **El CUERPO de la petición también lleva tipo.** Añadido en la ETAPA
+ *     09-B, y por el mismo defecto que motivó la regla 2, encontrado esta vez
+ *     en el otro sentido: un DTO de entrada con solo decoradores de
+ *     `class-validator` genera un esquema sin propiedades, así que el cliente
+ *     generado tipa el cuerpo como `Record<string, never>` y **la consola no
+ *     puede escribirlo**. El síntoma no fue un error de contrato: fue no poder
+ *     enviar el formulario de una vivienda. Solo se exige donde hay cuerpo
+ *     declarado; una operación sin cuerpo no lo necesita.
+ *  5. Las exenciones se declaran AQUÍ, con su etapa, y **caducan solas**: si una
  *     ruta exenta deja de existir o pasa a estar tipada, el control falla y
  *     obliga a quitarla de la lista. Una lista de excepciones que nadie poda es
  *     una lista que acaba tapando lo que debía vigilar.
@@ -40,15 +48,11 @@ import { resolve } from 'node:path';
  * entra con la pantalla que lo consume.
  */
 const EXENTAS = new Map([
-  ['POST /padron/vehiculos', 'ETAPA 09-B · pantalla de vehículos'],
-  ['POST /padron/vehiculos/{id}/desactivacion', 'ETAPA 09-B · pantalla de vehículos'],
-  ['POST /padron/viviendas/{id}/desactivacion', 'ETAPA 09-B · pantalla de viviendas'],
-  ['POST /padron/carga', 'ETAPA 09-B · carga de padrón (HU-03)'],
-  ['GET /copropiedades/{id}/zonas', 'ETAPA 09-B · pantalla de zonas comunes'],
-  ['POST /copropiedades/{id}/zonas/{zonaId}/configuracion', 'ETAPA 09-B · pantalla de zonas'],
-  ['POST /copropiedades/{id}/zonas/{zonaId}/ingresos', 'ETAPA 10 · consola operativa'],
-  ['POST /copropiedades/{id}/zonas/{zonaId}/salidas', 'ETAPA 10 · consola operativa'],
-  ['POST /copropiedades/{id}/zonas/{zonaId}/autorizaciones', 'ETAPA 09-B · pantalla de visitantes'],
+  // La ETAPA 09-B vació su parte de esta lista: las nueve rutas que llevaban
+  // «ETAPA 09-B» ya declaran su respuesta con un DTO decorado, y con ellas se
+  // fueron también las dos de zonas que la 10 iba a heredar. Lo que queda es
+  // exclusivamente lo que NINGUNA interfaz consume todavía.
+
   ['POST /copropiedades/{id}/biometria/capturas', 'ETAPA 11 · captura desde la app'],
   ['GET /copropiedades/{id}/biometria/consentimientos/{consentimientoId}', 'ETAPA 11'],
   ['POST /copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta', 'ETAPA 11'],
@@ -173,6 +177,18 @@ for (const [ruta, operaciones] of Object.entries(documento.paths ?? {})) {
       problemas.push(
         `${clave} · ya declara su respuesta: sobra la exención «${EXENTAS.get(clave)}»`,
       );
+    }
+    const cuerpo = operacion.requestBody?.content?.['application/json']?.schema;
+    if (cuerpo !== undefined) {
+      const esquema = resolver(cuerpo);
+      const propiedades = Object.keys(esquema?.properties ?? {});
+      if (propiedades.length === 0) {
+        problemas.push(
+          `${clave} · el CUERPO no declara propiedades. Añade @ApiProperty a cada campo del DTO ` +
+            'de entrada: sin ellas el cliente generado lo tipa como `Record<string, never>` y la ' +
+            'consola no puede enviarlo.',
+        );
+      }
     }
     if (!tipada && !EXENTAS.has(clave)) {
       problemas.push(

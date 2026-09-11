@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { registrar } from '@/lib/registro';
 import type { NextRequest } from 'next/server';
 import { configuracion } from '@/lib/configuracion';
 import { tokenVigente } from '@/lib/sesion/token';
@@ -84,11 +85,29 @@ const reenviar = async (peticion: NextRequest, segmentos: string[]): Promise<Res
       cache: 'no-store',
       signal: peticion.signal,
     } as RequestInit);
-  } catch {
-    // La API caída no es un error de la consola: se distingue con un 503 para
-    // que la interfaz muestre «sin conexión» y no «algo salió mal».
+  } catch (e) {
+    /**
+     * La API caída no es un error de la consola: se distingue con un 503 para
+     * que la interfaz muestre «sin conexión» y no «algo salió mal».
+     *
+     * **Y se registra con la ruta y la causa.** Un `503` mudo aquí costó una
+     * ronda entera: `POST /api/ncr/auth/mfa/codigos` fallaba, parecía una ruta
+     * inexistente del BFF y era la API que no estaba levantada —o que no
+     * arranca por configuración incompleta, §2.7.1—. La ruta se registra; el
+     * token y el cuerpo, nunca.
+     */
+    registrar('error', 'la API no responde', {
+      ruta: `/${segmentos.join('/')}`,
+      metodo: peticion.method,
+      causa: e instanceof Error ? e.name : typeof e,
+    });
     return NextResponse.json(
-      { estado: 503, correlacion: 'api-inalcanzable', mensaje: 'La API no responde' },
+      {
+        estado: 503,
+        correlacion: 'api-inalcanzable',
+        mensaje:
+          'La API de Next Control no responde. Comprueba que está levantada y que API_URL apunta a ella.',
+      },
       { status: 503 },
     );
   }

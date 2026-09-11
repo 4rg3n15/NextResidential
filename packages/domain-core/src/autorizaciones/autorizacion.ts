@@ -72,6 +72,51 @@ export class Autorizacion {
     );
   }
 
+  /**
+   * **Rehidratación desde persistencia.** `crear` aplica las reglas de un alta
+   * —nace vigente, sin acompañantes, con el máximo por defecto— y por eso no
+   * sirve para reconstruir algo que ya existe: una autorización revocada
+   * volvería del repositorio como vigente.
+   *
+   * No valida las invariantes de alta a propósito. Lo que entra por aquí ya
+   * ocurrió y ya fue validado cuando ocurrió; volver a exigirlo haría que un
+   * cambio de regla dejara ilegibles las filas escritas antes del cambio, que
+   * es como un sistema pierde su propio historial. La barrera de escritura
+   * sigue siendo `crear` y los métodos de intención.
+   *
+   * Es `internal` por convención de uso, no por lenguaje: la llama el
+   * adaptador de persistencia, nunca un caso de uso.
+   */
+  static rehidratar(datos: {
+    id: string;
+    copropiedadId: string;
+    viviendaId: string;
+    personaId: string;
+    vigencia: Vigencia;
+    estado: EstadoAutorizacion;
+    acompanantes: readonly Acompanante[];
+    zonasPermitidas: readonly string[];
+    patron: PatronRecurrencia | null;
+    maximoAcompanantes: number;
+    revocadaEn: Date | null;
+    motivoRevocacion: string | null;
+  }): Autorizacion {
+    return new Autorizacion(
+      datos.id,
+      datos.copropiedadId,
+      datos.viviendaId,
+      datos.personaId,
+      datos.vigencia,
+      datos.estado,
+      [...datos.acompanantes],
+      new Set(datos.zonasPermitidas),
+      datos.patron,
+      datos.maximoAcompanantes,
+      datos.revocadaEn,
+      datos.motivoRevocacion,
+    );
+  }
+
   get estado(): EstadoAutorizacion {
     return this._estado;
   }

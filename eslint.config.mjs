@@ -143,7 +143,17 @@ export default tseslint.config(
     // Las pruebas del dominio SÍ construyen instantes: es su trabajo fijar el
     // tiempo. Y los dos puntos de entrada escriben en consola antes de que
     // exista bitácora, que es el único momento en que no hay alternativa.
-    files: ['**/*.test.ts', '**/*.spec.ts', 'apps/api/src/main.ts', 'apps/api/src/openapi.ts'],
+    // `apps/web/src/lib/registro.ts` es la ÚNICA frontera de consola de la
+    // consola: todo lo demás pasa por `registrar()`. Se exime el fichero, no la
+    // aplicación, para que la excepción siga siendo una y se vea.
+    files: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.spec.ts',
+      'apps/api/src/main.ts',
+      'apps/api/src/openapi.ts',
+      'apps/web/src/lib/registro.ts',
+    ],
     rules: { 'no-console': 'off', 'no-restricted-syntax': 'off' },
   },
 );

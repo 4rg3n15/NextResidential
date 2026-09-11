@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
 import type { Firmante } from './utilidades';
-import { AuditoriaEnMemoria } from '../src/multiempresa/auditoria-en-memoria';
+import { AuditoriaEnMemoria } from '../src/comun/auditoria';
 
 /**
  * §2.7.8 · el restablecimiento de contraseña deja rastro auditable.

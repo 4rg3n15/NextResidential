@@ -46,6 +46,7 @@ import {
   RepositorioEventosEnMemoria,
 } from './infraestructura/repositorios-en-memoria';
 import { EventosController } from './presentacion/eventos.controller';
+import { InformesController } from './presentacion/informes.controller';
 import { AlertasController } from './presentacion/alertas.controller';
 
 /**
@@ -73,7 +74,7 @@ export class EventosModule {
   static registrar(): DynamicModule {
     return {
       module: EventosModule,
-      controllers: [EventosController, AlertasController],
+      controllers: [EventosController, AlertasController, InformesController],
       providers: [
         { provide: REPOSITORIO_EVENTOS, useFactory: () => new RepositorioEventosEnMemoria() },
         { provide: REPOSITORIO_ALERTAS, useFactory: () => new RepositorioAlertasEnMemoria() },

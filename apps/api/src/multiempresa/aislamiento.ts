@@ -1,33 +1,13 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
+import type { RegistroDeAuditoria } from '../comun/auditoria';
+import { REGISTRO_AUDITORIA as TOKEN_AUDITORIA } from '../comun/auditoria';
 import type { ContextoTenant } from '../autenticacion';
 import { alcanzaCopropiedad } from '../autenticacion';
 
-export interface RegistroDeAuditoria {
-  registrarAccesoCruzado(entrada: {
-    usuarioId: string;
-    rol: string;
-    copropiedadSolicitada: string;
-    recurso: string;
-  }): Promise<void>;
-
-  /**
-   * Rastro del cambio de credencial (migración 0023, §2.7.8).
-   *
-   * Método propio y no uno genérico `registrar(tipo, ...)`: cada evento de
-   * seguridad tiene su forma, y un método que acepta cualquier tipo acaba
-   * recibiendo cadenas libres que nadie puede filtrar después.
-   */
-  registrarRestablecimiento(entrada: {
-    usuarioId: string;
-    rol: string;
-    ip: string | null;
-    userAgent: string | null;
-  }): Promise<void>;
-}
-
-export const REGISTRO_AUDITORIA = Symbol.for('ncr.puerto.RegistroDeAuditoria');
+export type { RegistroDeAuditoria } from '../comun/auditoria';
+export { REGISTRO_AUDITORIA } from '../comun/auditoria';
 
 /**
  * Barrera de aislamiento en la CAPA DE APLICACIÓN.
@@ -45,7 +25,7 @@ export const REGISTRO_AUDITORIA = Symbol.for('ncr.puerto.RegistroDeAuditoria');
 export class Aislamiento {
   constructor(
     @Inject(BITACORA) private readonly bitacora: Bitacora,
-    @Inject(REGISTRO_AUDITORIA) private readonly auditoria: RegistroDeAuditoria,
+    @Inject(TOKEN_AUDITORIA) private readonly auditoria: RegistroDeAuditoria,
   ) {}
 
   async exigirAlcance(ctx: ContextoTenant, copropiedadId: string, recurso: string): Promise<void> {

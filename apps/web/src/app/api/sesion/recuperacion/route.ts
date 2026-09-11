@@ -65,7 +65,7 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
   } catch (e) {
     if (e instanceof FalloDeAcceso && e.motivo === 'DEMASIADOS_INTENTOS') {
       return NextResponse.json(
-        { mensaje: textoDeFalloDeAcceso(e.motivo), reintentarEn: e.reintentarEn ?? 60 },
+        { mensaje: textoDeFalloDeAcceso(e.motivo, e.detalle), reintentarEn: e.reintentarEn ?? 60 },
         { status: 429 },
       );
     }

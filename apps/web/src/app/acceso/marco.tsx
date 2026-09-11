@@ -1,5 +1,5 @@
 import type { JSX, ReactNode } from 'react';
-import { version } from '../../../package.json';
+import paquete from '../../../package.json';
 
 /**
  * Marco compartido de las tres pantallas previas a la sesión: acceso,
@@ -9,7 +9,16 @@ import { version } from '../../../package.json';
  * duplicar el panel de marca en cada una garantizaba que se separaran. El
  * número de versión sale del `package.json` en tiempo de construcción: el
  * mockup traía un «4.2.1-Prod» ficticio que no debe llegar al entregable (C-14).
+ *
+ * **Por qué se importa el módulo entero y se lee el campo, en vez de
+ * `import { version }`.** Un JSON no tiene exportaciones con nombre: el
+ * empaquetador las sintetiza y avisa de ello en cada compilación —«Should not
+ * import the named export 'version' from default-exporting module»—. El aviso
+ * no era cosmético: esa síntesis impide que el módulo se trate como un JSON
+ * estático, y bastaba con leer el campo del objeto para que dejara de hacer
+ * falta.
  */
+const { version } = paquete;
 export const MarcoDeAcceso = ({
   titulo,
   descripcion,

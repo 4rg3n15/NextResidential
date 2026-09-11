@@ -29,6 +29,14 @@ SET LOCAL request.jwt.claims =
 -- Identidades de arranque ------------------------------------------------------
 -- usuario_sistema es la única fila cuyo creado_por se referencia a sí misma:
 -- es el único ciclo del esquema y está acotado a una fila conocida.
+--
+-- DESDE LA ETAPA 09-A ESTA FILA LA CREA LA MIGRACIÓN 0025, no este fichero.
+-- Se conserva aquí, idempotente y con el mismo identificador, para que el seed
+-- siga siendo ejecutable por sí solo. El motivo del cambio: mientras el actor
+-- vivía únicamente aquí, la identidad que el sistema necesita para existir
+-- estaba soldada al conjunto de datos de demostración —«Urbanización Mira», sus
+-- viviendas, sus residentes—, que es justo lo que nadie ejecuta en producción.
+-- El resultado fue un despliegue real que no podía crear su primer usuario.
 INSERT INTO public.usuarios (id, copropiedad_id, auth_user_id, correo, nombre,
                              creado_por, actualizado_por)
 VALUES ('00000000-0000-4000-8000-000000000001', NULL,

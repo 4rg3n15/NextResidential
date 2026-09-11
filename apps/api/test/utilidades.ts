@@ -1,12 +1,20 @@
 import { generateKeyPair, SignJWT, exportJWK } from 'jose';
 import type { JWK } from 'jose';
 import { Test } from '@nestjs/testing';
+import { DiscoveryModule, DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core';
+import { PATH_METADATA } from '@nestjs/common/constants';
+import type { TestingModuleBuilder } from '@nestjs/testing';
 import express from 'express';
 import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
 import type { INestApplication } from '@nestjs/common';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
+import { SONDA_POSTGRES } from '../src/arranque/sonda-postgres';
 import { ProveedorDeJwks } from '../src/autenticacion/infraestructura/jwks';
+import {
+  REPOSITORIO_COPROPIEDADES,
+  RepositorioCopropiedadesEnMemoria,
+} from '../src/multiempresa/repositorio-copropiedades';
 import type { Configuracion } from '../src/configuracion/esquema';
 import type { Rol } from '../src/autenticacion/dominio/claims';
 
@@ -19,7 +27,11 @@ export const configuracionDePrueba: Configuracion = {
   SUPABASE_URL: 'https://proyecto-de-prueba.invalid',
   SUPABASE_PUBLISHABLE_KEY: 'marcador',
   SUPABASE_SECRET_KEY: 'marcador',
-  SUPABASE_JWKS_URL: 'https://proyecto-de-prueba.invalid/auth/v1/jwks',
+  SUPABASE_JWKS_URL: 'https://proyecto-de-prueba.invalid/auth/v1/.well-known/jwks.json',
+  // La suite corre con la regla del contrato EN VIGOR. El interruptor tiene sus
+  // propias pruebas, que lo apagan explícitamente: si el valor por defecto de
+  // la suite fuera `false`, las 363 pruebas dejarían de comprobar RN-20 sin que
+  // nadie lo notara — que es como se pierde un control.
   JWKS_CACHE_TTL_SEGUNDOS: 600,
   JWKS_REFRESCO_MINIMO_SEGUNDOS: 60,
   DATABASE_URL: 'marcador',
@@ -96,18 +108,80 @@ export const tokenDe = async (f: Firmante, id: Identidad): Promise<string> =>
     aal: id.aal ?? 'aal2',
   });
 
-export const crearApp = async (firmante: Firmante): Promise<INestApplication> => {
-  const modulo = await Test.createTestingModule({
-    imports: [AppModule.conConfiguracion(configuracionDePrueba)],
-  })
+/**
+ * `sustituir` permite a una suite cambiar un proveedor concreto sin duplicar
+ * este fixture. Se añadió en la ETAPA 09-A para poder probar la recuperación
+ * del segundo factor sin llamar a Supabase: lo que se sustituye es el PUERTO
+ * `AdministradorDeFactores`, no el controlador, así que lo que se ejercita
+ * sigue siendo el camino real.
+ */
+export const crearApp = async (
+  firmante: Firmante,
+  sustituir?: (constructor: TestingModuleBuilder) => TestingModuleBuilder,
+  /**
+   * Variaciones de CONFIGURACIÓN, no de proveedores. Sustituir el proveedor de
+   * la política de MFA probaría el guard pero no el cableado que va de la
+   * variable de entorno al guard, que es justo donde un interruptor de
+   * seguridad se rompe: el esquema la lee, el módulo no la pasa, y el guard
+   * recibe el valor por defecto sin que nadie lo note.
+   */
+  configuracion?: Partial<Configuracion>,
+): Promise<INestApplication> => {
+  const base = Test.createTestingModule({
+    imports: [
+      // `DiscoveryModule` para poder LEER los decoradores del código en la
+      // suite de aislamiento, en vez de mantener una lista paralela en la
+      // prueba que diga verificarlos y no los verifique.
+      DiscoveryModule,
+      AppModule.conConfiguracion(
+        configuracion === undefined
+          ? configuracionDePrueba
+          : { ...configuracionDePrueba, ...configuracion },
+      ),
+    ],
+  });
+  const modulo = await (sustituir === undefined ? base : sustituir(base))
+    /**
+     * El catálogo de copropiedades se sustituye por el doble en memoria.
+     *
+     * En producción lo sirve PostgreSQL bajo la RLS; aquí no hay contraseña
+     * (D-17) y una consulta real dejaría la suite dependiendo de una base. Lo
+     * que estas pruebas ejercitan es el **filtro de aplicación**, que es la
+     * barrera que sigue en pie cuando la llave secreta omite la RLS. El camino
+     * de la RLS se prueba aparte y contra base real.
+     */
+    .overrideProvider(REPOSITORIO_COPROPIEDADES)
+    .useFactory({
+      factory: () => {
+        const catalogo = new RepositorioCopropiedadesEnMemoria();
+        catalogo.declarar([
+          { id: COP_A, nombre: 'Copropiedad A', zonaHoraria: 'America/Bogota' },
+          { id: COP_B, nombre: 'Copropiedad B', zonaHoraria: 'America/Bogota' },
+        ]);
+        return catalogo;
+      },
+    })
     .overrideProvider(ProveedorDeJwks)
     .useValue({
       // `obtener()` devuelve la función que `jose` usa para resolver la clave
       // a partir del encabezado. Aquí resuelve siempre a la pública local.
       obtener: () => async () => firmante.clavePublica,
-      precalentar: async () => true,
+      sondear: async () => ({ estado: 'ok', claves: 1 }),
       disponible: true,
     })
+    /**
+     * La sonda de PostgreSQL, con doble. La suite no tiene base —los
+     * repositorios de estos módulos son los de memoria— y sin este reemplazo
+     * `/ready` respondería 503 en todas las pruebas.
+     *
+     * Que quede dicho, porque es exactamente el patrón que esta ronda persigue:
+     * **este doble no demuestra nada sobre la base real.** Lo que sí la toca es
+     * la comprobación de arranque de `main.ts` y el `/ready` del proceso
+     * desplegado, que ejecutan un `SELECT 1` de verdad. Un doble aquí evita que
+     * la suite dependa de una base; no sustituye a esa comprobación.
+     */
+    .overrideProvider(SONDA_POSTGRES)
+    .useValue({ comprobar: async () => ({ estado: 'ok', detalle: 'doble de pruebas' }) })
     .compile();
 
   // `bodyParser: false` + el mismo `express.json({ verify })` de `main.ts`.
@@ -192,4 +266,45 @@ export const enumerarRutas = (app: INestApplication): RutaExpuesta[] => {
     }
   }
   return rutas;
+};
+
+/**
+ * Rutas que llevan un metadato de decorador, **leído del código y no de una
+ * lista escrita en la prueba**.
+ *
+ * Por qué hace falta (ETAPA 09-B). La suite de aislamiento mantenía sus
+ * exenciones como conjuntos literales y las «correspondía» con el código
+ * comprobando solo que la ruta existiera en el enrutador — lo cual es cierto
+ * de cualquier ruta, tenga el decorador o no. Es decir: el control decía
+ * verificar la correspondencia y no la verificaba. Decimosexta aparición de la
+ * familia, y justo sobre las exenciones del aislamiento.
+ *
+ * Ahora la fuente es `Reflector` sobre el manejador real: si alguien añade una
+ * ruta al conjunto de la prueba sin poner el decorador —o al revés—, los dos
+ * conjuntos dejan de coincidir y la suite rompe el build.
+ */
+export const rutasConMetadato = (app: INestApplication, clave: string): string[] => {
+  const descubrimiento = app.get(DiscoveryService);
+  const reflector = app.get(Reflector);
+  const escaner = new MetadataScanner();
+  const rutas = new Set<string>();
+
+  for (const envoltorio of descubrimiento.getControllers()) {
+    const { instance, metatype } = envoltorio;
+    if (!instance || !metatype) continue;
+    const prefijo = reflector.get<string>(PATH_METADATA, metatype) ?? '';
+    const prototipo = Object.getPrototypeOf(instance) as object;
+
+    for (const nombre of escaner.getAllMethodNames(prototipo)) {
+      const manejador = (instance as Record<string, unknown>)[nombre];
+      if (typeof manejador !== 'function') continue;
+      const marcado =
+        reflector.get<boolean>(clave, manejador) === true ||
+        reflector.get<boolean>(clave, metatype) === true;
+      if (!marcado) continue;
+      const sufijo = reflector.get<string>(PATH_METADATA, manejador) ?? '';
+      rutas.add(`/${[prefijo, sufijo].filter((p) => p !== '' && p !== '/').join('/')}`);
+    }
+  }
+  return [...rutas].sort();
 };

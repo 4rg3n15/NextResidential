@@ -5,7 +5,7 @@ const completo = {
   SUPABASE_URL: 'https://ref.supabase.co',
   SUPABASE_PUBLISHABLE_KEY: 'valor-de-prueba',
   SUPABASE_SECRET_KEY: 'valor-de-prueba',
-  SUPABASE_JWKS_URL: 'https://ref.supabase.co/auth/v1/jwks',
+  SUPABASE_JWKS_URL: 'https://ref.supabase.co/auth/v1/.well-known/jwks.json',
   DATABASE_URL: 'valor-de-prueba',
   DATABASE_POOLER_URL: 'valor-de-prueba',
   CORS_ALLOWED_ORIGINS: 'https://consola.ejemplo.co, https://admin.ejemplo.co',
@@ -79,5 +79,65 @@ describe('biometría · la llave de cifrado es requisito de arranque (ETAPA 08)'
 
   it('por defecto apunta a la variable de entorno', () => {
     expect(cargarConfiguracion(completo).BIOMETRIA_LLAVE_REF).toBe('env:BIOMETRIA_LLAVE');
+  });
+});
+
+/**
+ * D-61 · el `.env` sin salto de línea final.
+ *
+ * El cliente añadió una variable a un fichero que no terminaba en `\n`. Las dos
+ * líneas se fundieron: `INGESTA_FIRMA_SECRETO` se quedó con el nombre de la
+ * otra pegado al valor, y **la otra nunca llegó a existir**. La aplicación
+ * arrancó tan contenta con un secreto corrupto, porque `min(32)` solo mira la
+ * longitud y el valor pegado la superaba de sobra.
+ *
+ * La variable del caso real era `MFA_OBLIGATORIO`, que ya no existe —se retiró
+ * con el interruptor—. La prueba usa una vigente a propósito: comprueba el
+ * MECANISMO, y escrita contra un nombre muerto pasaría en vacío sin que nadie
+ * lo notara. Es la misma clase de defecto que el resto de esta ronda persigue.
+ */
+describe('valores con forma imposible', () => {
+  it('detecta el nombre de otra variable pegado dentro de un valor', () => {
+    const entorno = {
+      ...completo,
+      INGESTA_FIRMA_SECRETO: `${completo.INGESTA_FIRMA_SECRETO}EVIDENCIA_BUCKET=evidencia`,
+    };
+    expect(() => cargarConfiguracion(entorno as NodeJS.ProcessEnv)).toThrow(
+      /INGESTA_FIRMA_SECRETO/,
+    );
+    // El mensaje tiene que nombrar la causa REAL, no la consecuencia: quien lo
+    // lea debe ir al salto de línea, no a contar caracteres del secreto.
+    expect(() => cargarConfiguracion(entorno as NodeJS.ProcessEnv)).toThrow(/salto de línea/);
+  });
+
+  it('nombra también la variable que se perdió por el camino', () => {
+    const entorno = {
+      ...completo,
+      INGESTA_FIRMA_SECRETO: `${completo.INGESTA_FIRMA_SECRETO}EVIDENCIA_BUCKET=evidencia`,
+    };
+    expect(() => cargarConfiguracion(entorno as NodeJS.ProcessEnv)).toThrow(/EVIDENCIA_BUCKET/);
+  });
+
+  it('un secreto con espacios o saltos de línea no arranca', () => {
+    for (const roto of [
+      'a'.repeat(20) + ' ' + 'b'.repeat(20),
+      'c'.repeat(20) + '\n' + 'd'.repeat(20),
+    ]) {
+      expect(() =>
+        cargarConfiguracion({ ...completo, BIOMETRIA_LLAVE: roto } as NodeJS.ProcessEnv),
+      ).toThrow(/BIOMETRIA_LLAVE/);
+    }
+  });
+
+  it('no hay falso positivo: una URL con parámetros en minúscula pasa', () => {
+    // `?sslmode=require` se parece a una variable pegada solo si se busca
+    // cualquier `algo=`. Se buscan los nombres de ESTE esquema, que son en
+    // mayúsculas, y por eso una cadena de conexión legítima no salta.
+    expect(() =>
+      cargarConfiguracion({
+        ...completo,
+        DATABASE_URL: 'postgresql://u:p@host:5432/db?sslmode=require&application_name=ncr',
+      } as NodeJS.ProcessEnv),
+    ).not.toThrow();
   });
 });

@@ -30,9 +30,14 @@ afterAll(async () => {
 });
 
 describe('las rutas de MFA propias ya no existen', () => {
-  it('el enrutador no expone ninguna ruta bajo /auth/mfa', () => {
-    const mfa = enumerarRutas(app).filter((r) => r.ruta.startsWith('/auth/mfa'));
-    expect(mfa, `siguen expuestas: ${mfa.map((r) => r.ruta).join(', ')}`).toEqual([]);
+  it('no queda ninguna ruta de INSCRIPCIÓN ni de VERIFICACIÓN propias', () => {
+    // Las dos que ADR-008 retiró. Las de `mfa/codigos` y `mfa/recuperacion` que
+    // añadió la 09-A son otra cosa: no emiten `aal2` ni verifican un TOTP —eso
+    // lo sigue haciendo Supabase—, gestionan los códigos de recuperación que
+    // Supabase no ofrece.
+    const rutas = enumerarRutas(app).map((r) => r.ruta);
+    expect(rutas).not.toContain('/auth/mfa/inscripcion');
+    expect(rutas).not.toContain('/auth/mfa/verificacion');
   });
 
   it('/auth expone exactamente dos rutas, y ninguna es de segundo factor', () => {
@@ -42,7 +47,12 @@ describe('las rutas de MFA propias ya no existen', () => {
       .filter((r) => r.ruta.startsWith('/auth'))
       .map((r) => `${r.metodo} ${r.ruta}`)
       .sort();
-    expect(auth).toEqual(['GET /auth/sesion', 'POST /auth/restablecimiento']);
+    expect(auth).toEqual([
+      'GET /auth/sesion',
+      'POST /auth/mfa/codigos',
+      'POST /auth/mfa/recuperacion',
+      'POST /auth/restablecimiento',
+    ]);
   });
 
   it('un POST a la ruta retirada devuelve 404, no 401 ni 403', async () => {

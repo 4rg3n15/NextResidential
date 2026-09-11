@@ -6,8 +6,13 @@ import {
   leerSesion,
   marcarFactorPendiente,
 } from '@/lib/sesion/cookies';
-import { FalloDeAcceso, cerrarSesionRemota, iniciarSesion } from '@/lib/sesion/supabase-auth';
-import { textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
+import {
+  FalloDeAcceso,
+  cerrarSesionRemota,
+  exigeSegundoFactor,
+  iniciarSesion,
+} from '@/lib/sesion/supabase-auth';
+import { estadoDeFalloDeAcceso, textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -31,7 +36,14 @@ interface Credenciales {
 
 export type ResultadoDeAcceso =
   | { readonly siguiente: 'consola' }
-  | { readonly siguiente: 'segundo-factor' };
+  | { readonly siguiente: 'segundo-factor' }
+  /**
+   * Rol administrativo autenticado que **todavía no tiene ningún factor**. Sin
+   * este destino, el usuario entraba con `aal1`, la API le respondía 401 en
+   * cada llamada y la consola no tenía nada que ofrecerle. Era el bloqueo que
+   * dejaba el sistema inaccesible.
+   */
+  | { readonly siguiente: 'inscripcion' };
 
 const esCorreo = (v: unknown): v is string =>
   typeof v === 'string' && v.length >= 5 && v.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
@@ -80,17 +92,27 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
     // el rol no exige MFA, la API aceptará igualmente el token `aal1`; a quien
     // sí lo exige, la API le responderá 401 hasta que lo complete. La consola
     // no decide eso: se limita a ofrecer el paso cuando hay factor.
-    await marcarFactorPendiente(sesion.factorPendienteId);
+    if (sesion.factorPendienteId !== null) {
+      await marcarFactorPendiente(sesion.factorPendienteId);
+      return NextResponse.json<ResultadoDeAcceso>({ siguiente: 'segundo-factor' });
+    }
+
+    await marcarFactorPendiente(null);
+    // Sin factor inscrito: si el rol lo exige, hay que inscribirlo AHORA. Si no
+    // lo exige —portero, residente—, el token `aal1` le sirve y entra.
     return NextResponse.json<ResultadoDeAcceso>({
-      siguiente: sesion.factorPendienteId === null ? 'consola' : 'segundo-factor',
+      siguiente: exigeSegundoFactor(sesion.rol) ? 'inscripcion' : 'consola',
     });
   } catch (e) {
     if (e instanceof FalloDeAcceso) {
-      const estado = e.motivo === 'DEMASIADOS_INTENTOS' ? 429 : 401;
+      const estado = estadoDeFalloDeAcceso(e.motivo, 401);
       const cabeceras =
         e.reintentarEn === undefined ? undefined : { 'Retry-After': String(e.reintentarEn) };
       return NextResponse.json(
-        { mensaje: textoDeFalloDeAcceso(e.motivo), reintentarEn: e.reintentarEn ?? null },
+        {
+          mensaje: textoDeFalloDeAcceso(e.motivo, e.detalle),
+          reintentarEn: e.reintentarEn ?? null,
+        },
         cabeceras === undefined ? { status: estado } : { status: estado, headers: cabeceras },
       );
     }

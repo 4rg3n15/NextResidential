@@ -51,3 +51,29 @@ export class RestablecimientoRegistradoDto {
   })
   registrado!: boolean;
 }
+
+export class CodigosDeRecuperacionDto {
+  @ApiProperty({
+    type: [String],
+    description:
+      'Códigos de un solo uso, en claro. Se entregan UNA vez: solo se guarda su ' +
+      'hash. No dan acceso — autorizan a retirar el factor perdido para inscribir otro.',
+    example: ['A1B2C-D3E4F', '09876-54321'],
+  })
+  codigos!: string[];
+
+  @ApiProperty({ type: Number, example: 10 })
+  cantidad!: number;
+}
+
+export class RecuperacionDeFactorDto {
+  @ApiProperty({
+    type: Number,
+    example: 1,
+    description: 'Factores TOTP verificados que se retiraron. Ya se puede inscribir uno nuevo.',
+  })
+  factoresRetirados!: number;
+
+  @ApiProperty({ type: Number, description: 'Códigos de recuperación que quedan sin usar' })
+  codigosRestantes!: number;
+}

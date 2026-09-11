@@ -37,14 +37,25 @@ LIMITE_LARGO=1200    # suite completa, cobertura, base de datos
 
 con_limite() { node scripts/lib/con-limite.mjs "$@"; }
 
-paso() { printf '\n▸ %s\n' "$1"; }
+# Cada paso queda anotado: al final se compara lo ejecutado con lo declarado.
+# Sin esta cuenta, un paso encerrado en un `if` que no se cumple no da rojo: da
+# una salida más corta, y una salida más corta se lee como «todo bien».
+PASOS_EJECUTADOS="$(mktemp "${TMPDIR:-/tmp}/ncr-pasos.XXXXXX")"
+trap 'rm -f "$PASOS_EJECUTADOS"' EXIT
+paso() { printf '\n▸ %s\n' "$1"; printf '%s\n' "$1" >>"$PASOS_EJECUTADOS"; }
 ok()   { echo "   ✓ $1"; }
 mal()  { echo "   ✗ $1"; fallos=1; }
 
 paso "0 · borrando artefactos de compilación (así corre un checkout nuevo)"
 rm -rf packages/*/dist apps/*/dist .turbo packages/*/.turbo apps/*/.turbo
 rm -rf packages/*/coverage apps/*/coverage
-ok "dist, .turbo y coverage eliminados"
+# Los `.tsbuildinfo` viven DENTRO de `dist/` y ya se van con la línea de arriba.
+# Este barrido es por si alguno quedó fuera de sitio: un registro de compilación
+# que sobreviva al borrado de sus artefactos hace que `tsc -b` no emita nada y
+# la compilación siguiente falle con «Cannot find module». Pasó al introducir
+# las referencias de proyecto, y este paso es justo el que lo provoca.
+rm -f packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo
+ok "dist, .turbo, coverage y registros de compilación eliminados"
 
 paso "1 · entorno dentro de lo declarado"
 # La verificación depende ahora de Node y no del shell. Eso cierra la
@@ -65,7 +76,40 @@ else
 fi
 
 paso "3 · compilación desde cero"
+# D-65 · ORDEN DELIBERADO: primero CADA APLICACIÓN POR SEPARADO, después la raíz.
+#
+# Al revés no sirve de nada, y así estuvo hasta el 2026-09-11. `pnpm build` pasa
+# por turbo, que construye las dependencias en orden y deja todos los `dist/`
+# frescos; después de eso, un build por paquete pasa aunque el paquete no sepa
+# construir sus dependencias — porque ya están construidas. La verificación
+# daba verde y `pnpm --filter @ncr/api build` fallaba en el equipo del usuario
+# con un `TS2339` sobre un método que SÍ existía en el dominio: el `dist/` de
+# `@ncr/domain-core` era anterior a la etapa que lo añadió.
+#
+# Es la misma familia que el falso verde de la ETAPA 04 —`dist` está en
+# `.gitignore`, así que cada checkout tiene el suyo y envejece por su cuenta— y
+# la regla de §2.8.0 («las pruebas resuelven los paquetes internos a su código
+# fuente, nunca a su `dist/`») se había aplicado a las PRUEBAS y no al BUILD.
+#
+# Partiendo del paso 0, aquí no hay ningún `dist/`: si una aplicación no arrastra
+# sus dependencias, falla, y falla aquí en vez de en el equipo de quien la use.
+for app in api edge; do
+  if [[ -f "apps/$app/package.json" ]] && grep -q '"build"' "apps/$app/package.json"; then
+    con_limite "$LIMITE_MEDIO" pnpm --filter "@ncr/$app" build >/dev/null 2>&1 \
+      && ok "@ncr/$app construye SOLO, sin que nadie le prepare las dependencias" \
+      || mal "@ncr/$app no construye por sí solo: depende de un dist/ que alguien haya dejado ahí"
+  fi
+done
 con_limite "$LIMITE_MEDIO" pnpm build >/dev/null 2>&1 && ok "pnpm build" || mal "pnpm build"
+# Y la invariante que hace posible lo anterior, comprobada aparte: el bucle de
+# arriba solo detecta la regresión si alguien la introduce Y el paso llega a
+# correr con los `dist/` ya borrados. Esto la detecta siempre.
+if salida_constr=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-construccion.mjs 2>&1); then
+  ok "${salida_constr#OK }"
+else
+  mal "una aplicación puede compilar contra un dist/ desfasado (D-65)"
+  echo "$salida_constr" | head -8 | sed 's/^/     /'
+fi
 
 paso "4 · lint y typecheck"
 con_limite "$LIMITE_MEDIO" pnpm lint      >/dev/null 2>&1 && ok "pnpm lint"      || mal "pnpm lint"
@@ -153,6 +197,16 @@ else
   mal "protocolo del fabricante o IP de dispositivo fuera de packages/providers (KPI-11)"
   echo "$salida_kpi11" | head -8 | sed 's/^/     /'
 fi
+# D-63 · la CSP de la consola rechaza los atributos `style`, y las barras del
+# tablero los emitían: salían a cero y nadie lo veía. jsdom no aplica CSP y el
+# recorrido del navegador visitaba el tablero sin datos — dos suites que se
+# solapan y dejan el intervalo justo donde vivía el defecto (DT-12).
+if salida_csp=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-csp.mjs 2>&1); then
+  ok "${salida_csp#OK }"
+else
+  mal "atributo \`style\` en la consola: la CSP lo rechaza (§2.7.7)"
+  echo "$salida_csp" | head -8 | sed 's/^/     /'
+fi
 # ADR-005 · una clave ajena hacia una tabla append-only NO se puede insertar
 # jamás: la comprobación exige un bloqueo de fila que la revocación impide. El
 # defecto vivió cinco etapas porque las tablas estaban vacías (ETAPA 06).
@@ -200,13 +254,66 @@ else
 fi
 
 if [[ "$CON_BASE" == "1" ]]; then
-  paso "12 · esquema y aislamiento en --modo-supabase"
+  paso "12 · esquema y aislamiento en --modo-supabase (requiere --con-base)"
   if con_limite "$LIMITE_LARGO" ./supabase/verificar.sh --con-pruebas --modo-supabase >/tmp/ncr-sql.log 2>&1; then
     ok "migraciones, semillas y suite SQL"
   else
     mal "suite SQL (ver /tmp/ncr-sql.log)"
   fi
-  paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base"
+  paso "12b · arranque en frío: base vacía → migraciones → superadministrador (requiere --con-base)"
+  # ETAPA 09-A · el camino que un despliegue recorre de verdad y que ninguna
+  # suite tocaba: la SQL corre después de las semillas y la de la API firma sus
+  # propios tokens contra adaptadores en memoria. Entre las dos cubrían todo
+  # menos esto, y el usuario se lo encontró desplegando.
+  if con_limite "$LIMITE_LARGO" ./supabase/arranque-en-frio.sh >/tmp/ncr-arranque.log 2>&1; then
+    ok "una base recién migrada llega a un superadministrador con claims válidos"
+    # El último tramo: «puede entrar», que lo decide el guard de la API con los
+    # claims que la base acaba de producir. Se ejecuta AQUÍ, con el fichero de
+    # claims recién escrito; si se dejara para el paso 5 el fichero podría ser
+    # de una corrida anterior — un artefacto que envejece, otra vez.
+    if NCR_CLAIMS_ARRANQUE="$PWD/.arranque-en-frio.json" \
+       con_limite "$LIMITE_MEDIO" pnpm --filter @ncr/api exec vitest run \
+         test/arranque-en-frio.e2e.test.ts >/tmp/ncr-entra.log 2>&1 &&
+       ! grep -q "skipped" /tmp/ncr-entra.log; then
+      ok "y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1"
+    else
+      mal "el superadministrador aprovisionado no puede entrar (ver /tmp/ncr-entra.log)"
+      grep -E "×|→|skipped" /tmp/ncr-entra.log | head -5 | sed 's/^/     /'
+    fi
+  else
+    mal "el arranque en frío está roto (ver /tmp/ncr-arranque.log)"
+    grep -E "ERROR|ASSERT" /tmp/ncr-arranque.log | head -5 | sed 's/^/     /'
+  fi
+
+fi
+
+paso "12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero"
+# ETAPA 09-A · el intervalo de DT-12, cerrado. `arranque-en-frio` llega hasta
+# «la API acepta estos claims»; las pruebas de la consola usan dobles por
+# módulo. Entre las dos quedaba el camino que recorre una persona, y ahí
+# vivieron cuatro rondas de defectos: el gancho de claims, el arranque en frío,
+# la carrera del 503 y el QR que no se pintaba. Esto levanta la API y la consola
+# COMPILADA contra un doble de GoTrue con su semántica real y conduce Chromium.
+#
+# **FUERA DE `--con-base`, y no por gusto.** Nació dentro del bloque que exige
+# base de datos y ahí no se ejecutaba nunca sin ella: en la corrida del usuario
+# el paso ni salía en la salida. Un control que no aparece no es una omisión
+# declarada, es un hueco silencioso — la misma familia de fallo que este guion
+# existe para impedir. Este camino no toca PostgreSQL: usa un doble de GoTrue y
+# los adaptadores en memoria de la API, así que corre siempre.
+#
+# Y el guardián de Chromium vive AHORA dentro del propio comando: el que había
+# aquí miraba una ruta de Linux (`/opt/pw-browsers`) estando el entorno de
+# desarrollo objetivo en macOS, donde Playwright instala en otro sitio.
+if con_limite "$LIMITE_LARGO" node e2e/camino-de-acceso.mjs >/tmp/ncr-camino.log 2>&1; then
+  ok "el camino completo se recorre en el navegador"
+else
+  mal "el camino del navegador está roto o no hay con qué recorrerlo (ver /tmp/ncr-camino.log)"
+  grep -E "✗|     " /tmp/ncr-camino.log | head -6 | sed 's/^/     /'
+fi
+
+if [[ "$CON_BASE" == "1" ]]; then
+  paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)"
   # Estas dos pruebas se OMITEN solas si no alcanzan la base, y una omisión no
   # es un verde. Se comprueba la marca «OMITIDA» de su salida: sin esto, el
   # paso daba «✓ UPDATE y DELETE rechazados» con el servidor caído — que es
@@ -259,6 +366,19 @@ if salida_est=$(con_limite "$LIMITE_LARGO" node scripts/lib/estabilidad.mjs --re
 else
   echo "$salida_est" | grep -E "^   (corrida|✗)|^     " | head -20 | sed 's/^/   /'
   mal "la suite no es reproducible entre corridas"
+fi
+
+paso "15 · ningún paso declarado se quedó sin ejecutar"
+# El defecto que cierra este control: «12c» vivía dentro del bloque que exige
+# base de datos, así que en una corrida sin ella no se ejecutaba NI se omitía;
+# simplemente no salía. Lo detectó el usuario leyendo la salida y echándolo en
+# falta. Un control que solo se comprueba a ojo no es un control.
+if salida_pasos=$(node scripts/lib/pasos-ejecutados.mjs "$PASOS_EJECUTADOS" \
+     $([[ "$CON_BASE" == "1" ]] && echo --con-base) 2>&1); then
+  ok "$salida_pasos"
+else
+  mal "hay pasos declarados que no llegaron a ejecutarse"
+  echo "$salida_pasos" | sed 's/^/     /'
 fi
 
 echo

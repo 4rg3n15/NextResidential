@@ -39,3 +39,32 @@ import { cleanup } from '@testing-library/react';
 afterEach(() => {
   cleanup();
 });
+
+/**
+ * **URLs relativas en el entorno de pruebas.**
+ *
+ * El cliente de la API apunta a `/api/ncr`, que es una ruta del PROPIO origen:
+ * es la decisión que mantiene el token en una cookie `httpOnly` y evita que
+ * ninguna URL de Supabase llegue al navegador. En un navegador real esa ruta se
+ * resuelve contra el origen de la página; el `Request` de Node exige una URL
+ * absoluta y falla con «Invalid URL» antes de llegar a `fetch`.
+ *
+ * Se le da un origen a las rutas relativas, y solo a ellas. La alternativa
+ * —poner una URL absoluta en el cliente— habría cambiado el código de
+ * producción para que las pruebas pasaran, que es exactamente al revés.
+ */
+const ORIGEN_DE_PRUEBAS = 'http://consola.de.pruebas.local';
+const PeticionOriginal = globalThis.Request;
+
+if (typeof PeticionOriginal === 'function') {
+  globalThis.Request = class extends PeticionOriginal {
+    constructor(entrada: RequestInfo | URL, opciones?: RequestInit) {
+      super(
+        typeof entrada === 'string' && entrada.startsWith('/')
+          ? `${ORIGEN_DE_PRUEBAS}${entrada}`
+          : entrada,
+        opciones,
+      );
+    }
+  };
+}

@@ -30,8 +30,9 @@ import {
   chmodSync,
   symlinkSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createRequire } from 'node:module';
 
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
@@ -82,17 +83,41 @@ const banco = mkdtempSync(join(tmpdir(), 'ncr-negativas-'));
 const clon = join(banco, 'repo');
 try {
   correr('git', ['clone', '--quiet', '--no-hardlinks', '--depth', '1', raiz, clon]);
-  // El clon necesita los guiones tal como están AHORA, no como estén en HEAD:
-  // se está verificando el árbol de trabajo, no el último commit.
-  mkdirSync(join(clon, 'scripts', 'lib'), { recursive: true });
-  cpSync(join(raiz, 'scripts', 'lib'), join(clon, 'scripts', 'lib'), { recursive: true });
-  cpSync(join(raiz, 'package.json'), join(clon, 'package.json'));
-  cpSync(join(raiz, '.nvmrc'), join(clon, '.nvmrc'));
+  /**
+   * EL BANCO REFLEJA EL ÁRBOL DE TRABAJO, NO `HEAD`.
+   *
+   * Antes se copiaban tres cosas sueltas —`scripts/lib`, `package.json`,
+   * `.nvmrc`— y el resto del banco quedaba en el último commit. Eso convierte
+   * al banco en un artefacto que envejece: una corrección hecha en el árbol no
+   * se veía aquí, y la sonda concluía sobre un estado que ya no existe. Es la
+   * misma familia de fallo que motivó `contrato-desfasado.mjs`.
+   *
+   * Se copian TODOS los ficheros versionados tal como están ahora. El índice
+   * del clon sigue siendo el de `HEAD`, que es lo que `git ls-files` necesita
+   * para que las sondas vean lo mismo que ve el control real.
+   */
+  for (const relativo of correr('git', ['ls-files', '-z']).salida.split('\0')) {
+    if (relativo.length === 0) continue;
+    const origen = join(raiz, relativo);
+    if (!existsSync(origen)) continue;
+    mkdirSync(dirname(join(clon, relativo)), { recursive: true });
+    cpSync(origen, join(clon, relativo));
+  }
 
   const enClon = (cmd, args) => correr(cmd, args, { cwd: clon });
 
   console.log('\n▸ 1 · un secreto sintético bloquea el escaneo');
   {
+    /**
+     * LÍNEA BASE PRIMERO. Sin esto, un hallazgo REAL del repositorio se
+     * informaba como «la sonda dejó rastro en el banco»: un diagnóstico falso
+     * que manda a buscar el defecto donde no está. Ocurrió —había una
+     * contraseña literal en `e2e/doble-gotrue.mjs`— y costó una ronda.
+     */
+    enClon('node', ['scripts/lib/escanear-secretos.mjs']).codigo === 0
+      ? ok('la línea base del banco está limpia')
+      : mal('el banco NO parte de una línea base limpia: el repositorio tiene un hallazgo real');
+
     // Valor SINTÉTICO con forma de llave secreta, en el clon temporal. Nunca
     // toca el repositorio real ni su índice.
     writeFileSync(
@@ -113,6 +138,10 @@ try {
 
   console.log('\n▸ 2 · una construcción BSD/GNU divergente rompe la verificación');
   {
+    enClon('node', ['scripts/lib/portabilidad.mjs']).codigo === 0
+      ? ok('la línea base del banco está limpia')
+      : mal('el banco NO parte de una línea base limpia: el repositorio tiene un hallazgo real');
+
     writeFileSync(
       join(clon, 'sonda-portabilidad.sh'),
       '#!/usr/bin/env bash\necho x | xargs -r echo\n',
@@ -180,6 +209,83 @@ try {
     enClon('node', ['scripts/lib/frontera-hardware.mjs']).salida === base
       ? ok('el banco de pruebas vuelve a su línea base')
       : mal('la sonda dejó rastro en el banco');
+  }
+
+  console.log('\n▸ 4b · un atributo `style` en la consola rompe el build (D-63, §2.7.7)');
+  {
+    /**
+     * El control cuya ausencia dejó las barras del tablero a cero en
+     * producción: la CSP rechaza `style="height:37%"`, jsdom no aplica CSP y el
+     * recorrido del navegador visitaba el tablero sin datos. Aquí se introduce
+     * la violación a propósito y se exige que se detecte.
+     */
+    const sonda = join(clon, 'apps', 'web', 'src', 'componentes', 'sonda-csp.tsx');
+    mkdirSync(join(clon, 'apps', 'web', 'src', 'componentes'), { recursive: true });
+    const base = enClon('node', ['scripts/lib/frontera-csp.mjs']).salida;
+    writeFileSync(sonda, 'export const S = () => <div style={{ height: `50%` }} />;\n');
+    const r = enClon('node', ['scripts/lib/frontera-csp.mjs']);
+    if (r.codigo !== 0 && /sonda-csp/.test(r.salida)) {
+      ok('detectado el atributo `style`, con salida distinta de cero');
+    } else {
+      mal(`NO detectado (codigo ${r.codigo})`);
+    }
+    rmSync(sonda, { force: true });
+    enClon('node', ['scripts/lib/frontera-csp.mjs']).salida === base
+      ? ok('el banco de pruebas vuelve a su línea base')
+      : mal('la sonda dejó rastro en el banco');
+  }
+
+  console.log('\n▸ 4c · volver a `tsc -p` deja que un `dist/` VIEJO compile una app (D-65)');
+  {
+    /**
+     * El defecto que reportó el usuario: `pnpm --filter @ncr/api build` daba
+     * `TS2339: Property 'rehidratar' does not exist` sobre un método que SÍ
+     * existía en el dominio y SÍ se exportaba —los dos llegaron en el mismo
+     * commit—. La API compila contra el `dist/` de `@ncr/domain-core`, y con
+     * `tsc -p` ese `dist/` puede ser de cualquier etapa anterior.
+     *
+     * **Por qué esta sonda comprueba configuración y no compila.** El banco es
+     * una copia de los ficheros versionados **sin `node_modules`**: aquí no hay
+     * `tsc` que ejecutar. La comprobación de extremo a extremo es el paso 3 del
+     * verificador, que construye cada aplicación por separado partiendo de cero
+     * `dist/`. Esto guarda la invariante que lo hace posible, y es lo que falla
+     * si alguien vuelve a `tsc -p` o quita una referencia.
+     */
+    const tsconfigApi = join(clon, 'apps', 'api', 'tsconfig.json');
+    const pkgApi = join(clon, 'apps', 'api', 'package.json');
+    const tsconfigOriginal = readFileSync(tsconfigApi, 'utf8');
+    const pkgOriginal = readFileSync(pkgApi, 'utf8');
+
+    const base = enClon('node', ['scripts/lib/frontera-construccion.mjs']);
+    if (base.codigo !== 0) {
+      mal('el banco no parte de una línea base limpia');
+    } else {
+      ok('la configuración versionada pasa el control');
+
+      // Violación 1: el script vuelve a `tsc -p`.
+      writeFileSync(pkgApi, pkgOriginal.replace('tsc -b tsconfig.json', 'tsc -p tsconfig.json'));
+      const conTscP = enClon('node', ['scripts/lib/frontera-construccion.mjs']);
+      conTscP.codigo !== 0 && /tsc -p/.test(conTscP.salida)
+        ? ok('`tsc -p` se detecta y nombra el script')
+        : mal(`\`tsc -p\` NO detectado (codigo ${conTscP.codigo})`);
+      writeFileSync(pkgApi, pkgOriginal);
+
+      // Violación 2: desaparece la referencia al dominio.
+      const sinReferencia = JSON.parse(tsconfigOriginal);
+      sinReferencia.references = (sinReferencia.references ?? []).filter(
+        (r) => !r.path.includes('domain-core'),
+      );
+      writeFileSync(tsconfigApi, JSON.stringify(sinReferencia, null, 2));
+      const sinRef = enClon('node', ['scripts/lib/frontera-construccion.mjs']);
+      sinRef.codigo !== 0 && /domain-core/.test(sinRef.salida)
+        ? ok('una referencia que falta se detecta y se nombra')
+        : mal(`la referencia ausente NO se detecta (codigo ${sinRef.codigo})`);
+      writeFileSync(tsconfigApi, tsconfigOriginal);
+
+      enClon('node', ['scripts/lib/frontera-construccion.mjs']).codigo === 0
+        ? ok('el banco de pruebas vuelve a su línea base')
+        : mal('la sonda dejó rastro en el banco');
+    }
   }
 
   console.log('\n▸ 5 · una clave ajena hacia una tabla append-only se detecta al escribirla');
@@ -445,6 +551,130 @@ try {
         : mal(`un contrato desfasado NO se detecta (codigo ${r2.codigo})`);
     }
   }
+
+  console.log('\n▸ 11 · el último tramo del arranque en frío: «alguien puede entrar»');
+  {
+    /**
+     * QUÉ CONTROLA ESTA SONDA. `supabase/arranque-en-frio.sh` comprueba que la
+     * base produce claims; `apps/api/test/arranque-en-frio.e2e.test.ts`
+     * comprueba lo siguiente —que con esos claims la API **abre**—, que es el
+     * criterio que faltaba: «tiene un rol» no es «puede entrar».
+     *
+     * La sonda NO necesita PostgreSQL, y es deliberado: lo que se pone a prueba
+     * es la suite, no la base. Se le dan claims sintéticos bien formados (debe
+     * pasar), claims con el rol cambiado (debe romperse) y ningún fichero (debe
+     * OMITIRSE, y la omisión debe ser visible para el guardián del paso 12b de
+     * `verificar-etapa.sh`).
+     *
+     * El tercer caso es el importante: una suite que se omite en silencio es
+     * verde sin haber ejercitado nada, que es justo el modo de fallo de §2.8.0.
+     */
+    const apiDir = join(raiz, 'apps', 'api');
+    // `node_modules/.bin/vitest` es un envoltorio de shell, no JavaScript:
+    // pasárselo a `node` da un SyntaxError. Se resuelve el punto de entrada
+    // real del paquete, igual que hace `contrato-desfasado.mjs` con
+    // `openapi-typescript` por exactamente el mismo motivo.
+    const vitest = join(
+      dirname(createRequire(join(apiDir, 'package.json')).resolve('vitest/package.json')),
+      'vitest.mjs',
+    );
+    const suite = 'test/arranque-en-frio.e2e.test.ts';
+    const correrSuite = (fichero) =>
+      correr('node', [vitest, 'run', suite], {
+        cwd: apiDir,
+        timeout: 300_000,
+        env: { ...process.env, NCR_CLAIMS_ARRANQUE: fichero, CI: '1' },
+      });
+
+    const legitimo = join(banco, 'claims-arranque.json');
+    const claimsBase = {
+      aud: 'authenticated',
+      rol: 'superadministrador',
+      usuario_id: 'f1e541fc-0000-4000-8000-0000000000f1',
+      copropiedad_id: null,
+    };
+    writeFileSync(legitimo, JSON.stringify(claimsBase));
+
+    const base = correrSuite(legitimo);
+    if (base.codigo === 0 && /5 passed/.test(base.salida) && !/skipped/.test(base.salida)) {
+      ok('con claims bien formados, la suite corre entera y la API abre');
+    } else {
+      mal(`la suite no parte de un estado sano (codigo ${base.codigo})`);
+      console.log(base.salida.split('\n').slice(-8).join('\n'));
+    }
+
+    const mutado = join(banco, 'claims-mutados.json');
+    writeFileSync(mutado, JSON.stringify({ ...claimsBase, rol: 'residente' }));
+    correrSuite(mutado).codigo !== 0
+      ? ok('unos claims con el rol equivocado rompen la suite')
+      : mal('la suite acepta claims con el rol equivocado: no comprueba lo que dice');
+
+    const ausente = join(banco, 'claims-que-no-existen.json');
+    const sinFichero = correrSuite(ausente);
+    /skipped/.test(sinFichero.salida)
+      ? ok('sin claims la suite se OMITE, y la omisión queda escrita en la salida')
+      : mal('sin claims la suite no declara su omisión: sería un verde vacío');
+    // El guardián del paso 12b es literalmente este `grep`: se ejercita aquí
+    // para que no dependa de que alguien lea la salida.
+    /skipped/.test(sinFichero.salida) && !/skipped/.test(base.salida)
+      ? ok('el guardián distingue la corrida real de la omitida')
+      : mal('el guardián no distingue una omisión de una corrida real');
+  }
+
+  console.log('\n▸ 12 · un paso declarado que NO se ejecuta se detecta');
+  {
+    /**
+     * El defecto de la sexta ronda: «12c · el camino del NAVEGADOR» estaba
+     * dentro del bloque que exige base de datos, así que sin ella no se
+     * ejecutaba ni se omitía — no salía. Ningún rojo: una salida más corta.
+     * Lo cazó el usuario leyendo la salida; esto lo caza el guion.
+     */
+    const declarados = readFileSync(join(raiz, 'scripts', 'verificar-etapa.sh'), 'utf8')
+      .split('\n')
+      .map((linea) => /^\s*paso "([^"]+)"/.exec(linea))
+      .filter((m) => m !== null)
+      .map((m) => m[1]);
+    const sinBase = declarados.filter((e) => !/\(requiere --con-base\)/.test(e));
+
+    const completo = join(banco, 'pasos-completos.txt');
+    writeFileSync(completo, `${sinBase.join('\n')}\n`);
+    const r0 = correr('node', ['scripts/lib/pasos-ejecutados.mjs', completo]);
+    r0.codigo === 0
+      ? ok('una corrida que ejecuta todos los pasos pasa el control')
+      : mal(`el control no acepta el caso legítimo (codigo ${r0.codigo}): ${r0.salida}`);
+
+    const objetivo = sinBase.find((e) => e.startsWith('12c')) ?? sinBase[sinBase.length - 1];
+    const mutilado = join(banco, 'pasos-sin-12c.txt');
+    writeFileSync(mutilado, `${sinBase.filter((e) => e !== objetivo).join('\n')}\n`);
+    const r1 = correr('node', ['scripts/lib/pasos-ejecutados.mjs', mutilado]);
+    r1.codigo !== 0 && r1.salida.includes(objetivo)
+      ? ok('un paso que no llegó a ejecutarse se nombra y rompe la verificación')
+      : mal(`un paso ausente pasa inadvertido (codigo ${r1.codigo})`);
+
+    // Y la exención tiene que ser real, no una coartada: los pasos con base
+    // NO pueden exigirse en una corrida sin ella.
+    const conBase = declarados.filter((e) => /\(requiere --con-base\)/.test(e));
+    const r2 = correr('node', ['scripts/lib/pasos-ejecutados.mjs', completo, '--con-base']);
+    conBase.length > 0 && r2.codigo !== 0
+      ? ok('con --con-base sí se exigen los pasos que necesitan base')
+      : mal('la exención de --con-base no distingue las dos corridas');
+  }
+
+  console.log('\n▸ 13 · sin Chromium, el camino del navegador NO pasa por verde');
+  {
+    /**
+     * «Sin Chromium no se omite en silencio» era una afirmación mía, y era
+     * falsa: el guardián miraba `/opt/pw-browsers`, una ruta de Linux, con el
+     * entorno de desarrollo objetivo en macOS. Aquí se ejerce de verdad.
+     */
+    const r = correr('node', ['e2e/camino-de-acceso.mjs'], {
+      timeout: 120_000,
+      env: { ...process.env, NCR_CHROMIUM: join(banco, 'chromium-que-no-existe') },
+    });
+    r.codigo !== 0 && /no hay Chromium/.test(r.salida)
+      ? ok('la ausencia de navegador es un fallo explícito, no un salto')
+      : mal(`sin navegador el camino no falla como debe (codigo ${r.codigo})`);
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -468,6 +698,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 10 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 15 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

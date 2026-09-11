@@ -68,12 +68,25 @@ describe('zonas · CU-05 por HTTP', () => {
 
   it('admite hasta el aforo EXACTO y deniega el siguiente (CA-14)', async () => {
     const ruta = `/copropiedades/${COP_A}/zonas/${ZONA}/ingresos`;
-    expect((await con('post', ruta).expect(201)).body).toEqual({ admitido: true, conteo: 1 });
-    expect((await con('post', ruta).expect(201)).body).toEqual({ admitido: true, conteo: 2 });
+    // La forma de la respuesta es FIJA desde la ETAPA 09-B: los tres campos
+    // salen siempre, con `null` donde no aplican. Antes `conteo` y `motivo`
+    // aparecían y desaparecían según el veredicto, y un campo que a veces no
+    // está obliga a la consola a distinguir «ausente» de «cero» en cada uso.
+    expect((await con('post', ruta).expect(201)).body).toEqual({
+      admitido: true,
+      conteo: 1,
+      motivo: null,
+    });
+    expect((await con('post', ruta).expect(201)).body).toEqual({
+      admitido: true,
+      conteo: 2,
+      motivo: null,
+    });
     // La denegación es 201 con motivo, no un error: el intento es legítimo y su
     // respuesta es una decisión de negocio que además va a un evento (RN-02).
     expect((await con('post', ruta).expect(201)).body).toEqual({
       admitido: false,
+      conteo: null,
       motivo: 'AFORO_SUPERADO',
     });
   });
@@ -100,6 +113,7 @@ describe('zonas · CU-05 por HTTP', () => {
 
     expect((await con('post', `/copropiedades/${COP_A}/zonas/${ZONA}/ingresos`)).body).toEqual({
       admitido: false,
+      conteo: null,
       motivo: 'FUERA_DE_HORARIO',
     });
   });

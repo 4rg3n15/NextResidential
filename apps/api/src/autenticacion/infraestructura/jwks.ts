@@ -20,8 +20,56 @@ export interface OpcionesJwks {
   readonly refrescoMinimoSegundos: number;
 }
 
+/**
+ * Resultado de la sonda. Es un estado con nombre y no un booleano porque los
+ * tres modos de fallo piden acciones distintas y quien lo lee —`/ready`, el
+ * arranque— tiene que poder decirlas:
+ *
+ *  · `inalcanzable` — la URL está mal o el servicio no responde. Se arregla en
+ *    el entorno. Es lo que ocurría con `/auth/v1/jwks`, que devuelve 404.
+ *  · `sin-claves` — la URL es la buena y responde 200, pero el documento no
+ *    trae ninguna clave. Ocurre cuando el proyecto no tiene llaves asimétricas
+ *    habilitadas. Se arregla en el panel, no en el entorno, y es el caso que
+ *    más engaña: hay endpoint, hay JSON válido, y no se verifica ni un token.
+ *  · `en-espera` — un fallo reciente todavía dentro del suelo de refresco.
+ */
+export type EstadoDeJwks =
+  | { readonly estado: 'ok'; readonly claves: number }
+  | { readonly estado: 'inalcanzable'; readonly detalle: string }
+  | { readonly estado: 'sin-claves' }
+  | { readonly estado: 'en-espera' };
+
+/** Texto corto para la bitácora y para `/ready`. Nunca incluye la URL: puede
+ * llevar el `project-ref` y no tiene por qué salir en una respuesta pública. */
+export const describir = (e: EstadoDeJwks): string =>
+  e.estado === 'ok' ? 'ok' : e.estado === 'sin-claves' ? 'sin-claves' : e.estado;
+
+type ConjuntoRemoto = ReturnType<typeof createRemoteJWKSet>;
+
+/**
+ * ¿El JWKS contestó?
+ *
+ * La distinción que importa no es qué clase de error lanzó `jose`, sino si
+ * llegamos a inspeccionar el documento. `jose` responde «no hay clave que
+ * coincida» o «hay varias» **después** de descargarlo: eso es una respuesta
+ * sobre el token. Cualquier otra cosa —404, DNS, TLS, tiempo agotado, un JSON
+ * que no es un JWKS— es que no hubo documento, y eso es un fallo del servicio.
+ *
+ * Se clasifica así, y no por la clase de la excepción, porque `jose` lanza un
+ * `JOSEError` GENÉRICO —`ERR_JOSE_GENERIC`, «Expected 200 OK from the JSON Web
+ * Key Set HTTP response»— cuando la descarga no da 200. Es indistinguible por
+ * tipo de un fallo de firma, y confiar en el tipo es lo que hizo que un 404 se
+ * registrara como `FIRMA_INVALIDA` durante toda la ETAPA 09. Comprobado contra
+ * jose 5.9.6, no supuesto.
+ */
+const esRespuestaSobreLaClave = (e: unknown): boolean =>
+  e instanceof Error &&
+  /no applicable key|multiple matching keys|JWKSNoMatchingKey|JWKSMultipleMatchingKeys/i.test(
+    `${e.name} ${e.message}`,
+  );
+
 export class ProveedorDeJwks {
-  private conjunto: JWTVerifyGetKey | null = null;
+  private conjunto: ConjuntoRemoto | null = null;
   private ultimoIntento = 0;
 
   constructor(
@@ -37,7 +85,30 @@ export class ProveedorDeJwks {
    * claves es precisamente donde se cometen los errores que esta clase intenta
    * evitar. Lo que sí es nuestro es la CONFIGURACIÓN de los plazos.
    */
+  /**
+   * La función de resolución que usa el verificador, **envuelta**: el
+   * proveedor es el dueño del JWKS, así que es quien tiene que decir cuándo el
+   * fallo es del JWKS y no del token. Sin esta envoltura, el verificador
+   * tendría que reconocer la taxonomía interna de `jose` —que no es estable
+   * entre versiones y que ya nos engañó una vez— para no llamar «firma rota» a
+   * un endpoint caído.
+   */
   obtener(): JWTVerifyGetKey {
+    const conjunto = this.conjuntoRemoto();
+    return async (encabezado, token) => {
+      try {
+        return await conjunto(encabezado, token);
+      } catch (e) {
+        if (esRespuestaSobreLaClave(e)) throw e;
+        throw new RechazoDeAutenticacion(
+          'JWKS_NO_DISPONIBLE',
+          e instanceof Error ? `${e.name}: ${e.message}` : undefined,
+        );
+      }
+    };
+  }
+
+  private conjuntoRemoto(): ConjuntoRemoto {
     if (this.conjunto) return this.conjunto;
     const ahora = Date.now();
     if (ahora - this.ultimoIntento < this.opciones.refrescoMinimoSegundos * 1000) {
@@ -53,31 +124,51 @@ export class ProveedorDeJwks {
   }
 
   /**
-   * `/ready` lo consulta: sin JWKS la API no puede autenticar y no está lista.
+   * Sonda de disponibilidad. La consultan `/ready` y la comprobación de
+   * arranque: sin JWKS la API no puede verificar ni un token.
    *
-   * `createRemoteJWKSet` es PEREZOSO —no descarga nada hasta la primera
-   * verificación—, así que limitarse a construirlo haría que `/ready`
-   * respondiera «ok» con un endpoint inalcanzable. Aquí se fuerza una
-   * resolución con un `kid` que no existe: si el JWKS se descargó, `jose`
-   * responde «no hay clave que coincida», y esa respuesta es precisamente la
-   * prueba de que la descarga funcionó. Un fallo de red da otro error.
+   * Dos cosas que hay que forzar, y por qué:
+   *
+   * 1. **La descarga.** `createRemoteJWKSet` es PEREZOSO —no pide nada hasta la
+   *    primera verificación—, así que limitarse a construirlo haría que
+   *    `/ready` respondiera «ok» con un endpoint inalcanzable. Se fuerza con
+   *    una resolución de un `kid` que no existe: si el documento se descargó,
+   *    `jose` responde «no hay clave que coincida», y esa respuesta es
+   *    precisamente la prueba de que la descarga funcionó.
+   *
+   * 2. **El contenido.** Que la descarga funcione NO basta, y esto es lo que la
+   *    versión anterior de esta sonda no vio: un proyecto sin llaves
+   *    asimétricas devuelve `200` con `{"keys":[]}`, `jose` contesta igualmente
+   *    «no hay clave que coincida», y la sonda daba verde mientras ningún token
+   *    del mundo podía verificarse. Por eso se inspecciona el documento
+   *    descargado y se exige **al menos una clave**.
    */
-  async precalentar(): Promise<boolean> {
+  async sondear(): Promise<EstadoDeJwks> {
+    let conjunto: ConjuntoRemoto;
     try {
-      const conjunto = this.obtener();
+      conjunto = this.conjuntoRemoto();
+    } catch {
+      return { estado: 'en-espera' };
+    }
+    try {
       await conjunto(
         { alg: 'RS256', kid: 'sonda-de-disponibilidad' },
         // `jose` solo usa el encabezado para elegir la clave.
         { payload: '', signature: '', signatures: [] } as never,
       );
-      return true;
     } catch (e) {
-      // La única excepción que acredita disponibilidad es «no coincide ninguna
-      // clave»: significa que el documento se descargó y se pudo inspeccionar.
-      return (
-        e instanceof Error && /no applicable key|JWKSNoMatchingKey/i.test(`${e.name} ${e.message}`)
-      );
+      // La única excepción que acredita que el documento se descargó y se pudo
+      // inspeccionar es «no coincide ninguna clave». Cualquier otra —404, DNS,
+      // tiempo agotado, JSON inválido— es que no se llegó al documento.
+      if (!esRespuestaSobreLaClave(e)) {
+        return {
+          estado: 'inalcanzable',
+          detalle: e instanceof Error ? `${e.name}: ${e.message}` : 'error desconocido',
+        };
+      }
     }
+    const claves = conjunto.jwks()?.keys.length ?? 0;
+    return claves > 0 ? { estado: 'ok', claves } : { estado: 'sin-claves' };
   }
 
   get disponible(): boolean {

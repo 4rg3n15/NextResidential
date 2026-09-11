@@ -4,6 +4,7 @@ import type { Rol } from '@ncr/contracts';
 import { sesionActual } from '@/lib/sesion/servidor';
 import { MarcoDeConsola } from '@/componentes/marco-consola';
 import { ProveedorDeConsultas } from '@/lib/api/proveedor';
+import { alcanceActivo } from './copropiedad';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,10 +21,15 @@ const LayoutDeConsola = async ({
 }): Promise<JSX.Element> => {
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
+  // El alcance se resuelve UNA vez, aquí, y baja al marco. Que cada pantalla lo
+  // pidiera por su cuenta multiplicaría la llamada y —peor— permitiría que dos
+  // pantallas de la misma página discreparan sobre cuál es la copropiedad
+  // activa.
+  const alcance = await alcanceActivo();
 
   return (
     <ProveedorDeConsultas>
-      <MarcoDeConsola sesion={sesion} rol={sesion.rol as Rol}>
+      <MarcoDeConsola sesion={sesion} rol={sesion.rol as Rol} alcance={alcance}>
         {children}
       </MarcoDeConsola>
     </ProveedorDeConsultas>

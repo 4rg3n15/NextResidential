@@ -41,8 +41,8 @@ La consola verifica el factor contra `/auth/v1/factors/{id}/challenge` y `/verif
 **Que se aceptan:**
 
 - **RN-20 y CA-25 se cumplen igual, y por el mismo sitio de siempre**: el guard de autenticación. La retirada no toca la regla, solo elimina una implementación que no participaba en ella.
-- La **inscripción del factor** pasa a ser una operación del panel de Supabase o de un flujo de la consola en una etapa posterior. Queda documentada en `docs/guias/APROVISIONAMIENTO_USUARIOS.md`.
-- Se pierden los **códigos de recuperación propios**. Supabase admite varios factores por usuario, que es su equivalente; queda anotado para la ETAPA 13.
+- La **inscripción del factor** pasa a ser una operación de la consola, sobre la propia sesión del titular. **Enmienda del 2026-09-09:** esta consecuencia se escribió como «del panel de Supabase o de un flujo de la consola en una etapa posterior», y la primera mitad era falsa — el panel solo *retira* factores. Mientras se creyó cierta, ningún rol administrativo podía alcanzar `aal2` y el sistema quedó inaccesible. La consola llama a `POST /auth/v1/factors`, `challenge` y `verify` con el token del propio titular; el paso a paso está en [`docs/guias/RECUPERACION_Y_USUARIOS.md`](../guias/RECUPERACION_Y_USUARIOS.md) §B.6.
+- Los **códigos de recuperación** se recuperan, y no contradicen esta decisión. Se anotó que la respuesta de Supabase a perder el factor es tener varios inscritos, y no sirve cuando solo había uno. La API emite diez, guarda **solo el hash** y los canjea por la retirada del factor perdido: un código **no emite ningún token ni eleva ningún `aal`**, así que Supabase sigue siendo el único mecanismo autoritativo.
 - La suite de aislamiento pierde dos exenciones de `@SinRecursoDeTenant()`. Su propia comprobación de coherencia lo habría delatado si se hubiera olvidado.
 
 **A asumir en etapas siguientes:**

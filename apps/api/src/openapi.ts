@@ -12,7 +12,7 @@ const configuracionParaContrato: Configuracion = {
   SUPABASE_URL: 'https://generacion-de-contrato.invalid',
   SUPABASE_PUBLISHABLE_KEY: 'no-aplica',
   SUPABASE_SECRET_KEY: 'no-aplica',
-  SUPABASE_JWKS_URL: 'https://generacion-de-contrato.invalid/auth/v1/jwks',
+  SUPABASE_JWKS_URL: 'https://generacion-de-contrato.invalid/auth/v1/.well-known/jwks.json',
   JWKS_CACHE_TTL_SEGUNDOS: 600,
   JWKS_REFRESCO_MINIMO_SEGUNDOS: 60,
   DATABASE_URL: 'no-aplica',
@@ -29,6 +29,29 @@ const configuracionParaContrato: Configuracion = {
   THROTTLE_INGESTA_IP_LIMITE: 3000,
   origenesPermitidos: ['https://generacion-de-contrato.invalid'],
 };
+
+/**
+ * ORDEN CANÓNICO DEL DOCUMENTO.
+ *
+ * Swagger emite las rutas en el orden en que Nest registró los módulos. Mover
+ * el puerto de auditoría a `NucleoModule` —para que la API arrancara en
+ * producción— cambió ese orden y produjo un diff de 238 líneas **sin un solo
+ * cambio de contrato**: las mismas 35 rutas, el mismo contenido, otra
+ * posición. El control de desfase, que compara byte a byte, lo denunció como
+ * si la API hubiera cambiado.
+ *
+ * Un artefacto cuyo orden depende del orden de registro de módulos no es
+ * comparable byte a byte, y un control que denuncia un reordenamiento como
+ * cambio de contrato entrena a ignorarlo. Se ordenan `paths`, las colecciones
+ * de `components` y `tags`: a partir de aquí el fichero depende solo de la
+ * FORMA de la API.
+ */
+const ordenadas = <T>(objeto: Record<string, T>): Record<string, T> =>
+  Object.fromEntries(
+    Object.keys(objeto)
+      .sort()
+      .map((clave) => [clave, objeto[clave] as T]),
+  );
 
 /**
  * Genera el contrato OpenAPI a fichero. Es la fuente del cliente Dart y del
@@ -50,6 +73,20 @@ async function generar(): Promise<void> {
       .addBearerAuth()
       .build(),
   );
+  documento.paths = ordenadas(documento.paths);
+  if (documento.components !== undefined) {
+    const componentes = documento.components as Record<string, unknown>;
+    for (const grupo of Object.keys(componentes)) {
+      const contenido = componentes[grupo];
+      if (contenido !== null && typeof contenido === 'object' && !Array.isArray(contenido)) {
+        componentes[grupo] = ordenadas(contenido as Record<string, unknown>);
+      }
+    }
+  }
+  if (Array.isArray(documento.tags)) {
+    documento.tags = [...documento.tags].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   // `NCR_DESTINO_OPENAPI` permite escribir a un temporal sin tocar el árbol:
   // lo usa `scripts/lib/contrato-desfasado.mjs` para comparar sin modificar
   // nada, que es la disciplina que ya siguen las pruebas negativas.

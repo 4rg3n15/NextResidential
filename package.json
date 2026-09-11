@@ -23,19 +23,23 @@
     "contrato:tipado": "node scripts/lib/contrato-tipado.mjs",
     "entorno": "node scripts/lib/verificar-entorno.mjs",
     "contrato:cliente": "pnpm --filter @ncr/contracts generar",
-    "contrato:desfasado": "node scripts/lib/contrato-desfasado.mjs"
+    "contrato:desfasado": "node scripts/lib/contrato-desfasado.mjs",
+    "entorno:diff": "node scripts/lib/comparar-entorno.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.17.0",
     "@types/node": "22.10.2",
+    "@vitest/coverage-v8": "2.1.8",
     "eslint": "9.17.0",
     "husky": "9.1.7",
+    "jose": "5.9.6",
     "lint-staged": "15.2.11",
+    "otplib": "12.0.1",
+    "playwright": "1.49.1",
     "prettier": "3.4.2",
     "turbo": "2.3.3",
     "typescript": "5.7.2",
     "typescript-eslint": "8.18.0",
-    "vitest": "2.1.8",
-    "@vitest/coverage-v8": "2.1.8"
+    "vitest": "2.1.8"
   }
 }

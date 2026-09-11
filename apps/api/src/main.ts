@@ -23,8 +23,21 @@ import { resolve } from 'node:path';
  * desarrollador—, y allí el proceso arranca y se queda escuchando para siempre.
  * No relaja nada: solo evita leer un fichero.
  */
+/**
+ * **DOS FICHEROS, EN ESTE ORDEN, Y NINGUNA SORPRESA** (nota del cliente,
+ * 2026-09-10). Cada aplicación leía un sitio distinto y no estaba escrito en
+ * ninguna parte: el `.env` del cliente estaba en la raíz y la API miraba solo
+ * `apps/api/.env`, así que el fichero existía, era correcto y nadie lo leía —el
+ * mismo defecto que la corrección de arriba resolvió para otra ruta—.
+ *
+ * Ahora se leen los dos: primero el de la aplicación, después el de la raíz, y
+ * como `override: false` conserva lo primero que se fijó, **lo específico gana
+ * sobre lo común** y el entorno real —contenedor, CI— gana sobre los dos. La
+ * tabla de qué lee cada aplicación está en `docs/guias/CONEXION_SUPABASE.md`.
+ */
 if (process.env.NCR_IGNORAR_ENV_FILE !== '1') {
   cargarEnv({ path: resolve(__dirname, '..', '.env'), override: false });
+  cargarEnv({ path: resolve(__dirname, '..', '..', '..', '.env'), override: false });
 }
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -39,6 +52,15 @@ import { BitacoraEstructurada } from './comun/bitacora/bitacora-estructurada';
 import { AdaptadorDeBitacoraNest } from './comun/bitacora/adaptador-nest';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
+import { ProveedorDeJwks } from './autenticacion';
+import { comprobarRecursosExternos } from './arranque/recursos-externos';
+import { SONDA_POSTGRES, recursoBaseDeDatos } from './arranque/sonda-postgres';
+import type { SondaDePostgres } from './arranque/sonda-postgres';
+import {
+  recursoBucketDeEvidencia,
+  recursoJwks,
+  recursoRecuperacionDeContrasena,
+} from './arranque/recursos';
 
 async function arrancar(): Promise<void> {
   // Primero la configuración, antes de construir nada: si falta una variable,
@@ -66,6 +88,30 @@ async function arrancar(): Promise<void> {
 
   await app.listen(config.PORT);
   bitacora.registrar('info', 'API arrancada', { puerto: config.PORT, entorno: config.NODE_ENV });
+
+  /**
+   * Los recursos externos se comprueban AL ARRANCAR, hablando con el recurso
+   * real (DT-12). Se hace después de `listen` a propósito: si se hiciera antes,
+   * un endpoint lento retrasaría la apertura del puerto y el orquestador daría
+   * el despliegue por muerto. Aquí el proceso ya responde `/health`, y `/ready`
+   * sigue siendo quien decide si entra tráfico.
+   */
+  await comprobarRecursosExternos(
+    [
+      recursoJwks(app.get(ProveedorDeJwks)),
+      recursoBaseDeDatos(app.get<SondaDePostgres>(SONDA_POSTGRES)),
+      recursoBucketDeEvidencia({
+        supabaseUrl: config.SUPABASE_URL,
+        llaveSecreta: config.SUPABASE_SECRET_KEY,
+        bucket: config.EVIDENCIA_BUCKET,
+      }),
+      recursoRecuperacionDeContrasena({
+        urlDeRedireccion: config.RECUPERACION_URL_REDIRECCION,
+        origenesPermitidos: config.origenesPermitidos,
+      }),
+    ],
+    bitacora,
+  );
 }
 
 arrancar().catch((error: unknown) => {

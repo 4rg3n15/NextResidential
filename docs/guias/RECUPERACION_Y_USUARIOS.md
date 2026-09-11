@@ -11,10 +11,11 @@ Esta guía tiene dos partes independientes. La **A** configura la recuperación 
 ## Antes de nada · aplicar las migraciones nuevas
 
 ```bash
-supabase db push          # aplica 0023 y 0024
+supabase db push          # aplica 0023, 0024 y 0025
 ```
 
 - **0023** añade `restablecimiento_contrasena` al enumerado de eventos de seguridad. Sin ella, el registro de auditoría del restablecimiento falla al escribir.
+- **0025** crea el **actor de sistema** y las funciones de arranque. Sin ella no se puede crear la primera copropiedad ni el primer usuario: ver la explicación del ciclo en la parte B.
 - **0024** crea el **Auth Hook de _custom claims_**. Sin ella **nadie puede entrar a la consola**: el token no lleva `rol` ni `copropiedad_id`, `app.copropiedad_id()` devuelve `NULL`, ninguna política RLS concede acceso y el guard de la API rechaza. El sistema falla cerrado, que es correcto, y también completamente inutilizable.
 
 Las dos traen aserciones: si algo no quedó aplicado, `db push` falla en vez de dejarlo a medias.
@@ -85,73 +86,157 @@ El flujo ya está construido en la consola (`/acceso/recuperacion` y `/acceso/nu
 
 # B · Primer superadministrador, y los demás roles
 
+> **Reescrito el 2026-09-09.** La versión anterior de esta parte daba por hecho que ya existía una copropiedad y que el guion podía escribir en `public.usuarios`. Ninguna de las dos cosas es cierta sobre una base recién migrada, y el despliegue real falló en las dos. Lo que sigue está **verificado por ejecución** contra una base vacía, y hay una prueba automatizada que lo recorre entero: `./supabase/arranque-en-frio.sh`.
+
+### Por qué hacía falta arreglarlo — el ciclo de auditoría
+
+El contrato exige `creado_por` y `actualizado_por` en toda tabla operativa (KPI-05), y ambas son `NOT NULL` y claves ajenas a `usuarios`:
+
+```
+copropiedades.creado_por  →  usuarios
+usuarios.creado_por       →  usuarios      (a sí misma)
+roles_usuario.creado_por  →  usuarios
+```
+
+Es un ciclo: sobre una base vacía no hay copropiedad, no hay usuario, y el primer usuario no puede existir porque su creador tendría que existir antes. La migración **0025** lo rompe con un **actor de sistema**: una fila de `usuarios` con identificador fijo cuyo `creado_por` se apunta a sí misma. **No se ha relajado ninguna restricción** — las columnas siguen siendo `NOT NULL`, y las filas de arranque quedan atribuidas a ese actor, que es trazable.
+
+Hay una segunda razón por la que el guion antiguo no podía funcionar: `tg_usuario_tenant` es un disparador de restricción `DEFERRABLE INITIALLY DEFERRED`, o sea que se comprueba **al commit**. El usuario y su rol tienen que escribirse en la misma transacción, y cada petición REST es una transacción distinta. Por eso la escritura vive en funciones SQL versionadas y los guiones solo las llaman.
+
 ### B.1 · Crear la identidad — lo hace usted, en el panel
 
 1. Panel → **Authentication → Users → Add user**.
 2. Marque **Auto Confirm User** (no habrá nadie para confirmar el primer correo).
 3. Escriba el correo corporativo y **una contraseña que elija usted**. No la comparta por chat ni la escriba en ningún fichero del proyecto; lo natural es que el titular la cambie en su primer acceso con el flujo de la parte A.
-4. Anote el **User UID** que aparece en la lista. No es secreto: es un identificador.
 
-### B.2 · Asegurar que existe una copropiedad
-
-`roles_usuario.copropiedad_id` es `NOT NULL`, así que **también el superadministrador necesita una fila con una copropiedad**. No lo ata a ella: su alcance real es global y lo resuelve `app.es_superadmin()` en las políticas RLS.
-
-```sql
-SELECT id, nombre FROM public.copropiedades WHERE estado = 'activa' ORDER BY creado_en LIMIT 5;
-```
-
-Si no hay ninguna, aplique las semillas (`supabase/seed/`) o cree la real. Anote el `id`.
-
-### B.3 · Asignar el rol — con el guion, que lee del entorno
-
-En la sesión de su terminal, **sin escribir esto en ningún fichero**:
+### B.2 · Exportar las credenciales, solo en su terminal
 
 ```bash
 export SUPABASE_URL='https://<referencia>.supabase.co'
 export SUPABASE_SECRET_KEY='sb_secret_...'      # llave SECRETA; omite la RLS
+```
 
+Al terminar todo, `unset SUPABASE_SECRET_KEY`: es la credencial más sensible del proyecto.
+
+### B.3 · La primera copropiedad
+
+Sobre una base recién migrada **no hay ninguna**, y ese fue el primer fallo del despliegue: no había ningún identificador que pasarle al guion.
+
+```bash
+node scripts/registrar-copropiedad.mjs \
+  --nombre 'Urbanizacion Mira' \
+  --nit '900123456' \
+  --zona-horaria 'America/Bogota'
+```
+
+Imprime el `id` que necesita el paso siguiente. Es **idempotente por NIT**: repetirlo no crea una segunda.
+
+> La zona horaria no es decorativa: es la que decide qué significa «hoy» en el tablero (`ventanaDelDia`). Con la del servidor, un conjunto en Colombia perdería las cinco últimas horas de cada día.
+
+### B.4 · El superadministrador
+
+```bash
 node scripts/aprovisionar-rol.mjs \
   --correo 'admin@grupocontrol.co' \
   --rol superadministrador \
-  --copropiedad '<uuid-de-la-copropiedad>' \
+  --copropiedad '<id-del-paso-anterior>' \
   --nombre 'Nombre Apellido'
 ```
 
-El guion es **idempotente** y hace tres cosas: comprueba que la identidad existe en Supabase Auth —si no existe, se detiene y le dice que la cree usted—, crea o reutiliza la fila de `public.usuarios` enlazada por `auth_user_id`, y añade la fila de `roles_usuario`. **No crea usuarios, no genera contraseñas y no inscribe el segundo factor.**
+El guion **valida antes de escribir**: si el UUID no existe, se detiene y le enseña las copropiedades activas que sí hay; si no existe la identidad en Supabase Auth, le dice que la cree usted. No crea usuarios, no genera contraseñas y no inscribe segundos factores.
 
-Cuando termine, cierre la sesión de terminal o ejecute `unset SUPABASE_SECRET_KEY`: esa llave omite la RLS y es la credencial más sensible del proyecto.
+`--copropiedad` es obligatoria también para el superadministrador, porque `roles_usuario.copropiedad_id` es `NOT NULL`. **No lo ata a ella**: su `usuarios.copropiedad_id` queda nulo y su alcance real lo resuelve `app.es_superadmin()`.
 
-### B.4 · Activar el gancho de claims — **si esto falta, no entra nadie**
+### B.5 · Activar el gancho de claims — **si esto falta, no entra nadie**
 
 1. Panel → **Authentication → Hooks**.
 2. **Customize Access Token (JWT) Claims** → _Enable_.
-3. Elija **Postgres** y seleccione la función `public.custom_access_token_hook` (la crea la migración 0024).
+3. Elija **Postgres** y la función `public.custom_access_token_hook` (migración 0024).
 4. Guarde.
-5. Compruébelo: inicie sesión en la consola y, en `Application → Cookies`, no verá el token —es `httpOnly`, y así debe ser—. La comprobación real es que `/tablero` carga en vez de redirigir. Si redirige a `/acceso`, el token no lleva `rol`: revise que el gancho está activo y que el usuario tiene una fila **activa** en `roles_usuario`.
 
-### B.5 · Inscribir el segundo factor — lo hace el titular
+Comprobación: inicie sesión en la consola. No verá el token en las cookies —es `httpOnly`, y así debe ser—; la comprobación real es que `/tablero` carga en vez de redirigir a `/acceso`. Si redirige, el token no lleva `rol`.
 
-Los tres roles administrativos —superadministrador, administrador, operador de central— **no entran sin `aal2`** (RN-20, CA-25). Es el guard de la API quien lo exige, así que sin este paso el usuario se autentica y no puede hacer nada.
+### B.6 · Inscribir el segundo factor — lo hace el titular, desde la consola
 
-1. Panel → **Authentication → Providers → Multi-Factor Authentication**: active **TOTP**.
-2. El titular inscribe su factor desde **su propia sesión**. Hoy eso se hace desde el panel de Supabase (Account → Multi-Factor Authentication) o con la aplicación de autenticación que use la organización.
-3. **Nadie más debería poder inscribir el factor de otra persona**, y por eso la consola no lo ofrece: un segundo factor que un tercero puede dar de alta no es un segundo factor.
-4. Con el factor inscrito, el acceso a la consola muestra el paso de verificación automáticamente.
+Los tres roles administrativos **no entran sin `aal2`** (RN-20, CA-25). Lo exige el guard de la API, así que sin este paso el usuario se autentica y no puede hacer nada.
 
-> **Pendiente declarado.** Una pantalla de inscripción de TOTP dentro de la consola no está construida: es trabajo de una etapa posterior y queda anotado en el informe. Hasta entonces, la inscripción es una operación del panel.
+> **Corrección (2026-09-10).** Esta guía afirmaba que «la inscripción de TOTP funciona con la sesión `aal1` del propio titular». Es cierto **solo para el primer factor**: en cuanto hay uno verificado, Supabase exige `aal2` para añadir otro y responde `403 insufficient_aal`. La consola ya lo detecta y lleva a **verificar** en vez de a inscribir. Si necesita empezar de cero, en el panel → **Authentication → Users → Remove MFA factors**, y vuelva al paso 2.
 
-### B.6 · Los demás roles, para la ETAPA 10
+**El panel de Supabase no sirve para esto**, y no es un descuido suyo: en `Authentication → Users` solo ofrece _Remove MFA factors_, y `Account → Security` es su propia cuenta de Supabase, no la del usuario de la aplicación. Un factor que otra persona inscribe no es un segundo factor —el secreto habría pasado por sus manos—, así que la plataforma no lo permite y hace bien.
 
-El mismo guion, cambiando `--rol`:
+1. Panel → **Authentication → Providers → Multi-Factor Authentication**: active **TOTP**. Una vez por proyecto.
+2. Entre a la consola en `/acceso` con su correo y contraseña.
+3. La consola detecta que no tiene ningún factor verificado y **muestra la pantalla de inscripción**: código QR, la clave en texto para quien no puede escanear, y el campo del código de verificación.
+4. Escanee con su aplicación de autenticación, escriba el código de seis dígitos y confirme.
+5. La consola le entrega **diez códigos de recuperación, una sola vez**. Guárdelos: son la única vía si pierde el teléfono. No dan acceso —sirven para retirar el factor perdido y configurar otro—; cada uno funciona una vez.
+6. Entra a la consola con la sesión ya elevada a `aal2`.
+
+Nadie inscribe el factor de otra persona: la petición de alta no lleva ningún identificador de usuario, y el servidor toma la identidad de la cookie `httpOnly`. No es una comprobación que se pueda olvidar; es que no existe el dato con el que equivocarse.
+
+#### Si prefiere hacerlo por API
+
+Existe, y es la vía de Supabase Auth directamente. La consola hace exactamente estas tres llamadas. Sirve para desbloquearse sin depender del navegador:
 
 ```bash
-# Portero de una copropiedad concreta.
+# 1 · Contraseña → token aal1
+TOKEN=$(curl -s "$SUPABASE_URL/auth/v1/token?grant_type=password" \
+  -H "apikey: $SUPABASE_PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
+  -d '{"email":"...","password":"..."}' | jq -r .access_token)
+
+# 2 · Alta del factor: devuelve el `id`, el QR y el secreto
+curl -s "$SUPABASE_URL/auth/v1/factors" -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"factor_type":"totp","friendly_name":"Next Control Residencial"}'
+
+# 3 · Desafío y verificación con el código de la aplicación de autenticación
+curl -s "$SUPABASE_URL/auth/v1/factors/<factor-id>/challenge" \
+  -H "apikey: $SUPABASE_PUBLISHABLE_KEY" -H "Authorization: Bearer $TOKEN" -X POST
+curl -s "$SUPABASE_URL/auth/v1/factors/<factor-id>/verify" \
+  -H "apikey: $SUPABASE_PUBLISHABLE_KEY" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"challenge_id":"<challenge-id>","code":"123456"}'
+```
+
+La respuesta del paso 3 trae ya un token con `aal2`. La llave que aparece aquí es la **publicable**: no hay ninguna secreta en este camino, y no debe haberla — es el titular autenticándose, no un administrador actuando por él.
+
+> **Si la pantalla no muestra el QR.** Pulse «Volver a intentarlo»: la inscripción se rehace entera y descarta la anterior. Si vuelve a fallar, el registro del servidor de la consola nombra ya la causa —`estadoDelProveedor` y `codigoDelProveedor`— en vez de un `503` a secas.
+
+> **`SUPABASE_SECRET_KEY` y este paso.** La inscripción **no** la necesita: viaja con el token del titular y la llave publicable. La necesita solo el canje de un código de recuperación, porque retirar un factor es una operación de administración. La API ya la exige para arrancar desde la ETAPA 03, así que si no está definida el problema aparece antes, al levantar el servicio.
+
+> **P-14, redefinido y cerrado.** Se declaró como «no hay pantalla de inscripción en la consola» y se resolvió diciendo que era una operación del panel. **No lo era**: el panel no inscribe factores, así que el pendiente no describía una comodidad ausente sino un sistema inaccesible. La pantalla existe desde esta versión y el pendiente queda cerrado.
+
+### B.6.bis · El interruptor del segundo factor, RETIRADO
+
+> **Ya no existe.** Esta sección explicaba cómo poner `MFA_OBLIGATORIO=false` para entrar solo con contraseña. La variable se retiró del código el **2026-09-10**, entera: no queda ni con valor por defecto.
+
+**Por qué se puso y por qué se fue.** Se introdujo para desbloquearle mientras se cerraba el camino del segundo factor. El bloqueo era **otro**: la URL del JWKS estaba mal (`/auth/v1/jwks`, que devuelve 404), la API no obtenía ninguna clave pública y rechazaba **todos** los tokens. Corregida la URL, el ciclo completo funciona —inscripción desde cero, QR, códigos de recuperación, sesión `aal2`, tablero— y el interruptor dejó de tener motivo.
+
+**Si la tiene puesta en su `.env`, quítela.** No hace nada: la configuración ya no la conoce. Pero `pnpm entorno:diff` se la señalará como variable que no está en el `.example`, y conviene que su fichero no acumule líneas muertas.
+
+**Si alguien la reintroduce, tres controles la cazan**: la suite de la API, la de la consola y el paso 5 del camino del navegador levantan los procesos **con** la variable puesta y exigen que el segundo factor se siga pidiendo.
+
+### B.6.ter · «Meto el código de seis dígitos y vuelvo al login»
+
+Dos hechos distintos, y solo uno es un defecto:
+
+1. **No sale el QR y le piden el código directamente.** Es lo correcto: esa cuenta **ya tiene un factor TOTP verificado**, así que toca _verificar_, no _inscribir_. Para volver a ver el QR, retire el factor: panel → **Authentication → Users** → su usuario → **Remove MFA factors**.
+2. **El código correcto le devuelve al login.** Eso es que la API rechaza el token nuevo. La consola ya no se lo calla: en su registro aparece
+
+   ```
+   la API rechazó la sesión: la consola volverá al acceso
+     estado: 401   claims: aal,aud,email,exp,iat,sub
+   ```
+
+   Los **nombres** de los claims son el diagnóstico —nunca sus valores, nunca el token—. Si en esa lista **no aparece `rol`**, el gancho de claims no está activo: vuelva a **B.5**. Es, con diferencia, la causa más frecuente. Si `rol` está y el estado sigue siendo 401, mire la bitácora de la API: dirá `SEGUNDO_FACTOR_REQUERIDO` (nivel `aal1`) o `FIRMA_INVALIDA` (JWKS mal apuntado).
+
+### B.7 · Los demás roles, para la ETAPA 10
+
+```bash
 node scripts/aprovisionar-rol.mjs --correo 'porteria@...' --rol portero \
   --copropiedad '<uuid>' --nombre 'Portería Principal'
 
-# Operador de central: se ejecuta UNA VEZ POR COPROPIEDAD que atienda.
-# El gancho las agrupa en el claim `copropiedades` y deja `copropiedad_id` nulo,
-# que es lo que la consola de guardia virtual usará para conmutar (KPI-35).
+# Operador de central: UNA VEZ POR COPROPIEDAD que atienda. El gancho las agrupa
+# en el claim `copropiedades` y deja `copropiedad_id` nulo, que es lo que la
+# consola de guardia virtual usará para conmutar (KPI-35).
 node scripts/aprovisionar-rol.mjs --correo 'central@...' --rol operador_central \
   --copropiedad '<uuid-copropiedad-A>' --nombre 'Central 1'
 node scripts/aprovisionar-rol.mjs --correo 'central@...' --rol operador_central \
@@ -167,13 +252,23 @@ node scripts/aprovisionar-rol.mjs --correo 'central@...' --rol operador_central 
 | `residente`          | no              | su copropiedad               | App Flutter (ETAPA 11)                |
 | `servicio`           | no              | su copropiedad               | Edge e ingesta; no entra a la consola |
 
-> **Un usuario con varios roles se queda con el más privilegiado.** Lo decide `app.precedencia_de_rol` en la migración 0024, y está declarado ahí en vez de deducirse del orden del enumerado: tomar «cualquiera» haría que la sesión dependiera del orden físico de las filas, que cambia con un `VACUUM`.
+> **Un usuario con varios roles se queda con el más privilegiado.** Lo decide `app.precedencia_de_rol` (migración 0024), declarado ahí en vez de deducirse del orden del enumerado: tomar «cualquiera» haría que la sesión dependiera del orden físico de las filas, que cambia con un `VACUUM`.
+
+### B.8 · Comprobarlo sin desplegar
+
+Contra una base PostgreSQL local, el camino entero se verifica solo:
+
+```bash
+./supabase/arranque-en-frio.sh
+```
+
+Crea una base vacía, aplica las migraciones **sin semillas**, ejecuta el aprovisionamiento y comprueba que el gancho emite `rol`, `usuario_id` y `copropiedad_id`. También comprueba que un identificador de copropiedad inexistente se rechaza con un mensaje claro, que repetir el aprovisionamiento no duplica nada y que **ninguna columna de auditoría ha perdido su `NOT NULL`**.
 
 ---
 
 ## Lista de comprobación
 
-- [ ] Migraciones `0023` y `0024` aplicadas.
+- [ ] Migraciones `0023`, `0024`, `0025` y `0026` aplicadas.
 - [ ] SMTP propio configurado, con SPF y DKIM en el dominio remitente.
 - [ ] `Site URL` y las dos `Redirect URLs` de `/acceso/nueva-contrasena`.
 - [ ] Plantilla de _Reset Password_ usando `token_hash`, **no** `ConfirmationURL`.
@@ -181,7 +276,11 @@ node scripts/aprovisionar-rol.mjs --correo 'central@...' --rol operador_central 
 - [ ] Un correo que existe y otro que no dan la **misma** respuesta.
 - [ ] El enlace de recuperación **no funciona dos veces**.
 - [ ] El restablecimiento aparece en `auditoria_seguridad`.
+- [ ] Primera copropiedad registrada con `registrar-copropiedad.mjs`.
 - [ ] Auth Hook de _custom claims_ activo y apuntando a `public.custom_access_token_hook`.
-- [ ] Primer superadministrador con fila activa en `roles_usuario`.
-- [ ] TOTP activado en el proyecto y factor inscrito por el titular.
+- [ ] Primer superadministrador aprovisionado y capaz de cargar `/tablero`.
+- [ ] TOTP activado en el proyecto y factor inscrito por el titular **desde la consola** (§B.6).
+- [ ] Códigos de recuperación entregados y guardados; se muestran una sola vez.
+- [ ] `./supabase/arranque-en-frio.sh` en verde contra una base local: es el camino entero, hasta «la API le abre».
 - [ ] `SUPABASE_SECRET_KEY` fuera del entorno al terminar.
+- [ ] La consola arranca sin quejarse: con el entorno incompleto se detiene con código 78 y dice qué falta.

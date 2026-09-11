@@ -17,6 +17,17 @@ import type { paths } from '@ncr/contracts';
  */
 export const cliente = createClient<paths>({
   baseUrl: '/api/ncr',
+  /**
+   * `fetch` se resuelve en CADA llamada, no al crear el cliente.
+   *
+   * `openapi-fetch` guarda la referencia que encuentre al construirse, y eso
+   * ata el cliente al `fetch` que existía en ese instante. En producción da
+   * igual; en las pruebas significaba que las siete pantallas **no se podían
+   * montar con un servidor falso**: el cliente seguía llamando al `fetch` real
+   * y salía a la red. Una capa de red que no se puede sustituir es una capa
+   * que no se puede probar, y eso ya es un defecto de diseño.
+   */
+  fetch: (peticion) => globalThis.fetch(peticion),
   // Las cookies de sesión son de primera parte y `httpOnly`; sin esto el
   // navegador no las enviaría en una petición hecha desde JavaScript.
   credentials: 'same-origin',

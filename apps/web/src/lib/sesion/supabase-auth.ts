@@ -1,4 +1,5 @@
 import 'server-only';
+import { randomBytes } from 'node:crypto';
 import { configuracion } from '../configuracion';
 
 /**
@@ -32,13 +33,57 @@ export type MotivoDeFalloDeAcceso =
   | 'SESION_EXPIRADA'
   | 'ENLACE_NO_VALIDO'
   | 'CONTRASENA_DEBIL'
-  | 'SERVICIO_NO_DISPONIBLE';
+  /**
+   * El proveedor rechaza inscribir porque ya existe un factor con ese nombre.
+   * Tiene motivo propio porque **es recuperable** —se reintenta— y porque
+   * plegarlo en `SERVICIO_NO_DISPONIBLE` fue el defecto que dejó la pantalla
+   * de inscripción inservible: al titular se le decía «no se pudo contactar
+   * con el servicio de identidad» cuando el servicio había contestado, y de
+   * hecho había contestado que ya había un factor.
+   */
+  | 'FACTOR_DUPLICADO'
+  /**
+   * El titular **ya tiene un factor verificado**, así que el proveedor exige
+   * `aal2` para inscribir otro y responde 403 `insufficient_aal`. No es un
+   * fallo del usuario ni un código equivocado: es que la pantalla equivocada
+   * está en pantalla. La salida no es un mensaje, es **llevarle a verificar**.
+   */
+  | 'SEGUNDO_FACTOR_YA_INSCRITO'
+  /**
+   * **No se pudo contactar**: la petición ni siquiera obtuvo respuesta —red
+   * caída, DNS, TLS—. Es lo único que este motivo debe significar.
+   */
+  | 'SERVICIO_NO_DISPONIBLE'
+  /**
+   * **Contestó, y contestó un error.** Motivo aparte de `SERVICIO_NO_DISPONIBLE`
+   * porque son observaciones distintas y llevan a sitios distintos: «no
+   * contesta» manda a mirar la red, y un 500 manda a mirar el servicio. Se
+   * plegaban en uno solo, y el mensaje resultante afirmaba que no se había
+   * podido contactar con un servicio que había respondido — la misma clase de
+   * mentira que el diagnóstico inventado sobre el segundo factor.
+   */
+  | 'SERVICIO_RESPONDIO_ERROR';
+
+/**
+ * Rastro del fallo para el diagnóstico, **sin cuerpo de respuesta**.
+ *
+ * Solo el estado HTTP y el `error_code` del proveedor, que son enumerados
+ * suyos y no datos del titular. Sin esto, un `503` en el camino de acceso no
+ * se puede investigar: fue exactamente lo que ocurrió — el registro decía
+ * «503» y no había forma de saber si era la red, un 422 o una respuesta
+ * incompleta.
+ */
+export interface DetalleDeFallo {
+  readonly estado?: number | undefined;
+  readonly codigo?: string | undefined;
+}
 
 export class FalloDeAcceso extends Error {
   constructor(
     readonly motivo: MotivoDeFalloDeAcceso,
     /** Segundos que pide esperar el 429, si el servidor los declara. */
     readonly reintentarEn?: number,
+    readonly detalle: DetalleDeFallo = {},
   ) {
     super(motivo);
     this.name = 'FalloDeAcceso';
@@ -52,7 +97,21 @@ export interface SesionSupabase {
   /** `aal1` mientras falte el segundo factor; `aal2` cuando ya se verificó. */
   readonly nivel: 'aal1' | 'aal2';
   readonly factorPendienteId: string | null;
+  /** Rol del claim, para saber si este usuario NECESITA segundo factor. */
+  readonly rol: string | null;
 }
+
+/**
+ * Los tres roles que RN-20 obliga a proteger con segundo factor.
+ *
+ * La lista se repite aquí a propósito y no se importa de la API: la consola no
+ * comparte código con el backend, y quien hace cumplir la regla sigue siendo el
+ * guard. Si las dos se separaran, el síntoma sería una pantalla de inscripción
+ * que no aparece cuando debería —molesto— y nunca un acceso indebido, porque la
+ * API rechazaría igual. La interfaz oculta; no protege.
+ */
+export const exigeSegundoFactor = (rol: string | null): boolean =>
+  rol === 'superadministrador' || rol === 'administrador' || rol === 'operador_central';
 
 interface RespuestaToken {
   access_token?: string;
@@ -76,19 +135,23 @@ const cabeceras = (token?: string): HeadersInit => {
   };
 };
 
-/** El `aal` sale del propio token: es lo que la API va a verificar. */
-const nivelDelToken = (accessToken: string): 'aal1' | 'aal2' => {
+/** `aal` y `rol` salen del propio token: es lo que la API va a verificar. */
+const claimsDelToken = (accessToken: string): { nivel: 'aal1' | 'aal2'; rol: string | null } => {
   const carga = accessToken.split('.')[1];
-  if (carga === undefined) return 'aal1';
+  if (carga === undefined) return { nivel: 'aal1', rol: null };
   try {
     const json = JSON.parse(Buffer.from(carga, 'base64url').toString('utf8')) as {
       aal?: unknown;
+      rol?: unknown;
     };
-    return json.aal === 'aal2' ? 'aal2' : 'aal1';
+    return {
+      nivel: json.aal === 'aal2' ? 'aal2' : 'aal1',
+      rol: typeof json.rol === 'string' ? json.rol : null,
+    };
   } catch {
     // Un token que no se puede leer se trata como el nivel MÁS BAJO, no como
     // el más alto: fallar cerrado (§2.1.4).
-    return 'aal1';
+    return { nivel: 'aal1', rol: null };
   }
 };
 
@@ -102,13 +165,8 @@ const aSesion = (cuerpo: RespuestaToken, factorPendienteId: string | null): Sesi
     typeof cuerpo.expires_at === 'number'
       ? cuerpo.expires_at
       : Math.floor(Date.now() / 1000) + (cuerpo.expires_in ?? 3600);
-  return {
-    accessToken,
-    refreshToken,
-    expiraEn,
-    nivel: nivelDelToken(accessToken),
-    factorPendienteId,
-  };
+  const { nivel, rol } = claimsDelToken(accessToken);
+  return { accessToken, refreshToken, expiraEn, nivel, rol, factorPendienteId };
 };
 
 const pedir = async (ruta: string, opciones: RequestInit): Promise<Response> => {
@@ -121,28 +179,105 @@ const pedir = async (ruta: string, opciones: RequestInit): Promise<Response> => 
   }
 };
 
-const exigirOk = (respuesta: Response, siInvalido: MotivoDeFalloDeAcceso): void => {
-  if (respuesta.ok) return;
-  if (respuesta.status === 429) {
-    const espera = Number(respuesta.headers.get('retry-after') ?? '60');
-    throw new FalloDeAcceso('DEMASIADOS_INTENTOS', Number.isFinite(espera) ? espera : 60);
+/**
+ * Código de error del proveedor, y **nada más del cuerpo**.
+ *
+ * GoTrue enumera sus errores (`error_code`), y ese enumerado es lo único que
+ * hace falta para distinguir «ya existe ese factor» de «el servicio no
+ * responde». El resto del cuerpo no se lee ni se registra: es la regla de
+ * §2.7.8, y aquí además el cuerpo de un error de autenticación puede llevar
+ * el correo del titular.
+ */
+const codigoDelProveedor = async (respuesta: Response): Promise<string | undefined> => {
+  try {
+    const cuerpo = (await respuesta.json()) as { error_code?: unknown; code?: unknown };
+    for (const candidato of [cuerpo.error_code, cuerpo.code]) {
+      if (typeof candidato === 'string' && candidato.length > 0 && candidato.length <= 64) {
+        return candidato;
+      }
+    }
+  } catch {
+    // Un cuerpo que no es JSON no es un problema: el estado ya informa.
   }
-  if (respuesta.status === 400 || respuesta.status === 401 || respuesta.status === 403) {
-    throw new FalloDeAcceso(siInvalido);
-  }
-  throw new FalloDeAcceso('SERVICIO_NO_DISPONIBLE');
+  return undefined;
 };
 
-/** Factores TOTP ya inscritos y verificados por el titular. */
-const factorTotp = async (accessToken: string): Promise<string | null> => {
-  const respuesta = await pedir('/auth/v1/factors', {
+/**
+ * Traduce la respuesta del proveedor a un motivo tipado.
+ *
+ * **El caso 409/422 no es «servicio no disponible».** La versión anterior
+ * plegaba en `SERVICIO_NO_DISPONIBLE` todo lo que no fuera 400/401/403/429, y
+ * un 422 de «ya existe un factor con ese nombre» —que es recuperable y que el
+ * propio proveedor explica— llegaba a la pantalla como «no se pudo contactar
+ * con el servicio de identidad». Un mensaje que describe mal el fallo cuesta
+ * más que no tener mensaje: manda a investigar la red cuando el problema era
+ * nuestro.
+ */
+const exigirOk = async (respuesta: Response, siInvalido: MotivoDeFalloDeAcceso): Promise<void> => {
+  if (respuesta.ok) return;
+  const estado = respuesta.status;
+  if (estado === 429) {
+    const espera = Number(respuesta.headers.get('retry-after') ?? '60');
+    throw new FalloDeAcceso('DEMASIADOS_INTENTOS', Number.isFinite(espera) ? espera : 60, {
+      estado,
+    });
+  }
+  const codigo = await codigoDelProveedor(respuesta);
+  if (estado === 409 || estado === 422) {
+    // 422 es el estado con el que GoTrue rechaza un nombre de factor repetido.
+    // Se mira además el código, para no llamar «duplicado» a cualquier 422.
+    const duplicado = codigo === undefined || /conflict|exist|duplicate/i.test(codigo);
+    throw new FalloDeAcceso(duplicado ? 'FACTOR_DUPLICADO' : siInvalido, undefined, {
+      estado,
+      codigo,
+    });
+  }
+  if (estado === 403 && codigo === 'insufficient_aal') {
+    // El proveedor está diciendo algo muy concreto: «ya tienes un factor
+    // verificado, para añadir otro preséntame aal2». Contarlo como
+    // `FACTOR_INVALIDO` era acusar al usuario de teclear mal un código que
+    // nunca llegó a evaluarse.
+    throw new FalloDeAcceso('SEGUNDO_FACTOR_YA_INSCRITO', undefined, { estado, codigo });
+  }
+  if (estado === 400 || estado === 401 || estado === 403) {
+    throw new FalloDeAcceso(siInvalido, undefined, { estado, codigo });
+  }
+  // Contestó. No sabemos por qué falló y no vamos a inventarlo: se transmite
+  // el estado que respondió, que es lo único que consta.
+  throw new FalloDeAcceso('SERVICIO_RESPONDIO_ERROR', undefined, { estado, codigo });
+};
+
+/**
+ * Factores del titular, leídos de `GET /auth/v1/user`.
+ *
+ * **GoTrue no expone `GET /auth/v1/factors`, y ahí estaba el fallo de fondo.**
+ * Se consultaba esa ruta, no existe, la respuesta no era `ok` y el código lo
+ * interpretaba como «este usuario no tiene ningún factor». De ahí salía todo lo
+ * demás: la consola mandaba a inscribir a quien ya tenía un factor verificado,
+ * el proveedor respondía 403 `insufficient_aal` —para añadir un segundo factor
+ * exige `aal2`— y la pantalla lo contaba como «el código no es válido». La
+ * limpieza de factores a medias tampoco limpiaba nada, por lo mismo.
+ *
+ * Los factores viven en el objeto del usuario (`factors[]`), que es lo que
+ * `listFactors()` del SDK lee por debajo.
+ *
+ * **Falla cerrado.** Si la lista no se puede leer, esto lanza en vez de
+ * devolver «no hay factores». Suponer que no hay ninguno fue exactamente el
+ * defecto: una respuesta que no se entiende no es una respuesta vacía.
+ */
+export const factoresDelTitular = async (accessToken: string): Promise<readonly Factor[]> => {
+  const respuesta = await pedir('/auth/v1/user', {
     method: 'GET',
     headers: cabeceras(accessToken),
   });
-  if (!respuesta.ok) return null;
-  const cuerpo = (await respuesta.json()) as { totp?: Factor[]; all?: Factor[] };
-  const candidatos = cuerpo.totp ?? cuerpo.all ?? [];
-  const verificado = candidatos.find((f) => f.factor_type === 'totp' && f.status === 'verified');
+  await exigirOk(respuesta, 'SESION_EXPIRADA');
+  const cuerpo = (await respuesta.json()) as { factors?: Factor[] };
+  return (cuerpo.factors ?? []).filter((f) => f.factor_type === 'totp');
+};
+
+/** Factor TOTP ya verificado, que es el que habilita el paso de verificación. */
+const factorTotp = async (accessToken: string): Promise<string | null> => {
+  const verificado = (await factoresDelTitular(accessToken)).find((f) => f.status === 'verified');
   return verificado?.id ?? null;
 };
 
@@ -155,9 +290,13 @@ export const iniciarSesion = async (
     headers: cabeceras(),
     body: JSON.stringify({ email: correo, password: contrasena }),
   });
-  exigirOk(respuesta, 'CREDENCIALES_INVALIDAS');
+  await exigirOk(respuesta, 'CREDENCIALES_INVALIDAS');
   const sesion = aSesion((await respuesta.json()) as RespuestaToken, null);
   if (sesion.nivel === 'aal2') return sesion;
+  // Si la lista de factores no se puede leer, `factorTotp` lanza y el acceso
+  // falla con un motivo. Antes devolvía `null` y la consola mandaba a inscribir
+  // a alguien que ya tenía factor: el callejón sin salida que bloqueó al
+  // cliente durante una ronda entera.
   return { ...sesion, factorPendienteId: await factorTotp(sesion.accessToken) };
 };
 
@@ -167,7 +306,7 @@ export const refrescarSesion = async (refreshToken: string): Promise<SesionSupab
     headers: cabeceras(),
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
-  exigirOk(respuesta, 'SESION_EXPIRADA');
+  await exigirOk(respuesta, 'SESION_EXPIRADA');
   return aSesion((await respuesta.json()) as RespuestaToken, null);
 };
 
@@ -185,7 +324,7 @@ export const verificarSegundoFactor = async (
     method: 'POST',
     headers: cabeceras(accessToken),
   });
-  exigirOk(desafio, 'FACTOR_INVALIDO');
+  await exigirOk(desafio, 'FACTOR_INVALIDO');
   const { id: challengeId } = (await desafio.json()) as { id: string };
 
   const verificacion = await pedir(`/auth/v1/factors/${factorId}/verify`, {
@@ -193,7 +332,7 @@ export const verificarSegundoFactor = async (
     headers: cabeceras(accessToken),
     body: JSON.stringify({ challenge_id: challengeId, code: codigo }),
   });
-  exigirOk(verificacion, 'FACTOR_INVALIDO');
+  await exigirOk(verificacion, 'FACTOR_INVALIDO');
   return aSesion((await verificacion.json()) as RespuestaToken, null);
 };
 
@@ -247,7 +386,7 @@ export const canjearTokenDeRecuperacion = async (tokenHash: string): Promise<Ses
     headers: cabeceras(),
     body: JSON.stringify({ type: 'recovery', token_hash: tokenHash }),
   });
-  exigirOk(respuesta, 'ENLACE_NO_VALIDO');
+  await exigirOk(respuesta, 'ENLACE_NO_VALIDO');
   return aSesion((await respuesta.json()) as RespuestaToken, null);
 };
 
@@ -263,7 +402,159 @@ export const cambiarContrasena = async (accessToken: string, contrasena: string)
   // del usuario es distinta: ahí hay que elegir otra contraseña, no pedir otro
   // correo.
   if (respuesta.status === 422) throw new FalloDeAcceso('CONTRASENA_DEBIL');
-  exigirOk(respuesta, 'ENLACE_NO_VALIDO');
+  await exigirOk(respuesta, 'ENLACE_NO_VALIDO');
+};
+
+/**
+ * Normaliza el código QR a algo que un `<img src>` pueda **pintar de verdad**.
+ *
+ * El defecto que lo motivó: GoTrue devuelve `totp.qr_code` como **marcado SVG
+ * en crudo** —`<svg …>…</svg>`—, no como una URL. Puesto tal cual en un `src`,
+ * el navegador no tiene nada que cargar y muestra el texto alternativo. La
+ * respuesta traía el QR y la pantalla no lo pintaba: por eso la comprobación
+ * útil no es «la respuesta trae un QR» sino «el navegador lo muestra».
+ *
+ * Se envuelve en un `data:` URI en base64 en vez de insertar el SVG en el DOM.
+ * Es lo que lo hace seguro: dentro de un `<img>`, un SVG **no ejecuta scripts**
+ * ni carga recursos externos, así que aunque el proveedor devolviera marcado
+ * hostil no habría nada que ejecutar. Insertarlo con `dangerouslySetInnerHTML`
+ * sí lo habría permitido. La CSP ya admite `data:` en `img-src` para los
+ * iconos de la PWA: no hace falta abrir nada.
+ *
+ * Un formato que no se reconoce devuelve cadena vacía, y la pantalla enseña la
+ * clave en texto. Nunca un `<img>` roto.
+ */
+export const imagenDeQr = (qr: string): string => {
+  const limpio = qr.trim();
+  if (limpio === '') return '';
+  if (limpio.startsWith('data:image/')) return limpio;
+  if (limpio.startsWith('<svg') || limpio.startsWith('<?xml')) {
+    return `data:image/svg+xml;base64,${Buffer.from(limpio, 'utf8').toString('base64')}`;
+  }
+  return '';
+};
+
+export interface InscripcionDeFactor {
+  readonly factorId: string;
+  /** QR ya normalizado a `data:`, listo para un `<img src>`. Vacío si no se pudo. */
+  readonly qr: string;
+  /** El secreto en texto, para quien no puede escanear. */
+  readonly secreto: string;
+}
+
+/** Retira los factores a medio inscribir: leer y borrar, sin atomicidad. */
+const retirarNoVerificados = async (
+  accessToken: string,
+  factores: readonly Factor[],
+): Promise<void> => {
+  for (const factor of factores) {
+    if (factor.status !== 'verified') {
+      await pedir(`/auth/v1/factors/${factor.id}`, {
+        method: 'DELETE',
+        headers: cabeceras(accessToken),
+      }).catch(() => undefined);
+    }
+  }
+};
+
+const altaDeFactor = async (
+  accessToken: string,
+  nombreAmistoso: string,
+): Promise<InscripcionDeFactor> => {
+  const respuesta = await pedir('/auth/v1/factors', {
+    method: 'POST',
+    headers: cabeceras(accessToken),
+    body: JSON.stringify({ factor_type: 'totp', friendly_name: nombreAmistoso }),
+  });
+  await exigirOk(respuesta, 'FACTOR_INVALIDO');
+
+  const cuerpo = (await respuesta.json()) as {
+    id?: string;
+    totp?: { qr_code?: string; secret?: string };
+  };
+  if (typeof cuerpo.id !== 'string' || cuerpo.totp === undefined) {
+    // Se marca con un código propio: un 503 sin causa fue lo que hizo que este
+    // fallo tardara en entenderse.
+    throw new FalloDeAcceso('SERVICIO_NO_DISPONIBLE', undefined, {
+      codigo: 'respuesta_de_alta_incompleta',
+    });
+  }
+  return {
+    factorId: cuerpo.id,
+    qr: imagenDeQr(cuerpo.totp.qr_code ?? ''),
+    secreto: cuerpo.totp.secret ?? '',
+  };
+};
+
+/**
+ * Inscribe un factor TOTP **con la sesión del propio titular**.
+ *
+ * Funciona con una sesión `aal1`, y ese es el punto: quien todavía no tiene
+ * segundo factor no puede presentar otra cosa. Es también la razón de que esto
+ * viva en la consola y no en el panel de Supabase — el panel solo ofrece
+ * RETIRAR factores de un usuario, no darlos de alta, y hace bien: un factor
+ * inscrito por un tercero no es un segundo factor.
+ *
+ * Antes de inscribir se retiran los factores **no verificados** que hubiera.
+ * Se acumulan cuando alguien empieza la inscripción y la abandona —cerrar la
+ * pestaña basta—, y Supabase rechaza inscribir con un nombre repetido, así que
+ * sin esta limpieza el segundo intento fallaría sin explicación.
+ */
+/**
+ * **La limpieza es leer-y-borrar, así que dos intentos simultáneos se pisan.**
+ * Ocurrió en el arranque del cliente: en desarrollo el modo estricto de React
+ * invoca dos veces el efecto, las dos altas viajaron con el mismo nombre y el
+ * proveedor rechazó una con 422. El reintento de abajo cubre el caso; la
+ * defensa principal es la de la ruta, que atiende una sola inscripción por
+ * titular a la vez.
+ */
+export const inscribirFactorTotp = async (
+  accessToken: string,
+  nombreAmistoso = 'Next Control Residencial',
+): Promise<InscripcionDeFactor> => {
+  // Se pregunta ANTES de intentar. Quien ya tiene un factor verificado no
+  // necesita inscribir otro: necesita verificar el que tiene. Intentarlo y
+  // traducir el 403 sería llegar al mismo sitio dando un rodeo, y dejando
+  // rastro en el proveedor.
+  // La lista se lee UNA vez y sirve para las dos decisiones. Leerla dos veces
+  // no solo costaba una vuelta de red: abría una ventana en la que las dos
+  // lecturas podían discrepar.
+  const factores = await factoresDelTitular(accessToken);
+  if (factores.some((f) => f.status === 'verified')) {
+    throw new FalloDeAcceso('SEGUNDO_FACTOR_YA_INSCRITO', undefined, { codigo: 'ya_verificado' });
+  }
+  await retirarNoVerificados(accessToken, factores);
+  try {
+    return await altaDeFactor(accessToken, nombreAmistoso);
+  } catch (e) {
+    if (!(e instanceof FalloDeAcceso) || e.motivo !== 'FACTOR_DUPLICADO') throw e;
+    // Un nombre repetido significa que otro intento del MISMO titular llegó
+    // primero —la limpieza de arriba es leer-y-borrar, y dos intentos a la vez
+    // se pisan—. Se limpia otra vez y se reintenta con un nombre distinto: el
+    // titular no tiene por qué enterarse de una carrera nuestra. **Un solo
+    // reintento**, porque si el segundo también choca ya no es una carrera y
+    // repetir solo alargaría la espera.
+    await retirarNoVerificados(accessToken, await factoresDelTitular(accessToken));
+    return await altaDeFactor(accessToken, `${nombreAmistoso} (${sufijoDeReintento()})`);
+  }
+};
+
+/**
+ * Sufijo del nombre en el reintento. Corto, legible y sin reloj: el nombre es
+ * metadato del proveedor, no algo que el titular teclee, y una marca de tiempo
+ * haría la función impura sin ganar nada.
+ */
+const sufijoDeReintento = (): string => randomBytes(2).toString('hex');
+
+/** Factores TOTP del titular, para saber si hay algo que inscribir. */
+export const factoresDe = async (
+  accessToken: string,
+): Promise<{ readonly verificados: number; readonly total: number }> => {
+  const factores = await factoresDelTitular(accessToken);
+  return {
+    verificados: factores.filter((f) => f.status === 'verified').length,
+    total: factores.length,
+  };
 };
 
 export const cerrarSesionRemota = async (accessToken: string): Promise<void> => {
