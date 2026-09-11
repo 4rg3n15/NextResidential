@@ -1017,3 +1017,164 @@ Rama `etapa-09-consola-administracion`, sin etapa nueva.
 | `be232ce` | Las tres violaciones eran del `next dev`; el defecto real estaba en las barras |
 | `1af9b9c` | `/ready` publicaba una cadena fija por PostgreSQL                              |
 | `e7628fc` | La ronda de auditoría, y la guía para verificarla contra el proyecto real      |
+
+---
+
+## Addendum · D-65, la decimoquinta aparición de DT-12 · 2026-09-11
+
+**Reportado por el cliente:** `pnpm --filter @ncr/api build` falla con
+`TS2339: Property 'rehidratar' does not exist on type 'typeof Autorizacion'`,
+con la verificación de etapa en verde.
+
+### Qué era
+
+**No faltaba nada en el dominio.** `Autorizacion.rehidratar` existe en
+`packages/domain-core/src/autorizaciones/autorizacion.ts:90`, se exporta por el
+barril, y llegó en el **mismo commit** que su uso (`e3d6a9f`, ETAPA 09-B). El
+adaptador no iba por delante del dominio.
+
+El fallo era de **resolución**. `@ncr/domain-core` publica sus tipos como
+`./dist/index.d.ts`, así que la API compila contra el **artefacto**, no contra
+el fuente. Con `tsc -p`, un build por paquete usa el `dist/` que haya, tenga la
+edad que tenga — y `dist/` está en `.gitignore`, así que cada checkout tiene el
+suyo y envejece por su cuenta.
+
+Reproducido reconstruyendo el `dist` del dominio con el código anterior a 09-B:
+
+| Comando                        | Resultado                                 |
+| ------------------------------ | ----------------------------------------- |
+| `pnpm --filter @ncr/api build` | **TS2339**, el error del cliente, literal |
+| `pnpm build` (raíz)            | **7 successful**                          |
+
+La raíz lo arregla porque turbo construye las dependencias en orden. De rebote, y solo hasta el siguiente `dist` viejo.
+
+### Por qué la verificación daba verde
+
+El paso 0 borra `dist/`. El paso 3 construía **solo por la raíz**, y turbo deja
+todos los `dist/` frescos. Después de eso, un build por paquete pasa aunque el
+paquete no sepa arrastrar sus dependencias — **porque ya están construidas**. El
+paso 4 typecheckeaba sobre ese mismo estado ya preparado.
+
+Es la misma familia que el falso verde de la ETAPA 04, y la regla que §2.8.0
+derivó entonces —«las pruebas resuelven los paquetes internos a su código
+fuente, nunca a su `dist/`»— se había aplicado a **las pruebas** y nunca al
+**build**. La quincena aparición de DT-12.
+
+### La corrección
+
+**Referencias de proyecto de TypeScript.** Los paquetes internos pasan a
+`composite`, quien los consume los declara en `references`, y los scripts pasan
+a `tsc -b`, que recorre las referencias y **reconstruye lo desfasado antes de
+compilar**. Verificado envejeciendo el `dist` a propósito: antes `TS2339`, ahora
+lo reconstruye y compila.
+
+**Y un defecto que introdujo la propia corrección, cazado por su propio control.**
+`tsc -b` decide si reconstruir mirando el `.tsbuildinfo`. Con el registro fuera
+de `outDir`, un `rm -rf dist` —que es lo que hace el paso 0, y lo que hace
+cualquiera— dejaba el registro afirmando «está al día» sobre artefactos que ya
+no existen: `tsc` no emitía nada y la compilación siguiente fallaba con
+«Cannot find module». El paso 3 lo dio en rojo en la primera corrida. El
+registro vive ahora **dentro de `dist/`**: registro y artefactos mueren juntos,
+y el modo de fallo deja de ser posible en vez de depender de que alguien
+recuerde borrar dos cosas.
+
+### Los controles que lo habrían cazado
+
+1. **Paso 3, reordenado.** Primero **cada aplicación por separado**, partiendo
+   del paso 0 donde no hay ningún `dist/`; después la raíz. Si una app no
+   arrastra sus dependencias, falla ahí y no en el equipo de quien la use.
+2. **`scripts/lib/frontera-construccion.mjs`.** Guarda la invariante: todo
+   paquete interno consumido es `composite`, quien lo consume lo declara en
+   `references`, y los scripts usan `tsc -b`. Comprueba configuración y no
+   compila **a propósito**: el banco de las pruebas negativas es una copia sin
+   `node_modules`.
+3. **Prueba negativa 4c.** Revierte a `tsc -p` y quita una referencia, y exige
+   que las dos violaciones se detecten y se nombren. Los controles pasan de 14 a
+   **15**.
+
+### Veredicto literal de §2.8.0
+
+```
+▸ 0 · borrando artefactos de compilación (así corre un checkout nuevo)
+   ✓ dist, .turbo, coverage y registros de compilación eliminados
+
+▸ 1 · entorno dentro de lo declarado
+   ✓ entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2
+
+▸ 2 · instalación coherente con el lockfile
+   ✓ pnpm install --frozen-lockfile
+
+▸ 3 · compilación desde cero
+   ✓ @ncr/api construye SOLO, sin que nadie le prepare las dependencias
+   ✓ @ncr/edge construye SOLO, sin que nadie le prepare las dependencias
+   ✓ pnpm build
+   ✓ ninguna aplicación compila contra un dist/ desfasado (7 paquetes del espacio de trabajo, D-65)
+
+▸ 4 · lint y typecheck
+   ✓ pnpm lint
+   ✓ pnpm typecheck
+
+▸ 5 · suite completa
+   @ncr/config:test:       Tests  39 passed (39)
+   @ncr/providers:test:       Tests  24 passed (24)
+   @ncr/domain-core:test:       Tests  328 passed (328)
+   @ncr/web:test:       Tests  249 passed (249)
+   @ncr/api:test:       Tests  415 passed | 5 skipped (420)
+   ✓ suite completa en verde
+
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 89 de 89 ficheros de prueba ejecutados
+
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     OK   dominio (packages/domain-core/src): lineas 97.75 % · ramas 97.67 % · funciones 98.09 % (umbral 90 %, 28 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 97.42 % · ramas 91.65 % · funciones 97.92 % (umbral 90 %, 22 archivos)
+     OK   global: lineas 73.87 % · ramas 85.94 % · funciones 76.19 % (umbral 70 %, 228 archivos)
+   ✓ las tres capas cumplen su umbral
+
+▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
+   ✓ portabilidad: 16 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
+
+▸ 9 · pruebas negativas de los propios controles
+   ✓ PRUEBAS NEGATIVAS: los 15 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+
+▸ 10 · fronteras de arquitectura y secretos
+   ✓ fronteras (DoD ETAPA 02)
+   ✓ frontera-modulos: 7 módulos (autenticacion, autorizaciones, biometria, eventos, padron, tablero, zonas) y ninguna importación entra por dentro
+   ✓ sin secretos
+   ✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers/
+   ✓ ningún atributo `style` en la consola (105 ficheros, §2.7.7)
+   ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 4 tablas vigiladas)
+
+▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
+   ✓ 41 de 49 operaciones con respuesta tipada; 8 exentas con etapa declarada
+   ✓ contrato y cliente generado al día respecto de los controladores
+
+▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
+   alertas entregadas: 200 de 200
+   p50 / p95 / p99   : 2 / 4 / 7 ms
+   maximo            : 10 ms
+   umbral KPI-25     : 10000 ms
+   ✓ KPI-25 con margen sobre el umbral
+
+▸ 12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero
+   ✓ el camino completo se recorre en el navegador
+
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 415 passed | 5 skipped (420) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 249 passed (249)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 415 passed | 5 skipped (420) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 249 passed (249)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 415 passed | 5 skipped (420) · @ncr/config:test: Tests 39 passed (39) · @ncr/domain-core:test: Tests 328 passed (328) · @ncr/providers:test: Tests 24 passed (24) · @ncr/web:test: Tests 249 passed (249)
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 16 de 19 pasos ejecutados; 3 exentos por necesitar --con-base
+
+VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
+```
+
+### Commits
+
+| Commit    | Asunto                                                            |
+| --------- | ----------------------------------------------------------------- |
+| `e23782e` | La API compilaba contra un dist que podía ser de otra etapa       |
+| `cc18cd6` | Los dos controles que habrían cazado D-65                         |
+| `544f2d7` | El `.tsbuildinfo` vive dentro de `dist`, o el build no emite nada |
