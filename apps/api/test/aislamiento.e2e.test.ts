@@ -1,7 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
-import { COP_A, COP_B, crearApp, crearFirmante, enumerarRutas, tokenDe } from './utilidades';
+import {
+  COP_A,
+  COP_B,
+  crearApp,
+  crearFirmante,
+  enumerarRutas,
+  rutasConMetadato,
+  tokenDe,
+} from './utilidades';
+import { CLAVE_ALCANCE_DEL_LLAMANTE } from '../src/comun/decoradores';
 import type { Firmante, RutaExpuesta } from './utilidades';
 import { AuditoriaEnMemoria } from '../src/comun/auditoria';
 
@@ -38,6 +47,20 @@ const SIN_RECURSO_TENANT = new Set([
  * siéndolo: ampliarla es relajar RN-20, y tiene que verse en el diff.
  */
 const SIN_SEGUNDO_FACTOR = new Set(['/auth/restablecimiento', '/auth/mfa/recuperacion']);
+
+/**
+ * Rutas marcadas `@AlcanceDelLlamante()`: devuelven el alcance del llamante y
+ * no reciben identificador de copropiedad, así que el recorrido genérico no
+ * puede juzgarlas —no hay identificador ajeno que pedirles—.
+ *
+ * **Estar aquí NO es una exención: es una obligación.** Cada una de estas
+ * rutas tiene abajo su comprobación dedicada, y el conjunto se compara con lo
+ * que el decorador dice en el CÓDIGO. Añadir el decorador sin añadir la
+ * comprobación rompe el build; añadir la comprobación sin el decorador,
+ * también. Exentar en silencio justo el endpoint que enumera tenants sería el
+ * peor agujero que esta suite podría tener.
+ */
+const CON_ALCANCE_PROPIO = new Set(['/copropiedades']);
 
 beforeAll(async () => {
   firmante = await crearFirmante();
@@ -87,6 +110,19 @@ describe('cobertura de la suite', () => {
     }
   });
 
+  it('la marca @AlcanceDelLlamante() del CÓDIGO coincide, exactamente, con la lista de la suite', () => {
+    /**
+     * La comprobación de arriba mira que la ruta EXISTA en el enrutador, lo
+     * cual es cierto de cualquier ruta lleve o no el decorador: dice verificar
+     * la correspondencia y no la verifica. Esta sí la verifica, leyendo el
+     * metadato del manejador real.
+     *
+     * Si alguien marca una ruta nueva y no le escribe su comprobación
+     * dedicada, el conjunto del código gana un elemento y esto se pone rojo.
+     */
+    expect(rutasConMetadato(app, CLAVE_ALCANCE_DEL_LLAMANTE)).toEqual([...CON_ALCANCE_PROPIO]);
+  });
+
   it('toda ruta no pública queda cubierta por los recorridos de abajo', () => {
     const protegidas = rutas.filter((r) => !PUBLICAS.has(`${r.metodo} ${r.ruta}`));
     expect(protegidas.length).toBeGreaterThan(0);
@@ -116,6 +152,9 @@ describe('camino 2 · JWT de usuario de OTRA copropiedad', () => {
     for (const r of rutas) {
       if (PUBLICAS.has(`${r.metodo} ${r.ruta}`)) continue;
       if (SIN_RECURSO_TENANT.has(r.ruta)) continue;
+      // No se saltan sin más: cada una tiene su comprobación dedicada abajo,
+      // y el `it` de arriba exige que exista.
+      if (CON_ALCANCE_PROPIO.has(r.ruta)) continue;
       const res = await invocar(r, token);
       // 404 o 403 son correctos. 2xx sobre un recurso de B es una FUGA.
       if (res.status >= 200 && res.status < 300) {
@@ -138,6 +177,78 @@ describe('camino 2 · JWT de usuario de OTRA copropiedad', () => {
     const res = await invocar({ metodo: 'GET', ruta: '/copropiedades/:id' }, token);
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(COP_B);
+  });
+});
+
+describe('GET /copropiedades · el alcance del llamante, N frente a 1', () => {
+  /**
+   * La comprobación dedicada que la marca `@AlcanceDelLlamante()` obliga a
+   * tener. Y el encargo que desbloqueó al superadministrador: hasta la ETAPA
+   * 09-B no existía forma de enumerar, así que el único rol capaz de
+   * administrarlo todo no alcanzaba ninguna pantalla.
+   */
+  const listar = async (token: string) =>
+    request(app.getHttpServer()).get('/copropiedades').set('Authorization', `Bearer ${token}`);
+
+  it('el superadministrador ve LAS N, sin pertenecer a ninguna', async () => {
+    // `copropiedadId: null` es su estado real: el gancho de claims lo emite
+    // así a propósito. Es exactamente el caso que la consola leía como «sin
+    // permiso».
+    const token = await tokenDe(firmante, { rol: 'superadministrador', copropiedadId: null });
+    const res = await listar(token);
+    expect(res.status).toBe(200);
+    expect(res.body.alcanceGlobal).toBe(true);
+    expect((res.body.copropiedades as { id: string }[]).map((c) => c.id).sort()).toEqual(
+      [COP_A, COP_B].sort(),
+    );
+  });
+
+  it('un administrador ve UNA: la suya, y nada de la ajena', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
+    const res = await listar(token);
+    expect(res.status).toBe(200);
+    expect(res.body.alcanceGlobal).toBe(false);
+    expect(res.body.copropiedades).toHaveLength(1);
+    expect(res.body.copropiedades[0].id).toBe(COP_A);
+    // La fuga que esta prueba existe para impedir: el nombre de la ajena.
+    expect(JSON.stringify(res.body)).not.toContain(COP_B);
+    expect(JSON.stringify(res.body)).not.toContain('Copropiedad B');
+  });
+
+  it('un portero de la B ve la B, y nunca la A', async () => {
+    const token = await tokenDe(firmante, {
+      rol: 'portero',
+      copropiedadId: COP_B,
+      aal: 'aal1',
+    });
+    const res = await listar(token);
+    expect(res.status).toBe(200);
+    expect(res.body.copropiedades.map((c: { id: string }) => c.id)).toEqual([COP_B]);
+  });
+
+  it('un operador de central ve las de su turno, ni una más', async () => {
+    const token = await tokenDe(firmante, {
+      rol: 'operador_central',
+      copropiedadId: null,
+      copropiedades: [COP_B],
+    });
+    const res = await listar(token);
+    expect(res.body.copropiedades.map((c: { id: string }) => c.id)).toEqual([COP_B]);
+  });
+
+  it('una identidad sin copropiedad y sin alcance global recibe la lista VACÍA, no todas', async () => {
+    // El modo de fallo que importa: si el filtro tratara «sin copropiedad»
+    // como «sin filtro», un residente mal aprovisionado vería el catálogo
+    // entero. Vacío es la respuesta conservadora.
+    const token = await tokenDe(firmante, { rol: 'residente', copropiedadId: null, aal: 'aal1' });
+    const res = await listar(token);
+    expect(res.status).toBe(200);
+    expect(res.body.copropiedades).toEqual([]);
+  });
+
+  it('sin token, 401 como cualquier otra', async () => {
+    const res = await request(app.getHttpServer()).get('/copropiedades');
+    expect(res.status).toBe(401);
   });
 });
 

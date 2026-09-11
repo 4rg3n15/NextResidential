@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { sesionActual } from '@/lib/sesion/servidor';
+import { alcanceActivo, motivoSinCopropiedad } from '../copropiedad';
 import { TableroOperativo } from './tablero-operativo';
 import { EstadoSinPermiso } from '@/componentes/estados';
 
@@ -16,19 +17,20 @@ export const dynamic = 'force-dynamic';
  * usuario controla, y aunque la API lo rechazaría con 404, la consola estaría
  * invitando a intentarlo.
  *
- * El operador de central atiende varias (KPI-35) y su selector llega con la
- * consola de guardia virtual, en la ETAPA 10; aquí se toma la primera de su
- * turno para que el tablero no quede inservible para ese rol.
+ * Quien alcanza varias —superadministrador y operador de central— elige en la
+ * cabecera, y la elección va por cookie `httpOnly` contrastada contra el
+ * catálogo de la API. Hasta la 09-B, `null` se leía como «sin permiso»: el
+ * superadministrador no pertenece a ninguna copropiedad y la consola le negaba
+ * las ocho pantallas.
  */
 const Tablero = async (): Promise<JSX.Element> => {
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
 
-  const copropiedadId = sesion.copropiedadId ?? sesion.copropiedadesAtendidas[0] ?? null;
+  const alcance = await alcanceActivo();
+  const copropiedadId = alcance.copropiedadId;
   if (copropiedadId === null) {
-    return (
-      <EstadoSinPermiso descripcion="Tu sesión no tiene ninguna copropiedad asignada. Un administrador debe asignarte al menos una para que el tablero tenga qué mostrar." />
-    );
+    return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
 
   return <TableroOperativo copropiedadId={copropiedadId} />;

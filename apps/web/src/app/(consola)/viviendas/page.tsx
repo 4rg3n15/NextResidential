@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { sesionActual } from '@/lib/sesion/servidor';
 import { EstadoSinPermiso } from '@/componentes/estados';
-import { copropiedadDeLaSesion } from '../copropiedad';
+import { alcanceActivo, motivoSinCopropiedad } from '../copropiedad';
 import { DirectorioDeViviendas } from './directorio';
 
 export const metadata: Metadata = { title: 'Viviendas' };
@@ -13,11 +13,10 @@ export const dynamic = 'force-dynamic';
 const Viviendas = async (): Promise<JSX.Element> => {
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
-  const copropiedadId = await copropiedadDeLaSesion();
+  const alcance = await alcanceActivo();
+  const copropiedadId = alcance.copropiedadId;
   if (copropiedadId === null) {
-    return (
-      <EstadoSinPermiso descripcion="Tu sesión no tiene ninguna copropiedad asignada. Un administrador debe asignarte al menos una." />
-    );
+    return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
   return <DirectorioDeViviendas copropiedadId={copropiedadId} />;
 };

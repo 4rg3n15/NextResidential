@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import type { Sesion } from '@ncr/contracts';
+import type { AlcanceDeCopropiedades, Sesion } from '@ncr/contracts';
 import { configuracion } from '../configuracion';
 import { registrar } from '../registro';
 import { tokenVigente } from './token';
@@ -72,6 +72,40 @@ export const sesionActual = cache(async (): Promise<Sesion | null> => {
   } catch {
     // API caída: no hay sesión *utilizable*. Devolver una sesión a medias haría
     // que el layout pintara una navegación que no lleva a ninguna parte.
+    return null;
+  }
+});
+
+/**
+ * Catálogo de copropiedades que el token alcanza, preguntado a la API.
+ *
+ * Igual que `sesionActual`: la autoridad sobre el alcance es la API, no una
+ * interpretación propia de los claims. Aquí eso importa el doble, porque el
+ * alcance del superadministrador **no está en el token**: su `copropiedad_id`
+ * es nulo y quien lo resuelve es `app.es_superadmin()` en la base.
+ */
+export const alcanceDeCopropiedades = cache(async (): Promise<AlcanceDeCopropiedades | null> => {
+  const token = await tokenVigente();
+  if (token === null) return null;
+
+  const { apiUrl } = configuracion();
+  try {
+    const respuesta = await fetch(`${apiUrl}/copropiedades`, {
+      headers: { Authorization: `Bearer ${token.accessToken}`, Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!respuesta.ok) {
+      registrar('aviso', 'la API rechazó el catálogo de copropiedades', {
+        estado: respuesta.status,
+        pista:
+          respuesta.status === 401
+            ? 'token sin rol o sin segundo factor'
+            : 'ver la bitácora de la API',
+      });
+      return null;
+    }
+    return (await respuesta.json()) as AlcanceDeCopropiedades;
+  } catch {
     return null;
   }
 });

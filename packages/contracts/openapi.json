@@ -169,6 +169,33 @@
         ]
       }
     },
+    "/copropiedades": {
+      "get": {
+        "operationId": "CopropiedadesController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlcanceDeCopropiedadesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enumera las copropiedades que el token alcanza, y solo esas",
+        "tags": [
+          "multiempresa"
+        ]
+      }
+    },
     "/copropiedades/ingesta": {
       "post": {
         "operationId": "CopropiedadesController_ingerir",
@@ -2487,6 +2514,26 @@
           "nombre"
         ]
       },
+      "AlcanceDeCopropiedadesDto": {
+        "type": "object",
+        "properties": {
+          "copropiedades": {
+            "description": "Las copropiedades que el token alcanza, y solo esas. Para el superadministrador son todas las activas; para un administrador, la suya; para un operador de central, las de su turno. Un arreglo vacío es una respuesta legítima.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CopropiedadResumenDto"
+            }
+          },
+          "alcanceGlobal": {
+            "type": "boolean",
+            "description": "true cuando el alcance es global y no viene de una pertenencia concreta (superadministrador). La consola lo usa para explicar por qué puede conmutar."
+          }
+        },
+        "required": [
+          "copropiedades",
+          "alcanceGlobal"
+        ]
+      },
       "AlertaExpuestaDto": {
         "type": "object",
         "properties": {
@@ -2907,6 +2954,29 @@
         "required": [
           "id",
           "alcance"
+        ]
+      },
+      "CopropiedadResumenDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Urbanización Mira"
+          },
+          "zonaHoraria": {
+            "type": "string",
+            "example": "America/Bogota",
+            "description": "Decide qué significa «hoy» en el tablero. Viaja con cada copropiedad porque un superadministrador puede conmutar entre husos distintos en la misma sesión."
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "zonaHoraria"
         ]
       },
       "CrearAutorizacionDto": {

@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { sesionActual } from '@/lib/sesion/servidor';
 import { EstadoSinPermiso } from '@/componentes/estados';
-import { copropiedadDeLaSesion } from '../copropiedad';
+import { alcanceActivo, motivoSinCopropiedad } from '../copropiedad';
 import { PantallaDeVehiculos } from './pantalla';
 
 export const metadata: Metadata = { title: 'Vehículos y placas' };
@@ -13,9 +13,10 @@ export const dynamic = 'force-dynamic';
 const Vehiculos = async (): Promise<JSX.Element> => {
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
-  const copropiedadId = await copropiedadDeLaSesion();
+  const alcance = await alcanceActivo();
+  const copropiedadId = alcance.copropiedadId;
   if (copropiedadId === null) {
-    return <EstadoSinPermiso descripcion="Tu sesión no tiene ninguna copropiedad asignada." />;
+    return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
   return <PantallaDeVehiculos copropiedadId={copropiedadId} />;
 };

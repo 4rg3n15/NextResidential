@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Enumera las copropiedades que el token alcanza, y solo esas */
+        get: operations["CopropiedadesController_listar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/ingesta": {
         parameters: {
             query?: never;
@@ -849,6 +866,12 @@ export interface components {
             personaId: string;
             nombre: string;
         };
+        AlcanceDeCopropiedadesDto: {
+            /** @description Las copropiedades que el token alcanza, y solo esas. Para el superadministrador son todas las activas; para un administrador, la suya; para un operador de central, las de su turno. Un arreglo vacío es una respuesta legítima. */
+            copropiedades: components["schemas"]["CopropiedadResumenDto"][];
+            /** @description true cuando el alcance es global y no viene de una pertenencia concreta (superadministrador). La consola lo usa para explicar por qué puede conmutar. */
+            alcanceGlobal: boolean;
+        };
         AlertaExpuestaDto: {
             /** Format: uuid */
             id: string;
@@ -989,6 +1012,17 @@ export interface components {
              * @enum {string}
              */
             alcance: "superadministrador" | "administrador" | "portero" | "operador_central" | "residente" | "servicio";
+        };
+        CopropiedadResumenDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Urbanización Mira */
+            nombre: string;
+            /**
+             * @description Decide qué significa «hoy» en el tablero. Viaja con cada copropiedad porque un superadministrador puede conmutar entre husos distintos en la misma sesión.
+             * @example America/Bogota
+             */
+            zonaHoraria: string;
         };
         CrearAutorizacionDto: {
             /** Format: uuid */
@@ -1598,6 +1632,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    CopropiedadesController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlcanceDeCopropiedadesDto"];
                 };
             };
         };

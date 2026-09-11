@@ -35,6 +35,9 @@ export type PaginaDeEventos = Esquemas['PaginaDeEventosDto'];
 export type AlertaExpuesta = Esquemas['AlertaExpuestaDto'];
 export type ErrorApi = Esquemas['ErrorApiDto'];
 export type Copropiedad = Esquemas['CopropiedadDto'];
+/** Catálogo del alcance del token (ETAPA 09-B, `GET /copropiedades`). */
+export type AlcanceDeCopropiedades = Esquemas['AlcanceDeCopropiedadesDto'];
+export type CopropiedadResumen = Esquemas['CopropiedadResumenDto'];
 
 /* ETAPA 09-B · las siete pantallas restantes. Los alias existen para que la
  * consola no escriba `components['schemas']['…Dto']` en cada import: el tipo

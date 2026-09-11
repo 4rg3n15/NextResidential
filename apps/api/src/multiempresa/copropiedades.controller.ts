@@ -11,10 +11,12 @@ import {
 } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
 import { Aislamiento } from './aislamiento';
-import { PermiteServicio, Roles } from '../comun/decoradores';
+import { AlcanceDelLlamante, PermiteServicio, Roles } from '../comun/decoradores';
 import { Contexto } from '../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../autenticacion';
-import { CopropiedadDto, IngestaAceptadaDto } from './respuestas';
+import { AlcanceDeCopropiedadesDto, CopropiedadDto, IngestaAceptadaDto } from './respuestas';
+import { REPOSITORIO_COPROPIEDADES } from './repositorio-copropiedades';
+import type { RepositorioCopropiedades } from './repositorio-copropiedades';
 import { ErrorApiDto } from '../comun/respuestas';
 
 export class IngestaDto {
@@ -33,7 +35,33 @@ export class IngestaDto {
 @ApiBearerAuth()
 @Controller('copropiedades')
 export class CopropiedadesController {
-  constructor(@Inject(Aislamiento) private readonly aislamiento: Aislamiento) {}
+  constructor(
+    @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    @Inject(REPOSITORIO_COPROPIEDADES) private readonly catalogo: RepositorioCopropiedades,
+  ) {}
+
+  /**
+   * Enumera el alcance del token. **La ruta va ANTES que `:id`**: Express
+   * resuelve por orden de declaración y `@Get(':id')` capturaría la cadena
+   * «copropiedades» como identificador, devolviendo 400 del `ParseUUIDPipe`.
+   *
+   * Existe porque el superadministrador no pertenece a ninguna copropiedad —su
+   * `copropiedad_id` es nulo por diseño— y sin enumerar no había forma de
+   * ofrecerle elegir. La consola trataba ese nulo como «sin permiso» y dejaba
+   * inutilizado al único rol capaz de administrarlo todo.
+   */
+  @Get()
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central', 'residente')
+  @AlcanceDelLlamante()
+  @ApiOperation({ summary: 'Enumera las copropiedades que el token alcanza, y solo esas' })
+  @ApiOkResponse({ type: AlcanceDeCopropiedadesDto })
+  async listar(@Contexto() ctx: ContextoTenant): Promise<AlcanceDeCopropiedadesDto> {
+    const copropiedades = await this.catalogo.listarParaElAlcance(ctx);
+    return {
+      copropiedades: [...copropiedades],
+      alcanceGlobal: ctx.rol === 'superadministrador',
+    };
+  }
 
   @Get(':id')
   @Roles('superadministrador', 'administrador', 'portero', 'operador_central', 'residente')

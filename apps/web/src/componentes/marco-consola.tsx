@@ -8,6 +8,7 @@ import { BarraLateral } from './barra-lateral';
 import { Cabecera } from './cabecera';
 import { ContextoDelCanal } from '@/lib/sse/contexto';
 import type { EstadoDelCanal } from '@/lib/sse/canal';
+import type { AlcanceActivo } from '@/app/(consola)/copropiedad';
 
 /**
  * Estructura visual de la consola y **dueño del estado del canal en vivo**.
@@ -20,10 +21,12 @@ import type { EstadoDelCanal } from '@/lib/sse/canal';
 export const MarcoDeConsola = ({
   sesion,
   rol,
+  alcance,
   children,
 }: {
   readonly sesion: Sesion;
   readonly rol: Rol;
+  readonly alcance: AlcanceActivo;
   readonly children: ReactNode;
 }): JSX.Element => {
   const [estado, setEstado] = useState<EstadoDelCanal>('conectando');
@@ -33,7 +36,7 @@ export const MarcoDeConsola = ({
       <div className="flex min-h-dvh">
         <BarraLateral rol={rol} className="hidden md:flex" />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Cabecera sesion={sesion} estadoDelCanal={estado} />
+          <Cabecera sesion={sesion} estadoDelCanal={estado} alcance={alcance} />
           <main id="contenido" className="flex-1 px-6 py-6">
             {children}
           </main>

@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { sesionActual } from '@/lib/sesion/servidor';
 import { EstadoSinPermiso } from '@/componentes/estados';
-import { copropiedadDeLaSesion } from '../copropiedad';
+import { alcanceActivo, motivoSinCopropiedad } from '../copropiedad';
 import { PantallaDeInformes } from './pantalla';
 
 export const metadata: Metadata = { title: 'Informes y auditoría' };
@@ -25,9 +25,10 @@ const Informes = async (): Promise<JSX.Element> => {
       <EstadoSinPermiso descripcion="Los informes y la auditoría del sistema son exclusivos de los roles administrativos." />
     );
   }
-  const copropiedadId = await copropiedadDeLaSesion();
+  const alcance = await alcanceActivo();
+  const copropiedadId = alcance.copropiedadId;
   if (copropiedadId === null) {
-    return <EstadoSinPermiso descripcion="Tu sesión no tiene ninguna copropiedad asignada." />;
+    return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
   return <PantallaDeInformes copropiedadId={copropiedadId} />;
 };
