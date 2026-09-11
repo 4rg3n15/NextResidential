@@ -63,7 +63,24 @@ export const Boton = forwardRef<HTMLButtonElement, PropiedadesDeBoton>(function 
       disabled={disabled === true || cargando}
       className={cn(
         'inline-flex items-center justify-center rounded-boton font-medium',
-        'transition-colors duration-150 motion-reduce:transition-none',
+        /**
+         * **`active:scale-[0.97]` — el botón responde a la pulsación.**
+         *
+         * Es el detalle que más separa una interfaz que «se siente» de una que
+         * solo funciona: sin él, entre pulsar y que ocurra algo no hay ninguna
+         * señal de que el sistema oyó. Con él, la confirmación es instantánea
+         * aunque la petición tarde.
+         *
+         * 0,97 y no 0,9: tiene que percibirse, no verse. Se anima `transform`
+         * y `colors` —las dos propiedades que la GPU resuelve sin recalcular
+         * disposición ni repintar—, nunca `all`.
+         *
+         * 150 ms con la curva de salida propia: por debajo de 100 no se
+         * percibe como movimiento, por encima de 200 el botón parece pastoso.
+         */
+        'transition-[transform,background-color,color,border-color] duration-150 ease-salida',
+        'active:scale-[0.97] disabled:active:scale-100',
+        'motion-reduce:transition-none motion-reduce:active:scale-100',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto focus-visible:ring-offset-2',
         'disabled:cursor-not-allowed disabled:opacity-50',
         VARIANTES[variante],

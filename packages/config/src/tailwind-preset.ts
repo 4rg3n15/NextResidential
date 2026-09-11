@@ -176,7 +176,7 @@ export const presetTailwind = {
         // `prefers-reduced-motion` se respeta en la hoja global, no aquí: una
         // animación declarada en el preset la usan tres superficies y solo una
         // sabe en qué contenedor vive.
-        entrada: 'entrada 160ms ease-out',
+        entrada: 'entrada 160ms cubic-bezier(0.23, 1, 0.32, 1)',
         latido: 'latido 2s ease-in-out infinite',
         /**
          * 120 ms: por debajo de 100 no se percibe como movimiento —aparece y
@@ -186,7 +186,28 @@ export const presetTailwind = {
          * aquí —el error más repetido en animación de interfaz— haría que
          * pareciera que el panel tarda en reaccionar a la pulsación.
          */
-        desplegar: 'desplegar 120ms ease-out',
+        desplegar: 'desplegar 120ms cubic-bezier(0.23, 1, 0.32, 1)',
+      },
+      /**
+       * Curvas de aceleración propias.
+       *
+       * Las de CSS —`ease-out`, `ease-in-out`— son deliberadamente suaves y por
+       * eso se quedan cortas: el movimiento se percibe blando, «de plantilla».
+       * Estas son las mismas curvas con más carácter, y la diferencia se nota
+       * sobre todo en los primeros milisegundos, que es cuando el usuario está
+       * mirando.
+       *
+       * `salida` para ENTRADAS —un panel que aparece, un menú que se despliega—:
+       * arranca deprisa y frena, que es como se percibe una respuesta
+       * inmediata. Nunca `ease-in` en interfaz: retrasa el movimiento justo en
+       * el instante que el usuario observa, y hace que 200 ms parezcan 400.
+       *
+       * `entradaSalida` para lo que se MUEVE en pantalla sin aparecer ni
+       * desaparecer.
+       */
+      transitionTimingFunction: {
+        salida: 'cubic-bezier(0.23, 1, 0.32, 1)',
+        entradaSalida: 'cubic-bezier(0.77, 0, 0.175, 1)',
       },
       ringWidth: { foco: '2px' },
     },

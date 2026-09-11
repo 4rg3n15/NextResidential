@@ -174,7 +174,13 @@ export const BuscadorGlobal = ({
       {mostrarPanel ? (
         <div
           className={cn(
-            'absolute left-0 top-full z-30 mt-1 w-full max-w-md overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-sm',
+            /**
+             * `origin-top`: el panel escala DESDE su disparador, no desde su
+             * propio centro. Con el origen en el centro parece que llega de
+             * otro sitio; con el origen arriba, sale del campo que lo abrió,
+             * que es lo que de verdad ocurrió.
+             */
+            'absolute left-0 top-full z-30 mt-1 w-full max-w-md origin-top overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-flotante',
             /**
              * Aparición de 120 ms con desplazamiento mínimo. `ease-out`, que es
              * la curva de una entrada: arranca y frena, en vez de acelerar
@@ -209,7 +215,7 @@ export const BuscadorGlobal = ({
                       onMouseEnter={() => setResaltado(indice)}
                       onClick={() => ir(r.destino)}
                       className={cn(
-                        'flex w-full items-baseline gap-2 px-3 py-2 text-left transition-colors duration-100 ease-out motion-reduce:transition-none',
+                        'flex w-full items-baseline gap-2 px-3 py-2 text-left transition-colors duration-100 ease-salida motion-reduce:transition-none',
                         indice === resaltado ? 'bg-lienzo' : 'bg-transparent',
                       )}
                     >
