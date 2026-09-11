@@ -49,7 +49,13 @@ mal()  { echo "   ✗ $1"; fallos=1; }
 paso "0 · borrando artefactos de compilación (así corre un checkout nuevo)"
 rm -rf packages/*/dist apps/*/dist .turbo packages/*/.turbo apps/*/.turbo
 rm -rf packages/*/coverage apps/*/coverage
-ok "dist, .turbo y coverage eliminados"
+# Los `.tsbuildinfo` viven DENTRO de `dist/` y ya se van con la línea de arriba.
+# Este barrido es por si alguno quedó fuera de sitio: un registro de compilación
+# que sobreviva al borrado de sus artefactos hace que `tsc -b` no emita nada y
+# la compilación siguiente falle con «Cannot find module». Pasó al introducir
+# las referencias de proyecto, y este paso es justo el que lo provoca.
+rm -f packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo
+ok "dist, .turbo, coverage y registros de compilación eliminados"
 
 paso "1 · entorno dentro de lo declarado"
 # La verificación depende ahora de Node y no del shell. Eso cierra la
