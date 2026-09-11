@@ -213,7 +213,7 @@ export const PantallaDeEventos = ({
                 type="date"
                 value={desde}
                 onChange={(e) => setDesde(e.target.value)}
-                className="rounded-campo border border-borde bg-white px-2 py-1.5 text-cuerpo"
+                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
               />
             </label>
             <label className="flex items-center gap-2 text-secundario">
@@ -222,7 +222,7 @@ export const PantallaDeEventos = ({
                 type="date"
                 value={hasta}
                 onChange={(e) => setHasta(e.target.value)}
-                className="rounded-campo border border-borde bg-white px-2 py-1.5 text-cuerpo"
+                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
               />
             </label>
             <label className="flex items-center gap-2 text-secundario">
@@ -230,7 +230,7 @@ export const PantallaDeEventos = ({
               <select
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value as '' | Tipo)}
-                className="rounded-campo border border-borde bg-white px-2 py-1.5 text-cuerpo"
+                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
               >
                 <option value="">Todos</option>
                 {TIPOS.map((t) => (
@@ -248,7 +248,7 @@ export const PantallaDeEventos = ({
                 onChange={(e) => setDispositivoId(e.target.value)}
                 placeholder="Identificador"
                 aria-label="Filtrar por dispositivo"
-                className="w-48 rounded-campo border border-borde bg-white px-2 py-1.5 text-cuerpo"
+                className="w-48 rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
               />
             </label>
           </>

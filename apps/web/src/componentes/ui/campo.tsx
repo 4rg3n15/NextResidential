@@ -42,7 +42,7 @@ export const Campo = forwardRef<HTMLInputElement, PropiedadesDeCampo>(function C
           aria-invalid={error !== undefined}
           aria-describedby={descritoPor === '' ? undefined : descritoPor}
           className={cn(
-            'h-11 w-full rounded-campo border bg-white px-3 text-cuerpo text-texto',
+            'h-11 w-full rounded-campo border bg-campo px-3 text-cuerpo text-texto',
             'placeholder:text-texto-apagado',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto focus-visible:ring-offset-1',
             'disabled:cursor-not-allowed disabled:bg-borde-suave',

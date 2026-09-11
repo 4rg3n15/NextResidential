@@ -123,7 +123,7 @@ export const PantallaDeInformes = ({
                 setTipo(e.target.value as TipoDeInforme);
                 setPedido(false);
               }}
-              className="rounded-campo border border-borde bg-white px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+              className="rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
             >
               {TIPOS.map((t) => (
                 <option key={t.valor} value={t.valor}>
@@ -141,7 +141,7 @@ export const PantallaDeInformes = ({
                 setDesde(e.target.value);
                 setPedido(false);
               }}
-              className="rounded-campo border border-borde bg-white px-3 py-2 text-cuerpo"
+              className="rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo"
             />
           </label>
           <label className="flex flex-col gap-1 text-secundario">
@@ -153,7 +153,7 @@ export const PantallaDeInformes = ({
                 setHasta(e.target.value);
                 setPedido(false);
               }}
-              className="rounded-campo border border-borde bg-white px-3 py-2 text-cuerpo"
+              className="rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo"
             />
           </label>
           <Boton onClick={() => setPedido(true)} cargando={consulta.isFetching && pedido}>

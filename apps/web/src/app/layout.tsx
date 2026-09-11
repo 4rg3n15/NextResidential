@@ -1,8 +1,9 @@
 import type { JSX } from 'react';
 import type { Metadata, Viewport } from 'next';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import Script from 'next/script';
 import './globals.css';
+import { GUION_DE_TEMA, NOMBRE_COOKIE, atributoDeTema, preferenciaValida } from '@/lib/tema';
 
 /**
  * Raíz de la consola.
@@ -23,7 +24,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0B0B12',
+  // Dos colores de barra del navegador, uno por esquema: con uno solo, en
+  // oscuro la barra del móvil queda de otro color que la página.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#0B0B12' },
+    { media: '(prefers-color-scheme: dark)', color: '#0F0F16' },
+  ],
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -35,9 +41,33 @@ const RootLayout = async ({ children }: { children: React.ReactNode }): Promise<
   // worker—; sin él, la CSP lo bloquea en silencio y el PWA no se instala.
   const nonce = (await headers()).get('x-nonce') ?? undefined;
 
+  /**
+   * SIN DESTELLO DE TEMA INCORRECTO.
+   *
+   * El atributo se decide **en el servidor**, con la cookie que escribe el
+   * conmutador, así que el HTML sale ya con el tema puesto y no hay una primera
+   * pintura que corregir. Con la preferencia en «sistema» —o sin cookie, que es
+   * la primera visita— no se escribe atributo ninguno y manda la consulta
+   * `@media (prefers-color-scheme: dark)` del preset, que el navegador aplica
+   * antes de pintar. Las dos vías son anteriores al primer fotograma.
+   *
+   * El guion en línea de más abajo cubre el único caso que la cookie no puede:
+   * una página servida desde la caché del service worker, cuyo HTML se generó
+   * con otra preferencia.
+   */
+  const preferenciaDeTema = preferenciaValida((await cookies()).get(NOMBRE_COOKIE)?.value);
+  const temaInicial = atributoDeTema(preferenciaDeTema);
+
   return (
-    <html lang="es">
+    <html lang="es" data-tema={temaInicial} suppressHydrationWarning>
       <body>
+        {/*
+          Primer nodo del cuerpo y síncrono: corre antes de que el analizador
+          llegue a nada que se pinte. `next/script` no sirve aquí —difiere la
+          ejecución, y diferido significa exactamente el destello que esto
+          evita—, así que va como etiqueta normal con el nonce de la CSP.
+        */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: GUION_DE_TEMA }} />
         <a href="#contenido" className="sr-only salto-al-contenido">
           Saltar al contenido
         </a>

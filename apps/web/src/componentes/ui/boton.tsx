@@ -21,8 +21,14 @@ export type TamanoDeBoton = 'sm' | 'md' | 'lg';
 const VARIANTES: Readonly<Record<VarianteDeBoton, string>> = {
   primario: 'bg-marca-boton text-white hover:bg-marca-presionado active:bg-marca-presionado',
   peligro: 'bg-peligro-boton text-white hover:bg-marca-presionado active:bg-marca-presionado',
-  exito: 'bg-exito text-white hover:bg-exito-texto active:bg-exito-texto',
-  secundario: 'bg-white text-texto border border-borde hover:bg-borde-suave',
+  // `bg-exito` (#10B981) con etiqueta blanca daba **2,537 : 1** — menos de la
+  // mitad de lo que AA exige, y llevaba nueve pantallas en el tema CLARO sin
+  // que nadie lo viera, porque ese par no estaba declarado en ninguna parte.
+  // Lo destapó declarar las parejas fondo/texto en `packages/config/temas.ts`.
+  exito: 'bg-exito-boton text-white hover:bg-exito-presionado active:bg-exito-presionado',
+  // `bg-campo` y no `bg-white`: en oscuro, un blanco literal junto a
+  // `text-texto` —que sí se aclara— produce etiqueta clara sobre fondo blanco.
+  secundario: 'bg-campo text-texto border border-borde hover:bg-borde-suave',
   fantasma: 'bg-transparent text-texto-apagado hover:bg-borde-suave hover:text-texto',
 };
 

@@ -149,8 +149,8 @@ export const InscripcionDeFactor = ({
         <div>
           <h2 className="text-seccion">Configura tu segundo factor</h2>
           <p className="mt-1 text-secundario text-texto-apagado">
-            Tu rol lo exige (RN-20). Escanea el código con tu aplicación de autenticación y
-            escribe el número que te muestre.
+            Tu rol lo exige (RN-20). Escanea el código con tu aplicación de autenticación y escribe
+            el número que te muestre.
           </p>
         </div>
 
@@ -188,6 +188,12 @@ export const InscripcionDeFactor = ({
                 de autenticación.
               </p>
             ) : (
+              /*
+                El ÚNICO blanco literal que queda en la consola, y a propósito:
+                un código QR necesita zona de silencio blanca para que el lector
+                lo resuelva. Sobre fondo oscuro, muchos lectores fallan. No es
+                un color de tema, es un requisito del formato.
+              */
               <div className="flex justify-center rounded-tarjeta border border-borde bg-white p-4">
                 {/* El QR llega ya normalizado a `data:`; `img-src` de la CSP
                     admite `data:` justamente para esto. */}

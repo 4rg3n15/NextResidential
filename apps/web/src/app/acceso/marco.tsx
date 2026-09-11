@@ -1,4 +1,5 @@
 import type { JSX, ReactNode } from 'react';
+import { ConmutadorDeTema } from '@/componentes/conmutador-tema';
 import { ShieldCheck } from 'lucide-react';
 import paquete from '../../../package.json';
 
@@ -92,7 +93,15 @@ export const MarcoDeAcceso = ({
       </div>
     </aside>
 
-    <section className="flex items-center justify-center px-6 py-12">
+    <section className="relative flex items-center justify-center px-6 py-12">
+      {/*
+        El conmutador de tema también aquí: quien entra de noche a una portería
+        no debería tener que autenticarse contra una pantalla blanca para poder
+        cambiarla después.
+      */}
+      <div className="absolute right-6 top-6">
+        <ConmutadorDeTema />
+      </div>
       <div className="w-full max-w-sm">
         <h1 className="text-titulo text-texto">{titulo}</h1>
         <p className="mt-1 text-cuerpo text-texto-apagado">{descripcion}</p>

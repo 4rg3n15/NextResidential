@@ -12,6 +12,7 @@ import type { EstadoDelCanal } from '@/lib/sse/canal';
 import type { AlcanceActivo } from '@/app/(consola)/copropiedad';
 import { SelectorDeCopropiedad } from './selector-copropiedad';
 import { BuscadorGlobal } from './buscador-global';
+import { ConmutadorDeTema } from './conmutador-tema';
 
 /**
  * Cabecera: buscador global, estado del canal en vivo y menú de usuario.
@@ -67,6 +68,8 @@ export const Cabecera = ({
       <BuscadorGlobal copropiedadId={alcance.copropiedadId} />
 
       <IndicadorDeCanal estado={estadoDelCanal} />
+
+      <ConmutadorDeTema />
 
       <div className="flex items-center gap-3">
         <div className="hidden text-right sm:block">

@@ -229,7 +229,7 @@ export const PantallaDeVisitantes = ({
           <select
             value={viviendaId}
             onChange={(e) => setViviendaId(e.target.value)}
-            className="w-full rounded-campo border border-borde bg-white px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+            className="w-full rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
           >
             <option value="">Selecciona una vivienda activa</option>
             {(viviendas.data?.viviendas ?? []).map((v) => (

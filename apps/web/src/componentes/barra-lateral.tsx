@@ -68,7 +68,11 @@ export const BarraLateral = ({
          * por el que desplazarse. Con `self-start` conserva su `h-dvh` y se
          * pega de verdad.
          */
-        'superficie-oscura sticky top-0 flex h-dvh w-lateral shrink-0 flex-col self-start bg-oscuro',
+        // El filete derecho no es decorativo: en tema claro el panel oscuro se
+        // recorta solo contra el lienzo, pero en oscuro lienzo y panel quedan a
+        // un paso de luminancia y sin él la consola pierde su estructura de
+        // planos.
+        'superficie-oscura sticky top-0 flex h-dvh w-lateral shrink-0 flex-col self-start border-r border-oscuro-borde bg-oscuro',
         className,
       )}
     >
