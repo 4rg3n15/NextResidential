@@ -438,6 +438,101 @@ describe('camino 6 · el residente y la frontera de la VIVIENDA', () => {
   });
 });
 
+describe('configuración de la copropiedad · editable, por quién, y con constancia', () => {
+  /**
+   * BLOQUE 7. La comprobación que importa no es que el formulario deshabilite
+   * el campo —eso lo salta un `curl`—, sino que el SERVIDOR lo rechace. Y la
+   * que importa después es que el cambio deje rastro: §2.7.8 exige auditoría
+   * append-only de los hechos de seguridad, y cambiar el umbral por debajo del
+   * cual una placa decide sola es uno de ellos.
+   */
+  it('el administrador lee la configuración de SU copropiedad', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const res = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.nit).toBeDefined();
+    // La API dice qué puede tocar ESTE rol: la consola no reproduce la tabla.
+    expect(res.body.editables).toContain('nombre');
+    expect(res.body.editables).not.toContain('umbralConfianzaPlaca');
+  });
+
+  it('la de OTRA copropiedad responde 404, no 403', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
+    const res = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('el administrador que intenta el umbral de placa recibe 422 con el motivo', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const res = await request(app.getHttpServer())
+      .patch(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ umbralConfianzaPlaca: 0.5 });
+    expect(res.status).toBe(422);
+    // El cuerpo es el que produce el filtro global de `main.ts`, que la suite
+    // ahora registra igual que producción: `{ estado, correlacion, mensaje }`.
+    // Antes no lo registraba, y esta misma aserción pasaba leyendo una forma
+    // que el despliegue nunca devuelve.
+    expect(res.body.mensaje.rechazos[0].clave).toBe('umbralConfianzaPlaca');
+  });
+
+  it('un ajuste que la consola NO ofrece se rechaza con 400 por el ValidationPipe', async () => {
+    // `forbidNonWhitelisted: true` global: el campo no declarado ni siquiera
+    // llega al controlador. Es la barrera de §2.7.3 haciendo su trabajo.
+    const token = await tokenDe(firmante, { rol: 'superadministrador', copropiedadId: null });
+    const res = await request(app.getHttpServer())
+      .patch(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nit: '123456789' });
+    expect(res.status).toBe(400);
+  });
+
+  it('un cambio válido se guarda y deja registro', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const res = await request(app.getHttpServer())
+      .patch(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ umbralLatidoMinutos: 9 });
+    expect(res.status).toBe(200);
+    expect(res.body.umbralLatidoMinutos).toBe(9);
+  });
+
+  it('reenviar el formulario sin tocar nada NO escribe en la auditoría', async () => {
+    // Si lo hiciera, la tabla que se consulta durante un incidente se llenaría
+    // de filas que no dicen nada.
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const antes = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`);
+    const res = await request(app.getHttpServer())
+      .patch(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: antes.body.nombre });
+    expect(res.status).toBe(200);
+  });
+
+  it('el PATCH sobre otra copropiedad responde 404 y no cambia nada', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
+    const res = await request(app.getHttpServer())
+      .patch(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Secuestrada' });
+    expect(res.status).toBe(404);
+  });
+
+  it('un portero no alcanza la configuración ni para leerla', async () => {
+    const token = await tokenDe(firmante, { rol: 'portero', copropiedadId: COP_B });
+    const res = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('CA-24 · todo acceso cruzado queda registrado', () => {
   it('deja rastro en auditoría de seguridad', async () => {
     const auditoria = app.get(AuditoriaEnMemoria);

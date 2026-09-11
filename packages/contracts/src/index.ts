@@ -38,6 +38,11 @@ export type Copropiedad = Esquemas['CopropiedadDto'];
 /** Catálogo del alcance del token (ETAPA 09-B, `GET /copropiedades`). */
 export type AlcanceDeCopropiedades = Esquemas['AlcanceDeCopropiedadesDto'];
 export type CopropiedadResumen = Esquemas['CopropiedadResumenDto'];
+export type ConfiguracionDeCopropiedad = Esquemas['ConfiguracionDeCopropiedadDto'];
+export type CambiosDeConfiguracion = Esquemas['CambiosDeConfiguracionDto'];
+export type ConfiguracionRechazada = Esquemas['ConfiguracionRechazadaDto'];
+/** Las claves que ESTE rol puede cambiar. La API las declara; la consola obedece. */
+export type ClaveDeAjuste = keyof CambiosDeConfiguracion;
 
 /* ETAPA 09-B · las siete pantallas restantes. Los alias existen para que la
  * consola no escriba `components['schemas']['…Dto']` en cada import: el tipo

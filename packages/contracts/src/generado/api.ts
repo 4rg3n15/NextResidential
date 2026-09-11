@@ -328,6 +328,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/configuracion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lee la configuración de una copropiedad del alcance */
+        get: operations["CopropiedadesController_leerConfiguracion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Cambia la configuración editable y lo anota en auditoria_seguridad */
+        patch: operations["CopropiedadesController_cambiarConfiguracion"];
+        trace?: never;
+    };
     "/copropiedades/{id}/dispositivos/pendientes": {
         parameters: {
             query?: never;
@@ -922,6 +940,18 @@ export interface components {
         BajaDto: {
             desactivado: boolean;
         };
+        CambiosDeConfiguracionDto: {
+            /** @example Urbanización Mira */
+            nombre?: string;
+            /** @example America/Bogota */
+            zonaHoraria?: string;
+            /** @example 0.85 */
+            umbralConfianzaPlaca?: number;
+            /** @enum {string} */
+            politicaContingenciaEdge?: "denegar" | "escalar_portero";
+            /** @example 5 */
+            umbralLatidoMinutos?: number;
+        };
         CapturarRostroDto: {
             /** @description El TITULAR del dato: el visitante (RN-10) */
             titularId: string;
@@ -958,6 +988,48 @@ export interface components {
             codigos: string[];
             /** @example 10 */
             cantidad: number;
+        };
+        ConfiguracionDeCopropiedadDto: {
+            /** @example Urbanización Mira */
+            nombre: string;
+            /** @example America/Bogota */
+            zonaHoraria: string;
+            /**
+             * @description Por debajo de este valor la lectura de placa NO decide sola: escala al portero (CU-01, excepción 3a). Sólo el superadministrador lo cambia.
+             * @example 0.85
+             */
+            umbralConfianzaPlaca: number;
+            /**
+             * @description Respuesta del Edge cuando la regla no está en su caché (RN-16). «denegar» es el valor conservador que impone §2.1.4.
+             * @enum {string}
+             */
+            politicaContingenciaEdge: "denegar" | "escalar_portero";
+            /** @example 5 */
+            umbralLatidoMinutos: number;
+            /** @description Solo lectura: identidad fiscal, con índice único. */
+            nit: string;
+            /** @description Solo lectura: suspender un tenant no es configurar. */
+            estado: string;
+            /**
+             * @description Solo lectura: cota legal de la Ley 1581 de 2012, no valor por defecto.
+             * @example 24
+             */
+            plazoConsentimientoHoras: number;
+            /**
+             * @description Solo lectura: sostiene el marcado de decisión con caché obsoleto (KPI-31).
+             * @example 24
+             */
+            margenCacheReglasHoras: number;
+            /** @example 3 */
+            versionReglasActual: number;
+            /** @description Ajustes que ESTE rol puede cambiar. La consola deshabilita el resto. */
+            editables: string[];
+        };
+        ConfiguracionRechazadaDto: {
+            /** @example 422 */
+            codigo: number;
+            /** @description TODOS los rechazos, no el primero: quien corrige un formulario necesita ver los cinco errores de una vez, no descubrirlos de uno en uno. */
+            rechazos: components["schemas"]["RechazoDeAjusteDto"][];
         };
         ConfigurarZonaDto: {
             nombre?: string;
@@ -1303,6 +1375,12 @@ export interface components {
             /** @description Lunes de la semana ISO, YYYY-MM-DD */
             semana: string;
             total: number;
+        };
+        RechazoDeAjusteDto: {
+            /** @example umbralConfianzaPlaca */
+            clave: string;
+            /** @example debe estar entre 0,500 y 1,000 */
+            motivo: string;
         };
         RecuperacionDeFactorDto: {
             /**
@@ -2046,6 +2124,79 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    CopropiedadesController_leerConfiguracion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionDeCopropiedadDto"];
+                };
+            };
+            /** @description Fuera del alcance del token */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    CopropiedadesController_cambiarConfiguracion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiosDeConfiguracionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionDeCopropiedadDto"];
+                };
+            };
+            /** @description Fuera del alcance del token */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description Ajuste no editable por este rol, o valor fuera de los límites de negocio */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracionRechazadaDto"];
+                };
             };
         };
     };

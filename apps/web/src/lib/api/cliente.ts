@@ -47,6 +47,12 @@ export class ErrorDeApi extends Error {
     readonly estado: number,
     mensaje: string,
     readonly correlacion?: string,
+    /**
+     * Rechazos por campo de un 422. Existe para que un formulario pueda poner
+     * cada motivo debajo de SU campo: un «no se pudo guardar» encima del
+     * formulario obliga a adivinar cuál de los cinco falló.
+     */
+    readonly porCampo?: Readonly<Record<string, string>>,
   ) {
     super(mensaje);
     this.name = 'ErrorDeApi';
@@ -58,6 +64,29 @@ interface CuerpoDeError {
   correlacion?: string;
   mensaje?: unknown;
 }
+
+/**
+ * Extrae los rechazos por campo de un 422, si los trae.
+ *
+ * Van dentro de `mensaje` porque el filtro global de la API envuelve **todo**
+ * error en `{ estado, correlacion, mensaje }` y `mensaje` es la respuesta de la
+ * excepción. Leerlos del nivel superior es el error fácil: es lo que la suite
+ * de la API devolvía antes de registrar el mismo filtro que producción.
+ */
+export const rechazosPorCampo = (cuerpo: unknown): Record<string, string> | undefined => {
+  if (typeof cuerpo !== 'object' || cuerpo === null) return undefined;
+  const mensaje = (cuerpo as CuerpoDeError).mensaje;
+  if (typeof mensaje !== 'object' || mensaje === null) return undefined;
+  const lista = (mensaje as { rechazos?: unknown }).rechazos;
+  if (!Array.isArray(lista)) return undefined;
+  const salida: Record<string, string> = {};
+  for (const entrada of lista) {
+    if (typeof entrada !== 'object' || entrada === null) continue;
+    const { clave, motivo } = entrada as { clave?: unknown; motivo?: unknown };
+    if (typeof clave === 'string' && typeof motivo === 'string') salida[clave] = motivo;
+  }
+  return Object.keys(salida).length > 0 ? salida : undefined;
+};
 
 /** Extrae un texto legible del cuerpo de error, sea cadena, arreglo u objeto. */
 export const textoDelError = (cuerpo: unknown): string => {
@@ -90,6 +119,7 @@ export const desenvolver = <T>(respuesta: {
       cuerpo.estado ?? respuesta.response.status,
       textoDelError(respuesta.error),
       cuerpo.correlacion,
+      rechazosPorCampo(respuesta.error),
     );
   }
   if (respuesta.data === undefined) {

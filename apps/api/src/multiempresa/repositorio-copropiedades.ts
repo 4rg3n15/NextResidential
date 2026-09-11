@@ -1,4 +1,6 @@
 import type { ContextoTenant } from '../autenticacion';
+import type { CambiosDeConfiguracion, ConfiguracionDeCopropiedad } from './configuracion';
+import { cambiosEfectivos } from './configuracion';
 
 /**
  * Puerto de lectura del catálogo de copropiedades.
@@ -25,6 +27,26 @@ export interface CopropiedadResumen {
 
 export interface RepositorioCopropiedades {
   listarParaElAlcance(ctx: ContextoTenant): Promise<readonly CopropiedadResumen[]>;
+
+  /** `null` si el token no alcanza esa copropiedad: la consola lo traduce a 404. */
+  leerConfiguracion(ctx: ContextoTenant, id: string): Promise<ConfiguracionDeCopropiedad | null>;
+
+  /**
+   * Guarda los cambios **y su registro de auditoría en la misma transacción**.
+   *
+   * Van juntos a propósito. Si el registro se escribiera después, una caída
+   * entre las dos operaciones dejaría un cambio de configuración sin rastro, y
+   * §2.7.8 exige que no exista esa ventana: la auditoría no es un `console.log`
+   * de cortesía, es la constancia de quién tocó qué.
+   *
+   * Devuelve la configuración ya guardada, o `null` si la copropiedad quedó
+   * fuera del alcance del token.
+   */
+  guardarConfiguracion(
+    ctx: ContextoTenant,
+    id: string,
+    cambios: CambiosDeConfiguracion,
+  ): Promise<ConfiguracionDeCopropiedad | null>;
 }
 
 /**
@@ -58,12 +80,74 @@ export const filtrarPorAlcance = (
  */
 export class RepositorioCopropiedadesEnMemoria implements RepositorioCopropiedades {
   private filas: readonly CopropiedadResumen[] = [];
+  private configuraciones = new Map<string, ConfiguracionDeCopropiedad>();
+
+  /** Lo que el doble anotó en `auditoria_seguridad`, para que la suite lo mire. */
+  readonly auditoria: {
+    copropiedadId: string;
+    usuarioId: string;
+    rol: string;
+    resumen: string;
+  }[] = [];
 
   declarar(filas: readonly CopropiedadResumen[]): void {
     this.filas = filas;
+    for (const fila of filas) {
+      if (!this.configuraciones.has(fila.id)) {
+        this.configuraciones.set(fila.id, {
+          nombre: fila.nombre,
+          zonaHoraria: fila.zonaHoraria,
+          umbralConfianzaPlaca: 0.85,
+          politicaContingenciaEdge: 'denegar',
+          umbralLatidoMinutos: 5,
+          nit: '900000000',
+          estado: 'activa',
+          plazoConsentimientoHoras: 24,
+          margenCacheReglasHoras: 24,
+          versionReglasActual: 0,
+        });
+      }
+    }
   }
 
   async listarParaElAlcance(ctx: ContextoTenant): Promise<readonly CopropiedadResumen[]> {
     return filtrarPorAlcance(ctx, this.filas);
+  }
+
+  private alcanza(ctx: ContextoTenant, id: string): boolean {
+    return filtrarPorAlcance(ctx, this.filas).some((c) => c.id === id);
+  }
+
+  async leerConfiguracion(
+    ctx: ContextoTenant,
+    id: string,
+  ): Promise<ConfiguracionDeCopropiedad | null> {
+    if (!this.alcanza(ctx, id)) return null;
+    return this.configuraciones.get(id) ?? null;
+  }
+
+  async guardarConfiguracion(
+    ctx: ContextoTenant,
+    id: string,
+    cambios: CambiosDeConfiguracion,
+  ): Promise<ConfiguracionDeCopropiedad | null> {
+    if (!this.alcanza(ctx, id)) return null;
+    const actual = this.configuraciones.get(id);
+    if (actual === undefined) return null;
+    const efectivos = cambiosEfectivos(actual, cambios);
+    const guardada: ConfiguracionDeCopropiedad = { ...actual, ...efectivos };
+    this.configuraciones.set(id, guardada);
+    this.filas = this.filas.map((f) =>
+      f.id === id ? { ...f, nombre: guardada.nombre, zonaHoraria: guardada.zonaHoraria } : f,
+    );
+    if (Object.keys(efectivos).length > 0) {
+      this.auditoria.push({
+        copropiedadId: id,
+        usuarioId: ctx.usuarioId,
+        rol: ctx.rol,
+        resumen: Object.keys(efectivos).join(','),
+      });
+    }
+    return guardada;
   }
 }
