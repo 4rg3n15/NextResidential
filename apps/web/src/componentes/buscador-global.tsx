@@ -53,8 +53,17 @@ export const BuscadorGlobal = ({
    * término casa con medio padrón y la lista deja de orientar.
    */
   const activo = consulta.trim().length >= 2 && copropiedadId !== null;
-  const viviendas = useViviendas(copropiedadId ?? '', { estado: '', busqueda: '' });
-  const vehiculos = useVehiculos(copropiedadId ?? '');
+  /**
+   * Las consultas **no salen hasta que hay algo que buscar**. Es la corrección
+   * de un defecto propio: sin la puerta, el buscador —que vive en la cabecera
+   * de todas las pantallas— disparaba dos peticiones en cada carga de la
+   * consola, y con la copropiedad todavía sin resolver la URL salía mal
+   * formada. Se veía en el recorrido del navegador como una petición fallida
+   * en cada página, sin que ninguna pantalla se rompiera: exactamente el tipo
+   * de fallo que no rompe nada y está mal.
+   */
+  const viviendas = useViviendas(copropiedadId ?? '', { estado: '', busqueda: '' }, activo);
+  const vehiculos = useVehiculos(copropiedadId ?? '', activo);
 
   const resultados = useMemo<readonly Resultado[]>(() => {
     if (!activo) return [];

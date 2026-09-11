@@ -20,7 +20,23 @@ const RAIZ = new URL('../..', import.meta.url).pathname.replace(/\/$/, '');
 const PAQUETE_PERMITIDO = join('packages', 'providers');
 
 const RAICES = ['apps', 'packages', 'supabase', 'scripts'];
-const IGNORADOS = new Set(['node_modules', 'dist', 'coverage', '.turbo', '.git', 'build']);
+/**
+ * Directorios que NO son código fuente y por tanto quedan fuera del recorrido.
+ *
+ * `.next` se añadió en la ETAPA 09-B, y el motivo importa. KPI-11 mide
+ * **referencias en el código** —así lo resolvió `03-mockups.md` M-07: «una IP
+ * leída de la base y renderizada no es una referencia en código fuente»— y
+ * `.next/` es artefacto generado, no fuente. Que estuviera dentro del recorrido
+ * era un agujero latente: el control decía medir una cosa y medía otra.
+ *
+ * Lo destapó añadir `lucide-react`. Los datos de trazado de sus iconos son
+ * secuencias de coordenadas —`2.95.6.6`, `4.5.8.8`— que la expresión de IPv4
+ * casa perfectamente. El control pasó de verde a rojo por una dependencia de
+ * iconos, sin que ninguna IP de dispositivo se hubiera acercado al repositorio.
+ * Un falso positivo así es tan dañino como un falso negativo: enseña a
+ * desactivar el control.
+ */
+const IGNORADOS = new Set(['node_modules', 'dist', 'coverage', '.turbo', '.git', 'build', '.next']);
 const EXTENSIONES = /\.(ts|tsx|js|mjs|cjs|dart|sql|sh|yml|yaml)$/;
 
 const PALABRAS = [/\bISAPI\b/i, /\bTwoWayAudio\b/i, /\bhikvision\b/i];

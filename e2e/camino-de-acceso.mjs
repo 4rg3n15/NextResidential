@@ -293,6 +293,28 @@ const principal = async () => {
   pagina.on('console', (m) => {
     if (m.type() === 'error') errores.push(m.text());
   });
+  /**
+   * QUÉ recurso falló, no solo que algo falló.
+   *
+   * «Failed to load resource: net::ERR_SSL_PROTOCOL_ERROR» es exactamente el
+   * tipo de aviso que no se puede diagnosticar: dice el error y calla la URL,
+   * así que hay que adivinar cuál de las cincuenta peticiones de la página lo
+   * produjo. Con esto, el mensaje trae el recurso y el motivo.
+   */
+  pagina.on('requestfailed', (p) => {
+    const motivo = p.failure()?.errorText ?? 'sin motivo';
+    /**
+     * `ERR_ABORTED` sobre una precarga RSC **no es un fallo**: es el navegador
+     * cancelando una petición en vuelo porque el usuario ya navegó a otro
+     * sitio. Contarla como error haría que este control fallara cada vez que
+     * alguien pulsa dos enlaces seguidos, y un control que falla por lo normal
+     * acaba desactivado — que es peor que no tenerlo.
+     *
+     * Lo que sí se cuenta es cualquier otro fallo de red, con su URL.
+     */
+    if (motivo === 'net::ERR_ABORTED' && p.url().includes('_rsc=')) return;
+    errores.push(`petición fallida · ${p.url()} · ${motivo}`);
+  });
   /** Respuestas del propio origen que no son 2xx: el rastro que faltaba. */
   const respuestasMalas = [];
   const trazas = [];
