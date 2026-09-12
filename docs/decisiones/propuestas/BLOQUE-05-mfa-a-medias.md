@@ -42,7 +42,21 @@ persiguiendo: el hueco no está en lo que falla, está en lo que nadie recorrió
 
 ## 3. Propuesta
 
-### 3.1 Barrido de factores sin verificar — la pieza principal
+> **CORRECCIÓN del 2026-09-12.** §3.1 describía como trabajo pendiente algo que
+> **ya estaba construido**: `retirarNoVerificados`, en
+> `apps/web/src/lib/sesion/supabase-auth.ts`, barre los factores sin verificar
+> antes de crear el nuevo, y lo hace desde una ronda anterior. Lo comprobé sobre
+> el código después de escribir esto, no antes, y la propuesta llegó con media
+> jornada facturada de más.
+>
+> Lo que sí faltaba —y ya está— es **una prueba que lo observe**: nadie había
+> visto el `DELETE` emitirse, así que el control existía sin estar demostrado.
+> Se añadió con su mutación, y con la mitad que impide que el arreglo se
+> convierta en el agujero: que el barrido **no** alcance a un factor verificado.
+> Si lo alcanzara, cualquiera podría quitarse el segundo factor abriendo la
+> pantalla de inscripción, y eso es exactamente lo que RN-20 impide.
+
+### 3.1 Barrido de factores sin verificar — ~~la pieza principal~~ **ya construido**
 
 Al empezar una inscripción, la API **retira los factores `unverified` del usuario**
 antes de crear el nuevo. Un factor sin verificar no protege nada y no tiene por

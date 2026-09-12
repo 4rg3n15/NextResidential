@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
-import { CONFIGURACION } from '../configuracion/configuracion.module';
-import type { Configuracion } from '../configuracion/esquema';
 import { REPOSITORIO_PADRON } from './aplicacion/puertos';
 import { RepositorioPadronPg } from './infraestructura/repositorio-pg';
 import { PadronController } from './presentacion/padron.controller';
@@ -25,12 +23,6 @@ export class PadronModule {
       module: PadronModule,
       controllers: [PadronController, PadronDeCopropiedadController],
       providers: [
-        {
-          provide: Pool,
-          inject: [CONFIGURACION],
-          useFactory: (c: Configuracion) =>
-            new Pool({ connectionString: c.DATABASE_POOLER_URL, max: 20 }),
-        },
         {
           provide: REPOSITORIO_PADRON,
           inject: [Pool],

@@ -49,12 +49,15 @@ export interface OpcionesCsp {
  *
  * **El defecto que esto corrige, reproducido y medido.** La directiva se emitía
  * cuando `NODE_ENV === 'production'`, sin mirar cómo se había alcanzado la
- * página. Entrando a la consola compilada por la IP de red —`http://192.0.2.2:3100`—
- * el navegador reescribía **todos** los subrecursos a `https://` contra un
- * servidor que no habla TLS:
+ * página. Entrando a la consola compilada por la IP de red del equipo —la que
+ * Next imprime como «Network»— el navegador reescribía **todos** los
+ * subrecursos a `https://` contra un servidor que no habla TLS:
  *
- *   https://192.0.2.2:3100/_next/static/css/30f39a…css → net::ERR_CONNECTION_RESET
+ *   https://<ip-de-red>:3100/_next/static/css/30f39a…css → net::ERR_CONNECTION_RESET
  *   …y las ocho piezas de JavaScript, igual.
+ *
+ * (Sin escribir la dirección: KPI-11 prohíbe una IP literal fuera de
+ * `packages/providers`, y tiene razón — la encontró en este mismo comentario.)
  *
  * Resultado: el HTML llega, la hoja de estilos no, y la consola sale en texto
  * plano. Por `localhost` funcionaba porque el navegador considera el bucle

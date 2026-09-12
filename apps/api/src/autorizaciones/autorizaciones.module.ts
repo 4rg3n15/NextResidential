@@ -3,14 +3,17 @@ import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
 import { GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { GeneradorDeId, Reloj } from '@ncr/domain-core';
-import { CONFIGURACION } from '../configuracion/configuracion.module';
-import type { Configuracion } from '../configuracion/esquema';
 import { IngestaController } from './presentacion/ingesta.controller';
 import { GuardiaDeFirmaDeIngesta } from './presentacion/guardia-firma';
 import { AutorizacionesController } from './presentacion/autorizaciones.controller';
-import { CONSULTA_AUTORIZACIONES, REPOSITORIO_AUTORIZACIONES } from './aplicacion/puertos';
+import {
+  CONSULTA_AUTORIZACIONES,
+  REPOSITORIO_AUTORIZACIONES,
+  REPOSITORIO_LISTA_NEGRA,
+} from './aplicacion/puertos';
 import type { RepositorioAutorizaciones } from './aplicacion/puertos';
 import { RepositorioAutorizacionesPg } from './infraestructura/repositorio-autorizaciones-pg';
+import { RepositorioListaNegraPg } from './infraestructura/repositorio-lista-negra-pg';
 import {
   AgregarAcompanante,
   CrearAutorizacion,
@@ -40,18 +43,25 @@ export class AutorizacionesModule {
       providers: [
         GuardiaDeFirmaDeIngesta,
         {
-          provide: Pool,
-          inject: [CONFIGURACION],
-          useFactory: (c: Configuracion) =>
-            new Pool({ connectionString: c.DATABASE_POOLER_URL, max: 10 }),
-        },
-        {
           provide: RepositorioAutorizacionesPg,
           inject: [Pool],
           useFactory: (pool: Pool) => new RepositorioAutorizacionesPg(pool),
         },
         { provide: REPOSITORIO_AUTORIZACIONES, useExisting: RepositorioAutorizacionesPg },
         { provide: CONSULTA_AUTORIZACIONES, useExisting: RepositorioAutorizacionesPg },
+        /**
+         * ETAPA 09-B · el puerto llevaba desde la 05 declarado y **sin nadie
+         * detrás**: los casos de uso existían, nadie podía invocarlos, y el
+         * motor recibía la lista negra vacía. RN-06 le da precedencia absoluta
+         * sobre cualquier autorización vigente, así que un puerto sin adaptador
+         * no era una funcionalidad pendiente: era la regla de mayor prioridad
+         * del sistema leyendo de la nada.
+         */
+        {
+          provide: REPOSITORIO_LISTA_NEGRA,
+          inject: [Pool],
+          useFactory: (pool: Pool) => new RepositorioListaNegraPg(pool),
+        },
         {
           provide: CrearAutorizacion,
           inject: [REPOSITORIO_AUTORIZACIONES, RELOJ, GENERADOR_DE_ID],
@@ -71,7 +81,7 @@ export class AutorizacionesModule {
             new AgregarAcompanante(repo, reloj),
         },
       ],
-      exports: [REPOSITORIO_AUTORIZACIONES, CONSULTA_AUTORIZACIONES],
+      exports: [REPOSITORIO_AUTORIZACIONES, CONSULTA_AUTORIZACIONES, REPOSITORIO_LISTA_NEGRA],
     };
   }
 }

@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-12 · **ETAPA 09-B construida** · bloques 6-8 construidos; 4, 5 y 9 entregados como propuesta escrita
+**Última actualización:** 2026-09-12 · **ETAPA 09 CERRADA** · verificada con `--con-base`, 19 de 19 pasos
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -20,7 +20,7 @@
 
 |                                |                                                                                                                 |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **8 de 17** (ETAPAS 00 a 08) · la **09: 09-A y 09-B construidas**                                               |
+| **Etapas cerradas**            | **9 de 17** (ETAPAS 00 a 09) · la 09 cerrada el 2026-09-12 con `--con-base`, 19 de 19 pasos                     |
 | **Etapa siguiente habilitada** | **ETAPA 10 — consolas operativas** (la 12 sigue habilitada)                                                     |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
 | **Defectos abiertos**          | Ninguno. D-60 a D-63 corregidos en la ronda del 2026-09-10                                                      |
@@ -253,6 +253,79 @@ en memoria del proceso: al reiniciar, el portero ve un evento con la imagen rota
 y una lista negra vacía. Son **3 jornadas** —`AlmacenEvidenciaSupabase` con
 validación de tipo real, y el adaptador PostgreSQL de autorizaciones y listas
 negras (D-25)— y conviene hacerlas antes de abrir la etapa, no dentro.
+
+### CIERRE DE LA ETAPA 09 · 2026-09-12
+
+**La etapa queda CERRADA.** Verificación de §2.8.0 ejecutada con base de datos:
+`./scripts/verificar-etapa.sh --con-base` → **`VERIFICACIÓN DE ETAPA: correcta`**,
+**19 de 19 pasos**, 1.266 pruebas en 97 ficheros, tres corridas idénticas.
+Dominio 97,75 % · aplicación 97,42 % · global 71,63 %. KPI-03, RN-03/CA-23 y
+RN-14/CA-14 ejercidos contra PostgreSQL real, no omitidos.
+
+#### Lo último que se construyó
+
+| Asunto                                                                          | Estado                                                                                                                          |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **D-67** · la consola sin estilos por cualquier origen que no fuera `localhost` | **Corregido** · `upgrade-insecure-requests` depende del esquema de la petición, no del modo de compilación                      |
+| Paso **3.bis** del recorrido del navegador                                      | **Nuevo** · mide reglas CSS aplicadas y color de fondo real, **también por una IP de red**                                      |
+| **`AlmacenEvidenciaSupabase`**                                                  | **Construido** · elegido por configuración; con `EVIDENCIA_BUCKET` ausente, el arranque avisa de que la evidencia es de memoria |
+| **`RepositorioListaNegraPg`**                                                   | **Construido** · el puerto llevaba desde la ETAPA 05 declarado y **sin nadie detrás**                                           |
+| **D-66** · un solo `Pool`                                                       | **Corregido** · `PoolModule` global, tope único configurable, y control que rompe el build si alguien abre otro                 |
+| Barrido de factores `unverified`                                                | **Ya estaba construido**; lo que faltaba era **verlo** — ver la corrección de abajo                                             |
+
+#### Correcciones a lo que dije antes
+
+1. **El barrido de factores `unverified` ya existía.** La propuesta del bloque 5
+   lo presentaba como trabajo pendiente de media jornada: es falso, `retirarNoVerificados`
+   está en `supabase-auth.ts` desde una ronda anterior. Lo que **no** existía era
+   una prueba que lo observara: nadie había visto el `DELETE` emitirse. Ya la hay,
+   con su mutación, y con la mitad que impide que el arreglo se vuelva el agujero
+   —que el barrido **no** alcance a un factor verificado, porque si lo alcanzara
+   cualquiera podría quitarse el segundo factor abriendo la pantalla de inscripción—.
+2. **Las listas negras no estaban «en memoria».** Estaban peor: el puerto
+   declarado, los casos de uso escritos y **ningún adaptador ni proveedor**. El
+   motor recibía conjuntos vacíos, así que RN-06 —precedencia absoluta— no tenía
+   de dónde leer.
+3. **Las autorizaciones sí estaban persistidas** desde la 09-B (`RepositorioAutorizacionesPg`).
+   D-25 era menor de lo que dije.
+4. **El `ERR_SSL_PROTOCOL_ERROR` de hace dos bloques era D-67**, no el buscador
+   global. Desactivé las consultas y el síntoma desapareció; la causa siguió ahí.
+
+---
+
+### Lo que queda ABIERTO al cerrar la ETAPA 09
+
+Sin adornos, con dueño y peso.
+
+| Id                                | Asunto                                                                                                                                                                                                                                                                                                                                    | Etapa                 | Peso   |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------ |
+| **BE-01**                         | **SMTP.** No hay proveedor de correo. El arranque verifica la mitad nuestra —la URL de redirección— y **declara que no puede ver** el SMTP ni la plantilla, que viven en el panel. El bloque 4 lo resuelve por el otro lado: con restablecimiento por TOTP, el SMTP deja de ser requisito operativo                                       | Bloque 4              | 3 j    |
+| **Sesiones por rol**              | Supabase tiene **una** política de sesión por proyecto; las duraciones por rol y la cota absoluta se construyen en nuestra capa. Aprobado el diseño, no construido                                                                                                                                                                        | Bloque 4              | 1,5 j  |
+| **WebAuthn**                      | **Diferido a la ETAPA 14**, aprobado. No eleva el `aal2` de Supabase, así que no satisface RN-20: es comodidad, no factor                                                                                                                                                                                                                 | ETAPA 14              | 4,5 j  |
+| **«Retomar sesión»**              | Diseñado con doble cota —vida del dispositivo y techo absoluto que no se renueva—, cookie `httpOnly`. No construido                                                                                                                                                                                                                       | Bloque 4              | 1,5 j  |
+| **FCM**                           | El `NotificadorPush` cableado **anota en la bitácora y no envía**. Deliberado: la ETAPA 11 es dueña del registro de tokens del dispositivo. Cuando llegue, pasa a ser el quinto recurso comprobado al arrancar                                                                                                                            | ETAPA 11              | —      |
+| **Realtime frente al SSE propio** | **No es deuda: es una decisión tomada y medida.** No se usa Supabase Realtime; el canal es SSE propio de la API, detrás del mismo puerto que un adaptador de Realtime cumpliría. RN-18 exige escalar en menos de 10 s y eso no puede depender de un servicio externo. Medido: 200 de 200 alertas, p99 de 65 ms contra un umbral de 10 000 | —                     | —      |
+| **Seis variables sin validar**    | `PGBOSS_SCHEMA`, `DEVICE_VAULT_*`, `LOG_LEVEL`, `SENTRY_DSN`, `BIOMETRIC_KEY_REF`, `BIOMETRIC_ALGORITHM` están en `.env.example` y Zod **no** las valida. No es un fallo activo —no se leen— pero `pnpm entorno:diff` se las exige al cliente sin que sirvan. Dueños: `SENTRY_DSN` y `LOG_LEVEL` → ETAPA 14; `DEVICE_VAULT_*` → ETAPA 15  | ETAPA 14              | 0,25 j |
+| **Flujo biométrico**              | De las cinco piezas, la 1 (`AlmacenEvidenciaSupabase`) y la 4 (tipo real por contenido) **quedan construidas**. Siguen abiertas: repositorios PostgreSQL de consentimientos y plantillas (**D-39**, ETAPA 11, 1,5 j), captura en Flutter (ETAPA 11, 3 j) y sincronización con terminal facial (ETAPA 15)                                  | 11 y 15               | —      |
+| **D-58**                          | El evento no distingue residente de visitante; el informe lo dice en vez de fingir el filtro. Requiere columna nueva en `eventos`, que es append-only y particionada                                                                                                                                                                      | Por decidir           | 1 j    |
+| **D-42**                          | Menores y representante legal: no existe en el esquema. Decisión de Grupo Control                                                                                                                                                                                                                                                         | Pendiente del cliente | —      |
+| **`factoresDe` sin uso**          | Función exportada que nadie llama. Residuo de la ronda de MFA; se retira o se usa en el contador de códigos                                                                                                                                                                                                                               | Bloque 4              | 0,1 j  |
+
+#### Lo que pesa menos de una jornada y cierra un requisito
+
+Preguntó cuál del subconjunto mínimo entra ahora. La respuesta es **una sola
+pieza**, y no es la que yo había puesto primero:
+
+**Superficie de los códigos de recuperación en la consola — 0,5 jornadas.**
+El endpoint que los regenera **ya existe** (`POST /auth/mfa/codigos`, que
+reemplaza los diez). Lo que no existe es dónde pulsarlo ni dónde ver cuántos
+quedan. Hoy, quien gasta los diez se queda sin la salida documentada de RN-20 y
+CA-25 y depende del panel de Supabase — que es exactamente el agujero operativo
+que usted quiere cerrar. Media jornada de consola sobre API ya construida,
+cierra la condición 4 del bloque 4, y de paso da uso a `factoresDe`.
+
+El resto del bloque 4 no baja de 1,5 jornadas por pieza y no cabe en el
+criterio que puso.
 
 ### Lo que usted debe ejecutar tras los bloques 6-8
 

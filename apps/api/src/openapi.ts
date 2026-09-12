@@ -9,6 +9,7 @@ import type { Configuracion } from './configuracion/esquema';
 const configuracionParaContrato: Configuracion = {
   NODE_ENV: 'development',
   PORT: 3000,
+  PG_POOL_MAX: 20,
   SUPABASE_URL: 'https://generacion-de-contrato.invalid',
   SUPABASE_PUBLISHABLE_KEY: 'no-aplica',
   SUPABASE_SECRET_KEY: 'no-aplica',

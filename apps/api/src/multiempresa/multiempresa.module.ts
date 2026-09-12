@@ -1,7 +1,5 @@
 import { Global, Module } from '@nestjs/common';
 import { Pool } from 'pg';
-import { CONFIGURACION } from '../configuracion/configuracion.module';
-import type { Configuracion } from '../configuracion/esquema';
 import { Aislamiento } from './aislamiento';
 import { CopropiedadesController } from './copropiedades.controller';
 import { REPOSITORIO_COPROPIEDADES } from './repositorio-copropiedades';
@@ -29,12 +27,6 @@ import { RepositorioCopropiedadesPg } from './repositorio-copropiedades-pg';
      * bloque que desbloquea al superadministrador, mezclaría dos cambios que
      * fallan por motivos distintos.
      */
-    {
-      provide: Pool,
-      inject: [CONFIGURACION],
-      useFactory: (c: Configuracion) =>
-        new Pool({ connectionString: c.DATABASE_POOLER_URL, max: 5 }),
-    },
     {
       provide: REPOSITORIO_COPROPIEDADES,
       inject: [Pool],
