@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { construirCsp, generarNonce } from './middleware-csp';
+import { construirCsp, generarNonce, peticionLlegoPorHttps } from './middleware-csp';
 
 /**
  * Nonce por petición y cabeceras de seguridad (§2.7.7).
@@ -19,6 +19,16 @@ export const middleware = (peticion: NextRequest): NextResponse => {
     desarrollo: process.env.NODE_ENV !== 'production',
     origenApi: process.env.API_URL,
     origenVideo: process.env.PUENTE_VIDEO_URL,
+    /**
+     * Del esquema de ESTA petición, no del modo de compilación. Con el proxy
+     * delante, el esquema real lo dice `x-forwarded-proto`: `nextUrl.protocol`
+     * vería el `http` del salto interno y quitaría la directiva en un
+     * despliegue que sí es HTTPS.
+     */
+    peticionSegura: peticionLlegoPorHttps(
+      peticion.headers.get('x-forwarded-proto'),
+      peticion.nextUrl.protocol,
+    ),
   });
 
   const cabeceras = new Headers(peticion.headers);

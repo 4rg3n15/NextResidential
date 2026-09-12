@@ -34,13 +34,52 @@ export interface OpcionesCsp {
   readonly origenApi?: string | undefined;
   /** Puente de vídeo de la ETAPA 10; vacío mientras no exista. */
   readonly origenVideo?: string | undefined;
+  /**
+   * Si **esta petición** llegó por HTTPS. No es lo mismo que «estamos en
+   * producción»: decide `upgrade-insecure-requests`, y esa directiva depende
+   * del esquema por el que se sirvió la página, no del modo de compilación.
+   * Ver el bloque de abajo.
+   */
+  readonly peticionSegura: boolean;
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * `upgrade-insecure-requests` DEPENDE DE LA PETICIÓN, NO DE LA COMPILACIÓN
+ *
+ * **El defecto que esto corrige, reproducido y medido.** La directiva se emitía
+ * cuando `NODE_ENV === 'production'`, sin mirar cómo se había alcanzado la
+ * página. Entrando a la consola compilada por la IP de red —`http://192.0.2.2:3100`—
+ * el navegador reescribía **todos** los subrecursos a `https://` contra un
+ * servidor que no habla TLS:
+ *
+ *   https://192.0.2.2:3100/_next/static/css/30f39a…css → net::ERR_CONNECTION_RESET
+ *   …y las ocho piezas de JavaScript, igual.
+ *
+ * Resultado: el HTML llega, la hoja de estilos no, y la consola sale en texto
+ * plano. Por `localhost` funcionaba porque el navegador considera el bucle
+ * local un origen «potencialmente seguro» y **se salta la subida de esquema**.
+ * De ahí que dependiera del origen, y de ahí que ninguna prueba lo viera: el
+ * recorrido del navegador corre sobre `127.0.0.1`, que es el caso exento.
+ *
+ * **Por qué quitarla en HTTP no debilita nada.** La directiva existe para que
+ * una página servida por HTTPS no pida subrecursos por HTTP. En una página
+ * servida por HTTP no hay nada de eso que proteger: el documento ya viajó en
+ * claro. Lo que sí protege el origen es **HSTS**, que `next.config.mjs` emite
+ * sin condición.
+ *
+ * **Sobre fiarse de `x-forwarded-proto`.** Sólo puede AÑADIR la directiva. Un
+ * valor falsificado provoca más subidas de esquema, nunca menos protección; y
+ * quien puede quitar la cabecera está en medio del canal, donde la defensa es
+ * HSTS y no una directiva de la respuesta.
+ */
 
 export const construirCsp = ({
   nonce,
   desarrollo,
   origenApi,
   origenVideo,
+  peticionSegura,
 }: OpcionesCsp): string => {
   const conexiones = ["'self'", origenApi, origenVideo].filter(
     (o): o is string => typeof o === 'string' && o.length > 0,
@@ -94,8 +133,26 @@ export const construirCsp = ({
     ['form-action', "'self'"],
     ['worker-src', "'self'"],
     ['manifest-src', "'self'"],
-    ...(desarrollo ? [] : [['upgrade-insecure-requests']]),
+    ...(!desarrollo && peticionSegura ? [['upgrade-insecure-requests']] : []),
   ];
 
   return directivas.map((d) => d.join(' ')).join('; ');
+};
+
+/**
+ * Esquema real de la petición.
+ *
+ * `x-forwarded-proto` manda cuando existe, porque detrás de un proxy el salto
+ * interno es HTTP y `nextUrl.protocol` diría `http:` en un despliegue que sí es
+ * HTTPS — quitando la directiva justo donde hace falta. Puede traer una lista
+ * (`https, http`) cuando hay proxies encadenados: el primero es el del cliente.
+ */
+export const peticionLlegoPorHttps = (
+  reenviado: string | null | undefined,
+  protocoloDeLaUrl: string,
+): boolean => {
+  if (typeof reenviado === 'string' && reenviado.trim() !== '') {
+    return reenviado.split(',')[0]?.trim().toLowerCase() === 'https';
+  }
+  return protocoloDeLaUrl.toLowerCase().startsWith('https');
 };

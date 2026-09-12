@@ -27,6 +27,7 @@ import { existsSync, writeFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
+import { networkInterfaces } from 'node:os';
 import { createRequire } from 'node:module';
 import { chromium } from 'playwright';
 import { authenticator } from 'otplib';
@@ -251,7 +252,12 @@ const principal = async () => {
     });
     b.on('exit', (c) => (c === 0 ? listo() : falla(new Error('build de la consola'))));
   });
-  lanzar('node', [binDeNext, 'start', '-p', String(puertoWeb)], {
+  /**
+   * `-H 0.0.0.0`: el servidor tiene que ser alcanzable **también por la IP de
+   * red**, no sólo por el bucle local. Sin eso, el paso 3.bis no puede existir,
+   * y ese paso es el que encontró D-67.
+   */
+  lanzar('node', [binDeNext, 'start', '-H', '0.0.0.0', '-p', String(puertoWeb)], {
     cwd: resolve(raiz, 'apps/web'),
     env: entornoWeb,
     detached: true,
@@ -428,6 +434,90 @@ const principal = async () => {
     !/volver a intentarlo|no se pudo|sin conexión/i.test(texto),
     'el tablero renderiza sin estado de error',
   );
+
+  // ── Los ESTILOS, y por un origen que no sea el bucle local ───────────────
+  paso('3.bis · la consola se ve, y por cualquier origen (D-67)');
+  /**
+   * EL INTERVALO QUE ESTE PASO CIERRA.
+   *
+   * Hasta aquí, el recorrido comprobaba que la página **responde**. El HTML
+   * llegaba, las aserciones pasaban, y la pantalla podía estar en texto plano:
+   * `upgrade-insecure-requests` reescribía CSS y JavaScript a `https://` contra
+   * un servidor que no habla TLS, y todo subrecurso moría con
+   * `ERR_CONNECTION_RESET`.
+   *
+   * **Y no se veía desde `127.0.0.1`**, porque el navegador considera el bucle
+   * local un origen «potencialmente seguro» y se salta la subida de esquema.
+   * Es decir: el único origen que la prueba visitaba era justo el exento. De
+   * ahí que este paso tenga que visitar una IP de red de verdad.
+   *
+   * Se comprueba lo que se ve, no lo que se sirve: número de reglas CSS
+   * aplicadas y el color de fondo real del `body`, que tiene que ser el token
+   * `lienzo` del preset. Una hoja que se descarga y no aplica daría 0 reglas.
+   */
+  const LIENZO_CLARO = 'rgb(248, 249, 250)';
+
+  const ipDeRed = Object.values(networkInterfaces())
+    .flat()
+    .find((i) => i !== undefined && i.family === 'IPv4' && !i.internal)?.address;
+
+  const medirEstilos = async (destino) => {
+    const ctx = await navegador.newContext({ viewport: { width: 1280, height: 900 } });
+    const p2 = await ctx.newPage();
+    const subrecursosCaidos = [];
+    p2.on('requestfailed', (r) => {
+      const motivo = r.failure()?.errorText ?? 'sin motivo';
+      if (motivo === 'net::ERR_ABORTED' && r.url().includes('_rsc=')) return;
+      subrecursosCaidos.push(`${r.url()} · ${motivo}`);
+    });
+    await p2
+      .goto(`${destino}/acceso`, { waitUntil: 'load', timeout: 30_000 })
+      .catch(() => undefined);
+    const medido = await p2
+      .evaluate(() => ({
+        reglas: [...document.styleSheets].reduce((n, h) => {
+          try {
+            return n + h.cssRules.length;
+          } catch {
+            return n;
+          }
+        }, 0),
+        fondo: getComputedStyle(document.body).backgroundColor,
+      }))
+      .catch(() => ({ reglas: 0, fondo: 'no evaluable' }));
+    await ctx.close();
+    return { ...medido, subrecursosCaidos };
+  };
+
+  for (const [etiqueta, destino] of [
+    ['bucle local', base],
+    ...(ipDeRed === undefined ? [] : [['IP de red', `http://${ipDeRed}:${puertoWeb}`]]),
+  ]) {
+    const m = await medirEstilos(destino);
+    afirmar(
+      m.reglas > 0,
+      `por ${etiqueta} la hoja de estilos se aplica (${String(m.reglas)} reglas)`,
+    );
+    afirmar(
+      m.fondo === LIENZO_CLARO,
+      `por ${etiqueta} el fondo es el token lienzo y no el del navegador (${m.fondo})`,
+    );
+    afirmar(
+      m.subrecursosCaidos.length === 0,
+      `por ${etiqueta} ningún subrecurso se cae${m.subrecursosCaidos.length === 0 ? '' : `: ${m.subrecursosCaidos.slice(0, 3).join(' | ')}`}`,
+    );
+  }
+
+  if (ipDeRed === undefined) {
+    /**
+     * Sin IP de red no hay verde silencioso: se dice que la mitad que importa
+     * no se ejerció. Un paso que se salta sin avisar es exactamente el patrón
+     * que dejó vivir a D-67.
+     */
+    mal('no hay ninguna IPv4 no interna: la mitad de este paso NO se ejerció');
+  } else {
+    ok(`ejercido también por ${ipDeRed}, que es el origen donde falla si la CSP se ata al proceso`);
+  }
 
   // ── La vuelta: volver a entrar NO debe pedir inscribir otra vez ──────────
   paso('4 · segunda entrada: con el factor ya verificado');

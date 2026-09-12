@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { construirCsp, generarNonce } from './middleware-csp';
+import { construirCsp, peticionLlegoPorHttps, generarNonce } from './middleware-csp';
 
 /**
  * La CSP es una cadena, y una cadena mal formada no da error: simplemente deja
@@ -13,7 +13,7 @@ const directiva = (politica: string, nombre: string): string | undefined =>
     ?.slice(nombre.length)
     .trim();
 
-const PRODUCCION = { nonce: 'abc123', desarrollo: false } as const;
+const PRODUCCION = { nonce: 'abc123', desarrollo: false, peticionSegura: true } as const;
 
 describe('generarNonce', () => {
   it('produce un valor distinto en cada llamada', () => {
@@ -86,15 +86,15 @@ describe('construirCsp en producción', () => {
 
 describe('construirCsp en desarrollo', () => {
   it('admite unsafe-eval, que Next necesita para el refresco en caliente', () => {
-    expect(directiva(csp({ nonce: 'x', desarrollo: true }), 'script-src')).toContain(
-      "'unsafe-eval'",
-    );
+    expect(
+      directiva(csp({ nonce: 'x', desarrollo: true, peticionSegura: false }), 'script-src'),
+    ).toContain("'unsafe-eval'");
   });
 
   it('pero sigue sin admitir unsafe-inline', () => {
-    expect(directiva(csp({ nonce: 'x', desarrollo: true }), 'script-src')).not.toContain(
-      'unsafe-inline',
-    );
+    expect(
+      directiva(csp({ nonce: 'x', desarrollo: true, peticionSegura: false }), 'script-src'),
+    ).not.toContain('unsafe-inline');
   });
 
   it('la excepción NO se cuela en producción', () => {
@@ -109,7 +109,7 @@ describe('construirCsp en desarrollo', () => {
  */
 describe('style-src: lo que se relaja y lo que no', () => {
   it('en producción NO hay unsafe-inline en ninguna directiva de estilo', () => {
-    const csp = construirCsp({ nonce: 'n', desarrollo: false });
+    const csp = construirCsp({ nonce: 'n', desarrollo: false, peticionSegura: true });
     expect(csp).not.toContain('unsafe-inline');
     expect(csp).not.toContain('style-src-elem');
   });
@@ -118,7 +118,7 @@ describe('style-src: lo que se relaja y lo que no', () => {
     // `next dev` inyecta el CSS con el cargador de webpack, que crea etiquetas
     // <style> sin conocer nuestro nonce. Es un fallo de la herramienta, no del
     // producto: la consola compilada no produce ninguna.
-    const csp = construirCsp({ nonce: 'n', desarrollo: true });
+    const csp = construirCsp({ nonce: 'n', desarrollo: true, peticionSegura: false });
     expect(csp).toContain("style-src-elem 'self' 'nonce-n' 'unsafe-inline'");
   });
 
@@ -130,8 +130,69 @@ describe('style-src: lo que se relaja y lo que no', () => {
      * `style="height:37%"` y salían a cero en producción: relajar `style-src`
      * entero habría apagado justo el control que encontró el defecto.
      */
-    const csp = construirCsp({ nonce: 'n', desarrollo: true });
+    const csp = construirCsp({ nonce: 'n', desarrollo: true, peticionSegura: false });
     expect(csp).not.toContain('style-src-attr');
     expect(csp).toContain("style-src 'self' 'nonce-n';");
+  });
+});
+
+/**
+ * D-67 · LA DIRECTIVA QUE ROMPÍA LA CONSOLA POR IP DE RED
+ *
+ * `upgrade-insecure-requests` se emitía por `NODE_ENV === 'production'`, sin
+ * mirar cómo se había alcanzado la página. Entrando por la IP de red a la
+ * consola compilada, el navegador reescribía CSS y JavaScript a `https://`
+ * contra un servidor que no habla TLS, y la consola salía en texto plano.
+ *
+ * Por `localhost` no pasaba —el bucle local es «potencialmente seguro» y el
+ * navegador se salta la subida— y por eso ninguna prueba lo veía: el recorrido
+ * del navegador corre sobre `127.0.0.1`, que es justo el caso exento.
+ */
+describe('D-67 · upgrade-insecure-requests depende de la PETICIÓN', () => {
+  it('en producción por HTTPS, se emite', () => {
+    expect(csp({ nonce: 'n', desarrollo: false, peticionSegura: true })).toContain(
+      'upgrade-insecure-requests',
+    );
+  });
+
+  it('en producción por HTTP, NO se emite: rompería todos los subrecursos', () => {
+    expect(csp({ nonce: 'n', desarrollo: false, peticionSegura: false })).not.toContain(
+      'upgrade-insecure-requests',
+    );
+  });
+
+  it('quitarla no relaja NINGUNA otra directiva', () => {
+    // La mitad que importa de este arreglo: lo único que cambia entre servir
+    // por HTTP y por HTTPS es esa directiva. Si alguien «arreglara» el fallo
+    // aflojando `style-src`, esto se pondría rojo.
+    const seguro = csp({ nonce: 'n', desarrollo: false, peticionSegura: true });
+    const inseguro = csp({ nonce: 'n', desarrollo: false, peticionSegura: false });
+    expect(`${inseguro}; upgrade-insecure-requests`).toBe(seguro);
+  });
+
+  it('nunca en desarrollo, sea cual sea el esquema', () => {
+    expect(csp({ nonce: 'n', desarrollo: true, peticionSegura: true })).not.toContain(
+      'upgrade-insecure-requests',
+    );
+  });
+});
+
+describe('esquema real de la petición', () => {
+  it('detrás de un proxy manda `x-forwarded-proto`', () => {
+    // Sin esto, el salto interno del proxy es HTTP y la directiva desaparecería
+    // en un despliegue que SÍ es HTTPS: el arreglo se comería su propio motivo.
+    expect(peticionLlegoPorHttps('https', 'http:')).toBe(true);
+    expect(peticionLlegoPorHttps('http', 'https:')).toBe(false);
+  });
+
+  it('con proxies encadenados vale el primero, que es el del cliente', () => {
+    expect(peticionLlegoPorHttps('https, http', 'http:')).toBe(true);
+    expect(peticionLlegoPorHttps(' HTTPS ,http', 'http:')).toBe(true);
+  });
+
+  it('sin cabecera, decide el protocolo de la propia URL', () => {
+    expect(peticionLlegoPorHttps(null, 'https:')).toBe(true);
+    expect(peticionLlegoPorHttps(undefined, 'http:')).toBe(false);
+    expect(peticionLlegoPorHttps('   ', 'https:')).toBe(true);
   });
 });
