@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-11 · **ETAPA 09-B construida** · bloques 6, 7 y 8 (modo oscuro, configuración editable, bucket de evidencia)
+**Última actualización:** 2026-09-12 · **ETAPA 09-B construida** · bloques 6-8 construidos; 4, 5 y 9 entregados como propuesta escrita
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -230,6 +230,29 @@ hace que la evidencia persista por sí solo: falta el adaptador
 `AlmacenEvidenciaSupabase` detrás del puerto que ya existe. Lo que el bucket sí
 cierra hoy es el primero de los cuatro recursos de DT-12 y el `SIN-CONFIGURAR`
 del arranque. El detalle, sin adornos, en el documento de flujo biométrico.
+
+### Bloques 4, 5 y 9 · propuestas escritas · 2026-09-12
+
+Entregadas **sin construir nada**, a la espera de aprobación:
+
+| Bloque                                                                  | Documento                                                                                                                    | Recomendación                                             |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **4** · Sesiones, restablecimiento sin SMTP, WebAuthn, «Retomar sesión» | [`decisiones/propuestas/BLOQUE-04-sesiones-y-autenticacion.md`](decisiones/propuestas/BLOQUE-04-sesiones-y-autenticacion.md) | Construir 6,75 j de 11,25: diferir WebAuthn a la ETAPA 14 |
+| **5** · Segundo factor a medias                                         | [`decisiones/propuestas/BLOQUE-05-mfa-a-medias.md`](decisiones/propuestas/BLOQUE-05-mfa-a-medias.md)                         | 1 j cierra el problema operativo                          |
+| **9** · Revisión de cierre de la ETAPA 09                               | [`etapas/ETAPA-09-revision-de-cierre.md`](etapas/ETAPA-09-revision-de-cierre.md)                                             | 3 j de persistencia real antes de la ETAPA 10             |
+
+**Corrección de cifra.** En dos ocasiones dije que «cinco» y luego «seis» módulos
+abrían su propio `Pool`. Contado sobre el código son **tres** —`padron`,
+`autorizaciones` y `multiempresa`— más la sonda de arranque, que conserva el suyo
+a propósito. Cuatro `Pool`, 35 conexiones de tope. El problema es menor de lo que
+dije y sigue teniendo que resolverse antes de la ETAPA 12 (**D-66**, 0,75 j).
+
+**Lo que bloquea la ETAPA 10, dicho sin rodeos.** La consola de portería muestra
+la evidencia de cada evento y decide con las listas negras, y las dos viven hoy
+en memoria del proceso: al reiniciar, el portero ve un evento con la imagen rota
+y una lista negra vacía. Son **3 jornadas** —`AlmacenEvidenciaSupabase` con
+validación de tipo real, y el adaptador PostgreSQL de autorizaciones y listas
+negras (D-25)— y conviene hacerlas antes de abrir la etapa, no dentro.
 
 ### Lo que usted debe ejecutar tras los bloques 6-8
 

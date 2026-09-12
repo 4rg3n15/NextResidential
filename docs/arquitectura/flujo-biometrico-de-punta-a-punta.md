@@ -110,9 +110,16 @@ escriba el adaptador tiene dos efectos inmediatos:
 
 ## 4. La comprobación, ejercida y no declarada
 
-`scripts/verificar-bucket-evidencia.mjs` **sube un objeto real**, lo pide sin
+`scripts/verificar-bucket-evidencia.mjs` **sube un objeto real** —un PNG de 1×1,
+para que pase el filtro de tipos del bucket sin tener que relajarlo—, lo pide sin
 credencial —tiene que fallar—, lo pide con URL firmada —tiene que funcionar— y lo
-borra. El procedimiento está en `docs/guias/CONEXION_SUPABASE.md` §7.2.
+borra. Cada fallo imprime el cuerpo que devolvió Storage, porque un `400` a secas
+obliga a adivinar. El procedimiento está en `docs/guias/CONEXION_SUPABASE.md` §7.2.
+
+**Ya encontró algo real.** En la primera ejecución contra el proyecto de Grupo
+Control el bucket había quedado marcado público —una casilla del panel— y el
+guion lo cazó. Por inspección habría dado verde, y la evidencia de accesos, que
+es prueba, estaba accesible a cualquiera con la ruta.
 
 La razón de subir un objeto real, dicha sin rodeos: si se pide uno inexistente,
 **un bucket público responde 404 igual que uno privado**. La sonda de arranque
