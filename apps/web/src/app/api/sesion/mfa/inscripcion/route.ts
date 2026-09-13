@@ -69,7 +69,15 @@ const inscribirUnaVez = async (accessToken: string): Promise<InscripcionDeFactor
 
 export const POST = async (): Promise<NextResponse> => {
   const sesion = await leerSesion();
-  if (sesion === null || sesion.accessToken === '') {
+  // Misma distinción que en la verificación (D-68): sin cookie no es lo mismo
+  // que con la cookie agotada, y decir «expiró» a la primera manda a un bucle.
+  if (sesion === null) {
+    return NextResponse.json(
+      { mensaje: textoDeFalloDeAcceso('SIN_COOKIE_DE_SESION') },
+      { status: 401 },
+    );
+  }
+  if (sesion.accessToken === '') {
     return NextResponse.json({ mensaje: textoDeFalloDeAcceso('SESION_EXPIRADA') }, { status: 401 });
   }
 
@@ -117,6 +125,7 @@ export const POST = async (): Promise<NextResponse> => {
         DEMASIADOS_INTENTOS: 429,
         SERVICIO_NO_DISPONIBLE: 503,
         SESION_EXPIRADA: 401,
+        SIN_COOKIE_DE_SESION: 401,
         FACTOR_DUPLICADO: 409,
         SEGUNDO_FACTOR_YA_INSCRITO: 409,
       };

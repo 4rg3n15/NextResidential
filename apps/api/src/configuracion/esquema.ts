@@ -52,6 +52,15 @@ export const esquemaConfiguracion = z.object({
   DATABASE_URL: noVacio('DATABASE_URL'),
   DATABASE_POOLER_URL: noVacio('DATABASE_POOLER_URL'),
 
+  /**
+   * Tope de conexiones del **único** pool del proceso (D-66). Antes cada
+   * módulo abría el suyo y el tope real era la suma —35— que nadie había
+   * decidido. Es configurable porque el límite que importa es el del proyecto
+   * Supabase, y ese cambia con el plan; el Edge de la ETAPA 12 añadirá tráfico
+   * sobre este mismo número.
+   */
+  PG_POOL_MAX: z.coerce.number().int().min(1).max(100).default(20),
+
   /** Lista blanca explícita (§2.7.2). Nunca `*`, nunca `origin: true`. */
   CORS_ALLOWED_ORIGINS: noVacio('CORS_ALLOWED_ORIGINS'),
 

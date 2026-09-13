@@ -2,6 +2,7 @@ import { VersionDeReglas, esFallo } from '@ncr/domain-core';
 import type { Bitacora, ContextoDeAcceso } from '@ncr/domain-core';
 import type {
   CargadorDeContexto,
+  RepositorioListaNegra,
   RepositorioVersionDeReglas,
   ResolutorDeZona,
   SolicitudDeAcceso,
@@ -40,6 +41,17 @@ export class CargadorDeContextoConservador implements CargadorDeContexto {
      * consulta nada: es lo que lo mantiene puro.
      */
     private readonly zonas?: ResolutorDeZona,
+    /**
+     * ETAPA 09-B · RN-06. La lista negra tiene **precedencia absoluta** sobre
+     * cualquier autorización vigente, y hasta ahora el motor recibía dos
+     * conjuntos vacíos porque el puerto no tenía adaptador: la regla de mayor
+     * precedencia del sistema no tenía de dónde leer.
+     *
+     * Se consulta SIEMPRE, también cuando el contexto viene sembrado: una
+     * prueba que siembra un acceso permitido tiene que seguir viendo el veto
+     * si lo hay, porque eso es exactamente lo que RN-06 promete.
+     */
+    private readonly listaNegra?: RepositorioListaNegra,
   ) {}
 
   /** Clave: `copropiedadId|dispositivoId`. Solo para pruebas y demostración. */
@@ -48,9 +60,20 @@ export class CargadorDeContextoConservador implements CargadorDeContexto {
   }
 
   async cargar(solicitud: SolicitudDeAcceso, ahora: Date): Promise<ContextoDeAcceso> {
+    const veto = await this.vetos(solicitud.copropiedadId);
+
     const sembrado = this.sembrados.get(`${solicitud.copropiedadId}|${solicitud.dispositivoId}`);
-    if (sembrado !== undefined)
-      return { ...sembrado, ahora, zona: await this.zona(solicitud, ahora) };
+    if (sembrado !== undefined) {
+      return {
+        ...sembrado,
+        ahora,
+        zona: await this.zona(solicitud, ahora),
+        // Se UNEN, no se sustituyen: lo sembrado por una prueba y lo que diga
+        // la base son dos fuentes de veto, y ninguna cancela a la otra.
+        personasEnListaNegra: new Set([...sembrado.personasEnListaNegra, ...veto.personas]),
+        placasEnListaNegra: new Set([...sembrado.placasEnListaNegra, ...veto.placas]),
+      };
+    }
 
     this.bitacora?.registrar('aviso', 'contexto de acceso sin origen de datos: se denegará', {
       copropiedadId: solicitud.copropiedadId,
@@ -66,8 +89,8 @@ export class CargadorDeContextoConservador implements CargadorDeContexto {
       viviendaId: null,
       metodo: solicitud.metodo,
       autorizaciones: [],
-      personasEnListaNegra: new Set<string>(),
-      placasEnListaNegra: new Set<string>(),
+      personasEnListaNegra: veto.personas,
+      placasEnListaNegra: veto.placas,
       placaLeida: solicitud.placaLeida,
       placaConocida: false,
       viviendaActiva: false,
@@ -76,6 +99,34 @@ export class CargadorDeContextoConservador implements CargadorDeContexto {
       umbralDeConfianza: UMBRAL_DE_CONFIANZA_POR_DEFECTO,
       consentimientoVigente: false,
     };
+  }
+
+  /**
+   * Vetos vigentes de la copropiedad. Sin adaptador devuelve conjuntos vacíos,
+   * que es lo que había antes de la 09-B — y un fallo al consultarlos **no**
+   * abre la puerta: se registra y se sigue con el contexto conservador, donde
+   * el motor deniega de todas formas por `politicaVivienda`.
+   */
+  private async vetos(
+    copropiedadId: string,
+  ): Promise<{ personas: Set<string>; placas: Set<string> }> {
+    if (this.listaNegra === undefined) {
+      return { personas: new Set<string>(), placas: new Set<string>() };
+    }
+    try {
+      const entradas = await this.listaNegra.activasDe(copropiedadId);
+      return {
+        personas: new Set(entradas.map((e) => e.personaId).filter((p): p is string => p !== null)),
+        placas: new Set(entradas.map((e) => e.placa).filter((p): p is string => p !== null)),
+      };
+    } catch (error) {
+      this.bitacora?.registrar('error', 'no se pudo leer la lista negra: se denegará', {
+        copropiedadId,
+        error: error instanceof Error ? error.message : String(error),
+        motivo: 'RN-06 · precedencia absoluta; sin datos, el motor deniega por politicaVivienda',
+      });
+      return { personas: new Set<string>(), placas: new Set<string>() };
+    }
   }
 
   /** `null` cuando la solicitud no nombra zona, o cuando no hay quien resuelva. */

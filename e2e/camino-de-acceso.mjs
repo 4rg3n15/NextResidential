@@ -27,12 +27,26 @@ import { existsSync, writeFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
+import { networkInterfaces } from 'node:os';
 import { createRequire } from 'node:module';
 import { chromium } from 'playwright';
 import { authenticator } from 'otplib';
 import { arrancarDobleGotrue, USUARIO } from './doble-gotrue.mjs';
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** Las nueve pantallas del menú, en el orden de `lib/navegacion.ts`. */
+const RUTAS_DE_LA_CONSOLA = [
+  '/tablero',
+  '/viviendas',
+  '/vehiculos',
+  '/visitantes',
+  '/zonas',
+  '/dispositivos',
+  '/eventos',
+  '/informes',
+  '/configuracion',
+];
 const procesos = [];
 let fallos = 0;
 
@@ -230,9 +244,19 @@ const principal = async () => {
     API_URL: `http://127.0.0.1:${puertoApi}`,
     SUPABASE_URL: doble.url,
     SUPABASE_PUBLISHABLE_KEY: 'publicable-de-prueba',
-    // La consola compilada se sirve por http en el propio equipo: con `Secure`
-    // el navegador descartaría la cookie y no habría sesión que recorrer.
-    COOKIE_SEGURA: 'false',
+    /**
+     * **`COOKIE_SEGURA` NO se fija aquí, y eso es el arreglo de D-68.**
+     *
+     * El banco la ponía a `'false'`, es decir **desactivaba justo el atributo
+     * que rompe en el despliegue real**. Con eso, el recorrido pasaba en verde
+     * mientras la consola servida por una IP de red rechazaba todos los códigos
+     * del autenticador. Un banco de pruebas que apaga la condición del defecto
+     * no prueba el sistema: prueba una variante suya que nadie despliega.
+     *
+     * Sin fijarla, `NODE_ENV=production` la resuelve como antes lo hacía el
+     * despliegue, y el paso 3.ter recorre el camino por una IP de red — que es
+     * donde el navegador deja de tratar el origen como «potencialmente seguro».
+     */
   };
   /**
    * Se compila y se sirve el resultado, **no `next dev`**. Es más lento y es lo
@@ -251,7 +275,12 @@ const principal = async () => {
     });
     b.on('exit', (c) => (c === 0 ? listo() : falla(new Error('build de la consola'))));
   });
-  lanzar('node', [binDeNext, 'start', '-p', String(puertoWeb)], {
+  /**
+   * `-H 0.0.0.0`: el servidor tiene que ser alcanzable **también por la IP de
+   * red**, no sólo por el bucle local. Sin eso, el paso 3.bis no puede existir,
+   * y ese paso es el que encontró D-67.
+   */
+  lanzar('node', [binDeNext, 'start', '-H', '0.0.0.0', '-p', String(puertoWeb)], {
     cwd: resolve(raiz, 'apps/web'),
     env: entornoWeb,
     detached: true,
@@ -429,6 +458,90 @@ const principal = async () => {
     'el tablero renderiza sin estado de error',
   );
 
+  // ── Los ESTILOS, y por un origen que no sea el bucle local ───────────────
+  paso('3.bis · la consola se ve, y por cualquier origen (D-67)');
+  /**
+   * EL INTERVALO QUE ESTE PASO CIERRA.
+   *
+   * Hasta aquí, el recorrido comprobaba que la página **responde**. El HTML
+   * llegaba, las aserciones pasaban, y la pantalla podía estar en texto plano:
+   * `upgrade-insecure-requests` reescribía CSS y JavaScript a `https://` contra
+   * un servidor que no habla TLS, y todo subrecurso moría con
+   * `ERR_CONNECTION_RESET`.
+   *
+   * **Y no se veía desde `127.0.0.1`**, porque el navegador considera el bucle
+   * local un origen «potencialmente seguro» y se salta la subida de esquema.
+   * Es decir: el único origen que la prueba visitaba era justo el exento. De
+   * ahí que este paso tenga que visitar una IP de red de verdad.
+   *
+   * Se comprueba lo que se ve, no lo que se sirve: número de reglas CSS
+   * aplicadas y el color de fondo real del `body`, que tiene que ser el token
+   * `lienzo` del preset. Una hoja que se descarga y no aplica daría 0 reglas.
+   */
+  const LIENZO_CLARO = 'rgb(248, 249, 250)';
+
+  const ipDeRed = Object.values(networkInterfaces())
+    .flat()
+    .find((i) => i !== undefined && i.family === 'IPv4' && !i.internal)?.address;
+
+  const medirEstilos = async (destino) => {
+    const ctx = await navegador.newContext({ viewport: { width: 1280, height: 900 } });
+    const p2 = await ctx.newPage();
+    const subrecursosCaidos = [];
+    p2.on('requestfailed', (r) => {
+      const motivo = r.failure()?.errorText ?? 'sin motivo';
+      if (motivo === 'net::ERR_ABORTED' && r.url().includes('_rsc=')) return;
+      subrecursosCaidos.push(`${r.url()} · ${motivo}`);
+    });
+    await p2
+      .goto(`${destino}/acceso`, { waitUntil: 'load', timeout: 30_000 })
+      .catch(() => undefined);
+    const medido = await p2
+      .evaluate(() => ({
+        reglas: [...document.styleSheets].reduce((n, h) => {
+          try {
+            return n + h.cssRules.length;
+          } catch {
+            return n;
+          }
+        }, 0),
+        fondo: getComputedStyle(document.body).backgroundColor,
+      }))
+      .catch(() => ({ reglas: 0, fondo: 'no evaluable' }));
+    await ctx.close();
+    return { ...medido, subrecursosCaidos };
+  };
+
+  for (const [etiqueta, destino] of [
+    ['bucle local', base],
+    ...(ipDeRed === undefined ? [] : [['IP de red', `http://${ipDeRed}:${puertoWeb}`]]),
+  ]) {
+    const m = await medirEstilos(destino);
+    afirmar(
+      m.reglas > 0,
+      `por ${etiqueta} la hoja de estilos se aplica (${String(m.reglas)} reglas)`,
+    );
+    afirmar(
+      m.fondo === LIENZO_CLARO,
+      `por ${etiqueta} el fondo es el token lienzo y no el del navegador (${m.fondo})`,
+    );
+    afirmar(
+      m.subrecursosCaidos.length === 0,
+      `por ${etiqueta} ningún subrecurso se cae${m.subrecursosCaidos.length === 0 ? '' : `: ${m.subrecursosCaidos.slice(0, 3).join(' | ')}`}`,
+    );
+  }
+
+  if (ipDeRed === undefined) {
+    /**
+     * Sin IP de red no hay verde silencioso: se dice que la mitad que importa
+     * no se ejerció. Un paso que se salta sin avisar es exactamente el patrón
+     * que dejó vivir a D-67.
+     */
+    mal('no hay ninguna IPv4 no interna: la mitad de este paso NO se ejerció');
+  } else {
+    ok(`ejercido también por ${ipDeRed}, que es el origen donde falla si la CSP se ata al proceso`);
+  }
+
   // ── La vuelta: volver a entrar NO debe pedir inscribir otra vez ──────────
   paso('4 · segunda entrada: con el factor ya verificado');
   await contexto.clearCookies();
@@ -458,6 +571,158 @@ const principal = async () => {
   if (errores.length > 0) errores.slice(0, 5).forEach((e) => console.log(`     · ${e}`));
   writeFileSync('/tmp/ncr-camino-red.log', trazas.join('\n'));
   console.log('   · trazas de red en /tmp/ncr-camino-red.log');
+
+  // ── EL CAMINO ENTERO, POR UNA IP DE RED ──────────────────────────────────
+  paso('3.ter · contraseña → segundo factor → aal2 → tablero, por IP de red (D-68)');
+  /**
+   * POR QUÉ ESTE PASO EXISTE, Y POR QUÉ NO BASTABA CON 3.bis.
+   *
+   * 3.bis comprueba que la consola **se ve** por una IP de red. Este comprueba
+   * que **funciona**, que es otra cosa: el defecto D-68 dejaba la pantalla
+   * perfecta y rechazaba todos los códigos del autenticador con «La sesión
+   * expiró», porque la cookie de sesión salía con `Secure` sobre HTTP y el
+   * navegador la descartaba en silencio.
+   *
+   * `127.0.0.1` no lo veía por la misma razón que no veía D-67: el navegador
+   * trata el bucle local como origen **potencialmente seguro** y ahí sí acepta
+   * cookies `Secure` sobre HTTP. Es decir, el único origen que el recorrido
+   * visitaba era el que se salta la comprobación. Cualquier prueba que sólo
+   * mire `localhost` está midiendo el caso más favorable.
+   */
+  if (ipDeRed === undefined) {
+    mal('no hay ninguna IPv4 no interna: el camino por red NO se ejerció');
+  } else {
+    const baseRed = `http://${ipDeRed}:${puertoWeb}`;
+    const ctxRed = await navegador.newContext({ viewport: { width: 1280, height: 900 } });
+    const pRed = await ctxRed.newPage();
+    const erroresRed = [];
+    pRed.on('console', (m) => {
+      if (m.type() === 'error') erroresRed.push(m.text());
+    });
+
+    await pRed.goto(`${baseRed}/acceso`, { waitUntil: 'networkidle' });
+    await pRed.fill('input[name="correo"]', USUARIO.correo);
+    await pRed.fill('input[name="contrasena"]', USUARIO.contrasena);
+    await pRed.click('button[type="submit"]');
+    await pRed.waitForSelector('text=Verificación en dos pasos', { timeout: 30_000 });
+    ok('la contraseña lleva al segundo factor');
+
+    /**
+     * LA COMPROBACIÓN QUE FALTABA, Y SE MIRA EN EL NAVEGADOR.
+     *
+     * Si la cookie de sesión no llegó al navegador, el paso siguiente falla
+     * pase lo que pase y el mensaje culpará a la sesión. Se comprueba ANTES de
+     * teclear el código, para que el diagnóstico salga aquí y no dentro de un
+     * «código incorrecto» que no lo es.
+     */
+    const galletas = await ctxRed.cookies();
+    const deSesion = galletas.filter((c) => c.name.startsWith('ncr_'));
+    afirmar(
+      deSesion.length > 0,
+      `el navegador CONSERVA las cookies de sesión por IP (${deSesion.map((c) => c.name).join(', ') || 'ninguna'})`,
+    );
+    afirmar(
+      deSesion.every((c) => c.secure === false),
+      'ninguna cookie sale con `Secure` sobre HTTP: el navegador la descartaría en silencio',
+    );
+    afirmar(
+      deSesion.every((c) => c.httpOnly),
+      'y todas siguen siendo `httpOnly`: el arreglo no afloja lo que 09-A fijó',
+    );
+
+    await pRed.fill('input[name="codigo"]', authenticator.generate(secreto));
+    await pRed.click('button[type="submit"]');
+
+    /**
+     * O llega al tablero, o se dice **qué contestó la consola**. Un
+     * `waitForURL` que expira sólo informa de que no llegó, y el motivo —que es
+     * lo único útil— se queda en la pantalla.
+     */
+    const llego = await pRed
+      .waitForURL(/\/tablero/, { timeout: 30_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (llego) {
+      ok('el código del autenticador ENTRA por IP de red, igual que por el bucle local');
+    } else {
+      const dicho = await pRed.locator('body').innerText();
+      const linea = dicho.split('\n').find((l) => /sesión|código|expir|no se pudo/i.test(l));
+      mal(`el segundo factor NO entra por IP de red · la consola dice: «${linea ?? 'nada'}»`);
+    }
+
+    /**
+     * LAS NUEVE PANTALLAS: **COMPARADAS**, no juzgadas por separado.
+     *
+     * Este banco no tiene datos, así que varias pantallas muestran estados
+     * vacíos o de error legítimos. Preguntar «¿esta pantalla está bien por
+     * IP?» daría rojos que no lo son. La pregunta correcta es **«¿se comporta
+     * igual que por el bucle local?»**, porque lo que se persigue es la
+     * diferencia por origen, no el estado en sí.
+     *
+     * Es además la forma que sobrevive a que el banco gane datos mañana.
+     */
+    const recorrer = async (pagina2, origen) => {
+      const visto = {};
+      for (const ruta of RUTAS_DE_LA_CONSOLA) {
+        await pagina2.goto(`${origen}${ruta}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+        await pagina2
+          .waitForSelector('main, [role="main"]', { timeout: 30_000 })
+          .catch(() => undefined);
+        const texto = await pagina2.locator('body').innerText();
+        // Se resume a las señales que importan, no al texto entero: comparar
+        // cuerpos completos daría falsos rojos por una hora en pantalla.
+        visto[ruta] = [
+          /sin permiso/i.test(texto) ? 'sin-permiso' : '',
+          /sin conexión con el servidor/i.test(texto) ? 'sin-conexion' : '',
+          /sesión expiró|no devolvió la cookie/i.test(texto) ? 'sin-sesion' : '',
+          /no se pudo cargar/i.test(texto) ? 'error' : '',
+          pagina2.url().includes(ruta) ? '' : `redirigido-a-${new URL(pagina2.url()).pathname}`,
+        ]
+          .filter((x) => x !== '')
+          .join('+');
+      }
+      const estado = await pagina2.evaluate(() => ({
+        canal: document.body.innerText.includes('En vivo'),
+        contextoSeguro: window.isSecureContext,
+      }));
+      return { visto, ...estado };
+    };
+
+    const porIp = await recorrer(pRed, baseRed);
+    const porLocal = await recorrer(pagina, base);
+
+    const distintas = RUTAS_DE_LA_CONSOLA.filter((r) => porIp.visto[r] !== porLocal.visto[r]).map(
+      (r) => `${r}: local «${porLocal.visto[r] || 'bien'}» ≠ IP «${porIp.visto[r] || 'bien'}»`,
+    );
+    afirmar(
+      distintas.length === 0,
+      `las nueve pantallas se comportan IGUAL por IP que por bucle local${
+        distintas.length === 0 ? '' : ` · ${distintas.join(' | ')}`
+      }`,
+    );
+    afirmar(
+      porIp.canal === porLocal.canal,
+      `el canal en vivo se comporta igual por los dos orígenes (local ${String(porLocal.canal)}, IP ${String(porIp.canal)})`,
+    );
+
+    /**
+     * LA ÚNICA DIFERENCIA QUE NO ES UN DEFECTO, Y SE DEJA DICHA.
+     *
+     * Una IP por HTTP **no es un contexto seguro**, así que el navegador no
+     * registra el service worker: por ahí la consola no es instalable como PWA
+     * y no hay caché sin conexión. No es código nuestro y no se arregla en el
+     * código: vuelve sola con dominio y HTTPS. El bucle local sí lo es, y por
+     * eso ahí funciona.
+     */
+    afirmar(
+      porLocal.contextoSeguro && !porIp.contextoSeguro,
+      `contexto seguro: bucle local ${String(porLocal.contextoSeguro)}, IP por HTTP ${String(porIp.contextoSeguro)} — sin PWA ni caché sin conexión hasta que haya TLS`,
+    );
+
+    afirmar(erroresRed.length === 0, `sin errores de consola por IP (${erroresRed.length})`);
+    if (erroresRed.length > 0) erroresRed.slice(0, 5).forEach((e) => console.log(`     · ${e}`));
+    await ctxRed.close();
+  }
 
   /**
    * ── El interruptor retirado, comprobado en el navegador ──────────────────

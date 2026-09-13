@@ -91,6 +91,40 @@ for (const fichero of ficheros) {
   }
 }
 
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * D-66 · UN SOLO `Pool` POR PROCESO
+ *
+ * Tres módulos abrían el suyo —`padron` 20, `autorizaciones` 10, `multiempresa`
+ * 5— y el tope real del proceso era la suma, 35, que nadie había decidido. El
+ * síntoma no aparece mientras cada uno va por su cuenta: aparece cuando el Edge
+ * de la ETAPA 12 añade su tráfico y se agota el límite del proyecto Supabase
+ * **sin que ninguno crea estar cerca del suyo**.
+ *
+ * La sonda de arranque conserva el suyo a propósito: responde `/ready` y tiene
+ * que poder contestar justo cuando el pool principal está saturado.
+ */
+const DUENOS_DEL_POOL = ['persistencia/pool.module.ts', 'arranque/sonda-postgres.ts'];
+const poolsSueltos = [];
+for (const fichero of ficheros) {
+  const relativo = relative(raiz, fichero).replace(/\\/g, '/');
+  if (DUENOS_DEL_POOL.some((d) => relativo.endsWith(d))) continue;
+  const contenido = readFileSync(fichero, 'utf8');
+  if (/\bnew Pool\s*\(/.test(contenido)) {
+    poolsSueltos.push(relative(raizProyecto, fichero));
+  }
+}
+
+if (poolsSueltos.length > 0) {
+  console.log(
+    `FALLO frontera-modulos: ${poolsSueltos.length} fichero(s) abren su propio Pool de PostgreSQL (D-66)`,
+  );
+  for (const f of poolsSueltos) {
+    console.log(`   ${f}: usa el Pool global de \`PoolModule\`, que es @Global`);
+  }
+  process.exit(1);
+}
+
 if (violaciones.length > 0) {
   console.log(
     `FALLO frontera-modulos: ${violaciones.length} importación(es) alcanzan el interior de otro módulo en vez de su barril (§2.2)`,
@@ -102,5 +136,5 @@ if (violaciones.length > 0) {
 }
 
 console.log(
-  `OK frontera-modulos: ${modulos.length} módulos (${modulos.join(', ')}) y ninguna importación entra por dentro`,
+  `OK frontera-modulos: ${modulos.length} módulos (${modulos.join(', ')}), ninguna importación entra por dentro y un solo Pool de PostgreSQL (D-66)`,
 );

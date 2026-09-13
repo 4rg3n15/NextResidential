@@ -31,3 +31,10 @@ export {
   UMBRAL_DE_CONFIANZA_POR_DEFECTO,
   VersionDeReglasFija,
 } from './infraestructura/cargador-conservador';
+/**
+ * Sale por el barril porque quien COMPONE el motor de decisión es
+ * `EventosModule`, y el cargador necesita la lista negra para que RN-06 tenga
+ * de dónde leer. La alternativa —que `eventos` importara el fichero del
+ * adaptador— rompería la frontera de §2.2, que el verificador comprueba.
+ */
+export { RepositorioListaNegraPg } from './infraestructura/repositorio-lista-negra-pg';

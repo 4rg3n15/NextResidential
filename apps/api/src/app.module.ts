@@ -7,6 +7,7 @@ import { AutenticacionModule } from './autenticacion';
 import { GuardaDeAutenticacion } from './comun/guardas/autenticacion.guard';
 import { GuardaDeRoles } from './comun/guardas/roles.guard';
 import { MultiempresaModule } from './multiempresa/multiempresa.module';
+import { PoolModule } from './persistencia/pool.module';
 import { PadronModule } from './padron';
 import { AutorizacionesModule } from './autorizaciones';
 import { EventosModule } from './eventos';
@@ -56,6 +57,13 @@ export class AppModule {
          * paso «la API arranca de verdad» de `verificar-etapa.sh`, que ejecuta
          * el proceso compilado y le pide `/health`.
          */
+        /**
+         * **Antes que todo lo que consulta la base** (D-66). Es `@Global` y
+         * provee el ÚNICO `Pool` del proceso: hasta la 09-B cada módulo abría
+         * el suyo y el tope real —35 conexiones— era la suma de tres decisiones
+         * que nadie había tomado junta.
+         */
+        PoolModule.registrar(),
         MultiempresaModule,
         AutenticacionModule.registrar(),
         PadronModule.registrar(),

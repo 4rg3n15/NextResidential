@@ -417,23 +417,42 @@ que fallar—, la pide con **URL firmada de 60 s** —tiene que funcionar— y l
 borra. Las dos mitades importan: sin la segunda, un bucket roto de forma que
 nadie pueda leerlo pasaría por seguro.
 
+**La sonda es un PNG real de 1×1 píxel**, no un fichero de texto, precisamente
+porque el paso anterior manda restringir los tipos permitidos a `image/jpeg` e
+`image/png`. Un guion que subiera texto plano chocaría con esa restricción, y la
+salida obvia —ampliar los tipos permitidos— **debilitaría el bucket para que la
+comprobación pase**, que es al revés de lo que una verificación debe provocar.
+Si su bucket no admite `image/png`, el guion se detiene y le dice que ajuste la
+sonda, no el bucket.
+
 Salida esperada:
 
 ```
 Bucket de evidencia «evidencias»
 
   ✓ el bucket existe y se declara privado
-  ✓ sonda subida con la llave secreta
+  ✓ tipos permitidos: image/jpeg, image/png
+  ✓ sonda subida con la llave secreta (PNG de 70 bytes)
   ✓ un GET sin firmar sobre un objeto que EXISTE responde 400
-  ✓ con URL firmada de 60 s, el objeto se lee correctamente
+  ✓ con URL firmada de 60 s, el objeto se lee byte a byte igual que se subió
   ✓ sonda borrada
 
 ✓ bucket privado verificado por ejercicio: escribe con llave, niega sin firma, sirve con firma.
 ```
 
-El código de la tercera línea puede ser `400`, `401` o `403` según la versión de
+El código de la cuarta línea puede ser `400`, `401` o `403` según la versión de
 Storage; **lo único inaceptable es `200`**. Si sale `200`, hay una política sobre
 `storage.objects` concediendo `SELECT` a `anon`: quítala antes de seguir.
+
+**Cuando algo falla, el guion imprime el cuerpo que devolvió Storage**, recortado
+a 300 caracteres y sin ninguna credencial. Es donde vive el motivo real —`mime
+type text/plain is not supported`, `The object exceeded the maximum allowed
+size`, `new row violates row-level security policy`— y un `400` a secas obliga a
+adivinar.
+
+Los cuatro caminos del guion —correcto, bucket público, objeto servido sin firma
+y subida rechazada— se ejercieron contra un Storage simulado antes de
+entregarlo. Un verificador que nadie ha visto fallar no es un verificador.
 
 ---
 

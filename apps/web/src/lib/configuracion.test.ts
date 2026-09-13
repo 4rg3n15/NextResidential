@@ -87,14 +87,28 @@ describe('lo que hace fallar el arranque', () => {
     expect(validarEntorno(COMPLETO).puenteVideoUrl).toBeUndefined();
   });
 
-  it('la cookie va Secure en producción y no en desarrollo', () => {
+  it('D-68 · `NODE_ENV` ya NO decide el atributo Secure de la cookie', () => {
+    /**
+     * Lo decidía, y con `NODE_ENV=production` la cookie salía `Secure` aunque
+     * la página se sirviera por HTTP: el navegador la descartaba en silencio y
+     * la consola quedaba inservible por cualquier origen que no fuera el bucle
+     * local — que es el único que acepta cookies `Secure` sobre HTTP.
+     *
+     * Sin declarar, `undefined` significa «lo decide la petición», y quien lo
+     * decide es el middleware con el mismo dato que la CSP.
+     */
     const enProduccion = {
       ...COMPLETO,
       NODE_ENV: 'production' as const,
       API_URL: 'https://api.ejemplo.co',
     };
-    expect(validarEntorno(enProduccion).cookieSegura).toBe(true);
-    expect(validarEntorno(COMPLETO).cookieSegura).toBe(false);
+    expect(validarEntorno(enProduccion).cookieSegura).toBeUndefined();
+    expect(validarEntorno(COMPLETO).cookieSegura).toBeUndefined();
+  });
+
+  it('declarada, manda lo declarado: es la salida del proxy que no reenvía el esquema', () => {
+    expect(validarEntorno({ ...COMPLETO, COOKIE_SEGURA: 'true' }).cookieSegura).toBe(true);
+    expect(validarEntorno({ ...COMPLETO, COOKIE_SEGURA: 'false' }).cookieSegura).toBe(false);
   });
 
   it('COOKIE_SEGURA=false vale en local y NO fuera de local', () => {

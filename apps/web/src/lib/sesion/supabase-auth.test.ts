@@ -216,3 +216,72 @@ describe('cerrarSesionRemota', () => {
     await expect(modulo.cerrarSesionRemota('t')).resolves.toBeUndefined();
   });
 });
+
+/**
+ * BLOQUE 5 · LA CUENTA CON EL SEGUNDO FACTOR A MEDIAS
+ *
+ * La inscripción tiene dos pasos separados por una persona: el factor nace
+ * `unverified` y sólo pasa a `verified` cuando alguien escanea el QR y manda un
+ * código. Entre los dos hay una ventana —se cierra la pestaña, se acaba la
+ * batería, se escanea con la aplicación equivocada— en la que el factor
+ * **existe y no sirve**. Con él colgando, el guard exige `aal2`, la cuenta no
+ * lo alcanza, y hasta hace poco la única salida era el panel de Supabase.
+ *
+ * El barrido de factores sin verificar ya estaba escrito, pero **nadie lo había
+ * visto hacerlo**: ninguna prueba comprobaba que el `DELETE` se emite. Un
+ * control sin observar es un control sin demostrar, y este es justo el que
+ * decide si un administrador puede volver a entrar solo.
+ */
+describe('la inscripción barre lo que quedó a medias', () => {
+  const factor = (estado: string) => ({ id: 'f-viejo', status: estado, factor_type: 'totp' });
+
+  const espiar = (factores: readonly unknown[]) => {
+    const llamadas: { url: string; metodo: string }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opciones?: { method?: string }) => {
+        llamadas.push({ url, metodo: opciones?.method ?? 'GET' });
+        if (url.includes('/user')) return respuestaJson({ factors: factores });
+        if (url.includes('/factors/')) return respuestaJson({});
+        return respuestaJson({
+          id: 'f-nuevo',
+          totp: { qr_code: '<svg />', secret: 'ABCDEFGH' },
+        });
+      }),
+    );
+    return llamadas;
+  };
+
+  it('BORRA el factor sin verificar antes de crear el nuevo', async () => {
+    const llamadas = espiar([factor('unverified')]);
+    const inscripcion = await modulo.inscribirFactorTotp('token-de-prueba');
+
+    const borrado = llamadas.find((l) => l.metodo === 'DELETE');
+    expect(borrado, 'no se emitió ningún DELETE del factor a medias').toBeDefined();
+    expect(borrado?.url).toContain('/factors/f-viejo');
+
+    // Y el orden importa: crear antes de barrer dejaría dos factores y el
+    // proveedor rechazaría el segundo por nombre duplicado.
+    const iBorrado = llamadas.findIndex((l) => l.metodo === 'DELETE');
+    const iAlta = llamadas.findIndex((l) => l.metodo === 'POST' && l.url.endsWith('/factors'));
+    expect(iBorrado).toBeLessThan(iAlta);
+    expect(inscripcion.factorId).toBe('f-nuevo');
+  });
+
+  it('NO borra un factor ya verificado: se pide verificar, no inscribir de nuevo', async () => {
+    // La mitad que impide que el arreglo se convierta en el agujero: si el
+    // barrido alcanzara a los verificados, cualquiera podría quitarse el
+    // segundo factor abriendo la pantalla de inscripción, y eso es RN-20.
+    const llamadas = espiar([factor('verified')]);
+    await expect(modulo.inscribirFactorTotp('token-de-prueba')).rejects.toMatchObject({
+      motivo: 'SEGUNDO_FACTOR_YA_INSCRITO',
+    });
+    expect(llamadas.some((l) => l.metodo === 'DELETE')).toBe(false);
+  });
+
+  it('sin factores previos no borra nada y crea uno', async () => {
+    const llamadas = espiar([]);
+    await modulo.inscribirFactorTotp('token-de-prueba');
+    expect(llamadas.some((l) => l.metodo === 'DELETE')).toBe(false);
+  });
+});

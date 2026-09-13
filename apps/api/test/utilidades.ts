@@ -26,6 +26,7 @@ export const COP_B = '10000000-0000-4000-8000-000000000002';
 
 export const configuracionDePrueba: Configuracion = {
   NODE_ENV: 'test',
+  PG_POOL_MAX: 20,
   PORT: 0,
   SUPABASE_URL: 'https://proyecto-de-prueba.invalid',
   SUPABASE_PUBLISHABLE_KEY: 'marcador',

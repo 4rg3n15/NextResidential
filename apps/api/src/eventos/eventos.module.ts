@@ -4,10 +4,12 @@ import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
+import { Pool } from 'pg';
 import {
   CargadorDeContextoConservador,
   DecidirAcceso,
   RESOLUTOR_DE_ZONA,
+  RepositorioListaNegraPg,
   VersionDeReglasFija,
 } from '../autorizaciones';
 import type { ResolutorDeZona } from '../autorizaciones';
@@ -36,6 +38,7 @@ import {
 } from './aplicacion/consultar-eventos';
 import { VigilarLatidos } from './aplicacion/vigilancia-latidos';
 import { CanalEnProceso } from './infraestructura/canal-en-proceso';
+import { AlmacenEvidenciaSupabase } from './infraestructura/evidencia-supabase';
 import {
   AlmacenEvidenciaFirmado,
   NotificadorPushRegistrado,
@@ -95,24 +98,62 @@ export class EventosModule {
         },
         {
           provide: ALMACEN_EVIDENCIA,
-          inject: [CONFIGURACION],
-          useFactory: (c: Configuracion) => new AlmacenEvidenciaFirmado(c.INGESTA_FIRMA_SECRETO),
+          /**
+           * ETAPA 09-B · el bucket real cuando está declarado, y el de memoria
+           * sólo cuando no lo está.
+           *
+           * **La elección se hace por configuración y se DICE en la bitácora.**
+           * Un adaptador de memoria que entra en silencio es el peor de los dos
+           * mundos: el sistema funciona en las pruebas y pierde la evidencia al
+           * reiniciar, sin que nadie vea la diferencia. Con el aviso, un
+           * despliegue mal configurado se lee en la primera línea del arranque
+           * —además de en la comprobación de recursos externos—.
+           */
+          inject: [CONFIGURACION, BITACORA],
+          useFactory: (c: Configuracion, bitacora: Bitacora): AlmacenEvidencia => {
+            if (c.EVIDENCIA_BUCKET === undefined) {
+              bitacora.registrar(
+                'aviso',
+                'evidencia EN MEMORIA: se pierde al reiniciar el proceso',
+                {
+                  motivo: 'EVIDENCIA_BUCKET no está declarada',
+                  remedio: 'docs/guias/CONEXION_SUPABASE.md §7.1',
+                },
+              );
+              return new AlmacenEvidenciaFirmado(c.INGESTA_FIRMA_SECRETO);
+            }
+            return new AlmacenEvidenciaSupabase({
+              supabaseUrl: c.SUPABASE_URL,
+              llaveSecreta: c.SUPABASE_SECRET_KEY,
+              bucket: c.EVIDENCIA_BUCKET,
+              bitacora,
+            });
+          },
         },
         {
           provide: MOTOR_DE_DECISION,
           // ETAPA 07 · el resolutor de zona entra aquí, así que una solicitud
           // que nombre una zona llega al motor con su horario y su aforo ya
           // resueltos (CU-05). El motor sigue sin consultar nada.
-          inject: [RELOJ, BITACORA, RESOLUTOR_DE_ZONA],
+          /**
+           * ETAPA 09-B · entra la LISTA NEGRA. Hasta aquí el motor recibía dos
+           * conjuntos vacíos y RN-06 —precedencia absoluta sobre cualquier
+           * autorización vigente— no tenía de dónde leer. El `Pool` es el
+           * global de `PoolModule` (D-66), así que esto no abre conexiones
+           * nuevas.
+           */
+          inject: [RELOJ, BITACORA, RESOLUTOR_DE_ZONA, Pool],
           useFactory: (
             reloj: Reloj,
             bitacora: Bitacora,
             zonas: ResolutorDeZona,
+            pool: Pool,
           ): MotorDeDecision => {
             const cargador = new CargadorDeContextoConservador(
               new VersionDeReglasFija(),
               bitacora,
               zonas,
+              new RepositorioListaNegraPg(pool),
             );
             const decidir = new DecidirAcceso(cargador, reloj);
             return { decidir: (solicitud) => decidir.ejecutar(solicitud) };
