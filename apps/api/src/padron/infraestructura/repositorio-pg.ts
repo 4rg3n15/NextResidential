@@ -2,11 +2,14 @@ import type { Pool } from 'pg';
 import type { PoolClient } from 'pg';
 import { Injectable } from '@nestjs/common';
 import type {
+  AltaPersona,
   AltaResidente,
   AltaVehiculo,
   AltaVivienda,
   FiltroDeViviendas,
+  PersonaEnLista,
   RepositorioPadron,
+  ResultadoAltaPersona,
   ResultadoAltaVivienda,
   ResultadoRegistroVehiculo,
   TipoDeVehiculo,
@@ -14,7 +17,7 @@ import type {
   VehiculoEnLista,
   ViviendaEnLista,
 } from '../aplicacion/puertos';
-import type { Placa } from '@ncr/domain-core';
+import type { Placa, TipoDeDocumento } from '@ncr/domain-core';
 
 /** Violación de restricción única en PostgreSQL. */
 const VIOLACION_UNICA = '23505';
@@ -299,6 +302,148 @@ export class RepositorioPadronPg implements RepositorioPadron {
         [copropiedadId, vehiculoId, motivo, actorId],
       );
       return (rowCount ?? 0) > 0;
+    });
+  }
+
+  /**
+   * Búsqueda de personas por nombre o por documento (D-72).
+   *
+   * `unaccent` no está disponible como extensión garantizada, así que la
+   * insensibilidad a la tilde se resuelve con `ILIKE` sobre el texto tal cual
+   * MÁS la coincidencia exacta por documento normalizado, que es el camino que
+   * de verdad desambigua. El `LIMIT` llega del caso de uso: un buscador
+   * incremental sin tope descarga el padrón letra a letra.
+   *
+   * El `LEFT JOIN` lateral trae la vivienda de la que la persona es residente
+   * activa. Sin él, dos homónimos son indistinguibles en la lista y quien
+   * autoriza elige a ciegas — que es la misma clase de defecto que pedir el
+   * UUID, solo que más difícil de ver.
+   */
+  async buscarPersonas(
+    copropiedadId: string,
+    texto: string,
+    documentoNormalizado: string,
+    limite: number,
+  ): Promise<readonly PersonaEnLista[]> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{
+        id: string;
+        nombre_completo: string;
+        tipo_documento: TipoDeDocumento;
+        numero_documento: string;
+        es_residente: boolean;
+        vivienda_identificador: string | null;
+      }>(
+        `SELECT p.id,
+                p.nombre_completo,
+                p.tipo_documento,
+                p.numero_documento,
+                (r.id IS NOT NULL)   AS es_residente,
+                v.identificador      AS vivienda_identificador
+           FROM public.personas p
+           LEFT JOIN LATERAL (
+                SELECT r.id, r.vivienda_id
+                  FROM public.residentes r
+                 WHERE r.persona_id = p.id
+                   AND r.copropiedad_id = p.copropiedad_id
+                   AND r.estado = 'activo'
+                 LIMIT 1
+           ) r ON true
+           LEFT JOIN public.viviendas v ON v.id = r.vivienda_id
+          WHERE p.copropiedad_id = $1
+            AND p.estado = 'activo'
+            AND (
+                  p.nombre_completo ILIKE '%' || $2 || '%'
+                  OR ($3 <> '' AND p.numero_documento LIKE $3 || '%')
+                )
+          ORDER BY p.nombre_completo
+          LIMIT $4`,
+        [copropiedadId, texto, documentoNormalizado, limite],
+      );
+      return rows.map((f) => ({
+        id: f.id,
+        nombreCompleto: f.nombre_completo,
+        tipoDocumento: f.tipo_documento,
+        numeroDocumento: f.numero_documento,
+        esResidente: f.es_residente,
+        viviendaIdentificador: f.vivienda_identificador,
+      }));
+    });
+  }
+
+  /**
+   * Alta de persona. **Sin `SELECT` previo** (ADR-04): el índice único parcial
+   * `personas_documento_uk` decide, y si ya había alguien con ese documento
+   * activo se devuelve ESA persona en vez de crear una segunda. El documento es
+   * la identidad (RN-06); duplicarla es justo la fuga que `personas` cerró.
+   */
+  async registrarPersona(alta: AltaPersona): Promise<ResultadoAltaPersona> {
+    return this.conContexto(async (c) => {
+      const insertada = await c.query<{ id: string; nombre_completo: string }>(
+        `INSERT INTO public.personas
+           (copropiedad_id, tipo_documento, numero_documento, nombre_completo,
+            telefono, correo, creado_por, actualizado_por)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$7)
+         ON CONFLICT (copropiedad_id, tipo_documento, numero_documento)
+           WHERE estado = 'activo'
+           DO NOTHING
+         RETURNING id, nombre_completo`,
+        [
+          alta.copropiedadId,
+          alta.documento.tipo,
+          alta.documento.numero,
+          alta.nombreCompleto,
+          alta.telefono ?? null,
+          alta.correo ?? null,
+          alta.actorId,
+        ],
+      );
+      const nueva = insertada.rows[0];
+      if (nueva !== undefined) {
+        return { tipo: 'registrada', id: nueva.id, nombreCompleto: nueva.nombre_completo };
+      }
+
+      // `DO NOTHING` no devuelve fila: la persona ya estaba. Se lee la que hay
+      // —con su nombre real, que puede no ser el que acaban de teclear— para
+      // que la consola pueda DECIRLO en vez de fingir que creó algo.
+      const { rows } = await c.query<{ id: string; nombre_completo: string }>(
+        `SELECT id, nombre_completo
+           FROM public.personas
+          WHERE copropiedad_id = $1
+            AND tipo_documento = $2
+            AND numero_documento = $3
+            AND estado = 'activo'
+          LIMIT 1`,
+        [alta.copropiedadId, alta.documento.tipo, alta.documento.numero],
+      );
+      const existente = rows[0];
+      if (existente === undefined) {
+        // Solo llega aquí si la RLS ocultó la fila que el índice sí vio: es una
+        // condición de aislamiento, no un duplicado, y callarla la escondería.
+        throw new Error('No se pudo resolver la persona tras el conflicto de documento');
+      }
+      return { tipo: 'ya_existia', id: existente.id, nombreCompleto: existente.nombre_completo };
+    });
+  }
+
+  /**
+   * Solo viviendas ACTIVAS, que es lo que garantiza el índice único parcial: si
+   * también mirara las inactivas, «Casa 12» podría resolver a una vivienda dada
+   * de baja y la carga colgaría residentes de un registro histórico.
+   */
+  async buscarViviendaPorIdentificador(
+    copropiedadId: string,
+    identificador: string,
+  ): Promise<{ readonly id: string } | null> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{ id: string }>(
+        `SELECT id FROM public.viviendas
+          WHERE copropiedad_id = $1 AND identificador = $2 AND estado = 'activo'
+          LIMIT 1`,
+        [copropiedadId, identificador],
+      );
+      const fila = rows[0];
+      return fila === undefined ? null : { id: fila.id };
     });
   }
 

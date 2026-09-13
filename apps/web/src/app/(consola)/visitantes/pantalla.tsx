@@ -9,11 +9,14 @@ import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
 import { Distintivo, DistintivoDePlaca } from '@/componentes/ui/distintivo';
 import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
+import { BuscadorDePersonas } from '@/componentes/buscador-personas';
+import type { PersonaElegida } from '@/componentes/buscador-personas';
 import { DialogoDeConfirmacion } from '@/componentes/dialogo-confirmacion';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useAutorizaciones, useViviendas } from '@/lib/api/consultas';
+import { minutosDeHora, problemaDePatron, problemaDeVigencia } from '@/lib/validacion/vigencia';
 import { patronEnTexto } from './patron';
 
 /**
@@ -45,11 +48,24 @@ export const PantallaDeVisitantes = ({
   const [error, setError] = useState<string | undefined>(undefined);
 
   const [viviendaId, setViviendaId] = useState('');
-  const [personaId, setPersonaId] = useState('');
+  const [persona, setPersona] = useState<PersonaElegida | null>(null);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [recurrente, setRecurrente] = useState(false);
   const [dias, setDias] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [horaInicio, setHoraInicio] = useState('08:00');
+  const [horaFin, setHoraFin] = useState('18:00');
+
+  /**
+   * **Las restricciones del dominio se señalan AQUÍ, antes de enviarlas.**
+   *
+   * D-73: el formulario aceptó una vigencia invertida y el error que acabó
+   * mostrando fue el de otro campo. Quien decide sigue siendo el dominio —esto
+   * no puede relajar nada—, pero una restricción que solo aparece cuando el
+   * servidor la nombra obliga a descubrirla por ensayo y error.
+   */
+  const problemaVigencia = problemaDeVigencia(desde, hasta);
+  const problemaPatron = recurrente ? problemaDePatron(dias, horaInicio, horaFin) : null;
 
   const refrescar = async (): Promise<void> => {
     await clientes.invalidateQueries({ queryKey: ['autorizaciones', copropiedadId] });
@@ -64,15 +80,15 @@ export const PantallaDeVisitantes = ({
           params: { path: { id: copropiedadId } },
           body: {
             viviendaId,
-            personaId,
+            personaId: persona?.id ?? '',
             desde: new Date(desde).toISOString(),
             hasta: new Date(hasta).toISOString(),
             ...(recurrente
               ? {
                   patron: {
                     dias,
-                    minutoInicio: 8 * 60,
-                    minutoFin: 18 * 60,
+                    minutoInicio: minutosDeHora(horaInicio) ?? 0,
+                    minutoFin: minutosDeHora(horaFin) ?? 0,
                     // El desfase se toma del navegador de quien la crea, que es
                     // el huso en el que está pensando las horas.
                     desplazamientoUtcMinutos: -new Date().getTimezoneOffset(),
@@ -83,6 +99,7 @@ export const PantallaDeVisitantes = ({
         }),
       );
       setAlta(false);
+      setPersona(null);
       await refrescar();
     } catch (e) {
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo crear la autorización');
@@ -213,11 +230,18 @@ export const PantallaDeVisitantes = ({
       <DialogoDeFormulario
         abierto={alta}
         titulo="Nueva autorización"
-        descripcion="La vigencia no puede nacer expirada y se comprueba en el dominio, no aquí (RN-01)."
+        descripcion="Quién visita, a qué vivienda y entre qué momentos. La vigencia no puede nacer expirada (RN-01)."
         etiquetaEnviar="Autorizar"
         enviando={enviando}
         error={error}
-        puedeEnviar={viviendaId !== '' && personaId !== '' && desde !== '' && hasta !== ''}
+        puedeEnviar={
+          viviendaId !== '' &&
+          persona !== null &&
+          desde !== '' &&
+          hasta !== '' &&
+          problemaVigencia === null &&
+          problemaPatron === null
+        }
         alEnviar={() => void crear()}
         alCancelar={() => {
           setAlta(false);
@@ -239,12 +263,13 @@ export const PantallaDeVisitantes = ({
             ))}
           </select>
         </label>
-        <Campo
-          etiqueta="Persona que visita (identificador)"
-          value={personaId}
-          onChange={(e) => setPersonaId(e.target.value)}
-          ayuda="El visitante entra por su propia identidad; es lo que permite que la lista negra lo alcance."
-          required
+        {/* D-72 · el visitante se busca por nombre o documento, y si no está se
+            registra aquí mismo. Nadie escribe un identificador interno. */}
+        <BuscadorDePersonas
+          copropiedadId={copropiedadId}
+          elegida={persona}
+          alElegir={setPersona}
+          ayuda="El visitante entra por su propia identidad: es lo que permite que la lista negra lo alcance (RN-06)."
         />
         <Campo
           etiqueta="Desde"
@@ -258,39 +283,75 @@ export const PantallaDeVisitantes = ({
           type="datetime-local"
           value={hasta}
           onChange={(e) => setHasta(e.target.value)}
+          // El motivo se pone bajo «Hasta» y no encima del formulario: es este
+          // campo el que hay que corregir, y un aviso general obliga a
+          // adivinar cuál de los dos está mal.
+          error={problemaVigencia ?? undefined}
           required
         />
-        <label className="flex items-center gap-2 text-secundario">
-          <input
-            type="checkbox"
-            checked={recurrente}
-            onChange={(e) => setRecurrente(e.target.checked)}
-          />
-          Recurrente (08:00–18:00 en los días marcados)
-        </label>
-        {recurrente ? (
-          <div className="flex flex-wrap gap-1.5">
-            {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => (
-              <button
-                key={d}
-                type="button"
-                aria-pressed={dias.includes(i)}
-                onClick={() =>
-                  setDias((previos) =>
-                    previos.includes(i) ? previos.filter((x) => x !== i) : [...previos, i],
-                  )
-                }
-                className={
-                  dias.includes(i)
-                    ? 'rounded-distintivo bg-marca-suave px-2 py-1 text-distintivo text-marca-texto'
-                    : 'rounded-distintivo border border-borde px-2 py-1 text-distintivo text-texto-apagado'
-                }
+
+        <fieldset className="space-y-2 rounded-campo border border-borde p-3">
+          <legend className="px-1 text-secundario font-medium text-texto">Repetición</legend>
+          <label className="flex items-center gap-2 text-secundario text-texto">
+            <input
+              type="checkbox"
+              checked={recurrente}
+              onChange={(e) => setRecurrente(e.target.checked)}
+              className="h-4 w-4 accent-marca"
+            />
+            {/* La etiqueta ya NO anuncia «los días marcados» ni una franja fija:
+                antes describía un selector que solo existía tras marcarla y unas
+                horas que no se podían cambiar (D-74). */}
+            Autorización recurrente
+          </label>
+          {recurrente ? (
+            <>
+              <p className="text-secundario text-texto-apagado">
+                Vale solo en los días y la franja que marques, dentro de la vigencia (RN-22).
+              </p>
+              <div
+                role="group"
+                aria-label="Días de la semana en que aplica"
+                className="flex flex-wrap gap-1.5"
               >
-                {d}
-              </button>
-            ))}
-          </div>
-        ) : null}
+                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => (
+                  <button
+                    key={d}
+                    type="button"
+                    aria-pressed={dias.includes(i)}
+                    onClick={() =>
+                      setDias((previos) =>
+                        previos.includes(i) ? previos.filter((x) => x !== i) : [...previos, i],
+                      )
+                    }
+                    className={
+                      dias.includes(i)
+                        ? 'rounded-distintivo bg-marca-suave px-2 py-1 text-distintivo font-medium text-marca-texto'
+                        : 'rounded-distintivo border border-borde px-2 py-1 text-distintivo text-texto-apagado hover:bg-lienzo'
+                    }
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Campo
+                  etiqueta="Desde la hora"
+                  type="time"
+                  value={horaInicio}
+                  onChange={(e) => setHoraInicio(e.target.value)}
+                />
+                <Campo
+                  etiqueta="Hasta la hora"
+                  type="time"
+                  value={horaFin}
+                  onChange={(e) => setHoraFin(e.target.value)}
+                  error={problemaPatron ?? undefined}
+                />
+              </div>
+            </>
+          ) : null}
+        </fieldset>
       </DialogoDeFormulario>
 
       <DialogoDeConfirmacion

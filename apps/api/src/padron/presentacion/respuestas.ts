@@ -88,4 +88,47 @@ export class ResultadoDeCargaDto {
   })
   aplicada!: boolean;
   @ApiProperty({ type: Number }) filasLeidas!: number;
+  @ApiProperty({
+    type: Number,
+    description:
+      'Viviendas que hubo que crear porque el identificador de la hoja no existía. Una errata ' +
+      'crea una vivienda que nadie quería, y este número la delata en el momento (D-72).',
+  })
+  viviendasCreadas!: number;
+  @ApiProperty({
+    type: Number,
+    description: 'Personas nuevas. Las que ya tenían ese documento se reutilizan (RN-06).',
+  })
+  personasCreadas!: number;
+}
+
+/**
+ * Persona resuelta por el buscador (D-72).
+ *
+ * `esResidente` y `viviendaIdentificador` no son adorno: sin ellos, dos
+ * homónimos son indistinguibles en la lista y quien autoriza elige a ciegas —
+ * la misma clase de defecto que pedir el UUID, pero más difícil de ver.
+ */
+export class PersonaDto {
+  @ApiProperty({ type: String, format: 'uuid' }) id!: string;
+  @ApiProperty({ type: String }) nombreCompleto!: string;
+  @ApiProperty({
+    type: String,
+    enum: ['cedula', 'cedula_extranjeria', 'pasaporte', 'nit', 'otro'],
+  })
+  tipoDocumento!: string;
+  @ApiProperty({ type: String }) numeroDocumento!: string;
+  @ApiProperty({ type: Boolean }) esResidente!: boolean;
+  @ApiProperty({ type: String, nullable: true }) viviendaIdentificador!: string | null;
+}
+
+/**
+ * Resultado del alta. `yaExistia` es la diferencia entre «creé a esta persona»
+ * y «esta persona ya estaba con ese documento»: la consola lo dice en vez de
+ * fingir un alta que no ocurrió (RN-06 — el documento ES la identidad).
+ */
+export class PersonaResueltaDto {
+  @ApiProperty({ type: String, format: 'uuid' }) id!: string;
+  @ApiProperty({ type: String }) nombreCompleto!: string;
+  @ApiProperty({ type: Boolean }) yaExistia!: boolean;
 }

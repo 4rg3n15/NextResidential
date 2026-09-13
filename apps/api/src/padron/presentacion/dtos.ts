@@ -1,6 +1,7 @@
 import {
   IsBase64,
   IsBoolean,
+  IsEmail,
   IsIn,
   IsOptional,
   IsString,
@@ -120,4 +121,50 @@ export class RegistrarResidenteDto {
   @IsString()
   @Length(1, 60)
   parentesco?: string;
+}
+
+/**
+ * Alta de persona en el mismo paso en que se la autoriza (D-72, HU-07).
+ *
+ * **El DTO valida FORMA y nada más.** Aquí no se normaliza el documento ni el
+ * nombre: eso lo hacen los objetos de valor `Documento` y `NombreDePersona`,
+ * que son el único punto por el que pasan los dos caminos de entrada —este y la
+ * carga de padrón—. Normalizar en el DTO produciría dos reglas que se separan.
+ */
+export class RegistrarPersonaDto {
+  @ApiProperty({
+    type: String,
+    enum: ['cedula', 'cedula_extranjeria', 'pasaporte', 'nit', 'otro'],
+    description: 'Catálogo del enumerado `tipo_documento` de la migración 0002.',
+  })
+  @IsIn(['cedula', 'cedula_extranjeria', 'pasaporte', 'nit', 'otro'])
+  tipoDocumento!: 'cedula' | 'cedula_extranjeria' | 'pasaporte' | 'nit' | 'otro';
+
+  @ApiProperty({
+    type: String,
+    minLength: 4,
+    maxLength: 30,
+    example: '12.345.678',
+    description: 'Se admite con puntos o espacios: el objeto de valor lo normaliza.',
+  })
+  @IsString()
+  @Length(4, 30)
+  numeroDocumento!: string;
+
+  @ApiProperty({ type: String, minLength: 2, maxLength: 200, example: 'Ana María Pérez' })
+  @IsString()
+  @Length(2, 200)
+  nombreCompleto!: string;
+
+  @ApiPropertyOptional({ type: String, maxLength: 40 })
+  @IsOptional()
+  @IsString()
+  @Length(3, 40)
+  telefono?: string;
+
+  @ApiPropertyOptional({ type: String, maxLength: 200 })
+  @IsOptional()
+  @IsEmail()
+  @Length(3, 200)
+  correo?: string;
 }

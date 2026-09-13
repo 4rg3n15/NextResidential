@@ -13,6 +13,7 @@ import type {
   EstadoDeRegistro,
   PaginaDeViviendas,
   Pendientes,
+  Persona,
   TipoDeInforme,
   Vehiculo,
   Zona,
@@ -117,6 +118,7 @@ export const clavesDe09B = {
     ['viviendas', c, estado, busqueda] as const,
   vehiculos: (c: string) => ['vehiculos', c] as const,
   autorizaciones: (c: string, ver: string) => ['autorizaciones', c, ver] as const,
+  personas: (c: string, busqueda: string) => ['personas', c, busqueda] as const,
   zonas: (c: string) => ['zonas', c] as const,
   dispositivosPendientes: (c: string) => ['dispositivos', c, 'pendientes'] as const,
   alertas: (c: string) => ['alertas', c] as const,
@@ -182,6 +184,30 @@ export const useAutorizaciones = (
       desenvolver(
         await cliente.GET('/copropiedades/{id}/autorizaciones', {
           params: { path: { id: copropiedadId }, query: { ver } },
+        }),
+      ),
+  });
+
+/**
+ * Buscador de personas (D-72).
+ *
+ * **La API decide el mínimo, no la consola.** `BuscarPersonas` devuelve vacío
+ * por debajo de dos caracteres; aquí solo se evita disparar la petición, que es
+ * una economía de red, no una regla. Si la regla viviera en los dos sitios, un
+ * cambio en la API dejaría la consola pidiendo lo que ya no se responde.
+ *
+ * `placeholderData` conserva la lista anterior mientras llega la siguiente: sin
+ * él, cada tecla vacía el desplegable y la lista parpadea bajo el cursor.
+ */
+export const usePersonas = (copropiedadId: string, busqueda: string): UseQueryResult<Persona[]> =>
+  useQuery({
+    enabled: copropiedadId !== '' && busqueda.trim().length >= 2,
+    queryKey: clavesDe09B.personas(copropiedadId, busqueda.trim()),
+    placeholderData: (previa) => previa,
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/padron/personas', {
+          params: { path: { id: copropiedadId }, query: { busqueda: busqueda.trim() } },
         }),
       ),
   });

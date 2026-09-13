@@ -653,6 +653,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/padron/personas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Busca personas por nombre o documento para autorizar sin escribir un UUID (D-72) */
+        get: operations["PadronDeCopropiedadController_personas"];
+        put?: never;
+        /** Da de alta una persona por nombre y documento, o resuelve la que ya existe (D-72) */
+        post: operations["PadronController_registrarPersona"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/padron/residentes": {
         parameters: {
             query?: never;
@@ -1549,6 +1567,22 @@ export interface components {
             /** Format: uuid */
             zonaId: string;
         };
+        PersonaDto: {
+            /** Format: uuid */
+            id: string;
+            nombreCompleto: string;
+            /** @enum {string} */
+            tipoDocumento: "cedula" | "cedula_extranjeria" | "pasaporte" | "nit" | "otro";
+            numeroDocumento: string;
+            esResidente: boolean;
+            viviendaIdentificador: string | null;
+        };
+        PersonaResueltaDto: {
+            /** Format: uuid */
+            id: string;
+            nombreCompleto: string;
+            yaExistia: boolean;
+        };
         PuntoDeFrecuenciaDto: {
             /** @description Lunes de la semana ISO, YYYY-MM-DD */
             semana: string;
@@ -1575,6 +1609,22 @@ export interface components {
              * @example A1B2C-D3E4F
              */
             codigo: string;
+        };
+        RegistrarPersonaDto: {
+            /**
+             * @description Catálogo del enumerado `tipo_documento` de la migración 0002.
+             * @enum {string}
+             */
+            tipoDocumento: "cedula" | "cedula_extranjeria" | "pasaporte" | "nit" | "otro";
+            /**
+             * @description Se admite con puntos o espacios: el objeto de valor lo normaliza.
+             * @example 12.345.678
+             */
+            numeroDocumento: string;
+            /** @example Ana María Pérez */
+            nombreCompleto: string;
+            telefono?: string;
+            correo?: string;
         };
         RegistrarResidenteDto: {
             /** Format: uuid */
@@ -1633,6 +1683,10 @@ export interface components {
             /** @description Verdadero solo si entró el padrón ENTERO. Una carga a medias no existe (HU-03). */
             aplicada: boolean;
             filasLeidas: number;
+            /** @description Viviendas que hubo que crear porque el identificador de la hoja no existía. Una errata crea una vivienda que nadie quería, y este número la delata en el momento (D-72). */
+            viviendasCreadas: number;
+            /** @description Personas nuevas. Las que ya tenían ese documento se reutilizan (RN-06). */
+            personasCreadas: number;
         };
         ResultadoDeOperacionDto: {
             encolada: boolean;
@@ -2968,6 +3022,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultadoDeCargaDto"];
+                };
+            };
+        };
+    };
+    PadronDeCopropiedadController_personas: {
+        parameters: {
+            query: {
+                /** @description Nombre parcial o documento; con menos de dos caracteres devuelve vacío. */
+                busqueda: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaDto"][];
+                };
+            };
+        };
+    };
+    PadronController_registrarPersona: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarPersonaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaResueltaDto"];
                 };
             };
         };

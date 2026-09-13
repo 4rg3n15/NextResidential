@@ -2252,6 +2252,98 @@
         ]
       }
     },
+    "/copropiedades/{id}/padron/personas": {
+      "post": {
+        "operationId": "PadronController_registrarPersona",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarPersonaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaResueltaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Da de alta una persona por nombre y documento, o resuelve la que ya existe (D-72)",
+        "tags": [
+          "padron"
+        ]
+      },
+      "get": {
+        "operationId": "PadronDeCopropiedadController_personas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "busqueda",
+            "required": true,
+            "in": "query",
+            "description": "Nombre parcial o documento; con menos de dos caracteres devuelve vacío.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PersonaDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Busca personas por nombre o documento para autorizar sin escribir un UUID (D-72)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
     "/copropiedades/{id}/padron/residentes": {
       "post": {
         "operationId": "PadronController_registrarResidente",
@@ -4835,6 +4927,66 @@
           "zonaId"
         ]
       },
+      "PersonaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombreCompleto": {
+            "type": "string"
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "cedula",
+              "cedula_extranjeria",
+              "pasaporte",
+              "nit",
+              "otro"
+            ]
+          },
+          "numeroDocumento": {
+            "type": "string"
+          },
+          "esResidente": {
+            "type": "boolean"
+          },
+          "viviendaIdentificador": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "nombreCompleto",
+          "tipoDocumento",
+          "numeroDocumento",
+          "esResidente",
+          "viviendaIdentificador"
+        ]
+      },
+      "PersonaResueltaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombreCompleto": {
+            "type": "string"
+          },
+          "yaExistia": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "nombreCompleto",
+          "yaExistia"
+        ]
+      },
       "PuntoDeFrecuenciaDto": {
         "type": "object",
         "properties": {
@@ -4899,6 +5051,48 @@
         },
         "required": [
           "codigo"
+        ]
+      },
+      "RegistrarPersonaDto": {
+        "type": "object",
+        "properties": {
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "cedula",
+              "cedula_extranjeria",
+              "pasaporte",
+              "nit",
+              "otro"
+            ],
+            "description": "Catálogo del enumerado `tipo_documento` de la migración 0002."
+          },
+          "numeroDocumento": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 30,
+            "example": "12.345.678",
+            "description": "Se admite con puntos o espacios: el objeto de valor lo normaliza."
+          },
+          "nombreCompleto": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200,
+            "example": "Ana María Pérez"
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "correo": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "tipoDocumento",
+          "numeroDocumento",
+          "nombreCompleto"
         ]
       },
       "RegistrarResidenteDto": {
@@ -5063,13 +5257,23 @@
           },
           "filasLeidas": {
             "type": "number"
+          },
+          "viviendasCreadas": {
+            "type": "number",
+            "description": "Viviendas que hubo que crear porque el identificador de la hoja no existía. Una errata crea una vivienda que nadie quería, y este número la delata en el momento (D-72)."
+          },
+          "personasCreadas": {
+            "type": "number",
+            "description": "Personas nuevas. Las que ya tenían ese documento se reutilizan (RN-06)."
           }
         },
         "required": [
           "aceptadas",
           "errores",
           "aplicada",
-          "filasLeidas"
+          "filasLeidas",
+          "viviendasCreadas",
+          "personasCreadas"
         ]
       },
       "ResultadoDeOperacionDto": {

@@ -6,21 +6,19 @@ import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { REPOSITORIO_PADRON } from '../aplicacion/puertos';
 import type { FiltroDeViviendas, RepositorioPadron } from '../aplicacion/puertos';
-import { ListarVehiculos, ListarViviendas } from '../aplicacion/casos-de-uso';
-import { PaginaDeViviendasDto, VehiculoDto } from './respuestas';
+import { BuscarPersonas, ListarVehiculos, ListarViviendas } from '../aplicacion/casos-de-uso';
+import { PaginaDeViviendasDto, PersonaDto, VehiculoDto } from './respuestas';
 
 /**
  * LECTURAS del padrón, bajo `copropiedades/:id`.
  *
- * **Por qué las lecturas van aquí y las escrituras siguen en `/padron`.** La
- * copropiedad en la ruta es lo que la suite de aislamiento recorre para
- * intentar la fuga: cada ruta con `:id` entra en el barrido automáticamente y
- * nadie tiene que acordarse de añadirla. Las escrituras derivan la copropiedad
- * del token —no admiten que el cliente la nombre— y por eso no llevan `:id`:
- * un identificador de tenant en el cuerpo es un campo con el que equivocarse.
- *
- * Las dos formas comprueban el alcance; lo que cambia es de dónde sale el
- * identificador, no si se verifica.
+ * **La copropiedad va en la ruta, en las lecturas y en las escrituras.** Es lo
+ * que la suite de aislamiento recorre para intentar la fuga: cada ruta con
+ * `:id` entra en el barrido automáticamente y nadie tiene que acordarse de
+ * añadirla. Las escrituras vivían en `/padron` a secas y tomaban la copropiedad
+ * del token, hasta que D-71 demostró que así el superadministrador —cuyo campo
+ * es nulo por diseño— no podía escribir nada; ahora comparten prefijo con estas
+ * lecturas y `exigirAlcance` valida el destino en los dos casos.
  */
 @ApiTags('padron')
 @ApiBearerAuth()
@@ -56,6 +54,29 @@ export class PadronDeCopropiedadController {
     const r = await new ListarViviendas(this.repo).ejecutar(copropiedadId, filtro);
     if (!r.ok) throw new Error(r.error.detalle);
     return { totales: r.valor.totales, viviendas: [...r.valor.viviendas] };
+  }
+
+  @Get('personas')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({
+    summary: 'Busca personas por nombre o documento para autorizar sin escribir un UUID (D-72)',
+  })
+  @ApiQuery({
+    name: 'busqueda',
+    required: true,
+    type: String,
+    description: 'Nombre parcial o documento; con menos de dos caracteres devuelve vacío.',
+  })
+  @ApiOkResponse({ type: [PersonaDto] })
+  async personas(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Query('busqueda') busqueda?: string,
+  ): Promise<PersonaDto[]> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/personas');
+    const r = await new BuscarPersonas(this.repo).ejecutar(copropiedadId, busqueda ?? '');
+    if (!r.ok) throw new Error(r.error.detalle);
+    return [...r.valor];
   }
 
   @Get('vehiculos')

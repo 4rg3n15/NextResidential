@@ -428,3 +428,87 @@ en verde:
 ```
    ✗ no hay ninguna IPv4 no interna: la mitad de este paso NO se ejerció
 ```
+
+---
+
+## 11 · Dar de alta el padrón sin escribir un solo identificador (D-72)
+
+Es lo que bloqueaba todo lo demás: sin viviendas y sin personas no se puede
+probar ni una autorización. Dos caminos, y los dos se recorren desde la consola.
+
+### 11.1 · A mano, vivienda a vivienda
+
+1. **Viviendas → Nueva vivienda.** El identificador es el que usa el conjunto:
+   «Casa 12», «Torre B - 401». No hay ningún campo con forma de identificador
+   interno.
+2. **Visitantes → Nueva autorización.** En «Persona que visita» escriba un
+   nombre o una cédula. Con dos caracteres empieza a buscar; los resultados
+   dicen además de qué vivienda es residente cada quien, para que dos homónimos
+   no sean la misma línea.
+3. Si la persona no aparece, la última opción de la lista es **«Registrar a
+   «…» como persona nueva»**. Pide tipo de documento, número y nombre, y vuelve
+   al formulario con la persona ya elegida.
+
+**Lo que debe ver si registra un documento que ya existía:**
+
+```
+Ese documento ya estaba registrado como «Ana María Pérez». Se usa esa persona:
+el documento es la identidad.
+```
+
+No es un error: el documento **es** la identidad (RN-06). Crear una segunda
+persona con la misma cédula sería justo la fuga que la lista negra no admite.
+
+**Y la vigencia:** ponga «Hasta» antes que «Desde» a propósito. Debajo del
+campo debe aparecer, **antes de enviar nada**:
+
+```
+La vigencia termina antes de empezar. Revisa a. m. y p. m.: «hasta» debe ser
+posterior a «desde».
+```
+
+El botón «Autorizar» queda deshabilitado. Si lo consigue enviar, es un defecto:
+repórtelo.
+
+### 11.2 · El padrón entero, desde una hoja
+
+**Viviendas → Cargar padrón.** La hoja se llena con lo que el conjunto tiene
+escrito. La única columna obligatoria es `vivienda`:
+
+| vivienda | documento  | nombre          | placa  | es_titular |
+| -------- | ---------- | --------------- | ------ | ---------- |
+| Casa 12  | 12.345.678 | Ana María Pérez |        | true       |
+| Casa 12  |            |                 | ABC123 |            |
+| Casa 13  | 98765432   | Luis Gómez      | XYZ987 | true       |
+| Casa 14  |            |                 |        |            |
+
+- `vivienda` — si no existe, **se crea**.
+- `documento` + `nombre` — registran a la persona como residente de esa
+  vivienda. El mismo documento en dos filas es **una** persona, con puntos o sin
+  ellos.
+- `placa` — registra el vehículo en esa vivienda.
+- `tipo_documento` y `es_titular` — opcionales; por omisión, cédula y no
+  titular.
+- Una fila con solo `vivienda` da de alta la casa vacía.
+
+**Salida esperada de una carga correcta:**
+
+```
+Padrón cargado: 4 filas de 4.
+Se crearon 3 viviendas y 2 personas. Si alguno de esos números te sorprende,
+revisa la hoja: una errata en «vivienda» crea una casa nueva.
+```
+
+Ese segundo renglón es el control: la hoja nombra la vivienda por su
+identificador, así que **«Casa 12 » con un espacio de más crea una casa
+distinta**. El número lo delata en el momento.
+
+**Salida esperada si una fila está mal** — la carga es de todo o nada (HU-03):
+
+```
+No se aplicó nada. Se leyeron 4 filas y 1 tiene errores.
+  Fila 3: la fila trae documento pero no un nombre válido en la columna «nombre»
+```
+
+Compruebe después, en **Viviendas**, que el total de activas es el que esperaba,
+y que ninguna vivienda quedó a medias.

@@ -11,21 +11,24 @@ import type { RepositorioPadron } from '../aplicacion/puertos';
 import {
   DesactivarVehiculo,
   DesactivarVivienda,
+  RegistrarPersona,
   RegistrarResidente,
   RegistrarVehiculo,
   RegistrarVivienda,
 } from '../aplicacion/casos-de-uso';
 import { CargarPadronDesdeArchivo, analizarCsv } from '../aplicacion/carga-padron';
+import type { FilaPadron } from '../aplicacion/carga-padron';
 import { ArchivoInvalido, filasDesdeXlsx } from '../infraestructura/xlsx';
 import {
   CargarPadronDto,
   CargarPadronXlsxDto,
   DesactivarDto,
+  RegistrarPersonaDto,
   RegistrarResidenteDto,
   RegistrarVehiculoDto,
   RegistrarViviendaDto,
 } from './dtos';
-import { BajaDto, IdCreadoDto, ResultadoDeCargaDto } from './respuestas';
+import { BajaDto, IdCreadoDto, PersonaResueltaDto, ResultadoDeCargaDto } from './respuestas';
 
 /**
  * Traduce protocolo a casos de uso. **Cero reglas de negocio** (§2.2): lo único
@@ -159,19 +162,15 @@ export class PadronController {
 
   private async aplicarCarga(
     ctx: ContextoTenant,
-    filas: readonly {
-      readonly numeroDeFila: number;
-      readonly viviendaId: string;
-      readonly placa?: string;
-      readonly personaId?: string;
-      readonly esTitular?: boolean;
-    }[],
+    filas: readonly FilaPadron[],
   ): Promise<ResultadoDeCargaDto> {
     const resultado = await new CargarPadronDesdeArchivo(this.repo).ejecutar(ctx, filas);
     return {
       aceptadas: resultado.aceptadas,
       errores: resultado.errores.map((e) => ({ fila: e.numeroDeFila, motivo: e.motivo })),
       aplicada: resultado.aplicada,
+      viviendasCreadas: resultado.viviendasCreadas,
+      personasCreadas: resultado.personasCreadas,
       // Cuántas filas se leyeron de verdad. Sin este número, «0 aceptadas y 0
       // errores» no distingue «el archivo estaba vacío» de «no se entendió la
       // cabecera», y son dos problemas con soluciones distintas.
@@ -190,6 +189,21 @@ export class PadronController {
   ): Promise<IdCreadoDto> {
     const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/viviendas');
     return this.desenvolver(await new RegistrarVivienda(this.repo).ejecutar(destino, dto));
+  }
+
+  @Post('personas')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({
+    summary: 'Da de alta una persona por nombre y documento, o resuelve la que ya existe (D-72)',
+  })
+  @ApiOkResponse({ type: PersonaResueltaDto })
+  async registrarPersona(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Body() dto: RegistrarPersonaDto,
+  ): Promise<PersonaResueltaDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/personas');
+    return this.desenvolver(await new RegistrarPersona(this.repo).ejecutar(destino, dto));
   }
 
   @Post('residentes')

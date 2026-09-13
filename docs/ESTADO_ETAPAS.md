@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-13 · **ETAPA 10 construida** · D-71 corregido: el superadministrador ya escribe
+**Última actualización:** 2026-09-13 · **ETAPA 10 construida** · D-71 a D-74 corregidos: el padrón se da de alta escribiendo nombres
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -23,7 +23,7 @@
 | **Etapas cerradas**            | **9 de 17** (ETAPAS 00 a 09) · la 09 cerrada el 2026-09-12 con `--con-base`, 19 de 19 pasos                     |
 | **Etapa siguiente habilitada** | **ETAPA 10 — consolas operativas** (la 12 sigue habilitada)                                                     |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | Ninguno. D-60 a D-63 corregidos en la ronda del 2026-09-10                                                      |
+| **Defectos abiertos**          | Ninguno. D-71 a D-74 corregidos en la ronda del 2026-09-13                                                      |
 | **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
 | **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
 | **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)                                                     |
@@ -292,6 +292,63 @@ Propuesta escrita en
 `agrupacion` como dato y `etiqueta_agrupacion` configurable por copropiedad.
 Implica migración, y **hoy es barata porque no hay ni una vivienda creada**:
 dos `ALTER TABLE` sin mover datos. En cuanto se cargue el padrón, deja de serlo.
+
+### D-72 · la consola pedía un UUID donde va una persona · 2026-09-13
+
+El campo se rotulaba **«Persona que visita (identificador)»**, aceptaba texto
+libre y respondía `personaId must be a UUID` a quien escribiera un nombre. Nadie
+tiene a mano el UUID de un visitante: el dato solo existe dentro de la base.
+
+**No era un defecto de rótulo.** El flujo real es que el residente autoriza a
+alguien **por su nombre y su documento**, y que si esa persona no está en el
+sistema se cree en ese momento. La tabla `personas` existe precisamente para eso
+(D-01): que la lista negra alcance a la misma persona sea cual sea el rol con el
+que se presente (RN-06). La identidad importa; el UUID no es asunto del usuario.
+
+| Corregido                        | Cómo                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identidad como objeto de valor   | `Documento` y `NombreDePersona` en `domain-core`. `12.345.678`, `12 345 678` y `12345678` producen **una sola forma**; lo que no se puede normalizar **falla** en vez de desaparecer, porque borrar lo desconocido colapsaría dos personas en una                                                                                                   |
+| Buscar y crear en un solo paso   | `GET`/`POST /copropiedades/:id/padron/personas` y el componente `BuscadorDePersonas`: se teclea nombre o documento, se elige de la lista, y si no aparece se registra sin salir del formulario                                                                                                                                                      |
+| Un documento repetido NO duplica | El alta resuelve a la persona que ya existe —lo decide el índice único parcial, no un `SELECT` previo (ADR-04)— y la consola **lo dice**: «ya estaba registrado como …». Fingir un alta que no ocurrió habría escondido que el nombre tecleado se descartó                                                                                          |
+| La hoja de padrón, rellenable    | Pedía las columnas `vivienda_id` y `persona_id`. Ahora la vivienda se nombra **«Casa 12»**, la persona por **documento y nombre**, y el resumen dice cuántas viviendas y personas hubo que crear: una errata en la columna «vivienda» crea una casa que nadie quería, y el número la delata en el momento. Las cabeceras antiguas se siguen leyendo |
+| Barrido, no ruta a ruta          | `formularios-sin-identificadores.test.ts` teclea basura en todo campo de texto de cada formulario, elige la primera opción de cada desplegable, resuelve cada buscador, envía, y comprueba **contra `openapi.json`** que toda propiedad declarada `format: uuid` llegó siendo un UUID. No hay lista de campos prohibidos que mantener               |
+| Alta real contra base            | `padron-por-nombre.test.ts`, en el paso 13: una hoja sin un solo UUID crea las viviendas, las personas y sus vínculos, y la misma cédula escrita de dos formas resuelve a **una** persona                                                                                                                                                           |
+
+**Lo que el barrido dejó clasificado y por qué.** Portería y guardia escriben
+sobre el elemento que ya está en pantalla —solo se teclea el motivo—;
+dispositivos son botones por fila; configuración declara `min`/`max` en sus
+campos numéricos y responde 422 por campo. Ninguna pide una identidad. Queda
+anotado que `POST /padron/residentes` sigue aceptando `personaId`: **no hay
+todavía pantalla de residentes**, y cuando la haya debe usar el buscador.
+
+### D-73 · la vigencia se aceptó invertida · 2026-09-13
+
+«Desde 13/09/2026 05:45 p. m.» y «Hasta 13/09/2026 05:45 a. m.»: terminaba antes
+de empezar. El formulario no lo señaló, y el error que acabó mostrando fue el de
+**otro campo** —el UUID—, porque el `ValidationPipe` corre antes que el dominio.
+
+**El dominio sí lo rechaza, y está comprobado.** `Vigencia.crear` devuelve fallo
+para el rango invertido y para el de duración cero —el intervalo es
+cerrado-abierto, así que con los dos extremos iguales no contiene ningún
+instante—, y el caso de uso no llega a tocar el repositorio. No es un defecto de
+fondo: **una vigencia invertida no se puede persistir.** Se añadió la prueba con
+los valores exactos del 13, afirmando además que no se escribió nada, y
+`autorizaciones-vigencia.e2e.test.ts` exige que la respuesta HTTP **nombre la
+vigencia** y no mencione el UUID.
+
+Lo que faltaba era el aviso: `problemaDeVigencia` señala el motivo **debajo del
+campo «Hasta»** y bloquea el envío. No relaja nada —quien decide sigue siendo el
+dominio—, pero una restricción que solo aparece cuando el servidor la nombra
+obliga a descubrirla por ensayo y error.
+
+### D-74 · «los días marcados» que no se veían · 2026-09-13
+
+La casilla decía «Recurrente (08:00–18:00 en los días marcados)» y anunciaba dos
+cosas que no existían: los días solo aparecían **después** de marcarla, y la
+franja horaria estaba fija en el código. Ahora la casilla dice «Autorización
+recurrente» a secas, y al marcarla se abre un grupo con los días **y** las dos
+horas, editables; una franja que cruce la medianoche se señala en el formulario
+con el mismo motivo que da RN-22 (se registra con dos autorizaciones).
 
 ---
 

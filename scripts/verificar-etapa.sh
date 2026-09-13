@@ -354,6 +354,15 @@ if [[ "$CON_BASE" == "1" ]]; then
     # nunca coinciden—, así que solo cuenta ejecutada contra PostgreSQL real.
     con_base_o_omitida test/aforo-concurrencia.test.ts \
       "50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)"
+    # D-72 · el padrón se da de alta escribiendo nombres. Con dobles esta
+    # prueba pasa con cualquier implementación; lo que hay que demostrar es que
+    # la fila EXISTE y que la misma cédula escrita de dos formas resuelve a una
+    # sola persona, y eso solo lo garantiza el índice único de PostgreSQL.
+    con_base_o_omitida test/padron-por-nombre.test.ts \
+      "una hoja sin un solo UUID crea viviendas, personas y sus vínculos (D-72, RN-06)"
+    # D-71 · y el superadministrador escribe de verdad, no solo pasa el alcance.
+    con_base_o_omitida test/padron-superadmin.test.ts \
+      "el superadministrador escribe el padrón en la copropiedad del selector (D-71)"
   else
     echo "   – omitido: exporta DATABASE_URL_PRUEBAS para ejecutarlo"
   fi

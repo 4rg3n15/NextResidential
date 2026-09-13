@@ -59,6 +59,11 @@ export type PaginaDeViviendas = Esquemas['PaginaDeViviendasDto'];
 export type Vivienda = Esquemas['ViviendaDto'];
 export type Vehiculo = Esquemas['VehiculoDto'];
 export type Autorizacion = Esquemas['AutorizacionDto'];
+
+/* D-72 · identidad de persona resuelta por nombre o documento, nunca por UUID. */
+export type Persona = Esquemas['PersonaDto'];
+export type PersonaResuelta = Esquemas['PersonaResueltaDto'];
+export type TipoDeDocumento = Persona['tipoDocumento'];
 export type PatronDeAutorizacion = Esquemas['PatronDto'];
 export type Zona = Esquemas['ZonaDto'];
 export type FranjaDeZona = Esquemas['FranjaDto'];
