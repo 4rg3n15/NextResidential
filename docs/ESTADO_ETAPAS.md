@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-13 · **ETAPA 10 construida** · consolas de portería y guardia virtual; DT-12 cerrado
+**Última actualización:** 2026-09-13 · **ETAPA 10 construida** · D-71 corregido: el superadministrador ya escribe
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -253,6 +253,47 @@ en memoria del proceso: al reiniciar, el portero ve un evento con la imagen rota
 y una lista negra vacía. Son **3 jornadas** —`AlmacenEvidenciaSupabase` con
 validación de tipo real, y el adaptador PostgreSQL de autorizaciones y listas
 negras (D-25)— y conviene hacerlas antes de abrir la etapa, no dentro.
+
+### D-71 · el superadministrador no podía escribir NADA · 2026-09-13
+
+`POST /padron/viviendas` → `400 · La identidad no tiene copropiedad`.
+
+**Causa.** Su `copropiedad_id` es **nulo por diseño** —no pertenece a ninguna,
+las alcanza todas, y lo resuelve `app.es_superadmin()`—, y los casos de uso de
+escritura la leían del token. La 09-B movió las **lecturas** bajo
+`copropiedades/:id` para que entraran en el barrido de aislamiento; las
+**escrituras** se quedaron tomándola del token, y nadie las recorrió con ese rol.
+
+No afectaba sólo a viviendas: **padrón entero, autorizaciones, listas negras y
+biometría**. Todas fallaban igual. El cliente tenía razón en pedir que no se
+arreglara ruta a ruta.
+
+**Por qué ninguna prueba lo vio.** Todas las de escritura usaban
+**administrador**, que sí lleva `copropiedad_id`. Es el mismo hueco que dejó las
+ocho pantallas en «sin permiso»: el rol que no encaja en el modelo mental de
+«una identidad, una copropiedad» es justo el que nadie recorre.
+
+| Corregido                                    | Cómo                                                                                                                                                                                                                                   |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Toda escritura cuelga de `copropiedades/:id` | El padrón se movió; el resto ya estaba                                                                                                                                                                                                 |
+| El contexto que llega al dominio             | `exigirAlcance` **devuelve el contexto de destino** con la copropiedad ya validada. Un caso de uso no puede olvidar la comprobación porque no la hace: recibe el dato comprobado o no se ejecuta                                       |
+| El aislamiento **no se afloja**              | La copropiedad viene de la ruta, que la pone el cliente, así que se valida contra el alcance real: un administrador que apunte a otra recibe **404, no 403**                                                                           |
+| Prueba derivada del enrutador                | `escrituras-superadministrador.e2e.test.ts` recorre **toda** ruta de escritura con `copropiedadId: null`. Una ruta nueva entra sola, y un `it` estructural falla si alguien vuelve a colgar una escritura fuera de `copropiedades/:id` |
+| Alta real contra base                        | `padron-superadmin.test.ts`, en el paso 13                                                                                                                                                                                             |
+
+**Un hallazgo de propina.** El primer intento de limpieza de esa prueba hacía
+`DELETE` sobre `viviendas` y la base lo rechazó: «Borrado físico prohibido […]
+use la baja lógica». RN-19 funcionando — y la confirmación de que la fila se
+había creado de verdad.
+
+**Vocabulario «Manzana».** No lo fija ningún requisito: viene de un mockup.
+Propuesta escrita en
+[`decisiones/propuestas/agrupacion-de-vivienda.md`](decisiones/propuestas/agrupacion-de-vivienda.md):
+`agrupacion` como dato y `etiqueta_agrupacion` configurable por copropiedad.
+Implica migración, y **hoy es barata porque no hay ni una vivienda creada**:
+dos `ALTER TABLE` sin mover datos. En cuanto se cargue el padrón, deja de serlo.
+
+---
 
 ## ETAPA 10 — Consolas operativas · **CONSTRUIDA** · 2026-09-13
 

@@ -100,8 +100,8 @@ export class AutorizacionesController {
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Body() dto: CrearAutorizacionDto,
   ): Promise<IdAutorizacionDto> {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
-    return this.desenvolver(await this.crear.ejecutar(ctx, dto));
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
+    return this.desenvolver(await this.crear.ejecutar(destino, dto));
   }
 
   @Post(':autorizacionId/revocacion')
@@ -114,8 +114,8 @@ export class AutorizacionesController {
     @Param('autorizacionId', ParseUUIDPipe) autorizacionId: string,
     @Body() dto: RevocarAutorizacionDto,
   ): Promise<RevocacionDto> {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
-    this.desenvolver(await this.revocarCasoDeUso.ejecutar(ctx, autorizacionId, dto.motivo));
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
+    this.desenvolver(await this.revocarCasoDeUso.ejecutar(destino, autorizacionId, dto.motivo));
     return { revocada: true };
   }
 
@@ -129,8 +129,8 @@ export class AutorizacionesController {
     @Param('autorizacionId', ParseUUIDPipe) autorizacionId: string,
     @Body() dto: AgregarAcompananteDto,
   ): Promise<AcompananteAgregadoDto> {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
-    this.desenvolver(await this.agregar.ejecutar(ctx, autorizacionId, dto));
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
+    this.desenvolver(await this.agregar.ejecutar(destino, autorizacionId, dto));
     return { agregado: true };
   }
 }

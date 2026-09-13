@@ -60,7 +60,13 @@ export const DirectorioDeViviendas = ({
     setError(undefined);
     try {
       desenvolver(
-        await cliente.POST('/padron/viviendas', {
+        /**
+         * La copropiedad de destino va en la RUTA, y sale del selector (D-71).
+         * Antes se derivaba del token, y el superadministrador —que no
+         * pertenece a ninguna— no podía crear nada.
+         */
+        await cliente.POST('/copropiedades/{id}/padron/viviendas', {
+          params: { path: { id: copropiedadId } },
           body: {
             identificador: identificador.trim(),
             ...(manzana.trim() === '' ? {} : { manzana: manzana.trim() }),
@@ -89,8 +95,8 @@ export const DirectorioDeViviendas = ({
     setError(undefined);
     try {
       desenvolver(
-        await cliente.POST('/padron/viviendas/{id}/desactivacion', {
-          params: { path: { id: baja.id } },
+        await cliente.POST('/copropiedades/{id}/padron/viviendas/{viviendaId}/desactivacion', {
+          params: { path: { id: copropiedadId, viviendaId: baja.id } },
           body: { motivo },
         }),
       );
@@ -189,7 +195,7 @@ export const DirectorioDeViviendas = ({
         }
         acciones={
           <>
-            <CargaDePadron alTerminar={() => void refrescar()} />
+            <CargaDePadron copropiedadId={copropiedadId} alTerminar={() => void refrescar()} />
             <Boton onClick={() => setAlta(true)}>Nueva vivienda</Boton>
           </>
         }

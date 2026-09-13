@@ -2160,7 +2160,189 @@
         ]
       }
     },
+    "/copropiedades/{id}/padron/carga": {
+      "post": {
+        "operationId": "PadronController_cargar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CargarPadronDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Carga transaccional desde CSV con reporte de errores por fila (HU-03)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/carga/xlsx": {
+      "post": {
+        "operationId": "PadronController_cargarXlsx",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CargarPadronXlsxDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Carga transaccional desde XLSX validando el TIPO REAL del archivo (HU-03, D-20t)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/residentes": {
+      "post": {
+        "operationId": "PadronController_registrarResidente",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarResidenteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdCreadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vincula una persona a una vivienda como residente (HU-02)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
     "/copropiedades/{id}/padron/vehiculos": {
+      "post": {
+        "operationId": "PadronController_registrarVehiculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarVehiculoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdCreadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registra un vehículo; la placa única activa la garantiza la base",
+        "tags": [
+          "padron"
+        ]
+      },
       "get": {
         "operationId": "PadronDeCopropiedadController_vehiculos",
         "parameters": [
@@ -2199,7 +2381,105 @@
         ]
       }
     },
+    "/copropiedades/{id}/padron/vehiculos/{vehiculoId}/desactivacion": {
+      "post": {
+        "operationId": "PadronController_desactivarVehiculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vehiculoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesactivarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BajaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Baja lógica del vehículo; el motivo es obligatorio (RN-19)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
     "/copropiedades/{id}/padron/viviendas": {
+      "post": {
+        "operationId": "PadronController_registrarVivienda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarViviendaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdCreadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alta de vivienda; el identificador único activo lo garantiza la base",
+        "tags": [
+          "padron"
+        ]
+      },
       "get": {
         "operationId": "PadronDeCopropiedadController_viviendas",
         "parameters": [
@@ -2250,6 +2530,60 @@
           }
         ],
         "summary": "Directorio de viviendas con totales de activas e inactivas (HU-01, RN-13)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/viviendas/{viviendaId}/desactivacion": {
+      "post": {
+        "operationId": "PadronController_desactivarVivienda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesactivarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BajaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Baja lógica de la vivienda; conserva su historial (RN-19, CA-02)",
         "tags": [
           "padron"
         ]
@@ -2668,283 +3002,6 @@
         "summary": "Registra el latido de un dispositivo (CA-26)",
         "tags": [
           "ingesta"
-        ]
-      }
-    },
-    "/padron/carga": {
-      "post": {
-        "operationId": "PadronController_cargar",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CargarPadronDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Carga transaccional desde CSV con reporte de errores por fila (HU-03)",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/carga/xlsx": {
-      "post": {
-        "operationId": "PadronController_cargarXlsx",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CargarPadronXlsxDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Carga transaccional desde XLSX validando el TIPO REAL del archivo (HU-03, D-20t)",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/residentes": {
-      "post": {
-        "operationId": "PadronController_registrarResidente",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrarResidenteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IdCreadoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Vincula una persona a una vivienda como residente (HU-02)",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/vehiculos": {
-      "post": {
-        "operationId": "PadronController_registrarVehiculo",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrarVehiculoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IdCreadoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Registra un vehículo; la placa única activa la garantiza la base",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/vehiculos/{id}/desactivacion": {
-      "post": {
-        "operationId": "PadronController_desactivarVehiculo",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DesactivarDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BajaDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Baja lógica del vehículo; el motivo es obligatorio (RN-19)",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/viviendas": {
-      "post": {
-        "operationId": "PadronController_registrarVivienda",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrarViviendaDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IdCreadoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Alta de vivienda; el identificador único activo lo garantiza la base",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/viviendas/{id}/desactivacion": {
-      "post": {
-        "operationId": "PadronController_desactivarVivienda",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DesactivarDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BajaDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Baja lógica de la vivienda; conserva su historial (RN-19, CA-02)",
-        "tags": [
-          "padron"
         ]
       }
     },

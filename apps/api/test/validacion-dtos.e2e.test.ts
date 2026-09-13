@@ -51,8 +51,11 @@ describe('validación de DTOs activa en toda superficie con @Body()', () => {
   });
 
   it('padrón · vehículo con identificadores no válidos → 400', async () => {
-    await post('/padron/vehiculos', { viviendaId: 'no-es-uuid', placa: 'ABC123' }).expect(400);
-    await post('/padron/vehiculos', {
+    await post(`/copropiedades/${COP_A}/padron/vehiculos`, {
+      viviendaId: 'no-es-uuid',
+      placa: 'ABC123',
+    }).expect(400);
+    await post(`/copropiedades/${COP_A}/padron/vehiculos`, {
       viviendaId: '20000000-0000-4000-8000-000000000001',
       placa: 'ABC123',
       colado: 'x',

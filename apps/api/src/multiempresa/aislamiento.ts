@@ -28,8 +28,48 @@ export class Aislamiento {
     @Inject(TOKEN_AUDITORIA) private readonly auditoria: RegistroDeAuditoria,
   ) {}
 
-  async exigirAlcance(ctx: ContextoTenant, copropiedadId: string, recurso: string): Promise<void> {
-    if (alcanzaCopropiedad(ctx, copropiedadId)) return;
+  /**
+   * Comprueba el alcance y **devuelve el contexto de la copropiedad DESTINO**.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * POR QUÉ DEVUELVE UN CONTEXTO Y NO `void` — D-71
+   *
+   * El defecto: **ningún superadministrador podía escribir nada**. Las lecturas
+   * se arreglaron en la 09-B poniendo la copropiedad en la ruta, pero los casos
+   * de uso de escritura seguían leyéndola del token (`ctx.copropiedadId`), y en
+   * el superadministrador ese campo es **nulo por diseño** —su alcance lo
+   * resuelve `app.es_superadmin()`—. Resultado: `400 · La identidad no tiene
+   * copropiedad` en vivienda, residente, vehículo, carga de padrón,
+   * autorización, lista negra y biometría. Todas.
+   *
+   * No se vio antes porque **todas las pruebas de escritura usaban
+   * administrador**, que sí lleva `copropiedad_id` en el token. Es el mismo
+   * hueco que dejó las ocho pantallas en «sin permiso»: el rol que no encaja en
+   * el modelo mental de «una identidad, una copropiedad» es justo el que nadie
+   * prueba.
+   *
+   * La salida no es un `if` más en cada caso de uso: es que **el contexto que
+   * llega al dominio ya lleve la copropiedad de destino resuelta y validada**.
+   * Así `ctx.copropiedadId` dentro de un caso de uso significa siempre lo mismo
+   * —«la copropiedad sobre la que se está operando»— y no «la del token, si la
+   * hay». Un caso de uso no puede olvidarse de la comprobación porque no la
+   * hace: recibe el dato ya comprobado o no se ejecuta.
+   *
+   * El destino sale de la RUTA, que es lo que el selector de la consola pone.
+   * Una copropiedad ajena —o un selector manipulado— no llega aquí: se queda en
+   * el 404 de abajo, con su registro en `auditoria_seguridad`.
+   */
+  async exigirAlcance(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    recurso: string,
+  ): Promise<ContextoTenant> {
+    if (alcanzaCopropiedad(ctx, copropiedadId)) {
+      // El contexto de DESTINO: mismo actor y mismo rol, con la copropiedad ya
+      // resuelta. Se devuelve uno nuevo en vez de mutar el del token para que
+      // no haya forma de que un caso de uso vea un contexto a medio validar.
+      return { ...ctx, copropiedadId };
+    }
 
     this.bitacora.registrar('aviso', 'acceso cruzado bloqueado', {
       usuarioId: ctx.usuarioId,
@@ -51,9 +91,9 @@ export class Aislamiento {
     ctx: ContextoTenant,
     copropiedadId: string,
     recurso: string,
-  ): Promise<void> {
+  ): Promise<ContextoTenant> {
     if (ctx.rol !== 'servicio') return this.exigirAlcance(ctx, copropiedadId, recurso);
-    if (ctx.copropiedadId === copropiedadId) return;
+    if (ctx.copropiedadId === copropiedadId) return { ...ctx, copropiedadId };
     await this.auditoria.registrarAccesoCruzado({
       usuarioId: ctx.usuarioId,
       rol: ctx.rol,

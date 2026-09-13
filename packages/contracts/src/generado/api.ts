@@ -619,6 +619,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/padron/carga": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Carga transaccional desde CSV con reporte de errores por fila (HU-03) */
+        post: operations["PadronController_cargar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/padron/carga/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Carga transaccional desde XLSX validando el TIPO REAL del archivo (HU-03, D-20t) */
+        post: operations["PadronController_cargarXlsx"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/padron/residentes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vincula una persona a una vivienda como residente (HU-02) */
+        post: operations["PadronController_registrarResidente"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/padron/vehiculos": {
         parameters: {
             query?: never;
@@ -629,7 +680,25 @@ export interface paths {
         /** Vehículos con su vivienda y su propietario (HU-04, HU-05) */
         get: operations["PadronDeCopropiedadController_vehiculos"];
         put?: never;
-        post?: never;
+        /** Registra un vehículo; la placa única activa la garantiza la base */
+        post: operations["PadronController_registrarVehiculo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/padron/vehiculos/{vehiculoId}/desactivacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Baja lógica del vehículo; el motivo es obligatorio (RN-19) */
+        post: operations["PadronController_desactivarVehiculo"];
         delete?: never;
         options?: never;
         head?: never;
@@ -646,7 +715,25 @@ export interface paths {
         /** Directorio de viviendas con totales de activas e inactivas (HU-01, RN-13) */
         get: operations["PadronDeCopropiedadController_viviendas"];
         put?: never;
-        post?: never;
+        /** Alta de vivienda; el identificador único activo lo garantiza la base */
+        post: operations["PadronController_registrarVivienda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/padron/viviendas/{viviendaId}/desactivacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Baja lógica de la vivienda; conserva su historial (RN-19, CA-02) */
+        post: operations["PadronController_desactivarVivienda"];
         delete?: never;
         options?: never;
         head?: never;
@@ -837,125 +924,6 @@ export interface paths {
         put?: never;
         /** Registra el latido de un dispositivo (CA-26) */
         post: operations["IngestaController_latido"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/carga": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Carga transaccional desde CSV con reporte de errores por fila (HU-03) */
-        post: operations["PadronController_cargar"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/carga/xlsx": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Carga transaccional desde XLSX validando el TIPO REAL del archivo (HU-03, D-20t) */
-        post: operations["PadronController_cargarXlsx"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/residentes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Vincula una persona a una vivienda como residente (HU-02) */
-        post: operations["PadronController_registrarResidente"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/vehiculos": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Registra un vehículo; la placa única activa la garantiza la base */
-        post: operations["PadronController_registrarVehiculo"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/vehiculos/{id}/desactivacion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Baja lógica del vehículo; el motivo es obligatorio (RN-19) */
-        post: operations["PadronController_desactivarVehiculo"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/viviendas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Alta de vivienda; el identificador único activo lo garantiza la base */
-        post: operations["PadronController_registrarVivienda"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/padron/viviendas/{id}/desactivacion": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Baja lógica de la vivienda; conserva su historial (RN-19, CA-02) */
-        post: operations["PadronController_desactivarVivienda"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2954,6 +2922,81 @@ export interface operations {
             };
         };
     };
+    PadronController_cargar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CargarPadronDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeCargaDto"];
+                };
+            };
+        };
+    };
+    PadronController_cargarXlsx: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CargarPadronXlsxDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeCargaDto"];
+                };
+            };
+        };
+    };
+    PadronController_registrarResidente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarResidenteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdCreadoDto"];
+                };
+            };
+        };
+    };
     PadronDeCopropiedadController_vehiculos: {
         parameters: {
             query?: never;
@@ -2971,6 +3014,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VehiculoDto"][];
+                };
+            };
+        };
+    };
+    PadronController_registrarVehiculo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarVehiculoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdCreadoDto"];
+                };
+            };
+        };
+    };
+    PadronController_desactivarVehiculo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                vehiculoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesactivarDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BajaDto"];
                 };
             };
         };
@@ -2995,6 +3089,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginaDeViviendasDto"];
+                };
+            };
+        };
+    };
+    PadronController_registrarVivienda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarViviendaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdCreadoDto"];
+                };
+            };
+        };
+    };
+    PadronController_desactivarVivienda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                viviendaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesactivarDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BajaDto"];
                 };
             };
         };
@@ -3237,171 +3382,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    PadronController_cargar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CargarPadronDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ResultadoDeCargaDto"];
-                };
-            };
-        };
-    };
-    PadronController_cargarXlsx: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CargarPadronXlsxDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ResultadoDeCargaDto"];
-                };
-            };
-        };
-    };
-    PadronController_registrarResidente: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegistrarResidenteDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IdCreadoDto"];
-                };
-            };
-        };
-    };
-    PadronController_registrarVehiculo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegistrarVehiculoDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IdCreadoDto"];
-                };
-            };
-        };
-    };
-    PadronController_desactivarVehiculo: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DesactivarDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BajaDto"];
-                };
-            };
-        };
-    };
-    PadronController_registrarVivienda: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegistrarViviendaDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IdCreadoDto"];
-                };
-            };
-        };
-    };
-    PadronController_desactivarVivienda: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DesactivarDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BajaDto"];
-                };
             };
         };
     };

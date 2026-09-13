@@ -34,7 +34,20 @@ import { BajaDto, IdCreadoDto, ResultadoDeCargaDto } from './respuestas';
  */
 @ApiTags('padron')
 @ApiBearerAuth()
-@Controller('padron')
+/**
+ * **Bajo `copropiedades/:id`, y no en `padron` a secas** — D-71.
+ *
+ * Las escrituras del padrón colgaban de `/padron/…` y tomaban la copropiedad
+ * del token. Para un superadministrador ese campo es nulo por diseño, así que
+ * **ninguna escritura funcionaba**: `400 · La identidad no tiene copropiedad`.
+ * Las lecturas ya se habían movido aquí en la 09-B por el barrido de
+ * aislamiento; las escrituras se quedaron, y nadie las recorrió con ese rol.
+ *
+ * Ahora la copropiedad de destino viene de la RUTA —que es lo que el selector
+ * de la consola pone— y `exigirAlcance` la valida contra el alcance real antes
+ * de devolver el contexto con el que se opera.
+ */
+@Controller('copropiedades/:id/padron')
 export class PadronController {
   constructor(
     @Inject(REPOSITORIO_PADRON) private readonly repo: RepositorioPadron,
@@ -62,37 +75,40 @@ export class PadronController {
   @ApiOkResponse({ type: IdCreadoDto })
   async registrarVehiculo(
     @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Body() dto: RegistrarVehiculoDto,
   ): Promise<IdCreadoDto> {
-    await this.aislamiento.exigirAlcance(ctx, ctx.copropiedadId ?? '', 'padron/vehiculos');
-    return this.desenvolver(await new RegistrarVehiculo(this.repo).ejecutar(ctx, dto));
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/vehiculos');
+    return this.desenvolver(await new RegistrarVehiculo(this.repo).ejecutar(destino, dto));
   }
 
-  @Post('vehiculos/:id/desactivacion')
+  @Post('vehiculos/:vehiculoId/desactivacion')
   @Roles('administrador', 'superadministrador')
   @ApiOperation({ summary: 'Baja lógica del vehículo; el motivo es obligatorio (RN-19)' })
   @ApiOkResponse({ type: BajaDto })
   async desactivarVehiculo(
     @Contexto() ctx: ContextoTenant,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('vehiculoId', ParseUUIDPipe) id: string,
     @Body() dto: DesactivarDto,
   ): Promise<BajaDto> {
-    await this.aislamiento.exigirAlcance(ctx, ctx.copropiedadId ?? '', 'padron/vehiculos');
-    this.desenvolver(await new DesactivarVehiculo(this.repo).ejecutar(ctx, id, dto.motivo));
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/vehiculos');
+    this.desenvolver(await new DesactivarVehiculo(this.repo).ejecutar(destino, id, dto.motivo));
     return { desactivado: true };
   }
 
-  @Post('viviendas/:id/desactivacion')
+  @Post('viviendas/:viviendaId/desactivacion')
   @Roles('administrador', 'superadministrador')
   @ApiOperation({ summary: 'Baja lógica de la vivienda; conserva su historial (RN-19, CA-02)' })
   @ApiOkResponse({ type: BajaDto })
   async desactivarVivienda(
     @Contexto() ctx: ContextoTenant,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('viviendaId', ParseUUIDPipe) id: string,
     @Body() dto: DesactivarDto,
   ): Promise<BajaDto> {
-    await this.aislamiento.exigirAlcance(ctx, ctx.copropiedadId ?? '', 'padron/viviendas');
-    this.desenvolver(await new DesactivarVivienda(this.repo).ejecutar(ctx, id, dto.motivo));
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/viviendas');
+    this.desenvolver(await new DesactivarVivienda(this.repo).ejecutar(destino, id, dto.motivo));
     // `desactivado`, no `desactivada`: el mismo nombre que la baja de vehículo.
     // Dos campos distintos para la misma respuesta obligarían a la consola a
     // recordar cuál toca en cada pantalla, y ese es el tipo de detalle que se
@@ -108,11 +124,12 @@ export class PadronController {
   @ApiOkResponse({ type: ResultadoDeCargaDto })
   async cargar(
     @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Body() dto: CargarPadronDto,
   ): Promise<ResultadoDeCargaDto> {
-    await this.aislamiento.exigirAlcance(ctx, ctx.copropiedadId ?? '', 'padron/carga');
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/carga');
     const filas = analizarCsv(dto.csv);
-    return this.aplicarCarga(ctx, filas);
+    return this.aplicarCarga(destino, filas);
   }
 
   @Post('carga/xlsx')
@@ -123,9 +140,10 @@ export class PadronController {
   @ApiOkResponse({ type: ResultadoDeCargaDto })
   async cargarXlsx(
     @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Body() dto: CargarPadronXlsxDto,
   ): Promise<ResultadoDeCargaDto> {
-    await this.aislamiento.exigirAlcance(ctx, ctx.copropiedadId ?? '', 'padron/carga');
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/carga');
     let filas;
     try {
       // El lector comprueba la firma del archivo, no su extensión (§2.7.8), y
@@ -136,7 +154,7 @@ export class PadronController {
       if (e instanceof ArchivoInvalido) throw new BadRequestException(e.message);
       throw e;
     }
-    return this.aplicarCarga(ctx, filas);
+    return this.aplicarCarga(destino, filas);
   }
 
   private async aplicarCarga(
@@ -167,10 +185,11 @@ export class PadronController {
   @ApiOkResponse({ type: IdCreadoDto })
   async registrarVivienda(
     @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Body() dto: RegistrarViviendaDto,
   ): Promise<IdCreadoDto> {
-    await this.aislamiento.exigirAlcance(ctx, ctx.copropiedadId ?? '', 'padron/viviendas');
-    return this.desenvolver(await new RegistrarVivienda(this.repo).ejecutar(ctx, dto));
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/viviendas');
+    return this.desenvolver(await new RegistrarVivienda(this.repo).ejecutar(destino, dto));
   }
 
   @Post('residentes')
@@ -179,9 +198,10 @@ export class PadronController {
   @ApiOkResponse({ type: IdCreadoDto })
   async registrarResidente(
     @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Body() dto: RegistrarResidenteDto,
   ): Promise<IdCreadoDto> {
-    await this.aislamiento.exigirAlcance(ctx, ctx.copropiedadId ?? '', 'padron/residentes');
-    return this.desenvolver(await new RegistrarResidente(this.repo).ejecutar(ctx, dto));
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/residentes');
+    return this.desenvolver(await new RegistrarResidente(this.repo).ejecutar(destino, dto));
   }
 }

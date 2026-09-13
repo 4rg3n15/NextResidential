@@ -83,9 +83,9 @@ export class BiometriaController {
     @Contexto() ctx: ContextoTenant,
     @Body() dto: CapturarRostroDto,
   ) {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/capturas');
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/capturas');
     return desenvolver(
-      await this.capturar.ejecutar(ctx, {
+      await this.capturar.ejecutar(destino, {
         titularId: dto.titularId,
         ...(dto.autorizacionId === undefined ? {} : { autorizacionId: dto.autorizacionId }),
         medidas: dto.medidas,
@@ -129,11 +129,15 @@ export class BiometriaController {
     @Contexto() ctx: ContextoTenant,
     @Body() dto: ResponderConsentimientoDto,
   ) {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/consentimientos');
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'biometria/consentimientos',
+    );
     // `quienResponde` sale del TOKEN, nunca del cuerpo: si el cliente lo
     // pusiera, RN-10 sería una casilla que cualquiera marca.
     return desenvolver(
-      await this.responder.ejecutar(ctx, {
+      await this.responder.ejecutar(destino, {
         consentimientoId,
         quienResponde: ctx.personaId ?? ctx.usuarioId,
         acepta: dto.acepta,
@@ -150,9 +154,13 @@ export class BiometriaController {
     @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
     @Contexto() ctx: ContextoTenant,
   ) {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/consentimientos');
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'biometria/consentimientos',
+    );
     return desenvolver(
-      await this.revocar.ejecutar(ctx, {
+      await this.revocar.ejecutar(destino, {
         consentimientoId,
         quienRevoca: ctx.personaId ?? ctx.usuarioId,
       }),
@@ -168,9 +176,13 @@ export class BiometriaController {
     @Contexto() ctx: ContextoTenant,
     @Body() dto: SincronizarPlantillaDto,
   ) {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/plantillas');
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'biometria/plantillas',
+    );
     return desenvolver(
-      await this.sincronizar.ejecutar(ctx, { plantillaId, dispositivoId: dto.dispositivoId }),
+      await this.sincronizar.ejecutar(destino, { plantillaId, dispositivoId: dto.dispositivoId }),
     );
   }
 
@@ -181,7 +193,7 @@ export class BiometriaController {
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Contexto() ctx: ContextoTenant,
   ) {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/barrido');
-    return desenvolver(await this.barrer.ejecutar(ctx));
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/barrido');
+    return desenvolver(await this.barrer.ejecutar(destino));
   }
 }

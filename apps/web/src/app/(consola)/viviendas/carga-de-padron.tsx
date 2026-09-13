@@ -25,7 +25,14 @@ import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
  */
 const MAXIMO_BYTES = 180 * 1024;
 
-export const CargaDePadron = ({ alTerminar }: { readonly alTerminar: () => void }): JSX.Element => {
+export const CargaDePadron = ({
+  copropiedadId,
+  alTerminar,
+}: {
+  /** Destino de la carga. Va en la ruta, no en el token (D-71). */
+  readonly copropiedadId: string;
+  readonly alTerminar: () => void;
+}): JSX.Element => {
   const [abierto, setAbierto] = useState(false);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -42,7 +49,11 @@ export const CargaDePadron = ({ alTerminar }: { readonly alTerminar: () => void 
       let binario = '';
       for (const b of bytes) binario += String.fromCharCode(b);
       const r = desenvolver(
-        await cliente.POST('/padron/carga/xlsx', { body: { xlsxBase64: btoa(binario) } }),
+        // D-71 · la copropiedad de destino en la ruta, no en el token.
+        await cliente.POST('/copropiedades/{id}/padron/carga/xlsx', {
+          params: { path: { id: copropiedadId } },
+          body: { xlsxBase64: btoa(binario) },
+        }),
       );
       setResultado(r);
       if (r.aplicada) alTerminar();
