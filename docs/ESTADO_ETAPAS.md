@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-12 · **ETAPA 09 CERRADA** · verificada con `--con-base`, 19 de 19 pasos
+**Última actualización:** 2026-09-13 · **ETAPA 09 CERRADA** · D-68 corregido: la consola funciona por red igual que por `localhost`
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -253,6 +253,50 @@ en memoria del proceso: al reiniciar, el portero ve un evento con la imagen rota
 y una lista negra vacía. Son **3 jornadas** —`AlmacenEvidenciaSupabase` con
 validación de tipo real, y el adaptador PostgreSQL de autorizaciones y listas
 negras (D-25)— y conviene hacerlas antes de abrir la etapa, no dentro.
+
+### D-68 · la consola no funcionaba por red · 2026-09-13
+
+**La ETAPA 10 no se lanza hasta que esto esté cerrado, y ya lo está.**
+
+Entrando por una IP de red, el código del autenticador se rechazaba **siempre**,
+con «La sesión expiró». El mismo código entraba por `localhost`. Reproducido en
+el navegador: **cero cookies `ncr_*`** en el origen de red.
+
+**Causa.** El atributo `Secure` de la cookie salía de `NODE_ENV`, no del esquema
+de la petición. Sobre HTTP el navegador descarta una cookie `Secure` en
+silencio, así que el paso del segundo factor llegaba sin nada que leer. Por
+`localhost` y `127.0.0.1` no pasaba: el navegador los trata como orígenes
+**potencialmente seguros** y ahí sí las acepta. Es **la misma forma que D-67**
+—algo decidido por el modo de compilación y no por cómo se alcanzó la página— y
+la misma exención del bucle local lo escondió las dos veces.
+
+**Y el banco de pruebas lo tapaba.** El recorrido del navegador fijaba
+`COOKIE_SEGURA: 'false'`, es decir **desactivaba justo el atributo que rompe en
+el despliegue real**. Un banco que apaga la condición del defecto no prueba el
+sistema: prueba una variante suya que nadie despliega. Retirado.
+
+| Corregido                      | Cómo                                                                                                                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| El atributo `Secure`           | Lo decide la petición. El middleware sella `x-ncr-esquema-seguro` con la **misma función** que decide `upgrade-insecure-requests`; `COOKIE_SEGURA` queda como salida para un proxy que no reenvíe el esquema                         |
+| `httpOnly`, `SameSite`, `path` | **Sin tocar.** No dependen del esquema, y el recorrido comprueba en el navegador que siguen puestas                                                                                                                                  |
+| El mensaje que mentía          | «Sin cookie» y «sesión expirada» eran tres causas con un solo texto. Ahora se distinguen: el nuevo dice que el navegador no devolvió la cookie y qué mirar, sin filtrar nada del servidor. El anterior mandaba a reintentar en bucle |
+| **Paso 3.ter** del recorrido   | El camino ENTERO por IP de red: contraseña → factor → `aal2` → tablero, las nueve pantallas **comparadas** con el bucle local, el canal en vivo y el contexto seguro                                                                 |
+
+**Lo que NO es un defecto y queda dicho:** por IP sin TLS el navegador no
+registra el service worker, así que no hay PWA instalable ni caché sin conexión.
+Vuelve solo con dominio y HTTPS. Lo mismo afectará a la cámara de la guardia
+virtual (ETAPA 10): `getUserMedia` exige contexto seguro.
+
+**`API_URL=http://localhost:3000` no era parte de esto.** La consola nunca llama
+a la API desde el navegador: todo pasa por el proxy del servidor. Sí queda
+anotado un aviso para la ETAPA 10 — la evidencia se sirve con URL firmada del
+**bucket**, y `img-src` no lista hoy el origen de Supabase.
+
+Todo el detalle, con los pasos para comprobarlo y lo que espera al desplegar
+(TLS, dominio, proxy, CORS, `Site URL` y `Redirect URLs`), en
+[`guias/CONSOLA_EN_RED_Y_DESPLIEGUE.md`](guias/CONSOLA_EN_RED_Y_DESPLIEGUE.md).
+
+---
 
 ### CIERRE DE LA ETAPA 09 · 2026-09-12
 

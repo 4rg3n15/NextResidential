@@ -33,6 +33,17 @@ const TEXTOS: Readonly<Record<MotivoDeFalloDeAcceso, string>> = {
   DEMASIADOS_INTENTOS: 'Demasiados intentos. Espera un momento antes de volver a probar.',
   FACTOR_INVALIDO: 'El código no es válido o ya caducó. Genera uno nuevo e inténtalo otra vez.',
   SESION_EXPIRADA: 'La sesión expiró. Vuelve a iniciar sesión.',
+  /**
+   * NO dice «la sesión expiró». Decirlo mandaba a reintentar en bucle: quien
+   * reintenta vuelve a perder la cookie por el mismo motivo. El texto nombra la
+   * causa —el navegador no devolvió la cookie— y las dos cosas que la producen
+   * y el usuario puede mirar. No revela nada del servidor.
+   */
+  SIN_COOKIE_DE_SESION:
+    'Tu navegador no devolvió la cookie de sesión, así que este paso llegó sin el intento ' +
+    'que estaba en curso. Suele ser por tener las cookies bloqueadas para este sitio, o por ' +
+    'haber empezado a entrar desde otra dirección. Vuelve a la pantalla de acceso y empieza ' +
+    'de nuevo desde esta misma dirección.',
   ENLACE_NO_VALIDO:
     'El enlace ya se usó o caducó. Los enlaces de recuperación son de un solo uso: pide uno nuevo.',
   CONTRASENA_DEBIL:

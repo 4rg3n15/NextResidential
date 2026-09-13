@@ -23,7 +23,25 @@ export const runtime = 'nodejs';
 export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
   const sesion = await leerSesion();
   const factorId = await factorPendiente();
-  if (sesion === null || sesion.accessToken === '' || factorId === null) {
+  /**
+   * TRES CAUSAS DISTINTAS, Y ANTES DECÍAN LO MISMO.
+   *
+   * `sesion === null` y `factorId === null` significan que **no llegó la
+   * cookie**; `accessToken === ''` significa que llegó y está agotada. Las tres
+   * salían como «La sesión expiró», que en las dos primeras es falso y, peor,
+   * inútil: manda a reintentar, y el reintento pierde la cookie otra vez por el
+   * mismo motivo. Fue el síntoma con el que se reportó D-68.
+   *
+   * Ninguno de los dos textos revela nada del servidor: dicen qué pasó del lado
+   * del navegador y qué hacer.
+   */
+  if (sesion === null || factorId === null) {
+    return NextResponse.json(
+      { mensaje: textoDeFalloDeAcceso('SIN_COOKIE_DE_SESION') },
+      { status: 401 },
+    );
+  }
+  if (sesion.accessToken === '') {
     return NextResponse.json({ mensaje: textoDeFalloDeAcceso('SESION_EXPIRADA') }, { status: 401 });
   }
 

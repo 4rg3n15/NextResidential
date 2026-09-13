@@ -31,6 +31,17 @@ export type MotivoDeFalloDeAcceso =
   | 'DEMASIADOS_INTENTOS'
   | 'FACTOR_INVALIDO'
   | 'SESION_EXPIRADA'
+  /**
+   * **La petición llegó SIN la cookie de sesión.** No es lo mismo que expirar,
+   * y confundirlos manda al usuario a un bucle: reintentar no arregla una
+   * cookie que el navegador nunca guardó.
+   *
+   * Es lo que ocurría en D-68 —la cookie salía `Secure` sobre HTTP y el
+   * navegador la descartaba— y lo que ocurre también con cookies bloqueadas, un
+   * modo privado restrictivo o una pestaña abierta desde hace días. El texto
+   * dice qué mirar sin filtrar nada del servidor.
+   */
+  | 'SIN_COOKIE_DE_SESION'
   | 'ENLACE_NO_VALIDO'
   | 'CONTRASENA_DEBIL'
   /**

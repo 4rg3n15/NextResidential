@@ -14,6 +14,22 @@ import { construirCsp, generarNonce, peticionLlegoPorHttps } from './middleware-
  */
 export const middleware = (peticion: NextRequest): NextResponse => {
   const nonce = generarNonce();
+  /**
+   * El esquema REAL de la petición, sellado para el resto del proceso.
+   *
+   * Lo calcula el middleware porque es el único punto que ve la petición
+   * entera; los manejadores de ruta sólo alcanzan las cabeceras, y ahí no hay
+   * protocolo. Con esta marca, **la CSP y la cookie de sesión deciden con el
+   * mismo dato** en vez de con `NODE_ENV`, que es lo que produjo D-67 y D-68.
+   *
+   * Se reescribe siempre, nunca se propaga la que venga de fuera: si un cliente
+   * la enviara, estaría decidiendo el atributo `Secure` de su propia cookie.
+   */
+  const seguro = peticionLlegoPorHttps(
+    peticion.headers.get('x-forwarded-proto'),
+    peticion.nextUrl.protocol,
+  );
+
   const csp = construirCsp({
     nonce,
     desarrollo: process.env.NODE_ENV !== 'production',
@@ -25,14 +41,12 @@ export const middleware = (peticion: NextRequest): NextResponse => {
      * vería el `http` del salto interno y quitaría la directiva en un
      * despliegue que sí es HTTPS.
      */
-    peticionSegura: peticionLlegoPorHttps(
-      peticion.headers.get('x-forwarded-proto'),
-      peticion.nextUrl.protocol,
-    ),
+    peticionSegura: seguro,
   });
 
   const cabeceras = new Headers(peticion.headers);
   cabeceras.set('x-nonce', nonce);
+  cabeceras.set('x-ncr-esquema-seguro', seguro ? '1' : '0');
   cabeceras.set('content-security-policy', csp);
 
   const respuesta = NextResponse.next({ request: { headers: cabeceras } });

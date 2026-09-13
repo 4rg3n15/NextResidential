@@ -185,7 +185,12 @@ export interface Configuracion {
   readonly apiUrl: string;
   readonly supabaseUrl: string;
   readonly supabasePublishableKey: string;
-  readonly cookieSegura: boolean;
+  /**
+   * `undefined` = **lo decide la petición** (D-68). Sólo se fija cuando el
+   * despliegue lo declara: la salida para un proxy que termina TLS y no
+   * reenvía `x-forwarded-proto`.
+   */
+  readonly cookieSegura: boolean | undefined;
   readonly puenteVideoUrl: string | undefined;
 }
 
@@ -206,12 +211,14 @@ const leer = (entorno: NodeJS.ProcessEnv): Configuracion => {
     apiUrl: datos.API_URL,
     supabaseUrl: datos.SUPABASE_URL,
     supabasePublishableKey: datos.SUPABASE_PUBLISHABLE_KEY,
-    // En producción la cookie va `Secure` siempre. En desarrollo sobre
-    // http://localhost el navegador la rechazaría y no habría sesión.
-    cookieSegura:
-      datos.COOKIE_SEGURA === undefined
-        ? datos.NODE_ENV === 'production'
-        : datos.COOKIE_SEGURA === 'true',
+    /**
+     * **Ya NO lo decide `NODE_ENV`** (D-68). Con `NODE_ENV=production` la
+     * cookie salía `Secure` aunque la página se sirviera por HTTP, y el
+     * navegador la descartaba: la consola quedaba inservible por cualquier
+     * origen que no fuera el bucle local. Sin declarar, decide el esquema de
+     * cada petición; declarada, manda lo declarado.
+     */
+    cookieSegura: datos.COOKIE_SEGURA === undefined ? undefined : datos.COOKIE_SEGURA === 'true',
     puenteVideoUrl: datos.PUENTE_VIDEO_URL,
   };
 };
