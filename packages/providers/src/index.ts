@@ -9,3 +9,4 @@
  */
 export * from './mock/simulacion';
 export * from './mock/mock-provider';
+export * from './mock/intercom-simulado';

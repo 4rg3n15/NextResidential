@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-13 · **ETAPA 09 CERRADA** · D-68 corregido: la consola funciona por red igual que por `localhost`
+**Última actualización:** 2026-09-13 · **ETAPA 10 construida** · consolas de portería y guardia virtual; DT-12 cerrado
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -253,6 +253,40 @@ en memoria del proceso: al reiniciar, el portero ve un evento con la imagen rota
 y una lista negra vacía. Son **3 jornadas** —`AlmacenEvidenciaSupabase` con
 validación de tipo real, y el adaptador PostgreSQL de autorizaciones y listas
 negras (D-25)— y conviene hacerlas antes de abrir la etapa, no dentro.
+
+## ETAPA 10 — Consolas operativas · **CONSTRUIDA** · 2026-09-13
+
+Rama `etapa-10-consolas-operativas`, desde `develop` con la 09 ya fusionada.
+
+| Entregable                                            | Estado                                                                                                                                             |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Consola de **portería** (HU-21 a HU-24)               | Construida · evento actual con evidencia, vivienda y autorización; apertura y negación con motivo; historial inmediato; alertas y listas negras    |
+| Consola de **guardia virtual** (CU-03, HU-25 a HU-29) | Construida · cola por tiempo de espera, ficha, video reservado, abrir/negar atribuido, aviso al residente, emergencia                              |
+| **Los cuatro flujos alternos de CU-03**               | Cubiertos · detalle en [`etapas/ETAPA-10.md`](etapas/ETAPA-10.md) §3                                                                               |
+| Exclusividad del canal de audio (ADR-01)              | **Máquina de estados pura en el dominio**: bloqueo por dispositivo, cola, liberación por reloj. La ETAPA 15 sustituye el transporte, no las reglas |
+| `IntercomSimulado` tras `IntercomProvider`            | Construido · aplica la exclusividad de verdad                                                                                                      |
+| KPI-35 · conmutación sin fuga                         | Probado por HTTP: la copropiedad fuera del turno responde **404, no 403**                                                                          |
+| Los tres avisos de la 09                              | Resueltos · `img-src` con el origen de Supabase, y el video y la PWA declaran que necesitan HTTPS                                                  |
+| **DT-12**                                             | **Cerrado** · [`seguridad/DT-12-recursos-externos.md`](seguridad/DT-12-recursos-externos.md)                                                       |
+| Paso 3.ter por IP                                     | Recorre **las once pantallas**, las dos nuevas incluidas                                                                                           |
+
+**Sobre DT-12.** Los cuatro recursos externos quedan cerrados salvo SMTP, que es
+bloqueo de entorno (BE-01) y lo resuelve el bloque 4 por el otro lado. **FCM no
+es deuda**: es orden de etapas —el registro de tokens es de la 11— y el intento
+de aviso ya queda registrado. **Realtime tampoco**: no se usa, el canal es SSE
+propio, y la razón es RN-18: escalar en menos de 10 s no puede depender de un
+servicio externo. Medido, 200 de 200.
+
+**Deuda nueva declarada:** D-69 (el estado del canal vive en el proceso; con
+varias instancias haría falta llevarlo a PostgreSQL, y por eso la máquina está
+en el dominio) y D-70 (bitácora de órdenes en memoria, acotada a 200 por
+copropiedad; el historial completo ya vive en `eventos`).
+
+**Lo que no se puede medir sin hardware, dicho:** KPI-32 y KPI-33 son latencias
+extremo a extremo. El proveedor simulado no da una cifra que signifique nada, y
+publicar una sería peor que no tenerla.
+
+---
 
 ### D-68 · la consola no funcionaba por red · 2026-09-13
 

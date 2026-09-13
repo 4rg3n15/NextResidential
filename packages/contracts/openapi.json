@@ -1644,6 +1644,440 @@
         ]
       }
     },
+    "/copropiedades/{id}/guardia/avisar-residente": {
+      "post": {
+        "operationId": "GuardiaController_avisarResidente",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvisoAlResidenteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AceptadoDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Avisa al residente cuando no contesta al intercom (HU-28)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/cola": {
+      "get": {
+        "operationId": "GuardiaController_cola",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ColaDeAtencionDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cola de atención con tiempo de espera (CU-03, HU-25)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/emergencia": {
+      "post": {
+        "operationId": "GuardiaController_emergencia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmergenciaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AceptadoDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alerta de emergencia, severidad crítica (HU-29, RN-18)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/intercom/abrir": {
+      "post": {
+        "operationId": "GuardiaController_abrirCanal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudDeCanalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeCanalDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pide el canal de audio del equipo; encola si está ocupado (ADR-01)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/intercom/cerrar": {
+      "post": {
+        "operationId": "GuardiaController_cerrarCanal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudDeCanalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeCanalDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suelta el canal y lo cede al primero de la cola",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}": {
+      "get": {
+        "operationId": "GuardiaController_estadoDelCanal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeCanalDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado del canal: quién tiene la palabra y cuántos esperan",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/ordenes": {
+      "post": {
+        "operationId": "GuardiaController_ordenar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdenManualDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenEjecutadaDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol que no acciona puertas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Abre o niega a mano, con motivo obligatorio (RN-08)",
+        "tags": [
+          "guardia"
+        ]
+      },
+      "get": {
+        "operationId": "GuardiaController_historialDeOrdenes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorialDeOrdenesDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Últimas órdenes manuales de la copropiedad (HU-23)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
     "/copropiedades/{id}/informes": {
       "get": {
         "operationId": "InformesController_generar",
@@ -2594,6 +3028,21 @@
           "hasta"
         ]
       },
+      "AceptadoDto": {
+        "type": "object",
+        "properties": {
+          "aceptado": {
+            "type": "boolean",
+            "example": true
+          },
+          "detalle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "aceptado"
+        ]
+      },
       "AcompananteAgregadoDto": {
         "type": "object",
         "properties": {
@@ -2819,6 +3268,24 @@
           "autorizacionId"
         ]
       },
+      "AvisoAlResidenteDto": {
+        "type": "object",
+        "properties": {
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "texto": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "viviendaId",
+          "texto"
+        ]
+      },
       "BajaDto": {
         "type": "object",
         "properties": {
@@ -2950,6 +3417,33 @@
         "required": [
           "codigos",
           "cantidad"
+        ]
+      },
+      "ColaDeAtencionDto": {
+        "type": "object",
+        "properties": {
+          "cola": {
+            "description": "Ordenada por espera DESCENDENTE, con lo crítico delante. No por recencia: una bandeja por recencia hunde al que lleva más tiempo esperando cada vez que llega otro.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnAtencionDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "criticos": {
+            "type": "number"
+          },
+          "esperaMaxima": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "cola",
+          "total",
+          "criticos",
+          "esperaMaxima"
         ]
       },
       "ConfiguracionDeCopropiedadDto": {
@@ -3383,6 +3877,83 @@
           "segundosSinLatir"
         ]
       },
+      "EmergenciaDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 300,
+            "description": "Qué ocurre. Obligatorio."
+          },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "EnAtencionDto": {
+        "type": "object",
+        "properties": {
+          "eventoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ocurridoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true
+          },
+          "resultado": {
+            "type": "string"
+          },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "viviendaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "placaDetectada": {
+            "type": "string",
+            "nullable": true
+          },
+          "esperaSegundos": {
+            "type": "number",
+            "description": "Segundos que lleva esperando. Se CALCULA en cada consulta, no se guarda: una espera guardada envejece mal y la consola pintaría un número que dejó de ser cierto."
+          },
+          "urgencia": {
+            "type": "string",
+            "enum": [
+              "critica",
+              "normal"
+            ]
+          },
+          "demorado": {
+            "type": "boolean",
+            "description": "Pasado el umbral de KPI-34"
+          }
+        },
+        "required": [
+          "eventoId",
+          "ocurridoEn",
+          "motivo",
+          "resultado",
+          "dispositivoId",
+          "viviendaId",
+          "placaDetectada",
+          "esperaSegundos",
+          "urgencia",
+          "demorado"
+        ]
+      },
       "ErrorApiDto": {
         "type": "object",
         "properties": {
@@ -3427,6 +3998,44 @@
         "required": [
           "fila",
           "motivo"
+        ]
+      },
+      "EstadoDeCanalDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "abierta",
+              "en_espera",
+              "cerrada"
+            ],
+            "description": "El canal de audio del equipo admite UNA conversación a la vez (ADR-01). El segundo operador no se rechaza: se encola."
+          },
+          "porDelante": {
+            "type": "number",
+            "description": "Cuántos van delante. 0 cuando se tiene la palabra."
+          },
+          "titular": {
+            "type": "string",
+            "nullable": true,
+            "description": "Quién tiene la palabra ahora"
+          },
+          "timeoutSegundos": {
+            "type": "number",
+            "description": "Segundos tras los que el canal se libera solo por inactividad"
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "estado",
+          "porDelante",
+          "titular",
+          "timeoutSegundos"
         ]
       },
       "EstadoDeDispositivosDto": {
@@ -3731,6 +4340,20 @@
           "continuaDelDiaAnterior"
         ]
       },
+      "HistorialDeOrdenesDto": {
+        "type": "object",
+        "properties": {
+          "ordenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrdenEjecutadaDto"
+            }
+          }
+        },
+        "required": [
+          "ordenes"
+        ]
+      },
       "IdAutorizacionDto": {
         "type": "object",
         "properties": {
@@ -3940,6 +4563,87 @@
         },
         "required": [
           "notas"
+        ]
+      },
+      "OrdenEjecutadaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accion": {
+            "type": "string",
+            "enum": [
+              "abrir",
+              "negar"
+            ]
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "operadorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rol": {
+            "type": "string"
+          },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "momento": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eventoId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "accion",
+          "motivo",
+          "operadorId",
+          "rol",
+          "dispositivoId",
+          "momento",
+          "eventoId"
+        ]
+      },
+      "OrdenManualDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accion": {
+            "type": "string",
+            "enum": [
+              "abrir",
+              "negar"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 300,
+            "description": "Obligatorio. Sin motivo la puerta NO se acciona: no es un campo requerido del formulario, es una condición de la orden (RN-08, CA-16, CA-17).",
+            "example": "Visitante esperado por la vivienda 4, confirmado por teléfono"
+          },
+          "eventoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Evento que se está atendiendo"
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "accion",
+          "motivo"
         ]
       },
       "PaginaDeEventosDto": {
@@ -4433,6 +5137,18 @@
         "properties": {
           "dispositivoId": {
             "type": "string"
+          }
+        },
+        "required": [
+          "dispositivoId"
+        ]
+      },
+      "SolicitudDeCanalDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [

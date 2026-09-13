@@ -35,7 +35,14 @@ import { arrancarDobleGotrue, USUARIO } from './doble-gotrue.mjs';
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Las nueve pantallas del menú, en el orden de `lib/navegacion.ts`. */
+/**
+ * Las ONCE pantallas del menú, en el orden de `lib/navegacion.ts`.
+ *
+ * La ETAPA 10 añade las dos consolas operativas, y entran aquí el mismo día que
+ * se construyen: tres defectos seguidos —D-63, D-67 y D-68— se escondieron en
+ * la exención del bucle local, y lo que no se recorre por IP no está
+ * verificado.
+ */
 const RUTAS_DE_LA_CONSOLA = [
   '/tablero',
   '/viviendas',
@@ -43,6 +50,8 @@ const RUTAS_DE_LA_CONSOLA = [
   '/visitantes',
   '/zonas',
   '/dispositivos',
+  '/porteria',
+  '/guardia',
   '/eventos',
   '/informes',
   '/configuracion',
@@ -651,7 +660,7 @@ const principal = async () => {
     }
 
     /**
-     * LAS NUEVE PANTALLAS: **COMPARADAS**, no juzgadas por separado.
+     * LAS ONCE PANTALLAS: **COMPARADAS**, no juzgadas por separado.
      *
      * Este banco no tiene datos, así que varias pantallas muestran estados
      * vacíos o de error legítimos. Preguntar «¿esta pantalla está bien por
@@ -696,7 +705,7 @@ const principal = async () => {
     );
     afirmar(
       distintas.length === 0,
-      `las nueve pantallas se comportan IGUAL por IP que por bucle local${
+      `las once pantallas se comportan IGUAL por IP que por bucle local${
         distintas.length === 0 ? '' : ` · ${distintas.join(' | ')}`
       }`,
     );

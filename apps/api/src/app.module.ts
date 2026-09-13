@@ -20,6 +20,21 @@ import type { Configuracion } from './configuracion/esquema';
 import { NucleoModule } from './nucleo/nucleo.module';
 import { SaludController } from './salud/salud.controller';
 import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
+/**
+ * **La última importación del bloque, y no por orden alfabético** (DT-13).
+ *
+ * El barril de `guardia` alcanza el de `eventos`, que alcanza el de
+ * `autorizaciones`, que alcanza `IngestaController`, que vuelve a `eventos`. Si
+ * esta línea se coloca antes, ese ciclo se resuelve con `RegistrarAcceso`
+ * todavía sin definir y Nest falla con «argument Function at index [1]», que no
+ * dice nada de la causa. Colocada aquí, `eventos` y `autorizaciones` ya están
+ * evaluados cuando `guardia` los mira.
+ *
+ * Es un apaño de orden y se declara como tal: la salida de verdad es que el
+ * puerto de auditoría y el de escalamiento vivan en el núcleo compartido, que
+ * es lo que DT-13 dejó escrito.
+ */
+import { GuardiaModule } from './guardia';
 
 /**
  * El límite de peticiones es GLOBAL desde el primer día (§2.7.5). Ponerlo solo
@@ -71,6 +86,9 @@ export class AppModule {
         BiometriaModule.registrar(),
         EventosModule.registrar(),
         AutorizacionesModule.registrar(),
+        // Después de eventos y autorizaciones: la guardia lee la cola del
+        // repositorio de eventos y escala por el mismo camino que la ingesta.
+        GuardiaModule.registrar(),
         // Después de eventos: el tablero lee por los puertos que aquel publica.
         TableroModule.registrar(),
         // Dos limitadores con NOMBRE, y cada uno cuenta por lo suyo: `default`

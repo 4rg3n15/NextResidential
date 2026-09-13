@@ -35,6 +35,17 @@ export interface OpcionesCsp {
   /** Puente de vídeo de la ETAPA 10; vacío mientras no exista. */
   readonly origenVideo?: string | undefined;
   /**
+   * Origen de Supabase Storage — **de donde llega la evidencia**.
+   *
+   * La evidencia de un acceso se sirve con URL firmada de vida corta, y esa URL
+   * apunta al bucket, no a la API. Hasta la ETAPA 10 ninguna pantalla la
+   * pintaba y `img-src` no lo listaba; la consola de portería muestra la
+   * miniatura de cada evento (HU-21), así que sin esto la CSP la bloquearía —
+   * y sin ruido: la imagen sale rota y el navegador se queja en un sitio que
+   * nadie mira.
+   */
+  readonly origenEvidencia?: string | undefined;
+  /**
    * Si **esta petición** llegó por HTTPS. No es lo mismo que «estamos en
    * producción»: decide `upgrade-insecure-requests`, y esa directiva depende
    * del esquema por el que se sirvió la página, no del modo de compilación.
@@ -82,6 +93,7 @@ export const construirCsp = ({
   desarrollo,
   origenApi,
   origenVideo,
+  origenEvidencia,
   peticionSegura,
 }: OpcionesCsp): string => {
   const conexiones = ["'self'", origenApi, origenVideo].filter(
@@ -124,9 +136,26 @@ export const construirCsp = ({
      * En producción no aparece ninguna de las dos, y hay prueba que lo exige.
      */
     ...(desarrollo ? [['style-src-elem', "'self'", `'nonce-${nonce}'`, "'unsafe-inline'"]] : []),
-    // La evidencia llega por URL firmada de vida corta desde el bucket privado,
-    // que es el origen de la API. `data:` para los iconos embebidos del PWA.
-    ['img-src', "'self'", 'data:', 'blob:', ...conexiones.slice(1)],
+    /**
+     * La evidencia llega por URL firmada de vida corta **desde el bucket**, que
+     * es el origen de Supabase Storage y NO el de la API. `data:` para los
+     * iconos embebidos del PWA y para el QR del segundo factor.
+     *
+     * Se añade sólo el origen, sin ruta: una CSP no acota rutas de forma útil
+     * —`img-src` compara origen— y fingir que sí daría una falsa sensación de
+     * acotamiento. Lo que acota de verdad la evidencia es que el bucket es
+     * privado y la URL caduca en 60 segundos (RN-21).
+     */
+    [
+      'img-src',
+      "'self'",
+      'data:',
+      'blob:',
+      ...conexiones.slice(1),
+      ...(typeof origenEvidencia === 'string' && origenEvidencia.length > 0
+        ? [origenEvidencia]
+        : []),
+    ],
     ['font-src', "'self'"],
     ['connect-src', ...conexiones],
     ['media-src', ...medios],

@@ -39,6 +39,13 @@ export type Copropiedad = Esquemas['CopropiedadDto'];
 export type AlcanceDeCopropiedades = Esquemas['AlcanceDeCopropiedadesDto'];
 export type CopropiedadResumen = Esquemas['CopropiedadResumenDto'];
 export type ConfiguracionDeCopropiedad = Esquemas['ConfiguracionDeCopropiedadDto'];
+
+/* ── ETAPA 10 · consolas operativas ─────────────────────────────────────── */
+export type OrdenManual = Esquemas['OrdenManualDto'];
+export type OrdenEjecutada = Esquemas['OrdenEjecutadaDto'];
+export type ColaDeAtencion = Esquemas['ColaDeAtencionDto'];
+export type EnAtencion = Esquemas['EnAtencionDto'];
+export type EstadoDeCanal = Esquemas['EstadoDeCanalDto'];
 export type CambiosDeConfiguracion = Esquemas['CambiosDeConfiguracionDto'];
 export type ConfiguracionRechazada = Esquemas['ConfiguracionRechazadaDto'];
 /** Las claves que ESTE rol puede cambiar. La API las declara; la consola obedece. */

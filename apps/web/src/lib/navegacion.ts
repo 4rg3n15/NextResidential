@@ -44,6 +44,8 @@ export const ICONOS_DE_NAVEGACION = [
   'ScrollText',
   'FileBarChart',
   'Settings',
+  'DoorOpen',
+  'RadioTower',
 ] as const;
 export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 
@@ -103,6 +105,29 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     roles: ADMINISTRACION,
     pendienteDeEtapa: null,
     icono: 'Cpu',
+  },
+  /**
+   * Las dos consolas OPERATIVAS van juntas y antes de los eventos: quien las
+   * usa entra a atender, no a consultar. El orden del menú es el orden en que
+   * se usa la consola, no el orden en que se construyó.
+   */
+  {
+    clave: 'porteria',
+    etiqueta: 'Portería',
+    ruta: '/porteria',
+    roles: OPERACION,
+    pendienteDeEtapa: null,
+    icono: 'DoorOpen',
+  },
+  {
+    clave: 'guardia',
+    etiqueta: 'Guardia virtual',
+    // C-12 · son DOS superficies, no una: el portero atiende su puerta y el
+    // operador de central atiende varias copropiedades que no ve.
+    ruta: '/guardia',
+    roles: ['superadministrador', 'administrador', 'operador_central'],
+    pendienteDeEtapa: null,
+    icono: 'RadioTower',
   },
   {
     clave: 'eventos',

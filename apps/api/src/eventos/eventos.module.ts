@@ -17,6 +17,7 @@ import {
   CANAL_TIEMPO_REAL,
   MOTOR_DE_DECISION,
   NOTIFICADOR_PUSH,
+  ESCALAMIENTO_DE_ALERTA,
   REPOSITORIO_ALERTAS,
   REPOSITORIO_DISPOSITIVOS,
   REPOSITORIO_EVENTOS,
@@ -170,6 +171,8 @@ export class EventosModule {
             push: NotificadorPush,
           ) => new EscalarAlerta(canal, alertas, reloj, bitacora, push),
         },
+        // Mismo objeto, publicado bajo el puerto que consumen otros módulos.
+        { provide: ESCALAMIENTO_DE_ALERTA, useExisting: EscalarAlerta },
         {
           provide: RegistrarAcceso,
           inject: [
@@ -251,6 +254,7 @@ export class EventosModule {
         RegistrarAcceso,
         VigilarLatidos,
         EscalarAlerta,
+        ESCALAMIENTO_DE_ALERTA,
       ],
     };
   }

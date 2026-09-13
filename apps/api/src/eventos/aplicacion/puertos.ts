@@ -128,6 +128,17 @@ export const MOTOR_DE_DECISION = Symbol.for('ncr.puerto.MotorDeDecision');
 
 export const REPOSITORIO_EVENTOS = Symbol.for('ncr.puerto.RepositorioEventos');
 export const REPOSITORIO_ALERTAS = Symbol.for('ncr.puerto.RepositorioAlertas');
+
+/**
+ * El escalamiento de alertas, publicado como PUERTO y no como clase.
+ *
+ * La ETAPA 10 lo necesita desde `guardia` —la emergencia y el aviso al
+ * residente escalan por el mismo camino que la ingesta—, y hacerlo importando
+ * la clase obligaría a entrar en `eventos/aplicacion/…`, que es justo lo que
+ * §2.2 prohíbe. Con un token, `guardia` depende de una forma y la raíz de
+ * composición las une.
+ */
+export const ESCALAMIENTO_DE_ALERTA = Symbol.for('ncr.puerto.EscalamientoDeAlerta');
 export const REPOSITORIO_DISPOSITIVOS = Symbol.for('ncr.puerto.RepositorioDispositivos');
 export const CANAL_TIEMPO_REAL = Symbol.for('ncr.puerto.CanalTiempoReal');
 export const NOTIFICADOR_PUSH = Symbol.for('ncr.puerto.NotificadorPush');

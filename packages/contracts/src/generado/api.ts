@@ -482,6 +482,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/guardia/avisar-residente": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Avisa al residente cuando no contesta al intercom (HU-28) */
+        post: operations["GuardiaController_avisarResidente"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/guardia/cola": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cola de atención con tiempo de espera (CU-03, HU-25) */
+        get: operations["GuardiaController_cola"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/guardia/emergencia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Alerta de emergencia, severidad crítica (HU-29, RN-18) */
+        post: operations["GuardiaController_emergencia"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/guardia/intercom/abrir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pide el canal de audio del equipo; encola si está ocupado (ADR-01) */
+        post: operations["GuardiaController_abrirCanal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/guardia/intercom/cerrar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suelta el canal y lo cede al primero de la cola */
+        post: operations["GuardiaController_cerrarCanal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado del canal: quién tiene la palabra y cuántos esperan */
+        get: operations["GuardiaController_estadoDelCanal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/guardia/ordenes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Últimas órdenes manuales de la copropiedad (HU-23) */
+        get: operations["GuardiaController_historialDeOrdenes"];
+        put?: never;
+        /** Abre o niega a mano, con motivo obligatorio (RN-08) */
+        post: operations["GuardiaController_ordenar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/informes": {
         parameters: {
             query?: never;
@@ -873,6 +993,11 @@ export interface components {
             /** Format: date-time */
             hasta: string;
         };
+        AceptadoDto: {
+            /** @example true */
+            aceptado: boolean;
+            detalle?: string;
+        };
         AcompananteAgregadoDto: {
             agregado: boolean;
         };
@@ -937,6 +1062,11 @@ export interface components {
         AutorizarZonaDto: {
             autorizacionId: string;
         };
+        AvisoAlResidenteDto: {
+            /** Format: uuid */
+            viviendaId: string;
+            texto: string;
+        };
         BajaDto: {
             desactivado: boolean;
         };
@@ -988,6 +1118,13 @@ export interface components {
             codigos: string[];
             /** @example 10 */
             cantidad: number;
+        };
+        ColaDeAtencionDto: {
+            /** @description Ordenada por espera DESCENDENTE, con lo crítico delante. No por recencia: una bandeja por recencia hunde al que lleva más tiempo esperando cada vez que llega otro. */
+            cola: components["schemas"]["EnAtencionDto"][];
+            total: number;
+            criticos: number;
+            esperaMaxima: number;
         };
         ConfiguracionDeCopropiedadDto: {
             /** @example Urbanización Mira */
@@ -1150,6 +1287,30 @@ export interface components {
             ultimaSincronizacion: string | null;
             segundosSinLatir: number | null;
         };
+        EmergenciaDto: {
+            /** @description Qué ocurre. Obligatorio. */
+            motivo: string;
+            /** Format: uuid */
+            dispositivoId?: string;
+        };
+        EnAtencionDto: {
+            /** Format: uuid */
+            eventoId: string;
+            /** Format: date-time */
+            ocurridoEn: string;
+            motivo: string | null;
+            resultado: string;
+            /** Format: uuid */
+            dispositivoId: string;
+            viviendaId: string | null;
+            placaDetectada: string | null;
+            /** @description Segundos que lleva esperando. Se CALCULA en cada consulta, no se guarda: una espera guardada envejece mal y la consola pintaría un número que dejó de ser cierto. */
+            esperaSegundos: number;
+            /** @enum {string} */
+            urgencia: "critica" | "normal";
+            /** @description Pasado el umbral de KPI-34 */
+            demorado: boolean;
+        };
         ErrorApiDto: {
             /**
              * @description Código HTTP, repetido en el cuerpo
@@ -1167,6 +1328,21 @@ export interface components {
         ErrorDeFilaDto: {
             fila: number;
             motivo: string;
+        };
+        EstadoDeCanalDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            /**
+             * @description El canal de audio del equipo admite UNA conversación a la vez (ADR-01). El segundo operador no se rechaza: se encola.
+             * @enum {string}
+             */
+            estado: "abierta" | "en_espera" | "cerrada";
+            /** @description Cuántos van delante. 0 cuando se tiene la palabra. */
+            porDelante: number;
+            /** @description Quién tiene la palabra ahora */
+            titular: string | null;
+            /** @description Segundos tras los que el canal se libera solo por inactividad */
+            timeoutSegundos: number;
         };
         EstadoDeDispositivosDto: {
             dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
@@ -1259,6 +1435,9 @@ export interface components {
             /** @description La franja viene del día anterior: una zona abierta de 22:00 a 02:00 son DOS franjas encadenadas, no una que reinicia a medianoche. El contador de aforo no se reinicia con el cambio de día (CU-05). */
             continuaDelDiaAnterior: boolean;
         };
+        HistorialDeOrdenesDto: {
+            ordenes: components["schemas"]["OrdenEjecutadaDto"][];
+        };
         IdAutorizacionDto: {
             /** Format: uuid */
             id: string;
@@ -1323,6 +1502,37 @@ export interface components {
         };
         NotasDeAlertaDto: {
             notas: string;
+        };
+        OrdenEjecutadaDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            accion: "abrir" | "negar";
+            motivo: string;
+            /** Format: uuid */
+            operadorId: string;
+            rol: string;
+            /** Format: uuid */
+            dispositivoId: string;
+            /** Format: date-time */
+            momento: string;
+            eventoId: string | null;
+        };
+        OrdenManualDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            /** @enum {string} */
+            accion: "abrir" | "negar";
+            /**
+             * @description Obligatorio. Sin motivo la puerta NO se acciona: no es un campo requerido del formulario, es una condición de la orden (RN-08, CA-16, CA-17).
+             * @example Visitante esperado por la vivienda 4, confirmado por teléfono
+             */
+            motivo: string;
+            /**
+             * Format: uuid
+             * @description Evento que se está atendiendo
+             */
+            eventoId?: string;
         };
         PaginaDeEventosDto: {
             filas: components["schemas"]["EventoRegistradoDto"][];
@@ -1495,6 +1705,10 @@ export interface components {
             mfaVerificado: boolean;
         };
         SincronizarPlantillaDto: {
+            dispositivoId: string;
+        };
+        SolicitudDeCanalDto: {
+            /** Format: uuid */
             dispositivoId: string;
         };
         TotalesDeViviendasDto: {
@@ -2433,6 +2647,276 @@ export interface operations {
                 };
             };
             /** @description Sin evidencia, o evento inexistente */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_avisarResidente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AvisoAlResidenteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AceptadoDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_cola: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColaDeAtencionDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_emergencia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmergenciaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AceptadoDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_abrirCanal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SolicitudDeCanalDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeCanalDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_cerrarCanal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SolicitudDeCanalDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeCanalDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_estadoDelCanal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeCanalDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_historialDeOrdenes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistorialDeOrdenesDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_ordenar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdenManualDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdenEjecutadaDto"];
+                };
+            };
+            /** @description Rol que no acciona puertas */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
             404: {
                 headers: {
                     [name: string]: unknown;

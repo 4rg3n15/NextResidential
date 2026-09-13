@@ -9,12 +9,14 @@ export { EventosModule } from './eventos.module';
 export { RegistrarAcceso } from './aplicacion/registrar-acceso';
 export {
   CANAL_TIEMPO_REAL,
+  ESCALAMIENTO_DE_ALERTA,
   REPOSITORIO_ALERTAS,
   REPOSITORIO_DISPOSITIVOS,
   REPOSITORIO_EVENTOS,
 } from './aplicacion/puertos';
 export type {
   CanalTiempoReal,
+  EventoRegistrado,
   RepositorioAlertas,
   RepositorioDispositivos,
   RepositorioEventos,

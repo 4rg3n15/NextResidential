@@ -16,6 +16,8 @@ import type {
   TipoDeInforme,
   Vehiculo,
   Zona,
+  ColaDeAtencion,
+  OrdenEjecutada,
 } from '@ncr/contracts';
 import { cliente, desenvolver } from './cliente';
 
@@ -254,6 +256,47 @@ export const useInforme = (
               ...(parametros.dispositivoId ? { dispositivoId: parametros.dispositivoId } : {}),
             },
           },
+        }),
+      ),
+  });
+
+/* ── ETAPA 10 · consolas operativas ─────────────────────────────────────── */
+
+/**
+ * La cola de atención se refresca **sola y a menudo**, y esa es la diferencia
+ * con el resto de la consola.
+ *
+ * Las demás pantallas se consultan cuando alguien entra. Esta es una bandeja de
+ * turno: el operador la mira sin tocar nada y lo que decide su trabajo es que
+ * refleje lo que está pasando **ahora**. Cuatro segundos es el intervalo con el
+ * que la espera en pantalla nunca se aleja más de eso de la real; el canal SSE
+ * empuja los eventos nuevos, pero el CONTADOR de espera sólo avanza si se
+ * vuelve a preguntar.
+ */
+export const useColaDeAtencion = (copropiedadId: string): UseQueryResult<ColaDeAtencion> =>
+  useQuery({
+    queryKey: ['guardia', copropiedadId, 'cola'],
+    refetchInterval: 4000,
+    // Sin esto, el operador que deja la pestaña de fondo vuelve a una cola
+    // congelada y no lo sabe.
+    refetchIntervalInBackground: false,
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/guardia/cola', {
+          params: { path: { id: copropiedadId } },
+        }),
+      ),
+  });
+
+export const useOrdenesManuales = (
+  copropiedadId: string,
+): UseQueryResult<{ ordenes: OrdenEjecutada[] }> =>
+  useQuery({
+    queryKey: ['guardia', copropiedadId, 'ordenes'],
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/guardia/ordenes', {
+          params: { path: { id: copropiedadId } },
         }),
       ),
   });

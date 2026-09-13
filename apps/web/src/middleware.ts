@@ -35,6 +35,8 @@ export const middleware = (peticion: NextRequest): NextResponse => {
     desarrollo: process.env.NODE_ENV !== 'production',
     origenApi: process.env.API_URL,
     origenVideo: process.env.PUENTE_VIDEO_URL,
+    // El origen del bucket es el de Supabase: la evidencia se sirve desde ahí.
+    origenEvidencia: process.env.SUPABASE_URL,
     /**
      * Del esquema de ESTA petición, no del modo de compilación. Con el proxy
      * delante, el esquema real lo dice `x-forwarded-proto`: `nextUrl.protocol`
