@@ -1,5 +1,11 @@
 import { errorDominio, exito, fallo } from '@ncr/domain-core';
-import type { ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
+import type {
+  ErrorDominio,
+  GeneradorDeId,
+  Reloj,
+  ResultadoDeAccionamiento,
+  Resultado,
+} from '@ncr/domain-core';
 import type { ContextoTenant, Rol } from '../../autenticacion';
 import { alcanzaCopropiedad } from '../../autenticacion';
 
@@ -51,6 +57,18 @@ export interface OrdenManual {
   readonly eventoId?: string | null;
 }
 
+/**
+ * Cómo respondió el equipo, en tres estados y ninguno «abierta».
+ *
+ * `null` mientras la orden no se ha ejecutado —y siempre, en una negación, que
+ * no acciona nada—. El detalle de por qué son tres y por qué falta el cuarto
+ * está en el puerto `ControlDeBarrera` del dominio: H-1 y H-2 de la validación
+ * en sitio. Aquí basta con no perderlos por el camino, porque **un portero
+ * delante de la barrera necesita distinguir un rechazo de un equipo mudo**: uno
+ * se arregla desbloqueando el acceso, el otro llamando al técnico.
+ */
+export type EstadoDeAccionamiento = ResultadoDeAccionamiento['estado'];
+
 export interface OrdenEjecutada {
   readonly id: string;
   /** La frontera del tenant viaja con la orden: la bitácora la indexa por ella. */
@@ -62,19 +80,52 @@ export interface OrdenEjecutada {
   readonly dispositivoId: string;
   readonly momento: Date;
   readonly eventoId: string | null;
+  readonly resultado?: EstadoDeAccionamiento | null;
+  /** Lo que contestó el equipo, ya en lenguaje del operador. */
+  readonly detalle?: string | null;
 }
 
 /**
  * Puerto de accionamiento. Lo declara el consumidor: al caso de uso no le
  * importa si detrás hay un relé del fabricante o el simulado de esta etapa.
+ *
+ * **Devolvía `void` y ya no puede.** Con un relé real hay tres desenlaces que
+ * el operador necesita ver separados —aceptada, rechazada, inalcanzable— y
+ * `void` los aplasta en uno. El tipo del resultado vive en el dominio para que
+ * el adaptador de `packages/providers` lo comprometa con `implements`; si
+ * viviera solo aquí, el paquete no podría importarlo y la compatibilidad sería
+ * una coincidencia en vez de una comprobación.
  */
 export interface AccionadorDePuerta {
-  accionar(dispositivoId: string, abrir: boolean): Promise<void>;
+  accionar(dispositivoId: string, abrir: boolean): Promise<ResultadoDeAccionamiento>;
 }
 export const ACCIONADOR_DE_PUERTA = Symbol.for('ncr.puerto.AccionadorDePuerta');
 
+/**
+ * Puerto del BLOQUEO, separado del anterior a propósito (H-3).
+ *
+ * Accionar es un pulso sobre un paso concreto; bloquear es **estado que queda**
+ * y que manda sobre toda decisión posterior: con el acceso bloqueado, una placa
+ * autorizada no abre. Son operaciones distintas en consecuencias y en quién
+ * puede ejecutarlas, y un solo método las haría parecer intercambiables.
+ */
+export interface BloqueoDeAcceso {
+  fijarBloqueo(dispositivoId: string, bloqueado: boolean): Promise<ResultadoDeAccionamiento>;
+}
+export const BLOQUEO_DE_ACCESO = Symbol.for('ncr.puerto.BloqueoDeAcceso');
+
 export interface BitacoraDeOrdenes {
   registrar(orden: OrdenEjecutada): Promise<void>;
+  /**
+   * Anota cómo acabó una orden ya registrada. Es una segunda escritura, y por
+   * eso existe: el rastro se guarda ANTES de accionar y no puede esperar a
+   * saber el desenlace. Si esta falla, el rastro sigue estando.
+   */
+  anotarResultado(
+    id: string,
+    resultado: EstadoDeAccionamiento,
+    detalle: string | null,
+  ): Promise<void>;
   ultimas(copropiedadId: string, cuantas: number): Promise<readonly OrdenEjecutada[]>;
 }
 export const BITACORA_DE_ORDENES = Symbol.for('ncr.puerto.BitacoraDeOrdenes');
@@ -158,8 +209,17 @@ export class AccionarPuertaAMano {
      * abrir: el operador lo ve, insiste, y el incidente queda documentado.
      */
     await this.bitacora.registrar(ejecutada);
-    if (orden.accion === 'abrir') await this.accionador.accionar(orden.dispositivoId, true);
+    if (orden.accion !== 'abrir') return exito(ejecutada);
 
-    return exito(ejecutada);
+    const resultado = await this.accionador.accionar(orden.dispositivoId, true);
+    const detalle = resultado.estado === 'aceptada' ? null : resultado.motivo;
+    await this.bitacora.anotarResultado(ejecutada.id, resultado.estado, detalle);
+
+    /**
+     * Se devuelve el desenlace, **y «aceptada» no dice que la barrera se abrió**
+     * (H-1, H-2). La consola muestra lo que el equipo contestó, que es lo único
+     * que el sistema sabe mientras no haya señal de posición cableada.
+     */
+    return exito({ ...ejecutada, resultado: resultado.estado, detalle });
   }
 }
