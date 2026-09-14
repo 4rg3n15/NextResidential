@@ -10,6 +10,7 @@ export * from './compartido/errores';
 export * from './puertos/soporte';
 export * from './puertos/repositorios';
 export * from './puertos/proveedores';
+export * from './puertos/barrera';
 export * from './eventos/evento-de-dominio';
 export * from './eventos/bus-en-memoria';
 export * from './eventos/acceso';
