@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import {
   LONGITUD_MAXIMA_DE_MOTIVO,
   LONGITUD_MINIMA_DE_MOTIVO,
@@ -49,6 +57,28 @@ export class OrdenEjecutadaDto {
   @ApiProperty({ format: 'uuid' }) dispositivoId!: string;
   @ApiProperty({ format: 'date-time' }) momento!: string;
   @ApiProperty({ nullable: true, type: String }) eventoId!: string | null;
+
+  /**
+   * Cómo respondió el equipo. **Ninguno de los tres dice «se abrió»**: el
+   * equipo confirma que recibió la orden, no que el vehículo pasó. Mientras la
+   * señal de posición no esté cableada, el sistema no puede afirmarlo, y esta
+   * respuesta no va a fingir que sí.
+   *
+   * `rechazada` e `inalcanzable` se separan porque se resuelven de forma
+   * distinta: una desbloqueando el acceso, la otra llamando al técnico.
+   */
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    enum: ['aceptada', 'rechazada', 'inalcanzable'],
+    description:
+      'Respuesta del equipo. «aceptada» significa orden aceptada, NO paso franqueado. ' +
+      'Nulo en una negación, que no acciona nada.',
+  })
+  resultado!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'Lo que contestó el equipo.' })
+  detalle!: string | null;
 }
 
 export class HistorialDeOrdenesDto {
@@ -144,4 +174,59 @@ export class EmergenciaDto {
 export class AceptadoDto {
   @ApiProperty({ example: true }) aceptado!: boolean;
   @ApiProperty({ required: false }) detalle?: string;
+}
+
+/**
+ * Bloqueo y desbloqueo de un acceso — orden de administración, no de portería.
+ *
+ * `bloqueado` es un estado, no un pulso: mientras esté puesto, ninguna placa
+ * autorizada abre. Por eso el motivo pesa aquí tanto o más que en la apertura.
+ */
+export class OrdenDeBloqueoDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  dispositivoId!: string;
+
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'Verdadero deja el acceso bloqueado hasta que alguien lo revierta: ninguna ' +
+      'autorización abre mientras tanto.',
+  })
+  @IsBoolean()
+  bloqueado!: boolean;
+
+  @ApiProperty({
+    minLength: LONGITUD_MINIMA_DE_MOTIVO,
+    maxLength: LONGITUD_MAXIMA_DE_MOTIVO,
+    description:
+      'Obligatorio (RN-08). Sin motivo NO se bloquea: un acceso bloqueado sin ' +
+      'justificación registrada deja al conjunto sin entrada y sin a quién preguntar.',
+    example: 'Mantenimiento de la talanquera, coordinado con la administración',
+  })
+  @IsString()
+  @MinLength(LONGITUD_MINIMA_DE_MOTIVO)
+  @MaxLength(LONGITUD_MAXIMA_DE_MOTIVO)
+  motivo!: string;
+}
+
+/** El estado vigente **con dueño**: quién lo dejó así y desde cuándo. */
+export class BloqueoVigenteDto {
+  @ApiProperty({ format: 'uuid' }) dispositivoId!: string;
+  @ApiProperty({ type: Boolean }) bloqueado!: boolean;
+  @ApiProperty() motivo!: string;
+  @ApiProperty({ format: 'uuid' }) operadorId!: string;
+  @ApiProperty() rol!: string;
+  @ApiProperty({ format: 'date-time' }) desde!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    enum: ['aceptada', 'rechazada', 'inalcanzable'],
+  })
+  resultado!: string | null;
+  @ApiProperty({ type: String, nullable: true }) detalle!: string | null;
+}
+
+export class BloqueosVigentesDto {
+  @ApiProperty({ type: [BloqueoVigenteDto] }) bloqueos!: BloqueoVigenteDto[];
 }

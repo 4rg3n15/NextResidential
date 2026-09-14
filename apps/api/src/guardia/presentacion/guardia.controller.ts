@@ -30,16 +30,21 @@ import type { RepositorioEventos } from '../../eventos';
 import type { EscalamientoDeAlerta } from '../aplicacion/puertos';
 import { AccionarPuertaAMano, BITACORA_DE_ORDENES } from '../aplicacion/apertura-manual';
 import type { BitacoraDeOrdenes } from '../aplicacion/apertura-manual';
+import { FijarBloqueoDeAcceso, REGISTRO_DE_BLOQUEOS } from '../aplicacion/bloqueo-de-acceso';
+import type { BloqueoVigente, RegistroDeBloqueos } from '../aplicacion/bloqueo-de-acceso';
 import { construirCola, resumenDeCola } from '../aplicacion/cola-de-atencion';
 import { CANAL_DE_INTERCOM } from '../aplicacion/puertos';
 import type { CanalDeIntercom } from '../aplicacion/puertos';
 import {
   AceptadoDto,
   AvisoAlResidenteDto,
+  BloqueoVigenteDto,
+  BloqueosVigentesDto,
   ColaDeAtencionDto,
   EmergenciaDto,
   EstadoDeCanalDto,
   HistorialDeOrdenesDto,
+  OrdenDeBloqueoDto,
   OrdenEjecutadaDto,
   OrdenManualDto,
   SolicitudDeCanalDto,
@@ -75,7 +80,22 @@ export class GuardiaController {
     @Inject(ESCALAMIENTO_DE_ALERTA) private readonly escalar: EscalamientoDeAlerta,
     @Inject(RELOJ) private readonly reloj: Reloj,
     @Inject(GENERADOR_DE_ID) private readonly ids: GeneradorDeId,
+    @Inject(FijarBloqueoDeAcceso) private readonly bloquear: FijarBloqueoDeAcceso,
+    @Inject(REGISTRO_DE_BLOQUEOS) private readonly bloqueos: RegistroDeBloqueos,
   ) {}
+
+  private static aDto(b: BloqueoVigente): BloqueoVigenteDto {
+    return {
+      dispositivoId: b.dispositivoId,
+      bloqueado: b.bloqueado,
+      motivo: b.motivo,
+      operadorId: b.operadorId,
+      rol: b.rol,
+      desde: b.desde.toISOString(),
+      resultado: b.resultado,
+      detalle: b.detalle,
+    };
+  }
 
   private desenvolver<T>(r: Resultado<T, ErrorDominio>): T {
     if (r.ok) return r.valor;
@@ -116,7 +136,65 @@ export class GuardiaController {
         eventoId: dto.eventoId ?? null,
       }),
     );
-    return { ...orden, momento: orden.momento.toISOString() };
+    return {
+      ...orden,
+      momento: orden.momento.toISOString(),
+      resultado: orden.resultado ?? null,
+      detalle: orden.detalle ?? null,
+    };
+  }
+
+  /**
+   * Bloqueo y desbloqueo del acceso — **orden de administración** (H-3).
+   *
+   * No es la apertura manual con otro nombre: aquella es un pulso para un
+   * vehículo, ésta deja un estado que manda sobre toda decisión posterior.
+   * Mientras el acceso esté bloqueado, una placa autorizada **no** abre. Por
+   * eso no la ejerce el portero y por eso el motivo pesa igual que allí.
+   */
+  @Post('bloqueo')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Bloquea o desbloquea el acceso, con motivo obligatorio (RN-08)' })
+  @ApiCreatedResponse({ type: BloqueoVigenteDto })
+  @ApiForbiddenResponse({ type: ErrorApiDto, description: 'Rol que no bloquea accesos' })
+  @ApiNotFoundResponse({ type: ErrorApiDto, description: 'Copropiedad fuera del alcance' })
+  async fijarBloqueo(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Body() dto: OrdenDeBloqueoDto,
+  ): Promise<BloqueoVigenteDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/bloqueo');
+    const vigente = this.desenvolver(
+      await this.bloquear.ejecutar(ctx, {
+        copropiedadId,
+        dispositivoId: dto.dispositivoId,
+        bloqueado: dto.bloqueado,
+        motivo: dto.motivo,
+      }),
+    );
+    return GuardiaController.aDto(vigente);
+  }
+
+  /**
+   * Quién dejó cada acceso como está, y desde cuándo.
+   *
+   * Lo puede consultar también el portero, y es deliberado: es quien se
+   * encuentra la barrera que no responde. Sin esta vista, un rechazo del equipo
+   * es indistinguible de una avería, y la respuesta correcta —avisar a quien
+   * bloqueó— no está a su alcance.
+   */
+  @Get('bloqueo')
+  @Roles('portero', 'operador_central', 'administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Accesos bloqueados de la copropiedad, con su dueño y su fecha' })
+  @ApiOkResponse({ type: BloqueosVigentesDto })
+  @ApiNotFoundResponse({ type: ErrorApiDto, description: 'Copropiedad fuera del alcance' })
+  async bloqueosVigentes(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+  ): Promise<BloqueosVigentesDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/bloqueo');
+    const todos = await this.bloqueos.todos(copropiedadId);
+    return { bloqueos: todos.map((b) => GuardiaController.aDto(b)) };
   }
 
   /** HU-23 · el historial inmediato de lo accionado a mano en esta portería. */
@@ -131,7 +209,17 @@ export class GuardiaController {
   ): Promise<HistorialDeOrdenesDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/ordenes');
     const ordenes = await this.ordenes.ultimas(copropiedadId, 20);
-    return { ordenes: ordenes.map((o) => ({ ...o, momento: o.momento.toISOString() })) };
+    return {
+      ordenes: ordenes.map((o) => ({
+        ...o,
+        momento: o.momento.toISOString(),
+        // El historial dice también CÓMO acabó cada orden: una lista de
+        // órdenes sin desenlace no distingue la que abrió de la que se topó
+        // con un equipo mudo, y es justo lo que el portero necesita mirar.
+        resultado: o.resultado ?? null,
+        detalle: o.detalle ?? null,
+      })),
+    };
   }
 
   /* ── Guardia virtual ────────────────────────────────────────────────── */

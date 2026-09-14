@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-13 · **ETAPA 10 construida** · D-71 a D-74 corregidos: el padrón se da de alta escribiendo nombres
+**Última actualización:** 2026-09-15 · **ETAPA 10 construida** · adaptador real de barrera vehicular, verificado contra el equipo
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -349,6 +349,52 @@ franja horaria estaba fija en el código. Ahora la casilla dice «Autorización
 recurrente» a secas, y al marcarla se abre un grupo con los días **y** las dos
 horas, editables; una franja que cruce la medianoche se señala en el formulario
 con el mismo motivo que da RN-22 (se registra con dos autorizaciones).
+
+### Adaptador real de barrera vehicular · 2026-09-15
+
+**No es la ETAPA 15.** Es la rebanada acotada que propone
+`decisiones/propuestas/apertura-real-antes-de-la-etapa-15.md`: un adaptador
+detrás de un puerto que ya existía. El simulado sigue siendo el de por omisión y
+la suite completa sigue corriendo sin hardware (KPI-12).
+
+Los tres hallazgos de la validación en sitio están en
+`guias/VALIDACION_HIKVISION_EN_SITIO.md` §0.ter, y **determinan el diseño**:
+
+- **H-1** · la respuesta correcta del equipo no prueba que la barrera se movió.
+  Observado: con el acceso bloqueado, la orden de abrir responde
+  afirmativamente y el relé no actúa.
+- **H-2** · no hay señal de posición cableada. El sistema **no puede demostrar**
+  que una puerta se abrió, y ninguna pantalla va a afirmarlo.
+- **H-3** · bloquear y desbloquear son estado persistente, no pulso: mandan
+  sobre la decisión por vehículo.
+
+**Consecuencia en el contrato interno.** El puerto `AccionadorDePuerta`
+devolvía `void` y **ya no puede**: con un relé real hay tres desenlaces que el
+operador resuelve de forma distinta —`aceptada`, `rechazada`, `inalcanzable`— y
+`void` los aplasta en uno. Un portero necesita distinguir un rechazo, que se
+arregla desbloqueando, de un equipo mudo, que se arregla llamando al técnico.
+Ninguno de los tres estados dice «abierta», y `aceptada` lleva marcado **por el
+tipo** que el paso no es observable (H-1, H-2).
+
+**Bloqueo y desbloqueo** entran como caso de uso propio, no como variante de la
+apertura: motivo obligatorio con la misma regla (RN-08), rastro antes de
+accionar, estado vigente **con dueño y fecha**, y alcance de administración —
+el portero no deja un conjunto sin entrada—.
+
+**PENDIENTE DE DEFINICIÓN · consulta de estado.** El `GET` al estado de la
+barrera devuelve `notSupport`; la interfaz del equipo lo consulta por otro
+método **aún sin capturar**. Hasta entonces el sistema no puede preguntar en qué
+estado está el acceso: solo sabe lo que él mismo ordenó.
+
+**PENDIENTE · si el bloqueo sobrevive a un reinicio del equipo.** Sin comprobar.
+Importa: si no sobreviviera, un corte de luz desbloquearía el acceso sin que
+nadie se entere.
+
+**ANOTADO · el equipo no es fuente de verdad auditable.** Su registro de
+lecturas se puede borrar por API (`isSupportLPAuditDataDelete` es verdadero). La
+trazabilidad vive en `eventos`, append-only por permisos y por disparador
+(ADR-05). El equipo pasó además de control por cámara a **control por
+plataforma**: la decisión la toma Next Control.
 
 ---
 

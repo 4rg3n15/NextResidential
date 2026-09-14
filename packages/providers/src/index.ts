@@ -7,6 +7,9 @@
  * KPI-11 admite la palabra ISAPI o una IP de dispositivo: fuera de aquí, el
  * build se rompe.
  */
+export * from './barrera/digest';
+export * from './barrera/control-barrera';
+export * from './barrera/desde-entorno';
 export * from './mock/simulacion';
 export * from './mock/mock-provider';
 export * from './mock/intercom-simulado';

@@ -39,7 +39,24 @@ const RAICES = ['apps', 'packages', 'supabase', 'scripts'];
 const IGNORADOS = new Set(['node_modules', 'dist', 'coverage', '.turbo', '.git', 'build', '.next']);
 const EXTENSIONES = /\.(ts|tsx|js|mjs|cjs|dart|sql|sh|yml|yaml)$/;
 
-const PALABRAS = [/\bISAPI\b/i, /\bTwoWayAudio\b/i, /\bhikvision\b/i];
+/**
+ * Vocabulario del fabricante. Ninguna de estas palabras puede aparecer fuera
+ * del paquete de proveedores — ni en código ni en comentarios.
+ *
+ * Las cuatro últimas se añadieron con el adaptador de barrera del 15/09/2026:
+ * son el módulo, el elemento y el campo de la única ruta verificada contra el
+ * equipo. Sin ellas el control decía vigilar la frontera y vigilaba media, y
+ * KPI-11 ya encontró una fuga de este tipo una vez en la ETAPA 10.
+ */
+const PALABRAS = [
+  /\bISAPI\b/i,
+  /\bTwoWayAudio\b/i,
+  /\bhikvision\b/i,
+  /\bParking\b/,
+  /\bBarrierGate\b/i,
+  /\bctrlMode\b/i,
+  /\bbarrierGateCtrlType\b/i,
+];
 
 // IPv4 literal. Se excluyen las que no identifican un equipo: loopback, «todas
 // las interfaces» y la difusión. Una IP de dispositivo en el código sería
