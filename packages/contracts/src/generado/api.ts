@@ -499,6 +499,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/guardia/bloqueo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accesos bloqueados de la copropiedad, con su dueño y su fecha */
+        get: operations["GuardiaController_bloqueosVigentes"];
+        put?: never;
+        /** Bloquea o desbloquea el acceso, con motivo obligatorio (RN-08) */
+        post: operations["GuardiaController_fijarBloqueo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/guardia/cola": {
         parameters: {
             query?: never;
@@ -1056,6 +1074,23 @@ export interface components {
         BajaDto: {
             desactivado: boolean;
         };
+        BloqueoVigenteDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            bloqueado: boolean;
+            motivo: string;
+            /** Format: uuid */
+            operadorId: string;
+            rol: string;
+            /** Format: date-time */
+            desde: string;
+            /** @enum {string|null} */
+            resultado: "aceptada" | "rechazada" | "inalcanzable" | null;
+            detalle: string | null;
+        };
+        BloqueosVigentesDto: {
+            bloqueos: components["schemas"]["BloqueoVigenteDto"][];
+        };
         CambiosDeConfiguracionDto: {
             /** @example Urbanización Mira */
             nombre?: string;
@@ -1489,6 +1524,17 @@ export interface components {
         NotasDeAlertaDto: {
             notas: string;
         };
+        OrdenDeBloqueoDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            /** @description Verdadero deja el acceso bloqueado hasta que alguien lo revierta: ninguna autorización abre mientras tanto. */
+            bloqueado: boolean;
+            /**
+             * @description Obligatorio (RN-08). Sin motivo NO se bloquea: un acceso bloqueado sin justificación registrada deja al conjunto sin entrada y sin a quién preguntar.
+             * @example Mantenimiento de la talanquera, coordinado con la administración
+             */
+            motivo: string;
+        };
         OrdenEjecutadaDto: {
             /** Format: uuid */
             id: string;
@@ -1503,6 +1549,13 @@ export interface components {
             /** Format: date-time */
             momento: string;
             eventoId: string | null;
+            /**
+             * @description Respuesta del equipo. «aceptada» significa orden aceptada, NO paso franqueado. Nulo en una negación, que no acciona nada.
+             * @enum {string|null}
+             */
+            resultado: "aceptada" | "rechazada" | "inalcanzable" | null;
+            /** @description Lo que contestó el equipo. */
+            detalle: string | null;
         };
         OrdenManualDto: {
             /** Format: uuid */
@@ -2700,6 +2753,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AceptadoDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_bloqueosVigentes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BloqueosVigentesDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_fijarBloqueo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdenDeBloqueoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BloqueoVigenteDto"];
+                };
+            };
+            /** @description Rol que no bloquea accesos */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
                 };
             };
             /** @description Copropiedad fuera del alcance */

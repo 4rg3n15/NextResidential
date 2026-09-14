@@ -1700,6 +1700,116 @@
         ]
       }
     },
+    "/copropiedades/{id}/guardia/bloqueo": {
+      "post": {
+        "operationId": "GuardiaController_fijarBloqueo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdenDeBloqueoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BloqueoVigenteDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol que no bloquea accesos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bloquea o desbloquea el acceso, con motivo obligatorio (RN-08)",
+        "tags": [
+          "guardia"
+        ]
+      },
+      "get": {
+        "operationId": "GuardiaController_bloqueosVigentes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BloqueosVigentesDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accesos bloqueados de la copropiedad, con su dueño y su fecha",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
     "/copropiedades/{id}/guardia/cola": {
       "get": {
         "operationId": "GuardiaController_cola",
@@ -3446,6 +3556,69 @@
           "desactivado"
         ]
       },
+      "BloqueoVigenteDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bloqueado": {
+            "type": "boolean"
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "operadorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rol": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resultado": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "aceptada",
+              "rechazada",
+              "inalcanzable"
+            ]
+          },
+          "detalle": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "bloqueado",
+          "motivo",
+          "operadorId",
+          "rol",
+          "desde",
+          "resultado",
+          "detalle"
+        ]
+      },
+      "BloqueosVigentesDto": {
+        "type": "object",
+        "properties": {
+          "bloqueos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BloqueoVigenteDto"
+            }
+          }
+        },
+        "required": [
+          "bloqueos"
+        ]
+      },
       "CambiosDeConfiguracionDto": {
         "type": "object",
         "properties": {
@@ -4714,6 +4887,31 @@
           "notas"
         ]
       },
+      "OrdenDeBloqueoDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bloqueado": {
+            "type": "boolean",
+            "description": "Verdadero deja el acceso bloqueado hasta que alguien lo revierta: ninguna autorización abre mientras tanto."
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 300,
+            "description": "Obligatorio (RN-08). Sin motivo NO se bloquea: un acceso bloqueado sin justificación registrada deja al conjunto sin entrada y sin a quién preguntar.",
+            "example": "Mantenimiento de la talanquera, coordinado con la administración"
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "bloqueado",
+          "motivo"
+        ]
+      },
       "OrdenEjecutadaDto": {
         "type": "object",
         "properties": {
@@ -4749,6 +4947,21 @@
           "eventoId": {
             "type": "string",
             "nullable": true
+          },
+          "resultado": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "aceptada",
+              "rechazada",
+              "inalcanzable"
+            ],
+            "description": "Respuesta del equipo. «aceptada» significa orden aceptada, NO paso franqueado. Nulo en una negación, que no acciona nada."
+          },
+          "detalle": {
+            "type": "string",
+            "nullable": true,
+            "description": "Lo que contestó el equipo."
           }
         },
         "required": [
@@ -4759,7 +4972,9 @@
           "rol",
           "dispositivoId",
           "momento",
-          "eventoId"
+          "eventoId",
+          "resultado",
+          "detalle"
         ]
       },
       "OrdenManualDto": {
