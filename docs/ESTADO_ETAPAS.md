@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-13 · **ETAPA 10 construida** · D-71 a D-74 corregidos: el padrón se da de alta escribiendo nombres
+**Última actualización:** 2026-09-14 · **ETAPA 10 construida** · D-71 a D-74 corregidos · validación de hardware hecha: el evento de placa real ya es material del proyecto
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -349,6 +349,48 @@ franja horaria estaba fija en el código. Ahora la casilla dice «Autorización
 recurrente» a secas, y al marcarla se abre un grupo con los días **y** las dos
 horas, editables; una franja que cruce la medianoche se señala en el formulario
 con el mismo motivo que da RN-22 (se registra con dos autorizaciones).
+
+### Hardware Hikvision · validación en sitio · 2026-09-14
+
+Los tres equipos estuvieron disponibles y la cámara de entrada se validó contra
+ISAPI. **Lo medido está en `guias/VALIDACION_HIKVISION_EN_SITIO.md` §0.bis** y
+sustituye a toda suposición previa: ISAPI por **HTTP con Digest, no HTTPS**;
+espacio de nombres `www.isapi.org` y no el del fabricante; servidor de alarmas
+funcionando con `POST multipart` de tres partes y ~170 kB; y
+**`barrierGateCtrlType` = 0**, es decir, la cámara reporta y **no** acciona por
+su cuenta. El principio rector queda sostenido por medición.
+
+**El evento real es ya material del proyecto**, en `packages/providers/src/anpr/`:
+analizador del XML y del envío, emisor con la forma exacta del equipo, y
+`MockProvider` emitiendo a través de ese mismo analizador en vez de inventarse
+la lectura. De ahí sale un control nuevo —`laCamaraDecidePorSuCuenta`— que
+convierte `barrierGateCtrlType` en algo que la ingesta puede rechazar.
+
+**PENDIENTE DE INSUMO · la captura.** `docs/insumos/hikvision/` está en la
+máquina del cliente, no en el repositorio. Todo lo anterior está probado contra
+una **reconstrucción** de la lista de campos, no contra los bytes.
+`captura-real.test.ts` está escrita y espera esos archivos: mientras no estén
+**imprime OMITIDA**. Una omisión no es un verde.
+
+**PENDIENTE DE DEFINICIÓN · el relé de la talanquera.** La única salida que la
+cámara enumera es `whiteLight`, y `/ISAPI/System/IO/capabilities` responde
+`notSupport` en este firmware. **No se sabe qué relé abre la barrera**, y hasta
+saberlo el accionador real no se puede escribir. Detalle y alternativas en
+`decisiones/propuestas/placa-a-talanquera.md` §2.3.
+
+**DECISIÓN PENDIENTE · hora del equipo en el contrato de ingesta.** El evento
+trae `dateTime` con desfase y el contrato no tiene dónde ponerlo:
+`RegistrarAcceso` sella la hora del **servidor**. En vivo da igual; en la
+reconciliación del Edge tras media hora sin WAN (CA-21, CA-22, KPI-31) veinte
+accesos quedarían fechados en el mismo minuto. Propuesta aditiva y opcional,
+0,3 jornadas, en `placa-a-talanquera.md` §4. **No se ha aplicado**: cambia
+superficie publicada.
+
+**OBSERVACIÓN DE DISEÑO · dos puertos para la misma intención.**
+`AccessPointProvider` —dominio, devuelve la latencia, **no lo usa nadie**— y
+`AccionadorDePuerta` —guardia, **sí se usa**, devuelve `void`—. El que se usa es
+el que pierde la latencia, que es lo que KPI-13 y KPI-32 exigen medir. Conviene
+reconciliarlos **antes** de la ETAPA 15, no dentro.
 
 ---
 

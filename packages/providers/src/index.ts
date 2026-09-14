@@ -7,6 +7,9 @@
  * KPI-11 admite la palabra ISAPI o una IP de dispositivo: fuera de aquí, el
  * build se rompe.
  */
+export * from './anpr/evento-anpr';
+export * from './anpr/paquete-anpr';
+export * from './anpr/emisor-anpr';
 export * from './mock/simulacion';
 export * from './mock/mock-provider';
 export * from './mock/intercom-simulado';

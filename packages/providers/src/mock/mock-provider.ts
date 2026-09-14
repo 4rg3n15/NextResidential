@@ -9,6 +9,9 @@ import type {
 } from '@ncr/domain-core';
 import type { PerfilDeSimulacion } from './simulacion';
 import { Azar, FalloDeHardwareSimulado, PERFIL_REALISTA, RelojSimulado } from './simulacion';
+import type { EventoAnpr } from '../anpr/evento-anpr';
+import { analizarPaqueteAnpr } from '../anpr/paquete-anpr';
+import { construirPaqueteAnpr } from '../anpr/emisor-anpr';
 
 export interface OpcionesMock {
   readonly perfil?: PerfilDeSimulacion;
@@ -44,6 +47,7 @@ export class MockProvider
   private readonly suscriptores: ((l: LecturaDePlaca) => Promise<void>)[] = [];
 
   /** Exclusividad del canal de audio: consecuencia directa de ADR-01. */
+  private eventosEmitidos = 0;
   private canalOcupadoPor: string | null = null;
   private dispositivoEnSesion: string | null = null;
   private readonly audioEnviado: Uint8Array[] = [];
@@ -78,20 +82,71 @@ export class MockProvider
    * Emite una lectura hacia los suscriptores. **Puede emitirla dos veces**: el
    * hardware real duplica eventos y la ingesta tiene que ser idempotente
    * (RN-17, CA-22). Si el mock nunca duplicara, ese camino no se probaría.
+   *
+   * **La lectura NO se inventa: se construye con la forma del equipo real y se
+   * vuelve a leer con el mismo analizador** que usará el adaptador de la ETAPA
+   * 15 (`construirPaqueteAnpr` → `analizarPaqueteAnpr`). Antes el simulador
+   * producía directamente el objeto que le convenía, y eso dejaba sin ejercer
+   * justo lo que cuesta: el desfase horario, el identificador propio del
+   * evento, el delimitador del envío y la confianza en centésimas. Ahora el
+   * camino simulado y el real comparten el normalizador.
    */
   async emitirLectura(placa: string, dispositivoId: string): Promise<LecturaDePlaca> {
+    return (await this.emitirEventoAnpr(placa, dispositivoId)).lectura;
+  }
+
+  /**
+   * Lo mismo, devolviendo **también el evento completo del equipo**.
+   *
+   * Existe porque `LecturaDePlaca` —el puerto del dominio— no tiene dónde
+   * llevar el identificador propio del evento ni la hora del equipo, y esos dos
+   * datos son los que sostienen RN-17 y CA-21. Quien los necesite los toma de
+   * aquí; el puerto sigue diciendo lo que el dominio necesita saber, que es
+   * placa, confianza, equipo e instante.
+   */
+  async emitirEventoAnpr(
+    placa: string,
+    dispositivoId: string,
+  ): Promise<{ readonly lectura: LecturaDePlaca; readonly evento: EventoAnpr }> {
     const bajaConfianza = this.azar.ocurre(this.perfil.probabilidadDeBajaConfianza);
-    const lectura: LecturaDePlaca = {
+    // En CENTÉSIMAS enteras, que es la resolución que da el equipo: no tiene
+    // sentido que el simulador ofrezca más precisión de la que existe.
+    const confianzaCentesimas = Math.round(
+      (bajaConfianza ? this.azar.entre(0.3, 0.79) : this.azar.entre(0.85, 0.99)) * 100,
+    );
+
+    const { cuerpo, tipoDeContenido } = construirPaqueteAnpr({
       placa,
-      confianza: bajaConfianza ? this.azar.entre(0.3, 0.79) : this.azar.entre(0.85, 0.99),
-      dispositivoId,
+      confianzaCentesimas,
       ocurridoEn: this.reloj.ahora(),
+      referenciaExterna: this.siguienteReferencia(dispositivoId),
+    });
+
+    const paquete = analizarPaqueteAnpr(cuerpo, tipoDeContenido);
+    if (!paquete.ok) {
+      // Si esto salta, el simulador y el analizador se han separado: es un
+      // defecto del propio simulador y callarlo dejaría el camino sin ejercer.
+      throw new FalloDeHardwareSimulado(dispositivoId, paquete.error.detalle);
+    }
+    const evento = paquete.valor.evento;
+
+    const lectura: LecturaDePlaca = {
+      placa: evento.placa,
+      confianza: evento.confianzaCentesimas / 100,
+      dispositivoId,
+      ocurridoEn: evento.ocurridoEn,
     };
     const veces = this.azar.ocurre(this.perfil.probabilidadDeDuplicado) ? 2 : 1;
     for (let i = 0; i < veces; i += 1) {
       for (const suscriptor of this.suscriptores) await suscriptor(lectura);
     }
-    return lectura;
+    return { lectura, evento };
+  }
+
+  /** Identificador de evento del equipo, reproducible con la misma semilla. */
+  private siguienteReferencia(dispositivoId: string): string {
+    this.eventosEmitidos += 1;
+    return `${dispositivoId}-${String(this.eventosEmitidos).padStart(6, '0')}`;
   }
 
   // ── FaceTemplateProvider ─────────────────────────────────────────────────

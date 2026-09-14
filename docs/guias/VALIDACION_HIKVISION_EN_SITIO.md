@@ -52,6 +52,45 @@ que cubren estos tres aparatos; los nombres son los del índice del wiki):
 
 ---
 
+## 0.bis · Lo ya MEDIDO contra los equipos · 2026-09-14
+
+Esto deja de ser procedimiento y pasa a ser hecho. Sustituye a cualquier
+suposición anterior de esta guía.
+
+**Cámara de entrada — `DS-TCG405-E`, firmware `V5.4.0 build 250425`.**
+
+| Comprobación                     | Resultado medido                                                                                                          |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Transporte de ISAPI              | **HTTP con Digest, no HTTPS.** No hay que forzar TLS ni confiar certificado: el adaptador habla HTTP en esta red          |
+| Espacio de nombres del XML       | `www.isapi.org`, **no** el dominio del fabricante. Un analizador atado a ese dominio habría leído vacío                   |
+| `/ISAPI/System/IO/capabilities`  | `statusCode 4 · notSupport`. **La ruta genérica de capacidades de E/S no existe en este firmware**                        |
+| `/ISAPI/System/IO/outputs`       | Responde 200 con **una sola salida**: `id 1`, nombre `F1`, `IOUseType` **`whiteLight`**                                   |
+| `barrierGateCtrlType` del evento | **0** — la cámara reporta y **no** acciona por su cuenta. El principio rector se sostiene, medido y no supuesto           |
+| Servidor de alarmas              | Funciona. `POST multipart/form-data`, ~170 kB, tres partes: `anpr.xml`, `detectionPicture.jpg`, `licensePlatePicture.jpg` |
+| Autenticación del envío          | **Ninguna.** El equipo no firma nada (ver la advertencia de abajo)                                                        |
+| Lecturas capturadas              | `HNW094` y `EMM195`, las dos con `confidenceLevel` 100                                                                    |
+
+**Campos del evento, confirmados:** `eventType` `ANPR`, `licensePlate`,
+`confidenceLevel`, `plateCharBelieve` —confianza por carácter—, `dateTime` con
+desfase horario, `channelID`, `UUID` del evento, `capturePicSecurityCode`, y
+`pictureInfoList` con `plateRect` y `vehicelRect` —con la errata del fabricante—.
+
+> **La única salida enumerada es la luz, no la talanquera.** `IOUseType` dice
+> `whiteLight`, y la ruta genérica de capacidades de E/S no responde. Así que
+> **todavía no sabemos qué relé abre la barrera**: puede estar en otra rama de
+> ISAPI propia de la familia de tráfico, en otra salida que esa ruta no
+> enumera, o directamente en otro equipo. Es el dato que falta para escribir el
+> accionador, y es el que conviene sacar mientras los equipos estén delante.
+
+> **El envío no está autenticado, y eso tiene consecuencias de diseño.**
+> Cualquiera que alcance el puerto de escucha puede inventarse un paso de
+> vehículo con la matrícula que quiera. Por eso la cámara **no puede** apuntar
+> directamente a la ingesta del sistema, que exige firma: hace falta un
+> traductor —el servidor de alarmas— con su propia frontera. Está desarrollado
+> en `decisiones/propuestas/placa-a-talanquera.md`.
+
+---
+
 ## 1 · Antes de tocar nada
 
 ### 1.1 · Lo que NO debe hacer
