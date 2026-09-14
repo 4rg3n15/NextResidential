@@ -52,6 +52,68 @@ que cubren estos tres aparatos; los nombres son los del índice del wiki):
 
 ---
 
+## 0.ter · Barrera vehicular · medido el 15/09/2026 · **manda sobre lo anterior**
+
+**Procedencia, y es lo primero.** Nada de esta sección viene de documentación
+del fabricante. La ruta y el cuerpo se **capturaron del JavaScript de la propia
+interfaz del equipo**, con el panel de red del navegador, y se reprodujeron
+después con una petición manual. Equipo `DS-TCG405-E`, firmware
+`V5.4.0 build 250425`. Es la única ruta verificada y la única que el adaptador
+usa; **no se deduce ninguna otra por analogía** — esa suposición costó dos
+intentos fallidos ese mismo día.
+
+| Hecho              | Medido                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| Módulo             | `Parking`. **No** `Traffic` ni `System/IO`: los dos se probaron y contestaron `notSupport` |
+| Operación          | `PUT` sobre el canal de barrera, con un cuerpo XML de un solo campo de modo                |
+| Modos              | abrir · cerrar · bloquear · desbloquear                                                    |
+| Respuesta correcta | `statusCode 1` con `statusString OK`                                                       |
+| Autenticación      | Digest **MD5**                                                                             |
+| Transporte         | HTTP. **No HTTPS**                                                                         |
+
+### Los tres hallazgos que determinan el diseño
+
+**H-1 · La respuesta correcta no prueba que la barrera se movió.** Observado, no
+supuesto: con el equipo en estado bloqueado, la orden de abrir responde
+`statusCode 1` **y el relé no actúa**. Una respuesta afirmativa significa «orden
+aceptada» y nunca «paso franqueado».
+
+**H-2 · No hay señal de posición.** Las tres entradas de estado de la barrera
+están en `Ninguno`, y la propia interfaz del equipo lo advierte. **Hoy el
+sistema no puede demostrar que una puerta se abrió.** Es cableado, no software:
+ningún cambio de código lo resuelve.
+
+**H-3 · Bloquear y desbloquear son estado persistente, no pulso.** Con la
+barrera bloqueada, una placa autorizada **no abre**. El bloqueo manda sobre la
+decisión por vehículo, y por eso no es una variante de la apertura manual sino
+otra operación, con otros roles.
+
+> **Consecuencia directa en el código.** El resultado de una orden tiene tres
+> estados —`aceptada`, `rechazada`, `inalcanzable`— y **ninguno es «abierta»**.
+> `aceptada` lleva marcado por el tipo que el paso no es observable. Añadir un
+> estado que afirme la apertura exige antes la señal de H-2.
+
+### Estado en que quedó el equipo
+
+- Se pasó de **control por cámara** a **control por plataforma**. La dirección
+  de armado previa era la propia cámara; ahora la decisión la toma Next Control
+  y el equipo ejecuta, que es el principio rector del producto.
+- `isSupportLPAuditDataDelete` es **`true`**: el registro de lecturas del equipo
+  **se puede borrar por API**. De ahí una consecuencia que conviene tener
+  escrita: **el equipo no es fuente de verdad auditable**. La trazabilidad vive
+  en `eventos`, que es append-only por permisos y por disparador (ADR-05); lo
+  que el aparato guarde es una conveniencia operativa, no evidencia.
+
+### Lo que queda pendiente, y no se ha dado por bueno
+
+| Pendiente                             | Estado                                                                                                                                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Consulta de estado de la barrera**  | El `GET` al estado devuelve `notSupport`. La interfaz del equipo lo consulta por otro método, **aún sin capturar**. Hasta capturarlo, el sistema no puede preguntar en qué estado está |
+| **Señal de posición**                 | Sin cablear (H-2). Mientras siga así, ninguna afirmación de «se abrió» es sostenible                                                                                                   |
+| **Si `lock` sobrevive a un reinicio** | **Sin comprobar.** Importa: si no sobreviviera, un corte de luz desbloquearía el acceso sin que nadie lo sepa                                                                          |
+
+---
+
 ## 1 · Antes de tocar nada
 
 ### 1.1 · Lo que NO debe hacer
