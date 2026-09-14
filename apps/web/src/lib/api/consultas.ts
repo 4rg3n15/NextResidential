@@ -13,9 +13,12 @@ import type {
   EstadoDeRegistro,
   PaginaDeViviendas,
   Pendientes,
+  Persona,
   TipoDeInforme,
   Vehiculo,
   Zona,
+  ColaDeAtencion,
+  OrdenEjecutada,
 } from '@ncr/contracts';
 import { cliente, desenvolver } from './cliente';
 
@@ -115,6 +118,7 @@ export const clavesDe09B = {
     ['viviendas', c, estado, busqueda] as const,
   vehiculos: (c: string) => ['vehiculos', c] as const,
   autorizaciones: (c: string, ver: string) => ['autorizaciones', c, ver] as const,
+  personas: (c: string, busqueda: string) => ['personas', c, busqueda] as const,
   zonas: (c: string) => ['zonas', c] as const,
   dispositivosPendientes: (c: string) => ['dispositivos', c, 'pendientes'] as const,
   alertas: (c: string) => ['alertas', c] as const,
@@ -180,6 +184,30 @@ export const useAutorizaciones = (
       desenvolver(
         await cliente.GET('/copropiedades/{id}/autorizaciones', {
           params: { path: { id: copropiedadId }, query: { ver } },
+        }),
+      ),
+  });
+
+/**
+ * Buscador de personas (D-72).
+ *
+ * **La API decide el mínimo, no la consola.** `BuscarPersonas` devuelve vacío
+ * por debajo de dos caracteres; aquí solo se evita disparar la petición, que es
+ * una economía de red, no una regla. Si la regla viviera en los dos sitios, un
+ * cambio en la API dejaría la consola pidiendo lo que ya no se responde.
+ *
+ * `placeholderData` conserva la lista anterior mientras llega la siguiente: sin
+ * él, cada tecla vacía el desplegable y la lista parpadea bajo el cursor.
+ */
+export const usePersonas = (copropiedadId: string, busqueda: string): UseQueryResult<Persona[]> =>
+  useQuery({
+    enabled: copropiedadId !== '' && busqueda.trim().length >= 2,
+    queryKey: clavesDe09B.personas(copropiedadId, busqueda.trim()),
+    placeholderData: (previa) => previa,
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/padron/personas', {
+          params: { path: { id: copropiedadId }, query: { busqueda: busqueda.trim() } },
         }),
       ),
   });
@@ -254,6 +282,47 @@ export const useInforme = (
               ...(parametros.dispositivoId ? { dispositivoId: parametros.dispositivoId } : {}),
             },
           },
+        }),
+      ),
+  });
+
+/* ── ETAPA 10 · consolas operativas ─────────────────────────────────────── */
+
+/**
+ * La cola de atención se refresca **sola y a menudo**, y esa es la diferencia
+ * con el resto de la consola.
+ *
+ * Las demás pantallas se consultan cuando alguien entra. Esta es una bandeja de
+ * turno: el operador la mira sin tocar nada y lo que decide su trabajo es que
+ * refleje lo que está pasando **ahora**. Cuatro segundos es el intervalo con el
+ * que la espera en pantalla nunca se aleja más de eso de la real; el canal SSE
+ * empuja los eventos nuevos, pero el CONTADOR de espera sólo avanza si se
+ * vuelve a preguntar.
+ */
+export const useColaDeAtencion = (copropiedadId: string): UseQueryResult<ColaDeAtencion> =>
+  useQuery({
+    queryKey: ['guardia', copropiedadId, 'cola'],
+    refetchInterval: 4000,
+    // Sin esto, el operador que deja la pestaña de fondo vuelve a una cola
+    // congelada y no lo sabe.
+    refetchIntervalInBackground: false,
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/guardia/cola', {
+          params: { path: { id: copropiedadId } },
+        }),
+      ),
+  });
+
+export const useOrdenesManuales = (
+  copropiedadId: string,
+): UseQueryResult<{ ordenes: OrdenEjecutada[] }> =>
+  useQuery({
+    queryKey: ['guardia', copropiedadId, 'ordenes'],
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/guardia/ordenes', {
+          params: { path: { id: copropiedadId } },
         }),
       ),
   });

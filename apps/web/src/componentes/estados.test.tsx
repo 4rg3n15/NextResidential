@@ -75,9 +75,25 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
     expect(claves).not.toContain('viviendas');
   });
 
-  it('el administrador ve los nueve elementos del mockup', () => {
-    expect(navegacionDe('administrador')).toHaveLength(9);
-    expect(NAVEGACION).toHaveLength(9);
+  it('el administrador ve las once entradas: las nueve del mockup y las dos consolas operativas', () => {
+    // Nueve hasta la ETAPA 09; la 10 añade Portería y Guardia virtual, que son
+    // DOS superficies y no una (C-12).
+    expect(navegacionDe('administrador')).toHaveLength(11);
+    expect(NAVEGACION).toHaveLength(11);
+  });
+
+  it('el portero ve Portería y NO la guardia virtual', () => {
+    // No es un permiso que falte: es otra consola. El portero atiende su
+    // puerta; el operador de central atiende varias copropiedades que no ve.
+    const claves = navegacionDe('portero').map((e) => e.clave);
+    expect(claves).toContain('porteria');
+    expect(claves).not.toContain('guardia');
+  });
+
+  it('el operador de central ve las dos', () => {
+    const claves = navegacionDe('operador_central').map((e) => e.clave);
+    expect(claves).toContain('porteria');
+    expect(claves).toContain('guardia');
   });
 
   it('el residente no tiene consola web: se le dice, no se le deja en blanco', () => {

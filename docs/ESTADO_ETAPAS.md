@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-13 · **ETAPA 09 CERRADA** · D-68 corregido: la consola funciona por red igual que por `localhost`
+**Última actualización:** 2026-09-13 · **ETAPA 10 construida** · D-71 a D-74 corregidos: el padrón se da de alta escribiendo nombres
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -23,7 +23,7 @@
 | **Etapas cerradas**            | **9 de 17** (ETAPAS 00 a 09) · la 09 cerrada el 2026-09-12 con `--con-base`, 19 de 19 pasos                     |
 | **Etapa siguiente habilitada** | **ETAPA 10 — consolas operativas** (la 12 sigue habilitada)                                                     |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | Ninguno. D-60 a D-63 corregidos en la ronda del 2026-09-10                                                      |
+| **Defectos abiertos**          | Ninguno. D-71 a D-74 corregidos en la ronda del 2026-09-13                                                      |
 | **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
 | **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
 | **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)                                                     |
@@ -253,6 +253,138 @@ en memoria del proceso: al reiniciar, el portero ve un evento con la imagen rota
 y una lista negra vacía. Son **3 jornadas** —`AlmacenEvidenciaSupabase` con
 validación de tipo real, y el adaptador PostgreSQL de autorizaciones y listas
 negras (D-25)— y conviene hacerlas antes de abrir la etapa, no dentro.
+
+### D-71 · el superadministrador no podía escribir NADA · 2026-09-13
+
+`POST /padron/viviendas` → `400 · La identidad no tiene copropiedad`.
+
+**Causa.** Su `copropiedad_id` es **nulo por diseño** —no pertenece a ninguna,
+las alcanza todas, y lo resuelve `app.es_superadmin()`—, y los casos de uso de
+escritura la leían del token. La 09-B movió las **lecturas** bajo
+`copropiedades/:id` para que entraran en el barrido de aislamiento; las
+**escrituras** se quedaron tomándola del token, y nadie las recorrió con ese rol.
+
+No afectaba sólo a viviendas: **padrón entero, autorizaciones, listas negras y
+biometría**. Todas fallaban igual. El cliente tenía razón en pedir que no se
+arreglara ruta a ruta.
+
+**Por qué ninguna prueba lo vio.** Todas las de escritura usaban
+**administrador**, que sí lleva `copropiedad_id`. Es el mismo hueco que dejó las
+ocho pantallas en «sin permiso»: el rol que no encaja en el modelo mental de
+«una identidad, una copropiedad» es justo el que nadie recorre.
+
+| Corregido                                    | Cómo                                                                                                                                                                                                                                   |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Toda escritura cuelga de `copropiedades/:id` | El padrón se movió; el resto ya estaba                                                                                                                                                                                                 |
+| El contexto que llega al dominio             | `exigirAlcance` **devuelve el contexto de destino** con la copropiedad ya validada. Un caso de uso no puede olvidar la comprobación porque no la hace: recibe el dato comprobado o no se ejecuta                                       |
+| El aislamiento **no se afloja**              | La copropiedad viene de la ruta, que la pone el cliente, así que se valida contra el alcance real: un administrador que apunte a otra recibe **404, no 403**                                                                           |
+| Prueba derivada del enrutador                | `escrituras-superadministrador.e2e.test.ts` recorre **toda** ruta de escritura con `copropiedadId: null`. Una ruta nueva entra sola, y un `it` estructural falla si alguien vuelve a colgar una escritura fuera de `copropiedades/:id` |
+| Alta real contra base                        | `padron-superadmin.test.ts`, en el paso 13                                                                                                                                                                                             |
+
+**Un hallazgo de propina.** El primer intento de limpieza de esa prueba hacía
+`DELETE` sobre `viviendas` y la base lo rechazó: «Borrado físico prohibido […]
+use la baja lógica». RN-19 funcionando — y la confirmación de que la fila se
+había creado de verdad.
+
+**Vocabulario «Manzana».** No lo fija ningún requisito: viene de un mockup.
+Propuesta escrita en
+[`decisiones/propuestas/agrupacion-de-vivienda.md`](decisiones/propuestas/agrupacion-de-vivienda.md):
+`agrupacion` como dato y `etiqueta_agrupacion` configurable por copropiedad.
+Implica migración, y **hoy es barata porque no hay ni una vivienda creada**:
+dos `ALTER TABLE` sin mover datos. En cuanto se cargue el padrón, deja de serlo.
+
+### D-72 · la consola pedía un UUID donde va una persona · 2026-09-13
+
+El campo se rotulaba **«Persona que visita (identificador)»**, aceptaba texto
+libre y respondía `personaId must be a UUID` a quien escribiera un nombre. Nadie
+tiene a mano el UUID de un visitante: el dato solo existe dentro de la base.
+
+**No era un defecto de rótulo.** El flujo real es que el residente autoriza a
+alguien **por su nombre y su documento**, y que si esa persona no está en el
+sistema se cree en ese momento. La tabla `personas` existe precisamente para eso
+(D-01): que la lista negra alcance a la misma persona sea cual sea el rol con el
+que se presente (RN-06). La identidad importa; el UUID no es asunto del usuario.
+
+| Corregido                        | Cómo                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identidad como objeto de valor   | `Documento` y `NombreDePersona` en `domain-core`. `12.345.678`, `12 345 678` y `12345678` producen **una sola forma**; lo que no se puede normalizar **falla** en vez de desaparecer, porque borrar lo desconocido colapsaría dos personas en una                                                                                                   |
+| Buscar y crear en un solo paso   | `GET`/`POST /copropiedades/:id/padron/personas` y el componente `BuscadorDePersonas`: se teclea nombre o documento, se elige de la lista, y si no aparece se registra sin salir del formulario                                                                                                                                                      |
+| Un documento repetido NO duplica | El alta resuelve a la persona que ya existe —lo decide el índice único parcial, no un `SELECT` previo (ADR-04)— y la consola **lo dice**: «ya estaba registrado como …». Fingir un alta que no ocurrió habría escondido que el nombre tecleado se descartó                                                                                          |
+| La hoja de padrón, rellenable    | Pedía las columnas `vivienda_id` y `persona_id`. Ahora la vivienda se nombra **«Casa 12»**, la persona por **documento y nombre**, y el resumen dice cuántas viviendas y personas hubo que crear: una errata en la columna «vivienda» crea una casa que nadie quería, y el número la delata en el momento. Las cabeceras antiguas se siguen leyendo |
+| Barrido, no ruta a ruta          | `formularios-sin-identificadores.test.ts` teclea basura en todo campo de texto de cada formulario, elige la primera opción de cada desplegable, resuelve cada buscador, envía, y comprueba **contra `openapi.json`** que toda propiedad declarada `format: uuid` llegó siendo un UUID. No hay lista de campos prohibidos que mantener               |
+| Alta real contra base            | `padron-por-nombre.test.ts`, en el paso 13: una hoja sin un solo UUID crea las viviendas, las personas y sus vínculos, y la misma cédula escrita de dos formas resuelve a **una** persona                                                                                                                                                           |
+
+**Lo que el barrido dejó clasificado y por qué.** Portería y guardia escriben
+sobre el elemento que ya está en pantalla —solo se teclea el motivo—;
+dispositivos son botones por fila; configuración declara `min`/`max` en sus
+campos numéricos y responde 422 por campo. Ninguna pide una identidad. Queda
+anotado que `POST /padron/residentes` sigue aceptando `personaId`: **no hay
+todavía pantalla de residentes**, y cuando la haya debe usar el buscador.
+
+### D-73 · la vigencia se aceptó invertida · 2026-09-13
+
+«Desde 13/09/2026 05:45 p. m.» y «Hasta 13/09/2026 05:45 a. m.»: terminaba antes
+de empezar. El formulario no lo señaló, y el error que acabó mostrando fue el de
+**otro campo** —el UUID—, porque el `ValidationPipe` corre antes que el dominio.
+
+**El dominio sí lo rechaza, y está comprobado.** `Vigencia.crear` devuelve fallo
+para el rango invertido y para el de duración cero —el intervalo es
+cerrado-abierto, así que con los dos extremos iguales no contiene ningún
+instante—, y el caso de uso no llega a tocar el repositorio. No es un defecto de
+fondo: **una vigencia invertida no se puede persistir.** Se añadió la prueba con
+los valores exactos del 13, afirmando además que no se escribió nada, y
+`autorizaciones-vigencia.e2e.test.ts` exige que la respuesta HTTP **nombre la
+vigencia** y no mencione el UUID.
+
+Lo que faltaba era el aviso: `problemaDeVigencia` señala el motivo **debajo del
+campo «Hasta»** y bloquea el envío. No relaja nada —quien decide sigue siendo el
+dominio—, pero una restricción que solo aparece cuando el servidor la nombra
+obliga a descubrirla por ensayo y error.
+
+### D-74 · «los días marcados» que no se veían · 2026-09-13
+
+La casilla decía «Recurrente (08:00–18:00 en los días marcados)» y anunciaba dos
+cosas que no existían: los días solo aparecían **después** de marcarla, y la
+franja horaria estaba fija en el código. Ahora la casilla dice «Autorización
+recurrente» a secas, y al marcarla se abre un grupo con los días **y** las dos
+horas, editables; una franja que cruce la medianoche se señala en el formulario
+con el mismo motivo que da RN-22 (se registra con dos autorizaciones).
+
+---
+
+## ETAPA 10 — Consolas operativas · **CONSTRUIDA** · 2026-09-13
+
+Rama `etapa-10-consolas-operativas`, desde `develop` con la 09 ya fusionada.
+
+| Entregable                                            | Estado                                                                                                                                             |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Consola de **portería** (HU-21 a HU-24)               | Construida · evento actual con evidencia, vivienda y autorización; apertura y negación con motivo; historial inmediato; alertas y listas negras    |
+| Consola de **guardia virtual** (CU-03, HU-25 a HU-29) | Construida · cola por tiempo de espera, ficha, video reservado, abrir/negar atribuido, aviso al residente, emergencia                              |
+| **Los cuatro flujos alternos de CU-03**               | Cubiertos · detalle en [`etapas/ETAPA-10.md`](etapas/ETAPA-10.md) §3                                                                               |
+| Exclusividad del canal de audio (ADR-01)              | **Máquina de estados pura en el dominio**: bloqueo por dispositivo, cola, liberación por reloj. La ETAPA 15 sustituye el transporte, no las reglas |
+| `IntercomSimulado` tras `IntercomProvider`            | Construido · aplica la exclusividad de verdad                                                                                                      |
+| KPI-35 · conmutación sin fuga                         | Probado por HTTP: la copropiedad fuera del turno responde **404, no 403**                                                                          |
+| Los tres avisos de la 09                              | Resueltos · `img-src` con el origen de Supabase, y el video y la PWA declaran que necesitan HTTPS                                                  |
+| **DT-12**                                             | **Cerrado** · [`seguridad/DT-12-recursos-externos.md`](seguridad/DT-12-recursos-externos.md)                                                       |
+| Paso 3.ter por IP                                     | Recorre **las once pantallas**, las dos nuevas incluidas                                                                                           |
+
+**Sobre DT-12.** Los cuatro recursos externos quedan cerrados salvo SMTP, que es
+bloqueo de entorno (BE-01) y lo resuelve el bloque 4 por el otro lado. **FCM no
+es deuda**: es orden de etapas —el registro de tokens es de la 11— y el intento
+de aviso ya queda registrado. **Realtime tampoco**: no se usa, el canal es SSE
+propio, y la razón es RN-18: escalar en menos de 10 s no puede depender de un
+servicio externo. Medido, 200 de 200.
+
+**Deuda nueva declarada:** D-69 (el estado del canal vive en el proceso; con
+varias instancias haría falta llevarlo a PostgreSQL, y por eso la máquina está
+en el dominio) y D-70 (bitácora de órdenes en memoria, acotada a 200 por
+copropiedad; el historial completo ya vive en `eventos`).
+
+**Lo que no se puede medir sin hardware, dicho:** KPI-32 y KPI-33 son latencias
+extremo a extremo. El proveedor simulado no da una cifra que signifique nada, y
+publicar una sería peor que no tenerla.
+
+---
 
 ### D-68 · la consola no funcionaba por red · 2026-09-13
 

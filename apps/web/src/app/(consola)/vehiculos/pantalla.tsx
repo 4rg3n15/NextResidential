@@ -68,7 +68,9 @@ export const PantallaDeVehiculos = ({
     setError(undefined);
     try {
       desenvolver(
-        await cliente.POST('/padron/vehiculos', {
+        // D-71 · la copropiedad de destino en la ruta, no en el token.
+        await cliente.POST('/copropiedades/{id}/padron/vehiculos', {
+          params: { path: { id: copropiedadId } },
           body: {
             viviendaId,
             // Se envía lo que el usuario escribió, NO la vista previa: la
@@ -101,8 +103,8 @@ export const PantallaDeVehiculos = ({
     setError(undefined);
     try {
       desenvolver(
-        await cliente.POST('/padron/vehiculos/{id}/desactivacion', {
-          params: { path: { id: baja.id } },
+        await cliente.POST('/copropiedades/{id}/padron/vehiculos/{vehiculoId}/desactivacion', {
+          params: { path: { id: copropiedadId, vehiculoId: baja.id } },
           body: { motivo },
         }),
       );

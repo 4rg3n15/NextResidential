@@ -1,4 +1,5 @@
 import { inflateRawSync } from 'node:zlib';
+import { filaDesdeCeldas } from '../aplicacion/carga-padron';
 
 /**
  * Lector de XLSX **mínimo y acotado**, escrito a mano y sin dependencias.
@@ -233,8 +234,11 @@ export const leerHojaXlsx = (datos: Buffer): readonly (readonly string[])[] => {
  */
 export interface FilaLeida {
   readonly numeroDeFila: number;
-  readonly viviendaId: string;
+  readonly vivienda: string;
   readonly placa?: string;
+  readonly documento?: string;
+  readonly tipoDocumento?: string;
+  readonly nombre?: string;
   readonly personaId?: string;
   readonly esTitular?: boolean;
 }
@@ -244,9 +248,10 @@ export const filasDesdeXlsx = (datos: Buffer): readonly FilaLeida[] => {
   if (hoja.length < 2) return [];
   const cabeceras = (hoja[0] ?? []).map((c) => c.trim().toLowerCase());
   const columnaDeNombre = (n: string): number => cabeceras.indexOf(n);
-  if (columnaDeNombre('vivienda_id') === -1) {
+  if (columnaDeNombre('vivienda') === -1 && columnaDeNombre('vivienda_id') === -1) {
     throw new ArchivoInvalido(
-      'la primera fila debe ser la cabecera y contener al menos la columna «vivienda_id»',
+      'la primera fila debe ser la cabecera y contener al menos la columna «vivienda» ' +
+        '(el identificador que usa el conjunto, por ejemplo «Casa 12»)',
     );
   }
   const filas: FilaLeida[] = [];
@@ -261,17 +266,10 @@ export const filasDesdeXlsx = (datos: Buffer): readonly FilaLeida[] => {
       const v = j >= 0 ? celdas[j]?.trim() : undefined;
       return v !== undefined && v.length > 0 ? v : undefined;
     };
-    const placa = leer('placa');
-    const personaId = leer('persona_id');
-    const esTitular = leer('es_titular');
-    filas.push({
-      // +1: el número que ve el operador en Excel, no el índice del arreglo.
-      numeroDeFila: i + 1,
-      viviendaId: leer('vivienda_id') ?? '',
-      ...(placa === undefined ? {} : { placa }),
-      ...(personaId === undefined ? {} : { personaId }),
-      ...(esTitular === undefined ? {} : { esTitular: esTitular.toLowerCase() === 'true' }),
-    });
+    // +1: el número de fila que ve el operador en Excel, no el índice del
+    // arreglo. El mapeo de columnas lo hace el caso de uso, para que esta hoja
+    // y el CSV no acepten cabeceras distintas.
+    filas.push(filaDesdeCeldas(i + 1, leer));
   }
   return filas;
 };

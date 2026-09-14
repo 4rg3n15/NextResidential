@@ -196,3 +196,53 @@ describe('esquema real de la petición', () => {
     expect(peticionLlegoPorHttps('   ', 'https:')).toBe(true);
   });
 });
+
+/**
+ * ETAPA 10 · la evidencia llega del BUCKET, no de la API.
+ *
+ * Quedó anotado como aviso al cerrar la 09 y se resuelve antes de construir la
+ * portería: `img-src` listaba `'self'`, `data:`, `blob:` y el origen de la API,
+ * y la URL firmada apunta a Supabase Storage. La primera miniatura de un evento
+ * habría salido rota, con la queja en un sitio que nadie mira.
+ */
+describe('img-src admite el origen de la evidencia', () => {
+  const conBucket = {
+    ...PRODUCCION,
+    origenApi: 'https://api.ejemplo.co',
+    origenEvidencia: 'https://proyecto.supabase.co',
+  };
+
+  it('lista el origen del bucket', () => {
+    expect(directiva(csp(conBucket), 'img-src')).toContain('https://proyecto.supabase.co');
+  });
+
+  it('sin declararlo, no aparece: no se inventa un origen', () => {
+    expect(
+      directiva(csp({ ...PRODUCCION, origenApi: 'https://api.ejemplo.co' }), 'img-src'),
+    ).not.toContain('supabase');
+  });
+
+  it('el bucket entra en `img-src` y NO en `connect-src`', () => {
+    // La consola no habla con Storage por `fetch`: sólo pinta la imagen. Abrir
+    // `connect-src` sería ampliar la superficie sin que nadie lo necesite.
+    expect(directiva(csp(conBucket), 'connect-src')).not.toContain('supabase');
+  });
+
+  it('sigue sin admitir cualquier origen', () => {
+    // Se miran las FUENTES sueltas, no la cadena: los propios orígenes empiezan
+    // por `https:`, así que buscarlo en el texto daría un rojo que no lo es.
+    // Lo prohibido es `https:` o `*` **como fuente**, que abriría img-src entero.
+    const fuentes = (directiva(csp(conBucket), 'img-src') ?? '')
+      .split(' ')
+      .filter((f) => f !== 'img-src');
+    expect(fuentes).not.toContain('*');
+    expect(fuentes).not.toContain('https:');
+    expect(fuentes).toEqual([
+      "'self'",
+      'data:',
+      'blob:',
+      'https://api.ejemplo.co',
+      'https://proyecto.supabase.co',
+    ]);
+  });
+});

@@ -10,6 +10,8 @@ import { PantallaDeDispositivos } from './dispositivos/pantalla';
 import { PantallaDeEventos } from './eventos/pantalla';
 import { PantallaDeInformes } from './informes/pantalla';
 import { FormularioDeConfiguracion } from './configuracion/formulario';
+import { PantallaDePorteria } from './porteria/pantalla';
+import { PantallaDeGuardiaVirtual } from './guardia/pantalla';
 
 /**
  * **Los cinco estados de §6, en las SIETE pantallas.**
@@ -48,7 +50,7 @@ const Envoltura = ({ children }: { readonly children: ReactNode }): JSX.Element 
 };
 
 /**
- * Las OCHO, con el nombre con el que se las nombra en el informe. `informes`
+ * Las DIEZ, con el nombre con el que se las nombra en el informe. `informes`
  * no consulta al abrirse —es una consulta cara y se pide con un botón—, así
  * que su caso lleva la pulsación.
  */
@@ -68,6 +70,15 @@ const PANTALLAS: readonly {
   // entra en la misma batería. Un formulario que falla en blanco es peor que
   // una tabla que falla en blanco: parece que no hay nada que configurar.
   { nombre: 'configuración', montar: () => <FormularioDeConfiguracion copropiedadId={COP} /> },
+  // ETAPA 10 · las dos consolas operativas entran en la misma batería. Son las
+  // que más dependen de que un fallo se DIGA: un portero delante de una
+  // pantalla en blanco no sabe si no hay nadie esperando o si no se está
+  // enterando, y las dos cosas se parecen mucho.
+  { nombre: 'portería', montar: () => <PantallaDePorteria copropiedadId={COP} /> },
+  {
+    nombre: 'guardia virtual',
+    montar: () => <PantallaDeGuardiaVirtual copropiedadId={COP} nombreDeCopropiedad="Prueba" />,
+  },
 ];
 
 const montarYPedir = async (pantalla: (typeof PANTALLAS)[number]): Promise<void> => {

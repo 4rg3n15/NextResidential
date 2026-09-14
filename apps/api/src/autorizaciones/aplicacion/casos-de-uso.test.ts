@@ -82,16 +82,31 @@ describe('CrearAutorizacion (HU-07, HU-09)', () => {
     expect(repo.guardadas.size).toBe(0);
   });
 
-  it('rechaza una vigencia invertida y una que nace expirada (RN-01)', async () => {
+  it('rechaza una vigencia invertida y una que nace expirada, SIN persistir nada (RN-01)', async () => {
+    // Duración cero: el intervalo es cerrado-abierto, así que no contiene
+    // ningún instante.
     expect(esFallo(await caso.ejecutar(ctx(), { ...entradaBase, hasta: entradaBase.desde }))).toBe(
       true,
     );
+
+    // El caso EXACTO de D-73: «desde las 5:45 p. m., hasta las 5:45 a. m. del
+    // mismo día». El formulario lo aceptó; se comprueba aquí que el dominio no,
+    // y que la fila no llega a existir — si llegara, sería un defecto de fondo
+    // y no de formulario.
+    const invertida = await caso.ejecutar(ctx(), {
+      ...entradaBase,
+      desde: '2026-09-13T22:45:00Z',
+      hasta: '2026-09-13T10:45:00Z',
+    });
+    expect(esFallo(invertida)).toBe(true);
+
     const vieja = await caso.ejecutar(ctx(), {
       ...entradaBase,
       desde: '2026-09-01T00:00:00Z',
       hasta: '2026-09-02T00:00:00Z',
     });
     expect(esFallo(vieja)).toBe(true);
+    expect(repo.guardadas.size).toBe(0);
   });
 
   it('rechaza un máximo de acompañantes fuera de rango (RN-05)', async () => {

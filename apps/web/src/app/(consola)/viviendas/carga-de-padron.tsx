@@ -25,7 +25,14 @@ import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
  */
 const MAXIMO_BYTES = 180 * 1024;
 
-export const CargaDePadron = ({ alTerminar }: { readonly alTerminar: () => void }): JSX.Element => {
+export const CargaDePadron = ({
+  copropiedadId,
+  alTerminar,
+}: {
+  /** Destino de la carga. Va en la ruta, no en el token (D-71). */
+  readonly copropiedadId: string;
+  readonly alTerminar: () => void;
+}): JSX.Element => {
   const [abierto, setAbierto] = useState(false);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -42,7 +49,11 @@ export const CargaDePadron = ({ alTerminar }: { readonly alTerminar: () => void 
       let binario = '';
       for (const b of bytes) binario += String.fromCharCode(b);
       const r = desenvolver(
-        await cliente.POST('/padron/carga/xlsx', { body: { xlsxBase64: btoa(binario) } }),
+        // D-71 · la copropiedad de destino en la ruta, no en el token.
+        await cliente.POST('/copropiedades/{id}/padron/carga/xlsx', {
+          params: { path: { id: copropiedadId } },
+          body: { xlsxBase64: btoa(binario) },
+        }),
       );
       setResultado(r);
       if (r.aplicada) alTerminar();
@@ -67,7 +78,7 @@ export const CargaDePadron = ({ alTerminar }: { readonly alTerminar: () => void 
       <DialogoDeFormulario
         abierto={abierto}
         titulo="Cargar padrón desde XLSX"
-        descripcion="La primera fila es la cabecera y debe incluir «vivienda_id». Se admiten también «placa», «persona_id» y «es_titular»."
+        descripcion="La primera fila es la cabecera. La única obligatoria es «vivienda», con el identificador que usa el conjunto: «Casa 12»."
         etiquetaEnviar="Cargar"
         enviando={enviando}
         error={error}
@@ -80,6 +91,30 @@ export const CargaDePadron = ({ alTerminar }: { readonly alTerminar: () => void 
           setArchivo(null);
         }}
       >
+        {/* D-72 · la hoja se rellena con lo que el conjunto tiene escrito. Antes
+            pedía «vivienda_id» y «persona_id»: identificadores que solo existen
+            dentro de la base, así que la hoja no la podía llenar nadie. */}
+        <div className="rounded-campo border border-borde bg-lienzo px-3 py-2 text-secundario text-texto-apagado">
+          <p className="font-medium text-texto">Columnas de la hoja</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            <li>
+              <strong>vivienda</strong> — obligatoria. «Casa 12», tal como se nombra en la portería.
+              Si no existe todavía, se crea y el resumen lo dice.
+            </li>
+            <li>
+              <strong>placa</strong> — para registrar un vehículo de esa vivienda.
+            </li>
+            <li>
+              <strong>documento</strong> y <strong>nombre</strong> — para registrar un residente. El
+              mismo documento en dos filas es la misma persona, se escriba con puntos o sin ellos.
+            </li>
+            <li>
+              <strong>tipo_documento</strong> y <strong>es_titular</strong> — opcionales; por
+              omisión, cédula y no titular.
+            </li>
+          </ul>
+        </div>
+
         <label className="block space-y-1.5">
           <span className="block text-secundario font-medium">Archivo .xlsx</span>
           <input
@@ -118,6 +153,18 @@ export const CargaDePadron = ({ alTerminar }: { readonly alTerminar: () => void 
                 ? `Padrón cargado: ${resultado.aceptadas} filas de ${resultado.filasLeidas}.`
                 : `No se aplicó nada. Se leyeron ${resultado.filasLeidas} filas y ${resultado.errores.length} tienen errores.`}
             </p>
+            {/* Lo creado se DICE. La hoja nombra la vivienda por su
+                identificador, así que una errata crea una casa que nadie
+                quería: con el número delante se ve en el momento. */}
+            {resultado.aplicada &&
+            (resultado.viviendasCreadas > 0 || resultado.personasCreadas > 0) ? (
+              <p className="mt-1">
+                Se crearon {resultado.viviendasCreadas} vivienda
+                {resultado.viviendasCreadas === 1 ? '' : 's'} y {resultado.personasCreadas} persona
+                {resultado.personasCreadas === 1 ? '' : 's'}. Si alguno de esos números te
+                sorprende, revisa la hoja: una errata en «vivienda» crea una casa nueva.
+              </p>
+            ) : null}
             {resultado.errores.length > 0 ? (
               <ul className="mt-1 max-h-40 list-disc space-y-0.5 overflow-auto pl-4">
                 {resultado.errores.slice(0, 20).map((e) => (

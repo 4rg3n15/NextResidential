@@ -1,9 +1,10 @@
-import { Placa } from '@ncr/domain-core';
+import { Documento, NombreDePersona, Placa } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { errorDominio, exito, fallo } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type {
   FiltroDeViviendas,
+  PersonaEnLista,
   RepositorioPadron,
   TipoDeVehiculo,
   TotalesDePadron,
@@ -206,6 +207,98 @@ export class RegistrarResidente {
           ),
         )
       : exito(r);
+  }
+}
+
+/* ── Personas · identidad compartida (D-01, RN-06) ─────────────────────── */
+
+/**
+ * **D-72 · La consola no pide un UUID; pide un nombre o un documento.**
+ *
+ * Estos dos casos de uso existen para que el formulario de autorización pueda
+ * resolver la identidad sin que nadie escriba un identificador interno. El
+ * límite lo fija este caso de uso y no el cliente: una búsqueda incremental que
+ * el navegador pudiera pedir sin tope descargaría el padrón entero letra a
+ * letra.
+ */
+const LIMITE_DE_BUSQUEDA = 20;
+
+export class BuscarPersonas {
+  constructor(private readonly repo: RepositorioPadron) {}
+
+  /**
+   * No recibe `ContextoTenant`: el alcance se comprobó en el controlador con
+   * `exigirAlcance`, igual que en las demás lecturas. Un parámetro de identidad
+   * que este método no usa haría creer que comprueba algo.
+   */
+  async ejecutar(
+    copropiedadId: string,
+    busqueda: string,
+  ): Promise<Resultado<readonly PersonaEnLista[], ErrorDominio>> {
+    const texto = busqueda.trim().slice(0, 120);
+    if (texto.length < 2) {
+      // Con una sola letra la lista no discrimina nada y la consulta recorre
+      // todo el padrón. Devolver vacío es la respuesta honesta: la consola
+      // muestra «escribe al menos dos caracteres», no «sin resultados».
+      return exito([]);
+    }
+    // La forma normalizada la produce el VO, no el adaptador: así `12.345.678`
+    // encuentra a quien está guardado como `12345678` sin que la consulta SQL
+    // tenga que conocer las reglas de normalización.
+    const documento = Documento.normalizarNumero(texto);
+    return exito(
+      await this.repo.buscarPersonas(copropiedadId, texto, documento ?? '', LIMITE_DE_BUSQUEDA),
+    );
+  }
+}
+
+export interface EntradaRegistrarPersona {
+  readonly tipoDocumento: string;
+  readonly numeroDocumento: string;
+  readonly nombreCompleto: string;
+  readonly telefono?: string | null;
+  readonly correo?: string | null;
+}
+
+/**
+ * Alta de persona en el mismo paso en que se la autoriza (HU-07).
+ *
+ * Devuelve `yaExistia` en vez de fallar cuando el documento ya está: el
+ * documento ES la identidad (RN-06), y crear una segunda fila para la misma
+ * cédula sería justo la fuga que la tabla `personas` vino a cerrar.
+ */
+export class RegistrarPersona {
+  constructor(private readonly repo: RepositorioPadron) {}
+
+  async ejecutar(
+    ctx: ContextoTenant,
+    entrada: EntradaRegistrarPersona,
+  ): Promise<
+    Resultado<
+      { readonly id: string; readonly nombreCompleto: string; readonly yaExistia: boolean },
+      ErrorDominio
+    >
+  > {
+    if (!ctx.copropiedadId) return fallo(sinCopropiedad());
+
+    const documento = Documento.crear(entrada.tipoDocumento, entrada.numeroDocumento);
+    if (!documento.ok) return documento;
+    const nombre = NombreDePersona.crear(entrada.nombreCompleto);
+    if (!nombre.ok) return nombre;
+
+    const r = await this.repo.registrarPersona({
+      copropiedadId: ctx.copropiedadId,
+      documento: documento.valor,
+      nombreCompleto: nombre.valor.valor,
+      telefono: entrada.telefono ?? null,
+      correo: entrada.correo ?? null,
+      actorId: ctx.usuarioId,
+    });
+    return exito({
+      id: r.id,
+      nombreCompleto: r.nombreCompleto,
+      yaExistia: r.tipo === 'ya_existia',
+    });
   }
 }
 

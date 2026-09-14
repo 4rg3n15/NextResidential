@@ -1644,6 +1644,440 @@
         ]
       }
     },
+    "/copropiedades/{id}/guardia/avisar-residente": {
+      "post": {
+        "operationId": "GuardiaController_avisarResidente",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvisoAlResidenteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AceptadoDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Avisa al residente cuando no contesta al intercom (HU-28)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/cola": {
+      "get": {
+        "operationId": "GuardiaController_cola",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ColaDeAtencionDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cola de atención con tiempo de espera (CU-03, HU-25)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/emergencia": {
+      "post": {
+        "operationId": "GuardiaController_emergencia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmergenciaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AceptadoDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alerta de emergencia, severidad crítica (HU-29, RN-18)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/intercom/abrir": {
+      "post": {
+        "operationId": "GuardiaController_abrirCanal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudDeCanalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeCanalDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pide el canal de audio del equipo; encola si está ocupado (ADR-01)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/intercom/cerrar": {
+      "post": {
+        "operationId": "GuardiaController_cerrarCanal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudDeCanalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeCanalDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suelta el canal y lo cede al primero de la cola",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}": {
+      "get": {
+        "operationId": "GuardiaController_estadoDelCanal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeCanalDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado del canal: quién tiene la palabra y cuántos esperan",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/ordenes": {
+      "post": {
+        "operationId": "GuardiaController_ordenar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdenManualDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenEjecutadaDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol que no acciona puertas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Abre o niega a mano, con motivo obligatorio (RN-08)",
+        "tags": [
+          "guardia"
+        ]
+      },
+      "get": {
+        "operationId": "GuardiaController_historialDeOrdenes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorialDeOrdenesDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Últimas órdenes manuales de la copropiedad (HU-23)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
     "/copropiedades/{id}/informes": {
       "get": {
         "operationId": "InformesController_generar",
@@ -1726,7 +2160,281 @@
         ]
       }
     },
+    "/copropiedades/{id}/padron/carga": {
+      "post": {
+        "operationId": "PadronController_cargar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CargarPadronDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Carga transaccional desde CSV con reporte de errores por fila (HU-03)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/carga/xlsx": {
+      "post": {
+        "operationId": "PadronController_cargarXlsx",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CargarPadronXlsxDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Carga transaccional desde XLSX validando el TIPO REAL del archivo (HU-03, D-20t)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/personas": {
+      "post": {
+        "operationId": "PadronController_registrarPersona",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarPersonaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaResueltaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Da de alta una persona por nombre y documento, o resuelve la que ya existe (D-72)",
+        "tags": [
+          "padron"
+        ]
+      },
+      "get": {
+        "operationId": "PadronDeCopropiedadController_personas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "busqueda",
+            "required": true,
+            "in": "query",
+            "description": "Nombre parcial o documento; con menos de dos caracteres devuelve vacío.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PersonaDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Busca personas por nombre o documento para autorizar sin escribir un UUID (D-72)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/residentes": {
+      "post": {
+        "operationId": "PadronController_registrarResidente",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarResidenteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdCreadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vincula una persona a una vivienda como residente (HU-02)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
     "/copropiedades/{id}/padron/vehiculos": {
+      "post": {
+        "operationId": "PadronController_registrarVehiculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarVehiculoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdCreadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registra un vehículo; la placa única activa la garantiza la base",
+        "tags": [
+          "padron"
+        ]
+      },
       "get": {
         "operationId": "PadronDeCopropiedadController_vehiculos",
         "parameters": [
@@ -1765,7 +2473,105 @@
         ]
       }
     },
+    "/copropiedades/{id}/padron/vehiculos/{vehiculoId}/desactivacion": {
+      "post": {
+        "operationId": "PadronController_desactivarVehiculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vehiculoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesactivarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BajaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Baja lógica del vehículo; el motivo es obligatorio (RN-19)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
     "/copropiedades/{id}/padron/viviendas": {
+      "post": {
+        "operationId": "PadronController_registrarVivienda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarViviendaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdCreadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alta de vivienda; el identificador único activo lo garantiza la base",
+        "tags": [
+          "padron"
+        ]
+      },
       "get": {
         "operationId": "PadronDeCopropiedadController_viviendas",
         "parameters": [
@@ -1816,6 +2622,60 @@
           }
         ],
         "summary": "Directorio de viviendas con totales de activas e inactivas (HU-01, RN-13)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/viviendas/{viviendaId}/desactivacion": {
+      "post": {
+        "operationId": "PadronController_desactivarVivienda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesactivarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BajaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Baja lógica de la vivienda; conserva su historial (RN-19, CA-02)",
         "tags": [
           "padron"
         ]
@@ -2237,283 +3097,6 @@
         ]
       }
     },
-    "/padron/carga": {
-      "post": {
-        "operationId": "PadronController_cargar",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CargarPadronDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Carga transaccional desde CSV con reporte de errores por fila (HU-03)",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/carga/xlsx": {
-      "post": {
-        "operationId": "PadronController_cargarXlsx",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CargarPadronXlsxDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultadoDeCargaDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Carga transaccional desde XLSX validando el TIPO REAL del archivo (HU-03, D-20t)",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/residentes": {
-      "post": {
-        "operationId": "PadronController_registrarResidente",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrarResidenteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IdCreadoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Vincula una persona a una vivienda como residente (HU-02)",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/vehiculos": {
-      "post": {
-        "operationId": "PadronController_registrarVehiculo",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrarVehiculoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IdCreadoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Registra un vehículo; la placa única activa la garantiza la base",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/vehiculos/{id}/desactivacion": {
-      "post": {
-        "operationId": "PadronController_desactivarVehiculo",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DesactivarDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BajaDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Baja lógica del vehículo; el motivo es obligatorio (RN-19)",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/viviendas": {
-      "post": {
-        "operationId": "PadronController_registrarVivienda",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrarViviendaDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IdCreadoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Alta de vivienda; el identificador único activo lo garantiza la base",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
-    "/padron/viviendas/{id}/desactivacion": {
-      "post": {
-        "operationId": "PadronController_desactivarVivienda",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DesactivarDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BajaDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Baja lógica de la vivienda; conserva su historial (RN-19, CA-02)",
-        "tags": [
-          "padron"
-        ]
-      }
-    },
     "/ready": {
       "get": {
         "operationId": "SaludController_listo",
@@ -2592,6 +3175,21 @@
           "zonaHoraria",
           "desde",
           "hasta"
+        ]
+      },
+      "AceptadoDto": {
+        "type": "object",
+        "properties": {
+          "aceptado": {
+            "type": "boolean",
+            "example": true
+          },
+          "detalle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "aceptado"
         ]
       },
       "AcompananteAgregadoDto": {
@@ -2819,6 +3417,24 @@
           "autorizacionId"
         ]
       },
+      "AvisoAlResidenteDto": {
+        "type": "object",
+        "properties": {
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "texto": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "viviendaId",
+          "texto"
+        ]
+      },
       "BajaDto": {
         "type": "object",
         "properties": {
@@ -2950,6 +3566,33 @@
         "required": [
           "codigos",
           "cantidad"
+        ]
+      },
+      "ColaDeAtencionDto": {
+        "type": "object",
+        "properties": {
+          "cola": {
+            "description": "Ordenada por espera DESCENDENTE, con lo crítico delante. No por recencia: una bandeja por recencia hunde al que lleva más tiempo esperando cada vez que llega otro.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnAtencionDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "criticos": {
+            "type": "number"
+          },
+          "esperaMaxima": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "cola",
+          "total",
+          "criticos",
+          "esperaMaxima"
         ]
       },
       "ConfiguracionDeCopropiedadDto": {
@@ -3383,6 +4026,83 @@
           "segundosSinLatir"
         ]
       },
+      "EmergenciaDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 300,
+            "description": "Qué ocurre. Obligatorio."
+          },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "EnAtencionDto": {
+        "type": "object",
+        "properties": {
+          "eventoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ocurridoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true
+          },
+          "resultado": {
+            "type": "string"
+          },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "viviendaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "placaDetectada": {
+            "type": "string",
+            "nullable": true
+          },
+          "esperaSegundos": {
+            "type": "number",
+            "description": "Segundos que lleva esperando. Se CALCULA en cada consulta, no se guarda: una espera guardada envejece mal y la consola pintaría un número que dejó de ser cierto."
+          },
+          "urgencia": {
+            "type": "string",
+            "enum": [
+              "critica",
+              "normal"
+            ]
+          },
+          "demorado": {
+            "type": "boolean",
+            "description": "Pasado el umbral de KPI-34"
+          }
+        },
+        "required": [
+          "eventoId",
+          "ocurridoEn",
+          "motivo",
+          "resultado",
+          "dispositivoId",
+          "viviendaId",
+          "placaDetectada",
+          "esperaSegundos",
+          "urgencia",
+          "demorado"
+        ]
+      },
       "ErrorApiDto": {
         "type": "object",
         "properties": {
@@ -3427,6 +4147,44 @@
         "required": [
           "fila",
           "motivo"
+        ]
+      },
+      "EstadoDeCanalDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "abierta",
+              "en_espera",
+              "cerrada"
+            ],
+            "description": "El canal de audio del equipo admite UNA conversación a la vez (ADR-01). El segundo operador no se rechaza: se encola."
+          },
+          "porDelante": {
+            "type": "number",
+            "description": "Cuántos van delante. 0 cuando se tiene la palabra."
+          },
+          "titular": {
+            "type": "string",
+            "nullable": true,
+            "description": "Quién tiene la palabra ahora"
+          },
+          "timeoutSegundos": {
+            "type": "number",
+            "description": "Segundos tras los que el canal se libera solo por inactividad"
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "estado",
+          "porDelante",
+          "titular",
+          "timeoutSegundos"
         ]
       },
       "EstadoDeDispositivosDto": {
@@ -3731,6 +4489,20 @@
           "continuaDelDiaAnterior"
         ]
       },
+      "HistorialDeOrdenesDto": {
+        "type": "object",
+        "properties": {
+          "ordenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrdenEjecutadaDto"
+            }
+          }
+        },
+        "required": [
+          "ordenes"
+        ]
+      },
       "IdAutorizacionDto": {
         "type": "object",
         "properties": {
@@ -3942,6 +4714,87 @@
           "notas"
         ]
       },
+      "OrdenEjecutadaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accion": {
+            "type": "string",
+            "enum": [
+              "abrir",
+              "negar"
+            ]
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "operadorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rol": {
+            "type": "string"
+          },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "momento": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eventoId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "accion",
+          "motivo",
+          "operadorId",
+          "rol",
+          "dispositivoId",
+          "momento",
+          "eventoId"
+        ]
+      },
+      "OrdenManualDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accion": {
+            "type": "string",
+            "enum": [
+              "abrir",
+              "negar"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 300,
+            "description": "Obligatorio. Sin motivo la puerta NO se acciona: no es un campo requerido del formulario, es una condición de la orden (RN-08, CA-16, CA-17).",
+            "example": "Visitante esperado por la vivienda 4, confirmado por teléfono"
+          },
+          "eventoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Evento que se está atendiendo"
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "accion",
+          "motivo"
+        ]
+      },
       "PaginaDeEventosDto": {
         "type": "object",
         "properties": {
@@ -4074,6 +4927,66 @@
           "zonaId"
         ]
       },
+      "PersonaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombreCompleto": {
+            "type": "string"
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "cedula",
+              "cedula_extranjeria",
+              "pasaporte",
+              "nit",
+              "otro"
+            ]
+          },
+          "numeroDocumento": {
+            "type": "string"
+          },
+          "esResidente": {
+            "type": "boolean"
+          },
+          "viviendaIdentificador": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "nombreCompleto",
+          "tipoDocumento",
+          "numeroDocumento",
+          "esResidente",
+          "viviendaIdentificador"
+        ]
+      },
+      "PersonaResueltaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombreCompleto": {
+            "type": "string"
+          },
+          "yaExistia": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "nombreCompleto",
+          "yaExistia"
+        ]
+      },
       "PuntoDeFrecuenciaDto": {
         "type": "object",
         "properties": {
@@ -4138,6 +5051,48 @@
         },
         "required": [
           "codigo"
+        ]
+      },
+      "RegistrarPersonaDto": {
+        "type": "object",
+        "properties": {
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "cedula",
+              "cedula_extranjeria",
+              "pasaporte",
+              "nit",
+              "otro"
+            ],
+            "description": "Catálogo del enumerado `tipo_documento` de la migración 0002."
+          },
+          "numeroDocumento": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 30,
+            "example": "12.345.678",
+            "description": "Se admite con puntos o espacios: el objeto de valor lo normaliza."
+          },
+          "nombreCompleto": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200,
+            "example": "Ana María Pérez"
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "correo": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "tipoDocumento",
+          "numeroDocumento",
+          "nombreCompleto"
         ]
       },
       "RegistrarResidenteDto": {
@@ -4302,13 +5257,23 @@
           },
           "filasLeidas": {
             "type": "number"
+          },
+          "viviendasCreadas": {
+            "type": "number",
+            "description": "Viviendas que hubo que crear porque el identificador de la hoja no existía. Una errata crea una vivienda que nadie quería, y este número la delata en el momento (D-72)."
+          },
+          "personasCreadas": {
+            "type": "number",
+            "description": "Personas nuevas. Las que ya tenían ese documento se reutilizan (RN-06)."
           }
         },
         "required": [
           "aceptadas",
           "errores",
           "aplicada",
-          "filasLeidas"
+          "filasLeidas",
+          "viviendasCreadas",
+          "personasCreadas"
         ]
       },
       "ResultadoDeOperacionDto": {
@@ -4433,6 +5398,18 @@
         "properties": {
           "dispositivoId": {
             "type": "string"
+          }
+        },
+        "required": [
+          "dispositivoId"
+        ]
+      },
+      "SolicitudDeCanalDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [

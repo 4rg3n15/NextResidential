@@ -116,7 +116,7 @@ describe('lo que el lector LEE', () => {
         [VIVIENDA, 'ABC123'],
       ]),
     );
-    expect(filas).toEqual([{ numeroDeFila: 2, viviendaId: VIVIENDA, placa: 'ABC123' }]);
+    expect(filas).toEqual([{ numeroDeFila: 2, vivienda: VIVIENDA, placa: 'ABC123' }]);
   });
 
   it('el numero de fila es el que el operador ve en Excel', () => {
@@ -128,8 +128,21 @@ describe('lo que el lector LEE', () => {
     expect(filasDesdeXlsx(libro([['vivienda_id'], [VIVIENDA], [''], ['']]))).toHaveLength(1);
   });
 
-  it('sin la columna vivienda_id no se adivina: se dice que falta', () => {
-    expect(() => filasDesdeXlsx(libro([['placa'], ['ABC123']]))).toThrow(/vivienda_id/);
+  it('sin la columna de vivienda no se adivina: se dice que falta', () => {
+    expect(() => filasDesdeXlsx(libro([['placa'], ['ABC123']]))).toThrow(/vivienda/);
+  });
+
+  it('D-72 · la cabecera legible se lee, y la antigua sigue valiendo', () => {
+    const legible = filasDesdeXlsx(
+      libro([
+        ['vivienda', 'documento', 'nombre'],
+        ['Casa 12', '12.345.678', 'Ana Pérez'],
+      ]),
+    );
+    expect(legible).toEqual([
+      { numeroDeFila: 2, vivienda: 'Casa 12', documento: '12.345.678', nombre: 'Ana Pérez' },
+    ]);
+    expect(filasDesdeXlsx(libro([['vivienda_id'], [VIVIENDA]]))[0]!.vivienda).toBe(VIVIENDA);
   });
 
   it('una hoja con solo cabecera no es un error: son cero filas', () => {

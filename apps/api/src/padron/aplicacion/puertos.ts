@@ -1,4 +1,4 @@
-import type { Placa } from '@ncr/domain-core';
+import type { Documento, Placa, TipoDeDocumento } from '@ncr/domain-core';
 
 /**
  * Puertos del padrón. La aplicación los define; la infraestructura los cumple.
@@ -108,9 +108,68 @@ export interface AltaResidente {
   readonly actorId: string;
 }
 
+/**
+ * **Personas — la identidad compartida (D-01, RN-06).**
+ *
+ * Se busca por nombre O por documento porque quien autoriza tiene a mano una de
+ * las dos cosas, nunca un identificador interno. El puerto recibe el texto tal
+ * cual y ADEMÁS su forma normalizada de documento: así `12.345.678` encuentra a
+ * quien está guardado como `12345678` sin que el adaptador tenga que conocer
+ * las reglas de normalización, que viven en el objeto de valor.
+ */
+export interface PersonaEnLista {
+  readonly id: string;
+  readonly nombreCompleto: string;
+  readonly tipoDocumento: TipoDeDocumento;
+  readonly numeroDocumento: string;
+  /** Para desempatar dos homónimos en la lista: «residente de Casa 12». */
+  readonly esResidente: boolean;
+  readonly viviendaIdentificador: string | null;
+}
+
+export interface AltaPersona {
+  readonly copropiedadId: string;
+  readonly documento: Documento;
+  readonly nombreCompleto: string;
+  readonly telefono?: string | null;
+  readonly correo?: string | null;
+  readonly actorId: string;
+}
+
+/**
+ * `ya_existia` NO es un error: el documento ES la identidad (RN-06), así que
+ * dar de alta a alguien que ya está resuelve a la misma persona en vez de crear
+ * una segunda. El discriminador viaja hasta la consola para que pueda decirlo
+ * —«ya estaba registrada como …»— en lugar de fingir que creó algo.
+ *
+ * Quien decide es el índice único parcial de la base, no un `SELECT` previo
+ * (ADR-04): entre comprobar e insertar caben otras cien altas.
+ */
+export type ResultadoAltaPersona = {
+  readonly tipo: 'registrada' | 'ya_existia';
+  readonly id: string;
+  readonly nombreCompleto: string;
+};
+
 export interface RepositorioPadron {
   registrarVehiculo(alta: AltaVehiculo): Promise<ResultadoRegistroVehiculo>;
   registrarVivienda(alta: AltaVivienda): Promise<ResultadoAltaVivienda>;
+  buscarPersonas(
+    copropiedadId: string,
+    texto: string,
+    documentoNormalizado: string,
+    limite: number,
+  ): Promise<readonly PersonaEnLista[]>;
+  registrarPersona(alta: AltaPersona): Promise<ResultadoAltaPersona>;
+  /**
+   * Resuelve la vivienda por el identificador que se usa en la portería
+   * («Casa 12»). Lo necesita la carga de padrón: la hoja nombra la vivienda
+   * como está escrita en el conjunto, no por su UUID (D-72).
+   */
+  buscarViviendaPorIdentificador(
+    copropiedadId: string,
+    identificador: string,
+  ): Promise<{ readonly id: string } | null>;
   listarViviendas(
     copropiedadId: string,
     filtro: FiltroDeViviendas,

@@ -602,7 +602,15 @@ describe('cobertura tras la ETAPA 04', () => {
     // La enumeración del enrutador funcionó: nadie añadió estas rutas a la
     // suite a mano. Si el padrón hubiera filtrado, el recorrido de arriba ya
     // habría roto el build.
-    const padron = rutas.filter((r) => r.ruta.startsWith('/padron'));
+    //
+    // Desde D-71 **todas** cuelgan de `copropiedades/:id/padron`, escrituras
+    // incluidas: las que colgaban de `/padron` a secas tomaban la copropiedad
+    // del token, y para un superadministrador eso es nulo por diseño.
+    const padron = rutas.filter((r) => r.ruta.includes('/padron'));
     expect(padron.length).toBeGreaterThanOrEqual(4);
+    expect(
+      padron.filter((r) => !r.ruta.startsWith('/copropiedades/:id/padron')),
+      'una ruta del padrón fuera de copropiedades/:id vuelve a dejar sin escribir al superadministrador',
+    ).toEqual([]);
   });
 });

@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { esFallo } from '@ncr/domain-core';
 import {
+  BuscarPersonas,
   DesactivarVehiculo,
   DesactivarVivienda,
   ListarVehiculos,
   ListarViviendas,
+  RegistrarPersona,
   RegistrarResidente,
   RegistrarVehiculo,
   RegistrarVivienda,
@@ -30,6 +32,10 @@ const repo = (parcial: Partial<RepositorioPadron> = {}): RepositorioPadron => {
     desactivarVivienda: vi.fn().mockResolvedValue(true),
     contarVehiculosActivos: vi.fn().mockResolvedValue(0),
     registrarVivienda: vi.fn().mockResolvedValue({ tipo: 'registrada', id: 'viv-9' }),
+    buscarPersonas: vi.fn().mockResolvedValue([]),
+    registrarPersona: vi
+      .fn()
+      .mockResolvedValue({ tipo: 'registrada', id: 'per-1', nombreCompleto: 'Ana Pérez' }),
     listarViviendas: vi
       .fn()
       .mockResolvedValue({ totales: { activas: 2, inactivas: 1 }, viviendas: [] }),
@@ -220,5 +226,99 @@ describe('las lecturas del padrón', () => {
   it('la lista de vehículos se devuelve sin transformar', async () => {
     const r = await new ListarVehiculos(repo()).ejecutar('cop-1');
     expect(r.ok && r.valor).toEqual([]);
+  });
+});
+
+describe('BuscarPersonas', () => {
+  it('normaliza el documento ANTES de consultar: 12.345.678 encuentra a 12345678', async () => {
+    const buscar = vi.fn().mockResolvedValue([]);
+    await new BuscarPersonas(repo({ buscarPersonas: buscar })).ejecutar('cop-1', '12.345.678');
+    // El adaptador recibe el texto tal cual Y su forma normalizada; si la
+    // normalización viviera en el SQL, la búsqueda y la escritura se separarían.
+    expect(buscar.mock.calls[0]!.slice(1, 3)).toEqual(['12.345.678', '12345678']);
+  });
+
+  it('un nombre con espacios o tildes no produce forma de documento', async () => {
+    // «Ana Pérez» no puede ser un documento —tiene espacio y tilde—, así que la
+    // rama por documento queda vacía y solo busca por nombre. Un texto
+    // alfanumérico sin separadores («AB1234») SÍ es un documento posible: los
+    // pasaportes lo son, y probar las dos ramas es gratis.
+    const buscar = vi.fn().mockResolvedValue([]);
+    await new BuscarPersonas(repo({ buscarPersonas: buscar })).ejecutar('cop-1', 'Ana Pérez');
+    expect(buscar.mock.calls[0]!.slice(1, 3)).toEqual(['Ana Pérez', '']);
+  });
+
+  it('con menos de dos caracteres NO consulta: recorrería el padrón entero', async () => {
+    const buscar = vi.fn();
+    const r = await new BuscarPersonas(repo({ buscarPersonas: buscar })).ejecutar('cop-1', 'A');
+    expect(r.ok && r.valor).toEqual([]);
+    expect(buscar).not.toHaveBeenCalled();
+  });
+});
+
+describe('RegistrarPersona', () => {
+  const entrada = {
+    tipoDocumento: 'cedula',
+    numeroDocumento: '12.345.678',
+    nombreCompleto: '  Ana   Pérez ',
+  };
+
+  it('normaliza documento y nombre antes de escribir (RN-06)', async () => {
+    const registrar = vi
+      .fn()
+      .mockResolvedValue({ tipo: 'registrada', id: 'per-9', nombreCompleto: 'Ana Pérez' });
+    const r = await new RegistrarPersona(repo({ registrarPersona: registrar })).ejecutar(
+      ctx,
+      entrada,
+    );
+    expect(r.ok && r.valor).toEqual({ id: 'per-9', nombreCompleto: 'Ana Pérez', yaExistia: false });
+    const alta = registrar.mock.calls[0]![0];
+    expect(alta.documento.numero).toBe('12345678');
+    expect(alta.nombreCompleto).toBe('Ana Pérez');
+  });
+
+  it('un documento que ya existe NO es un error: resuelve a la misma persona', async () => {
+    // El documento ES la identidad. Crear una segunda fila sería justo la fuga
+    // que la tabla `personas` vino a cerrar.
+    const registrar = vi
+      .fn()
+      .mockResolvedValue({ tipo: 'ya_existia', id: 'per-1', nombreCompleto: 'Ana María Pérez' });
+    const r = await new RegistrarPersona(repo({ registrarPersona: registrar })).ejecutar(
+      ctx,
+      entrada,
+    );
+    expect(r.ok && r.valor.yaExistia).toBe(true);
+    // Y devuelve el nombre REAL, no el que se acaba de teclear.
+    expect(r.ok && r.valor.nombreCompleto).toBe('Ana María Pérez');
+  });
+
+  it('rechaza documento y nombre inválidos sin tocar el repositorio', async () => {
+    const registrar = vi.fn();
+    const malos = [
+      { ...entrada, numeroDocumento: 'AB#12' },
+      { ...entrada, tipoDocumento: 'licencia' },
+      { ...entrada, nombreCompleto: ' ' },
+    ];
+    for (const malo of malos) {
+      expect(
+        esFallo(
+          await new RegistrarPersona(repo({ registrarPersona: registrar })).ejecutar(ctx, malo),
+        ),
+      ).toBe(true);
+    }
+    expect(registrar).not.toHaveBeenCalled();
+  });
+
+  it('§2.7.6 · una identidad sin copropiedad no da de alta a nadie', async () => {
+    const registrar = vi.fn();
+    expect(
+      esFallo(
+        await new RegistrarPersona(repo({ registrarPersona: registrar })).ejecutar(
+          sinTenant,
+          entrada,
+        ),
+      ),
+    ).toBe(true);
+    expect(registrar).not.toHaveBeenCalled();
   });
 });
