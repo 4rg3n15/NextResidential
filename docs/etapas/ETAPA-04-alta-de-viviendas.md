@@ -229,8 +229,24 @@ La exportación no se comprueba comparando dos listas de nombres de columna:
 **se exporta, se analiza y se carga el resultado**. Si el círculo no cerrara, una
 de las dos estaría mal.
 
-**Veredicto literal de §2.8.0:** ver `docs/ESTADO_ETAPAS.md`, sección de este
-bloque.
+**Veredicto literal de §2.8.0** — `./scripts/verificar-etapa.sh --con-base`,
+con `DATABASE_URL_PRUEBAS` apuntando a una PostgreSQL local:
+
+```
+VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
+```
+
+19 de 19 pasos ejecutados · 1 485 pruebas en verde · 116 de 116 ficheros
+recogidos · dominio 97,68 % y aplicación 97,32 % de cobertura (umbral 90 %) ·
+global 74,42 % (umbral 70 %) · 15 controles negativos detectando su violación ·
+tres corridas idénticas sin caché. El desglose está en `docs/ESTADO_ETAPAS.md`.
+
+**Hallazgo del camino.** El paso 13 se omite sin `DATABASE_URL_PRUEBAS`, y esa
+omisión escondía **tres pruebas contra base en rojo**: los casos de uso del
+padrón habían dejado de compilar con la firma nueva y la suite con dobles seguía
+en verde. Es la familia de falso verde que el guion existe para impedir, esta vez
+desde el otro lado —el control estaba, pero nadie le daba la base—. Se corrigió,
+y el paso 13 ejecuta ahora también `test/generacion-padron.test.ts`.
 
 ---
 
