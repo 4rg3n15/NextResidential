@@ -3,7 +3,16 @@ import { Pool } from 'pg';
 import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-pg';
 import { CargarPadronDesdeArchivo, analizarCsv } from '../src/padron/aplicacion/carga-padron';
 import { BuscarPersonas, DesactivarVivienda } from '../src/padron/aplicacion/casos-de-uso';
+import type { LectorDeVocabulario } from '../src/padron/aplicacion/vocabulario';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
+
+/**
+ * El vocabulario de la copropiedad de las semillas: «Casa» y «Manzana». Importa
+ * que sea el de verdad, porque de él depende lo que el cargador recorta.
+ */
+const vocabulario: LectorDeVocabulario = {
+  leer: async () => ({ tipo: 'casas', etiquetaVivienda: 'Casa', etiquetaAgrupacion: 'Manzana' }),
+};
 
 /**
  * D-72 · **el padrón se da de alta escribiendo nombres, contra base real.**
@@ -62,24 +71,30 @@ describe('carga de padrón por nombre y documento, contra base', () => {
       return;
     }
     const repo = new RepositorioPadronPg(pool, {});
-    const casa = `Casa D72-${marca}`;
+    const casa = `D72-${marca}`;
     const documento = `10${marca}`;
 
-    // Exactamente lo que un administrador escribe en Excel: ni un UUID.
+    // Exactamente lo que un administrador escribe en Excel: ni un UUID. Y con
+    // la palabra delante en una de las dos filas —«Casa D72-…»—, que es como
+    // viene el archivo que el conjunto ya tenía: se guarda sin ella.
     const filas = analizarCsv(
       [
-        'vivienda,documento,nombre,placa,es_titular',
-        `${casa},${documento},Ana Pérez,,true`,
+        'identificador,agrupacion,documento,nombre,placa,es_titular',
+        `${casa},B,${documento},Ana Pérez,,true`,
         // La misma persona con el documento escrito con puntos, y un vehículo:
-        // debe resolver a la MISMA fila de `personas` (RN-06).
-        `${casa},10.${marca.slice(0, 3)}.${marca.slice(3)},Ana Pérez,DTS${marca.slice(-3)},`,
+        // debe resolver a la MISMA fila de `personas` (RN-06). Y la misma
+        // vivienda, aunque aquí lleve la palabra delante.
+        `Casa ${casa},B,10.${marca.slice(0, 3)}.${marca.slice(3)},Ana Pérez,DTS${marca.slice(-3)},`,
       ].join('\n'),
     );
 
-    const r = await new CargarPadronDesdeArchivo(repo).ejecutar(contexto(), filas);
+    const r = await new CargarPadronDesdeArchivo(repo, vocabulario).ejecutar(contexto(), filas);
     expect(r.aplicada, JSON.stringify(r.errores)).toBe(true);
     expect(r.aceptadas).toBe(2);
+    // UNA vivienda, no dos: «D72-x» y «Casa D72-x» son la misma, y el recorte
+    // se cuenta para que no sea silencioso (H-3).
     expect(r.viviendasCreadas).toBe(1);
+    expect(r.identificadoresRecortados).toBe(1);
     // Dos filas, una sola persona: el documento es la identidad.
     expect(r.personasCreadas).toBe(1);
 
@@ -121,13 +136,15 @@ describe('carga de padrón por nombre y documento, contra base', () => {
       return;
     }
     const repo = new RepositorioPadronPg(pool, {});
-    const casa = `Casa ROTA-${marca}`;
-    const r = await new CargarPadronDesdeArchivo(repo).ejecutar(
+    const casa = `ROTA-${marca}`;
+    const r = await new CargarPadronDesdeArchivo(repo, vocabulario).ejecutar(
       contexto(),
       analizarCsv(
-        ['vivienda,documento,nombre', `${casa},99${marca},Luis Gómez`, `,88${marca},Sin casa`].join(
-          '\n',
-        ),
+        [
+          'identificador,documento,nombre',
+          `${casa},99${marca},Luis Gómez`,
+          `,88${marca},Sin casa`,
+        ].join('\n'),
       ),
     );
     expect(r.aplicada).toBe(false);

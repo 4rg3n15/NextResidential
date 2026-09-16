@@ -373,6 +373,12 @@ if [[ "$CON_BASE" == "1" ]]; then
     # D-71 · y el superadministrador escribe de verdad, no solo pasa el alcance.
     con_base_o_omitida test/padron-superadmin.test.ts \
       "el superadministrador escribe el padrón en la copropiedad del selector (D-71)"
+    # ETAPA 04 (alta de viviendas) · el `ON CONFLICT` de la generación infiere
+    # el índice COMPUESTO de la 0029. Un doble en memoria no puede verlo: si la
+    # inferencia fallara, PostgreSQL rechazaría la sentencia entera y la suite
+    # con dobles seguiría en verde.
+    con_base_o_omitida test/generacion-padron.test.ts \
+      "las 12 en una sentencia, el mismo número en tres agrupaciones, y una colisión revierte las 12"
   else
     echo "   – omitido: exporta DATABASE_URL_PRUEBAS para ejecutarlo"
   fi
