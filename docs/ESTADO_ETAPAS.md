@@ -231,6 +231,20 @@ hace que la evidencia persista por sí solo: falta el adaptador
 cierra hoy es el primero de los cuatro recursos de DT-12 y el `SIN-CONFIGURAR`
 del arranque. El detalle, sin adornos, en el documento de flujo biométrico.
 
+### Alta de viviendas · diseño escrito · 2026-09-16
+
+Entregado **sin construir nada**, a la espera de aprobación:
+[`decisiones/propuestas/alta-de-viviendas.md`](decisiones/propuestas/alta-de-viviendas.md).
+
+Rehace el alta de viviendas —hoy exige repetir torre y dirección en cada una de
+las 300 unidades— e incorpora dentro la migración de `agrupacion` ya aprobada,
+porque toca el mismo campo y hoy no hay padrón cargado. Cinco hallazgos
+condicionan el diseño; dos exigen decisión suya: el índice único pasa a ser
+compuesto —`(copropiedad, agrupación, identificador)`, porque la Torre 1 y la
+Torre 2 tienen las dos un 101— y el reparto de casas entre secciones (S-16).
+El diálogo de primera vez **no crea la copropiedad**: no puede, porque nadie
+entra antes de que exista una. Estimado 4,5–5,5 j.
+
 ### Bloques 4, 5 y 9 · propuestas escritas · 2026-09-12
 
 Entregadas **sin construir nada**, a la espera de aprobación:
