@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import type { PlanDeGeneracion } from '@ncr/domain-core';
 import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-pg';
 import { GenerarViviendas } from '../src/padron/aplicacion/generar-viviendas';
-import { ExportarPadron } from '../src/padron/aplicacion/exportar-padron';
+import { BOM_UTF8, ExportarPadron } from '../src/padron/aplicacion/exportar-padron';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
 
 /**
@@ -18,7 +18,7 @@ import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
  *    infiere el índice compuesto de la migración `0029` —si no lo infiriese,
  *    PostgreSQL rechaza la sentencia entera y ningún doble lo vería—;
  *  · que el mismo número en dos agrupaciones entra sin chocar (H-2);
- *  · que una sola colisión revierte las 39 inserciones, y no 38.
+ *  · que una sola colisión revierte las 12 inserciones, y no deja 11.
  *
  * Se OMITE si no hay base, y lo dice: una omisión no es un verde.
  */
@@ -160,7 +160,7 @@ describe('generación del padrón contra base', () => {
     const exportado = await new ExportarPadron(new RepositorioPadronPg(pool, {})).ejecutar(
       contexto(),
     );
-    const lineas = exportado.csv.replace('﻿', '').trim().split('\r\n');
+    const lineas = exportado.csv.replace(BOM_UTF8, '').trim().split('\r\n');
     expect(lineas[0]).toBe(
       'identificador,agrupacion,documento,tipo_documento,nombre,placa,es_titular',
     );
