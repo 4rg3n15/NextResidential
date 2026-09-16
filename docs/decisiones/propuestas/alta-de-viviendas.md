@@ -1,9 +1,26 @@
 # Rediseño del alta de viviendas — diseño para aprobar
 
-> **Propuesta. No se ha construido nada.** Incluye la migración de `agrupacion`
-> ya aprobada, porque toca el mismo campo y hoy es gratis (§7).
+> **APROBADO Y CONSTRUIDO** el 2026-09-16, en la rama
+> `etapa-04-alta-de-viviendas`. El informe de lo construido, con lo que se
+> desvió de aquí y por qué, está en
+> [`etapas/ETAPA-04-alta-de-viviendas.md`](../../etapas/ETAPA-04-alta-de-viviendas.md).
 >
-> Fecha: 2026-09-16 · Rama propuesta cuando se apruebe: `etapa-04-alta-de-viviendas`
+> **Decisiones del usuario sobre este documento:**
+>
+> - **H-2, índice compuesto: sí.** Construido.
+> - **H-3, control del alta individual: sí.** Construido, con dos respuestas
+>   —rechazar al teclear, recortar al importar— por el motivo que explica el
+>   informe §2.2.
+> - **S-16, reparto de casas entre secciones:** distribución uniforme, **el
+>   resto en la última**, editable después. Construido así.
+> - **Baja masiva:** fuera de alcance, como se proponía. Queda como D-74.
+>
+> **Lo que se desvió, declarado:** el §4 de aquí proponía una clave de
+> idempotencia en la confirmación. No se construyó: un segundo envío del mismo
+> plan ya choca contra lo que el primero creó y se rechaza entero nombrándolo,
+> que es más fuerte y no necesita almacenamiento. El informe lo explica en §8.
+>
+> Fecha: 2026-09-16
 
 ---
 

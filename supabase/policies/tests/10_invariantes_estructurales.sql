@@ -446,4 +446,58 @@ BEGIN
 END
 $$;
 
+-- ADR-04 sobre clave COMPUESTA — migración 0029 --------------------------------
+--
+-- El hallazgo H-2 del rediseño del alta de viviendas: en un conjunto de
+-- apartamentos la Torre 1 y la Torre 2 tienen LAS DOS un 101. Con el índice
+-- anterior —(copropiedad_id, identificador)— generar la segunda torre chocaba
+-- contra la primera en el primer apartamento de cada piso.
+--
+-- Se comprueban las tres caras de la misma regla, porque cada una falla por su
+-- cuenta y las tres importan.
+DO $$
+DECLARE cop uuid := '10000000-0000-4000-8000-000000000001';
+        actor uuid := '00000000-0000-4000-8000-000000000002';
+BEGIN
+  -- 1 · El MISMO numero en DOS agrupaciones distintas se acepta.
+  INSERT INTO public.viviendas (copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
+  VALUES (cop, '101', 'T1', actor, actor), (cop, '101', 'T2', actor, actor);
+  RAISE NOTICE 'H-2 el mismo numero en dos agrupaciones: ok';
+
+  -- 2 · El MISMO par se rechaza. Es ADR-04 sin cambios: lo impone el indice.
+  BEGIN
+    INSERT INTO public.viviendas (copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
+    VALUES (cop, '101', 'T1', actor, actor);
+    RAISE EXCEPTION 'ADR-04 INCUMPLIDA: se acepto el mismo par (agrupacion, identificador)';
+  EXCEPTION WHEN unique_violation THEN
+    RAISE NOTICE 'ADR-04 par duplicado rechazado: ok';
+  END;
+
+  -- 3 · SIN agrupacion, dos veces el mismo numero tambien se rechaza.
+  --     Esta es la que justifica el `coalesce` del indice: en un indice unico
+  --     varios NULL NO chocan entre si, asi que sin la expresion una
+  --     parcelacion sin secciones podria tener dos «7» activas a la vez.
+  INSERT INTO public.viviendas (copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
+  VALUES (cop, '7777', NULL, actor, actor);
+  BEGIN
+    INSERT INTO public.viviendas (copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
+    VALUES (cop, '7777', NULL, actor, actor);
+    RAISE EXCEPTION 'ADR-04 INCUMPLIDA: dos viviendas SIN agrupacion con el mismo numero';
+  EXCEPTION WHEN unique_violation THEN
+    RAISE NOTICE 'ADR-04 coalesce(agrupacion) evita que dos NULL se escapen: ok';
+  END;
+
+  -- Se deja el padron como estaba: estas tres son sondas, no semillas.
+  UPDATE public.viviendas
+     SET estado = 'inactivo', desactivado_en = now(), desactivado_por = actor,
+         motivo_desactivacion = 'sonda de la prueba 10'
+   WHERE copropiedad_id = cop AND identificador IN ('101', '7777');
+END
+$$;
+
+-- El RESET va AL FINAL, y no antes de este bloque. En `--modo-supabase` el dueño
+-- del esquema NO es superusuario y la RLS está en modo FORCE: escribir como él
+-- choca contra `viviendas_insercion`. Este bloque necesita el mismo actor que
+-- los de arriba —`service_role`, el que de verdad omite la RLS en Supabase—,
+-- porque lo que prueba es el ÍNDICE, no la política.
 RESET ROLE;
