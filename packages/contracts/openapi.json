@@ -2362,6 +2362,42 @@
         ]
       }
     },
+    "/copropiedades/{id}/padron/exportacion": {
+      "get": {
+        "operationId": "PadronController_exportar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Padrón en CSV, con las mismas columnas que acepta la carga",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
     "/copropiedades/{id}/padron/personas": {
       "post": {
         "operationId": "PadronController_registrarPersona",
@@ -2732,6 +2768,98 @@
           }
         ],
         "summary": "Directorio de viviendas con totales de activas e inactivas (HU-01, RN-13)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/viviendas/generacion": {
+      "post": {
+        "operationId": "PadronController_generarViviendas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmarGeneracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneracionAplicadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crea el padrón entero en una sentencia; el índice decide (ADR-04)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/viviendas/generacion/previsualizacion": {
+      "post": {
+        "operationId": "PadronController_previsualizarGeneracion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanDeGeneracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VistaPreviaDeGeneracionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Qué se va a crear, antes de crearlo: extremos por grupo y total",
         "tags": [
           "padron"
         ]
@@ -3626,6 +3754,27 @@
             "type": "string",
             "example": "Urbanización Mira"
           },
+          "direccion": {
+            "type": "string",
+            "example": "Kilómetro 4 vía La Calera, Bogotá"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "apartamentos",
+              "casas",
+              "fincas",
+              "otro"
+            ]
+          },
+          "etiquetaVivienda": {
+            "type": "string",
+            "example": "Casa"
+          },
+          "etiquetaAgrupacion": {
+            "type": "string",
+            "example": "Manzana"
+          },
           "zonaHoraria": {
             "type": "string",
             "example": "America/Bogota"
@@ -3775,6 +3924,33 @@
             "type": "string",
             "example": "Urbanización Mira"
           },
+          "direccion": {
+            "type": "string",
+            "nullable": true,
+            "example": "Kilómetro 4 vía La Calera, Bogotá",
+            "description": "Dirección DEL CONJUNTO. La vivienda no tiene la suya: en Colombia la dirección es de la copropiedad y lo que cambia es la agrupación y el número."
+          },
+          "tipo": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "apartamentos",
+              "casas",
+              "fincas",
+              "otro"
+            ],
+            "description": "null = SIN CONFIGURAR, y es lo que dispara el diálogo inicial de la consola. Decide el formulario de alta y las etiquetas sugeridas; ninguna vivienda lo guarda, así que cambiarlo no afecta a las ya creadas."
+          },
+          "etiquetaVivienda": {
+            "type": "string",
+            "example": "Casa",
+            "description": "Cómo se llama una vivienda aquí. Es una ETIQUETA: se pinta al mostrar y nunca entra en el identificador, por eso cambiarla no renombra ninguna fila."
+          },
+          "etiquetaAgrupacion": {
+            "type": "string",
+            "example": "Manzana",
+            "description": "Cómo se llama la agrupación aquí."
+          },
           "zonaHoraria": {
             "type": "string",
             "example": "America/Bogota"
@@ -3828,6 +4004,10 @@
         },
         "required": [
           "nombre",
+          "direccion",
+          "tipo",
+          "etiquetaVivienda",
+          "etiquetaAgrupacion",
           "zonaHoraria",
           "umbralConfianzaPlaca",
           "politicaContingenciaEdge",
@@ -3895,6 +4075,60 @@
             "description": "Cierre manual del operador, sin presencia física (PB-04)"
           }
         }
+      },
+      "ConfirmarGeneracionDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "apartamentos",
+              "casas",
+              "fincas"
+            ]
+          },
+          "agrupaciones": {
+            "type": "number"
+          },
+          "estilo": {
+            "type": "string",
+            "enum": [
+              "letras",
+              "numeros"
+            ]
+          },
+          "pisos": {
+            "type": "number"
+          },
+          "porPiso": {
+            "type": "number"
+          },
+          "excepciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExcepcionDeAgrupacionDto"
+            }
+          },
+          "secciones": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "reiniciarNumeracion": {
+            "type": "boolean"
+          },
+          "cantidad": {
+            "type": "number"
+          },
+          "totalEsperado": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "tipo",
+          "totalEsperado"
+        ]
       },
       "ConteoDto": {
         "type": "object",
@@ -4572,6 +4806,26 @@
           "decididoPorEdge"
         ]
       },
+      "ExcepcionDeAgrupacionDto": {
+        "type": "object",
+        "properties": {
+          "agrupacion": {
+            "type": "string",
+            "maxLength": 24
+          },
+          "pisos": {
+            "type": "number"
+          },
+          "porPiso": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "agrupacion",
+          "pisos",
+          "porPiso"
+        ]
+      },
       "FilaDeInformeDto": {
         "type": "object",
         "properties": {
@@ -4660,6 +4914,51 @@
           "minutoInicio",
           "minutoFin",
           "continuaDelDiaAnterior"
+        ]
+      },
+      "GeneracionAplicadaDto": {
+        "type": "object",
+        "properties": {
+          "creadas": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "creadas"
+        ]
+      },
+      "GrupoProyectadoDto": {
+        "type": "object",
+        "properties": {
+          "agrupacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "cantidad": {
+            "type": "number"
+          },
+          "primeras": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ultimas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "porExcepcion": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "agrupacion",
+          "cantidad",
+          "primeras",
+          "ultimas",
+          "porExcepcion"
         ]
       },
       "HistorialDeOrdenesDto": {
@@ -5202,6 +5501,56 @@
           "yaExistia"
         ]
       },
+      "PlanDeGeneracionDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "apartamentos",
+              "casas",
+              "fincas"
+            ]
+          },
+          "agrupaciones": {
+            "type": "number"
+          },
+          "estilo": {
+            "type": "string",
+            "enum": [
+              "letras",
+              "numeros"
+            ]
+          },
+          "pisos": {
+            "type": "number"
+          },
+          "porPiso": {
+            "type": "number"
+          },
+          "excepciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExcepcionDeAgrupacionDto"
+            }
+          },
+          "secciones": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "reiniciarNumeracion": {
+            "type": "boolean"
+          },
+          "cantidad": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "tipo"
+        ]
+      },
       "PuntoDeFrecuenciaDto": {
         "type": "object",
         "properties": {
@@ -5381,13 +5730,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 60,
-            "example": "Casa 12"
+            "example": "42"
           },
-          "manzana": {
-            "type": "string"
-          },
-          "direccion": {
-            "type": "string"
+          "agrupacion": {
+            "type": "string",
+            "example": "B"
           }
         },
         "required": [
@@ -5480,6 +5827,10 @@
           "personasCreadas": {
             "type": "number",
             "description": "Personas nuevas. Las que ya tenían ese documento se reutilizan (RN-06)."
+          },
+          "identificadoresRecortados": {
+            "type": "number",
+            "description": "Identificadores que traían la palabra dentro («Casa 42») y se guardaron sin ella. Se recorta y se cuenta: contarlo es lo que impide que el recorte sea silencioso."
           }
         },
         "required": [
@@ -5488,7 +5839,8 @@
           "aplicada",
           "filasLeidas",
           "viviendasCreadas",
-          "personasCreadas"
+          "personasCreadas",
+          "identificadoresRecortados"
         ]
       },
       "ResultadoDeOperacionDto": {
@@ -5773,6 +6125,32 @@
           "motivo"
         ]
       },
+      "VistaPreviaDeGeneracionDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "grupos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrupoProyectadoDto"
+            }
+          },
+          "colisiones": {
+            "description": "Las que ya existen activas. Con una sola, la confirmacion se niega entera: la generacion solo inserta y nunca sustituye nada.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViviendaProyectadaDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "grupos",
+          "colisiones"
+        ]
+      },
       "ViviendaDto": {
         "type": "object",
         "properties": {
@@ -5783,11 +6161,7 @@
           "identificador": {
             "type": "string"
           },
-          "manzana": {
-            "type": "string",
-            "nullable": true
-          },
-          "direccion": {
+          "agrupacion": {
             "type": "string",
             "nullable": true
           },
@@ -5823,8 +6197,7 @@
         "required": [
           "id",
           "identificador",
-          "manzana",
-          "direccion",
+          "agrupacion",
           "estado",
           "estadoAdministrativo",
           "residentes",
@@ -5832,6 +6205,22 @@
           "autorizacionesVigentes",
           "desactivadaEn",
           "motivoDesactivacion"
+        ]
+      },
+      "ViviendaProyectadaDto": {
+        "type": "object",
+        "properties": {
+          "agrupacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "identificador": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agrupacion",
+          "identificador"
         ]
       },
       "ZonaDto": {

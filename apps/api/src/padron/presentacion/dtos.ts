@@ -1,14 +1,21 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBase64,
   IsBoolean,
   IsEmail,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Length,
   Matches,
+  Max,
+  Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -51,18 +58,105 @@ export class RegistrarVehiculoDto {
 }
 
 export class RegistrarViviendaDto {
-  @ApiProperty({ type: String, minLength: 1, maxLength: 60, example: 'Casa 12' })
+  /**
+   * Solo el número. La palabra —«Casa», «Apartamento»— es de la copropiedad y
+   * se pinta al mostrar; el caso de uso rechaza el identificador que la traiga
+   * dentro, y explica por qué (H-3).
+   */
+  @ApiProperty({ type: String, minLength: 1, maxLength: 60, example: '42' })
   @IsString()
   @Length(1, 60)
   identificador!: string;
 
-  @ApiPropertyOptional({ type: String }) @IsOptional() @IsString() @Length(1, 60) manzana?: string;
-
-  @ApiPropertyOptional({ type: String })
+  /** Torre, bloque, manzana, sección o sector. Forma parte de la identidad. */
+  @ApiPropertyOptional({ type: String, example: 'B' })
   @IsOptional()
   @IsString()
-  @Length(1, 200)
-  direccion?: string;
+  @Length(1, 24)
+  agrupacion?: string;
+}
+
+/**
+ * Una excepción del plan: la torre que no sigue los valores generales. Un
+ * conjunto real casi nunca es homogéneo.
+ */
+export class ExcepcionDeAgrupacionDto {
+  @ApiProperty({ type: String, maxLength: 24 })
+  @IsString()
+  @Length(1, 24)
+  agrupacion!: string;
+
+  @ApiProperty({ type: Number }) @IsInt() @Min(0) @Max(50) pisos!: number;
+  @ApiProperty({ type: Number }) @IsInt() @Min(0) @Max(99) porPiso!: number;
+}
+
+/**
+ * El plan de generación. **Un solo DTO con los campos de los tres tipos** y no
+ * tres DTOs: `ValidationPipe` con `forbidNonWhitelisted` rechaza lo que sobre,
+ * y el dominio valida lo que falte con su propio mensaje. Partirlo en tres
+ * obligaría a la consola a elegir ruta según el tipo, que es la decisión que ya
+ * toma el campo `tipo`.
+ *
+ * Los mínimos de aquí son de FORMA (§2.7.3). La verdad —que una excepción
+ * apunte a una torre que existe, que el total quepa en la cota— la decide
+ * `generarPlan` en el dominio.
+ */
+export class PlanDeGeneracionDto {
+  @ApiProperty({ type: String, enum: ['apartamentos', 'casas', 'fincas'] })
+  @IsIn(['apartamentos', 'casas', 'fincas'])
+  tipo!: 'apartamentos' | 'casas' | 'fincas';
+
+  @ApiPropertyOptional({ type: Number })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(99)
+  agrupaciones?: number;
+
+  @ApiPropertyOptional({ type: String, enum: ['letras', 'numeros'] })
+  @IsOptional()
+  @IsIn(['letras', 'numeros'])
+  estilo?: 'letras' | 'numeros';
+
+  @ApiPropertyOptional({ type: Number }) @IsOptional() @IsInt() @Min(0) @Max(50) pisos?: number;
+  @ApiPropertyOptional({ type: Number }) @IsOptional() @IsInt() @Min(0) @Max(99) porPiso?: number;
+
+  @ApiPropertyOptional({ type: [ExcepcionDeAgrupacionDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(99)
+  @ValidateNested({ each: true })
+  @Type(() => ExcepcionDeAgrupacionDto)
+  excepciones?: ExcepcionDeAgrupacionDto[];
+
+  @ApiPropertyOptional({ type: Number }) @IsOptional() @IsInt() @Min(0) @Max(99) secciones?: number;
+  @ApiPropertyOptional({ type: Number }) @IsOptional() @IsInt() @Min(0) @Max(2000) total?: number;
+
+  @ApiPropertyOptional({ type: Boolean })
+  @IsOptional()
+  @IsBoolean()
+  reiniciarNumeracion?: boolean;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2000)
+  cantidad?: number;
+}
+
+export class ConfirmarGeneracionDto extends PlanDeGeneracionDto {
+  /**
+   * El total que la vista previa enseñó. Si el servidor recalcula el plan y le
+   * sale otro número, no crea nada: cierra la ventana en que el formulario
+   * cambió entre previsualizar y confirmar, sin pedirle al usuario que teclee
+   * una confirmación que acabaría escribiendo sin leer.
+   */
+  @ApiProperty({ type: Number })
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  totalEsperado!: number;
 }
 
 /**

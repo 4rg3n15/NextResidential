@@ -23,6 +23,7 @@ export * from './padron/placa';
 export * from './padron/vivienda';
 export * from './padron/persona';
 export * from './padron/plan-de-viviendas';
+export * from './padron/etiquetas';
 export * from './autorizaciones/vigencia';
 export * from './autorizaciones/patron-recurrencia';
 export * from './autorizaciones/version-de-reglas';

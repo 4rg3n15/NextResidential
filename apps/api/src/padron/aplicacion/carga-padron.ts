@@ -1,6 +1,8 @@
 import { Documento, NombreDePersona, Placa } from '@ncr/domain-core';
-import { esExito } from '@ncr/domain-core';
+import { esExito, recortarEtiqueta } from '@ncr/domain-core';
 import type { RepositorioPadron } from './puertos';
+import type { LectorDeVocabulario } from './vocabulario';
+import { VOCABULARIO_SIN_CONFIGURAR } from './vocabulario';
 import type { ContextoTenant } from '../../autenticacion';
 
 /**
@@ -22,8 +24,15 @@ import type { ContextoTenant } from '../../autenticacion';
  */
 export interface FilaPadron {
   readonly numeroDeFila: number;
-  /** Identificador visible de la vivienda («Casa 12») o su UUID. */
+  /** Identificador visible de la vivienda («42», «101») o su UUID. */
   readonly vivienda: string;
+  /**
+   * Torre, bloque, manzana, sección o sector. Desde la migración `0029` forma
+   * parte de la identidad de la vivienda, así que una hoja de apartamentos sin
+   * esta columna es ambigua: el 101 de la Torre 1 y el de la Torre 2 son dos
+   * viviendas distintas. Si la copropiedad no agrupa, la columna sobra.
+   */
+  readonly agrupacion?: string;
   readonly placa?: string;
   /** Documento de la persona, tal como se escribe: se normaliza al resolver. */
   readonly documento?: string;
@@ -53,6 +62,14 @@ export interface ResultadoCarga {
    */
   readonly viviendasCreadas: number;
   readonly personasCreadas: number;
+  /**
+   * Cuántos identificadores traían la palabra dentro —«Casa 42»— y se
+   * guardaron sin ella. **Se recorta y se cuenta, no se rechaza**: el archivo
+   * es el que el conjunto ya tenía, y negarse a leerlo por una palabra que
+   * sabemos quitar convertiría la vía más rápida de cargar el padrón en la más
+   * lenta. Contarlo es lo que impide que el recorte sea silencioso.
+   */
+  readonly identificadoresRecortados: number;
 }
 
 interface FilaValidada {
@@ -63,7 +80,10 @@ interface FilaValidada {
 }
 
 export class CargarPadronDesdeArchivo {
-  constructor(private readonly repo: RepositorioPadron) {}
+  constructor(
+    private readonly repo: RepositorioPadron,
+    private readonly vocabulario: LectorDeVocabulario,
+  ) {}
 
   /**
    * Valida **todas** las filas antes de escribir ninguna, y aborta la
@@ -125,12 +145,25 @@ export class CargarPadronDesdeArchivo {
     }
 
     if (errores.length > 0 || !ctx.copropiedadId) {
-      return { aceptadas: 0, errores, aplicada: false, viviendasCreadas: 0, personasCreadas: 0 };
+      return {
+        aceptadas: 0,
+        errores,
+        aplicada: false,
+        viviendasCreadas: 0,
+        personasCreadas: 0,
+        identificadoresRecortados: 0,
+      };
     }
 
     const copropiedadId = ctx.copropiedadId;
     let viviendasCreadas = 0;
     let personasCreadas = 0;
+    let identificadoresRecortados = 0;
+
+    // La etiqueta se lee UNA vez por carga, no una por fila: son 5 000 filas
+    // como mucho y sería la misma respuesta 5 000 veces.
+    const vocabulario =
+      (await this.vocabulario.leer(ctx, copropiedadId)) ?? VOCABULARIO_SIN_CONFIGURAR;
     try {
       const aceptadas = await this.repo.enTransaccion(async (repo) => {
         // Las cachés no son una optimización: sin ellas, treinta filas de la
@@ -140,23 +173,50 @@ export class CargarPadronDesdeArchivo {
         const personas = new Map<string, string>();
 
         const resolverVivienda = async (fila: FilaPadron): Promise<string> => {
-          const clave = fila.vivienda.trim();
-          if (UUID.test(clave)) return clave;
+          const escrito = fila.vivienda.trim();
+          if (UUID.test(escrito)) return escrito;
+
+          // «Casa 42» en la hoja se guarda como «42»: la palabra es de la
+          // copropiedad y se pinta al mostrar (H-3). Se cuenta para que el
+          // recorte conste en el informe de la carga.
+          const recortado = recortarEtiqueta(escrito, vocabulario.etiquetaVivienda);
+          const identificador = recortado ?? escrito;
+          if (recortado !== null) identificadoresRecortados += 1;
+
+          const agrupacionEscrita = fila.agrupacion?.trim();
+          const agrupacion =
+            agrupacionEscrita === undefined || agrupacionEscrita === ''
+              ? null
+              : (recortarEtiqueta(agrupacionEscrita, vocabulario.etiquetaAgrupacion) ??
+                agrupacionEscrita);
+
+          // La clave de la caché es el PAR, no el número: desde la 0029 el 101
+          // de la Torre 1 y el de la Torre 2 son dos viviendas distintas, y una
+          // caché por número las confundiría en la misma carga.
+          const clave = JSON.stringify([agrupacion ?? '', identificador]);
           const enCache = viviendas.get(clave);
           if (enCache !== undefined) return enCache;
 
-          const existente = await repo.buscarViviendaPorIdentificador(copropiedadId, clave);
+          const existente = await repo.buscarViviendaPorIdentificador(
+            copropiedadId,
+            agrupacion,
+            identificador,
+          );
           if (existente !== null) {
             viviendas.set(clave, existente.id);
             return existente.id;
           }
           const creada = await repo.registrarVivienda({
             copropiedadId,
-            identificador: clave,
+            identificador,
+            agrupacion,
             actorId: ctx.usuarioId,
           });
           if (creada.tipo !== 'registrada') {
-            throw new ErrorDeCarga(fila.numeroDeFila, `no se pudo crear la vivienda «${clave}»`);
+            throw new ErrorDeCarga(
+              fila.numeroDeFila,
+              `no se pudo crear la vivienda «${identificador}»`,
+            );
           }
           viviendasCreadas += 1;
           viviendas.set(clave, creada.id);
@@ -217,7 +277,14 @@ export class CargarPadronDesdeArchivo {
         }
         return n;
       });
-      return { aceptadas, errores: [], aplicada: true, viviendasCreadas, personasCreadas };
+      return {
+        aceptadas,
+        errores: [],
+        aplicada: true,
+        viviendasCreadas,
+        personasCreadas,
+        identificadoresRecortados,
+      };
     } catch (e) {
       if (e instanceof ErrorDeCarga) {
         return {
@@ -226,6 +293,7 @@ export class CargarPadronDesdeArchivo {
           aplicada: false,
           viviendasCreadas: 0,
           personasCreadas: 0,
+          identificadoresRecortados: 0,
         };
       }
       throw e;
@@ -275,14 +343,43 @@ export const analizarCsv = (contenido: string): FilaPadron[] => {
  * lectores con dos vocabularios son dos formatos, y el operador se entera al
  * tercer intento fallido.
  *
- * `vivienda_id` y `persona_id` siguen leyéndose como sinónimos de `vivienda` y
- * `persona_id`: quien exporte del sistema y recargue no tiene que traducir.
+ * **Las columnas son las del archivo que el administrador ya tiene** —
+ * `identificador`, `agrupacion`, `documento`, `tipo_documento`, `nombre`,
+ * `placa`, `es_titular`—, y son exactamente las que produce la exportación:
+ * si el círculo no cerrara, una de las dos estaría mal (D-72).
+ *
+ * `vivienda`, `vivienda_id` y `persona_id` se siguen leyendo como sinónimos
+ * opcionales: quien exportó del sistema antes de este cambio no tiene que
+ * traducir nada.
  */
+/**
+ * **Las columnas del padrón, en una sola lista.**
+ *
+ * La lee el importador —abajo— y la escribe el exportador
+ * (`exportar-padron.ts`). Que sea la misma constante es lo que hace que el
+ * archivo exportado vuelva a entrar sin editarlo: dos listas escritas aparte
+ * son dos formatos esperando a divergir, y el operador se entera al tercer
+ * intento fallido.
+ *
+ * Son las columnas que un administrador tiene en SU archivo. Ningún
+ * identificador interno (D-72).
+ */
+export const COLUMNAS_DEL_PADRON = [
+  'identificador',
+  'agrupacion',
+  'documento',
+  'tipo_documento',
+  'nombre',
+  'placa',
+  'es_titular',
+] as const;
+
 export const filaDesdeCeldas = (
   numeroDeFila: number,
   leer: (columna: string) => string | undefined,
 ): FilaPadron => {
-  const vivienda = leer('vivienda') ?? leer('vivienda_id') ?? '';
+  const vivienda = leer('identificador') ?? leer('vivienda') ?? leer('vivienda_id') ?? '';
+  const agrupacion = leer('agrupacion');
   const placa = leer('placa');
   const documento = leer('documento');
   const tipoDocumento = leer('tipo_documento');
@@ -292,6 +389,7 @@ export const filaDesdeCeldas = (
   return {
     numeroDeFila,
     vivienda,
+    ...(agrupacion === undefined ? {} : { agrupacion }),
     ...(placa === undefined ? {} : { placa }),
     ...(documento === undefined ? {} : { documento }),
     ...(tipoDocumento === undefined ? {} : { tipoDocumento }),

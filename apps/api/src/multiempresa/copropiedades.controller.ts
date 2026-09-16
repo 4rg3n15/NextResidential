@@ -72,6 +72,32 @@ export class CambiosDeConfiguracionDto {
   @MaxLength(200)
   nombre?: string;
 
+  @ApiProperty({ required: false, example: 'Kilómetro 4 vía La Calera, Bogotá' })
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  @MaxLength(200)
+  direccion?: string;
+
+  @ApiProperty({ required: false, enum: ['apartamentos', 'casas', 'fincas', 'otro'] })
+  @IsOptional()
+  @IsEnum(['apartamentos', 'casas', 'fincas', 'otro'])
+  tipo?: 'apartamentos' | 'casas' | 'fincas' | 'otro';
+
+  @ApiProperty({ required: false, example: 'Casa' })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(24)
+  etiquetaVivienda?: string;
+
+  @ApiProperty({ required: false, example: 'Manzana' })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(24)
+  etiquetaAgrupacion?: string;
+
   @ApiProperty({ required: false, example: 'America/Bogota' })
   @IsOptional()
   @IsString()

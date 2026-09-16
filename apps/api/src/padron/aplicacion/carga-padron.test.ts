@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CargarPadronDesdeArchivo, analizarCsv } from './carga-padron';
 import type { RepositorioPadron } from './puertos';
+import type { LectorDeVocabulario } from './vocabulario';
 import type { ContextoTenant } from '../../autenticacion';
 
 const ctx: ContextoTenant = {
@@ -27,10 +28,25 @@ const repoFalso = (
       .mockResolvedValue({ tipo: 'registrada', id: 'per-1', nombreCompleto: 'Ana Pérez' }),
     desactivarVivienda: vi.fn().mockResolvedValue(true),
     contarVehiculosActivos: vi.fn().mockResolvedValue(0),
+    listarViviendas: vi
+      .fn()
+      .mockResolvedValue({ totales: { activas: 0, inactivas: 0 }, viviendas: [] }),
+    listarVehiculos: vi.fn().mockResolvedValue([]),
+    generarViviendas: vi.fn().mockResolvedValue({ creadas: 0, colisiones: [] }),
+    viviendasExistentes: vi.fn().mockResolvedValue([]),
+    exportarPadron: vi.fn().mockResolvedValue([]),
     enTransaccion: async (op) => op(repo),
   };
   return repo;
 };
+
+/** Vocabulario del conjunto. Sin configurar salvo que la prueba diga otra cosa. */
+const vocabulario = (
+  etiquetaVivienda = 'Vivienda',
+  etiquetaAgrupacion = 'Torre o bloque',
+): LectorDeVocabulario => ({
+  leer: vi.fn().mockResolvedValue({ tipo: null, etiquetaVivienda, etiquetaAgrupacion }),
+});
 
 describe('analizador CSV', () => {
   it('lee cabeceras y celdas entrecomilladas', () => {
@@ -47,6 +63,13 @@ describe('analizador CSV', () => {
   it('las comillas dobles escapadas no parten la celda', () => {
     const filas = analizarCsv('vivienda,placa\n"Casa, 1","AB""C12"\n');
     expect(filas[0]!.vivienda).toBe('Casa, 1');
+  });
+
+  it('la columna se llama `identificador`, y `vivienda` sigue valiendo', () => {
+    const nuevas = analizarCsv('identificador,agrupacion\n101,B\n');
+    expect(nuevas[0]).toMatchObject({ vivienda: '101', agrupacion: 'B' });
+    const viejas = analizarCsv('vivienda\nCasa 12\n');
+    expect(viejas[0]).toMatchObject({ vivienda: 'Casa 12' });
   });
 
   it('D-72 · la hoja se llena con nombre y documento, no con UUIDs', () => {
@@ -67,10 +90,13 @@ describe('analizador CSV', () => {
 describe('carga de padrón · todo o nada (HU-03)', () => {
   it('no escribe NADA si alguna fila es inválida', async () => {
     const registrar = vi.fn();
-    const r = await new CargarPadronDesdeArchivo(repoFalso(registrar)).ejecutar(ctx, [
-      { numeroDeFila: 2, vivienda: 'Casa 12', placa: 'ABC123' },
-      { numeroDeFila: 3, vivienda: 'Casa 12', placa: 'no-vale-Ω' },
-    ]);
+    const r = await new CargarPadronDesdeArchivo(repoFalso(registrar), vocabulario()).ejecutar(
+      ctx,
+      [
+        { numeroDeFila: 2, vivienda: 'Casa 12', placa: 'ABC123' },
+        { numeroDeFila: 3, vivienda: 'Casa 12', placa: 'no-vale-Ω' },
+      ],
+    );
     expect(r.aplicada).toBe(false);
     expect(r.aceptadas).toBe(0);
     expect(r.errores).toHaveLength(1);
@@ -80,7 +106,7 @@ describe('carga de padrón · todo o nada (HU-03)', () => {
   });
 
   it('aplica la carga completa cuando todas las filas son válidas', async () => {
-    const r = await new CargarPadronDesdeArchivo(repoFalso()).ejecutar(ctx, [
+    const r = await new CargarPadronDesdeArchivo(repoFalso(), vocabulario()).ejecutar(ctx, [
       { numeroDeFila: 2, vivienda: 'Casa 12', placa: 'abc-123' },
       { numeroDeFila: 3, vivienda: 'Casa 13', personaId: 'p1', esTitular: true },
     ]);
@@ -92,17 +118,20 @@ describe('carga de padrón · todo o nada (HU-03)', () => {
       .fn()
       .mockResolvedValueOnce({ tipo: 'registrado', id: 'v1' })
       .mockResolvedValueOnce({ tipo: 'placa_activa_duplicada' });
-    const r = await new CargarPadronDesdeArchivo(repoFalso(registrar)).ejecutar(ctx, [
-      { numeroDeFila: 2, vivienda: 'Casa 12', placa: 'ABC123' },
-      { numeroDeFila: 3, vivienda: 'Casa 12', placa: 'XYZ987' },
-    ]);
+    const r = await new CargarPadronDesdeArchivo(repoFalso(registrar), vocabulario()).ejecutar(
+      ctx,
+      [
+        { numeroDeFila: 2, vivienda: 'Casa 12', placa: 'ABC123' },
+        { numeroDeFila: 3, vivienda: 'Casa 12', placa: 'XYZ987' },
+      ],
+    );
     expect(r.aplicada).toBe(false);
     expect(r.aceptadas).toBe(0);
     expect(r.errores[0]!.numeroDeFila).toBe(3);
   });
 
   it('rechaza la fila sin vivienda', async () => {
-    const r = await new CargarPadronDesdeArchivo(repoFalso()).ejecutar(ctx, [
+    const r = await new CargarPadronDesdeArchivo(repoFalso(), vocabulario()).ejecutar(ctx, [
       { numeroDeFila: 2, vivienda: '', placa: 'ABC123' },
     ]);
     expect(r.errores[0]!.motivo).toMatch(/vivienda/);
@@ -119,12 +148,15 @@ describe('carga de padrón · la hoja se rellena con lo que el conjunto tiene es
     const buscar = vi.fn().mockResolvedValue({ id: 'viv-uuid' });
     const registrarVehiculo = vi.fn().mockResolvedValue({ tipo: 'registrado', id: 'v1' });
     const repo = repoFalso(registrarVehiculo);
-    const r = await new CargarPadronDesdeArchivo({
-      ...repo,
-      buscarViviendaPorIdentificador: buscar,
-      enTransaccion: async (op) =>
-        op({ ...repo, buscarViviendaPorIdentificador: buscar, registrarVehiculo }),
-    }).ejecutar(ctx, [
+    const r = await new CargarPadronDesdeArchivo(
+      {
+        ...repo,
+        buscarViviendaPorIdentificador: buscar,
+        enTransaccion: async (op) =>
+          op({ ...repo, buscarViviendaPorIdentificador: buscar, registrarVehiculo }),
+      },
+      vocabulario(),
+    ).ejecutar(ctx, [
       { numeroDeFila: 2, vivienda: 'Casa 12', placa: 'ABC123' },
       { numeroDeFila: 3, vivienda: 'Casa 12', placa: 'XYZ987' },
     ]);
@@ -141,12 +173,58 @@ describe('carga de padrón · la hoja se rellena con lo que el conjunto tiene es
       buscarViviendaPorIdentificador: vi.fn().mockResolvedValue(null),
       registrarVivienda,
     };
-    const r = await new CargarPadronDesdeArchivo({
-      ...repo,
-      enTransaccion: async (op) => op(repo),
-    }).ejecutar(ctx, [{ numeroDeFila: 2, vivienda: 'Casa 40' }]);
+    const r = await new CargarPadronDesdeArchivo(
+      { ...repo, enTransaccion: async (op) => op(repo) },
+      vocabulario(),
+    ).ejecutar(ctx, [{ numeroDeFila: 2, vivienda: 'Casa 40' }]);
     expect(r).toMatchObject({ aplicada: true, aceptadas: 1, viviendasCreadas: 1 });
     expect(registrarVivienda.mock.calls[0]![0].identificador).toBe('Casa 40');
+  });
+
+  it('H-3 · «Casa 40» en la hoja se GUARDA como «40», y el recorte se cuenta', async () => {
+    // Al revés que el alta individual, que lo rechaza. Aquí el archivo es el
+    // que el conjunto ya tenía: negarse a leerlo por una palabra que sabemos
+    // quitar convertiría la vía más rápida de cargar el padrón en la más lenta.
+    const registrarVivienda = vi.fn().mockResolvedValue({ tipo: 'registrada', id: 'viv-nueva' });
+    const repo = {
+      ...repoFalso(),
+      buscarViviendaPorIdentificador: vi.fn().mockResolvedValue(null),
+      registrarVivienda,
+    };
+    const r = await new CargarPadronDesdeArchivo(
+      { ...repo, enTransaccion: async (op) => op(repo) },
+      vocabulario('Casa', 'Manzana'),
+    ).ejecutar(ctx, [{ numeroDeFila: 2, vivienda: 'Casa 40', agrupacion: 'Manzana B' }]);
+    expect(r).toMatchObject({ aplicada: true, identificadoresRecortados: 1 });
+    expect(registrarVivienda.mock.calls[0]![0].identificador).toBe('40');
+    // La agrupación también: «Manzana B» es la palabra y el valor juntos.
+    expect(registrarVivienda.mock.calls[0]![0].agrupacion).toBe('B');
+  });
+
+  it('el 101 de la Torre 1 y el de la Torre 2 son DOS viviendas (H-2)', async () => {
+    const registrarVivienda = vi
+      .fn()
+      .mockResolvedValueOnce({ tipo: 'registrada', id: 'viv-a' })
+      .mockResolvedValueOnce({ tipo: 'registrada', id: 'viv-b' });
+    const buscar = vi.fn().mockResolvedValue(null);
+    const repo = {
+      ...repoFalso(),
+      buscarViviendaPorIdentificador: buscar,
+      registrarVivienda,
+    };
+    const r = await new CargarPadronDesdeArchivo(
+      { ...repo, enTransaccion: async (op) => op(repo) },
+      vocabulario('Apartamento', 'Torre'),
+    ).ejecutar(ctx, [
+      { numeroDeFila: 2, vivienda: '101', agrupacion: '1' },
+      { numeroDeFila: 3, vivienda: '101', agrupacion: '2' },
+    ]);
+    // Si la caché se guardara por número, la segunda fila reutilizaría la
+    // primera y el padrón se cargaría con la mitad de las viviendas.
+    expect(r).toMatchObject({ aplicada: true, viviendasCreadas: 2 });
+    expect(buscar).toHaveBeenCalledTimes(2);
+    expect(buscar.mock.calls[0]).toEqual(['cop-1', '1', '101']);
+    expect(buscar.mock.calls[1]).toEqual(['cop-1', '2', '101']);
   });
 
   it('resuelve la persona por documento, sin duplicarla entre filas (RN-06)', async () => {
@@ -155,10 +233,10 @@ describe('carga de padrón · la hoja se rellena con lo que el conjunto tiene es
       .mockResolvedValue({ tipo: 'registrada', id: 'per-1', nombreCompleto: 'Ana Pérez' });
     const registrarResidente = vi.fn().mockResolvedValue({ id: 'r1' });
     const repo = { ...repoFalso(), registrarPersona, registrarResidente };
-    const r = await new CargarPadronDesdeArchivo({
-      ...repo,
-      enTransaccion: async (op) => op(repo),
-    }).ejecutar(ctx, [
+    const r = await new CargarPadronDesdeArchivo(
+      { ...repo, enTransaccion: async (op) => op(repo) },
+      vocabulario(),
+    ).ejecutar(ctx, [
       { numeroDeFila: 2, vivienda: 'Casa 12', documento: '12.345.678', nombre: 'Ana Pérez' },
       // El mismo documento escrito de otra forma: es la MISMA persona.
       { numeroDeFila: 3, vivienda: 'Casa 13', documento: '12345678', nombre: 'Ana Pérez' },
@@ -170,7 +248,7 @@ describe('carga de padrón · la hoja se rellena con lo que el conjunto tiene es
   });
 
   it('un documento con nombre ausente se rechaza con el motivo, no con un 500', async () => {
-    const r = await new CargarPadronDesdeArchivo(repoFalso()).ejecutar(ctx, [
+    const r = await new CargarPadronDesdeArchivo(repoFalso(), vocabulario()).ejecutar(ctx, [
       { numeroDeFila: 2, vivienda: 'Casa 12', documento: '12345678' },
     ]);
     expect(r.aplicada).toBe(false);
@@ -178,7 +256,7 @@ describe('carga de padrón · la hoja se rellena con lo que el conjunto tiene es
   });
 
   it('un nombre sin documento tampoco pasa: sin documento no hay identidad', async () => {
-    const r = await new CargarPadronDesdeArchivo(repoFalso()).ejecutar(ctx, [
+    const r = await new CargarPadronDesdeArchivo(repoFalso(), vocabulario()).ejecutar(ctx, [
       { numeroDeFila: 2, vivienda: 'Casa 12', nombre: 'Ana Pérez' },
     ]);
     expect(r.errores[0]!.motivo).toMatch(/sin documento no hay identidad/);

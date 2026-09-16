@@ -77,6 +77,17 @@ export type TipoDeInforme = Informe['tipo'];
 export type EstadoDeRegistro = Vivienda['estado'];
 export type ResultadoDeCarga = Esquemas['ResultadoDeCargaDto'];
 
+/* Alta de viviendas por generación. El plan y su vista previa salen del
+ * contrato, no de una copia en la consola: el día que el dominio añada un campo
+ * al plan, el asistente deja de compilar hasta que alguien lo pinte. */
+export type PlanDeGeneracion = Esquemas['PlanDeGeneracionDto'];
+export type ExcepcionDeAgrupacion = Esquemas['ExcepcionDeAgrupacionDto'];
+export type VistaPreviaDeGeneracion = Esquemas['VistaPreviaDeGeneracionDto'];
+export type GrupoProyectado = Esquemas['GrupoProyectadoDto'];
+export type ViviendaProyectada = Esquemas['ViviendaProyectadaDto'];
+/** Los cuatro tipos de conjunto, tomados del contrato. */
+export type TipoDeCopropiedad = NonNullable<ConfiguracionDeCopropiedad['tipo']>;
+
 /**
  * Motivo de denegación, tomado del contrato y no de una lista paralela.
  *

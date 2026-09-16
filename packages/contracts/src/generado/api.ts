@@ -671,6 +671,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/padron/exportacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Padrón en CSV, con las mismas columnas que acepta la carga */
+        get: operations["PadronController_exportar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/padron/personas": {
         parameters: {
             query?: never;
@@ -753,6 +770,40 @@ export interface paths {
         put?: never;
         /** Alta de vivienda; el identificador único activo lo garantiza la base */
         post: operations["PadronController_registrarVivienda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/padron/viviendas/generacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Crea el padrón entero en una sentencia; el índice decide (ADR-04) */
+        post: operations["PadronController_generarViviendas"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/padron/viviendas/generacion/previsualizacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Qué se va a crear, antes de crearlo: extremos por grupo y total */
+        post: operations["PadronController_previsualizarGeneracion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1094,6 +1145,14 @@ export interface components {
         CambiosDeConfiguracionDto: {
             /** @example Urbanización Mira */
             nombre?: string;
+            /** @example Kilómetro 4 vía La Calera, Bogotá */
+            direccion?: string;
+            /** @enum {string} */
+            tipo?: "apartamentos" | "casas" | "fincas" | "otro";
+            /** @example Casa */
+            etiquetaVivienda?: string;
+            /** @example Manzana */
+            etiquetaAgrupacion?: string;
             /** @example America/Bogota */
             zonaHoraria?: string;
             /** @example 0.85 */
@@ -1150,6 +1209,26 @@ export interface components {
         ConfiguracionDeCopropiedadDto: {
             /** @example Urbanización Mira */
             nombre: string;
+            /**
+             * @description Dirección DEL CONJUNTO. La vivienda no tiene la suya: en Colombia la dirección es de la copropiedad y lo que cambia es la agrupación y el número.
+             * @example Kilómetro 4 vía La Calera, Bogotá
+             */
+            direccion: string | null;
+            /**
+             * @description null = SIN CONFIGURAR, y es lo que dispara el diálogo inicial de la consola. Decide el formulario de alta y las etiquetas sugeridas; ninguna vivienda lo guarda, así que cambiarlo no afecta a las ya creadas.
+             * @enum {string|null}
+             */
+            tipo: "apartamentos" | "casas" | "fincas" | "otro" | null;
+            /**
+             * @description Cómo se llama una vivienda aquí. Es una ETIQUETA: se pinta al mostrar y nunca entra en el identificador, por eso cambiarla no renombra ninguna fila.
+             * @example Casa
+             */
+            etiquetaVivienda: string;
+            /**
+             * @description Cómo se llama la agrupación aquí.
+             * @example Manzana
+             */
+            etiquetaAgrupacion: string;
             /** @example America/Bogota */
             zonaHoraria: string;
             /**
@@ -1199,6 +1278,21 @@ export interface components {
             normas?: string[];
             /** @description Cierre manual del operador, sin presencia física (PB-04) */
             abierta?: boolean;
+        };
+        ConfirmarGeneracionDto: {
+            /** @enum {string} */
+            tipo: "apartamentos" | "casas" | "fincas";
+            agrupaciones?: number;
+            /** @enum {string} */
+            estilo?: "letras" | "numeros";
+            pisos?: number;
+            porPiso?: number;
+            excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
+            secciones?: number;
+            total?: number;
+            reiniciarNumeracion?: boolean;
+            cantidad?: number;
+            totalEsperado: number;
         };
         ConteoDto: {
             conteo: number;
@@ -1428,6 +1522,11 @@ export interface components {
             /** @description Resuelto localmente por el Edge con caché de reglas (RN-16, CA-21, KPI-31) */
             decididoPorEdge: boolean;
         };
+        ExcepcionDeAgrupacionDto: {
+            agrupacion: string;
+            pisos: number;
+            porPiso: number;
+        };
         FilaDeInformeDto: {
             /** Format: date-time */
             momento: string;
@@ -1455,6 +1554,16 @@ export interface components {
             minutoFin: number;
             /** @description La franja viene del día anterior: una zona abierta de 22:00 a 02:00 son DOS franjas encadenadas, no una que reinicia a medianoche. El contador de aforo no se reinicia con el cambio de día (CU-05). */
             continuaDelDiaAnterior: boolean;
+        };
+        GeneracionAplicadaDto: {
+            creadas: number;
+        };
+        GrupoProyectadoDto: {
+            agrupacion: string | null;
+            cantidad: number;
+            primeras: string[];
+            ultimas: string[];
+            porExcepcion: boolean;
         };
         HistorialDeOrdenesDto: {
             ordenes: components["schemas"]["OrdenEjecutadaDto"][];
@@ -1636,6 +1745,20 @@ export interface components {
             nombreCompleto: string;
             yaExistia: boolean;
         };
+        PlanDeGeneracionDto: {
+            /** @enum {string} */
+            tipo: "apartamentos" | "casas" | "fincas";
+            agrupaciones?: number;
+            /** @enum {string} */
+            estilo?: "letras" | "numeros";
+            pisos?: number;
+            porPiso?: number;
+            excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
+            secciones?: number;
+            total?: number;
+            reiniciarNumeracion?: boolean;
+            cantidad?: number;
+        };
         PuntoDeFrecuenciaDto: {
             /** @description Lunes de la semana ISO, YYYY-MM-DD */
             semana: string;
@@ -1701,10 +1824,10 @@ export interface components {
             tipo?: "automovil" | "motocicleta" | "bicicleta" | "otro";
         };
         RegistrarViviendaDto: {
-            /** @example Casa 12 */
+            /** @example 42 */
             identificador: string;
-            manzana?: string;
-            direccion?: string;
+            /** @example B */
+            agrupacion?: string;
         };
         ReservaDelDiaDto: {
             /** Format: uuid */
@@ -1740,6 +1863,8 @@ export interface components {
             viviendasCreadas: number;
             /** @description Personas nuevas. Las que ya tenían ese documento se reutilizan (RN-06). */
             personasCreadas: number;
+            /** @description Identificadores que traían la palabra dentro («Casa 42») y se guardaron sin ella. Se recorta y se cuenta: contarlo es lo que impide que el recorte sea silencioso. */
+            identificadoresRecortados: number;
         };
         ResultadoDeOperacionDto: {
             encolada: boolean;
@@ -1834,12 +1959,17 @@ export interface components {
             conteo: number | null;
             motivo: string | null;
         };
+        VistaPreviaDeGeneracionDto: {
+            total: number;
+            grupos: components["schemas"]["GrupoProyectadoDto"][];
+            /** @description Las que ya existen activas. Con una sola, la confirmacion se niega entera: la generacion solo inserta y nunca sustituye nada. */
+            colisiones: components["schemas"]["ViviendaProyectadaDto"][];
+        };
         ViviendaDto: {
             /** Format: uuid */
             id: string;
             identificador: string;
-            manzana: string | null;
-            direccion: string | null;
+            agrupacion: string | null;
             /** @enum {string} */
             estado: "activo" | "inactivo";
             estadoAdministrativo: string;
@@ -1849,6 +1979,10 @@ export interface components {
             autorizacionesVigentes: number;
             desactivadaEn: string | null;
             motivoDesactivacion: string | null;
+        };
+        ViviendaProyectadaDto: {
+            agrupacion: string | null;
+            identificador: string;
         };
         ZonaDto: {
             /** Format: uuid */
@@ -3152,6 +3286,27 @@ export interface operations {
             };
         };
     };
+    PadronController_exportar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+        };
+    };
     PadronDeCopropiedadController_personas: {
         parameters: {
             query: {
@@ -3343,6 +3498,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdCreadoDto"];
+                };
+            };
+        };
+    };
+    PadronController_generarViviendas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmarGeneracionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeneracionAplicadaDto"];
+                };
+            };
+        };
+    };
+    PadronController_previsualizarGeneracion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanDeGeneracionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VistaPreviaDeGeneracionDto"];
                 };
             };
         };

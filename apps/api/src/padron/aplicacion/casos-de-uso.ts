@@ -1,6 +1,6 @@
 import { Documento, NombreDePersona, Placa } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
-import { errorDominio, exito, fallo } from '@ncr/domain-core';
+import { errorDominio, exito, fallo, recortarEtiqueta } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type {
   FiltroDeViviendas,
@@ -11,6 +11,8 @@ import type {
   VehiculoEnLista,
   ViviendaEnLista,
 } from './puertos';
+import type { LectorDeVocabulario } from './vocabulario';
+import { VOCABULARIO_SIN_CONFIGURAR } from './vocabulario';
 
 /**
  * Casos de uso del padrón. Orquestan: validan forma con el VO, delegan la
@@ -138,12 +140,14 @@ const sinCopropiedad = (): ErrorDominio =>
 
 export interface EntradaRegistrarVivienda {
   readonly identificador: string;
-  readonly manzana?: string | null;
-  readonly direccion?: string | null;
+  readonly agrupacion?: string | null;
 }
 
 export class RegistrarVivienda {
-  constructor(private readonly repo: RepositorioPadron) {}
+  constructor(
+    private readonly repo: RepositorioPadron,
+    private readonly vocabulario: LectorDeVocabulario,
+  ) {}
 
   async ejecutar(
     ctx: ContextoTenant,
@@ -154,21 +158,53 @@ export class RegistrarVivienda {
     if (identificador.length === 0) {
       return fallo(errorDominio('DATO_INVALIDO', 'El identificador no puede ir vacío', 'RN-13'));
     }
+
+    const vocabulario =
+      (await this.vocabulario.leer(ctx, ctx.copropiedadId)) ?? VOCABULARIO_SIN_CONFIGURAR;
+
+    /**
+     * **Control de H-3: la palabra no entra en el dato.**
+     *
+     * Aquí se RECHAZA, y en la importación se recorta. No es incoherencia: allí
+     * el archivo es el que el administrador ya tenía y rechazarlo entero
+     * convertiría la vía rápida en la lenta; aquí hay una persona escribiendo y
+     * decírselo una vez evita que lo repita trescientas.
+     *
+     * Sin este control, el primero que teclee «Casa 42» reintroduce el problema
+     * que todo el rediseño elimina: el día que el conjunto cambie «Casa» por
+     * «Apartamento», esa vivienda se queda mintiendo.
+     */
+    const sinPalabra = recortarEtiqueta(identificador, vocabulario.etiquetaVivienda);
+    if (sinPalabra !== null) {
+      return fallo(
+        errorDominio(
+          'DATO_INVALIDO',
+          `Escriba solo el número: la palabra «${vocabulario.etiquetaVivienda}» la pone el ` +
+            `sistema. Para esta vivienda, «${sinPalabra}»`,
+          'HU-01',
+        ),
+      );
+    }
+
+    const agrupacion = entrada.agrupacion?.trim();
     const r = await this.repo.registrarVivienda({
       copropiedadId: ctx.copropiedadId,
       identificador,
-      manzana: entrada.manzana ?? null,
-      direccion: entrada.direccion ?? null,
+      agrupacion: agrupacion === undefined || agrupacion === '' ? null : agrupacion,
       actorId: ctx.usuarioId,
     });
     // Igual que la placa: quien decide es el índice único parcial de la base,
-    // no un `SELECT` previo de este código (ADR-04).
+    // no un `SELECT` previo de este código (ADR-04). Desde la 0029 la clave es
+    // el PAR (agrupación, identificador).
     return r.tipo === 'registrada'
       ? exito({ id: r.id })
       : fallo(
           errorDominio(
             'CONFLICTO_DE_CONCURRENCIA',
-            `Ya hay una vivienda activa con el identificador ${identificador}`,
+            `Ya hay una vivienda activa con el identificador ${identificador}` +
+              (agrupacion === undefined || agrupacion === ''
+                ? ''
+                : ` en ${vocabulario.etiquetaAgrupacion} ${agrupacion}`),
             'RN-13',
           ),
         );
