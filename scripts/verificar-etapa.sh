@@ -217,6 +217,16 @@ else
   mal "color fuera del sistema de temas: no tiene pareja que medir en oscuro"
   echo "$salida_tema" | head -8 | sed 's/^/     /'
 fi
+# ETAPA 04 (alta de viviendas) · el tipo de copropiedad y sus dos etiquetas NO
+# entran en el dominio. De eso depende que «el tipo se puede cambiar después»
+# siga siendo cierto: el día que una politica ramifique por el, cambiarlo
+# dejaria de ser inocuo y nadie se enteraria hasta produccion.
+if salida_vocab=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-vocabulario.mjs 2>&1); then
+  ok "${salida_vocab#OK }"
+else
+  mal "el vocabulario de la copropiedad entro en el dominio"
+  echo "$salida_vocab" | head -8 | sed 's/^/     /'
+fi
 # ADR-005 · una clave ajena hacia una tabla append-only NO se puede insertar
 # jamás: la comprobación exige un bloqueo de fila que la revocación impide. El
 # defecto vivió cinco etapas porque las tablas estaban vacías (ETAPA 06).

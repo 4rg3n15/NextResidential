@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { empiezaPorEtiqueta, nombreDeVivienda, recortarEtiqueta } from './etiquetas';
+import { empiezaPorEtiqueta, recortarEtiqueta } from './etiquetas';
 
 describe('la palabra se detecta escrita como sea', () => {
   it('con espacio, con guion y sin tildes', () => {
@@ -27,18 +27,5 @@ describe('la palabra se detecta escrita como sea', () => {
 
   it('una etiqueta vacía no recorta nada: si no, se comería el identificador', () => {
     expect(recortarEtiqueta('42', '')).toBeNull();
-  });
-});
-
-describe('el nombre visible se COMPONE, nunca se guarda', () => {
-  it('con agrupación y sin ella', () => {
-    expect(nombreDeVivienda('Casa', '42', 'Manzana', 'B')).toBe('Casa 42 · Manzana B');
-    expect(nombreDeVivienda('Finca', '7')).toBe('Finca 7');
-    expect(nombreDeVivienda('Casa', '42', 'Manzana', null)).toBe('Casa 42');
-    expect(nombreDeVivienda('Casa', '42', 'Manzana', '   ')).toBe('Casa 42');
-  });
-
-  it('cambiar la etiqueta cambia el nombre sin tocar el identificador', () => {
-    expect(nombreDeVivienda('Apartamento', '101', 'Torre', '1')).toBe('Apartamento 101 · Torre 1');
   });
 });

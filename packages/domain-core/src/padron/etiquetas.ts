@@ -21,9 +21,25 @@
  *    más rápida de cargar el padrón en la más lenta.
  */
 
-/** Sin tildes y en minúsculas, para comparar «Sección» con «seccion». */
+/**
+ * Sin tildes y en minúsculas, para comparar «Sección» con «seccion».
+ *
+ * Los diacríticos se descartan **por punto de código** y no con un rango de
+ * escape dentro de una expresión regular. Es la misma convención que sigue
+ * `eventos/presentacion/formatos.ts` con los caracteres de control, y por el
+ * mismo motivo: un rango escrito como escape acaba guardado como los
+ * caracteres literales que representa —el formateador los normaliza— y
+ * entonces el fichero depende de que nadie lo abra con la codificación
+ * equivocada.
+ */
+const ES_DIACRITICO = (punto: number): boolean => punto >= 0x300 && punto <= 0x36f;
+
 const plano = (texto: string): string =>
-  texto.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  [...texto.normalize('NFD')]
+    .filter((c) => !ES_DIACRITICO(c.codePointAt(0) ?? 0))
+    .join('')
+    .trim()
+    .toLowerCase();
 
 /** Separadores admitidos entre la palabra y el número: espacio, guion, punto. */
 const SEPARADOR = /^[\s.\-_]+/;
@@ -58,17 +74,16 @@ export const empiezaPorEtiqueta = (identificador: string, etiqueta: string): boo
   recortarEtiqueta(identificador, etiqueta) !== null;
 
 /**
- * Cómo se llama una vivienda en pantalla: «Casa 42 · Manzana B».
+ * **Lo que NO vive aquí: componer «Casa 42 · Manzana B».**
  *
- * Se compone al mostrar, siempre. Ninguna de las dos palabras se persiste.
+ * Se escribió en este fichero y el control `frontera-vocabulario.mjs` lo
+ * rechazó, con razón. Componer el nombre visible es presentación: no decide
+ * nada, no se persiste y no lo consulta ninguna regla. Traerlo al dominio
+ * —compartido con el Edge— habría metido aquí las dos etiquetas de la
+ * copropiedad, y con ellas la duda de si alguna decisión depende de una
+ * palabra configurable.
+ *
+ * Vive en la consola (`apps/web/src/lib/vocabulario.ts`), que es quien pinta.
+ * Lo que sí es del dominio es lo de arriba: que la palabra **no entre** en el
+ * identificador es un invariante, y ese se comprueba aquí.
  */
-export const nombreDeVivienda = (
-  etiquetaVivienda: string,
-  identificador: string,
-  etiquetaAgrupacion?: string,
-  agrupacion?: string | null,
-): string => {
-  const vivienda = `${etiquetaVivienda.trim()} ${identificador.trim()}`.trim();
-  if (agrupacion === undefined || agrupacion === null || agrupacion.trim() === '') return vivienda;
-  return `${vivienda} · ${(etiquetaAgrupacion ?? '').trim()} ${agrupacion.trim()}`.trim();
-};

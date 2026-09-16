@@ -18,6 +18,7 @@ import type {
   Vehiculo,
   Zona,
   ColaDeAtencion,
+  ConfiguracionDeCopropiedad,
   OrdenEjecutada,
 } from '@ncr/contracts';
 import { cliente, desenvolver } from './cliente';
@@ -124,7 +125,35 @@ export const clavesDe09B = {
   alertas: (c: string) => ['alertas', c] as const,
   informe: (c: string, tipo: string, desde: string, hasta: string) =>
     ['informes', c, tipo, desde, hasta] as const,
+  configuracion: (c: string) => ['configuracion', c] as const,
 };
+
+/**
+ * Configuración de la copropiedad. La consultan las pantallas que necesitan el
+ * VOCABULARIO —cómo se llama aquí una vivienda— además de la de Configuración.
+ *
+ * La misma clave que usa el formulario de configuración, a propósito: al
+ * guardar allí, el directorio repinta sus etiquetas sin recargar la página.
+ *
+ * `reintentar: false` porque la ruta es exclusiva de los dos roles
+ * administrativos y a los demás les responde 404. Insistir tres veces en un
+ * 404 legítimo es ruido, y quien la consulta ya sabe funcionar sin ella.
+ */
+export const useConfiguracion = (
+  copropiedadId: string,
+  habilitada = true,
+): UseQueryResult<ConfiguracionDeCopropiedad> =>
+  useQuery({
+    enabled: habilitada && copropiedadId !== '',
+    retry: false,
+    queryKey: clavesDe09B.configuracion(copropiedadId),
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/configuracion', {
+          params: { path: { id: copropiedadId } },
+        }),
+      ),
+  });
 
 export const useViviendas = (
   copropiedadId: string,

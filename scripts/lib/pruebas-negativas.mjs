@@ -265,6 +265,42 @@ try {
       : mal('la sonda dejó rastro en el banco');
   }
 
+  console.log('\n▸ 4b-ter · el tipo de copropiedad entrando en el dominio se detecta');
+  {
+    /**
+     * Este control sostiene una RESPUESTA, no una convención: «el tipo de
+     * copropiedad se puede cambiar después y las viviendas ya creadas no se
+     * enteran» es cierto solo mientras nada del dominio ramifique por él. Sin
+     * el control, la afirmación envejece en silencio y se descubre el día que
+     * un conjunto cambie el tipo en producción.
+     */
+    const sonda = join(clon, 'packages', 'domain-core', 'src', 'reglas', 'sonda-vocabulario.ts');
+    const base = enClon('node', ['scripts/lib/frontera-vocabulario.mjs']).salida;
+
+    for (const [linea, etiqueta] of [
+      ['export type T = TipoDeCopropiedad;', 'el tipo de copropiedad'],
+      ['export const e = (c: { etiquetaVivienda: string }) => c.etiquetaVivienda;', 'la etiqueta'],
+    ]) {
+      writeFileSync(sonda, `${linea}\n`);
+      const r = enClon('node', ['scripts/lib/frontera-vocabulario.mjs']);
+      r.codigo !== 0 && /sonda-vocabulario/.test(r.salida)
+        ? ok(`detectado: ${etiqueta}`)
+        : mal(`${etiqueta} NO detectado (codigo ${r.codigo})`);
+    }
+
+    // Y el comentario que EXPLICA por qué no está no puede dar rojo: si lo
+    // diera, el control obligaría a no documentarse a sí mismo.
+    writeFileSync(sonda, '// aquí no vive el TipoDeCopropiedad, y por eso se explica\n');
+    enClon('node', ['scripts/lib/frontera-vocabulario.mjs']).codigo === 0
+      ? ok('un comentario que lo nombra NO da falso positivo')
+      : mal('el control rechaza un comentario explicativo');
+
+    rmSync(sonda, { force: true });
+    enClon('node', ['scripts/lib/frontera-vocabulario.mjs']).salida === base
+      ? ok('el banco de pruebas vuelve a su línea base')
+      : mal('la sonda dejó rastro en el banco');
+  }
+
   console.log('\n▸ 4c · volver a `tsc -p` deja que un `dist/` VIEJO compile una app (D-65)');
   {
     /**

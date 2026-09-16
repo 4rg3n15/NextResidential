@@ -100,11 +100,29 @@ const PERSONA = {
   viviendaIdentificador: null,
 };
 
+/** Vocabulario del conjunto: sin él el directorio no ofrece generar padrón. */
+const CONFIGURACION = {
+  nombre: 'Urbanización Mira',
+  direccion: 'Kilómetro 4 vía La Calera',
+  tipo: 'casas',
+  etiquetaVivienda: 'Casa',
+  etiquetaAgrupacion: 'Manzana',
+  zonaHoraria: 'America/Bogota',
+  umbralConfianzaPlaca: 0.85,
+  politicaContingenciaEdge: 'denegar',
+  umbralLatidoMinutos: 5,
+  nit: '900123456',
+  estado: 'activa',
+  plazoConsentimientoHoras: 24,
+  margenCacheReglasHoras: 24,
+  versionReglasActual: 1,
+  editables: ['nombre'],
+};
+
 const VIVIENDA = {
   id: '30000000-0000-4000-8000-0000000000bb',
-  identificador: 'Casa 12',
-  manzana: 'B',
-  direccion: null,
+  identificador: '12',
+  agrupacion: 'B',
   estado: 'activo',
   estadoAdministrativo: 'al_dia',
   residentes: 1,
@@ -117,6 +135,10 @@ const VIVIENDA = {
 const servidorFalso = (): ReturnType<typeof vi.fn> =>
   vi.fn(async (entrada: string | Request) => {
     const url = typeof entrada === 'string' ? entrada : entrada.url;
+    if (url.includes('/configuracion')) return respuesta(CONFIGURACION);
+    if (url.includes('/padron/viviendas/generacion/previsualizacion')) {
+      return respuesta({ total: 30, grupos: [], colisiones: [] });
+    }
     if (url.includes('/padron/personas')) return respuesta([PERSONA]);
     if (url.includes('/padron/viviendas')) {
       return respuesta({ totales: { activas: 1, inactivas: 0 }, viviendas: [VIVIENDA] });
@@ -225,6 +247,15 @@ const PANTALLAS = [
     nombre: 'viviendas',
     elemento: <DirectorioDeViviendas copropiedadId={COP} />,
     boton: /Nueva vivienda/,
+  },
+  {
+    // El asistente de generación entra en el barrido como una pantalla más: es
+    // un formulario que escribe, y la regla de D-72 se le aplica igual. Aquí
+    // además cubre lo contrario de lo habitual —no pide NINGÚN identificador,
+    // solo cuántas y de qué medidas—, que es justo lo que había que conseguir.
+    nombre: 'generación de padrón',
+    elemento: <DirectorioDeViviendas copropiedadId={COP} />,
+    boton: /Generar padrón/,
   },
   {
     nombre: 'vehículos',
@@ -341,6 +372,10 @@ describe('las restricciones del dominio se señalan antes de enviarlas (D-73)', 
  * clasificado — con formulario que este barrido recorre, o exento con motivo.
  */
 const SIN_FORMULARIO: Readonly<Record<string, string>> = {
+  'componentes/buscador-personas.tsx':
+    'es el buscador que RESUELVE la identidad por nombre o documento; su propio barrido está en buscador-personas.test.tsx',
+  'componentes/configuracion-inicial.tsx':
+    'pide dirección, tipo y las dos etiquetas de la copropiedad: ni un campo de identidad, y ninguna propiedad UUID en el cuerpo del PATCH',
   'porteria/pantalla.tsx':
     'la apertura manual actúa sobre el evento que ya está en pantalla; solo se teclea el motivo (RN-08)',
   'guardia/pantalla.tsx':
@@ -352,24 +387,40 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
     'campos numéricos con min/max declarados que el navegador impide enviar fuera de rango, y 422 por campo',
 };
 
-const ficherosQueEscriben = (directorio: string): readonly string[] =>
+/**
+ * Se recorren las pantallas **y los componentes compartidos**, no solo las
+ * primeras. El hueco se vio al construir el alta de viviendas: el diálogo de
+ * configuración inicial escribe y vive en `componentes/`, así que el barrido
+ * anterior no lo habría visto nunca. Un control que solo mira medio árbol
+ * declara una cobertura que no tiene.
+ */
+const RAICES: readonly (readonly [string, string])[] = [
+  [CONSOLA, ''],
+  [resolve(process.cwd(), 'src/componentes'), 'componentes/'],
+];
+
+const ficherosQueEscriben = (directorio: string, raiz: string, prefijo: string): string[] =>
   readdirSync(directorio).flatMap((entrada) => {
     const ruta = join(directorio, entrada);
-    if (statSync(ruta).isDirectory()) return ficherosQueEscriben(ruta);
+    if (statSync(ruta).isDirectory()) return ficherosQueEscriben(ruta, raiz, prefijo);
     if (!ruta.endsWith('.tsx') || ruta.endsWith('.test.tsx')) return [];
     return /cliente\.(POST|PATCH|PUT|DELETE)\(/.test(readFileSync(ruta, 'utf8'))
-      ? [relative(CONSOLA, ruta)]
+      ? [`${prefijo}${relative(raiz, ruta)}`]
       : [];
   });
+
+const todasLasEscrituras = (): readonly string[] =>
+  RAICES.flatMap(([raiz, prefijo]) => ficherosQueEscriben(raiz, raiz, prefijo));
 
 describe('cobertura del barrido', () => {
   it('todas las escrituras de la consola están clasificadas', () => {
     const conFormulario = new Set([
       'viviendas/directorio.tsx',
+      'viviendas/asistente-de-generacion.tsx',
       'vehiculos/pantalla.tsx',
       'visitantes/pantalla.tsx',
     ]);
-    const sinClasificar = ficherosQueEscriben(CONSOLA).filter(
+    const sinClasificar = todasLasEscrituras().filter(
       (f) => !conFormulario.has(f) && SIN_FORMULARIO[f] === undefined,
     );
     expect(
