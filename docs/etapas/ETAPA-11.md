@@ -203,7 +203,8 @@ desactivado se muestra marcado) · §2.7.1 (ningún secreto en el binario) · §
 VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
 ```
 
-**24 de 24 pasos ejecutados**, ninguno omitido, con `DATABASE_URL_PRUEBAS`
+**25 de 25 pasos ejecutados** —tras la ronda de entorno del 2026-09-18, que
+añadió el paso 1c y amplió el 1—, ninguno omitido, con `DATABASE_URL_PRUEBAS`
 apuntando a una PostgreSQL 16 local.
 
 | Medida                        | Resultado                                                                        |
@@ -217,11 +218,16 @@ apuntando a una PostgreSQL 16 local.
 | Recorrido en navegador        | 13 comprobaciones, **ni un error de JavaScript**                                 |
 | Con base de datos             | KPI-03 (100 inserciones, 0 duplicados) · RN-03/CA-23 · RN-14/CA-14 · D-71 · D-72 |
 
-**La primera ejecución salió FALLIDA y sus hallazgos eran reales**, los cinco de
-§8. El último fue el más pequeño y el más elocuente: el control de frontera
-cazó el nombre del fabricante en un **comentario** de un guion nuevo. Tiene
-razón — KPI-11 existe para que el protocolo viva en un solo sitio, y un
-comentario es por donde empieza la filtración.
+**La primera ejecución salió FALLIDA y sus hallazgos eran reales**, los de §8.
+Uno fue el más pequeño y el más elocuente: el control de frontera cazó el
+nombre del fabricante en un **comentario** de un guion nuevo. Tiene razón —
+KPI-11 existe para que el protocolo viva en un solo sitio, y un comentario es
+por donde empieza la filtración.
+
+Y una corrida posterior falló por algo que **no** era del repositorio: la
+PostgreSQL local de este contenedor murió a mitad, y con ella se cayeron cuatro
+pasos con mensajes que hablaban de otra cosa. De ahí la sonda de base del paso
+1c: la causa se nombra al principio, no cuarenta minutos después.
 
 ---
 
