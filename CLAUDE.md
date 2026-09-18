@@ -66,6 +66,7 @@ Aplican a cada línea de código. No se repiten por etapa: se dan por incluidas 
 4. Decisión de negocio no resuelta → `PENDIENTE DE DEFINICIÓN`, comportamiento conservador (**denegar por defecto**), reporte en el informe. Nunca la inventes en silencio.
 5. Suposición tuya → marcada `[SUPUESTO]` en código y en informe.
 6. Conflicto entre fuentes → `[CONTRADICCIÓN]` con la resolución aplicada según §3.
+7. **Canario de contexto (usuario, 2026-09-18) — regla permanente.** Toda respuesta al usuario en el chat empieza literalmente por «Argenis, ». No es cortesía: es la señal de que este contrato sigue cargado. Si una respuesta no lo lleva, el contexto se perdió y el usuario debe recargarlo antes de que el agente siga trabajando. Aplica a todo: informes de cierre, respuestas cortas, preguntas y avisos de error.
 
 ### 2.2 Arquitectura obligatoria
 
@@ -179,6 +180,8 @@ La ETAPA 13 **audita** esto; no lo introduce. Construir sin estas medidas y "ase
 8. **Transversales.** HTTPS obligatorio. MFA TOTP para roles administrativos (RN-20). RBAC por _guard_ declarativo, nunca `if (rol === 'admin')` disperso. Contraseñas y tokens jamás en logs. Evidencia en buckets privados con URLs firmadas de vida corta (RN-21). Tamaño máximo de payload. Carga de archivos validada por **tipo real**, no por extensión. Auditoría append-only garantizada por permisos de base de datos, no solo por código.
 
 ### 2.8 Informe de cierre de etapa
+
+> **Canario obligatorio (regla permanente, §2.1.7).** Todo informe y toda respuesta al usuario en el chat empieza literalmente por «Argenis, ». Si falta, el contrato de contexto se perdió: hay que recargarlo antes de continuar.
 
 #### 2.8.0 Verificación previa — obligatoria, por ejecución real
 
