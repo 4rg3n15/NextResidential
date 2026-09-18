@@ -73,16 +73,21 @@ export const BuscadorGlobal = ({
       .filter(
         (v) =>
           normalizar(v.identificador).includes(aguja) ||
-          normalizar(v.manzana ?? '').includes(aguja) ||
-          normalizar(v.direccion ?? '').includes(aguja),
+          normalizar(v.agrupacion ?? '').includes(aguja) ||
+          // «torre b 101» encuentra la vivienda aunque el usuario escriba las
+          // dos partes seguidas, que es como se dicen en voz alta.
+          normalizar(`${v.agrupacion ?? ''} ${v.identificador}`).includes(aguja),
       )
       .slice(0, MAXIMO_POR_GRUPO)
       .map((v) => ({
         clave: `vivienda-${v.id}`,
+        // Sin la palabra de la copropiedad, a propósito: este buscador vive en
+        // la cabecera de TODAS las pantallas y el portero no puede leer la
+        // configuración —la API le responde 404—. Escribir «Vivienda 42» con la
+        // palabra de reserva sería peor que escribir «42»: diría algo que el
+        // conjunto no dice.
         titulo: v.identificador,
-        contexto:
-          [v.manzana, v.direccion].filter(Boolean).join(' · ') ||
-          `${v.residentes} residentes · ${v.vehiculos} vehículos`,
+        contexto: (v.agrupacion ?? '') || `${v.residentes} residentes · ${v.vehiculos} vehículos`,
         grupo: 'Viviendas' as const,
         destino: `/viviendas?busqueda=${encodeURIComponent(v.identificador)}`,
       }));

@@ -1,13 +1,17 @@
-import { Body, Controller, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Header, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { ErrorDominio, Resultado } from '@ncr/domain-core';
+import type { ErrorDominio, PlanDeGeneracion, Resultado } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { REPOSITORIO_PADRON } from '../aplicacion/puertos';
 import type { RepositorioPadron } from '../aplicacion/puertos';
+import { LECTOR_DE_VOCABULARIO } from '../aplicacion/vocabulario';
+import type { LectorDeVocabulario } from '../aplicacion/vocabulario';
+import { GenerarViviendas } from '../aplicacion/generar-viviendas';
+import { ExportarPadron } from '../aplicacion/exportar-padron';
 import {
   DesactivarVehiculo,
   DesactivarVivienda,
@@ -22,13 +26,59 @@ import { ArchivoInvalido, filasDesdeXlsx } from '../infraestructura/xlsx';
 import {
   CargarPadronDto,
   CargarPadronXlsxDto,
+  ConfirmarGeneracionDto,
   DesactivarDto,
+  PlanDeGeneracionDto,
   RegistrarPersonaDto,
   RegistrarResidenteDto,
   RegistrarVehiculoDto,
   RegistrarViviendaDto,
 } from './dtos';
-import { BajaDto, IdCreadoDto, PersonaResueltaDto, ResultadoDeCargaDto } from './respuestas';
+import {
+  BajaDto,
+  GeneracionAplicadaDto,
+  IdCreadoDto,
+  PersonaResueltaDto,
+  ResultadoDeCargaDto,
+  VistaPreviaDeGeneracionDto,
+} from './respuestas';
+
+/**
+ * Del DTO plano al plan del dominio.
+ *
+ * El DTO es plano porque `ValidationPipe` valida formas planas; el dominio es
+ * una unión discriminada porque un plan de apartamentos y uno de fincas no
+ * tienen los mismos campos. La traducción es aquí, en presentación, y es el
+ * único sitio donde los dos se tocan. **No decide nada**: los valores que
+ * faltan van como `0` o `''` y `generarPlan` los rechaza con su mensaje, que es
+ * el que el usuario debe leer (§2.7.3: el DTO valida forma, el dominio valida
+ * verdad).
+ */
+const planDesdeDto = (dto: PlanDeGeneracionDto): PlanDeGeneracion => {
+  if (dto.tipo === 'apartamentos') {
+    return {
+      tipo: 'apartamentos',
+      agrupaciones: dto.agrupaciones ?? 0,
+      estilo: dto.estilo ?? 'numeros',
+      pisos: dto.pisos ?? 0,
+      porPiso: dto.porPiso ?? 0,
+      excepciones: (dto.excepciones ?? []).map((e) => ({
+        agrupacion: e.agrupacion,
+        pisos: e.pisos,
+        porPiso: e.porPiso,
+      })),
+    };
+  }
+  if (dto.tipo === 'casas') {
+    return {
+      tipo: 'casas',
+      secciones: dto.secciones ?? 0,
+      total: dto.total ?? 0,
+      reiniciarNumeracion: dto.reiniciarNumeracion ?? false,
+    };
+  }
+  return { tipo: 'fincas', cantidad: dto.cantidad ?? 0 };
+};
 
 /**
  * Traduce protocolo a casos de uso. **Cero reglas de negocio** (§2.2): lo único
@@ -55,6 +105,7 @@ export class PadronController {
   constructor(
     @Inject(REPOSITORIO_PADRON) private readonly repo: RepositorioPadron,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    @Inject(LECTOR_DE_VOCABULARIO) private readonly vocabulario: LectorDeVocabulario,
   ) {}
 
   private desenvolver<T>(r: Resultado<T, ErrorDominio>): T {
@@ -164,13 +215,17 @@ export class PadronController {
     ctx: ContextoTenant,
     filas: readonly FilaPadron[],
   ): Promise<ResultadoDeCargaDto> {
-    const resultado = await new CargarPadronDesdeArchivo(this.repo).ejecutar(ctx, filas);
+    const resultado = await new CargarPadronDesdeArchivo(this.repo, this.vocabulario).ejecutar(
+      ctx,
+      filas,
+    );
     return {
       aceptadas: resultado.aceptadas,
       errores: resultado.errores.map((e) => ({ fila: e.numeroDeFila, motivo: e.motivo })),
       aplicada: resultado.aplicada,
       viviendasCreadas: resultado.viviendasCreadas,
       personasCreadas: resultado.personasCreadas,
+      identificadoresRecortados: resultado.identificadoresRecortados,
       // Cuántas filas se leyeron de verdad. Sin este número, «0 aceptadas y 0
       // errores» no distingue «el archivo estaba vacío» de «no se entendió la
       // cabecera», y son dos problemas con soluciones distintas.
@@ -188,7 +243,102 @@ export class PadronController {
     @Body() dto: RegistrarViviendaDto,
   ): Promise<IdCreadoDto> {
     const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/viviendas');
-    return this.desenvolver(await new RegistrarVivienda(this.repo).ejecutar(destino, dto));
+    return this.desenvolver(
+      await new RegistrarVivienda(this.repo, this.vocabulario).ejecutar(destino, dto),
+    );
+  }
+
+  /**
+   * **Vista previa de la generación.** Es `POST` y no `GET` porque el plan es un
+   * cuerpo con excepciones anidadas, no una cadena de consulta — y porque un
+   * `GET` con ese cuerpo acabaría cacheado en algún proxy.
+   *
+   * No escribe nada. Lee para informar de las colisiones, y esa lectura puede
+   * quedarse obsoleta antes de que el usuario confirme: la garantía es el
+   * índice (ADR-04), no esta consulta.
+   */
+  @Post('viviendas/generacion/previsualizacion')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Qué se va a crear, antes de crearlo: extremos por grupo y total' })
+  @ApiOkResponse({ type: VistaPreviaDeGeneracionDto })
+  async previsualizarGeneracion(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Body() dto: PlanDeGeneracionDto,
+  ): Promise<VistaPreviaDeGeneracionDto> {
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'padron/viviendas/generacion',
+    );
+    const vista = this.desenvolver(
+      await new GenerarViviendas(this.repo).previsualizar(destino, planDesdeDto(dto)),
+    );
+    return {
+      total: vista.total,
+      grupos: vista.grupos.map((g) => ({
+        agrupacion: g.agrupacion,
+        cantidad: g.cantidad,
+        primeras: [...g.primeras],
+        ultimas: [...g.ultimas],
+        porExcepcion: g.porExcepcion,
+      })),
+      colisiones: vista.colisiones.map((c) => ({
+        agrupacion: c.agrupacion,
+        identificador: c.identificador,
+      })),
+    };
+  }
+
+  /**
+   * **La generación. Solo inserta.**
+   *
+   * No hay `UPDATE` ni `DELETE` en esta ruta, así que «regenerar sobre un padrón
+   * con residentes» no existe como operación: si una sola de las viviendas del
+   * plan ya está activa, no se crea ninguna y se nombran todas las que chocaron.
+   * Volver a lanzar el mismo plan es un rechazo con la lista, no un duplicado —
+   * por eso tampoco hace falta clave de idempotencia.
+   */
+  @Post('viviendas/generacion')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Crea el padrón entero en una sentencia; el índice decide (ADR-04)' })
+  @ApiOkResponse({ type: GeneracionAplicadaDto })
+  async generarViviendas(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Body() dto: ConfirmarGeneracionDto,
+  ): Promise<GeneracionAplicadaDto> {
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'padron/viviendas/generacion',
+    );
+    return this.desenvolver(
+      await new GenerarViviendas(this.repo).confirmar(
+        destino,
+        planDesdeDto(dto),
+        dto.totalEsperado,
+      ),
+    );
+  }
+
+  /**
+   * El padrón en las columnas del archivo del administrador, para corregirlo en
+   * Excel y volver a cargarlo. El círculo tiene que cerrar sin editar nada.
+   */
+  @Get('exportacion')
+  @Roles('administrador', 'superadministrador')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="padron.csv"')
+  @ApiOperation({ summary: 'Padrón en CSV, con las mismas columnas que acepta la carga' })
+  @ApiOkResponse({ type: String })
+  async exportar(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+  ): Promise<string> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/exportacion');
+    const exportado = await new ExportarPadron(this.repo).ejecutar(destino);
+    return exportado.csv;
   }
 
   @Post('personas')

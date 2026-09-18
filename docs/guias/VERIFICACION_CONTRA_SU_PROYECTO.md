@@ -436,11 +436,16 @@ en verde:
 Es lo que bloqueaba todo lo demás: sin viviendas y sin personas no se puede
 probar ni una autorización. Dos caminos, y los dos se recorren desde la consola.
 
+> **Actualizado el 2026-09-16 con el rediseño del alta.** Las columnas de la
+> hoja y el formulario cambiaron: ahora se escribe **solo el número** y la
+> palabra la pone la copropiedad. Lo de aquí abajo ya refleja ese cambio; el
+> paso a paso completo del alta nueva está en el **§12**.
+
 ### 11.1 · A mano, vivienda a vivienda
 
-1. **Viviendas → Nueva vivienda.** El identificador es el que usa el conjunto:
-   «Casa 12», «Torre B - 401». No hay ningún campo con forma de identificador
-   interno.
+1. **Viviendas → Nueva vivienda.** Se escribe **el número** —«42», «101»— y, si
+   el conjunto agrupa, la torre o manzana en su campo. La palabra «Casa» la pone
+   el sistema. No hay ningún campo con forma de identificador interno.
 2. **Visitantes → Nueva autorización.** En «Persona que visita» escriba un
    nombre o una cédula. Con dos caracteres empieza a buscar; los resultados
    dicen además de qué vivienda es residente cada quien, para que dos homónimos
@@ -473,16 +478,22 @@ repórtelo.
 ### 11.2 · El padrón entero, desde una hoja
 
 **Viviendas → Cargar padrón.** La hoja se llena con lo que el conjunto tiene
-escrito. La única columna obligatoria es `vivienda`:
+escrito. La única columna obligatoria es `identificador`:
 
-| vivienda | documento  | nombre          | placa  | es_titular |
-| -------- | ---------- | --------------- | ------ | ---------- |
-| Casa 12  | 12.345.678 | Ana María Pérez |        | true       |
-| Casa 12  |            |                 | ABC123 |            |
-| Casa 13  | 98765432   | Luis Gómez      | XYZ987 | true       |
-| Casa 14  |            |                 |        |            |
+| identificador | agrupacion | documento  | nombre          | placa  | es_titular |
+| ------------- | ---------- | ---------- | --------------- | ------ | ---------- |
+| 12            | B          | 12.345.678 | Ana María Pérez |        | true       |
+| 12            | B          |            |                 | ABC123 |            |
+| 13            | B          | 98765432   | Luis Gómez      | XYZ987 | true       |
+| 14            | C          |            |                 |        |            |
 
-- `vivienda` — si no existe, **se crea**.
+- `identificador` — si no existe, **se crea**. Si su archivo trae «Casa 12», se
+  guarda «12» y el resumen cuenta cuántos recortó.
+- `agrupacion` — torre, bloque, manzana, sección o sector. **Hace falta cuando
+  el conjunto agrupa**: el 101 de la torre 1 y el de la torre 2 son dos
+  viviendas distintas. Si su conjunto no agrupa, la columna sobra.
+- `vivienda` sigue aceptándose como sinónimo de `identificador`, para quien ya
+  tenga archivos de antes.
 - `documento` + `nombre` — registran a la persona como residente de esa
   vivienda. El mismo documento en dos filas es **una** persona, con puntos o sin
   ellos.
@@ -496,11 +507,11 @@ escrito. La única columna obligatoria es `vivienda`:
 ```
 Padrón cargado: 4 filas de 4.
 Se crearon 3 viviendas y 2 personas. Si alguno de esos números te sorprende,
-revisa la hoja: una errata en «vivienda» crea una casa nueva.
+revisa la hoja: una errata en «identificador» crea una vivienda nueva.
 ```
 
 Ese segundo renglón es el control: la hoja nombra la vivienda por su
-identificador, así que **«Casa 12 » con un espacio de más crea una casa
+identificador, así que **«12 » con un espacio de más crea una vivienda
 distinta**. El número lo delata en el momento.
 
 **Salida esperada si una fila está mal** — la carga es de todo o nada (HU-03):
@@ -512,3 +523,172 @@ No se aplicó nada. Se leyeron 4 filas y 1 tiene errores.
 
 Compruebe después, en **Viviendas**, que el total de activas es el que esperaba,
 y que ninguna vivienda quedó a medias.
+
+---
+
+## 12 · El alta de viviendas rediseñada — qué comprobar usted, paso a paso
+
+Lo de aquí abajo se ejecuta **contra su proyecto**, que es donde están sus
+credenciales. Cada paso lleva la salida esperada; si alguno no la da, es un
+defecto y no una diferencia de entorno.
+
+### 12.0 · Antes de nada: aplicar la migración `0029`
+
+```bash
+supabase db push        # o el procedimiento de CONEXION_SUPABASE.md §5
+```
+
+**Esperado:** aplica `20260916120000_0029_alta_de_viviendas.sql` sin errores.
+
+Si su padrón ya tuviera viviendas con dirección propia, la migración **se
+detiene** con este mensaje en vez de perder el dato:
+
+```
+ERROR: Hay N viviendas con direccion propia. La direccion pasa a la copropiedad:
+traslade o descarte esos valores antes de aplicar la 0029.
+```
+
+Compruebe después, desde el SQL Editor del panel, que el índice quedó compuesto:
+
+```sql
+SELECT indexdef FROM pg_indexes WHERE indexname = 'viviendas_identificador_uk';
+```
+
+**Esperado** — las tres piezas tienen que estar: `UNIQUE`, `coalesce(agrupacion,
+''::text)` y `WHERE (estado = 'activo')`.
+
+```
+CREATE UNIQUE INDEX viviendas_identificador_uk ON public.viviendas
+  USING btree (copropiedad_id, COALESCE(agrupacion, ''::text), identificador)
+  WHERE (estado = 'activo'::estado_registro)
+```
+
+### 12.1 · El diálogo de configuración inicial
+
+Entre a la consola como administrador de una copropiedad **recién creada con el
+guion**, sin configurar.
+
+**Esperado:** al entrar —en cualquier pantalla, no solo en Viviendas— aparece
+**«Configure su copropiedad»** pidiendo dirección y tipo.
+
+Lo que NO debe ocurrir, y es lo que conviene comprobar de verdad: **que no
+vuelva a aparecer** después de guardarlo, y que **sí aparezca** en otra
+copropiedad sin configurar. Lo dispara el tipo nulo en la base, no una marca del
+navegador; para confirmarlo, borre los datos del sitio y vuelva a entrar: no
+debe reaparecer.
+
+### 12.2 · Generar el padrón, con la vista previa por delante
+
+**Viviendas → Generar padrón.** Con 3 torres por letras, 5 pisos y 3 por piso, y
+una excepción: torre **C**, 3 pisos, 3 por piso.
+
+Pulse **«Ver qué se va a crear»**. **Esperado**, antes de crear nada:
+
+```
+Se van a crear 39 viviendas en 3 torres
+Torre A   15 viviendas   101, 102 … 502, 503
+Torre B   15 viviendas   101, 102 … 502, 503
+Torre C    9 viviendas   101, 102 … 302, 303   (excepción)
+```
+
+Que la torre C acabe en **303** y no en 503 es lo que hay que mirar: es lo que
+delata un patrón mal puesto antes de que cueste deshacerlo.
+
+Ahora, **sin cerrar el diálogo, cambie «cuántas torres» a 4**. El botón debe
+volver a decir «Ver qué se va a crear» y la vista previa debe desaparecer. Si le
+dejara crear 39 después de ese cambio, repórtelo.
+
+Confirme. **Esperado:** «Se crearon 39 viviendas.» y el directorio agrupado por
+torre, con el recuento en cada cabecera.
+
+### 12.3 · La operación que debía ser peligrosa y no lo es
+
+Repita **exactamente la misma generación** sobre el mismo conjunto.
+
+**Esperado** — no se crea nada, y se nombran las que ya estaban:
+
+```
+No se creó ninguna vivienda: ya existen A · 101, A · 102, … (39 en total)
+```
+
+Es la comprobación que pidió: regenerar sobre un padrón con residentes **no
+sustituye ni borra nada**, porque la generación solo inserta y se revierte
+entera ante la primera colisión.
+
+Añadir una torre nueva sí funciona: genere solo la torre **D** y debe crearse.
+
+### 12.4 · Que la palabra no esté dentro del dato
+
+En **Nueva vivienda**, escriba `Casa 42` en el número.
+
+**Esperado**, del servidor y no del navegador:
+
+```
+Escriba solo el número: la palabra «Casa» la pone el sistema. Para esta
+vivienda, «42»
+```
+
+Y compruébelo en la base, que es donde importa:
+
+```sql
+SELECT identificador, agrupacion FROM public.viviendas
+ WHERE copropiedad_id = '<su-id>' AND estado = 'activo' ORDER BY agrupacion, identificador LIMIT 5;
+```
+
+**Esperado:** `identificador` solo con dígitos. Si aparece «Casa 42» guardado,
+el control no está actuando y el día que cambie el prefijo esa fila mentirá.
+
+### 12.5 · El mismo número en dos torres
+
+```sql
+SELECT agrupacion, identificador FROM public.viviendas
+ WHERE copropiedad_id = '<su-id>' AND identificador = '101' AND estado='activo';
+```
+
+**Esperado:** una fila por torre (A, B, C…). Si solo hay una, el índice no quedó
+compuesto y la generación de la segunda torre habría fallado.
+
+### 12.6 · El círculo de exportar e importar
+
+1. **Viviendas → Exportar.** Se descarga `padron.csv`.
+2. Ábralo en Excel. **Esperado:** las tildes se ven bien —«Pérez», no «PeÌ rez»—
+   y la cabecera es exactamente:
+
+   ```
+   identificador,agrupacion,documento,tipo_documento,nombre,placa,es_titular
+   ```
+
+3. **Sin editar nada**, guárdelo como `.xlsx` y cárguelo por **Cargar padrón**.
+
+**Esperado:** se aplica, y el resumen dice **0 viviendas creadas y 0 personas
+creadas** — porque todo lo que traía ya existía. Si creara algo, el archivo que
+sale y el que entra no son el mismo formato, y eso es un defecto: repórtelo.
+
+### 12.7 · Cambiar el prefijo no renombra nada
+
+**Configuración → «Cómo se llama una vivienda aquí»**: cambie «Casa» por
+«Apartamento» y guarde.
+
+**Esperado:** el directorio, el buscador y la ficha pasan a decir «Apartamento
+42». Y en la base:
+
+```sql
+SELECT count(*) FROM public.viviendas WHERE identificador LIKE '%Casa%';
+```
+
+**Esperado: `0`.** Ninguna fila se tocó, porque la palabra nunca estuvo dentro.
+Es la respuesta a su segunda pregunta, comprobada.
+
+### 12.8 · Cambiar el tipo no afecta a lo ya creado
+
+**Configuración → Tipo de copropiedad**: de «Casas» a «Apartamentos».
+
+**Esperado:** las viviendas siguen exactamente donde estaban, con su mismo
+identificador y su misma agrupación; lo único que cambia es el formulario de la
+próxima generación. Compruebe el recuento antes y después:
+
+```sql
+SELECT count(*) FROM public.viviendas WHERE copropiedad_id = '<su-id>' AND estado='activo';
+```
+
+**Esperado:** el mismo número antes y después del cambio.

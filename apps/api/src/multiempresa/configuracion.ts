@@ -36,6 +36,10 @@ import type { Rol } from '../autenticacion';
 
 export type ClaveEditable =
   | 'nombre'
+  | 'direccion'
+  | 'tipo'
+  | 'etiquetaVivienda'
+  | 'etiquetaAgrupacion'
   | 'zonaHoraria'
   | 'umbralConfianzaPlaca'
   | 'politicaContingenciaEdge'
@@ -43,9 +47,41 @@ export type ClaveEditable =
 
 export type PoliticaContingencia = 'denegar' | 'escalar_portero';
 
+/**
+ * Tipo de conjunto. Enumerado y no texto libre —al revés que las etiquetas—
+ * porque DECIDE COMPORTAMIENTO: qué formulario de alta se muestra y qué
+ * generador se ejecuta. Un valor que el código no conoce no tendría formulario.
+ */
+export const TIPOS_DE_COPROPIEDAD = ['apartamentos', 'casas', 'fincas', 'otro'] as const;
+export type TipoDeCopropiedad = (typeof TIPOS_DE_COPROPIEDAD)[number];
+
+/**
+ * Etiquetas sugeridas por tipo. **Sugeridas, no impuestas**: el conjunto
+ * escribe la suya y por eso son texto libre. Un desplegable cerrado con cinco
+ * palabras obliga a elegir mal al primero que use «manzana y lote» a la vez.
+ */
+export const ETIQUETAS_SUGERIDAS: Readonly<
+  Record<TipoDeCopropiedad, { vivienda: string; agrupacion: string }>
+> = {
+  apartamentos: { vivienda: 'Apartamento', agrupacion: 'Torre' },
+  casas: { vivienda: 'Casa', agrupacion: 'Sección' },
+  fincas: { vivienda: 'Finca', agrupacion: 'Sector' },
+  otro: { vivienda: 'Vivienda', agrupacion: 'Agrupación' },
+};
+
 /** Lo que la consola pinta: lo editable y lo que solo se consulta. */
 export interface ConfiguracionDeCopropiedad {
   readonly nombre: string;
+  /**
+   * Dirección **del conjunto**. La vivienda no tiene la suya: en Colombia la
+   * dirección es de la copropiedad y lo que cambia es la agrupación y el
+   * número. `null` mientras nadie la haya escrito.
+   */
+  readonly direccion: string | null;
+  /** `null` = sin configurar. Es lo que dispara el diálogo inicial. */
+  readonly tipo: TipoDeCopropiedad | null;
+  readonly etiquetaVivienda: string;
+  readonly etiquetaAgrupacion: string;
   readonly zonaHoraria: string;
   readonly umbralConfianzaPlaca: number;
   readonly politicaContingenciaEdge: PoliticaContingencia;
@@ -66,6 +102,10 @@ export interface ConfiguracionDeCopropiedad {
  */
 export interface CambiosDeConfiguracion {
   readonly nombre?: string;
+  readonly direccion?: string;
+  readonly tipo?: TipoDeCopropiedad;
+  readonly etiquetaVivienda?: string;
+  readonly etiquetaAgrupacion?: string;
   readonly zonaHoraria?: string;
   readonly umbralConfianzaPlaca?: number;
   readonly politicaContingenciaEdge?: PoliticaContingencia;
@@ -111,6 +151,47 @@ const AJUSTES: readonly Ajuste[] = [
     etiqueta: 'Nombre de la copropiedad',
     editablePor: ['superadministrador', 'administrador'],
     validar: textoAcotado(1, 200),
+  },
+  {
+    clave: 'direccion',
+    etiqueta: 'Dirección del conjunto',
+    editablePor: ['superadministrador', 'administrador'],
+    // Cinco caracteres como mínimo: «Cll 4» es una dirección y «—» no lo es.
+    // El mínimo evita que el diálogo inicial se despache con un guion.
+    validar: textoAcotado(5, 200),
+  },
+  {
+    clave: 'tipo',
+    /**
+     * **Se puede cambiar después, y las viviendas ya creadas no se enteran.**
+     * Se lee en dos sitios —el formulario de generación y la etiqueta sugerida—
+     * y ninguna vivienda lo guarda. Esa es la condición que hace segura esta
+     * respuesta, y el analizador de fronteras la vigila: si un día apareciera
+     * en el dominio, dejaría de ser cierta.
+     */
+    etiqueta: 'Tipo de copropiedad',
+    editablePor: ['superadministrador', 'administrador'],
+    validar: (valor) =>
+      typeof valor === 'string' && (TIPOS_DE_COPROPIEDAD as readonly string[]).includes(valor)
+        ? null
+        : `debe ser uno de: ${TIPOS_DE_COPROPIEDAD.join(', ')}`,
+  },
+  {
+    clave: 'etiquetaVivienda',
+    /**
+     * Cambiarla **no renombra nada**: la palabra nunca estuvo dentro del
+     * identificador (H-3). Repinta el directorio, el buscador y la ficha, y no
+     * toca una sola fila.
+     */
+    etiqueta: 'Cómo se llama una vivienda aquí',
+    editablePor: ['superadministrador', 'administrador'],
+    validar: textoAcotado(1, 24),
+  },
+  {
+    clave: 'etiquetaAgrupacion',
+    etiqueta: 'Cómo se llama la agrupación aquí',
+    editablePor: ['superadministrador', 'administrador'],
+    validar: textoAcotado(1, 24),
   },
   {
     clave: 'zonaHoraria',
@@ -228,9 +309,20 @@ export const cambiosEfectivos = (
 ): CambiosDeConfiguracion => {
   const nombre = p.nombre?.trim();
   const zonaHoraria = p.zonaHoraria?.trim();
+  const direccion = p.direccion?.trim();
+  const etiquetaVivienda = p.etiquetaVivienda?.trim();
+  const etiquetaAgrupacion = p.etiquetaAgrupacion?.trim();
   return {
     ...(nombre !== undefined && nombre !== actual.nombre ? { nombre } : {}),
     ...(zonaHoraria !== undefined && zonaHoraria !== actual.zonaHoraria ? { zonaHoraria } : {}),
+    ...(direccion !== undefined && direccion !== actual.direccion ? { direccion } : {}),
+    ...(p.tipo !== undefined && p.tipo !== actual.tipo ? { tipo: p.tipo } : {}),
+    ...(etiquetaVivienda !== undefined && etiquetaVivienda !== actual.etiquetaVivienda
+      ? { etiquetaVivienda }
+      : {}),
+    ...(etiquetaAgrupacion !== undefined && etiquetaAgrupacion !== actual.etiquetaAgrupacion
+      ? { etiquetaAgrupacion }
+      : {}),
     ...(p.umbralConfianzaPlaca !== undefined &&
     p.umbralConfianzaPlaca !== actual.umbralConfianzaPlaca
       ? { umbralConfianzaPlaca: p.umbralConfianzaPlaca }

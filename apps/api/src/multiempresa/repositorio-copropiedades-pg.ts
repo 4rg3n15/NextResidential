@@ -7,12 +7,17 @@ import type {
   CambiosDeConfiguracion,
   ConfiguracionDeCopropiedad,
   PoliticaContingencia,
+  TipoDeCopropiedad,
 } from './configuracion';
 import { cambiosEfectivos, resumenDeCambios } from './configuracion';
 
 /** `interval` de PostgreSQL → horas y minutos, sin depender del formato de texto. */
 interface FilaDeConfiguracion {
   readonly nombre: string;
+  readonly direccion: string | null;
+  readonly tipo: TipoDeCopropiedad | null;
+  readonly etiqueta_vivienda: string;
+  readonly etiqueta_agrupacion: string;
   readonly zona_horaria: string;
   readonly umbral_confianza_placa: string;
   readonly politica_contingencia_edge: PoliticaContingencia;
@@ -26,6 +31,10 @@ interface FilaDeConfiguracion {
 
 const aConfiguracion = (f: FilaDeConfiguracion): ConfiguracionDeCopropiedad => ({
   nombre: f.nombre,
+  direccion: f.direccion,
+  tipo: f.tipo,
+  etiquetaVivienda: f.etiqueta_vivienda,
+  etiquetaAgrupacion: f.etiqueta_agrupacion,
   zonaHoraria: f.zona_horaria,
   umbralConfianzaPlaca: Number(f.umbral_confianza_placa),
   politicaContingenciaEdge: f.politica_contingencia_edge,
@@ -45,6 +54,10 @@ const aConfiguracion = (f: FilaDeConfiguracion): ConfiguracionDeCopropiedad => (
  */
 const CAMPOS_DE_CONFIGURACION = `
        nombre,
+       direccion,
+       tipo::text AS tipo,
+       etiqueta_vivienda,
+       etiqueta_agrupacion,
        zona_horaria,
        umbral_confianza_placa,
        politica_contingencia_edge,
@@ -163,6 +176,10 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
 
     const COLUMNA: Readonly<Record<string, string>> = {
       nombre: 'nombre = $#',
+      direccion: 'direccion = $#',
+      tipo: 'tipo = $#::tipo_copropiedad',
+      etiquetaVivienda: 'etiqueta_vivienda = $#',
+      etiquetaAgrupacion: 'etiqueta_agrupacion = $#',
       zonaHoraria: 'zona_horaria = $#',
       umbralConfianzaPlaca: 'umbral_confianza_placa = $#',
       politicaContingenciaEdge: 'politica_contingencia_edge = $#::politica_contingencia',

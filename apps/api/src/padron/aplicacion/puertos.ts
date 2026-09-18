@@ -1,4 +1,4 @@
-import type { Documento, Placa, TipoDeDocumento } from '@ncr/domain-core';
+import type { Documento, Placa, TipoDeDocumento, ViviendaProyectada } from '@ncr/domain-core';
 
 /**
  * Puertos del padrón. La aplicación los define; la infraestructura los cumple.
@@ -32,8 +32,13 @@ export interface AltaVehiculo {
 export interface AltaVivienda {
   readonly copropiedadId: string;
   readonly identificador: string;
-  readonly manzana?: string | null;
-  readonly direccion?: string | null;
+  /**
+   * Torre, bloque, manzana, etapa o sector. **Forma parte de la identidad**
+   * desde la migración `0029`: el índice único es
+   * `(copropiedad_id, coalesce(agrupacion,''), identificador)`, porque la
+   * Torre 1 y la Torre 2 tienen las dos un 101.
+   */
+  readonly agrupacion?: string | null;
   readonly actorId: string;
 }
 
@@ -58,8 +63,7 @@ export type ResultadoAltaVivienda =
 export interface ViviendaEnLista {
   readonly id: string;
   readonly identificador: string;
-  readonly manzana: string | null;
-  readonly direccion: string | null;
+  readonly agrupacion: string | null;
   readonly estado: 'activo' | 'inactivo';
   readonly estadoAdministrativo: string;
   readonly residentes: number;
@@ -151,6 +155,48 @@ export type ResultadoAltaPersona = {
   readonly nombreCompleto: string;
 };
 
+/**
+ * **La generación, y por qué es una sola llamada y no N altas.**
+ *
+ * Trescientas altas son trescientas sentencias y trescientas oportunidades de
+ * quedarse a medias. Aquí van en una, dentro de una transacción, y quien decide
+ * la unicidad es el índice único parcial (ADR-04) — no un `SELECT` previo, que
+ * entre comprobar e insertar deja pasar a otro administrador generando a la vez.
+ */
+export interface GeneracionDeViviendas {
+  readonly copropiedadId: string;
+  readonly viviendas: readonly ViviendaProyectada[];
+  readonly actorId: string;
+  /** Texto del rastro en `auditoria_seguridad` (valor `generacion_de_padron`). */
+  readonly resumenDelPlan: string;
+}
+
+export interface ResultadoDeGeneracion {
+  readonly creadas: number;
+  /**
+   * Las que ya existían activas. Si trae alguna, **no se creó ninguna**: la
+   * diferencia entre lo pedido y lo devuelto por el `RETURNING` es la lista
+   * exacta de colisiones, y la transacción se revierte entera.
+   */
+  readonly colisiones: readonly ViviendaProyectada[];
+}
+
+/**
+ * Una fila del padrón exportado. Son **las columnas que el administrador tiene
+ * en su archivo** —identificador, agrupación, documento, nombre—, nunca
+ * identificadores internos (D-72): lo que sale por aquí tiene que poder volver
+ * a entrar por la carga sin editar nada.
+ */
+export interface FilaExportada {
+  readonly identificador: string;
+  readonly agrupacion: string | null;
+  readonly documento: string | null;
+  readonly tipoDocumento: string | null;
+  readonly nombre: string | null;
+  readonly placa: string | null;
+  readonly esTitular: boolean | null;
+}
+
 export interface RepositorioPadron {
   registrarVehiculo(alta: AltaVehiculo): Promise<ResultadoRegistroVehiculo>;
   registrarVivienda(alta: AltaVivienda): Promise<ResultadoAltaVivienda>;
@@ -168,8 +214,27 @@ export interface RepositorioPadron {
    */
   buscarViviendaPorIdentificador(
     copropiedadId: string,
+    agrupacion: string | null,
     identificador: string,
   ): Promise<{ readonly id: string } | null>;
+  /**
+   * Genera el padrón entero en **una sola sentencia**, sin `SELECT` previo.
+   * Devuelve las que colisionaron para que el caso de uso las nombre todas; si
+   * hay una sola, no se crea ninguna.
+   */
+  generarViviendas(generacion: GeneracionDeViviendas): Promise<ResultadoDeGeneracion>;
+  /**
+   * Cuáles del plan ya existen activas. Es una lectura **para informar**: puede
+   * quedarse obsoleta entre la vista previa y la confirmación —otro
+   * administrador crea una vivienda suelta en ese minuto—, y por eso NO es la
+   * garantía. La garantía es el índice (ADR-04).
+   */
+  viviendasExistentes(
+    copropiedadId: string,
+    viviendas: readonly ViviendaProyectada[],
+  ): Promise<readonly ViviendaProyectada[]>;
+  /** Filas del padrón para exportar, en el orden en que se muestran. */
+  exportarPadron(copropiedadId: string): Promise<readonly FilaExportada[]>;
   listarViviendas(
     copropiedadId: string,
     filtro: FiltroDeViviendas,

@@ -3,34 +3,42 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Download, Plus } from 'lucide-react';
 import type { Vivienda } from '@ncr/contracts';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
-import { TablaDeDatos } from '@/componentes/tabla-datos';
-import type { Columna } from '@/componentes/tabla-datos';
 import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { DialogoDeConfirmacion } from '@/componentes/dialogo-confirmacion';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
-import { estadoSegunCodigo } from '@/componentes/estados';
+import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
-import { useViviendas } from '@/lib/api/consultas';
+import { useConfiguracion, useViviendas } from '@/lib/api/consultas';
+import { nombreDeGrupo, nombreDeVivienda, sinConfigurar, vocabularioDe } from '@/lib/vocabulario';
 import { CargaDePadron } from './carga-de-padron';
+import { AsistenteDeGeneracion } from './asistente-de-generacion';
 
 /**
  * Directorio de viviendas.
  *
+ * **Agrupado, y desplegable.** Un conjunto de 300 apartamentos en una tabla
+ * plana es una lista de 300 números sin contexto. Agrupado por torre, con el
+ * recuento en la cabecera y un `+` por grupo, la pantalla dice lo que el
+ * administrador necesita saber —cuántas hay en cada torre— y el alta suelta no
+ * puede equivocarse de torre, porque la pone el grupo donde se pulsó.
+ *
+ * **Las palabras vienen de la configuración.** «Casa», «Torre», «Manzana» son
+ * `etiqueta_vivienda` y `etiqueta_agrupacion` de la copropiedad; el
+ * identificador guardado es solo el número. Cambiar la palabra repinta esta
+ * pantalla y no renombra una sola fila (H-3).
+ *
  * **Lo que esta pantalla tiene que decir y ninguna tabla dice sola:** una
  * vivienda inactiva **conserva sus autorizaciones vigentes** (RN-13). Sin ese
  * número junto al estado, «inactiva» se lee como «ya no deja entrar a nadie», y
- * es falso: las autorizaciones que ya existían siguen abriendo la puerta hasta
- * que expiren. Por eso la columna de estado lleva la cifra al lado y el diálogo
- * de baja la repite antes de confirmar.
+ * es falso.
  *
  * **No hay borrado.** El botón dice «Desactivar» y exige motivo, porque eso es
- * lo que ocurre: baja lógica con historial (RN-19, CA-02). Un botón «Eliminar»
- * que en realidad desactiva enseña al usuario algo que no es cierto sobre su
- * propio sistema.
+ * lo que ocurre: baja lógica con historial (RN-19, CA-02).
  */
 export const DirectorioDeViviendas = ({
   copropiedadId,
@@ -40,19 +48,30 @@ export const DirectorioDeViviendas = ({
   const clientes = useQueryClient();
   const [estado, setEstado] = useState<'' | 'activo' | 'inactivo'>('');
   const [busqueda, setBusqueda] = useState('');
-  const [alta, setAlta] = useState(false);
+  const [alta, setAlta] = useState<{ readonly agrupacion: string } | null>(null);
+  const [generando, setGenerando] = useState(false);
   const [baja, setBaja] = useState<Vivienda | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const [identificador, setIdentificador] = useState('');
-  const [manzana, setManzana] = useState('');
-  const [direccion, setDireccion] = useState('');
+  const [agrupacion, setAgrupacion] = useState('');
 
   const consulta = useViviendas(copropiedadId, { estado, busqueda });
+  const configuracion = useConfiguracion(copropiedadId);
+  const vocabulario = vocabularioDe(configuracion.data);
+  const tipo = configuracion.data?.tipo ?? null;
 
   const refrescar = async (): Promise<void> => {
     await clientes.invalidateQueries({ queryKey: ['viviendas', copropiedadId] });
+  };
+
+  const abrirAlta = (deGrupo: string): void => {
+    setIdentificador('');
+    setAgrupacion(deGrupo);
+    setError(undefined);
+    setAlta({ agrupacion: deGrupo });
   };
 
   const crear = async (): Promise<void> => {
@@ -69,20 +88,18 @@ export const DirectorioDeViviendas = ({
           params: { path: { id: copropiedadId } },
           body: {
             identificador: identificador.trim(),
-            ...(manzana.trim() === '' ? {} : { manzana: manzana.trim() }),
-            ...(direccion.trim() === '' ? {} : { direccion: direccion.trim() }),
+            ...(agrupacion.trim() === '' ? {} : { agrupacion: agrupacion.trim() }),
           },
         }),
       );
-      setAlta(false);
+      setAlta(null);
       setIdentificador('');
-      setManzana('');
-      setDireccion('');
       await refrescar();
     } catch (e) {
       // El mensaje de la API viaja TAL CUAL: es quien sabe por qué rechazó
-      // —identificador ya activo— y reinterpretarlo aquí produciría un texto
-      // que no coincide con lo que ocurrió.
+      // —identificador ya activo, o la palabra metida dentro del número— y
+      // reinterpretarlo aquí produciría un texto que no coincide con lo que
+      // ocurrió.
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo crear la vivienda');
     } finally {
       setEnviando(false);
@@ -119,66 +136,23 @@ export const DirectorioDeViviendas = ({
   }
 
   const datos = consulta.data;
-  const columnas: readonly Columna<Vivienda>[] = [
-    {
-      clave: 'identificador',
-      titulo: 'Vivienda',
-      texto: (v) => `${v.identificador} ${v.manzana ?? ''} ${v.direccion ?? ''}`,
-      celda: (v) => (
-        <div>
-          <p className="font-medium text-texto">{v.identificador}</p>
-          <p className="text-secundario text-texto-apagado">
-            {[v.manzana, v.direccion].filter((x) => x !== null && x !== '').join(' · ') || '—'}
-          </p>
-        </div>
-      ),
-    },
-    {
-      clave: 'ocupacion',
-      titulo: 'Residentes / vehículos',
-      alineacion: 'derecha',
-      celda: (v) => (
-        <span className="tabular-nums">
-          {v.residentes} / {v.vehiculos}
-        </span>
-      ),
-    },
-    {
-      clave: 'estado',
-      titulo: 'Estado',
-      texto: (v) => v.estado,
-      celda: (v) => (
-        <div className="flex flex-col items-start gap-1">
-          <Distintivo tono={v.estado === 'activo' ? 'exito' : 'neutro'}>
-            {v.estado === 'activo' ? 'Activa' : 'Inactiva'}
-          </Distintivo>
-          {v.autorizacionesVigentes > 0 ? (
-            <span className="text-secundario text-texto-apagado">
-              {v.autorizacionesVigentes} autorización
-              {v.autorizacionesVigentes === 1 ? '' : 'es'} vigente
-              {v.autorizacionesVigentes === 1 ? '' : 's'}
-              {v.estado === 'inactivo' ? ' — siguen abriendo (RN-13)' : ''}
-            </span>
-          ) : null}
-        </div>
-      ),
-    },
-    {
-      clave: 'acciones',
-      titulo: 'Acciones',
-      alineacion: 'derecha',
-      celda: (v) =>
-        v.estado === 'activo' ? (
-          <Boton variante="secundario" tamano="sm" onClick={() => setBaja(v)}>
-            Desactivar
-          </Boton>
-        ) : (
-          <span className="text-secundario text-texto-apagado">
-            {v.motivoDesactivacion ?? 'Sin motivo registrado'}
-          </span>
-        ),
-    },
-  ];
+  const viviendas = datos?.viviendas ?? [];
+
+  /**
+   * Agrupación en el orden en que llegan. **El orden lo decide el servidor**
+   * —por agrupación y por número dentro de ella—, no esta pantalla: si la
+   * consola reordenara, el 1000 acabaría antes del 101 en cuanto alguien
+   * paginara, y el desajuste solo se vería con padrones grandes.
+   */
+  const grupos: { readonly agrupacion: string | null; readonly viviendas: Vivienda[] }[] = [];
+  for (const vivienda of viviendas) {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo !== undefined && ultimo.agrupacion === vivienda.agrupacion) {
+      ultimo.viviendas.push(vivienda);
+    } else {
+      grupos.push({ agrupacion: vivienda.agrupacion, viviendas: [vivienda] });
+    }
+  }
 
   return (
     <>
@@ -195,89 +169,193 @@ export const DirectorioDeViviendas = ({
         }
         acciones={
           <>
+            <a
+              href={`/api/ncr/copropiedades/${copropiedadId}/padron/exportacion`}
+              download="padron.csv"
+              className="inline-flex h-11 items-center gap-2 rounded-campo border border-borde bg-campo px-4 text-cuerpo text-texto hover:bg-borde-suave focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+            >
+              <Download aria-hidden className="size-4" /> Exportar
+            </a>
             <CargaDePadron copropiedadId={copropiedadId} alTerminar={() => void refrescar()} />
-            <Boton onClick={() => setAlta(true)}>Nueva vivienda</Boton>
+            {tipo !== null && tipo !== 'otro' ? (
+              <Boton variante="secundario" onClick={() => setGenerando(true)}>
+                Generar padrón
+              </Boton>
+            ) : null}
+            <Boton onClick={() => abrirAlta('')}>Nueva {vocabulario.vivienda.toLowerCase()}</Boton>
           </>
         }
       />
 
-      <TablaDeDatos
-        titulo="Viviendas de la copropiedad"
-        columnas={columnas}
-        filas={datos?.viviendas ?? []}
-        claveDeFila={(v) => v.id}
-        cargando={consulta.isLoading}
-        // El buscador es del SERVIDOR y no el de la tabla, y hay uno solo. La
-        // API acota a 500 filas: un filtro que solo mirara lo ya descargado
-        // diría «sin resultados» sobre un padrón que sí tiene la vivienda,
-        // que es la peor respuesta posible a una búsqueda.
-        filtros={
-          <>
-            <label className="flex items-center gap-2 text-secundario">
-              <span className="text-texto-apagado">Buscar</span>
-              <input
-                type="search"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Identificador, manzana o dirección"
-                aria-label="Buscar viviendas en el padrón"
-                className="w-64 rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
-              />
-            </label>
-            <label className="flex items-center gap-2 text-secundario">
-              <span className="text-texto-apagado">Estado</span>
-              <select
-                value={estado}
-                onChange={(e) => setEstado(e.target.value as '' | 'activo' | 'inactivo')}
-                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+      {sinConfigurar(configuracion.data) ? (
+        <p
+          role="status"
+          className="rounded-md border border-aviso bg-aviso-suave px-3 py-2 text-secundario text-aviso-texto"
+        >
+          Esta copropiedad todavía no dice de qué tipo es, así que el sistema no sabe cómo llamar a
+          sus viviendas ni puede generarlas. Configúrelo para empezar.
+        </p>
+      ) : null}
+
+      {aviso !== null ? (
+        <p
+          role="status"
+          className="rounded-md border border-exito bg-exito-suave px-3 py-2 text-secundario text-exito-texto"
+        >
+          {aviso}
+        </p>
+      ) : null}
+
+      <section className="space-y-3 rounded-tarjeta border border-borde bg-superficie p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <h2 className="text-subtitulo font-medium text-texto">Viviendas de la copropiedad</h2>
+          {/* El buscador es del SERVIDOR y no de esta lista, y hay uno solo. La
+              API acota a 500 filas: un filtro que solo mirara lo ya descargado
+              diría «sin resultados» sobre un padrón que sí tiene la vivienda. */}
+          <label className="flex items-center gap-2 text-secundario">
+            <span className="text-texto-apagado">Buscar</span>
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder={`Número o ${vocabulario.agrupacion.toLowerCase()}`}
+              aria-label="Buscar viviendas en el padrón"
+              className="w-64 rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-secundario">
+            <span className="text-texto-apagado">Estado</span>
+            <select
+              value={estado}
+              onChange={(e) => setEstado(e.target.value as '' | 'activo' | 'inactivo')}
+              className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+            >
+              <option value="">Todas</option>
+              <option value="activo">Activas</option>
+              <option value="inactivo">Inactivas</option>
+            </select>
+          </label>
+        </div>
+
+        {consulta.isLoading ? <EstadoCargando etiqueta="Cargando el padrón" /> : null}
+
+        {!consulta.isLoading && grupos.length === 0 ? (
+          <EstadoVacio
+            titulo="Sin viviendas"
+            descripcion="El padrón de esta copropiedad está vacío. Genéralo, cárgalo desde un archivo o crea la primera a mano."
+            accion={<Boton onClick={() => abrirAlta('')}>Nueva vivienda</Boton>}
+          />
+        ) : null}
+
+        {grupos.map((grupo, indice) => (
+          <details
+            key={grupo.agrupacion ?? 'sin-agrupacion'}
+            // Con un solo grupo, cerrarlo esconde la pantalla entera detrás de
+            // un clic que no aporta nada.
+            open={grupos.length === 1 || indice === 0}
+            className="rounded-md border border-borde"
+          >
+            <summary className="flex cursor-pointer flex-wrap items-center gap-3 px-3 py-2 text-cuerpo text-texto">
+              <span className="font-medium">{nombreDeGrupo(vocabulario, grupo.agrupacion)}</span>
+              <span className="tabular-nums text-texto-apagado">
+                {grupo.viviendas.length} {grupo.viviendas.length === 1 ? 'vivienda' : 'viviendas'}
+              </span>
+            </summary>
+            <ul className="divide-y divide-borde border-t border-borde">
+              {grupo.viviendas.map((v) => (
+                <li key={v.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                  <span className="min-w-40 font-medium text-texto">
+                    {nombreDeVivienda(vocabulario, v.identificador, v.agrupacion)}
+                  </span>
+                  <span className="tabular-nums text-secundario text-texto-apagado">
+                    {v.residentes} residentes · {v.vehiculos} vehículos
+                  </span>
+                  <Distintivo tono={v.estado === 'activo' ? 'exito' : 'neutro'}>
+                    {v.estado === 'activo' ? 'Activa' : 'Inactiva'}
+                  </Distintivo>
+                  {v.autorizacionesVigentes > 0 ? (
+                    <span className="text-secundario text-texto-apagado">
+                      {v.autorizacionesVigentes} autorización
+                      {v.autorizacionesVigentes === 1 ? '' : 'es'} vigente
+                      {v.autorizacionesVigentes === 1 ? '' : 's'}
+                      {v.estado === 'inactivo' ? ' — siguen abriendo (RN-13)' : ''}
+                    </span>
+                  ) : null}
+                  <span className="ml-auto">
+                    {v.estado === 'activo' ? (
+                      <Boton variante="secundario" tamano="sm" onClick={() => setBaja(v)}>
+                        Desactivar
+                      </Boton>
+                    ) : (
+                      <span className="text-secundario text-texto-apagado">
+                        {v.motivoDesactivacion ?? 'Sin motivo registrado'}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="border-t border-borde px-3 py-2">
+              <Boton
+                variante="fantasma"
+                tamano="sm"
+                onClick={() => abrirAlta(grupo.agrupacion ?? '')}
               >
-                <option value="">Todas</option>
-                <option value="activo">Activas</option>
-                <option value="inactivo">Inactivas</option>
-              </select>
-            </label>
-          </>
-        }
-        vacio={{
-          titulo: 'Sin viviendas',
-          descripcion:
-            'El padrón de esta copropiedad está vacío. Crea la primera vivienda o carga el padrón desde un archivo.',
-          accion: <Boton onClick={() => setAlta(true)}>Nueva vivienda</Boton>,
-        }}
-      />
+                <Plus aria-hidden className="size-4" />
+                Añadir una en {nombreDeGrupo(vocabulario, grupo.agrupacion).toLowerCase()}
+              </Boton>
+            </div>
+          </details>
+        ))}
+      </section>
 
       <DialogoDeFormulario
-        abierto={alta}
-        titulo="Nueva vivienda"
-        descripcion="El identificador debe ser único entre las viviendas activas; lo garantiza la base de datos."
+        abierto={alta !== null}
+        titulo={`Nueva ${vocabulario.vivienda.toLowerCase()}`}
+        descripcion={`Escriba solo el número: la palabra «${vocabulario.vivienda}» la pone el sistema. El identificador debe ser único dentro de su ${vocabulario.agrupacion.toLowerCase()}, y lo garantiza la base de datos.`}
         etiquetaEnviar="Crear vivienda"
         enviando={enviando}
         error={error}
         puedeEnviar={identificador.trim().length > 0}
         alEnviar={() => void crear()}
         alCancelar={() => {
-          setAlta(false);
+          setAlta(null);
           setError(undefined);
         }}
       >
         <Campo
-          etiqueta="Identificador"
+          etiqueta="Número"
           value={identificador}
           onChange={(e) => setIdentificador(e.target.value)}
-          ayuda="Como aparece en el conjunto: «Casa 12», «Torre B - 401»."
+          ayuda={`Como está en la puerta: «42», «101». Se mostrará como «${vocabulario.vivienda} ${identificador.trim() === '' ? '42' : identificador.trim()}».`}
           required
         />
-        <Campo etiqueta="Manzana" value={manzana} onChange={(e) => setManzana(e.target.value)} />
         <Campo
-          etiqueta="Dirección"
-          value={direccion}
-          onChange={(e) => setDireccion(e.target.value)}
+          etiqueta={vocabulario.agrupacion}
+          value={agrupacion}
+          onChange={(e) => setAgrupacion(e.target.value)}
+          ayuda={`Déjelo vacío si esta ${vocabulario.vivienda.toLowerCase()} no pertenece a ninguna.`}
         />
       </DialogoDeFormulario>
 
+      {tipo !== null && tipo !== 'otro' ? (
+        <AsistenteDeGeneracion
+          copropiedadId={copropiedadId}
+          tipo={tipo}
+          vocabulario={vocabulario}
+          abierto={generando}
+          alCerrar={() => setGenerando(false)}
+          alTerminar={(creadas) => {
+            setGenerando(false);
+            setAviso(`Se crearon ${String(creadas)} viviendas.`);
+            void refrescar();
+          }}
+        />
+      ) : null}
+
       <DialogoDeConfirmacion
         abierto={baja !== null}
-        titulo={`Desactivar ${baja?.identificador ?? ''}`}
+        titulo={`Desactivar ${baja === null ? '' : nombreDeVivienda(vocabulario, baja.identificador, baja.agrupacion)}`}
         descripcion="La vivienda deja de generar autorizaciones nuevas y conserva todo su historial. No se borra nada."
         etiquetaConfirmar="Desactivar"
         enviando={enviando}

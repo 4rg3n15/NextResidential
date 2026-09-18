@@ -12,6 +12,7 @@ import {
   RegistrarVivienda,
 } from './casos-de-uso';
 import type { RepositorioPadron } from './puertos';
+import type { LectorDeVocabulario } from './vocabulario';
 import type { ContextoTenant } from '../../autenticacion';
 
 const ctx: ContextoTenant = {
@@ -23,6 +24,18 @@ const ctx: ContextoTenant = {
 };
 /** Identidad de plataforma: superadministrador sin copropiedad propia. */
 const sinTenant: ContextoTenant = { ...ctx, rol: 'superadministrador', copropiedadId: null };
+
+/**
+ * Vocabulario del conjunto. Por defecto, **sin configurar**: es el estado de una
+ * copropiedad recién creada por el guion de aprovisionamiento, y el que más se
+ * ejercita en producción el primer día.
+ */
+const vocabulario = (
+  etiquetaVivienda = 'Vivienda',
+  etiquetaAgrupacion = 'Torre o bloque',
+): LectorDeVocabulario => ({
+  leer: vi.fn().mockResolvedValue({ tipo: null, etiquetaVivienda, etiquetaAgrupacion }),
+});
 
 const repo = (parcial: Partial<RepositorioPadron> = {}): RepositorioPadron => {
   const base: RepositorioPadron = {
@@ -40,6 +53,10 @@ const repo = (parcial: Partial<RepositorioPadron> = {}): RepositorioPadron => {
       .fn()
       .mockResolvedValue({ totales: { activas: 2, inactivas: 1 }, viviendas: [] }),
     listarVehiculos: vi.fn().mockResolvedValue([]),
+    buscarViviendaPorIdentificador: vi.fn().mockResolvedValue(null),
+    generarViviendas: vi.fn().mockResolvedValue({ creadas: 0, colisiones: [] }),
+    viviendasExistentes: vi.fn().mockResolvedValue([]),
+    exportarPadron: vi.fn().mockResolvedValue([]),
     enTransaccion: async (op) => op(base),
     ...parcial,
   };
@@ -149,18 +166,59 @@ describe('DesactivarVivienda · RN-19', () => {
 describe('RegistrarVivienda', () => {
   it('recorta el identificador y lo pasa limpio al repositorio', async () => {
     const registrar = vi.fn().mockResolvedValue({ tipo: 'registrada', id: 'viv-7' });
-    const r = await new RegistrarVivienda(repo({ registrarVivienda: registrar })).ejecutar(ctx, {
-      identificador: '  Casa 12  ',
-    });
+    const r = await new RegistrarVivienda(
+      repo({ registrarVivienda: registrar }),
+      vocabulario(),
+    ).ejecutar(ctx, { identificador: '  42  ', agrupacion: '  B  ' });
     expect(r.ok && r.valor.id).toBe('viv-7');
-    expect(registrar.mock.calls[0]![0].identificador).toBe('Casa 12');
+    expect(registrar.mock.calls[0]![0].identificador).toBe('42');
+    expect(registrar.mock.calls[0]![0].agrupacion).toBe('B');
+  });
+
+  it('una agrupación vacía llega como NULL, no como cadena vacía', async () => {
+    // Importa: el índice único usa `coalesce(agrupacion,'')`, así que '' y NULL
+    // son la misma clave. Pero guardar '' dejaría la columna llena de cadenas
+    // vacías que ninguna pantalla sabe distinguir de «sin agrupación».
+    const registrar = vi.fn().mockResolvedValue({ tipo: 'registrada', id: 'viv-7' });
+    await new RegistrarVivienda(repo({ registrarVivienda: registrar }), vocabulario()).ejecutar(
+      ctx,
+      { identificador: '42', agrupacion: '   ' },
+    );
+    expect(registrar.mock.calls[0]![0].agrupacion).toBeNull();
+  });
+
+  it('H-3 · «Casa 42» se RECHAZA cuando la copropiedad se llama así a sí misma', async () => {
+    // Sin este control, el primero que teclee la palabra reintroduce lo que el
+    // rediseño elimina: el día que el conjunto pase de «Casa» a «Apartamento»,
+    // esa vivienda se queda mintiendo y la base no puede verlo.
+    const registrar = vi.fn();
+    const r = await new RegistrarVivienda(
+      repo({ registrarVivienda: registrar }),
+      vocabulario('Casa'),
+    ).ejecutar(ctx, { identificador: 'Casa 42' });
+    expect(esFallo(r)).toBe(true);
+    expect(esFallo(r) && r.error.detalle).toMatch(/Escriba solo el número/);
+    // Y el mensaje dice cuál sería el correcto, que es lo que lo hace una
+    // instrucción y no un reproche.
+    expect(esFallo(r) && r.error.detalle).toMatch(/«42»/);
+    expect(registrar).not.toHaveBeenCalled();
+  });
+
+  it('la misma palabra NO se rechaza si el conjunto se llama de otra manera', async () => {
+    const registrar = vi.fn().mockResolvedValue({ tipo: 'registrada', id: 'viv-7' });
+    const r = await new RegistrarVivienda(
+      repo({ registrarVivienda: registrar }),
+      vocabulario('Apartamento'),
+    ).ejecutar(ctx, { identificador: 'Casa 42' });
+    expect(r.ok).toBe(true);
   });
 
   it('un identificador vacío se rechaza aquí y no llega a la base', async () => {
     const registrar = vi.fn();
-    const r = await new RegistrarVivienda(repo({ registrarVivienda: registrar })).ejecutar(ctx, {
-      identificador: '   ',
-    });
+    const r = await new RegistrarVivienda(
+      repo({ registrarVivienda: registrar }),
+      vocabulario(),
+    ).ejecutar(ctx, { identificador: '   ' });
     expect(esFallo(r)).toBe(true);
     expect(registrar).not.toHaveBeenCalled();
   });
@@ -170,16 +228,17 @@ describe('RegistrarVivienda', () => {
     // y por eso este caso de uso solo traduce el discriminador que recibe.
     const r = await new RegistrarVivienda(
       repo({ registrarVivienda: vi.fn().mockResolvedValue({ tipo: 'identificador_duplicado' }) }),
-    ).ejecutar(ctx, { identificador: 'Casa 12' });
+      vocabulario(),
+    ).ejecutar(ctx, { identificador: '12' });
     expect(esFallo(r) && r.error.codigo).toBe('CONFLICTO_DE_CONCURRENCIA');
   });
 
   it('una identidad sin copropiedad no crea nada (RN-15)', async () => {
     const registrar = vi.fn();
-    const r = await new RegistrarVivienda(repo({ registrarVivienda: registrar })).ejecutar(
-      sinTenant,
-      { identificador: 'Casa 12' },
-    );
+    const r = await new RegistrarVivienda(
+      repo({ registrarVivienda: registrar }),
+      vocabulario(),
+    ).ejecutar(sinTenant, { identificador: '12' });
     expect(esFallo(r)).toBe(true);
     expect(registrar).not.toHaveBeenCalled();
   });

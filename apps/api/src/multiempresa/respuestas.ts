@@ -59,6 +59,39 @@ export class AlcanceDeCopropiedadesDto {
  */
 export class ConfiguracionDeCopropiedadDto {
   @ApiProperty({ example: 'Urbanización Mira' }) nombre!: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'Kilómetro 4 vía La Calera, Bogotá',
+    description:
+      'Dirección DEL CONJUNTO. La vivienda no tiene la suya: en Colombia la dirección es ' +
+      'de la copropiedad y lo que cambia es la agrupación y el número.',
+  })
+  direccion!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    enum: ['apartamentos', 'casas', 'fincas', 'otro'],
+    description:
+      'null = SIN CONFIGURAR, y es lo que dispara el diálogo inicial de la consola. Decide ' +
+      'el formulario de alta y las etiquetas sugeridas; ninguna vivienda lo guarda, así que ' +
+      'cambiarlo no afecta a las ya creadas.',
+  })
+  tipo!: string | null;
+
+  @ApiProperty({
+    example: 'Casa',
+    description:
+      'Cómo se llama una vivienda aquí. Es una ETIQUETA: se pinta al mostrar y nunca entra ' +
+      'en el identificador, por eso cambiarla no renombra ninguna fila.',
+  })
+  etiquetaVivienda!: string;
+
+  @ApiProperty({ example: 'Manzana', description: 'Cómo se llama la agrupación aquí.' })
+  etiquetaAgrupacion!: string;
+
   @ApiProperty({ example: 'America/Bogota' }) zonaHoraria!: string;
 
   @ApiProperty({

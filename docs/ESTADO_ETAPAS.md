@@ -231,6 +231,63 @@ hace que la evidencia persista por sí solo: falta el adaptador
 cierra hoy es el primero de los cuatro recursos de DT-12 y el `SIN-CONFIGURAR`
 del arranque. El detalle, sin adornos, en el documento de flujo biométrico.
 
+### Alta de viviendas · CONSTRUIDO y verificado · 2026-09-16
+
+Rama `etapa-04-alta-de-viviendas`, desde `develop`. Informe completo en
+[`etapas/ETAPA-04-alta-de-viviendas.md`](etapas/ETAPA-04-alta-de-viviendas.md).
+
+**Qué cambió.** La copropiedad declara una vez quién es —dirección, tipo, y cómo
+llama a sus viviendas y agrupaciones— y el padrón se genera entero desde un
+patrón, con vista previa obligatoria. Dentro va la migración de `agrupacion` que
+estaba aprobada: los tres cambios de esquema son de catálogo porque todavía no
+hay padrón cargado.
+
+**Las dos preguntas del usuario, contestadas y con control:**
+
+- **¿El tipo puede cambiar después?** Sí, y las viviendas ya creadas no se
+  enteran, porque ninguna lo guarda y el dominio no lo lee. Lo vigila
+  `scripts/lib/frontera-vocabulario.mjs`, con prueba negativa: sin él la
+  respuesta envejecería en silencio.
+- **¿Al cambiar el prefijo se renombra algo?** No hay nada que renombrar: la
+  palabra nunca estuvo dentro del identificador (H-3). El alta individual
+  rechaza «Casa 42» y la importación lo recorta y lo cuenta.
+
+**Y la operación peligrosa —regenerar sobre un padrón con residentes— no existe:**
+la generación solo inserta y una sola colisión la revierte entera, nombrando
+todas las que chocaron.
+
+**Veredicto literal de §2.8.0** — `./scripts/verificar-etapa.sh --con-base`, con
+`DATABASE_URL_PRUEBAS` apuntando a una PostgreSQL local (ninguna credencial del
+usuario viajó a ningún sitio):
+
+```
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+   ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
+   ✓ una hoja sin un solo UUID crea viviendas, personas y sus vínculos (D-72, RN-06)
+   ✓ el superadministrador escribe el padrón en la copropiedad del selector (D-71)
+   ✓ las 12 en una sentencia, el mismo número en tres agrupaciones, y una colisión revierte las 12
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 19 de 19 pasos ejecutados
+
+VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe
+```
+
+**Cifras de esa misma ejecución:** 1 485 pruebas en verde (api 565 · dominio 380
+· consola 350 · config 144 · providers 46), 116 de 116 ficheros recogidos,
+cobertura de dominio 97,68 % y de aplicación 97,32 % —umbral 90 %—, global
+74,42 % —umbral 70 %—, y los 15 controles negativos detectando su violación.
+
+**Hallazgo del camino, y no menor.** El paso 13 se omite sin
+`DATABASE_URL_PRUEBAS`, y esa omisión escondía tres pruebas contra base en rojo:
+los casos de uso del padrón habían dejado de compilar con la firma nueva. Es la
+familia de falso verde que el propio guion existe para impedir, esta vez desde el
+otro lado —el control estaba, pero nadie le daba la base—. **Si usted ejecuta la
+verificación sin esa variable, el paso 13 le dirá «omitido»: no es un verde.**
+
 ### Alta de viviendas · diseño escrito · 2026-09-16
 
 Entregado **sin construir nada**, a la espera de aprobación:

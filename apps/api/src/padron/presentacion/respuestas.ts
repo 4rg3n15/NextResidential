@@ -20,8 +20,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class ViviendaDto {
   @ApiProperty({ type: String, format: 'uuid' }) id!: string;
   @ApiProperty({ type: String }) identificador!: string;
-  @ApiProperty({ type: String, nullable: true }) manzana!: string | null;
-  @ApiProperty({ type: String, nullable: true }) direccion!: string | null;
+  @ApiProperty({ type: String, nullable: true }) agrupacion!: string | null;
   @ApiProperty({ type: String, enum: ['activo', 'inactivo'] }) estado!: 'activo' | 'inactivo';
   @ApiProperty({ type: String }) estadoAdministrativo!: string;
   @ApiProperty({ type: Number }) residentes!: number;
@@ -35,6 +34,41 @@ export class ViviendaDto {
   autorizacionesVigentes!: number;
   @ApiProperty({ type: String, nullable: true }) desactivadaEn!: string | null;
   @ApiProperty({ type: String, nullable: true }) motivoDesactivacion!: string | null;
+}
+
+/**
+ * Un grupo de la vista previa: el recuento y los extremos, no las 300.
+ *
+ * Ver que la Torre C acaba en 303 y no en 503 es lo que detecta un patrón mal
+ * puesto; ver las trescientas no ayuda a nadie.
+ */
+export class GrupoProyectadoDto {
+  @ApiProperty({ type: String, nullable: true }) agrupacion!: string | null;
+  @ApiProperty({ type: Number }) cantidad!: number;
+  @ApiProperty({ type: [String] }) primeras!: string[];
+  @ApiProperty({ type: [String] }) ultimas!: string[];
+  @ApiProperty({ type: Boolean }) porExcepcion!: boolean;
+}
+
+export class ViviendaProyectadaDto {
+  @ApiProperty({ type: String, nullable: true }) agrupacion!: string | null;
+  @ApiProperty({ type: String }) identificador!: string;
+}
+
+export class VistaPreviaDeGeneracionDto {
+  @ApiProperty({ type: Number }) total!: number;
+  @ApiProperty({ type: [GrupoProyectadoDto] }) grupos!: GrupoProyectadoDto[];
+  @ApiProperty({
+    type: [ViviendaProyectadaDto],
+    description:
+      'Las que ya existen activas. Con una sola, la confirmacion se niega entera: la ' +
+      'generacion solo inserta y nunca sustituye nada.',
+  })
+  colisiones!: ViviendaProyectadaDto[];
+}
+
+export class GeneracionAplicadaDto {
+  @ApiProperty({ type: Number }) creadas!: number;
 }
 
 export class TotalesDeViviendasDto {
@@ -100,6 +134,13 @@ export class ResultadoDeCargaDto {
     description: 'Personas nuevas. Las que ya tenían ese documento se reutilizan (RN-06).',
   })
   personasCreadas!: number;
+  @ApiProperty({
+    type: Number,
+    description:
+      'Identificadores que traían la palabra dentro («Casa 42») y se guardaron sin ella. Se ' +
+      'recorta y se cuenta: contarlo es lo que impide que el recorte sea silencioso.',
+  })
+  identificadoresRecortados!: number;
 }
 
 /**

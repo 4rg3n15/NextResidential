@@ -41,8 +41,19 @@ const ETIQUETA_DE_POLITICA: Readonly<Record<string, string>> = {
   escalar_portero: 'Escalar al portero',
 };
 
+const ETIQUETA_DE_TIPO: Readonly<Record<string, string>> = {
+  apartamentos: 'Apartamentos (torres y pisos)',
+  casas: 'Casas (conjunto o urbanización)',
+  fincas: 'Fincas o parcelas',
+  otro: 'Otro (sin generación automática)',
+};
+
 interface Borrador {
   nombre: string;
+  direccion: string;
+  tipo: string;
+  etiquetaVivienda: string;
+  etiquetaAgrupacion: string;
   zonaHoraria: string;
   umbralConfianzaPlaca: string;
   politicaContingenciaEdge: string;
@@ -51,6 +62,10 @@ interface Borrador {
 
 const aBorrador = (c: ConfiguracionDeCopropiedad): Borrador => ({
   nombre: c.nombre,
+  direccion: c.direccion ?? '',
+  tipo: c.tipo ?? '',
+  etiquetaVivienda: c.etiquetaVivienda,
+  etiquetaAgrupacion: c.etiquetaAgrupacion,
   zonaHoraria: c.zonaHoraria,
   umbralConfianzaPlaca: c.umbralConfianzaPlaca.toFixed(3),
   politicaContingenciaEdge: c.politicaContingenciaEdge,
@@ -89,6 +104,14 @@ export const FormularioDeConfiguracion = ({
         params: { path: { id: copropiedadId } },
         body: {
           nombre: b.nombre,
+          // Vacío significa «no lo toques», no «bórralo»: la configuración no
+          // borra datos, y una dirección en blanco no es una dirección.
+          ...(b.direccion.trim() === '' ? {} : { direccion: b.direccion.trim() }),
+          ...(b.tipo === ''
+            ? {}
+            : { tipo: b.tipo as 'apartamentos' | 'casas' | 'fincas' | 'otro' }),
+          etiquetaVivienda: b.etiquetaVivienda,
+          etiquetaAgrupacion: b.etiquetaAgrupacion,
           zonaHoraria: b.zonaHoraria,
           umbralConfianzaPlaca: Number(b.umbralConfianzaPlaca),
           politicaContingenciaEdge: b.politicaContingenciaEdge as 'denegar' | 'escalar_portero',
@@ -154,6 +177,78 @@ export const FormularioDeConfiguracion = ({
         maxLength={200}
         error={rechazos['nombre']}
         ayuda={editable('nombre') ? undefined : bloqueado}
+      />
+
+      <Campo
+        etiqueta="Dirección del conjunto"
+        value={borrador.direccion}
+        onChange={(e) => cambiar('direccion', e.target.value)}
+        disabled={!editable('direccion')}
+        maxLength={200}
+        error={rechazos['direccion']}
+        ayuda={
+          editable('direccion')
+            ? 'La dirección es del CONJUNTO: las viviendas no tienen la suya. Lo que cambia entre ellas es la agrupación y el número.'
+            : bloqueado
+        }
+      />
+
+      <div className="space-y-1.5">
+        <label
+          htmlFor="tipo-de-copropiedad"
+          className="block text-secundario font-medium text-texto"
+        >
+          Tipo de copropiedad
+        </label>
+        <select
+          id="tipo-de-copropiedad"
+          value={borrador.tipo}
+          onChange={(e) => cambiar('tipo', e.target.value)}
+          disabled={!editable('tipo')}
+          className="h-11 w-full rounded-campo border border-borde bg-campo px-3 text-cuerpo text-texto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto disabled:cursor-not-allowed disabled:bg-borde-suave"
+        >
+          <option value="" disabled>
+            Sin configurar
+          </option>
+          {Object.entries(ETIQUETA_DE_TIPO).map(([valor, etiqueta]) => (
+            <option key={valor} value={valor}>
+              {etiqueta}
+            </option>
+          ))}
+        </select>
+        <p className="text-secundario text-texto-apagado">
+          {editable('tipo')
+            ? 'Decide el formulario de alta y las palabras sugeridas. Puede cambiarlo cuando quiera: las viviendas ya creadas conservan su identificador, porque ninguna guarda el tipo.'
+            : bloqueado}
+        </p>
+      </div>
+
+      <Campo
+        etiqueta="Cómo se llama una vivienda aquí"
+        value={borrador.etiquetaVivienda}
+        onChange={(e) => cambiar('etiquetaVivienda', e.target.value)}
+        disabled={!editable('etiquetaVivienda')}
+        maxLength={24}
+        error={rechazos['etiquetaVivienda']}
+        ayuda={
+          editable('etiquetaVivienda')
+            ? 'Casa, Apartamento, Finca… Se pinta al mostrar y nunca se guarda dentro del número, así que cambiarla no renombra ninguna vivienda.'
+            : bloqueado
+        }
+      />
+
+      <Campo
+        etiqueta="Cómo se llama una agrupación aquí"
+        value={borrador.etiquetaAgrupacion}
+        onChange={(e) => cambiar('etiquetaAgrupacion', e.target.value)}
+        disabled={!editable('etiquetaAgrupacion')}
+        maxLength={24}
+        error={rechazos['etiquetaAgrupacion']}
+        ayuda={
+          editable('etiquetaAgrupacion')
+            ? 'Torre, bloque, manzana, etapa, sector… la palabra que use el conjunto. Texto libre: hay parcelaciones que usan manzana y lote a la vez.'
+            : bloqueado
+        }
       />
 
       <Campo

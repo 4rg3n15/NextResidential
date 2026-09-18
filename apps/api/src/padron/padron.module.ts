@@ -2,7 +2,11 @@ import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
 import { REPOSITORIO_PADRON } from './aplicacion/puertos';
+import { LECTOR_DE_VOCABULARIO } from './aplicacion/vocabulario';
+import { REPOSITORIO_COPROPIEDADES } from '../multiempresa/repositorio-copropiedades';
+import type { RepositorioCopropiedades } from '../multiempresa/repositorio-copropiedades';
 import { RepositorioPadronPg } from './infraestructura/repositorio-pg';
+import { VocabularioDesdeCopropiedad } from './infraestructura/vocabulario-desde-copropiedad';
 import { PadronController } from './presentacion/padron.controller';
 import { PadronDeCopropiedadController } from './presentacion/padron-copropiedad.controller';
 
@@ -28,8 +32,20 @@ export class PadronModule {
           inject: [Pool],
           useFactory: (pool: Pool) => new RepositorioPadronPg(pool, {}),
         },
+        /**
+         * El vocabulario del conjunto llega por el repositorio de
+         * `multiempresa` —que `MultiempresaModule` exporta y es `@Global()`—,
+         * no por una consulta del padrón a `copropiedades`. La frontera de §2.2
+         * se sostiene en el cableado, que es donde puede sostenerse.
+         */
+        {
+          provide: LECTOR_DE_VOCABULARIO,
+          inject: [REPOSITORIO_COPROPIEDADES],
+          useFactory: (copropiedades: RepositorioCopropiedades) =>
+            new VocabularioDesdeCopropiedad(copropiedades),
+        },
       ],
-      exports: [REPOSITORIO_PADRON],
+      exports: [REPOSITORIO_PADRON, LECTOR_DE_VOCABULARIO],
     };
   }
 }

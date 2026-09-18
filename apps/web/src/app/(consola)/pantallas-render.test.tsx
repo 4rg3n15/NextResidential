@@ -30,11 +30,34 @@ const respuesta = (cuerpo: unknown): Response =>
     headers: { 'content-type': 'application/json' },
   });
 
+/**
+ * El vocabulario del conjunto. Con él, el directorio pinta «Casa 12 · Manzana
+ * B» —el texto exacto del mockup W-03— a partir de un identificador que en la
+ * base es solo «12». Si la palabra estuviera dentro del dato, esta prueba no
+ * distinguiría una cosa de la otra.
+ */
+const CONFIGURACION = {
+  nombre: 'Urbanización Mira',
+  direccion: 'Kilómetro 4 vía La Calera',
+  tipo: 'casas',
+  etiquetaVivienda: 'Casa',
+  etiquetaAgrupacion: 'Manzana',
+  zonaHoraria: 'America/Bogota',
+  umbralConfianzaPlaca: 0.85,
+  politicaContingenciaEdge: 'denegar',
+  umbralLatidoMinutos: 5,
+  nit: '900123456',
+  estado: 'activa',
+  plazoConsentimientoHoras: 24,
+  margenCacheReglasHoras: 24,
+  versionReglasActual: 1,
+  editables: ['nombre'],
+};
+
 const VIVIENDA = {
   id: 'viv-1',
-  identificador: 'Casa 12',
-  manzana: 'B',
-  direccion: null,
+  identificador: '12',
+  agrupacion: 'B',
   estado: 'inactivo',
   estadoAdministrativo: 'al_dia',
   residentes: 3,
@@ -147,6 +170,7 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
     if (url.includes('/padron/viviendas')) {
       return respuesta({ totales: { activas: 4, inactivas: 1 }, viviendas: [VIVIENDA] });
     }
+    if (url.includes('/configuracion')) return respuesta(CONFIGURACION);
     if (url.includes('/padron/vehiculos')) return respuesta([VEHICULO]);
     if (url.includes('/autorizaciones')) return respuesta([AUTORIZACION]);
     if (url.includes('/zonas')) return respuesta([ZONA]);
@@ -195,7 +219,9 @@ afterEach(() => {
 describe('viviendas', () => {
   it('muestra los totales y NO esconde que una inactiva conserva autorizaciones (RN-13)', async () => {
     montar(<DirectorioDeViviendas copropiedadId={COP} />);
-    await waitFor(() => expect(screen.getByText('Casa 12')).toBeDefined());
+    // El identificador guardado es «12»; «Casa» y «Manzana» salen de la
+    // configuración y se componen al mostrar (H-3).
+    await waitFor(() => expect(screen.getByText('Casa 12 · Manzana B')).toBeDefined());
     expect(screen.getByText('4 activas')).toBeDefined();
     // La frase que impide leer «inactiva» como «ya no entra nadie».
     expect(screen.getByText(/siguen abriendo/i)).toBeDefined();

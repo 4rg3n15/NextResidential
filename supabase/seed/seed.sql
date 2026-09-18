@@ -58,16 +58,27 @@ ON CONFLICT (id) DO NOTHING;
 SET LOCAL request.jwt.claims = '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002"}';
 
 -- Copropiedad ------------------------------------------------------------------
-INSERT INTO public.copropiedades (id, nombre, nit, zona_horaria, creado_por, actualizado_por)
+-- `tipo`, `direccion` y las dos etiquetas entran en la 0029. La copropiedad de
+-- ejemplo es de CASAS y se llama a si misma como el mockup W-03: «Casa 42 ·
+-- Manzana B». Las palabras estan aqui, en la copropiedad; dentro del
+-- identificador de la vivienda solo va el numero.
+INSERT INTO public.copropiedades (id, nombre, nit, zona_horaria, tipo, direccion,
+                                  etiqueta_vivienda, etiqueta_agrupacion,
+                                  creado_por, actualizado_por)
 VALUES ('10000000-0000-4000-8000-000000000001', 'Urbanizacion Mira', '900123456',
-        'America/Bogota',
+        'America/Bogota', 'casas', 'Kilometro 4 Via La Calera, Bogota',
+        'Casa', 'Manzana',
         '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT (id) DO NOTHING;
 
 -- Segunda copropiedad: existe para que la suite de aislamiento tenga contra qué
 -- probar. Sin un segundo tenant, las pruebas negativas no prueban nada.
-INSERT INTO public.copropiedades (id, nombre, nit, creado_por, actualizado_por)
+INSERT INTO public.copropiedades (id, nombre, nit, tipo, direccion,
+                                  etiqueta_vivienda, etiqueta_agrupacion,
+                                  creado_por, actualizado_por)
 VALUES ('10000000-0000-4000-8000-000000000002', 'Parcelacion El Roble', '900987654',
+        'fincas', 'Vereda El Roble, Km 12 Via Silvania',
+        'Lote', 'Sector',
         '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT (id) DO NOTHING;
 
@@ -157,15 +168,18 @@ SELECT c.id, v.clave, v.nombre, v.descripcion, v.orden, v.permite_autorizar,
 ON CONFLICT DO NOTHING;
 
 -- Padrón · viviendas del mockup W-03 -------------------------------------------
-INSERT INTO public.viviendas (id, copropiedad_id, identificador, manzana, creado_por, actualizado_por)
+-- El identificador lleva SOLO el numero. La palabra «Casa» es
+-- `copropiedades.etiqueta_vivienda` y se pinta al mostrar: asi, cambiar el
+-- prefijo del conjunto no renombra 300 filas (hallazgo H-3 del diseno).
+INSERT INTO public.viviendas (id, copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
 VALUES
- ('30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','Casa 01','A',
+ ('30000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','01','A',
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
- ('30000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001','Casa 02','A',
+ ('30000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001','02','A',
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
- ('30000000-0000-4000-8000-000000000042','10000000-0000-4000-8000-000000000001','Casa 42','B',
+ ('30000000-0000-4000-8000-000000000042','10000000-0000-4000-8000-000000000001','42','B',
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002'),
- ('30000000-0000-4000-8000-000000000089','10000000-0000-4000-8000-000000000001','Casa 89','C',
+ ('30000000-0000-4000-8000-000000000089','10000000-0000-4000-8000-000000000001','89','C',
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT (id) DO NOTHING;
 
@@ -464,9 +478,9 @@ SELECT c.id, v.clave, v.nombre, v.descripcion, v.orden, v.permite_autorizar,
  ) AS v(clave, nombre, descripcion, orden, permite_autorizar)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO public.viviendas (id, copropiedad_id, identificador, manzana, creado_por, actualizado_por)
+INSERT INTO public.viviendas (id, copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
 VALUES
- ('30000000-0000-4000-8000-000000000101','10000000-0000-4000-8000-000000000002','Lote 01','U',
+ ('30000000-0000-4000-8000-000000000101','10000000-0000-4000-8000-000000000002','01','U',
   '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT DO NOTHING;
 

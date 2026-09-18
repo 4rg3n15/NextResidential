@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-pg';
+import type { LectorDeVocabulario } from '../src/padron/aplicacion/vocabulario';
 import {
   DesactivarVivienda,
   RegistrarResidente,
@@ -59,6 +60,20 @@ afterAll(async () => {
   await pool?.end();
 });
 
+/**
+ * Vocabulario del conjunto. Las semillas declaran «Casa» y «Manzana»; aquí se
+ * usa una palabra que NO colisiona con los identificadores de la prueba, para
+ * que lo que se mida sea el alta y no el recorte de la etiqueta —que tiene su
+ * propia prueba.
+ */
+const vocabulario: LectorDeVocabulario = {
+  leer: async () => ({
+    tipo: 'apartamentos',
+    etiquetaVivienda: 'Apartamento',
+    etiquetaAgrupacion: 'Torre',
+  }),
+};
+
 describe('alta de padrón con superadministrador, contra base', () => {
   it('crea una vivienda y devuelve su identificador', async () => {
     if (!disponible || pool === undefined) {
@@ -67,7 +82,9 @@ describe('alta de padrón con superadministrador, contra base', () => {
     }
     const repo = new RepositorioPadronPg(pool);
     const identificador = `TORRE-A-${String(Date.now()).slice(-8)}`;
-    const r = await new RegistrarVivienda(repo).ejecutar(contextoDestino(), { identificador });
+    const r = await new RegistrarVivienda(repo, vocabulario).ejecutar(contextoDestino(), {
+      identificador,
+    });
 
     expect(r.ok, r.ok ? '' : `no se creó: ${r.error.detalle}`).toBe(true);
     if (!r.ok) return;
@@ -101,7 +118,7 @@ describe('alta de padrón con superadministrador, contra base', () => {
       return;
     }
     const repo = new RepositorioPadronPg(pool);
-    const vivienda = await new RegistrarVivienda(repo).ejecutar(contextoDestino(), {
+    const vivienda = await new RegistrarVivienda(repo, vocabulario).ejecutar(contextoDestino(), {
       identificador: `TORRE-B-${String(Date.now()).slice(-8)}`,
     });
     expect(vivienda.ok).toBe(true);

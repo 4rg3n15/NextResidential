@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import type { Rol, Sesion } from '@ncr/contracts';
 import { BarraLateral } from './barra-lateral';
 import { Cabecera } from './cabecera';
+import { ConfiguracionInicial } from './configuracion-inicial';
 import { ContextoDelCanal } from '@/lib/sse/contexto';
 import type { EstadoDelCanal } from '@/lib/sse/canal';
 import type { AlcanceActivo } from '@/app/(consola)/copropiedad';
@@ -40,6 +41,10 @@ export const MarcoDeConsola = ({
           <main id="contenido" className="flex-1 px-6 py-6">
             {children}
           </main>
+          {/* Aquí y no en una pantalla concreta: «al entrar» es al entrar, y el
+              estado que lo dispara —tipo sin configurar— lo decide el servidor,
+              no la ruta en la que se esté. */}
+          <ConfiguracionInicial copropiedadId={alcance.copropiedadId} rol={rol} />
         </div>
       </div>
     </ContextoDelCanal.Provider>

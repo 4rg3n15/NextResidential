@@ -6,18 +6,21 @@ import type {
   AltaResidente,
   AltaVehiculo,
   AltaVivienda,
+  FilaExportada,
   FiltroDeViviendas,
+  GeneracionDeViviendas,
   PersonaEnLista,
   RepositorioPadron,
   ResultadoAltaPersona,
   ResultadoAltaVivienda,
+  ResultadoDeGeneracion,
   ResultadoRegistroVehiculo,
   TipoDeVehiculo,
   TotalesDePadron,
   VehiculoEnLista,
   ViviendaEnLista,
 } from '../aplicacion/puertos';
-import type { Placa, TipoDeDocumento } from '@ncr/domain-core';
+import type { Placa, TipoDeDocumento, ViviendaProyectada } from '@ncr/domain-core';
 
 /** Violación de restricción única en PostgreSQL. */
 const VIOLACION_UNICA = '23505';
@@ -105,16 +108,10 @@ export class RepositorioPadronPg implements RepositorioPadron {
       try {
         const { rows } = await c.query<{ id: string }>(
           `INSERT INTO public.viviendas
-             (copropiedad_id, identificador, manzana, direccion, creado_por, actualizado_por)
-           VALUES ($1,$2,$3,$4,$5,$5)
+             (copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
+           VALUES ($1,$2,$3,$4,$4)
            RETURNING id`,
-          [
-            alta.copropiedadId,
-            alta.identificador,
-            alta.manzana ?? null,
-            alta.direccion ?? null,
-            alta.actorId,
-          ],
+          [alta.copropiedadId, alta.identificador, alta.agrupacion ?? null, alta.actorId],
         );
         return { tipo: 'registrada', id: rows[0]!.id };
       } catch (e) {
@@ -123,9 +120,11 @@ export class RepositorioPadronPg implements RepositorioPadron {
           e !== null &&
           (e as { code?: string }).code === VIOLACION_UNICA
         ) {
-          // `viviendas_identificador_uk` es parcial sobre `estado='activo'`: un
-          // identificador reutilizado tras una baja NO choca, y eso es
-          // deliberado (RN-19). Aquí solo llega el choque con una vivienda viva.
+          // `viviendas_identificador_uk` es parcial sobre `estado='activo'` y
+          // COMPUESTO desde la 0029: un identificador reutilizado tras una baja
+          // NO choca —deliberado, RN-19— y el 101 de la Torre 1 no choca con el
+          // de la Torre 2. Aquí solo llega el choque con una vivienda viva del
+          // mismo par.
           return { tipo: 'identificador_duplicado' };
         }
         throw e;
@@ -156,8 +155,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
       const { rows } = await c.query<{
         id: string;
         identificador: string;
-        manzana: string | null;
-        direccion: string | null;
+        agrupacion: string | null;
         estado: 'activo' | 'inactivo';
         estado_administrativo: string;
         residentes: string;
@@ -168,7 +166,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
         total_activas: string;
         total_inactivas: string;
       }>(
-        `SELECT v.id, v.identificador, v.manzana, v.direccion, v.estado,
+        `SELECT v.id, v.identificador, v.agrupacion, v.estado,
                 v.estado_administrativo::text AS estado_administrativo,
                 v.desactivado_en, v.motivo_desactivacion,
                 (SELECT count(*) FROM public.residentes r
@@ -189,9 +187,16 @@ export class RepositorioPadronPg implements RepositorioPadron {
           WHERE v.copropiedad_id = $1
             AND ($2::text IS NULL OR v.estado::text = $2)
             AND ($3::text = '' OR v.identificador ILIKE '%' || $3 || '%'
-                              OR coalesce(v.manzana, '') ILIKE '%' || $3 || '%'
-                              OR coalesce(v.direccion, '') ILIKE '%' || $3 || '%')
-          ORDER BY v.identificador
+                              OR coalesce(v.agrupacion, '') ILIKE '%' || $3 || '%'
+                              OR coalesce(v.agrupacion, '') || ' ' || v.identificador
+                                   ILIKE '%' || $3 || '%')
+          -- Por agrupación primero y por número DENTRO de ella: el directorio
+          -- se pinta agrupado, y un orden alfabético puro pondría el 1000 antes
+          -- del 101. Las viviendas sin agrupación quedan al final.
+          ORDER BY coalesce(v.agrupacion, '~~~'),
+                   nullif(regexp_replace(v.identificador, '[^0-9]', '', 'g'), '')::bigint
+                     NULLS LAST,
+                   v.identificador
           LIMIT 500`,
         [copropiedadId, filtro.estado ?? null, busqueda],
       );
@@ -211,8 +216,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
         viviendas: rows.map((f) => ({
           id: f.id,
           identificador: f.identificador,
-          manzana: f.manzana,
-          direccion: f.direccion,
+          agrupacion: f.agrupacion,
           estado: f.estado,
           estadoAdministrativo: f.estado_administrativo,
           residentes: Number(f.residentes),
@@ -433,17 +437,197 @@ export class RepositorioPadronPg implements RepositorioPadron {
    */
   async buscarViviendaPorIdentificador(
     copropiedadId: string,
+    agrupacion: string | null,
     identificador: string,
   ): Promise<{ readonly id: string } | null> {
     return this.conContexto(async (c) => {
+      // `coalesce` a los dos lados, igual que el índice: comparar contra NULL
+      // con `=` no devuelve nunca verdadero, así que sin esto una parcelación
+      // sin secciones no encontraría ninguna de sus casas.
       const { rows } = await c.query<{ id: string }>(
         `SELECT id FROM public.viviendas
-          WHERE copropiedad_id = $1 AND identificador = $2 AND estado = 'activo'
+          WHERE copropiedad_id = $1
+            AND coalesce(agrupacion, '') = coalesce($2::text, '')
+            AND identificador = $3
+            AND estado = 'activo'
           LIMIT 1`,
-        [copropiedadId, identificador],
+        [copropiedadId, agrupacion, identificador],
       );
       const fila = rows[0];
       return fila === undefined ? null : { id: fila.id };
+    });
+  }
+
+  /**
+   * Las del plan que YA existen activas. Lectura para informar a la vista
+   * previa; la garantía sigue siendo el índice (ADR-04).
+   */
+  async viviendasExistentes(
+    copropiedadId: string,
+    viviendas: readonly ViviendaProyectada[],
+  ): Promise<readonly ViviendaProyectada[]> {
+    if (viviendas.length === 0) return [];
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{ agrupacion: string | null; identificador: string }>(
+        `SELECT v.agrupacion, v.identificador
+           FROM public.viviendas v
+           JOIN unnest($2::text[], $3::text[]) AS p(agrupacion, identificador)
+             ON coalesce(v.agrupacion, '') = p.agrupacion
+            AND v.identificador = p.identificador
+          WHERE v.copropiedad_id = $1 AND v.estado = 'activo'`,
+        [
+          copropiedadId,
+          viviendas.map((v) => v.agrupacion ?? ''),
+          viviendas.map((v) => v.identificador),
+        ],
+      );
+      return rows.map((f) => ({ agrupacion: f.agrupacion, identificador: f.identificador }));
+    });
+  }
+
+  /**
+   * **El padrón entero en UNA sentencia, sin `SELECT` previo.**
+   *
+   * `ON CONFLICT … DO NOTHING` deja que el índice decida vivienda a vivienda, y
+   * `RETURNING` dice cuáles entraron. Si entraron menos de las pedidas, la
+   * diferencia ES la lista de colisiones: se calcula restando, no consultando,
+   * y la transacción se revierte entera. Así el operador recibe TODAS las que
+   * chocaron —no la primera— y no queda media generación aplicada.
+   *
+   * El rastro va en la MISMA transacción, por el mismo motivo que en el cambio
+   * de configuración (§2.7.8): si se escribiera después, una caída entre las
+   * dos dejaría 300 viviendas sin constancia de quién las creó ni con qué plan.
+   */
+  async generarViviendas(generacion: GeneracionDeViviendas): Promise<ResultadoDeGeneracion> {
+    const { copropiedadId, viviendas, actorId } = generacion;
+    if (viviendas.length === 0) return { creadas: 0, colisiones: [] };
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
+        JSON.stringify(this.claims),
+      ]);
+      await cliente.query('BEGIN');
+      try {
+        const { rows } = await cliente.query<{ agrupacion: string | null; identificador: string }>(
+          `INSERT INTO public.viviendas
+             (copropiedad_id, agrupacion, identificador, creado_por, actualizado_por)
+           SELECT $1, nullif(p.agrupacion, ''), p.identificador, $4, $4
+             FROM unnest($2::text[], $3::text[]) AS p(agrupacion, identificador)
+           ON CONFLICT (copropiedad_id, coalesce(agrupacion, ''), identificador)
+             WHERE estado = 'activo'
+           DO NOTHING
+           RETURNING agrupacion, identificador`,
+          [
+            copropiedadId,
+            viviendas.map((v) => v.agrupacion ?? ''),
+            viviendas.map((v) => v.identificador),
+            actorId,
+          ],
+        );
+
+        if (rows.length !== viviendas.length) {
+          const entraron = new Set(
+            rows.map((f) => JSON.stringify([f.agrupacion ?? '', f.identificador])),
+          );
+          const colisiones = viviendas.filter(
+            (v) => !entraron.has(JSON.stringify([v.agrupacion ?? '', v.identificador])),
+          );
+          await cliente.query('ROLLBACK');
+          return { creadas: 0, colisiones };
+        }
+
+        await cliente.query(
+          `INSERT INTO public.auditoria_seguridad
+             (copropiedad_id_actor, copropiedad_id_objetivo, usuario_id, tipo,
+              recurso, identificador_solicitado, resultado, creado_por)
+           VALUES ($1, $1, $2, 'generacion_de_padron', $3, $4, 'permitido', $2)`,
+          [
+            copropiedadId,
+            actorId,
+            `copropiedades/${copropiedadId}/padron/viviendas/generacion`,
+            generacion.resumenDelPlan.slice(0, 300),
+          ],
+        );
+
+        await cliente.query('COMMIT');
+        return { creadas: rows.length, colisiones: [] };
+      } catch (e) {
+        await cliente.query('ROLLBACK');
+        throw e;
+      }
+    } finally {
+      cliente.release();
+    }
+  }
+
+  /**
+   * El padrón, en las columnas del archivo del administrador. Una fila por
+   * vínculo —vehículo o residente— y una fila suelta por vivienda vacía, para
+   * que el archivo exportado describa el padrón entero y no solo su parte
+   * poblada.
+   */
+  async exportarPadron(copropiedadId: string): Promise<readonly FilaExportada[]> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{
+        identificador: string;
+        agrupacion: string | null;
+        documento: string | null;
+        tipo_documento: string | null;
+        nombre: string | null;
+        placa: string | null;
+        es_titular: boolean | null;
+      }>(
+        `WITH vinculos AS (
+           SELECT v.identificador, v.agrupacion,
+                  p.numero_documento AS documento, p.tipo_documento::text AS tipo_documento,
+                  p.nombre_completo AS nombre, NULL::text AS placa, r.es_titular
+             FROM public.viviendas v
+             JOIN public.residentes r
+               ON r.copropiedad_id = v.copropiedad_id AND r.vivienda_id = v.id
+              AND r.estado = 'activo'
+             JOIN public.personas p
+               ON p.copropiedad_id = v.copropiedad_id AND p.id = r.persona_id
+            WHERE v.copropiedad_id = $1 AND v.estado = 'activo'
+           UNION ALL
+           SELECT v.identificador, v.agrupacion,
+                  p.numero_documento, p.tipo_documento::text,
+                  p.nombre_completo, ve.placa, NULL::boolean
+             FROM public.viviendas v
+             JOIN public.vehiculos ve
+               ON ve.copropiedad_id = v.copropiedad_id AND ve.vivienda_id = v.id
+              AND ve.estado = 'activo'
+             LEFT JOIN public.personas p
+               ON p.copropiedad_id = v.copropiedad_id AND p.id = ve.persona_id
+            WHERE v.copropiedad_id = $1 AND v.estado = 'activo'
+           UNION ALL
+           -- La vivienda sin residentes ni vehículos también sale: una fila con
+           -- solo el identificador significa «esta casa existe y está vacía», y
+           -- la carga la lee exactamente así.
+           SELECT v.identificador, v.agrupacion, NULL, NULL, NULL, NULL, NULL
+             FROM public.viviendas v
+            WHERE v.copropiedad_id = $1 AND v.estado = 'activo'
+              AND NOT EXISTS (SELECT 1 FROM public.residentes r
+                               WHERE r.vivienda_id = v.id AND r.estado = 'activo')
+              AND NOT EXISTS (SELECT 1 FROM public.vehiculos ve
+                               WHERE ve.vivienda_id = v.id AND ve.estado = 'activo')
+         )
+         SELECT * FROM vinculos
+          ORDER BY coalesce(agrupacion, '~~~'),
+                   nullif(regexp_replace(identificador, '[^0-9]', '', 'g'), '')::bigint NULLS LAST,
+                   identificador, documento NULLS FIRST, placa NULLS FIRST
+          LIMIT 10000`,
+        [copropiedadId],
+      );
+      return rows.map((f) => ({
+        identificador: f.identificador,
+        agrupacion: f.agrupacion,
+        documento: f.documento,
+        tipoDocumento: f.tipo_documento,
+        nombre: f.nombre,
+        placa: f.placa,
+        esTitular: f.es_titular,
+      }));
     });
   }
 

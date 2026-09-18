@@ -36,9 +36,8 @@ const COP = '10000000-0000-4000-8000-000000000001';
 const CON_DATOS = (url: string): Response => {
   const vivienda = {
     id: 'viv-1',
-    identificador: 'Casa 12',
-    manzana: null,
-    direccion: null,
+    identificador: '12',
+    agrupacion: 'B',
     estado: 'activo',
     estadoAdministrativo: 'al_dia',
     residentes: 1,
@@ -308,7 +307,11 @@ describe('la estructura del documento es navegable', () => {
 });
 
 describe('las tablas se anuncian como tablas', () => {
-  const CON_TABLA = ['viviendas', 'vehículos', 'dispositivos', 'eventos'];
+  // `viviendas` salió de esta lista al dejar de ser una tabla: ahora es una
+  // lista desplegable agrupada por torre o sección, y se comprueba abajo con
+  // los roles que SÍ le corresponden. Quitarla sin poner nada en su lugar
+  // habría sido perder un control, no adaptarlo.
+  const CON_TABLA = ['vehículos', 'dispositivos', 'eventos'];
   for (const pantalla of PANTALLAS.filter((p) => CON_TABLA.includes(p.nombre))) {
     it(`${pantalla.nombre}: encabezados de columna con ámbito y descripción`, async () => {
       await montarConDatos(pantalla);
@@ -324,6 +327,30 @@ describe('las tablas se anuncian como tablas', () => {
       expect(tabla.querySelector('caption')).not.toBeNull();
     });
   }
+});
+
+describe('el directorio de viviendas se anuncia como lo que es', () => {
+  it('grupos desplegables con nombre, y una lista dentro de cada uno', async () => {
+    // El equivalente de la comprobación de tabla para la estructura nueva. Un
+    // acordeón hecho con `div` y `onClick` se ve igual y no existe para un
+    // lector de pantalla: `details`/`summary` sí, y sin una línea de JavaScript.
+    const pantalla = PANTALLAS.find((p) => p.nombre === 'viviendas');
+    if (pantalla === undefined) throw new Error('falta la pantalla de viviendas');
+    await montarConDatos(pantalla);
+
+    const grupos = document.querySelectorAll('details');
+    expect(grupos.length).toBeGreaterThan(0);
+    for (const grupo of grupos) {
+      // El resumen es el control que abre y cierra: sin texto, se anuncia
+      // «detalles» y nada más.
+      const resumen = grupo.querySelector('summary');
+      expect(resumen).not.toBeNull();
+      expect((resumen?.textContent ?? '').trim().length).toBeGreaterThan(0);
+      // Y lo de dentro es una lista, no una sucesión de `div`: el lector dice
+      // cuántas viviendas hay antes de empezar a leerlas.
+      expect(grupo.querySelectorAll('ul > li').length).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe('los avisos se anuncian solos', () => {

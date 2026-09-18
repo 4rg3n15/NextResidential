@@ -78,7 +78,7 @@ export const CargaDePadron = ({
       <DialogoDeFormulario
         abierto={abierto}
         titulo="Cargar padrón desde XLSX"
-        descripcion="La primera fila es la cabecera. La única obligatoria es «vivienda», con el identificador que usa el conjunto: «Casa 12»."
+        descripcion="La primera fila es la cabecera. La única obligatoria es «identificador»: el número de la vivienda, como está en la puerta."
         etiquetaEnviar="Cargar"
         enviando={enviando}
         error={error}
@@ -98,8 +98,14 @@ export const CargaDePadron = ({
           <p className="font-medium text-texto">Columnas de la hoja</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4">
             <li>
-              <strong>vivienda</strong> — obligatoria. «Casa 12», tal como se nombra en la portería.
-              Si no existe todavía, se crea y el resumen lo dice.
+              <strong>identificador</strong> — obligatoria. El número: «42», «101». Si su archivo
+              trae la palabra delante —«Casa 42»— se guarda sin ella y el resumen lo cuenta. Si la
+              vivienda no existe todavía, se crea y el resumen también lo dice.
+            </li>
+            <li>
+              <strong>agrupacion</strong> — torre, bloque, manzana, sección o sector. Hace falta
+              cuando el conjunto agrupa: el 101 de la torre 1 y el de la torre 2 son dos viviendas
+              distintas. Si su conjunto no agrupa, la columna sobra.
             </li>
             <li>
               <strong>placa</strong> — para registrar un vehículo de esa vivienda.
@@ -162,7 +168,19 @@ export const CargaDePadron = ({
                 Se crearon {resultado.viviendasCreadas} vivienda
                 {resultado.viviendasCreadas === 1 ? '' : 's'} y {resultado.personasCreadas} persona
                 {resultado.personasCreadas === 1 ? '' : 's'}. Si alguno de esos números te
-                sorprende, revisa la hoja: una errata en «vivienda» crea una casa nueva.
+                sorprende, revisa la hoja: una errata en «identificador» crea una vivienda nueva.
+              </p>
+            ) : null}
+            {/* El recorte de la palabra se CUENTA. Es lo que impide que sea
+                silencioso: quien cargó «Casa 42» ve que se guardó «42» y por
+                qué, en vez de descubrirlo al buscar y no encontrarla. */}
+            {resultado.aplicada && resultado.identificadoresRecortados > 0 ? (
+              <p className="mt-1">
+                {resultado.identificadoresRecortados} identificador
+                {resultado.identificadoresRecortados === 1 ? '' : 'es'} traía
+                {resultado.identificadoresRecortados === 1 ? '' : 'n'} la palabra dentro y se guardó
+                {resultado.identificadoresRecortados === 1 ? '' : 'aron'} solo con el número: la
+                palabra la pone el sistema al mostrar.
               </p>
             ) : null}
             {resultado.errores.length > 0 ? (

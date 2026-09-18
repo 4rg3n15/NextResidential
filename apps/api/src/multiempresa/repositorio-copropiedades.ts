@@ -96,6 +96,12 @@ export class RepositorioCopropiedadesEnMemoria implements RepositorioCopropiedad
       if (!this.configuraciones.has(fila.id)) {
         this.configuraciones.set(fila.id, {
           nombre: fila.nombre,
+          direccion: null,
+          // Sin configurar, como una copropiedad recién creada por el guion de
+          // aprovisionamiento: es el estado que dispara el diálogo inicial.
+          tipo: null,
+          etiquetaVivienda: 'Vivienda',
+          etiquetaAgrupacion: 'Torre o bloque',
           zonaHoraria: fila.zonaHoraria,
           umbralConfianzaPlaca: 0.85,
           politicaContingenciaEdge: 'denegar',
