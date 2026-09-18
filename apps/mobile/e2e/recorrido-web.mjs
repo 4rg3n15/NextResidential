@@ -1,0 +1,417 @@
+#!/usr/bin/env node
+/**
+ * RECORRIDO DE LA APP EN UN NAVEGADOR DE VERDAD.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * POR QUÉ EXISTE, Y QUÉ NO ES
+ *
+ * «Los defectos que más han costado aparecieron usando el producto, no
+ * ejecutando pruebas.» Las pruebas de widget montan un árbol en memoria: no
+ * compilan la app para un destino real, no la pintan, no recorren un flujo
+ * entero. Tres de los defectos más caros de este proyecto —D-67, D-68, la
+ * consola sin estilos— eran invisibles en la suite y evidentes en el navegador.
+ *
+ * Esto compila la app **para web**, la sirve y la recorre con Playwright:
+ * acceso → inicio → familia → vehículos → historial → perfil.
+ *
+ * **Lo que NO es: una prueba de la API.** Enfrente hay un servidor de guardarropa
+ * que contesta las cinco rutas del residente y el `token` de Supabase. La API de
+ * verdad tiene sus propias suites —incluidas las dos de aislamiento— y lo que
+ * garantiza que las dos partes encajan es el cliente GENERADO desde el contrato
+ * más el control `cliente-dart-desfasado.mjs`. Decir que esto prueba la API
+ * sería exactamente el tipo de afirmación que este repositorio persigue.
+ *
+ * **Y el destino web no es el producto.** El producto es iOS y Android. En web
+ * no hay Keychain —la sesión vive en memoria y no sobrevive a la recarga— y eso
+ * está declarado en `main.dart`. Web es el único destino que este contenedor
+ * puede recorrer sin un emulador.
+ *
+ *   node apps/mobile/e2e/recorrido-web.mjs
+ */
+import { createServer } from 'node:http';
+import { readFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { join, extname, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const aqui = dirname(fileURLToPath(import.meta.url));
+const raizApp = join(aqui, '..');
+const bundle = join(raizApp, 'build/web');
+const capturas = join(raizApp, 'build/recorrido');
+
+const PUERTO = Number(process.env.NCR_PUERTO_RECORRIDO ?? 4599);
+const COP = '10000000-0000-4000-8000-000000000001';
+
+if (!existsSync(bundle)) {
+  console.error('✗ no hay `build/web`. Compile primero:');
+  console.error(
+    '  flutter build web --dart-define=API_URL=http://127.0.0.1:4599 ' +
+      '--dart-define=SUPABASE_URL=http://127.0.0.1:4599/supabase ' +
+      '--dart-define=SUPABASE_PUBLISHABLE_KEY=<la clave publicable, de mentira>',
+  );
+  process.exit(1);
+}
+
+// ─── Datos del guardarropa ───────────────────────────────────────────────────
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+const tokenCon = (segundos) =>
+  `${b64({ alg: 'RS256' })}.${b64({
+    sub: 'auth-1',
+    usuario_id: 'usr-1',
+    copropiedad_id: COP,
+    email: 'maria@ejemplo.invalid',
+    exp: Math.floor(Date.now() / 1000) + segundos,
+  })}.sin-firma-porque-el-servidor-real-la-verifica`;
+
+const DATOS = {
+  vivienda: {
+    vivienda: {
+      id: 'viv-1',
+      identificador: '42',
+      agrupacion: 'B',
+      etiquetaVivienda: 'Casa',
+      etiquetaAgrupacion: 'Manzana',
+      direccion: 'Calle inventada 00',
+      copropiedadNombre: 'Urbanización de prueba',
+      estadoAdministrativo: 'al_dia',
+      activa: true,
+    },
+    vinculo: { residenteId: 'res-1', esTitular: true, nivelAcceso: 'acceso_completo' },
+    puedeAutorizar: true,
+  },
+  familia: [
+    {
+      residenteId: 'res-1',
+      nombre: 'Maria Titular',
+      parentesco: 'Propietario',
+      esTitular: true,
+      nivelAcceso: 'acceso_completo',
+      activo: true,
+    },
+    {
+      residenteId: 'res-2',
+      nombre: 'Antiguo Residente',
+      parentesco: 'Hijo',
+      esTitular: false,
+      nivelAcceso: 'solo_ingreso',
+      activo: false,
+    },
+  ],
+  vehiculos: [
+    {
+      id: 'veh-1',
+      placa: 'ABC123',
+      marca: 'Marca',
+      modelo: 'Modelo',
+      color: 'Blanco',
+      esPrincipal: true,
+      activo: true,
+    },
+  ],
+  autorizaciones: [
+    {
+      id: 'aut-1',
+      visitante: 'Visitante propio',
+      tipo: 'unica',
+      desde: new Date(Date.now() - 3600_000).toISOString(),
+      hasta: new Date(Date.now() + 3600_000).toISOString(),
+      placa: 'DEF456',
+      permiteAccesoVehicular: true,
+      estado: 'activa',
+      acompanantes: 1,
+    },
+  ],
+  historial: [
+    {
+      id: 'evt-1',
+      ocurridoEn: new Date(Date.now() - 7200_000).toISOString(),
+      tipo: 'acceso',
+      resultado: 'negado',
+      motivo: 'FUERA_DE_HORARIO',
+      metodo: 'placa',
+      placaDetectada: 'DEF456',
+      persona: 'Visitante propio',
+      zona: 'Piscina',
+      decididoPorEdge: true,
+    },
+  ],
+};
+
+const TIPOS = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.wasm': 'application/wasm',
+  '.png': 'image/png',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.ico': 'image/x-icon',
+};
+
+/** Peticiones que el guardarropa vio: la prueba mira las cabeceras. */
+const vistas = [];
+
+const servidor = createServer(async (peticion, respuesta) => {
+  const url = new URL(peticion.url, `http://127.0.0.1:${PUERTO}`);
+  vistas.push({ ruta: url.pathname, autorizacion: peticion.headers.authorization });
+
+  const responder = (codigo, cuerpo) => {
+    respuesta.writeHead(codigo, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': '*',
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    });
+    respuesta.end(JSON.stringify(cuerpo));
+  };
+
+  if (peticion.method === 'OPTIONS') return responder(204, {});
+
+  if (url.pathname === '/supabase/auth/v1/token') {
+    // 40 s de vida: suficiente para el recorrido y corto para que el margen de
+    // refresco entre en juego si alguien deja la pestaña abierta.
+    return responder(200, {
+      access_token: tokenCon(40),
+      refresh_token: 'refresco-de-recorrido',
+      expires_in: 40,
+    });
+  }
+
+  const mi = new RegExp(`^/copropiedades/${COP}/mi/(\\w+)$`).exec(url.pathname);
+  if (mi !== null) {
+    if (!peticion.headers.authorization?.startsWith('Bearer ')) {
+      return responder(401, { mensaje: 'sin token' });
+    }
+    const clave = mi[1] === 'vivienda' ? 'vivienda' : mi[1];
+    const datos = DATOS[clave];
+    if (datos === undefined) return responder(404, { mensaje: 'ruta desconocida' });
+    return responder(200, datos);
+  }
+
+  // Estáticos del bundle.
+  const ruta = join(bundle, url.pathname === '/' ? 'index.html' : url.pathname.slice(1));
+  try {
+    const contenido = await readFile(ruta);
+    respuesta.writeHead(200, {
+      'Content-Type': TIPOS[extname(ruta)] ?? 'application/octet-stream',
+    });
+    respuesta.end(contenido);
+  } catch {
+    respuesta.writeHead(404).end('no está');
+  }
+});
+
+const fallos = [];
+const ok = (m) => console.log(`   ✓ ${m}`);
+const mal = (m) => {
+  console.log(`   ✗ ${m}`);
+  fallos.push(m);
+};
+
+await new Promise((resolver) => servidor.listen(PUERTO, '127.0.0.1', resolver));
+console.log(`▸ guardarropa en http://127.0.0.1:${PUERTO}`);
+
+let navegador;
+try {
+  const { chromium } = await import('playwright');
+  const ejecutable = process.env.NCR_CHROMIUM ?? '/opt/pw-browsers/chromium';
+  navegador = await chromium.launch(existsSync(ejecutable) ? { executablePath: ejecutable } : {});
+} catch (e) {
+  console.error('✗ no hay Chromium con el que recorrer la app:', e.message);
+  console.error('  Una omisión no es un verde: instale Playwright o exporte NCR_CHROMIUM.');
+  servidor.close();
+  process.exit(1);
+}
+
+await mkdir(capturas, { recursive: true });
+const contexto = await navegador.newContext({ viewport: { width: 420, height: 900 } });
+const pagina = await contexto.newPage();
+const errores = [];
+pagina.on('pageerror', (e) => errores.push(String(e)));
+
+const captura = (nombre) => pagina.screenshot({ path: join(capturas, `${nombre}.png`) });
+
+/**
+ * Pulsa una pestaña de la barra inferior.
+ *
+ * Por TEXTO exacto y no por rol: en el árbol de semántica de Flutter una
+ * destinación de `NavigationBar` no siempre se anuncia como `button`, y
+ * «Vehículos» además casa parcialmente con el acceso rápido «Mis vehículos».
+ * El `exact` deja una sola coincidencia — y el hecho de que haga falta es en sí
+ * un aviso: dos superficies con nombres tan parecidos también confunden a quien
+ * navegue con lector de pantalla.
+ */
+const irAPestana = async (etiqueta) => {
+  /**
+   * La barra inferior se busca por varias vías porque el árbol de semántica de
+   * Flutter no siempre expone una destinación de `NavigationBar` igual: a veces
+   * como `aria-label`, a veces como nodo de texto. Se prueban en orden y se
+   * declara cuál funcionó — una sola vía escrita a ciegas es lo que convierte
+   * un recorrido en intermitente.
+   */
+  const vias = [
+    pagina.getByLabel(etiqueta, { exact: true }),
+    pagina.getByText(etiqueta, { exact: true }),
+    pagina.locator(`flt-semantics[aria-label*="${etiqueta}"]`),
+  ];
+  for (const via of vias) {
+    const cuantos = await via.count();
+    if (cuantos === 0) continue;
+    await via.last().click();
+    await pagina.waitForTimeout(500);
+    return;
+  }
+  throw new Error(`no se encontró la pestaña «${etiqueta}» en la barra inferior`);
+};
+const texto = () => pagina.locator('body').innerText();
+
+/**
+ * Espera a que una frase aparezca, con tope. **Sustituye a los
+ * `waitForTimeout` fijos**, que es como se escribe un recorrido intermitente:
+ * una espera de dos segundos pasa hoy y falla el día que la máquina va cargada,
+ * y entonces alguien sube el número en vez de mirar. Aquí, si la frase llega en
+ * 300 ms el recorrido sigue en 300 ms; si no llega nunca, falla diciendo qué
+ * esperaba.
+ */
+const esperarTexto = async (frase, ms = 20000) => {
+  const limite = Date.now() + ms;
+  while (Date.now() < limite) {
+    if ((await texto()).includes(frase)) return true;
+    await pagina.waitForTimeout(150);
+  }
+  return false;
+};
+const hay = (frase) => esperarTexto(frase);
+
+try {
+  await pagina.goto(`http://127.0.0.1:${PUERTO}/`, { waitUntil: 'networkidle' });
+  await pagina.waitForTimeout(2500);
+
+  /**
+   * FLUTTER WEB PINTA EN UN `<canvas>`, así que el DOM está VACÍO de texto
+   * hasta que se activa el árbol de semántica. No es un detalle del recorrido:
+   * es la misma información que consume un lector de pantalla, y activarla es
+   * lo que convierte esta comprobación en una de accesibilidad además de una
+   * de interfaz. Si un botón no tiene etiqueta semántica, aquí no se encuentra
+   * — y tampoco lo encontraría quien navegue con TalkBack o VoiceOver.
+   *
+   * Flutter expone un botón oculto («Enable accessibility») justo para esto.
+   */
+  await pagina.evaluate(() => {
+    const marcador = document.querySelector('flt-semantics-placeholder');
+    if (marcador !== null) marcador.click();
+  });
+  await pagina.waitForTimeout(1500);
+
+  // ── 1 · acceso ────────────────────────────────────────────────────────────
+  (await hay('Acceso del residente'))
+    ? ok('la app arranca en la pantalla de acceso')
+    : mal('no se ve la pantalla de acceso');
+  await captura('1-acceso');
+
+  /**
+   * El formulario se rellena PULSANDO y TECLEANDO, no con `fill()`.
+   *
+   * En Flutter web el campo visible es un `<canvas>` y el texto entra por un
+   * `<input>` oculto que el motor crea al enfocar. `fill()` escribe en él antes
+   * de que exista o mientras el árbol de semántica se reconstruye, y entonces
+   * el botón se pulsa con los campos vacíos: la primera versión de este
+   * recorrido fallaba una vez de cada tres por esto, y la tentación era subir
+   * el `waitForTimeout`. Teclear es lo que hace el residente, y esperar la
+   * PETICIÓN —no un reloj— es lo que hace la comprobación determinista.
+   */
+  await pagina.getByLabel('Correo').click();
+  await pagina.keyboard.type('maria@ejemplo.invalid');
+  await pagina.getByLabel('Contraseña').click();
+  await pagina.keyboard.type('la-que-sea');
+
+  const [respuestaDelToken] = await Promise.all([
+    pagina.waitForResponse((r) => r.url().includes('/auth/v1/token'), { timeout: 20000 }),
+    pagina.getByRole('button', { name: 'Entrar' }).click(),
+  ]);
+  respuestaDelToken.status() === 200
+    ? ok('el acceso pide el token al emisor de identidad')
+    : mal(`el emisor contestó ${respuestaDelToken.status()}`);
+
+  // ── 2 · inicio ────────────────────────────────────────────────────────────
+  (await hay('Casa 42 · Manzana B'))
+    ? ok('entra y compone el título con las etiquetas del conjunto')
+    : mal('no se ve la vivienda tras entrar');
+  (await hay('Al día')) ? ok('el distintivo administrativo se pinta') : mal('falta el distintivo');
+  await captura('2-inicio');
+
+  const conToken = vistas.filter((v) => v.ruta.includes('/mi/') && v.autorizacion);
+  conToken.length >= 4
+    ? ok(`las ${conToken.length} lecturas salieron con el token en la cabecera`)
+    : mal(`solo ${conToken.length} lecturas llevaron token`);
+
+  // ── 3 · familia ───────────────────────────────────────────────────────────
+  // `exact` en la barra inferior: «Vehículos» también casa con el acceso
+  // rápido «Mis vehículos», y sin precisarlo Playwright para con «strict mode
+  // violation». El aviso es útil: dos superficies distintas con el mismo
+  // nombre también confunden a quien navega con lector de pantalla.
+  await pagina.getByText('Mi familia').first().click();
+  (await hay('Antiguo Residente'))
+    ? ok('el residente desactivado sigue apareciendo (RN-19)')
+    : mal('no se ve el residente desactivado');
+  (await hay('Desactivado')) ? ok('y está marcado') : mal('no está marcado');
+  await captura('3-familia');
+
+  // Se vuelve por la FLECHA de la pantalla, no por `goBack()` del navegador:
+  // es lo que pulsa el residente, y en un teléfono no hay botón «atrás» del
+  // navegador. Además así se comprueba que la pila de navegación existe.
+  await pagina
+    .getByRole('button', { name: /Back|Atrás/i })
+    .first()
+    .click();
+  await esperarTexto('Accesos rápidos');
+
+  // ── 4 · vehículos ─────────────────────────────────────────────────────────
+  await irAPestana('Vehículos');
+  (await hay('ABC123'))
+    ? ok('la placa se muestra como la normalizó el dominio')
+    : mal('no se ve la placa');
+  await captura('4-vehiculos');
+
+  // ── 5 · las pestañas de 11-B dicen qué falta ──────────────────────────────
+  await irAPestana('Visitantes');
+  (await hay('en construcción'))
+    ? ok('la pestaña de 11-B explica qué falta en vez de quedarse muda')
+    : mal('la pestaña pendiente no dice nada');
+  await captura('5-pendiente');
+
+  // ── 6 · perfil e historial ────────────────────────────────────────────────
+  await irAPestana('Perfil');
+  (await hay('maria@ejemplo.invalid'))
+    ? ok('el perfil trae el correo de la sesión')
+    : mal('sin correo');
+  await captura('6-perfil');
+
+  await pagina.getByText('Historial de accesos').first().click();
+  (await hay('La zona estaba cerrada a esa hora'))
+    ? ok('el motivo de la negación se explica en lenguaje llano')
+    : mal('el motivo no se explica');
+  (await hay('Decidido en el conjunto, sin nube'))
+    ? ok('lo decidido por el Edge se marca (KPI-31)')
+    : mal('no se marca lo del Edge');
+  await captura('7-historial');
+
+  // ── 7 · ningún error de JavaScript en todo el recorrido ───────────────────
+  errores.length === 0
+    ? ok('ni un error de JavaScript en el recorrido completo')
+    : mal(`${errores.length} error(es) en el navegador: ${errores[0]}`);
+} catch (e) {
+  mal(`el recorrido se rompió: ${e.message}`);
+  await captura('fallo');
+} finally {
+  await navegador.close();
+  servidor.close();
+}
+
+console.log(`\ncapturas en ${capturas}`);
+if (fallos.length > 0) {
+  console.error(`RECORRIDO DE LA APP: ${fallos.length} fallo(s)`);
+  process.exit(1);
+}
+console.log('RECORRIDO DE LA APP: completo');

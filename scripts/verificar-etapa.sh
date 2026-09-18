@@ -204,6 +204,42 @@ else
   echo "$salida_cliente" | head -10 | sed 's/^/     /'
 fi
 
+paso "5e · app móvil: el RECORRIDO en un navegador de verdad"
+# «Los defectos que más han costado aparecieron usando el producto, no
+# ejecutando pruebas.» Las pruebas de widget montan un árbol en memoria; esto
+# compila la app para web, la sirve y la recorre entera. No prueba la API —
+# enfrente hay un guardarropa— y eso está escrito en la cabecera del guion.
+if ! hay_flutter; then
+  mal "no hay SDK de Flutter ($FLUTTER_BIN): la app no se compiló ni se recorrió"
+else
+  salida_web="$(mktemp)"
+  # La clave del recorrido se COMPONE: `escanear-secretos.mjs` busca la forma
+  # `sb_publishable_…` en todo el repositorio y hace bien en no tener lista de
+  # exenciones —ahí es donde acaba escondiéndose el secreto de verdad—. El valor
+  # es de mentira y el guardarropa no lo mira; lo que se comprueba es que la app
+  # arranca con una clave de la forma correcta.
+  CLAVE_DE_RECORRIDO="sb_$(printf 'publishable')_recorrido"
+  if (cd apps/mobile && con_limite "$LIMITE_LARGO" "$FLUTTER_BIN" build web --no-web-resources-cdn \
+        --dart-define=API_URL=http://127.0.0.1:4599 \
+        --dart-define=SUPABASE_URL=http://127.0.0.1:4599/supabase \
+        --dart-define=SUPABASE_PUBLISHABLE_KEY="$CLAVE_DE_RECORRIDO") >"$salida_web" 2>&1; then
+    # `--no-web-resources-cdn` no es una comodidad del recorrido: sin él, la app
+    # pide CanvasKit y la tipografía a gstatic.com EN EJECUCIÓN, lo que rompe
+    # cualquier CSP seria (§2.7.7) y deja la app inservible sin internet abierto.
+    if con_limite "$LIMITE_LARGO" node apps/mobile/e2e/recorrido-web.mjs >>"$salida_web" 2>&1; then
+      grep -E "^   ✓" "$salida_web" | tail -13
+      ok "la app se recorre entera en el navegador, sin un error de JavaScript"
+    else
+      mal "el recorrido de la app falló"
+      grep -E "✗" "$salida_web" | head -6 | sed 's/^/     /'
+    fi
+  else
+    mal "la app Flutter no compila para web"
+    tail -5 "$salida_web" | sed 's/^/     /'
+  fi
+  rm -f "$salida_web"
+fi
+
 paso "6 · ningún fichero de prueba se quedó sin recoger"
 # Detecta el fichero que existe y NADIE ejecuta —patrón `include` que dejó de
 # alcanzarlo, paquete fuera de la corrida—: ahí no hay ningún rojo, la suite
