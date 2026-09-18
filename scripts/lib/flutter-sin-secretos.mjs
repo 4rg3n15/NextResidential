@@ -47,7 +47,7 @@ const NOMBRES_PROHIBIDOS = [
   ['INGESTA_FIRMA_SECRETO', 'permitiría fabricar eventos de acceso'],
   ['BIOMETRIA_LLAVE', 'descifra plantillas biométricas (Ley 1581)'],
   ['DATABASE_URL', 'la app no habla con PostgreSQL; habla con la API'],
-  ['DEVICE_VAULT', 'credenciales de los equipos Hikvision (RN-21)'],
+  ['DEVICE_VAULT', 'credenciales de los equipos del fabricante (RN-21, KPI-11)'],
 ];
 
 /** Formas de valor que delatan una llave pegada en el código. */
