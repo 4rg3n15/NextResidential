@@ -68,6 +68,19 @@ else
   echo "$salida_entorno" | sed 's/^/     /'
 fi
 
+paso "1b · docs/ESTADO_ETAPAS.md no se contradice a sí mismo"
+# AÑADIDO EN LA ETAPA 11 a petición del usuario, y por la razón más incómoda:
+# la cabecera del documento se congeló DOS veces, la segunda pese a existir ya
+# la regla del DoD (2026-09-08) que obliga a actualizarla. Una regla en prosa
+# que nada comprueba es la decimoctava aparición del patrón de este repositorio
+# —el control existe pero no comprueba lo que crees—. Ahora la comprueba esto.
+if salida_estado=$(con_limite "$LIMITE_CORTO" node scripts/lib/coherencia-estado-etapas.mjs 2>&1); then
+  ok "$salida_estado"
+else
+  mal "la cabecera, el mapa y las fichas de ESTADO_ETAPAS.md no dicen lo mismo"
+  echo "$salida_estado" | sed 's/^/     /'
+fi
+
 paso "2 · instalación coherente con el lockfile"
 if con_limite "$LIMITE_MEDIO" pnpm install --frozen-lockfile >/dev/null 2>&1; then
   ok "pnpm install --frozen-lockfile"

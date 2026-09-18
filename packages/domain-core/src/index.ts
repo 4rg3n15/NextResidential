@@ -43,3 +43,4 @@ export * from './reglas/motor';
 export * from './tokens';
 export * from './tiempo/ventana-del-dia';
 export * from './intercom/canal-exclusivo';
+export * from './residente/ambito-del-residente';

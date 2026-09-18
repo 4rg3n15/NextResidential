@@ -741,6 +741,72 @@ try {
       ? ok('la ausencia de navegador es un fallo explícito, no un salto')
       : mal(`sin navegador el camino no falla como debe (codigo ${r.codigo})`);
   }
+
+  console.log('\n▸ 14 · una cabecera congelada en ESTADO_ETAPAS.md se detecta');
+  {
+    /**
+     * El control nació de un defecto REPETIDO: la cabecera del documento se
+     * quedó atrás dos veces, la segunda pese a existir ya la regla del DoD que
+     * obliga a actualizarla. Aquí se introducen las tres formas en que el
+     * documento puede contradecirse y se exige que las tres den rojo.
+     */
+    const original = join(banco, 'estado-original.md');
+    const doc = readFileSync(join(raiz, 'docs/ESTADO_ETAPAS.md'), 'utf8');
+    writeFileSync(original, doc);
+    correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', original]).codigo === 0
+      ? ok('la línea base del banco está limpia')
+      : mal('el banco NO parte de una línea base limpia: ESTADO_ETAPAS.md ya se contradice');
+
+    // (a) el mapa dice una cosa y la ficha otra.
+    const desfasado = join(banco, 'estado-mapa-contra-ficha.md');
+    const cerradaEnMapa = /^\|\s*\*{0,2}(\d{2})\*{0,2}\s.*\*\*CERRADA\*\*.*$/m.exec(doc);
+    if (cerradaEnMapa === null) {
+      mal('no hay ninguna fila CERRADA en el mapa con la que ejercer el control');
+    } else {
+      writeFileSync(
+        desfasado,
+        doc.replace(cerradaEnMapa[0], cerradaEnMapa[0].replace('**CERRADA**', 'PENDIENTE   ')),
+      );
+      const r = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', desfasado]);
+      r.codigo !== 0 && /su ficha dice/.test(r.salida)
+        ? ok('mapa y ficha en desacuerdo: detectado')
+        : mal(`el desacuerdo entre mapa y ficha NO se detecta (codigo ${r.codigo})`);
+    }
+
+    // (b) un estado inventado, fuera del vocabulario que el propio documento
+    //     declara. Es literalmente `CONSTRUIDA`, el que se colo el 2026-09-13.
+    const inventado = join(banco, 'estado-vocabulario.md');
+    writeFileSync(
+      inventado,
+      doc.replace(/^(## ETAPA \d{2} —[^\n]*?)\*\*CERRADA\*\*/m, '$1**CONSTRUIDA**'),
+    );
+    const rb = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', inventado]);
+    rb.codigo !== 0 && /CONSTRUIDA/.test(rb.salida)
+      ? ok('un estado fuera del vocabulario: detectado')
+      : mal(`un estado inventado NO se detecta (codigo ${rb.codigo})`);
+
+    // (c) el recuento de la cabecera, descuadrado en uno.
+    const recuento = join(banco, 'estado-recuento.md');
+    const fila = /\*\*Etapas cerradas\*\*[^\n]*?\*\*(\d+) de (\d+)\*\*/.exec(doc);
+    if (fila === null) {
+      mal('la cabecera no lleva el recuento «**N de M**» con el que ejercer el control');
+    } else {
+      writeFileSync(
+        recuento,
+        doc.replace(
+          fila[0],
+          fila[0].replace(
+            `**${fila[1]} de ${fila[2]}**`,
+            `**${Number(fila[1]) + 1} de ${fila[2]}**`,
+          ),
+        ),
+      );
+      const rc = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', recuento]);
+      rc.codigo !== 0 && /etapas cerradas y el mapa marca/.test(rc.salida)
+        ? ok('el recuento descuadrado: detectado')
+        : mal(`un recuento descuadrado NO se detecta (codigo ${rc.codigo})`);
+    }
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -764,6 +830,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 15 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 16 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );
