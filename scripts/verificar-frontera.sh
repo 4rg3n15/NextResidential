@@ -60,12 +60,18 @@ sonda_arranque() {
 }
 salida=$(sonda_arranque || true)
 sonda_arranque >/dev/null 2>&1; codigo=$?
-if [ "$codigo" -eq 78 ] && echo "$salida" | grep -q "no arranca"; then
+if [ "$codigo" -eq 78 ] && grep -q "no arranca" <<<"$salida"; then
   echo "   ✓ arranque abortado con EX_CONFIG (78) y motivo explícito"
 else
   echo "   ✗ arrancó o falló por otra razón (código $codigo)"; echo "$salida" | head -3; fallos=1
 fi
-if echo "$salida" | grep -qiE "sb_secret|eyJ|postgres(ql)?://[^:]+:[^@]"; then
+# D-80, y aquí era lo más grave: este `if` es el que detecta un SECRETO en la
+# salida. Con `set -o pipefail` —activo arriba— `echo "$x" | grep -q` devuelve
+# 141 cuando ENCUENTRA, porque `grep -q` sale al primer acierto y `echo` recibe
+# SIGPIPE. Es decir: la comprobación se leía como «no hay secreto» justo cuando
+# lo había, y solo con salidas grandes, que es cuando `grep` gana la carrera.
+# `<<<` no crea tubería.
+if grep -qiE "sb_secret|eyJ|postgres(ql)?://[^:]+:[^@]" <<<"$salida"; then
   echo "   ✗ el mensaje de arranque fallido filtró un valor sensible"; fallos=1
 else
   echo "   ✓ el fallo de arranque no filtra valores"

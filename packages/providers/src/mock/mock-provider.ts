@@ -30,6 +30,13 @@ export interface OpcionesMock {
  * comparte —qué dispositivos existen, qué canal de audio está ocupado— es el
  * mismo estado. Separarlo obligaría a sincronizar cuatro copias de la verdad.
  */
+import {
+  desdeAlarmServerXml,
+  desdeAlertStreamJson,
+  soloEnVivo,
+} from '../hikvision/contratos-de-evento';
+import type { BloqueDeAlertStream } from '../hikvision/contratos-de-evento';
+
 export class MockProvider
   implements AccessPointProvider, PlateEventSource, FaceTemplateProvider, IntercomProvider
 {
@@ -87,6 +94,100 @@ export class MockProvider
       dispositivoId,
       ocurridoEn: this.reloj.ahora(),
     };
+    const veces = this.azar.ocurre(this.perfil.probabilidadDeDuplicado) ? 2 : 1;
+    for (let i = 0; i < veces; i += 1) {
+      for (const suscriptor of this.suscriptores) await suscriptor(lectura);
+    }
+    return lectura;
+  }
+
+  /**
+   * Emite una lectura **por el camino de la cámara real**: construye el XML que
+   * el equipo POSTea al Alarm Server y lo hace pasar por el mismo analizador
+   * que usará la ETAPA 15.
+   *
+   * POR QUÉ, y es la diferencia entre un simulado útil y uno decorativo: hasta
+   * ahora `emitirLectura` fabricaba directamente un `LecturaDePlaca` —la forma
+   * de salida—, así que la suite completa corría sin que nadie hubiera
+   * analizado nunca un XML. El día que llegara el equipo, el analizador sería
+   * código recién escrito estrenándose contra hardware. Ahora la normalización
+   * está ejercida desde hoy, y lo que la 15 sustituye es el transporte.
+   */
+  async emitirComoCamaraAnpr(placa: string, dispositivoId: string): Promise<LecturaDePlaca> {
+    const ahora = this.reloj.ahora();
+    const bajaConfianza = this.azar.ocurre(this.perfil.probabilidadDeBajaConfianza);
+    const confianza = bajaConfianza ? this.azar.entre(0.3, 0.79) : this.azar.entre(0.85, 0.99);
+    const xml = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<EventNotificationAlert version="2.0">',
+      `  <channelID>1</channelID>`,
+      `  <dateTime>${ahora.toISOString()}</dateTime>`,
+      '  <eventType>ANPR</eventType>',
+      '  <eventState>active</eventState>',
+      `  <licensePlate>${placa}</licensePlate>`,
+      `  <confidenceLevel>${Math.round(confianza * 100)}</confidenceLevel>`,
+      '</EventNotificationAlert>',
+    ].join('\n');
+
+    const evento = desdeAlarmServerXml(xml, dispositivoId, ahora);
+    if (evento === null || evento.placa === null) {
+      throw new Error('el simulado produjo un XML que su propio analizador no entiende');
+    }
+    return this.difundir({
+      placa: evento.placa,
+      confianza: evento.confianza ?? confianza,
+      dispositivoId,
+      ocurridoEn: evento.ocurridoEn,
+    });
+  }
+
+  /**
+   * Emite por el camino del VIDEOPORTERO: el volcado histórico al conectar
+   * —`currentEvent: false`— seguido del evento en vivo.
+   *
+   * Devuelve cuántos históricos se descartaron, porque esa cifra es la que
+   * distingue «el videoportero está mudo» de «volcó cuatrocientos eventos
+   * viejos y los tiramos todos». Un simulado que solo emitiera el evento bueno
+   * nunca ejercitaría el filtro, y el filtro es justo lo que impide inundar una
+   * tabla que no admite borrado.
+   */
+  async emitirComoVideoportero(
+    placa: string,
+    dispositivoId: string,
+    historicos = 3,
+  ): Promise<{ readonly lectura: LecturaDePlaca; readonly descartados: number }> {
+    const ahora = this.reloj.ahora();
+    const volcado: BloqueDeAlertStream[] = [
+      ...Array.from({ length: historicos }, (_, i) => ({
+        eventType: 'ANPR',
+        currentEvent: false,
+        dateTime: new Date(ahora.getTime() - (i + 1) * 86_400_000).toISOString(),
+        ANPR: { licensePlate: placa, confidenceLevel: 90 },
+      })),
+      {
+        eventType: 'ANPR',
+        currentEvent: true,
+        dateTime: ahora.toISOString(),
+        channelID: 1,
+        ANPR: { licensePlate: placa, confidenceLevel: 93 },
+      },
+    ];
+
+    const { enVivo, descartados } = soloEnVivo(volcado);
+    const bloque = enVivo[0];
+    if (bloque === undefined) throw new Error('el volcado simulado no dejó ningún evento en vivo');
+    const evento = desdeAlertStreamJson(bloque, dispositivoId, ahora);
+    const lectura = await this.difundir({
+      placa: evento.placa ?? placa,
+      confianza: evento.confianza ?? 0.93,
+      dispositivoId,
+      ocurridoEn: evento.ocurridoEn,
+    });
+    return { lectura, descartados };
+  }
+
+  /** Difunde a los suscriptores, duplicando como lo hace el hardware real. */
+  private async difundir(lectura: LecturaDePlaca): Promise<LecturaDePlaca> {
     const veces = this.azar.ocurre(this.perfil.probabilidadDeDuplicado) ? 2 : 1;
     for (let i = 0; i < veces; i += 1) {
       for (const suscriptor of this.suscriptores) await suscriptor(lectura);

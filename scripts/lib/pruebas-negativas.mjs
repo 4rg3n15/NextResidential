@@ -807,6 +807,32 @@ try {
         : mal(`un recuento descuadrado NO se detecta (codigo ${rc.codigo})`);
     }
   }
+
+  console.log('\n▸ 15 · `echo | grep -q` bajo pipefail se detecta (D-80)');
+  {
+    /**
+     * El defecto más caro de la ETAPA 11-A, y estaba en el verificador: con
+     * `set -o pipefail`, `echo "$x" | grep -q` devuelve 141 cuando ENCUENTRA lo
+     * que busca. La comprobación de «pruebas en rojo» se leía como falsa justo
+     * al acertar, y el paso informaba «suite completa en verde». El mismo
+     * patrón estaba en la comprobación de SECRETOS de `verificar-frontera.sh`.
+     */
+    writeFileSync(
+      join(clon, 'sonda-pipefail.sh'),
+      '#!/usr/bin/env bash\nset -uo pipefail\nsalida=$(cat /etc/hostname)\n' +
+        'if echo "$salida" | grep -q x; then echo si; fi\n',
+    );
+    enClon('git', ['add', '--intent-to-add', 'sonda-pipefail.sh']);
+    const r = enClon('node', ['scripts/lib/portabilidad.mjs']);
+    r.codigo !== 0 && /141/.test(r.salida)
+      ? ok('detectado, con la explicación del 141')
+      : mal(`NO detectado (codigo ${r.codigo})`);
+    rmSync(join(clon, 'sonda-pipefail.sh'), { force: true });
+    enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-pipefail.sh']);
+    enClon('node', ['scripts/lib/portabilidad.mjs']).codigo === 0
+      ? ok('el banco de pruebas queda limpio')
+      : mal('la sonda dejó rastro en el banco');
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -830,6 +856,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 16 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 17 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

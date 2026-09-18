@@ -65,20 +65,22 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 | **07** | Zonas comunes: horario y aforo                      | Agregado `Zona`. **El aforo lo garantiza la base**: incremento atómico donde cero filas devueltas es el aforo superado. El horario que cruza la medianoche no reinicia el contador                                                                                |
 | **08** | Biometría con consentimiento                        | Ciclo completo bajo Ley 1581 de 2012. Sin consentimiento vigente del **titular** no hay sincronización, con tres cerrojos estructurales. La revocación suprime en la misma transacción. El vector se cifra con AES-256-GCM y **ninguna operación permite leerlo** |
 
-**Métricas al cierre de la ETAPA 08:** 645 pruebas en 53 ficheros · dominio 98,61 % líneas / 97,78 % ramas · aplicación 98,15 % · global 90,04 % (contenedor Linux)
+| **09** | Consola web de administración | Next.js + Tailwind con el preset derivado del mockup, los dos temas por parejas de tokens, cliente de API generado desde el contrato y recorrido del navegador que entra por contraseña, segundo factor y `aal2` |
+| **10** | Consolas de portería y guardia virtual | Dos consolas y no una: el portero atiende **una** puerta y la tiene delante; el operador de central atiende **varias copropiedades** y no ve ninguna. Exclusividad del canal de audio como máquina de estados **en el dominio**, y adaptador real de barrera |
+| **11-A** | App móvil Flutter del residente · primera mitad | La **superficie del residente**, que no existía, y el **segundo eje del aislamiento** —vivienda, además de copropiedad—. App Flutter con cliente Dart generado, sesión en el llavero, refresco al volver a primer plano y cinco de las ocho pantallas |
+
+**Métricas al cierre de la ETAPA 11-A:** ver el veredicto literal en [`docs/etapas/ETAPA-11.md`](docs/etapas/ETAPA-11.md) §6 · TypeScript y Dart se miden **por separado y por capa**, porque un agregado alto esconde una capa por debajo
 
 ### Próximas etapas
 
-| #   | Etapa                                   | Alcance                                                                                                            |
-| --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 09  | Consola web de administración           | Next.js + Tailwind. Dashboard, padrón, vehículos, visitantes, zonas, dispositivos, eventos e informes. Base de PWA |
-| 10  | Consolas operativas                     | Portería y guardia virtual multiproyecto, con video en vivo, intercom y apertura remota atribuida                  |
-| 11  | Aplicación móvil Flutter                | Las ocho pantallas del residente, con cliente generado desde OpenAPI                                               |
-| 12  | Edge Gateway                            | Operación autónoma sin conexión y reconciliación idempotente al reconectar                                         |
-| 13  | Auditoría de ciberseguridad             | Verificación y endurecimiento. No introduce la seguridad: la audita                                                |
-| 14  | Observabilidad, CI/CD, PWA y escritorio | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio                              |
-| 15  | **Integración Hikvision**               | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio                          |
-| 16  | Documentación técnica final             | Consolidación, README definitivo, OpenAPI navegable                                                                |
+| #    | Etapa                                    | Alcance                                                                                                                                                    |
+| ---- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 11-B | Aplicación móvil Flutter · segunda mitad | Registrar visitante (patrón, acompañantes nominales, zonas), zonas con aforo, notificaciones con FCM, cámara con validación de calidad y modo sin conexión |
+| 12   | Edge Gateway                             | Operación autónoma sin conexión y reconciliación idempotente al reconectar                                                                                 |
+| 13   | Auditoría de ciberseguridad              | Verificación y endurecimiento. No introduce la seguridad: la audita                                                                                        |
+| 14   | Observabilidad, CI/CD, PWA y escritorio  | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio                                                                      |
+| 15   | **Integración Hikvision**                | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio                                                                  |
+| 16   | Documentación técnica final              | Consolidación, README definitivo, OpenAPI navegable                                                                                                        |
 
 ### Pruebas con hardware
 
@@ -154,7 +156,7 @@ NextResidential/
 ├─ apps/
 │  ├─ api/            # NestJS — monolito modular hexagonal
 │  ├─ web/            # Next.js — consolas (ETAPA 09-10)
-│  ├─ mobile/         # Flutter — app del residente (ETAPA 11)
+│  ├─ mobile/         # Flutter — app del residente (ETAPA 11-A: cinco pantallas)
 │  └─ edge/           # Edge Gateway (ETAPA 12)
 ├─ packages/
 │  ├─ domain-core/    # dominio puro compartido API ↔ Edge
@@ -240,7 +242,17 @@ Endpoints de salud: `/health` (proceso vivo) y `/ready` (dependencias alcanzable
 pnpm --filter @ncr/api test
 pnpm --filter @ncr/domain-core test
 pnpm --filter @ncr/providers test
+
+# La app móvil va por su cuenta: es otro lenguaje y otro ejecutor.
+cd apps/mobile && flutter test --coverage
+node scripts/lib/cobertura-flutter.mjs   # cobertura POR CAPA, desde la raíz
 ```
+
+> **Por qué la app se mide aparte.** Dart es el único componente que no comparte
+> tipos con el resto: su cliente se **genera** desde el contrato OpenAPI y hay
+> un control que rompe el build si se queda atrás
+> (`scripts/lib/cliente-dart-desfasado.mjs`). Sumar sus líneas al porcentaje de
+> TypeScript daría un número más redondo y menos cierto.
 
 ### Verificación de etapa — obligatoria antes de cerrar
 
@@ -248,7 +260,15 @@ pnpm --filter @ncr/providers test
 ./scripts/verificar-etapa.sh
 ```
 
-Catorce pasos, y ninguno es decorativo. Con `--con-base` se añaden los tres que necesitan PostgreSQL:
+**Veintitrés pasos**, y ninguno es decorativo. Con `--con-base` se añaden los tres que necesitan PostgreSQL.
+
+Cinco llegaron con la ETAPA 11-A y conviene saber por qué: **1b** comprueba que
+`docs/ESTADO_ETAPAS.md` no se contradiga —la regla existía en prosa y se
+incumplió dos veces—, y **5b a 5e** miran `apps/mobile`, que hasta entonces no
+tocaba ningún paso: análisis estático de Dart, suite con cobertura por capa,
+cliente generado al día y sin secretos en el binario, y el **recorrido en un
+navegador de verdad**. Si falta el SDK de Flutter, esos pasos **fallan**; no se
+omiten.
 
 | Paso | Verifica                                                                                                                                     |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |

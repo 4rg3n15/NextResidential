@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-15 · **ETAPA 10 construida** · adaptador real de barrera vehicular, verificado contra el equipo
+**Última actualización:** 2026-09-18 · **ETAPA 10 CERRADA** y **ETAPA 11-A cerrada** · la app Flutter del residente y el segundo eje del aislamiento
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -20,10 +20,10 @@
 
 |                                |                                                                                                                 |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **9 de 17** (ETAPAS 00 a 09) · la 09 cerrada el 2026-09-12 con `--con-base`, 19 de 19 pasos                     |
-| **Etapa siguiente habilitada** | **ETAPA 10 — consolas operativas** (la 12 sigue habilitada)                                                     |
+| **Etapas cerradas**            | **11 de 17** (ETAPAS 00 a 10) · la 10 cerrada el 2026-09-18 con `--con-base`; la 11 va por su mitad 11-A        |
+| **Etapa siguiente habilitada** | **ETAPA 11-B — la app que escribe** (la 12 sigue habilitada)                                                    |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | Ninguno. D-71 a D-74 corregidos en la ronda del 2026-09-13                                                      |
+| **Defectos abiertos**          | **D-77 y D-78**, declarados en la 11-A. D-76 y D-79 corregidos en la misma ronda                                |
 | **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
 | **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
 | **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)                                                     |
@@ -44,9 +44,9 @@
 | 06     | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05 ✅                            | **CERRADA**                      | [ETAPA-06](etapas/ETAPA-06.md) |
 | 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06 ✅                            | **CERRADA**                      | [ETAPA-07](etapas/ETAPA-07.md) |
 | 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                            | **CERRADA**                      | [ETAPA-08](etapas/ETAPA-08.md) |
-| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **EN CURSO** — 09-A cerrada      | [ETAPA-09](etapas/ETAPA-09.md) |
-| 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09                               | PENDIENTE                        | —                              |
-| 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09                               | PENDIENTE                        | —                              |
+| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **CERRADA**                      | [ETAPA-09](etapas/ETAPA-09.md) |
+| 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09 ✅                            | **CERRADA**                      | [ETAPA-10](etapas/ETAPA-10.md) |
+| 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                            | **EN CURSO** — 11-A cerrada      | [ETAPA-11](etapas/ETAPA-11.md) |
 | 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
 | 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12                               | PENDIENTE                        | —                              |
 | 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13                               | PENDIENTE                        | —                              |
@@ -69,7 +69,7 @@
 
 ---
 
-## ETAPA 09 — Consola web de administración · **EN CURSO** (09-A cerrada)
+## ETAPA 09 — Consola web de administración · **CERRADA** (09-A y 09-B)
 
 **Rama:** `etapa-09-consola-administracion` · **Cierre de 09-A:** 2026-09-09 · **Informe:** [`etapas/ETAPA-09.md`](etapas/ETAPA-09.md)
 
@@ -469,7 +469,58 @@ plataforma**: la decisión la toma Next Control.
 
 ---
 
-## ETAPA 10 — Consolas operativas · **CONSTRUIDA** · 2026-09-13
+## ETAPA 11 — App móvil Flutter del residente · **EN CURSO** — 11-A cerrada · 2026-09-18
+
+**Rama:** `etapa-11-app-flutter-residente`, desde `develop` actualizado ·
+**Informe:** [`etapas/ETAPA-11.md`](etapas/ETAPA-11.md)
+
+La etapa se ejecuta en dos mitades, aprobadas por el usuario. El corte no es por
+tamaño: **11-A se recorre entera en un emulador sin conceder un permiso del
+sistema ni cortar la red; 11-B no se puede demostrar sin ninguna de las dos.**
+
+### Lo que 11-A dejó construido
+
+| Entregable                                           | Estado                                                                                                                |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **La superficie del residente en la API**            | `copropiedades/:id/mi/{vivienda,familia,vehiculos,autorizaciones,historial}`. **No existía**: OE-02 no tenía endpoint |
+| **El SEGUNDO EJE del aislamiento**                   | `alcanzaVivienda` en el dominio. La vivienda **nunca** llega en la petición: se deriva de la identidad                |
+| Suite `aislamiento-residente.e2e.test.ts`            | Rompe el build. La lista de rutas se DERIVA del enrutador, y lleva línea base                                         |
+| App Flutter con arquitectura limpia                  | Dominio, aplicación, infraestructura y presentación, con los puertos declarados en Dart                               |
+| Cliente Dart **generado** desde OpenAPI              | 170 ficheros · control que falla si se queda atrás                                                                    |
+| Sesión en Keychain/Keystore + **refresco al volver** | Política pura con reloj inyectado, y **una sola** renovación concurrente                                              |
+| Los cinco estados transversales                      | Unión sellada: el `switch` no compila si falta una rama                                                               |
+| Pantallas M-1, M-2, M-3, M-6 y M-8                   | Con las decisiones del mockup revisadas, y lo que falta dicho en pantalla                                             |
+| **Recorrido en navegador** con capturas              | Acceso → inicio → familia → vehículos → pendiente → perfil → historial                                                |
+| Los **dos contratos** de evento de Hikvision         | XML del Alarm Server y JSON del `alertStream`, con el filtro del volcado histórico. El simulado los emite             |
+| Verificador: **23 pasos** (cinco nuevos)             | Coherencia de este documento · análisis Dart · suite y cobertura por capa · cliente al día y secretos · recorrido     |
+
+### Hallazgos de esta mitad
+
+| ID       | Qué                                                                                                                                                                                                     | Estado                                                        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **D-76** | Un residente podía dar acceso a una zona a la autorización **de otra vivienda**: el permiso se da a un `autorizacionId` del cuerpo                                                                      | **Corregido**                                                 |
+| **D-77** | `GET …/biometria/consentimientos/:id` expone el estado de cualquier consentimiento del conjunto a quien conozca su UUID                                                                                 | Declarado, 11-B                                               |
+| **D-78** | El tema de la app copia los colores del preset a mano; la prueba compara con el `.ts` mientras no se genere                                                                                             | Declarado                                                     |
+| **D-79** | El paso 5 del verificador decidía por TEXTO y no por código de salida: con la compilación rota informaba verde con cero pruebas ejecutadas                                                              | **Corregido**                                                 |
+| **D-80** | **`echo "$x" \| grep -q` bajo `pipefail` devuelve 141 al ACERTAR.** La comprobación de pruebas en rojo —y la de SECRETOS de `verificar-frontera.sh`— se leían como falsas justo cuando encontraban algo | **Corregido** · regla en `portabilidad.mjs` + prueba negativa |
+
+**D-80 es el más caro de los cinco** y llevaba en el repositorio desde que se
+escribió el verificador. Apareció por una cadena: la coherencia de este
+documento (control nuevo) puso el paso 1b en rojo → se leyó la salida entera →
+la suite decía «en verde» con 0 ficheros recogidos → al mirar por qué, salió el 141. Un control nuevo destapó un hueco en otro que llevaba nueve etapas dándose
+por bueno.
+
+### Lo que queda para 11-B
+
+M-4 completa (patrón de recurrencia, acompañantes nominales, zonas, y los
+rechazos de RN-06, RN-13 y CA-03) · M-5 con aforo y horario · M-7 con registro
+de token FCM —cierra la deuda de FCM declarada en la ETAPA 10— · captura de
+cámara con validación de calidad y D-39 · bandeja de salida con clave de
+idempotencia · KPI-10 medido.
+
+---
+
+## ETAPA 10 — Consolas operativas · **CERRADA** · 2026-09-18
 
 Rama `etapa-10-consolas-operativas`, desde `develop` con la 09 ya fusionada.
 

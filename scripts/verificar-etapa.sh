@@ -35,7 +35,12 @@ LIMITE_CORTO=120     # comprobaciones de segundos
 LIMITE_MEDIO=600     # instalación, compilación, lint, tipos
 LIMITE_LARGO=1200    # suite completa, cobertura, base de datos
 
-con_limite() { node scripts/lib/con-limite.mjs "$@"; }
+# La ruta es ABSOLUTA a propósito. Con la relativa, cualquier paso que se
+# ejecute dentro de un subshell con `cd` —los de la app móvil lo hacen— llamaba
+# a un fichero que desde allí no existe, y Node contestaba `MODULE_NOT_FOUND`:
+# el paso daba rojo por una causa que no tenía nada que ver con lo que probaba.
+RAIZ_DEL_REPO="$PWD"
+con_limite() { node "$RAIZ_DEL_REPO/scripts/lib/con-limite.mjs" "$@"; }
 
 # Cada paso queda anotado: al final se compara lo ejecutado con lo declarado.
 # Sin esta cuenta, un paso encerrado en un `if` que no se cumple no da rojo: da
@@ -131,11 +136,37 @@ con_limite "$LIMITE_MEDIO" pnpm typecheck >/dev/null 2>&1 && ok "pnpm typecheck"
 paso "5 · suite completa"
 salida_pruebas="$(mktemp)"
 con_limite "$LIMITE_LARGO" pnpm test >"$salida_pruebas" 2>&1
+codigo_pruebas=$?
 salida=$(cat "$salida_pruebas")
 echo "$salida" | grep -E "Tests +[0-9]" | sed 's/^/   /'
-if echo "$salida" | grep -qE "Tests +[0-9]+ failed|FAIL "; then
+# ─────────────────────────────────────────────────────────────────────────────
+# D-79 · SE MIRA EL CÓDIGO DE SALIDA, y no solo el texto.
+#
+# Este paso decidía «en verde» buscando «Tests N failed» o «FAIL» en la salida.
+# Con la compilación rota, `pnpm test` ni siquiera llega a ejecutar la suite:
+# no imprime ninguna de las dos cosas, así que el paso informaba **suite
+# completa en verde con cero pruebas ejecutadas**. Lo destapó la corrida de la
+# ETAPA 11-A, donde un error de tipos dejó la compilación rota y el único paso
+# que se quejó fue el recuento de ficheros recogidos.
+#
+# Y al arreglarlo apareció algo PEOR, D-80: con `set -o pipefail` —que este
+# guion activa en su primera línea— la construcción `echo "$x" | grep -q ...`
+# devuelve **141**, no 0, cuando encuentra lo que busca. `grep -q` sale en
+# cuanto acierta, `echo` recibe SIGPIPE, y `pipefail` propaga ese 141 al
+# pipeline. Es decir: la comprobación original de pruebas en rojo **se leía
+# como falsa justo cuando acertaba**, y el paso informaba «suite completa en
+# verde» con la suite en rojo. Solo se manifiesta con salidas grandes, que es
+# cuando `grep -q` puede terminar antes que `echo`.
+#
+# Por eso aquí se usa `<<<`, que no crea tubería y no puede romperse así.
+if [[ $codigo_pruebas -ne 0 ]]; then
+  mal "la suite no terminó bien (código $codigo_pruebas): puede que ni siquiera llegara a correr"
+  grep -E "error|Error|ERR_|×|→" "$salida_pruebas" | head -10 | sed 's/^/     /'
+elif grep -qE "Tests +[0-9]+ failed|FAIL " <<<"$salida"; then
   mal "hay pruebas en rojo"
   echo "$salida" | grep -E "×|→" | head -10 | sed 's/^/     /'
+elif ! grep -qE "Tests +[0-9]" <<<"$salida"; then
+  mal "la suite no informó ni una prueba: una salida sin recuento no es un verde"
 else
   ok "suite completa en verde"
 fi
@@ -457,7 +488,7 @@ if [[ "$CON_BASE" == "1" ]]; then
     if [[ $? -ne 0 ]]; then
       mal "$etiqueta"
       echo "$salida" | grep -E "×|→" | head -5 | sed 's/^/     /'
-    elif echo "$salida" | grep -q "OMITIDA"; then
+    elif grep -q "OMITIDA" <<<"$salida"; then
       mal "$etiqueta — OMITIDA: no se alcanzó la base. Una omisión no es un verde."
     else
       ok "$etiqueta"

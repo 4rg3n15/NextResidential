@@ -52,6 +52,77 @@ que cubren estos tres aparatos; los nombres son los del índice del wiki):
 
 ---
 
+## 0.quater · Los dos contratos de evento · dicho por el usuario el 18/09/2026
+
+**Procedencia, otra vez lo primero.** Esta sección recoge lo que el usuario
+reportó de la validación en sitio. **No hay captura pegada en el repositorio
+todavía**, y por eso lo que aquí se afirma es la _forma_ del contrato —quién
+inicia la conexión, qué transporte, qué campo gobierna—, nunca un cuerpo
+literal. Pegar las capturas es el primer paso de la ETAPA 15; hasta entonces,
+cualquier ejemplo de payload que vea en el código está marcado como inventado.
+
+### Son DOS contratos, no uno
+
+| Equipo           | Quién inicia la conexión | Transporte                    | Formato  |
+| ---------------- | ------------------------ | ----------------------------- | -------- |
+| **Cámara ANPR**  | **El equipo**            | POST al _Alarm Server_        | **XML**  |
+| **Videoportero** | **Nuestro sistema**      | GET sostenido a `alertStream` | **JSON** |
+
+No es una diferencia estética: son **direcciones de conexión opuestas**, y por
+tanto dos adaptadores distintos en la ETAPA 15. La cámara _empuja_ —de ahí que
+el Alarm Server viva en la capa de presentación y necesite firma (RNF-03), que
+es la única cosa que acredita a un emisor sin sesión—. El videoportero **no
+empuja**: hay que ir a buscarlo, mantener la conexión abierta y reconectar, que
+es trabajo de infraestructura y tiene otros modos de fallo.
+
+Un diseño que asumiera «un solo contrato de evento» habría que rehacerlo entero
+al conectar el segundo equipo.
+
+### `alertStream` vuelca el HISTORIAL antes del tiempo real
+
+Al abrir la conexión, el videoportero suelta lo que ya tenía guardado, marcado
+con **`currentEvent: false`**, y solo después empieza a emitir lo que ocurre.
+
+**Consecuencia si se ignora, y es grave:** el adaptador procesaría como «está
+llamando ahora mismo» cada timbrazo de las últimas semanas. Eso son alertas al
+operador de central por visitas que ya pasaron, residentes avisados de gente
+que vino hace quince días, y **eventos falsos en una tabla append-only**: por
+ADR-05 no se pueden borrar ni siendo dueño de la tabla. Un error de arranque
+quedaría en la auditoría para siempre.
+
+La regla, implementada y probada desde la ETAPA 11-A en
+`packages/providers/src/hikvision/contratos-de-evento.ts`: **un bloque sin
+`currentEvent: true` es historial**. Sin el campo también, que es la dirección
+segura —callar un timbre cuesta menos que escribir un evento irreversible—. Y
+el adaptador **cuenta** cuántos descartó, porque esa cifra es lo que distingue
+«el videoportero está mudo» de «volcó cuatrocientos y los tiramos todos».
+
+### TwoWayAudio existe, con G.711 µ-law, y está **deshabilitado**
+
+El canal está presente en el equipo y el códec es G.711 µ-law, pero el canal
+viene con `enabled: false`.
+
+**Lo que significa para ADR-01:** la decisión no se reabre —la capacidad está
+ahí— pero **habilitar el canal es un paso de puesta en marcha**, con nombre y
+dueño, no un detalle que el adaptador resuelva por su cuenta. Y hasta que
+alguien lo habilite y se mida, **KPI-33 (audio y video < 2 s) no tiene cifra**:
+el proveedor simulado no produce una que signifique nada, y publicarla sería
+peor que no tenerla (misma decisión que en la ETAPA 10).
+
+### Lo que falta para cerrar esta sección
+
+1. Pegar la **captura real** del XML del Alarm Server, con sus etiquetas tal
+   como las emite el firmware de su cámara.
+2. Pegar la **captura real** de dos bloques del `alertStream`: uno del volcado
+   histórico y uno en vivo.
+3. Anotar el **modelo y firmware** del videoportero, como se hizo con la
+   barrera en §0.ter.
+
+Con esas tres cosas, los analizadores de `contratos-de-evento.ts` se ajustan en
+una tarde y el resto del camino ya está probado.
+
+---
+
 ## 0.ter · Barrera vehicular · medido el 15/09/2026 · **manda sobre lo anterior**
 
 **Procedencia, y es lo primero.** Nada de esta sección viene de documentación

@@ -13,3 +13,10 @@ export * from './barrera/desde-entorno';
 export * from './mock/simulacion';
 export * from './mock/mock-provider';
 export * from './mock/intercom-simulado';
+
+/**
+ * Los dos contratos de evento de Hikvision. Se exportan desde la ETAPA 11-A —antes
+ * de que exista el adaptador— porque la normalización se prueba desde hoy: el día
+ * que llegue el equipo, lo que se estrena es el transporte y no el analizador.
+ */
+export * from './hikvision/contratos-de-evento';
