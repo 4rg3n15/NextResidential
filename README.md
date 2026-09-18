@@ -260,9 +260,14 @@ node scripts/lib/cobertura-flutter.mjs   # cobertura POR CAPA, desde la raíz
 ./scripts/verificar-etapa.sh
 ```
 
-**Veintitrés pasos**, y ninguno es decorativo. Con `--con-base` se añaden los tres que necesitan PostgreSQL.
+**Veinticinco pasos**, y ninguno es decorativo. Con `--con-base` se añaden los tres que necesitan PostgreSQL.
 
-Cinco llegaron con la ETAPA 11-A y conviene saber por qué: **1b** comprueba que
+Siete llegaron con la ETAPA 11-A y conviene saber por qué: **1** comprueba
+también **Flutter y Dart** —la versión mínima del framework vive en
+`.flutter-version`, como `.nvmrc` para Node, y el mínimo de Dart se lee de
+`apps/mobile/pubspec.yaml`—; **1c** ejerce la **escritura** en las rutas que las
+herramientas van a usar, creando y borrando un fichero de verdad en cada una;
+**1b** comprueba que
 `docs/ESTADO_ETAPAS.md` no se contradiga —la regla existía en prosa y se
 incumplió dos veces—, y **5b a 5e** miran `apps/mobile`, que hasta entonces no
 tocaba ningún paso: análisis estático de Dart, suite con cobertura por capa,

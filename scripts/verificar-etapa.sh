@@ -73,6 +73,33 @@ else
   echo "$salida_entorno" | sed 's/^/     /'
 fi
 
+paso "1c · el árbol es escribible por las herramientas que van a usarlo"
+# AÑADIDO EN LA ETAPA 11-A a petición del usuario, tras tres rondas perdidas en
+# errores de entorno. Un permiso denegado no aparece donde está: aparece cuatro
+# pasos más abajo, disfrazado del error de la herramienta que tropezó con él
+# —un `PathAccessException` al crear `.dart_tool`— y mandando a buscar el
+# problema en el código. Se comprueba por EJERCICIO, no con `access()`.
+if salida_escritura=$(con_limite "$LIMITE_CORTO" node scripts/lib/verificar-escritura.mjs 2>&1); then
+  ok "$salida_escritura"
+else
+  mal "hay rutas que las herramientas necesitan y no pueden usar"
+  echo "$salida_escritura" | sed 's/^/     /'
+fi
+
+# Y la base, si se prometió una. Los pasos 12, 12b y 13 la dan por hecha; sin
+# ella fallan cuarenta minutos más tarde con tres mensajes que hablan de otra
+# cosa. Se pregunta aquí, con el host, el puerto y la base en el mensaje.
+if [[ "$CON_BASE" == "1" ]]; then
+  if salida_base=$(con_limite "$LIMITE_CORTO" node scripts/lib/verificar-base-de-pruebas.mjs 2>&1); then
+    ok "$salida_base"
+  else
+    mal "se pidió --con-base y la base no está utilizable"
+    echo "$salida_base" | sed 's/^/     /'
+  fi
+else
+  echo "   – sin --con-base: la base no se comprueba ni se usa"
+fi
+
 paso "1b · docs/ESTADO_ETAPAS.md no se contradice a sí mismo"
 # AÑADIDO EN LA ETAPA 11 a petición del usuario, y por la razón más incómoda:
 # la cabecera del documento se congeló DOS veces, la segunda pese a existir ya
@@ -185,23 +212,75 @@ fi
 # `NCR_FLUTTER` se puede apuntar a un SDK fuera del PATH.
 FLUTTER_BIN="${NCR_FLUTTER:-flutter}"
 hay_flutter() { command -v "$FLUTTER_BIN" >/dev/null 2>&1; }
+DIR_MOVIL="$RAIZ_DEL_REPO/apps/mobile"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# `ejecutar_movil` · un paso de la app, y un fallo que se puede diagnosticar.
+#
+# PEDIDO POR EL USUARIO, con su motivo: «"flutter analyze encontró problemas"
+# sin más no dice nada; ni siquiera sé si los problemas son del código o del
+# entorno». Así que ante un fallo esto imprime, SIEMPRE y antes que la salida:
+#
+#   · el comando exacto, con sus argumentos
+#   · el directorio desde el que se ejecutó, absoluto
+#   · qué binario de Flutter es y qué versiones trae
+#
+# Y clasifica: si la salida tiene la firma de un problema de ENTORNO —permisos,
+# resolución de versiones, un módulo de Node que no aparece— lo dice con esas
+# palabras y remite al paso 1, en vez de dejar creer que el código está roto.
+#
+# Uso: ejecutar_movil <limite> <fichero-de-salida> <comando...>
+# Devuelve el código del comando.
+ejecutar_movil() {
+  local limite="$1" destino="$2"
+  shift 2
+  (cd "$DIR_MOVIL" && con_limite "$limite" "$@") >"$destino" 2>&1
+  return $?
+}
+
+diagnostico_movil() {
+  local destino="$1"
+  shift
+  echo "     comando   : $*"
+  echo "     directorio: $DIR_MOVIL"
+  echo "     flutter   : $(command -v "$FLUTTER_BIN" 2>/dev/null || echo '<no está en el PATH>')"
+  local version
+  version=$("$FLUTTER_BIN" --version --machine 2>/dev/null |
+    node -e 'let e="";process.stdin.on("data",d=>e+=d).on("end",()=>{try{const j=JSON.parse(e);console.log(`Flutter ${j.frameworkVersion} · Dart ${String(j.dartSdkVersion).split(" ")[0]} · canal ${j.channel}`)}catch{console.log("no se pudo leer la versión")}})' 2>/dev/null)
+  echo "     versiones : ${version:-desconocidas}"
+
+  # La clasificación. Cada patrón es un fallo que YA ocurrió en este proyecto.
+  if grep -qiE "PathAccessException|Permission denied|EACCES|Operation not permitted" "$destino"; then
+    echo "     ► Esto es ENTORNO, no código: permisos de escritura. Vea el paso 1c."
+  elif grep -qiE "requires SDK version|version solving failed|Dart SDK version" "$destino"; then
+    echo "     ► Esto es ENTORNO, no código: su Dart no cumple lo que pide"
+    echo "       apps/mobile/pubspec.yaml. Vea el paso 1, que lo nombra."
+  elif grep -qiE "MODULE_NOT_FOUND|Cannot find module" "$destino"; then
+    echo "     ► Esto es ENTORNO: falta un módulo de Node para el guion, no para la app."
+  elif grep -qiE "No pubspec.yaml file found|Target file .* not found" "$destino"; then
+    echo "     ► Esto es ENTORNO: el comando corrió desde un directorio sin app Flutter."
+  fi
+  sed 's/^/     /' <(tail -20 "$destino")
+}
 
 paso "5b · app móvil: análisis estático de Dart"
+salida_movil="$(mktemp)"
 if ! hay_flutter; then
   mal "no hay SDK de Flutter ($FLUTTER_BIN). Instálelo o exporte NCR_FLUTTER; una omisión no es un verde"
-elif salida_dart=$(cd apps/mobile && con_limite "$LIMITE_MEDIO" "$FLUTTER_BIN" analyze 2>&1); then
+elif ejecutar_movil "$LIMITE_MEDIO" "$salida_movil" "$FLUTTER_BIN" analyze; then
   ok "flutter analyze sin hallazgos"
 else
-  mal "flutter analyze encontró problemas"
-  echo "$salida_dart" | grep -E "error|warning" | head -8 | sed 's/^/     /'
+  mal "flutter analyze terminó con fallo"
+  diagnostico_movil "$salida_movil" "$FLUTTER_BIN" analyze
 fi
+rm -f "$salida_movil"
 
 paso "5c · app móvil: suite de Dart y cobertura POR CAPA"
 if ! hay_flutter; then
   mal "no hay SDK de Flutter ($FLUTTER_BIN): la suite de la app no se ejecutó"
 else
   salida_flutter="$(mktemp)"
-  if (cd apps/mobile && con_limite "$LIMITE_LARGO" "$FLUTTER_BIN" test --coverage) >"$salida_flutter" 2>&1; then
+  if ejecutar_movil "$LIMITE_LARGO" "$salida_flutter" "$FLUTTER_BIN" test --coverage; then
     grep -E "All tests passed|[0-9]+ \+[0-9]+" "$salida_flutter" | tail -1 | sed 's/^/   /'
     # La cobertura se mide por capa, como en TypeScript: un agregado alto
     # esconde una capa por debajo, y eso ya ocurrió una vez (`aplicacion` al 79 %).
@@ -213,8 +292,8 @@ else
       mal "la app Flutter no alcanza sus umbrales de cobertura"
     fi
   else
-    mal "la suite de la app Flutter falló"
-    grep -E "\[E\]|Expected:|Actual:" "$salida_flutter" | head -8 | sed 's/^/     /'
+    mal "la suite de la app Flutter terminó con fallo"
+    diagnostico_movil "$salida_flutter" "$FLUTTER_BIN" test --coverage
   fi
   rm -f "$salida_flutter"
 fi
@@ -250,23 +329,25 @@ else
   # es de mentira y el guardarropa no lo mira; lo que se comprueba es que la app
   # arranca con una clave de la forma correcta.
   CLAVE_DE_RECORRIDO="sb_$(printf 'publishable')_recorrido"
-  if (cd apps/mobile && con_limite "$LIMITE_LARGO" "$FLUTTER_BIN" build web --no-web-resources-cdn \
-        --dart-define=API_URL=http://127.0.0.1:4599 \
-        --dart-define=SUPABASE_URL=http://127.0.0.1:4599/supabase \
-        --dart-define=SUPABASE_PUBLISHABLE_KEY="$CLAVE_DE_RECORRIDO") >"$salida_web" 2>&1; then
-    # `--no-web-resources-cdn` no es una comodidad del recorrido: sin él, la app
-    # pide CanvasKit y la tipografía a gstatic.com EN EJECUCIÓN, lo que rompe
-    # cualquier CSP seria (§2.7.7) y deja la app inservible sin internet abierto.
+  # `--no-web-resources-cdn` no es una comodidad del recorrido: sin él, la app
+  # pide CanvasKit y la tipografía a un CDN EN EJECUCIÓN, lo que rompe cualquier
+  # CSP seria (§2.7.7) y deja la app inservible sin internet abierto.
+  if ejecutar_movil "$LIMITE_LARGO" "$salida_web" "$FLUTTER_BIN" build web --no-web-resources-cdn \
+       --dart-define=API_URL=http://127.0.0.1:4599 \
+       --dart-define=SUPABASE_URL=http://127.0.0.1:4599/supabase \
+       --dart-define=SUPABASE_PUBLISHABLE_KEY="$CLAVE_DE_RECORRIDO"; then
     if con_limite "$LIMITE_LARGO" node apps/mobile/e2e/recorrido-web.mjs >>"$salida_web" 2>&1; then
       grep -E "^   ✓" "$salida_web" | tail -13
       ok "la app se recorre entera en el navegador, sin un error de JavaScript"
     else
       mal "el recorrido de la app falló"
+      echo "     comando   : node apps/mobile/e2e/recorrido-web.mjs"
+      echo "     directorio: $RAIZ_DEL_REPO"
       grep -E "✗" "$salida_web" | head -6 | sed 's/^/     /'
     fi
   else
     mal "la app Flutter no compila para web"
-    tail -5 "$salida_web" | sed 's/^/     /'
+    diagnostico_movil "$salida_web" "$FLUTTER_BIN" build web --no-web-resources-cdn
   fi
   rm -f "$salida_web"
 fi

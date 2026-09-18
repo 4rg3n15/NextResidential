@@ -26,7 +26,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const APP = 'apps/mobile';
@@ -42,9 +42,41 @@ if (!existsSync(GENERADO)) {
   process.exit(1);
 }
 
-/** Ruta de `flutter`/`dart`, configurable como la de Chromium (NCR_FLUTTER). */
+/**
+ * Ruta de `flutter`, configurable como la de Chromium (`NCR_FLUTTER`).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * EL `dart` SALE DEL SDK DE FLUTTER, NUNCA DEL PATH
+ *
+ * Antes esto usaba `dart` a secas cuando Flutter venía del PATH, y esa es
+ * justamente la configuración que produce el síntoma más desconcertante de
+ * todos: **`flutter pub get` funciona y `dart run` falla**. Ocurre cuando hay
+ * un Dart suelto instalado —de Homebrew, de un SDK anterior— distinto del que
+ * trae el Flutter en uso: dos SDK, dos resoluciones de paquetes y un
+ * `.dart_tool` escrito por uno y leído por el otro.
+ *
+ * `flutter --version --machine` dice qué Dart trae; el binario vive junto al de
+ * `flutter`. Si no se puede resolver, se cae a `dart` y se dice en el mensaje,
+ * porque una suposición silenciosa aquí es media hora de diagnóstico ajeno.
+ */
 const flutterBin = process.env.NCR_FLUTTER ?? 'flutter';
-const dartBin = flutterBin === 'flutter' ? 'dart' : join(flutterBin, '..', 'dart');
+
+const rutaDeFlutter = () => {
+  try {
+    return execFileSync(process.platform === 'win32' ? 'where' : 'command', ['-v', flutterBin], {
+      encoding: 'utf8',
+      shell: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .trim()
+      .split('\n')[0];
+  } catch {
+    return null;
+  }
+};
+
+const rutaFlutter = rutaDeFlutter();
+const dartBin = rutaFlutter === null ? 'dart' : join(dirname(rutaFlutter), 'dart');
 
 const ficheros = (raiz) => {
   const salida = [];
@@ -82,9 +114,13 @@ try {
     );
   } catch (e) {
     console.error('FALLO no se pudo ejecutar el generador de cliente Dart.');
+    // Qué se intentó y desde dónde: un fallo de herramienta sin estos dos datos
+    // manda a buscar el problema en el código.
+    console.error(`  comando   : ${dartBin} run swagger_parser`);
+    console.error(`  directorio: ${join(process.cwd(), APP)}`);
     console.error(
-      'Hace falta el SDK de Flutter en el PATH (o NCR_FLUTTER apuntando a su bin).\n' +
-        'Sin él, este control NO puede afirmar nada: una omisión no es un verde.',
+      '  Hace falta el SDK de Flutter en el PATH (o NCR_FLUTTER apuntando a su binario).\n' +
+        '  Sin él, este control NO puede afirmar nada: una omisión no es un verde.',
     );
     console.error(String(e.stderr ?? e.message).slice(0, 400));
     process.exit(1);

@@ -510,6 +510,32 @@ documento (control nuevo) puso el paso 1b en rojo → se leyó la salida entera 
 la suite decía «en verde» con 0 ficheros recogidos → al mirar por qué, salió el 141. Un control nuevo destapó un hueco en otro que llevaba nueve etapas dándose
 por bueno.
 
+### Ronda de entorno del 2026-09-18 · pedida por el usuario
+
+Tres rondas perdidas en errores de entorno, y la causa no estaba donde parecía.
+El síntoma era `PathAccessException` al crear `.dart_tool`; las dos hipótesis
+—directorio de trabajo o `PUB_CACHE`— se **descartaron midiendo**, sustituyendo
+`flutter` por un guion que imprime su `pwd` y su entorno: los tres pasos lo
+invocan desde `apps/mobile`, con `PUB_CACHE` sin definir. Lo que sí lo explica
+es que su Dart era **3.11.5** y el `pubspec.yaml` exige **^3.13.3**.
+
+| Añadido                                                     | Por qué                                                                                      |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **`.flutter-version`** en la raíz, y el paso 1 lo comprueba | Node tenía `.nvmrc` desde la 02; Flutter no tenía nada. El mínimo de Dart se lee del pubspec |
+| **Paso 1c · escritura por ejercicio**                       | `access(W_OK)` no ve un montaje de solo lectura ni una ACL. Nueve rutas, creando y borrando  |
+| **Diagnóstico en los pasos móviles**                        | Comando, directorio, binario y versiones; y si es entorno, lo dice con esas palabras         |
+
+| ID       | Qué                                                                                          | Estado        |
+| -------- | -------------------------------------------------------------------------------------------- | ------------- |
+| **D-81** | `cumple()` aceptaba `^` y **no lo interpretaba**: devolvía `true` para cualquier versión     | **Corregido** |
+| **D-82** | El control del cliente Dart usaba el `dart` del PATH, que puede no ser el del Flutter en uso | **Corregido** |
+
+**D-81 lo destapó la propia comprobación nueva**, probada con un mínimo
+imposible: pasó en verde. Es la misma familia de siempre, y esta vez a los diez
+minutos de nacer el control.
+
+---
+
 ### Lo que queda para 11-B
 
 M-4 completa (patrón de recurrencia, acompañantes nominales, zonas, y los

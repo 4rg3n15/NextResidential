@@ -250,6 +250,48 @@ comentario es por donde empieza la filtración.
 | **S-21** | Un residente con vínculo en varias viviendas ve la del titular, o la más antigua                                                                                                                                      | `[SUPUESTO]` · multivivienda sería HU propia                         |
 | **P-11** | El «nivel de acceso» del mockup no existe en los requisitos                                                                                                                                                           | Sigue `PENDIENTE DE DEFINICIÓN`; la app lo pinta y lo dice           |
 
+### Ronda de entorno (2026-09-18) · tres rondas perdidas, y por qué
+
+El usuario reportó `PathAccessException` al crear `.dart_tool` en los pasos
+móviles, con `flutter pub get` funcionando desde `apps/mobile`. Sus dos
+hipótesis —directorio de trabajo equivocado, o un `PUB_CACHE` ajeno— **quedaron
+descartadas por medición**: se sustituyó `flutter` por un guion que imprime su
+`pwd` y su entorno, y los tres pasos lo invocan desde
+`/…/apps/mobile`, con `PUB_CACHE` sin definir; `con-limite.mjs` no pasa `cwd` a
+`spawn`, así que el hijo hereda el del shell, que es el correcto.
+
+Lo que sí explica el síntoma es lo que él mismo reportó en la misma frase: **su
+Dart era 3.11.5 y el `pubspec.yaml` exige `^3.13.3`**. Con el SDK por debajo del
+mínimo, `pub` falla al resolver y, según el estado en que quedara `.dart_tool`,
+el error que sale es de permisos y no de versiones. Eso debía nombrarse en el
+paso 1. Ahora se nombra.
+
+| ID       | Qué                                                                                                                                                                                                                                           | Estado                                 |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| **D-81** | `cumple()` aceptaba `^` en la expresión regular y **no lo interpretaba**: caía al caso por defecto y devolvía `true` para cualquier versión. Se destapó probando la comprobación nueva con un mínimo imposible (`^3.99.0`), que pasó en verde | **Corregido**                          |
+| **D-82** | `cliente-dart-desfasado.mjs` usaba el `dart` del PATH, que no tiene por qué ser el del Flutter en uso. Es la configuración que produce «`flutter pub get` funciona y `dart run` falla»                                                        | **Corregido** · el `dart` sale del SDK |
+
+**Lo que se añadió, con su motivo:**
+
+1. **`.flutter-version`** en la raíz, como `.nvmrc`. El mínimo de Dart **no** se
+   duplica ahí: se lee de `apps/mobile/pubspec.yaml`, que ya lo declara.
+   Duplicarlo garantizaría que un día digan cosas distintas.
+2. **Paso 1c · escritura**, por ejercicio y no por `access()`: se crea un
+   fichero, se escribe, se lee y se borra en las nueve rutas que las
+   herramientas usan —incluidas `.dart_tool`, la caché de pub y el `bin/cache`
+   del propio SDK, que Flutter escribe—. `access(W_OK)` mira los bits de
+   permiso y no ve un montaje de solo lectura, una ACL de macOS ni un disco
+   lleno.
+3. **Diagnóstico en los pasos móviles.** Ante un fallo se imprime el comando
+   exacto, el directorio absoluto, qué binario de Flutter es y qué versiones
+   trae; y se **clasifica**: permisos, desajuste de SDK, módulo de Node ausente
+   o directorio sin app se anuncian como **entorno**, con la frase «esto es
+   ENTORNO, no código» y el paso que lo detecta. Comprobado con un error de Dart
+   introducido a propósito (no lo clasifica como entorno) y con el `pubspec`
+   pidiendo `^3.99.0` (sí lo clasifica, y muestra el error de resolución).
+
+---
+
 **Y un aviso sobre el `con_limite` del verificador**, que no es deuda sino
 corrección: llamaba al ayudante por ruta relativa, así que cualquier paso dentro
 de un subshell con `cd` —los de la app móvil— moría con `MODULE_NOT_FOUND` y
