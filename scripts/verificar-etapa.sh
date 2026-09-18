@@ -140,6 +140,70 @@ else
   ok "suite completa en verde"
 fi
 
+# ─────────────────────────────────────────────────────────────────────────────
+# LA APP FLUTTER · pasos 5b, 5c y 5d (ETAPA 11-A)
+#
+# Hasta aquí, NINGUNO de los 19 pasos tocaba `apps/mobile`. Es la misma forma de
+# hueco que persigue el resto del guion: un verificador que informa «correcta»
+# sin haber mirado una cuarta parte del monorepo. La app se distribuye —no se
+# despliega— así que un defecto suyo no se arregla con un `git push`.
+#
+# **Si falta el SDK de Flutter, estos pasos FALLAN.** No se omiten: es la misma
+# regla que el guardián de Chromium del paso 12c, y por el mismo motivo —«sin
+# navegador no se omite en silencio» era una afirmación que resultó falsa—. Con
+# `NCR_FLUTTER` se puede apuntar a un SDK fuera del PATH.
+FLUTTER_BIN="${NCR_FLUTTER:-flutter}"
+hay_flutter() { command -v "$FLUTTER_BIN" >/dev/null 2>&1; }
+
+paso "5b · app móvil: análisis estático de Dart"
+if ! hay_flutter; then
+  mal "no hay SDK de Flutter ($FLUTTER_BIN). Instálelo o exporte NCR_FLUTTER; una omisión no es un verde"
+elif salida_dart=$(cd apps/mobile && con_limite "$LIMITE_MEDIO" "$FLUTTER_BIN" analyze 2>&1); then
+  ok "flutter analyze sin hallazgos"
+else
+  mal "flutter analyze encontró problemas"
+  echo "$salida_dart" | grep -E "error|warning" | head -8 | sed 's/^/     /'
+fi
+
+paso "5c · app móvil: suite de Dart y cobertura POR CAPA"
+if ! hay_flutter; then
+  mal "no hay SDK de Flutter ($FLUTTER_BIN): la suite de la app no se ejecutó"
+else
+  salida_flutter="$(mktemp)"
+  if (cd apps/mobile && con_limite "$LIMITE_LARGO" "$FLUTTER_BIN" test --coverage) >"$salida_flutter" 2>&1; then
+    grep -E "All tests passed|[0-9]+ \+[0-9]+" "$salida_flutter" | tail -1 | sed 's/^/   /'
+    # La cobertura se mide por capa, como en TypeScript: un agregado alto
+    # esconde una capa por debajo, y eso ya ocurrió una vez (`aplicacion` al 79 %).
+    if salida_cob=$(node scripts/lib/cobertura-flutter.mjs 2>&1); then
+      echo "$salida_cob"
+      ok "cobertura de la app dentro de los umbrales por capa"
+    else
+      echo "$salida_cob"
+      mal "la app Flutter no alcanza sus umbrales de cobertura"
+    fi
+  else
+    mal "la suite de la app Flutter falló"
+    grep -E "\[E\]|Expected:|Actual:" "$salida_flutter" | head -8 | sed 's/^/     /'
+  fi
+  rm -f "$salida_flutter"
+fi
+
+paso "5d · app móvil: cliente generado al día y ningún secreto en el binario"
+if salida_secretos=$(node scripts/lib/flutter-sin-secretos.mjs 2>&1); then
+  ok "$salida_secretos"
+else
+  mal "la app nombra o incrusta algo que no puede viajar en un binario"
+  echo "$salida_secretos" | sed 's/^/     /'
+fi
+if ! hay_flutter; then
+  mal "no hay SDK de Flutter ($FLUTTER_BIN): no se pudo comprobar si el cliente Dart está al día"
+elif salida_cliente=$(con_limite "$LIMITE_MEDIO" node scripts/lib/cliente-dart-desfasado.mjs 2>&1); then
+  ok "$salida_cliente"
+else
+  mal "el cliente Dart no coincide con el contrato OpenAPI"
+  echo "$salida_cliente" | head -10 | sed 's/^/     /'
+fi
+
 paso "6 · ningún fichero de prueba se quedó sin recoger"
 # Detecta el fichero que existe y NADIE ejecuta —patrón `include` que dejó de
 # alcanzarlo, paquete fuera de la corrida—: ahí no hay ningún rojo, la suite
@@ -393,7 +457,12 @@ if [[ "$CON_BASE" == "1" ]]; then
     con_base_o_omitida test/generacion-padron.test.ts \
       "las 12 en una sentencia, el mismo número en tres agrupaciones, y una colisión revierte las 12"
   else
-    echo "   – omitido: exporta DATABASE_URL_PRUEBAS para ejecutarlo"
+    # `--con-base` SIN base era una omisión silenciosa: el paso se declaraba,
+    # imprimía una nota y el veredicto salía «correcta» sin haber tocado
+    # PostgreSQL. Es la misma familia que el paso 13 escondiendo tres pruebas en
+    # rojo. Quien no tenga base, que corra sin `--con-base` y lo diga en el
+    # informe; pedirla y no tenerla es un fallo.
+    mal "se pidió --con-base y no hay DATABASE_URL_PRUEBAS: estas pruebas NO se ejecutaron"
   fi
 fi
 
