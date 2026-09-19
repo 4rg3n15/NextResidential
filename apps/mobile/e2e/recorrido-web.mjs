@@ -304,6 +304,54 @@ try {
   });
   await pagina.waitForTimeout(1500);
 
+  /**
+   * Escribe en un campo y COMPRUEBA QUE EL TEXTO ENTRÓ antes de seguir.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * EL FALLO QUE LO ORIGINA, leído en `fallo.png` y no supuesto
+   *
+   * La captura del fallo muestra el formulario con **«Contraseña» rellena y
+   * «Correo» vacío**, y debajo el propio validador de la app diciendo «Escriba
+   * su correo». Es decir: `_entrar()` salía en su primera línea
+   * —`if (!formulario.validate()) return;`— y **la petición del token no llegó
+   * a existir**. El recorrido esperaba 20 s una petición que, por construcción,
+   * ya no iba a ocurrir.
+   *
+   * La causa es del recorrido, no de la app: en Flutter web el campo visible es
+   * un `<canvas>` y el texto entra por un `<input>` que el motor crea AL
+   * ENFOCAR. Si se teclea antes de que exista, las pulsaciones se pierden. El
+   * segundo campo funciona porque para entonces el motor ya está listo — de ahí
+   * la asimetría exacta de la captura.
+   *
+   * La versión anterior sustituyó `fill()` por clic + tecleo, lo que redujo la
+   * ventana sin cerrarla. Esto la cierra: se lee el valor de vuelta y se
+   * reintenta. **Y si tras tres intentos sigue vacío, se dice eso** —no se
+   * espera una petición que nadie va a hacer—.
+   */
+  const escribirEn = async (etiqueta, texto) => {
+    const campo = pagina.getByLabel(etiqueta);
+    for (let intento = 1; intento <= 3; intento += 1) {
+      await campo.click();
+      await pagina.keyboard.type(texto);
+      let valor = '';
+      try {
+        valor = await campo.inputValue();
+      } catch {
+        valor = '';
+      }
+      if (valor === texto) return;
+      // Lo que entró a medias se borra: reintentar sobre ello daría el texto
+      // duplicado, que es un fallo peor porque parece un error de la app.
+      await campo.click();
+      await pagina.keyboard.press('ControlOrMeta+a');
+      await pagina.keyboard.press('Delete');
+    }
+    throw new Error(
+      `el campo «${etiqueta}» sigue vacío tras 3 intentos: el motor de Flutter no creó ` +
+        'su <input> a tiempo. Es el recorrido, no la app',
+    );
+  };
+
   // ── 1 · acceso ────────────────────────────────────────────────────────────
   (await hay('Acceso del residente'))
     ? ok('la app arranca en la pantalla de acceso')
@@ -321,10 +369,8 @@ try {
    * el `waitForTimeout`. Teclear es lo que hace el residente, y esperar la
    * PETICIÓN —no un reloj— es lo que hace la comprobación determinista.
    */
-  await pagina.getByLabel('Correo').click();
-  await pagina.keyboard.type('maria@ejemplo.invalid');
-  await pagina.getByLabel('Contraseña').click();
-  await pagina.keyboard.type('la-que-sea');
+  await escribirEn('Correo', 'maria@ejemplo.invalid');
+  await escribirEn('Contraseña', 'la-que-sea');
 
   const [respuestaDelToken] = await Promise.all([
     pagina.waitForResponse((r) => r.url().includes('/auth/v1/token'), { timeout: 20000 }),

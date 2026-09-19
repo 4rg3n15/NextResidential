@@ -424,6 +424,75 @@ disfrazarse de umbral incumplido.
 
 ---
 
+### Tercera ronda de entorno · 2026-09-19 · los tres cierres
+
+**1 · El paso 5e. La causa está en `fallo.png`, no en una hipótesis.**
+
+La captura del fallo muestra el formulario de acceso con **«Contraseña» rellena
+y «Correo» vacío**, y debajo el validador de la propia app: «Escriba su correo».
+Con eso, `_entrar()` sale en su primera línea —`if (!formulario.validate())
+return;`— y **la petición del token nunca llega a emitirse**. El recorrido
+esperaba 20 s `POST /supabase/auth/v1/token?grant_type=password`; lo que ocurrió
+en su lugar no fue otra petición: **no hubo ninguna**.
+
+`flutter_secure_storage` **no** interviene. El aviso
+`flutter_secure_storage_web/src/subtle.dart · package:js/js.dart unsupported` es
+de **compilación**, y la app ni siquiera llegó a tener sesión que guardar: se
+quedó antes, en su propia validación de formulario. Era una pista razonable y
+resulta ser un falso culpable.
+
+La causa real es del recorrido: en Flutter web el campo es un `<canvas>` y el
+texto entra por un `<input>` que el motor crea **al enfocar**. Si se teclea
+antes de que exista, las pulsaciones se pierden — y eso explica la asimetría
+exacta de la captura: el segundo campo funciona porque para entonces el motor ya
+está listo. La versión anterior sustituyó `fill()` por clic + tecleo, lo que
+**redujo la ventana sin cerrarla**.
+
+Arreglo, ocho líneas: `escribirEn()` escribe y **lee el valor de vuelta**; si no
+entró, limpia y reintenta hasta tres veces, y si sigue vacío **lo dice** en vez
+de esperar una petición que ya nadie va a hacer. Ejercido en los dos sentidos:
+el recorrido completo pasa, y forzando el fallo aparece «el campo «Correo» sigue
+vacío tras 3 intentos … Es el recorrido, no la app».
+
+> **No hace falta declararlo no ejercido en web.** El recorrido no estaba
+> midiendo algo imposible en esa plataforma: estaba perdiendo pulsaciones. Si el
+> síntoma vuelve, ahora el mensaje lo separa de la app en la primera línea.
+
+**2 · El paso 9, y por qué el control de hace dos rondas ya fallaba.**
+
+En una línea: **la comprobación que escribí daba por hecho `node_modules`, y el
+banco de las pruebas negativas es un clon sin ellos** — así que en cualquier
+máquina sin el Chromium preinstalado del contenedor caía a `import('playwright')`
+y exigía un paquete que allí, por construcción, no existe. De las dependencias
+responde el paso 2 con `--frozen-lockfile`; confundir «falta el navegador» con
+«falta instalar» fue el error. Reproducido haciendo invisible el Chromium del
+contenedor —el control de antes falla, el de ahora pasa— y corregido sin tocar
+la detección del navegador ausente, que sigue avisando.
+
+**3 · El paso 7: el aviso era D-85 disfrazado, y D-86 queda cerrado.**
+
+| ID       | Qué                                                                                                                                                                          | Estado                                       |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **D-85** | Un paquete cuya corrida no terminaba dejaba su resumen ANTERIOR en disco: las capas se medían con un fichero viejo y el paso pasaba. Como aviso seguía siendo un falso verde | **Cerrado** · ahora es **fallo**, no aviso   |
+| **D-86** | `@ncr/providers` al 84,58 % contra el 90 % que declara: `intercom-simulado.ts` con **147 líneas y cero pruebas**, y la lectura de entorno de la barrera sin sus ramas        | **Cerrado** · 98,49 % líneas · 90,47 % ramas |
+
+D-86 se cierra con pruebas, no bajando el umbral: 11 casos para
+`IntercomSimulado` —exclusividad del canal, relevo por caducidad, la renovación
+al hablar, el cierre, el audio de 160 bytes— y 5 para
+`crearControlDeBarreraDesdeEntorno`, más tres ramas de borde de los contratos
+Hikvision. De 59 a 78 pruebas en el paquete.
+
+> **Un hallazgo anotado y no corregido, a propósito.** `cerrarSesion()` del
+> puerto no lleva `operadorId`, pero `IntercomSimulado` guarda un mapa de todos
+> los operadores que pasaron por la instancia: si dos la comparten, un cierre
+> los suelta a los dos y el canal queda libre en vez de relevar al que esperaba.
+> Queda **escrito como prueba `[OBSERVADO]`**, no cambiado: una instancia por
+> operador frente a una compartida es decisión de la consola (ETAPA 10) y del
+> adaptador ISAPI (ETAPA 15), y resolverlo desde una ronda de verificación sería
+> ampliar alcance.
+
+---
+
 ## 9 · Qué debe hacer usted
 
 1. **Nada para que la suite corra.** Todo lo de esta mitad se verifica sin

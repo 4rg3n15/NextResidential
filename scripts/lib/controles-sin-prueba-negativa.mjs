@@ -83,7 +83,7 @@ const DEUDA = new Map([
   ['scripts/lib/dependencias-acotadas.mjs', 'nacido hoy con este mismo control; se prueba en 11-B'],
   [
     'scripts/lib/metricas.mjs',
-    'el paso 7 SÍ mira su código de salida: es un control, y estaba mal exento',
+    'es un control —el paso 7 mira su código de salida— y estaba mal exento; su prueba\n     negativa exige correr la suite entera, así que va con la granularidad de rama de 11-B',
   ],
 ]);
 

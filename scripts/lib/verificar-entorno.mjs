@@ -290,11 +290,17 @@ if (existsSync('apps/mobile/e2e/recorrido-web.mjs')) {
             'correr.\n      Instálelo: `pnpm exec playwright install chromium`',
         );
       }
-    } catch (e) {
-      problemas.push(
-        `no se pudo cargar \`playwright\` (${String(e.message).split('\n')[0]}). ` +
-          'Ejecute `pnpm install`',
-      );
+    } catch {
+      /**
+       * Que `playwright` no se pueda cargar NO es un problema de entorno: es
+       * que no hay dependencias instaladas, y de eso responde el paso 2 con
+       * `--frozen-lockfile`. Confundir las dos cosas produjo un falso positivo
+       * inmediato: el banco de `pruebas-negativas.mjs` es un CLON SIN
+       * `node_modules`, así que en cualquier máquina sin el Chromium
+       * preinstalado del contenedor este control exigía un paquete que, por
+       * construcción, allí no existe — y la mitad positiva del caso 6
+       * informaba «el control rechaza un entorno que sí cumple».
+       */
     }
   }
 

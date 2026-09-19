@@ -423,12 +423,6 @@ paso "7 · umbrales de cobertura por capa (§2.4)"
 # ocurrió con `aplicacion`, que estaba al 79 % sin que nadie lo midiera.
 if salida_cob=$(con_limite "$LIMITE_LARGO" node scripts/lib/metricas.mjs 2>&1); then
   echo "$salida_cob" | grep -E "^  (OK|BAJO)" | sed 's/^/   /'
-  # Un paquete cuya corrida NO terminó —porque incumple SU PROPIO umbral, no el
-  # de §2.4— escribe el resumen igual, así que las capas se miden bien y el paso
-  # pasa. Pero callarlo lo convertía en un hallazgo invisible: `@ncr/providers`
-  # lleva desde la ETAPA 10 por debajo del 90 % que él mismo declara, y ninguna
-  # ejecución lo había dicho nunca. Se imprime, aunque no tumbe el paso.
-  grep -E "la corrida NO terminó" <<<"$salida_cob" | sed 's/^## /   aviso: /' || true
   ok "las tres capas cumplen su umbral"
 else
   # El motivo REAL, no una conjetura. `metricas.mjs` falla por tres razones
@@ -439,14 +433,16 @@ else
   # del informe en lugar de salir en rojo, y el mensaje mandaba a buscar un
   # umbral incumplido que no existía. Es la misma clase de fallo que el usuario
   # señaló en los pasos móviles: un mensaje que no nombra su causa.
-  if grep -q "QUEDARON FUERA de la medición" <<<"$salida_cob"; then
+  if grep -q "corrida(s) que NO terminaron" <<<"$salida_cob"; then
+    mal "la corrida de un paquete NO terminó: su resumen sería de la ejecución anterior"
+  elif grep -q "QUEDARON FUERA de la medición" <<<"$salida_cob"; then
     mal "un paquete quedó FUERA de la medición: no es una capa baja, es una capa que nadie midió"
   elif grep -q "que NADIE ejecutó" <<<"$salida_cob"; then
     mal "hay ficheros de prueba en disco que nadie ejecutó"
   else
     mal "alguna capa por debajo del umbral de §2.4"
   fi
-  echo "$salida_cob" | grep -E "^  (OK|BAJO)|QUEDARON FUERA|NADIE ejecutó|^     - |SIN RESUMEN|SIN INFORME" | sed 's/^/     /'
+  echo "$salida_cob" | grep -E "^  (OK|BAJO)|QUEDARON FUERA|NADIE ejecutó|NO terminaron|^     - |SIN RESUMEN|SIN INFORME" | sed 's/^/     /'
 fi
 
 paso "8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)"

@@ -112,12 +112,26 @@ const coberturaPorCapa = { dominio: [], aplicacion: [], resto: [] };
  * capa por debajo del umbral, era una capa que nadie midió. Ahora es fallo.
  */
 const sinMedir = [];
+/**
+ * Paquetes cuya corrida no terminó AUNQUE dejaran resumen.
+ *
+ * Es la otra mitad de D-85 y la que faltaba: si el resumen existe de una
+ * ejecución anterior, las capas se miden con él y el paso pasa —midiendo un
+ * fichero viejo—. Eso es un falso verde de manual. Y fue peor: `@ncr/providers`
+ * llevaba desde la ETAPA 10 incumpliendo su propio umbral, fallando en CADA
+ * corrida, y ninguna ejecución lo dijo jamás porque el código de salida se
+ * perdía en un `catch` vacío. Ahora es fallo, no aviso.
+ */
+const corridasIncompletas = [];
 /** Rutas relativas de los ficheros que SÍ se ejecutaron, para nombrar los que no. */
 const ficherosMedidos = [];
 
 for (const [paquete, dir] of paquetes) {
   const { informe, cobertura, fallo } = correr(paquete, dir);
-  if (fallo !== null) console.log(`\n## ${paquete}: la corrida NO terminó — ${fallo}`);
+  if (fallo !== null) {
+    console.log(`\n## ${paquete}: la corrida NO terminó — ${fallo}`);
+    corridasIncompletas.push(`${paquete}: ${fallo}`);
+  }
   if (!informe) {
     console.log(`\n## ${paquete}: SIN INFORME — la corrida no produjo resultados`);
     sinMedir.push(`${paquete} (sin informe de pruebas)`);
@@ -231,6 +245,15 @@ if (sinMedir.length > 0) {
   console.log(`\n   ${sinMedir.length} paquete(s) QUEDARON FUERA de la medición:`);
   for (const p of sinMedir) console.log(`     - ${p}`);
   console.log('   Una capa sin medir no es una capa que cumple.');
+  process.exit(1);
+}
+if (corridasIncompletas.length > 0) {
+  console.log(`\n   ${corridasIncompletas.length} corrida(s) que NO terminaron:`);
+  for (const c of corridasIncompletas) console.log(`     - ${c}`);
+  console.log(
+    '   Un resumen que sobrevive a una corrida fallida es de la ejecución anterior:\n' +
+      '   medir con él es un falso verde. Por eso esto es fallo y no aviso.',
+  );
   process.exit(1);
 }
 if (incumple > 0) {

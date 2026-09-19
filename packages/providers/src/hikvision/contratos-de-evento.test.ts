@@ -119,3 +119,31 @@ describe('videoportero · JSON del alertStream que ABRE nuestro sistema', () => 
     expect(evento.confianza).toBeCloseTo(0.88);
   });
 });
+
+/**
+ * Ramas que la medición señalaba sin cubrir (D-86). No son casos de laboratorio:
+ * las tres salen de firmware que se comporta distinto entre modelos, que es lo
+ * que obliga a normalizar en el adaptador y no en el dominio.
+ */
+describe('normalización · los bordes que distinguen un firmware de otro', () => {
+  it('una etiqueta de confianza VACÍA deja la confianza nula, no cero', () => {
+    // Cero sería una lectura pésima que el umbral rechazaría; nulo es «el
+    // equipo no la informó». Confundirlos negaría accesos legítimos.
+    const xml = xmlAnpr().replace('<confidenceLevel>92<', '<confidenceLevel><');
+    expect(desdeAlarmServerXml(xml, DISPOSITIVO, AHORA)?.confianza).toBeNull();
+  });
+
+  it('un bloque en vivo que no es timbre ni placa se clasifica «desconocido»', () => {
+    const otro = { eventType: 'tamperDetection', currentEvent: true };
+    expect(desdeAlertStreamJson(otro, DISPOSITIVO, AHORA).clase).toBe('desconocido');
+  });
+
+  it('por el alertStream la confianza también llega en fracción en algunos equipos', () => {
+    const conFraccion = {
+      eventType: 'ANPR',
+      currentEvent: true,
+      ANPR: { licensePlate: 'ABC123', confidenceLevel: 0.77 },
+    };
+    expect(desdeAlertStreamJson(conFraccion, DISPOSITIVO, AHORA).confianza).toBeCloseTo(0.77);
+  });
+});

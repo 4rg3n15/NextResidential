@@ -554,12 +554,14 @@ sin hallazgos y las 72 pruebas de Dart en verde.
 | **Paso 1 · `xcrun` en macOS**                    | Xcode seleccionado no implica SDK. Se ejecuta el comando y se exige que la ruta exista                    |
 | **Paso 1 · Chromium y puerto del 5e**            | El recorrido **no necesita la API**; necesita navegador y el 4599 libre, y ahora se nombran               |
 
-| ID       | Qué                                                                                                                                                         | Estado        |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| **D-83** | `objective_c` entraba por el plugin de **Windows** y rompía `flutter test` en macOS                                                                         | **Corregido** |
-| **D-84** | La lista de pruebas negativas se mantenía a mano: un control podía nacer sin ella —así nació D-81—                                                          | **Corregido** |
-| **D-85** | `metricas.mjs` se callaba que la corrida de un paquete no terminó: el paso 7 decía «capa por debajo del umbral» cuando la verdad era «capa que nadie midió» | **Corregido** |
-| **D-86** | `@ncr/providers` al 84,58 % frente al 90 % que él mismo declara (`intercom-simulado.ts` al 0 %); fallaba en cada corrida y nadie lo veía                    | **Declarado** |
+| ID       | Qué                                                                                                                                                                                                  | Estado                                                 |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| **D-83** | `objective_c` entraba por el plugin de **Windows** y rompía `flutter test` en macOS                                                                                                                  | **Corregido**                                          |
+| **D-84** | La lista de pruebas negativas se mantenía a mano: un control podía nacer sin ella —así nació D-81—                                                                                                   | **Corregido**                                          |
+| **D-85** | `metricas.mjs` se callaba que la corrida de un paquete no terminó: el paso 7 decía «capa por debajo del umbral» cuando la verdad era «capa que nadie midió»                                          | **Corregido**                                          |
+| **D-86** | `@ncr/providers` al 84,58 % frente al 90 % que él mismo declara (`intercom-simulado.ts` al 0 %); fallaba en cada corrida y nadie lo veía                                                             | **Cerrado** con pruebas: 98,49 % líneas, 90,47 % ramas |
+| **D-87** | El recorrido del 5e perdía las pulsaciones del primer campo —el `<input>` de Flutter web se crea al enfocar— y esperaba 20 s una petición que la app, con el formulario inválido, ya no iba a emitir | **Corregido**                                          |
+| **D-88** | La comprobación del navegador del paso 1 daba por hecho `node_modules`, y el banco de pruebas negativas es un clon sin ellos: falso positivo en el caso 6                                            | **Corregido**                                          |
 
 Hoy: **18 de 25 controles con prueba negativa, 7 en deuda declarada**, y esa
 lista solo puede encoger. Lo que aún no cubre —una rama _nueva_ dentro de un
