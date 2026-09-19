@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-15 · **ETAPA 10 construida** · adaptador real de barrera vehicular, verificado contra el equipo
+**Última actualización:** 2026-09-19 · **ETAPA 10 CERRADA**, **ETAPA 11-A CERRADA** y **11-B en curso** · la app Flutter del residente y el segundo eje del aislamiento
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -20,10 +20,10 @@
 
 |                                |                                                                                                                 |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **9 de 17** (ETAPAS 00 a 09) · la 09 cerrada el 2026-09-12 con `--con-base`, 19 de 19 pasos                     |
-| **Etapa siguiente habilitada** | **ETAPA 10 — consolas operativas** (la 12 sigue habilitada)                                                     |
+| **Etapas cerradas**            | **11 de 17** (ETAPAS 00 a 10) · la 10 cerrada el 2026-09-18 con `--con-base`; la 11 va por su mitad 11-A        |
+| **Etapa siguiente habilitada** | **ETAPA 11-B — la app que escribe** (la 12 sigue habilitada)                                                    |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | Ninguno. D-71 a D-74 corregidos en la ronda del 2026-09-13                                                      |
+| **Defectos abiertos**          | **D-77 y D-78**, declarados en la 11-A. D-76 y D-79 corregidos en la misma ronda                                |
 | **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
 | **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
 | **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)                                                     |
@@ -44,9 +44,9 @@
 | 06     | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05 ✅                            | **CERRADA**                      | [ETAPA-06](etapas/ETAPA-06.md) |
 | 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06 ✅                            | **CERRADA**                      | [ETAPA-07](etapas/ETAPA-07.md) |
 | 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                            | **CERRADA**                      | [ETAPA-08](etapas/ETAPA-08.md) |
-| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **EN CURSO** — 09-A cerrada      | [ETAPA-09](etapas/ETAPA-09.md) |
-| 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09                               | PENDIENTE                        | —                              |
-| 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09                               | PENDIENTE                        | —                              |
+| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **CERRADA**                      | [ETAPA-09](etapas/ETAPA-09.md) |
+| 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09 ✅                            | **CERRADA**                      | [ETAPA-10](etapas/ETAPA-10.md) |
+| 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                            | **EN CURSO** — 11-A cerrada      | [ETAPA-11](etapas/ETAPA-11.md) |
 | 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
 | 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12                               | PENDIENTE                        | —                              |
 | 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13                               | PENDIENTE                        | —                              |
@@ -69,7 +69,7 @@
 
 ---
 
-## ETAPA 09 — Consola web de administración · **EN CURSO** (09-A cerrada)
+## ETAPA 09 — Consola web de administración · **CERRADA** (09-A y 09-B)
 
 **Rama:** `etapa-09-consola-administracion` · **Cierre de 09-A:** 2026-09-09 · **Informe:** [`etapas/ETAPA-09.md`](etapas/ETAPA-09.md)
 
@@ -469,7 +469,146 @@ plataforma**: la decisión la toma Next Control.
 
 ---
 
-## ETAPA 10 — Consolas operativas · **CONSTRUIDA** · 2026-09-13
+## ETAPA 11 — App móvil Flutter del residente · **EN CURSO** — 11-A cerrada · 2026-09-19
+
+**Rama:** `etapa-11-app-flutter-residente`, desde `develop` actualizado ·
+**Informe:** [`etapas/ETAPA-11.md`](etapas/ETAPA-11.md)
+
+La etapa se ejecuta en dos mitades, aprobadas por el usuario. El corte no es por
+tamaño: **11-A se recorre entera en un emulador sin conceder un permiso del
+sistema ni cortar la red; 11-B no se puede demostrar sin ninguna de las dos.**
+
+### Lo que 11-A dejó construido
+
+| Entregable                                           | Estado                                                                                                                |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **La superficie del residente en la API**            | `copropiedades/:id/mi/{vivienda,familia,vehiculos,autorizaciones,historial}`. **No existía**: OE-02 no tenía endpoint |
+| **El SEGUNDO EJE del aislamiento**                   | `alcanzaVivienda` en el dominio. La vivienda **nunca** llega en la petición: se deriva de la identidad                |
+| Suite `aislamiento-residente.e2e.test.ts`            | Rompe el build. La lista de rutas se DERIVA del enrutador, y lleva línea base                                         |
+| App Flutter con arquitectura limpia                  | Dominio, aplicación, infraestructura y presentación, con los puertos declarados en Dart                               |
+| Cliente Dart **generado** desde OpenAPI              | 170 ficheros · control que falla si se queda atrás                                                                    |
+| Sesión en Keychain/Keystore + **refresco al volver** | Política pura con reloj inyectado, y **una sola** renovación concurrente                                              |
+| Los cinco estados transversales                      | Unión sellada: el `switch` no compila si falta una rama                                                               |
+| Pantallas M-1, M-2, M-3, M-6 y M-8                   | Con las decisiones del mockup revisadas, y lo que falta dicho en pantalla                                             |
+| **Recorrido en navegador** con capturas              | Acceso → inicio → familia → vehículos → pendiente → perfil → historial                                                |
+| Los **dos contratos** de evento de Hikvision         | XML del Alarm Server y JSON del `alertStream`, con el filtro del volcado histórico. El simulado los emite             |
+| Verificador: **23 pasos** (cinco nuevos)             | Coherencia de este documento · análisis Dart · suite y cobertura por capa · cliente al día y secretos · recorrido     |
+
+### Hallazgos de esta mitad
+
+| ID       | Qué                                                                                                                                                                                                     | Estado                                                        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **D-76** | Un residente podía dar acceso a una zona a la autorización **de otra vivienda**: el permiso se da a un `autorizacionId` del cuerpo                                                                      | **Corregido**                                                 |
+| **D-77** | `GET …/biometria/consentimientos/:id` expone el estado de cualquier consentimiento del conjunto a quien conozca su UUID                                                                                 | Declarado, 11-B                                               |
+| **D-78** | El tema de la app copia los colores del preset a mano; la prueba compara con el `.ts` mientras no se genere                                                                                             | Declarado                                                     |
+| **D-79** | El paso 5 del verificador decidía por TEXTO y no por código de salida: con la compilación rota informaba verde con cero pruebas ejecutadas                                                              | **Corregido**                                                 |
+| **D-80** | **`echo "$x" \| grep -q` bajo `pipefail` devuelve 141 al ACERTAR.** La comprobación de pruebas en rojo —y la de SECRETOS de `verificar-frontera.sh`— se leían como falsas justo cuando encontraban algo | **Corregido** · regla en `portabilidad.mjs` + prueba negativa |
+
+**D-80 es el más caro de los cinco** y llevaba en el repositorio desde que se
+escribió el verificador. Apareció por una cadena: la coherencia de este
+documento (control nuevo) puso el paso 1b en rojo → se leyó la salida entera →
+la suite decía «en verde» con 0 ficheros recogidos → al mirar por qué, salió el 141. Un control nuevo destapó un hueco en otro que llevaba nueve etapas dándose
+por bueno.
+
+### Ronda de entorno del 2026-09-18 · pedida por el usuario
+
+Tres rondas perdidas en errores de entorno, y la causa no estaba donde parecía.
+El síntoma era `PathAccessException` al crear `.dart_tool`; las dos hipótesis
+—directorio de trabajo o `PUB_CACHE`— se **descartaron midiendo**, sustituyendo
+`flutter` por un guion que imprime su `pwd` y su entorno: los tres pasos lo
+invocan desde `apps/mobile`, con `PUB_CACHE` sin definir. Lo que sí lo explica
+es que su Dart era **3.11.5** y el `pubspec.yaml` exige **^3.13.3**.
+
+| Añadido                                                     | Por qué                                                                                      |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **`.flutter-version`** en la raíz, y el paso 1 lo comprueba | Node tenía `.nvmrc` desde la 02; Flutter no tenía nada. El mínimo de Dart se lee del pubspec |
+| **Paso 1c · escritura por ejercicio**                       | `access(W_OK)` no ve un montaje de solo lectura ni una ACL. Nueve rutas, creando y borrando  |
+| **Diagnóstico en los pasos móviles**                        | Comando, directorio, binario y versiones; y si es entorno, lo dice con esas palabras         |
+
+| ID       | Qué                                                                                          | Estado        |
+| -------- | -------------------------------------------------------------------------------------------- | ------------- |
+| **D-81** | `cumple()` aceptaba `^` y **no lo interpretaba**: devolvía `true` para cualquier versión     | **Corregido** |
+| **D-82** | El control del cliente Dart usaba el `dart` del PATH, que puede no ser el del Flutter en uso | **Corregido** |
+
+**D-81 lo destapó la propia comprobación nueva**, probada con un mínimo
+imposible: pasó en verde. Es la misma familia de siempre, y esta vez a los diez
+minutos de nacer el control.
+
+---
+
+### Segunda ronda de entorno · 2026-09-19 · `objective_c` y el control genérico
+
+**Quién arrastraba `objective_c`**, medido con `flutter pub deps`:
+`flutter_secure_storage` → su plugin de **Windows** → `path_provider` (federado,
+arrastra las cinco plataformas) → `path_provider_foundation` → `objective_c`.
+Su `hook/build.dart` compila `.m` con `clang` **solo en iOS y macOS** —en Linux
+devuelve sin hacer nada, por eso el contenedor nunca lo reprodujo— y exige el
+SDK de Apple. Acotado con `dependency_overrides` a `path_provider_foundation`
+2.5.1, la última versión sin él: **desaparece del `pubspec.lock`**, `analyze`
+sin hallazgos y las 72 pruebas de Dart en verde.
+
+| Añadido                                          | Por qué                                                                                                   |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **`dependencias-acotadas.mjs`**                  | Un `dependency_overrides` sin motivo escrito es una versión congelada que nadie vuelve a mirar            |
+| **`controles-sin-prueba-negativa.mjs`** (paso 9) | El control **genérico** de la familia: todo control que el verificador ejecuta debe tener prueba negativa |
+| **Paso 1 · `xcrun` en macOS**                    | Xcode seleccionado no implica SDK. Se ejecuta el comando y se exige que la ruta exista                    |
+| **Paso 1 · Chromium y puerto del 5e**            | El recorrido **no necesita la API**; necesita navegador y el 4599 libre, y ahora se nombran               |
+
+| ID       | Qué                                                                                                                                                                                                                                                                           | Estado                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **D-83** | `objective_c` entraba por el plugin de **Windows** y rompía `flutter test` en macOS                                                                                                                                                                                           | **Corregido**                                                                        |
+| **D-84** | La lista de pruebas negativas se mantenía a mano: un control podía nacer sin ella —así nació D-81—                                                                                                                                                                            | **Corregido**                                                                        |
+| **D-85** | `metricas.mjs` se callaba que la corrida de un paquete no terminó: el paso 7 decía «capa por debajo del umbral» cuando la verdad era «capa que nadie midió»                                                                                                                   | **Corregido**                                                                        |
+| **D-86** | `@ncr/providers` al 84,58 % frente al 90 % que él mismo declara (`intercom-simulado.ts` al 0 %); fallaba en cada corrida y nadie lo veía                                                                                                                                      | **Cerrado** con pruebas: 98,49 % líneas, 90,47 % ramas                               |
+| **D-87** | El recorrido del 5e leía el `<input>` del DOM creyendo leer el campo de la app: en Flutter web el motor copia al widget al enfocar, así que el valor leído podía ser cierto y el campo seguir vacío para la app. El primer arreglo movió el fallo de campo en vez de quitarlo | **Corregido** · se espera al foco del motor y la verdad la da el validador de la app |
+| **D-88** | La comprobación del navegador del paso 1 daba por hecho `node_modules`, y el banco de pruebas negativas es un clon sin ellos: falso positivo en el caso 6                                                                                                                     | **Corregido**                                                                        |
+
+Hoy: **18 de 25 controles con prueba negativa, 7 en deuda declarada**, y esa
+lista solo puede encoger. Lo que aún no cubre —una rama _nueva_ dentro de un
+control que _ya_ tiene prueba, que es literalmente D-81— exige granularidad de
+rama: la suite negativa bajo `NODE_V8_COVERAGE`. **Es el primer trabajo de 11-B.**
+
+---
+
+### 11-B · arrancada el 2026-09-19
+
+**Primero: la granularidad de rama**, que era lo que faltaba del control
+genérico. `controles-sin-prueba-negativa.mjs` atrapa al fichero que nace sin
+prueba; **no atrapaba a D-81**, que era una rama nueva dentro de un fichero que
+ya la tenía. Ahora la suite negativa corre bajo `NODE_V8_COVERAGE` —cada proceso
+que lanza escribe su cobertura, incluidos los del clon— y
+`ramas-de-los-controles.json` fija cuántos bloques no ejecuta nadie por control:
+**20 controles, 267 bloques, y ese número no puede subir**. `verificar-entorno.mjs`
+—donde vivió D-81— queda con 39 bloques clavados.
+
+**Y el paso 5e queda DECLARADO no ejercido**, no desactivado: sale en cada
+ejecución con motivo y fecha, el veredicto lo dice, y **caduca** cuando se cierre
+la ETAPA 14. Motivo: el motor de Flutter web no engancha el campo de contraseña
+bajo Chromium en macOS —el `<input>` recibe el texto y el widget no se entera—,
+reproducible allí y no en Linux.
+
+**Sobre `cerrarSesion()` y la ETAPA 15: no la bloquea.** La consola no usa el
+puerto de dominio `IntercomProvider`, usa el puerto de aplicación
+`CanalDeIntercom`, y **sus tres métodos llevan `operadorId` explícito**: no hay
+estado por instancia que compartir. La exclusividad por dispositivo la sostiene
+la máquina de `@ncr/domain-core`, que es justo lo que el equipo real impone con
+su única conexión de armado. Lo que sí queda anotado para la 15: el adaptador
+ISAPI abre **una conexión por dispositivo**, atada al titular del canal, nunca
+una por operador.
+
+---
+
+### Lo que queda para 11-B
+
+M-4 completa (patrón de recurrencia, acompañantes nominales, zonas, y los
+rechazos de RN-06, RN-13 y CA-03) · M-5 con aforo y horario · M-7 con registro
+de token FCM —cierra la deuda de FCM declarada en la ETAPA 10— · captura de
+cámara con validación de calidad y D-39 · bandeja de salida con clave de
+idempotencia · KPI-10 medido.
+
+---
+
+## ETAPA 10 — Consolas operativas · **CERRADA** · 2026-09-18
 
 Rama `etapa-10-consolas-operativas`, desde `develop` con la 09 ya fusionada.
 

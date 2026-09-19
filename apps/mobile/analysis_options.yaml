@@ -1,0 +1,43 @@
+# Análisis estático de la app del residente.
+#
+# `flutter_lints` es la línea base; encima, dos decisiones propias.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  # ───────────────────────────────────────────────────────────────────────────
+  # El código GENERADO no se audita con las reglas del escrito a mano.
+  #
+  # `lib/infraestructura/api/generado/**` lo produce `swagger_parser` desde
+  # `packages/contracts/openapi.json` y lo reescribe entero en cada corrida: una
+  # advertencia de estilo ahí no se puede corregir —volvería en la siguiente
+  # generación— y con la verificación en modo estricto bloquearía el cierre de
+  # etapa por algo que nadie escribió. Los `.g.dart` de `json_serializable` y
+  # `retrofit` van por lo mismo.
+  #
+  # Lo que NO se exime es el adaptador que traduce esos DTO
+  # (`repositorio_api.dart`): ese sí es código nuestro, y es donde un cambio de
+  # contrato tiene que doler.
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - lib/infraestructura/api/generado/**
+    - '**/*.g.dart'
+
+  errors:
+    # Un `await` olvidado en una app que guarda tokens no es una sugerencia: es
+    # una escritura que puede no haber ocurrido cuando la siguiente línea la da
+    # por hecha.
+    unawaited_futures: error
+
+    # Dart no admite parámetros con nombre que empiecen por `_`, así que un
+    # campo privado inyectado por nombre NO puede usar la forma abreviada
+    # `this._campo`. La regla pide algo que el lenguaje prohíbe aquí.
+    prefer_initializing_formals: ignore
+
+linter:
+  rules:
+    # `print` en una app distribuida acaba en el registro del dispositivo, y en
+    # esta app lo que se pasa por ahí son tokens (§2.7.8).
+    avoid_print: true

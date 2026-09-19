@@ -741,6 +741,310 @@ try {
       ? ok('la ausencia de navegador es un fallo explícito, no un salto')
       : mal(`sin navegador el camino no falla como debe (codigo ${r.codigo})`);
   }
+
+  console.log('\n▸ 14 · una cabecera congelada en ESTADO_ETAPAS.md se detecta');
+  {
+    /**
+     * El control nació de un defecto REPETIDO: la cabecera del documento se
+     * quedó atrás dos veces, la segunda pese a existir ya la regla del DoD que
+     * obliga a actualizarla. Aquí se introducen las tres formas en que el
+     * documento puede contradecirse y se exige que las tres den rojo.
+     */
+    const original = join(banco, 'estado-original.md');
+    const doc = readFileSync(join(raiz, 'docs/ESTADO_ETAPAS.md'), 'utf8');
+    writeFileSync(original, doc);
+    correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', original]).codigo === 0
+      ? ok('la línea base del banco está limpia')
+      : mal('el banco NO parte de una línea base limpia: ESTADO_ETAPAS.md ya se contradice');
+
+    // (a) el mapa dice una cosa y la ficha otra.
+    const desfasado = join(banco, 'estado-mapa-contra-ficha.md');
+    const cerradaEnMapa = /^\|\s*\*{0,2}(\d{2})\*{0,2}\s.*\*\*CERRADA\*\*.*$/m.exec(doc);
+    if (cerradaEnMapa === null) {
+      mal('no hay ninguna fila CERRADA en el mapa con la que ejercer el control');
+    } else {
+      writeFileSync(
+        desfasado,
+        doc.replace(cerradaEnMapa[0], cerradaEnMapa[0].replace('**CERRADA**', 'PENDIENTE   ')),
+      );
+      const r = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', desfasado]);
+      r.codigo !== 0 && /su ficha dice/.test(r.salida)
+        ? ok('mapa y ficha en desacuerdo: detectado')
+        : mal(`el desacuerdo entre mapa y ficha NO se detecta (codigo ${r.codigo})`);
+    }
+
+    // (b) un estado inventado, fuera del vocabulario que el propio documento
+    //     declara. Es literalmente `CONSTRUIDA`, el que se colo el 2026-09-13.
+    const inventado = join(banco, 'estado-vocabulario.md');
+    writeFileSync(
+      inventado,
+      doc.replace(/^(## ETAPA \d{2} —[^\n]*?)\*\*CERRADA\*\*/m, '$1**CONSTRUIDA**'),
+    );
+    const rb = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', inventado]);
+    rb.codigo !== 0 && /CONSTRUIDA/.test(rb.salida)
+      ? ok('un estado fuera del vocabulario: detectado')
+      : mal(`un estado inventado NO se detecta (codigo ${rb.codigo})`);
+
+    // (c) el recuento de la cabecera, descuadrado en uno.
+    const recuento = join(banco, 'estado-recuento.md');
+    const fila = /\*\*Etapas cerradas\*\*[^\n]*?\*\*(\d+) de (\d+)\*\*/.exec(doc);
+    if (fila === null) {
+      mal('la cabecera no lleva el recuento «**N de M**» con el que ejercer el control');
+    } else {
+      writeFileSync(
+        recuento,
+        doc.replace(
+          fila[0],
+          fila[0].replace(
+            `**${fila[1]} de ${fila[2]}**`,
+            `**${Number(fila[1]) + 1} de ${fila[2]}**`,
+          ),
+        ),
+      );
+      const rc = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', recuento]);
+      rc.codigo !== 0 && /etapas cerradas y el mapa marca/.test(rc.salida)
+        ? ok('el recuento descuadrado: detectado')
+        : mal(`un recuento descuadrado NO se detecta (codigo ${rc.codigo})`);
+    }
+  }
+
+  console.log('\n▸ 15 · `echo | grep -q` bajo pipefail se detecta (D-80)');
+  {
+    /**
+     * El defecto más caro de la ETAPA 11-A, y estaba en el verificador: con
+     * `set -o pipefail`, `echo "$x" | grep -q` devuelve 141 cuando ENCUENTRA lo
+     * que busca. La comprobación de «pruebas en rojo» se leía como falsa justo
+     * al acertar, y el paso informaba «suite completa en verde». El mismo
+     * patrón estaba en la comprobación de SECRETOS de `verificar-frontera.sh`.
+     */
+    writeFileSync(
+      join(clon, 'sonda-pipefail.sh'),
+      '#!/usr/bin/env bash\nset -uo pipefail\nsalida=$(cat /etc/hostname)\n' +
+        'if echo "$salida" | grep -q x; then echo si; fi\n',
+    );
+    enClon('git', ['add', '--intent-to-add', 'sonda-pipefail.sh']);
+    const r = enClon('node', ['scripts/lib/portabilidad.mjs']);
+    r.codigo !== 0 && /141/.test(r.salida)
+      ? ok('detectado, con la explicación del 141')
+      : mal(`NO detectado (codigo ${r.codigo})`);
+    rmSync(join(clon, 'sonda-pipefail.sh'), { force: true });
+    enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-pipefail.sh']);
+    enClon('node', ['scripts/lib/portabilidad.mjs']).codigo === 0
+      ? ok('el banco de pruebas queda limpio')
+      : mal('la sonda dejó rastro en el banco');
+  }
+
+  console.log('\n▸ 16 · un control SIN prueba negativa se detecta al cablearlo (D-81)');
+  {
+    /**
+     * EL CONTROL GENÉRICO DE LA FAMILIA. Veinte defectos de este proyecto son
+     * el mismo: el control existe y no comprueba lo que uno cree. Todos
+     * comparten que NADIE los había visto fallar. Hasta ahora esta lista de
+     * casos se mantenía a mano, así que un control nuevo podía entrar en el
+     * verificador sin que nadie comprobara que sabe decir «✗» — que es
+     * exactamente como nació D-81.
+     *
+     * Aquí se comprueba el control que compara los dos conjuntos: lo que el
+     * verificador EJECUTA contra lo que esta suite EJERCITA.
+     */
+    const verificador = join(clon, 'scripts', 'verificar-etapa.sh');
+    const original = readFileSync(verificador, 'utf8');
+
+    enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']).codigo === 0
+      ? ok('el banco parte en verde')
+      : mal('el banco NO parte en verde');
+
+    // Un control nuevo, cableado al verificador, que nadie ha visto fallar.
+    writeFileSync(verificador, original + '\nnode scripts/lib/sonda-sin-prueba-negativa.mjs\n');
+    const r = enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']);
+    r.codigo !== 0 && /NADIE lo ha visto fallar/.test(r.salida)
+      ? ok('un control nuevo sin prueba negativa: detectado al cablearlo')
+      : mal(`un control sin prueba negativa pasa inadvertido (codigo ${r.codigo})`);
+
+    // Y la otra mitad del trinquete: una exención que ya no corresponde. Sin
+    // esto, la lista de deuda protegería para siempre a un control que ya tiene
+    // prueba —o que ya nadie ejecuta— y volvería a ser una lista a mano.
+    writeFileSync(
+      verificador,
+      original.replace('node scripts/lib/dependencias-acotadas.mjs', 'true'),
+    );
+    const rz = enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']);
+    rz.codigo !== 0 && /ya no le corresponde/.test(rz.salida)
+      ? ok('una exención zombi también rompe: la lista solo puede encoger')
+      : mal(`una exención zombi sobrevive (codigo ${rz.codigo})`);
+
+    writeFileSync(verificador, original);
+    enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']).codigo === 0
+      ? ok('el banco de pruebas queda limpio')
+      : mal('la sonda dejó rastro en el banco');
+  }
+
+  console.log('\n▸ 17 · una declaración de «no ejercido» que sobrevive a su revisión se detecta');
+  {
+    /**
+     * Declarar un paso no ejercido es legítimo; que la declaración sobreviva a
+     * la etapa en que dijo revisarse, no. Sin esto, «revisión en la ETAPA 14»
+     * sería una frase, y el paso quedaría desactivado para siempre con buenos
+     * modales.
+     */
+    const estado = join(clon, 'docs', 'ESTADO_ETAPAS.md');
+    const original = readFileSync(estado, 'utf8');
+
+    enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']).codigo === 0
+      ? ok('con la etapa de revisión abierta, la declaración vale')
+      : mal('una declaración en regla se rechaza');
+
+    writeFileSync(
+      estado,
+      `${original}\n## ETAPA 14 — Observabilidad, CI/CD, PWA y escritorio · **CERRADA** · sonda\n`,
+    );
+    const r = enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']);
+    r.codigo !== 0 && /ya está CERRADA/.test(r.salida)
+      ? ok('cerrada la etapa de revisión, la declaración CADUCA y rompe la verificación')
+      : mal(`una declaración caducada sobrevive (codigo ${r.codigo})`);
+
+    writeFileSync(estado, original);
+    enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']).codigo === 0
+      ? ok('el banco de pruebas queda limpio')
+      : mal('la sonda dejó rastro en el banco');
+  }
+
+  console.log('\n▸ 18 · una rama de control que nadie ejecuta se detecta (D-81, granularidad)');
+  {
+    /**
+     * El trinquete de ramas, probado con cobertura FABRICADA en lugar de con una
+     * corrida real: lo que se comprueba aquí es la decisión —«este número no
+     * puede subir»—, no la medición de V8, que es de Node y ya está probada.
+     */
+    const dir = join(banco, 'cobertura-sonda');
+    mkdirSync(dir, { recursive: true });
+    const base = join(clon, 'scripts', 'lib', 'ramas-de-los-controles.json');
+    const original = readFileSync(base, 'utf8');
+    const volcado = (ceros) => {
+      writeFileSync(
+        join(dir, 'coverage-sonda.json'),
+        JSON.stringify({
+          result: [
+            {
+              url: `file://${join(clon, 'scripts', 'lib', 'contar-pruebas.mjs')}`,
+              functions: [
+                {
+                  ranges: Array.from({ length: ceros }, (_, i) => ({
+                    startOffset: i * 10,
+                    endOffset: i * 10 + 5,
+                    count: 0,
+                  })),
+                },
+              ],
+            },
+          ],
+        }),
+      );
+    };
+    const conCobertura = () =>
+      correr('node', ['scripts/lib/ramas-de-los-controles.mjs'], {
+        cwd: clon,
+        env: { ...process.env, NCR_COBERTURA_CONTROLES: dir },
+      });
+
+    writeFileSync(base, JSON.stringify({ 'scripts/lib/contar-pruebas.mjs': 7 }, null, 2));
+
+    volcado(7);
+    conCobertura().codigo === 0
+      ? ok('con los mismos bloques sin ejercer, pasa')
+      : mal('un número que no sube se rechaza');
+
+    volcado(3);
+    conCobertura().codigo === 0
+      ? ok('bajarlo es libre: ejercitar más nunca rompe')
+      : mal('bajar el número rompe, y no debería');
+
+    volcado(8);
+    const r = conCobertura();
+    r.codigo !== 0 && /NADIE ejecuta/.test(r.salida)
+      ? ok('una rama nueva que nadie ejercita: detectada')
+      : mal(`una rama sin ejercitar pasa inadvertida (codigo ${r.codigo})`);
+
+    // Y la otra mitad: una cifra en la base para un fichero que ya no se mide
+    // protege a algo que nadie vigila. También rompe.
+    volcado(7);
+    writeFileSync(
+      base,
+      JSON.stringify(
+        { 'scripts/lib/contar-pruebas.mjs': 7, 'scripts/lib/fantasma.mjs': 3 },
+        null,
+        2,
+      ),
+    );
+    const rf = conCobertura();
+    rf.codigo !== 0 && /ya no se mide/.test(rf.salida)
+      ? ok('una entrada de la base que ya nadie mide: detectada')
+      : mal(`una entrada fantasma sobrevive (codigo ${rf.codigo})`);
+
+    /**
+     * Y las dos ramas de higiene del propio control, que también son suyas: un
+     * volcado a medias —de un proceso que murió— no es una rama sin ejercer, y
+     * la suite negativa no se mide a sí misma (si se midiera, escribir una
+     * prueba negativa rompería el trinquete que pide pruebas negativas).
+     */
+    volcado(7);
+    writeFileSync(join(dir, 'coverage-roto.json'), '{"result": [');
+    writeFileSync(
+      join(dir, 'coverage-harness.json'),
+      JSON.stringify({
+        result: [
+          {
+            url: `file://${join(clon, 'scripts', 'lib', 'pruebas-negativas.mjs')}`,
+            functions: [{ ranges: [{ startOffset: 0, endOffset: 5, count: 0 }] }],
+          },
+        ],
+      }),
+    );
+    writeFileSync(base, JSON.stringify({ 'scripts/lib/contar-pruebas.mjs': 7 }, null, 2));
+    const rh = conCobertura();
+    rh.codigo === 0 && !/pruebas-negativas/.test(rh.salida)
+      ? ok('un volcado roto se ignora y la suite no se mide a sí misma')
+      : mal(`higiene del trinquete rota (codigo ${rh.codigo}): ${rh.salida.trim().slice(0, 120)}`);
+
+    writeFileSync(base, original);
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  console.log('\n▸ 19 · faltar Flutter NO es lo mismo que tenerlo mal (rojo del CI)');
+  {
+    /**
+     * La comprobación de Flutter del paso 1 trató «no hay SDK» como si fuera un
+     * desajuste de versión, y el trabajo `controles` del CI —que no compila la
+     * app ni tiene el SDK— murió en su primer paso. Aquí se fija la distinción:
+     * sin `flutter` en el PATH, aviso; con `NCR_FLUTTER` apuntando a algo que no
+     * funciona, fallo, porque se pidió ese binario adrede.
+     */
+    const sinFlutter = Object.fromEntries(
+      Object.entries(process.env).filter(([k]) => k !== 'NCR_FLUTTER'),
+    );
+    sinFlutter.PATH = (process.env.PATH ?? '')
+      .split(':')
+      .filter((d) => d !== '' && !existsSync(join(d, 'flutter')))
+      .join(':');
+
+    const sin = correr('node', ['scripts/lib/verificar-entorno.mjs'], {
+      cwd: clon,
+      env: sinFlutter,
+    });
+    sin.codigo === 0 && /no hay `flutter` en el PATH/.test(sin.salida)
+      ? ok('sin SDK: aviso y sigue, como necesita el CI')
+      : mal(
+          `sin SDK NO avisa o no sigue (codigo ${sin.codigo}): ${sin.salida.trim().slice(0, 120)}`,
+        );
+
+    const mal_apuntado = correr('node', ['scripts/lib/verificar-entorno.mjs'], {
+      cwd: clon,
+      env: { ...sinFlutter, NCR_FLUTTER: '/no/existe/flutter' },
+    });
+    mal_apuntado.codigo !== 0 && /NCR_FLUTTER apunta/.test(mal_apuntado.salida)
+      ? ok('NCR_FLUTTER a un binario que no está: fallo, no aviso')
+      : mal(`un NCR_FLUTTER roto pasa inadvertido (codigo ${mal_apuntado.codigo})`);
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -764,6 +1068,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 15 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 21 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

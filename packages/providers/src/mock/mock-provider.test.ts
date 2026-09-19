@@ -232,3 +232,40 @@ describe('MockProvider · intercom (ADR-01)', () => {
     await expect(mock.cerrarSesion('   ')).rejects.toBeInstanceOf(FalloDeHardwareSimulado);
   });
 });
+
+describe('los DOS contratos reales, ejercidos por el simulado', () => {
+  /**
+   * Hasta la ETAPA 11-A el simulado fabricaba directamente la forma de SALIDA,
+   * así que la suite entera corría sin que nadie hubiera analizado nunca un XML
+   * ni un bloque de `alertStream`. El día que llegara el equipo, el analizador
+   * sería código recién escrito estrenándose contra hardware.
+   */
+  it('la cámara ANPR entra por el XML del Alarm Server y sale normalizada', async () => {
+    const proveedor = ideal();
+    const recibidas: string[] = [];
+    await proveedor.suscribir(async (l) => {
+      recibidas.push(l.placa);
+    });
+
+    const lectura = await proveedor.emitirComoCamaraAnpr('ABC123', 'disp-1');
+
+    expect(lectura.placa).toBe('ABC123');
+    expect(lectura.confianza).toBeGreaterThan(0);
+    expect(recibidas).toContain('ABC123');
+  });
+
+  it('el videoportero descarta su volcado histórico y solo difunde lo vivo', async () => {
+    const proveedor = ideal();
+    const recibidas: string[] = [];
+    await proveedor.suscribir(async (l) => {
+      recibidas.push(l.placa);
+    });
+
+    const { lectura, descartados } = await proveedor.emitirComoVideoportero('XYZ789', 'disp-2', 4);
+
+    expect(descartados).toBe(4);
+    expect(lectura.placa).toBe('XYZ789');
+    // Cuatro históricos y un evento en vivo: solo llega UNA lectura.
+    expect(recibidas).toEqual(['XYZ789']);
+  });
+});
