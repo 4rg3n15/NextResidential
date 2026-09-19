@@ -143,10 +143,36 @@ if (existsSync('apps/mobile/pubspec.yaml')) {
       }),
     );
   } catch (e) {
-    problemas.push(
-      `no se pudo ejecutar \`${flutterBin} --version\`: ${String(e.message).split('\n')[0]}. ` +
-        'Instale el SDK o exporte NCR_FLUTTER con la ruta a su binario',
-    );
+    /**
+     * FALTAR NO ES LO MISMO QUE ESTAR MAL, y confundirlos rompió el CI.
+     *
+     * Esta comprobación nació para nombrar en el paso 1 un desajuste de
+     * VERSIÓN —Flutter instalado pero por debajo de lo que exige el pubspec—,
+     * que antes reventaba cuatro pasos más abajo disfrazado de otra cosa. Al
+     * escribirla se trató «no hay Flutter» como el mismo problema, y el trabajo
+     * `controles` del CI, que no toca `apps/mobile` ni tiene el SDK, empezó a
+     * fallar en su primer paso.
+     *
+     * La distinción que se aplica:
+     *
+     *   · `NCR_FLUTTER` apuntando a algo que no funciona **es un fallo**: se
+     *     pidió ese binario expresamente.
+     *   · Sin `NCR_FLUTTER` y sin `flutter` en el PATH es un **aviso**: aquí no
+     *     hay cadena de Dart. No se silencia nada, porque los pasos 5b a 5e del
+     *     verificador siguen FALLANDO si les falta el SDK —esa regla no se
+     *     toca—; lo que cambia es que un trabajo que no compila la app ya no
+     *     muere por no tenerlo.
+     */
+    const pedidoAdrede = process.env.NCR_FLUTTER !== undefined && process.env.NCR_FLUTTER !== '';
+    const detalle = String(e.message).split('\n')[0];
+    if (pedidoAdrede) {
+      problemas.push(`NCR_FLUTTER apunta a \`${flutterBin}\` y no se pudo ejecutar: ${detalle}`);
+    } else {
+      console.log(
+        '   aviso: no hay `flutter` en el PATH, así que no se comprueban sus versiones.\n' +
+          '   Los pasos 5b a 5e del verificador FALLAN sin SDK; no se omiten.',
+      );
+    }
   }
 
   if (maquina !== null) {

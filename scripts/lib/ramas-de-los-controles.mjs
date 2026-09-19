@@ -48,8 +48,22 @@ if (directorio === undefined || !existsSync(directorio)) {
   process.exit(1);
 }
 
-/** control → bloques sin ejecutar, fundiendo todos los procesos. */
-const sinEjecutar = new Map();
+/**
+ * Fundir la cobertura de varios procesos NO es comparar rangos por igualdad.
+ *
+ * Lo fue en la primera versión, y era un defecto de la misma familia que este
+ * control persigue: **decía «nadie ejecutó esto» de código que se acababa de
+ * ver correr**. La razón es cómo codifica V8 la cobertura: los rangos están
+ * ANIDADOS y cada proceso los parte donde le hace falta. El proceso que sí
+ * entró en un bloque no emite un rango con esos mismos extremos y cuenta > 0;
+ * emite uno más ancho, sin partir. Al comparar por `inicio:fin`, el rango a
+ * cero de otro proceso no encontraba pareja y sobrevivía como «sin ejecutar».
+ *
+ * Lo correcto es la regla de V8: **la cuenta de un punto es la del rango MÁS
+ * INTERNO que lo contiene**. Así que un bloque está sin ejercer solo si, en
+ * TODOS los procesos, el rango más interno que lo contiene vale cero.
+ */
+const porFichero = new Map();
 
 for (const fichero of readdirSync(directorio)) {
   if (!fichero.endsWith('.json')) continue;
@@ -67,27 +81,58 @@ for (const fichero of readdirSync(directorio)) {
      * temporal, y medirlos por separado habría dejado fuera justo a los que más
      * se ejercitan. Son el mismo fichero; lo que se funde es su ejecución.
      */
-    const absoluta = fileURLToPath(guion.url);
-    const coincide = /(?:^|\/)(scripts\/lib\/[a-z0-9-]+\.mjs)$/.exec(absoluta);
+    const coincide = /(?:^|\/)(scripts\/lib\/[a-z0-9-]+\.mjs)$/.exec(fileURLToPath(guion.url));
     if (coincide === null) continue;
     const ruta = coincide[1];
+    /**
+     * La suite negativa no se mide a sí misma. No es un control: es el banco
+     * que los ejercita, y sus ramas de fallo —cada `mal(...)`— **no se ejecutan
+     * precisamente cuando todo va bien**. Medirla haría que su número creciera
+     * con cada caso nuevo, es decir, que **escribir una prueba negativa rompiera
+     * el trinquete que existe para exigir pruebas negativas**. Sería un control
+     * castigando aquello que pide.
+     */
+    if (ruta === 'scripts/lib/pruebas-negativas.mjs') continue;
 
-    // Un bloque cuenta como ejercido si CUALQUIER proceso lo ejecutó: por eso
-    // se funden por rango y no se suman por fichero.
-    const previos = sinEjecutar.get(ruta) ?? new Map();
+    const rangos = [];
     for (const funcion of guion.functions ?? []) {
-      for (const rango of funcion.ranges ?? []) {
-        const clave = `${rango.startOffset}:${rango.endOffset}`;
-        previos.set(clave, (previos.get(clave) ?? true) && rango.count === 0);
-      }
+      for (const rango of funcion.ranges ?? []) rangos.push(rango);
     }
-    sinEjecutar.set(ruta, previos);
+    const previos = porFichero.get(ruta) ?? [];
+    previos.push(rangos);
+    porFichero.set(ruta, previos);
   }
 }
 
+/** Cuenta de un punto en un proceso: la del rango más interno que lo contiene. */
+const cuentaEn = (rangos, punto) => {
+  let mejor = null;
+  for (const r of rangos) {
+    if (r.startOffset > punto || r.endOffset <= punto) continue;
+    if (mejor === null || r.endOffset - r.startOffset < mejor.endOffset - mejor.startOffset) {
+      mejor = r;
+    }
+  }
+  return mejor === null ? 0 : mejor.count;
+};
+
 const medido = new Map(
-  [...sinEjecutar]
-    .map(([ruta, bloques]) => [ruta, [...bloques.values()].filter(Boolean).length])
+  [...porFichero]
+    .map(([ruta, procesos]) => {
+      // Candidatos: todo rango que ALGÚN proceso da a cero.
+      const candidatos = new Map();
+      for (const rangos of procesos) {
+        for (const r of rangos) {
+          if (r.count === 0) candidatos.set(`${r.startOffset}:${r.endOffset}`, r);
+        }
+      }
+      let sin = 0;
+      for (const r of candidatos.values()) {
+        const punto = r.startOffset;
+        if (!procesos.some((rangos) => cuentaEn(rangos, punto) > 0)) sin += 1;
+      }
+      return [ruta, sin];
+    })
     .sort(),
 );
 
@@ -108,6 +153,14 @@ for (const [ruta, cuantos] of medido) {
       `${ruta} pasa de ${antes} a ${cuantos} bloques que NADIE ejecuta: ` +
         'la rama que acaba de añadir no la ejercita ninguna prueba negativa',
     );
+  }
+}
+
+// Una entrada que ya no se mide es una cifra que protege a un fichero que
+// nadie vigila: se quita, y quitarla es un diff que alguien lee.
+for (const ruta of Object.keys(base)) {
+  if (!medido.has(ruta)) {
+    crecidos.push(`${ruta} sigue en la base y ya no se mide: quítelo con --actualizar`);
   }
 }
 

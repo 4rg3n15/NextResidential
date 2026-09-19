@@ -965,8 +965,85 @@ try {
       ? ok('una rama nueva que nadie ejercita: detectada')
       : mal(`una rama sin ejercitar pasa inadvertida (codigo ${r.codigo})`);
 
+    // Y la otra mitad: una cifra en la base para un fichero que ya no se mide
+    // protege a algo que nadie vigila. También rompe.
+    volcado(7);
+    writeFileSync(
+      base,
+      JSON.stringify(
+        { 'scripts/lib/contar-pruebas.mjs': 7, 'scripts/lib/fantasma.mjs': 3 },
+        null,
+        2,
+      ),
+    );
+    const rf = conCobertura();
+    rf.codigo !== 0 && /ya no se mide/.test(rf.salida)
+      ? ok('una entrada de la base que ya nadie mide: detectada')
+      : mal(`una entrada fantasma sobrevive (codigo ${rf.codigo})`);
+
+    /**
+     * Y las dos ramas de higiene del propio control, que también son suyas: un
+     * volcado a medias —de un proceso que murió— no es una rama sin ejercer, y
+     * la suite negativa no se mide a sí misma (si se midiera, escribir una
+     * prueba negativa rompería el trinquete que pide pruebas negativas).
+     */
+    volcado(7);
+    writeFileSync(join(dir, 'coverage-roto.json'), '{"result": [');
+    writeFileSync(
+      join(dir, 'coverage-harness.json'),
+      JSON.stringify({
+        result: [
+          {
+            url: `file://${join(clon, 'scripts', 'lib', 'pruebas-negativas.mjs')}`,
+            functions: [{ ranges: [{ startOffset: 0, endOffset: 5, count: 0 }] }],
+          },
+        ],
+      }),
+    );
+    writeFileSync(base, JSON.stringify({ 'scripts/lib/contar-pruebas.mjs': 7 }, null, 2));
+    const rh = conCobertura();
+    rh.codigo === 0 && !/pruebas-negativas/.test(rh.salida)
+      ? ok('un volcado roto se ignora y la suite no se mide a sí misma')
+      : mal(`higiene del trinquete rota (codigo ${rh.codigo}): ${rh.salida.trim().slice(0, 120)}`);
+
     writeFileSync(base, original);
     rmSync(dir, { recursive: true, force: true });
+  }
+
+  console.log('\n▸ 19 · faltar Flutter NO es lo mismo que tenerlo mal (rojo del CI)');
+  {
+    /**
+     * La comprobación de Flutter del paso 1 trató «no hay SDK» como si fuera un
+     * desajuste de versión, y el trabajo `controles` del CI —que no compila la
+     * app ni tiene el SDK— murió en su primer paso. Aquí se fija la distinción:
+     * sin `flutter` en el PATH, aviso; con `NCR_FLUTTER` apuntando a algo que no
+     * funciona, fallo, porque se pidió ese binario adrede.
+     */
+    const sinFlutter = Object.fromEntries(
+      Object.entries(process.env).filter(([k]) => k !== 'NCR_FLUTTER'),
+    );
+    sinFlutter.PATH = (process.env.PATH ?? '')
+      .split(':')
+      .filter((d) => d !== '' && !existsSync(join(d, 'flutter')))
+      .join(':');
+
+    const sin = correr('node', ['scripts/lib/verificar-entorno.mjs'], {
+      cwd: clon,
+      env: sinFlutter,
+    });
+    sin.codigo === 0 && /no hay `flutter` en el PATH/.test(sin.salida)
+      ? ok('sin SDK: aviso y sigue, como necesita el CI')
+      : mal(
+          `sin SDK NO avisa o no sigue (codigo ${sin.codigo}): ${sin.salida.trim().slice(0, 120)}`,
+        );
+
+    const mal_apuntado = correr('node', ['scripts/lib/verificar-entorno.mjs'], {
+      cwd: clon,
+      env: { ...sinFlutter, NCR_FLUTTER: '/no/existe/flutter' },
+    });
+    mal_apuntado.codigo !== 0 && /NCR_FLUTTER apunta/.test(mal_apuntado.salida)
+      ? ok('NCR_FLUTTER a un binario que no está: fallo, no aviso')
+      : mal(`un NCR_FLUTTER roto pasa inadvertido (codigo ${mal_apuntado.codigo})`);
   }
 } finally {
   rmSync(banco, { recursive: true, force: true });
@@ -991,6 +1068,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 20 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 21 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );
