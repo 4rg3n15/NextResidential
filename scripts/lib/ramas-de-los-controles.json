@@ -1,0 +1,22 @@
+{
+  "scripts/lib/coherencia-estado-etapas.mjs": 25,
+  "scripts/lib/contar-pruebas.mjs": 7,
+  "scripts/lib/contrato-desfasado.mjs": 7,
+  "scripts/lib/contrato-tipado.mjs": 22,
+  "scripts/lib/controles-declarados.mjs": 10,
+  "scripts/lib/controles-sin-prueba-negativa.mjs": 6,
+  "scripts/lib/escanear-secretos.mjs": 5,
+  "scripts/lib/estabilidad.mjs": 11,
+  "scripts/lib/frontera-append-only.mjs": 3,
+  "scripts/lib/frontera-construccion.mjs": 8,
+  "scripts/lib/frontera-csp.mjs": 2,
+  "scripts/lib/frontera-hardware.mjs": 5,
+  "scripts/lib/frontera-modulos.mjs": 14,
+  "scripts/lib/frontera-tema.mjs": 3,
+  "scripts/lib/frontera-vocabulario.mjs": 3,
+  "scripts/lib/pasos-ejecutados.mjs": 6,
+  "scripts/lib/portabilidad.mjs": 4,
+  "scripts/lib/pruebas-negativas.mjs": 71,
+  "scripts/lib/ramas-de-los-controles.mjs": 16,
+  "scripts/lib/verificar-entorno.mjs": 39
+}

@@ -315,6 +315,30 @@ que el primer conjunto esté contenido en el segundo. Lo que falta es **deuda
 declarada con motivo escrito, y esa lista solo puede encoger**: si crece, o si
 una entrada deja de corresponder, el paso se pone rojo.
 
+**Granularidad de rama (ETAPA 11-B).** Tener «alguna» prueba negativa no basta:
+D-81 vivía en un fichero que la tenía desde la ETAPA 02, en una rama añadida dos
+rondas antes que nadie ejercitaba. Así que la suite negativa corre bajo
+`NODE_V8_COVERAGE` —cada proceso que lanza escribe su cobertura— y
+`ramas-de-los-controles.json` guarda, por control, **cuántos bloques no ejecuta
+nadie**. Ese número **no puede subir**: añadir una rama sin ejercerla rompe la
+verificación en el mismo empujón que la añade. Bajarlo es libre.
+
+### Controles declarados no ejercidos
+
+Un control puede declararse **no ejercido** cuando su fallo es del entorno y no
+del producto. Declarado no es desactivado: sigue **saliendo en cada ejecución**
+con su motivo, su fecha y la etapa en que se revisa, y **el veredicto lo dice**
+(«correcta CON 1 CONTROL DECLARADO NO EJERCIDO»). Además **caduca**: cuando la
+etapa de revisión se cierra en `docs/ESTADO_ETAPAS.md`, la declaración rompe la
+verificación y hay que ejercer el paso o volver a declararlo.
+
+| Paso | Declarado  | Revisión | Motivo                                                                                                                                                                       |
+| ---- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5e   | 2026-09-19 | ETAPA 14 | El motor de Flutter web no engancha el campo de contraseña bajo Chromium en macOS: el `<input>` recibe el texto y el widget no se entera. Reproducible en macOS, no en Linux |
+
+Los otros tres controles móviles —análisis estático, 72 pruebas con cobertura
+por capa, cliente generado sin diferencias ni secretos— **sí se ejercen**.
+
 ### Fronteras por mutación
 
 ```bash

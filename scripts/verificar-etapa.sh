@@ -50,6 +50,14 @@ trap 'rm -f "$PASOS_EJECUTADOS"' EXIT
 paso() { printf '\n▸ %s\n' "$1"; printf '%s\n' "$1" >>"$PASOS_EJECUTADOS"; }
 ok()   { echo "   ✓ $1"; }
 mal()  { echo "   ✗ $1"; fallos=1; }
+# Un paso DECLARADO no ejercido no es un ✓ ni un ✗: es un ⚠ que sobrevive al
+# veredicto y sale en él. Desactivarlo sería borrarlo; declararlo es dejarlo a
+# la vista con su motivo y su fecha de revisión (`controles-declarados.mjs`).
+declarados=0
+declarado() {
+  echo "   ⚠ $1"
+  declarados=$((declarados + 1))
+}
 
 paso "0 · borrando artefactos de compilación (así corre un checkout nuevo)"
 rm -rf packages/*/dist apps/*/dist .turbo packages/*/.turbo apps/*/.turbo
@@ -369,7 +377,10 @@ paso "5e · app móvil: el RECORRIDO en un navegador de verdad"
 # ejecutando pruebas.» Las pruebas de widget montan un árbol en memoria; esto
 # compila la app para web, la sirve y la recorre entera. No prueba la API —
 # enfrente hay un guardarropa— y eso está escrito en la cabecera del guion.
-if ! hay_flutter; then
+if declaracion=$(node scripts/lib/controles-declarados.mjs 5e 2>/dev/null); then
+  declarado "$(head -1 <<<"$declaracion")"
+  tail -n +2 <<<"$declaracion" | fold -s -w 92 | sed 's/^/     /'
+elif ! hay_flutter; then
   mal "no hay SDK de Flutter ($FLUTTER_BIN): la app no se compiló ni se recorrió"
 else
   salida_web="$(mktemp)"
@@ -462,6 +473,15 @@ paso "9 · pruebas negativas de los propios controles"
 # crees». La lista de casos se mantenía a mano, así que un control nuevo podía
 # nacer, entrar aquí y reportar «✓» sin que nadie lo hubiera visto decir «✗».
 # Así nació D-81. Ahora los dos conjuntos se derivan del código y se comparan.
+# Y que las declaraciones de «no ejercido» sigan en regla: con motivo escrito y
+# con una etapa de revisión que todavía no se haya cerrado. Una declaración que
+# sobrevive a su propia revisión es una desactivación con buenos modales.
+if salida_declaradas=$(node scripts/lib/controles-declarados.mjs --auditar 2>&1); then
+  ok "$salida_declaradas"
+else
+  mal "hay declaraciones de «no ejercido» fuera de regla"
+  echo "$salida_declaradas" | sed 's/^/     /'
+fi
 if salida_cobertura_controles=$(node scripts/lib/controles-sin-prueba-negativa.mjs 2>&1); then
   ok "$salida_cobertura_controles"
 else
@@ -469,12 +489,29 @@ else
   echo "$salida_cobertura_controles" | sed 's/^/     /'
 fi
 # Un control que nadie ha visto fallar no está demostrado.
-if salida_neg=$(con_limite "$LIMITE_MEDIO" node scripts/lib/pruebas-negativas.mjs 2>&1); then
+#
+# Corre bajo `NODE_V8_COVERAGE`, que hace que CADA proceso de Node —incluidos
+# los que la suite lanza para ejercitar cada control— escriba su cobertura. Eso
+# alimenta la comprobación de granularidad de RAMA que viene a continuación, y
+# que es la mitad que faltaba: `controles-sin-prueba-negativa.mjs` atrapa al
+# fichero sin prueba; esto atrapa a la rama nueva dentro de un fichero que ya
+# la tenía — que es exactamente D-81.
+COBERTURA_CONTROLES="$(mktemp -d)"
+export NCR_COBERTURA_CONTROLES="$COBERTURA_CONTROLES"
+if salida_neg=$(NODE_V8_COVERAGE="$COBERTURA_CONTROLES" \
+     con_limite "$LIMITE_MEDIO" node scripts/lib/pruebas-negativas.mjs 2>&1); then
   ok "$(echo "$salida_neg" | tail -1)"
 else
   mal "algún control NO detecta su violación"
   echo "$salida_neg" | grep "✗" | sed 's/^/     /'
 fi
+if salida_ramas=$(node scripts/lib/ramas-de-los-controles.mjs 2>&1); then
+  ok "$salida_ramas"
+else
+  mal "hay ramas de control que nadie ha visto correr"
+  echo "$salida_ramas" | sed 's/^/     /'
+fi
+rm -rf "$COBERTURA_CONTROLES"
 
 paso "10 · fronteras de arquitectura y secretos"
 con_limite "$LIMITE_MEDIO" ./scripts/verificar-frontera.sh >/dev/null 2>&1 && ok "fronteras (DoD ETAPA 02)" || mal "fronteras"
@@ -722,8 +759,10 @@ else
 fi
 
 echo
-if [[ "$fallos" -eq 0 ]]; then
+if [[ "$fallos" -eq 0 && "$declarados" -eq 0 ]]; then
   echo "VERIFICACIÓN DE ETAPA: correcta — se puede escribir el informe"
+elif [[ "$fallos" -eq 0 ]]; then
+  echo "VERIFICACIÓN DE ETAPA: correcta CON $declarados CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe"
 else
   echo "VERIFICACIÓN DE ETAPA: FALLIDA — NO se cierra la etapa"
 fi

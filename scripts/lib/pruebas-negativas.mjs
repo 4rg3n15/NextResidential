@@ -878,6 +878,96 @@ try {
       ? ok('el banco de pruebas queda limpio')
       : mal('la sonda dejó rastro en el banco');
   }
+
+  console.log('\n▸ 17 · una declaración de «no ejercido» que sobrevive a su revisión se detecta');
+  {
+    /**
+     * Declarar un paso no ejercido es legítimo; que la declaración sobreviva a
+     * la etapa en que dijo revisarse, no. Sin esto, «revisión en la ETAPA 14»
+     * sería una frase, y el paso quedaría desactivado para siempre con buenos
+     * modales.
+     */
+    const estado = join(clon, 'docs', 'ESTADO_ETAPAS.md');
+    const original = readFileSync(estado, 'utf8');
+
+    enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']).codigo === 0
+      ? ok('con la etapa de revisión abierta, la declaración vale')
+      : mal('una declaración en regla se rechaza');
+
+    writeFileSync(
+      estado,
+      `${original}\n## ETAPA 14 — Observabilidad, CI/CD, PWA y escritorio · **CERRADA** · sonda\n`,
+    );
+    const r = enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']);
+    r.codigo !== 0 && /ya está CERRADA/.test(r.salida)
+      ? ok('cerrada la etapa de revisión, la declaración CADUCA y rompe la verificación')
+      : mal(`una declaración caducada sobrevive (codigo ${r.codigo})`);
+
+    writeFileSync(estado, original);
+    enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']).codigo === 0
+      ? ok('el banco de pruebas queda limpio')
+      : mal('la sonda dejó rastro en el banco');
+  }
+
+  console.log('\n▸ 18 · una rama de control que nadie ejecuta se detecta (D-81, granularidad)');
+  {
+    /**
+     * El trinquete de ramas, probado con cobertura FABRICADA en lugar de con una
+     * corrida real: lo que se comprueba aquí es la decisión —«este número no
+     * puede subir»—, no la medición de V8, que es de Node y ya está probada.
+     */
+    const dir = join(banco, 'cobertura-sonda');
+    mkdirSync(dir, { recursive: true });
+    const base = join(clon, 'scripts', 'lib', 'ramas-de-los-controles.json');
+    const original = readFileSync(base, 'utf8');
+    const volcado = (ceros) => {
+      writeFileSync(
+        join(dir, 'coverage-sonda.json'),
+        JSON.stringify({
+          result: [
+            {
+              url: `file://${join(clon, 'scripts', 'lib', 'contar-pruebas.mjs')}`,
+              functions: [
+                {
+                  ranges: Array.from({ length: ceros }, (_, i) => ({
+                    startOffset: i * 10,
+                    endOffset: i * 10 + 5,
+                    count: 0,
+                  })),
+                },
+              ],
+            },
+          ],
+        }),
+      );
+    };
+    const conCobertura = () =>
+      correr('node', ['scripts/lib/ramas-de-los-controles.mjs'], {
+        cwd: clon,
+        env: { ...process.env, NCR_COBERTURA_CONTROLES: dir },
+      });
+
+    writeFileSync(base, JSON.stringify({ 'scripts/lib/contar-pruebas.mjs': 7 }, null, 2));
+
+    volcado(7);
+    conCobertura().codigo === 0
+      ? ok('con los mismos bloques sin ejercer, pasa')
+      : mal('un número que no sube se rechaza');
+
+    volcado(3);
+    conCobertura().codigo === 0
+      ? ok('bajarlo es libre: ejercitar más nunca rompe')
+      : mal('bajar el número rompe, y no debería');
+
+    volcado(8);
+    const r = conCobertura();
+    r.codigo !== 0 && /NADIE ejecuta/.test(r.salida)
+      ? ok('una rama nueva que nadie ejercita: detectada')
+      : mal(`una rama sin ejercitar pasa inadvertida (codigo ${r.codigo})`);
+
+    writeFileSync(base, original);
+    rmSync(dir, { recursive: true, force: true });
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -901,6 +991,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 18 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 20 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

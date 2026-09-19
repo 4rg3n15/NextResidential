@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-19 · **ETAPA 10 CERRADA** y **ETAPA 11-A cerrada** · la app Flutter del residente y el segundo eje del aislamiento
+**Última actualización:** 2026-09-19 · **ETAPA 10 CERRADA**, **ETAPA 11-A CERRADA** y **11-B en curso** · la app Flutter del residente y el segundo eje del aislamiento
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -567,6 +567,34 @@ Hoy: **18 de 25 controles con prueba negativa, 7 en deuda declarada**, y esa
 lista solo puede encoger. Lo que aún no cubre —una rama _nueva_ dentro de un
 control que _ya_ tiene prueba, que es literalmente D-81— exige granularidad de
 rama: la suite negativa bajo `NODE_V8_COVERAGE`. **Es el primer trabajo de 11-B.**
+
+---
+
+### 11-B · arrancada el 2026-09-19
+
+**Primero: la granularidad de rama**, que era lo que faltaba del control
+genérico. `controles-sin-prueba-negativa.mjs` atrapa al fichero que nace sin
+prueba; **no atrapaba a D-81**, que era una rama nueva dentro de un fichero que
+ya la tenía. Ahora la suite negativa corre bajo `NODE_V8_COVERAGE` —cada proceso
+que lanza escribe su cobertura, incluidos los del clon— y
+`ramas-de-los-controles.json` fija cuántos bloques no ejecuta nadie por control:
+**20 controles, 267 bloques, y ese número no puede subir**. `verificar-entorno.mjs`
+—donde vivió D-81— queda con 39 bloques clavados.
+
+**Y el paso 5e queda DECLARADO no ejercido**, no desactivado: sale en cada
+ejecución con motivo y fecha, el veredicto lo dice, y **caduca** cuando se cierre
+la ETAPA 14. Motivo: el motor de Flutter web no engancha el campo de contraseña
+bajo Chromium en macOS —el `<input>` recibe el texto y el widget no se entera—,
+reproducible allí y no en Linux.
+
+**Sobre `cerrarSesion()` y la ETAPA 15: no la bloquea.** La consola no usa el
+puerto de dominio `IntercomProvider`, usa el puerto de aplicación
+`CanalDeIntercom`, y **sus tres métodos llevan `operadorId` explícito**: no hay
+estado por instancia que compartir. La exclusividad por dispositivo la sostiene
+la máquina de `@ncr/domain-core`, que es justo lo que el equipo real impone con
+su única conexión de armado. Lo que sí queda anotado para la 15: el adaptador
+ISAPI abre **una conexión por dispositivo**, atada al titular del canal, nunca
+una por operador.
 
 ---
 
