@@ -493,6 +493,53 @@ Hikvision. De 59 a 78 pruebas en el paquete.
 
 ---
 
+### Cuarta ronda · 2026-09-19 · el 5e, la causa de verdad
+
+El arreglo anterior **movió el fallo de campo en vez de eliminarlo**: antes
+«Correo» vacío con «Contraseña» llena; después, «Correo» lleno y «Contraseña»
+vacía. Un arreglo que desplaza el síntoma no ha tocado la causa.
+
+**La causa: se estaba comprobando la cosa equivocada.** En Flutter web el
+`<input>` del DOM no es el campo — es un buzón que el motor crea al enfocar y
+del que copia el texto al widget. `inputValue()` dice que **el navegador**
+recibió las pulsaciones, no que **la app** se haya enterado. Si el motor aún no
+ha enganchado su escucha, las dos cosas divergen, y el reintento daba por bueno
+un campo que para la app seguía vacío. Eso es exactamente el síntoma invertido:
+la comprobación de vuelta pasaba, y el validador de la app decía que no.
+
+La instrumentación —reintentos, valor leído en cada uno y con cuál se quedó— se
+conserva en la salida del paso: por campo, una línea.
+
+**El arreglo, en dos mitades, y ninguna es un reintento a ciegas:**
+
+1. **La causa.** No se teclea hasta que el `<input>` de ese campo existe **y es
+   `document.activeElement`**. Ese foco lo pone el motor, no el clic: es su
+   señal de «ya estoy escuchando». Si no llega en 5 s, se dice.
+2. **La verdad.** Se le pregunta a la app, no al DOM. Si al pulsar «Entrar» no
+   sale la petición, se mira **cuál de sus dos validadores protesta** y se
+   rellena ese campo. Hasta tres vueltas de 6 s.
+
+**Ejercido en los dos sentidos**, saboteando la entrega al campo:
+
+| Sabotaje                           | Resultado                                                                                                                                 |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| La contraseña no llega **una vez** | «vuelta 1: no hubo petición; la app reclama la contraseña» → se rellena y el recorrido **completa**                                       |
+| La contraseña no llega **nunca**   | Tres vueltas, y falla nombrando la causa: «es el recorrido tecleando en un campo que el motor no había enganchado, no un fallo de la app» |
+
+Y tres ejecuciones seguidas del recorrido completo, las tres en verde.
+
+| ID       | Qué                                                                                                                                              | Estado        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| **D-87** | El recorrido leía el `<input>` del DOM creyendo leer el campo de la app. El reintento daba por bueno un campo vacío y el fallo cambiaba de sitio | **Corregido** |
+
+> **No se declara no ejercido.** La opción estaba sobre la mesa y no hace falta:
+> la causa tiene nombre, el arreglo la ataca donde está, y el caso que fallaba
+> —exactamente el suyo— se reproduce a propósito y ahora se recupera solo. Lo
+> que queda fuera de nuestro alcance es su máquina; por eso el recorrido, cuando
+> no pueda, **lo dirá en la primera línea** en vez de esperar en silencio.
+
+---
+
 ## 9 · Qué debe hacer usted
 
 1. **Nada para que la suite corra.** Todo lo de esta mitad se verifica sin

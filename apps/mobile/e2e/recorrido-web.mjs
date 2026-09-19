@@ -328,27 +328,93 @@ try {
    * reintenta. **Y si tras tres intentos sigue vacío, se dice eso** —no se
    * espera una petición que nadie va a hacer—.
    */
+  /**
+   * Escribir en un campo de Flutter web: ENFOCAR, ESPERAR A QUE EL MOTOR
+   * ENGANCHE, y solo entonces teclear.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA CAUSA, Y POR QUÉ EL ARREGLO ANTERIOR SOLO LA MOVIÓ DE CAMPO
+   *
+   * Primero falló «Correo» vacío con «Contraseña» llena. Se añadió un reintento
+   * que leía el valor de vuelta del `<input>` y el fallo **cambió de campo**:
+   * «Correo» lleno y «Contraseña» vacía. Un arreglo que mueve el síntoma no ha
+   * tocado la causa, y aquí la causa es que **se estaba comprobando la cosa
+   * equivocada**.
+   *
+   * En Flutter web el `<input>` del DOM NO es el campo: es un buzón que el
+   * motor crea al enfocar y del que copia el texto al widget. Leer
+   * `input.value` dice que el navegador recibió las pulsaciones, **no que la
+   * app se haya enterado**. Si el motor todavía no ha enganchado su escucha,
+   * las dos cosas divergen — y el reintento daba por bueno un campo que para la
+   * app seguía vacío. Ese es exactamente el síntoma invertido.
+   *
+   * De ahí las dos mitades de abajo:
+   *
+   *   1 · **Atacar la causa, no el síntoma**: no se teclea hasta que el
+   *       `<input>` de ese campo existe Y es `document.activeElement`. Ese foco
+   *       lo pone el motor, no el clic: es su señal de «ya estoy escuchando».
+   *   2 · **Preguntarle a la app, no al DOM**: la única fuente de verdad sobre
+   *       lo que el formulario tiene es su propio validador. Si al pulsar
+   *       «Entrar» no sale la petición, se mira qué campo reclama la app y se
+   *       rellena ESE. El recorrido deja de adivinar.
+   */
+  const CORREO = 'maria@ejemplo.invalid';
+  const CLAVE = 'la-que-sea';
+
   const escribirEn = async (etiqueta, texto) => {
     const campo = pagina.getByLabel(etiqueta);
-    for (let intento = 1; intento <= 3; intento += 1) {
-      await campo.click();
-      await pagina.keyboard.type(texto);
-      let valor = '';
-      try {
-        valor = await campo.inputValue();
-      } catch {
-        valor = '';
-      }
-      if (valor === texto) return;
-      // Lo que entró a medias se borra: reintentar sobre ello daría el texto
-      // duplicado, que es un fallo peor porque parece un error de la app.
-      await campo.click();
-      await pagina.keyboard.press('ControlOrMeta+a');
-      await pagina.keyboard.press('Delete');
+    await campo.click();
+    try {
+      await pagina.waitForFunction(
+        (et) => {
+          const i = [...document.querySelectorAll('input, textarea')].find(
+            (e) => e.getAttribute('aria-label') === et,
+          );
+          return i !== undefined && i === document.activeElement;
+        },
+        etiqueta,
+        { timeout: 5000 },
+      );
+    } catch {
+      console.log(`   · «${etiqueta}»: el motor no enfocó su <input> en 5 s`);
+      return false;
+    }
+    await pagina.keyboard.type(texto);
+    const leido = await campo.inputValue().catch(() => '<ilegible>');
+    console.log(
+      `   · «${etiqueta}»: enfocado por el motor, tecleado, leído ${JSON.stringify(leido)}`,
+    );
+    return leido === texto;
+  };
+
+  /**
+   * Pulsa «Entrar» y EXIGE LA PETICIÓN. Si no sale, no se espera veinte
+   * segundos a nada: se le pregunta a la app cuál de sus dos validadores está
+   * protestando, se rellena ese campo y se vuelve a pulsar.
+   */
+  const entrar = async () => {
+    for (let vuelta = 1; vuelta <= 3; vuelta += 1) {
+      const espera = pagina
+        .waitForResponse((r) => r.url().includes('/auth/v1/token'), { timeout: 6000 })
+        .catch(() => null);
+      await pagina.getByRole('button', { name: 'Entrar' }).click();
+      const respuesta = await espera;
+      if (respuesta !== null) return respuesta;
+
+      const faltaCorreo = await esperarTexto('Escriba su correo', 500);
+      const faltaClave = await esperarTexto('Escriba su contraseña', 500);
+      console.log(
+        `   · vuelta ${vuelta}: no hubo petición; la app reclama` +
+          `${faltaCorreo ? ' el correo' : ''}${faltaClave ? ' la contraseña' : ''}` +
+          `${!faltaCorreo && !faltaClave ? ' nada (ningún validador protesta)' : ''}`,
+      );
+      if (faltaCorreo) await escribirEn('Correo', CORREO);
+      if (faltaClave) await escribirEn('Contraseña', CLAVE);
     }
     throw new Error(
-      `el campo «${etiqueta}» sigue vacío tras 3 intentos: el motor de Flutter no creó ` +
-        'su <input> a tiempo. Es el recorrido, no la app',
+      'la app no llegó a pedir el token en 3 vueltas: su propio validador seguía ' +
+        'rechazando el formulario. Es el recorrido tecleando en un campo que el motor ' +
+        'de Flutter no había enganchado, no un fallo de la app',
     );
   };
 
@@ -369,13 +435,10 @@ try {
    * el `waitForTimeout`. Teclear es lo que hace el residente, y esperar la
    * PETICIÓN —no un reloj— es lo que hace la comprobación determinista.
    */
-  await escribirEn('Correo', 'maria@ejemplo.invalid');
-  await escribirEn('Contraseña', 'la-que-sea');
+  await escribirEn('Correo', CORREO);
+  await escribirEn('Contraseña', CLAVE);
 
-  const [respuestaDelToken] = await Promise.all([
-    pagina.waitForResponse((r) => r.url().includes('/auth/v1/token'), { timeout: 20000 }),
-    pagina.getByRole('button', { name: 'Entrar' }).click(),
-  ]);
+  const respuestaDelToken = await entrar();
   respuestaDelToken.status() === 200
     ? ok('el acceso pide el token al emisor de identidad')
     : mal(`el emisor contestó ${respuestaDelToken.status()}`);
