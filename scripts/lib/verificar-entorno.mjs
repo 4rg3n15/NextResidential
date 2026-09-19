@@ -33,6 +33,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createServer } from 'node:net';
 
 const paquete = JSON.parse(readFileSync('package.json', 'utf8'));
 const nvmrc = readFileSync('.nvmrc', 'utf8').trim();
@@ -187,6 +188,133 @@ if (existsSync('apps/mobile/pubspec.yaml')) {
     }
 
     resumenMovil = ` · Flutter ${framework} (Dart ${dartDeFlutter}) dentro de lo declarado`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// macOS · LA CADENA DE HERRAMIENTAS DE APPLE
+//
+// PEDIDO POR EL USUARIO, y con razón: «el paso 1 debe comprobar en macOS que
+// `xcrun --sdk macosx --show-sdk-path` devuelve algo, no solo que Xcode está
+// seleccionado. Es el prerrequisito real.»
+//
+// Lo es literalmente. `xcode-select -p` solo dice a qué directorio apunta un
+// enlace; puede apuntar a un Xcode.app cuyo primer arranque nunca se completó,
+// o cuya licencia no se aceptó, y entonces NO HAY SDK. Los paquetes con
+// `hook/build.dart` —los «native assets» de Dart— compilan código nativo
+// llamando a `clang` con `-isysroot <esa ruta>`, así que sin ella el fallo sale
+// mucho más abajo, dentro de `flutter test`, hablando de un paquete de pub.
+//
+// Esta comprobación no pregunta: **ejecuta el mismo comando que ejecutará la
+// cadena de compilación**, y exige que la ruta que devuelva exista de verdad.
+// Es la misma regla que `verificar-escritura.mjs`: un control que pregunta en
+// vez de ejercer no demuestra nada.
+// ─────────────────────────────────────────────────────────────────────────────
+if (process.platform === 'darwin' && existsSync('apps/mobile/pubspec.yaml')) {
+  let sdk = null;
+  let motivo = '';
+  try {
+    sdk = execFileSync('xcrun', ['--sdk', 'macosx', '--show-sdk-path'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  } catch (e) {
+    motivo =
+      String(e.stderr ?? e.message)
+        .split('\n')
+        .filter((l) => l.trim() !== '')
+        .slice(-1)[0] ?? String(e.message);
+  }
+
+  if (sdk === null || sdk === '') {
+    problemas.push(
+      '`xcrun --sdk macosx --show-sdk-path` no devuelve nada' +
+        (motivo === '' ? '' : ` (${motivo})`) +
+        '.\n      Sin SDK de macOS no compila NINGÚN paquete con `hook/build.dart`, y el ' +
+        'fallo\n      sale luego dentro de `flutter test` hablando de un paquete de pub. ' +
+        'Pruebe:\n' +
+        '        sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer\n' +
+        '        sudo xcodebuild -runFirstLaunch && sudo xcodebuild -license accept',
+    );
+  } else if (!existsSync(sdk)) {
+    problemas.push(
+      `\`xcrun\` devuelve ${sdk} y esa ruta NO EXISTE. Es un Xcode a medio instalar ` +
+        'o movido;\n      reinstálelo o ejecute `sudo xcodebuild -runFirstLaunch`',
+    );
+  } else {
+    resumenMovil += ` · SDK de macOS en ${sdk.replace(/^.*\//, '')}`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL RECORRIDO DEL PASO 5e · sus DOS prerrequisitos, nombrados aquí
+//
+// PEDIDO POR EL USUARIO: «El 5e sigue sin diagnosticar. ¿Necesita la API
+// levantada? Si es así, que el paso lo compruebe y lo nombre.»
+//
+// **No la necesita.** `apps/mobile/e2e/recorrido-web.mjs` levanta él mismo un
+// servidor de guardarropa en 127.0.0.1:4599 que contesta las cinco rutas del
+// residente y el `token`. Si el 5e fallara por la API caída sería un defecto
+// del recorrido, no del entorno.
+//
+// Lo que sí necesita son dos cosas que hasta ahora no se comprobaban en ningún
+// sitio, y que en macOS faltan con toda normalidad:
+//
+//   1 · un **Chromium** que Playwright pueda lanzar. En este contenedor viene
+//       preinstalado en `/opt/pw-browsers`; en un portátil recién clonado, no
+//       existe hasta que alguien ejecuta `playwright install`.
+//   2 · el **puerto libre**. Si algo lo ocupa, el recorrido no arranca y el
+//       mensaje habla de una conexión rechazada, no del puerto.
+// ─────────────────────────────────────────────────────────────────────────────
+if (existsSync('apps/mobile/e2e/recorrido-web.mjs')) {
+  const explicito = process.env.NCR_CHROMIUM;
+  let navegador = null;
+
+  if (explicito !== undefined && explicito !== '') {
+    navegador = existsSync(explicito) ? explicito : null;
+    if (navegador === null) {
+      problemas.push(`NCR_CHROMIUM apunta a ${explicito} y ahí no hay nada`);
+    }
+  } else if (existsSync('/opt/pw-browsers/chromium')) {
+    navegador = '/opt/pw-browsers/chromium';
+  } else {
+    // El camino normal fuera del contenedor: que lo resuelva Playwright.
+    try {
+      const { chromium } = await import('playwright');
+      const ruta = chromium.executablePath();
+      navegador = existsSync(ruta) ? ruta : null;
+      if (navegador === null) {
+        problemas.push(
+          `Playwright espera Chromium en ${ruta} y no está.\n` +
+            '      El paso 5e —el recorrido de la app en un navegador de verdad— no puede ' +
+            'correr.\n      Instálelo: `pnpm exec playwright install chromium`',
+        );
+      }
+    } catch (e) {
+      problemas.push(
+        `no se pudo cargar \`playwright\` (${String(e.message).split('\n')[0]}). ` +
+          'Ejecute `pnpm install`',
+      );
+    }
+  }
+
+  // El puerto. Se comprueba INTENTANDO escucharlo, no consultando una lista.
+  const puerto = Number(process.env.NCR_PUERTO_RECORRIDO ?? 4599);
+  const ocupado = await new Promise((resolver) => {
+    const s = createServer();
+    s.once('error', (e) => resolver(e.code ?? 'EADDRINUSE'));
+    s.once('listening', () => s.close(() => resolver(null)));
+    s.listen(puerto, '127.0.0.1');
+  });
+  if (ocupado !== null) {
+    problemas.push(
+      `el puerto ${puerto}, que usa el recorrido del paso 5e, no se puede escuchar ` +
+        `(${ocupado}).\n      Libérelo o exporte NCR_PUERTO_RECORRIDO con otro`,
+    );
+  }
+
+  if (navegador !== null && ocupado === null) {
+    resumenMovil += ` · recorrido listo (Chromium + puerto ${puerto})`;
   }
 }
 

@@ -305,6 +305,125 @@ daba rojo por una causa ajena a lo que probaba. Ahora la ruta es absoluta.
 
 ---
 
+### Ronda de entorno (2026-09-19) · `objective_c`, y el control genérico de la familia
+
+**Quién arrastraba `objective_c`.** Medido con `flutter pub deps`, no deducido.
+La cadena no es la que parecía:
+
+```
+flutter_secure_storage
+  └─ flutter_secure_storage_WINDOWS          ← sí: el de Windows
+       └─ path_provider                       (federado: arrastra las 5 plataformas)
+            └─ path_provider_foundation
+                 └─ objective_c 9.5.0
+```
+
+Es decir: **la implementación para Windows de un paquete de almacenamiento
+arrastraba una dependencia de Apple.** `flutter_secure_storage_macos` no depende
+de `objective_c`; `flutter_secure_storage_windows` depende de `path_provider`,
+que por ser un plugin federado arrastra las cinco implementaciones de plataforma
+—Android, Foundation, Linux, Windows, la interfaz— tanto si se usan como si no.
+
+Y `objective_c` no es una dependencia pasiva: trae `hook/build.dart`, un _native
+asset_ de Dart que **compila fuentes `.m` con `clang`**. Su primera línea
+útil es `const supportedOSs = {OS.iOS, OS.macOS}`: en Linux devuelve sin hacer
+nada —por eso este contenedor jamás lo reprodujo en cinco rondas— y en macOS
+compila, lo que exige el SDK de Apple. El fallo salía a cuatro capas de su causa
+y hablando de un paquete que este proyecto no declara ni usa.
+
+**La acotación, y por qué es esa.** `path_provider_foundation` 2.5.1 es la última
+versión sin `objective_c` (2.5.0 lo adoptó, 2.5.1 lo revirtió, 2.6.0 lo volvió a
+meter), y satisface el rango de Flutter y Dart en uso. Un
+`dependency_overrides` la fija y **`objective_c` desaparece del `pubspec.lock`
+entero**. Verificado aquí: `flutter analyze` sin hallazgos y las 72 pruebas en
+verde con la acotación puesta.
+
+No se eligió desactivar los _native assets_ (`FLUTTER_NATIVE_ASSETS=false`):
+habría escondido el paquete en lugar de sacarlo, y su efecto depende de una
+bandera del entorno que nadie versiona.
+
+| ID       | Qué                                                                                                                                                                                      | Estado                                              |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **D-83** | `objective_c` entraba en el grafo por el plugin de **Windows** de `flutter_secure_storage` y rompía `flutter test` en macOS, en código que la suite no toca                              | **Corregido** · acotado, con control que lo vigila  |
+| **D-84** | La lista de pruebas negativas se mantenía **a mano**: un control nuevo podía entrar en el verificador y reportar «✓» sin que nadie hubiera comprobado que sabe decir «✗». Así nació D-81 | **Corregido** · `controles-sin-prueba-negativa.mjs` |
+
+**El control genérico de la familia (D-84).** Es la respuesta a la pregunta de
+fondo: veinte defectos —D-79 decidiendo por texto y no por código de salida,
+D-80 leyendo `false` al acertar, D-81 aceptando `^` sin interpretarlo, D-82
+tomando `dart` del PATH— no comparten tema. Comparten que **nadie los había
+visto fallar**. La defensa genérica no es otra comprobación temática: es exigir
+que todo control tenga su demostración de fallo, y comprobarlo mecánicamente.
+
+El control deriva dos conjuntos del código, sin tabla que mantener:
+
+- **A** · lo que `verificar-etapa.sh` ejecuta —y lo que ejecutan los `.sh` que
+  él invoca, que es como `escanear-secretos.mjs` se contaba fuera—.
+- **B** · lo que `pruebas-negativas.mjs` **invoca** de verdad.
+
+Y exige `A ⊆ B`. Lo que no está en B y no está exento es deuda declarada, con
+motivo escrito; **esa lista solo puede encoger**: si crece, el paso 9 se pone
+rojo, y si una entrada deja de corresponder —porque ya tiene prueba, o porque el
+verificador ya no ejecuta ese control— también. Hoy son **18 de 25 con prueba
+negativa y 7 en deuda**, y el número sale en pantalla en cada ejecución.
+
+> **Y el control genérico estuvo a punto de nacer con el defecto de la familia.**
+> La primera versión contaba un control como «ejercido» si su ruta _aparecía_ en
+> la suite negativa. Al escribir el caso 16, mencionar
+> `'node scripts/lib/dependencias-acotadas.mjs'` dentro de otra cadena bastó
+> para que diera por probado un control que nadie había probado. Ahora exige el
+> literal exacto entre comillas, que es la forma real de una invocación. Se
+> anota aquí porque es la mejor descripción que tenemos del patrón: **mencionar
+> no es ejercer, y un control que confunde las dos cosas es la decimonovena
+> aparición.**
+>
+> Lo que este control **no** cubre todavía: una rama _nueva_ dentro de un
+> control que _ya_ tiene prueba negativa. Es exactamente D-81 —`verificar-entorno.mjs`
+> tenía su caso 6 desde la ETAPA 02, y la rama del acento circunflejo no—. Para
+> eso hace falta granularidad de rama: correr la suite negativa bajo
+> `NODE_V8_COVERAGE` y exigir que los propios `scripts/lib/*.mjs` queden
+> cubiertos. Es el primer trabajo de 11-B.
+
+**Dos hallazgos que salieron del propio control genérico.** Al comprobar si
+`metricas.mjs` estaba exento con razón, resultó que no: el paso 7 **sí** mira su
+código de salida, así que es un control. Y mirándolo de cerca aparecieron dos
+cosas:
+
+| ID       | Qué                                                                                                                                                                                                                                                                                                                                                 | Estado                                                                           |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **D-85** | Si la corrida de un paquete no terminaba, `metricas.mjs` se lo callaba (`catch {}` vacío) y el paso 7 anunciaba **«alguna capa por debajo del umbral»**. Pasó en esta ronda: `@ncr/api` no dejó resumen, la capa de **aplicación desapareció del informe** en vez de salir en rojo, y el mensaje mandaba a buscar una cobertura baja que no existía | **Corregido** · se guarda el motivo y el paso lo nombra                          |
+| **D-86** | `@ncr/providers` está al **84,58 %** frente al **90 % que él mismo declara** en su `vitest.config.ts` —`intercom-simulado.ts` al 0 %, 147 líneas sin una sola prueba—. Su corrida falla en cada ejecución desde la ETAPA 10 y **ninguna lo había dicho jamás**, porque `metricas.mjs` se tragaba el código de salida                                | **Declarado** · el paso 7 lo imprime; cerrarlo son pruebas del intercom simulado |
+
+Sobre **D-86** conviene ser exacto: no incumple §2.4 —`providers` no es dominio
+ni aplicación, y el umbral global del 70 % se cumple—, incumple el listón más
+estricto que el propio paquete se puso. Por eso el paso lo **imprime** y no lo
+tumba, y por eso **no se baja el umbral**: bajarlo sería cambiar la medida para
+que dé el resultado que uno quiere. Lo que falta son pruebas.
+
+Y una nota de honestidad sobre D-85: el fallo de `@ncr/api` **no se reprodujo**
+—dos ejecuciones seguidas sin resumen, la tercera con él y con las cifras
+exactas de la ronda anterior—, así que la causa raíz sigue sin nombre. Lo que sí
+está cerrado es que la próxima vez **el motivo saldrá impreso** en lugar de
+disfrazarse de umbral incumplido.
+
+**Las otras dos correcciones de esta ronda:**
+
+1. **Paso 1 · el SDK de macOS, ejecutando `xcrun`.** `xcode-select -p` solo dice
+   a qué apunta un enlace: puede apuntar a un Xcode cuyo primer arranque nunca se
+   completó o cuya licencia no se aceptó, y entonces **no hay SDK**. El paso
+   ejecuta `xcrun --sdk macosx --show-sdk-path`, exige salida no vacía y
+   **comprueba que esa ruta existe**. Ejercido en sus cuatro caminos con un
+   `xcrun` falso: vacío, fallo con mensaje, ruta inexistente y ruta buena.
+2. **Paso 5e · sus prerrequisitos, nombrados.** **No necesita la API levantada**:
+   `recorrido-web.mjs` levanta él mismo el guardarropa en `127.0.0.1:4599`. Lo
+   que necesita es un **Chromium** que Playwright pueda lanzar y **el puerto
+   libre**, y las dos cosas se comprueban ahora en el paso 1 —el puerto
+   intentando escucharlo, no consultando una lista— con su remedio
+   (`pnpm exec playwright install chromium`). Y ante un fallo, el 5e imprime
+   comando, directorio, navegador y puerto, y clasifica: navegador ausente,
+   puerto ocupado, compilación sin artefactos, o «esto es la APP».
+
+---
+
 ## 9 · Qué debe hacer usted
 
 1. **Nada para que la suite corra.** Todo lo de esta mitad se verifica sin

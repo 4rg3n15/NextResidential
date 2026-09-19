@@ -97,3 +97,8 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ACOTACIÓN DE UNA DEPENDENCIA QUE NADIE PIDIÓ · ver docs/etapas/ETAPA-11.md §8
+dependency_overrides:
+  path_provider_foundation: 2.5.1

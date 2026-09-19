@@ -275,6 +275,15 @@ cliente generado al día y sin secretos en el binario, y el **recorrido en un
 navegador de verdad**. Si falta el SDK de Flutter, esos pasos **fallan**; no se
 omiten.
 
+En **macOS**, el paso 1 comprueba además que `xcrun --sdk macosx --show-sdk-path`
+devuelva una ruta **que exista**: tener Xcode seleccionado no basta —un Xcode a
+medio instalar o sin licencia aceptada no tiene SDK—, y sin SDK no compila
+ningún paquete de Dart con `hook/build.dart`. Y comprueba los dos
+prerrequisitos del paso 5e: un **Chromium** que Playwright pueda lanzar
+(`pnpm exec playwright install chromium`) y el **puerto 4599 libre**. El
+recorrido **no necesita la API levantada**: levanta su propio servidor de
+guardarropa.
+
 | Paso | Verifica                                                                                                                                     |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0    | Borra artefactos: corre como un checkout nuevo                                                                                               |
@@ -296,6 +305,15 @@ omiten.
 El paso 14 se añadió en la ETAPA 07 tras una prueba HTTP intermitente: **una prueba intermitente es peor que una rota**, porque enseña a reejecutar hasta el verde y ese hábito acaba tapando defectos reales. Compara recuentos, ficheros, títulos en rojo y errores no manejados, y fuerza la ejecución para que el caché de Turborepo no reimprima los números de la primera corrida sin ejecutar nada.
 
 Los pasos 6 y 9 existen por experiencia directa: un fichero que no carga desaparece del recuento sin ponerse en rojo, y un control que nadie ha visto fallar no está demostrado.
+
+Y desde la ETAPA 11-A el paso 9 comprueba, **antes** de ejecutar las pruebas
+negativas, que las haya **para todos**. Veinte defectos de este proyecto son el
+mismo defecto —«el control existe pero no comprueba lo que crees»— y lo único
+que comparten es que nadie los había visto fallar. El control deriva del código
+qué controles ejecuta el verificador y cuáles invoca la suite negativa, y exige
+que el primer conjunto esté contenido en el segundo. Lo que falta es **deuda
+declarada con motivo escrito, y esa lista solo puede encoger**: si crece, o si
+una entrada deja de corresponder, el paso se pone rojo.
 
 ### Fronteras por mutación
 

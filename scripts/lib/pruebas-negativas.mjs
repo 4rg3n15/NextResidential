@@ -833,6 +833,51 @@ try {
       ? ok('el banco de pruebas queda limpio')
       : mal('la sonda dejó rastro en el banco');
   }
+
+  console.log('\n▸ 16 · un control SIN prueba negativa se detecta al cablearlo (D-81)');
+  {
+    /**
+     * EL CONTROL GENÉRICO DE LA FAMILIA. Veinte defectos de este proyecto son
+     * el mismo: el control existe y no comprueba lo que uno cree. Todos
+     * comparten que NADIE los había visto fallar. Hasta ahora esta lista de
+     * casos se mantenía a mano, así que un control nuevo podía entrar en el
+     * verificador sin que nadie comprobara que sabe decir «✗» — que es
+     * exactamente como nació D-81.
+     *
+     * Aquí se comprueba el control que compara los dos conjuntos: lo que el
+     * verificador EJECUTA contra lo que esta suite EJERCITA.
+     */
+    const verificador = join(clon, 'scripts', 'verificar-etapa.sh');
+    const original = readFileSync(verificador, 'utf8');
+
+    enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']).codigo === 0
+      ? ok('el banco parte en verde')
+      : mal('el banco NO parte en verde');
+
+    // Un control nuevo, cableado al verificador, que nadie ha visto fallar.
+    writeFileSync(verificador, original + '\nnode scripts/lib/sonda-sin-prueba-negativa.mjs\n');
+    const r = enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']);
+    r.codigo !== 0 && /NADIE lo ha visto fallar/.test(r.salida)
+      ? ok('un control nuevo sin prueba negativa: detectado al cablearlo')
+      : mal(`un control sin prueba negativa pasa inadvertido (codigo ${r.codigo})`);
+
+    // Y la otra mitad del trinquete: una exención que ya no corresponde. Sin
+    // esto, la lista de deuda protegería para siempre a un control que ya tiene
+    // prueba —o que ya nadie ejecuta— y volvería a ser una lista a mano.
+    writeFileSync(
+      verificador,
+      original.replace('node scripts/lib/dependencias-acotadas.mjs', 'true'),
+    );
+    const rz = enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']);
+    rz.codigo !== 0 && /ya no le corresponde/.test(rz.salida)
+      ? ok('una exención zombi también rompe: la lista solo puede encoger')
+      : mal(`una exención zombi sobrevive (codigo ${rz.codigo})`);
+
+    writeFileSync(verificador, original);
+    enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']).codigo === 0
+      ? ok('el banco de pruebas queda limpio')
+      : mal('la sonda dejó rastro en el banco');
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -856,6 +901,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 17 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 18 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

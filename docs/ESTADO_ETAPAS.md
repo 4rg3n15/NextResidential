@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-18 · **ETAPA 10 CERRADA** y **ETAPA 11-A cerrada** · la app Flutter del residente y el segundo eje del aislamiento
+**Última actualización:** 2026-09-19 · **ETAPA 10 CERRADA** y **ETAPA 11-A cerrada** · la app Flutter del residente y el segundo eje del aislamiento
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -469,7 +469,7 @@ plataforma**: la decisión la toma Next Control.
 
 ---
 
-## ETAPA 11 — App móvil Flutter del residente · **EN CURSO** — 11-A cerrada · 2026-09-18
+## ETAPA 11 — App móvil Flutter del residente · **EN CURSO** — 11-A cerrada · 2026-09-19
 
 **Rama:** `etapa-11-app-flutter-residente`, desde `develop` actualizado ·
 **Informe:** [`etapas/ETAPA-11.md`](etapas/ETAPA-11.md)
@@ -533,6 +533,38 @@ es que su Dart era **3.11.5** y el `pubspec.yaml` exige **^3.13.3**.
 **D-81 lo destapó la propia comprobación nueva**, probada con un mínimo
 imposible: pasó en verde. Es la misma familia de siempre, y esta vez a los diez
 minutos de nacer el control.
+
+---
+
+### Segunda ronda de entorno · 2026-09-19 · `objective_c` y el control genérico
+
+**Quién arrastraba `objective_c`**, medido con `flutter pub deps`:
+`flutter_secure_storage` → su plugin de **Windows** → `path_provider` (federado,
+arrastra las cinco plataformas) → `path_provider_foundation` → `objective_c`.
+Su `hook/build.dart` compila `.m` con `clang` **solo en iOS y macOS** —en Linux
+devuelve sin hacer nada, por eso el contenedor nunca lo reprodujo— y exige el
+SDK de Apple. Acotado con `dependency_overrides` a `path_provider_foundation`
+2.5.1, la última versión sin él: **desaparece del `pubspec.lock`**, `analyze`
+sin hallazgos y las 72 pruebas de Dart en verde.
+
+| Añadido                                          | Por qué                                                                                                   |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **`dependencias-acotadas.mjs`**                  | Un `dependency_overrides` sin motivo escrito es una versión congelada que nadie vuelve a mirar            |
+| **`controles-sin-prueba-negativa.mjs`** (paso 9) | El control **genérico** de la familia: todo control que el verificador ejecuta debe tener prueba negativa |
+| **Paso 1 · `xcrun` en macOS**                    | Xcode seleccionado no implica SDK. Se ejecuta el comando y se exige que la ruta exista                    |
+| **Paso 1 · Chromium y puerto del 5e**            | El recorrido **no necesita la API**; necesita navegador y el 4599 libre, y ahora se nombran               |
+
+| ID       | Qué                                                                                                                                                         | Estado        |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **D-83** | `objective_c` entraba por el plugin de **Windows** y rompía `flutter test` en macOS                                                                         | **Corregido** |
+| **D-84** | La lista de pruebas negativas se mantenía a mano: un control podía nacer sin ella —así nació D-81—                                                          | **Corregido** |
+| **D-85** | `metricas.mjs` se callaba que la corrida de un paquete no terminó: el paso 7 decía «capa por debajo del umbral» cuando la verdad era «capa que nadie midió» | **Corregido** |
+| **D-86** | `@ncr/providers` al 84,58 % frente al 90 % que él mismo declara (`intercom-simulado.ts` al 0 %); fallaba en cada corrida y nadie lo veía                    | **Declarado** |
+
+Hoy: **18 de 25 controles con prueba negativa, 7 en deuda declarada**, y esa
+lista solo puede encoger. Lo que aún no cubre —una rama _nueva_ dentro de un
+control que _ya_ tiene prueba, que es literalmente D-81— exige granularidad de
+rama: la suite negativa bajo `NODE_V8_COVERAGE`. **Es el primer trabajo de 11-B.**
 
 ---
 

@@ -44,6 +44,7 @@ for (const f of ficheros) console.log(`  ${f}`);
 /** Ejecuta vitest en un paquete y devuelve su informe JSON. */
 const correr = (paquete, dir) => {
   const salida = join(mkdtempSync(join(tmpdir(), 'ncr-')), 'r.json');
+  let fallo = null;
   try {
     execFileSync(
       'pnpm',
@@ -61,13 +62,24 @@ const correr = (paquete, dir) => {
       ],
       { cwd: raiz, stdio: 'pipe', encoding: 'utf8' },
     );
-  } catch {
-    /* el informe se escribe igual aunque haya rojos */
+    fallo = null;
+  } catch (e) {
+    /**
+     * El informe se escribe igual aunque haya rojos, así que una excepción aquí
+     * NO es «la suite falló»: es que el proceso no llegó a terminar —lo mató una
+     * señal, se pasó de `maxBuffer`, no encontró el binario—. Callarlo era el
+     * defecto: el paquete desaparecía de la medición y el paso 7 informaba
+     * «alguna capa por debajo del umbral», mandando a buscar una cobertura baja
+     * que no existía. Ahora se guarda y se imprime.
+     */
+    fallo =
+      `${e.code ?? ''} ${e.signal ? `señal ${e.signal}` : ''} ${String(e.message).split('\n')[0]}`.trim() +
+      ` · ${(e.stdout ?? '').length} bytes por salida estándar, ${(e.stderr ?? '').length} por error`;
   }
   const informe = existsSync(salida) ? JSON.parse(readFileSync(salida, 'utf8')) : null;
   const resumenPath = join(raiz, dir, 'coverage', 'coverage-summary.json');
   const cobertura = existsSync(resumenPath) ? JSON.parse(readFileSync(resumenPath, 'utf8')) : null;
-  return { informe, cobertura };
+  return { informe, cobertura, fallo };
 };
 
 const paquetes = [
@@ -104,7 +116,8 @@ const sinMedir = [];
 const ficherosMedidos = [];
 
 for (const [paquete, dir] of paquetes) {
-  const { informe, cobertura } = correr(paquete, dir);
+  const { informe, cobertura, fallo } = correr(paquete, dir);
+  if (fallo !== null) console.log(`\n## ${paquete}: la corrida NO terminó — ${fallo}`);
   if (!informe) {
     console.log(`\n## ${paquete}: SIN INFORME — la corrida no produjo resultados`);
     sinMedir.push(`${paquete} (sin informe de pruebas)`);
@@ -128,7 +141,9 @@ for (const [paquete, dir] of paquetes) {
 
   if (!cobertura) {
     console.log('   SIN RESUMEN DE COBERTURA — este paquete no entra en la medición');
-    sinMedir.push(`${paquete} (sin resumen de cobertura)`);
+    sinMedir.push(
+      `${paquete} (sin resumen de cobertura${fallo === null ? '' : `; la corrida no terminó: ${fallo}`})`,
+    );
     continue;
   }
   for (const [archivo, m] of Object.entries(cobertura)) {

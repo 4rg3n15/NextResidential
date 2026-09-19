@@ -263,6 +263,48 @@ diagnostico_movil() {
   sed 's/^/     /' <(tail -20 "$destino")
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# `diagnostico_recorrido` · el paso 5e, que hasta ahora no decía nada.
+#
+# PEDIDO POR EL USUARIO: «El 5e sigue sin diagnosticar. ¿Necesita la API
+# levantada? Si es así, que el paso lo compruebe y lo nombre.»
+#
+# **NO la necesita, y conviene que quede escrito aquí y no solo en un informe:**
+# `recorrido-web.mjs` levanta él mismo un servidor de guardarropa en
+# 127.0.0.1:$PUERTO_RECORRIDO que contesta las cinco rutas del residente y el
+# `token`. Si el 5e fallara por «la API está caída» sería un defecto del
+# recorrido, no del entorno.
+#
+# Lo que sí necesita —un Chromium que Playwright pueda lanzar y el puerto
+# libre— se comprueba ahora en el paso 1, con su remedio. Aquí se clasifica lo
+# que llegue, para que un fallo del RECORRIDO no se confunda con uno de la app.
+PUERTO_RECORRIDO="${NCR_PUERTO_RECORRIDO:-4599}"
+diagnostico_recorrido() {
+  local destino="$1"
+  echo "     comando   : node apps/mobile/e2e/recorrido-web.mjs"
+  echo "     directorio: $RAIZ_DEL_REPO"
+  echo "     navegador : ${NCR_CHROMIUM:-el que resuelva Playwright}"
+  echo "     puerto    : $PUERTO_RECORRIDO (guardarropa propio; NO usa la API real)"
+
+  if grep -qiE "no hay Chromium|Executable doesn't exist|browserType.launch" "$destino"; then
+    echo "     ► Esto es ENTORNO: falta el navegador. \`pnpm exec playwright install chromium\`."
+    echo "       El paso 1 lo nombra desde esta ronda."
+  elif grep -qiE "EADDRINUSE|address already in use" "$destino"; then
+    echo "     ► Esto es ENTORNO: el puerto $PUERTO_RECORRIDO está ocupado. Libérelo o"
+    echo "       exporte NCR_PUERTO_RECORRIDO. Vea el paso 1."
+  elif grep -qiE "no hay .build/web|ENOENT.*build/web" "$destino"; then
+    echo "     ► Esto es ENTORNO: la compilación web no dejó artefactos. Vea el fallo"
+    echo "       de \`flutter build web\` más arriba, no este."
+  elif grep -qiE "ECONNREFUSED" "$destino"; then
+    echo "     ► El guardarropa no llegó a escuchar. NO es la API: el recorrido no la usa."
+  else
+    echo "     ► Nada apunta al entorno: esto es la APP. Las líneas ✗ de abajo dicen"
+    echo "       en qué pantalla y con qué error de JavaScript se quedó."
+  fi
+  grep -E "✗" "$destino" | head -8 | sed 's/^/     /'
+  sed 's/^/     /' <(tail -15 "$destino")
+}
+
 paso "5b · app móvil: análisis estático de Dart"
 salida_movil="$(mktemp)"
 if ! hay_flutter; then
@@ -298,12 +340,20 @@ else
   rm -f "$salida_flutter"
 fi
 
-paso "5d · app móvil: cliente generado al día y ningún secreto en el binario"
+paso "5d · app móvil: cliente al día, sin secretos y sin dependencias a ciegas"
 if salida_secretos=$(node scripts/lib/flutter-sin-secretos.mjs 2>&1); then
   ok "$salida_secretos"
 else
   mal "la app nombra o incrusta algo que no puede viajar en un binario"
   echo "$salida_secretos" | sed 's/^/     /'
+fi
+# La acotación de `objective_c`: un `dependency_overrides` sin motivo escrito es
+# una versión congelada que nadie vuelve a mirar. Ver el propio control.
+if salida_acot=$(node scripts/lib/dependencias-acotadas.mjs 2>&1); then
+  ok "$salida_acot"
+else
+  mal "hay una dependencia acotada a ciegas"
+  echo "$salida_acot" | sed 's/^/     /'
 fi
 if ! hay_flutter; then
   mal "no hay SDK de Flutter ($FLUTTER_BIN): no se pudo comprobar si el cliente Dart está al día"
@@ -341,9 +391,7 @@ else
       ok "la app se recorre entera en el navegador, sin un error de JavaScript"
     else
       mal "el recorrido de la app falló"
-      echo "     comando   : node apps/mobile/e2e/recorrido-web.mjs"
-      echo "     directorio: $RAIZ_DEL_REPO"
-      grep -E "✗" "$salida_web" | head -6 | sed 's/^/     /'
+      diagnostico_recorrido "$salida_web"
     fi
   else
     mal "la app Flutter no compila para web"
@@ -375,10 +423,30 @@ paso "7 · umbrales de cobertura por capa (§2.4)"
 # ocurrió con `aplicacion`, que estaba al 79 % sin que nadie lo midiera.
 if salida_cob=$(con_limite "$LIMITE_LARGO" node scripts/lib/metricas.mjs 2>&1); then
   echo "$salida_cob" | grep -E "^  (OK|BAJO)" | sed 's/^/   /'
+  # Un paquete cuya corrida NO terminó —porque incumple SU PROPIO umbral, no el
+  # de §2.4— escribe el resumen igual, así que las capas se miden bien y el paso
+  # pasa. Pero callarlo lo convertía en un hallazgo invisible: `@ncr/providers`
+  # lleva desde la ETAPA 10 por debajo del 90 % que él mismo declara, y ninguna
+  # ejecución lo había dicho nunca. Se imprime, aunque no tumbe el paso.
+  grep -E "la corrida NO terminó" <<<"$salida_cob" | sed 's/^## /   aviso: /' || true
   ok "las tres capas cumplen su umbral"
 else
-  mal "alguna capa por debajo del umbral de §2.4"
-  echo "$salida_cob" | grep -E "^  (OK|BAJO)" | sed 's/^/     /'
+  # El motivo REAL, no una conjetura. `metricas.mjs` falla por tres razones
+  # distintas —un fichero que nadie ejecuta, un paquete que quedó fuera de la
+  # medición, o una capa bajo el umbral— y hasta esta ronda las tres se
+  # anunciaban como «alguna capa por debajo del umbral». Ocurrió: una corrida
+  # dejó `@ncr/api` sin resumen de cobertura, la capa de aplicación desapareció
+  # del informe en lugar de salir en rojo, y el mensaje mandaba a buscar un
+  # umbral incumplido que no existía. Es la misma clase de fallo que el usuario
+  # señaló en los pasos móviles: un mensaje que no nombra su causa.
+  if grep -q "QUEDARON FUERA de la medición" <<<"$salida_cob"; then
+    mal "un paquete quedó FUERA de la medición: no es una capa baja, es una capa que nadie midió"
+  elif grep -q "que NADIE ejecutó" <<<"$salida_cob"; then
+    mal "hay ficheros de prueba en disco que nadie ejecutó"
+  else
+    mal "alguna capa por debajo del umbral de §2.4"
+  fi
+  echo "$salida_cob" | grep -E "^  (OK|BAJO)|QUEDARON FUERA|NADIE ejecutó|^     - |SIN RESUMEN|SIN INFORME" | sed 's/^/     /'
 fi
 
 paso "8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)"
@@ -393,6 +461,17 @@ else
 fi
 
 paso "9 · pruebas negativas de los propios controles"
+# ANTES de ejecutarlas: ¿las hay para TODOS? Esta es la defensa genérica contra
+# la familia de veinte defectos «el control existe pero no comprueba lo que
+# crees». La lista de casos se mantenía a mano, así que un control nuevo podía
+# nacer, entrar aquí y reportar «✓» sin que nadie lo hubiera visto decir «✗».
+# Así nació D-81. Ahora los dos conjuntos se derivan del código y se comparan.
+if salida_cobertura_controles=$(node scripts/lib/controles-sin-prueba-negativa.mjs 2>&1); then
+  ok "$salida_cobertura_controles"
+else
+  mal "hay un control que el verificador ejecuta y nadie ha visto fallar"
+  echo "$salida_cobertura_controles" | sed 's/^/     /'
+fi
 # Un control que nadie ha visto fallar no está demostrado.
 if salida_neg=$(con_limite "$LIMITE_MEDIO" node scripts/lib/pruebas-negativas.mjs 2>&1); then
   ok "$(echo "$salida_neg" | tail -1)"
