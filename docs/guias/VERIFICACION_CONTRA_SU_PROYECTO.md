@@ -692,3 +692,191 @@ SELECT count(*) FROM public.viviendas WHERE copropiedad_id = '<su-id>' AND estad
 ```
 
 **Esperado:** el mismo número antes y después del cambio.
+
+---
+
+## 13 · La superficie del residente contra su base — ETAPA 11-B
+
+**Por qué este apartado existe y es el más importante de la ronda.** En 11-A la
+app del residente se probó entera contra un **doble en memoria**: 1.519 pruebas
+en verde, incluidas las del segundo eje de aislamiento. Al escribir 11-B se
+ejerció por primera vez el adaptador SQL contra PostgreSQL y aparecieron **dos
+consultas rotas** (D-89): una unía una tabla que no existe y otra leía una
+columna que no existe. Es decir: **ninguna lectura del residente funcionaba
+contra una base real** y ningún control lo decía.
+
+Está corregido y ahora hay una suite que lo vigila. Lo que sigue es cómo
+comprobarlo usted contra SU proyecto.
+
+### 13.1 · Aplicar la migración 0030
+
+```bash
+supabase db push
+```
+
+**Esperado:** la migración `0030_autorizacion_del_residente` aplicada, sin error.
+Añade dos cosas: la columna `clave_idempotencia` en `autorizaciones` con su
+índice único parcial, y la tabla `dispositivos_de_notificacion`.
+
+Compruébelo:
+
+```sql
+select column_name
+  from information_schema.columns
+ where table_name = 'autorizaciones' and column_name = 'clave_idempotencia';
+
+select indexname from pg_indexes where indexname = 'autorizaciones_idempotencia_uk';
+
+select count(*) from public.dispositivos_de_notificacion;
+```
+
+**Esperado:** una fila, una fila, y `0`. Si la tercera consulta da un error de
+permisos en vez de `0`, está usando una llave sujeta a RLS y **eso es correcto**:
+la política solo deja ver los aparatos propios.
+
+### 13.2 · Que el SQL del residente encaje con SU esquema
+
+Esta es la comprobación que faltaba en 11-A.
+
+```bash
+DATABASE_URL_PRUEBAS='postgresql://…' \
+  pnpm --filter @ncr/api exec vitest run test/residente-pg.test.ts
+```
+
+**Esperado:**
+
+```
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+```
+
+**Si ve `el SQL no encaja con el esquema migrado (42P01)`** falta una tabla: su
+base no tiene todas las migraciones. **Con `(42703)`** falta una columna: tiene
+una versión anterior del esquema. En los dos casos, vuelva a 13.1.
+
+**Si los cuatro se OMITEN**, no definió `DATABASE_URL_PRUEBAS`. Una omisión no
+es un verde: el paso 13 del verificador la exige.
+
+### 13.3 · Crear una visita desde la API, como la haría la app
+
+Con un token de un usuario con rol `residente` y vínculo activo:
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/autorizaciones" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "visitante": "Visitante de prueba",
+        "desde": "2026-09-20T14:00:00-05:00",
+        "hasta": "2026-09-20T18:00:00-05:00",
+        "acompanantes": ["Acompañante de prueba"],
+        "observaciones": "creada a mano para verificar",
+        "claveDeIdempotencia": "verificacion-manual-0001"
+      }'
+```
+
+**Esperado:** `{"creada":true,"id":"…","repetida":false,"motivo":null,"explicacion":null}`.
+
+**En ningún momento se envía la vivienda.** La deriva el servidor desde su
+identidad; el cliente no puede nombrarla. Si intenta añadir `viviendaId` al
+cuerpo recibirá **400**, porque el `ValidationPipe` corre con
+`forbidNonWhitelisted`.
+
+### 13.4 · La idempotencia, que es lo que hace seguro el modo sin conexión
+
+Repita **el mismo comando de 13.3, sin cambiar nada**.
+
+**Esperado:** `{"creada":true,"id":"<el MISMO id>","repetida":true,…}`.
+
+Si obtiene un `id` distinto, la migración 0030 no está aplicada o el índice
+único no existe: el reintento del ascensor crearía visitas duplicadas.
+
+Compruebe que solo hay una:
+
+```sql
+select count(*) from public.autorizaciones
+ where clave_idempotencia = 'verificacion-manual-0001';
+```
+
+**Esperado: `1`.**
+
+### 13.5 · Los rechazos, con su motivo tipado
+
+Vete a la persona y repita con otra clave:
+
+```sql
+insert into public.listas_negras (copropiedad_id, placa, motivo, creado_por, actualizado_por)
+values ('<su copropiedad>', 'ABC123', 'prueba de verificación', '<su usuario>', '<su usuario>');
+```
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/autorizaciones" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" -H 'Content-Type: application/json' \
+  -d '{"visitante":"Vetado","placa":"ABC123",
+       "desde":"2026-09-20T14:00:00-05:00","hasta":"2026-09-20T18:00:00-05:00",
+       "claveDeIdempotencia":"verificacion-vetado-0001"}'
+```
+
+**Esperado:**
+
+```json
+{
+  "creada": false,
+  "id": null,
+  "repetida": false,
+  "motivo": "LISTA_NEGRA",
+  "explicacion": "Esta persona está en la lista negra del conjunto. …"
+}
+```
+
+**Lo que importa de esa respuesta:** es un **200 con motivo**, no un 403. El
+residente tiene que poder distinguir «está vetada» de «su vivienda está
+inactiva», y una de las dos se arregla llamando a la administración. Un código
+de error no distingue.
+
+No olvide limpiar:
+
+```sql
+update public.listas_negras
+   set estado = 'levantada', levantada_en = now(),
+       levantada_por = '<su usuario>', motivo_levantamiento = 'fin de la prueba'
+ where motivo = 'prueba de verificación';
+```
+
+### 13.6 · Que un residente NO alcance la vivienda del vecino
+
+Con el token de un residente de la vivienda A, pida **todo**:
+
+```bash
+for r in vivienda familia vehiculos autorizaciones historial zonas; do
+  echo "== $r"
+  curl -s "$API/copropiedades/$COP/mi/$r" -H "Authorization: Bearer $TOKEN_RESIDENTE" | head -c 300
+  echo
+done
+```
+
+**Esperado:** seis respuestas `200`, y **ningún dato de otra vivienda**. Busque
+el identificador de una vivienda vecina en las salidas: no debe aparecer.
+
+`zonas` es la excepción declarada y está bien que lo sea: las zonas comunes son
+del conjunto, no de una vivienda (RN-14).
+
+### 13.7 · El token de notificaciones
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/notificaciones/aparatos" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" -H 'Content-Type: application/json' \
+  -d '{"instalacionId":"verificacion-manual","token":"token-de-prueba-0001","plataforma":"android"}'
+```
+
+**Esperado:** `{"id":"…"}`. Repítalo con otro `token` y el **mismo**
+`instalacionId`:
+
+```sql
+select count(*), max(token) from public.dispositivos_de_notificacion
+ where instalacion_id = 'verificacion-manual';
+```
+
+**Esperado: `1` fila y el token NUEVO.** Si aparecen dos filas, el `UPSERT` no
+está tomando el índice y cada arranque de la app dejaría un token muerto más al
+que se seguiría notificando.

@@ -2307,6 +2307,50 @@
         "tags": [
           "residente"
         ]
+      },
+      "post": {
+        "operationId": "MiController_crearAutorizacion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevaVisitaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitaCreadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Autorizo a un visitante de mi vivienda (HU-07, HU-08, HU-09, M-4)",
+        "tags": [
+          "residente"
+        ]
       }
     },
     "/copropiedades/{id}/mi/familia": {
@@ -2413,6 +2457,52 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/notificaciones/aparatos": {
+      "post": {
+        "operationId": "MiController_registrarAparato",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenDeNotificacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AparatoRegistradoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registro este aparato para recibir notificaciones (HU-34, M-7)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/vehiculos": {
       "get": {
         "operationId": "MiController_vehiculos",
@@ -2483,6 +2573,45 @@
           }
         ],
         "summary": "Mi vivienda, mi vínculo y si puedo autorizar (HU-33, M-1)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/zonas": {
+      "get": {
+        "operationId": "MiController_zonas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MiZonaDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Zonas comunes con aforo y horario en vivo (HU-19, M-5)",
         "tags": [
           "residente"
         ]
@@ -3773,6 +3902,18 @@
           "dispositivoId",
           "escaladaDentroDelPlazo",
           "notas"
+        ]
+      },
+      "AparatoRegistradoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
         ]
       },
       "AutorizacionDto": {
@@ -5627,6 +5768,47 @@
           "activa"
         ]
       },
+      "MiZonaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "aforoMaximo": {
+            "type": "number"
+          },
+          "ocupacionActual": {
+            "type": "number",
+            "description": "Ocupación de ESTE instante. La interfaz lo refleja; el aforo lo garantiza la base."
+          },
+          "abiertaAhora": {
+            "type": "boolean"
+          },
+          "franjasDeHoy": {
+            "description": "Franjas de hoy ya resueltas; una que cruza medianoche llega como dos (S-09).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FranjaDto"
+            }
+          },
+          "requiereAutorizacion": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "aforoMaximo",
+          "ocupacionActual",
+          "abiertaAhora",
+          "franjasDeHoy",
+          "requiereAutorizacion"
+        ]
+      },
       "MiembroDeFamiliaDto": {
         "type": "object",
         "properties": {
@@ -5671,6 +5853,71 @@
         },
         "required": [
           "notas"
+        ]
+      },
+      "NuevaVisitaDto": {
+        "type": "object",
+        "properties": {
+          "visitante": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "documento": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Documento; sin él, RN-06 solo cruza placa"
+          },
+          "desde": {
+            "type": "string",
+            "description": "Inicio de la vigencia, ISO-8601 con zona"
+          },
+          "hasta": {
+            "type": "string",
+            "description": "Fin de la vigencia, EXCLUIDO"
+          },
+          "placa": {
+            "type": "string",
+            "maxLength": 8,
+            "description": "Placa; se normaliza en la base"
+          },
+          "permiteAccesoVehicular": {
+            "type": "boolean",
+            "default": false
+          },
+          "acompanantes": {
+            "maxItems": 20,
+            "description": "Nombres, no un contador",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "zonasPermitidas": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observaciones": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "patron": {
+            "$ref": "#/components/schemas/PatronDeVisitaDto"
+          },
+          "claveDeIdempotencia": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "visitante",
+          "desde",
+          "hasta",
+          "claveDeIdempotencia"
         ]
       },
       "OrdenDeBloqueoDto": {
@@ -5867,6 +6114,38 @@
             "type": "number",
             "description": "Desfase UTC en minutos de la copropiedad; el patrón es local, no UTC.",
             "example": -300
+          }
+        },
+        "required": [
+          "dias",
+          "minutoInicio",
+          "minutoFin",
+          "desplazamientoUtcMinutos"
+        ]
+      },
+      "PatronDeVisitaDto": {
+        "type": "object",
+        "properties": {
+          "dias": {
+            "description": "0=domingo … 6=sábado",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "minutoInicio": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1440
+          },
+          "minutoFin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1440
+          },
+          "desplazamientoUtcMinutos": {
+            "type": "number",
+            "description": "Minutos respecto de UTC; Bogotá: -300"
           }
         },
         "required": [
@@ -6470,6 +6749,35 @@
           "dispositivoId"
         ]
       },
+      "TokenDeNotificacionDto": {
+        "type": "object",
+        "properties": {
+          "instalacionId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "description": "Identificador estable del aparato"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 4096
+          },
+          "plataforma": {
+            "type": "string",
+            "enum": [
+              "ios",
+              "android",
+              "web"
+            ]
+          }
+        },
+        "required": [
+          "instalacionId",
+          "token",
+          "plataforma"
+        ]
+      },
       "TotalesDeViviendasDto": {
         "type": "object",
         "properties": {
@@ -6610,6 +6918,47 @@
           "admitido",
           "conteo",
           "motivo"
+        ]
+      },
+      "VisitaCreadaDto": {
+        "type": "object",
+        "properties": {
+          "creada": {
+            "type": "boolean",
+            "description": "false = una regla de negocio lo impidió"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "repetida": {
+            "type": "boolean",
+            "description": "true = este era un reintento y se devolvió la autorización anterior (RN-17)"
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "LISTA_NEGRA",
+              "VIVIENDA_INACTIVA",
+              "SIN_NIVEL_DE_ACCESO",
+              "PLACA_DUPLICADA"
+            ],
+            "description": "Motivo TIPADO del rechazo (RN-06, RN-13, P-11, RN-04/CA-03)"
+          },
+          "explicacion": {
+            "type": "string",
+            "nullable": true,
+            "description": "El mismo motivo en castellano llano; lo escribe el dominio, no la pantalla"
+          }
+        },
+        "required": [
+          "creada",
+          "id",
+          "repetida",
+          "motivo",
+          "explicacion"
         ]
       },
       "VistaPreviaDeGeneracionDto": {

@@ -647,7 +647,8 @@ export interface paths {
         /** Las autorizaciones de mi vivienda (HU-07 lectura, M-1) */
         get: operations["MiController_autorizaciones"];
         put?: never;
-        post?: never;
+        /** Autorizo a un visitante de mi vivienda (HU-07, HU-08, HU-09, M-4) */
+        post: operations["MiController_crearAutorizacion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -688,6 +689,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/mi/notificaciones/aparatos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Registro este aparato para recibir notificaciones (HU-34, M-7) */
+        post: operations["MiController_registrarAparato"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/vehiculos": {
         parameters: {
             query?: never;
@@ -714,6 +732,23 @@ export interface paths {
         };
         /** Mi vivienda, mi vínculo y si puedo autorizar (HU-33, M-1) */
         get: operations["MiController_vivienda"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/zonas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Zonas comunes con aforo y horario en vivo (HU-19, M-5) */
+        get: operations["MiController_zonas"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1175,6 +1210,10 @@ export interface components {
             /** @description KPI-25 medido, no supuesto: null mientras no se haya escalado */
             escaladaDentroDelPlazo: boolean | null;
             notas: string | null;
+        };
+        AparatoRegistradoDto: {
+            /** Format: uuid */
+            id: string;
         };
         AutorizacionDto: {
             /** Format: uuid */
@@ -1784,6 +1823,18 @@ export interface components {
             /** @description RN-13: inactiva conserva lo vigente y no genera autorizaciones nuevas. */
             activa: boolean;
         };
+        MiZonaDto: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            aforoMaximo: number;
+            /** @description Ocupación de ESTE instante. La interfaz lo refleja; el aforo lo garantiza la base. */
+            ocupacionActual: number;
+            abiertaAhora: boolean;
+            /** @description Franjas de hoy ya resueltas; una que cruza medianoche llega como dos (S-09). */
+            franjasDeHoy: components["schemas"]["FranjaDto"][];
+            requiereAutorizacion: boolean;
+        };
         MiembroDeFamiliaDto: {
             /** Format: uuid */
             residenteId: string;
@@ -1796,6 +1847,25 @@ export interface components {
         };
         NotasDeAlertaDto: {
             notas: string;
+        };
+        NuevaVisitaDto: {
+            visitante: string;
+            /** @description Documento; sin él, RN-06 solo cruza placa */
+            documento?: string;
+            /** @description Inicio de la vigencia, ISO-8601 con zona */
+            desde: string;
+            /** @description Fin de la vigencia, EXCLUIDO */
+            hasta: string;
+            /** @description Placa; se normaliza en la base */
+            placa?: string;
+            /** @default false */
+            permiteAccesoVehicular: boolean;
+            /** @description Nombres, no un contador */
+            acompanantes?: string[];
+            zonasPermitidas?: string[];
+            observaciones?: string;
+            patron?: components["schemas"]["PatronDeVisitaDto"];
+            claveDeIdempotencia: string;
         };
         OrdenDeBloqueoDto: {
             /** Format: uuid */
@@ -1875,6 +1945,14 @@ export interface components {
              * @description Desfase UTC en minutos de la copropiedad; el patrón es local, no UTC.
              * @example -300
              */
+            desplazamientoUtcMinutos: number;
+        };
+        PatronDeVisitaDto: {
+            /** @description 0=domingo … 6=sábado */
+            dias: number[];
+            minutoInicio: number;
+            minutoFin: number;
+            /** @description Minutos respecto de UTC; Bogotá: -300 */
             desplazamientoUtcMinutos: number;
         };
         PatronDto: {
@@ -2075,6 +2153,13 @@ export interface components {
             /** Format: uuid */
             dispositivoId: string;
         };
+        TokenDeNotificacionDto: {
+            /** @description Identificador estable del aparato */
+            instalacionId: string;
+            token: string;
+            /** @enum {string} */
+            plataforma: "ios" | "android" | "web";
+        };
         TotalesDeViviendasDto: {
             activas: number;
             inactivas: number;
@@ -2122,6 +2207,21 @@ export interface components {
             admitido: boolean;
             conteo: number | null;
             motivo: string | null;
+        };
+        VisitaCreadaDto: {
+            /** @description false = una regla de negocio lo impidió */
+            creada: boolean;
+            /** Format: uuid */
+            id: string | null;
+            /** @description true = este era un reintento y se devolvió la autorización anterior (RN-17) */
+            repetida: boolean;
+            /**
+             * @description Motivo TIPADO del rechazo (RN-06, RN-13, P-11, RN-04/CA-03)
+             * @enum {string|null}
+             */
+            motivo: "LISTA_NEGRA" | "VIVIENDA_INACTIVA" | "SIN_NIVEL_DE_ACCESO" | "PLACA_DUPLICADA" | null;
+            /** @description El mismo motivo en castellano llano; lo escribe el dominio, no la pantalla */
+            explicacion: string | null;
         };
         VistaPreviaDeGeneracionDto: {
             total: number;
@@ -3421,6 +3521,31 @@ export interface operations {
             };
         };
     };
+    MiController_crearAutorizacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NuevaVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitaCreadaDto"];
+                };
+            };
+        };
+    };
     MiController_familia: {
         parameters: {
             query?: never;
@@ -3466,6 +3591,31 @@ export interface operations {
             };
         };
     };
+    MiController_registrarAparato: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenDeNotificacionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AparatoRegistradoDto"];
+                };
+            };
+        };
+    };
     MiController_vehiculos: {
         parameters: {
             query?: never;
@@ -3504,6 +3654,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MiInicioDto"];
+                };
+            };
+        };
+    };
+    MiController_zonas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiZonaDto"][];
                 };
             };
         };

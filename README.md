@@ -323,6 +323,45 @@ rondas antes que nadie ejercitaba. Así que la suite negativa corre bajo
 nadie**. Ese número **no puede subir**: añadir una rama sin ejercerla rompe la
 verificación en el mismo empujón que la añade. Bajarlo es libre.
 
+### La app del residente · qué añade y cómo se prueba
+
+**Qué añade.** La app Flutter del residente (`apps/mobile`) es la superficie de
+OE-02: el residente autoriza a su visitante desde el teléfono. En 11-A se
+construyeron la sesión, el aislamiento por vivienda y cinco pantallas; en 11-B,
+**el servidor que faltaba**: crear la visita con patrón de recurrencia,
+acompañantes nominales, zonas y observaciones; las zonas comunes con aforo y
+horario; y el registro del token de notificaciones.
+
+**Prerrequisitos.** La versión mínima de Flutter está en `.flutter-version` y el
+mínimo de Dart en `apps/mobile/pubspec.yaml`; el paso 1 del verificador
+comprueba las dos. En macOS hace falta además que
+`xcrun --sdk macosx --show-sdk-path` devuelva una ruta que exista.
+
+```bash
+cd apps/mobile
+flutter pub get
+flutter analyze          # sin hallazgos
+flutter test             # 93 pruebas
+flutter test --coverage  # umbrales por capa, que el paso 5c comprueba
+```
+
+**El cliente de la API se GENERA, nunca se escribe a mano** (§2.6). Tras tocar
+un controlador:
+
+```bash
+pnpm contrato && cd apps/mobile \
+  && dart run swagger_parser \
+  && dart run build_runner build --delete-conflicting-outputs
+```
+
+El paso 5d falla si el generado no coincide con el contrato, y `.gitignore` no
+lo excluye a propósito: un generado que nadie regenera describe la API de la
+semana pasada sin dar ningún error.
+
+**Y ningún secreto viaja en el binario.** Todo lo compilado en Flutter es
+extraíble; la llave publicable entra por `--dart-define` y la secreta no entra
+nunca. El paso 5d lo comprueba.
+
 ### Controles declarados no ejercidos
 
 Un control puede declararse **no ejercido** cuando su fallo es del entorno y no

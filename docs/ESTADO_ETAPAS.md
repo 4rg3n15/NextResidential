@@ -598,6 +598,34 @@ una por operador.
 
 ---
 
+### 11-B · primer bloque construido · 2026-09-19
+
+**El servidor del residente, que no existía.** `POST …/mi/autorizaciones`
+(vigencia, patrón, acompañantes nominales, zonas, observaciones), `GET
+…/mi/zonas` (aforo y horario) y `POST …/mi/notificaciones/aparatos` (token FCM).
+Migración **0030**: `clave_idempotencia` con índice único parcial y la tabla
+`dispositivos_de_notificacion` con su RLS por identidad.
+
+**Rechazos tipados con precedencia probada** (`puedeAutorizar` en el dominio):
+RN-06 > RN-13 > P-11 > RN-04/CA-03. Respuesta 200 con motivo y explicación, no 403. Segundo eje de aislamiento ampliado a las escrituras: 23 pruebas.
+
+**Cliente:** bandeja de salida con retroceso acotado y jitter, y validación de
+calidad de captura (CA-08). 93 pruebas de Dart.
+
+| ID       | Qué                                                                                                      | Estado        |
+| -------- | -------------------------------------------------------------------------------------------------------- | ------------- |
+| **D-89** | Dos consultas del adaptador del residente no existían en el esquema (`niveles_de_acceso`, `v.direccion`) | **Corregido** |
+
+**D-89 cambia cómo hay que leer 11-A:** ninguna lectura del residente funcionaba
+contra una base real, y la suite estaba en verde porque probaba un doble en
+memoria. Lo cierra `apps/api/test/residente-pg.test.ts`, que ejerce cada
+adaptador contra el esquema migrado.
+
+**NO entró en este bloque:** las pantallas M-4, M-5 y M-7 de Flutter, la captura
+con cámara y la medición de KPI-10.
+
+---
+
 ### Lo que queda para 11-B
 
 M-4 completa (patrón de recurrencia, acompañantes nominales, zonas, y los

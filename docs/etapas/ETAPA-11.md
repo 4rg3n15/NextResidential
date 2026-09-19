@@ -540,6 +540,90 @@ Y tres ejecuciones seguidas del recorrido completo, las tres en verde.
 
 ---
 
+## 8-B · ETAPA 11-B · el servidor del residente, y un hallazgo grave
+
+### El hallazgo primero · D-89, porque cambia cómo hay que leer 11-A
+
+Al ejercer por primera vez el adaptador SQL del residente contra PostgreSQL
+aparecieron **dos consultas rotas**:
+
+| Dónde                   | Qué decía                  | Qué existe       |
+| ----------------------- | -------------------------- | ---------------- |
+| `vinculoDe` (dos veces) | `public.niveles_de_acceso` | `niveles_acceso` |
+| `vivienda`              | `v.direccion`              | `cp.direccion`   |
+
+O sea: **ninguna lectura de la app del residente funcionaba contra una base
+real**. Y la suite estaba en verde —1.519 pruebas, incluidas las quince del
+segundo eje de aislamiento— porque todas montan la aplicación con un **doble en
+memoria** del directorio.
+
+El doble es correcto para lo que prueba: el filtro por vivienda vive en la capa
+de aplicación y el doble lo deja al desnudo. Lo que no puede hacer es conocer el
+esquema. Es la familia de siempre, con una forma nueva: **el control existe, es
+riguroso, y prueba el doble**.
+
+El cierre no es «revisar mejor»: es `apps/api/test/residente-pg.test.ts`, que
+ejecuta cada método de cada adaptador contra la base migrada y **falla si
+aparece un `42P01`, un `42703`, un `42883`, un `42804` o un `42P10`** —tabla,
+columna, función, tipo o referencia que no casan—. No necesita datos: con
+identificadores inventados, las consultas se ejecutan igual y lo que se juzga es
+si el esquema las admite. Encontró la segunda rotura a los diez minutos de
+existir.
+
+### Lo que se construyó
+
+**La superficie de ESCRITURA del residente**, que no existía. `POST
+…/mi/autorizaciones` crea la visita con vigencia, patrón de recurrencia,
+acompañantes **nominales**, zonas y observaciones, sin que el cliente pueda
+nombrar una vivienda. `GET …/mi/zonas` da el aforo y el horario. `POST
+…/mi/notificaciones/aparatos` registra el token de FCM.
+
+**Los rechazos, tipados y con precedencia probada.** `puedeAutorizar()` en el
+dominio decide entre RN-06, RN-13, P-11 y RN-04/CA-03, **en ese orden**, y hay
+una prueba por cada pareja en conflicto: con una vivienda inactiva y un
+visitante vetado a la vez, el residente lee «está en lista negra», que es lo
+que bloquea de verdad. La respuesta es **200 con motivo**, no un 403: un código
+de error no distingue «llame a la administración» de «esto no se arregla».
+
+**La idempotencia, de punta a punta.** La app genera la clave antes del primer
+intento; la columna nueva y su índice único parcial la sostienen en la base
+(ADR-04: la unicidad la garantiza la base, no un `SELECT` previo); el adaptador
+devuelve la autorización anterior ante una clave repetida, incluso cuando dos
+reintentos corren a la vez y uno pierde la carrera del índice.
+
+**En el cliente**, las dos piezas puras que 11-B necesita y que se prueban sin
+dispositivo: la **bandeja de salida** con retroceso exponencial acotado y jitter
+que resta —mil teléfonos recuperando cobertura a la vez no pueden golpear la API
+en el mismo milisegundo, que es justo lo que el rate limiting rechazaría—, y la
+**validación de calidad de captura** de CA-08, que devuelve **todos** los fallos
+y no el primero: con el primero, el residente repetiría la foto tres veces para
+tres problemas que ve de una sola vez.
+
+### El segundo eje, ampliado a las escrituras
+
+La suite de 11-A probaba lecturas. Una escritura mal acotada es peor: la lectura
+enseña la vida del vecino, la escritura **le abre la puerta**. Ahora la suite
+deriva también las escrituras del enrutador, y el día que añadí las tres rutas
+se puso roja sola —«rutas alcanzables por un residente SIN comprobación de
+vivienda»— antes de que yo escribiera ninguna prueba. Es exactamente lo que se
+le pidió en 11-A.
+
+| ID       | Qué                                                                                                          | Estado        |
+| -------- | ------------------------------------------------------------------------------------------------------------ | ------------- |
+| **D-89** | Dos consultas del adaptador del residente no existían en el esquema; la suite pasaba porque probaba el doble | **Corregido** |
+| **D-77** | `GET …/biometria/consentimientos/:id` sigue sin acotarse por titular                                         | **Abierto**   |
+| **S-22** | Sin documento del visitante, RN-06 solo cruza la lista negra por placa: media regla, que es más que ninguna  | `[SUPUESTO]`  |
+
+### Lo que NO entró en esta mitad
+
+Y conviene que esté escrito aquí y no solo en el chat: **las pantallas M-4, M-5
+y M-7 de Flutter, la captura con cámara y la medición de KPI-10 no se
+construyeron en esta ronda.** Lo que hay es el servidor que las sostiene, el
+cliente Dart regenerado desde el contrato y las dos piezas de dominio del
+cliente. Las pantallas son la ronda siguiente.
+
+---
+
 ## 9 · Qué debe hacer usted
 
 1. **Nada para que la suite corra.** Todo lo de esta mitad se verifica sin

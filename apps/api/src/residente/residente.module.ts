@@ -1,9 +1,26 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
-import { DIRECTORIO_DEL_RESIDENTE } from './aplicacion/puertos';
-import type { DirectorioDelResidente } from './aplicacion/puertos';
+import { RELOJ } from '@ncr/domain-core';
+import type { Reloj } from '@ncr/domain-core';
+import {
+  AUTORIZACIONES_DEL_RESIDENTE,
+  DIRECTORIO_DEL_RESIDENTE,
+  NOTIFICACIONES_DEL_RESIDENTE,
+  ZONAS_DEL_RESIDENTE,
+} from './aplicacion/puertos';
+import type {
+  AutorizacionesDelResidente,
+  DirectorioDelResidente,
+  NotificacionesDelResidente,
+  ZonasDelResidente,
+} from './aplicacion/puertos';
 import { DirectorioDelResidentePg } from './infraestructura/directorio-pg';
+import { AutorizacionesDelResidentePg } from './infraestructura/autorizaciones-pg';
+import { ZonasDelResidentePg } from './infraestructura/zonas-pg';
+import { NotificacionesDelResidentePg } from './infraestructura/notificaciones-pg';
+import { CrearMiAutorizacion } from './aplicacion/crear-mi-autorizacion';
+import { RegistrarMiAparato, VerMisZonas } from './aplicacion/casos-de-uso-11b';
 import {
   ResolverMiAmbito,
   VerMiFamilia,
@@ -56,6 +73,39 @@ export class ResidenteModule {
           inject: [ResolverMiAmbito, DIRECTORIO_DEL_RESIDENTE],
           useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente) =>
             new VerMisAutorizaciones(r, d),
+        },
+        {
+          provide: AUTORIZACIONES_DEL_RESIDENTE,
+          inject: [Pool],
+          useFactory: (pool: Pool) => new AutorizacionesDelResidentePg(pool, {}),
+        },
+        {
+          provide: ZONAS_DEL_RESIDENTE,
+          inject: [Pool],
+          useFactory: (pool: Pool) => new ZonasDelResidentePg(pool, {}),
+        },
+        {
+          provide: NOTIFICACIONES_DEL_RESIDENTE,
+          inject: [Pool],
+          useFactory: (pool: Pool) => new NotificacionesDelResidentePg(pool, {}),
+        },
+        {
+          provide: CrearMiAutorizacion,
+          inject: [ResolverMiAmbito, AUTORIZACIONES_DEL_RESIDENTE, RELOJ],
+          useFactory: (r: ResolverMiAmbito, a: AutorizacionesDelResidente, reloj: Reloj) =>
+            new CrearMiAutorizacion(r, a, reloj),
+        },
+        {
+          provide: VerMisZonas,
+          inject: [ResolverMiAmbito, ZONAS_DEL_RESIDENTE, RELOJ],
+          useFactory: (r: ResolverMiAmbito, z: ZonasDelResidente, reloj: Reloj) =>
+            new VerMisZonas(r, z, reloj),
+        },
+        {
+          provide: RegistrarMiAparato,
+          inject: [ResolverMiAmbito, NOTIFICACIONES_DEL_RESIDENTE],
+          useFactory: (r: ResolverMiAmbito, n: NotificacionesDelResidente) =>
+            new RegistrarMiAparato(r, n),
         },
         {
           provide: VerMiHistorial,

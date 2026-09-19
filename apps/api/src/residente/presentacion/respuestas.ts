@@ -113,3 +113,71 @@ export class MiEventoDto {
   })
   decididoPorEdge!: boolean;
 }
+
+/**
+ * M-4 · Lo que la app recibe al crear una visita.
+ *
+ * Es UN tipo para los dos desenlaces —creada y rechazada— y no dos códigos HTTP
+ * distintos con cuerpos distintos. La razón es la app: la pantalla tiene que
+ * pintar el rechazo **con su motivo**, y un 409 con un cuerpo de error genérico
+ * la habría obligado a leer texto para distinguir cuál de los cuatro era. El
+ * rechazo de una regla de negocio es una respuesta, no una avería.
+ */
+export class VisitaCreadaDto {
+  @ApiProperty({ type: Boolean, description: 'false = una regla de negocio lo impidió' })
+  creada!: boolean;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  id!: string | null;
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'true = este era un reintento y se devolvió la autorización anterior (RN-17)',
+  })
+  repetida!: boolean;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    enum: ['LISTA_NEGRA', 'VIVIENDA_INACTIVA', 'SIN_NIVEL_DE_ACCESO', 'PLACA_DUPLICADA'],
+    description: 'Motivo TIPADO del rechazo (RN-06, RN-13, P-11, RN-04/CA-03)',
+  })
+  motivo!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'El mismo motivo en castellano llano; lo escribe el dominio, no la pantalla',
+  })
+  explicacion!: string | null;
+}
+
+/** M-7 · HU-34 · confirmación del registro del aparato. */
+export class AparatoRegistradoDto {
+  @ApiProperty({ type: String, format: 'uuid' }) id!: string;
+}
+
+/** M-5 · HU-19 · una zona común tal como la ve el residente. */
+export class FranjaDto {
+  @ApiProperty({ type: String, format: 'date-time' }) desde!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) hasta!: string;
+}
+
+export class MiZonaDto {
+  @ApiProperty({ type: String, format: 'uuid' }) id!: string;
+  @ApiProperty({ type: String }) nombre!: string;
+  @ApiProperty({ type: Number }) aforoMaximo!: number;
+  @ApiProperty({
+    type: Number,
+    description:
+      'Ocupación de ESTE instante. La interfaz lo refleja; el aforo lo garantiza la base.',
+  })
+  ocupacionActual!: number;
+  @ApiProperty({ type: Boolean }) abiertaAhora!: boolean;
+  @ApiProperty({
+    type: [FranjaDto],
+    description: 'Franjas de hoy ya resueltas; una que cruza medianoche llega como dos (S-09).',
+  })
+  franjasDeHoy!: FranjaDto[];
+  @ApiProperty({ type: Boolean }) requiereAutorizacion!: boolean;
+}
