@@ -72,9 +72,29 @@ const correr = (paquete, dir) => {
      * «alguna capa por debajo del umbral», mandando a buscar una cobertura baja
      * que no existía. Ahora se guarda y se imprime.
      */
+    /**
+     * Y se guarda LA EVIDENCIA, no solo el tamaño.
+     *
+     * La primera versión contaba los bytes de cada flujo. Sirvió para descartar
+     * que el proceso muriera por `maxBuffer` —434 KB de salida no es un
+     * truncamiento— y no sirvió para nada más: el nombre de la prueba que falló
+     * estaba en esos 434 KB y no se imprimía ninguno. Aquí se quedan las líneas
+     * que lo dicen.
+     */
+    const salida = String(e.stdout ?? '');
+    const pistas = salida
+      .split('\n')
+      .filter((l) => /FAIL|AssertionError|✗|Tests\s+\d+ failed|Unhandled/.test(l))
+      .slice(0, 6);
     fallo =
       `${e.code ?? ''} ${e.signal ? `señal ${e.signal}` : ''} ${String(e.message).split('\n')[0]}`.trim() +
-      ` · ${(e.stdout ?? '').length} bytes por salida estándar, ${(e.stderr ?? '').length} por error`;
+      ` · ${salida.length} bytes por salida estándar, ${(e.stderr ?? '').length} por error` +
+      (pistas.length === 0
+        ? ' · sin líneas de fallo en la salida'
+        : `\n     ${pistas.join('\n     ')}`) +
+      (String(e.stderr ?? '').trim() === ''
+        ? ''
+        : `\n     error: ${String(e.stderr).trim().split('\n').slice(-3).join(' / ')}`);
   }
   const informe = existsSync(salida) ? JSON.parse(readFileSync(salida, 'utf8')) : null;
   const resumenPath = join(raiz, dir, 'coverage', 'coverage-summary.json');
