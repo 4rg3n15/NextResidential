@@ -1,0 +1,29 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Generación del CLIENTE DART desde el contrato OpenAPI.
+#
+# §2.6 lo exige y el documento de requisitos lo señala por su motivo: Dart es
+# el único componente que NO comparte tipos con el resto del monorepo. La
+# consola de Next.js importa los tipos del contrato generado por
+# `openapi-typescript` y el compilador la obliga; Dart no tiene esa red, así
+# que si el cliente se escribe a mano, la app y la API se separan en silencio y
+# el primer aviso es un campo nulo en producción.
+#
+# `swagger_parser` y no `openapi-generator`: aquel exige una JVM y descarga su
+# `.jar` en tiempo de construcción, lo que rompe el `--frozen-lockfile` de
+# §2.8.0 —una dependencia que no está en ningún lockfile— y obliga a instalar
+# Java en el CI. Este es una dependencia de desarrollo más del `pubspec.lock`.
+# Registrado como ADR-015.
+# ─────────────────────────────────────────────────────────────────────────────
+swagger_parser:
+  schema_path: ../../packages/contracts/openapi.json
+  output_directory: lib/infraestructura/api/generado
+  name: ncr_api
+  json_serializer: json_serializable
+  language: dart
+  client_postfix: Api
+  put_clients_in_folder: true
+  squash_clients: false
+  enums_to_json: true
+  unknown_enum_value: true
+  put_in_folder: false
+  replacement_rules: []

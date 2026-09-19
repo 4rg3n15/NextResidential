@@ -637,6 +637,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/mi/autorizaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Las autorizaciones de mi vivienda (HU-07 lectura, M-1) */
+        get: operations["MiController_autorizaciones"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/familia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Los residentes de mi vivienda (HU-02 lectura, M-2) */
+        get: operations["MiController_familia"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/historial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El historial de mi vivienda, con los filtros del mockup (HU-33, M-6) */
+        get: operations["MiController_historial"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/vehiculos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Los vehículos de mi vivienda (HU-05, HU-06 lectura, M-3) */
+        get: operations["MiController_vehiculos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/vivienda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mi vivienda, mi vínculo y si puedo autorizar (HU-33, M-1) */
+        get: operations["MiController_vivienda"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/padron/carga": {
         parameters: {
             query?: never;
@@ -1629,6 +1714,85 @@ export interface components {
             nitidez: number;
             iluminacion: number;
             proporcionRostro: number;
+        };
+        MiAutorizacionDto: {
+            /** Format: uuid */
+            id: string;
+            visitante: string;
+            tipo: string;
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
+            placa: string | null;
+            permiteAccesoVehicular: boolean;
+            estado: string;
+            acompanantes: number;
+        };
+        MiEventoDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            ocurridoEn: string;
+            tipo: string;
+            resultado: string | null;
+            /** @description El residente tiene derecho a entender la negación (mockup M-6). */
+            motivo: string | null;
+            metodo: string;
+            placaDetectada: string | null;
+            persona: string | null;
+            zona: string | null;
+            /** @description KPI-31 · decidido por el Edge: la app lo marca, no lo esconde. */
+            decididoPorEdge: boolean;
+        };
+        MiInicioDto: {
+            vivienda: components["schemas"]["MiViviendaDto"];
+            vinculo: components["schemas"]["MiVinculoDto"];
+            /** @description Si puede crear autorizaciones: exige vivienda activa (RN-13) y ser titular (RN-05). Lo decide el servidor; la app no repite la regla. */
+            puedeAutorizar: boolean;
+        };
+        MiVehiculoDto: {
+            /** Format: uuid */
+            id: string;
+            placa: string;
+            marca: string | null;
+            modelo: string | null;
+            color: string | null;
+            esPrincipal: boolean;
+            activo: boolean;
+        };
+        MiVinculoDto: {
+            /** Format: uuid */
+            residenteId: string;
+            esTitular: boolean;
+            /** @description P-11 · por defecto el más restrictivo mientras no se defina. */
+            nivelAcceso: string | null;
+        };
+        MiViviendaDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description El número, sin la palabra: «42». */
+            identificador: string;
+            agrupacion: string | null;
+            /** @description Cómo llama esta copropiedad a sus viviendas. */
+            etiquetaVivienda: string;
+            etiquetaAgrupacion: string;
+            direccion: string | null;
+            copropiedadNombre: string;
+            /** @description Alimentado externamente; Next Control no calcula cartera (S-01). */
+            estadoAdministrativo: string;
+            /** @description RN-13: inactiva conserva lo vigente y no genera autorizaciones nuevas. */
+            activa: boolean;
+        };
+        MiembroDeFamiliaDto: {
+            /** Format: uuid */
+            residenteId: string;
+            nombre: string;
+            parentesco: string | null;
+            esTitular: boolean;
+            nivelAcceso: string | null;
+            /** @description RN-19: el desactivado conserva historial. */
+            activo: boolean;
         };
         NotasDeAlertaDto: {
             notas: string;
@@ -3232,6 +3396,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InformeDto"];
+                };
+            };
+        };
+    };
+    MiController_autorizaciones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiAutorizacionDto"][];
+                };
+            };
+        };
+    };
+    MiController_familia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiembroDeFamiliaDto"][];
+                };
+            };
+        };
+    };
+    MiController_historial: {
+        parameters: {
+            query?: {
+                periodo?: "hoy" | "semana" | "mes" | "todo";
+                limite?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiEventoDto"][];
+                };
+            };
+        };
+    };
+    MiController_vehiculos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiVehiculoDto"][];
+                };
+            };
+        };
+    };
+    MiController_vivienda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiInicioDto"];
                 };
             };
         };

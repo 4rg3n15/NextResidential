@@ -67,6 +67,19 @@ const DIVERGENTES = [
     'arreglos indexados, o Node',
   ],
   [/\b(mapfile|readarray)\b/, '`mapfile`/`readarray` exigen bash 4', '`while read -r`'],
+  /**
+   * D-80 · `echo "$x" | grep -q` bajo `set -o pipefail` devuelve **141** cuando
+   * ENCUENTRA lo que busca: `grep -q` sale al primer acierto, `echo` recibe
+   * SIGPIPE y `pipefail` propaga ese 141. La condición se lee como falsa justo
+   * cuando acierta. En `verificar-etapa.sh` eso significaba informar «suite
+   * completa en verde» con pruebas en rojo. La salida es `grep -q … <<<"$x"`,
+   * que no crea tubería.
+   */
+  [
+    /echo\s+"\$\{?\w+\}?"\s*\|\s*grep\s+-\w*q/,
+    '`echo "$x" | grep -q` devuelve 141 al acertar si `pipefail` está activo (D-80)',
+    'grep -q … <<<"$x", sin tubería',
+  ],
   [
     /\$\{[A-Za-z_][A-Za-z0-9_]*(,,|\^\^)/,
     'conversión de mayúsculas `${x,,}` exige bash 4',

@@ -65,20 +65,22 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 | **07** | Zonas comunes: horario y aforo                      | Agregado `Zona`. **El aforo lo garantiza la base**: incremento atómico donde cero filas devueltas es el aforo superado. El horario que cruza la medianoche no reinicia el contador                                                                                |
 | **08** | Biometría con consentimiento                        | Ciclo completo bajo Ley 1581 de 2012. Sin consentimiento vigente del **titular** no hay sincronización, con tres cerrojos estructurales. La revocación suprime en la misma transacción. El vector se cifra con AES-256-GCM y **ninguna operación permite leerlo** |
 
-**Métricas al cierre de la ETAPA 08:** 645 pruebas en 53 ficheros · dominio 98,61 % líneas / 97,78 % ramas · aplicación 98,15 % · global 90,04 % (contenedor Linux)
+| **09** | Consola web de administración | Next.js + Tailwind con el preset derivado del mockup, los dos temas por parejas de tokens, cliente de API generado desde el contrato y recorrido del navegador que entra por contraseña, segundo factor y `aal2` |
+| **10** | Consolas de portería y guardia virtual | Dos consolas y no una: el portero atiende **una** puerta y la tiene delante; el operador de central atiende **varias copropiedades** y no ve ninguna. Exclusividad del canal de audio como máquina de estados **en el dominio**, y adaptador real de barrera |
+| **11-A** | App móvil Flutter del residente · primera mitad | La **superficie del residente**, que no existía, y el **segundo eje del aislamiento** —vivienda, además de copropiedad—. App Flutter con cliente Dart generado, sesión en el llavero, refresco al volver a primer plano y cinco de las ocho pantallas |
+
+**Métricas al cierre de la ETAPA 11-A:** ver el veredicto literal en [`docs/etapas/ETAPA-11.md`](docs/etapas/ETAPA-11.md) §6 · TypeScript y Dart se miden **por separado y por capa**, porque un agregado alto esconde una capa por debajo
 
 ### Próximas etapas
 
-| #   | Etapa                                   | Alcance                                                                                                            |
-| --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 09  | Consola web de administración           | Next.js + Tailwind. Dashboard, padrón, vehículos, visitantes, zonas, dispositivos, eventos e informes. Base de PWA |
-| 10  | Consolas operativas                     | Portería y guardia virtual multiproyecto, con video en vivo, intercom y apertura remota atribuida                  |
-| 11  | Aplicación móvil Flutter                | Las ocho pantallas del residente, con cliente generado desde OpenAPI                                               |
-| 12  | Edge Gateway                            | Operación autónoma sin conexión y reconciliación idempotente al reconectar                                         |
-| 13  | Auditoría de ciberseguridad             | Verificación y endurecimiento. No introduce la seguridad: la audita                                                |
-| 14  | Observabilidad, CI/CD, PWA y escritorio | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio                              |
-| 15  | **Integración Hikvision**               | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio                          |
-| 16  | Documentación técnica final             | Consolidación, README definitivo, OpenAPI navegable                                                                |
+| #    | Etapa                                    | Alcance                                                                                                                                                    |
+| ---- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 11-B | Aplicación móvil Flutter · segunda mitad | Registrar visitante (patrón, acompañantes nominales, zonas), zonas con aforo, notificaciones con FCM, cámara con validación de calidad y modo sin conexión |
+| 12   | Edge Gateway                             | Operación autónoma sin conexión y reconciliación idempotente al reconectar                                                                                 |
+| 13   | Auditoría de ciberseguridad              | Verificación y endurecimiento. No introduce la seguridad: la audita                                                                                        |
+| 14   | Observabilidad, CI/CD, PWA y escritorio  | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio                                                                      |
+| 15   | **Integración Hikvision**                | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio                                                                  |
+| 16   | Documentación técnica final              | Consolidación, README definitivo, OpenAPI navegable                                                                                                        |
 
 ### Pruebas con hardware
 
@@ -154,7 +156,7 @@ NextResidential/
 ├─ apps/
 │  ├─ api/            # NestJS — monolito modular hexagonal
 │  ├─ web/            # Next.js — consolas (ETAPA 09-10)
-│  ├─ mobile/         # Flutter — app del residente (ETAPA 11)
+│  ├─ mobile/         # Flutter — app del residente (ETAPA 11-A: cinco pantallas)
 │  └─ edge/           # Edge Gateway (ETAPA 12)
 ├─ packages/
 │  ├─ domain-core/    # dominio puro compartido API ↔ Edge
@@ -240,7 +242,17 @@ Endpoints de salud: `/health` (proceso vivo) y `/ready` (dependencias alcanzable
 pnpm --filter @ncr/api test
 pnpm --filter @ncr/domain-core test
 pnpm --filter @ncr/providers test
+
+# La app móvil va por su cuenta: es otro lenguaje y otro ejecutor.
+cd apps/mobile && flutter test --coverage
+node scripts/lib/cobertura-flutter.mjs   # cobertura POR CAPA, desde la raíz
 ```
+
+> **Por qué la app se mide aparte.** Dart es el único componente que no comparte
+> tipos con el resto: su cliente se **genera** desde el contrato OpenAPI y hay
+> un control que rompe el build si se queda atrás
+> (`scripts/lib/cliente-dart-desfasado.mjs`). Sumar sus líneas al porcentaje de
+> TypeScript daría un número más redondo y menos cierto.
 
 ### Verificación de etapa — obligatoria antes de cerrar
 
@@ -248,7 +260,29 @@ pnpm --filter @ncr/providers test
 ./scripts/verificar-etapa.sh
 ```
 
-Catorce pasos, y ninguno es decorativo. Con `--con-base` se añaden los tres que necesitan PostgreSQL:
+**Veinticinco pasos**, y ninguno es decorativo. Con `--con-base` se añaden los tres que necesitan PostgreSQL.
+
+Siete llegaron con la ETAPA 11-A y conviene saber por qué: **1** comprueba
+también **Flutter y Dart** —la versión mínima del framework vive en
+`.flutter-version`, como `.nvmrc` para Node, y el mínimo de Dart se lee de
+`apps/mobile/pubspec.yaml`—; **1c** ejerce la **escritura** en las rutas que las
+herramientas van a usar, creando y borrando un fichero de verdad en cada una;
+**1b** comprueba que
+`docs/ESTADO_ETAPAS.md` no se contradiga —la regla existía en prosa y se
+incumplió dos veces—, y **5b a 5e** miran `apps/mobile`, que hasta entonces no
+tocaba ningún paso: análisis estático de Dart, suite con cobertura por capa,
+cliente generado al día y sin secretos en el binario, y el **recorrido en un
+navegador de verdad**. Si falta el SDK de Flutter, esos pasos **fallan**; no se
+omiten.
+
+En **macOS**, el paso 1 comprueba además que `xcrun --sdk macosx --show-sdk-path`
+devuelva una ruta **que exista**: tener Xcode seleccionado no basta —un Xcode a
+medio instalar o sin licencia aceptada no tiene SDK—, y sin SDK no compila
+ningún paquete de Dart con `hook/build.dart`. Y comprueba los dos
+prerrequisitos del paso 5e: un **Chromium** que Playwright pueda lanzar
+(`pnpm exec playwright install chromium`) y el **puerto 4599 libre**. El
+recorrido **no necesita la API levantada**: levanta su propio servidor de
+guardarropa.
 
 | Paso | Verifica                                                                                                                                     |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -271,6 +305,39 @@ Catorce pasos, y ninguno es decorativo. Con `--con-base` se añaden los tres que
 El paso 14 se añadió en la ETAPA 07 tras una prueba HTTP intermitente: **una prueba intermitente es peor que una rota**, porque enseña a reejecutar hasta el verde y ese hábito acaba tapando defectos reales. Compara recuentos, ficheros, títulos en rojo y errores no manejados, y fuerza la ejecución para que el caché de Turborepo no reimprima los números de la primera corrida sin ejecutar nada.
 
 Los pasos 6 y 9 existen por experiencia directa: un fichero que no carga desaparece del recuento sin ponerse en rojo, y un control que nadie ha visto fallar no está demostrado.
+
+Y desde la ETAPA 11-A el paso 9 comprueba, **antes** de ejecutar las pruebas
+negativas, que las haya **para todos**. Veinte defectos de este proyecto son el
+mismo defecto —«el control existe pero no comprueba lo que crees»— y lo único
+que comparten es que nadie los había visto fallar. El control deriva del código
+qué controles ejecuta el verificador y cuáles invoca la suite negativa, y exige
+que el primer conjunto esté contenido en el segundo. Lo que falta es **deuda
+declarada con motivo escrito, y esa lista solo puede encoger**: si crece, o si
+una entrada deja de corresponder, el paso se pone rojo.
+
+**Granularidad de rama (ETAPA 11-B).** Tener «alguna» prueba negativa no basta:
+D-81 vivía en un fichero que la tenía desde la ETAPA 02, en una rama añadida dos
+rondas antes que nadie ejercitaba. Así que la suite negativa corre bajo
+`NODE_V8_COVERAGE` —cada proceso que lanza escribe su cobertura— y
+`ramas-de-los-controles.json` guarda, por control, **cuántos bloques no ejecuta
+nadie**. Ese número **no puede subir**: añadir una rama sin ejercerla rompe la
+verificación en el mismo empujón que la añade. Bajarlo es libre.
+
+### Controles declarados no ejercidos
+
+Un control puede declararse **no ejercido** cuando su fallo es del entorno y no
+del producto. Declarado no es desactivado: sigue **saliendo en cada ejecución**
+con su motivo, su fecha y la etapa en que se revisa, y **el veredicto lo dice**
+(«correcta CON 1 CONTROL DECLARADO NO EJERCIDO»). Además **caduca**: cuando la
+etapa de revisión se cierra en `docs/ESTADO_ETAPAS.md`, la declaración rompe la
+verificación y hay que ejercer el paso o volver a declararlo.
+
+| Paso | Declarado  | Revisión | Motivo                                                                                                                                                                       |
+| ---- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5e   | 2026-09-19 | ETAPA 14 | El motor de Flutter web no engancha el campo de contraseña bajo Chromium en macOS: el `<input>` recibe el texto y el widget no se entera. Reproducible en macOS, no en Linux |
+
+Los otros tres controles móviles —análisis estático, 72 pruebas con cobertura
+por capa, cliente generado sin diferencias ni secretos— **sí se ejercen**.
 
 ### Fronteras por mutación
 

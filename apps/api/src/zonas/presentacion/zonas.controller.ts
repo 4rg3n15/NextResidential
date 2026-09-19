@@ -147,7 +147,22 @@ export class ZonasController {
   }
 
   @Post(':zonaId/autorizaciones')
-  @Roles('administrador', 'superadministrador', 'residente')
+  /**
+   * **`residente` retirado de esta ruta — D-76, ETAPA 11-A.**
+   *
+   * Lo destapó el recorrido del segundo eje de aislamiento: el permiso se da a
+   * `dto.autorizacionId`, que llega en el CUERPO, y aquí solo se comprobaba la
+   * copropiedad. Un residente podía por tanto dar acceso a la piscina al
+   * visitante de su vecino —o a cualquiera de las autorizaciones del conjunto—
+   * con solo conocer su identificador. No es una fuga de lectura: es una
+   * escritura sobre el recurso de otra vivienda.
+   *
+   * Se deniega por defecto (§2.1.4) mientras la superficie propia del residente
+   * no tenga su ruta acotada por vivienda, que llega con la pantalla M-5 en
+   * 11-B. Retirar el rol no quita función a nadie: la app del residente aún no
+   * existe, y la consola de administración sigue entrando por aquí.
+   */
+  @Roles('administrador', 'superadministrador')
   @ApiOperation({ summary: 'Da permiso sobre la zona a una autorización (HU-19, HU-20)' })
   @ApiOkResponse({ type: PermisoDeZonaDto })
   async permiso(

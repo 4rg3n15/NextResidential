@@ -2270,6 +2270,224 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/autorizaciones": {
+      "get": {
+        "operationId": "MiController_autorizaciones",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MiAutorizacionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Las autorizaciones de mi vivienda (HU-07 lectura, M-1)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/familia": {
+      "get": {
+        "operationId": "MiController_familia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MiembroDeFamiliaDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Los residentes de mi vivienda (HU-02 lectura, M-2)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/historial": {
+      "get": {
+        "operationId": "MiController_historial",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "mes",
+              "enum": [
+                "hoy",
+                "semana",
+                "mes",
+                "todo"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MiEventoDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El historial de mi vivienda, con los filtros del mockup (HU-33, M-6)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/vehiculos": {
+      "get": {
+        "operationId": "MiController_vehiculos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MiVehiculoDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Los vehículos de mi vivienda (HU-05, HU-06 lectura, M-3)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/vivienda": {
+      "get": {
+        "operationId": "MiController_vivienda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiInicioDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mi vivienda, mi vínculo y si puedo autorizar (HU-33, M-1)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/padron/carga": {
       "post": {
         "operationId": "PadronController_cargar",
@@ -5173,6 +5391,275 @@
           "nitidez",
           "iluminacion",
           "proporcionRostro"
+        ]
+      },
+      "MiAutorizacionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "visitante": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true
+          },
+          "permiteAccesoVehicular": {
+            "type": "boolean"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "acompanantes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "visitante",
+          "tipo",
+          "desde",
+          "hasta",
+          "placa",
+          "permiteAccesoVehicular",
+          "estado",
+          "acompanantes"
+        ]
+      },
+      "MiEventoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ocurridoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "resultado": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true,
+            "description": "El residente tiene derecho a entender la negación (mockup M-6)."
+          },
+          "metodo": {
+            "type": "string"
+          },
+          "placaDetectada": {
+            "type": "string",
+            "nullable": true
+          },
+          "persona": {
+            "type": "string",
+            "nullable": true
+          },
+          "zona": {
+            "type": "string",
+            "nullable": true
+          },
+          "decididoPorEdge": {
+            "type": "boolean",
+            "description": "KPI-31 · decidido por el Edge: la app lo marca, no lo esconde."
+          }
+        },
+        "required": [
+          "id",
+          "ocurridoEn",
+          "tipo",
+          "resultado",
+          "motivo",
+          "metodo",
+          "placaDetectada",
+          "persona",
+          "zona",
+          "decididoPorEdge"
+        ]
+      },
+      "MiInicioDto": {
+        "type": "object",
+        "properties": {
+          "vivienda": {
+            "$ref": "#/components/schemas/MiViviendaDto"
+          },
+          "vinculo": {
+            "$ref": "#/components/schemas/MiVinculoDto"
+          },
+          "puedeAutorizar": {
+            "type": "boolean",
+            "description": "Si puede crear autorizaciones: exige vivienda activa (RN-13) y ser titular (RN-05). Lo decide el servidor; la app no repite la regla."
+          }
+        },
+        "required": [
+          "vivienda",
+          "vinculo",
+          "puedeAutorizar"
+        ]
+      },
+      "MiVehiculoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "placa": {
+            "type": "string"
+          },
+          "marca": {
+            "type": "string",
+            "nullable": true
+          },
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "esPrincipal": {
+            "type": "boolean"
+          },
+          "activo": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "placa",
+          "marca",
+          "modelo",
+          "color",
+          "esPrincipal",
+          "activo"
+        ]
+      },
+      "MiVinculoDto": {
+        "type": "object",
+        "properties": {
+          "residenteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "esTitular": {
+            "type": "boolean"
+          },
+          "nivelAcceso": {
+            "type": "string",
+            "nullable": true,
+            "description": "P-11 · por defecto el más restrictivo mientras no se defina."
+          }
+        },
+        "required": [
+          "residenteId",
+          "esTitular",
+          "nivelAcceso"
+        ]
+      },
+      "MiViviendaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "identificador": {
+            "type": "string",
+            "description": "El número, sin la palabra: «42»."
+          },
+          "agrupacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "etiquetaVivienda": {
+            "type": "string",
+            "description": "Cómo llama esta copropiedad a sus viviendas."
+          },
+          "etiquetaAgrupacion": {
+            "type": "string"
+          },
+          "direccion": {
+            "type": "string",
+            "nullable": true
+          },
+          "copropiedadNombre": {
+            "type": "string"
+          },
+          "estadoAdministrativo": {
+            "type": "string",
+            "description": "Alimentado externamente; Next Control no calcula cartera (S-01)."
+          },
+          "activa": {
+            "type": "boolean",
+            "description": "RN-13: inactiva conserva lo vigente y no genera autorizaciones nuevas."
+          }
+        },
+        "required": [
+          "id",
+          "identificador",
+          "agrupacion",
+          "etiquetaVivienda",
+          "etiquetaAgrupacion",
+          "direccion",
+          "copropiedadNombre",
+          "estadoAdministrativo",
+          "activa"
+        ]
+      },
+      "MiembroDeFamiliaDto": {
+        "type": "object",
+        "properties": {
+          "residenteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "parentesco": {
+            "type": "string",
+            "nullable": true
+          },
+          "esTitular": {
+            "type": "boolean"
+          },
+          "nivelAcceso": {
+            "type": "string",
+            "nullable": true
+          },
+          "activo": {
+            "type": "boolean",
+            "description": "RN-19: el desactivado conserva historial."
+          }
+        },
+        "required": [
+          "residenteId",
+          "nombre",
+          "parentesco",
+          "esTitular",
+          "nivelAcceso",
+          "activo"
         ]
       },
       "NotasDeAlertaDto": {

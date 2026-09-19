@@ -2,7 +2,9 @@ import { generateKeyPair, SignJWT, exportJWK } from 'jose';
 import type { JWK } from 'jose';
 import { Test } from '@nestjs/testing';
 import { DiscoveryModule, DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core';
-import { PATH_METADATA } from '@nestjs/common/constants';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { RequestMethod } from '@nestjs/common';
+import { CLAVE_ROLES } from '../src/comun/decoradores';
 import type { TestingModuleBuilder } from '@nestjs/testing';
 import express from 'express';
 import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
@@ -20,9 +22,11 @@ import type { Rol } from '../src/autenticacion/dominio/claims';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { FiltroGlobalDeExcepciones } from '../src/comun/filtros/filtro-global';
+import { COP_A, COP_B } from './constantes';
+import { DIRECTORIO_DEL_RESIDENTE } from '../src/residente/aplicacion/puertos';
+import { DirectorioDelResidenteEnMemoria } from './dobles/directorio-del-residente';
 
-export const COP_A = '10000000-0000-4000-8000-000000000001';
-export const COP_B = '10000000-0000-4000-8000-000000000002';
+export { COP_A, COP_B } from './constantes';
 
 export const configuracionDePrueba: Configuracion = {
   NODE_ENV: 'test',
@@ -165,6 +169,18 @@ export const crearApp = async (
         return catalogo;
       },
     })
+    /**
+     * El directorio del residente, con su doble en memoria y DOS VIVIENDAS
+     * pobladas en la misma copropiedad.
+     *
+     * Se sustituye aquí —y no en cada suite— porque el eje de aislamiento que
+     * la ETAPA 11 añade es residente contra residente DENTRO del mismo
+     * conjunto, y sin dos viviendas con datos distinguibles ese recorrido
+     * pasaría en verde con una implementación que solo filtrara por
+     * copropiedad. El adaptador PostgreSQL se ejerce aparte, contra base real.
+     */
+    .overrideProvider(DIRECTORIO_DEL_RESIDENTE)
+    .useFactory({ factory: () => new DirectorioDelResidenteEnMemoria() })
     .overrideProvider(ProveedorDeJwks)
     .useValue({
       // `obtener()` devuelve la función que `jose` usa para resolver la clave
@@ -326,3 +342,55 @@ export const rutasConMetadato = (app: INestApplication, clave: string): string[]
   }
   return [...rutas].sort();
 };
+
+/**
+ * Rutas que declaran un rol concreto en su `@Roles(...)`, **leído del código**.
+ *
+ * `rutasConMetadato` solo sirve para marcas booleanas; `CLAVE_ROLES` guarda un
+ * arreglo. Hace falta para el recorrido del segundo eje: la lista de rutas que
+ * un residente alcanza no se escribe en la prueba —envejecería en la primera
+ * que se añada— sino que se deriva del enrutador, y la suite exige que todas
+ * tengan su comprobación de vivienda.
+ */
+export const rutasConRol = (app: INestApplication, rol: Rol): RutaExpuesta[] => {
+  const descubrimiento = app.get(DiscoveryService);
+  const reflector = app.get(Reflector);
+  const escaner = new MetadataScanner();
+  const rutas: RutaExpuesta[] = [];
+
+  for (const envoltorio of descubrimiento.getControllers()) {
+    const { instance, metatype } = envoltorio;
+    if (!instance || !metatype) continue;
+    const prefijo = reflector.get<string>(PATH_METADATA, metatype) ?? '';
+    const prototipo = Object.getPrototypeOf(instance) as object;
+
+    for (const nombre of escaner.getAllMethodNames(prototipo)) {
+      const manejador = (instance as Record<string, unknown>)[nombre];
+      if (typeof manejador !== 'function') continue;
+      const roles =
+        reflector.get<string[]>(CLAVE_ROLES, manejador) ??
+        reflector.get<string[]>(CLAVE_ROLES, metatype) ??
+        [];
+      if (!roles.includes(rol)) continue;
+      const sufijo = reflector.get<string>(PATH_METADATA, manejador) ?? '';
+      const ruta = `/${[prefijo, sufijo].filter((p) => p !== '' && p !== '/').join('/')}`;
+      const metodo = METODOS.find(
+        (m) => reflector.get<unknown>(METHOD_METADATA, manejador) === m.codigo,
+      );
+      rutas.push({ metodo: metodo?.nombre ?? 'GET', ruta });
+    }
+  }
+  return rutas.sort((a, b) => `${a.metodo} ${a.ruta}`.localeCompare(`${b.metodo} ${b.ruta}`));
+};
+
+/**
+ * `METHOD_METADATA` de Nest guarda el verbo como número del enum
+ * `RequestMethod`. Se traduce aquí en vez de confiar en el orden del enum.
+ */
+const METODOS = [
+  { codigo: RequestMethod.GET, nombre: 'GET' },
+  { codigo: RequestMethod.POST, nombre: 'POST' },
+  { codigo: RequestMethod.PUT, nombre: 'PUT' },
+  { codigo: RequestMethod.DELETE, nombre: 'DELETE' },
+  { codigo: RequestMethod.PATCH, nombre: 'PATCH' },
+] as const;

@@ -33,3 +33,9 @@ next-env.d.ts
 
 # Claims que produce ./supabase/arranque-en-frio.sh; dependen de la base local.
 .arranque-en-frio.json
+
+# App Flutter: artefactos de compilacion y de analisis
+/apps/mobile/build/
+/apps/mobile/.dart_tool/
+/apps/mobile/coverage/
+/apps/mobile/.flutter-plugins-dependencies
