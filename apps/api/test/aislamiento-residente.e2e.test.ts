@@ -88,7 +88,7 @@ const RECORRIDAS: Record<string, { readonly esperaLista: boolean }> = {
  * | `GET /copropiedades/:id/mi/zonas`              | Igual, y por eso cuelga de `/mi` solo por comodidad de la app: lo que cambia respecto de la ruta de administración es el ROL, no el ámbito (11-B, M-5) |
  * | `…/biometria/consentimientos/:id/respuesta`    | La barrera es más fuerte que la vivienda: el agregado exige que responda **el titular del dato** (RN-10), y lo verifica el dominio, no el controlador |
  * | `…/biometria/consentimientos/:id/revocacion`   | Igual: solo el titular revoca (RN-11). Cubierto en `biometria.e2e.test.ts` |
- * | `GET …/biometria/consentimientos/:id`          | **D-77, declarado y no resuelto.** Devuelve estado, finalidad y canal de cualquier consentimiento del conjunto a quien conozca su UUID. No expone dato biométrico y el identificador no es enumerable, pero un residente no debería poder leer el consentimiento del visitante de su vecino. Se acota por titular en 11-B |
+ * | `GET …/biometria/consentimientos/:id`          | **D-77, cerrado en 11-B.** Ahora el rol `residente` solo lee el consentimiento cuyo titular es él, y lo que no es suyo responde 404 —no 403—, para no confirmar que existe. Probado en `biometria.e2e.test.ts` por los dos lados: el vecino no lo ve y el titular sí |
  *
  * Y una que estaba y ya no está: `POST …/zonas/:zonaId/autorizaciones`
  * (**D-76**), donde un residente podía dar acceso a una zona a la autorización
@@ -151,6 +151,23 @@ const ESCRITURAS_DEL_AMBITO: Record<string, { readonly cuerpo: Record<string, un
   },
 };
 
+/**
+ * La captura de rostro no entra en `ESCRITURAS_DEL_AMBITO` porque su ruta lleva
+ * un `:autorizacionId`, y eso cambia la pregunta: aquí el residente SÍ puede
+ * nombrar un recurso ajeno, así que lo que hay que demostrar no es dónde cae lo
+ * que crea, sino que nombrar el del vecino no sirve de nada. Tiene su propio
+ * bloque más abajo, con las dos direcciones.
+ */
+const RUTA_DE_ROSTRO = 'POST /copropiedades/:id/mi/autorizaciones/:autorizacionId/rostro';
+
+/** Una captura que pasa los umbrales, para que el rechazo no sea de calidad. */
+const ROSTRO_BUENO = {
+  vector: Buffer.from(new Uint8Array(64).fill(7)).toString('base64'),
+  medidas: { nitidez: 0.9, iluminacion: 0.5, rostrosDetectados: 1, proporcionRostro: 0.4 },
+  versionPolitica: 'v1.0',
+  suprimirEn: new Date(Date.now() + 8 * 3_600_000).toISOString(),
+};
+
 /** Relleno con forma de UUID para los parámetros que no son la copropiedad. */
 const OTRO_ID = '00000000-0000-4000-8000-0000000000ff';
 
@@ -194,6 +211,7 @@ describe('cobertura · la lista de rutas sale del CÓDIGO, no de esta prueba', (
         (clave) =>
           RECORRIDAS[clave] === undefined &&
           ESCRITURAS_DEL_AMBITO[clave] === undefined &&
+          clave !== RUTA_DE_ROSTRO &&
           !SIN_AMBITO_DE_VIVIENDA.has(clave),
       );
     expect(
@@ -445,6 +463,80 @@ describe('eje 2 · lo que el residente ESCRIBE cae en SU vivienda (11-B)', () =>
       const res = await enviar(clave.slice(5), COP_A, token, cuerpo);
       expect(res.status, `${clave} → ${res.status}`).toBe(404);
     }
+  });
+});
+
+describe('CU-02 · RN-10 · el rostro es de MI visitante, y el consentimiento es SUYO', () => {
+  /**
+   * Dos preguntas distintas, y las dos tienen que responderse aquí:
+   *
+   *   1. ¿Puede un residente capturar contra la autorización del vecino? No, y
+   *      la respuesta es 404: la consulta del titular filtra por vivienda, así
+   *      que no hay nada que un permiso olvidado pueda dejar pasar.
+   *   2. ¿A quién se le pide el consentimiento? Al VISITANTE. El residente no
+   *      puede nombrarlo —`titularId` no existe en el cuerpo— y el DTO rechaza
+   *      el intento de colarlo, porque `forbidNonWhitelisted` está activo.
+   */
+  const rutaPara = (autorizacionId: string) =>
+    `/copropiedades/:id/mi/autorizaciones/${autorizacionId}/rostro`;
+
+  const crearPara = async (token: string, clave: string) => {
+    const r = await enviar('/copropiedades/:id/mi/autorizaciones', COP_A, token, {
+      ...ESCRITURAS_DEL_AMBITO['POST /copropiedades/:id/mi/autorizaciones']?.cuerpo,
+      visitante: `Visitante de ${clave}`,
+      claveDeIdempotencia: clave,
+    });
+    expect(r.body.creada, JSON.stringify(r.body)).toBe(true);
+    return r.body.id as string;
+  };
+
+  it('el residente captura contra SU autorización y el consentimiento queda PENDIENTE', async () => {
+    const token = await tokenResidente(USUARIO_R1, COP_A);
+    const autorizacionId = await crearPara(token, 'rostro-propio-0001');
+
+    const res = await enviar(rutaPara(autorizacionId), COP_A, token, ROSTRO_BUENO);
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(res.body.aceptada).toBe(true);
+    expect(res.body.consentimientoId).not.toBeNull();
+    // Y lo que el residente lee es a quién se le pidió: no a él.
+    expect(res.body.titular).toBe('Visitante de rostro-propio-0001');
+  });
+
+  it('EL EJE 2 · contra la autorización del VECINO responde 404', async () => {
+    const tokenR2 = await tokenResidente(USUARIO_R2, COP_A);
+    const delVecino = await crearPara(tokenR2, 'rostro-del-vecino-0001');
+
+    const tokenR1 = await tokenResidente(USUARIO_R1, COP_A);
+    const res = await enviar(rutaPara(delVecino), COP_A, tokenR1, ROSTRO_BUENO);
+    expect(res.status, JSON.stringify(res.body)).toBe(404);
+  });
+
+  it('RN-10 · `titularId` en el cuerpo se rechaza; no se ignora en silencio', async () => {
+    // Ignorarlo también sería correcto en el efecto, y peor en la práctica: un
+    // cliente que lo enviara creería que sirvió.
+    const token = await tokenResidente(USUARIO_R1, COP_A);
+    const autorizacionId = await crearPara(token, 'rostro-con-titular-0001');
+    const res = await enviar(rutaPara(autorizacionId), COP_A, token, {
+      ...ROSTRO_BUENO,
+      titularId: USUARIO_R1,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('KPI-16 · el servidor vuelve a juzgar la calidad, y la mala NO crea nada', async () => {
+    // La validación de la app es para la persona, que puede repetir la foto
+    // ahí mismo. Esta es para el sistema, porque un cliente modificado se salta
+    // la primera.
+    const token = await tokenResidente(USUARIO_R1, COP_A);
+    const autorizacionId = await crearPara(token, 'rostro-malo-0001');
+    const res = await enviar(rutaPara(autorizacionId), COP_A, token, {
+      ...ROSTRO_BUENO,
+      medidas: { nitidez: 0.05, iluminacion: 0.02, rostrosDetectados: 3, proporcionRostro: 0.02 },
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.aceptada).toBe(false);
+    expect(res.body.motivos.length).toBeGreaterThan(1);
+    expect(res.body.consentimientoId).toBeNull();
   });
 });
 

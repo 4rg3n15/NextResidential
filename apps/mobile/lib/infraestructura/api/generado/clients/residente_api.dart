@@ -14,6 +14,8 @@ import '../models/mi_zona_dto.dart';
 import '../models/miembro_de_familia_dto.dart';
 import '../models/nueva_visita_dto.dart';
 import '../models/periodo.dart';
+import '../models/rostro_capturado_dto.dart';
+import '../models/rostro_de_mi_visitante_dto.dart';
 import '../models/token_de_notificacion_dto.dart';
 import '../models/visita_creada_dto.dart';
 
@@ -34,6 +36,14 @@ abstract class ResidenteApi {
   Future<VisitaCreadaDto> miControllerCrearAutorizacion({
     @Path('id') required String id,
     @Body() required NuevaVisitaDto body,
+  });
+
+  /// Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10)
+  @POST('/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/rostro')
+  Future<RostroCapturadoDto> miControllerCapturarRostro({
+    @Path('id') required String id,
+    @Path('autorizacionId') required String autorizacionId,
+    @Body() required RostroDeMiVisitanteDto body,
   });
 
   /// Los residentes de mi vivienda (HU-02 lectura, M-2)

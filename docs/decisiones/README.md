@@ -11,6 +11,18 @@ Registro de las decisiones de arquitectura del proyecto. Una decisión **aceptad
 | [ADR-005](ADR-005-inmutabilidad-por-permisos-de-base-de-datos.md)    | Inmutabilidad de eventos por permisos de base de datos      | Aceptada | ETAPA 00       |
 | [ADR-006](ADR-006-datos-y-estado-en-la-consola.md)                   | TanStack Query, y ninguna biblioteca de estado global       | Aceptada | ETAPA 09-A     |
 | [ADR-007](ADR-007-cliente-de-api-generado-con-openapi-typescript.md) | Cliente generado con `openapi-typescript` + `openapi-fetch` | Aceptada | ETAPA 09-A     |
+| [ADR-008](ADR-008-supabase-auth-como-mecanismo-autoritativo-de-mfa.md) | Supabase Auth es el único mecanismo de segundo factor       | Aceptada | ETAPA 09-A     |
+| [ADR-012](ADR-012-artefactos-de-turbo.md)                            | Cada tarea declara sus artefactos, también las que no producen ninguno | Aceptada | ETAPA 09-B |
+| [ADR-013](ADR-013-iconografia.md)                                    | Iconografía con Lucide, bajo licencia ISC                   | Aceptada | ETAPA 09-B     |
+| [ADR-014](ADR-014-modo-oscuro-por-parejas-de-tokens.md)              | El tema se declara como parejas de fondo y texto            | Aceptada | ETAPA 09-B     |
+| [ADR-015](ADR-015-cliente-dart-generado-con-swagger-parser.md)       | Cliente Dart con `swagger_parser` + `retrofit`, sin JVM      | Aceptada | ETAPA 11-A     |
+| [ADR-016](ADR-016-captura-biometrica-desde-la-app-del-residente.md)  | La captura del residente comparte el **caso de uso**, no el controlador (RN-10) | Aceptada | ETAPA 11-C |
+
+**Los números 009, 010 y 011 no existen** y no es un error de numeración que
+haya que corregir: se reservaron para decisiones de la 09-A que acabaron siendo
+consecuencias de ADR-006 y ADR-007, no decisiones propias. Renumerar los
+posteriores rompería las referencias que ya existen en el código y en los
+informes.
 
 **Formato.** Contexto → Decisión → Alternativas consideradas → Consecuencias (asumidas y a asumir) → Verificación → Contingencia.
 

@@ -31,20 +31,31 @@
 /// residente sin saber que lo que busca existe y aún no está.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../aplicacion/avisos_en_uso.dart';
+import '../aplicacion/envio_de_visitas.dart';
 import '../aplicacion/sesion_en_uso.dart';
 import '../configuracion/ambiente.dart';
+import '../infraestructura/camara/fuente_de_fotos.dart';
 import '../configuracion/tema.dart';
+import '../aplicacion/estado.dart';
+import '../dominio/entidades.dart';
 import '../dominio/puertos.dart';
 import 'controlador.dart';
 import 'pantallas/acceso.dart';
 import 'pantallas/familia.dart';
 import 'pantallas/historial.dart';
 import 'pantallas/inicio.dart';
+import 'pantallas/notificaciones.dart';
+import 'pantallas/nuevo_visitante.dart';
 import 'pantallas/perfil.dart';
-import 'pantallas/pendiente.dart';
+import 'pantallas/rostro_del_visitante.dart';
 import 'pantallas/vehiculos.dart';
+import 'pantallas/visitantes.dart';
+import 'pantallas/zonas.dart';
 
 /// Todo lo que la app necesita, construido una vez en `main`.
 class Dependencias {
@@ -53,12 +64,27 @@ class Dependencias {
     required this.sesion,
     required this.repositorio,
     required this.reloj,
+    required this.notificaciones,
+    required this.claves,
+    this.versionPoliticaBiometrica = 'v1.0',
   });
 
   final Ambiente ambiente;
   final SesionEnUso sesion;
   final RepositorioDelResidente repositorio;
   final Reloj reloj;
+  final FuenteDeNotificaciones notificaciones;
+
+  /// De dónde sale la clave de idempotencia de cada visita. Se inyecta porque
+  /// una clave que la pantalla fabricara al construirse cambiaría con cada
+  /// `setState`, y entonces dejaría de ser una clave de idempotencia. Y porque
+  /// una prueba necesita poder fijarla.
+  final String Function() claves;
+
+  /// Qué versión de la política de tratamiento se le muestra al titular. Queda
+  /// escrita en el consentimiento: sin ella no se puede demostrar QUÉ aceptó
+  /// quien aceptó, que es la mitad de lo que exige la Ley 1581.
+  final String versionPoliticaBiometrica;
 }
 
 class AppDelResidente extends StatelessWidget {
@@ -89,8 +115,19 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
   late final ControladorDeVista _inicio = controladorDeInicio(_repo);
   late final ControladorDeVista _familia = controladorDeFamilia(_repo);
   late final ControladorDeVista _vehiculos = controladorDeVehiculos(_repo);
-  late final ControladorDeVista _autorizaciones = controladorDeAutorizaciones(_repo);
+  late final ControladorDeVista<List<Autorizacion>> _autorizaciones =
+      controladorDeAutorizaciones(_repo);
   late final ControladorDeHistorial _historial = ControladorDeHistorial(_repo);
+  late final ControladorDeVista<List<ZonaComun>> _zonas = controladorDeZonas(_repo);
+  late final ControladorDeAvisos _avisos = ControladorDeAvisos(
+    fuente: widget.dependencias.notificaciones,
+    repositorio: _repo,
+    reloj: widget.dependencias.reloj,
+  );
+  late final EnvioDeVisitas _envio = EnvioDeVisitas(
+    repositorio: _repo,
+    reloj: widget.dependencias.reloj,
+  );
 
   RepositorioDelResidente get _repo => widget.dependencias.repositorio;
   SesionEnUso get _sesion => widget.dependencias.sesion;
@@ -103,14 +140,23 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // El estado de los avisos se pinta en Perfil como valor, no como widget con
+    // su propio `AnimatedBuilder`: así la tarjeta de Perfil no tiene que saber
+    // que existe un controlador detrás.
+    _avisos.addListener(_alCambiarAvisos);
     _autenticado = _sesion.haySesion;
     if (_autenticado) _cargarTodo();
   }
 
   @override
   void dispose() {
+    _avisos.removeListener(_alCambiarAvisos);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _alCambiarAvisos() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -143,15 +189,51 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     _vehiculos.cargarAhora();
     _autorizaciones.cargarAhora();
     _historial.cargarAhora();
+    _zonas.cargarAhora();
+    // El token de FCM rota solo. Si el registro solo ocurriera al entrar en la
+    // pantalla de notificaciones, dejaría de funcionar en silencio el día que
+    // rote y nadie se enteraría hasta que un visitante esperara en la portería.
+    unawaited(_avisos.asegurarRegistro());
+    // Y lo que quedó sin enviar se intenta ahora, que es cuando más probable es
+    // que haya red: acaba de volver la app a primer plano.
+    unawaited(_vaciarBandeja());
+  }
+
+  Future<void> _vaciarBandeja() async {
+    try {
+      final aceptados = await _envio.vaciar();
+      if (!mounted) return;
+      setState(() {});
+      if (aceptados > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              aceptados == 1
+                  ? 'Se envió 1 visita que estaba pendiente.'
+                  : 'Se enviaron $aceptados visitas que estaban pendientes.',
+            ),
+          ),
+        );
+        _autorizaciones.cargarAhora();
+      }
+    } on Fallo {
+      // La sesión murió a mitad del vaciado. Lo resuelve el refresco de primer
+      // plano; aquí lo que no puede pasar es que reviente el armazón entero.
+      if (mounted) setState(() {});
+    }
   }
 
   void _cerrarSesion() {
     // Olvidar ANTES de cerrar: si se cerrara primero y la app se redibujara con
     // los controladores llenos, los datos del residente anterior seguirían en
     // pantalla un instante. En un teléfono compartido eso es una fuga.
-    for (final c in [_inicio, _familia, _vehiculos, _autorizaciones, _historial]) {
+    for (final c in [_inicio, _familia, _vehiculos, _autorizaciones, _historial, _zonas]) {
       c.olvidar();
     }
+    // El token pertenece al aparato; el REGISTRO pertenece a la cuenta. Sin
+    // esto, la siguiente cuenta en el mismo teléfono no volvería a registrarse
+    // y creería que le avisarán.
+    _avisos.olvidar();
     _sesion.cerrar();
     setState(() {
       _autenticado = false;
@@ -160,6 +242,90 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
   }
 
   void _pedirAcceso() => setState(() => _autenticado = false);
+
+  /// Abre M-4. **La clave se genera aquí, al abrir el formulario**, y no dentro
+  /// de la pantalla: si la fabricara el widget, cada reconstrucción la
+  /// cambiaría y un reintento crearía una visita distinta en vez de recuperar
+  /// la anterior (RN-17).
+  Future<void> _crearVisitante() async {
+    final clave = widget.dependencias.claves();
+    final zonas = switch (_zonas.estado) {
+      ConDatos<List<ZonaComun>>(datos: final d) => d,
+      Cargando<List<ZonaComun>>(previo: final p) => p ?? const <ZonaComun>[],
+      Fallido<List<ZonaComun>>(previo: final p) => p ?? const <ZonaComun>[],
+      _ => const <ZonaComun>[],
+    };
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PantallaDeNuevoVisitante(
+          enviar: _enviarVisita,
+          zonas: zonas,
+          claveDeIdempotencia: clave,
+          alCapturarRostro: _capturarRostro,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    // Al volver se recarga aunque se haya encolado: la bandeja también cambió.
+    setState(() {});
+    _autorizaciones.cargarAhora();
+  }
+
+  /// El puente entre la pantalla y la bandeja. Traduce el desenlace del envío al
+  /// vocabulario de la pantalla, que no conoce la bandeja ni el repositorio.
+  Future<ResultadoDeEnvio> _enviarVisita(NuevaVisita visita) async {
+    try {
+      final desenlace = await _envio.enviar(visita);
+      return switch (desenlace) {
+        Aceptado(resultado: final r) => EnvioAceptado(repetida: r.repetida, id: r.id),
+        Rechazado(resultado: final r) => EnvioRechazado(r),
+        Pendiente() => const EnvioEncolado(),
+      };
+    } on Fallo catch (f) {
+      if (f.clase == ClaseDeFallo.sesionInvalida && mounted) {
+        _pedirAcceso();
+        Navigator.of(context).popUntil((r) => r.isFirst);
+      }
+      rethrow;
+    }
+  }
+
+  /// CU-02 · la foto cuelga de la AUTORIZACIÓN, no del residente: es de ahí de
+  /// donde el servidor deriva quién es el titular del dato (RN-10).
+  void _capturarRostro(String autorizacionId, String nombreDelVisitante) {
+    final camara = CamaraSimulada();
+    _abrir(
+      PantallaDeRostroDelVisitante(
+        nombreDelVisitante: nombreDelVisitante,
+        tomarFoto: camara.tomar,
+        versionPolitica: widget.dependencias.versionPoliticaBiometrica,
+        enviar: (foto) => _repo.capturarRostro(
+          autorizacionId: autorizacionId,
+          medidas: foto.medidas,
+          vector: foto.vector,
+          versionPolitica: widget.dependencias.versionPoliticaBiometrica,
+          // RN-11 · la plantilla no vive más que la visita. Sin este tope, un
+          // dato biométrico se quedaría en la terminal indefinidamente.
+          suprimirEn: widget.dependencias.reloj.ahora().add(const Duration(days: 1)),
+        ),
+      ),
+    );
+  }
+
+  void _abrirNotificaciones() {
+    _abrir(
+      AnimatedBuilder(
+        animation: _avisos,
+        builder: (_, _) => PantallaDeNotificaciones(
+          estado: _avisos.estado,
+          alActivar: _avisos.activar,
+          alReintentar: _avisos.reintentar,
+          ultimoRegistro: _avisos.ultimoRegistro,
+          detalleDelFallo: _avisos.detalleDelFallo,
+        ),
+      ),
+    );
+  }
 
   void _abrir(Widget pantalla) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => pantalla));
@@ -191,24 +357,16 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
         ),
         alAbrirVehiculos: () => setState(() => _pestana = 2),
       ),
-      const PantallaPendiente(
-        titulo: 'Visitantes',
-        pantalla: 'M-4',
-        detalle:
-            'Registrar un visitante —con su vigencia, sus acompañantes por nombre, el patrón de '
-            'recurrencia y las zonas que podrá usar— llega en la ETAPA 11-B. Es la pantalla más '
-            'crítica de la app y la única que escribe: se construye con la cámara, el modo sin '
-            'conexión y la medición de los 60 segundos de KPI-10.',
+      PantallaDeVisitantes(
+        controlador: _autorizaciones,
+        alPedirAcceso: _pedirAcceso,
+        alCrear: _crearVisitante,
+        pendientes: _envio.bandeja.pendientes,
+        alReintentarPendientes: _vaciarBandeja,
+        ahora: widget.dependencias.reloj.ahora(),
       ),
       PantallaDeVehiculos(controlador: _vehiculos, alPedirAcceso: _pedirAcceso),
-      const PantallaPendiente(
-        titulo: 'Zonas comunes',
-        pantalla: 'M-5',
-        detalle:
-            'El aforo en vivo y la solicitud de acceso llegan en la ETAPA 11-B. La API de zonas '
-            'existe desde la ETAPA 07; lo que falta es la ruta acotada por vivienda que sustituye '
-            'a la que se le retiró al residente por el defecto D-76.',
-      ),
+      PantallaDeZonas(controlador: _zonas, alPedirAcceso: _pedirAcceso),
       PantallaDePerfil(
         sesion: _sesion,
         controladorDeInicio: _inicio,
@@ -220,6 +378,8 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
         alAbrirHistorial: () => _abrir(
           PantallaDeHistorial(controlador: _historial, alPedirAcceso: _pedirAcceso),
         ),
+        alAbrirNotificaciones: _abrirNotificaciones,
+        estadoDeAvisos: _avisos.estado,
       ),
     ];
 

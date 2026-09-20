@@ -78,14 +78,14 @@
 | HU-09 | Residente           | Should | Autorización     | **05** · 11      | M-4 _(C-06: lista nominal)_           | —                  |
 | HU-10 | Residente           | Must   | Autorización     | **05** · 11      | M-4, W-05                             | CA-07              |
 | HU-11 | Residente           | Must   | Biometría        | **08** · 11      | _(M-02: pantalla por diseñar)_        | CA-08              |
-| HU-12 | **Visitante**       | Must   | Biometría        | **08**           | _(M-03: pantalla por diseñar)_        | CA-09              |
-| HU-13 | Sistema             | Must   | Biometría        | **08** · 11      | _(captura)_                           | CA-08              |
+| HU-12 | **Visitante**       | Must   | Biometría        | **08** · 11-C    | M-4 → captura _(el consentimiento se le pide a ÉL)_ | CA-09 |
+| HU-13 | Sistema             | Must   | Biometría        | **08** · 11-C    | M-4 → captura, con los consejos de calidad | CA-08         |
 | HU-14 | Sistema             | Must   | Biometría        | **08**           | —                                     | CA-10              |
 | HU-15 | Titular del dato    | Must   | Biometría        | **08**           | _(consentimiento + M-8)_              | CA-11              |
 | HU-16 | Sistema             | Must   | Motor de reglas  | **05**           | W-08, W-09                            | CA-12, CA-13       |
 | HU-17 | Sistema             | Must   | Motor de reglas  | **05** · 06      | W-02, W-08                            | —                  |
 | HU-18 | Administrador       | Must   | Zonas comunes    | **07** · 09      | W-06                                  | CA-15              |
-| HU-19 | Residente           | Should | Zonas comunes    | **07** · 11      | M-5 _(M-12: falta control en M-4)_    | —                  |
+| HU-19 | Residente           | Should | Zonas comunes    | **07** · 11-C    | M-5 · el aforo se refleja, no se reserva | —               |
 | HU-20 | Sistema             | Must   | Zonas comunes    | **07**           | W-06, M-5                             | CA-14              |
 | HU-21 | Portero             | Must   | Consola portería | **10**           | W-09                                  | —                  |
 | HU-22 | Portero             | Must   | Consola portería | **10**           | W-09 _(C-12: falta motivo)_           | CA-16, CA-17       |
@@ -100,7 +100,7 @@
 | HU-31 | Sistema             | Must   | Continuidad      | **12**           | —                                     | CA-22              |
 | HU-32 | Administrador       | Must   | Trazabilidad     | **06** · 09      | W-08, W-10                            | CA-23              |
 | HU-33 | Residente           | Should | App residente    | **11**           | M-1, M-6                              | —                  |
-| HU-34 | Residente           | Should | App residente    | **06** · 11      | M-7                                   | —                  |
+| HU-34 | Residente           | Should | App residente    | **06** · 11-C    | M-7 · cinco estados, no un interruptor | —                 |
 | HU-35 | Administrador       | Must   | Seguridad        | **05** · 09      | W-05, W-08                            | CA-13              |
 | HU-36 | Superadministrador  | Must   | Multiempresa     | **03** · 09      | W-01                                  | CA-24              |
 | HU-37 | Administrador       | Must   | Seguridad        | **03** · 09      | W-01 _(C-05: falta MFA)_              | CA-25              |
@@ -189,7 +189,7 @@ _(Las etapas 09 y 11 exponen historias implementadas en etapas anteriores; su co
 | KPI-07       | Respeto de vigencia                       | 0 ingresos fuera de rango           | **05**           | Cruce evento vs. vigencia                 | _(funcional)_ |
 | KPI-08       | Fidelidad de sincronización               | 100 % íntegras                      | **11** · 05      | 30 autorizaciones, campo a campo          | 09.3          |
 | KPI-09       | Latencia de propagación                   | < 5 s                               | **05** · 14      | Marcas de tiempo                          | 01.2          |
-| KPI-10       | Tiempo de autorización                    | < 60 s                              | **11**           | Usabilidad con 5 residentes               | 09.1          |
+| KPI-10       | Tiempo de autorización                    | < 60 s                              | **11-C**         | **Parte del sistema MEDIDA** (`kpi-10.e2e.test.ts`, p95 ≈ 5 ms de 60 000) + cronometraje con residentes reales, criterio en la guía §14.6 | 09.1 |
 | KPI-11       | Desacople de interfaz                     | 0 referencias fuera del proveedor   | **05** · 02 · 14 | Análisis estático en CI                   | 07.1          |
 | KPI-12       | Sustituibilidad del proveedor             | Suite verde con simulado            | **05** · 14      | Ejecución en CI                           | 07.2          |
 | KPI-13 **H** | Latencia de apertura                      | < 3 s                               | **15** · 05      | Marcas de tiempo del evento               | 01.1          |

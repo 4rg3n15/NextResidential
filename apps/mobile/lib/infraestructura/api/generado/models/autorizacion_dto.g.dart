@@ -23,7 +23,9 @@ AutorizacionDto _$AutorizacionDtoFromJson(Map<String, dynamic> json) =>
           .toList(),
       patron: json['patron'] == null
           ? null
-          : PatronDto.fromJson(json['patron'] as Map<String, dynamic>),
+          : PatronDeAutorizacionDto.fromJson(
+              json['patron'] as Map<String, dynamic>,
+            ),
       revocadaEn: json['revocadaEn'] == null
           ? null
           : DateTime.parse(json['revocadaEn'] as String),

@@ -19,7 +19,7 @@ ZonaDto _$ZonaDtoFromJson(Map<String, dynamic> json) => ZonaDto(
   dentroDeHorario: json['dentroDeHorario'] as bool,
   aforoCompleto: json['aforoCompleto'] as bool,
   horario: (json['horario'] as List<dynamic>)
-      .map((e) => FranjaDto.fromJson(e as Map<String, dynamic>))
+      .map((e) => FranjaDeHorarioDto.fromJson(e as Map<String, dynamic>))
       .toList(),
   desplazamientoUtcMinutos: json['desplazamientoUtcMinutos'] as num,
   reservasDelDia: (json['reservasDelDia'] as List<dynamic>)

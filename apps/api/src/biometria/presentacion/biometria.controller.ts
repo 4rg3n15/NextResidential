@@ -108,6 +108,28 @@ export class BiometriaController {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/consentimientos');
     const c = await this.consentimientos.porId(copropiedadId, consentimientoId);
     if (c === null) throw new NotFoundException('El consentimiento no existe');
+
+    /**
+     * D-77 · el residente solo ve el SUYO.
+     *
+     * El aislamiento por copropiedad ya estaba, y no bastaba: dentro del mismo
+     * conjunto, cualquier residente que conociera un UUID podía leer el estado
+     * del consentimiento de otra persona —si lo otorgó, si lo revocó y cuándo—.
+     * No hay dato biométrico ahí, pero sí hay un hecho sobre un tercero, y la
+     * Ley 1581 lo trata como dato personal.
+     *
+     * Es el mismo defecto que D-76: una ruta acotada por el PRIMER eje de
+     * aislamiento y no por el segundo. Se responde 404 y no 403 a propósito: un
+     * 403 confirmaría que ese consentimiento existe, que es la mitad de lo que
+     * el curioso quería averiguar.
+     *
+     * El personal operativo sí lo ve: es quien atiende la captura en la
+     * portería y necesita saber si puede sincronizar (RN-09).
+     */
+    if (ctx.rol === 'residente' && c.titularId !== (ctx.personaId ?? ctx.usuarioId)) {
+      throw new NotFoundException('El consentimiento no existe');
+    }
+
     return {
       id: c.id,
       estado: c.estado,

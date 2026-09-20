@@ -2353,6 +2353,60 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/rostro": {
+      "post": {
+        "operationId": "MiController_capturarRostro",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RostroDeMiVisitanteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RostroCapturadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/familia": {
       "get": {
         "operationId": "MiController_familia",
@@ -3972,7 +4026,7 @@
             "nullable": true,
             "allOf": [
               {
-                "$ref": "#/components/schemas/PatronDto"
+                "$ref": "#/components/schemas/PatronDeAutorizacionDto"
               }
             ]
           },
@@ -5250,7 +5304,7 @@
           "negados"
         ]
       },
-      "FranjaDto": {
+      "FranjaDeHorarioDto": {
         "type": "object",
         "properties": {
           "dia": {
@@ -5273,6 +5327,47 @@
           "minutoInicio",
           "minutoFin",
           "continuaDelDiaAnterior"
+        ]
+      },
+      "FranjaDeHoyDto": {
+        "type": "object",
+        "properties": {
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "desde",
+          "hasta"
+        ]
+      },
+      "FranjaDto": {
+        "type": "object",
+        "properties": {
+          "dia": {
+            "type": "number",
+            "description": "0 = domingo … 6 = sábado"
+          },
+          "minutoInicio": {
+            "type": "number"
+          },
+          "minutoFin": {
+            "type": "number"
+          },
+          "continuaDelDiaAnterior": {
+            "type": "boolean",
+            "description": "Continúa la franja del día anterior tras la medianoche"
+          }
+        },
+        "required": [
+          "dia",
+          "minutoInicio",
+          "minutoFin"
         ]
       },
       "GeneracionAplicadaDto": {
@@ -5501,6 +5596,37 @@
         "required": [
           "estado",
           "dependencias"
+        ]
+      },
+      "MedidasDeCapturaDto": {
+        "type": "object",
+        "properties": {
+          "nitidez": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "iluminacion": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "rostrosDetectados": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "proporcionRostro": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "nitidez",
+          "iluminacion",
+          "rostrosDetectados",
+          "proporcionRostro"
         ]
       },
       "MedidasDto": {
@@ -5792,7 +5918,7 @@
             "description": "Franjas de hoy ya resueltas; una que cruza medianoche llega como dos (S-09).",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/FranjaDto"
+              "$ref": "#/components/schemas/FranjaDeHoyDto"
             }
           },
           "requiereAutorizacion": {
@@ -6081,6 +6207,31 @@
           "viviendas"
         ]
       },
+      "PatronDeAutorizacionDto": {
+        "type": "object",
+        "properties": {
+          "dias": {
+            "description": "Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio).",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "horaInicio": {
+            "type": "string",
+            "example": "08:00"
+          },
+          "horaFin": {
+            "type": "string",
+            "example": "18:00"
+          }
+        },
+        "required": [
+          "dias",
+          "horaInicio",
+          "horaFin"
+        ]
+      },
       "PatronDeEntradaDto": {
         "type": "object",
         "properties": {
@@ -6153,31 +6304,6 @@
           "minutoInicio",
           "minutoFin",
           "desplazamientoUtcMinutos"
-        ]
-      },
-      "PatronDto": {
-        "type": "object",
-        "properties": {
-          "dias": {
-            "description": "Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio).",
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "horaInicio": {
-            "type": "string",
-            "example": "08:00"
-          },
-          "horaFin": {
-            "type": "string",
-            "example": "18:00"
-          }
-        },
-        "required": [
-          "dias",
-          "horaInicio",
-          "horaFin"
         ]
       },
       "PendientesDto": {
@@ -6664,6 +6790,77 @@
           "motivo"
         ]
       },
+      "RostroCapturadoDto": {
+        "type": "object",
+        "properties": {
+          "aceptada": {
+            "type": "boolean"
+          },
+          "motivos": {
+            "description": "Por qué no sirve la foto. Vacío cuando sí sirve.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "plantillaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "consentimientoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10)."
+          },
+          "titular": {
+            "type": "string",
+            "nullable": true,
+            "description": "A quién se le pidió: el visitante, no el residente que tomó la foto"
+          },
+          "calidad": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "aceptada",
+          "motivos",
+          "plantillaId",
+          "consentimientoId",
+          "titular",
+          "calidad"
+        ]
+      },
+      "RostroDeMiVisitanteDto": {
+        "type": "object",
+        "properties": {
+          "vector": {
+            "type": "string",
+            "description": "Plantilla derivada, en base64. Entra cifrada a la bóveda y no vuelve a salir.",
+            "maxLength": 262144
+          },
+          "medidas": {
+            "$ref": "#/components/schemas/MedidasDeCapturaDto"
+          },
+          "versionPolitica": {
+            "type": "string",
+            "description": "Versión de la política de tratamiento que se le mostró"
+          },
+          "suprimirEn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Cuándo se suprime la plantilla. RN-11: no más allá de la visita."
+          }
+        },
+        "required": [
+          "vector",
+          "medidas",
+          "versionPolitica",
+          "suprimirEn"
+        ]
+      },
       "SaludDto": {
         "type": "object",
         "properties": {
@@ -7102,7 +7299,7 @@
           "horario": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/FranjaDto"
+              "$ref": "#/components/schemas/FranjaDeHorarioDto"
             }
           },
           "desplazamientoUtcMinutos": {

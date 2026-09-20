@@ -20,6 +20,7 @@ import { AutorizacionesDelResidentePg } from './infraestructura/autorizaciones-p
 import { ZonasDelResidentePg } from './infraestructura/zonas-pg';
 import { NotificacionesDelResidentePg } from './infraestructura/notificaciones-pg';
 import { CrearMiAutorizacion } from './aplicacion/crear-mi-autorizacion';
+import { CapturarRostroDeMiVisitante } from './aplicacion/capturar-rostro-de-mi-visitante';
 import { RegistrarMiAparato, VerMisZonas } from './aplicacion/casos-de-uso-11b';
 import {
   ResolverMiAmbito,
@@ -29,6 +30,7 @@ import {
   VerMisVehiculos,
   VerMiVivienda,
 } from './aplicacion/casos-de-uso';
+import { BiometriaModule, CapturarRostro } from '../biometria';
 import { MiController } from './presentacion/mi.controller';
 
 /**
@@ -45,6 +47,13 @@ export class ResidenteModule {
   static registrar(): DynamicModule {
     return {
       module: ResidenteModule,
+      /**
+       * Se importa el MÓDULO de biometría, no sus interioridades: lo que entra
+       * aquí es `CapturarRostro`, que él exporta por su barril. El residente no
+       * toca la bóveda, ni los repositorios de plantillas, ni el proveedor de
+       * terminales — y no podría, porque no los inyecta.
+       */
+      imports: [BiometriaModule.registrar()],
       controllers: [MiController],
       providers: [
         {
@@ -94,6 +103,15 @@ export class ResidenteModule {
           inject: [ResolverMiAmbito, AUTORIZACIONES_DEL_RESIDENTE, RELOJ],
           useFactory: (r: ResolverMiAmbito, a: AutorizacionesDelResidente, reloj: Reloj) =>
             new CrearMiAutorizacion(r, a, reloj),
+        },
+        {
+          provide: CapturarRostroDeMiVisitante,
+          inject: [ResolverMiAmbito, AUTORIZACIONES_DEL_RESIDENTE, CapturarRostro],
+          useFactory: (
+            r: ResolverMiAmbito,
+            a: AutorizacionesDelResidente,
+            c: CapturarRostro,
+          ) => new CapturarRostroDeMiVisitante(r, a, c),
         },
         {
           provide: VerMisZonas,

@@ -114,3 +114,15 @@ class ControladorDeHistorial extends ControladorDeVista<List<EventoDeAcceso>> {
     await cargarAhora();
   }
 }
+
+/// M-5 · las zonas del conjunto con su aforo de AHORA.
+///
+/// Es una lectura más, sin máquina propia, y eso es deliberado: la pantalla
+/// **refleja**, no calcula. Si aquí hubiera lógica de «puede entrar», el aforo
+/// se estaría decidiendo en el teléfono, que es justo lo que la base garantiza
+/// y lo que §2.2 prohíbe a la capa de presentación.
+ControladorDeVista<List<ZonaComun>> controladorDeZonas(RepositorioDelResidente repo) =>
+    ControladorDeVista<List<ZonaComun>>(
+      leer: repo.misZonas,
+      estaVacio: (l) => l.isEmpty,
+    );

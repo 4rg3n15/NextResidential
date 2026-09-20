@@ -115,4 +115,53 @@ void main() {
     // Una alerta no lleva resultado (la base lo permite): no es una negación.
     expect(e(null).negado, isFalse);
   });
+
+  // ── Las piezas de 11-C ─────────────────────────────────────────────────
+  group('MotivoDeRechazo · la salida y el campo que señalar', () {
+    test('la placa duplicada es lo ÚNICO que el residente arregla él mismo', () {
+      // Los otros tres se resuelven llamando a la administración, y señalar un
+      // campo ahí sería mandarle a corregir algo que no está mal.
+      expect(MotivoDeRechazo.placaDuplicada.salida, SalidaDelRechazo.corrijaElFormulario);
+      expect(MotivoDeRechazo.placaDuplicada.campoAResaltar, 'placa');
+    });
+
+    test('los otros tres no señalan ningún campo', () {
+      for (final m in [
+        MotivoDeRechazo.listaNegra,
+        MotivoDeRechazo.viviendaInactiva,
+        MotivoDeRechazo.sinNivelDeAcceso,
+      ]) {
+        expect(m.salida, SalidaDelRechazo.hableConLaAdministracion, reason: m.name);
+        expect(m.campoAResaltar, isNull, reason: m.name);
+      }
+    });
+  });
+
+  group('ZonaComun · lo que la pantalla refleja', () {
+    ZonaComun z(int aforo, int ocupacion) => ZonaComun(
+          id: 'z',
+          nombre: 'Piscina',
+          aforoMaximo: aforo,
+          ocupacionActual: ocupacion,
+          abiertaAhora: true,
+          franjasDeHoy: const [],
+          requiereAutorizacion: false,
+        );
+
+    test('con el aforo configurado a la baja con gente dentro, dice LLENO', () {
+      // «-3 plazas» no significa nada para quien lo lee.
+      expect(z(10, 13).plazasLibres, -3);
+      expect(z(10, 13).lleno, isTrue);
+      expect(z(10, 13).ocupacionRelativa, 1.0);
+    });
+
+    test('sin aforo configurado no se inventa un porcentaje', () {
+      expect(z(0, 5).ocupacionRelativa, isNull);
+    });
+
+    test('justo en el límite ya está lleno, no «queda una»', () {
+      expect(z(10, 10).lleno, isTrue);
+      expect(z(10, 9).lleno, isFalse);
+    });
+  });
 }

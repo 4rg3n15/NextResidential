@@ -308,6 +308,9 @@ export class AutorizacionesDelResidenteEnMemoria implements AutorizacionesDelRes
 
   /** `copropiedad:vivienda` → autorizaciones creadas. */
   readonly creadas = new Map<string, { id: string; nueva: NuevaAutorizacion }[]>();
+
+  /** Identificadores únicos en todo el doble, no por vivienda. Ver abajo. */
+  private siguiente = 0;
   /** Se pueden torcer desde la prueba para ejercer cada regla. */
   hechos: HechosDeLaBase = {
     visitanteVetado: false,
@@ -333,9 +336,42 @@ export class AutorizacionesDelResidenteEnMemoria implements AutorizacionesDelRes
     const repetida = previas.find((p) => p.nueva.claveDeIdempotencia === nueva.claveDeIdempotencia);
     if (repetida !== undefined) return { ok: true, id: repetida.id, repetida: true };
 
-    const id = `40000000-0000-4000-8000-${String(previas.length + 1).padStart(12, '0')}`;
+    /**
+     * El contador es del DOBLE, no de la vivienda.
+     *
+     * Con `previas.length` la primera autorización de cada vivienda recibía el
+     * mismo identificador, y entonces R1 nombrando el de su vecino encontraba
+     * el suyo: la prueba del segundo eje pasaba sin demostrar nada. Un doble
+     * que reparte identificadores ambiguos no es más simple, es menos capaz de
+     * detectar el fallo que la prueba busca.
+     */
+    this.siguiente += 1;
+    const id = `40000000-0000-4000-8000-${String(this.siguiente).padStart(12, '0')}`;
     this.creadas.set(clave, [...previas, { id, nueva }]);
     return { ok: true, id, repetida: false };
+  }
+
+  /**
+   * El titular del dato biométrico: el visitante de ESA autorización, buscado
+   * solo dentro del ámbito. El doble lo hace igual que el adaptador —filtrando
+   * por `copropiedad:vivienda` antes de mirar el identificador— porque si
+   * buscara en todas las viviendas, la prueba del segundo eje pasaría con un
+   * adaptador roto.
+   */
+  async titularDeLaAutorizacion(
+    ambito: AmbitoDelResidente,
+    autorizacionId: string,
+  ): Promise<{ readonly personaId: string; readonly nombre: string } | null> {
+    const clave = `${ambito.copropiedadId}:${ambito.viviendaId}`;
+    const suya = (this.creadas.get(clave) ?? []).find((a) => a.id === autorizacionId);
+    if (suya === undefined) return null;
+    return {
+      // El titular es una persona DISTINTA del residente: es lo que RN-10
+      // separa, y un doble que devolviera al residente haría pasar la prueba
+      // que existe para impedirlo.
+      personaId: `70000000-0000-4000-8000-${autorizacionId.slice(-12)}`,
+      nombre: suya.nueva.visitante,
+    };
   }
 }
 

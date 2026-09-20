@@ -4,22 +4,22 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
-part 'patron_dto.g.dart';
+part 'patron_de_autorizacion_dto.g.dart';
 
 @JsonSerializable()
-class PatronDto {
-  const PatronDto({
+class PatronDeAutorizacionDto {
+  const PatronDeAutorizacionDto({
     required this.dias,
     required this.horaInicio,
     required this.horaFin,
   });
   
-  factory PatronDto.fromJson(Map<String, Object?> json) => _$PatronDtoFromJson(json);
+  factory PatronDeAutorizacionDto.fromJson(Map<String, Object?> json) => _$PatronDeAutorizacionDtoFromJson(json);
   
   /// Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio).
   final List<num> dias;
   final String horaInicio;
   final String horaFin;
 
-  Map<String, Object?> toJson() => _$PatronDtoToJson(this);
+  Map<String, Object?> toJson() => _$PatronDeAutorizacionDtoToJson(this);
 }

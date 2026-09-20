@@ -12,6 +12,9 @@
 /// exactamente lo que hay que construir.
 library;
 
+import 'dart:typed_data';
+
+import 'calidad_de_captura.dart';
 import 'entidades.dart';
 import 'sesion.dart';
 
@@ -51,6 +54,46 @@ abstract interface class RepositorioDelResidente {
   Future<List<Vehiculo>> misVehiculos();
   Future<List<Autorizacion>> misAutorizaciones();
   Future<List<EventoDeAcceso>> miHistorial(PeriodoDeHistorial periodo);
+
+  /// M-5 · las zonas del conjunto con su aforo y su horario de AHORA.
+  Future<List<ZonaComun>> misZonas();
+
+  /// M-4 · crea la visita. **No lanza ante un rechazo de negocio**: devuelve
+  /// `VisitaRechazada` con su motivo. Lanzar habría obligado a la pantalla a
+  /// interrogar al error para distinguir los cuatro motivos, que es justo lo
+  /// que el tipo de retorno evita.
+  Future<ResultadoDeVisita> crearVisita(NuevaVisita visita);
+
+  /// M-7 · HU-34 · registra este aparato para recibir avisos.
+  Future<void> registrarAparato(AparatoDeNotificaciones aparato);
+
+  /// HU-12 · HU-13 · CU-02 · el rostro de MI visitante.
+  ///
+  /// **No recibe titular y esa ausencia es la regla.** El servidor lo deriva de
+  /// la autorización (RN-10): si la app pudiera nombrarlo, podría pedirle el
+  /// consentimiento a quien quisiera.
+  Future<ResultadoDeCaptura> capturarRostro({
+    required String autorizacionId,
+    required MedidasDeCaptura medidas,
+    required Uint8List vector,
+    required String versionPolitica,
+    required DateTime suprimirEn,
+  });
+}
+
+/// De dónde sale el identificador estable del aparato y su token de FCM.
+///
+/// Es un puerto y no una llamada directa a Firebase por lo de siempre: el
+/// dominio no sabe qué es FCM, y sin esta frontera no habría forma de probar el
+/// registro sin un teléfono con Google Play. El adaptador real llega con la
+/// integración de Firebase; el simulado permite ejercer el flujo entero.
+abstract interface class FuenteDeNotificaciones {
+  /// Pide permiso al sistema. `false` = el residente lo negó, y eso **no es un
+  /// error**: es un estado que la pantalla tiene que saber pintar.
+  Future<bool> pedirPermiso();
+
+  /// `null` si no hay permiso o el servicio no está disponible.
+  Future<AparatoDeNotificaciones?> aparato();
 }
 
 /// Dónde vive la sesión. El adaptador usa Keychain en iOS y Keystore en

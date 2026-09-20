@@ -959,3 +959,165 @@ select count(*), max(token) from public.dispositivos_de_notificacion
 **Esperado: `1` fila y el token NUEVO.** Si aparecen dos filas, el `UPSERT` no
 está tomando el índice y cada arranque de la app dejaría un token muerto más al
 que se seguiría notificando.
+
+---
+
+## 14 · Las pantallas, la cámara y el KPI — ETAPA 11-C
+
+Siete comprobaciones. **La 14.2 y la 14.6 son las prioritarias**: la primera es
+la que separa dos personas ante la ley, y la segunda es el único número del KPI
+que no puedo medir yo.
+
+Se usan las mismas variables de §13 (`API`, `COP`, `TOKEN_RESIDENTE`). Añada la
+del vecino, que hace falta en 14.2:
+
+```bash
+TOKEN_VECINO=<token de un residente de OTRA vivienda del mismo conjunto>
+```
+
+### 14.1 · La visita se crea y devuelve su identificador
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/autorizaciones" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" -H 'Content-Type: application/json' \
+  -d '{"visitante":"Plomero de prueba","desde":"'"$(date -u -d '+5 min' +%FT%TZ 2>/dev/null || date -u -v+5M +%FT%TZ)"'","hasta":"'"$(date -u -d '+4 hours' +%FT%TZ 2>/dev/null || date -u -v+4H +%FT%TZ)"'","acompanantes":["Ayudante"],"zonasPermitidas":[],"claveDeIdempotencia":"verificacion-14-1-0001"}'
+```
+
+**Esperado:** `{"creada":true,"id":"<uuid>","repetida":false,…}`. Guarde el
+identificador:
+
+```bash
+AUT=<el uuid devuelto>
+```
+
+### 14.2 · **[PRIORITARIO]** El rostro es del visitante, no del residente (RN-10)
+
+Es la comprobación que sostiene la Ley 1581 en esta superficie. Tres partes:
+
+**a · su propio visitante sí.**
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/autorizaciones/$AUT/rostro" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" -H 'Content-Type: application/json' \
+  -d '{"vector":"'"$(head -c 64 /dev/urandom | base64 | tr -d '\n')"'","medidas":{"nitidez":0.9,"iluminacion":0.5,"rostrosDetectados":1,"proporcionRostro":0.4},"versionPolitica":"v1.0","suprimirEn":"'"$(date -u -d '+1 day' +%FT%TZ 2>/dev/null || date -u -v+1d +%FT%TZ)"'"}'
+```
+
+**Esperado:** `{"aceptada":true,"consentimientoId":"…","titular":"Plomero de
+prueba",…}`. Mire el `titular`: **es el visitante**. Si apareciera su nombre de
+residente, el consentimiento se le estaría pidiendo a la persona equivocada.
+
+**b · el visitante del VECINO, no.** Con el mismo cuerpo, cambiando el token:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  "$API/copropiedades/$COP/mi/autorizaciones/$AUT/rostro" \
+  -H "Authorization: Bearer $TOKEN_VECINO" -H 'Content-Type: application/json' \
+  -d '{"vector":"'"$(head -c 64 /dev/urandom | base64 | tr -d '\n')"'","medidas":{"nitidez":0.9,"iluminacion":0.5,"rostrosDetectados":1,"proporcionRostro":0.4},"versionPolitica":"v1.0","suprimirEn":"'"$(date -u -d '+1 day' +%FT%TZ 2>/dev/null || date -u -v+1d +%FT%TZ)"'"}'
+```
+
+**Esperado: `404`.** No 403: un 403 confirmaría que esa autorización existe, que
+es la mitad de lo que alguien querría averiguar.
+
+**c · `titularId` en el cuerpo se rechaza.** Repita (a) añadiendo
+`"titularId":"<cualquier uuid>"`.
+
+**Esperado: `400`**, con un mensaje que nombra la propiedad. Si respondiera
+`201`, el campo se estaría ignorando en silencio y un cliente que lo enviara
+creería que sirvió.
+
+### 14.3 · Sin consentimiento no hay sincronización (RN-09)
+
+Con el `consentimientoId` que devolvió 14.2:
+
+```sql
+select estado from public.consentimientos_biometricos where id = '<consentimientoId>';
+```
+
+**Esperado: `pendiente`.** Y en la app: la pantalla dice «Pendiente de que
+&lt;visitante&gt; acepte» y **no hay ninguna casilla** con la que el residente
+pueda aceptar por él. Si la hubiera, sería la firma de otro en un papel.
+
+### 14.4 · **[PRIORITARIO]** Reintentar no duplica visitas (RN-17)
+
+Es la comprobación del modo sin conexión. Repita 14.1 **tal cual**, con la misma
+`claveDeIdempotencia`:
+
+**Esperado:** `{"creada":true,"id":"<el MISMO uuid>","repetida":true}`. Y en la
+base:
+
+```sql
+select count(*) from public.autorizaciones where clave_idempotencia = 'verificacion-14-1-0001';
+```
+
+**Esperado: `1`.** Si fueran dos, un residente en el ascensor con mala cobertura
+crearía tres visitas idénticas y el portero vería tres autorizaciones.
+
+Para verlo desde la app: active el modo avión, cree una visita, **verá «Quedó
+pendiente de enviarse» y NO «creada»**, y en la pestaña Visitantes aparecerá el
+recuadro «1 sin enviar» separado de la lista. Quite el modo avión, vuelva a
+primer plano y la visita pasa a la lista con un aviso de cuántas se enviaron.
+
+### 14.5 · El aforo refleja, no reserva
+
+En la pestaña Zonas:
+
+```bash
+curl -s "$API/copropiedades/$COP/mi/zonas" -H "Authorization: Bearer $TOKEN_RESIDENTE" | head -c 400
+```
+
+**Esperado:** cada zona con `aforoMaximo`, `ocupacionActual`, `abiertaAhora` y
+`franjasDeHoy`. En la app, la tarjeta dice «Quedan N de M plazas» y arriba, en
+todas las visitas, **«No reserva plaza»**. Compruebe además una zona con horario
+que cruce medianoche (por ejemplo 20:00–02:00): tiene que verse **entera**, no
+partida ni con el contador reiniciado a las 00:00.
+
+### 14.6 · **[PRIORITARIO]** KPI-10 — qué cronometra usted, y con qué criterio
+
+Yo puedo medir la parte del sistema y la mido: `p95 ≈ 5 ms` de un presupuesto de
+3 000 ms sobre los 60 000 (la suite lo imprime, §6 del informe). Lo que no cabe
+en una suite es la persona.
+
+**Lo que usted cronometra:** desde que el residente **toca el botón «Nuevo
+visitante»** hasta que la pantalla **muestra el desenlace** —«Visita registrada»
+o el rechazo con su motivo—.
+
+**El criterio, para que la medida signifique algo:**
+
+1. **Un residente real, no usted.** Quien construyó la pantalla sabe dónde está
+   cada campo; el KPI habla de un residente cualquiera.
+2. **Que no haya usado la app antes.** Si la usó, mida a otro: lo que KPI-10
+   mide es si la pantalla se entiende, y eso solo se mide una vez por persona.
+3. **Una visita normal:** nombre, documento, desde/hasta y una placa. **Sin
+   patrón de recurrencia y sin acompañantes** —son opcionales y no los usa la
+   mayoría—. Si quiere medir también el caso completo, cronométrelo aparte y
+   anótelo como otra cifra.
+4. **Con el teléfono en la mano, de pie, como en la portería.** Sentado en un
+   escritorio con teclado sale un número que nadie va a vivir.
+5. **Sin ayudarle.** Si pregunta, la respuesta es «haga lo que le parezca»; una
+   pregunta es un hallazgo de usabilidad, no una pausa del cronómetro.
+6. **Repita con tres personas** y quédese con **la peor**, no con el promedio.
+   El promedio esconde justo al residente que no lo consigue.
+
+**Criterio de aprobación: los tres por debajo de 60 s.** Si alguno se pasa,
+anote en qué campo se detuvo: eso es lo accionable, no el número.
+
+### 14.7 · Las notificaciones dicen la verdad
+
+En la app, Perfil → Notificaciones. **Esperado:** con Firebase aún sin
+aprovisionar, el estado es **«El servicio de avisos no respondió»** y no
+«activadas». Si dijera «Activas en este aparato» sin que exista el proyecto de
+Firebase, la pantalla estaría mintiendo y el residente creería que le avisarán
+cuando llegue su visitante.
+
+Con Firebase aprovisionado y el adaptador real conectado, el estado correcto es
+**«Activas en este aparato»** y en la base:
+
+```sql
+select instalacion_id, left(token, 12), actualizado_en
+  from public.dispositivos_de_notificacion where usuario_id = '<su usuario>';
+```
+
+**Esperado: una fila por aparato**, con el token actualizado. Dos filas para el
+mismo teléfono significan que la fila se está identificando por el token y no
+por la instalación, y cada rotación dejaría un registro muerto al que se
+seguiría notificando.

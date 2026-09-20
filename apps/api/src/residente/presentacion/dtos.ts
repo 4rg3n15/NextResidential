@@ -6,6 +6,7 @@ import {
   IsIn,
   IsISO8601,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -166,4 +167,75 @@ export class TokenDeNotificacionDto {
   @ApiProperty({ enum: ['ios', 'android', 'web'] })
   @IsIn(['ios', 'android', 'web'])
   plataforma!: 'ios' | 'android' | 'web';
+}
+
+/**
+ * CU-02 · las medidas que la CÁMARA produjo, no la foto.
+ *
+ * El vector va aparte y cifrado; esto son cuatro números. Se envían porque el
+ * servidor vuelve a juzgar la calidad (KPI-16): la validación de la app es para
+ * la persona que sostiene el teléfono —puede repetir la foto ahí mismo— y esta
+ * es para el sistema, porque un cliente modificado se salta la primera.
+ */
+export class MedidasDeCapturaDto {
+  @ApiProperty({ minimum: 0, maximum: 1 })
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  nitidez!: number;
+
+  @ApiProperty({ minimum: 0, maximum: 1 })
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  iluminacion!: number;
+
+  @ApiProperty({ minimum: 0, maximum: 20 })
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  rostrosDetectados!: number;
+
+  @ApiProperty({ minimum: 0, maximum: 1 })
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  proporcionRostro!: number;
+}
+
+/**
+ * HU-12 · HU-13 · el rostro de MI visitante.
+ *
+ * **No hay `titularId` y esa ausencia es la regla.** El titular sale de la
+ * autorización, que ya dice de quién es la visita (RN-10). Si estuviera aquí,
+ * un residente podría pedirle el consentimiento a quien quisiera.
+ */
+export class RostroDeMiVisitanteDto {
+  @ApiProperty({
+    description: 'Plantilla derivada, en base64. Entra cifrada a la bóveda y no vuelve a salir.',
+    maxLength: 262144,
+  })
+  @IsString()
+  @MinLength(16)
+  @MaxLength(262144)
+  vector!: string;
+
+  @ApiProperty({ type: MedidasDeCapturaDto })
+  @ValidateNested()
+  @Type(() => MedidasDeCapturaDto)
+  medidas!: MedidasDeCapturaDto;
+
+  @ApiProperty({ description: 'Versión de la política de tratamiento que se le mostró' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(32)
+  versionPolitica!: string;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    description: 'Cuándo se suprime la plantilla. RN-11: no más allá de la visita.',
+  })
+  @IsISO8601()
+  suprimirEn!: string;
 }

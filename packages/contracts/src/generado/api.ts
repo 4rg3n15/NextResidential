@@ -655,6 +655,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/rostro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10) */
+        post: operations["MiController_capturarRostro"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/familia": {
         parameters: {
             query?: never;
@@ -1233,7 +1250,7 @@ export interface components {
             estado: "activa" | "revocada";
             placa: string | null;
             acompanantes: string[];
-            patron: components["schemas"]["PatronDto"] | null;
+            patron: components["schemas"]["PatronDeAutorizacionDto"] | null;
             /** Format: date-time */
             revocadaEn: string | null;
             motivoRevocacion: string | null;
@@ -1671,13 +1688,27 @@ export interface components {
             /** @example 1 */
             negados: number;
         };
-        FranjaDto: {
+        FranjaDeHorarioDto: {
             /** @description Día 0..6 con domingo = 0. */
             dia: number;
             minutoInicio: number;
             minutoFin: number;
             /** @description La franja viene del día anterior: una zona abierta de 22:00 a 02:00 son DOS franjas encadenadas, no una que reinicia a medianoche. El contador de aforo no se reinicia con el cambio de día (CU-05). */
             continuaDelDiaAnterior: boolean;
+        };
+        FranjaDeHoyDto: {
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
+        };
+        FranjaDto: {
+            /** @description 0 = domingo … 6 = sábado */
+            dia: number;
+            minutoInicio: number;
+            minutoFin: number;
+            /** @description Continúa la franja del día anterior tras la medianoche */
+            continuaDelDiaAnterior?: boolean;
         };
         GeneracionAplicadaDto: {
             creadas: number;
@@ -1747,6 +1778,12 @@ export interface components {
             dependencias: {
                 [key: string]: string;
             };
+        };
+        MedidasDeCapturaDto: {
+            nitidez: number;
+            iluminacion: number;
+            rostrosDetectados: number;
+            proporcionRostro: number;
         };
         MedidasDto: {
             rostrosDetectados: number;
@@ -1832,7 +1869,7 @@ export interface components {
             ocupacionActual: number;
             abiertaAhora: boolean;
             /** @description Franjas de hoy ya resueltas; una que cruza medianoche llega como dos (S-09). */
-            franjasDeHoy: components["schemas"]["FranjaDto"][];
+            franjasDeHoy: components["schemas"]["FranjaDeHoyDto"][];
             requiereAutorizacion: boolean;
         };
         MiembroDeFamiliaDto: {
@@ -1925,6 +1962,14 @@ export interface components {
             totales: components["schemas"]["TotalesDeViviendasDto"];
             viviendas: components["schemas"]["ViviendaDto"][];
         };
+        PatronDeAutorizacionDto: {
+            /** @description Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio). */
+            dias: number[];
+            /** @example 08:00 */
+            horaInicio: string;
+            /** @example 18:00 */
+            horaFin: string;
+        };
         PatronDeEntradaDto: {
             /**
              * @description Días de la semana, 0..6 con domingo = 0 (RN-22).
@@ -1954,14 +1999,6 @@ export interface components {
             minutoFin: number;
             /** @description Minutos respecto de UTC; Bogotá: -300 */
             desplazamientoUtcMinutos: number;
-        };
-        PatronDto: {
-            /** @description Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio). */
-            dias: number[];
-            /** @example 08:00 */
-            horaInicio: string;
-            /** @example 18:00 */
-            horaFin: string;
         };
         PendientesDto: {
             /** @description Identificadores de equipos con una orden sin ejecutar: se muestran «sincronizando». */
@@ -2122,6 +2159,33 @@ export interface components {
         RevocarAutorizacionDto: {
             motivo: string;
         };
+        RostroCapturadoDto: {
+            aceptada: boolean;
+            /** @description Por qué no sirve la foto. Vacío cuando sí sirve. */
+            motivos: string[];
+            /** Format: uuid */
+            plantillaId: string | null;
+            /**
+             * Format: uuid
+             * @description El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10).
+             */
+            consentimientoId: string | null;
+            /** @description A quién se le pidió: el visitante, no el residente que tomó la foto */
+            titular: string | null;
+            calidad: number | null;
+        };
+        RostroDeMiVisitanteDto: {
+            /** @description Plantilla derivada, en base64. Entra cifrada a la bóveda y no vuelve a salir. */
+            vector: string;
+            medidas: components["schemas"]["MedidasDeCapturaDto"];
+            /** @description Versión de la política de tratamiento que se le mostró */
+            versionPolitica: string;
+            /**
+             * Format: date-time
+             * @description Cuándo se suprime la plantilla. RN-11: no más allá de la visita.
+             */
+            suprimirEn: string;
+        };
         SaludDto: {
             /** @example vivo */
             estado: string;
@@ -2261,7 +2325,7 @@ export interface components {
             aforoDisponible: number;
             dentroDeHorario: boolean;
             aforoCompleto: boolean;
-            horario: components["schemas"]["FranjaDto"][];
+            horario: components["schemas"]["FranjaDeHorarioDto"][];
             /** @description Minutos de desfase UTC del horario de la zona. */
             desplazamientoUtcMinutos: number;
             /** @description Reservas del día. Vacío mientras no exista el módulo de reservas (P-15): la pantalla muestra el estado vacío, que es información honesta, y no un número inventado. */
@@ -3542,6 +3606,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VisitaCreadaDto"];
+                };
+            };
+        };
+    };
+    MiController_capturarRostro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RostroDeMiVisitanteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RostroCapturadoDto"];
                 };
             };
         };

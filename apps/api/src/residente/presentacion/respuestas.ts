@@ -158,7 +158,7 @@ export class AparatoRegistradoDto {
 }
 
 /** M-5 · HU-19 · una zona común tal como la ve el residente. */
-export class FranjaDto {
+export class FranjaDeHoyDto {
   @ApiProperty({ type: String, format: 'date-time' }) desde!: string;
   @ApiProperty({ type: String, format: 'date-time' }) hasta!: string;
 }
@@ -175,9 +175,48 @@ export class MiZonaDto {
   ocupacionActual!: number;
   @ApiProperty({ type: Boolean }) abiertaAhora!: boolean;
   @ApiProperty({
-    type: [FranjaDto],
+    type: [FranjaDeHoyDto],
     description: 'Franjas de hoy ya resueltas; una que cruza medianoche llega como dos (S-09).',
   })
-  franjasDeHoy!: FranjaDto[];
+  franjasDeHoy!: FranjaDeHoyDto[];
   @ApiProperty({ type: Boolean }) requiereAutorizacion!: boolean;
+}
+
+/**
+ * CU-02 · el desenlace de la captura, tal como lo lee la app.
+ *
+ * `aceptada: false` con sus motivos es una RESPUESTA, no un error: el servidor
+ * volvió a juzgar la calidad y no pasó (KPI-16). Y `aceptada: true` no dice
+ * «listo»: dice que el consentimiento quedó PEDIDO. Quien lo otorga es el
+ * titular, por su canal, con su identidad (RN-10) — y hasta entonces la
+ * plantilla no se sincroniza con ninguna terminal (RN-09).
+ */
+export class RostroCapturadoDto {
+  @ApiProperty({ type: Boolean }) aceptada!: boolean;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Por qué no sirve la foto. Vacío cuando sí sirve.',
+  })
+  motivos!: string[];
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  plantillaId!: string | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description: 'El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10).',
+  })
+  consentimientoId!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'A quién se le pidió: el visitante, no el residente que tomó la foto',
+  })
+  titular!: string | null;
+
+  @ApiProperty({ type: Number, nullable: true }) calidad!: number | null;
 }

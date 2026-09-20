@@ -4,7 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
-import 'franja_dto.dart';
+import 'franja_de_hoy_dto.dart';
 
 part 'mi_zona_dto.g.dart';
 
@@ -31,7 +31,7 @@ class MiZonaDto {
   final bool abiertaAhora;
 
   /// Franjas de hoy ya resueltas; una que cruza medianoche llega como dos (S-09).
-  final List<FranjaDto> franjasDeHoy;
+  final List<FranjaDeHoyDto> franjasDeHoy;
   final bool requiereAutorizacion;
 
   Map<String, Object?> toJson() => _$MiZonaDtoToJson(this);

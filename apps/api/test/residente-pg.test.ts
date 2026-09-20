@@ -133,6 +133,27 @@ describe('adaptadores del residente · el SQL encaja con el esquema migrado (D-8
   );
 
   it.runIf(URL_BASE !== undefined)(
+    'RN-10 · la consulta del TITULAR encaja con el esquema y filtra por vivienda',
+    async () => {
+      expect(disponible).toBe(true);
+      const a = new AutorizacionesDelResidentePg(pool as Pool, { usuario_id: USUARIO });
+
+      // Tres tablas unidas —autorizaciones, visitantes, personas— y el filtro
+      // por `(copropiedad_id, vivienda_id)` dentro del WHERE. Si alguna columna
+      // no existiera, ninguna captura del residente funcionaría contra una base
+      // real y la suite seguiría verde sobre el doble: es D-89 otra vez, y por
+      // eso esta consulta se ejerce aquí el mismo día que nace.
+      await sinDesajuste('titularDeLaAutorizacion', () =>
+        a.titularDeLaAutorizacion(AMBITO, '30000000-0000-4000-8000-0000000000aa'),
+      );
+      // Y con una autorización que no existe, NULL: sin titular no hay captura.
+      expect(
+        await a.titularDeLaAutorizacion(AMBITO, '30000000-0000-4000-8000-0000000000aa'),
+      ).toBeNull();
+    },
+  );
+
+  it.runIf(URL_BASE !== undefined)(
     'la escritura llega hasta la clave ajena, no muere en el esquema',
     async () => {
       expect(disponible).toBe(true);

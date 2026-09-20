@@ -33,7 +33,7 @@ class MedidasDeCaptura {
     required this.nitidez,
     required this.iluminacion,
     required this.rostrosDetectados,
-    required this.proporcionDelRostro,
+    required this.proporcionRostro,
   });
 
   /// 0 = borrosa, 1 = perfectamente nítida.
@@ -45,7 +45,7 @@ class MedidasDeCaptura {
   final int rostrosDetectados;
 
   /// Cuánto del encuadre ocupa el rostro. Ni muy lejos ni pegado al objetivo.
-  final double proporcionDelRostro;
+  final double proporcionRostro;
 }
 
 /// Motivos por los que una captura NO sirve. Tipados, como todo lo que el
@@ -124,10 +124,10 @@ List<FalloDeCalidad> evaluarCaptura(
   }
   if (medidas.rostrosDetectados > 1) fallos.add(FalloDeCalidad.variosRostros);
 
-  if (medidas.proporcionDelRostro < umbrales.proporcionMinima) {
+  if (medidas.proporcionRostro < umbrales.proporcionMinima) {
     fallos.add(FalloDeCalidad.demasiadoLejos);
   }
-  if (medidas.proporcionDelRostro > umbrales.proporcionMaxima) {
+  if (medidas.proporcionRostro > umbrales.proporcionMaxima) {
     fallos.add(FalloDeCalidad.demasiadoCerca);
   }
   return fallos;

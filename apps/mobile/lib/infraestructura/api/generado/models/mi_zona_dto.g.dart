@@ -13,7 +13,7 @@ MiZonaDto _$MiZonaDtoFromJson(Map<String, dynamic> json) => MiZonaDto(
   ocupacionActual: json['ocupacionActual'] as num,
   abiertaAhora: json['abiertaAhora'] as bool,
   franjasDeHoy: (json['franjasDeHoy'] as List<dynamic>)
-      .map((e) => FranjaDto.fromJson(e as Map<String, dynamic>))
+      .map((e) => FranjaDeHoyDto.fromJson(e as Map<String, dynamic>))
       .toList(),
   requiereAutorizacion: json['requiereAutorizacion'] as bool,
 );

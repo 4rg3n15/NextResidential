@@ -6,7 +6,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'autorizacion_dto_estado.dart';
 import 'autorizacion_dto_tipo.dart';
-import 'patron_dto.dart';
+import 'patron_de_autorizacion_dto.dart';
 
 part 'autorizacion_dto.g.dart';
 
@@ -42,7 +42,7 @@ class AutorizacionDto {
   final AutorizacionDtoEstado estado;
   final String? placa;
   final List<String> acompanantes;
-  final PatronDto? patron;
+  final PatronDeAutorizacionDto? patron;
   final DateTime? revocadaEn;
   final String? motivoRevocacion;
 

@@ -235,6 +235,23 @@ export interface AutorizacionesDelResidente {
     | { readonly ok: true; readonly id: string; readonly repetida: boolean }
     | { readonly ok: false; readonly motivo: MotivoDeNoAutorizar }
   >;
+
+  /**
+   * Quién es el TITULAR del dato biométrico de esta autorización.
+   *
+   * Existe por RN-10 y por una sola razón: que el identificador del titular
+   * **no pueda venir del cuerpo de la petición**. Si la app lo enviara, un
+   * residente podría capturar un rostro y colgárselo a cualquiera —a su vecino,
+   * a sí mismo—, y el consentimiento quedaría pedido a la persona equivocada.
+   *
+   * Devuelve `null` cuando la autorización no es de esta vivienda, que es
+   * también como se cierra el segundo eje: no hay forma de nombrar la
+   * autorización del vecino y obtener a su visitante.
+   */
+  titularDeLaAutorizacion(
+    ambito: AmbitoDelResidente,
+    autorizacionId: string,
+  ): Promise<{ readonly personaId: string; readonly nombre: string } | null>;
 }
 
 /** HU-34 · M-7. El ámbito aquí es la IDENTIDAD, no la vivienda. */

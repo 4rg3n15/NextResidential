@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
+import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/dominio/sesion.dart';
@@ -9,6 +12,7 @@ import 'package:ncr_residente/presentacion/controlador.dart';
 import 'package:ncr_residente/presentacion/pantallas/familia.dart';
 import 'package:ncr_residente/presentacion/pantallas/historial.dart';
 import 'package:ncr_residente/presentacion/pantallas/inicio.dart';
+import 'package:ncr_residente/presentacion/pantallas/notificaciones.dart';
 import 'package:ncr_residente/presentacion/pantallas/pendiente.dart';
 import 'package:ncr_residente/presentacion/pantallas/perfil.dart';
 import 'package:ncr_residente/presentacion/pantallas/vehiculos.dart';
@@ -21,9 +25,25 @@ import 'package:ncr_residente/presentacion/pantallas/vehiculos.dart';
 /// que no se puede mover— porque son justo las que una revisión visual deja
 /// pasar.
 class RepositorioFalso implements RepositorioDelResidente {
-  RepositorioFalso({this.puedeAutorizar = true, this.activa = true});
+  RepositorioFalso({
+    this.puedeAutorizar = true,
+    this.activa = true,
+    this.zonas = const [],
+    this.respuesta,
+    this.falloAlCrear,
+  });
   final bool puedeAutorizar;
   final bool activa;
+  final List<ZonaComun> zonas;
+
+  /// Qué contesta el conjunto al crear. `null` = aceptada.
+  final ResultadoDeVisita? respuesta;
+
+  /// Un fallo de TRANSPORTE, que es cosa distinta de un rechazo de negocio.
+  final Fallo? falloAlCrear;
+
+  final List<NuevaVisita> creadas = [];
+  final List<AparatoDeNotificaciones> aparatos = [];
 
   @override
   Future<MiHogar> miHogar() async => MiHogar(
@@ -109,6 +129,38 @@ class RepositorioFalso implements RepositorioDelResidente {
           decididoPorEdge: true,
         ),
       ];
+
+  @override
+  Future<List<ZonaComun>> misZonas() async => zonas;
+
+  @override
+  Future<ResultadoDeVisita> crearVisita(NuevaVisita visita) async {
+    if (falloAlCrear != null) throw falloAlCrear!;
+    creadas.add(visita);
+    return respuesta ?? const VisitaCreada(id: 'a-1', repetida: false);
+  }
+
+  @override
+  Future<void> registrarAparato(AparatoDeNotificaciones aparato) async {
+    aparatos.add(aparato);
+  }
+
+  final List<String> capturas = [];
+@override
+  Future<ResultadoDeCaptura> capturarRostro({
+    required String autorizacionId,
+    required MedidasDeCaptura medidas,
+    required Uint8List vector,
+    required String versionPolitica,
+    required DateTime suprimirEn,
+  }) async {
+    capturas.add(autorizacionId);
+    return const CapturaAceptada(
+      consentimientoId: 'c-1',
+      titular: 'Visitante de prueba',
+      calidad: 0.8,
+    );
+  }
 }
 
 Widget envolver(Widget hijo) => MaterialApp(home: hijo);
@@ -240,7 +292,8 @@ void main() {
     expect(motivoLegible('LISTA_NEGRA'), 'La persona o la placa está en lista negra');
   });
 
-  testWidgets('M-8 · los interruptores del mockup están y NO se pueden mover', (t) async {
+  testWidgets('M-8 · las notificaciones ya NO son un interruptor, y lo que sigue pendiente sí',
+      (t) async {
     final repo = RepositorioFalso();
     final inicio = controladorDeInicio(repo);
     await inicio.cargarAhora();
@@ -262,6 +315,8 @@ void main() {
             alPedirAcceso: () {},
             alAbrirFamilia: () {},
             alAbrirHistorial: () {},
+            alAbrirNotificaciones: () {},
+            estadoDeAvisos: EstadoDeAvisos.sinDeterminar,
           ),
         ),
       ),
@@ -271,8 +326,14 @@ void main() {
     expect(find.text('residente@ejemplo.invalid'), findsOneWidget);
     expect(find.text('Casa 42 · Manzana B'), findsOneWidget);
 
+    // En 11-A las notificaciones eran dos interruptores apagados. Ahora son una
+    // fila con estado, porque «activadas» resumía tres condiciones distintas y
+    // dejaba al residente creyendo que le avisarían.
+    expect(find.text('Notificaciones'), findsOneWidget);
+    expect(find.text(resumenDeAvisos(EstadoDeAvisos.sinDeterminar)), findsOneWidget);
+
     final interruptores = t.widgetList<SwitchListTile>(find.byType(SwitchListTile));
-    expect(interruptores.length, 3);
+    expect(interruptores.length, 1, reason: 'solo queda el resumen semanal');
     // `onChanged: null` es lo que lo deshabilita de verdad. Uno que se mueva y
     // no guarde nada es una mentira con animación.
     expect(interruptores.every((s) => s.onChanged == null), isTrue);

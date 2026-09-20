@@ -18,9 +18,13 @@
 /// la interfaz sabe pintar como lo que es: un estado previsto.
 library;
 
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../aplicacion/sesion_en_uso.dart';
+import '../../dominio/calidad_de_captura.dart';
 import '../../dominio/entidades.dart';
 import '../../dominio/puertos.dart';
 import 'generado/clients/residente_api.dart';
@@ -29,7 +33,16 @@ import 'generado/models/mi_evento_dto.dart';
 import 'generado/models/mi_inicio_dto.dart';
 import 'generado/models/mi_vehiculo_dto.dart';
 import 'generado/models/miembro_de_familia_dto.dart';
+import 'generado/models/mi_zona_dto.dart';
+import 'generado/models/nueva_visita_dto.dart';
+import 'generado/models/patron_de_visita_dto.dart';
+import 'generado/models/medidas_de_captura_dto.dart';
 import 'generado/models/periodo.dart';
+import 'generado/models/rostro_de_mi_visitante_dto.dart';
+import 'generado/models/token_de_notificacion_dto.dart';
+import 'generado/models/token_de_notificacion_dto_plataforma.dart';
+import 'generado/models/visita_creada_dto.dart';
+import 'generado/models/visita_creada_dto_motivo.dart';
 
 /// Construye el `Dio` de la API con el interceptor de sesión.
 ///
@@ -135,6 +148,103 @@ class RepositorioApiDelResidente implements RepositorioDelResidente {
       _ => Fallo(ClaseDeFallo.servidor, detalle),
     };
   }
+
+  @override
+  Future<List<ZonaComun>> misZonas() => _pedir(() async {
+        final dtos = await _api.miControllerZonas(id: _copropiedad);
+        return dtos.map(_zonaDe).toList();
+      });
+
+  @override
+  Future<ResultadoDeVisita> crearVisita(NuevaVisita visita) => _pedir(() async {
+        final dto = await _api.miControllerCrearAutorizacion(
+          id: _copropiedad,
+          body: NuevaVisitaDto(
+            visitante: visita.visitante,
+            documento: visita.documento,
+            // La API espera ISO-8601 CON zona. `toUtc()` la garantiza: enviar
+            // una hora local sin huso deja que el servidor la interprete en el
+            // suyo, y una visita «de 14:00 a 18:00» se convierte en otra cosa.
+            desde: visita.desde.toUtc().toIso8601String(),
+            hasta: visita.hasta.toUtc().toIso8601String(),
+            placa: visita.placa,
+            permiteAccesoVehicular: visita.permiteAccesoVehicular,
+            acompanantes: visita.acompanantes.isEmpty ? null : visita.acompanantes,
+            zonasPermitidas: visita.zonasPermitidas.isEmpty ? null : visita.zonasPermitidas,
+            observaciones: visita.observaciones,
+            patron: visita.patron == null
+                ? null
+                : PatronDeVisitaDto(
+                    dias: visita.patron!.dias.map((d) => d.index).toList()..sort(),
+                    minutoInicio: visita.patron!.minutoInicio,
+                    minutoFin: visita.patron!.minutoFin,
+                    desplazamientoUtcMinutos: visita.patron!.desplazamientoUtcMinutos,
+                  ),
+            claveDeIdempotencia: visita.claveDeIdempotencia,
+          ),
+        );
+        return _resultadoDe(dto);
+      });
+
+  @override
+  Future<void> registrarAparato(AparatoDeNotificaciones aparato) => _pedir(() async {
+        await _api.miControllerRegistrarAparato(
+          id: _copropiedad,
+          body: TokenDeNotificacionDto(
+            instalacionId: aparato.instalacionId,
+            token: aparato.token,
+            plataforma: switch (aparato.plataforma) {
+              PlataformaDelAparato.ios => TokenDeNotificacionDtoPlataforma.ios,
+              PlataformaDelAparato.android => TokenDeNotificacionDtoPlataforma.android,
+              PlataformaDelAparato.web => TokenDeNotificacionDtoPlataforma.web,
+            },
+          ),
+        );
+      });
+
+  @override
+  Future<ResultadoDeCaptura> capturarRostro({
+    required String autorizacionId,
+    required MedidasDeCaptura medidas,
+    required Uint8List vector,
+    required String versionPolitica,
+    required DateTime suprimirEn,
+  }) =>
+      _pedir(() async {
+        final dto = await _api.miControllerCapturarRostro(
+          id: _copropiedad,
+          autorizacionId: autorizacionId,
+          body: RostroDeMiVisitanteDto(
+            // El vector va en base64 y entra cifrado a la bóveda del servidor.
+            // Nada de esto se guarda en el teléfono: la plantilla vive en la
+            // terminal y cifrada en base, nunca en el cliente.
+            vector: base64Encode(vector),
+            medidas: MedidasDeCapturaDto(
+              nitidez: medidas.nitidez,
+              iluminacion: medidas.iluminacion,
+              rostrosDetectados: medidas.rostrosDetectados,
+              proporcionRostro: medidas.proporcionRostro,
+            ),
+            versionPolitica: versionPolitica,
+            suprimirEn: suprimirEn.toUtc(),
+          ),
+        );
+        if (!dto.aceptada) return CapturaRechazada(List<String>.from(dto.motivos));
+        final consentimiento = dto.consentimientoId;
+        if (consentimiento == null) {
+          // Aceptada sin consentimiento sería un contrato roto, y tratarlo como
+          // éxito dejaría al residente creyendo que el trámite acabó.
+          throw const Fallo(
+            ClaseDeFallo.servidor,
+            'La captura se aceptó sin solicitud de consentimiento',
+          );
+        }
+        return CapturaAceptada(
+          consentimientoId: consentimiento,
+          titular: dto.titular ?? 'su visitante',
+          calidad: (dto.calidad ?? 0).toDouble(),
+        );
+      });
 
   /// El cuerpo de error de la API tiene forma `{estado, correlacion, mensaje}`
   /// —el filtro global de `main.ts`—, y `mensaje` puede ser a su vez el objeto
@@ -257,4 +367,44 @@ EventoDeAcceso _eventoDe(MiEventoDto d) => EventoDeAcceso(
       persona: d.persona,
       zona: d.zona,
       decididoPorEdge: d.decididoPorEdge,
+    );
+
+/// El resultado de crear, traducido.
+///
+/// Un motivo que el servidor añada mañana y esta app no conozca llega como
+/// `$unknown` del generador. NO se convierte en «creada»: se trata como
+/// rechazo con la explicación que venga del servidor, que es la dirección
+/// segura — decir «creada» sobre algo que no se creó sería lo peor posible.
+ResultadoDeVisita _resultadoDe(VisitaCreadaDto d) {
+  if (d.creada && d.id != null) {
+    return VisitaCreada(id: d.id!, repetida: d.repetida);
+  }
+  final motivo = switch (d.motivo) {
+    VisitaCreadaDtoMotivo.listaNegra => MotivoDeRechazo.listaNegra,
+    VisitaCreadaDtoMotivo.viviendaInactiva => MotivoDeRechazo.viviendaInactiva,
+    VisitaCreadaDtoMotivo.sinNivelDeAcceso => MotivoDeRechazo.sinNivelDeAcceso,
+    VisitaCreadaDtoMotivo.placaDuplicada => MotivoDeRechazo.placaDuplicada,
+    _ => null,
+  };
+  return VisitaRechazada(
+    // Sin motivo reconocible, el más conservador: el que manda al residente a
+    // la administración en vez de hacerle repetir un formulario que está bien.
+    motivo: motivo ?? MotivoDeRechazo.viviendaInactiva,
+    explicacion: d.explicacion ??
+        'El conjunto no permitió registrar esta visita. Consulte con la administración.',
+  );
+}
+
+ZonaComun _zonaDe(MiZonaDto d) => ZonaComun(
+      id: d.id,
+      nombre: d.nombre,
+      aforoMaximo: d.aforoMaximo.toInt(),
+      ocupacionActual: d.ocupacionActual.toInt(),
+      abiertaAhora: d.abiertaAhora,
+      franjasDeHoy: d.franjasDeHoy
+          // El generador ya devuelve `DateTime` para un `format: date-time`:
+          // volver a analizarlo sería analizar dos veces la misma cadena.
+          .map((f) => FranjaDeZona(desde: f.desde, hasta: f.hasta))
+          .toList(),
+      requiereAutorizacion: d.requiereAutorizacion,
     );

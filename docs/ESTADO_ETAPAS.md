@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-19 · **ETAPA 10 CERRADA**, **ETAPA 11-A CERRADA** y **11-B en curso** · la app Flutter del residente y el segundo eje del aislamiento
+**Última actualización:** 2026-09-20 · **ETAPA 11 CERRADA** (mitades 11-A, 11-B y 11-C) · la app Flutter del residente, el segundo eje del aislamiento y la captura con consentimiento del titular
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -20,10 +20,10 @@
 
 |                                |                                                                                                                 |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **11 de 17** (ETAPAS 00 a 10) · la 10 cerrada el 2026-09-18 con `--con-base`; la 11 va por su mitad 11-A        |
-| **Etapa siguiente habilitada** | **ETAPA 11-B — la app que escribe** (la 12 sigue habilitada)                                                    |
+| **Etapas cerradas**            | **12 de 17** (ETAPAS 00 a 11) · la 11 cerrada el 2026-09-20 con `--con-base`, en tres mitades: 11-A, 11-B y 11-C |
+| **Etapa siguiente habilitada** | **ETAPA 12 — Edge Gateway: offline y reconciliación**                                                           |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | **D-77 y D-78**, declarados en la 11-A. D-76 y D-79 corregidos en la misma ronda                                |
+| **Defectos abiertos**          | **D-78** (el tema de la app copia los colores a mano). D-77 cerrado en 11-C; D-89 a D-94 corregidos en la 11    |
 | **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
 | **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
 | **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)                                                     |
@@ -46,7 +46,7 @@
 | 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                            | **CERRADA**                      | [ETAPA-08](etapas/ETAPA-08.md) |
 | 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **CERRADA**                      | [ETAPA-09](etapas/ETAPA-09.md) |
 | 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09 ✅                            | **CERRADA**                      | [ETAPA-10](etapas/ETAPA-10.md) |
-| 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                            | **EN CURSO** — 11-A cerrada      | [ETAPA-11](etapas/ETAPA-11.md) |
+| 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                            | **CERRADA** — 11-A, 11-B y 11-C  | [ETAPA-11](etapas/ETAPA-11.md) |
 | 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
 | 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12                               | PENDIENTE                        | —                              |
 | 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13                               | PENDIENTE                        | —                              |
@@ -469,14 +469,18 @@ plataforma**: la decisión la toma Next Control.
 
 ---
 
-## ETAPA 11 — App móvil Flutter del residente · **EN CURSO** — 11-A cerrada · 2026-09-19
+## ETAPA 11 — App móvil Flutter del residente · **CERRADA** · 2026-09-20
 
-**Rama:** `etapa-11-app-flutter-residente`, desde `develop` actualizado ·
+**Ramas:** `etapa-11-app-flutter-residente` (11-A) y
+`etapa-11-app-flutter-residente-b` (11-B y 11-C), desde `develop` actualizado ·
 **Informe:** [`etapas/ETAPA-11.md`](etapas/ETAPA-11.md)
 
-La etapa se ejecuta en dos mitades, aprobadas por el usuario. El corte no es por
+La etapa se ejecutó en mitades, aprobadas por el usuario. El corte no fue por
 tamaño: **11-A se recorre entera en un emulador sin conceder un permiso del
-sistema ni cortar la red; 11-B no se puede demostrar sin ninguna de las dos.**
+sistema ni cortar la red; lo que vino después no se puede demostrar sin ninguna
+de las dos.** 11-B construyó el servidor que sostiene las pantallas que
+escriben; 11-C, las pantallas, la captura con consentimiento del titular y la
+medición de KPI-10.
 
 ### Lo que 11-A dejó construido
 
@@ -499,7 +503,7 @@ sistema ni cortar la red; 11-B no se puede demostrar sin ninguna de las dos.**
 | ID       | Qué                                                                                                                                                                                                     | Estado                                                        |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | **D-76** | Un residente podía dar acceso a una zona a la autorización **de otra vivienda**: el permiso se da a un `autorizacionId` del cuerpo                                                                      | **Corregido**                                                 |
-| **D-77** | `GET …/biometria/consentimientos/:id` expone el estado de cualquier consentimiento del conjunto a quien conozca su UUID                                                                                 | Declarado, 11-B                                               |
+| **D-77** | `GET …/biometria/consentimientos/:id` expone el estado de cualquier consentimiento del conjunto a quien conozca su UUID                                                                                 | **Corregido en 11-C** · 404 al que no es titular              |
 | **D-78** | El tema de la app copia los colores del preset a mano; la prueba compara con el `.ts` mientras no se genere                                                                                             | Declarado                                                     |
 | **D-79** | El paso 5 del verificador decidía por TEXTO y no por código de salida: con la compilación rota informaba verde con cero pruebas ejecutadas                                                              | **Corregido**                                                 |
 | **D-80** | **`echo "$x" \| grep -q` bajo `pipefail` devuelve 141 al ACERTAR.** La comprobación de pruebas en rojo —y la de SECRETOS de `verificar-frontera.sh`— se leían como falsas justo cuando encontraban algo | **Corregido** · regla en `portabilidad.mjs` + prueba negativa |
@@ -628,13 +632,42 @@ con cámara y la medición de KPI-10.
 
 ---
 
-### Lo que queda para 11-B
+### 11-C · cerrada el 2026-09-20 · las pantallas, la cámara y el KPI medido
 
-M-4 completa (patrón de recurrencia, acompañantes nominales, zonas, y los
-rechazos de RN-06, RN-13 y CA-03) · M-5 con aforo y horario · M-7 con registro
-de token FCM —cierra la deuda de FCM declarada en la ETAPA 10— · captura de
-cámara con validación de calidad y D-39 · bandeja de salida con clave de
-idempotencia · KPI-10 medido.
+| Entregable                                      | Estado                                                                                                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **M-4 · Crear visitante**                       | Construida · vigencia, patrón con días y franjas, acompañantes nominales, zonas, placa y observaciones. Los cuatro rechazos con su texto, separados por `SalidaDelRechazo` |
+| **M-5 · Zonas comunes**                         | Construida · la interfaz refleja y lo dice: el aforo **no reserva plaza**. Las franjas que cruzan medianoche llegan aplanadas y se pintan enteras                        |
+| **M-7 · Notificaciones**                        | Construida · cinco estados, no un interruptor. El token rota y se reenvía solo; al cerrar sesión se olvida                                                                |
+| **Bandeja de salida conectada al cliente HTTP** | Construida · se encola ANTES de intentar; el rechazo de negocio no se reintenta; el 401 no retrocede; lo rendido se enseña, no se borra                                   |
+| **Captura con consentimiento del titular**      | Construida · ruta propia del residente **sin `titularId` en el cuerpo** (RN-10); sin consentimiento no hay sincronización (RN-09); sin casilla de aceptar en la app       |
+| **KPI-10 medido**                               | `apps/api/test/kpi-10.e2e.test.ts` · p50 ~2 ms, p95 ~5 ms sobre un presupuesto de 3 000 ms de los 60 000                                                                  |
+| **D-77**                                        | **Cerrado** · el residente que no es titular recibe 404, y el titular sí lo lee                                                                                          |
+
+**Lo que sigue declarado, y por qué:**
+
+- **El adaptador real de cámara** (paquete `camera`) y **el de FCM**
+  (`firebase_messaging`). Los dos llevan binarios nativos y credenciales que
+  §2.5 prohíbe versionar —`google-services.json`, `GoogleService-Info.plist`— y
+  un permiso del sistema que solo se prueba en un dispositivo. Los puertos, las
+  pantallas, la máquina de estados y el registro contra el conjunto están
+  construidos y probados; lo que falta es quién implementa el puerto. Se cierra
+  cuando la app se compile contra un aparato con el proyecto de Firebase
+  aprovisionado. Es ADR-03 aplicado al teléfono.
+- **D-78** · el tema de la app copia los colores del preset a mano.
+
+**Hallazgos de esta mitad:** D-77 (cerrado), **D-93** —el doble de escrituras
+repartía identificadores ambiguos y hacía pasar la prueba del segundo eje sobre
+la ruta de rostro sin demostrar nada—, **D-94** —`contracts` apuntaba a un
+esquema renombrado en D-92—, **D-95** —el banco de pruebas negativas confundía
+«el control no está versionado» con «el control falló»— y **D-96** —el trinquete
+de ramas exigía una cifra fija a controles cuyas ramas dependen del host, así
+que estaba condenado a ponerse rojo en macOS o en Linux por la máquina y no por
+el código—.
+
+Los cuatro son la misma familia, y los cuatro aparecieron **en controles**, no
+en producto: el doble, el contrato, el banco de pruebas y el trinquete. Un
+control que no puede distinguir dos situaciones distintas no está demostrado.
 
 ---
 

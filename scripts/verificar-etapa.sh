@@ -588,6 +588,15 @@ paso "10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
 # ETAPA 09-A · el cliente de la consola se GENERA (§2.6), y un generado que
 # nadie regenera describe la API de la semana pasada sin dar ningún error.
 # Los dos controles son la contraparte mecánica de esa regla.
+# D-92 · en OpenAPI el nombre de la clase ES el nombre del esquema: dos clases
+# homónimas se pisan y el cliente generado describe la forma equivocada sin dar
+# ningún error. Lo encontró el compilador de Dart, no un control.
+if salida_esquemas=$(con_limite "$LIMITE_CORTO" node scripts/lib/esquemas-unicos.mjs 2>&1); then
+  ok "$salida_esquemas"
+else
+  mal "hay nombres de esquema repetidos: el contrato publica una forma y esconde otra"
+  echo "$salida_esquemas" | head -12 | sed 's/^/     /'
+fi
 if salida_tipado=$(con_limite "$LIMITE_CORTO" node scripts/lib/contrato-tipado.mjs 2>&1); then
   ok "${salida_tipado#OK }"
 else

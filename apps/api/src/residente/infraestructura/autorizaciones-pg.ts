@@ -151,6 +151,32 @@ export class AutorizacionesDelResidentePg
     }
   }
 
+  /**
+   * El titular del dato biométrico: el VISITANTE de esa autorización, no quien
+   * la creó. El filtro por vivienda va en el `WHERE` y no después, en código:
+   * una autorización de otra vivienda no devuelve fila, así que no hay nada que
+   * un `if` olvidado pueda dejar pasar.
+   */
+  async titularDeLaAutorizacion(
+    ambito: AmbitoDelResidente,
+    autorizacionId: string,
+  ): Promise<{ readonly personaId: string; readonly nombre: string } | null> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{ persona_id: string; nombre: string }>(
+        `SELECT p.id AS persona_id, p.nombre_completo AS nombre
+           FROM public.autorizaciones a
+           JOIN public.visitantes v
+             ON v.copropiedad_id = a.copropiedad_id AND v.id = a.visitante_id
+           JOIN public.personas p
+             ON p.copropiedad_id = v.copropiedad_id AND p.id = v.persona_id
+          WHERE a.copropiedad_id = $1 AND a.vivienda_id = $2 AND a.id = $3`,
+        [ambito.copropiedadId, ambito.viviendaId, autorizacionId],
+      );
+      const fila = rows[0];
+      return fila === undefined ? null : { personaId: fila.persona_id, nombre: fila.nombre };
+    });
+  }
+
   private async porClave(ambito: AmbitoDelResidente, clave: string): Promise<string | null> {
     return this.conContexto(async (c) => {
       const { rows } = await c.query<{ id: string }>(

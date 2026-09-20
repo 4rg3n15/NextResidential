@@ -6,6 +6,20 @@
  * cifra al guardar y descifra solo hacia la terminal, dentro del adaptador.
  */
 export { BiometriaModule } from './biometria.module';
+/**
+ * El CASO DE USO de captura sale del barril; el controlador no.
+ *
+ * La app del residente necesita capturar el rostro de su visitante, y esa ruta
+ * no puede ser la del mostrador de portería: aquella recibe `titularId` desde
+ * el cuerpo, que abierta al rol `residente` sería una forma de pedirle el
+ * consentimiento a quien uno quiera (RN-10). Lo que se comparte, por tanto, es
+ * la lógica —calidad, cifrado, solicitud de consentimiento, supresión
+ * programada—, y cada superficie pone su propia puerta y su propio titular.
+ *
+ * Sigue sin salir nada que permita LEER un vector: ese método no existe.
+ */
+export { CapturarRostro } from './aplicacion/casos-de-uso';
+export type { ResultadoCaptura, SolicitudDeCaptura } from './aplicacion/casos-de-uso';
 export {
   BOVEDA_DE_PLANTILLAS,
   REPOSITORIO_CONSENTIMIENTOS,

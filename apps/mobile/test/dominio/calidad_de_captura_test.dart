@@ -6,7 +6,7 @@ const buena = MedidasDeCaptura(
   nitidez: 0.8,
   iluminacion: 0.5,
   rostrosDetectados: 1,
-  proporcionDelRostro: 0.4,
+  proporcionRostro: 0.4,
 );
 
 void main() {
@@ -22,7 +22,7 @@ void main() {
           nitidez: 0.2,
           iluminacion: 0.5,
           rostrosDetectados: 1,
-          proporcionDelRostro: 0.4,
+          proporcionRostro: 0.4,
         )),
         contains(FalloDeCalidad.borrosa),
       );
@@ -36,7 +36,7 @@ void main() {
           nitidez: 0.8,
           iluminacion: 0.05,
           rostrosDetectados: 1,
-          proporcionDelRostro: 0.4,
+          proporcionRostro: 0.4,
         )),
         contains(FalloDeCalidad.oscura),
       );
@@ -45,7 +45,7 @@ void main() {
           nitidez: 0.8,
           iluminacion: 0.95,
           rostrosDetectados: 1,
-          proporcionDelRostro: 0.4,
+          proporcionRostro: 0.4,
         )),
         contains(FalloDeCalidad.quemada),
       );
@@ -56,7 +56,7 @@ void main() {
         nitidez: 0.8,
         iluminacion: 0.5,
         rostrosDetectados: 0,
-        proporcionDelRostro: 0.0,
+        proporcionRostro: 0.0,
       ));
       expect(fallos, contains(FalloDeCalidad.sinRostro));
       expect(fallos, isNot(contains(FalloDeCalidad.demasiadoLejos)));
@@ -68,7 +68,7 @@ void main() {
           nitidez: 0.8,
           iluminacion: 0.5,
           rostrosDetectados: 2,
-          proporcionDelRostro: 0.4,
+          proporcionRostro: 0.4,
         )),
         contains(FalloDeCalidad.variosRostros),
       );
@@ -80,7 +80,7 @@ void main() {
           nitidez: 0.8,
           iluminacion: 0.5,
           rostrosDetectados: 1,
-          proporcionDelRostro: 0.05,
+          proporcionRostro: 0.05,
         )),
         contains(FalloDeCalidad.demasiadoLejos),
       );
@@ -89,7 +89,7 @@ void main() {
           nitidez: 0.8,
           iluminacion: 0.5,
           rostrosDetectados: 1,
-          proporcionDelRostro: 0.9,
+          proporcionRostro: 0.9,
         )),
         contains(FalloDeCalidad.demasiadoCerca),
       );
@@ -104,7 +104,7 @@ void main() {
         nitidez: 0.1,
         iluminacion: 0.05,
         rostrosDetectados: 2,
-        proporcionDelRostro: 0.02,
+        proporcionRostro: 0.02,
       ));
       expect(fallos, containsAll([
         FalloDeCalidad.borrosa,
@@ -119,7 +119,7 @@ void main() {
         nitidez: 0.1,
         iluminacion: 0.05,
         rostrosDetectados: 1,
-        proporcionDelRostro: 0.02,
+        proporcionRostro: 0.02,
       );
       expect(evaluarCaptura(mala), equals(evaluarCaptura(mala)));
     });

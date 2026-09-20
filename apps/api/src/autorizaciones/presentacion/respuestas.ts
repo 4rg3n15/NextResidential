@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 /** DTOs de salida de visitantes y autorizaciones — HU-07 a HU-10, HU-16, HU-17. */
-export class PatronDto {
+export class PatronDeAutorizacionDto {
   @ApiProperty({
     type: [Number],
     description: 'Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio).',
@@ -23,7 +23,7 @@ export class AutorizacionDto {
   @ApiProperty({ type: String, enum: ['activa', 'revocada'] }) estado!: string;
   @ApiProperty({ type: String, nullable: true }) placa!: string | null;
   @ApiProperty({ type: [String] }) acompanantes!: string[];
-  @ApiProperty({ type: PatronDto, nullable: true }) patron!: PatronDto | null;
+  @ApiProperty({ type: PatronDeAutorizacionDto, nullable: true }) patron!: PatronDeAutorizacionDto | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) revocadaEn!: string | null;
   @ApiProperty({ type: String, nullable: true }) motivoRevocacion!: string | null;
 }

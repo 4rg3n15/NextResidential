@@ -9,7 +9,7 @@ import { ApiProperty } from '@nestjs/swagger';
  * recalculara el aforo restando ingresos de salidas, tendría una segunda
  * verdad que se separaría de la primera en la primera carrera.
  */
-export class FranjaDto {
+export class FranjaDeHorarioDto {
   @ApiProperty({ type: Number, description: 'Día 0..6 con domingo = 0.' }) dia!: number;
   @ApiProperty({ type: Number }) minutoInicio!: number;
   @ApiProperty({ type: Number }) minutoFin!: number;
@@ -43,7 +43,7 @@ export class ZonaDto {
   @ApiProperty({ type: Number }) aforoDisponible!: number;
   @ApiProperty({ type: Boolean }) dentroDeHorario!: boolean;
   @ApiProperty({ type: Boolean }) aforoCompleto!: boolean;
-  @ApiProperty({ type: [FranjaDto] }) horario!: FranjaDto[];
+  @ApiProperty({ type: [FranjaDeHorarioDto] }) horario!: FranjaDeHorarioDto[];
   @ApiProperty({ type: Number, description: 'Minutos de desfase UTC del horario de la zona.' })
   desplazamientoUtcMinutos!: number;
   @ApiProperty({
