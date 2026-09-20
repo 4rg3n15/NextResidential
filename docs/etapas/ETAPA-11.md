@@ -608,11 +608,13 @@ se puso roja sola —«rutas alcanzables por un residente SIN comprobación de
 vivienda»— antes de que yo escribiera ninguna prueba. Es exactamente lo que se
 le pidió en 11-A.
 
-| ID       | Qué                                                                                                          | Estado        |
-| -------- | ------------------------------------------------------------------------------------------------------------ | ------------- |
-| **D-89** | Dos consultas del adaptador del residente no existían en el esquema; la suite pasaba porque probaba el doble | **Corregido** |
-| **D-77** | `GET …/biometria/consentimientos/:id` sigue sin acotarse por titular                                         | **Abierto**   |
-| **S-22** | Sin documento del visitante, RN-06 solo cruza la lista negra por placa: media regla, que es más que ninguna  | `[SUPUESTO]`  |
+| ID       | Qué                                                                                                                                                                                                                                  | Estado        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| **D-90** | `.env.example` declaraba tres nombres que el código no lee (`RATE_LIMIT_TTL`, `RATE_LIMIT_LIMIT`, `MAX_PAYLOAD_BYTES`) y omitía cuatro que sí; `DATABASE_POOLER_URL` estaba sin el `=` y era invisible para `entorno:diff`           | **Corregido** |
+| **D-91** | Al corregir D-90 declaré dos opcionales como `VAR=`, y eso **impedía el arranque**: `dotenv` produce la cadena vacía, no `undefined`. La prueba genérica destapó que le pasaba igual a **todas las variables con valor por omisión** | **Corregido** |
+| **D-89** | Dos consultas del adaptador del residente no existían en el esquema; la suite pasaba porque probaba el doble                                                                                                                         | **Corregido** |
+| **D-77** | `GET …/biometria/consentimientos/:id` sigue sin acotarse por titular                                                                                                                                                                 | **Abierto**   |
+| **S-22** | Sin documento del visitante, RN-06 solo cruza la lista negra por placa: media regla, que es más que ninguna                                                                                                                          | `[SUPUESTO]`  |
 
 ### Lo que NO entró en esta mitad
 
