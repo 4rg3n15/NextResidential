@@ -1045,6 +1045,42 @@ try {
       ? ok('NCR_FLUTTER a un binario que no está: fallo, no aviso')
       : mal(`un NCR_FLUTTER roto pasa inadvertido (codigo ${mal_apuntado.codigo})`);
   }
+
+  console.log('\n▸ 20 · un `.env.example` que no dice la verdad se detecta (D-90)');
+  {
+    /**
+     * Las dos direcciones, que son dos defectos distintos: una variable que el
+     * código lee y el ejemplo no declara deja a quien despliega sin saber que
+     * existe; una que el ejemplo declara y nadie lee hace creer que se
+     * configuró algo. La segunda es la que dejó el rate limiting en sus valores
+     * por omisión durante semanas.
+     */
+    const ejemplo = join(clon, 'apps', 'api', '.env.example');
+    const original = readFileSync(ejemplo, 'utf8');
+
+    enClon('node', ['scripts/lib/entorno-declarado.mjs']).codigo === 0
+      ? ok('el banco parte en verde')
+      : mal('el ejemplo real no cuadra con el esquema');
+
+    // (a) el `=` que falta: la línea sigue ahí y el comparador deja de verla.
+    writeFileSync(ejemplo, original.replace('CORS_ALLOWED_ORIGINS=', 'CORS_ALLOWED_ORIGINS'));
+    const rA = enClon('node', ['scripts/lib/entorno-declarado.mjs']);
+    rA.codigo !== 0 && /CORS_ALLOWED_ORIGINS/.test(rA.salida)
+      ? ok('una declaración sin `=` se detecta, no se disculpa')
+      : mal(`una declaracion sin igual pasa inadvertida (codigo ${rA.codigo})`);
+
+    // (b) un nombre que nadie lee.
+    writeFileSync(ejemplo, `${original}\nVARIABLE_QUE_NADIE_LEE=1\n`);
+    const rB = enClon('node', ['scripts/lib/entorno-declarado.mjs']);
+    rB.codigo !== 0 && /NADIE la lee/.test(rB.salida)
+      ? ok('una variable declarada que nadie lee: detectada')
+      : mal(`una variable inventada pasa inadvertida (codigo ${rB.codigo})`);
+
+    writeFileSync(ejemplo, original);
+    enClon('node', ['scripts/lib/entorno-declarado.mjs']).codigo === 0
+      ? ok('el banco de pruebas queda limpio')
+      : mal('la sonda dejó rastro en el banco');
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -1068,6 +1104,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 21 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 22 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

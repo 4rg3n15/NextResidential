@@ -6,6 +6,7 @@
   "scripts/lib/contrato-tipado.mjs": 20,
   "scripts/lib/controles-declarados.mjs": 5,
   "scripts/lib/controles-sin-prueba-negativa.mjs": 1,
+  "scripts/lib/entorno-declarado.mjs": 3,
   "scripts/lib/escanear-secretos.mjs": 3,
   "scripts/lib/estabilidad.mjs": 8,
   "scripts/lib/frontera-append-only.mjs": 1,

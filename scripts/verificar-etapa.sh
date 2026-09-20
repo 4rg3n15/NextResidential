@@ -476,6 +476,16 @@ paso "9 · pruebas negativas de los propios controles"
 # Y que las declaraciones de «no ejercido» sigan en regla: con motivo escrito y
 # con una etapa de revisión que todavía no se haya cerrado. Una declaración que
 # sobrevive a su propia revisión es una desactivación con buenos modales.
+# `.env.example` es la ÚNICA documentación de la configuración y aquello contra
+# lo que `entorno:diff` compara. Nadie comprobaba que dijera la verdad: tenía
+# una variable sin `=` —invisible para el comparador, reclamada en cada
+# corrida durante semanas— y tres nombres que el código no lee (D-90).
+if salida_entorno=$(node scripts/lib/entorno-declarado.mjs 2>&1); then
+  ok "$salida_entorno"
+else
+  mal ".env.example no declara lo que el código lee"
+  echo "$salida_entorno" | sed 's/^/     /'
+fi
 if salida_declaradas=$(node scripts/lib/controles-declarados.mjs --auditar 2>&1); then
   ok "$salida_declaradas"
 else

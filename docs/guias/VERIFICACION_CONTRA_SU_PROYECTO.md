@@ -697,6 +697,23 @@ SELECT count(*) FROM public.viviendas WHERE copropiedad_id = '<su-id>' AND estad
 
 ## 13 · La superficie del residente contra su base — ETAPA 11-B
 
+> **Empiece por dos.** Si solo tiene tiempo para dos puntos de este apartado,
+> que sean **13.2** y **13.4**:
+>
+> - **13.2** es el que habría detectado D-89. Comprueba que el SQL de los
+>   adaptadores del residente encaja con SU esquema. Un minuto.
+> - **13.4** es el que comprueba que un reintento sin cobertura **no duplica la
+>   visita**. Es la diferencia entre que el portero vea una autorización o dos
+>   para la misma persona.
+>
+> Los demás son útiles y ninguno es bloqueante.
+
+> **Antes de nada, dos avisos de `entorno:diff` que ya no debería ver.** > `DATABASE_POOLER_URL` estaba declarada en `.env.example` **sin el signo
+> igual**, así que el comparador no la veía y se la reclamaba en cada corrida.
+> `EVIDENCIA_BUCKET` no estaba declarada en absoluto. Las dos están corregidas
+> en esta ronda (D-90), junto con tres nombres que el ejemplo pedía y el código
+> nunca ha leído — ver §13.0.
+
 **Por qué este apartado existe y es el más importante de la ronda.** En 11-A la
 app del residente se probó entera contra un **doble en memoria**: 1.519 pruebas
 en verde, incluidas las del segundo eje de aislamiento. Al escribir 11-B se
@@ -707,6 +724,43 @@ contra una base real** y ningún control lo decía.
 
 Está corregido y ahora hay una suite que lo vigila. Lo que sigue es cómo
 comprobarlo usted contra SU proyecto.
+
+### 13.0 · Las variables de entorno, corregidas (D-90)
+
+Tres nombres del `.env.example` **no los leía nadie**. Como el esquema tiene
+valores por omisión, la aplicación arrancaba igual, así que quien endurecía el
+límite de peticiones creía haberlo endurecido:
+
+| Lo que decía el ejemplo | Lo que el código lee de verdad |
+| ----------------------- | ------------------------------ |
+| `RATE_LIMIT_TTL`        | `THROTTLE_TTL_SEGUNDOS`        |
+| `RATE_LIMIT_LIMIT`      | `THROTTLE_LIMITE`              |
+| `MAX_PAYLOAD_BYTES`     | `LIMITE_PAYLOAD`               |
+
+**Qué hacer en su `.env`:** renombrar esos tres. Los valores viejos no hacen
+nada. `RATE_LIMIT_LIMIT=100` se convierte en `THROTTLE_LIMITE=100`, y si no lo
+renombra seguirá con el valor por omisión de 120.
+
+Y se declararon cuatro que faltaban: `DATABASE_POOLER_URL` (le faltaba el `=`),
+`EVIDENCIA_BUCKET`, `PG_POOL_MAX` y `RECUPERACION_URL_REDIRECCION`.
+
+```bash
+pnpm entorno:diff
+```
+
+**Esperado:** ninguna diferencia, o solo las que usted haya añadido a propósito.
+
+**Las seis `BARRERA_*` son correctas y debe tenerlas**: las lee el adaptador de
+barrera (`packages/providers`) y `BARRERA_DISPOSITIVO_ID` la lee el módulo de
+guardia. La IP y las credenciales del equipo **viven solo en su `.env`**: §2.7.1
+y KPI-11 prohíben que una IP de dispositivo entre en el repositorio, y el paso
+10 del verificador lo comprueba.
+
+Desde esta ronda hay un control que impide que esto se repita: el paso 9
+compara el esquema Zod contra `.env.example` **en las dos direcciones** y falla
+si una variable se lee y no se declara, o se declara y no se lee.
+
+---
 
 ### 13.1 · Aplicar la migración 0030
 
@@ -734,9 +788,9 @@ select count(*) from public.dispositivos_de_notificacion;
 permisos en vez de `0`, está usando una llave sujeta a RLS y **eso es correcto**:
 la política solo deja ver los aparatos propios.
 
-### 13.2 · Que el SQL del residente encaje con SU esquema
+### 13.2 · **[PRIORITARIO]** Que el SQL del residente encaje con SU esquema
 
-Esta es la comprobación que faltaba en 11-A.
+Esta es la comprobación que faltaba en 11-A, y la que habría detectado D-89.
 
 ```bash
 DATABASE_URL_PRUEBAS='postgresql://…' \
@@ -782,7 +836,7 @@ identidad; el cliente no puede nombrarla. Si intenta añadir `viviendaId` al
 cuerpo recibirá **400**, porque el `ValidationPipe` corre con
 `forbidNonWhitelisted`.
 
-### 13.4 · La idempotencia, que es lo que hace seguro el modo sin conexión
+### 13.4 · **[PRIORITARIO]** La idempotencia, que es lo que hace seguro el modo sin conexión
 
 Repita **el mismo comando de 13.3, sin cambiar nada**.
 
