@@ -740,7 +740,47 @@ veredicto en cada corrida, que es como se pidió: declarado, no desactivado.
 | **D-93** | El doble de escrituras repartía identificadores por vivienda (`previas.length + 1`), así que la primera autorización de cada vivienda tenía el MISMO id. La prueba del segundo eje sobre la ruta de rostro **pasaba sin demostrar nada**: R1 nombrando el del vecino encontraba el suyo. Lo destapó que la prueba diera 201 donde esperaba 404 | **Corregido** |
 | **D-94** | `packages/contracts/src/index.ts` seguía apuntando a `PatronDto`, renombrado en D-92. El contrato regenerado lo destapó en `typecheck`                                                                                                           | **Corregido** |
 | **D-95** | El banco de pruebas negativas clona `HEAD` y copia lo que `git ls-files` conoce, así que **un control todavía sin versionar no llega al banco**. Node devuelve 1 por módulo inexistente, y 1 es justo lo que la sonda espera de una violación: la línea base salía en rojo con el diagnóstico «la sonda dejó rastro en el banco», que manda a buscar el defecto donde no está | **Corregido** |
+| **D-97** | La prueba de la franja que cruza medianoche construía la franja **en UTC** y exigía leer «02:00». El widget pinta `toLocal()`, así que con `TZ=Etc/UTC` pasaba y en Bogotá fallaba: **mismo código, dos resultados**. Lo reportó el usuario desde su máquina | **Corregido** |
+| **S-23** | Derivado de D-97: `MiZonaDto.franjasDeHoy` viaja como instantes y la app los pinta en el huso **del teléfono**, no en el de la copropiedad. El servidor sí conoce el suyo —resuelve «hoy» con `copropiedades.zona_horaria`— pero no lo publica. Un residente de viaje leería el horario de la piscina desplazado | `[SUPUESTO]` **abierto** |
 | **D-96** | El trinquete de granularidad de rama (11-B) exigía **una cifra fija** a controles cuyas ramas SON el entorno: `verificar-entorno.mjs` daba 26 bloques sin ejercer en una corrida y 33 en la siguiente con el mismo código, y `con-limite.mjs` aparecía o no según qué sondas hubieran corrido. Un solo número no puede ser correcto en macOS y en Linux a la vez, y §2.8.0 exige las dos | **Corregido** |
+
+### D-97 · la prueba de la medianoche era la expuesta a que el huso la moviera
+
+El nombre lo decía y no lo vi: la prueba que existía para demostrar que una
+franja que cruza medianoche se pinta entera **construía la franja en UTC y
+afirmaba un texto que solo es cierto en UTC**. Yo la corrí en un contenedor con
+`TZ=Etc/UTC` y salió verde; en Bogotá el mismo widget escribe «21:00» y la
+prueba falla. No es del entorno del usuario: es de la prueba.
+
+Reproducido antes de tocar nada, y medido en cinco husos —UTC, Bogotá, Tokio,
+Auckland y Santiago—: solo fallaba esa. El resto de las 158 pasa en los cuatro
+husos que probé.
+
+**El arreglo no es fijar un huso.** Eso solo mueve el punto ciego de sitio. La
+franja se construye ahora en hora **local** —que es lo que el residente tiene
+delante— y el texto esperado se deriva de esa misma hora en vez de ser una
+constante, con una aserción previa de que la franja sigue cruzando medianoche
+para que un cambio de horario de verano no la deje pasando sin probar nada.
+
+**Y el control que lo habría detectado**, en el paso 5c: la suite de Dart se
+corre **dos veces, en dos husos distintos**, y el segundo se elige comparando
+desplazamientos con el de la máquina —el primero de la lista que no coincida—.
+Fijar `TZ` a un valor no habría servido: el entorno objetivo es macOS en Bogotá
+y el CI corre en UTC (§2.8.0), así que una prueba dependiente del reloj está
+verde en una máquina y roja en la otra, y quien la ve roja no puede saber si es
+el código o la hora.
+
+**S-23, que sale de aquí y NO se corrige en esta ronda.** El widget pinta
+`toLocal()`, es decir el huso del teléfono, y el horario de una zona común es el
+de la copropiedad. Para un residente en el conjunto coinciden; para uno de viaje
+no. El servidor ya conoce el huso correcto —`zonas-pg.ts` resuelve «hoy» con
+`copropiedades.zona_horaria`— y no lo publica en el DTO. La salida es la misma
+que ya se tomó en M-4: **enviar el desplazamiento en minutos** junto a las
+franjas, como `desplazamientoUtcMinutos`, y pintar con él en vez de con
+`toLocal()`; no hace falta una dependencia nueva de husos en Dart. Es un cambio
+de contrato, se encontró al cerrar y queda declarado para que lo decida el
+cliente: el impacto real es bajo —Colombia tiene un solo huso y no cambia la
+hora— pero la app afirma algo que no siempre es cierto.
 
 **D-96 es mío y de la ronda anterior**, y conviene decirlo así: construí un
 trinquete determinista sobre una medición que no lo es. El arreglo no es aflojar

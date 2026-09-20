@@ -268,6 +268,37 @@ diagnostico_movil() {
   elif grep -qiE "No pubspec.yaml file found|Target file .* not found" "$destino"; then
     echo "     ► Esto es ENTORNO: el comando corrió desde un directorio sin app Flutter."
   fi
+  # ── QUÉ SE IMPRIME PRIMERO · pedido por el usuario, 2026-09-20 ────────────
+  #
+  # `flutter test` termina con el contador de progreso, y ese contador arrastra
+  # el `-1` en cada prueba POSTERIOR que pasa. Con `tail -20` a secas, las
+  # veinte últimas líneas eran quince nombres de pruebas que pasaron, todas
+  # marcadas con el mismo `-1`, y el nombre de la que falló quedaba arriba,
+  # fuera del recorte. Costó minutos localizar una prueba que el propio guion
+  # tenía delante.
+  #
+  # Ahora el nombre de lo que falla va PRIMERO y el volcado después, como
+  # contexto. Dos fuentes, por orden: el bloque «Failing tests:» que Flutter
+  # escribe al final, y si no estuviera, las líneas marcadas `[E]`, que es como
+  # marca cada fallo mientras corre.
+  local fallidas
+  fallidas=$(sed -n '/^Failing tests:/,$p' "$destino" | sed '1d' | sed '/^[[:space:]]*$/d')
+  if [[ -z "$fallidas" ]]; then
+    fallidas=$(grep -E '\[E\]$' "$destino" | sed -E 's/^[0-9:]+ \+[0-9]+ -[0-9]+: //')
+  fi
+  if [[ -n "$fallidas" ]]; then
+    echo "     ► PRUEBAS QUE FALLAN:"
+    echo "$fallidas" | sed 's/^/       ✗ /'
+    # Y el detalle de la PRIMERA, que es donde está la causa: lo que se esperaba
+    # y lo que se obtuvo, sin tener que abrir el fichero.
+    local detalle
+    detalle=$(grep -m 4 -E '^[[:space:]]*(Expected|Actual|Which):' "$destino")
+    if [[ -n "$detalle" ]]; then
+      echo "     ► DETALLE DE LA PRIMERA:"
+      echo "$detalle" | sed 's/^[[:space:]]*/       /'
+    fi
+    echo "     ► Contexto (últimas líneas de la corrida):"
+  fi
   sed 's/^/     /' <(tail -20 "$destino")
 }
 
@@ -340,6 +371,40 @@ else
     else
       echo "$salida_cob"
       mal "la app Flutter no alcanza sus umbrales de cobertura"
+    fi
+
+    # ── LA SUITE TIENE QUE DAR LO MISMO EN OTRO HUSO · D-97 ─────────────────
+    #
+    # Una prueba de widget construyó una franja horaria en UTC y exigió leer
+    # «02:00». El widget pinta la hora LOCAL, así que en un contenedor con
+    # TZ=Etc/UTC pasaba y en Bogotá fallaba: mismo código, dos resultados. El
+    # entorno de desarrollo objetivo es macOS en Bogotá y el CI corre en UTC
+    # (§2.8.0), de modo que una prueba así está verde en una máquina y roja en
+    # la otra, y quien la ve roja no puede saber si es el código o el reloj.
+    #
+    # No basta con fijar un huso: eso solo mueve el punto ciego. Lo que hace
+    # falta es que la suite dé el MISMO resultado en dos husos distintos, y por
+    # eso el segundo se elige comparando desplazamientos con el de esta máquina
+    # —el primero de la lista que no coincida—. Así siempre son dos de verdad,
+    # se corra donde se corra.
+    tz_otro=""
+    for tz_candidato in Pacific/Auckland America/Bogota Asia/Kolkata Etc/UTC; do
+      if [[ "$(TZ="$tz_candidato" date +%z 2>/dev/null)" != "$(date +%z)" ]]; then
+        tz_otro="$tz_candidato"
+        break
+      fi
+    done
+    if [[ -z "$tz_otro" ]]; then
+      mal "no se encontró un huso distinto del de esta máquina para la segunda corrida"
+    else
+      salida_tz="$(mktemp)"
+      if TZ="$tz_otro" ejecutar_movil "$LIMITE_LARGO" "$salida_tz" "$FLUTTER_BIN" test; then
+        ok "la suite de Dart da lo mismo en otro huso ($tz_otro): ninguna prueba depende del reloj del sistema"
+      else
+        mal "la suite de Dart pasa aquí y falla en $tz_otro: alguna prueba depende del huso"
+        diagnostico_movil "$salida_tz" "$FLUTTER_BIN" test
+      fi
+      rm -f "$salida_tz"
     fi
   else
     mal "la suite de la app Flutter terminó con fallo"

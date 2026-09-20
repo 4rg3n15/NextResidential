@@ -1121,3 +1121,35 @@ select instalacion_id, left(token, 12), actualizado_en
 mismo teléfono significan que la fila se está identificando por el token y no
 por la instalación, y cada rotación dejaría un registro muerto al que se
 seguiría notificando.
+
+### 14.8 · Que la suite de Dart no dependa del reloj de su máquina
+
+Es la comprobación que salió de D-97, y la puede hacer usted en veinte segundos:
+
+```bash
+cd apps/mobile
+TZ=Etc/UTC          flutter test | tail -1
+TZ=America/Bogota   flutter test | tail -1
+TZ=Pacific/Auckland flutter test | tail -1
+```
+
+**Esperado: las tres líneas idénticas.** Si una difiere, hay una prueba que
+afirma una hora escrita a mano en vez de derivarla, y estará verde en su Mac y
+roja en el CI —o al revés—, que es justo lo que pasó.
+
+El paso **5c** del verificador ya lo hace solo: corre la suite una segunda vez en
+un huso elegido por ser distinto del de su máquina. Si ve
+
+```
+✓ la suite de Dart da lo mismo en otro huso (Pacific/Auckland): ninguna prueba depende del reloj del sistema
+```
+
+no hace falta que lo repita a mano.
+
+> **Nota sobre S-23, declarado y no corregido.** La app pinta el horario de las
+> zonas comunes en el huso **de su teléfono**, no en el de la copropiedad. En
+> Colombia coinciden siempre —un solo huso, sin horario de verano—, así que no
+> lo verá. Se nota si abre la app desde otro país: la piscina aparecerá con las
+> horas desplazadas. El arreglo está propuesto en `docs/etapas/ETAPA-11.md`
+> (enviar el desplazamiento en minutos, como ya hace M-4) y es un cambio de
+> contrato, así que lo decide usted.

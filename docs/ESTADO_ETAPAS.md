@@ -663,11 +663,16 @@ esquema renombrado en D-92—, **D-95** —el banco de pruebas negativas confund
 «el control no está versionado» con «el control falló»— y **D-96** —el trinquete
 de ramas exigía una cifra fija a controles cuyas ramas dependen del host, así
 que estaba condenado a ponerse rojo en macOS o en Linux por la máquina y no por
-el código—.
+el código— y **D-97** —la prueba de la franja que cruza medianoche afirmaba un
+texto que solo es cierto con `TZ=Etc/UTC`, así que estaba verde aquí y roja en
+la máquina del usuario—. De D-97 sale **S-23**, declarado y no corregido: la app
+pinta el horario de las zonas en el huso del teléfono y no en el de la
+copropiedad.
 
-Los cuatro son la misma familia, y los cuatro aparecieron **en controles**, no
-en producto: el doble, el contrato, el banco de pruebas y el trinquete. Un
-control que no puede distinguir dos situaciones distintas no está demostrado.
+Los cinco son la misma familia, y los cuatro aparecieron **en controles**, no
+en producto: el doble, el contrato, el banco de pruebas, el trinquete y una
+prueba de widget. Un control que no puede distinguir dos situaciones distintas
+no está demostrado — y uno que da resultados distintos según la máquina tampoco.
 
 ---
 

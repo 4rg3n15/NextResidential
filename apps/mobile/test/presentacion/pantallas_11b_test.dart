@@ -270,22 +270,39 @@ void main() {
     });
 
     testWidgets('EL HORARIO QUE CRUZA MEDIANOCHE se pinta entero', (t) async {
-      // 20:00 → 02:00 del día siguiente. Si la pantalla lo partiera en dos o
-      // reiniciara el contador a medianoche, el residente leería un horario
-      // que no es el de la zona.
+      /**
+       * D-97 · ESTA PRUEBA AFIRMABA UN TEXTO QUE DEPENDÍA DE LA MÁQUINA.
+       *
+       * Construía la franja en UTC —`DateTime.utc(2026, 9, 21, 2)`— y exigía
+       * leer «02:00». El widget pinta `toLocal()`, así que el texto sale en el
+       * huso del sistema: en un contenedor con `TZ=Etc/UTC` da 02:00 y pasa, y
+       * en Bogotá da 21:00 y falla. Mismo código, dos resultados.
+       *
+       * La ironía está en el nombre: la prueba de la franja que cruza
+       * medianoche era justo la expuesta a que el huso la moviera de día.
+       *
+       * Ahora se construye en hora LOCAL —lo que el residente tiene delante— y
+       * el texto esperado se deriva de la misma hora, no de una constante. Así
+       * la afirmación es la misma en macOS, en Linux y en cualquier huso.
+       */
+      final desde = DateTime(2026, 9, 20, 20);
+      final hasta = desde.add(const Duration(hours: 6));
+      // Sin esto la prueba podría dejar de cruzar medianoche —un cambio de
+      // horario de verano mueve la hora— y seguiría en verde sin probar nada.
+      expect(hasta.day, isNot(desde.day), reason: 'la franja tiene que cruzar medianoche');
+
       await montar(t, [
-        zona(
-          nombre: 'Salón social',
-          franjas: [
-            FranjaDeZona(
-              desde: DateTime.utc(2026, 9, 20, 20),
-              hasta: DateTime.utc(2026, 9, 21, 2),
-            ),
-          ],
-        ),
+        zona(nombre: 'Salón social', franjas: [FranjaDeZona(desde: desde, hasta: hasta)]),
       ]);
+
+      String dosCifras(int n) => n.toString().padLeft(2, '0');
+      final esperado = '${dosCifras(desde.hour)}:00–${dosCifras(hasta.hour)}:00';
+
       expect(find.text('Salón social'), findsOneWidget);
-      expect(find.textContaining('02:00'), findsWidgets);
+      // Y ENTERO: un solo texto con los dos extremos. Si la pantalla la
+      // partiera en dos al llegar a medianoche, aquí habría dos entradas y el
+      // residente leería un horario que no es el de la zona.
+      expect(find.textContaining(esperado), findsOneWidget);
     });
 
     testWidgets('cerrada ahora se distingue de llena: son cosas distintas', (t) async {
