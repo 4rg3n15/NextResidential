@@ -15,6 +15,38 @@ import { z } from 'zod';
 const noVacio = (nombre: string) => z.string().trim().min(1, `${nombre} es obligatoria`);
 
 /**
+ * `VAR=` EN UN `.env` SIGNIFICA «NO CONFIGURADA», NO «CADENA VACÍA».
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * D-91, y lo introduje yo hace una ronda
+ *
+ * `.optional()` y `.default()` de Zod quieren decir «`undefined` vale». Pero
+ * `dotenv` no produce `undefined` para una línea `VAR=`: produce **la cadena
+ * vacía**, que sí llega al validador. Resultado: `RECUPERACION_URL_REDIRECCION=`
+ * fallaba contra `.url()` y **la aplicación no arrancaba**.
+ *
+ * Lo grave es cómo apareció: al corregir D-90 declaré esa variable y
+ * `EVIDENCIA_BUCKET=` en `.env.example`, así que **copiar el ejemplo al pie de
+ * la letra impedía arrancar**, y el único camino que le quedaba a quien
+ * desplegara era arrancar, fallar y adivinar. Un ejemplo que no se puede copiar
+ * es peor que uno incompleto.
+ *
+ * Y al escribir la prueba genérica apareció la mitad que yo no veía: **lo mismo
+ * le pasaba a todas las variables con valor por omisión**. `PORT=`, `PG_POOL_MAX=`
+ * o `THROTTLE_LIMITE=` rompían el arranque, que es justo lo contrario de lo que
+ * un valor por omisión promete. Por eso esto se normaliza **una vez, para todo
+ * el entorno**, y no campo a campo: campo a campo, la variable número treinta
+ * es la que se olvida.
+ *
+ * Lo que NO cambia: una variable obligatoria vacía sigue impidiendo el
+ * arranque. Se vuelve «ausente» en vez de «vacía», y ausente ya era un fallo.
+ */
+const sinCadenasVacias = (entorno: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
+  Object.fromEntries(
+    Object.entries(entorno).filter(([, v]) => !(typeof v === 'string' && v.trim() === '')),
+  );
+
+/**
  * Un secreto tiene forma, y comprobar solo su LONGITUD deja pasar basura.
  *
  * El caso que motivó esto: un `.env` que no terminaba en salto de línea recibió
@@ -96,7 +128,24 @@ export const esquemaConfiguracion = z.object({
   /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 
-  LIMITE_PAYLOAD: z.string().default('256kb'),
+  /**
+   * Tope del cuerpo de una petición (§2.7.8). Lo consume `express.json({ limit })`,
+   * que acepta la forma `256kb`, `1mb` o un número de bytes.
+   *
+   * La forma se valida aquí y no se daba por buena: era `z.string()` a secas, y
+   * lo destapó la prueba genérica de D-91 al exigir que un valor inválido
+   * impidiera el arranque. `LIMITE_PAYLOAD=mucho` se aceptaba, llegaba a
+   * `express` y el tope quedaba en lo que `express` decidiera — es decir, el
+   * límite estaba «configurado» y no lo estaba.
+   */
+  LIMITE_PAYLOAD: z
+    .string()
+    .trim()
+    .regex(
+      /^\d+(b|kb|mb|gb)?$/i,
+      'LIMITE_PAYLOAD debe ser como `256kb`, `1mb` o un número de bytes',
+    )
+    .default('256kb'),
 
   /**
    * Bucket privado de evidencia (RN-21). Opcional mientras el almacén sea el
@@ -199,7 +248,8 @@ export const cargarConfiguracion = (entorno: NodeJS.ProcessEnv): Configuracion =
   const pegadas = detectarVariablePegada(entorno);
   if (pegadas.length > 0) throw new ErrorDeConfiguracion(pegadas);
 
-  const analisis = esquemaConfiguracion.safeParse(entorno);
+  // D-91 · antes de validar, `VAR=` deja de existir (ver `sinCadenasVacias`).
+  const analisis = esquemaConfiguracion.safeParse(sinCadenasVacias(entorno));
   if (!analisis.success) {
     throw new ErrorDeConfiguracion(
       analisis.error.issues.map((i) => `${i.path.join('.') || '(raíz)'}: ${i.message}`),

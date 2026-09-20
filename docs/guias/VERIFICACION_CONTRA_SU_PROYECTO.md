@@ -744,6 +744,31 @@ renombra seguirá con el valor por omisión de 120.
 Y se declararon cuatro que faltaban: `DATABASE_POOLER_URL` (le faltaba el `=`),
 `EVIDENCIA_BUCKET`, `PG_POOL_MAX` y `RECUPERACION_URL_REDIRECCION`.
 
+> **D-91 · corrección de la corrección.** Al declarar las dos opcionales las
+> escribí como `EVIDENCIA_BUCKET=` y `RECUPERACION_URL_REDIRECCION=`, y **eso
+> impedía el arranque**: `dotenv` no produce «no configurada» para una línea
+> `VAR=`, produce **la cadena vacía**, que sí llega al validador y no es una URL
+> absoluta. Copiar el ejemplo al pie de la letra rompía la aplicación.
+>
+> Corregido en el sitio que lo cierra entero: el cargador descarta las cadenas
+> vacías **antes** de validar, así que `VAR=` vuelve a significar «no
+> configurada». Y al escribir la prueba genérica apareció la mitad que no se
+> veía: **lo mismo le pasaba a todas las variables con valor por omisión**
+> —`PORT=`, `PG_POOL_MAX=`, `THROTTLE_LIMITE=`—, que es justo lo contrario de
+> lo que un valor por omisión promete.
+>
+> En su `.env`: si tiene alguna de esas líneas vacía, ya no le molestará. Las
+> dos opcionales van en el ejemplo **comentadas y con un valor de referencia**,
+> que es como se lee sin ambigüedad:
+>
+> ```
+> # RECUPERACION_URL_REDIRECCION=http://localhost:3001/restablecer
+> # EVIDENCIA_BUCKET=evidencias
+> ```
+>
+> Si pone la primera, su origen tiene que estar en `CORS_ALLOWED_ORIGINS`: el
+> arranque lo comprueba.
+
 ```bash
 pnpm entorno:diff
 ```
