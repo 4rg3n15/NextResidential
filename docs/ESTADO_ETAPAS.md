@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-20 · **ETAPA 11 CERRADA** (mitades 11-A, 11-B y 11-C) · la app Flutter del residente, el segundo eje del aislamiento y la captura con consentimiento del titular
+**Última actualización:** 2026-09-20 · **ETAPA 12 CERRADA** · el Edge Gateway: decide sin conexión con el MISMO motor que la nube, y reconcilia exactamente una vez
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -20,13 +20,13 @@
 
 |                                |                                                                                                                 |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **12 de 17** (ETAPAS 00 a 11) · la 11 cerrada el 2026-09-20 con `--con-base`, en tres mitades: 11-A, 11-B y 11-C |
-| **Etapa siguiente habilitada** | **ETAPA 12 — Edge Gateway: offline y reconciliación**                                                           |
+| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-20 con `--con-base`                                     |
+| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento**                                                     |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | **D-78** (el tema de la app copia los colores a mano). D-77 cerrado en 11-C; D-89 a D-94 corregidos en la 11    |
+| **Defectos abiertos**          | **D-78** (el tema de la app copia los colores a mano). D-89 a D-99 corregidos en las etapas 11 y 12             |
 | **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
 | **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
-| **Supuestos vigentes**         | 13 — nuevos S-19 y S-20 (conteos de visitantes del tablero)                                                     |
+| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)     |
 | **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                           |
 
 ---
@@ -47,8 +47,8 @@
 | 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **CERRADA**                      | [ETAPA-09](etapas/ETAPA-09.md) |
 | 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09 ✅                            | **CERRADA**                      | [ETAPA-10](etapas/ETAPA-10.md) |
 | 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                            | **CERRADA** — 11-A, 11-B y 11-C  | [ETAPA-11](etapas/ETAPA-11.md) |
-| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **PENDIENTE** — habilitada       | —                              |
-| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12                               | PENDIENTE                        | —                              |
+| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **CERRADA**                      | [ETAPA-12](etapas/ETAPA-12.md) |
+| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12 ✅                            | **PENDIENTE** — habilitada       | —                              |
 | 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13                               | PENDIENTE                        | —                              |
 | 15     | Integración real con hardware Hikvision                       | `etapa-15-integracion-hikvision`       | 14                               | **PENDIENTE — con precondición** | —                              |
 | 16     | Documentación técnica final y README                          | `etapa-16-documentacion-final`         | 14 (ejecutable), 15 (definitiva) | PENDIENTE                        | —                              |
@@ -466,6 +466,43 @@ lecturas se puede borrar por API (`isSupportLPAuditDataDelete` es verdadero). La
 trazabilidad vive en `eventos`, append-only por permisos y por disparador
 (ADR-05). El equipo pasó además de control por cámara a **control por
 plataforma**: la decisión la toma Next Control.
+
+---
+
+## ETAPA 12 — Edge Gateway: offline y reconciliación · **CERRADA** · 2026-09-20
+
+**Rama:** `etapa-12-edge-gateway-offline`, desde `develop` con la ETAPA 11
+cerrada · **Informe:** [`etapas/ETAPA-12.md`](etapas/ETAPA-12.md)
+
+| Entregable                                    | Estado                                                                                                                                  |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dominio reutilizado SIN modificar**         | Cumplido · `apps/edge` no tiene una sola regla de acceso propia. Probado por los dos caminos en `misma-decision.test.ts`                  |
+| Caché de reglas versionada                     | SQLite, una instantánea cerrada por copropiedad. **La versión solo avanza**: una respuesta vieja que llega tarde no hace retroceder        |
+| Detección de WAN y modo autónomo               | Máquina de estados pura con histéresis (3 para caer, 2 para volver). Arranca autónomo, no en línea                                        |
+| Decisión local sellando la versión (RN-16, CA-21) | Cada decisión lleva la `VersionDeReglas` de la caché que la produjo                                                                    |
+| Bandeja con clave de idempotencia              | La misma mecánica que la app del residente, a propósito. Clave primaria en SQLite: lo impide la base, no un `if`                          |
+| Reconciliación ordenada (RN-17, CA-22)         | En orden, duplicado descartado en silencio con 202, corte del lote al primer fallo                                                        |
+| Reanudación ante conexión intermitente         | Desde el último confirmado. Probado con un corte a mitad de lote                                                                          |
+| Contingencia configurable                      | `denegar` por omisión (§2.1.4). **`escalar` tampoco abre**: entrega el caso al portero                                                    |
+| Marcado de caché obsoleta (KPI-31)             | Por antigüedad de la instantánea, medida desde que **la nube** la generó                                                                  |
+| **DoD · 30 min sin WAN, 20 accesos**           | **Ejecutada** · los 20 resueltos localmente, los 20 en la nube exactamente una vez, en dos tics de 15 s                                   |
+| **DoD · 24 h sin degradación (KPI-30)**        | **Ejecutada** · 1.440 accesos; decide igual en la hora 23; el coste por acceso no crece con la bandeja llena                              |
+| `docs/guias/DESPLIEGUE_EDGE.md`                | Entregada · aprovisionamiento, identidad y llave **por equipo**, rotación en el orden correcto, NTP y actualización por fases             |
+| **ADR-017**                                    | `node:sqlite` y no un módulo nativo: se despliega copiando ficheros, sin `node-gyp` en una máquina de portería                            |
+
+**Lo que la API tuvo que crecer, y solo eso:** `POST /ingesta/reconciliacion`,
+que **no vuelve a decidir**. Recalcular con las reglas de hoy haría que el
+histórico afirmara algo que nadie decidió y borraría la única prueba de qué hizo
+el Edge durante el corte.
+
+**Hallazgos:** **D-98** —una instantánea truncada tumbaba el gateway en vez de
+caer en contingencia— y **D-99** —`SQLITE_PATH` admitía un byte nulo, encontrado
+otra vez por la prueba genérica de D-91—.
+
+**Declarado y no construido · S-24:** la ruta que SIRVE la instantánea de reglas
+desde la nube. Cliente y contrato están; hoy la caché se siembra al aprovisionar.
+Se cierra con el tablero de reglas de la ETAPA 14. No afecta a la DoD —que parte
+de un gateway ya sincronizado— pero sí a la operación en régimen.
 
 ---
 

@@ -17,6 +17,7 @@ Registro de las decisiones de arquitectura del proyecto. Una decisión **aceptad
 | [ADR-014](ADR-014-modo-oscuro-por-parejas-de-tokens.md)              | El tema se declara como parejas de fondo y texto            | Aceptada | ETAPA 09-B     |
 | [ADR-015](ADR-015-cliente-dart-generado-con-swagger-parser.md)       | Cliente Dart con `swagger_parser` + `retrofit`, sin JVM      | Aceptada | ETAPA 11-A     |
 | [ADR-016](ADR-016-captura-biometrica-desde-la-app-del-residente.md)  | La captura del residente comparte el **caso de uso**, no el controlador (RN-10) | Aceptada | ETAPA 11-C |
+| [ADR-017](ADR-017-sqlite-del-edge-con-node-sqlite.md)                | SQLite del Edge con `node:sqlite`, sin módulos nativos      | Aceptada | ETAPA 12       |
 
 **Los números 009, 010 y 011 no existen** y no es un error de numeración que
 haya que corregir: se reservaron para decisiones de la 09-A que acabaron siendo

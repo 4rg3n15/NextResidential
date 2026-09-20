@@ -1,15 +1,20 @@
 import { Body, Controller, HttpCode, Inject, Post, UseGuards } from '@nestjs/common';
 import { BadRequestException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Bitacora, Reloj } from '@ncr/domain-core';
-import { BITACORA, RELOJ } from '@ncr/domain-core';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Bitacora, MotivoAcceso, Reloj } from '@ncr/domain-core';
+import { BITACORA, RELOJ, VersionDeReglas, negar, permitir } from '@ncr/domain-core';
 import { Publico, SinRecursoDeTenant } from '../../comun/decoradores';
 import { RegistrarAcceso } from '../../eventos';
 import { REPOSITORIO_DISPOSITIVOS } from '../../eventos';
 import type { RepositorioDispositivos } from '../../eventos';
 import { GuardiaDeFirmaDeIngesta } from './guardia-firma';
-import { EventoIngestaDto } from './dtos';
+import {
+  EventoIngestaDto,
+  LoteDeReconciliacionDto,
+  LoteReconciliadoDto,
+  ResultadoDeReconciliacionDto,
+} from './dtos';
 import { LatidoDto } from '../../eventos';
 
 /**
@@ -113,6 +118,134 @@ export class IngestaController {
     });
 
     return { aceptado: true, ...constancia.valor };
+  }
+
+  /**
+   * ETAPA 12 · CU-04 · La bandeja del Edge, al reconectar. RN-16, RN-17, CA-21, CA-22.
+   *
+   * ═════════════════════════════════════════════════════════════════════════
+   * AQUÍ NO SE DECIDE NADA. ESA ES LA RUTA.
+   *
+   * Cada evento llega con la decisión que el gateway YA tomó en la portería,
+   * sellada con la `VersionDeReglas` que tenía en ese momento, y con el
+   * instante real en que ocurrió. Volver a evaluarlo con las reglas de hoy
+   * produciría un histórico que afirma algo que nadie decidió, y borraría la
+   * única prueba de qué hizo el Edge durante el corte.
+   *
+   * ═════════════════════════════════════════════════════════════════════════
+   * EL DUPLICADO SE RESPONDE 202, NO 409
+   *
+   * El Edge reenvía a propósito: no sabe si el envío anterior llegó. Un 409 le
+   * diría «error» a algo que salió bien y le haría reintentar para siempre. Se
+   * responde aceptado con `duplicado: true`, y el gateway lo saca de su bandeja
+   * igual que si lo hubiera creado (CA-22, descarte silencioso).
+   *
+   * ═════════════════════════════════════════════════════════════════════════
+   * POR QUÉ EN ORDEN Y EN SERIE
+   *
+   * Un `Promise.all` sobre el lote sería más rápido y dejaría el histórico con
+   * los eventos de un corte en un orden que no es el que ocurrió. Se procesan
+   * en secuencia, y en el primero que falla se corta: los siguientes van a
+   * fallar igual y, si no lo hicieran, quedarían escritos antes que el que
+   * falló.
+   */
+  @Post('reconciliacion')
+  @Publico()
+  @SinRecursoDeTenant()
+  @UseGuards(GuardiaDeFirmaDeIngesta)
+  @Throttle({ default: { limit: LIMITE_IP_INGESTA, ttl: 60_000 } })
+  @HttpCode(202)
+  @ApiOkResponse({ type: LoteReconciliadoDto })
+  @ApiOperation({
+    summary: 'Recibe la bandeja de un Edge Gateway tras un corte de WAN (CU-04)',
+    description:
+      'NO vuelve a decidir: cada evento trae la decisión que el gateway tomó, ' +
+      'sellada con su versión de reglas (RN-16, CA-21). Deduplica por clave de ' +
+      'idempotencia y responde 202 también a los duplicados (RN-17, CA-22).',
+  })
+  async reconciliar(@Body() dto: LoteDeReconciliacionDto): Promise<LoteReconciliadoDto> {
+    const resultados: ResultadoDeReconciliacionDto[] = [];
+
+    for (const evento of dto.eventos) {
+      const version = VersionDeReglas.crear(
+        evento.decision.versionDeReglas,
+        evento.copropiedadId,
+      );
+      if (!version.ok) {
+        resultados.push({
+          claveIdempotencia: '',
+          aceptado: false,
+          duplicado: false,
+          detalle: version.error.detalle,
+        });
+        break;
+      }
+
+      // CA-16 · una negación sin motivo no es admisible. El tipo del dominio lo
+      // hace imposible; aquí, donde los datos vienen de fuera, se comprueba.
+      if (!evento.decision.permitido && evento.decision.motivo === undefined) {
+        resultados.push({
+          claveIdempotencia: '',
+          aceptado: false,
+          duplicado: false,
+          detalle: 'Una decisión denegada debe traer motivo (CA-16)',
+        });
+        break;
+      }
+
+      const decision = evento.decision.permitido
+        ? permitir(
+            version.valor,
+            evento.decision.reglaAplicada,
+            evento.decision.requiereConfirmacionHumana ?? false,
+          )
+        : negar(
+            evento.decision.motivo as MotivoAcceso,
+            version.valor,
+            evento.decision.reglaAplicada,
+          );
+
+      const constancia = await this.registrar.ejecutar(
+        {
+          copropiedadId: evento.copropiedadId,
+          dispositivoId: evento.dispositivoId,
+          metodo: evento.metodo,
+          referenciaExterna: evento.referenciaExterna,
+          confianza: evento.confianzaCentesimas / 100,
+          personaId: evento.personaId ?? null,
+          placaLeida: evento.placaLeida ?? null,
+          zonaId: evento.zonaId ?? null,
+          decididoPorEdge: true,
+          cachePotencialmenteObsoleto: evento.cachePotencialmenteObsoleto ?? false,
+          decisionDelEdge: decision,
+          ocurridoEn: new Date(evento.ocurridoEn),
+        },
+        ACTOR_INGESTA,
+      );
+
+      if (!constancia.ok) {
+        resultados.push({
+          claveIdempotencia: '',
+          aceptado: false,
+          duplicado: false,
+          detalle: constancia.error.detalle,
+        });
+        break;
+      }
+      resultados.push({
+        claveIdempotencia: constancia.valor.claveIdempotencia,
+        aceptado: true,
+        duplicado: constancia.valor.duplicado,
+      });
+    }
+
+    this.bitacora.registrar('info', 'lote reconciliado desde el Edge', {
+      recibidos: dto.eventos.length,
+      aceptados: resultados.filter((r) => r.aceptado).length,
+      duplicados: resultados.filter((r) => r.duplicado).length,
+    });
+
+    return { aceptado: true, resultados };
   }
 
   /**

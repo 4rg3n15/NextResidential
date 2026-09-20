@@ -143,6 +143,12 @@ const paquetes = [
   // ficheros de prueba en disco que nadie mide.
   ['@ncr/config', 'packages/config'],
   ['@ncr/web', 'apps/web'],
+  // ETAPA 12 · el Edge. Lo destapó este mismo control al informar «11 ficheros
+  // de prueba en disco que NADIE ejecutó»: el paso 5 los corría —136 de 136—
+  // y la MEDICIÓN de cobertura no los veía, así que su capa de aplicación,
+  // que es el corazón de la etapa, no entraba en el umbral del 90 % de §2.4.
+  // Es la misma forma del hueco de `@ncr/providers` en la ETAPA 05.
+  ['@ncr/edge', 'apps/edge'],
 ];
 
 let totalPruebas = 0;

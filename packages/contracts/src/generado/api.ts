@@ -1154,6 +1154,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ingesta/reconciliacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recibe la bandeja de un Edge Gateway tras un corte de WAN (CU-04)
+         * @description NO vuelve a decidir: cada evento trae la decisión que el gateway tomó, sellada con su versión de reglas (RN-16, CA-21). Deduplica por clave de idempotencia y responde 202 también a los duplicados (RN-17, CA-22).
+         */
+        post: operations["IngestaController_reconciliar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ready": {
         parameters: {
             query?: never;
@@ -1506,6 +1526,21 @@ export interface components {
             /** @description Su presencia es lo único que distingue una recurrente de una única (HU-09). */
             patron?: components["schemas"]["PatronDeEntradaDto"];
         };
+        DecisionDelEdgeDto: {
+            /** @description Lo que el Edge resolvió en la portería */
+            permitido: boolean;
+            /**
+             * @description Obligatorio cuando `permitido` es falso (CA-16)
+             * @enum {string}
+             */
+            motivo?: "VIGENCIA_EXPIRADA" | "AFORO_SUPERADO" | "LISTA_NEGRA" | "ZONA_NO_AUTORIZADA" | "FUERA_DE_PATRON" | "FUERA_DE_HORARIO" | "SIN_CONSENTIMIENTO" | "PLACA_DESCONOCIDA" | "CONFIANZA_INSUFICIENTE" | "FALLO_TECNICO";
+            /** @description Qué política resolvió. Es la traza de CA-21. */
+            reglaAplicada: string;
+            /** @description La versión de reglas con la que decidió (RN-16) */
+            versionDeReglas: number;
+            /** @description Lectura de baja confianza (CU-01 3a) */
+            requiereConfirmacionHumana?: boolean;
+        };
         DesactivarDto: {
             /** @description Obligatorio (RN-19). Queda en la auditoría junto al actor y no se puede editar. */
             motivo: string;
@@ -1621,6 +1656,24 @@ export interface components {
             confianzaCentesimas: number;
             /** @description Identificador del evento en el equipo (RN-17) */
             referenciaExterna: string;
+        };
+        EventoReconciliadoDto: {
+            copropiedadId: string;
+            dispositivoId: string;
+            /** @enum {string} */
+            metodo: "placa" | "facial" | "manual" | "remoto" | "tarjeta";
+            personaId?: string;
+            placaLeida?: string;
+            zonaId?: string;
+            /** @description Confianza de la lectura, 0..1 */
+            confianzaCentesimas: number;
+            /** @description Identificador del evento en el equipo (RN-17) */
+            referenciaExterna: string;
+            /** @description Instante REAL del acceso, no el de la reconciliación (CA-22) */
+            ocurridoEn: string;
+            decision: components["schemas"]["DecisionDelEdgeDto"];
+            /** @description KPI-31 · decidido con una caché que pudo haber envejecido */
+            cachePotencialmenteObsoleto?: boolean;
         };
         EventoRegistradoDto: {
             /** Format: uuid */
@@ -1778,6 +1831,14 @@ export interface components {
             dependencias: {
                 [key: string]: string;
             };
+        };
+        LoteDeReconciliacionDto: {
+            eventos: components["schemas"]["EventoReconciliadoDto"][];
+        };
+        LoteReconciliadoDto: {
+            aceptado: boolean;
+            /** @description Uno por evento procesado, EN ORDEN. Se corta en el primero que falla. */
+            resultados: components["schemas"]["ResultadoDeReconciliacionDto"][];
         };
         MedidasDeCapturaDto: {
             nitidez: number;
@@ -2152,6 +2213,15 @@ export interface components {
             /** @enum {string} */
             estado: "sincronizando";
             detalle: string;
+        };
+        ResultadoDeReconciliacionDto: {
+            /** @description La clave con la que el Edge lo reconocerá en su bandeja */
+            claveIdempotencia: string;
+            aceptado: boolean;
+            /** @description La nube ya lo tenía. NO es un error: el Edge reenvía porque no sabe si llegó (CA-22) */
+            duplicado: boolean;
+            /** @description Por qué no se aceptó, si no se aceptó */
+            detalle?: string;
         };
         RevocacionDto: {
             revocada: boolean;
@@ -4349,6 +4419,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    IngestaController_reconciliar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteDeReconciliacionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteReconciliadoDto"];
+                };
             };
         };
     };

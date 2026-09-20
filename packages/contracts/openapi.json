@@ -3736,6 +3736,39 @@
         ]
       }
     },
+    "/ingesta/reconciliacion": {
+      "post": {
+        "description": "NO vuelve a decidir: cada evento trae la decisión que el gateway tomó, sellada con su versión de reglas (RN-16, CA-21). Deduplica por clave de idempotencia y responde 202 también a los duplicados (RN-17, CA-22).",
+        "operationId": "IngestaController_reconciliar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoteDeReconciliacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteReconciliadoDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Recibe la bandeja de un Edge Gateway tras un corte de WAN (CU-04)",
+        "tags": [
+          "ingesta"
+        ]
+      }
+    },
     "/ready": {
       "get": {
         "operationId": "SaludController_listo",
@@ -4720,6 +4753,48 @@
           "hasta"
         ]
       },
+      "DecisionDelEdgeDto": {
+        "type": "object",
+        "properties": {
+          "permitido": {
+            "type": "boolean",
+            "description": "Lo que el Edge resolvió en la portería"
+          },
+          "motivo": {
+            "type": "string",
+            "enum": [
+              "VIGENCIA_EXPIRADA",
+              "AFORO_SUPERADO",
+              "LISTA_NEGRA",
+              "ZONA_NO_AUTORIZADA",
+              "FUERA_DE_PATRON",
+              "FUERA_DE_HORARIO",
+              "SIN_CONSENTIMIENTO",
+              "PLACA_DESCONOCIDA",
+              "CONFIANZA_INSUFICIENTE",
+              "FALLO_TECNICO"
+            ],
+            "description": "Obligatorio cuando `permitido` es falso (CA-16)"
+          },
+          "reglaAplicada": {
+            "type": "string",
+            "description": "Qué política resolvió. Es la traza de CA-21."
+          },
+          "versionDeReglas": {
+            "type": "number",
+            "description": "La versión de reglas con la que decidió (RN-16)"
+          },
+          "requiereConfirmacionHumana": {
+            "type": "boolean",
+            "description": "Lectura de baja confianza (CU-01 3a)"
+          }
+        },
+        "required": [
+          "permitido",
+          "reglaAplicada",
+          "versionDeReglas"
+        ]
+      },
       "DesactivarDto": {
         "type": "object",
         "properties": {
@@ -5079,6 +5154,64 @@
           "metodo",
           "confianzaCentesimas",
           "referenciaExterna"
+        ]
+      },
+      "EventoReconciliadoDto": {
+        "type": "object",
+        "properties": {
+          "copropiedadId": {
+            "type": "string"
+          },
+          "dispositivoId": {
+            "type": "string"
+          },
+          "metodo": {
+            "type": "string",
+            "enum": [
+              "placa",
+              "facial",
+              "manual",
+              "remoto",
+              "tarjeta"
+            ]
+          },
+          "personaId": {
+            "type": "string"
+          },
+          "placaLeida": {
+            "type": "string"
+          },
+          "zonaId": {
+            "type": "string"
+          },
+          "confianzaCentesimas": {
+            "type": "number",
+            "description": "Confianza de la lectura, 0..1"
+          },
+          "referenciaExterna": {
+            "type": "string",
+            "description": "Identificador del evento en el equipo (RN-17)"
+          },
+          "ocurridoEn": {
+            "type": "string",
+            "description": "Instante REAL del acceso, no el de la reconciliación (CA-22)"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionDelEdgeDto"
+          },
+          "cachePotencialmenteObsoleto": {
+            "type": "boolean",
+            "description": "KPI-31 · decidido con una caché que pudo haber envejecido"
+          }
+        },
+        "required": [
+          "copropiedadId",
+          "dispositivoId",
+          "metodo",
+          "confianzaCentesimas",
+          "referenciaExterna",
+          "ocurridoEn",
+          "decision"
         ]
       },
       "EventoRegistradoDto": {
@@ -5596,6 +5729,40 @@
         "required": [
           "estado",
           "dependencias"
+        ]
+      },
+      "LoteDeReconciliacionDto": {
+        "type": "object",
+        "properties": {
+          "eventos": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventoReconciliadoDto"
+            }
+          }
+        },
+        "required": [
+          "eventos"
+        ]
+      },
+      "LoteReconciliadoDto": {
+        "type": "object",
+        "properties": {
+          "aceptado": {
+            "type": "boolean"
+          },
+          "resultados": {
+            "description": "Uno por evento procesado, EN ORDEN. Se corta en el primero que falla.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResultadoDeReconciliacionDto"
+            }
+          }
+        },
+        "required": [
+          "aceptado",
+          "resultados"
         ]
       },
       "MedidasDeCapturaDto": {
@@ -6764,6 +6931,31 @@
           "operacion",
           "estado",
           "detalle"
+        ]
+      },
+      "ResultadoDeReconciliacionDto": {
+        "type": "object",
+        "properties": {
+          "claveIdempotencia": {
+            "type": "string",
+            "description": "La clave con la que el Edge lo reconocerá en su bandeja"
+          },
+          "aceptado": {
+            "type": "boolean"
+          },
+          "duplicado": {
+            "type": "boolean",
+            "description": "La nube ya lo tenía. NO es un error: el Edge reenvía porque no sabe si llegó (CA-22)"
+          },
+          "detalle": {
+            "type": "string",
+            "description": "Por qué no se aceptó, si no se aceptó"
+          }
+        },
+        "required": [
+          "claveIdempotencia",
+          "aceptado",
+          "duplicado"
         ]
       },
       "RevocacionDto": {

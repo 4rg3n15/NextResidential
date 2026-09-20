@@ -368,6 +368,31 @@ try {
         : mal(`la referencia ausente NO se detecta (codigo ${sinRef.codigo})`);
       writeFileSync(tsconfigApi, tsconfigOriginal);
 
+      /**
+       * Y un paquete SIN `tsconfig.json` se salta, no revienta.
+       *
+       * Esta sonda la pidió el trinquete de ramas en la ETAPA 12: hasta
+       * entonces `apps/edge` era un esqueleto sin `tsconfig`, así que esa rama
+       * se ejercitaba **por accidente**. Al construirse el Edge de verdad dejó
+       * de tocarla nadie, y el trinquete lo cantó. Es justo para lo que está:
+       * una rama que se cubría sola deja de cubrirse y el número lo dice.
+       *
+       * El caso no es hipotético: un paquete que no compila con TypeScript
+       * —una app de Flutter, un guion suelto— no tiene `tsconfig.json`, y el
+       * control tiene que pasar de largo en vez de fallar por su ausencia.
+       */
+      const sinTs = join(clon, 'packages', 'paquete-sin-tsconfig');
+      mkdirSync(sinTs, { recursive: true });
+      writeFileSync(
+        join(sinTs, 'package.json'),
+        JSON.stringify({ name: '@ncr/paquete-sin-tsconfig', version: '0.0.0' }, null, 2),
+      );
+      const sinTsconfig = enClon('node', ['scripts/lib/frontera-construccion.mjs']);
+      sinTsconfig.codigo === 0
+        ? ok('un paquete sin tsconfig.json se salta, no rompe el control')
+        : mal(`un paquete sin tsconfig rompe el control (codigo ${sinTsconfig.codigo})`);
+      rmSync(sinTs, { recursive: true, force: true });
+
       enClon('node', ['scripts/lib/frontera-construccion.mjs']).codigo === 0
         ? ok('el banco de pruebas vuelve a su línea base')
         : mal('la sonda dejó rastro en el banco');

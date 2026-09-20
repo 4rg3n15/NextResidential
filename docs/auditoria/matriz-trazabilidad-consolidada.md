@@ -149,8 +149,8 @@ _(Las etapas 09 y 11 exponen historias implementadas en etapas anteriores; su co
 | CA-18 | HU-29 | Evento crítico → operador notificado en < 10 s                                      | **06**                                | Prueba temporizada                                |
 | CA-19 | HU-26 | Intercom aceptado → audio y vídeo con retardo < 2 s                                 | **10** _(simulado)_ · **15** _(real)_ | Medición en sesión                                |
 | CA-20 | HU-28 | Apertura remota → relé en < 3 s, con identidad                                      | **10** _(simulado)_ · **15** _(real)_ | Medición de marcas de tiempo                      |
-| CA-21 | HU-30 | Sin internet + regla en caché → resuelve local y marca la versión                   | **12**                                | Prueba de corte de WAN                            |
-| CA-22 | HU-31 | 20 eventos offline → 20 en la nube, exactamente una vez, < 5 min                    | **12**                                | Conteo local vs. nube                             |
+| CA-21 | HU-30 | Sin internet + regla en caché → resuelve local y marca la versión                   | **12** ✅                             | Corte de WAN + el evento **leído de vuelta** del histórico |
+| CA-22 | HU-31 | 20 eventos offline → 20 en la nube, exactamente una vez, < 5 min                    | **12** ✅                             | Conteo de LLEGADAS, no de creaciones: un reenvío se vería |
 | CA-23 | HU-32 | `UPDATE`/`DELETE` sobre eventos rechazado **para todos los roles**                  | **01** · 06                           | Prueba con cada rol de aplicación                 |
 | CA-24 | HU-36 | Consulta cruzada por API → 403/404 + evento de seguridad                            | **03**                                | Suite de aislamiento (rompe el build)             |
 | CA-25 | HU-37 | Credenciales válidas sin MFA → acceso no concedido                                  | **03**                                | Prueba de flujo de autenticación                  |
@@ -207,10 +207,10 @@ _(Las etapas 09 y 11 exponen historias implementadas en etapas anteriores; su co
 | KPI-25       | Latencia de alerta                        | < 10 s                              | **06** · 14      | Marca del evento vs. recepción            | 12.1          |
 | KPI-26 **H** | Cobertura de sabotaje                     | 100 % generan alerta                | **15** · 06      | 10 aperturas de gabinete                  | 12.2          |
 | KPI-27 **H** | Tasa de falsa alarma                      | < 5 %                               | **15** · 06      | Clasificación de una semana               | 12.3          |
-| KPI-28       | Continuidad local                         | 100 % con regla en caché            | **12**           | 30 min sin WAN, 20 accesos                | 02.1          |
-| KPI-29       | Reconciliación                            | 100 % en < 5 min sin duplicados     | **12**           | Conteo local vs. nube                     | 02.2          |
-| KPI-30       | Autonomía del Edge                        | 24 h sin degradación                | **12**           | Prueba de estrés prolongada               | 02.3          |
-| KPI-31       | Vigencia del caché                        | 0 decisiones con reglas obsoletas   | **12**           | Revisión de `VersionDeReglas`             | 02.4          |
+| KPI-28       | Continuidad local                         | 100 % con regla en caché            | **12** ✅        | `dod-corte-de-wan.test.ts` · 30 min sin WAN, 20 accesos    | 02.1 |
+| KPI-29       | Reconciliación                            | 100 % en < 5 min sin duplicados     | **12** ✅        | `dod-corte-de-wan.test.ts` · llegadas contadas, no solo creaciones | 02.2 |
+| KPI-30       | Autonomía del Edge                        | 24 h sin degradación                | **12** ✅        | `kpi-30-autonomia.test.ts` · 1.440 accesos; el coste por acceso no crece | 02.3 |
+| KPI-31       | Vigencia del caché                        | 0 decisiones con reglas obsoletas **sin marcar** | **12** ✅ | `kpi-30-autonomia.test.ts` · el umbral se mide desde que la NUBE generó la instantánea | 02.4 |
 | KPI-32 **H** | Latencia de apertura remota               | < 3 s                               | **10** · 15      | Marca de tiempo del evento                | 01.3          |
 | KPI-33 **H** | Latencia de audio y vídeo                 | < 2 s                               | **10** · 15      | Medición en sesión de intercom            | 01.4          |
 | KPI-34       | Trazabilidad de acción remota             | 100 % con identidad del operador    | **10**           | Consulta de eventos remotos               | 04.7          |
@@ -328,3 +328,29 @@ Dos pantallas nuevas, ambas derivadas de hallazgos M-02 y M-03.
 | **11 CP con etapa**                               | ✅ 11/11 — §7                                                             |
 | **6 PB con solución identificada**                | ✅ 6/6 — §8                                                               |
 | **Toda contradicción documentada con resolución** | ✅ 14 contradicciones y 11 pendientes en `contradicciones-y-supuestos.md` |
+
+
+---
+
+## Nota de la ETAPA 12 · la tensión entre KPI-30 y KPI-31, y cómo se resolvió
+
+Los dos indicadores se rozan y conviene dejar escrito el criterio, porque no es
+deducible del texto de ninguno:
+
+- **KPI-30** pide **24 horas de autonomía sin degradación**. Un gateway que
+  dejara de decidir tras unas horas cumpliría la letra y no el propósito.
+- **KPI-31** pide **cero decisiones con reglas obsoletas**.
+
+Leído al pie, el segundo exigiría que a las 24 horas y un minuto el equipo
+dejara de decidir — que es exactamente lo que el primero prohíbe.
+
+**Resolución aplicada:** el Edge **sigue decidiendo** y **marca** lo decidido a
+partir del umbral (`cachePotencialmenteObsoleto`, que viaja en el evento y queda
+en el histórico). KPI-31 se mide entonces como «cero decisiones con reglas
+obsoletas **sin marcar**», que es lo que el indicador puede sostener sin
+contradecir a KPI-30: lo que hace auditable un corte largo no es negarlo todo,
+es saber con qué reglas se decidió.
+
+El umbral por omisión es **1.440 minutos**, alineado con las 24 horas de KPI-30 a
+propósito: si el equipo aguanta un día solo, un día es también el plazo a partir
+del cual lo decidido merece una segunda mirada.

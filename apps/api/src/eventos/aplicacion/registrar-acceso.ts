@@ -42,6 +42,38 @@ export interface HechoEntrante {
   readonly motivoManual?: string | null;
   readonly decididoPorEdge?: boolean;
   readonly cachePotencialmenteObsoleto?: boolean;
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * RECONCILIACIÓN DESDE EL EDGE · ETAPA 12 · RN-16, CA-21
+   *
+   * Cuando el hecho llega reconciliado, **la decisión ya se tomó** —en la
+   * portería, durante un corte, con la caché que el gateway tenía— y viaja
+   * sellada con su `VersionDeReglas`. Si estuviera ausente, el motor la
+   * recalcularía aquí, y eso sería un error de dos formas a la vez:
+   *
+   *  · con las reglas de HOY, que pueden no ser las de entonces, así que el
+   *    histórico diría que se decidió algo que nadie decidió;
+   *  · y borraría la única prueba de qué hizo el Edge, que es justo lo que
+   *    CA-21 exige poder auditar.
+   *
+   * Por eso entra como dato y no se recalcula. Lo demás del camino —clave,
+   * evento, alerta, escalamiento, aviso— es idéntico a propósito: un acceso
+   * decidido offline tiene que alertar igual que uno decidido en la nube.
+   */
+  readonly decisionDelEdge?: ResultadoAcceso;
+
+  /**
+   * El instante REAL del acceso, no el de la reconciliación.
+   *
+   * Sin esto, veinte accesos de un corte de media hora aparecerían en el
+   * histórico con la hora en que volvió la conexión, todos juntos, y la línea
+   * de tiempo —que es lo que un informe de auditoría lee— quedaría inservible.
+   * No entra en la clave de idempotencia, y esa separación es deliberada
+   * (`construirClaveIdempotencia`, D-11): el instante puede recalcularse sin
+   * que el mismo hecho produzca dos claves.
+   */
+  readonly ocurridoEn?: Date;
 }
 
 export interface ConstanciaDeAcceso {
@@ -91,21 +123,27 @@ export class RegistrarAcceso {
     });
     if (esFallo(clave)) return clave;
 
-    const decision = await this.motor.decidir({
-      copropiedadId: hecho.copropiedadId,
-      dispositivoId: hecho.dispositivoId,
-      metodo: hecho.metodo,
-      personaId: hecho.personaId ?? null,
-      placaLeida: hecho.placaLeida ?? null,
-      zonaId: hecho.zonaId ?? null,
-      confianza: hecho.confianza,
-    });
+    // La decisión sellada del Edge SUSTITUYE al motor, no lo complementa.
+    // Consultar el motor «para comparar» y quedarse con uno de los dos sería
+    // tener dos decisiones para un mismo acceso y ninguna forma de explicar
+    // cuál se aplicó.
+    const decision =
+      hecho.decisionDelEdge ??
+      (await this.motor.decidir({
+        copropiedadId: hecho.copropiedadId,
+        dispositivoId: hecho.dispositivoId,
+        metodo: hecho.metodo,
+        personaId: hecho.personaId ?? null,
+        placaLeida: hecho.placaLeida ?? null,
+        zonaId: hecho.zonaId ?? null,
+        confianza: hecho.confianza,
+      }));
 
     const construido = Acceso.desdeDecision(
       {
         id: this.ids.nuevo(),
         copropiedadId: hecho.copropiedadId,
-        ocurridoEn: this.reloj.ahora(),
+        ocurridoEn: hecho.ocurridoEn ?? this.reloj.ahora(),
         tipo: tipoDeEvento(hecho, decision),
         metodo: hecho.metodo,
         dispositivoId: hecho.dispositivoId,

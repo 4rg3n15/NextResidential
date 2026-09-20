@@ -51,6 +51,11 @@ const EXENTAS = new Set([
   // alcance lo comprueba `exigirAlcanceDeServicio` (§2.7.6).
   '/ingesta/eventos',
   '/ingesta/latidos',
+  // ETAPA 12 · la bandeja del Edge. Cada evento del lote trae su
+  // `copropiedadId` dentro del cuerpo FIRMADO, igual que los dos de arriba:
+  // quien reconcilia es un equipo, no una sesión, y no hay token del que
+  // derivar una copropiedad.
+  '/ingesta/reconciliacion',
   '/copropiedades/ingesta',
 ]);
 
