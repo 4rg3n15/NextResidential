@@ -130,6 +130,12 @@ jobs:
       - name: Instalación reproducible
         run: pnpm install --frozen-lockfile
 
+      # El paso 12c conduce Chromium y NO está declarado: sin navegador falla, y
+      # con razón —«la ausencia es un fallo inmediato y explícito»—. Se instala
+      # aquí para que el fallo, si llega, sea del camino y no del entorno.
+      - name: Chromium para el paso 12c
+        run: pnpm exec playwright install chromium
+
       - name: PostgreSQL en el runner
         run: |
           brew install postgresql@16 || brew list postgresql@16
