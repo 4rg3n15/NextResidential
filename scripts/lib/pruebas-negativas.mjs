@@ -1392,6 +1392,46 @@ try {
         : mal('marca una captura limpia: el control obligaría a cambios inútiles');
       limpiar();
 
+      /**
+       * Los otros dos productores que el usuario pidió revisar, y que fallan
+       * por motivos DISTINTOS al de `wc`. No basta con que la regla exista:
+       * hay que haberlos visto detectar, porque cada uno tiene su regex y una
+       * regex que no se ejercita es una rama que nadie ha visto correr (D-81).
+       */
+      const conPsql = escribirSonda(
+        'n=$(psql -t -c "select count(*) from t")\nif [[ "$n" != "1" ]]; then echo d; fi\n',
+      );
+      conPsql.codigo !== 0 && /psql/.test(conPsql.salida)
+        ? ok('`psql -t` sin `-A` también se detecta: alinea la columna con espacios')
+        : mal('`psql -t` sin `-A` pasa: devuelve el valor almohadillado y nadie lo ve');
+      limpiar();
+
+      // Y con `-A` NO se marca: `-Atq` es la forma correcta y el repositorio la
+      // usa en todas partes. Marcarla sería inutilizable.
+      const psqlCorrecto = escribirSonda(
+        'n=$(psql -Atq -c "select count(*) from t")\nif [[ "$n" != "1" ]]; then echo d; fi\n',
+      );
+      psqlCorrecto.codigo === 0
+        ? ok('y `psql -Atq`, que es la forma correcta, no se marca')
+        : mal('marca `psql -Atq`: la forma que el repositorio usa en todas partes');
+      limpiar();
+
+      const conGrepC = escribirSonda(
+        'n=$(grep -c foo a.txt b.txt)\nif [[ "$n" != "1" ]]; then echo d; fi\n',
+      );
+      conGrepC.codigo !== 0 && /grep -c/.test(conGrepC.salida)
+        ? ok('`grep -c` también: antepone «fichero:» cuando recibe varios')
+        : mal('`grep -c` pasa: con varios ficheros el valor no es un número');
+      limpiar();
+
+      // La forma de UNA línea, sin variable de por medio, que es la otra manera
+      // de escribir el mismo defecto.
+      const enUnaLinea = escribirSonda('if [[ "$(ls | wc -l)" == "1" ]]; then echo d; fi\n');
+      enUnaLinea.codigo !== 0
+        ? ok('la captura y la comparación en la MISMA línea también se detectan')
+        : mal('escrito en una sola línea, el mismo defecto pasa inadvertido');
+      limpiar();
+
       enClon('node', ['scripts/lib/portabilidad.mjs']).codigo === 0
         ? ok('el banco de pruebas queda limpio')
         : mal('la sonda dejó rastro en el banco');

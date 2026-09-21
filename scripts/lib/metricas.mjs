@@ -60,10 +60,11 @@ const sinColores = (t) => String(t ?? '').replace(/\u001B\[[0-9;]*[A-Za-z]/g, ''
  * INTERRUMPIDA», y la sonda 22 exige que la cadena `[object Object]` no
  * aparezca en ninguna parte de la salida.
  */
-const primeraLinea = (fallo) =>
-  String(fallo?.detalle ?? fallo ?? '?')
-    .split('\n')[0]
-    .trim();
+// Sin defensas para casos que no existen: en el único sitio que lo llama,
+// `fallo` no es nulo y `detalle` siempre está escrito. Un `??` de adorno es una
+// rama que nadie ejecuta jamás, y el trinquete de D-81 la cuenta como tal —con
+// razón: una rama que nadie ha visto correr no está demostrada.
+const primeraLinea = (fallo) => String(fallo.detalle).split('\n')[0].trim();
 
 /** Ejecuta vitest en un paquete y devuelve su informe JSON. */
 const correr = (paquete, dir) => {
