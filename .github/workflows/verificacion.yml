@@ -53,6 +53,47 @@ jobs:
           pnpm lint
           pnpm typecheck
 
+      # ══════════════════════════════════════════════════════════════════════
+      # PASO TEMPORAL · caza de la roja intermitente de @ncr/api en Linux
+      #
+      # La ETAPA 12 se declaró cerrada sobre un veredicto local de macOS; en
+      # `ubuntu-latest` la MISMA SHA salió roja con UNA prueba de 658. Es
+      # intermitente —en Linux de 4 vCPU la suite pasa 3 de 3, dos de ellas con
+      # `taskset -c 0,1`— así que esperar a que vuelva a salir no es un método:
+      # «flake» no es una causa raíz, y re-ejecutar hasta que salga verde es
+      # declarar cerrado lo que no se entendió.
+      #
+      # Se repite la suite bajo cobertura hasta cinco veces y se para en la
+      # PRIMERA roja, con el nombre ya impreso por `metricas.mjs` (D-100).
+      #
+      # SE RETIRA en cuanto el nombre esté. Un paso que multiplica por cinco el
+      # tiempo del trabajo no se queda «por si acaso».
+      # ══════════════════════════════════════════════════════════════════════
+      - name: '[TEMPORAL] Caza de la roja intermitente de @ncr/api'
+        if: matrix.so == 'ubuntu-latest'
+        env:
+          NCR_PAQUETES_METRICAS: '@ncr/api'
+        # Una corrida restringida SALE 1 por diseño —no puede medir las capas
+        # que no corrió—, así que el código de salida no es la señal aquí: la
+        # señal es la cadena que `metricas.mjs` imprime.
+        run: |
+          for i in 1 2 3 4 5; do
+            echo "── intento $i de 5 ──────────────────────────────────────────"
+            node scripts/lib/metricas.mjs > "/tmp/intento-$i.log" 2>&1 || true
+            if grep -q 'SUITE EN ROJO' "/tmp/intento-$i.log"; then
+              echo "════ ROJA CAZADA EN EL INTENTO $i ════"
+              grep -A 12 'SUITE EN ROJO' "/tmp/intento-$i.log"
+              exit 1
+            fi
+            if grep -q 'CORRIDA INTERRUMPIDA' "/tmp/intento-$i.log"; then
+              echo "intento $i: el proceso NO terminó (no hay prueba a la que culpar)"
+              grep -A 6 'CORRIDA INTERRUMPIDA' "/tmp/intento-$i.log"
+            else
+              echo "intento $i: sin rojas"
+            fi
+          done
+          echo "cinco intentos sin reproducir la roja"
+
       - name: Suite completa y umbrales de cobertura
         run: node scripts/lib/metricas.mjs
 
