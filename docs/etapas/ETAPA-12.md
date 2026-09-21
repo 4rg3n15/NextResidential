@@ -247,6 +247,13 @@ matriz sobre la SHA final:
 | `controles (ubuntu-latest)` | **verde** |
 | `controles (macos-latest)`  | **verde** |
 
+Corrida **138**, sobre `8a9ddae`, la SHA que cerró la etapa:
+<https://github.com/4rg3n15/NextResidential/actions/runs/35559801946>
+
+Y la que la dejó abierta, para que quede el rastro: la **133**, sobre `bbae506`,
+con `ubuntu-latest` en rojo y `macos-latest` en verde —
+<https://github.com/4rg3n15/NextResidential/actions/runs/35486519614>.
+
 El control declarado no ejercido sigue siendo el **5e** de la ETAPA 11 —el
 recorrido de la app en un navegador real—, con su motivo escrito y revisión en
 la ETAPA 14. Aparece en el veredicto en cada corrida, que es como se pidió.
