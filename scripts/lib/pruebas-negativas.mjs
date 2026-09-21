@@ -1264,52 +1264,139 @@ try {
      * **no hay ninguna suite en rojo**, que es lo que la sonda va a provocar.
      */
     try {
-    const base = conConfig();
-    !/SUITE EN ROJO/.test(base.salida)
-      ? ok('el banco parte sin ninguna suite en rojo')
-      : mal('la línea base ya tiene pruebas rojas: la sonda no demostraría nada');
+      const base = conConfig();
+      !/SUITE EN ROJO/.test(base.salida)
+        ? ok('el banco parte sin ninguna suite en rojo')
+        : mal('la línea base ya tiene pruebas rojas: la sonda no demostraría nada');
 
-    writeFileSync(
-      sonda,
-      "import { describe, expect, it } from 'vitest';\n" +
-        "describe('sonda de D-100', () => {\n" +
-        "  it('esta prueba falla a proposito y su nombre tiene que aparecer', () => {\n" +
-        '    expect(1).toBe(2);\n' +
-        '  });\n' +
-        '});\n',
-    );
-    const conRoja = conConfig();
+      writeFileSync(
+        sonda,
+        "import { describe, expect, it } from 'vitest';\n" +
+          "describe('sonda de D-100', () => {\n" +
+          "  it('esta prueba falla a proposito y su nombre tiene que aparecer', () => {\n" +
+          '    expect(1).toBe(2);\n' +
+          '  });\n' +
+          '});\n',
+      );
+      const conRoja = conConfig();
 
-    conRoja.codigo !== 0
-      ? ok('una suite en rojo hace fallar la medición')
-      : mal('una prueba roja pasa inadvertida: el paquete se mediría igual');
+      conRoja.codigo !== 0
+        ? ok('una suite en rojo hace fallar la medición')
+        : mal('una prueba roja pasa inadvertida: el paquete se mediría igual');
 
-    // LO QUE IMPORTA: el nombre, no el recuento.
-    /esta prueba falla a proposito y su nombre tiene que aparecer/.test(conRoja.salida)
-      ? ok('el NOMBRE de la prueba roja aparece en la salida')
-      : mal('la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas');
+      // LO QUE IMPORTA: el nombre, no el recuento.
+      /esta prueba falla a proposito y su nombre tiene que aparecer/.test(conRoja.salida)
+        ? ok('el NOMBRE de la prueba roja aparece en la salida')
+        : mal('la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas');
 
-    /sonda-roja\.test\.ts/.test(conRoja.salida)
-      ? ok('y también su fichero')
-      : mal('no se dice en qué fichero está');
+      /sonda-roja\.test\.ts/.test(conRoja.salida)
+        ? ok('y también su fichero')
+        : mal('no se dice en qué fichero está');
 
-    // Y que NO se disfrace de corrida interrumpida, que es el otro remedio.
-    /SUITE EN ROJO/.test(conRoja.salida) && !/CORRIDA INTERRUMPIDA/.test(conRoja.salida)
-      ? ok('se clasifica como SUITE EN ROJO, no como corrida interrumpida')
-      : mal('una suite en rojo se informa como corrida interrumpida: remedio equivocado');
+      // Y que NO se disfrace de corrida interrumpida, que es el otro remedio.
+      /SUITE EN ROJO/.test(conRoja.salida) && !/CORRIDA INTERRUMPIDA/.test(conRoja.salida)
+        ? ok('se clasifica como SUITE EN ROJO, no como corrida interrumpida')
+        : mal('una suite en rojo se informa como corrida interrumpida: remedio equivocado');
 
-    // El eco de pnpm no es el nombre de ninguna prueba.
-    !/ERR_PNPM_/.test(conRoja.salida)
-      ? ok('la línea de pnpm no se cuela como si fuera una pista')
-      : mal('ERR_PNPM_* sigue apareciendo entre las pistas');
+      // El eco de pnpm no es el nombre de ninguna prueba.
+      !/ERR_PNPM_/.test(conRoja.salida)
+        ? ok('la línea de pnpm no se cuela como si fuera una pista')
+        : mal('ERR_PNPM_* sigue apareciendo entre las pistas');
 
-    rmSync(sonda, { force: true });
-    !/SUITE EN ROJO/.test(conConfig().salida)
-      ? ok('el árbol real queda sin la sonda')
-      : mal('la sonda dejó rastro en el árbol real');
+      /**
+       * D-102 · y NADA de la salida es un objeto sin serializar. El bloque
+       * «QUEDARON FUERA de la medición» interpolaba el fallo entero y escribía
+       * `[object Object]` — con el detalle correcto impreso diez líneas más
+       * arriba—. La sonda ya provocaba ese caso y no lo miraba: comprobaba lo
+       * que se había arreglado, no lo que el control imprime. Esta aserción es
+       * genérica a propósito: cubre ese sitio y cualquier otro que nazca igual.
+       */
+      !/\[object Object\]/.test(conRoja.salida)
+        ? ok('ningún objeto llega a la salida sin serializar')
+        : mal('la salida contiene [object Object]: un mensaje que no dice nada (D-102)');
+
+      // Y el segundo mensaje nombra la MISMA clase que el primero. Decir «la
+      // corrida no terminó» de una suite en rojo manda al remedio contrario.
+      !/(?:sin resumen de cobertura|QUEDARON FUERA)[\s\S]{0,200}?la corrida no terminó/i.test(
+        conRoja.salida,
+      )
+        ? ok('el resumen final no llama «corrida no terminada» a una suite en rojo')
+        : mal('el resumen final contradice la clasificación de D-100');
+
+      rmSync(sonda, { force: true });
+      !/SUITE EN ROJO/.test(conConfig().salida)
+        ? ok('el árbol real queda sin la sonda')
+        : mal('la sonda dejó rastro en el árbol real');
     } finally {
       // Si cualquier aserción de arriba lanzara, el fichero NO se queda.
       rmSync(sonda, { force: true });
+    }
+  }
+
+  console.log('\n▸ 23 · un número de `wc` comparado como TEXTO se detecta (D-103)');
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * EL DEFECTO QUE ESTA SONDA CIERRA
+     *
+     * `30_concurrencia_placas.sh` capturaba `exitosos=$(… | wc -l)` en una
+     * línea y comparaba `[[ "$exitosos" != "1" ]]` en otra. En BSD `wc`
+     * almohadilla —«       1»— y en GNU no, así que en macOS el paso 12 fallaba
+     * **con el KPI-03 cumplido delante**: una sola inserción aceptada, cero
+     * duplicados, y el guion informando incumplimiento.
+     *
+     * Ninguna regla de LÍNEA podía verlo: las dos líneas son portables por
+     * separado; lo que no lo es, es la pareja. Por eso la regla nueva mira el
+     * fichero entero, y por eso esta sonda comprueba las tres respuestas:
+     * que detecta el defecto, que NO se queja de la comparación numérica, y
+     * que NO se queja de la captura ya normalizada. Un control que solo se ve
+     * decir «✗» tampoco está demostrado: hay que verlo callar cuando toca.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const escribirSonda = (cuerpo) => {
+      writeFileSync(join(clon, 'sonda-wc.sh'), `#!/usr/bin/env bash\nset -euo pipefail\n${cuerpo}`);
+      enClon('git', ['add', '--intent-to-add', 'sonda-wc.sh']);
+      return enClon('node', ['scripts/lib/portabilidad.mjs']);
+    };
+    const limpiar = () => {
+      rmSync(join(clon, 'sonda-wc.sh'), { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-wc.sh']);
+    };
+
+    try {
+      const roto = escribirSonda('n=$(ls | wc -l)\nif [[ "$n" != "1" ]]; then echo distinto; fi\n');
+      roto.codigo !== 0 && /wc/.test(roto.salida)
+        ? ok('detectado, con salida distinta de cero')
+        : mal(`NO detectado: el defecto que rompió el paso 12 en macOS (codigo ${roto.codigo})`);
+
+      // Que NOMBRE las dos líneas: sin eso hay que buscar la captura a mano, y
+      // es justo lo que hizo caro encontrarlo la primera vez.
+      /viene de la línea 3/.test(roto.salida)
+        ? ok('y dice en qué línea se capturó el número, no solo dónde se compara')
+        : mal('no enlaza la comparación con la captura: obliga a buscarla a mano');
+      limpiar();
+
+      const numerico = escribirSonda(
+        'n=$(ls | wc -l)\nif [[ "$n" -ne 1 ]]; then echo distinto; fi\n',
+      );
+      numerico.codigo === 0
+        ? ok('la comparación NUMÉRICA no se marca: no hay falso positivo')
+        : mal('marca `-ne`, que es exactamente el remedio que el control pide');
+      limpiar();
+
+      const normalizado = escribirSonda(
+        'n=$(ls | wc -l | tr -d "[:space:]")\nif [[ "$n" != "1" ]]; then echo distinto; fi\n',
+      );
+      normalizado.codigo === 0
+        ? ok('una captura ya normalizada tampoco se marca')
+        : mal('marca una captura limpia: el control obligaría a cambios inútiles');
+      limpiar();
+
+      enClon('node', ['scripts/lib/portabilidad.mjs']).codigo === 0
+        ? ok('el banco de pruebas queda limpio')
+        : mal('la sonda dejó rastro en el banco');
+    } finally {
+      limpiar();
     }
   }
 } finally {

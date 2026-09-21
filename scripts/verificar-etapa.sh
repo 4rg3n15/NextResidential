@@ -760,11 +760,31 @@ if [[ "$CON_BASE" == "1" ]]; then
   # paso daba «✓ UPDATE y DELETE rechazados» con el servidor caído — que es
   # exactamente la familia de falso verde que este guion existe para impedir.
   con_base_o_omitida() {
-    local fichero="$1" etiqueta="$2" salida
+    local fichero="$1" etiqueta="$2" salida codigo
     salida=$(con_limite "$LIMITE_LARGO" pnpm --filter @ncr/api exec vitest run "$fichero" 2>&1)
-    if [[ $? -ne 0 ]]; then
+    # El código se guarda en su propia variable EN LA LÍNEA SIGUIENTE. Con
+    # `if [[ $? -ne 0 ]]` funcionaba, pero cualquier línea que alguien metiera
+    # entre medias —un `echo` de depuración— lo habría pisado en silencio.
+    codigo=$?
+    if [[ "$codigo" -ne 0 ]]; then
       mal "$etiqueta"
-      echo "$salida" | grep -E "×|→" | head -5 | sed 's/^/     /'
+      # D-104 · el diagnóstico decía el qué y no el porqué. Filtraba por `×` y
+      # `→`, que son los marcadores de vitest CUANDO hay una aserción rota; si
+      # el proceso moría antes —sin base, sin módulo, por tiempo límite— no
+      # casaba ninguno y el paso imprimía la etiqueta y NADA más. Es la misma
+      # familia que D-100 en el paso 7: un fallo que no se nombra a sí mismo
+      # obliga a reproducirlo a mano, y en el CI de macOS eso es otra corrida
+      # de cuarenta minutos. Ahora sale el código y la cola real.
+      echo "     código de salida: $codigo · fichero: $fichero"
+      local pistas
+      pistas=$(grep -E "×|→|FAIL|Error|error:|ECONN|timed out|AssertionError" <<<"$salida" |
+        head -8)
+      if [[ -n "$pistas" ]]; then
+        sed 's/^/     /' <<<"$pistas"
+      else
+        echo "     (ninguna línea reconocible; últimas 15 de la salida)"
+        tail -15 <<<"$salida" | sed 's/^/     /'
+      fi
     elif grep -q "OMITIDA" <<<"$salida"; then
       mal "$etiqueta — OMITIDA: no se alcanzó la base. Una omisión no es un verde."
     else

@@ -78,3 +78,61 @@ jobs:
 
       - name: El contrato y el cliente generado están al día
         run: node scripts/lib/contrato-desfasado.mjs
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # EL VERIFICADOR ENTERO, CON BASE, EN macOS.
+  #
+  # Hasta esta corrección el CI NO ejecutaba `verificar-etapa.sh` en absoluto.
+  # Corría los nueve controles de arriba, que son valiosos y no son el
+  # verificador: este tiene VEINTICINCO pasos. La consecuencia, escrita sin
+  # rodeos, es que los pasos 12, 12b, 12c y 13 —esquema, aislamiento, arranque
+  # en frío, KPI-03 e inmutabilidad contra PostgreSQL real— no se habían
+  # ejecutado NUNCA en ninguna máquina salvo la del usuario, y que el veredicto
+  # «25 de 25 pasos» de todos los informes anteriores salía siempre de una sola
+  # máquina.
+  #
+  # Se vio al primer intento: el paso 12 comparaba la salida de `wc` como texto
+  # y en BSD viene almohadillada, así que fallaba en macOS **con el KPI-03
+  # cumplido delante**. Un defecto de meses que ningún control podía ver porque
+  # en el único sitio donde el paso corría no había CI.
+  #
+  # Corre en macOS porque es el entorno de desarrollo declarado en §2.8.0 y el
+  # que tiene BSD. Es un trabajo aparte del de arriba, no un paso más, por tres
+  # razones: tarda mucho más, necesita SDK de Flutter y PostgreSQL, y su fallo
+  # debe poder leerse sin confundirse con el de los controles rápidos.
+  # ═══════════════════════════════════════════════════════════════════════════
+  verificador-con-base:
+    name: verificar-etapa.sh --con-base (macos)
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .flutter-version
+          cache: true
+
+      # El orden importa: el control de la base carga `pg` del árbol instalado,
+      # así que la instalación va ANTES. Al revés, el paso fallaría por no
+      # encontrar el módulo y el mensaje hablaría de otra cosa.
+      - name: Instalación reproducible
+        run: pnpm install --frozen-lockfile
+
+      - name: PostgreSQL en el runner
+        run: |
+          brew install postgresql@16 || brew list postgresql@16
+          ./scripts/base-de-pruebas.sh arrancar | sed 's/^export //' >>"$GITHUB_ENV"
+
+      - name: La base contesta antes de gastar cuarenta minutos
+        run: node scripts/lib/verificar-base-de-pruebas.mjs
+
+      - name: El verificador completo, con base
+        run: ./scripts/verificar-etapa.sh --con-base

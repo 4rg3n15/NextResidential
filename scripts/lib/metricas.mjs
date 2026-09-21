@@ -45,6 +45,26 @@ for (const f of ficheros) console.log(`  ${f}`);
 // eslint-disable-next-line no-control-regex
 const sinColores = (t) => String(t ?? '').replace(/\u001B\[[0-9;]*[A-Za-z]/g, '');
 
+/**
+ * D-102 · UNA LÍNEA, Y QUE DIGA CUÁL DE LAS DOS COSAS FUE.
+ *
+ * El bloque «QUEDARON FUERA de la medición» interpolaba el objeto entero:
+ * `${fallo}` imprimía **`[object Object]`**. Y el texto fijo que lo acompañaba
+ * decía «la corrida no terminó» aunque el fallo fuera una suite en rojo — la
+ * misma confusión que D-100 acababa de cerrar diez líneas más arriba,
+ * sobreviviendo en el segundo mensaje.
+ *
+ * Es la forma exacta del defecto que este repositorio persigue: se arregló el
+ * sitio donde se miró, no la clase. Aquí se corrige la clase: el resumen sale
+ * SIEMPRE de `detalle`, que ya trae escrito «SUITE EN ROJO» o «CORRIDA
+ * INTERRUMPIDA», y la sonda 22 exige que la cadena `[object Object]` no
+ * aparezca en ninguna parte de la salida.
+ */
+const primeraLinea = (fallo) =>
+  String(fallo?.detalle ?? fallo ?? '?')
+    .split('\n')[0]
+    .trim();
+
 /** Ejecuta vitest en un paquete y devuelve su informe JSON. */
 const correr = (paquete, dir) => {
   const salida = join(mkdtempSync(join(tmpdir(), 'ncr-')), 'r.json');
@@ -267,9 +287,7 @@ for (const [paquete, dir] of paquetesAMedir) {
     // D-100 · el encabezado dice CUÁL de las dos cosas es, porque el remedio
     // de una no sirve para la otra.
     const titulo =
-      fallo.clase === 'roja'
-        ? `${paquete}: PRUEBAS EN ROJO`
-        : `${paquete}: la corrida NO terminó`;
+      fallo.clase === 'roja' ? `${paquete}: PRUEBAS EN ROJO` : `${paquete}: la corrida NO terminó`;
     console.log(`\n## ${titulo}\n       ${fallo.detalle}`);
     corridasIncompletas.push(`${paquete}: ${fallo.detalle}`);
   }
@@ -297,7 +315,7 @@ for (const [paquete, dir] of paquetesAMedir) {
   if (!cobertura) {
     console.log('   SIN RESUMEN DE COBERTURA — este paquete no entra en la medición');
     sinMedir.push(
-      `${paquete} (sin resumen de cobertura${fallo === null ? '' : `; la corrida no terminó: ${fallo}`})`,
+      `${paquete} (sin resumen de cobertura${fallo === null ? '' : `; ${primeraLinea(fallo)}`})`,
     );
     continue;
   }

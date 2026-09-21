@@ -166,6 +166,118 @@ const extraerShell = (archivo) => {
   return filas;
 };
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * REGLAS DE FICHERO · lo que una sola línea no puede ver
+ *
+ * Las de arriba miran una línea cada vez, y hay una clase entera que así no se
+ * ve nunca: el defecto vive en DOS líneas separadas. Se captura un número en
+ * una y se compara en otra, y entre las dos está el fallo.
+ *
+ * D-103 · `supabase/policies/tests/30_concurrencia_placas.sh` hacía esto:
+ *
+ *     exitosos=$(grep -l '^ok$' "$tmp"/* | wc -l)     # línea 39
+ *     ...
+ *     if [[ "$exitosos" != "1" ]]; then               # línea 44
+ *
+ * **`wc` almohadilla el número en BSD y no en GNU.** En macOS la primera línea
+ * produce `"       1"`; en Linux, `"1"`. La comparación es de TEXTO, así que en
+ * macOS falla **con el resultado correcto delante**: el KPI-03 se cumplía, una
+ * sola inserción era aceptada, y el guion informaba incumplimiento.
+ *
+ * Ninguna regla de línea lo veía: `wc -l` es portable y `[[ "$x" != "1" ]]` es
+ * portable. Lo que no es portable es la PAREJA. Y no lo detectó nadie porque
+ * el paso 12 nunca se había ejecutado en macOS en ninguna máquina salvo la del
+ * usuario — que es un hallazgo aparte, y está en el informe.
+ *
+ * La regla, enunciada para que no dependa de la plataforma: **un número que
+ * produce una herramienta se compara como número, no como texto.** Vale para
+ * `wc` (almohadilla en BSD), para `psql -t` sin `-A` (almohadilla siempre) y
+ * para `grep -c` (antepone `fichero:` con varios ficheros). Y de paso protege
+ * de la cadena vacía, que como texto nunca es `"1"` y como número tampoco.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/** Herramientas cuya salida numérica NO es un entero limpio garantizado. */
+const PRODUCTORES = [
+  [/\bwc\b/, '`wc` almohadilla con espacios en BSD («       1») y no en GNU («1»)'],
+  [
+    /\bpsql\b(?=[^|;&]*\s-\w*t)(?![^|;&]*\s-\w*A)/,
+    '`psql -t` sin `-A` alinea la columna: el valor llega con espacios delante',
+  ],
+  [/\bgrep\s+(-\w*\s+)*-\w*c/, '`grep -c` antepone «fichero:» cuando recibe varios ficheros'],
+];
+
+/** Lo que deja el valor ya limpio: si aparece en la captura, no hay hallazgo. */
+const NORMALIZADORES = /\|\s*(tr\b|xargs\b|awk\b|sed\b|cut\b)|^\s*\$\(\(/;
+
+/** Operadores de comparación de CADENA dentro de un `[` o `[[`. */
+const COMPARA_TEXTO = (nombre) =>
+  new RegExp(`\\[\\[?[^\\]]*\\$\\{?${nombre}\\b\\}?"?\\s*(==|!=|=)(?!~)`);
+
+/**
+ * Captura de un número sucio en la misma línea que su comparación de texto,
+ * sin variable de por medio: `if [[ "$(… | wc -l)" == "1" ]]`.
+ */
+const EN_UNA_LINEA = /\[\[?[^\]]*\$\([^)]*\)[^\]]*(==|!=|=)(?!~)/;
+
+/** Devuelve los hallazgos de las reglas que necesitan ver el fichero entero. */
+const numerosComparadosComoTexto = (archivo, filas) => {
+  const hallazgos = [];
+  const sucias = new Map(); // nombre de variable → { linea, texto, problema }
+
+  for (const { linea, texto } of filas) {
+    if (/^\s*#/.test(texto)) continue;
+
+    const asignacion = texto.match(
+      /^\s*(?:local\s+|declare\s+|export\s+|readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)=(\$\(.*\)|`.*`)\s*$/,
+    );
+    if (asignacion) {
+      const [, nombre, captura] = asignacion;
+      const productor = PRODUCTORES.find(([patron]) => patron.test(captura));
+      if (productor && !NORMALIZADORES.test(captura)) {
+        sucias.set(nombre, { linea, texto, problema: productor[1] });
+      } else if (productor) {
+        sucias.delete(nombre); // se normalizó: deja de estar sucia
+      }
+      continue;
+    }
+
+    // El caso de una sola línea: captura y comparación juntas.
+    const productor = PRODUCTORES.find(([patron]) => patron.test(texto));
+    if (productor && EN_UNA_LINEA.test(texto) && !NORMALIZADORES.test(texto)) {
+      hallazgos.push({
+        archivo,
+        linea,
+        texto: texto.trim(),
+        problema: productor[1],
+        alternativa: 'comparar con `-eq`/`-ne`, o normalizar con `| tr -d "[:space:]"`',
+      });
+    }
+  }
+
+  // Segunda pasada: quién compara como texto una de esas variables.
+  for (const { linea, texto } of filas) {
+    if (/^\s*#/.test(texto)) continue;
+    for (const [nombre, origen] of sucias) {
+      if (!COMPARA_TEXTO(nombre).test(texto)) continue;
+      hallazgos.push({
+        archivo,
+        linea,
+        texto: texto.trim(),
+        problema:
+          `«$${nombre}» se compara como TEXTO y viene de la línea ${origen.linea}, ` +
+          `donde ${origen.problema}`,
+        alternativa:
+          'comparar con `-eq`/`-ne` (bash normaliza los espacios en contexto ' +
+          'aritmético), o limpiar en la captura con `| tr -d "[:space:]"`',
+      });
+    }
+  }
+
+  return hallazgos;
+};
+
 const SUPERFICIES = (f) =>
   f.endsWith('.sh') ||
   f.startsWith('.husky/') ||
@@ -179,7 +291,8 @@ const auditados = versionados
 
 const hallazgos = [];
 for (const archivo of auditados) {
-  for (const { linea, texto } of extraerShell(archivo)) {
+  const filas = extraerShell(archivo);
+  for (const { linea, texto } of filas) {
     // Los comentarios describen estas construcciones a propósito (los
     // encabezados que explican por qué se evitaron).
     if (/^\s*#/.test(texto)) continue;
@@ -189,6 +302,7 @@ for (const archivo of auditados) {
       }
     }
   }
+  hallazgos.push(...numerosComparadosComoTexto(archivo, filas));
 }
 
 if (hallazgos.length > 0) {
