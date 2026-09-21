@@ -20,13 +20,13 @@
 
 |                                |                                                                                                                 |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas              |
+| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas             |
 | **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento**                                                     |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos)  |
+| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos) |
 | **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
 | **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
-| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)     |
+| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)    |
 | **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                           |
 
 ---
@@ -480,21 +480,21 @@ el PR #20 (`a7c046d`) · **Informe:** [`etapas/ETAPA-12.md`](etapas/ETAPA-12.md)
 > `develop` no contenía 11-B ni 11-C. Que `develop` fuera un ancestro estricto
 > hacía la base equivalente en contenido, no en hecho. Corregido por fusión.
 
-| Entregable                                    | Estado                                                                                                                                  |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dominio reutilizado SIN modificar**         | Cumplido · `apps/edge` no tiene una sola regla de acceso propia. Probado por los dos caminos en `misma-decision.test.ts`                  |
-| Caché de reglas versionada                     | SQLite, una instantánea cerrada por copropiedad. **La versión solo avanza**: una respuesta vieja que llega tarde no hace retroceder        |
-| Detección de WAN y modo autónomo               | Máquina de estados pura con histéresis (3 para caer, 2 para volver). Arranca autónomo, no en línea                                        |
-| Decisión local sellando la versión (RN-16, CA-21) | Cada decisión lleva la `VersionDeReglas` de la caché que la produjo                                                                    |
-| Bandeja con clave de idempotencia              | La misma mecánica que la app del residente, a propósito. Clave primaria en SQLite: lo impide la base, no un `if`                          |
-| Reconciliación ordenada (RN-17, CA-22)         | En orden, duplicado descartado en silencio con 202, corte del lote al primer fallo                                                        |
-| Reanudación ante conexión intermitente         | Desde el último confirmado. Probado con un corte a mitad de lote                                                                          |
-| Contingencia configurable                      | `denegar` por omisión (§2.1.4). **`escalar` tampoco abre**: entrega el caso al portero                                                    |
-| Marcado de caché obsoleta (KPI-31)             | Por antigüedad de la instantánea, medida desde que **la nube** la generó                                                                  |
-| **DoD · 30 min sin WAN, 20 accesos**           | **Ejecutada** · los 20 resueltos localmente, los 20 en la nube exactamente una vez, en dos tics de 15 s                                   |
-| **DoD · 24 h sin degradación (KPI-30)**        | **Ejecutada** · 1.440 accesos; decide igual en la hora 23; el coste por acceso no crece con la bandeja llena                              |
-| `docs/guias/DESPLIEGUE_EDGE.md`                | Entregada · aprovisionamiento, identidad y llave **por equipo**, rotación en el orden correcto, NTP y actualización por fases             |
-| **ADR-017**                                    | `node:sqlite` y no un módulo nativo: se despliega copiando ficheros, sin `node-gyp` en una máquina de portería                            |
+| Entregable                                        | Estado                                                                                                                              |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Dominio reutilizado SIN modificar**             | Cumplido · `apps/edge` no tiene una sola regla de acceso propia. Probado por los dos caminos en `misma-decision.test.ts`            |
+| Caché de reglas versionada                        | SQLite, una instantánea cerrada por copropiedad. **La versión solo avanza**: una respuesta vieja que llega tarde no hace retroceder |
+| Detección de WAN y modo autónomo                  | Máquina de estados pura con histéresis (3 para caer, 2 para volver). Arranca autónomo, no en línea                                  |
+| Decisión local sellando la versión (RN-16, CA-21) | Cada decisión lleva la `VersionDeReglas` de la caché que la produjo                                                                 |
+| Bandeja con clave de idempotencia                 | La misma mecánica que la app del residente, a propósito. Clave primaria en SQLite: lo impide la base, no un `if`                    |
+| Reconciliación ordenada (RN-17, CA-22)            | En orden, duplicado descartado en silencio con 202, corte del lote al primer fallo                                                  |
+| Reanudación ante conexión intermitente            | Desde el último confirmado. Probado con un corte a mitad de lote                                                                    |
+| Contingencia configurable                         | `denegar` por omisión (§2.1.4). **`escalar` tampoco abre**: entrega el caso al portero                                              |
+| Marcado de caché obsoleta (KPI-31)                | Por antigüedad de la instantánea, medida desde que **la nube** la generó                                                            |
+| **DoD · 30 min sin WAN, 20 accesos**              | **Ejecutada** · los 20 resueltos localmente, los 20 en la nube exactamente una vez, en dos tics de 15 s                             |
+| **DoD · 24 h sin degradación (KPI-30)**           | **Ejecutada** · 1.440 accesos; decide igual en la hora 23; el coste por acceso no crece con la bandeja llena                        |
+| `docs/guias/DESPLIEGUE_EDGE.md`                   | Entregada · aprovisionamiento, identidad y llave **por equipo**, rotación en el orden correcto, NTP y actualización por fases       |
+| **ADR-017**                                       | `node:sqlite` y no un módulo nativo: se despliega copiando ficheros, sin `node-gyp` en una máquina de portería                      |
 
 **Lo que la API tuvo que crecer, y solo eso:** `POST /ingesta/reconciliacion`,
 que **no vuelve a decidir**. Recalcular con las reglas de hoy haría que el
@@ -507,16 +507,20 @@ otra vez por la prueba genérica de D-91—.
 
 ### Por qué se retiró el cierre · D-100 y D-101
 
-| ID        | Qué                                                                                                                                                                                                                                                                             | Estado                              |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| **D-100** | `metricas.mjs` tenía el informe JSON con la prueba roja **en memoria** y no imprimía su nombre: decía «la corrida NO terminó» con un recuento de bytes y mandaba a buscar una cobertura baja inexistente. Confundía **suite en rojo** con **corrida interrumpida**, que tienen remedios opuestos. Su filtro de pistas se tragaba `ERR_PNPM_*`, el eco de pnpm | **Corregido** · prueba negativa 22 |
+| ID        | Qué                                                                                                                                                                                                                                                                                                                                                                                                                                           | Estado                                                                           |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **D-100** | `metricas.mjs` tenía el informe JSON con la prueba roja **en memoria** y no imprimía su nombre: decía «la corrida NO terminó» con un recuento de bytes y mandaba a buscar una cobertura baja inexistente. Confundía **suite en rojo** con **corrida interrumpida**, que tienen remedios opuestos. Su filtro de pistas se tragaba `ERR_PNPM_*`, el eco de pnpm                                                                                 | **Corregido** · prueba negativa 22                                               |
 | **D-101** | Una prueba de `@ncr/api` falla de forma **intermitente en Linux bajo cobertura**: 1 de 658 en `ubuntu-latest`, verde en `macos-latest` sobre la misma SHA (`bbae506`). **No reproducida en 11 intentos deliberados** (5 en el CI con un paso de caza, 6 en local con `taskset -c 0,1`); el sospechoso principal —la prueba de latencia— se midió clavada a un núcleo y da p99 de 61–67 ms contra un umbral de 1 000. Causa **no establecida** | **Abierto** · instrumentado. Con D-100 corregido, la próxima roja se nombra sola |
 
 **La etapa se cerró la primera vez sobre un veredicto local de macOS mientras el
 CI de `ubuntu-latest` estaba en rojo.** El cierre se retiró y se repone ahora con
 las tres condiciones cumplidas: CI **verde en las dos plataformas** sobre la SHA
-final, `verificar-etapa.sh --con-base` correcto en local, y el veredicto del
-informe diciendo de qué corrida sale cada cosa.
+final —corrida [**139**](https://github.com/4rg3n15/NextResidential/actions/runs/35560294330)
+sobre `4899ae9`—, `verificar-etapa.sh --con-base` correcto en local, y el
+veredicto del informe diciendo de qué corrida sale cada cosa. La que dejó la
+etapa abierta, para que quede el rastro, es la
+[**133**](https://github.com/4rg3n15/NextResidential/actions/runs/35486519614)
+sobre `bbae506`.
 
 Nota de método: **re-ejecutar hasta el verde no es un arreglo.** «Flake» no es
 una causa raíz.
@@ -693,15 +697,15 @@ con cámara y la medición de KPI-10.
 
 ### 11-C · cerrada el 2026-09-20 · las pantallas, la cámara y el KPI medido
 
-| Entregable                                      | Estado                                                                                                                                                                   |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Entregable                                      | Estado                                                                                                                                                                     |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **M-4 · Crear visitante**                       | Construida · vigencia, patrón con días y franjas, acompañantes nominales, zonas, placa y observaciones. Los cuatro rechazos con su texto, separados por `SalidaDelRechazo` |
-| **M-5 · Zonas comunes**                         | Construida · la interfaz refleja y lo dice: el aforo **no reserva plaza**. Las franjas que cruzan medianoche llegan aplanadas y se pintan enteras                        |
-| **M-7 · Notificaciones**                        | Construida · cinco estados, no un interruptor. El token rota y se reenvía solo; al cerrar sesión se olvida                                                                |
-| **Bandeja de salida conectada al cliente HTTP** | Construida · se encola ANTES de intentar; el rechazo de negocio no se reintenta; el 401 no retrocede; lo rendido se enseña, no se borra                                   |
-| **Captura con consentimiento del titular**      | Construida · ruta propia del residente **sin `titularId` en el cuerpo** (RN-10); sin consentimiento no hay sincronización (RN-09); sin casilla de aceptar en la app       |
-| **KPI-10 medido**                               | `apps/api/test/kpi-10.e2e.test.ts` · p50 ~2 ms, p95 ~5 ms sobre un presupuesto de 3 000 ms de los 60 000                                                                  |
-| **D-77**                                        | **Cerrado** · el residente que no es titular recibe 404, y el titular sí lo lee                                                                                          |
+| **M-5 · Zonas comunes**                         | Construida · la interfaz refleja y lo dice: el aforo **no reserva plaza**. Las franjas que cruzan medianoche llegan aplanadas y se pintan enteras                          |
+| **M-7 · Notificaciones**                        | Construida · cinco estados, no un interruptor. El token rota y se reenvía solo; al cerrar sesión se olvida                                                                 |
+| **Bandeja de salida conectada al cliente HTTP** | Construida · se encola ANTES de intentar; el rechazo de negocio no se reintenta; el 401 no retrocede; lo rendido se enseña, no se borra                                    |
+| **Captura con consentimiento del titular**      | Construida · ruta propia del residente **sin `titularId` en el cuerpo** (RN-10); sin consentimiento no hay sincronización (RN-09); sin casilla de aceptar en la app        |
+| **KPI-10 medido**                               | `apps/api/test/kpi-10.e2e.test.ts` · p50 ~2 ms, p95 ~5 ms sobre un presupuesto de 3 000 ms de los 60 000                                                                   |
+| **D-77**                                        | **Cerrado** · el residente que no es titular recibe 404, y el titular sí lo lee                                                                                            |
 
 **Lo que sigue declarado, y por qué:**
 

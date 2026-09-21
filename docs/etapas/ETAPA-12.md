@@ -175,33 +175,33 @@ docs/decisiones/ADR-017-…                          `node:sqlite` y no un módu
 
 ## 4 · Cumplimiento SOLID
 
-| Principio | Cómo se materializa aquí                                                                                                              |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **SRP**   | `DecidirLocalmente` decide, `Reconciliacion` vacía, `enlace-wan` conmuta, `Gateway` coordina. Ningún fichero pasa de 300 líneas          |
-| **OCP**   | El motor recibe las políticas por parámetro (`reglas` en `OpcionesDeDecision`): cambiar el conjunto no toca `DecidirLocalmente`          |
+| Principio | Cómo se materializa aquí                                                                                                                                                        |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SRP**   | `DecidirLocalmente` decide, `Reconciliacion` vacía, `enlace-wan` conmuta, `Gateway` coordina. Ningún fichero pasa de 300 líneas                                                 |
+| **OCP**   | El motor recibe las políticas por parámetro (`reglas` en `OpcionesDeDecision`): cambiar el conjunto no toca `DecidirLocalmente`                                                 |
 | **LSP**   | `CacheDeReglas` y `BandejaDeSalida` tienen doble en memoria y adaptador SQLite; las pruebas de la DoD corren con el real y las de unidad con el doble, sin cambiar una aserción |
-| **ISP**   | Cuatro puertos pequeños —caché, bandeja, sonda, nube— en vez de un `ServicioDelEdge`. Ningún adaptador lanza `NotImplemented`            |
-| **DIP**   | `apps/edge/src/aplicacion/` no importa `node:sqlite` ni `fetch`. `grep -r "node:sqlite\|fetch(" src/aplicacion/` devuelve 0              |
+| **ISP**   | Cuatro puertos pequeños —caché, bandeja, sonda, nube— en vez de un `ServicioDelEdge`. Ningún adaptador lanza `NotImplemented`                                                   |
+| **DIP**   | `apps/edge/src/aplicacion/` no importa `node:sqlite` ni `fetch`. `grep -r "node:sqlite\|fetch(" src/aplicacion/` devuelve 0                                                     |
 
 ---
 
 ## 5 · Trazabilidad
 
-| Elemento   | Dónde se cumple                                                                                     |
-| ---------- | ----------------------------------------------------------------------------------------------------- |
-| **OE-06**  | La etapa entera                                                                                       |
-| **CU-04**  | `decidir-localmente.ts` + `reconciliacion.ts`, con la excepción 3a como política configurable         |
-| **RN-16**  | `test/misma-decision.test.ts`: once casos por los dos caminos, resultado y motivo idénticos           |
-| **RN-17**  | `construirClaveIdempotencia` del dominio; clave primaria en SQLite; 202 con `duplicado` en la API     |
-| **CA-21**  | `VersionDeReglas` sellada en cada decisión; se lee de vuelta en `reconciliacion-edge.e2e.test.ts`     |
-| **CA-22**  | Orden, descarte silencioso y reanudación desde el último confirmado                                   |
-| **HU-30**  | Conmutación a modo autónomo con histéresis                                                            |
-| **HU-31**  | Reconciliación al reconectar, con su resumen en el registro                                           |
-| **KPI-28** | Los 20 accesos de un corte llegan a la nube; medido en la DoD                                         |
-| **KPI-29** | Reconciliación en menos de 5 minutos; medido en la DoD                                                |
-| **KPI-30** | `test/kpi-30-autonomia.test.ts`: decide igual en la hora 23, el coste no crece, y no degrada          |
-| **KPI-31** | Marcado por antigüedad de la instantánea, medido desde que la generó la nube                          |
-| **CP-09**  | El recorrido de §3.3 de la guía de despliegue                                                         |
+| Elemento   | Dónde se cumple                                                                                   |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| **OE-06**  | La etapa entera                                                                                   |
+| **CU-04**  | `decidir-localmente.ts` + `reconciliacion.ts`, con la excepción 3a como política configurable     |
+| **RN-16**  | `test/misma-decision.test.ts`: once casos por los dos caminos, resultado y motivo idénticos       |
+| **RN-17**  | `construirClaveIdempotencia` del dominio; clave primaria en SQLite; 202 con `duplicado` en la API |
+| **CA-21**  | `VersionDeReglas` sellada en cada decisión; se lee de vuelta en `reconciliacion-edge.e2e.test.ts` |
+| **CA-22**  | Orden, descarte silencioso y reanudación desde el último confirmado                               |
+| **HU-30**  | Conmutación a modo autónomo con histéresis                                                        |
+| **HU-31**  | Reconciliación al reconectar, con su resumen en el registro                                       |
+| **KPI-28** | Los 20 accesos de un corte llegan a la nube; medido en la DoD                                     |
+| **KPI-29** | Reconciliación en menos de 5 minutos; medido en la DoD                                            |
+| **KPI-30** | `test/kpi-30-autonomia.test.ts`: decide igual en la hora 23, el coste no crece, y no degrada      |
+| **KPI-31** | Marcado por antigüedad de la instantánea, medido desde que la generó la nube                      |
+| **CP-09**  | El recorrido de §3.3 de la guía de despliegue                                                     |
 
 **Parcial, y dicho:** la descarga de la instantánea desde la nube
 (`descargarReglas`) tiene cliente y contrato, y **la ruta que la sirve no está
@@ -214,13 +214,13 @@ escrito aquí y en `ESTADO_ETAPAS.md`.
 
 ## 6 · Pruebas
 
-| Suite                      | Qué demuestra                                                            |
-| -------------------------- | -------------------------------------------------------------------------- |
-| `misma-decision`           | 11 casos: permitido, lista negra, vigencia, vivienda, placa, confianza, zona, aforo, consentimiento. Y una prueba que exige que los casos cubran permitidos **y** denegados con cuatro motivos distintos: diez denegaciones por lo mismo no demostrarían la precedencia |
-| `dod-corte-de-wan`         | El corte entero con reloj fabricado. Reenvío sin duplicar, conexión intermitente, nube caída |
-| `kpi-30-autonomia`         | 1.440 accesos en 24 h; el coste por acceso no crece con la bandeja llena; el marcado no niega |
-| `reconciliacion-edge.e2e`  | La API escribe la decisión del Edge **leída de vuelta del histórico**, con su motivo y su versión |
-| `cliente-de-nube`          | La firma del Edge la verifica el **verificador real de la API**, importado, no reescrito |
+| Suite                     | Qué demuestra                                                                                                                                                                                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `misma-decision`          | 11 casos: permitido, lista negra, vigencia, vivienda, placa, confianza, zona, aforo, consentimiento. Y una prueba que exige que los casos cubran permitidos **y** denegados con cuatro motivos distintos: diez denegaciones por lo mismo no demostrarían la precedencia |
+| `dod-corte-de-wan`        | El corte entero con reloj fabricado. Reenvío sin duplicar, conexión intermitente, nube caída                                                                                                                                                                            |
+| `kpi-30-autonomia`        | 1.440 accesos en 24 h; el coste por acceso no crece con la bandeja llena; el marcado no niega                                                                                                                                                                           |
+| `reconciliacion-edge.e2e` | La API escribe la decisión del Edge **leída de vuelta del histórico**, con su motivo y su versión                                                                                                                                                                       |
+| `cliente-de-nube`         | La firma del Edge la verifica el **verificador real de la API**, importado, no reescrito                                                                                                                                                                                |
 
 Total del Edge: **101 pruebas**. Cobertura del paquete: líneas 99 %, ramas 90 %.
 
@@ -247,8 +247,18 @@ matriz sobre la SHA final:
 | `controles (ubuntu-latest)` | **verde** |
 | `controles (macos-latest)`  | **verde** |
 
-Corrida **138**, sobre `8a9ddae`, la SHA que cerró la etapa:
+Corrida **139**, sobre `4899ae9`, la SHA final de la rama:
+<https://github.com/4rg3n15/NextResidential/actions/runs/35560294330>
+
+Y la **138**, sobre `8a9ddae`, la última que lleva cambios de código —lo que va
+de `8a9ddae` a `4899ae9` es este mismo apartado y nada más—:
 <https://github.com/4rg3n15/NextResidential/actions/runs/35559801946>
+
+Queda una nota de método, porque el lector la va a pensar: un apartado que cita
+la corrida de su propia SHA no puede citarse a sí mismo sin regresión infinita.
+Se corta así: **la SHA final es la última que toca código**, y a partir de ahí
+solo se escribe documentación, cuya corrida se verifica igualmente antes de dar
+la etapa por cerrada, pero ya no se transcribe aquí.
 
 Y la que la dejó abierta, para que quede el rastro: la **133**, sobre `bbae506`,
 con `ubuntu-latest` en rojo y `macos-latest` en verde —
@@ -258,12 +268,12 @@ El control declarado no ejercido sigue siendo el **5e** de la ETAPA 11 —el
 recorrido de la app en un navegador real—, con su motivo escrito y revisión en
 la ETAPA 14. Aparece en el veredicto en cada corrida, que es como se pidió.
 
-| Medida del conjunto            | Valor                                            |
-| ------------------------------ | -------------------------------------------------- |
-| Pruebas                        | **1.729** · 136 de 136 ficheros recogidos          |
-| Cobertura · dominio            | líneas 97,71 % · ramas 96,48 % (umbral 90 %)       |
-| Cobertura · **aplicación**     | líneas 96,92 % · ramas 92,01 % (umbral 90 %) — ahora sobre **39** ficheros, con la del Edge dentro |
-| Cobertura · global             | líneas 72,85 % (umbral 70 %)                       |
+| Medida del conjunto        | Valor                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| Pruebas                    | **1.729** · 136 de 136 ficheros recogidos                                                          |
+| Cobertura · dominio        | líneas 97,71 % · ramas 96,48 % (umbral 90 %)                                                       |
+| Cobertura · **aplicación** | líneas 96,92 % · ramas 92,01 % (umbral 90 %) — ahora sobre **39** ficheros, con la del Edge dentro |
+| Cobertura · global         | líneas 72,85 % (umbral 70 %)                                                                       |
 
 **Y un hallazgo del propio verificador que vale la pena contar:** el paso 7
 informó «11 ficheros de prueba en disco que NADIE ejecutó». El paso 5 los corría
@@ -278,29 +288,29 @@ entonces para que no volviera a pasar.
 
 ## 7 · Verificación de seguridad (§2.7)
 
-| Medida                        | Estado en esta etapa                                                                                      |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 1 · Secretos en entorno        | El Edge no arranca sin los suyos. `.env.example` versionado sin valores; el control de D-90 ahora vigila **los dos** esquemas |
-| 2 · CORS                       | No aplica: el receptor del Edge escucha en la red local y no sirve un navegador                             |
-| 3 · Validación en servidor     | El lote se valida con DTO y `forbidNonWhitelisted`; un campo de más es 400                                  |
-| 4 · Anti inyección             | Todo el SQL del Edge es parametrizado; cero concatenación                                                   |
-| 5 · Rate limiting              | La ruta nueva hereda el tope de ingesta; el retroceso del Edge tiene jitter que **resta** para no chocar     |
-| 6 · Aislamiento                | El gateway atiende UNA copropiedad; una instantánea de otra se descarta (RN-15). El lote valida la copropiedad de cada evento |
-| 7 · Cabeceras                  | No aplica                                                                                                   |
-| 8 · Transversales              | Firma HMAC con ventana de frescura; identidad y llave **por equipo**; el registro nunca imprime el secreto ni el cuerpo de un evento |
+| Medida                     | Estado en esta etapa                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 · Secretos en entorno    | El Edge no arranca sin los suyos. `.env.example` versionado sin valores; el control de D-90 ahora vigila **los dos** esquemas        |
+| 2 · CORS                   | No aplica: el receptor del Edge escucha en la red local y no sirve un navegador                                                      |
+| 3 · Validación en servidor | El lote se valida con DTO y `forbidNonWhitelisted`; un campo de más es 400                                                           |
+| 4 · Anti inyección         | Todo el SQL del Edge es parametrizado; cero concatenación                                                                            |
+| 5 · Rate limiting          | La ruta nueva hereda el tope de ingesta; el retroceso del Edge tiene jitter que **resta** para no chocar                             |
+| 6 · Aislamiento            | El gateway atiende UNA copropiedad; una instantánea de otra se descarta (RN-15). El lote valida la copropiedad de cada evento        |
+| 7 · Cabeceras              | No aplica                                                                                                                            |
+| 8 · Transversales          | Firma HMAC con ventana de frescura; identidad y llave **por equipo**; el registro nunca imprime el secreto ni el cuerpo de un evento |
 
 ---
 
 ## 8 · Deuda, hallazgos y supuestos
 
-| ID       | Qué                                                                                                                                                                                       | Estado        |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| **D-98** | Una instantánea truncada —corte de luz a mitad de la escritura— **tumbaba el gateway**: el primer recorrido sobre una colección ausente lanzaba. En un equipo de portería eso no es una traza: es una puerta que deja de abrirse. Lo destapó la prueba de la caché ilegible | **Corregido** · `instantaneaUsable` |
-| **D-99** | `SQLITE_PATH` admitía un byte nulo. Lo encontró la prueba genérica de D-91 al exigir que todo campo opcional rechace un valor inválido; §2.7.4 lo pide para toda entrada de texto            | **Corregido** |
-| **S-24** | La ruta que SIRVE la instantánea de reglas no está construida: hoy la caché se siembra al aprovisionar. Cliente y contrato listos; se cierra con el tablero de reglas (ETAPA 14)            | `[SUPUESTO]` **abierto** |
-| **S-23** | (de la 11) El horario de zonas se pinta en el huso del teléfono. **Anotado para la ETAPA 16**                                                                                              | `[SUPUESTO]` **abierto** |
-| **D-100** | **El cierre de esta etapa se retiró por este defecto.** `metricas.mjs` tenía delante el informe JSON con la prueba roja y **no imprimía su nombre**: informaba «la corrida NO terminó» con un recuento de bytes, y mandaba a buscar una cobertura baja que no existía. Confundía **suite en rojo** —hay informe con rojas, y el remedio es arreglar la prueba— con **corrida interrumpida** —murió el proceso, y el remedio es mirar la máquina—. Además, su filtro de pistas se tragaba `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`, que es el eco de pnpm y no el nombre de nada | **Corregido** · prueba negativa 22 |
-| **D-101** | Una prueba de `@ncr/api` falla **de forma intermitente en Linux bajo instrumentación de cobertura**: 1 roja de 658 en `ubuntu-latest` (`bbae506`), verde en `macos-latest` sobre la misma SHA. **No reproducida en 11 intentos deliberados** posteriores (5 en `ubuntu-latest` con un paso de caza, 6 en local con `taskset -c 0,1`). Su causa **no está establecida** | **Abierto** · instrumentado, no cerrado |
+| ID        | Qué                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Estado                                  |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| **D-98**  | Una instantánea truncada —corte de luz a mitad de la escritura— **tumbaba el gateway**: el primer recorrido sobre una colección ausente lanzaba. En un equipo de portería eso no es una traza: es una puerta que deja de abrirse. Lo destapó la prueba de la caché ilegible                                                                                                                                                                                                                                                                                                 | **Corregido** · `instantaneaUsable`     |
+| **D-99**  | `SQLITE_PATH` admitía un byte nulo. Lo encontró la prueba genérica de D-91 al exigir que todo campo opcional rechace un valor inválido; §2.7.4 lo pide para toda entrada de texto                                                                                                                                                                                                                                                                                                                                                                                           | **Corregido**                           |
+| **S-24**  | La ruta que SIRVE la instantánea de reglas no está construida: hoy la caché se siembra al aprovisionar. Cliente y contrato listos; se cierra con el tablero de reglas (ETAPA 14)                                                                                                                                                                                                                                                                                                                                                                                            | `[SUPUESTO]` **abierto**                |
+| **S-23**  | (de la 11) El horario de zonas se pinta en el huso del teléfono. **Anotado para la ETAPA 16**                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `[SUPUESTO]` **abierto**                |
+| **D-100** | **El cierre de esta etapa se retiró por este defecto.** `metricas.mjs` tenía delante el informe JSON con la prueba roja y **no imprimía su nombre**: informaba «la corrida NO terminó» con un recuento de bytes, y mandaba a buscar una cobertura baja que no existía. Confundía **suite en rojo** —hay informe con rojas, y el remedio es arreglar la prueba— con **corrida interrumpida** —murió el proceso, y el remedio es mirar la máquina—. Además, su filtro de pistas se tragaba `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`, que es el eco de pnpm y no el nombre de nada | **Corregido** · prueba negativa 22      |
+| **D-101** | Una prueba de `@ncr/api` falla **de forma intermitente en Linux bajo instrumentación de cobertura**: 1 roja de 658 en `ubuntu-latest` (`bbae506`), verde en `macos-latest` sobre la misma SHA. **No reproducida en 11 intentos deliberados** posteriores (5 en `ubuntu-latest` con un paso de caza, 6 en local con `taskset -c 0,1`). Su causa **no está establecida**                                                                                                                                                                                                      | **Abierto** · instrumentado, no cerrado |
 
 ### D-100 · por qué esta etapa dejó de estar cerrada
 
@@ -315,10 +325,10 @@ además una invitación explícita a buscar una cobertura baja, que no existía.
 
 Son dos situaciones con remedios opuestos y se informaban igual:
 
-| Situación              | Cómo se reconoce                      | Qué hay que hacer                          |
-| ---------------------- | ------------------------------------- | ------------------------------------------ |
-| SUITE EN ROJO          | hay informe y trae `numFailedTests>0` | arreglar **esa** prueba, que ahora se nombra |
-| CORRIDA INTERRUMPIDA   | no hay informe, o lo hay sin rojas    | mirar la máquina: señal, memoria, contenedor |
+| Situación            | Cómo se reconoce                      | Qué hay que hacer                            |
+| -------------------- | ------------------------------------- | -------------------------------------------- |
+| SUITE EN ROJO        | hay informe y trae `numFailedTests>0` | arreglar **esa** prueba, que ahora se nombra |
+| CORRIDA INTERRUMPIDA | no hay informe, o lo hay sin rojas    | mirar la máquina: señal, memoria, contenedor |
 
 Es la familia de siempre —el control existe y no comprueba lo que uno cree— y
 esta vez dentro de la herramienta que la persigue: **llevaba desde la ETAPA 09
@@ -342,10 +352,10 @@ cuatro de la prueba de latencia sola con `taskset -c 0`: todas limpias.
 reloj de pared apretado: p99 < 1 000 ms con 25 suscriptores SSE y 200 eventos en
 ráfaga. Clavada a **un solo núcleo** y bajo instrumentación de cobertura:
 
-| Medida  | Valor    | Umbral de la prueba | Compromiso (KPI-25) |
-| ------- | -------- | ------------------- | ------------------- |
-| p99     | 61–67 ms | 1 000 ms            | —                   |
-| máximo  | 68–75 ms | —                   | 10 000 ms           |
+| Medida | Valor    | Umbral de la prueba | Compromiso (KPI-25) |
+| ------ | -------- | ------------------- | ------------------- |
+| p99    | 61–67 ms | 1 000 ms            | —                   |
+| máximo | 68–75 ms | —                   | 10 000 ms           |
 
 Quince veces de margen contra la alarma temprana y ciento treinta contra el
 compromiso. **No es el sospechoso**, o al menos no lo es en ninguna máquina a la
@@ -406,8 +416,7 @@ porque el problema esté resuelto.
 **Corrección de esta línea.** Decía «desde `develop` con la ETAPA 11 ya cerrada»
 y **no era cierto**: la rama salió de la punta de
 `etapa-11-app-flutter-residente-b`, cuyo PR #20 seguía **abierto**, así que
-`develop` no contenía 11-B ni 11-C y esta rama arrastraba siete commits de la
-11. Que `develop` fuera un ancestro estricto —un avance rápido— hacía la base
+`develop` no contenía 11-B ni 11-C y esta rama arrastraba siete commits de la 11. Que `develop` fuera un ancestro estricto —un avance rápido— hacía la base
 equivalente **en contenido** a `develop` una vez fusionado el PR, y eso no
 autoriza a escribir en el informe que ya lo estaba. Un informe que afirma un
 estado del repositorio que nadie puede comprobar es el mismo defecto que esta
