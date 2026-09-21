@@ -202,6 +202,14 @@ elif grep -qE "Tests +[0-9]+ failed|FAIL " <<<"$salida"; then
   echo "$salida" | grep -E "×|→" | head -10 | sed 's/^/     /'
 elif ! grep -qE "Tests +[0-9]" <<<"$salida"; then
   mal "la suite no informó ni una prueba: una salida sin recuento no es un verde"
+  # D-106 · esta rama imprimía CERO líneas. Saltó en la primera corrida del
+  # verificador en macOS —`pnpm test` terminó en 0 sin un solo recuento— y no
+  # dejó nada con lo que diagnosticarlo: ni el código, ni cuánto se escribió,
+  # ni la cola. Un fallo que no se nombra a sí mismo obliga a reproducirlo, y
+  # reproducir este cuesta otra corrida entera del runner.
+  echo "     código de salida: $codigo_pruebas · $(wc -c <"$salida_pruebas" | tr -d '[:space:]') bytes escritos"
+  echo "     últimas 20 líneas de lo que sí salió:"
+  tail -20 "$salida_pruebas" | sed 's/^/       /'
 else
   ok "suite completa en verde"
 fi
@@ -519,6 +527,24 @@ else
     mal "alguna capa por debajo del umbral de §2.4"
   fi
   echo "$salida_cob" | grep -E "^  (OK|BAJO)|QUEDARON FUERA|NADIE ejecutó|NO terminaron|^     - |SIN RESUMEN|SIN INFORME" | sed 's/^/     /'
+  # ───────────────────────────────────────────────────────────────────────────
+  # D-105 · EL CONTROL IMPRIMÍA EL NOMBRE Y EL CONSUMIDOR LO TIRABA.
+  #
+  # D-100 hizo que `metricas.mjs` escribiera, por cada prueba roja, su nombre,
+  # su fichero y su aserción. Este filtro no los recogía: la primera corrida
+  # del verificador en macOS informó «SUITE EN ROJO · 5 prueba(s) fallaron de
+  # 658» y ni una sola línea más. Los nombres estaban a tres líneas de
+  # distancia, en la misma salida que este `grep` acababa de recortar.
+  #
+  # Es la misma familia una capa más arriba: se arregló que el control lo
+  # dijera y no que alguien lo escuchara. Dos rondas para el mismo defecto.
+  # ───────────────────────────────────────────────────────────────────────────
+  # El rango termina en la cabecera SIN dos puntos —`## @ncr/api`—, que es la
+  # del bloque siguiente; la de apertura sí los lleva —`## @ncr/api: PRUEBAS EN
+  # ROJO`—. Distinguirlas por los dos puntos conserva el encabezado del hallazgo
+  # y descarta el del bloque que viene detrás.
+  echo "$salida_cob" | sed -n '/: PRUEBAS EN ROJO/,/^## [^:]*$/p' | grep -v '^## [^:]*$' |
+    head -30 | sed 's/^/     /'
 fi
 
 paso "8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)"

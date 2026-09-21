@@ -141,7 +141,29 @@ jobs:
           brew install postgresql@16 || brew list postgresql@16
           ./scripts/base-de-pruebas.sh arrancar | sed 's/^export //' >>"$GITHUB_ENV"
 
-      - name: La base contesta antes de gastar cuarenta minutos
+      # PRUEBA NEGATIVA DEL CONTROL DE LA BASE, y sale gratis: en este punto el
+      # clúster está recién creado y VACÍO, que es exactamente la condición que
+      # el control tiene que rechazar. Hasta esta ronda la daba por buena —dijo
+      # «conectado como postgres» y cuatro minutos después aparecían cinco rojas
+      # de `residente-pg.test.ts` sin relación aparente con la base—. Un control
+      # que nadie ha visto fallar no está demostrado (§2.8.0), y este no tenía
+      # dónde demostrarse porque el banco de pruebas negativas no tiene
+      # PostgreSQL. Aquí sí lo hay, y en el único instante en que sirve.
+      - name: Una base SIN esquema se detecta como tal
+        run: |
+          if node scripts/lib/verificar-base-de-pruebas.mjs; then
+            echo "FALLO el control dio por buena una base sin esquema" >&2
+            exit 1
+          fi
+          echo "ok · una base que contesta pero no tiene esquema NO pasa por buena"
+
+      # Y ahora se deja en el estado del que parten los pasos 5, 7, 12b y 13:
+      # migrada y sembrada. En la máquina del usuario ese estado lleva puesto
+      # desde hace semanas y nadie lo declara; aquí se declara.
+      - name: Migraciones y semillas
+        run: ./supabase/verificar.sh --con-semillas --modo-supabase
+
+      - name: La base contesta, con esquema y semillas
         run: node scripts/lib/verificar-base-de-pruebas.mjs
 
       - name: El verificador completo, con base
