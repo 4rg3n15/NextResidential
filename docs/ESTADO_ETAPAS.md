@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-21 · **ETAPA 12 CERRADA** · con CI verde en `ubuntu-latest` **y** `macos-latest` sobre la SHA final, y `verificar-etapa.sh --con-base` correcto en local. Su primer cierre se retiró por apoyarse en un veredicto de una sola plataforma
+**Última actualización:** 2026-09-21 · **ETAPA 12 CERRADA** · y en curso la rama `correccion-macos`, que lleva el CI a ejecutar **el verificador entero con base en macOS** por primera vez en el proyecto. Hasta ella, los pasos 12, 12b, 12c y 13 no se habían ejercido nunca fuera de la máquina del usuario
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,16 +18,77 @@
 
 ## Resumen
 
-|                                |                                                                                                                 |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas             |
-| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento**                                                     |
-| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos) |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
-| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
-| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)    |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                           |
+|                                |                                                                                                                                                                                        |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas                                                                                    |
+| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento**                                                                                                                            |
+| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                        |
+| **Defectos abiertos**          | **D-78** (colores a mano), **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos) y **D-106** (el paso 5 en macOS: causa hallada, ver `correccion-macos`) |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                                                                                                 |
+| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                                                                                          |
+| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)                                                                           |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                  |
+
+---
+
+## Corrección `correccion-macos` — entre la 12 y la 13
+
+**Rama:** `correccion-macos`, desde la punta de la ETAPA 12 · **No es una etapa:**
+no añade producto. Corrige el verificador y el CI.
+
+### El hallazgo que la motiva, dicho sin suavizar
+
+**El CI no ejecutaba `verificar-etapa.sh`.** Ni con `--con-base` ni sin él, ni en
+Linux ni en macOS. El flujo corría nueve controles escogidos a mano; el
+verificador tiene **25 pasos**. Consecuencias, todas comprobadas:
+
+- Los pasos **12, 12b, 12c y 13** —esquema, aislamiento, arranque en frío,
+  KPI-03 e inmutabilidad contra PostgreSQL real— **no se habían ejecutado nunca
+  en ninguna máquina salvo la del usuario.**
+- Tampoco los pasos 5b a 5d (Flutter), 11 (latencia), 14 (estabilidad) ni 15.
+- Y el «25 de 25 pasos» que aparece en **todos** los informes anteriores salía
+  siempre de una sola máquina. Cuando esos informes decían «CI verde en las dos
+  plataformas», era cierto de los nueve controles y no del veredicto.
+
+Ahora hay un trabajo `verificador-con-base` en `macos-latest` que instala
+Flutter, Chromium y PostgreSQL, siembra la base y ejecuta el verificador entero.
+
+### Lo que encontró la primera corrida
+
+| ID        | Qué                                                                                                                                                                                                                                                                                          | Estado                                                                   |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **D-102** | El bloque «QUEDARON FUERA de la medición» interpolaba el objeto de fallo: imprimía **`[object Object]`**. Y llamaba «la corrida no terminó» a una suite en rojo — la confusión que D-100 había cerrado diez líneas más arriba                                                                | **Corregido** · sonda 22 ampliada                                        |
+| **D-103** | El paso 12 comparaba como TEXTO un número de `wc`, que **BSD almohadilla y GNU no**. En macOS fallaba con el KPI-03 cumplido delante: una inserción aceptada, cero duplicados, e incumplimiento informado                                                                                    | **Corregido** · sonda 23                                                 |
+| **D-104** | El diagnóstico del paso 13 filtraba por `×` y `→`. Si el proceso moría antes de una aserción no casaba ninguno, y el paso imprimía la etiqueta y **nada más**                                                                                                                                | **Corregido**                                                            |
+| **D-105** | D-100 hizo que el control imprimiera el nombre de cada prueba roja; **el filtro del paso 7 lo tiraba**. macOS informó «5 prueba(s) fallaron» y ni una línea más, con los nombres a tres líneas de distancia                                                                                  | **Corregido**                                                            |
+| **D-106** | El paso 5 falló en macOS imprimiendo **cero líneas**: ni código, ni bytes, ni cola                                                                                                                                                                                                           | **Corregido** · y su instrumentación halló D-108 en la corrida siguiente |
+| **D-107** | El control de la base preguntaba `select version()` y daba por buena una base **vacía**. Cuatro minutos después aparecían cinco rojas de `residente-pg.test.ts` sin relación aparente. En las máquinas de desarrollo era invisible: sus clústeres llevan esquema y semillas puestos de antes | **Corregido** · prueba negativa en el propio trabajo de macOS            |
+| **D-108** | Los colores de Vitest **parten `Tests` de su número**, y el recuento del paso 5 no casaba. Con colores, la rama que detecta pruebas en rojo tampoco casa: la única defensa que quedaba era el código de salida                                                                               | **Corregido** · sonda 24                                                 |
+
+### La lección, que es una sola y aparece tres veces
+
+**D-102, D-105 y D-108 son el mismo defecto: el arreglo se aplicó al sitio y no
+a la clase.**
+
+- D-102 · se arregló el mensaje de D-100 y sobrevivió intacto el de al lado.
+- D-105 · se arregló que el control lo dijera, no que alguien lo escuchara.
+- D-108 · **ya estaba descubierto y documentado** en la cabecera de
+  `estabilidad.mjs` —«los códigos de color de Vitest partían `Tests` de su
+  número»— y se corrigió solo allí. El paso 5 lo conservó intacto.
+
+De ahí que el patrón ANSI viva ahora en `scripts/lib/sin-colores.mjs`, uno solo
+para las tres superficies, y que la regla nueva del paso 8 mire el **fichero
+entero** y no la línea: el defecto de D-103 vivía en dos líneas que, por
+separado, son las dos portables.
+
+### Lo que queda abierto
+
+**El paso 13 en la máquina del usuario.** Se probó la hipótesis de que su fallo
+fuera consecuencia del paso 12 —si la suite SQL aborta, la base queda a medias—
+y **el experimento la refutó**: con el paso 12 abortado a propósito, las seis
+pruebas del paso 13 pasan. El paso 13 está verde en `macos-latest`, así que lo
+que el usuario vio es específico de su máquina. Con D-104 corregido, la próxima
+corrida suya lo nombrará.
 
 ---
 
