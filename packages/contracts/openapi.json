@@ -2307,6 +2307,104 @@
         "tags": [
           "residente"
         ]
+      },
+      "post": {
+        "operationId": "MiController_crearAutorizacion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuevaVisitaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitaCreadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Autorizo a un visitante de mi vivienda (HU-07, HU-08, HU-09, M-4)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/rostro": {
+      "post": {
+        "operationId": "MiController_capturarRostro",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RostroDeMiVisitanteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RostroCapturadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10)",
+        "tags": [
+          "residente"
+        ]
       }
     },
     "/copropiedades/{id}/mi/familia": {
@@ -2413,6 +2511,52 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/notificaciones/aparatos": {
+      "post": {
+        "operationId": "MiController_registrarAparato",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenDeNotificacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AparatoRegistradoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registro este aparato para recibir notificaciones (HU-34, M-7)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/vehiculos": {
       "get": {
         "operationId": "MiController_vehiculos",
@@ -2483,6 +2627,45 @@
           }
         ],
         "summary": "Mi vivienda, mi vínculo y si puedo autorizar (HU-33, M-1)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/zonas": {
+      "get": {
+        "operationId": "MiController_zonas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MiZonaDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Zonas comunes con aforo y horario en vivo (HU-19, M-5)",
         "tags": [
           "residente"
         ]
@@ -3775,6 +3958,18 @@
           "notas"
         ]
       },
+      "AparatoRegistradoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
       "AutorizacionDto": {
         "type": "object",
         "properties": {
@@ -3831,7 +4026,7 @@
             "nullable": true,
             "allOf": [
               {
-                "$ref": "#/components/schemas/PatronDto"
+                "$ref": "#/components/schemas/PatronDeAutorizacionDto"
               }
             ]
           },
@@ -5109,7 +5304,7 @@
           "negados"
         ]
       },
-      "FranjaDto": {
+      "FranjaDeHorarioDto": {
         "type": "object",
         "properties": {
           "dia": {
@@ -5132,6 +5327,47 @@
           "minutoInicio",
           "minutoFin",
           "continuaDelDiaAnterior"
+        ]
+      },
+      "FranjaDeHoyDto": {
+        "type": "object",
+        "properties": {
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "desde",
+          "hasta"
+        ]
+      },
+      "FranjaDto": {
+        "type": "object",
+        "properties": {
+          "dia": {
+            "type": "number",
+            "description": "0 = domingo … 6 = sábado"
+          },
+          "minutoInicio": {
+            "type": "number"
+          },
+          "minutoFin": {
+            "type": "number"
+          },
+          "continuaDelDiaAnterior": {
+            "type": "boolean",
+            "description": "Continúa la franja del día anterior tras la medianoche"
+          }
+        },
+        "required": [
+          "dia",
+          "minutoInicio",
+          "minutoFin"
         ]
       },
       "GeneracionAplicadaDto": {
@@ -5360,6 +5596,37 @@
         "required": [
           "estado",
           "dependencias"
+        ]
+      },
+      "MedidasDeCapturaDto": {
+        "type": "object",
+        "properties": {
+          "nitidez": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "iluminacion": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "rostrosDetectados": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "proporcionRostro": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "nitidez",
+          "iluminacion",
+          "rostrosDetectados",
+          "proporcionRostro"
         ]
       },
       "MedidasDto": {
@@ -5627,6 +5894,47 @@
           "activa"
         ]
       },
+      "MiZonaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "aforoMaximo": {
+            "type": "number"
+          },
+          "ocupacionActual": {
+            "type": "number",
+            "description": "Ocupación de ESTE instante. La interfaz lo refleja; el aforo lo garantiza la base."
+          },
+          "abiertaAhora": {
+            "type": "boolean"
+          },
+          "franjasDeHoy": {
+            "description": "Franjas de hoy ya resueltas; una que cruza medianoche llega como dos (S-09).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FranjaDeHoyDto"
+            }
+          },
+          "requiereAutorizacion": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "aforoMaximo",
+          "ocupacionActual",
+          "abiertaAhora",
+          "franjasDeHoy",
+          "requiereAutorizacion"
+        ]
+      },
       "MiembroDeFamiliaDto": {
         "type": "object",
         "properties": {
@@ -5671,6 +5979,71 @@
         },
         "required": [
           "notas"
+        ]
+      },
+      "NuevaVisitaDto": {
+        "type": "object",
+        "properties": {
+          "visitante": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "documento": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Documento; sin él, RN-06 solo cruza placa"
+          },
+          "desde": {
+            "type": "string",
+            "description": "Inicio de la vigencia, ISO-8601 con zona"
+          },
+          "hasta": {
+            "type": "string",
+            "description": "Fin de la vigencia, EXCLUIDO"
+          },
+          "placa": {
+            "type": "string",
+            "maxLength": 8,
+            "description": "Placa; se normaliza en la base"
+          },
+          "permiteAccesoVehicular": {
+            "type": "boolean",
+            "default": false
+          },
+          "acompanantes": {
+            "maxItems": 20,
+            "description": "Nombres, no un contador",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "zonasPermitidas": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observaciones": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "patron": {
+            "$ref": "#/components/schemas/PatronDeVisitaDto"
+          },
+          "claveDeIdempotencia": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "visitante",
+          "desde",
+          "hasta",
+          "claveDeIdempotencia"
         ]
       },
       "OrdenDeBloqueoDto": {
@@ -5834,6 +6207,31 @@
           "viviendas"
         ]
       },
+      "PatronDeAutorizacionDto": {
+        "type": "object",
+        "properties": {
+          "dias": {
+            "description": "Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio).",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "horaInicio": {
+            "type": "string",
+            "example": "08:00"
+          },
+          "horaFin": {
+            "type": "string",
+            "example": "18:00"
+          }
+        },
+        "required": [
+          "dias",
+          "horaInicio",
+          "horaFin"
+        ]
+      },
       "PatronDeEntradaDto": {
         "type": "object",
         "properties": {
@@ -5876,29 +6274,36 @@
           "desplazamientoUtcMinutos"
         ]
       },
-      "PatronDto": {
+      "PatronDeVisitaDto": {
         "type": "object",
         "properties": {
           "dias": {
-            "description": "Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio).",
+            "description": "0=domingo … 6=sábado",
             "type": "array",
             "items": {
               "type": "number"
             }
           },
-          "horaInicio": {
-            "type": "string",
-            "example": "08:00"
+          "minutoInicio": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1440
           },
-          "horaFin": {
-            "type": "string",
-            "example": "18:00"
+          "minutoFin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1440
+          },
+          "desplazamientoUtcMinutos": {
+            "type": "number",
+            "description": "Minutos respecto de UTC; Bogotá: -300"
           }
         },
         "required": [
           "dias",
-          "horaInicio",
-          "horaFin"
+          "minutoInicio",
+          "minutoFin",
+          "desplazamientoUtcMinutos"
         ]
       },
       "PendientesDto": {
@@ -6385,6 +6790,77 @@
           "motivo"
         ]
       },
+      "RostroCapturadoDto": {
+        "type": "object",
+        "properties": {
+          "aceptada": {
+            "type": "boolean"
+          },
+          "motivos": {
+            "description": "Por qué no sirve la foto. Vacío cuando sí sirve.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "plantillaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "consentimientoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10)."
+          },
+          "titular": {
+            "type": "string",
+            "nullable": true,
+            "description": "A quién se le pidió: el visitante, no el residente que tomó la foto"
+          },
+          "calidad": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "aceptada",
+          "motivos",
+          "plantillaId",
+          "consentimientoId",
+          "titular",
+          "calidad"
+        ]
+      },
+      "RostroDeMiVisitanteDto": {
+        "type": "object",
+        "properties": {
+          "vector": {
+            "type": "string",
+            "description": "Plantilla derivada, en base64. Entra cifrada a la bóveda y no vuelve a salir.",
+            "maxLength": 262144
+          },
+          "medidas": {
+            "$ref": "#/components/schemas/MedidasDeCapturaDto"
+          },
+          "versionPolitica": {
+            "type": "string",
+            "description": "Versión de la política de tratamiento que se le mostró"
+          },
+          "suprimirEn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Cuándo se suprime la plantilla. RN-11: no más allá de la visita."
+          }
+        },
+        "required": [
+          "vector",
+          "medidas",
+          "versionPolitica",
+          "suprimirEn"
+        ]
+      },
       "SaludDto": {
         "type": "object",
         "properties": {
@@ -6468,6 +6944,35 @@
         },
         "required": [
           "dispositivoId"
+        ]
+      },
+      "TokenDeNotificacionDto": {
+        "type": "object",
+        "properties": {
+          "instalacionId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "description": "Identificador estable del aparato"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 4096
+          },
+          "plataforma": {
+            "type": "string",
+            "enum": [
+              "ios",
+              "android",
+              "web"
+            ]
+          }
+        },
+        "required": [
+          "instalacionId",
+          "token",
+          "plataforma"
         ]
       },
       "TotalesDeViviendasDto": {
@@ -6612,6 +7117,47 @@
           "motivo"
         ]
       },
+      "VisitaCreadaDto": {
+        "type": "object",
+        "properties": {
+          "creada": {
+            "type": "boolean",
+            "description": "false = una regla de negocio lo impidió"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "repetida": {
+            "type": "boolean",
+            "description": "true = este era un reintento y se devolvió la autorización anterior (RN-17)"
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "LISTA_NEGRA",
+              "VIVIENDA_INACTIVA",
+              "SIN_NIVEL_DE_ACCESO",
+              "PLACA_DUPLICADA"
+            ],
+            "description": "Motivo TIPADO del rechazo (RN-06, RN-13, P-11, RN-04/CA-03)"
+          },
+          "explicacion": {
+            "type": "string",
+            "nullable": true,
+            "description": "El mismo motivo en castellano llano; lo escribe el dominio, no la pantalla"
+          }
+        },
+        "required": [
+          "creada",
+          "id",
+          "repetida",
+          "motivo",
+          "explicacion"
+        ]
+      },
       "VistaPreviaDeGeneracionDto": {
         "type": "object",
         "properties": {
@@ -6753,7 +7299,7 @@
           "horario": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/FranjaDto"
+              "$ref": "#/components/schemas/FranjaDeHorarioDto"
             }
           },
           "desplazamientoUtcMinutos": {

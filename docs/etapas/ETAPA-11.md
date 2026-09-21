@@ -540,6 +540,272 @@ Y tres ejecuciones seguidas del recorrido completo, las tres en verde.
 
 ---
 
+## 8-B · ETAPA 11-B · el servidor del residente, y un hallazgo grave
+
+### El hallazgo primero · D-89, porque cambia cómo hay que leer 11-A
+
+Al ejercer por primera vez el adaptador SQL del residente contra PostgreSQL
+aparecieron **dos consultas rotas**:
+
+| Dónde                   | Qué decía                  | Qué existe       |
+| ----------------------- | -------------------------- | ---------------- |
+| `vinculoDe` (dos veces) | `public.niveles_de_acceso` | `niveles_acceso` |
+| `vivienda`              | `v.direccion`              | `cp.direccion`   |
+
+O sea: **ninguna lectura de la app del residente funcionaba contra una base
+real**. Y la suite estaba en verde —1.519 pruebas, incluidas las quince del
+segundo eje de aislamiento— porque todas montan la aplicación con un **doble en
+memoria** del directorio.
+
+El doble es correcto para lo que prueba: el filtro por vivienda vive en la capa
+de aplicación y el doble lo deja al desnudo. Lo que no puede hacer es conocer el
+esquema. Es la familia de siempre, con una forma nueva: **el control existe, es
+riguroso, y prueba el doble**.
+
+El cierre no es «revisar mejor»: es `apps/api/test/residente-pg.test.ts`, que
+ejecuta cada método de cada adaptador contra la base migrada y **falla si
+aparece un `42P01`, un `42703`, un `42883`, un `42804` o un `42P10`** —tabla,
+columna, función, tipo o referencia que no casan—. No necesita datos: con
+identificadores inventados, las consultas se ejecutan igual y lo que se juzga es
+si el esquema las admite. Encontró la segunda rotura a los diez minutos de
+existir.
+
+### Lo que se construyó
+
+**La superficie de ESCRITURA del residente**, que no existía. `POST
+…/mi/autorizaciones` crea la visita con vigencia, patrón de recurrencia,
+acompañantes **nominales**, zonas y observaciones, sin que el cliente pueda
+nombrar una vivienda. `GET …/mi/zonas` da el aforo y el horario. `POST
+…/mi/notificaciones/aparatos` registra el token de FCM.
+
+**Los rechazos, tipados y con precedencia probada.** `puedeAutorizar()` en el
+dominio decide entre RN-06, RN-13, P-11 y RN-04/CA-03, **en ese orden**, y hay
+una prueba por cada pareja en conflicto: con una vivienda inactiva y un
+visitante vetado a la vez, el residente lee «está en lista negra», que es lo
+que bloquea de verdad. La respuesta es **200 con motivo**, no un 403: un código
+de error no distingue «llame a la administración» de «esto no se arregla».
+
+**La idempotencia, de punta a punta.** La app genera la clave antes del primer
+intento; la columna nueva y su índice único parcial la sostienen en la base
+(ADR-04: la unicidad la garantiza la base, no un `SELECT` previo); el adaptador
+devuelve la autorización anterior ante una clave repetida, incluso cuando dos
+reintentos corren a la vez y uno pierde la carrera del índice.
+
+**En el cliente**, las dos piezas puras que 11-B necesita y que se prueban sin
+dispositivo: la **bandeja de salida** con retroceso exponencial acotado y jitter
+que resta —mil teléfonos recuperando cobertura a la vez no pueden golpear la API
+en el mismo milisegundo, que es justo lo que el rate limiting rechazaría—, y la
+**validación de calidad de captura** de CA-08, que devuelve **todos** los fallos
+y no el primero: con el primero, el residente repetiría la foto tres veces para
+tres problemas que ve de una sola vez.
+
+### El segundo eje, ampliado a las escrituras
+
+La suite de 11-A probaba lecturas. Una escritura mal acotada es peor: la lectura
+enseña la vida del vecino, la escritura **le abre la puerta**. Ahora la suite
+deriva también las escrituras del enrutador, y el día que añadí las tres rutas
+se puso roja sola —«rutas alcanzables por un residente SIN comprobación de
+vivienda»— antes de que yo escribiera ninguna prueba. Es exactamente lo que se
+le pidió en 11-A.
+
+| ID       | Qué                                                                                                                                                                                                                                  | Estado        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| **D-90** | `.env.example` declaraba tres nombres que el código no lee (`RATE_LIMIT_TTL`, `RATE_LIMIT_LIMIT`, `MAX_PAYLOAD_BYTES`) y omitía cuatro que sí; `DATABASE_POOLER_URL` estaba sin el `=` y era invisible para `entorno:diff`           | **Corregido** |
+| **D-91** | Al corregir D-90 declaré dos opcionales como `VAR=`, y eso **impedía el arranque**: `dotenv` produce la cadena vacía, no `undefined`. La prueba genérica destapó que le pasaba igual a **todas las variables con valor por omisión** | **Corregido** |
+| **D-89** | Dos consultas del adaptador del residente no existían en el esquema; la suite pasaba porque probaba el doble                                                                                                                         | **Corregido** |
+| **D-77** | `GET …/biometria/consentimientos/:id` sigue sin acotarse por titular                                                                                                                                                                 | **Corregido en 11-C** |
+| **S-22** | Sin documento del visitante, RN-06 solo cruza la lista negra por placa: media regla, que es más que ninguna                                                                                                                          | `[SUPUESTO]`  |
+
+### Lo que NO entró en esta mitad
+
+Y conviene que esté escrito aquí y no solo en el chat: **las pantallas M-4, M-5
+y M-7 de Flutter, la captura con cámara y la medición de KPI-10 no se
+construyeron en esta ronda.** Lo que hay es el servidor que las sostiene, el
+cliente Dart regenerado desde el contrato y las dos piezas de dominio del
+cliente. Las pantallas son la ronda siguiente.
+
+---
+
+## 8-C · ETAPA 11-C · las pantallas, la cámara y el KPI medido
+
+Esta mitad cierra la ETAPA 11: la app deja de tener dos pestañas que explican
+lo que falta y pasa a hacerlo.
+
+### Las tres pantallas, y la decisión que gobierna cada una
+
+**M-4 · Crear visitante.** Vigencia, patrón con días y franjas, acompañantes por
+nombre, zonas, placa y observaciones. Lo que determinó su forma no fue el
+formulario sino **el desenlace**: los cuatro rechazos llegan como `201` con
+motivo tipado, y la pantalla los separa en dos familias según
+`SalidaDelRechazo` —«no se pudo registrar» para lo que resuelve la
+administración (lista negra, vivienda inactiva, nivel de acceso) y «corrija un
+dato y vuelva a intentar» para lo que el residente arregla ahí mismo (placa
+duplicada)—. Es la distinción que se pidió por escrito y la que separa una
+llamada a la administración de un intento más. El tercer desenlace, el de la
+bandeja, **no dice «creada»**: prometerlo mandaría al visitante a una puerta que
+no se va a abrir.
+
+**M-5 · Zonas comunes.** La interfaz refleja; no calcula. No hay un solo método
+que decida si se puede entrar, y el aviso lo dice con todas las letras: el aforo
+que se ve es el de ese instante y **no reserva plaza**. Las franjas que cruzan
+medianoche llegan ya aplanadas desde el servidor (S-09) y se pintan enteras: la
+app no reinicia ningún contador a las 00:00 porque no lleva ninguno.
+
+**M-7 · Notificaciones.** Cinco estados, no un interruptor. «Activadas» resume
+tres condiciones que fallan por separado —permiso del sistema, token del
+servicio, registro en el conjunto— y la peligrosa es la tercera: el teléfono
+listo y el conjunto sin apuntarlo. Un interruptor la pintaría encendida y el
+residente creería que le avisarán. El token rota solo, así que el registro se
+reintenta al volver a primer plano y se reenvía cuando cambia; al cerrar sesión
+se olvida, porque el registro es de la cuenta y no del aparato.
+
+### La cámara, el consentimiento y la línea que separa dos personas
+
+Quien sostiene el teléfono es el residente; quien es dueño del rostro es el
+visitante. La ruta lo encarna: `POST …/mi/autorizaciones/:autorizacionId/rostro`
+**no recibe `titularId`**. El titular se deriva de la autorización, y la consulta
+que lo busca filtra por vivienda, así que nombrar la del vecino devuelve 404 sin
+que haga falta un permiso que alguien pueda olvidar.
+
+No se abrió la ruta del mostrador (`POST …/biometria/capturas`) al rol
+`residente`: habría sido un cambio de una palabra en un decorador, y habría
+dado a cada residente una entrada que acepta el titular desde el cuerpo. Lo que
+se comparte es el **caso de uso** —calidad, cifrado del vector, solicitud del
+consentimiento, supresión programada—; lo que no se comparte es la puerta.
+
+En la pantalla, la consecuencia: **no hay casilla de aceptar**, ni para el
+residente ni para nadie, y el desenlace bueno no dice «listo» sino a quién se le
+pidió y que hasta entonces la foto no viaja a ninguna terminal (RN-09). Una
+casilla aquí sería la firma de otro en un papel.
+
+La fuente de la foto es un puerto con un simulado declarado, que es ADR-03
+aplicado al teléfono: el ciclo entero se ejerce sin cámara. **El simulado no
+devuelve siempre una foto buena** —eso convertiría la validación de calidad en
+adorno— y hay una prueba que lo exige.
+
+### KPI-10, medido y acotado
+
+Los 60 segundos son de una persona, y una persona no cabe en una suite. Lo que
+sí cabe es **la parte del sistema**, y está medida: `apps/api/test/kpi-10.e2e.test.ts`
+crea 30 visitas con claves distintas —con la misma se estaría midiendo el camino
+del reintento, que es más barato— y publica p50, p95 y el peor caso. Sale por la
+salida de la suite a propósito: un KPI que solo se afirma no se puede discutir.
+
+| Medida                          | Valor    |
+| ------------------------------- | -------- |
+| p50 de la creación              | ~2 ms    |
+| p95 de la creación              | ~5 ms    |
+| p95 del reintento idempotente   | ~3 ms    |
+| Presupuesto del sistema         | 3 000 ms |
+| Lo que queda para la persona    | ~59,99 s |
+
+Es un **suelo**, no el tiempo real: el repositorio es el doble en memoria, así
+que no incluye ni la red ni PostgreSQL. Sirve para lo que sirve —detectar que la
+ruta se encarezca— y la medición con el residente delante es el procedimiento de
+la guía (§14.6).
+
+### Pruebas y veredicto de 11-C
+
+Ejecutado con `./scripts/verificar-etapa.sh --con-base`, **25 de 25 pasos**:
+
+| Suite                         | Resultado                                                                         |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| TypeScript                    | 642 + 398 + 350 + 144 + 78 = **1.612 pruebas**, 5 omitidas, tres corridas idénticas |
+| Dart (`apps/mobile`)          | **158 pruebas**                                                                     |
+| Ficheros de prueba recogidos  | 124 de 124                                                                          |
+| Cobertura TS · dominio        | líneas 97,71 % · ramas 96,48 % (umbral 90 %)                                        |
+| Cobertura TS · aplicación     | líneas 96,62 % · ramas 92,12 % (umbral 90 %)                                        |
+| Cobertura Dart · dominio      | 95,87 % (umbral 90 %) — era 88,43 % antes de esta ronda                             |
+| Cobertura Dart · aplicación   | 95,03 % (umbral 90 %)                                                               |
+| Cobertura Dart · infraestruc. | 88,47 % (umbral 60 %) — era 47,46 %                                                 |
+| Contra base real              | migraciones, semillas y suite SQL · KPI-03 (100 inserciones, 0 duplicados) · UPDATE y DELETE rechazados sobre un evento real |
+| KPI-25                        | 200 de 200 alertas, p95 muy por debajo de los 10 s                                  |
+| Controles                     | 22 de 30 con prueba negativa · 22 controles con granularidad de rama                |
+
+**Veredicto literal:**
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El control declarado sigue siendo el **5e** —el recorrido de la app en un
+navegador real—, con su motivo escrito y revisión en la ETAPA 14. Aparece en el
+veredicto en cada corrida, que es como se pidió: declarado, no desactivado.
+
+### Hallazgos de esta mitad
+
+| ID       | Qué                                                                                                                                                                                                                                             | Estado        |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **D-77** | `GET …/biometria/consentimientos/:id` no se acotaba por titular: dentro del mismo conjunto, cualquier residente con el UUID leía si su vecino otorgó o revocó. Ahora responde **404** —no 403, que confirmaría que existe—, y el titular sí lo lee | **Corregido** |
+| **D-93** | El doble de escrituras repartía identificadores por vivienda (`previas.length + 1`), así que la primera autorización de cada vivienda tenía el MISMO id. La prueba del segundo eje sobre la ruta de rostro **pasaba sin demostrar nada**: R1 nombrando el del vecino encontraba el suyo. Lo destapó que la prueba diera 201 donde esperaba 404 | **Corregido** |
+| **D-94** | `packages/contracts/src/index.ts` seguía apuntando a `PatronDto`, renombrado en D-92. El contrato regenerado lo destapó en `typecheck`                                                                                                           | **Corregido** |
+| **D-95** | El banco de pruebas negativas clona `HEAD` y copia lo que `git ls-files` conoce, así que **un control todavía sin versionar no llega al banco**. Node devuelve 1 por módulo inexistente, y 1 es justo lo que la sonda espera de una violación: la línea base salía en rojo con el diagnóstico «la sonda dejó rastro en el banco», que manda a buscar el defecto donde no está | **Corregido** |
+| **D-97** | La prueba de la franja que cruza medianoche construía la franja **en UTC** y exigía leer «02:00». El widget pinta `toLocal()`, así que con `TZ=Etc/UTC` pasaba y en Bogotá fallaba: **mismo código, dos resultados**. Lo reportó el usuario desde su máquina | **Corregido** |
+| **S-23** | Derivado de D-97: `MiZonaDto.franjasDeHoy` viaja como instantes y la app los pinta en el huso **del teléfono**, no en el de la copropiedad. El servidor sí conoce el suyo —resuelve «hoy» con `copropiedades.zona_horaria`— pero no lo publica. Un residente de viaje leería el horario de la piscina desplazado | `[SUPUESTO]` **abierto** |
+| **D-96** | El trinquete de granularidad de rama (11-B) exigía **una cifra fija** a controles cuyas ramas SON el entorno: `verificar-entorno.mjs` daba 26 bloques sin ejercer en una corrida y 33 en la siguiente con el mismo código, y `con-limite.mjs` aparecía o no según qué sondas hubieran corrido. Un solo número no puede ser correcto en macOS y en Linux a la vez, y §2.8.0 exige las dos | **Corregido** |
+
+### D-97 · la prueba de la medianoche era la expuesta a que el huso la moviera
+
+El nombre lo decía y no lo vi: la prueba que existía para demostrar que una
+franja que cruza medianoche se pinta entera **construía la franja en UTC y
+afirmaba un texto que solo es cierto en UTC**. Yo la corrí en un contenedor con
+`TZ=Etc/UTC` y salió verde; en Bogotá el mismo widget escribe «21:00» y la
+prueba falla. No es del entorno del usuario: es de la prueba.
+
+Reproducido antes de tocar nada, y medido en cinco husos —UTC, Bogotá, Tokio,
+Auckland y Santiago—: solo fallaba esa. El resto de las 158 pasa en los cuatro
+husos que probé.
+
+**El arreglo no es fijar un huso.** Eso solo mueve el punto ciego de sitio. La
+franja se construye ahora en hora **local** —que es lo que el residente tiene
+delante— y el texto esperado se deriva de esa misma hora en vez de ser una
+constante, con una aserción previa de que la franja sigue cruzando medianoche
+para que un cambio de horario de verano no la deje pasando sin probar nada.
+
+**Y el control que lo habría detectado**, en el paso 5c: la suite de Dart se
+corre **dos veces, en dos husos distintos**, y el segundo se elige comparando
+desplazamientos con el de la máquina —el primero de la lista que no coincida—.
+Fijar `TZ` a un valor no habría servido: el entorno objetivo es macOS en Bogotá
+y el CI corre en UTC (§2.8.0), así que una prueba dependiente del reloj está
+verde en una máquina y roja en la otra, y quien la ve roja no puede saber si es
+el código o la hora.
+
+**S-23, que sale de aquí y NO se corrige en esta ronda.** El widget pinta
+`toLocal()`, es decir el huso del teléfono, y el horario de una zona común es el
+de la copropiedad. Para un residente en el conjunto coinciden; para uno de viaje
+no. El servidor ya conoce el huso correcto —`zonas-pg.ts` resuelve «hoy» con
+`copropiedades.zona_horaria`— y no lo publica en el DTO. La salida es la misma
+que ya se tomó en M-4: **enviar el desplazamiento en minutos** junto a las
+franjas, como `desplazamientoUtcMinutos`, y pintar con él en vez de con
+`toLocal()`; no hace falta una dependencia nueva de husos en Dart. Es un cambio
+de contrato, se encontró al cerrar y queda declarado para que lo decida el
+cliente: el impacto real es bajo —Colombia tiene un solo huso y no cambia la
+hora— pero la app afirma algo que no siempre es cierto.
+
+**D-96 es mío y de la ronda anterior**, y conviene decirlo así: construí un
+trinquete determinista sobre una medición que no lo es. El arreglo no es aflojar
+el control, sino separar lo que depende del host de lo que no: los dos ficheros
+sensibles quedan declarados con su motivo y su cifra se informa pero no se
+exige; lo que sigue exigiéndoseles —tener prueba negativa— lo comprueba
+`controles-sin-prueba-negativa.mjs`, que lee ficheros y sí es determinista. La
+lista de exentos es un trinquete por sí misma: una exención que protege a un
+fichero que ya no existe rompe, y hay dos pruebas negativas nuevas que lo
+demuestran.
+
+**D-95 es la familia dentro del control de los controles.** El banco existía
+para demostrar que cada control detecta su violación, y no comprobaba lo que uno
+creía: confundía «el control no está» con «el control falló». Ahora lo comprueba
+antes de sondear y el mensaje dice qué hacer (`git add`).
+
+D-93 merece una línea más, porque es la familia otra vez y esta vez en una
+prueba: **el control existía —la suite del segundo eje sobre una ruta con
+recurso nombrable— y no comprobaba lo que uno creía**, porque el doble hacía
+indistinguibles dos recursos distintos. Un doble que reparte identificadores
+ambiguos no es más simple: es menos capaz de detectar el fallo que la prueba
+busca.
+
+---
+
 ## 9 · Qué debe hacer usted
 
 1. **Nada para que la suite corra.** Todo lo de esta mitad se verifica sin

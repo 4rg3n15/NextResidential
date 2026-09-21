@@ -106,6 +106,26 @@ try {
 
   const enClon = (cmd, args) => correr(cmd, args, { cwd: clon });
 
+  /**
+   * EL BANCO SOLO VE LO QUE GIT CONOCE.
+   *
+   * Un control recién escrito y todavía **sin versionar** no llega aquí: el
+   * clon sale de `HEAD` y la copia recorre `git ls-files`. El control se
+   * ejecuta, Node no encuentra el módulo y devuelve 1 — y 1 es exactamente lo
+   * que la sonda espera de una violación, así que la línea base sale en rojo
+   * con un diagnóstico que manda a buscar el defecto donde no está. Pasó con
+   * `esquemas-unicos.mjs` y costó una lectura entera del banco.
+   *
+   * Es la familia otra vez, y esta vez dentro del control de los controles: el
+   * control existía y no comprobaba lo que uno creía. Ahora se comprueba antes
+   * de sondear, y el mensaje dice qué hacer.
+   */
+  const exigeControl = (ruta) => {
+    if (existsSync(join(clon, ruta))) return true;
+    mal(`${ruta} no está en el banco: falta versionarlo (\`git add\`) antes de verificar`);
+    return false;
+  };
+
   console.log('\n▸ 1 · un secreto sintético bloquea el escaneo');
   {
     /**
@@ -1006,6 +1026,61 @@ try {
       ? ok('un volcado roto se ignora y la suite no se mide a sí misma')
       : mal(`higiene del trinquete rota (codigo ${rh.codigo}): ${rh.salida.trim().slice(0, 120)}`);
 
+    /**
+     * Y las dos ramas de la exención por entorno (D-96). Un fichero declarado
+     * sensible al host no se exige numéricamente —su cifra depende de si hay
+     * Flutter, de si hay `xcrun`, de qué sondas corrieron—, pero la lista es un
+     * trinquete por sí misma: una exención que protege a un fichero que ya no
+     * existe es una desactivación en silencio.
+     */
+    volcado(9); // más que la base: si se exigiera, esto rompería
+    writeFileSync(
+      join(dir, 'coverage-sensible.json'),
+      JSON.stringify({
+        result: [
+          {
+            url: `file://${join(clon, 'scripts', 'lib', 'verificar-entorno.mjs')}`,
+            functions: [
+              {
+                ranges: Array.from({ length: 99 }, (_, i) => ({
+                  startOffset: i * 10,
+                  endOffset: i * 10 + 5,
+                  count: 0,
+                })),
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    writeFileSync(base, JSON.stringify({ 'scripts/lib/contar-pruebas.mjs': 9 }, null, 2));
+    const rs = conCobertura();
+    rs.codigo === 0 && !/verificar-entorno/.test(rs.salida)
+      ? ok('un control sensible al entorno no rompe por su cifra')
+      : mal(`la exención por entorno no se aplica (codigo ${rs.codigo})`);
+
+    // Y el otro lado de la lista: la exención sigue escrita y el fichero que
+    // protegía ya no está. Eso es una desactivación en silencio, y rompe.
+    const sensible = join(clon, 'scripts', 'lib', 'verificar-entorno.mjs');
+    const guardado = readFileSync(sensible, 'utf8');
+    rmSync(sensible, { force: true });
+    const re = conCobertura();
+    re.codigo !== 0 && /ya no existe/.test(re.salida)
+      ? ok('una exención que protege a un fichero inexistente: detectada')
+      : mal(`una exención huérfana sobrevive (codigo ${re.codigo})`);
+    writeFileSync(sensible, guardado);
+
+    // Y que `--actualizar` NO guarde la cifra del sensible: guardar un número
+    // que no se exige invita a leerlo como si se exigiera.
+    correr('node', ['scripts/lib/ramas-de-los-controles.mjs', '--actualizar'], {
+      cwd: clon,
+      env: { ...process.env, NCR_COBERTURA_CONTROLES: dir },
+    });
+    !/verificar-entorno/.test(readFileSync(base, 'utf8'))
+      ? ok('`--actualizar` no escribe la cifra de un control sensible al entorno')
+      : mal('la base guarda una cifra que no se exige');
+
+    rmSync(join(dir, 'coverage-sensible.json'), { force: true });
     writeFileSync(base, original);
     rmSync(dir, { recursive: true, force: true });
   }
@@ -1045,6 +1120,73 @@ try {
       ? ok('NCR_FLUTTER a un binario que no está: fallo, no aviso')
       : mal(`un NCR_FLUTTER roto pasa inadvertido (codigo ${mal_apuntado.codigo})`);
   }
+
+  console.log('\n▸ 20 · un `.env.example` que no dice la verdad se detecta (D-90)');
+  {
+    /**
+     * Las dos direcciones, que son dos defectos distintos: una variable que el
+     * código lee y el ejemplo no declara deja a quien despliega sin saber que
+     * existe; una que el ejemplo declara y nadie lee hace creer que se
+     * configuró algo. La segunda es la que dejó el rate limiting en sus valores
+     * por omisión durante semanas.
+     */
+    const ejemplo = join(clon, 'apps', 'api', '.env.example');
+    const original = readFileSync(ejemplo, 'utf8');
+
+    enClon('node', ['scripts/lib/entorno-declarado.mjs']).codigo === 0
+      ? ok('el banco parte en verde')
+      : mal('el ejemplo real no cuadra con el esquema');
+
+    // (a) el `=` que falta: la línea sigue ahí y el comparador deja de verla.
+    writeFileSync(ejemplo, original.replace('CORS_ALLOWED_ORIGINS=', 'CORS_ALLOWED_ORIGINS'));
+    const rA = enClon('node', ['scripts/lib/entorno-declarado.mjs']);
+    rA.codigo !== 0 && /CORS_ALLOWED_ORIGINS/.test(rA.salida)
+      ? ok('una declaración sin `=` se detecta, no se disculpa')
+      : mal(`una declaracion sin igual pasa inadvertida (codigo ${rA.codigo})`);
+
+    // (b) un nombre que nadie lee.
+    writeFileSync(ejemplo, `${original}\nVARIABLE_QUE_NADIE_LEE=1\n`);
+    const rB = enClon('node', ['scripts/lib/entorno-declarado.mjs']);
+    rB.codigo !== 0 && /NADIE la lee/.test(rB.salida)
+      ? ok('una variable declarada que nadie lee: detectada')
+      : mal(`una variable inventada pasa inadvertida (codigo ${rB.codigo})`);
+
+    writeFileSync(ejemplo, original);
+    enClon('node', ['scripts/lib/entorno-declarado.mjs']).codigo === 0
+      ? ok('el banco de pruebas queda limpio')
+      : mal('la sonda dejó rastro en el banco');
+  }
+
+  console.log('\n▸ 21 · dos DTO con el mismo nombre se detectan (D-92)');
+  {
+    /**
+     * En OpenAPI el nombre de la clase es el nombre del esquema. La segunda
+     * pisa a la primera y el cliente generado describe la forma equivocada sin
+     * dar ningún error: lo encontró el compilador de Dart, no un control.
+     */
+    const sonda = join(clon, 'apps', 'api', 'src', 'sonda-dto.ts');
+
+    // Sin el control en el banco, las tres sondas de abajo dirían cualquier
+    // cosa: Node devuelve 1 por módulo inexistente y 1 es justo lo que la
+    // sonda espera de una violación. Se comprueba antes, y el motivo que se
+    // informa es el verdadero.
+    if (exigeControl('scripts/lib/esquemas-unicos.mjs')) {
+      enClon('node', ['scripts/lib/esquemas-unicos.mjs']).codigo === 0
+        ? ok('el banco parte sin nombres repetidos')
+        : mal('el repositorio real tiene nombres de esquema repetidos');
+
+      writeFileSync(sonda, 'export class MiZonaDto {\n  otraCosa!: string;\n}\n');
+      const r = enClon('node', ['scripts/lib/esquemas-unicos.mjs']);
+      r.codigo !== 0 && /MiZonaDto/.test(r.salida)
+        ? ok('un nombre de esquema repetido: detectado, con los dos ficheros')
+        : mal(`un DTO homónimo pasa inadvertido (codigo ${r.codigo})`);
+
+      rmSync(sonda, { force: true });
+      enClon('node', ['scripts/lib/esquemas-unicos.mjs']).codigo === 0
+        ? ok('el banco de pruebas queda limpio')
+        : mal('la sonda dejó rastro en el banco');
+    }
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -1068,6 +1210,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 21 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 23 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

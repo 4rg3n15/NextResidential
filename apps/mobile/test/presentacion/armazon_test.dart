@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
 import 'package:ncr_residente/configuracion/ambiente.dart';
+import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/dominio/sesion.dart';
@@ -101,6 +104,67 @@ class RepositorioQueAnota implements RepositorioDelResidente {
     bitacora.add('leer:historial');
     return const [];
   }
+
+  @override
+  Future<List<ZonaComun>> misZonas() async {
+    bitacora.add('leer:zonas');
+    return const [];
+  }
+
+  @override
+  Future<ResultadoDeVisita> crearVisita(NuevaVisita visita) async {
+    bitacora.add('escribir:visita:${visita.claveDeIdempotencia}');
+    return const VisitaCreada(id: 'a-1', repetida: false);
+  }
+
+  @override
+  Future<void> registrarAparato(AparatoDeNotificaciones aparato) async {
+    bitacora.add('escribir:aparato:${aparato.token}');
+  }
+
+  final List<String> capturas = [];
+@override
+  Future<ResultadoDeCaptura> capturarRostro({
+    required String autorizacionId,
+    required MedidasDeCaptura medidas,
+    required Uint8List vector,
+    required String versionPolitica,
+    required DateTime suprimirEn,
+  }) async {
+    capturas.add(autorizacionId);
+    return const CapturaAceptada(
+      consentimientoId: 'c-1',
+      titular: 'Visitante de prueba',
+      calidad: 0.8,
+    );
+  }
+}
+
+/// Fuente de avisos gobernada: el permiso y el token se deciden en la prueba,
+/// que es la única forma de ejercer los cinco estados de M-7 sin un teléfono
+/// con Google Play.
+class FuenteGobernada implements FuenteDeNotificaciones {
+  FuenteGobernada({this.concede = true, this.token = 'tok-1'});
+  bool concede;
+  String? token;
+
+  @override
+  Future<bool> pedirPermiso() async {
+    bitacora.add('avisos:permiso');
+    return concede;
+  }
+
+  @override
+  Future<AparatoDeNotificaciones?> aparato() async {
+    bitacora.add('avisos:aparato');
+    final t = token;
+    if (t == null) return null;
+    return AparatoDeNotificaciones(
+      instalacionId: 'inst-1',
+      token: t,
+      plataforma: PlataformaDelAparato.android,
+    );
+  }
 }
 
 void main() {
@@ -127,6 +191,8 @@ void main() {
       sesion: sesion,
       repositorio: RepositorioQueAnota(),
       reloj: reloj,
+      notificaciones: FuenteGobernada(),
+      claves: () => 'clave-fija-de-prueba',
     );
   });
 

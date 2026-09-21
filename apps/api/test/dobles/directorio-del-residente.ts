@@ -1,7 +1,13 @@
-import type { AmbitoDelResidente } from '@ncr/domain-core';
+import type { AmbitoDelResidente, MotivoDeNoAutorizar } from '@ncr/domain-core';
 import type {
   AutorizacionDelResidente,
+  AutorizacionesDelResidente,
   DirectorioDelResidente,
+  HechosDeLaBase,
+  NotificacionesDelResidente,
+  NuevaAutorizacion,
+  ZonaParaResidente,
+  ZonasDelResidente,
   EventoDelResidente,
   FiltroDeHistorial,
   MiembroDeFamilia,
@@ -274,3 +280,147 @@ export class DirectorioDelResidenteEnMemoria implements DirectorioDelResidente {
     return (this.de(ambito)?.eventos ?? []).slice(0, filtro.limite);
   }
 }
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LOS TRES PUERTOS DE 11-B, EN MEMORIA
+ *
+ * El de escritura es el que importa para el segundo eje. Guarda lo creado
+ * **bajo la clave del ámbito que recibió**, igual que el adaptador SQL escribe
+ * con el `vivienda_id` del ámbito. Si guardara en una lista plana, la prueba de
+ * que «lo que crea R1 no aparece en la vivienda de R2» pasaría con cualquier
+ * implementación, incluida una rota.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export class AutorizacionesDelResidenteEnMemoria implements AutorizacionesDelResidente {
+  /**
+   * La última instancia construida, que es la que la aplicación de pruebas
+   * está usando. La suite necesita mirar DÓNDE cayó lo escrito, y la fábrica
+   * de Nest no devuelve la instancia. Una variable estática es fea; la
+   * alternativa —exponer un puerto de lectura solo para la prueba— habría sido
+   * peor: añadir superficie de producción para que una prueba se vea bien.
+   */
+  static ultima: AutorizacionesDelResidenteEnMemoria | undefined;
+
+  constructor() {
+    AutorizacionesDelResidenteEnMemoria.ultima = this;
+  }
+
+  /** `copropiedad:vivienda` → autorizaciones creadas. */
+  readonly creadas = new Map<string, { id: string; nueva: NuevaAutorizacion }[]>();
+
+  /** Identificadores únicos en todo el doble, no por vivienda. Ver abajo. */
+  private siguiente = 0;
+  /** Se pueden torcer desde la prueba para ejercer cada regla. */
+  hechos: HechosDeLaBase = {
+    visitanteVetado: false,
+    viviendaActiva: true,
+    placaYaActiva: false,
+  };
+
+  async hechosParaAutorizar(): Promise<HechosDeLaBase> {
+    return this.hechos;
+  }
+
+  async crearAutorizacion(
+    ambito: AmbitoDelResidente,
+    _creadaPor: { readonly usuarioId: string; readonly residenteId: string },
+    nueva: NuevaAutorizacion,
+  ): Promise<
+    | { readonly ok: true; readonly id: string; readonly repetida: boolean }
+    | { readonly ok: false; readonly motivo: MotivoDeNoAutorizar }
+  > {
+    const clave = `${ambito.copropiedadId}:${ambito.viviendaId}`;
+    const previas = this.creadas.get(clave) ?? [];
+    // RN-17 · la misma clave devuelve la de antes, no una nueva.
+    const repetida = previas.find((p) => p.nueva.claveDeIdempotencia === nueva.claveDeIdempotencia);
+    if (repetida !== undefined) return { ok: true, id: repetida.id, repetida: true };
+
+    /**
+     * El contador es del DOBLE, no de la vivienda.
+     *
+     * Con `previas.length` la primera autorización de cada vivienda recibía el
+     * mismo identificador, y entonces R1 nombrando el de su vecino encontraba
+     * el suyo: la prueba del segundo eje pasaba sin demostrar nada. Un doble
+     * que reparte identificadores ambiguos no es más simple, es menos capaz de
+     * detectar el fallo que la prueba busca.
+     */
+    this.siguiente += 1;
+    const id = `40000000-0000-4000-8000-${String(this.siguiente).padStart(12, '0')}`;
+    this.creadas.set(clave, [...previas, { id, nueva }]);
+    return { ok: true, id, repetida: false };
+  }
+
+  /**
+   * El titular del dato biométrico: el visitante de ESA autorización, buscado
+   * solo dentro del ámbito. El doble lo hace igual que el adaptador —filtrando
+   * por `copropiedad:vivienda` antes de mirar el identificador— porque si
+   * buscara en todas las viviendas, la prueba del segundo eje pasaría con un
+   * adaptador roto.
+   */
+  async titularDeLaAutorizacion(
+    ambito: AmbitoDelResidente,
+    autorizacionId: string,
+  ): Promise<{ readonly personaId: string; readonly nombre: string } | null> {
+    const clave = `${ambito.copropiedadId}:${ambito.viviendaId}`;
+    const suya = (this.creadas.get(clave) ?? []).find((a) => a.id === autorizacionId);
+    if (suya === undefined) return null;
+    return {
+      // El titular es una persona DISTINTA del residente: es lo que RN-10
+      // separa, y un doble que devolviera al residente haría pasar la prueba
+      // que existe para impedirlo.
+      personaId: `70000000-0000-4000-8000-${autorizacionId.slice(-12)}`,
+      nombre: suya.nueva.visitante,
+    };
+  }
+}
+
+export class ZonasDelResidenteEnMemoria implements ZonasDelResidente {
+  async zonas(ambito: AmbitoDelResidente, ahora: Date): Promise<readonly ZonaParaResidente[]> {
+    // Las zonas son del CONJUNTO: no dependen de la vivienda, y por eso este
+    // doble no las indexa por ella. Depender de ella aquí habría hecho pasar
+    // una prueba que no dice nada.
+    if (ambito.copropiedadId !== COP_A) return [];
+    return [
+      {
+        id: '50000000-0000-4000-8000-000000000001',
+        nombre: 'Piscina',
+        aforoMaximo: 20,
+        ocupacionActual: 17,
+        abiertaAhora: true,
+        franjasDeHoy: [
+          {
+            desde: new Date(ahora.getTime() - 3_600_000).toISOString(),
+            hasta: ahora.toISOString(),
+          },
+        ],
+        requiereAutorizacion: true,
+      },
+    ];
+  }
+}
+
+export class NotificacionesDelResidenteEnMemoria implements NotificacionesDelResidente {
+  readonly registrados: { copropiedadId: string; usuarioId: string; instalacionId: string }[] = [];
+
+  async registrarToken(
+    copropiedadId: string,
+    usuarioId: string,
+    aparato: {
+      readonly instalacionId: string;
+      readonly token: string;
+      readonly plataforma: string;
+    },
+  ): Promise<{ readonly id: string }> {
+    this.registrados.push({ copropiedadId, usuarioId, instalacionId: aparato.instalacionId });
+    return { id: '60000000-0000-4000-8000-000000000001' };
+  }
+}
+
+/** El registro de escrituras que la aplicación de pruebas está usando. */
+export const registroDeEscrituras = (): AutorizacionesDelResidenteEnMemoria => {
+  const r = AutorizacionesDelResidenteEnMemoria.ultima;
+  if (r === undefined)
+    throw new Error('la aplicación de pruebas no construyó el doble de escritura');
+  return r;
+};

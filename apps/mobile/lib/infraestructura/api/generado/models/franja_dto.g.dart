@@ -10,7 +10,7 @@ FranjaDto _$FranjaDtoFromJson(Map<String, dynamic> json) => FranjaDto(
   dia: json['dia'] as num,
   minutoInicio: json['minutoInicio'] as num,
   minutoFin: json['minutoFin'] as num,
-  continuaDelDiaAnterior: json['continuaDelDiaAnterior'] as bool,
+  continuaDelDiaAnterior: json['continuaDelDiaAnterior'] as bool?,
 );
 
 Map<String, dynamic> _$FranjaDtoToJson(FranjaDto instance) => <String, dynamic>{

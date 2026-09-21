@@ -68,14 +68,15 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 | **09** | Consola web de administración | Next.js + Tailwind con el preset derivado del mockup, los dos temas por parejas de tokens, cliente de API generado desde el contrato y recorrido del navegador que entra por contraseña, segundo factor y `aal2` |
 | **10** | Consolas de portería y guardia virtual | Dos consolas y no una: el portero atiende **una** puerta y la tiene delante; el operador de central atiende **varias copropiedades** y no ve ninguna. Exclusividad del canal de audio como máquina de estados **en el dominio**, y adaptador real de barrera |
 | **11-A** | App móvil Flutter del residente · primera mitad | La **superficie del residente**, que no existía, y el **segundo eje del aislamiento** —vivienda, además de copropiedad—. App Flutter con cliente Dart generado, sesión en el llavero, refresco al volver a primer plano y cinco de las ocho pantallas |
+| **11-B** | · segunda mitad · el servidor que escribe | Crear la visita con patrón, acompañantes nominales y zonas, con los cuatro rechazos **tipados**; zonas con aforo y horario; registro del token del aparato. El segundo eje ampliado a las **escrituras**: una lectura mal acotada enseña la vida del vecino, una escritura **le abre la puerta** |
+| **11-C** | · tercera mitad · las pantallas y la cámara | M-4, M-5 y M-7; la bandeja de salida conectada al cliente HTTP; y la captura de rostro con el consentimiento **del visitante, no del residente** (RN-10) desde una ruta que no admite `titularId`. KPI-10 medido: la parte del sistema es **p95 ≈ 5 ms** de los 60 000 |
 
-**Métricas al cierre de la ETAPA 11-A:** ver el veredicto literal en [`docs/etapas/ETAPA-11.md`](docs/etapas/ETAPA-11.md) §6 · TypeScript y Dart se miden **por separado y por capa**, porque un agregado alto esconde una capa por debajo
+**Métricas al cierre de la ETAPA 11:** ver el veredicto literal en [`docs/etapas/ETAPA-11.md`](docs/etapas/ETAPA-11.md) §6 · TypeScript y Dart se miden **por separado y por capa**, porque un agregado alto esconde una capa por debajo
 
 ### Próximas etapas
 
 | #    | Etapa                                    | Alcance                                                                                                                                                    |
 | ---- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 11-B | Aplicación móvil Flutter · segunda mitad | Registrar visitante (patrón, acompañantes nominales, zonas), zonas con aforo, notificaciones con FCM, cámara con validación de calidad y modo sin conexión |
 | 12   | Edge Gateway                             | Operación autónoma sin conexión y reconciliación idempotente al reconectar                                                                                 |
 | 13   | Auditoría de ciberseguridad              | Verificación y endurecimiento. No introduce la seguridad: la audita                                                                                        |
 | 14   | Observabilidad, CI/CD, PWA y escritorio  | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio                                                                      |
@@ -156,7 +157,7 @@ NextResidential/
 ├─ apps/
 │  ├─ api/            # NestJS — monolito modular hexagonal
 │  ├─ web/            # Next.js — consolas (ETAPA 09-10)
-│  ├─ mobile/         # Flutter — app del residente (ETAPA 11-A: cinco pantallas)
+│  ├─ mobile/         # Flutter — app del residente (ETAPA 11: las ocho pantallas)
 │  └─ edge/           # Edge Gateway (ETAPA 12)
 ├─ packages/
 │  ├─ domain-core/    # dominio puro compartido API ↔ Edge
@@ -322,6 +323,70 @@ rondas antes que nadie ejercitaba. Así que la suite negativa corre bajo
 `ramas-de-los-controles.json` guarda, por control, **cuántos bloques no ejecuta
 nadie**. Ese número **no puede subir**: añadir una rama sin ejercerla rompe la
 verificación en el mismo empujón que la añade. Bajarlo es libre.
+
+### La app del residente · qué añade y cómo se prueba
+
+**Qué añade.** La app Flutter del residente (`apps/mobile`) es la superficie de
+OE-02: el residente autoriza a su visitante desde el teléfono. En 11-A se
+construyeron la sesión, el aislamiento por vivienda y cinco pantallas; en 11-B,
+**el servidor que faltaba**: crear la visita con patrón de recurrencia,
+acompañantes nominales, zonas y observaciones; las zonas comunes con aforo y
+horario; y el registro del token de notificaciones. En 11-C, las tres pantallas
+que faltaban y la cámara.
+
+**Las tres decisiones que más forma dieron a esas pantallas**, porque explican
+el resto del código:
+
+1. **Los rechazos se separan en dos familias, no en cuatro mensajes.** Lista
+   negra, vivienda inactiva y nivel de acceso las resuelve la administración;
+   la placa duplicada la resuelve el residente ahí mismo. El dominio lo dice
+   (`SalidaDelRechazo`) y la pantalla lo pinta con dos títulos distintos.
+2. **La interfaz refleja; no calcula.** No hay un solo método en la app que
+   decida si se puede entrar a una zona. El aforo lo garantiza la base en el
+   momento del acceso, y la pantalla lo dice: **no reserva plaza**.
+3. **El rostro es del visitante.** La ruta de captura del residente
+   (`POST …/mi/autorizaciones/:autorizacionId/rostro`) **no recibe `titularId`**:
+   lo deriva de la autorización. En la pantalla no hay casilla de aceptar, y el
+   desenlace bueno no dice «listo» sino a quién se le pidió — porque hasta que
+   ese alguien responda, la foto no viaja a ninguna terminal (RN-09, RN-10).
+
+**Lo que está declarado y no construido:** los adaptadores reales de **cámara**
+y **FCM**. Los dos llevan binarios nativos y credenciales que §2.5 prohíbe
+versionar, y un permiso del sistema que solo se prueba en un dispositivo. Los
+puertos, las pantallas y el registro contra el conjunto están construidos y
+probados contra fuentes simuladas; es ADR-03 aplicado al teléfono. La fuente
+simulada **no devuelve siempre una foto buena**, y hay una prueba que lo exige:
+una que siempre acertara convertiría la validación de calidad en adorno.
+
+**Prerrequisitos.** La versión mínima de Flutter está en `.flutter-version` y el
+mínimo de Dart en `apps/mobile/pubspec.yaml`; el paso 1 del verificador
+comprueba las dos. En macOS hace falta además que
+`xcrun --sdk macosx --show-sdk-path` devuelva una ruta que exista.
+
+```bash
+cd apps/mobile
+flutter pub get
+flutter analyze          # sin hallazgos
+flutter test             # 158 pruebas
+flutter test --coverage  # umbrales por capa, que el paso 5c comprueba
+```
+
+**El cliente de la API se GENERA, nunca se escribe a mano** (§2.6). Tras tocar
+un controlador:
+
+```bash
+pnpm contrato && cd apps/mobile \
+  && dart run swagger_parser \
+  && dart run build_runner build --delete-conflicting-outputs
+```
+
+El paso 5d falla si el generado no coincide con el contrato, y `.gitignore` no
+lo excluye a propósito: un generado que nadie regenera describe la API de la
+semana pasada sin dar ningún error.
+
+**Y ningún secreto viaja en el binario.** Todo lo compilado en Flutter es
+extraíble; la llave publicable entra por `--dart-define` y la secreta no entra
+nunca. El paso 5d lo comprueba.
 
 ### Controles declarados no ejercidos
 

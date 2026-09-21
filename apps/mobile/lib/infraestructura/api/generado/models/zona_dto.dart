@@ -4,7 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
-import 'franja_dto.dart';
+import 'franja_de_horario_dto.dart';
 import 'reserva_del_dia_dto.dart';
 
 part 'zona_dto.g.dart';
@@ -41,7 +41,7 @@ class ZonaDto {
   final num aforoDisponible;
   final bool dentroDeHorario;
   final bool aforoCompleto;
-  final List<FranjaDto> horario;
+  final List<FranjaDeHorarioDto> horario;
 
   /// Minutos de desfase UTC del horario de la zona.
   final num desplazamientoUtcMinutos;

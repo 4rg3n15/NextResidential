@@ -88,7 +88,7 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
                                    AND r.estado = 'activo'
            JOIN public.viviendas  v ON v.id = r.vivienda_id
                                    AND v.copropiedad_id = r.copropiedad_id
-      LEFT JOIN public.niveles_de_acceso n ON n.id = r.nivel_acceso_id
+      LEFT JOIN public.niveles_acceso n ON n.id = r.nivel_acceso_id
           WHERE u.id = $1
             AND u.estado = 'activo'
           ORDER BY r.es_titular DESC, r.creado_en ASC
@@ -122,7 +122,10 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
         copropiedad: string;
       }>(
         `SELECT v.id, v.identificador, v.agrupacion,
-                coalesce(v.direccion, cp.direccion) AS direccion,
+                -- La dirección es de la COPROPIEDAD (0029): la vivienda tiene
+                -- identificador y agrupación, no calle. Aquí se leía
+                -- v.direccion, que no existe, y la consulta entera fallaba (D-89).
+                cp.direccion AS direccion,
                 v.estado, v.estado_administrativo,
                 cp.etiqueta_vivienda, cp.etiqueta_agrupacion,
                 cp.nombre AS copropiedad
@@ -161,7 +164,7 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
                 n.clave AS nivel, r.estado
            FROM public.residentes r
            JOIN public.personas   p ON p.id = r.persona_id
-      LEFT JOIN public.niveles_de_acceso n ON n.id = r.nivel_acceso_id
+      LEFT JOIN public.niveles_acceso n ON n.id = r.nivel_acceso_id
           WHERE r.copropiedad_id = $1 AND r.vivienda_id = $2
           ORDER BY r.es_titular DESC, p.nombre_completo ASC`,
         [ambito.copropiedadId, ambito.viviendaId],

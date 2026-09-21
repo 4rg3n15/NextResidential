@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'notificaciones.dart';
+
 import '../../aplicacion/estado.dart';
 import '../../aplicacion/sesion_en_uso.dart';
 import '../../configuracion/tema.dart';
@@ -34,6 +36,8 @@ class PantallaDePerfil extends StatelessWidget {
     required this.alPedirAcceso,
     required this.alAbrirFamilia,
     required this.alAbrirHistorial,
+    required this.alAbrirNotificaciones,
+    required this.estadoDeAvisos,
   });
 
   final SesionEnUso sesion;
@@ -42,6 +46,12 @@ class PantallaDePerfil extends StatelessWidget {
   final void Function() alPedirAcceso;
   final void Function() alAbrirFamilia;
   final void Function() alAbrirHistorial;
+  final void Function() alAbrirNotificaciones;
+
+  /// En qué punto está el registro del aparato. Se recibe como VALOR: el perfil
+  /// no tiene por qué saber que hay un controlador detrás, y así el resumen que
+  /// enseña aquí y el detalle de M-7 no pueden contradecirse.
+  final EstadoDeAvisos estadoDeAvisos;
 
   @override
   Widget build(BuildContext context) {
@@ -127,14 +137,18 @@ class PantallaDePerfil extends StatelessWidget {
             Card(
               child: Column(
                 children: [
-                  _InterruptorPendiente(
-                    titulo: 'Notificaciones push',
-                    detalle: 'Llega con el registro de token FCM (11-B).',
-                  ),
-                  const Divider(height: 1),
-                  _InterruptorPendiente(
-                    titulo: 'Alertas de seguridad',
-                    detalle: 'Llega con el registro de token FCM (11-B).',
+                  ListTile(
+                    leading: const Icon(Icons.notifications_outlined),
+                    title: const Text('Notificaciones'),
+                    // El resumen dice el estado REAL, no «activadas». Que la
+                    // app tenga permiso no significa que los avisos lleguen:
+                    // hace falta además que el conjunto tenga el token.
+                    subtitle: Text(
+                      resumenDeAvisos(estadoDeAvisos),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: alAbrirNotificaciones,
                   ),
                   const Divider(height: 1),
                   _InterruptorPendiente(

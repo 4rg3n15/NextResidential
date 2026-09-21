@@ -113,3 +113,110 @@ export class MiEventoDto {
   })
   decididoPorEdge!: boolean;
 }
+
+/**
+ * M-4 · Lo que la app recibe al crear una visita.
+ *
+ * Es UN tipo para los dos desenlaces —creada y rechazada— y no dos códigos HTTP
+ * distintos con cuerpos distintos. La razón es la app: la pantalla tiene que
+ * pintar el rechazo **con su motivo**, y un 409 con un cuerpo de error genérico
+ * la habría obligado a leer texto para distinguir cuál de los cuatro era. El
+ * rechazo de una regla de negocio es una respuesta, no una avería.
+ */
+export class VisitaCreadaDto {
+  @ApiProperty({ type: Boolean, description: 'false = una regla de negocio lo impidió' })
+  creada!: boolean;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  id!: string | null;
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'true = este era un reintento y se devolvió la autorización anterior (RN-17)',
+  })
+  repetida!: boolean;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    enum: ['LISTA_NEGRA', 'VIVIENDA_INACTIVA', 'SIN_NIVEL_DE_ACCESO', 'PLACA_DUPLICADA'],
+    description: 'Motivo TIPADO del rechazo (RN-06, RN-13, P-11, RN-04/CA-03)',
+  })
+  motivo!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'El mismo motivo en castellano llano; lo escribe el dominio, no la pantalla',
+  })
+  explicacion!: string | null;
+}
+
+/** M-7 · HU-34 · confirmación del registro del aparato. */
+export class AparatoRegistradoDto {
+  @ApiProperty({ type: String, format: 'uuid' }) id!: string;
+}
+
+/** M-5 · HU-19 · una zona común tal como la ve el residente. */
+export class FranjaDeHoyDto {
+  @ApiProperty({ type: String, format: 'date-time' }) desde!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) hasta!: string;
+}
+
+export class MiZonaDto {
+  @ApiProperty({ type: String, format: 'uuid' }) id!: string;
+  @ApiProperty({ type: String }) nombre!: string;
+  @ApiProperty({ type: Number }) aforoMaximo!: number;
+  @ApiProperty({
+    type: Number,
+    description:
+      'Ocupación de ESTE instante. La interfaz lo refleja; el aforo lo garantiza la base.',
+  })
+  ocupacionActual!: number;
+  @ApiProperty({ type: Boolean }) abiertaAhora!: boolean;
+  @ApiProperty({
+    type: [FranjaDeHoyDto],
+    description: 'Franjas de hoy ya resueltas; una que cruza medianoche llega como dos (S-09).',
+  })
+  franjasDeHoy!: FranjaDeHoyDto[];
+  @ApiProperty({ type: Boolean }) requiereAutorizacion!: boolean;
+}
+
+/**
+ * CU-02 · el desenlace de la captura, tal como lo lee la app.
+ *
+ * `aceptada: false` con sus motivos es una RESPUESTA, no un error: el servidor
+ * volvió a juzgar la calidad y no pasó (KPI-16). Y `aceptada: true` no dice
+ * «listo»: dice que el consentimiento quedó PEDIDO. Quien lo otorga es el
+ * titular, por su canal, con su identidad (RN-10) — y hasta entonces la
+ * plantilla no se sincroniza con ninguna terminal (RN-09).
+ */
+export class RostroCapturadoDto {
+  @ApiProperty({ type: Boolean }) aceptada!: boolean;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Por qué no sirve la foto. Vacío cuando sí sirve.',
+  })
+  motivos!: string[];
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  plantillaId!: string | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description: 'El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10).',
+  })
+  consentimientoId!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'A quién se le pidió: el visitante, no el residente que tomó la foto',
+  })
+  titular!: string | null;
+
+  @ApiProperty({ type: Number, nullable: true }) calidad!: number | null;
+}

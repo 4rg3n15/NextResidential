@@ -153,6 +153,8 @@ export class BiometriaModule {
         },
       ],
       exports: [
+        // Lo consume el módulo del residente para su propia ruta de captura.
+        CapturarRostro,
         REPOSITORIO_CONSENTIMIENTOS,
         REPOSITORIO_PLANTILLAS,
         BOVEDA_DE_PLANTILLAS,

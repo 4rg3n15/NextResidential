@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   ForbiddenException,
   Get,
@@ -6,9 +7,11 @@ import {
   NotFoundException,
   Param,
   ParseUUIDPipe,
+  Post,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { explicacionDe } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
@@ -21,13 +24,25 @@ import {
   VerMisVehiculos,
   VerMiVivienda,
 } from '../aplicacion/casos-de-uso';
-import { HistorialQueryDto } from './dtos';
+import { CrearMiAutorizacion } from '../aplicacion/crear-mi-autorizacion';
+import { CapturarRostroDeMiVisitante } from '../aplicacion/capturar-rostro-de-mi-visitante';
+import { RegistrarMiAparato, VerMisZonas } from '../aplicacion/casos-de-uso-11b';
 import {
+  HistorialQueryDto,
+  NuevaVisitaDto,
+  RostroDeMiVisitanteDto,
+  TokenDeNotificacionDto,
+} from './dtos';
+import {
+  AparatoRegistradoDto,
   MiAutorizacionDto,
   MiEventoDto,
   MiInicioDto,
   MiVehiculoDto,
+  MiZonaDto,
   MiembroDeFamiliaDto,
+  RostroCapturadoDto,
+  VisitaCreadaDto,
 } from './respuestas';
 
 /**
@@ -71,6 +86,11 @@ export class MiController {
     @Inject(VerMisVehiculos) private readonly verVehiculos: VerMisVehiculos,
     @Inject(VerMisAutorizaciones) private readonly verAutorizaciones: VerMisAutorizaciones,
     @Inject(VerMiHistorial) private readonly verHistorial: VerMiHistorial,
+    @Inject(CrearMiAutorizacion) private readonly crearMiAutorizacion: CrearMiAutorizacion,
+    @Inject(VerMisZonas) private readonly verMisZonas: VerMisZonas,
+    @Inject(RegistrarMiAparato) private readonly registrarMiAparato: RegistrarMiAparato,
+    @Inject(CapturarRostroDeMiVisitante)
+    private readonly capturarRostroDeMiVisitante: CapturarRostroDeMiVisitante,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
 
@@ -159,6 +179,147 @@ export class MiController {
   ): Promise<MiAutorizacionDto[]> {
     const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'mi/autorizaciones');
     return [...this.desenvolver(await this.verAutorizaciones.ejecutar(destino, copropiedadId))];
+  }
+
+  /**
+   * HU-07 · HU-08 · HU-09 · Crear la visita (M-4).
+   *
+   * Devuelve **200 con el motivo** cuando una regla de negocio lo impide, no un
+   * 403 ni un 409 vacío: el residente tiene que leer por qué, y la pantalla no
+   * puede adivinarlo por el texto de un error. Los 4xx quedan para lo que sí
+   * son: 400 por forma inválida, 403 por cruce de copropiedad, 404 por no tener
+   * vivienda.
+   */
+  @Post('autorizaciones')
+  @Roles('residente')
+  @ApiOperation({ summary: 'Autorizo a un visitante de mi vivienda (HU-07, HU-08, HU-09, M-4)' })
+  @ApiOkResponse({ type: VisitaCreadaDto })
+  async crearAutorizacion(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Body() cuerpo: NuevaVisitaDto,
+  ): Promise<VisitaCreadaDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'mi/autorizaciones');
+    const r = this.desenvolver(
+      await this.crearMiAutorizacion.ejecutar(destino, copropiedadId, {
+        visitante: cuerpo.visitante,
+        documento: cuerpo.documento ?? null,
+        desde: cuerpo.desde,
+        hasta: cuerpo.hasta,
+        placa: cuerpo.placa ?? null,
+        permiteAccesoVehicular: cuerpo.permiteAccesoVehicular ?? false,
+        acompanantes: cuerpo.acompanantes ?? [],
+        zonasPermitidas: cuerpo.zonasPermitidas ?? [],
+        observaciones: cuerpo.observaciones ?? null,
+        patron: cuerpo.patron ?? null,
+        claveDeIdempotencia: cuerpo.claveDeIdempotencia,
+      }),
+    );
+    return r.creada
+      ? { creada: true, id: r.id, repetida: r.repetida, motivo: null, explicacion: null }
+      : {
+          creada: false,
+          id: null,
+          repetida: false,
+          motivo: r.motivo,
+          explicacion: explicacionDe(r.motivo),
+        };
+  }
+
+  /**
+   * HU-12 · HU-13 · CU-02 · el rostro de MI visitante.
+   *
+   * La autorización va en la ruta y el TITULAR no va a ninguna parte: se deriva
+   * de ella. Es la diferencia con `POST …/biometria/capturas`, que recibe
+   * `titularId` desde el cuerpo y por eso es del mostrador de portería y no del
+   * residente (RN-10).
+   */
+  @Post('autorizaciones/:autorizacionId/rostro')
+  @Roles('residente')
+  @ApiOperation({
+    summary: 'Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10)',
+  })
+  @ApiOkResponse({ type: RostroCapturadoDto })
+  async capturarRostro(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('autorizacionId', ParseUUIDPipe) autorizacionId: string,
+    @Body() cuerpo: RostroDeMiVisitanteDto,
+  ): Promise<RostroCapturadoDto> {
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'mi/autorizaciones/rostro',
+    );
+    const r = this.desenvolver(
+      await this.capturarRostroDeMiVisitante.ejecutar(destino, copropiedadId, {
+        autorizacionId,
+        medidas: cuerpo.medidas,
+        vector: cuerpo.vector,
+        versionPolitica: cuerpo.versionPolitica,
+        suprimirEn: cuerpo.suprimirEn,
+      }),
+    );
+    return r.aceptada
+      ? {
+          aceptada: true,
+          motivos: [],
+          plantillaId: r.plantillaId,
+          consentimientoId: r.consentimientoId,
+          titular: r.titular ?? null,
+          calidad: r.calidad,
+        }
+      : {
+          aceptada: false,
+          motivos: [...r.motivos],
+          plantillaId: null,
+          consentimientoId: null,
+          titular: null,
+          calidad: null,
+        };
+  }
+
+  /** M-7 · HU-34 · el aparato se registra al abrir la app y al rotar el token. */
+  @Post('notificaciones/aparatos')
+  @Roles('residente')
+  @ApiOperation({ summary: 'Registro este aparato para recibir notificaciones (HU-34, M-7)' })
+  @ApiOkResponse({ type: AparatoRegistradoDto })
+  async registrarAparato(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Body() cuerpo: TokenDeNotificacionDto,
+  ): Promise<AparatoRegistradoDto> {
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'mi/notificaciones/aparatos',
+    );
+    return this.desenvolver(
+      await this.registrarMiAparato.ejecutar(destino, copropiedadId, {
+        instalacionId: cuerpo.instalacionId,
+        token: cuerpo.token,
+        plataforma: cuerpo.plataforma,
+      }),
+    );
+  }
+
+  /** M-5 · zonas comunes con aforo y horario, resueltos para AHORA. */
+  @Get('zonas')
+  @Roles('residente')
+  @ApiOperation({ summary: 'Zonas comunes con aforo y horario en vivo (HU-19, M-5)' })
+  @ApiOkResponse({ type: [MiZonaDto] })
+  async zonas(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+  ): Promise<MiZonaDto[]> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'mi/zonas');
+    // Las franjas se copian a un arreglo mutable porque el DTO de OpenAPI no
+    // admite `readonly`: es el mismo motivo por el que el resto de rutas hacen
+    // el `[...]`, y no una conversión de tipo escondida.
+    return this.desenvolver(await this.verMisZonas.ejecutar(destino, copropiedadId)).map((z) => ({
+      ...z,
+      franjasDeHoy: z.franjasDeHoy.map((f) => ({ ...f })),
+    }));
   }
 
   @Get('historial')

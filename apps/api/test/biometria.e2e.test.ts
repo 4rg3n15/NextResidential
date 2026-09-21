@@ -103,6 +103,36 @@ describe('biometría · CU-02 por HTTP', () => {
     expect(texto).not.toContain(VECTOR.slice(0, 8));
   });
 
+  it('D-77 · un residente que NO es el titular no puede leer el consentimiento', async () => {
+    /**
+     * El aislamiento por copropiedad ya estaba y no bastaba: dentro del mismo
+     * conjunto, cualquier residente con el UUID leía si su vecino otorgó o
+     * revocó, y cuándo. No hay dato biométrico ahí, pero sí un hecho sobre un
+     * tercero.
+     *
+     * Y se exige 404, no 403: un 403 confirmaría que ese consentimiento
+     * existe, que es la mitad de lo que el curioso quería averiguar.
+     */
+    const { consentimientoId } = await capturar();
+    const tokenVecino = await tokenDe(firmante, {
+      rol: 'residente',
+      copropiedadId: COP_A,
+      usuarioId: '00000000-0000-4000-8000-00000000cafe',
+    });
+    await request(app.getHttpServer())
+      .get(`${base}/consentimientos/${consentimientoId}`)
+      .set('Authorization', `Bearer ${tokenVecino}`)
+      .expect(404);
+  });
+
+  it('D-77 · y el titular SÍ lee el suyo: HU-15 sigue en pie', async () => {
+    // La corrección no puede cerrarle la puerta al titular, que es quien tiene
+    // que poder consultarlo para revocarlo (RN-11).
+    const { consentimientoId } = await capturar();
+    const r = await comoTitular('get', `${base}/consentimientos/${consentimientoId}`).expect(200);
+    expect(r.body).toMatchObject({ estado: 'pendiente' });
+  });
+
   it('el ADMINISTRADOR no puede aceptar por el titular (RN-10)', async () => {
     const { consentimientoId } = await capturar();
     const r = await comoAdmin('post', `${base}/consentimientos/${consentimientoId}/respuesta`)

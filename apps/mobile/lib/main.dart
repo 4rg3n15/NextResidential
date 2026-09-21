@@ -11,6 +11,8 @@
 /// RLS es el proyecto entero regalado.
 library;
 
+import 'dart:math';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +22,7 @@ import 'configuracion/ambiente.dart';
 import 'dominio/puertos.dart';
 import 'infraestructura/api/generado/clients/residente_api.dart';
 import 'infraestructura/api/repositorio_api.dart';
+import 'infraestructura/notificaciones/fuente.dart';
 import 'infraestructura/sesion/almacen_seguro.dart';
 import 'infraestructura/sesion/autenticador_supabase.dart';
 import 'presentacion/app.dart';
@@ -65,9 +68,24 @@ Future<void> main() async {
         sesion: sesion,
         repositorio: repositorio,
         reloj: reloj,
+        notificaciones: SinServicioDeMensajeria(identidad: IdentidadDelAparato()),
+        claves: claveDeIdempotencia,
       ),
     ),
   );
+}
+
+/// Una clave de idempotencia por visita.
+///
+/// La genera el cliente y no el servidor, y ese es el punto: si la pidiera al
+/// servidor, la petición que la trae podría perderse igual que la que crea la
+/// visita, y no habría con qué reconocer el reintento. Es azar del sistema, no
+/// `DateTime.now()`: dos teléfonos con el reloj sincronizado pulsando a la vez
+/// no pueden producir la misma.
+String claveDeIdempotencia() {
+  final azar = Random.secure();
+  final bytes = List<int>.generate(16, (_) => azar.nextInt(256));
+  return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 }
 
 /// Lo que se ve si la compilación trae algo que no debe.

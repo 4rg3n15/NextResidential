@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ErrorDeConfiguracion, cargarConfiguracion } from './esquema';
+import { ErrorDeConfiguracion, cargarConfiguracion, esquemaConfiguracion } from './esquema';
 
 const completo = {
   SUPABASE_URL: 'https://ref.supabase.co',
@@ -140,4 +140,49 @@ describe('valores con forma imposible', () => {
       } as NodeJS.ProcessEnv),
     ).not.toThrow();
   });
+});
+
+describe('D-91 · «VAR=» en un .env significa NO CONFIGURADA, no «cadena vacía»', () => {
+  /**
+   * El defecto: `.optional()` de Zod admite `undefined`, y `dotenv` para una
+   * línea `VAR=` no produce `undefined` sino **la cadena vacía**, que sí llega
+   * al validador. `EVIDENCIA_BUCKET=` y `RECUPERACION_URL_REDIRECCION=`
+   * impedían el arranque — y las dos estaban así en `.env.example`, así que
+   * **copiar el ejemplo al pie de la letra rompía el arranque**.
+   *
+   * Esta prueba no comprueba las dos de hoy: comprueba TODAS las opcionales,
+   * derivándolas del esquema. Una opcional nueva que no tolere el vacío se
+   * detecta el día que se añade, que es el único día en que su autor tiene el
+   * contexto para arreglarla.
+   */
+  const opcionales = Object.entries(esquemaConfiguracion.shape)
+    .filter(([, tipo]) => tipo.isOptional())
+    .map(([clave]) => clave);
+
+  it('hay opcionales que comprobar (si no, esto no diría nada)', () => {
+    expect(opcionales.length).toBeGreaterThan(0);
+  });
+
+  for (const clave of opcionales) {
+    it(`${clave}= (vacía) NO impide el arranque`, () => {
+      expect(() =>
+        cargarConfiguracion({ ...completo, [clave]: '' } as NodeJS.ProcessEnv),
+      ).not.toThrow();
+    });
+
+    it(`${clave} con solo espacios tampoco`, () => {
+      // Un espacio suelto tras el `=` es lo que deja un copiar y pegar.
+      expect(() =>
+        cargarConfiguracion({ ...completo, [clave]: '   ' } as NodeJS.ProcessEnv),
+      ).not.toThrow();
+    });
+
+    it(`${clave} con un valor INVÁLIDO sí impide el arranque`, () => {
+      // La otra mitad: tolerar el vacío no puede convertirse en tolerar
+      // cualquier cosa. Si esto pasara, la opcional habría dejado de validar.
+      expect(() =>
+        cargarConfiguracion({ ...completo, [clave]: 'no-sirve como valor' } as NodeJS.ProcessEnv),
+      ).toThrow(ErrorDeConfiguracion);
+    });
+  }
 });

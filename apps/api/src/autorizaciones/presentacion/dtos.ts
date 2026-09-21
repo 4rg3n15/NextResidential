@@ -1,82 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsArray,
-  IsInt,
-  IsISO8601,
-  IsIn,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Max,
-  MaxLength,
-  Min,
-  MinLength,
-  ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 /**
  * El DTO valida FORMA; el agregado valida VERDAD (§2.7.3). Aquí no se comprueba
  * que la vigencia sea coherente ni que el patrón tenga sentido: eso es del
  * objeto de valor, y duplicarlo aquí crearía dos verdades que se separan.
  */
-export class PatronDto {
-  @ApiProperty({ type: [Number], description: '0=domingo … 6=sábado' })
-  @IsArray()
-  @IsInt({ each: true })
-  dias!: number[];
-
-  @ApiProperty() @IsInt() @Min(0) @Max(1440) minutoInicio!: number;
-  @ApiProperty() @IsInt() @Min(0) @Max(1440) minutoFin!: number;
-  @ApiProperty({ description: 'Minutos respecto de UTC; Bogotá: -300' })
-  @IsInt()
-  @Min(-840)
-  @Max(840)
-  desplazamientoUtcMinutos!: number;
-}
-
-export class CrearAutorizacionDto {
-  @ApiProperty() @IsUUID() viviendaId!: string;
-  @ApiProperty() @IsUUID() personaId!: string;
-  @ApiProperty({ description: 'Inicio de la vigencia, ISO-8601 con zona' })
-  @IsISO8601()
-  desde!: string;
-  @ApiProperty({ description: 'Fin de la vigencia, EXCLUIDO' }) @IsISO8601() hasta!: string;
-
-  @ApiProperty({ required: false, type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsUUID('4', { each: true })
-  zonasPermitidas?: string[];
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(50)
-  maximoAcompanantes?: number;
-
-  @ApiProperty({ required: false, type: PatronDto })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => PatronDto)
-  patron?: PatronDto;
-}
-
-export class AcompananteDto {
-  @ApiProperty() @IsUUID() personaId!: string;
-  @ApiProperty() @IsString() @MinLength(2) @MaxLength(120) nombre!: string;
-}
-
-export class MotivoDto {
-  @ApiProperty() @IsString() @MinLength(3) @MaxLength(500) motivo!: string;
-}
-
-export class VetarDto {
-  @ApiProperty({ required: false }) @IsOptional() @IsUUID() personaId?: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsString() @MaxLength(16) placa?: string;
-  @ApiProperty() @IsString() @MinLength(3) @MaxLength(500) motivo!: string;
-}
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AQUÍ VIVÍAN CINCO DTO MUERTOS · D-92
+ *
+ * `PatronDto`, `CrearAutorizacionDto`, `AcompananteDto`, `MotivoDto` y
+ * `VetarDto` estaban declarados aquí y **nadie los importaba**: los vivos son
+ * los de `dtos-autorizacion.ts`, que es lo que el controlador usa. Eran copias
+ * envejecidas con los mismos nombres.
+ *
+ * No era solo ruido. En OpenAPI el nombre de la clase ES el nombre del esquema,
+ * así que dos clases con el mismo nombre se pisan y **solo una sobrevive en el
+ * contrato**. El generador de clientes —TypeScript y Dart— produce entonces la
+ * forma equivocada para la otra, sin un solo error. Se borraron, y el paso 10b
+ * comprueba desde ahora que ningún nombre de esquema se repita.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 /**
  * Evento normalizado del Alarm Server. La ETAPA 15 traduce el XML del

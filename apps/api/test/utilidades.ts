@@ -23,8 +23,18 @@ import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { FiltroGlobalDeExcepciones } from '../src/comun/filtros/filtro-global';
 import { COP_A, COP_B } from './constantes';
-import { DIRECTORIO_DEL_RESIDENTE } from '../src/residente/aplicacion/puertos';
-import { DirectorioDelResidenteEnMemoria } from './dobles/directorio-del-residente';
+import {
+  AUTORIZACIONES_DEL_RESIDENTE,
+  DIRECTORIO_DEL_RESIDENTE,
+  NOTIFICACIONES_DEL_RESIDENTE,
+  ZONAS_DEL_RESIDENTE,
+} from '../src/residente/aplicacion/puertos';
+import {
+  AutorizacionesDelResidenteEnMemoria,
+  DirectorioDelResidenteEnMemoria,
+  NotificacionesDelResidenteEnMemoria,
+  ZonasDelResidenteEnMemoria,
+} from './dobles/directorio-del-residente';
 
 export { COP_A, COP_B } from './constantes';
 
@@ -181,6 +191,15 @@ export const crearApp = async (
      */
     .overrideProvider(DIRECTORIO_DEL_RESIDENTE)
     .useFactory({ factory: () => new DirectorioDelResidenteEnMemoria() })
+    // Los tres puertos que 11-B añadió. El de escritura guarda por ámbito, que
+    // es lo que hace que la prueba del segundo eje diga algo sobre las
+    // escrituras y no solo sobre las lecturas.
+    .overrideProvider(AUTORIZACIONES_DEL_RESIDENTE)
+    .useFactory({ factory: () => new AutorizacionesDelResidenteEnMemoria() })
+    .overrideProvider(ZONAS_DEL_RESIDENTE)
+    .useFactory({ factory: () => new ZonasDelResidenteEnMemoria() })
+    .overrideProvider(NOTIFICACIONES_DEL_RESIDENTE)
+    .useFactory({ factory: () => new NotificacionesDelResidenteEnMemoria() })
     .overrideProvider(ProveedorDeJwks)
     .useValue({
       // `obtener()` devuelve la función que `jose` usa para resolver la clave

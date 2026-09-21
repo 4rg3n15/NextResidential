@@ -692,3 +692,464 @@ SELECT count(*) FROM public.viviendas WHERE copropiedad_id = '<su-id>' AND estad
 ```
 
 **Esperado:** el mismo número antes y después del cambio.
+
+---
+
+## 13 · La superficie del residente contra su base — ETAPA 11-B
+
+> **Empiece por dos.** Si solo tiene tiempo para dos puntos de este apartado,
+> que sean **13.2** y **13.4**:
+>
+> - **13.2** es el que habría detectado D-89. Comprueba que el SQL de los
+>   adaptadores del residente encaja con SU esquema. Un minuto.
+> - **13.4** es el que comprueba que un reintento sin cobertura **no duplica la
+>   visita**. Es la diferencia entre que el portero vea una autorización o dos
+>   para la misma persona.
+>
+> Los demás son útiles y ninguno es bloqueante.
+
+> **Antes de nada, dos avisos de `entorno:diff` que ya no debería ver.** > `DATABASE_POOLER_URL` estaba declarada en `.env.example` **sin el signo
+> igual**, así que el comparador no la veía y se la reclamaba en cada corrida.
+> `EVIDENCIA_BUCKET` no estaba declarada en absoluto. Las dos están corregidas
+> en esta ronda (D-90), junto con tres nombres que el ejemplo pedía y el código
+> nunca ha leído — ver §13.0.
+
+**Por qué este apartado existe y es el más importante de la ronda.** En 11-A la
+app del residente se probó entera contra un **doble en memoria**: 1.519 pruebas
+en verde, incluidas las del segundo eje de aislamiento. Al escribir 11-B se
+ejerció por primera vez el adaptador SQL contra PostgreSQL y aparecieron **dos
+consultas rotas** (D-89): una unía una tabla que no existe y otra leía una
+columna que no existe. Es decir: **ninguna lectura del residente funcionaba
+contra una base real** y ningún control lo decía.
+
+Está corregido y ahora hay una suite que lo vigila. Lo que sigue es cómo
+comprobarlo usted contra SU proyecto.
+
+### 13.0 · Las variables de entorno, corregidas (D-90)
+
+Tres nombres del `.env.example` **no los leía nadie**. Como el esquema tiene
+valores por omisión, la aplicación arrancaba igual, así que quien endurecía el
+límite de peticiones creía haberlo endurecido:
+
+| Lo que decía el ejemplo | Lo que el código lee de verdad |
+| ----------------------- | ------------------------------ |
+| `RATE_LIMIT_TTL`        | `THROTTLE_TTL_SEGUNDOS`        |
+| `RATE_LIMIT_LIMIT`      | `THROTTLE_LIMITE`              |
+| `MAX_PAYLOAD_BYTES`     | `LIMITE_PAYLOAD`               |
+
+**Qué hacer en su `.env`:** renombrar esos tres. Los valores viejos no hacen
+nada. `RATE_LIMIT_LIMIT=100` se convierte en `THROTTLE_LIMITE=100`, y si no lo
+renombra seguirá con el valor por omisión de 120.
+
+Y se declararon cuatro que faltaban: `DATABASE_POOLER_URL` (le faltaba el `=`),
+`EVIDENCIA_BUCKET`, `PG_POOL_MAX` y `RECUPERACION_URL_REDIRECCION`.
+
+> **D-91 · corrección de la corrección.** Al declarar las dos opcionales las
+> escribí como `EVIDENCIA_BUCKET=` y `RECUPERACION_URL_REDIRECCION=`, y **eso
+> impedía el arranque**: `dotenv` no produce «no configurada» para una línea
+> `VAR=`, produce **la cadena vacía**, que sí llega al validador y no es una URL
+> absoluta. Copiar el ejemplo al pie de la letra rompía la aplicación.
+>
+> Corregido en el sitio que lo cierra entero: el cargador descarta las cadenas
+> vacías **antes** de validar, así que `VAR=` vuelve a significar «no
+> configurada». Y al escribir la prueba genérica apareció la mitad que no se
+> veía: **lo mismo le pasaba a todas las variables con valor por omisión**
+> —`PORT=`, `PG_POOL_MAX=`, `THROTTLE_LIMITE=`—, que es justo lo contrario de
+> lo que un valor por omisión promete.
+>
+> En su `.env`: si tiene alguna de esas líneas vacía, ya no le molestará. Las
+> dos opcionales van en el ejemplo **comentadas y con un valor de referencia**,
+> que es como se lee sin ambigüedad:
+>
+> ```
+> # RECUPERACION_URL_REDIRECCION=http://localhost:3001/restablecer
+> # EVIDENCIA_BUCKET=evidencias
+> ```
+>
+> Si pone la primera, su origen tiene que estar en `CORS_ALLOWED_ORIGINS`: el
+> arranque lo comprueba.
+
+```bash
+pnpm entorno:diff
+```
+
+**Esperado:** ninguna diferencia, o solo las que usted haya añadido a propósito.
+
+**Las seis `BARRERA_*` son correctas y debe tenerlas**: las lee el adaptador de
+barrera (`packages/providers`) y `BARRERA_DISPOSITIVO_ID` la lee el módulo de
+guardia. La IP y las credenciales del equipo **viven solo en su `.env`**: §2.7.1
+y KPI-11 prohíben que una IP de dispositivo entre en el repositorio, y el paso
+10 del verificador lo comprueba.
+
+Desde esta ronda hay un control que impide que esto se repita: el paso 9
+compara el esquema Zod contra `.env.example` **en las dos direcciones** y falla
+si una variable se lee y no se declara, o se declara y no se lee.
+
+---
+
+### 13.1 · Aplicar la migración 0030
+
+```bash
+supabase db push
+```
+
+**Esperado:** la migración `0030_autorizacion_del_residente` aplicada, sin error.
+Añade dos cosas: la columna `clave_idempotencia` en `autorizaciones` con su
+índice único parcial, y la tabla `dispositivos_de_notificacion`.
+
+Compruébelo:
+
+```sql
+select column_name
+  from information_schema.columns
+ where table_name = 'autorizaciones' and column_name = 'clave_idempotencia';
+
+select indexname from pg_indexes where indexname = 'autorizaciones_idempotencia_uk';
+
+select count(*) from public.dispositivos_de_notificacion;
+```
+
+**Esperado:** una fila, una fila, y `0`. Si la tercera consulta da un error de
+permisos en vez de `0`, está usando una llave sujeta a RLS y **eso es correcto**:
+la política solo deja ver los aparatos propios.
+
+### 13.2 · **[PRIORITARIO]** Que el SQL del residente encaje con SU esquema
+
+Esta es la comprobación que faltaba en 11-A, y la que habría detectado D-89.
+
+```bash
+DATABASE_URL_PRUEBAS='postgresql://…' \
+  pnpm --filter @ncr/api exec vitest run test/residente-pg.test.ts
+```
+
+**Esperado:**
+
+```
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+```
+
+**Si ve `el SQL no encaja con el esquema migrado (42P01)`** falta una tabla: su
+base no tiene todas las migraciones. **Con `(42703)`** falta una columna: tiene
+una versión anterior del esquema. En los dos casos, vuelva a 13.1.
+
+**Si los cuatro se OMITEN**, no definió `DATABASE_URL_PRUEBAS`. Una omisión no
+es un verde: el paso 13 del verificador la exige.
+
+### 13.3 · Crear una visita desde la API, como la haría la app
+
+Con un token de un usuario con rol `residente` y vínculo activo:
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/autorizaciones" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "visitante": "Visitante de prueba",
+        "desde": "2026-09-20T14:00:00-05:00",
+        "hasta": "2026-09-20T18:00:00-05:00",
+        "acompanantes": ["Acompañante de prueba"],
+        "observaciones": "creada a mano para verificar",
+        "claveDeIdempotencia": "verificacion-manual-0001"
+      }'
+```
+
+**Esperado:** `{"creada":true,"id":"…","repetida":false,"motivo":null,"explicacion":null}`.
+
+**En ningún momento se envía la vivienda.** La deriva el servidor desde su
+identidad; el cliente no puede nombrarla. Si intenta añadir `viviendaId` al
+cuerpo recibirá **400**, porque el `ValidationPipe` corre con
+`forbidNonWhitelisted`.
+
+### 13.4 · **[PRIORITARIO]** La idempotencia, que es lo que hace seguro el modo sin conexión
+
+Repita **el mismo comando de 13.3, sin cambiar nada**.
+
+**Esperado:** `{"creada":true,"id":"<el MISMO id>","repetida":true,…}`.
+
+Si obtiene un `id` distinto, la migración 0030 no está aplicada o el índice
+único no existe: el reintento del ascensor crearía visitas duplicadas.
+
+Compruebe que solo hay una:
+
+```sql
+select count(*) from public.autorizaciones
+ where clave_idempotencia = 'verificacion-manual-0001';
+```
+
+**Esperado: `1`.**
+
+### 13.5 · Los rechazos, con su motivo tipado
+
+Vete a la persona y repita con otra clave:
+
+```sql
+insert into public.listas_negras (copropiedad_id, placa, motivo, creado_por, actualizado_por)
+values ('<su copropiedad>', 'ABC123', 'prueba de verificación', '<su usuario>', '<su usuario>');
+```
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/autorizaciones" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" -H 'Content-Type: application/json' \
+  -d '{"visitante":"Vetado","placa":"ABC123",
+       "desde":"2026-09-20T14:00:00-05:00","hasta":"2026-09-20T18:00:00-05:00",
+       "claveDeIdempotencia":"verificacion-vetado-0001"}'
+```
+
+**Esperado:**
+
+```json
+{
+  "creada": false,
+  "id": null,
+  "repetida": false,
+  "motivo": "LISTA_NEGRA",
+  "explicacion": "Esta persona está en la lista negra del conjunto. …"
+}
+```
+
+**Lo que importa de esa respuesta:** es un **200 con motivo**, no un 403. El
+residente tiene que poder distinguir «está vetada» de «su vivienda está
+inactiva», y una de las dos se arregla llamando a la administración. Un código
+de error no distingue.
+
+No olvide limpiar:
+
+```sql
+update public.listas_negras
+   set estado = 'levantada', levantada_en = now(),
+       levantada_por = '<su usuario>', motivo_levantamiento = 'fin de la prueba'
+ where motivo = 'prueba de verificación';
+```
+
+### 13.6 · Que un residente NO alcance la vivienda del vecino
+
+Con el token de un residente de la vivienda A, pida **todo**:
+
+```bash
+for r in vivienda familia vehiculos autorizaciones historial zonas; do
+  echo "== $r"
+  curl -s "$API/copropiedades/$COP/mi/$r" -H "Authorization: Bearer $TOKEN_RESIDENTE" | head -c 300
+  echo
+done
+```
+
+**Esperado:** seis respuestas `200`, y **ningún dato de otra vivienda**. Busque
+el identificador de una vivienda vecina en las salidas: no debe aparecer.
+
+`zonas` es la excepción declarada y está bien que lo sea: las zonas comunes son
+del conjunto, no de una vivienda (RN-14).
+
+### 13.7 · El token de notificaciones
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/notificaciones/aparatos" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" -H 'Content-Type: application/json' \
+  -d '{"instalacionId":"verificacion-manual","token":"token-de-prueba-0001","plataforma":"android"}'
+```
+
+**Esperado:** `{"id":"…"}`. Repítalo con otro `token` y el **mismo**
+`instalacionId`:
+
+```sql
+select count(*), max(token) from public.dispositivos_de_notificacion
+ where instalacion_id = 'verificacion-manual';
+```
+
+**Esperado: `1` fila y el token NUEVO.** Si aparecen dos filas, el `UPSERT` no
+está tomando el índice y cada arranque de la app dejaría un token muerto más al
+que se seguiría notificando.
+
+---
+
+## 14 · Las pantallas, la cámara y el KPI — ETAPA 11-C
+
+Siete comprobaciones. **La 14.2 y la 14.6 son las prioritarias**: la primera es
+la que separa dos personas ante la ley, y la segunda es el único número del KPI
+que no puedo medir yo.
+
+Se usan las mismas variables de §13 (`API`, `COP`, `TOKEN_RESIDENTE`). Añada la
+del vecino, que hace falta en 14.2:
+
+```bash
+TOKEN_VECINO=<token de un residente de OTRA vivienda del mismo conjunto>
+```
+
+### 14.1 · La visita se crea y devuelve su identificador
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/autorizaciones" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" -H 'Content-Type: application/json' \
+  -d '{"visitante":"Plomero de prueba","desde":"'"$(date -u -d '+5 min' +%FT%TZ 2>/dev/null || date -u -v+5M +%FT%TZ)"'","hasta":"'"$(date -u -d '+4 hours' +%FT%TZ 2>/dev/null || date -u -v+4H +%FT%TZ)"'","acompanantes":["Ayudante"],"zonasPermitidas":[],"claveDeIdempotencia":"verificacion-14-1-0001"}'
+```
+
+**Esperado:** `{"creada":true,"id":"<uuid>","repetida":false,…}`. Guarde el
+identificador:
+
+```bash
+AUT=<el uuid devuelto>
+```
+
+### 14.2 · **[PRIORITARIO]** El rostro es del visitante, no del residente (RN-10)
+
+Es la comprobación que sostiene la Ley 1581 en esta superficie. Tres partes:
+
+**a · su propio visitante sí.**
+
+```bash
+curl -s -X POST "$API/copropiedades/$COP/mi/autorizaciones/$AUT/rostro" \
+  -H "Authorization: Bearer $TOKEN_RESIDENTE" -H 'Content-Type: application/json' \
+  -d '{"vector":"'"$(head -c 64 /dev/urandom | base64 | tr -d '\n')"'","medidas":{"nitidez":0.9,"iluminacion":0.5,"rostrosDetectados":1,"proporcionRostro":0.4},"versionPolitica":"v1.0","suprimirEn":"'"$(date -u -d '+1 day' +%FT%TZ 2>/dev/null || date -u -v+1d +%FT%TZ)"'"}'
+```
+
+**Esperado:** `{"aceptada":true,"consentimientoId":"…","titular":"Plomero de
+prueba",…}`. Mire el `titular`: **es el visitante**. Si apareciera su nombre de
+residente, el consentimiento se le estaría pidiendo a la persona equivocada.
+
+**b · el visitante del VECINO, no.** Con el mismo cuerpo, cambiando el token:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  "$API/copropiedades/$COP/mi/autorizaciones/$AUT/rostro" \
+  -H "Authorization: Bearer $TOKEN_VECINO" -H 'Content-Type: application/json' \
+  -d '{"vector":"'"$(head -c 64 /dev/urandom | base64 | tr -d '\n')"'","medidas":{"nitidez":0.9,"iluminacion":0.5,"rostrosDetectados":1,"proporcionRostro":0.4},"versionPolitica":"v1.0","suprimirEn":"'"$(date -u -d '+1 day' +%FT%TZ 2>/dev/null || date -u -v+1d +%FT%TZ)"'"}'
+```
+
+**Esperado: `404`.** No 403: un 403 confirmaría que esa autorización existe, que
+es la mitad de lo que alguien querría averiguar.
+
+**c · `titularId` en el cuerpo se rechaza.** Repita (a) añadiendo
+`"titularId":"<cualquier uuid>"`.
+
+**Esperado: `400`**, con un mensaje que nombra la propiedad. Si respondiera
+`201`, el campo se estaría ignorando en silencio y un cliente que lo enviara
+creería que sirvió.
+
+### 14.3 · Sin consentimiento no hay sincronización (RN-09)
+
+Con el `consentimientoId` que devolvió 14.2:
+
+```sql
+select estado from public.consentimientos_biometricos where id = '<consentimientoId>';
+```
+
+**Esperado: `pendiente`.** Y en la app: la pantalla dice «Pendiente de que
+&lt;visitante&gt; acepte» y **no hay ninguna casilla** con la que el residente
+pueda aceptar por él. Si la hubiera, sería la firma de otro en un papel.
+
+### 14.4 · **[PRIORITARIO]** Reintentar no duplica visitas (RN-17)
+
+Es la comprobación del modo sin conexión. Repita 14.1 **tal cual**, con la misma
+`claveDeIdempotencia`:
+
+**Esperado:** `{"creada":true,"id":"<el MISMO uuid>","repetida":true}`. Y en la
+base:
+
+```sql
+select count(*) from public.autorizaciones where clave_idempotencia = 'verificacion-14-1-0001';
+```
+
+**Esperado: `1`.** Si fueran dos, un residente en el ascensor con mala cobertura
+crearía tres visitas idénticas y el portero vería tres autorizaciones.
+
+Para verlo desde la app: active el modo avión, cree una visita, **verá «Quedó
+pendiente de enviarse» y NO «creada»**, y en la pestaña Visitantes aparecerá el
+recuadro «1 sin enviar» separado de la lista. Quite el modo avión, vuelva a
+primer plano y la visita pasa a la lista con un aviso de cuántas se enviaron.
+
+### 14.5 · El aforo refleja, no reserva
+
+En la pestaña Zonas:
+
+```bash
+curl -s "$API/copropiedades/$COP/mi/zonas" -H "Authorization: Bearer $TOKEN_RESIDENTE" | head -c 400
+```
+
+**Esperado:** cada zona con `aforoMaximo`, `ocupacionActual`, `abiertaAhora` y
+`franjasDeHoy`. En la app, la tarjeta dice «Quedan N de M plazas» y arriba, en
+todas las visitas, **«No reserva plaza»**. Compruebe además una zona con horario
+que cruce medianoche (por ejemplo 20:00–02:00): tiene que verse **entera**, no
+partida ni con el contador reiniciado a las 00:00.
+
+### 14.6 · **[PRIORITARIO]** KPI-10 — qué cronometra usted, y con qué criterio
+
+Yo puedo medir la parte del sistema y la mido: `p95 ≈ 5 ms` de un presupuesto de
+3 000 ms sobre los 60 000 (la suite lo imprime, §6 del informe). Lo que no cabe
+en una suite es la persona.
+
+**Lo que usted cronometra:** desde que el residente **toca el botón «Nuevo
+visitante»** hasta que la pantalla **muestra el desenlace** —«Visita registrada»
+o el rechazo con su motivo—.
+
+**El criterio, para que la medida signifique algo:**
+
+1. **Un residente real, no usted.** Quien construyó la pantalla sabe dónde está
+   cada campo; el KPI habla de un residente cualquiera.
+2. **Que no haya usado la app antes.** Si la usó, mida a otro: lo que KPI-10
+   mide es si la pantalla se entiende, y eso solo se mide una vez por persona.
+3. **Una visita normal:** nombre, documento, desde/hasta y una placa. **Sin
+   patrón de recurrencia y sin acompañantes** —son opcionales y no los usa la
+   mayoría—. Si quiere medir también el caso completo, cronométrelo aparte y
+   anótelo como otra cifra.
+4. **Con el teléfono en la mano, de pie, como en la portería.** Sentado en un
+   escritorio con teclado sale un número que nadie va a vivir.
+5. **Sin ayudarle.** Si pregunta, la respuesta es «haga lo que le parezca»; una
+   pregunta es un hallazgo de usabilidad, no una pausa del cronómetro.
+6. **Repita con tres personas** y quédese con **la peor**, no con el promedio.
+   El promedio esconde justo al residente que no lo consigue.
+
+**Criterio de aprobación: los tres por debajo de 60 s.** Si alguno se pasa,
+anote en qué campo se detuvo: eso es lo accionable, no el número.
+
+### 14.7 · Las notificaciones dicen la verdad
+
+En la app, Perfil → Notificaciones. **Esperado:** con Firebase aún sin
+aprovisionar, el estado es **«El servicio de avisos no respondió»** y no
+«activadas». Si dijera «Activas en este aparato» sin que exista el proyecto de
+Firebase, la pantalla estaría mintiendo y el residente creería que le avisarán
+cuando llegue su visitante.
+
+Con Firebase aprovisionado y el adaptador real conectado, el estado correcto es
+**«Activas en este aparato»** y en la base:
+
+```sql
+select instalacion_id, left(token, 12), actualizado_en
+  from public.dispositivos_de_notificacion where usuario_id = '<su usuario>';
+```
+
+**Esperado: una fila por aparato**, con el token actualizado. Dos filas para el
+mismo teléfono significan que la fila se está identificando por el token y no
+por la instalación, y cada rotación dejaría un registro muerto al que se
+seguiría notificando.
+
+### 14.8 · Que la suite de Dart no dependa del reloj de su máquina
+
+Es la comprobación que salió de D-97, y la puede hacer usted en veinte segundos:
+
+```bash
+cd apps/mobile
+TZ=Etc/UTC          flutter test | tail -1
+TZ=America/Bogota   flutter test | tail -1
+TZ=Pacific/Auckland flutter test | tail -1
+```
+
+**Esperado: las tres líneas idénticas.** Si una difiere, hay una prueba que
+afirma una hora escrita a mano en vez de derivarla, y estará verde en su Mac y
+roja en el CI —o al revés—, que es justo lo que pasó.
+
+El paso **5c** del verificador ya lo hace solo: corre la suite una segunda vez en
+un huso elegido por ser distinto del de su máquina. Si ve
+
+```
+✓ la suite de Dart da lo mismo en otro huso (Pacific/Auckland): ninguna prueba depende del reloj del sistema
+```
+
+no hace falta que lo repita a mano.
+
+> **Nota sobre S-23, declarado y no corregido.** La app pinta el horario de las
+> zonas comunes en el huso **de su teléfono**, no en el de la copropiedad. En
+> Colombia coinciden siempre —un solo huso, sin horario de verano—, así que no
+> lo verá. Se nota si abre la app desde otro país: la piscina aparecerá con las
+> horas desplazadas. El arreglo está propuesto en `docs/etapas/ETAPA-11.md`
+> (enviar el desplazamiento en minutos, como ya hace M-4) y es un cambio de
+> contrato, así que lo decide usted.

@@ -136,8 +136,60 @@ const medido = new Map(
     .sort(),
 );
 
+/**
+ * CONTROLES CUYO NÚMERO DEPENDE DEL HOST · D-96
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * QUÉ PASÓ
+ *
+ * Este trinquete nació en 11-B y falló en 11-C de dos formas que parecían
+ * defectos y no lo eran:
+ *
+ *   · `verificar-entorno.mjs` daba **26** bloques sin ejercer en una corrida y
+ *     **33** en la siguiente, con el mismo código.
+ *   · `con-limite.mjs` aparecía medido en una corrida y ausente en la otra.
+ *
+ * La causa no es aleatoriedad: es que la suite negativa **toma caminos
+ * distintos según la máquina**, y eso es exactamente su trabajo. Tiene una
+ * sonda para «faltar Flutter NO es lo mismo que tenerlo mal»; con el SDK en el
+ * PATH recorre una rama y sin él, otra. Lo mismo con `xcrun`, que existe en
+ * macOS y no en Linux. Y `con-limite.mjs` solo se carga si alguna sonda lo
+ * invoca, que depende de cuáles se ejecutaron.
+ *
+ * Así que **un solo número no puede ser correcto en macOS y en Linux a la vez**.
+ * El entorno de desarrollo objetivo es macOS y el CI corre en Linux (§2.8.0):
+ * un trinquete con una cifra fija estaría en rojo en uno de los dos siempre, y
+ * un rojo que aparece por la máquina y no por el código es peor que no tener
+ * control, porque enseña a ignorarlo.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * QUÉ SE HACE EN SU LUGAR
+ *
+ * Para estos ficheros la cifra se informa pero **no se exige**, y su ausencia
+ * en una corrida tampoco rompe. Lo que sí se sigue exigiendo es lo que no
+ * depende del host: que tengan prueba negativa, que lo comprueba
+ * `controles-sin-prueba-negativa.mjs`, y ese control sí es determinista porque
+ * lee ficheros, no cobertura.
+ *
+ * La lista es cerrada y cada entrada lleva su motivo. Añadir una sin motivo es
+ * desactivar el trinquete por la puerta de atrás.
+ */
+const SENSIBLES_AL_ENTORNO = new Map([
+  [
+    'scripts/lib/verificar-entorno.mjs',
+    'sus ramas SON el entorno: Flutter presente o no, macOS o Linux, `xcrun` o no',
+  ],
+  [
+    'scripts/lib/con-limite.mjs',
+    'solo se carga si alguna sonda lo invoca, y qué sondas corren depende del host',
+  ],
+]);
+
 if (process.argv.includes('--actualizar')) {
-  writeFileSync(BASE, `${JSON.stringify(Object.fromEntries(medido), null, 2)}\n`);
+  // Los sensibles al entorno NO se guardan: guardar una cifra que no se exige
+  // invita a leerla como si se exigiera.
+  const guardable = [...medido].filter(([r]) => !SENSIBLES_AL_ENTORNO.has(r));
+  writeFileSync(BASE, `${JSON.stringify(Object.fromEntries(guardable), null, 2)}\n`);
   console.log(`base actualizada: ${medido.size} controles medidos`);
   process.exit(0);
 }
@@ -145,6 +197,7 @@ if (process.argv.includes('--actualizar')) {
 const base = existsSync(BASE) ? JSON.parse(readFileSync(BASE, 'utf8')) : {};
 const crecidos = [];
 for (const [ruta, cuantos] of medido) {
+  if (SENSIBLES_AL_ENTORNO.has(ruta)) continue;
   const antes = base[ruta];
   if (antes === undefined) {
     crecidos.push(`${ruta} no está en la base: mídalo con --actualizar (${cuantos} sin ejecutar)`);
@@ -159,8 +212,17 @@ for (const [ruta, cuantos] of medido) {
 // Una entrada que ya no se mide es una cifra que protege a un fichero que
 // nadie vigila: se quita, y quitarla es un diff que alguien lee.
 for (const ruta of Object.keys(base)) {
+  if (SENSIBLES_AL_ENTORNO.has(ruta)) continue;
   if (!medido.has(ruta)) {
     crecidos.push(`${ruta} sigue en la base y ya no se mide: quítelo con --actualizar`);
+  }
+}
+
+// La otra mitad del trinquete de la lista: una exención que ya no corresponde
+// —el fichero desapareció— se queda protegiendo a nadie.
+for (const [ruta, motivo] of SENSIBLES_AL_ENTORNO) {
+  if (!existsSync(ruta)) {
+    crecidos.push(`${ruta} está declarado sensible al entorno y ya no existe (${motivo})`);
   }
 }
 
@@ -175,8 +237,12 @@ if (crecidos.length > 0) {
   process.exit(1);
 }
 
-const mejoras = [...medido].filter(([r, c]) => base[r] !== undefined && c < base[r]).length;
-const totalSin = [...medido.values()].reduce((a, b) => a + b, 0);
+const mejoras = [...medido].filter(
+  ([r, c]) => !SENSIBLES_AL_ENTORNO.has(r) && base[r] !== undefined && c < base[r],
+).length;
+const totalSin = [...medido]
+  .filter(([r]) => !SENSIBLES_AL_ENTORNO.has(r))
+  .reduce((a, [, c]) => a + c, 0);
 console.log(
   `ramas: ${medido.size} controles medidos · ${totalSin} bloques sin ejercer ` +
     `(no puede subir${mejoras > 0 ? `; ${mejoras} bajaron` : ''})`,

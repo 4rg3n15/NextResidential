@@ -72,9 +72,56 @@ const correr = (paquete, dir) => {
      * «alguna capa por debajo del umbral», mandando a buscar una cobertura baja
      * que no existía. Ahora se guarda y se imprime.
      */
+    /**
+     * Y se guarda LA EVIDENCIA, no solo el tamaño.
+     *
+     * La primera versión contaba los bytes de cada flujo. Sirvió para descartar
+     * que el proceso muriera por `maxBuffer` —434 KB de salida no es un
+     * truncamiento— y no sirvió para nada más: el nombre de la prueba que falló
+     * estaba en esos 434 KB y no se imprimía ninguno. Aquí se quedan las líneas
+     * que lo dicen.
+     */
+    /**
+     * Y la evidencia se LIMPIA antes de decidir si la hay.
+     *
+     * La versión anterior filtraba las líneas con `FAIL`, `✗` o `AssertionError`
+     * y las imprimía tal cual. Cuando el proceso muere a mitad de escribir, lo
+     * que queda en los flujos son secuencias de color sin texto: el filtro las
+     * daba por buenas —el `✗` estaba, rodeado de escapes— y el informe imprimía
+     * una línea EN BLANCO. Ocurrió, y el mensaje acababa en «153 por error» sin
+     * decir nada más, que es peor que no haberlo intentado: parece que la
+     * herramienta se quedó a medias y no se sabe por qué.
+     *
+     * Ahora se quitan los escapes ANSI primero y se descartan las líneas que
+     * quedan vacías. Si después de eso no queda ninguna, **eso es en sí el
+     * diagnóstico**: una corrida que falla por una prueba deja su nombre
+     * escrito; una que no deja ninguno no falló, la mataron.
+     */
+    // eslint-disable-next-line no-control-regex
+    const sinColores = (t) => String(t ?? '').replace(/\u001B\[[0-9;]*[A-Za-z]/g, '');
+    const salida = sinColores(e.stdout);
+    const errorTexto = sinColores(e.stderr);
+    const pistas = salida
+      .split('\n')
+      .filter((l) => /FAIL|AssertionError|✗|Tests\s+\d+ failed|Unhandled/.test(l))
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)
+      .slice(0, 6);
+    const colaDeError = errorTexto
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)
+      .slice(-3);
     fallo =
       `${e.code ?? ''} ${e.signal ? `señal ${e.signal}` : ''} ${String(e.message).split('\n')[0]}`.trim() +
-      ` · ${(e.stdout ?? '').length} bytes por salida estándar, ${(e.stderr ?? '').length} por error`;
+      ` · ${salida.length} bytes por salida estándar, ${errorTexto.length} por error` +
+      (pistas.length === 0
+        ? '\n     NINGUNA línea de fallo en la salida: esto no es una prueba en rojo.' +
+          '\n     Una corrida que falla deja el nombre de la prueba escrito. Sin él, el' +
+          '\n     proceso se interrumpió — señal, memoria o el contenedor— y hay que' +
+          '\n     repetirlo, no buscar una cobertura baja que no existe.'
+        : `\n     ${pistas.join('\n     ')}`) +
+      (colaDeError.length === 0 ? '' : `\n     error: ${colaDeError.join(' / ')}`);
   }
   const informe = existsSync(salida) ? JSON.parse(readFileSync(salida, 'utf8')) : null;
   const resumenPath = join(raiz, dir, 'coverage', 'coverage-summary.json');
