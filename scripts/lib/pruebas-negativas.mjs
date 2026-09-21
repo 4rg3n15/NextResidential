@@ -1439,6 +1439,57 @@ try {
       limpiar();
     }
   }
+
+  console.log('\n▸ 24 · los colores de Vitest no pueden partir un recuento (D-108)');
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * EL DEFECTO QUE ESTA SONDA CIERRA, Y POR QUÉ ES EL TERCERO IGUAL
+     *
+     * Vitest escribe «Tests  648 passed» con códigos de color EN MEDIO:
+     * `Tests \e[22m \e[1m\e[32m648 passed`. Ninguna expresión regular del tipo
+     * `Tests +[0-9]` casa con eso.
+     *
+     * Ya había ocurrido una vez, en `estabilidad.mjs`, y su cabecera lo cuenta.
+     * Se arregló allí. El paso 5 de `verificar-etapa.sh` conservó el defecto
+     * intacto hasta la primera corrida del verificador en macOS, donde la
+     * suite informó 648 verdes de 658 y el paso dijo «la suite no informó ni
+     * una prueba».
+     *
+     * Lo que se exige aquí no es solo que limpie: es que **el recuento
+     * sobreviva entero**, porque un filtro demasiado ávido que se comiera el
+     * número sería el mismo fallo con otra cara.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const conColores =
+      'Tests \u001B[22m \u001B[1m\u001B[32m648 passed\u001B[39m\u001B[2m | \u001B[22m10 skipped\n' +
+      '\u001B[2K\u001B[1GTest Files \u001B[1m54 passed\u001B[22m\n';
+
+    const r = correr('node', ['scripts/lib/sin-colores.mjs'], { cwd: raiz, input: conColores });
+
+    /Tests {2}648 passed/.test(r.salida)
+      ? ok('«Tests  648 passed» vuelve a ser una sola cadena que se puede contar')
+      : mal('el recuento sigue partido: el paso 5 no podría contarlo');
+
+    /Test Files 54 passed/.test(r.salida)
+      ? ok('y también sobrevive a los borrados de línea que emite turbo')
+      : mal('un movimiento de cursor sigue partiendo la línea');
+
+    // eslint-disable-next-line no-control-regex
+    !/\u001B\[/.test(r.salida)
+      ? ok('no queda ni un escape en la salida')
+      : mal('quedan escapes ANSI sin limpiar');
+
+    // Y que NO se coma texto legítimo: un filtro demasiado ávido es el mismo
+    // defecto con otra cara.
+    const limpio = correr('node', ['scripts/lib/sin-colores.mjs'], {
+      cwd: raiz,
+      input: 'Tests  12 passed [corchetes] 3;4 m\n',
+    });
+    /Tests {2}12 passed \[corchetes\] 3;4 m/.test(limpio.salida)
+      ? ok('un texto sin escapes pasa intacto, corchetes y puntos y coma incluidos')
+      : mal('se come texto legítimo: el recuento podría desaparecer por el otro lado');
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }

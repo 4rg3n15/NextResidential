@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync, mkdtempSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { sinColores } from './sin-colores.mjs';
 
 const raiz = process.cwd();
 const IGNORADOS = new Set(['node_modules', 'dist', 'coverage', '.turbo', '.git']);
@@ -41,9 +42,8 @@ const ficheros = ['apps', 'packages']
 console.log(`## Ficheros de prueba en disco: ${ficheros.length}\n`);
 for (const f of ficheros) console.log(`  ${f}`);
 
-/** Quita los escapes ANSI. Sin esto, las «pistas» salían en blanco (11-C). */
-// eslint-disable-next-line no-control-regex
-const sinColores = (t) => String(t ?? '').replace(/\u001B\[[0-9;]*[A-Za-z]/g, '');
+// El patrón ANSI vive en un solo sitio desde D-108. Tres copias eran tres
+// oportunidades de arreglar una y dejar las otras dos — y es justo lo que pasó.
 
 /**
  * D-102 · UNA LÍNEA, Y QUE DIGA CUÁL DE LAS DOS COSAS FUE.

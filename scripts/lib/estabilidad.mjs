@@ -28,6 +28,7 @@
  *   node scripts/lib/estabilidad.mjs [--repeticiones N] [--comando "<orden>"]
  */
 import { spawnSync } from 'node:child_process';
+import { ESCAPES_ANSI } from './sin-colores.mjs';
 
 const argv = process.argv.slice(2);
 const valorDe = (bandera, porDefecto) => {
@@ -49,8 +50,9 @@ if (!Number.isInteger(repeticiones) || repeticiones < 2) {
  * Se normalizan los espacios porque Vitest alinea las columnas según el número
  * de dígitos, y una diferencia de formato no es una diferencia de resultado.
  */
-// eslint-disable-next-line no-control-regex
-const SIN_COLOR = /\u001B\[[0-9;]*m/g;
+// D-108 · y el patrón compartido, que además borra movimientos de cursor y
+// borrados de línea. Aquí solo se quitaban los colores; turbo emite los otros.
+const SIN_COLOR = ESCAPES_ANSI;
 
 const firmaDe = (salida, codigo) => {
   const lineas = salida

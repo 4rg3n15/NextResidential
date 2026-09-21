@@ -172,7 +172,25 @@ paso "5 · suite completa"
 salida_pruebas="$(mktemp)"
 con_limite "$LIMITE_LARGO" pnpm test >"$salida_pruebas" 2>&1
 codigo_pruebas=$?
-salida=$(cat "$salida_pruebas")
+# ─────────────────────────────────────────────────────────────────────────────
+# D-108 · SIN COLORES ANTES DE CONTAR NADA.
+#
+# Los códigos de color de Vitest **parten `Tests` de su número**: la línea que
+# se lee como «Tests  648 passed» es, en bytes, `Tests \e[22m \e[1m\e[32m648
+# passed`, y ni `Tests +[0-9]` ni `Tests +[0-9]+ failed` casan con ella.
+#
+# La primera corrida del verificador en macOS lo enseñó entero: `pnpm test`
+# terminó en 0, escribió 477 200 bytes, la suite informó 648 verdes de 658 — y
+# este paso dijo «la suite no informó ni una prueba». Y lo peor no es el falso
+# rojo: con colores, la rama que detecta PRUEBAS EN ROJO tampoco casa, así que
+# la única defensa que quedaba era el código de salida.
+#
+# Ya había pasado, y está escrito en la cabecera de `estabilidad.mjs`: «los
+# códigos de color de Vitest partían `Tests` de su número, no casaba una sola
+# línea, y comparar dos firmas vacías daba "idéntico"». Se arregló allí y no
+# aquí. Ahora el patrón vive en un solo sitio y lo usan los tres.
+# ─────────────────────────────────────────────────────────────────────────────
+salida=$(node "$RAIZ_DEL_REPO/scripts/lib/sin-colores.mjs" <"$salida_pruebas")
 echo "$salida" | grep -E "Tests +[0-9]" | sed 's/^/   /'
 # ─────────────────────────────────────────────────────────────────────────────
 # D-79 · SE MIRA EL CÓDIGO DE SALIDA, y no solo el texto.
@@ -208,8 +226,8 @@ elif ! grep -qE "Tests +[0-9]" <<<"$salida"; then
   # ni la cola. Un fallo que no se nombra a sí mismo obliga a reproducirlo, y
   # reproducir este cuesta otra corrida entera del runner.
   echo "     código de salida: $codigo_pruebas · $(wc -c <"$salida_pruebas" | tr -d '[:space:]') bytes escritos"
-  echo "     últimas 20 líneas de lo que sí salió:"
-  tail -20 "$salida_pruebas" | sed 's/^/       /'
+  echo "     últimas 20 líneas de lo que sí salió (ya sin colores):"
+  tail -20 <<<"$salida" | sed 's/^/       /'
 else
   ok "suite completa en verde"
 fi
