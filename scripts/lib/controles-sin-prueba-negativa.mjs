@@ -81,10 +81,12 @@ const DEUDA = new Map([
   ['scripts/lib/verificar-base-de-pruebas.mjs', 'apuntar a un puerto muerto y exigir detección'],
   ['apps/mobile/e2e/recorrido-web.mjs', 'romper una pantalla y exigir que el recorrido lo vea'],
   ['scripts/lib/dependencias-acotadas.mjs', 'nacido hoy con este mismo control; se prueba en 11-B'],
-  [
-    'scripts/lib/metricas.mjs',
-    'es un control —el paso 7 mira su código de salida— y estaba mal exento; su prueba\n     negativa exige correr la suite entera, así que va con la granularidad de rama de 11-B',
-  ],
+  // `scripts/lib/metricas.mjs` estuvo aquí desde 11-B con el motivo «su prueba
+  // negativa exige correr la suite entera». Salió de la deuda en la ETAPA 12,
+  // cuando D-100 demostró lo caro que era no tenerla: el control llevaba desde
+  // la 09 sin que nadie viera qué imprime con una roja de verdad, y lo que
+  // imprimía mandaba a buscar el defecto donde no estaba. La sonda 22 lo
+  // ejercita en dos segundos restringiendo la medición a un paquete.
 ]);
 
 const RUTA = /(?:scripts\/lib|e2e|apps\/mobile\/e2e)\/[a-z0-9-]+\.mjs/g;
