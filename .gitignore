@@ -39,3 +39,9 @@ next-env.d.ts
 /apps/mobile/.dart_tool/
 /apps/mobile/coverage/
 /apps/mobile/.flutter-plugins-dependencies
+
+# Basura que se coló en la raíz (ETAPA 12): un binario vacío de un `cc` suelto y
+# el fichero de configuración de `openapi-generator`, que este proyecto NO usa
+# (ADR-015: el cliente Dart se genera con `swagger_parser`). Los dos de 0 bytes.
+a.out
+openapitools.json

@@ -70,6 +70,7 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 | **11-A** | App móvil Flutter del residente · primera mitad | La **superficie del residente**, que no existía, y el **segundo eje del aislamiento** —vivienda, además de copropiedad—. App Flutter con cliente Dart generado, sesión en el llavero, refresco al volver a primer plano y cinco de las ocho pantallas |
 | **11-B** | · segunda mitad · el servidor que escribe | Crear la visita con patrón, acompañantes nominales y zonas, con los cuatro rechazos **tipados**; zonas con aforo y horario; registro del token del aparato. El segundo eje ampliado a las **escrituras**: una lectura mal acotada enseña la vida del vecino, una escritura **le abre la puerta** |
 | **11-C** | · tercera mitad · las pantallas y la cámara | M-4, M-5 y M-7; la bandeja de salida conectada al cliente HTTP; y la captura de rostro con el consentimiento **del visitante, no del residente** (RN-10) desde una ruta que no admite `titularId`. KPI-10 medido: la parte del sistema es **p95 ≈ 5 ms** de los 60 000 |
+| **12** | Edge Gateway: offline y reconciliación | El diferenciador técnico. Un equipo en la portería que decide sin internet **con el mismo motor de reglas que la nube** —cero lógica de acceso propia, probado por los dos caminos— y reconcilia al volver exactamente una vez. DoD ejecutada: 30 minutos de corte, 20 accesos, los 20 en la nube sin un duplicado |
 
 **Métricas al cierre de la ETAPA 11:** ver el veredicto literal en [`docs/etapas/ETAPA-11.md`](docs/etapas/ETAPA-11.md) §6 · TypeScript y Dart se miden **por separado y por capa**, porque un agregado alto esconde una capa por debajo
 
@@ -77,7 +78,6 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 
 | #    | Etapa                                    | Alcance                                                                                                                                                    |
 | ---- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 12   | Edge Gateway                             | Operación autónoma sin conexión y reconciliación idempotente al reconectar                                                                                 |
 | 13   | Auditoría de ciberseguridad              | Verificación y endurecimiento. No introduce la seguridad: la audita                                                                                        |
 | 14   | Observabilidad, CI/CD, PWA y escritorio  | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio                                                                      |
 | 15   | **Integración Hikvision**                | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio                                                                  |
@@ -158,7 +158,7 @@ NextResidential/
 │  ├─ api/            # NestJS — monolito modular hexagonal
 │  ├─ web/            # Next.js — consolas (ETAPA 09-10)
 │  ├─ mobile/         # Flutter — app del residente (ETAPA 11: las ocho pantallas)
-│  └─ edge/           # Edge Gateway (ETAPA 12)
+│  └─ edge/           # Edge Gateway — Node.js + SQLite, offline y reconciliación
 ├─ packages/
 │  ├─ domain-core/    # dominio puro compartido API ↔ Edge
 │  ├─ providers/      # puertos + MockProvider + HikvisionProvider (ETAPA 15)
@@ -323,6 +323,57 @@ rondas antes que nadie ejercitaba. Así que la suite negativa corre bajo
 `ramas-de-los-controles.json` guarda, por control, **cuántos bloques no ejecuta
 nadie**. Ese número **no puede subir**: añadir una rama sin ejercerla rompe la
 verificación en el mismo empujón que la añade. Bajarlo es libre.
+
+### El Edge Gateway · el diferenciador, y cómo se comprueba que lo es
+
+**Qué es.** Un equipo pequeño en la portería que decide accesos **cuando no hay
+internet**, con las reglas que la nube le dio la última vez, y que al reconectar
+envía todo lo que pasó durante el corte exactamente una vez.
+
+**Qué lo hace OE-06 y no «una copia pequeña del sistema».** Una sola cosa:
+`apps/edge` **no tiene una línea de lógica de acceso**. Ni un `if` sobre
+vigencias, ni sobre listas negras, ni sobre horarios. Lo que hay es código que
+arma un contexto —que es armar datos— y llama a `evaluarAcceso` de
+`@ncr/domain-core`, el mismo que ejecuta la API.
+
+Y no es una promesa: `apps/edge/test/misma-decision.test.ts` evalúa once
+contextos por los dos caminos —el de la nube y el del Edge, este último con la
+instantánea pasando por serializar, como en producción— y exige resultado
+idéntico, **motivo incluido**. Una condición «solo para el Edge» en cualquier
+punto pondría esa prueba en rojo el mismo día.
+
+```bash
+pnpm --filter @ncr/edge test    # 101 pruebas, incluidas las dos de la DoD
+```
+
+**La DoD, ejecutada y no leída.** «30 minutos sin WAN con 20 accesos resueltos
+localmente; al reconectar, los 20 en la nube exactamente una vez en menos de 5
+minutos», y «24 horas de autonomía sin degradación». Las dos corren en
+milisegundos porque el reloj, el enlace y la nube son **puertos**: con esperas
+reales durarían media hora y un día, y nadie las ejecutaría, así que la DoD se
+«verificaría» leyéndola.
+
+Lo simulado es el tiempo y la red. La decisión es el motor real, la bandeja es
+SQLite de verdad, y la deduplicación usa la clave que construye el dominio.
+
+**Tres decisiones que explican el resto del código:**
+
+1. **La caché es una instantánea cerrada y versionada, no una réplica de
+   tablas.** Con tablas replicadas, la decisión dependería de cómo consulte cada
+   lado, y dos consultas parecidas con un `JOIN` distinto son dos sistemas de
+   reglas que se parecen.
+2. **La reconciliación corta el lote al primer fallo.** Si el tercero falló por
+   un corte, del cuarto al cincuenta van a fallar igual; y si el cuarto se
+   confirmara, el histórico tendría el cuarto sin el tercero.
+3. **La nube NO vuelve a decidir al reconciliar.** El evento se escribe con la
+   decisión que el gateway tomó y con el instante en que ocurrió. Recalcular
+   afirmaría algo que nadie decidió y borraría la prueba de qué hizo el Edge
+   (CA-21).
+
+Despliegue, rotación por equipo, NTP y actualización por fases:
+[`docs/guias/DESPLIEGUE_EDGE.md`](docs/guias/DESPLIEGUE_EDGE.md).
+
+---
 
 ### La app del residente · qué añade y cómo se prueba
 

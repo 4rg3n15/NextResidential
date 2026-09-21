@@ -41,10 +41,18 @@ const ficheros = ['apps', 'packages']
 console.log(`## Ficheros de prueba en disco: ${ficheros.length}\n`);
 for (const f of ficheros) console.log(`  ${f}`);
 
+/** Quita los escapes ANSI. Sin esto, las «pistas» salían en blanco (11-C). */
+// eslint-disable-next-line no-control-regex
+const sinColores = (t) => String(t ?? '').replace(/\u001B\[[0-9;]*[A-Za-z]/g, '');
+
 /** Ejecuta vitest en un paquete y devuelve su informe JSON. */
 const correr = (paquete, dir) => {
   const salida = join(mkdtempSync(join(tmpdir(), 'ncr-')), 'r.json');
-  let fallo = null;
+  let codigoSalida = 0;
+  let crudoSalida = '';
+  let crudoError = '';
+  let senal = null;
+  let mensajeDelProceso = '';
   try {
     execFileSync(
       'pnpm',
@@ -62,71 +70,112 @@ const correr = (paquete, dir) => {
       ],
       { cwd: raiz, stdio: 'pipe', encoding: 'utf8' },
     );
-    fallo = null;
+    codigoSalida = 0;
   } catch (e) {
-    /**
-     * El informe se escribe igual aunque haya rojos, así que una excepción aquí
-     * NO es «la suite falló»: es que el proceso no llegó a terminar —lo mató una
-     * señal, se pasó de `maxBuffer`, no encontró el binario—. Callarlo era el
-     * defecto: el paquete desaparecía de la medición y el paso 7 informaba
-     * «alguna capa por debajo del umbral», mandando a buscar una cobertura baja
-     * que no existía. Ahora se guarda y se imprime.
-     */
-    /**
-     * Y se guarda LA EVIDENCIA, no solo el tamaño.
-     *
-     * La primera versión contaba los bytes de cada flujo. Sirvió para descartar
-     * que el proceso muriera por `maxBuffer` —434 KB de salida no es un
-     * truncamiento— y no sirvió para nada más: el nombre de la prueba que falló
-     * estaba en esos 434 KB y no se imprimía ninguno. Aquí se quedan las líneas
-     * que lo dicen.
-     */
-    /**
-     * Y la evidencia se LIMPIA antes de decidir si la hay.
-     *
-     * La versión anterior filtraba las líneas con `FAIL`, `✗` o `AssertionError`
-     * y las imprimía tal cual. Cuando el proceso muere a mitad de escribir, lo
-     * que queda en los flujos son secuencias de color sin texto: el filtro las
-     * daba por buenas —el `✗` estaba, rodeado de escapes— y el informe imprimía
-     * una línea EN BLANCO. Ocurrió, y el mensaje acababa en «153 por error» sin
-     * decir nada más, que es peor que no haberlo intentado: parece que la
-     * herramienta se quedó a medias y no se sabe por qué.
-     *
-     * Ahora se quitan los escapes ANSI primero y se descartan las líneas que
-     * quedan vacías. Si después de eso no queda ninguna, **eso es en sí el
-     * diagnóstico**: una corrida que falla por una prueba deja su nombre
-     * escrito; una que no deja ninguno no falló, la mataron.
-     */
-    // eslint-disable-next-line no-control-regex
-    const sinColores = (t) => String(t ?? '').replace(/\u001B\[[0-9;]*[A-Za-z]/g, '');
-    const salida = sinColores(e.stdout);
-    const errorTexto = sinColores(e.stderr);
-    const pistas = salida
-      .split('\n')
-      .filter((l) => /FAIL|AssertionError|✗|Tests\s+\d+ failed|Unhandled/.test(l))
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
-      .slice(0, 6);
-    const colaDeError = errorTexto
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
-      .slice(-3);
-    fallo =
-      `${e.code ?? ''} ${e.signal ? `señal ${e.signal}` : ''} ${String(e.message).split('\n')[0]}`.trim() +
-      ` · ${salida.length} bytes por salida estándar, ${errorTexto.length} por error` +
-      (pistas.length === 0
-        ? '\n     NINGUNA línea de fallo en la salida: esto no es una prueba en rojo.' +
-          '\n     Una corrida que falla deja el nombre de la prueba escrito. Sin él, el' +
-          '\n     proceso se interrumpió — señal, memoria o el contenedor— y hay que' +
-          '\n     repetirlo, no buscar una cobertura baja que no existe.'
-        : `\n     ${pistas.join('\n     ')}`) +
-      (colaDeError.length === 0 ? '' : `\n     error: ${colaDeError.join(' / ')}`);
+    codigoSalida = typeof e.status === 'number' ? e.status : 1;
+    crudoSalida = String(e.stdout ?? '');
+    crudoError = String(e.stderr ?? '');
+    senal = e.signal ?? null;
+    mensajeDelProceso = String(e.message).split('\n')[0];
   }
+
   const informe = existsSync(salida) ? JSON.parse(readFileSync(salida, 'utf8')) : null;
   const resumenPath = join(raiz, dir, 'coverage', 'coverage-summary.json');
   const cobertura = existsSync(resumenPath) ? JSON.parse(readFileSync(resumenPath, 'utf8')) : null;
-  return { informe, cobertura, fallo };
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * D-100 · DOS COSAS DISTINTAS QUE ESTE CONTROL CONFUNDÍA EN UNA
+   *
+   * Hasta la ETAPA 12 cualquier salida distinta de 0 se informaba igual: «la
+   * corrida NO terminó», con bytes, una `pista` recortada y una invitación a
+   * buscar una cobertura baja. El CI de `ubuntu-latest` tumbó la ETAPA 12 con
+   * ese mensaje mientras **el informe JSON tenía delante el nombre de la prueba
+   * roja** y no lo imprimía. Encontrar cuál era costó abrir el registro del
+   * trabajo a mano.
+   *
+   * Son dos situaciones con dos remedios opuestos:
+   *
+   *   · **SUITE EN ROJO** — hay informe y trae `numFailedTests > 0`. Lo que
+   *     hace falta es el NOMBRE de la prueba, su fichero y su aserción. No es
+   *     un problema de cobertura ni de entorno: es una prueba que falla.
+   *   · **CORRIDA INTERRUMPIDA** — no hay informe, o lo hay sin rojas. El
+   *     proceso murió: señal, memoria, el contenedor. Ahí sí hay que repetir y
+   *     mirar la máquina, y NO hay ninguna prueba a la que culpar.
+   *
+   * Decirlas con el mismo mensaje manda a buscar el defecto donde no está, que
+   * es la misma familia que este repositorio lleva doce etapas persiguiendo —y
+   * esta vez dentro de la herramienta que la persigue.
+   * ══════════════════════════════════════════════════════════════════════════
+   */
+  const rojas = informe?.numFailedTests ?? 0;
+
+  if (codigoSalida === 0 && rojas === 0) return { informe, cobertura, fallo: null };
+
+  if (rojas > 0) {
+    /**
+     * El informe ya trae, por fichero, cada aserción con su `status` y su
+     * `failureMessages`. Estaba en memoria y se descartaba.
+     */
+    const nombradas = [];
+    for (const suite of informe?.testResults ?? []) {
+      for (const a of suite.assertionResults ?? []) {
+        if (a.status !== 'failed') continue;
+        const fichero = relative(raiz, suite.name ?? '');
+        const motivo = (a.failureMessages ?? [])
+          .join('\n')
+          .split('\n')
+          .map((l) => sinColores(l).trim())
+          .filter((l) => l.length > 0)
+          .slice(0, 3);
+        nombradas.push(
+          `✗ ${a.fullName ?? a.title}\n         en ${fichero}` +
+            (motivo.length === 0 ? '' : `\n         ${motivo.join('\n         ')}`),
+        );
+      }
+    }
+    const detalle =
+      `SUITE EN ROJO · ${rojas} prueba(s) fallaron de ${informe?.numTotalTests ?? '?'}` +
+      (nombradas.length === 0
+        ? '\n       (el informe dice que hay rojas y no trae sus aserciones: informe truncado)'
+        : `\n       ${nombradas.join('\n       ')}`);
+    return { informe, cobertura, fallo: { clase: 'roja', detalle } };
+  }
+
+  /**
+   * Interrumpida. Aquí sí valen las pistas de los flujos, ya sin colores y
+   * **sin las líneas de pnpm**: `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL` casa con
+   * /FAIL/ y se colaba como si fuera el nombre de una prueba. Es el eco del
+   * gestor de paquetes diciendo que algo falló, no el qué.
+   */
+  const salidaLimpia = sinColores(crudoSalida);
+  const errorLimpio = sinColores(crudoError);
+  const pistas = salidaLimpia
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+    .filter((l) => !/^ERR_PNPM_/.test(l) && !/ELIFECYCLE/.test(l))
+    .filter((l) => /FAIL|AssertionError|✗|Tests\s+\d+ failed|Unhandled/.test(l))
+    .slice(0, 6);
+  const colaDeError = errorLimpio
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !/^ERR_PNPM_/.test(l))
+    .slice(-3);
+
+  const detalle =
+    `CORRIDA INTERRUMPIDA · código ${codigoSalida}` +
+    (senal === null ? '' : ` · señal ${senal}`) +
+    ` · ${mensajeDelProceso}` +
+    `\n       ${informe === null ? 'sin informe JSON' : `informe con ${informe.numTotalTests ?? 0} pruebas y 0 rojas`}` +
+    ` · ${salidaLimpia.length} bytes por salida, ${errorLimpio.length} por error` +
+    (pistas.length === 0
+      ? '\n       NINGUNA prueba en rojo: NO busque una cobertura baja ni una aserción.' +
+        '\n       El proceso murió —señal, memoria o el contenedor—. Repítalo y mire la máquina.'
+      : `\n       ${pistas.join('\n       ')}`) +
+    (colaDeError.length === 0 ? '' : `\n       error: ${colaDeError.join(' / ')}`);
+
+  return { informe, cobertura, fallo: { clase: 'interrumpida', detalle } };
 };
 
 const paquetes = [
@@ -143,7 +192,46 @@ const paquetes = [
   // ficheros de prueba en disco que nadie mide.
   ['@ncr/config', 'packages/config'],
   ['@ncr/web', 'apps/web'],
+  // ETAPA 12 · el Edge. Lo destapó este mismo control al informar «11 ficheros
+  // de prueba en disco que NADIE ejecutó»: el paso 5 los corría —136 de 136—
+  // y la MEDICIÓN de cobertura no los veía, así que su capa de aplicación,
+  // que es el corazón de la etapa, no entraba en el umbral del 90 % de §2.4.
+  // Es la misma forma del hueco de `@ncr/providers` en la ETAPA 05.
+  ['@ncr/edge', 'apps/edge'],
 ];
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * NCR_PAQUETES_METRICAS · restringir la lista, solo para probar ESTE control
+ *
+ * La prueba negativa de D-100 tiene que meter una prueba roja de verdad y leer
+ * lo que este guion imprime. Correr los seis paquetes bajo cobertura para eso
+ * añadiría minutos al banco, que corre dentro del verificador; con un paquete
+ * pequeño tarda dos segundos y ejercita exactamente el mismo camino: vitest de
+ * verdad, informe JSON de verdad, mensaje de verdad.
+ *
+ * **No es un agujero para poner verde una corrida recortada**, y no lo es por
+ * dos razones que conviene dejar escritas:
+ *
+ *  · solo admite nombres que YA están en la lista de arriba: no sirve para
+ *    añadir un paquete fantasma ni para medir otra cosa;
+ *  · el paso 6 del verificador cuenta los ficheros de prueba en disco contra
+ *    los ejecutados, así que una corrida recortada se delata sola —es
+ *    literalmente el control que destapó que `@ncr/edge` faltaba aquí—.
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+const soloEstos = (process.env.NCR_PAQUETES_METRICAS ?? '')
+  .split(',')
+  .map((x) => x.trim())
+  .filter((x) => x.length > 0);
+const paquetesAMedir =
+  soloEstos.length === 0 ? paquetes : paquetes.filter(([nombre]) => soloEstos.includes(nombre));
+if (soloEstos.length > 0) {
+  console.log(
+    `\n## AVISO: medición restringida a ${paquetesAMedir.map(([n]) => n).join(', ')} ` +
+      '(NCR_PAQUETES_METRICAS). El paso 6 delata una corrida recortada.',
+  );
+}
 
 let totalPruebas = 0;
 let totalFicheros = 0;
@@ -173,11 +261,17 @@ const corridasIncompletas = [];
 /** Rutas relativas de los ficheros que SÍ se ejecutaron, para nombrar los que no. */
 const ficherosMedidos = [];
 
-for (const [paquete, dir] of paquetes) {
+for (const [paquete, dir] of paquetesAMedir) {
   const { informe, cobertura, fallo } = correr(paquete, dir);
   if (fallo !== null) {
-    console.log(`\n## ${paquete}: la corrida NO terminó — ${fallo}`);
-    corridasIncompletas.push(`${paquete}: ${fallo}`);
+    // D-100 · el encabezado dice CUÁL de las dos cosas es, porque el remedio
+    // de una no sirve para la otra.
+    const titulo =
+      fallo.clase === 'roja'
+        ? `${paquete}: PRUEBAS EN ROJO`
+        : `${paquete}: la corrida NO terminó`;
+    console.log(`\n## ${titulo}\n       ${fallo.detalle}`);
+    corridasIncompletas.push(`${paquete}: ${fallo.detalle}`);
   }
   if (!informe) {
     console.log(`\n## ${paquete}: SIN INFORME — la corrida no produjo resultados`);
@@ -279,12 +373,30 @@ console.log(
  * impreso en el informe y verde en el resultado. Quien mira un CI en verde no
  * lee las cifras.
  */
-if (totalFicheros < ficheros.length) {
+/**
+ * El recuento se acota a los paquetes MEDIDOS, no al disco entero.
+ *
+ * Sin esto, restringir la lista con `NCR_PAQUETES_METRICAS` haría saltar este
+ * mismo control —los ficheros de los paquetes que no se pidieron aparecerían
+ * como «nadie los ejecutó»—, y la prueba negativa de D-100 no podría existir.
+ *
+ * Lo que la restricción NO afloja: en la corrida normal `paquetesAMedir` es la
+ * lista entera, así que `esperados` son todos los ficheros del disco y el
+ * control sigue siendo el mismo. Y cuando se restringe, el aviso de arriba lo
+ * dice en la primera línea de la salida.
+ */
+const directoriosMedidos = paquetesAMedir.map(([, d]) => `${d}/`);
+const esperados =
+  soloEstos.length === 0
+    ? ficheros
+    : ficheros.filter((f) => directoriosMedidos.some((d) => f.startsWith(d)));
+
+if (totalFicheros < esperados.length) {
   const medidos = new Set(ficherosMedidos);
   console.log(
-    `\n   ${ficheros.length - totalFicheros} fichero(s) de prueba en disco que NADIE ejecutó:`,
+    `\n   ${esperados.length - totalFicheros} fichero(s) de prueba en disco que NADIE ejecutó:`,
   );
-  for (const f of ficheros) if (!medidos.has(f)) console.log(`     - ${f}`);
+  for (const f of esperados) if (!medidos.has(f)) console.log(`     - ${f}`);
   console.log('   Un fichero que no se recoge no deja ningún rojo: por eso esto es un fallo.');
   process.exit(1);
 }
@@ -295,11 +407,14 @@ if (sinMedir.length > 0) {
   process.exit(1);
 }
 if (corridasIncompletas.length > 0) {
-  console.log(`\n   ${corridasIncompletas.length} corrida(s) que NO terminaron:`);
+  console.log(`\n   ${corridasIncompletas.length} corrida(s) que no dieron una medición válida:`);
   for (const c of corridasIncompletas) console.log(`     - ${c}`);
   console.log(
-    '   Un resumen que sobrevive a una corrida fallida es de la ejecución anterior:\n' +
-      '   medir con él es un falso verde. Por eso esto es fallo y no aviso.',
+    '\n   Un resumen que sobrevive a una corrida fallida es de la ejecución anterior:\n' +
+      '   medir con él es un falso verde. Por eso esto es fallo y no aviso.\n' +
+      '\n   Si arriba dice SUITE EN ROJO, el nombre de la prueba está escrito: arréglela.\n' +
+      '   Si dice CORRIDA INTERRUMPIDA, no hay ninguna prueba a la que culpar —el proceso\n' +
+      '   murió— y lo que hay que mirar es la máquina, no la cobertura.',
   );
   process.exit(1);
 }

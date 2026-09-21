@@ -7,6 +7,8 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/evento_ingesta_dto.dart';
 import '../models/latido_dto.dart';
+import '../models/lote_de_reconciliacion_dto.dart';
+import '../models/lote_reconciliado_dto.dart';
 
 part 'ingesta_api.g.dart';
 
@@ -26,5 +28,13 @@ abstract class IngestaApi {
   @POST('/ingesta/latidos')
   Future<void> ingestaControllerLatido({
     @Body() required LatidoDto body,
+  });
+
+  /// Recibe la bandeja de un Edge Gateway tras un corte de WAN (CU-04).
+  ///
+  /// NO vuelve a decidir: cada evento trae la decisión que el gateway tomó, sellada con su versión de reglas (RN-16, CA-21). Deduplica por clave de idempotencia y responde 202 también a los duplicados (RN-17, CA-22).
+  @POST('/ingesta/reconciliacion')
+  Future<LoteReconciliadoDto> ingestaControllerReconciliar({
+    @Body() required LoteDeReconciliacionDto body,
   });
 }

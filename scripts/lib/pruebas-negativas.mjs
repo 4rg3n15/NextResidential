@@ -368,6 +368,31 @@ try {
         : mal(`la referencia ausente NO se detecta (codigo ${sinRef.codigo})`);
       writeFileSync(tsconfigApi, tsconfigOriginal);
 
+      /**
+       * Y un paquete SIN `tsconfig.json` se salta, no revienta.
+       *
+       * Esta sonda la pidió el trinquete de ramas en la ETAPA 12: hasta
+       * entonces `apps/edge` era un esqueleto sin `tsconfig`, así que esa rama
+       * se ejercitaba **por accidente**. Al construirse el Edge de verdad dejó
+       * de tocarla nadie, y el trinquete lo cantó. Es justo para lo que está:
+       * una rama que se cubría sola deja de cubrirse y el número lo dice.
+       *
+       * El caso no es hipotético: un paquete que no compila con TypeScript
+       * —una app de Flutter, un guion suelto— no tiene `tsconfig.json`, y el
+       * control tiene que pasar de largo en vez de fallar por su ausencia.
+       */
+      const sinTs = join(clon, 'packages', 'paquete-sin-tsconfig');
+      mkdirSync(sinTs, { recursive: true });
+      writeFileSync(
+        join(sinTs, 'package.json'),
+        JSON.stringify({ name: '@ncr/paquete-sin-tsconfig', version: '0.0.0' }, null, 2),
+      );
+      const sinTsconfig = enClon('node', ['scripts/lib/frontera-construccion.mjs']);
+      sinTsconfig.codigo === 0
+        ? ok('un paquete sin tsconfig.json se salta, no rompe el control')
+        : mal(`un paquete sin tsconfig rompe el control (codigo ${sinTsconfig.codigo})`);
+      rmSync(sinTs, { recursive: true, force: true });
+
       enClon('node', ['scripts/lib/frontera-construccion.mjs']).codigo === 0
         ? ok('el banco de pruebas vuelve a su línea base')
         : mal('la sonda dejó rastro en el banco');
@@ -1187,6 +1212,106 @@ try {
         : mal('la sonda dejó rastro en el banco');
     }
   }
+
+  console.log('\n▸ 22 · una prueba ROJA se NOMBRA, y no se disfraza de otra cosa (D-100)');
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * EL DEFECTO QUE ESTA SONDA CIERRA
+     *
+     * El CI de `ubuntu-latest` tumbó la ETAPA 12 con «la corrida NO terminó» y
+     * un recuento de bytes. El informe JSON tenía delante el nombre de la
+     * prueba roja y este guion no lo imprimía: encontrar cuál era costó abrir
+     * el registro del trabajo a mano. Peor, el mensaje mandaba a buscar una
+     * cobertura baja que no existía.
+     *
+     * Aquí se mete una prueba que falla A PROPÓSITO y se exige que la salida
+     * del control **diga su nombre**. Un control que nadie ha visto fallar no
+     * está demostrado (§2.8.0), y este llevaba desde la ETAPA 09 sin que nadie
+     * viera qué imprime cuando de verdad hay una roja.
+     *
+     * Se restringe a `@ncr/config` con `NCR_PAQUETES_METRICAS`: dos segundos en
+     * vez de varios minutos, por el mismo camino —vitest real, informe JSON
+     * real— y sin añadir el peso de los seis paquetes al banco.
+     *
+     * ════════════════════════════════════════════════════════════════════════
+     * ÚNICA SONDA QUE CORRE EN EL ÁRBOL REAL, Y POR QUÉ NO PUEDE SER DE OTRO MODO
+     *
+     * El banco es un clon SIN `node_modules`: copia los ficheros versionados y
+     * `node_modules` no lo está. Ahí `pnpm exec vitest` no encuentra vitest y
+     * todo sale como «corrida interrumpida» — justo el caso contrario al que
+     * esta sonda tiene que provocar. Y ejecutar una suite de verdad es el punto:
+     * lo que se demuestra es que el informe JSON REAL se convierte en un mensaje
+     * con el nombre dentro.
+     *
+     * Por eso escribe un fichero en el árbol real y lo borra en `finally`. Es
+     * una ruta NO versionada, así que `git status` vuelve a ser idéntico, y la
+     * comprobación final del banco —que le pregunta a git, no a una copia en
+     * memoria— lo verifica al terminar.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const sonda = join(raiz, 'packages', 'config', 'src', 'sonda-roja.test.ts');
+    const conConfig = (extra = {}) =>
+      correr('node', ['scripts/lib/metricas.mjs'], {
+        cwd: raiz,
+        env: { ...process.env, NCR_PAQUETES_METRICAS: '@ncr/config', ...extra },
+      });
+
+    /**
+     * La línea base no se mide por el código de salida: una corrida
+     * restringida sale 1 igualmente porque no puede medir las capas que no
+     * corrió, y eso es correcto. Lo que hay que fijar antes de sondear es que
+     * **no hay ninguna suite en rojo**, que es lo que la sonda va a provocar.
+     */
+    try {
+    const base = conConfig();
+    !/SUITE EN ROJO/.test(base.salida)
+      ? ok('el banco parte sin ninguna suite en rojo')
+      : mal('la línea base ya tiene pruebas rojas: la sonda no demostraría nada');
+
+    writeFileSync(
+      sonda,
+      "import { describe, expect, it } from 'vitest';\n" +
+        "describe('sonda de D-100', () => {\n" +
+        "  it('esta prueba falla a proposito y su nombre tiene que aparecer', () => {\n" +
+        '    expect(1).toBe(2);\n' +
+        '  });\n' +
+        '});\n',
+    );
+    const conRoja = conConfig();
+
+    conRoja.codigo !== 0
+      ? ok('una suite en rojo hace fallar la medición')
+      : mal('una prueba roja pasa inadvertida: el paquete se mediría igual');
+
+    // LO QUE IMPORTA: el nombre, no el recuento.
+    /esta prueba falla a proposito y su nombre tiene que aparecer/.test(conRoja.salida)
+      ? ok('el NOMBRE de la prueba roja aparece en la salida')
+      : mal('la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas');
+
+    /sonda-roja\.test\.ts/.test(conRoja.salida)
+      ? ok('y también su fichero')
+      : mal('no se dice en qué fichero está');
+
+    // Y que NO se disfrace de corrida interrumpida, que es el otro remedio.
+    /SUITE EN ROJO/.test(conRoja.salida) && !/CORRIDA INTERRUMPIDA/.test(conRoja.salida)
+      ? ok('se clasifica como SUITE EN ROJO, no como corrida interrumpida')
+      : mal('una suite en rojo se informa como corrida interrumpida: remedio equivocado');
+
+    // El eco de pnpm no es el nombre de ninguna prueba.
+    !/ERR_PNPM_/.test(conRoja.salida)
+      ? ok('la línea de pnpm no se cuela como si fuera una pista')
+      : mal('ERR_PNPM_* sigue apareciendo entre las pistas');
+
+    rmSync(sonda, { force: true });
+    !/SUITE EN ROJO/.test(conConfig().salida)
+      ? ok('el árbol real queda sin la sonda')
+      : mal('la sonda dejó rastro en el árbol real');
+    } finally {
+      // Si cualquier aserción de arriba lanzara, el fichero NO se queda.
+      rmSync(sonda, { force: true });
+    }
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }
@@ -1210,6 +1335,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 23 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 24 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

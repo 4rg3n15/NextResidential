@@ -1,5 +1,21 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsISO8601,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { MOTIVOS_ACCESO } from '@ncr/domain-core';
 
 /**
  * El DTO valida FORMA; el agregado valida VERDAD (§2.7.3). Aquí no se comprueba
@@ -45,4 +61,104 @@ export class EventoIngestaDto {
   @IsString()
   @MaxLength(128)
   referenciaExterna!: string;
+}
+
+/**
+ * ETAPA 12 · La decisión que el Edge YA tomó, sellada con su versión de reglas.
+ *
+ * Viaja como dato y no se recalcula (RN-16, CA-21). El DTO valida su FORMA; que
+ * la versión exista de verdad y pertenezca a esa copropiedad lo comprueba el
+ * dominio al construir el `VersionDeReglas`, como todo lo demás.
+ */
+export class DecisionDelEdgeDto {
+  @ApiProperty({ description: 'Lo que el Edge resolvió en la portería' })
+  @IsBoolean()
+  permitido!: boolean;
+
+  @ApiProperty({
+    required: false,
+    enum: MOTIVOS_ACCESO,
+    description: 'Obligatorio cuando `permitido` es falso (CA-16)',
+  })
+  @IsOptional()
+  @IsIn(MOTIVOS_ACCESO)
+  motivo?: (typeof MOTIVOS_ACCESO)[number];
+
+  @ApiProperty({ description: 'Qué política resolvió. Es la traza de CA-21.' })
+  @IsString()
+  @MaxLength(128)
+  reglaAplicada!: string;
+
+  @ApiProperty({ description: 'La versión de reglas con la que decidió (RN-16)' })
+  @IsInt()
+  @Min(1)
+  versionDeReglas!: number;
+
+  @ApiProperty({ required: false, description: 'Lectura de baja confianza (CU-01 3a)' })
+  @IsOptional()
+  @IsBoolean()
+  requiereConfirmacionHumana?: boolean;
+}
+
+/** Un acceso decidido en el Edge durante un corte, listo para reconciliar. */
+export class EventoReconciliadoDto extends EventoIngestaDto {
+  @ApiProperty({
+    description: 'Instante REAL del acceso, no el de la reconciliación (CA-22)',
+  })
+  @IsISO8601({ strict: true })
+  ocurridoEn!: string;
+
+  @ApiProperty({ type: DecisionDelEdgeDto })
+  @ValidateNested()
+  @Type(() => DecisionDelEdgeDto)
+  decision!: DecisionDelEdgeDto;
+
+  @ApiProperty({
+    description: 'KPI-31 · decidido con una caché que pudo haber envejecido',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  cachePotencialmenteObsoleto?: boolean;
+}
+
+/**
+ * El lote. Se envía en orden y se procesa en orden: un histórico que recibe los
+ * eventos de un corte desordenados es un histórico en el que alguien salió
+ * antes de entrar (CA-22).
+ */
+export class LoteDeReconciliacionDto {
+  @ApiProperty({ type: [EventoReconciliadoDto], maxItems: 500 })
+  @IsArray()
+  @ArrayMaxSize(500, { message: 'El lote no puede superar 500 eventos' })
+  @ValidateNested({ each: true })
+  @Type(() => EventoReconciliadoDto)
+  eventos!: EventoReconciliadoDto[];
+}
+
+/** Qué pasó con UNA clave del lote reconciliado. */
+export class ResultadoDeReconciliacionDto {
+  @ApiProperty({ description: 'La clave con la que el Edge lo reconocerá en su bandeja' })
+  claveIdempotencia!: string;
+
+  @ApiProperty() aceptado!: boolean;
+
+  @ApiProperty({
+    description:
+      'La nube ya lo tenía. NO es un error: el Edge reenvía porque no sabe si llegó (CA-22)',
+  })
+  duplicado!: boolean;
+
+  @ApiProperty({ required: false, description: 'Por qué no se aceptó, si no se aceptó' })
+  detalle?: string;
+}
+
+export class LoteReconciliadoDto {
+  @ApiProperty() aceptado!: boolean;
+
+  @ApiProperty({
+    type: [ResultadoDeReconciliacionDto],
+    description: 'Uno por evento procesado, EN ORDEN. Se corta en el primero que falla.',
+  })
+  resultados!: ResultadoDeReconciliacionDto[];
 }
