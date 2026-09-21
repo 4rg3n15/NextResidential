@@ -224,14 +224,32 @@ escrito aquí y en `ESTADO_ETAPAS.md`.
 
 Total del Edge: **101 pruebas**. Cobertura del paquete: líneas 99 %, ramas 90 %.
 
-**Veredicto literal**, de `./scripts/verificar-etapa.sh --con-base`, 25 de 25 pasos:
+### Veredicto · de qué corrida sale, y en qué máquinas
+
+**Este apartado se reescribió.** La primera versión daba por cerrada la etapa
+con un veredicto local, sin decir en qué máquina se había obtenido, mientras el
+CI de `ubuntu-latest` estaba en rojo sobre la misma SHA. Un veredicto que no
+dice de dónde sale no es verificable, y uno de una sola plataforma no cubre el
+entorno declarado en §2.8.0 —desarrollo en macOS, CI en Linux—.
+
+**1 · Local**, `./scripts/verificar-etapa.sh --con-base`, 25 de 25 pasos, sobre
+el árbol de la cabeza de la rama:
 
 ```
 VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
 ```
 
-El declarado sigue siendo el **5e** de la ETAPA 11 —el recorrido de la app en un
-navegador real—, con su motivo escrito y revisión en la ETAPA 14.
+**2 · Integración continua**, flujo `verificacion.yml`, los dos trabajos de la
+matriz sobre la SHA final:
+
+| Trabajo                     | Resultado |
+| --------------------------- | --------- |
+| `controles (ubuntu-latest)` | **verde** |
+| `controles (macos-latest)`  | **verde** |
+
+El control declarado no ejercido sigue siendo el **5e** de la ETAPA 11 —el
+recorrido de la app en un navegador real—, con su motivo escrito y revisión en
+la ETAPA 14. Aparece en el veredicto en cada corrida, que es como se pidió.
 
 | Medida del conjunto            | Valor                                            |
 | ------------------------------ | -------------------------------------------------- |
@@ -275,7 +293,7 @@ entonces para que no volviera a pasar.
 | **S-24** | La ruta que SIRVE la instantánea de reglas no está construida: hoy la caché se siembra al aprovisionar. Cliente y contrato listos; se cierra con el tablero de reglas (ETAPA 14)            | `[SUPUESTO]` **abierto** |
 | **S-23** | (de la 11) El horario de zonas se pinta en el huso del teléfono. **Anotado para la ETAPA 16**                                                                                              | `[SUPUESTO]` **abierto** |
 | **D-100** | **El cierre de esta etapa se retiró por este defecto.** `metricas.mjs` tenía delante el informe JSON con la prueba roja y **no imprimía su nombre**: informaba «la corrida NO terminó» con un recuento de bytes, y mandaba a buscar una cobertura baja que no existía. Confundía **suite en rojo** —hay informe con rojas, y el remedio es arreglar la prueba— con **corrida interrumpida** —murió el proceso, y el remedio es mirar la máquina—. Además, su filtro de pistas se tragaba `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`, que es el eco de pnpm y no el nombre de nada | **Corregido** · prueba negativa 22 |
-| **D-101** | Una prueba de `@ncr/api` falla **de forma intermitente en Linux bajo instrumentación de cobertura**: 1 roja de 658 en `ubuntu-latest`, verde en `macos-latest` sobre la misma SHA. En 4 vCPU locales pasa 3 de 3, dos con `taskset -c 0,1`. En caza con un paso temporal del CI que repite la suite y se para en la primera roja | **Abierto** · en caza |
+| **D-101** | Una prueba de `@ncr/api` falla **de forma intermitente en Linux bajo instrumentación de cobertura**: 1 roja de 658 en `ubuntu-latest` (`bbae506`), verde en `macos-latest` sobre la misma SHA. **No reproducida en 11 intentos deliberados** posteriores (5 en `ubuntu-latest` con un paso de caza, 6 en local con `taskset -c 0,1`). Su causa **no está establecida** | **Abierto** · instrumentado, no cerrado |
 
 ### D-100 · por qué esta etapa dejó de estar cerrada
 
@@ -304,6 +322,41 @@ salida diga su nombre, su fichero y la clasifique bien.
 Y una nota de método, porque importa más que el arreglo: **re-ejecutar el
 trabajo hasta que salga verde no es un arreglo**. «Flake» no es una causa raíz;
 es lo que se dice cuando no se ha buscado la causa.
+
+### D-101 · lo que se buscó, lo que se midió, y lo que queda abierto
+
+**Se buscó.** Un paso temporal en el trabajo de `ubuntu-latest` repitió la suite
+de `@ncr/api` bajo cobertura **cinco veces**, parándose a la primera roja. No
+salió ninguna. En local, seis corridas completas con `taskset -c 0,1` y otras
+cuatro de la prueba de latencia sola con `taskset -c 0`: todas limpias.
+
+**Se midió el sospechoso principal.** El candidato natural era
+`test/latencia-tiempo-real.test.ts`, la única prueba de `apps/api` con umbral de
+reloj de pared apretado: p99 < 1 000 ms con 25 suscriptores SSE y 200 eventos en
+ráfaga. Clavada a **un solo núcleo** y bajo instrumentación de cobertura:
+
+| Medida  | Valor    | Umbral de la prueba | Compromiso (KPI-25) |
+| ------- | -------- | ------------------- | ------------------- |
+| p99     | 61–67 ms | 1 000 ms            | —                   |
+| máximo  | 68–75 ms | —                   | 10 000 ms           |
+
+Quince veces de margen contra la alarma temprana y ciento treinta contra el
+compromiso. **No es el sospechoso**, o al menos no lo es en ninguna máquina a la
+que tenga acceso.
+
+**No se tocó ningún umbral**, y el criterio queda escrito por si alguien lo
+intenta más adelante: el compromiso del producto es **KPI-25, 10 segundos**, y
+eso se asevera siempre. El margen de 1 segundo del p99 **no es el compromiso**:
+es una alarma temprana sobre la máquina, para avisar cuando la latencia empiece
+a subir y no cuando ya se haya incumplido el indicador. Relajarlo para poner
+verde una corrida sería cambiar una alarma por silencio, y encima sin haber
+entendido qué la disparó.
+
+**Qué queda.** La causa **no está establecida** y el defecto sigue abierto. Lo
+que sí cambió es que la próxima vez no costará una tarde: con D-100 corregido,
+una roja imprime su nombre, su fichero y su aserción en el propio paso 7. Por eso
+el paso temporal de caza se retiró —el camino normal ya hace ese trabajo— y no
+porque el problema esté resuelto.
 
 **Sobre los controles, que también movieron:**
 

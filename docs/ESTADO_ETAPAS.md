@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-21 · **ETAPA 12 EN CORRECCIÓN** · se declaró cerrada sobre un veredicto local de macOS mientras el CI de `ubuntu-latest` estaba en rojo sobre la misma SHA. No se cierra hasta tener CI verde en **las dos** plataformas
+**Última actualización:** 2026-09-21 · **ETAPA 12 CERRADA** · con CI verde en `ubuntu-latest` **y** `macos-latest` sobre la SHA final, y `verificar-etapa.sh --con-base` correcto en local. Su primer cierre se retiró por apoyarse en un veredicto de una sola plataforma
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -20,10 +20,10 @@
 
 |                                |                                                                                                                 |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **12 de 17** (ETAPAS 00 a 11) · la 12 está **EN CORRECCIÓN**: su cierre se retiró el 2026-09-21                  |
-| **Etapa siguiente habilitada** | **ETAPA 12 — terminar de cerrarla.** La 13 depende de ella y no se habilita hasta que la 12 esté cerrada        |
+| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas              |
+| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento**                                                     |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (la roja intermitente de `@ncr/api` en Linux, en caza). D-100 corregido    |
+| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos)  |
 | **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
 | **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
 | **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)     |
@@ -47,8 +47,8 @@
 | 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **CERRADA**                      | [ETAPA-09](etapas/ETAPA-09.md) |
 | 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09 ✅                            | **CERRADA**                      | [ETAPA-10](etapas/ETAPA-10.md) |
 | 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                            | **CERRADA** — 11-A, 11-B y 11-C  | [ETAPA-11](etapas/ETAPA-11.md) |
-| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **EN CURSO** — cierre retirado   | [ETAPA-12](etapas/ETAPA-12.md) |
-| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12                               | PENDIENTE                        | —                              |
+| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **CERRADA**                      | [ETAPA-12](etapas/ETAPA-12.md) |
+| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12 ✅                            | **PENDIENTE** — habilitada       | —                              |
 | 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13                               | PENDIENTE                        | —                              |
 | 15     | Integración real con hardware Hikvision                       | `etapa-15-integracion-hikvision`       | 14                               | **PENDIENTE — con precondición** | —                              |
 | 16     | Documentación técnica final y README                          | `etapa-16-documentacion-final`         | 14 (ejecutable), 15 (definitiva) | PENDIENTE                        | —                              |
@@ -469,7 +469,7 @@ plataforma**: la decisión la toma Next Control.
 
 ---
 
-## ETAPA 12 — Edge Gateway: offline y reconciliación · **EN CURSO** — cierre retirado el 2026-09-21
+## ETAPA 12 — Edge Gateway: offline y reconciliación · **CERRADA** · 2026-09-21
 
 **Rama:** `etapa-12-edge-gateway-offline`, salida de la punta de
 `etapa-11-app-flutter-residente-b` y **fusionada con `develop`** una vez cerrado
@@ -510,12 +510,13 @@ otra vez por la prueba genérica de D-91—.
 | ID        | Qué                                                                                                                                                                                                                                                                             | Estado                              |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | **D-100** | `metricas.mjs` tenía el informe JSON con la prueba roja **en memoria** y no imprimía su nombre: decía «la corrida NO terminó» con un recuento de bytes y mandaba a buscar una cobertura baja inexistente. Confundía **suite en rojo** con **corrida interrumpida**, que tienen remedios opuestos. Su filtro de pistas se tragaba `ERR_PNPM_*`, el eco de pnpm | **Corregido** · prueba negativa 22 |
-| **D-101** | Una prueba de `@ncr/api` falla de forma **intermitente en Linux bajo cobertura**: 1 de 658 en `ubuntu-latest`, verde en `macos-latest` sobre la misma SHA (`bbae506`). Localmente pasa 3 de 3 en 4 vCPU, dos con `taskset -c 0,1`                                                | **Abierto** · en caza con paso temporal del CI |
+| **D-101** | Una prueba de `@ncr/api` falla de forma **intermitente en Linux bajo cobertura**: 1 de 658 en `ubuntu-latest`, verde en `macos-latest` sobre la misma SHA (`bbae506`). **No reproducida en 11 intentos deliberados** (5 en el CI con un paso de caza, 6 en local con `taskset -c 0,1`); el sospechoso principal —la prueba de latencia— se midió clavada a un núcleo y da p99 de 61–67 ms contra un umbral de 1 000. Causa **no establecida** | **Abierto** · instrumentado. Con D-100 corregido, la próxima roja se nombra sola |
 
-**La etapa se cerró sobre un veredicto local de macOS mientras el CI de
-`ubuntu-latest` estaba en rojo.** El cierre se retira hasta tener CI verde en
-las dos plataformas sobre la SHA final, y el veredicto del informe dirá de qué
-corrida sale y en qué plataformas — no solo el local.
+**La etapa se cerró la primera vez sobre un veredicto local de macOS mientras el
+CI de `ubuntu-latest` estaba en rojo.** El cierre se retiró y se repone ahora con
+las tres condiciones cumplidas: CI **verde en las dos plataformas** sobre la SHA
+final, `verificar-etapa.sh --con-base` correcto en local, y el veredicto del
+informe diciendo de qué corrida sale cada cosa.
 
 Nota de método: **re-ejecutar hasta el verde no es un arreglo.** «Flake» no es
 una causa raíz.
