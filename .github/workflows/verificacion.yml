@@ -11,7 +11,11 @@ name: verificacion
 
 on:
   push:
-    branches: [develop, main, 'etapa-**']
+    # `correccion-**` entra aquí porque la primera rama de corrección se empujó
+    # y NO disparó nada: el patrón solo cubría `etapa-**`. Una rama que arregla
+    # el CI y a la que el CI no mira es la misma familia de defecto que esta
+    # rama viene a cerrar, en su forma más literal.
+    branches: [develop, main, 'etapa-**', 'correccion-**']
   pull_request:
     branches: [develop, main]
 
