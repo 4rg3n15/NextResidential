@@ -274,6 +274,36 @@ entonces para que no volviera a pasar.
 | **D-99** | `SQLITE_PATH` admitía un byte nulo. Lo encontró la prueba genérica de D-91 al exigir que todo campo opcional rechace un valor inválido; §2.7.4 lo pide para toda entrada de texto            | **Corregido** |
 | **S-24** | La ruta que SIRVE la instantánea de reglas no está construida: hoy la caché se siembra al aprovisionar. Cliente y contrato listos; se cierra con el tablero de reglas (ETAPA 14)            | `[SUPUESTO]` **abierto** |
 | **S-23** | (de la 11) El horario de zonas se pinta en el huso del teléfono. **Anotado para la ETAPA 16**                                                                                              | `[SUPUESTO]` **abierto** |
+| **D-100** | **El cierre de esta etapa se retiró por este defecto.** `metricas.mjs` tenía delante el informe JSON con la prueba roja y **no imprimía su nombre**: informaba «la corrida NO terminó» con un recuento de bytes, y mandaba a buscar una cobertura baja que no existía. Confundía **suite en rojo** —hay informe con rojas, y el remedio es arreglar la prueba— con **corrida interrumpida** —murió el proceso, y el remedio es mirar la máquina—. Además, su filtro de pistas se tragaba `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`, que es el eco de pnpm y no el nombre de nada | **Corregido** · prueba negativa 22 |
+| **D-101** | Una prueba de `@ncr/api` falla **de forma intermitente en Linux bajo instrumentación de cobertura**: 1 roja de 658 en `ubuntu-latest`, verde en `macos-latest` sobre la misma SHA. En 4 vCPU locales pasa 3 de 3, dos con `taskset -c 0,1`. En caza con un paso temporal del CI que repite la suite y se para en la primera roja | **Abierto** · en caza |
+
+### D-100 · por qué esta etapa dejó de estar cerrada
+
+La cerré sobre un veredicto local de macOS. En `ubuntu-latest`, **la misma SHA**
+estaba en rojo: una prueba de 658 en `@ncr/api` bajo cobertura.
+
+Lo que hace esto un defecto del control y no solo mala suerte: `metricas.mjs`
+**tenía el nombre de esa prueba en memoria** —el informe JSON de vitest trae
+cada aserción con su `status` y sus `failureMessages`— y lo descartaba para
+imprimir «la corrida NO terminó» con un recuento de bytes. El mensaje llevaba
+además una invitación explícita a buscar una cobertura baja, que no existía.
+
+Son dos situaciones con remedios opuestos y se informaban igual:
+
+| Situación              | Cómo se reconoce                      | Qué hay que hacer                          |
+| ---------------------- | ------------------------------------- | ------------------------------------------ |
+| SUITE EN ROJO          | hay informe y trae `numFailedTests>0` | arreglar **esa** prueba, que ahora se nombra |
+| CORRIDA INTERRUMPIDA   | no hay informe, o lo hay sin rojas    | mirar la máquina: señal, memoria, contenedor |
+
+Es la familia de siempre —el control existe y no comprueba lo que uno cree— y
+esta vez dentro de la herramienta que la persigue: **llevaba desde la ETAPA 09
+sin que nadie viera qué imprime cuando de verdad hay una roja**. La prueba
+negativa 22 lo cierra: mete una prueba que falla a propósito y exige que la
+salida diga su nombre, su fichero y la clasifique bien.
+
+Y una nota de método, porque importa más que el arreglo: **re-ejecutar el
+trabajo hasta que salga verde no es un arreglo**. «Flake» no es una causa raíz;
+es lo que se dice cuando no se ha buscado la causa.
 
 **Sobre los controles, que también movieron:**
 
@@ -311,5 +341,21 @@ entonces para que no volviera a pasar.
 
 ## 10 · Rama y commits
 
-**Rama:** `etapa-12-edge-gateway-offline`, desde `develop` con la ETAPA 11 ya
-cerrada.
+**Rama:** `etapa-12-edge-gateway-offline`.
+
+**Corrección de esta línea.** Decía «desde `develop` con la ETAPA 11 ya cerrada»
+y **no era cierto**: la rama salió de la punta de
+`etapa-11-app-flutter-residente-b`, cuyo PR #20 seguía **abierto**, así que
+`develop` no contenía 11-B ni 11-C y esta rama arrastraba siete commits de la
+11. Que `develop` fuera un ancestro estricto —un avance rápido— hacía la base
+equivalente **en contenido** a `develop` una vez fusionado el PR, y eso no
+autoriza a escribir en el informe que ya lo estaba. Un informe que afirma un
+estado del repositorio que nadie puede comprobar es el mismo defecto que esta
+etapa persigue, aplicado a la documentación.
+
+**Resuelto:** PR #20 fusionado contra `develop` (`a7c046d`), y esta rama
+fusionada con `origin/develop` **por fusión, nunca reescribiendo historia ya
+empujada**.
+
+**Cabecera de la rama:** ver §11 (veredicto), que dice de qué corrida sale cada
+cifra y en qué plataformas.

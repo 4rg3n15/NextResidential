@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-20 · **ETAPA 12 CERRADA** · el Edge Gateway: decide sin conexión con el MISMO motor que la nube, y reconcilia exactamente una vez
+**Última actualización:** 2026-09-21 · **ETAPA 12 EN CORRECCIÓN** · se declaró cerrada sobre un veredicto local de macOS mientras el CI de `ubuntu-latest` estaba en rojo sobre la misma SHA. No se cierra hasta tener CI verde en **las dos** plataformas
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -20,10 +20,10 @@
 
 |                                |                                                                                                                 |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-20 con `--con-base`                                     |
-| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento**                                                     |
+| **Etapas cerradas**            | **12 de 17** (ETAPAS 00 a 11) · la 12 está **EN CORRECCIÓN**: su cierre se retiró el 2026-09-21                  |
+| **Etapa siguiente habilitada** | **ETAPA 12 — terminar de cerrarla.** La 13 depende de ella y no se habilita hasta que la 12 esté cerrada        |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | **D-78** (el tema de la app copia los colores a mano). D-89 a D-99 corregidos en las etapas 11 y 12             |
+| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (la roja intermitente de `@ncr/api` en Linux, en caza). D-100 corregido    |
 | **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
 | **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
 | **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)     |
@@ -47,8 +47,8 @@
 | 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                     | **CERRADA**                      | [ETAPA-09](etapas/ETAPA-09.md) |
 | 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09 ✅                            | **CERRADA**                      | [ETAPA-10](etapas/ETAPA-10.md) |
 | 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                            | **CERRADA** — 11-A, 11-B y 11-C  | [ETAPA-11](etapas/ETAPA-11.md) |
-| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **CERRADA**                      | [ETAPA-12](etapas/ETAPA-12.md) |
-| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12 ✅                            | **PENDIENTE** — habilitada       | —                              |
+| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **EN CURSO** — cierre retirado   | [ETAPA-12](etapas/ETAPA-12.md) |
+| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12                               | PENDIENTE                        | —                              |
 | 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13                               | PENDIENTE                        | —                              |
 | 15     | Integración real con hardware Hikvision                       | `etapa-15-integracion-hikvision`       | 14                               | **PENDIENTE — con precondición** | —                              |
 | 16     | Documentación técnica final y README                          | `etapa-16-documentacion-final`         | 14 (ejecutable), 15 (definitiva) | PENDIENTE                        | —                              |
@@ -469,10 +469,16 @@ plataforma**: la decisión la toma Next Control.
 
 ---
 
-## ETAPA 12 — Edge Gateway: offline y reconciliación · **CERRADA** · 2026-09-20
+## ETAPA 12 — Edge Gateway: offline y reconciliación · **EN CURSO** — cierre retirado el 2026-09-21
 
-**Rama:** `etapa-12-edge-gateway-offline`, desde `develop` con la ETAPA 11
-cerrada · **Informe:** [`etapas/ETAPA-12.md`](etapas/ETAPA-12.md)
+**Rama:** `etapa-12-edge-gateway-offline`, salida de la punta de
+`etapa-11-app-flutter-residente-b` y **fusionada con `develop`** una vez cerrado
+el PR #20 (`a7c046d`) · **Informe:** [`etapas/ETAPA-12.md`](etapas/ETAPA-12.md)
+
+> **Corrección del 2026-09-21.** Esta ficha y el informe decían «desde `develop`
+> con la ETAPA 11 cerrada», y no era cierto: el PR #20 seguía abierto y
+> `develop` no contenía 11-B ni 11-C. Que `develop` fuera un ancestro estricto
+> hacía la base equivalente en contenido, no en hecho. Corregido por fusión.
 
 | Entregable                                    | Estado                                                                                                                                  |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
@@ -498,6 +504,21 @@ el Edge durante el corte.
 **Hallazgos:** **D-98** —una instantánea truncada tumbaba el gateway en vez de
 caer en contingencia— y **D-99** —`SQLITE_PATH` admitía un byte nulo, encontrado
 otra vez por la prueba genérica de D-91—.
+
+### Por qué se retiró el cierre · D-100 y D-101
+
+| ID        | Qué                                                                                                                                                                                                                                                                             | Estado                              |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| **D-100** | `metricas.mjs` tenía el informe JSON con la prueba roja **en memoria** y no imprimía su nombre: decía «la corrida NO terminó» con un recuento de bytes y mandaba a buscar una cobertura baja inexistente. Confundía **suite en rojo** con **corrida interrumpida**, que tienen remedios opuestos. Su filtro de pistas se tragaba `ERR_PNPM_*`, el eco de pnpm | **Corregido** · prueba negativa 22 |
+| **D-101** | Una prueba de `@ncr/api` falla de forma **intermitente en Linux bajo cobertura**: 1 de 658 en `ubuntu-latest`, verde en `macos-latest` sobre la misma SHA (`bbae506`). Localmente pasa 3 de 3 en 4 vCPU, dos con `taskset -c 0,1`                                                | **Abierto** · en caza con paso temporal del CI |
+
+**La etapa se cerró sobre un veredicto local de macOS mientras el CI de
+`ubuntu-latest` estaba en rojo.** El cierre se retira hasta tener CI verde en
+las dos plataformas sobre la SHA final, y el veredicto del informe dirá de qué
+corrida sale y en qué plataformas — no solo el local.
+
+Nota de método: **re-ejecutar hasta el verde no es un arreglo.** «Flake» no es
+una causa raíz.
 
 **Declarado y no construido · S-24:** la ruta que SIRVE la instantánea de reglas
 desde la nube. Cliente y contrato están; hoy la caché se siembra al aprovisionar.
