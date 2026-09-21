@@ -33,8 +33,17 @@
 
 ## Corrección `correccion-macos` — entre la 12 y la 13
 
-**Rama:** `correccion-macos`, desde la punta de la ETAPA 12 · **No es una etapa:**
-no añade producto. Corrige el verificador y el CI.
+**Rama:** `correccion-macos` · **PR:** [#22](https://github.com/4rg3n15/NextResidential/pull/22)
+· **No es una etapa:** no añade producto. Corrige el verificador y el CI.
+
+> **Procedencia, escrita como es y no como convenía.** La rama se sacó de la
+> punta de `etapa-12-edge-gateway-offline` cuando su PR #21 **seguía abierto**,
+> porque `develop` no contenía todavía la ETAPA 12 y el trabajo habría partido
+> de un árbol sin el código que hay que corregir. Era equivalente **en
+> contenido** a lo que `develop` iba a ser, y eso no autoriza a llamarlo
+> `develop` — es el mismo defecto que se corrigió en la ETAPA 12 aplicado a la
+> documentación. Fusionado el #21, `develop` se trajo aquí **por fusión**, y
+> ahora la procedencia es literal.
 
 ### El hallazgo que la motiva, dicho sin suavizar
 
