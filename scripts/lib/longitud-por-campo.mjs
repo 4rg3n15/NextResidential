@@ -50,6 +50,17 @@ for (const fichero of ficheros) {
   const lineas = readFileSync(fichero, 'utf8').split('\n');
   for (let i = 0; i < lineas.length; i += 1) {
     if (!/@IsString\(\)/.test(lineas[i])) continue;
+    /**
+     * UN COMENTARIO QUE NOMBRA EL DECORADOR NO ES EL DECORADOR.
+     *
+     * La primera versión de este control contaba como campo la línea de un
+     * bloque de documentación que decía «rompe el build si un `@IsString()`
+     * nace sin cota» — la del fichero que explica por qué existe este control.
+     * Lo destapó su propia prueba negativa, que es exactamente para lo que
+     * está: el control existía y no comprobaba lo que uno creía.
+     */
+    const limpio = lineas[i].trim();
+    if (limpio.startsWith('*') || limpio.startsWith('//') || limpio.startsWith('/*')) continue;
     total += 1;
 
     // El bloque de decoradores de una propiedad no está todo por encima de
@@ -63,6 +74,8 @@ for (const fichero of ficheros) {
       j += 1;
     }
     const declaracion = (lineas[j] ?? '').trim();
+    // Sin declaración de propiedad no hay campo que acotar: es otra cosa.
+    if (declaracion.length === 0) continue;
     let k = i - 1;
     while (k >= 0 && /^\s*@/.test(lineas[k])) {
       bloque.push(lineas[k]);

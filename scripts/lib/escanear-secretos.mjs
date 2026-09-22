@@ -233,6 +233,14 @@ if (modo === 'historial') {
     const cuerpo = buf.subarray(nl + 1, nl + 1 + tam);
     pos = nl + 1 + tam + 1;
     revisados += 1;
+    /**
+     * `EXCLUIDOS` vale también aquí, y por el mismo motivo que en el árbol: el
+     * propio escáner contiene los PATRONES y sus ejemplos —`sb_secret_STAGEDONLY`
+     * vive en el encabezado de este fichero—, así que cada versión histórica de
+     * sí mismo se denunciaría. No es una excepción real; es no morderse la cola.
+     * Se excluye por la RUTA que git asocia al objeto, no por su contenido.
+     */
+    if (EXCLUIDOS.has(nombres.get(sha) ?? '')) continue;
     if (BLOBS_CONOCIDOS.has(sha) || esBinarioDeVerdad(cuerpo)) continue;
     const descripcion = esFuga(cuerpo.toString('utf8').replace(/\0/g, ''));
     if (descripcion !== null) {
