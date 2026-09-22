@@ -38,6 +38,7 @@
  */
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { createRequire } from 'node:module';
 
 const raiz = resolve(process.argv[2] ?? process.cwd());
 
@@ -161,10 +162,20 @@ if (fallos.length > 0) {
 }
 
 const ficheros = new Set(bloques.map((b) => b.fichero));
+/**
+ * La versión importa en el veredicto: GitHub fija la suya, y una diferencia de
+ * mayor entre ambas es una causa legítima de discrepancia.
+ *
+ * Se resuelve desde el MÓDULO y no desde `raiz`: la raíz es el árbol que se
+ * revisa, que puede ser un directorio temporal sin `node_modules`. Buscarla
+ * allí hacía reventar el control con un ENOENT justo cuando el diagrama era
+ * CORRECTO —es decir, el control fallaba solo en el caso bueno, y en el malo
+ * funcionaba—. Lo destapó su propia prueba negativa en la primera ejecución,
+ * que es exactamente para lo que existe.
+ */
+const versionDeMermaid = JSON.parse(
+  readFileSync(createRequire(import.meta.url).resolve('mermaid/package.json'), 'utf8'),
+).version;
 console.log(
-  `OK mermaid: ${bloques.length} diagrama(s) en ${ficheros.size} fichero(s) analizan con Mermaid ${
-    // La versión importa en el veredicto: GitHub fija la suya, y una diferencia
-    // de mayor entre ambas es una causa legítima de discrepancia.
-    JSON.parse(readFileSync(join(raiz, 'node_modules', 'mermaid', 'package.json'), 'utf8')).version
-  }`,
+  `OK mermaid: ${bloques.length} diagrama(s) en ${ficheros.size} fichero(s) analizan con Mermaid ${versionDeMermaid}`,
 );

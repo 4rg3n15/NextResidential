@@ -1,15 +1,29 @@
 /// El tema de la app, derivado del MISMO sistema de diseño que la consola.
 ///
 /// ─────────────────────────────────────────────────────────────────────────────
-/// POR QUÉ LOS COLORES SE COPIAN Y NO SE IMPORTAN
+/// D-78 · CERRADA. LOS COLORES YA NO SE COPIAN: SE GENERAN
 ///
-/// El preset vive en `packages/config/src/temas.ts` y es TypeScript: Dart no
-/// puede leerlo. Copiarlos a mano es lo que hay, y es una deuda declarada —
-/// **D-78**: la salida limpia es generar este fichero desde el preset, como se
-/// genera el cliente de API. Mientras no exista, la prueba
-/// `test/configuracion/tema_test.dart` compara estos valores con los del preset
-/// leyendo el `.ts`, de modo que una divergencia rompe la suite en vez de
-/// aparecer como «la app se ve distinta de la consola».
+/// Hasta la ETAPA 14 este fichero llevaba los valores hexadecimales escritos a
+/// mano, porque Dart no puede leer `packages/config/src/temas.ts`. La deuda
+/// estaba declarada con su salida escrita, y es la que se aplicó:
+/// `scripts/lib/generar-paleta-dart.mjs` emite `paleta.g.dart` desde el preset
+/// COMPILADO, igual que se genera el cliente de API (§2.6), y
+/// `pnpm paleta:desfasada` rompe el build si alguien edita lo generado o si el
+/// preset cambia y nadie regenera.
+///
+/// **Lo que la prueba anterior no podía ver, y se vio al generar.** Aquella
+/// leía el `.ts` como texto y comprobaba que cada color copiado siguiera
+/// apareciendo allí. Daba verde sobre tres divergencias reales:
+///
+///  · `bordeOscuro` era `#2A2A3D`, que es `oscuro.borde` del tema **CLARO**.
+///    El borde del tema oscuro del preset es `#33334A`. La cadena existía en
+///    el fichero, así que la prueba pasaba.
+///  · `fondoOscuro` (`#0B0B12`) y `tarjetaOscura` (`#15151F`) venían de la
+///    familia `oscuro.*`, que son planos de superficie, y no de `lienzo` y
+///    `tarjeta`, que son los que el tema oscuro declara para eso.
+///  · De los cuarenta tokens que el preset declara por tema, la app había
+///    copiado quince, y ninguna comprobación podía notar los veinticinco que
+///    faltaban.
 ///
 /// ─────────────────────────────────────────────────────────────────────────────
 /// LA REGLA QUE SE HEREDA DE LA 09-B: PAREJAS, NO COLORES SUELTOS
@@ -18,10 +32,13 @@
 /// produjo `bg-exito text-white` a 2,537:1 de contraste, menos de la mitad de
 /// lo que AA exige. Aquí se respeta: cada color de fondo de este fichero viene
 /// con el color de texto que le corresponde, y no hay forma de pedir uno sin el
-/// otro.
+/// otro. Las parejas se componen a partir de los tokens generados; los valores
+/// no se vuelven a escribir.
 library;
 
 import 'package:flutter/material.dart';
+
+import 'paleta.g.dart';
 
 /// Parejas de fondo y texto. No se puede usar una mitad.
 class Pareja {
@@ -30,30 +47,31 @@ class Pareja {
   final Color texto;
 }
 
+/// Fachada sobre los tokens generados. **Ni un valor hexadecimal aquí**: si
+/// aparece uno, es una copia a mano y D-78 vuelve a estar abierta.
 class Paleta {
-  // Marca. El rojo es el color de marca de Next Control, y `boton` es el tono
-  // que pasa AA con texto blanco encima (#DC3341 frente a #E63946).
-  static const marca = Color(0xFFE63946);
-  static const botonMarca = Pareja(Color(0xFFDC3341), Colors.white);
+  static const marca = PaletaClara.marca;
+  static const botonMarca = Pareja(PaletaClara.marcaBoton, PaletaClara.constanteBlanco);
 
-  static const exito = Pareja(Color(0xFF0A855C), Colors.white);
-  static const exitoSuave = Pareja(Color(0xFFD1FAE5), Color(0xFF047857));
-  static const aviso = Pareja(Color(0xFFF59E0B), Color(0xFF111827));
-  static const avisoSuave = Pareja(Color(0xFFFEF3C7), Color(0xFFB45309));
-  static const peligroSuave = Pareja(Color(0xFFFEF3F3), Color(0xFFA23037));
-  static const neutroSuave = Pareja(Color(0xFFF3F4F6), Color(0xFF4B5563));
+  static const exito = Pareja(PaletaClara.exitoBoton, PaletaClara.constanteBlanco);
+  static const exitoSuave = Pareja(PaletaClara.exitoSuave, PaletaClara.exitoTexto);
+  static const aviso = Pareja(PaletaClara.aviso, PaletaClara.texto);
+  static const avisoSuave = Pareja(PaletaClara.avisoSuave, PaletaClara.avisoTexto);
+  static const peligroSuave = Pareja(PaletaClara.peligroSuave, PaletaClara.peligroTexto);
+  static const neutroSuave = Pareja(PaletaClara.neutroSuave, PaletaClara.neutroTexto);
 
-  static const fondo = Color(0xFFF8F9FA);
-  static const tarjeta = Colors.white;
-  static const borde = Color(0xFFE5E7EB);
-  static const textoFuerte = Color(0xFF111827);
-  static const textoSuave = Color(0xFF6B7280);
+  static const fondo = PaletaClara.lienzo;
+  static const tarjeta = PaletaClara.tarjeta;
+  static const borde = PaletaClara.borde;
+  static const textoFuerte = PaletaClara.texto;
+  static const textoSuave = PaletaClara.textoApagado;
 
-  // Modo oscuro: los tres planos del preset.
-  static const fondoOscuro = Color(0xFF0B0B12);
-  static const tarjetaOscura = Color(0xFF15151F);
-  static const bordeOscuro = Color(0xFF2A2A3D);
-  static const textoClaro = Color(0xFFF8F9FA);
+  // Modo oscuro: los tokens del TEMA OSCURO, no los de la familia `oscuro.*`
+  // del tema claro. Ver la nota de D-78 arriba: ahí estaba la divergencia.
+  static const fondoOscuro = PaletaOscura.lienzo;
+  static const tarjetaOscura = PaletaOscura.tarjeta;
+  static const bordeOscuro = PaletaOscura.borde;
+  static const textoClaro = PaletaOscura.texto;
 }
 
 ThemeData temaClaro() => _tema(Brightness.light);
