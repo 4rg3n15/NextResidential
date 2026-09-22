@@ -57,6 +57,16 @@ const EXENTAS = new Set([
   // derivar una copropiedad.
   '/ingesta/reconciliacion',
   '/copropiedades/ingesta',
+  /**
+   * ETAPA 15 · el receptor del «servidor de alarma». Identidad de SERVICIO,
+   * como los tres de arriba, pero la copropiedad **no llega en el cuerpo**:
+   * sale del equipo declarado que el guard acreditó por secreto y origen. Es
+   * más fuerte que tomarla del cuerpo —la cámara no la elige— y por el mismo
+   * motivo no puede colgar de `copropiedades/:id`: quien publica es un
+   * aparato sin sesión, y la ruta la escribe un instalador en un formulario
+   * del equipo, no un navegador.
+   */
+  '/alarm-server/:secreto',
 ]);
 
 const escrituras = (): RutaExpuesta[] =>

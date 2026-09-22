@@ -260,6 +260,15 @@ export class EventosModule {
       ],
       exports: [
         REPOSITORIO_EVENTOS,
+        /**
+         * Sale desde la ETAPA 15: el receptor del «servidor de alarma» guarda
+         * la fotografía de la lectura por este mismo puerto. Exportarlo —en
+         * vez de que aquel módulo componga su propio almacén— es lo que
+         * garantiza que la evidencia de una apertura por placa y la de
+         * cualquier otro evento acaben en el MISMO bucket con la MISMA
+         * política de firma (RN-21).
+         */
+        ALMACEN_EVIDENCIA,
         REPOSITORIO_ALERTAS,
         REPOSITORIO_DISPOSITIVOS,
         CANAL_TIEMPO_REAL,

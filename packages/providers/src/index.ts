@@ -20,3 +20,4 @@ export * from './mock/intercom-simulado';
  * que llegue el equipo, lo que se estrena es el transporte y no el analizador.
  */
 export * from './hikvision/contratos-de-evento';
+export * from './hikvision/publicacion-alarm-server';

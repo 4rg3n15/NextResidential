@@ -43,6 +43,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import express from 'express';
 import { guardarCuerpoCrudo } from './autorizaciones';
+import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from './comun/sobre-de-equipo';
 import { AppModule } from './app.module';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
 import { aplicarSaneamiento, aplicarSeguridad } from './seguridad';
@@ -97,6 +98,15 @@ async function arrancar(): Promise<void> {
   // `verify` guarda el cuerpo CRUDO antes de parsearlo: la firma del Alarm
   // Server se calcula sobre los bytes que llegaron, y reserializar el JSON
   // produciría otra cadena con la que ninguna firma cuadraría (RNF-03.11).
+  /**
+   * ANTES de `express.json`, y sólo bajo su propia ruta (ETAPA 15).
+   *
+   * La cámara publica `multipart/form-data`. `express.json` no lo parsea y
+   * dejaría el flujo sin consumir; montarlo después tampoco serviría, porque
+   * para entonces el cuerpo ya se habría perdido. Aquí se acumula el sobre
+   * crudo, acotado en tamaño, y `@ncr/providers` lo abre.
+   */
+  app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
   app.use(express.json({ limit: config.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
   app.use(express.urlencoded({ limit: config.LIMITE_PAYLOAD, extended: false }));
   // §2.7.4 · saneamiento DESPUÉS de los parsers: antes no hay cuerpo que sanear.

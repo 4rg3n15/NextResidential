@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 
 /**
  * Configuración tipada y validada (§2.7.1).
@@ -106,6 +107,35 @@ export const esquemaConfiguracion = z.object({
   INGESTA_FIRMA_SECRETO: secreto('INGESTA_FIRMA_SECRETO', 32),
   /** Ventana de frescura de la firma, en segundos: acota la repetición. */
   INGESTA_VENTANA_SEGUNDOS: z.coerce.number().int().min(10).max(900).default(300),
+  /**
+   * ETAPA 15 · equipos que pueden publicar en el «servidor de alarma».
+   *
+   * `copropiedad|dispositivo|secreto|ip[,ip]`, y `;` entre equipos. Vacía por
+   * omisión, y entonces ese extremo **no acredita a nadie**: un despliegue sin
+   * cámaras declaradas rechaza todo en vez de aceptar todo.
+   *
+   * La forma la valida `leerEquiposDeclarados`, y se invoca **aquí**: el
+   * control D-91 exige que tolerar la variable vacía no se convierta en
+   * tolerar cualquier cosa, y una declaración mal formada tiene que impedir el
+   * arranque, no descubrirse en la primera publicación de una cámara. El
+   * mensaje que sale es el del propio lector, que nombra la entrada y el campo
+   * —«entrada 2: el secreto tiene 12 caracteres»—, cosa que un `regex` de Zod
+   * no haría.
+   */
+  ALARM_SERVER_EQUIPOS: z
+    .string()
+    .optional()
+    .superRefine((valor, contexto) => {
+      if (valor === undefined || valor.trim() === '') return;
+      try {
+        leerEquiposDeclarados(valor);
+      } catch (error) {
+        contexto.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: error instanceof Error ? error.message : 'declaración de equipos inválida',
+        });
+      }
+    }),
 
   /**
    * ETAPA 08 · Llave de cifrado de las plantillas biométricas (D-10).
