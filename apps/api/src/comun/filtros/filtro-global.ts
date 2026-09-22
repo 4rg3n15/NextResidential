@@ -12,6 +12,29 @@ import type { Bitacora } from '@ncr/domain-core';
  * registra completo del lado del servidor con el identificador de correlación
  * para poder seguirlo.
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * EL CUERPO DEL ERROR NO NOMBRA LA CLASE QUE LO LANZÓ · H-13-24
+ *
+ * Medido al ejercer el limitador bajo carga:
+ *
+ *   429 -> {"estado":429,…,"mensaje":"ThrottlerException: Too Many Requests"}
+ *
+ * `ThrottlerException` es el nombre interno de `@nestjs/throttler`. No es una
+ * brecha, pero sí le dice a quien sondea qué biblioteca hay detrás y dónde
+ * buscarle los CVE — información que §2.7.8 clasifica como fuga por mensaje de
+ * error y que a un cliente legítimo no le sirve de nada.
+ *
+ * Se retira el prefijo `<Algo>Exception: ` de forma genérica, y no sólo para el
+ * 429, porque cualquier `HttpException` de una dependencia futura llegará con
+ * la misma forma. El texto útil —«Too Many Requests»— se conserva.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const sinNombreDeClase = (respuesta: string | object): string | object =>
+  typeof respuesta === 'string'
+    ? respuesta.replace(/^[A-Za-z]+(Exception|Error):\s*/, '')
+    : respuesta;
+
 @Catch()
 export class FiltroGlobalDeExcepciones implements ExceptionFilter {
   constructor(private readonly bitacora: Bitacora) {}
@@ -73,7 +96,7 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
       // too large»— que no revela nada interno, pero se normaliza igualmente a
       // un texto nuestro para no depender de lo que escriba una dependencia.
       mensaje: esHttp
-        ? excepcion.getResponse()
+        ? sinNombreDeClase(excepcion.getResponse())
         : codigoDeBiblioteca === undefined
           ? 'Error interno'
           : 'Petición rechazada',

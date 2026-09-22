@@ -213,3 +213,43 @@ describe('H-13-13 · parámetros de consulta no escalares', () => {
     expect(r.status).toBe(400);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * H-13-09 · UNA CARGA LARGA LLEGA ENTERA
+ *
+ * Es la regresión del hallazgo ALTO de esta etapa. El saneamiento recortaba a
+ * 4096 caracteres con `.slice()`, así que el CSV y el XLSX del padrón llegaban
+ * mutilados sin un solo error: el DTO no protestaba —4096 cabe en su
+ * `@Length(1, 1_000_000)`— y en el XLSX la firma `PK\x03\x04` sobrevivía al
+ * corte, de modo que la validación de tipo real daba el archivo por bueno.
+ *
+ * La comprobación NO es que el saneador devuelva la cadena entera —eso ya lo
+ * prueba `saneamiento.test.ts`—, sino que el número de filas que la API dice
+ * haber LEÍDO coincide con las que se enviaron, a través de la tubería real.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('H-13-09 · una carga por encima del antiguo techo llega completa', () => {
+  const FILAS = 200;
+
+  it(`un CSV de ${FILAS} filas se lee entero, no recortado a 4096 caracteres`, async () => {
+    const cabecera = 'identificador,agrupacion,documento,tipo_documento,nombre,placa,es_titular';
+    const filas = Array.from(
+      { length: FILAS },
+      (_, i) => `${100 + i},Torre 1,10${String(i).padStart(6, '0')},CC,Persona ${i},,false`,
+    );
+    const csv = [cabecera, ...filas].join('\n');
+    // Muy por encima del techo que se retiró: si volviera, se leerían ~55.
+    expect(csv.length).toBeGreaterThan(4096 * 2);
+
+    const r = await request(srv())
+      .post(`/copropiedades/${COP_A}/padron/carga`)
+      .set('authorization', `Bearer ${administrador}`)
+      .send({ csv });
+
+    expect(r.status).toBeLessThan(500);
+    if (r.status === 201 || r.status === 200) {
+      expect(r.body.filasLeidas).toBe(FILAS);
+    }
+  });
+});
