@@ -738,8 +738,26 @@ Coste medido: **2 158 blobs en 0,75 s**. No hay excusa de coste.
 
 ```
 $ node scripts/lib/escanear-secretos.mjs --historial
-escaneo de secretos: limpio (2158 blobs del historial alcanzable · 2 de línea base declarados)
+escaneo de secretos: limpio (2182 blobs del historial alcanzable · 2 de línea base declarados)
 ```
+
+> **Y una recaída, encontrada comparando el control consigo mismo.** El
+> `fetch-depth: 0` se añadió al trabajo `controles` y **no** al de
+> `verificar-etapa.sh --con-base`, que ejecuta el mismo escaneo dentro del
+> verificador. En la misma corrida de CI, el mismo control informó:
+>
+> ```
+> controles:              limpio (2180 blobs del historial alcanzable)
+> verificador-con-base:   limpio (1136 blobs del historial alcanzable)
+> ```
+>
+> Mil blobs de diferencia, «limpio» las dos veces. Es **exactamente el modo de
+> fallo que este hallazgo documenta** —un control que informa verde sobre un
+> repositorio que no ha visto— reintroducido por poner la mitad del remedio. No
+> se detectó leyendo el YAML: se detectó porque el control publica **cuántos
+> blobs miró**, y dos cifras distintas del mismo control en la misma corrida no
+> pueden ser las dos correctas. Los dos trabajos traen ahora la historia
+> completa.
 
 Y la prueba negativa (sonda 28e) planta un secreto, lo confirma, lo retira en el
 commit siguiente y exige que el modo historial siga viéndolo.

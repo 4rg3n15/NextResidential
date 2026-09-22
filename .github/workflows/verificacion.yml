@@ -124,6 +124,17 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historia COMPLETA, igual que en `controles`, y por el mismo motivo.
+          # Se descubrió comparando dos salidas del MISMO control en la misma
+          # corrida: el paso 10 de este trabajo informaba
+          #   «limpio (1136 blobs del historial alcanzable)»
+          # mientras que en local y en `controles` eran 2182. No es una
+          # diferencia de máquina: es que este checkout no traía la historia, y
+          # el escaneo del historial daba «limpio» sobre un repositorio que no
+          # había visto. Es LITERALMENTE el modo de fallo que H-13-17 documenta,
+          # reintroducido por la mitad del remedio.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
