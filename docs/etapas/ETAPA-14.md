@@ -305,7 +305,31 @@ de agregados corregida).
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
 
-<!-- VEREDICTO -->
+Ejecutado en Linux con PostgreSQL 16 efímero (`scripts/base-de-pruebas.sh`),
+Flutter 3.47.4 y Chromium. **Veredicto literal, pegado de la ejecución:**
+
+```
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 26 de 26 pasos ejecutados
+
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+CODIGO=0
+```
+
+El «1 control declarado no ejercido» es el recuento del registro completo, y la
+línea del paso 1b lo precisa: **`0 de ellos en linux`**. Es el paso 5e, acotado a
+macOS en esta etapa; aquí **sí se ejerce**, y su salida está tres pasos más
+arriba con sus catorce comprobaciones en verde.
+
+**Estabilidad — tres corridas idénticas (paso 14):**
+
+```
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 818 passed (818) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 398 passed (398) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 78 passed (78) · @ncr/web:test: Tests 351 passed (351)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 818 passed (818) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 398 passed (398) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 78 passed (78) · @ncr/web:test: Tests 351 passed (351)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 818 passed (818) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 398 passed (398) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 78 passed (78) · @ncr/web:test: Tests 351 passed (351)
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+```
 
 ### Suites
 
@@ -320,7 +344,14 @@ de agregados corregida).
 
 ### Cobertura por capa (§2.4)
 
-<!-- COBERTURA -->
+Medida **por capa**, que es como §2.4 lo exige. Pegado del paso 7:
+
+```
+     OK   dominio (packages/domain-core/src): lineas 97.73 % · ramas 96.48 % · funciones 97.42 % (umbral 90 %, 34 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 97.25 % · ramas 92.07 % · funciones 98.31 % (umbral 90 %, 44 archivos)
+     OK   global: lineas 76.46 % · ramas 85.97 % · funciones 80.54 % (umbral 70 %, 331 archivos)
+   ✓ las tres capas cumplen su umbral
+```
 
 ### Los tres controles nuevos, y lo que encontró cada uno
 
@@ -560,4 +591,22 @@ a la ETAPA 16 con esa condición escrita.
 | `afb03a3` | PWA verificada, escritorio con Tauri y la paleta generada (D-78)                |
 | `044c764` | CI de los seis entregables, guías, y el instrumento de D-101                    |
 
-<!-- COMMITS-FINALES -->
+| `429367b` | El planificador deja de poder impedir el arranque de la API (paso 12c) |
+| `f7cfe97` | La actualización firmada del escritorio se apaga hasta que exista la clave |
+| `eee1a7c` | Cliente Dart regenerado y trinquete de ramas al día |
+| _(este)_ | Informe con el veredicto literal y la SHA final |
+
+### Cómo se verificó, y con qué
+
+| Qué                             | Dónde                                                                       |
+| ------------------------------- | --------------------------------------------------------------------------- |
+| `verificar-etapa.sh --con-base` | Linux, PostgreSQL 16 efímero, Flutter 3.47.4, Chromium · **26 de 26 pasos** |
+| CI                              | Corrida sobre la SHA final, los cuatro trabajos                             |
+| Los cuatro diagramas del README | Renderizados en Chromium real: SVG de 15 826, 31 606, 27 567 y 22 305 bytes |
+| El `.deb` de escritorio         | `Next Control Residencial_0.1.0_amd64.deb`, en local y en CI                |
+
+> **Sobre «los TRES trabajos» de la DoD.** El flujo tenía tres y ahora tiene
+> **cuatro** —`controles` corre en dos sistemas y son dos trabajos—, porque esta
+> etapa añade `entregables`. Se dice aquí para que el recuento de la DoD y el de
+> la pantalla de CI no se contradigan: lo que la DoD pide es que estén **todos**
+> en verde sobre la SHA final, y están.
