@@ -1069,7 +1069,10 @@ try {
 
     writeFileSync(
       estado,
-      `${original}\n## ETAPA 14 — Observabilidad, CI/CD, PWA y escritorio · **CERRADA** · sonda\n`,
+      // La etapa de revisión la lee el control de `DECLARADOS`: si cambia allí,
+      // cambia aquí. Hoy es la 16, porque la 14 acotó la declaración del paso 5e
+      // a macOS en vez de dejarla valiendo en todas partes.
+      `${original}\n## ETAPA 16 — Documentación técnica final · **CERRADA** · sonda\n`,
     );
     const r = enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']);
     r.codigo !== 0 && /ya está CERRADA/.test(r.salida)
@@ -1080,6 +1083,58 @@ try {
     enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']).codigo === 0
       ? ok('el banco de pruebas queda limpio')
       : mal('la sonda dejó rastro en el banco');
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * LA DECLARACIÓN ACOTADA POR PLATAFORMA · ETAPA 14
+     *
+     * Acotar una declaración a `soloEn: ['darwin']` es lo que permite que el
+     * paso SE EJERCITE donde puede ejercitarse. La rama que decide eso tiene
+     * que verse fallar, o sería una exención silenciosa con otro nombre: una
+     * lista mal escrita dejaría el paso declarado en TODAS partes sin que nada
+     * lo dijera.
+     */
+    const declarados = join(clon, 'scripts/lib/controles-declarados.mjs');
+    const fuente = readFileSync(declarados, 'utf8');
+
+    // (a) FUERA de su plataforma, el paso NO está declarado: código 1, que es
+    //     lo que hace al verificador tomar la rama que lo ejecuta de verdad.
+    const otra = process.platform === 'darwin' ? 'linux' : 'darwin';
+    writeFileSync(declarados, fuente.replace(/soloEn: \[[^\]]*\]/, `soloEn: ['${otra}']`));
+    enClon('node', ['scripts/lib/controles-declarados.mjs', '5e']).codigo !== 0
+      ? ok('fuera de su plataforma, el paso NO se da por declarado')
+      : mal('un paso declarado para OTRA plataforma se exime igual aquí');
+
+    // (b) DENTRO de su plataforma sí, y con su motivo impreso.
+    writeFileSync(
+      declarados,
+      fuente.replace(/soloEn: \[[^\]]*\]/, `soloEn: ['${process.platform}']`),
+    );
+    const dentro = enClon('node', ['scripts/lib/controles-declarados.mjs', '5e']);
+    dentro.codigo === 0 && /DECLARADO NO EJERCIDO/.test(dentro.salida)
+      ? ok('y dentro de ella sí, imprimiendo su motivo')
+      : mal(`la declaración no se aplica en su propia plataforma (codigo ${dentro.codigo})`);
+
+    // (c-bis) SIN `soloEn` la declaración vale en TODAS partes, que es el
+    //         comportamiento de siempre y tiene que seguir funcionando.
+    writeFileSync(declarados, fuente.replace(/\s*soloEn: \[[^\]]*\],/, ''));
+    const sinAcotar = enClon('node', ['scripts/lib/controles-declarados.mjs', '5e']);
+    const auditada = enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']);
+    sinAcotar.codigo === 0 && auditada.codigo === 0
+      ? ok('una declaración SIN acotar sigue valiendo en todas las plataformas')
+      : mal(
+          `quitar \`soloEn\` rompe la declaración (paso ${sinAcotar.codigo}, ` +
+            `auditoría ${auditada.codigo})`,
+        );
+
+    // (c) UNA LISTA MAL ESCRITA se detecta en la auditoría.
+    writeFileSync(declarados, fuente.replace(/soloEn: \[[^\]]*\]/, 'soloEn: []'));
+    const vacia = enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']);
+    vacia.codigo !== 0 && /soloEn/.test(vacia.salida)
+      ? ok('una lista de plataformas vacía se detecta')
+      : mal(`\`soloEn: []\` pasa por buena (codigo ${vacia.codigo})`);
+
+    writeFileSync(declarados, fuente);
   }
 
   console.log('\n▸ 18 · una rama de control que nadie ejecuta se detecta (D-81, granularidad)');
@@ -1989,6 +2044,243 @@ try {
     }
   }
 
+  console.log('\n▸ 29 · una PWA que deja de ser instalable se detecta (ETAPA 14)');
+  {
+    if (exigeControl('scripts/lib/pwa-instalable.mjs')) {
+      const manifiesto = join(clon, 'apps/web/public/manifest.webmanifest');
+      const original = readFileSync(manifiesto, 'utf8');
+
+      enClon('node', ['scripts/lib/pwa-instalable.mjs']).codigo === 0
+        ? ok('la línea base del banco es instalable')
+        : mal('el banco NO parte de una consola instalable');
+
+      // (a) `display: browser` · la forma más silenciosa de perder la
+      //     instalabilidad: el manifiesto sigue siendo válido y el navegador
+      //     deja de ofrecer instalar, sin un solo error.
+      writeFileSync(manifiesto, original.replace('"standalone"', '"browser"'));
+      const a = enClon('node', ['scripts/lib/pwa-instalable.mjs']);
+      a.codigo !== 0 && /display/.test(a.salida)
+        ? ok('`display: browser` se detecta: ahí se pierde la instalación sin dar error')
+        : mal(`un manifiesto no instalable pasa por bueno (codigo ${a.codigo})`);
+
+      // (b) EL ICONO ENMASCARABLE QUE NO LO ES · el hallazgo que motivó el
+      //     control: era byte a byte el mismo fichero que el normal.
+      writeFileSync(
+        manifiesto,
+        original.replace('/iconos/icono-mascara.png', '/iconos/icono-512.png'),
+      );
+      const b = enClon('node', ['scripts/lib/pwa-instalable.mjs']);
+      b.codigo !== 0 && /BYTE A BYTE/.test(b.salida)
+        ? ok('un «enmascarable» que es el mismo fichero que el normal se detecta')
+        : mal(`el icono enmascarable falso pasa inadvertido (codigo ${b.codigo})`);
+
+      // (c) EL TAMAÑO DECLARADO QUE NO ES EL REAL.
+      writeFileSync(manifiesto, original.replace('"sizes": "192x192"', '"sizes": "144x144"'));
+      const c = enClon('node', ['scripts/lib/pwa-instalable.mjs']);
+      c.codigo !== 0 && /mide/.test(c.salida)
+        ? ok('un icono que dice un tamaño y mide otro se detecta')
+        : mal(`el tamaño declarado no se comprueba contra el fichero (codigo ${c.codigo})`);
+
+      // (c-bis) EL ICONO QUE NO ESTÁ · el manifiesto lo promete y el fichero
+      //         no existe: el navegador no instala y no dice por qué.
+      writeFileSync(manifiesto, original.replace('icono-512.png', 'icono-que-no-existe.png'));
+      const cb = enClon('node', ['scripts/lib/pwa-instalable.mjs']);
+      cb.codigo !== 0 && /no existe/.test(cb.salida)
+        ? ok('un icono prometido y ausente se detecta')
+        : mal(`un icono inexistente pasa inadvertido (codigo ${cb.codigo})`);
+
+      // (c-ter) SIN `lang` · el sistema no sabe en qué idioma anunciarla.
+      writeFileSync(manifiesto, original.replace(/\s*"lang": "[^"]*",/, ''));
+      const ct = enClon('node', ['scripts/lib/pwa-instalable.mjs']);
+      ct.codigo !== 0 && /lang/.test(ct.salida)
+        ? ok('un manifiesto sin `lang` se detecta')
+        : mal(`falta \`lang\` y nadie lo nota (codigo ${ct.codigo})`);
+      writeFileSync(manifiesto, original);
+
+      // (e) EL SERVICE WORKER QUE NADIE REGISTRA · el fichero existe, el
+      //     navegador no lo usa, y la consola parece una PWA sin serlo.
+      {
+        const disposicion = join(clon, 'apps/web/src/app/layout.tsx');
+        const antes = readFileSync(disposicion, 'utf8');
+        writeFileSync(disposicion, antes.replace("register('/sw.js')", "registrar('/sw.js')"));
+        const e = enClon('node', ['scripts/lib/pwa-instalable.mjs']);
+        e.codigo !== 0 && /registra/.test(e.salida)
+          ? ok('un service worker que nadie registra se detecta')
+          : mal(`el sw.js sin registro pasa por bueno (codigo ${e.codigo})`);
+        writeFileSync(disposicion, antes);
+      }
+
+      // (f) EL REPLIEGUE HACIA UNA RUTA QUE NO EXISTE · peor que no tenerlo.
+      {
+        const pagina = join(clon, 'apps/web/src/app/sin-conexion');
+        rmSync(pagina, { recursive: true, force: true });
+        const f = enClon('node', ['scripts/lib/pwa-instalable.mjs']);
+        f.codigo !== 0 && /sin-conexion/.test(f.salida)
+          ? ok('la página de sin conexión ausente se detecta')
+          : mal(`el repliegue hacia una ruta inexistente pasa (codigo ${f.codigo})`);
+        enClon('git', ['checkout', '--', 'apps/web/src/app/sin-conexion']);
+      }
+
+      // (d) `/api/` DENTRO DE LA CACHÉ · la fuga multiempresa desde el propio
+      //     navegador, que ninguna RLS puede ver.
+      writeFileSync(manifiesto, original);
+      const sw = join(clon, 'apps/web/public/sw.js');
+      const swOriginal = readFileSync(sw, 'utf8');
+      writeFileSync(sw, swOriginal.replace('if (esApi(url)) return;', '// sin exclusión'));
+      const d = enClon('node', ['scripts/lib/pwa-instalable.mjs']);
+      d.codigo !== 0 && /fuga/.test(d.salida)
+        ? ok('quitar la exclusión de `/api/` de la caché se detecta')
+        : mal(`el service worker podría cachear respuestas de la API (codigo ${d.codigo})`);
+      writeFileSync(sw, swOriginal);
+    }
+  }
+
+  console.log('\n▸ 30 · una paleta de la app desfasada del preset se detecta (D-78, ETAPA 14)');
+  {
+    if (exigeControl('scripts/lib/generar-paleta-dart.mjs')) {
+      /**
+       * El control necesita `packages/config/dist/temas.js`, que está ignorado
+       * y no viaja en el clon. Se monta un banco con el `dist` REAL enlazado y
+       * una copia del generado, para poder estropear la copia sin tocar el
+       * árbol de trabajo.
+       *
+       * ═══════════════════════════════════════════════════════════════════════
+       * Y LA SONDA SE ASEGURA DE QUE ESE `dist` EXISTA · corregido en CI
+       *
+       * En local pasaba y en CI fallaba las tres veces, con «el banco NO parte
+       * de una paleta al día». El motivo: este banco corre ANTES del paso de
+       * compilación del flujo, así que `packages/config/dist` no existía y el
+       * control informaba de su ausencia —correctamente— en los tres casos.
+       *
+       * La sonda depende de un artefacto y por tanto lo produce ella misma, en
+       * vez de dar por hecho que alguien lo dejó ahí. Es lo mismo que se hizo
+       * con la sonda 14 cuando dependía de una rama que el checkout no traía:
+       * una prueba negativa que solo funciona si el entorno viene preparado no
+       * demuestra nada en el entorno que no lo trae.
+       * ═══════════════════════════════════════════════════════════════════════
+       */
+      if (!existsSync(join(raiz, 'packages/config/dist/temas.js'))) {
+        correr('pnpm', ['--filter', '@ncr/config', 'build'], { cwd: raiz });
+      }
+      const banquito = mkdtempSync(join(tmpdir(), 'ncr-paleta-'));
+      try {
+        mkdirSync(join(banquito, 'packages/config'), { recursive: true });
+        mkdirSync(join(banquito, 'apps/mobile/lib/configuracion'), { recursive: true });
+        symlinkSync(join(raiz, 'packages/config/dist'), join(banquito, 'packages/config/dist'));
+        const destino = join(banquito, 'apps/mobile/lib/configuracion/paleta.g.dart');
+        const generada = readFileSync(join(raiz, 'apps/mobile/lib/configuracion/paleta.g.dart'));
+        writeFileSync(destino, generada);
+
+        const correrControl = () =>
+          correr('node', ['scripts/lib/generar-paleta-dart.mjs', banquito, '--comprobar'], {
+            cwd: raiz,
+          });
+
+        correrControl().codigo === 0
+          ? ok('la línea base del banco está al día')
+          : mal('el banco NO parte de una paleta al día');
+
+        // (a) EDITAR EL GENERADO A MANO · §2.6: lo generado no se edita.
+        writeFileSync(destino, String(generada).replace('Color(0xFFE63946)', 'Color(0xFF00FF00)'));
+        const a = correrControl();
+        a.codigo !== 0 && /no coincide con el preset/.test(a.salida)
+          ? ok('un color editado a mano en el fichero generado se detecta')
+          : mal(`editar el generado a mano pasa inadvertido (codigo ${a.codigo})`);
+
+        // (b) EL PRESET CAMBIA Y NADIE REGENERA · se simula quitando un token
+        //     del generado, que es lo que se ve cuando el preset gana uno.
+        writeFileSync(
+          destino,
+          String(generada)
+            .split('\n')
+            .filter((l) => !l.includes('static const marcaSuave'))
+            .join('\n'),
+        );
+        const b = correrControl();
+        b.codigo !== 0
+          ? ok('un token que falta respecto del preset se detecta')
+          : mal(`una paleta incompleta pasa por al día (codigo ${b.codigo})`);
+
+        // (c) Y CON LA COPIA BUENA, VERDE: que no sea un control que siempre grita.
+        writeFileSync(destino, generada);
+        correrControl().codigo === 0
+          ? ok('y con el generado intacto, pasa')
+          : mal('marca como desfasada una paleta idéntica: falso positivo');
+      } finally {
+        rmSync(banquito, { recursive: true, force: true });
+      }
+    }
+  }
+
+  console.log('\n▸ 31 · un diagrama Mermaid que NO analiza se detecta (ETAPA 14)');
+  {
+    if (exigeControl('scripts/lib/mermaid-analizable.mjs')) {
+      // Este control se ejecuta desde la RAÍZ REAL y se le pasa el directorio a
+      // revisar. No corre dentro del clon porque necesita `mermaid` y `jsdom`
+      // resueltos, y el banco es un clon sin `node_modules`. Lo que se prueba
+      // es el control, no dónde vive el fichero: el argumento de raíz existe
+      // justamente para eso.
+      const banquito = mkdtempSync(join(tmpdir(), 'ncr-mermaid-'));
+      try {
+        const escribir = (nombre, cuerpo) => {
+          mkdirSync(join(banquito, 'docs'), { recursive: true });
+          writeFileSync(join(banquito, 'docs', nombre), cuerpo);
+        };
+        const correrControl = () =>
+          correr('node', ['scripts/lib/mermaid-analizable.mjs', banquito], { cwd: raiz });
+
+        // (a) LÍNEA BASE · sin ningún bloque, el control no inventa hallazgos.
+        escribir('sin-diagramas.md', '# solo prosa\n\nNada que analizar.\n');
+        correrControl().codigo === 0
+          ? ok('un documento sin diagramas no produce hallazgos')
+          : mal('el control grita sobre un documento que no tiene un solo bloque');
+
+        // (b) UNO CORRECTO · que no sea un control que siempre grita.
+        escribir(
+          'bueno.md',
+          '# bueno\n\n```mermaid\nflowchart TD\n  A["Dominio"] --> B["Aplicación"]\n```\n',
+        );
+        correrControl().codigo === 0
+          ? ok('un diagrama correcto pasa')
+          : mal('marca como roto un diagrama que Mermaid sí analiza: falso positivo');
+
+        // (c) LA VIOLACIÓN · el paréntesis suelto dentro de la etiqueta, que es
+        //     exactamente la forma en que estos diagramas se rompen al editarlos.
+        escribir(
+          'roto.md',
+          '# roto\n\n```mermaid\nflowchart TD\n  A[Presentación (driving)] --> B\n```\n',
+        );
+        const r = correrControl();
+        r.codigo !== 0 && /roto\.md:3/.test(r.salida) && /NO ANALIZA/.test(r.salida)
+          ? ok('detectado, con fichero y línea, y salida distinta de cero')
+          : mal(`un diagrama roto pasa por bueno (codigo ${r.codigo})`);
+
+        // (d) EL COLOR FIJADO A MANO · analiza perfectamente y aun así se
+        //     rechaza: en el tema oscuro de GitHub no se lee.
+        rmSync(join(banquito, 'docs', 'roto.md'), { force: true });
+        escribir(
+          'color.md',
+          '# color\n\n```mermaid\nflowchart TD\n  A["Dominio"] --> B["Aplicación"]\n' +
+            '  style A fill:#ffffff,stroke:#000000\n```\n',
+        );
+        const c = correrControl();
+        c.codigo !== 0 && /color fijado a mano/.test(c.salida)
+          ? ok('un color literal se rechaza aunque el diagrama analice')
+          : mal(`un color fijado a mano pasa (codigo ${c.codigo})`);
+
+        // (e) EL BLOQUE SIN CERRAR · no se descarta en silencio.
+        rmSync(join(banquito, 'docs', 'color.md'), { force: true });
+        escribir('abierto.md', '# abierto\n\n```mermaid\nflowchart TD\n  A --> B\n');
+        const a = correrControl();
+        a.codigo !== 0 && /no se cierra/.test(a.salida)
+          ? ok('un bloque ```mermaid sin cerrar se detecta')
+          : mal(`un bloque sin cerrar se descarta en silencio (codigo ${a.codigo})`);
+      } finally {
+        rmSync(banquito, { recursive: true, force: true });
+      }
+    }
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
@@ -2187,6 +2479,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 24 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 27 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

@@ -15,7 +15,7 @@
 
 ---
 
-## 1. Contradicciones · 14 registradas, 14 resueltas
+## 1. Contradicciones · 15 registradas, 15 resueltas
 
 ### C-01 · Protocolo del intercom — **Alta**
 
@@ -207,6 +207,35 @@ No es contradicción sino precisión progresiva: el reto abre la opción, los re
 
 ---
 
+### C-27 · Qué nueve agregados raíz son los nueve — **Media** · registrada en la ETAPA 14
+
+|                |                                                                                                                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | `README.md` §3, hasta la ETAPA 14: nueve, **con `Persona` y sin `PlantillaBiometrica`**, y `Consentimiento` en vez de `ConsentimientoBiometrico`                                       |
+| **Fuente B**   | `CLAUDE.md` §2.2 y `02-arquitectura.md` §2.1: nueve, **con `PlantillaBiometrica` y sin `Persona`**                                                                                     |
+| **Fuente C**   | El código: `packages/domain-core/src/padron/persona.ts` **y** `packages/domain-core/src/biometria/plantilla.ts` existen los dos, que es lo que hacía parecer que fueran diez           |
+| **Resolución** | **Nueve, los de la fuente B.** `Persona` **no es agregado raíz**: `persona.ts` no declara ninguno. La lista del README estaba mal y se corrigió; C-02 no se reabre y no hay una décima |
+
+**Cómo se resolvió, que es lo que importa: contrastando contra el código, no eligiendo entre dos documentos.**
+
+`padron/persona.ts` no contiene ningún agregado. Lo que exporta son **dos objetos de valor** —`Documento` y `NombreDePersona`— más el catálogo `TIPOS_DE_DOCUMENTO`; su propia cabecera lo dice en la primera línea («objetos de valor `Documento` y `NombreDePersona`») y explica por qué existen: normalizar el documento para que el índice único `(copropiedad, tipo, número)` alcance a la misma persona se presente como visitante, acompañante o residente (RN-06). No tiene métodos de intención, no tiene estado, no tiene frontera de consistencia. No es raíz de nada.
+
+`biometria/plantilla.ts` sí lo es, y lo dice con esas palabras: «Agregado raíz `PlantillaBiometrica` — RN-09, RN-11 · CA-09, CA-10, CA-11». Tiene estado (`ESTADOS_PLANTILLA`), métodos de intención (`sincronizar`, `programarSupresion`, `suprimir`) e invariante propia (no sincroniza sin consentimiento vigente; supresión antes de 24 h).
+
+Y el modelo de datos ya lo había zanjado sin que nadie lo cruzara con el README: [`modelo-datos.md`](../arquitectura/modelo-datos.md) dedica una sección por agregado —§2.1 a §2.9, nueve— y clasifica `personas` en **§2.10 «Tablas que no son agregado»**, con la nota «Entidad de identidad compartida · ver D-01». `PlantillaBiometrica` tiene la suya, §2.6.
+
+**Por qué `Persona` se coló.** D-01 introdujo `personas` como entidad de identidad compartida en la ETAPA 01 porque sin ella RN-06 es inaplicable, y D-72 la llevó a la interfaz en la ETAPA 09. Es una pieza visible y muy citada; al redactar el README se la ascendió a raíz por peso aparente, y a cambio cayó la que menos se nombra. Es un error de redacción de un documento derivado, no una decisión de diseño que nadie tomara: **ninguna fuente declaró jamás diez**, y el dominio no implementa diez.
+
+**Qué NO es esto.** No es la reapertura de C-02. C-02 fijó **nueve** frente a los seis que resumía el contrato, y esos nueve siguen siendo estos nueve, con los mismos nombres. Si hubieran sido diez habría que declararlo aquí y cambiar `modelo-datos.md` §2; no lo son.
+
+**Remedio aplicado (ETAPA 14):** corregida la lista de `README.md` §3 —entra `PlantillaBiometrica`, sale `Persona`, y `Consentimiento` pasa a `ConsentimientoBiometrico`, que es el nombre del agregado en el código y en el diagrama— con una nota al pie que remite a esta entrada. El README es el único documento que estaba mal; `CLAUDE.md`, `02-arquitectura.md` y `modelo-datos.md` no se tocan porque coincidían entre sí y con el código.
+
+**Riesgo residual declarado:** nada comprueba por máquina que la lista del README siga coincidiendo con los agregados del dominio. Queda anotado como deuda **D-119** para la ETAPA 16, que es la dueña de la consolidación documental; el control natural es derivar la lista de las cabeceras «Agregado raíz» de `packages/domain-core/src/**` y compararla con la del README, igual que `coherencia-estado-etapas.mjs` hace con `ESTADO_ETAPAS.md`.
+
+**Afecta a:** ETAPAS 00, 01, 14, 16
+
+---
+
 ## 2. Supuestos · 11 registrados
 
 Cada supuesto se marca `[SUPUESTO]` en el código donde se materialice, y todos son **configurables**, no constantes escondidas.
@@ -276,7 +305,7 @@ código.
 | `PENDIENTE DE DEFINICIÓN`   | **12** — **2 resueltos** (P-11, P-12) | Los 10 abiertos tienen comportamiento conservador vigente; ninguno bloquea la ETAPA 02. P-12 queda sujeto a confirmación legal     |
 | **Extensiones al contrato** | **1**                                 | E-01 · `FUERA_DE_HORARIO`, aprobada                                                                                                |
 
-**Contradicciones por severidad:** **5 altas** (C-01, C-02, C-03, C-05, C-12) · **4 medias** (C-04, C-06, C-07, C-22) · **5 bajas** (C-11, C-14, C-15, C-23, C-26). Total 14.
+**Contradicciones por severidad:** **5 altas** (C-01, C-02, C-03, C-05, C-12) · **5 medias** (C-04, C-06, C-07, C-22, C-27) · **5 bajas** (C-11, C-14, C-15, C-23, C-26). Total 15.
 
 **Contradicción con mayor impacto en el código:** **C-02**. Es la única que cambia el modelo de dominio, y sin resolverla cinco reglas de negocio no tendrían agregado que las sostuviera.
 

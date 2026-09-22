@@ -19,6 +19,8 @@ import { limitadorPorDispositivo } from './eventos';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
 import { NucleoModule } from './nucleo/nucleo.module';
+import { ObservabilidadModule } from './observabilidad';
+import { VERSION_API } from './version';
 import { SaludController } from './salud/salud.controller';
 import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
 /**
@@ -36,6 +38,7 @@ import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
  * es lo que DT-13 dejó escrito.
  */
 import { GuardiaModule } from './guardia';
+import { PlanificacionModule } from './planificacion';
 
 /**
  * El límite de peticiones es GLOBAL desde el primer día (§2.7.5). Ponerlo solo
@@ -50,6 +53,19 @@ export class AppModule {
       imports: [
         ConfiguracionModule.conValores(config),
         NucleoModule,
+        /**
+         * ETAPA 14 · justo después del núcleo, porque es `@Global` y provee el
+         * puerto de métricas que consumen tanto el interceptor de latencias
+         * —fuera de todo módulo de negocio— como `EscalarAlerta`, dentro de
+         * uno. Un proveedor global alcanza a lo que se registra DESPUÉS: el
+         * orden es funcional, igual que el de `MultiempresaModule` de abajo.
+         */
+        ObservabilidadModule.registrar({
+          ...(config.SENTRY_DSN === undefined ? {} : { sentryDsn: config.SENTRY_DSN }),
+          entorno: config.NODE_ENV,
+          version: VERSION_API,
+          ventana: config.METRICAS_VENTANA,
+        }),
         /**
          * **`MultiempresaModule` va ANTES de `AutenticacionModule`, y el orden
          * es funcional: no lo toque sin leer esto.**
@@ -95,6 +111,19 @@ export class AppModule {
         // La superficie del residente, después del padrón: lee por su propio
         // puerto y no entra en el de administración (ver `mi.controller.ts`).
         ResidenteModule.registrar(),
+        /**
+         * EL ÚLTIMO de los de negocio (ETAPA 14). Toma un caso de uso de
+         * eventos, uno de zonas y uno de biometría por sus barriles, y un
+         * módulo no puede inyectar lo que todavía no se ha registrado. Es el
+         * mismo argumento de orden que el de `MultiempresaModule`, arriba.
+         */
+        PlanificacionModule.registrar({
+          cadenaDeConexion: config.DATABASE_URL,
+          esquema: config.PGBOSS_SCHEMA,
+          // En pruebas NUNCA: una suite que levanta veinte aplicaciones abriría
+          // veinte conexiones de pg-boss contra una base que no existe.
+          habilitado: config.PLANIFICADOR_HABILITADO && config.NODE_ENV !== 'test',
+        }),
         // Dos limitadores con NOMBRE, y cada uno cuenta por lo suyo: `default`
         // por IP —el de siempre— y `dispositivo` por equipo firmante (D-28).
         // Uno solo no sirve: en la ingesta todos los equipos comparten IP, y el

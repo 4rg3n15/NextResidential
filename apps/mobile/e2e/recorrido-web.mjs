@@ -483,11 +483,30 @@ try {
     : mal('no se ve la placa');
   await captura('4-vehiculos');
 
-  // ── 5 · las pestañas de 11-B dicen qué falta ──────────────────────────────
+  // ── 5 · la pestaña de visitantes ──────────────────────────────────────────
+  //
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ESTA ASERCIÓN ESTABA CADUCA, y lo estuvo tres días sin que nadie lo viera.
+  //
+  // Decía: «la pestaña de 11-B explica qué falta en vez de quedarse muda», y
+  // buscaba el texto «en construcción». Era cierto en la ETAPA 11-B, cuando la
+  // pestaña era un `PantallaPendiente`. La 11 la sustituyó por la pantalla de
+  // visitantes de verdad y la aserción se quedó describiendo un estado que el
+  // producto ya no tiene.
+  //
+  // Nadie lo notó porque el paso 5e quedó DECLARADO no ejercido el 2026-09-19
+  // por una diferencia de entorno de macOS, y desde entonces este fichero no lo
+  // había ejecutado ninguna máquina. Es el coste exacto de declarar un control:
+  // sigue en la salida, sigue con su motivo, y mientras tanto envejece. Salió a
+  // la luz en la primera ejecución de la ETAPA 14, en Linux, donde sí corre.
+  // ═══════════════════════════════════════════════════════════════════════════
   await irAPestana('Visitantes');
-  (await hay('en construcción'))
-    ? ok('la pestaña de 11-B explica qué falta en vez de quedarse muda')
-    : mal('la pestaña pendiente no dice nada');
+  (await hay('Mis visitantes'))
+    ? ok('la pestaña de visitantes muestra lo que el conjunto tiene a su nombre')
+    : mal('la pestaña de visitantes no muestra su encabezado');
+  (await hay('Nuevo visitante'))
+    ? ok('y ofrece autorizar una visita, que es para lo que se abre (HU-07)')
+    : mal('no se ve la acción de autorizar');
   await captura('5-pendiente');
 
   // ── 6 · perfil e historial ────────────────────────────────────────────────

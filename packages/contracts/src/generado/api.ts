@@ -1174,6 +1174,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/observabilidad/latencias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * p50, p95 y p99 de las cinco latencias comprometidas (KPI-09, 13, 25, 32, 33)
+         * @description Cada fila trae el tramo que mide y lo que NO mide. Se leen juntos a propósito: una cifra de latencia sin su tramo no demuestra nada.
+         */
+        get: operations["ObservabilidadController_latencias"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ready": {
         parameters: {
             query?: never;
@@ -1541,6 +1561,21 @@ export interface components {
             /** @description Lectura de baja confianza (CU-01 3a) */
             requiereConfirmacionHumana?: boolean;
         };
+        DefinicionKpiDto: {
+            /** @example KPI-32 */
+            clave: string;
+            titulo: string;
+            /** @description Techo comprometido, en milisegundos */
+            umbralMs: number;
+            /** @description Dónde arranca y dónde para el cronómetro */
+            segmento: string;
+            /** @description Lo que la cifra NO contiene. Se lee antes que la cifra */
+            noIncluye: string;
+            /** @example RNF-01.3 */
+            rnf: string;
+            /** @example CA-20 */
+            ca?: string | null;
+        };
         DesactivarDto: {
             /** @description Obligatorio (RN-19). Queda en la auditoría junto al actor y no se puede editar. */
             motivo: string;
@@ -1733,6 +1768,21 @@ export interface components {
             resultado: "permitido" | "negado";
             detalle: string;
         };
+        FilaDeLatenciaDto: {
+            definicion: components["schemas"]["DefinicionKpiDto"];
+            /** @description Muestras dentro de la ventana deslizante */
+            muestras: number;
+            /** @description Observaciones desde el arranque; no las borra la ventana */
+            observadas: number;
+            /** @description Muestras por encima del umbral desde el arranque */
+            incumplimientos: number;
+            p50?: number | null;
+            p95?: number | null;
+            p99?: number | null;
+            maximo?: number | null;
+            /** @description `null` significa SIN MUESTRAS, que no es lo mismo que incumplir */
+            cumple?: boolean | null;
+        };
         FranjaDeAccesosDto: {
             /** @description Hora local de la copropiedad */
             hora: number;
@@ -1812,6 +1862,15 @@ export interface components {
         IngestaDto: {
             /** Format: uuid */
             copropiedadId: string;
+        };
+        LatenciasDto: {
+            /** @description Arranque del proceso que sirve esta respuesta */
+            desde: string;
+            /** @description Tamaño de la ventana deslizante, en muestras */
+            ventana: number;
+            /** @description Por proceso, no por despliegue: con varias instancias cada una lleva su ventana (D-29) */
+            porProceso: boolean;
+            filas: components["schemas"]["FilaDeLatenciaDto"][];
         };
         LatidoDto: {
             copropiedadId: string;
@@ -4441,6 +4500,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoteReconciliadoDto"];
+                };
+            };
+        };
+    };
+    ObservabilidadController_latencias: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LatenciasDto"];
                 };
             };
         };

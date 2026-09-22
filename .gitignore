@@ -49,3 +49,7 @@ openapitools.json
 
 # Informes JSON del paso 5 del verificador (D-113): se borran al terminar.
 .informe-paso5.json
+
+# Informes JSON de las suites (instrumento de D-101, ETAPA 14): se conservan
+# para poder subirlos como artefacto cuando el CI se pone rojo, y no se versionan.
+/.informes-de-prueba/

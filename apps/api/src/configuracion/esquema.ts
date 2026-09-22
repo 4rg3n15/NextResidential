@@ -169,6 +169,69 @@ export const esquemaConfiguracion = z.object({
     .trim()
     .url('RECUPERACION_URL_REDIRECCION debe ser una URL absoluta')
     .optional(),
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * OBSERVABILIDAD · ETAPA 14. Las dos variables que `.env.example` declaraba
+   * desde la ETAPA 02 y que **Zod no validaba y nadie leía**: estaban en el
+   * ejemplo, `pnpm entorno:diff` se las exigía al cliente, y no servían para
+   * nada. Era deuda registrada con dueño («`SENTRY_DSN` y `LOG_LEVEL` → ETAPA
+   * 14») y se salda aquí, dándoles uso, no borrándolas.
+   *
+   * `SENTRY_DSN` es OPCIONAL a propósito. Sin él el reporte es un objeto nulo
+   * y la API arranca igual: desarrollo y CI son despliegues legítimos sin
+   * agregador. Lo que no se admite es un DSN presente y mal formado, porque
+   * eso sí es un despliegue que cree tener reporte y no lo tiene.
+   */
+  SENTRY_DSN: z
+    .string()
+    .trim()
+    .url('SENTRY_DSN debe ser el DSN completo que da el panel de Sentry')
+    .refine((v) => {
+      try {
+        const u = new URL(v);
+        return u.username !== '' && /\/\d+$/.test(u.pathname);
+      } catch {
+        return false;
+      }
+    }, 'SENTRY_DSN no tiene forma de DSN: le falta la clave pública o el identificador de proyecto')
+    .optional(),
+
+  /** Umbral mínimo de severidad que se escribe. Por debajo, la línea no sale. */
+  LOG_LEVEL: z.enum(['debug', 'info', 'aviso', 'error']).default('info'),
+
+  /**
+   * Tamaño de la ventana deslizante de latencias (RNF-11.3). Acota la memoria
+   * del proceso: los percentiles necesitan las muestras y guardarlas todas no
+   * es una opción en un proceso que corre semanas.
+   */
+  METRICAS_VENTANA: z.coerce.number().int().min(16).max(65536).default(2048),
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * PLANIFICADOR (ETAPA 14) · pg-boss sobre el mismo PostgreSQL (§2.6)
+   *
+   * `PGBOSS_SCHEMA` estaba en `.env.example` desde la ETAPA 02 con la nota «la
+   * lee la configuración de pg-boss, fuera del esquema de la API». No había
+   * tal configuración: no se leía en ningún sitio. Ahora sí.
+   *
+   * `PLANIFICADOR_HABILITADO` existe porque **no todo proceso debe planificar**.
+   * Con varias instancias de API, pg-boss ya garantiza que solo una ejecuta
+   * cada disparo —toma el cerrojo en PostgreSQL—, así que dejarlo encendido en
+   * todas es correcto; apagarlo permite dedicar un proceso a servir HTTP y otro
+   * a los barridos, que es lo que se quiere cuando el barrido de plantillas
+   * habla con terminales lentas. Apagado, el planificador ESCRIBE qué no va a
+   * ejecutar: el silencio dejaría creer que RN-11 se está cumpliendo.
+   */
+  PGBOSS_SCHEMA: z
+    .string()
+    .trim()
+    .regex(/^[a-z_][a-z0-9_]{0,62}$/, 'PGBOSS_SCHEMA es un nombre de esquema de PostgreSQL')
+    .default('pgboss'),
+  PLANIFICADOR_HABILITADO: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+
   THROTTLE_TTL_SEGUNDOS: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMITE: z.coerce.number().int().positive().default(120),
 

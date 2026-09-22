@@ -2,16 +2,17 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/configuracion/ambiente.dart';
+import 'package:ncr_residente/configuracion/paleta.g.dart';
 import 'package:ncr_residente/configuracion/tema.dart';
 
-/// El tema de la app contra el preset de la consola, leyendo el `.ts`.
+/// El tema de la app contra el preset de la consola — **D-78 cerrada**.
 ///
-/// Es la mitad que faltaba de **D-78**. Copiar colores a mano no es el
-/// problema; el problema es que la copia envejezca sin que nadie lo note, y que
-/// el síntoma sea «la app se ve distinta de la consola» seis semanas después.
-/// Mientras no se genere este fichero desde el preset, esta prueba hace de
-/// pegamento: cambiar un color en `packages/config/src/temas.ts` sin cambiarlo
-/// aquí pone la suite en rojo.
+/// Ya no se comparan colores contra el texto del `.ts`: la paleta se GENERA
+/// desde el preset compilado (`pnpm paleta`) y el control `paleta:desfasada`
+/// rompe el build si el generado y el preset se separan. Lo que esta prueba
+/// comprueba ahora es lo que un generador no puede: que nadie vuelva a escribir
+/// un color a mano en `tema.dart`, que los dos temas declaren los mismos
+/// tokens, y que el modo oscuro use los del tema oscuro.
 /// Las llaves de estas pruebas se COMPONEN en tiempo de ejecución.
 ///
 /// `escanear-secretos.mjs` recorre el repositorio buscando la forma
@@ -25,38 +26,45 @@ String llaveSecretaFalsa() => '${_prefijoSecreto}_esto_no_puede_viajar';
 String llavePublicableFalsa() => '${_prefijoPublicable}_de_prueba';
 
 void main() {
-  String hex(int valor) => '#${(valor & 0xFFFFFF).toRadixString(16).toUpperCase().padLeft(6, '0')}';
-
-  test('los colores de la app son los del preset compartido', () {
-    final fichero = File('../../packages/config/src/temas.ts');
+  test('la paleta se GENERA desde el preset: ni un hexadecimal a mano', () {
+    // D-78 cerrada. La prueba anterior leía el `.ts` como TEXTO y comprobaba
+    // que cada color copiado siguiera apareciendo allí. Daba verde sobre tres
+    // divergencias reales —entre ellas `bordeOscuro`, que usaba el borde del
+    // tema CLARO— porque la cadena existía en el fichero, aunque con otro papel.
+    //
+    // Ahora la comprobación es de forma, no de contenido: si `tema.dart` vuelve
+    // a llevar un `0xFF…`, alguien copió un color a mano y la deuda reabrió.
+    final tema = File('lib/configuracion/tema.dart').readAsStringSync();
     expect(
-      fichero.existsSync(),
-      isTrue,
-      reason: 'sin el preset no hay nada que comparar y esta prueba mentiría',
+      RegExp(r'0x[Ff][Ff][0-9A-Fa-f]{6}').hasMatch(tema),
+      isFalse,
+      reason: 'hay un color escrito a mano en tema.dart: use un token de paleta.g.dart',
     );
-    final preset = fichero.readAsStringSync();
 
-    // Cada pareja se busca por su valor: si el preset cambia el tono, deja de
-    // aparecer y esto falla con el color concreto en el mensaje.
-    for (final esperado in [
-      hex(Paleta.marca.toARGB32()),
-      hex(Paleta.botonMarca.fondo.toARGB32()),
-      hex(Paleta.exito.fondo.toARGB32()),
-      hex(Paleta.aviso.fondo.toARGB32()),
-      hex(Paleta.fondo.toARGB32()),
-      hex(Paleta.borde.toARGB32()),
-      hex(Paleta.textoFuerte.toARGB32()),
-      hex(Paleta.textoSuave.toARGB32()),
-      hex(Paleta.fondoOscuro.toARGB32()),
-      hex(Paleta.tarjetaOscura.toARGB32()),
-      hex(Paleta.bordeOscuro.toARGB32()),
-    ]) {
-      expect(
-        preset.contains(esperado),
-        isTrue,
-        reason: '$esperado ya no está en packages/config/src/temas.ts',
-      );
-    }
+    final generada = File('lib/configuracion/paleta.g.dart');
+    expect(generada.existsSync(), isTrue, reason: 'falta paleta.g.dart: ejecute `pnpm paleta`');
+    expect(
+      generada.readAsStringSync(),
+      contains('NO EDITAR A MANO'),
+      reason: 'el fichero generado tiene que decir que lo es',
+    );
+  });
+
+  test('los dos temas declaran los MISMOS tokens', () {
+    // Un token que solo existe en claro es un color que desaparece al cambiar
+    // de tema, y no lo nota nadie hasta que alguien usa el modo oscuro.
+    expect(PaletaClara.porNombre.keys.toSet(), PaletaOscura.porNombre.keys.toSet());
+    expect(tokensDePaleta.toSet(), PaletaClara.porNombre.keys.toSet());
+    expect(tokensDePaleta.length, greaterThanOrEqualTo(30));
+  });
+
+  test('el modo oscuro usa los tokens del tema OSCURO, no los del claro', () {
+    // La divergencia concreta que destapó la generación: `bordeOscuro` era el
+    // borde de la familia `oscuro.*` del tema CLARO.
+    expect(Paleta.fondoOscuro, PaletaOscura.lienzo);
+    expect(Paleta.tarjetaOscura, PaletaOscura.tarjeta);
+    expect(Paleta.bordeOscuro, PaletaOscura.borde);
+    expect(Paleta.bordeOscuro, isNot(PaletaClara.oscuroBorde));
   });
 
   test('el tema claro y el oscuro declaran fondo propio', () {

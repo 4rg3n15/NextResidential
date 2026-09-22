@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Lo MÍNIMO que la consola necesita. Cada permiso que no está aquí no existe para la ventana: es el principio de privilegio mínimo de §2.7.8 aplicado al empaquetado, y la diferencia práctica frente a Electron, donde el proceso de render arranca con acceso a Node.",
+  "windows": ["consola"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-title",
+    "core:window:allow-set-fullscreen",
+    "updater:default"
+  ]
+}

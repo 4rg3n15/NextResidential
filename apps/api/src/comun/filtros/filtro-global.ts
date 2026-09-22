@@ -2,6 +2,7 @@ import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
 import { Catch, HttpException, HttpStatus } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { Bitacora } from '@ncr/domain-core';
+import type { ReporteDeErrores } from '../../observabilidad';
 
 /**
  * Manejo global de errores.
@@ -37,7 +38,16 @@ const sinNombreDeClase = (respuesta: string | object): string | object =>
 
 @Catch()
 export class FiltroGlobalDeExcepciones implements ExceptionFilter {
-  constructor(private readonly bitacora: Bitacora) {}
+  /**
+   * `reporte` es OPCIONAL y su ausencia significa «no hay agregador», no «no
+   * reportes»: las suites construyen el filtro a solas y no tienen por qué
+   * montar la observabilidad entera para comprobar que un 500 no filtra el
+   * mensaje original. En producción lo inyecta `main.ts` (ETAPA 14).
+   */
+  constructor(
+    private readonly bitacora: Bitacora,
+    private readonly reporte?: ReporteDeErrores,
+  ) {}
 
   catch(excepcion: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -80,13 +90,33 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
       ? excepcion.getStatus()
       : (codigoDeBiblioteca ?? HttpStatus.INTERNAL_SERVER_ERROR);
 
+    // `correlacion` NO se repite en el contexto: desde la ETAPA 14 la bitácora
+    // la pone en el nivel superior de TODA línea, y duplicarla aquí solo hacía
+    // la entrada más larga sin decir nada nuevo.
     this.bitacora.registrar(estado >= 500 ? 'error' : 'aviso', 'peticion fallida', {
-      correlacion,
       metodo: peticion.method,
       ruta: peticion.url,
       estado,
       error: excepcion instanceof Error ? excepcion.message : String(excepcion),
     });
+
+    /**
+     * AL AGREGADOR, SOLO LOS 5xx (ETAPA 14). Un 400 o un 403 no son fallos del
+     * sistema: son el sistema funcionando. Mandarlos a Sentry convertiría el
+     * panel en un registro de accesos y enterraría el 500 que sí hay que mirar
+     * —exactamente el ruido que H-13-12 describe para los logs, por otra vía—.
+     *
+     * `capturar` no devuelve nada y no puede lanzar: estamos atendiendo un
+     * error, y un fallo del observador no puede dejar al cliente sin respuesta.
+     */
+    if (estado >= 500) {
+      this.reporte?.capturar(excepcion, {
+        correlacion,
+        metodo: peticion.method,
+        ruta: peticion.url,
+        estado,
+      });
+    }
 
     respuesta.status(estado).json({
       estado,

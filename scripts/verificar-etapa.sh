@@ -804,6 +804,37 @@ else
   echo "$salida_append" | head -10 | sed 's/^/     /'
 fi
 
+# ETAPA 14 · la consola es INSTALABLE, y se comprueba. Una PWA que no lo es no
+# da ningún error: el navegador simplemente no ofrece instalarla. Este control
+# nació de un hallazgo así —el icono «enmascarable» era byte a byte el mismo
+# que el normal, y en Android el logo salía recortado—.
+if salida_pwa=$(con_limite "$LIMITE_CORTO" node scripts/lib/pwa-instalable.mjs 2>&1); then
+  ok "${salida_pwa#OK }"
+else
+  mal "la consola NO es instalable como PWA"
+  echo "$salida_pwa" | head -10 | sed 's/^/     /'
+fi
+# ETAPA 14 · D-78 · la paleta de la app se GENERA desde el preset compartido.
+# Un generado que nadie regenera describe el diseño de la semana pasada.
+if salida_paleta=$(con_limite "$LIMITE_CORTO" node scripts/lib/generar-paleta-dart.mjs --comprobar 2>&1); then
+  ok "${salida_paleta#OK }"
+else
+  mal "la paleta de la app Flutter no coincide con el preset (D-78)"
+  echo "$salida_paleta" | head -8 | sed 's/^/     /'
+fi
+# ETAPA 14 · TODO bloque ```mermaid del repositorio tiene que ANALIZAR, con
+# Mermaid de verdad y no con una expresión regular parecida. La DoD de la ETAPA
+# 16 exige «que los diagramas rendericen» y hasta ahora nadie lo comprobaba: los
+# cinco de `modelo-datos.md` llevaban desde la ETAPA 01 sin que ninguna máquina
+# los leyera. Es el control que no existe y la documentación que afirma como si
+# existiera. `LIMITE_MEDIO` y no corto: cargar Mermaid bajo jsdom tarda.
+if salida_mmd=$(con_limite "$LIMITE_MEDIO" node scripts/lib/mermaid-analizable.mjs 2>&1); then
+  ok "${salida_mmd#OK }"
+else
+  mal "hay un diagrama Mermaid que no analiza: GitHub lo mostraría como un recuadro de error"
+  echo "$salida_mmd" | head -12 | sed 's/^/     /'
+fi
+
 paso "10b · el contrato OpenAPI tiene tipos y el cliente generado está al día"
 # ETAPA 09-A · el cliente de la consola se GENERA (§2.6), y un generado que
 # nadie regenera describe la API de la semana pasada sin dar ningún error.

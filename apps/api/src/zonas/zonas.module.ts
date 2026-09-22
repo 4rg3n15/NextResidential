@@ -12,6 +12,7 @@ import {
   AutorizarZonaAVisitante,
   ConfigurarZona,
   LiberarAforo,
+  ReiniciarAforosVencidos,
   ValidarAforo,
 } from './aplicacion/casos-de-uso';
 import { RepositorioZonasEnMemoria } from './infraestructura/repositorio-zonas-memoria';
@@ -55,6 +56,14 @@ export class ZonasModule {
           inject: [REPOSITORIO_ZONAS],
           useFactory: (repo: RepositorioZonas) => new LiberarAforo(repo),
         },
+        // D-36 · el barrido que persiste el reinicio de las zonas que nadie
+        // toca. Lo invoca el planificador de la ETAPA 14, no una ruta.
+        {
+          provide: ReiniciarAforosVencidos,
+          inject: [REPOSITORIO_ZONAS, RELOJ],
+          useFactory: (repo: RepositorioZonas, reloj: Reloj) =>
+            new ReiniciarAforosVencidos(repo, reloj),
+        },
         {
           provide: ConfigurarZona,
           inject: [REPOSITORIO_ZONAS],
@@ -96,6 +105,7 @@ export class ZonasModule {
         RepositorioZonasEnMemoria,
         ValidarAforo,
         LiberarAforo,
+        ReiniciarAforosVencidos,
       ],
     };
   }

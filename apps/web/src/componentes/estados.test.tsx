@@ -75,11 +75,17 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
     expect(claves).not.toContain('viviendas');
   });
 
-  it('el administrador ve las once entradas: las nueve del mockup y las dos consolas operativas', () => {
+  it('el administrador ve las doce entradas: nueve del mockup, dos consolas operativas y latencias', () => {
     // Nueve hasta la ETAPA 09; la 10 añade Portería y Guardia virtual, que son
-    // DOS superficies y no una (C-12).
-    expect(navegacionDe('administrador')).toHaveLength(11);
-    expect(NAVEGACION).toHaveLength(11);
+    // DOS superficies y no una (C-12); la 14 añade Latencias, que no está en
+    // el mockup porque el mockup no tenía tablero de observabilidad.
+    expect(navegacionDe('administrador')).toHaveLength(12);
+    expect(NAVEGACION).toHaveLength(12);
+  });
+
+  it('el portero NO ve las latencias: no es información de su puesto', () => {
+    expect(navegacionDe('portero').map((e) => e.clave)).not.toContain('observabilidad');
+    expect(navegacionDe('operador_central').map((e) => e.clave)).toContain('observabilidad');
   });
 
   it('el portero ve Portería y NO la guardia virtual', () => {

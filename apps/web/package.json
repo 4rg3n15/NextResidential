@@ -9,7 +9,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run",
-    "test:cobertura": "vitest run --coverage"
+    "test:cobertura": "vitest run --coverage",
+    "escritorio:dev": "tauri dev",
+    "escritorio:build": "tauri build",
+    "escritorio:verificar": "cargo test --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
     "@ncr/config": "workspace:^",
@@ -25,6 +28,7 @@
     "zod": "3.24.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "2",
     "@testing-library/dom": "10.4.0",
     "@testing-library/react": "16.1.0",
     "@types/node": "22.10.2",

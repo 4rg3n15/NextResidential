@@ -94,15 +94,15 @@ const FUERA_DE_ZOD = new Map([
   ['API:BARRERA_CLAVE', 'ídem'],
   ['API:BARRERA_TIEMPO_LIMITE_MS', 'ídem'],
   ['API:BARRERA_DISPOSITIVO_ID', 'la lee apps/api/src/guardia/guardia.module.ts'],
-  ['API:PGBOSS_SCHEMA', 'la lee la configuración de pg-boss, fuera del esquema de la API'],
-  // Las seis ya registradas como deuda en ESTADO_ETAPAS: están en el ejemplo y
-  // Zod no las valida. Dueños y fecha, allí.
+  // De las SEIS registradas como deuda en ESTADO_ETAPAS quedan CUATRO. La ETAPA
+  // 14 saldó las dos suyas —`LOG_LEVEL` y `SENTRY_DSN`— dándoles uso, no
+  // borrándolas del ejemplo: ahora Zod las valida y el código las lee, así que
+  // salen de aquí y este mismo control lo exigió al comprobar que ya no
+  // corresponde la exención. Las cuatro restantes tienen dueño en la ETAPA 15.
   ['API:DEVICE_VAULT_PROVIDER', 'deuda declarada: sin validar, dueño ETAPA 15'],
   ['API:DEVICE_VAULT_URL', 'deuda declarada: sin validar, dueño ETAPA 15'],
   ['API:BIOMETRIC_KEY_REF', 'deuda declarada: sin validar, dueño ETAPA 15'],
   ['API:BIOMETRIC_ALGORITHM', 'deuda declarada: sin validar, dueño ETAPA 15'],
-  ['API:LOG_LEVEL', 'deuda declarada: sin validar, dueño ETAPA 14'],
-  ['API:SENTRY_DSN', 'deuda declarada: sin validar, dueño ETAPA 14'],
 ]);
 
 const problemas = [];

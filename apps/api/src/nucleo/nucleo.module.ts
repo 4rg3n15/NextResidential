@@ -11,6 +11,8 @@ import {
 import type { Bitacora, GeneradorDeId, Reloj, UnidadDeTrabajo } from '@ncr/domain-core';
 import { BitacoraEstructurada } from '../comun/bitacora/bitacora-estructurada';
 import { AuditoriaEnMemoria, REGISTRO_AUDITORIA } from '../comun/auditoria';
+import { CONFIGURACION } from '../configuracion/configuracion.module';
+import type { Configuracion } from '../configuracion/esquema';
 
 /**
  * Cableado de los puertos de soporte (§2.3, DIP).
@@ -48,7 +50,20 @@ class UnidadDeTrabajoSinTransaccion implements UnidadDeTrabajo {
     { provide: REGISTRO_AUDITORIA, useExisting: AuditoriaEnMemoria },
     { provide: RELOJ, useValue: relojDelSistema },
     { provide: GENERADOR_DE_ID, useValue: generadorUuid },
-    { provide: BITACORA, useFactory: (): Bitacora => new BitacoraEstructurada() },
+    /**
+     * ETAPA 14 · el nivel mínimo sale de `LOG_LEVEL`, que hasta ahora estaba en
+     * `.env.example` y no la leía nadie. La configuración se inyecta como
+     * **opcional** a propósito: hay bancos de prueba que montan el núcleo a
+     * solas, sin `ConfiguracionModule`, y ahí el valor por omisión —`debug`,
+     * todo se escribe— es el correcto. Exigirla convertiría una mejora de
+     * observabilidad en una rotura de veinte suites que no tienen nada que ver.
+     */
+    {
+      provide: BITACORA,
+      inject: [{ token: CONFIGURACION, optional: true }],
+      useFactory: (config?: Configuracion): Bitacora =>
+        new BitacoraEstructurada(undefined, config?.LOG_LEVEL ?? 'debug'),
+    },
     {
       provide: BUS_DE_EVENTOS,
       inject: [BITACORA],

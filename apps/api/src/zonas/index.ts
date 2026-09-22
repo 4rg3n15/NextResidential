@@ -13,4 +13,5 @@ export type {
   RepositorioZonas,
   ResultadoOcupacion,
 } from './aplicacion/puertos';
-export { LiberarAforo, ValidarAforo } from './aplicacion/casos-de-uso';
+export { LiberarAforo, ReiniciarAforosVencidos, ValidarAforo } from './aplicacion/casos-de-uso';
+export type { ParteDeReinicio } from './aplicacion/casos-de-uso';

@@ -3769,6 +3769,34 @@
         ]
       }
     },
+    "/observabilidad/latencias": {
+      "get": {
+        "description": "Cada fila trae el tramo que mide y lo que NO mide. Se leen juntos a propósito: una cifra de latencia sin su tramo no demuestra nada.",
+        "operationId": "ObservabilidadController_latencias",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatenciasDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "p50, p95 y p99 de las cinco latencias comprometidas (KPI-09, 13, 25, 32, 33)",
+        "tags": [
+          "observabilidad"
+        ]
+      }
+    },
     "/ready": {
       "get": {
         "operationId": "SaludController_listo",
@@ -4795,6 +4823,47 @@
           "versionDeReglas"
         ]
       },
+      "DefinicionKpiDto": {
+        "type": "object",
+        "properties": {
+          "clave": {
+            "type": "string",
+            "example": "KPI-32"
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "umbralMs": {
+            "type": "number",
+            "description": "Techo comprometido, en milisegundos"
+          },
+          "segmento": {
+            "type": "string",
+            "description": "Dónde arranca y dónde para el cronómetro"
+          },
+          "noIncluye": {
+            "type": "string",
+            "description": "Lo que la cifra NO contiene. Se lee antes que la cifra"
+          },
+          "rnf": {
+            "type": "string",
+            "example": "RNF-01.3"
+          },
+          "ca": {
+            "type": "string",
+            "nullable": true,
+            "example": "CA-20"
+          }
+        },
+        "required": [
+          "clave",
+          "titulo",
+          "umbralMs",
+          "segmento",
+          "noIncluye",
+          "rnf"
+        ]
+      },
       "DesactivarDto": {
         "type": "object",
         "properties": {
@@ -5413,6 +5482,53 @@
           "detalle"
         ]
       },
+      "FilaDeLatenciaDto": {
+        "type": "object",
+        "properties": {
+          "definicion": {
+            "$ref": "#/components/schemas/DefinicionKpiDto"
+          },
+          "muestras": {
+            "type": "number",
+            "description": "Muestras dentro de la ventana deslizante"
+          },
+          "observadas": {
+            "type": "number",
+            "description": "Observaciones desde el arranque; no las borra la ventana"
+          },
+          "incumplimientos": {
+            "type": "number",
+            "description": "Muestras por encima del umbral desde el arranque"
+          },
+          "p50": {
+            "type": "number",
+            "nullable": true
+          },
+          "p95": {
+            "type": "number",
+            "nullable": true
+          },
+          "p99": {
+            "type": "number",
+            "nullable": true
+          },
+          "maximo": {
+            "type": "number",
+            "nullable": true
+          },
+          "cumple": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "`null` significa SIN MUESTRAS, que no es lo mismo que incumplir"
+          }
+        },
+        "required": [
+          "definicion",
+          "muestras",
+          "observadas",
+          "incumplimientos"
+        ]
+      },
       "FranjaDeAccesosDto": {
         "type": "object",
         "properties": {
@@ -5689,6 +5805,35 @@
         },
         "required": [
           "copropiedadId"
+        ]
+      },
+      "LatenciasDto": {
+        "type": "object",
+        "properties": {
+          "desde": {
+            "type": "string",
+            "description": "Arranque del proceso que sirve esta respuesta"
+          },
+          "ventana": {
+            "type": "number",
+            "description": "Tamaño de la ventana deslizante, en muestras"
+          },
+          "porProceso": {
+            "type": "boolean",
+            "description": "Por proceso, no por despliegue: con varias instancias cada una lleva su ventana (D-29)"
+          },
+          "filas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilaDeLatenciaDto"
+            }
+          }
+        },
+        "required": [
+          "desde",
+          "ventana",
+          "porProceso",
+          "filas"
         ]
       },
       "LatidoDto": {

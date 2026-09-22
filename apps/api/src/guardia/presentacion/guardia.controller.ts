@@ -49,6 +49,7 @@ import {
   OrdenManualDto,
   SolicitudDeCanalDto,
 } from './dtos';
+import { MideKpi } from '../../observabilidad';
 
 /**
  * Consolas operativas — portería (HU-21 a HU-24) y guardia virtual (CU-03,
@@ -116,6 +117,8 @@ export class GuardiaController {
    * que la consola muestre lo que quedó registrado y no lo que se tecleó.
    */
   @Post('ordenes')
+  // RNF-01.3 · acción del operador → accionamiento remoto, < 3 s (CA-20).
+  @MideKpi('KPI-32')
   @Roles('portero', 'operador_central', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Abre o niega a mano, con motivo obligatorio (RN-08)' })
   @ApiCreatedResponse({ type: OrdenEjecutadaDto })
@@ -280,6 +283,9 @@ export class GuardiaController {
    * canal que no sabe cuándo se libera.
    */
   @Post('intercom/abrir')
+  // RNF-01.4 · establecimiento de audio y vídeo, < 2 s (CA-19). Hoy mide el
+  // canal SIMULADO: el adaptador real llega en la ETAPA 15 y el tablero lo dice.
+  @MideKpi('KPI-33')
   @HttpCode(200)
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Pide el canal de audio del equipo; encola si está ocupado (ADR-01)' })

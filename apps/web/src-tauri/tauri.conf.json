@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Next Control Residencial",
+  "version": "0.1.0",
+  "identifier": "co.grupocontrol.nextcontrol.consola",
+  "build": {
+    "frontendDist": "../public",
+    "devUrl": "http://localhost:3001"
+  },
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      "dangerousDisableAssetCspModification": false,
+      "assetProtocol": {
+        "enable": false,
+        "scope": []
+      }
+    },
+    "withGlobalTauri": false
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage", "msi", "app", "dmg"],
+    "icon": ["iconos/32x32.png", "iconos/128x128.png", "iconos/icon.png"],
+    "category": "Business",
+    "shortDescription": "Consola de control de acceso residencial",
+    "longDescription": "Consola de administración, portería y guardia virtual de Next Control Residencial.",
+    "copyright": "© Grupo Control",
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "active": false,
+      "dialog": true,
+      "pubkey": "",
+      "endpoints": [
+        "https://actualizaciones.ejemplo.invalid/consola/{{target}}/{{arch}}/{{current_version}}"
+      ]
+    }
+  }
+}
