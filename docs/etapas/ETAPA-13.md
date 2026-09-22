@@ -436,18 +436,26 @@ donde la base sí está, corren las 728.
 | **CI · los TRES trabajos**                     | `a6f702b` | **verde** · `controles` (ubuntu y macOS) + `verificar-etapa.sh --con-base (macos)` |
 | Local, `--con-base` + SDK de Flutter, repetida | `5cd2286` | **correcta**, cero ✗ — mismo veredicto                                             |
 
-Entre `a6f702b` y la punta de la rama **solo cambia documentación**, comprobado
-por máquina y no de memoria:
+Entre `a6f702b` y la punta de la rama, el **código de producto y de control es
+idéntico**. Lo que cambia se nombra, comprobado por máquina y no de memoria:
 
 ```
 $ git diff --stat a6f702b..HEAD -- ':!docs'
-(sin salida: el árbol de código es idéntico)
+ .github/workflows/verificacion.yml | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 ```
 
-Los tres commits que van después son el veredicto literal, el expediente de
-D-101 y la corrección del recuento por severidad. Se dice porque la alternativa
-—citar una corrida y dejar que el lector suponga que corresponde a la punta— es
-exactamente la clase de atajo que esta etapa audita.
+Las once líneas son el `fetch-depth: 0` que le faltaba al trabajo
+`verificar-etapa.sh --con-base (macos)` —la recaída de H-13-17 que se cuenta en
+el informe de auditoría— y su comentario. No tocan nada que el verificador
+LOCAL ejecute: es configuración del runner. El resto son los seis commits de
+documentación: el veredicto literal, el expediente de D-101, la corrección del
+recuento por severidad, la tabla de commits y esta misma tabla.
+
+Se dice con este detalle porque la alternativa —citar una corrida y dejar que el
+lector suponga que corresponde a la punta— es exactamente la clase de atajo que
+esta etapa audita. Y porque la primera versión de este párrafo decía «solo
+cambia documentación», y dejó de ser verdad en el commit siguiente.
 
 ---
 
