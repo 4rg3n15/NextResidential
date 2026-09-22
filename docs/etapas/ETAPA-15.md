@@ -466,6 +466,20 @@ sobre. Se usa como desempate cuando los nombres de parte no dicen nada.
 ## 10 · Rama y commits
 
 **Rama:** `etapa-15-integracion-hikvision`, sacada de `develop` (`b9d2a60`).
+**PR:** [#25](https://github.com/4rg3n15/NextResidential/pull/25) contra `develop`.
+
+**CI:** [corrida 203](https://github.com/4rg3n15/NextResidential/actions/runs/35796532017)
+sobre `fb273f4`, **los cuatro trabajos en verde**:
+
+```
+controles (ubuntu-latest):              success
+controles (macos-latest):               success
+verificar-etapa.sh --con-base (macos):  success
+los seis entregables (ubuntu):          success
+```
+
+El commit que cita esta corrida es posterior a ella y **sólo toca este
+informe**: el código que la corrida validó es el mismo.
 
 | Commit    | Qué                                                                 |
 | --------- | ------------------------------------------------------------------- |
