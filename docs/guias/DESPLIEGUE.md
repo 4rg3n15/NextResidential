@@ -254,13 +254,36 @@ NCR_ORIGENES_ESCRITORIO="https://consola.sudominio.co" \
   configuración junto al ejecutable lo puede editar quien tenga el equipo, y con
   ello redirigir la ventana que lleva la sesión del operador a un servidor suyo.
   Cambiar los orígenes exige recompilar y volver a firmar.
-- **Actualizaciones firmadas.** `tauri.conf.json` declara el punto de
-  actualización y la clave pública. Antes de la primera entrega hay que generar
-  el par con `tauri signer generate`, publicar la pública en la configuración y
-  guardar la privada **fuera del repositorio**, en el gestor de secretos de
-  Grupo Control. Mientras el valor siga siendo el marcador
-  `REEMPLAZAR_CON_LA_CLAVE_PUBLICA_DE_ACTUALIZACION`, la actualización no está
-  operativa: el binario funciona, pero no se actualizará solo.
+- **Actualizaciones firmadas: el complemento está cableado y la firma está
+  APAGADA hasta que exista la clave.** Y no por comodidad: la primera corrida de
+  CI lo demostró. Con el actualizador activo, Tauri empaqueta el `.deb`
+  correctamente y **después falla**:
+
+  ```
+  Bundling Next Control Residencial_0.1.0_amd64.deb … Finished 1 bundle at: …
+  Error A public key has been found, but no private key.
+        Make sure to set `TAURI_SIGNING_PRIVATE_KEY` environment variable.
+  ```
+
+  Es la respuesta correcta del empaquetador: **un artefacto de actualización sin
+  firmar no sirve de nada**, y declarar el actualizador sin tener la clave deja
+  una promesa que no se puede cumplir. Así que hoy
+  `bundle.createUpdaterArtifacts` y `plugins.updater.active` están en `false`, y
+  `pubkey` está vacía en vez de llevar un marcador que el actualizador
+  rechazaría en ejecución.
+
+  **Para activarlas** (D-122), en este orden:
+
+  1. `pnpm --filter @ncr/web exec tauri signer generate -w ~/.ncr/actualizacion.key`
+  2. Publique la **pública** en `tauri.conf.json` → `plugins.updater.pubkey`, y
+     ponga `active: true` y `bundle.createUpdaterArtifacts: true`.
+  3. Guarde la **privada** en el gestor de secretos de Grupo Control —nunca en
+     el repositorio— y expóngala al empaquetado como `TAURI_SIGNING_PRIVATE_KEY`.
+  4. Apunte `plugins.updater.endpoints` al servidor de actualizaciones real: hoy
+     es `actualizaciones.ejemplo.invalid`, que no existe a propósito.
+
+  Hasta entonces el binario funciona y **no se actualiza solo**, que es el
+  comportamiento conservador correcto: nadie instala nada que no venga firmado.
 
 ---
 

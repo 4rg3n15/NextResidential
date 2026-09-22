@@ -738,13 +738,13 @@ autorizó expresamente adelantar parte del punto 4 de la ETAPA 16:
 
 ### Deuda nueva
 
-| Id        | Qué                                                                                                              | Se salda en |
-| --------- | ---------------------------------------------------------------------------------------------------------------- | ----------- |
-| **D-119** | Nada comprueba por máquina que la lista de agregados del README coincida con el dominio. Es lo que permitió C-27 | ETAPA 16    |
-| **D-120** | KPI-13 no mide el tramo del equipo: el contrato de ingesta en vivo no trae marca del dispositivo                 | ETAPA 15    |
-| **D-121** | El registro de latencias es por proceso; con varias instancias hay que agregar fuera                             | ETAPA 16    |
-| **D-122** | La clave pública de actualización de Tauri es un marcador: el escritorio aún no se actualiza solo                | Operación   |
-| **D-123** | `pnpm audit --prod` arrastra 12 avisos `low`/`moderate` de Express 4 y Nest 10 sin versión corregida             | ETAPA 16    |
+| Id        | Qué                                                                                                                                                                                            | Se salda en |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| **D-119** | Nada comprueba por máquina que la lista de agregados del README coincida con el dominio. Es lo que permitió C-27                                                                               | ETAPA 16    |
+| **D-120** | KPI-13 no mide el tramo del equipo: el contrato de ingesta en vivo no trae marca del dispositivo                                                                                               | ETAPA 15    |
+| **D-121** | El registro de latencias es por proceso; con varias instancias hay que agregar fuera                                                                                                           | ETAPA 16    |
+| **D-122** | La actualización firmada del escritorio está cableada y **apagada** hasta que exista el par de claves. Lo destapó el CI: sin clave privada, el empaquetado falla DESPUÉS de producir el `.deb` | Operación   |
+| **D-123** | `pnpm audit --prod` arrastra 12 avisos `low`/`moderate` de Express 4 y Nest 10 sin versión corregida                                                                                           | ETAPA 16    |
 
 ### Supuestos nuevos
 

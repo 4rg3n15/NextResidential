@@ -491,13 +491,13 @@ a la ETAPA 16 con esa condición escrita.
 
 ### 8.8 · Deuda NUEVA de esta etapa
 
-| Id        | Qué                                                                                                                                                  | Se salda en |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| **D-119** | Nada comprueba por máquina que la lista de agregados raíz del README coincida con el dominio. Es lo que permitió C-27                                | ETAPA 16    |
-| **D-120** | KPI-13 no mide el tramo del equipo: el contrato de ingesta en vivo no trae marca del dispositivo                                                     | ETAPA 15    |
-| **D-121** | El registro de latencias es **por proceso**. Con varias instancias hay que agregar fuera; hoy la respuesta lo declara (`porProceso: true`) y ya está | ETAPA 16    |
-| **D-122** | La clave pública de actualización de Tauri es un marcador. Hasta que se genere el par, el escritorio no se actualiza solo                            | Operación   |
-| **D-123** | `pnpm audit --prod` arrastra 12 avisos `low`/`moderate` de Express 4 y Nest 10 sin versión corregida. El paso de CI falla a partir de `high`         | ETAPA 16    |
+| Id        | Qué                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Se salda en |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| **D-119** | Nada comprueba por máquina que la lista de agregados raíz del README coincida con el dominio. Es lo que permitió C-27                                                                                                                                                                                                                                                                                                                                                                         | ETAPA 16    |
+| **D-120** | KPI-13 no mide el tramo del equipo: el contrato de ingesta en vivo no trae marca del dispositivo                                                                                                                                                                                                                                                                                                                                                                                              | ETAPA 15    |
+| **D-121** | El registro de latencias es **por proceso**. Con varias instancias hay que agregar fuera; hoy la respuesta lo declara (`porProceso: true`) y ya está                                                                                                                                                                                                                                                                                                                                          | ETAPA 16    |
+| **D-122** | **La actualización firmada está cableada y APAGADA.** Lo destapó el CI: con el actualizador activo, Tauri empaqueta el `.deb` y **después** falla con «A public key has been found, but no private key». Es la respuesta correcta —un artefacto de actualización sin firmar no sirve—, así que `createUpdaterArtifacts` y `updater.active` quedan en `false` y `pubkey` vacía, en vez de un marcador que el actualizador rechazaría en ejecución. Pasos para activarla, en `DESPLIEGUE.md` §7 | Operación   |
+| **D-123** | `pnpm audit --prod` arrastra 12 avisos `low`/`moderate` de Express 4 y Nest 10 sin versión corregida. El paso de CI falla a partir de `high`                                                                                                                                                                                                                                                                                                                                                  | ETAPA 16    |
 
 ### 8.9 · Supuestos
 
@@ -523,9 +523,13 @@ a la ETAPA 16 con esa condición escrita.
    ```bash
    pnpm --filter @ncr/web exec tauri signer generate -w ~/.ncr/actualizacion.key
    ```
-   Publique la **pública** en `apps/web/src-tauri/tauri.conf.json` y guarde la
-   privada en el gestor de secretos de Grupo Control, **nunca en el repositorio**.
-   Mientras siga el marcador, el binario funciona y no se actualiza solo (D-122).
+   Publique la **pública** en `apps/web/src-tauri/tauri.conf.json`, ponga
+   `updater.active` y `bundle.createUpdaterArtifacts` en `true`, y guarde la
+   privada en el gestor de secretos de Grupo Control —**nunca en el
+   repositorio**— exponiéndola al empaquetado como `TAURI_SIGNING_PRIVATE_KEY`.
+   El procedimiento completo, con sus cuatro pasos, está en `DESPLIEGUE.md` §7.
+   Hasta entonces el binario funciona y **no se actualiza solo**, que es el
+   comportamiento conservador correcto: nadie instala lo que no viene firmado.
 3. **Decidir si quiere Sentry**, y con qué proyecto. Si sí, cargue `SENTRY_DSN`
    en el entorno del despliegue. Si no, déjela vacía: la API arranca igual y el
    reporte queda en objeto nulo. **Vacía es legítimo; mal formada impide

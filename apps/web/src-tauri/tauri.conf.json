@@ -26,13 +26,13 @@
     "shortDescription": "Consola de control de acceso residencial",
     "longDescription": "Consola de administración, portería y guardia virtual de Next Control Residencial.",
     "copyright": "© Grupo Control",
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": false
   },
   "plugins": {
     "updater": {
-      "active": true,
+      "active": false,
       "dialog": true,
-      "pubkey": "REEMPLAZAR_CON_LA_CLAVE_PUBLICA_DE_ACTUALIZACION",
+      "pubkey": "",
       "endpoints": [
         "https://actualizaciones.ejemplo.invalid/consola/{{target}}/{{arch}}/{{current_version}}"
       ]
