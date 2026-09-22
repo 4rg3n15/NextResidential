@@ -637,3 +637,148 @@ repetir la visita.
    leerlos —**sin contraseñas ni IPs reales en el repositorio**—.
 5. Si apareció el hallazgo de bloqueo del paso 4.1, dígalo antes que nada: cambia
    lo que hay que construir.
+
+---
+
+## 8 · ETAPA 15 · Lo que ya está construido, y lo que le toca a usted
+
+> **Añadido el 22/09/2026, al cerrar la ETAPA 15.** Lo que sigue **no se ejecutó
+> contra ningún equipo**: se escribió sin tocar hardware, a propósito, y esta
+> sección es la lista de lo que falta comprobar. El adaptador de la barrera es
+> la única pieza con una ruta **VERIFICADA**; todo lo demás está **DOCUMENTADO,
+> NO VERIFICADO** y puede fallar contra su aparato. Que falle está previsto.
+
+### 8.1 · Un solo comando, antes de tocar nada
+
+```bash
+pnpm --filter @ncr/providers build
+node --env-file=apps/api/.env scripts/puesta-en-marcha-hikvision.mjs
+```
+
+Sondea los tres equipos, **confirma o desmiente cada ruta documentada**, acciona
+cada relé midiendo la latencia y escribe un informe. Con `--sin-accionar` no
+mueve ningún relé, que es como conviene ejecutarlo la primera vez si hay alguien
+delante de la barrera.
+
+| Salida         | Qué significa                                                                          |
+| -------------- | -------------------------------------------------------------------------------------- |
+| `confirmada`   | La ruta existe en este firmware. Ascienda su procedencia en el catálogo                |
+| `desmentida`   | `notSupport` o `404`. **Capture la buena del equipo**; no pruebe otra por parecido     |
+| `inalcanzable` | Ni IP, ni puerto, ni equipo. Es de red, no de código                                   |
+| `credenciales` | Usuario o contraseña. **No insista**: el equipo bloquea la cuenta a los pocos intentos |
+
+El informe **elide el host y el usuario**, así que se puede adjuntar. Las rutas
+que dan de alta o suprimen plantillas y las del canal de audio **no se sondean**:
+dejan rastro en el aparato o se lo quitan a quien esté hablando, y se prueban a
+mano con esta guía delante.
+
+Las variables van en su `.env` local y **nunca** en el repositorio:
+
+```
+BARRERA_HOST= BARRERA_PUERTO= BARRERA_USUARIO= BARRERA_CLAVE=
+TERMINAL_HOST= TERMINAL_PUERTO= TERMINAL_USUARIO= TERMINAL_CLAVE=
+VIDEOPORTERO_HOST= VIDEOPORTERO_PUERTO= VIDEOPORTERO_USUARIO= VIDEOPORTERO_CLAVE=
+```
+
+### 8.2 · Cámara LPR · **que deje de decidir**
+
+Es el cambio que sostiene el principio rector entero. Mientras la cámara abra
+por su cuenta, el motor de reglas es decorativo y el histórico está incompleto.
+
+**Anote el estado PREVIO de cada casilla antes de tocarla.** Sin eso no hay
+vuelta atrás, y la vuelta atrás hace falta si algo sale mal con vehículos
+esperando.
+
+| #   | Qué hacer                                                                         | Estado previo (anótelo) |
+| --- | --------------------------------------------------------------------------------- | ----------------------- |
+| 1   | **Desactivar** la apertura por lista local de vehículos (lista blanca del equipo) |                         |
+| 2   | **Desactivar** todo enlace que dispare la barrera desde el propio equipo          |                         |
+| 3   | **Activar** la subida del evento por HTTP al «servidor de alarma»                 |                         |
+| 4   | Destino: `http://<IP-de-su-Mac>:<puerto>/alarm-server/<secreto>`                  |                         |
+| 5   | Formato del envío: multipart con XML, imagen de la escena y recorte de la placa   |                         |
+
+El secreto se genera con `openssl rand -hex 32` y se declara en
+`ALARM_SERVER_EQUIPOS` del `.env`, con la forma
+`copropiedad|dispositivo|secreto|ip-de-la-cámara`. Sin equipos declarados, ese
+extremo **rechaza todo**, que es la dirección segura.
+
+> **H-15-1, y no se calla.** Esa acreditación —secreto largo más origen— es **más
+> débil** que la firma HMAC que exige `POST /ingesta/eventos`: no da integridad
+> del cuerpo, ni anti-repetición, ni resiste a quien vea la URL. La cámara no
+> puede firmar y no hay ajuste que lo cambie. **El endurecimiento real es la VLAN
+> de equipos**, no el código. El hallazgo completo, con su orden de prioridad,
+> está escrito junto al código que lo aplica:
+> `apps/api/src/comun/equipos-de-alarm-server.ts`.
+
+**Verificación de que quedó en modo evento:** pase un vehículo con placa **no
+autorizada**. La cámara tiene que **reportar y NO abrir**. Si abre, es
+**hallazgo de bloqueo** (§4.1): pare y dígalo antes de seguir.
+
+### 8.3 · Terminal facial · **la pregunta que decide la arquitectura**
+
+Hoy la terminal **abre por su cuenta**. El adaptador está escrito para los dos
+modos y el modo **se declara, no se deduce**; lo que hay que averiguar aquí es
+cuál se puede usar.
+
+| Qué comprobar                                                                    | Dónde mirar                         |
+| -------------------------------------------------------------------------------- | ----------------------------------- |
+| Si el equipo admite **reconocer sin accionar el relé**                           | Capacidades de control de acceso    |
+| Si existe un modo «sólo notificación» o el relé se puede dejar sin asignar       | Configuración de puerta y de relés  |
+| Cuál de los **dos relés** que declara es la puerta                               | Prueba con `--sin-accionar` quitado |
+| Si la supresión de una plantilla es **verificable** (no basta con que se acepte) | RN-11 lo exige                      |
+
+**Con `reporta_y_espera`** —si el firmware lo permite— el equipo notifica,
+nuestro motor decide y nosotros accionamos: principio rector cumplido.
+
+**Con `decide_el_equipo`** gobernamos sólo **qué plantillas están cargadas**, y la
+revocación se ejerce **retirando la plantilla**. Es más débil y hay que decirlo
+así: entre que la vigencia vence y que la supresión llega, el equipo abre. Mida
+esa ventana y anótela.
+
+### 8.4 · Videoportero · **habilitar el canal de audio**
+
+Está **deshabilitado en el equipo** —medido el 18/09/2026, junto con que lo
+soporta con G.711 µ-law—. El adaptador está escrito y **no lo habilita**: un
+adaptador que encendiera por su cuenta una vía de audio hacia la calle sería una
+decisión de seguridad tomada por el código.
+
+| #   | Qué hacer                                                         | Estado previo (anótelo) |
+| --- | ----------------------------------------------------------------- | ----------------------- |
+| 1   | **Habilitar** el canal de audio bidireccional en la configuración |                         |
+| 2   | Anotar el **códec** y la frecuencia de muestreo que negocia       |                         |
+| 3   | Comprobar si es **semiduplex** o duplex completo                  |                         |
+| 4   | Medir la latencia extremo a extremo (KPI-33 · < 2 s)              |                         |
+| 5   | Probar qué pasa si **dos operadores** lo piden a la vez           |                         |
+
+Hasta que (2) y (3) estén medidos, el transporte del audio **lanza en vez de
+devolver silencio**, y la consola sigue usando el simulado. Devolver silencio
+haría que la consola diera por bueno un canal que nunca se ha abierto.
+
+### 8.5 · Las dos pruebas del recorrido de placa
+
+Con el superadministrador, desde la consola:
+
+1. Dé de alta una placa contra una vivienda.
+2. Pase ese vehículo. **La talanquera abre** y queda evento con la decisión.
+3. Pase un vehículo **no dado de alta**. **NO abre**, y queda evento con su
+   motivo tipado.
+4. Mida desde que entra el POST hasta el accionamiento: **KPI-13 · < 3 s**.
+
+El recorrido se puede ensayar **sin cámara** antes de que llegue el vehículo,
+publicando el mismo sobre que ella publica:
+
+```js
+// node, con la API levantada
+const { publicarLectura } = require('./packages/providers/dist/index.js');
+await publicarLectura('http://localhost:3000/alarm-server/<secreto>', { placa: 'ABC123' });
+```
+
+Si eso abre la talanquera y la cámara real no, el problema está en la
+configuración del equipo —§8.2—, no en el sistema. Es la única forma de separar
+las dos cosas sin adivinar.
+
+### 8.6 · Al terminar, revierta
+
+Con los estados previos que anotó en §8.2 y §8.4. Y si apareció el hallazgo de
+bloqueo de §8.2 —la cámara que abre sola y no se puede separar—, dígalo antes
+que nada: cambia lo que hay que construir.
