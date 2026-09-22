@@ -36,9 +36,13 @@ for i in $(seq 1 100); do
 done
 wait
 
-exitosos=$(grep -l '^ok$' "$tmp"/* 2>/dev/null | wc -l)
-rechazados=$(grep -l '^rechazado$' "$tmp"/* 2>/dev/null | wc -l)
-filas=$(psql -Atq -c "SELECT count(*) FROM public.vehiculos WHERE placa='${PLACA}' AND estado='activo';")
+# `wc` ALMOHADILLA EL NUMERO EN BSD Y NO EN GNU. En macOS `wc -l` devuelve
+# "       1" y en Linux "1": comparar eso como TEXTO contra "1" falla en macOS
+# con el resultado correcto delante. Se normaliza aqui y se compara como
+# NUMERO mas abajo; el control del paso 8 lo exige ahora para todo el arbol.
+exitosos=$(grep -l '^ok$' "$tmp"/* 2>/dev/null | wc -l | tr -d '[:space:]')
+rechazados=$(grep -l '^rechazado$' "$tmp"/* 2>/dev/null | wc -l | tr -d '[:space:]')
+filas=$(psql -Atq -c "SELECT count(*) FROM public.vehiculos WHERE placa='${PLACA}' AND estado='activo';" | tr -d '[:space:]')
 rm -rf "$tmp"
 
 echo "  intentos concurrentes : 100"
@@ -46,11 +50,20 @@ echo "  aceptados             : ${exitosos}"
 echo "  rechazados            : ${rechazados}"
 echo "  filas activas en base : ${filas}"
 
-if [[ "$filas" != "1" ]]; then
+# Comparacion NUMERICA: una cadena vacia o con espacios no se lee como "1"
+# accidentalmente, y el numero almohadillado de BSD se compara igual que el de
+# GNU. Se exige ademas que haya llegado un numero: `-eq` sobre cadena vacia
+# evalua 0, asi que sin esto una consulta que no devolviera nada se leeria como
+# "0 filas" en lugar de como "la consulta fallo".
+if ! [[ "$filas" =~ ^[0-9]+$ ]] || ! [[ "$exitosos" =~ ^[0-9]+$ ]]; then
+  echo "  KPI-03 NO VERIFICADO: no se obtuvo un recuento (filas='${filas}', aceptados='${exitosos}')" >&2
+  exit 1
+fi
+if [[ "$filas" -ne 1 ]]; then
   echo "  KPI-03 INCUMPLIDO: se esperaba exactamente 1 fila, hay ${filas}" >&2
   exit 1
 fi
-if [[ "$exitosos" != "1" ]]; then
+if [[ "$exitosos" -ne 1 ]]; then
   echo "  KPI-03 INCUMPLIDO: se esperaba exactamente 1 insercion aceptada, hubo ${exitosos}" >&2
   exit 1
 fi

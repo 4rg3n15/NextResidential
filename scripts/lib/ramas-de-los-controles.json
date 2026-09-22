@@ -16,8 +16,10 @@
   "scripts/lib/frontera-modulos.mjs": 9,
   "scripts/lib/frontera-tema.mjs": 1,
   "scripts/lib/frontera-vocabulario.mjs": 1,
-  "scripts/lib/metricas.mjs": 49,
+  "scripts/lib/metricas.mjs": 50,
   "scripts/lib/pasos-ejecutados.mjs": 3,
   "scripts/lib/portabilidad.mjs": 2,
-  "scripts/lib/ramas-de-los-controles.mjs": 12
+  "scripts/lib/ramas-de-los-controles.mjs": 12,
+  "scripts/lib/recuentos-coherentes.mjs": 3,
+  "scripts/lib/sin-colores.mjs": 1
 }

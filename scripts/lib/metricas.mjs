@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync, mkdtempSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { sinColores } from './sin-colores.mjs';
 
 const raiz = process.cwd();
 const IGNORADOS = new Set(['node_modules', 'dist', 'coverage', '.turbo', '.git']);
@@ -41,9 +42,29 @@ const ficheros = ['apps', 'packages']
 console.log(`## Ficheros de prueba en disco: ${ficheros.length}\n`);
 for (const f of ficheros) console.log(`  ${f}`);
 
-/** Quita los escapes ANSI. Sin esto, las «pistas» salían en blanco (11-C). */
-// eslint-disable-next-line no-control-regex
-const sinColores = (t) => String(t ?? '').replace(/\u001B\[[0-9;]*[A-Za-z]/g, '');
+// El patrón ANSI vive en un solo sitio desde D-108. Tres copias eran tres
+// oportunidades de arreglar una y dejar las otras dos — y es justo lo que pasó.
+
+/**
+ * D-102 · UNA LÍNEA, Y QUE DIGA CUÁL DE LAS DOS COSAS FUE.
+ *
+ * El bloque «QUEDARON FUERA de la medición» interpolaba el objeto entero:
+ * `${fallo}` imprimía **`[object Object]`**. Y el texto fijo que lo acompañaba
+ * decía «la corrida no terminó» aunque el fallo fuera una suite en rojo — la
+ * misma confusión que D-100 acababa de cerrar diez líneas más arriba,
+ * sobreviviendo en el segundo mensaje.
+ *
+ * Es la forma exacta del defecto que este repositorio persigue: se arregló el
+ * sitio donde se miró, no la clase. Aquí se corrige la clase: el resumen sale
+ * SIEMPRE de `detalle`, que ya trae escrito «SUITE EN ROJO» o «CORRIDA
+ * INTERRUMPIDA», y la sonda 22 exige que la cadena `[object Object]` no
+ * aparezca en ninguna parte de la salida.
+ */
+// Sin defensas para casos que no existen: en el único sitio que lo llama,
+// `fallo` no es nulo y `detalle` siempre está escrito. Un `??` de adorno es una
+// rama que nadie ejecuta jamás, y el trinquete de D-81 la cuenta como tal —con
+// razón: una rama que nadie ha visto correr no está demostrada.
+const primeraLinea = (fallo) => String(fallo.detalle).split('\n')[0].trim();
 
 /** Ejecuta vitest en un paquete y devuelve su informe JSON. */
 const correr = (paquete, dir) => {
@@ -267,9 +288,7 @@ for (const [paquete, dir] of paquetesAMedir) {
     // D-100 · el encabezado dice CUÁL de las dos cosas es, porque el remedio
     // de una no sirve para la otra.
     const titulo =
-      fallo.clase === 'roja'
-        ? `${paquete}: PRUEBAS EN ROJO`
-        : `${paquete}: la corrida NO terminó`;
+      fallo.clase === 'roja' ? `${paquete}: PRUEBAS EN ROJO` : `${paquete}: la corrida NO terminó`;
     console.log(`\n## ${titulo}\n       ${fallo.detalle}`);
     corridasIncompletas.push(`${paquete}: ${fallo.detalle}`);
   }
@@ -282,10 +301,32 @@ for (const [paquete, dir] of paquetesAMedir) {
   const pruebas = informe.numTotalTests ?? 0;
   totalPruebas += pruebas;
   totalFicheros += suites.length;
+  // Los nueve campos `num*` los emite SIEMPRE el informe JSON de vitest, así
+  // que aquí no hay `??` de adorno: un valor por defecto que nunca se usa es
+  // una rama que nadie ejecuta, y el trinquete de D-81 la cuenta como tal.
+  const saltadas = informe.numPendingTests + informe.numTodoTests;
   console.log(`\n## ${paquete}`);
   console.log(
     `   ficheros ejecutados: ${suites.length} · pruebas: ${pruebas} ` +
-      `(${informe.numPassedTests ?? 0} verdes, ${informe.numFailedTests ?? 0} rojas)`,
+      `(${informe.numPassedTests ?? 0} verdes, ${informe.numFailedTests ?? 0} rojas, ` +
+      `${saltadas} saltadas)`,
+  );
+  /**
+   * D-112 · UNA LÍNEA QUE OTRA HERRAMIENTA PUEDA LEER.
+   *
+   * El paso 5 y el paso 7 ejecutan la MISMA suite por caminos distintos —turbo
+   * y vitest directo— y hasta ahora nadie comparaba sus recuentos. La corrida
+   * del usuario dejó a la vista lo que eso permite: el paso 5 informaba
+   * «653 passed | 5 skipped» y el paso 7 ejecutaba las 658 sin saltarse
+   * ninguna. Dos veredictos sobre lo mismo, los dos verdes, y discrepando.
+   *
+   * Esta línea existe para que `recuentos-coherentes.mjs` no tenga que raspar
+   * prosa. La prosa es para quien lee; esto es para quien compara.
+   */
+  console.log(
+    `   RECUENTO ${paquete} ficheros=${suites.length} pruebas=${pruebas} ` +
+      `verdes=${informe.numPassedTests ?? 0} rojas=${informe.numFailedTests ?? 0} ` +
+      `saltadas=${saltadas}`,
   );
   for (const s of suites) {
     const n = (s.assertionResults ?? []).length;
@@ -297,7 +338,7 @@ for (const [paquete, dir] of paquetesAMedir) {
   if (!cobertura) {
     console.log('   SIN RESUMEN DE COBERTURA — este paquete no entra en la medición');
     sinMedir.push(
-      `${paquete} (sin resumen de cobertura${fallo === null ? '' : `; la corrida no terminó: ${fallo}`})`,
+      `${paquete} (sin resumen de cobertura${fallo === null ? '' : `; ${primeraLinea(fallo)}`})`,
     );
     continue;
   }

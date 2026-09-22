@@ -68,7 +68,27 @@ rm -rf packages/*/coverage apps/*/coverage
 # la compilación siguiente falle con «Cannot find module». Pasó al introducir
 # las referencias de proyecto, y este paso es justo el que lo provoca.
 rm -f packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo
-ok "dist, .turbo, coverage y registros de compilación eliminados"
+# ─────────────────────────────────────────────────────────────────────────────
+# D-115 · EL `dist/` VIEJO DE LA ETAPA 04, OTRA VEZ, CON OTRO NOMBRE.
+#
+# `.arranque-en-frio.json` lo escribe el paso 12b y está en `.gitignore`, así
+# que cada árbol tiene el suyo —o no tiene ninguno—. `arranque-en-frio.e2e.test.ts`
+# se salta entero si el fichero NO está, y se ejecuta si está: es decir, **el
+# resultado del paso 5 dependía de si alguien había corrido el verificador antes
+# en esa misma carpeta**.
+#
+# Se vio comparando dos corridas de la misma SHA: aquí, con el fichero de una
+# corrida previa, el paso 5 daba «658, sin una sola saltada»; en un runner
+# recién creado daba «653 | 5 skipped». Mi verde local era falso, y lo era por
+# exactamente el mismo mecanismo que motivó este guion: un artefacto que
+# envejece y que nadie declara.
+#
+# Borrándolo aquí, las dos máquinas parten igual: las cinco se saltan SIEMPRE en
+# el paso 5 —no hay claims todavía— y se ejecutan SIEMPRE en el 12b, que las
+# escribe y que ya exige que no se salten.
+# ─────────────────────────────────────────────────────────────────────────────
+rm -f .arranque-en-frio.json
+ok "dist, .turbo, coverage, registros de compilación y claims de arranque eliminados"
 
 paso "1 · entorno dentro de lo declarado"
 # La verificación depende ahora de Node y no del shell. Eso cierra la
@@ -170,9 +190,39 @@ con_limite "$LIMITE_MEDIO" pnpm typecheck >/dev/null 2>&1 && ok "pnpm typecheck"
 
 paso "5 · suite completa"
 salida_pruebas="$(mktemp)"
-con_limite "$LIMITE_LARGO" pnpm test >"$salida_pruebas" 2>&1
+# `pnpm test` ES `turbo run test`; se invoca turbo directamente para poder
+# pedirle a vitest, ADEMÁS del informe de consola, el JSON que el paso 7b
+# compara. Cada paquete escribe el suyo en su propio directorio (D-113: la
+# consola de turbo no tiene el mismo formato en todas las máquinas, y un
+# control que depende del formato no vigila lo que cree).
+rm -f apps/*/.informe-paso5.json packages/*/.informe-paso5.json
+TURBO_TELEMETRY_DISABLED=1 con_limite "$LIMITE_LARGO" pnpm exec turbo run test -- \
+  --reporter=default --reporter=json --outputFile=.informe-paso5.json \
+  >"$salida_pruebas" 2>&1
 codigo_pruebas=$?
-salida=$(cat "$salida_pruebas")
+# ─────────────────────────────────────────────────────────────────────────────
+# D-108 · SIN COLORES ANTES DE CONTAR NADA.
+#
+# Los códigos de color de Vitest **parten `Tests` de su número**: la línea que
+# se lee como «Tests  648 passed» es, en bytes, `Tests \e[22m \e[1m\e[32m648
+# passed`, y ni `Tests +[0-9]` ni `Tests +[0-9]+ failed` casan con ella.
+#
+# La primera corrida del verificador en macOS lo enseñó entero: `pnpm test`
+# terminó en 0, escribió 477 200 bytes, la suite informó 648 verdes de 658 — y
+# este paso dijo «la suite no informó ni una prueba». Y lo peor no es el falso
+# rojo: con colores, la rama que detecta PRUEBAS EN ROJO tampoco casa, así que
+# la única defensa que quedaba era el código de salida.
+#
+# Ya había pasado, y está escrito en la cabecera de `estabilidad.mjs`: «los
+# códigos de color de Vitest partían `Tests` de su número, no casaba una sola
+# línea, y comparar dos firmas vacías daba "idéntico"». Se arregló allí y no
+# aquí. Ahora el patrón vive en un solo sitio y lo usan los tres.
+# ─────────────────────────────────────────────────────────────────────────────
+salida=$(node "$RAIZ_DEL_REPO/scripts/lib/sin-colores.mjs" <"$salida_pruebas")
+# Se conserva en fichero porque el paso 7b compara estos recuentos con los del
+# paso 7. Dos pasos que deben decir lo mismo, y hasta D-112 nadie los comparaba.
+SALIDA_PASO5="$(mktemp "${TMPDIR:-/tmp}/ncr-paso5.XXXXXX")"
+printf '%s\n' "$salida" >"$SALIDA_PASO5"
 echo "$salida" | grep -E "Tests +[0-9]" | sed 's/^/   /'
 # ─────────────────────────────────────────────────────────────────────────────
 # D-79 · SE MIRA EL CÓDIGO DE SALIDA, y no solo el texto.
@@ -200,10 +250,62 @@ if [[ $codigo_pruebas -ne 0 ]]; then
 elif grep -qE "Tests +[0-9]+ failed|FAIL " <<<"$salida"; then
   mal "hay pruebas en rojo"
   echo "$salida" | grep -E "×|→" | head -10 | sed 's/^/     /'
+elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida" && [[ "$CON_BASE" == "1" ]]; then
+  # ───────────────────────────────────────────────────────────────────────────
+  # D-112 · UNA PRUEBA SALTADA NO SUMA AL VERDE.
+  #
+  # Hasta aquí este paso solo miraba `Tests N failed`. Una prueba que no llega a
+  # ejecutarse no falla: se descuenta del total y el resumen sigue diciendo
+  # «passed». Así es como «653 passed | 5 skipped» pasaba por verde.
+  #
+  # Con `--con-base` la única omisión admisible es la DECLARADA, y la
+  # declaración nombra el paso que sí la ejerce —hoy, las del arranque en frío,
+  # que el paso 12b ejecuta con los claims que él mismo escribe—. Cualquier otra
+  # es un fallo, y las dos salen nombradas.
+  # ───────────────────────────────────────────────────────────────────────────
+  if salida_salt=$(node scripts/lib/recuentos-coherentes.mjs --saltadas "$RAIZ_DEL_REPO" 2>&1); then
+    declarado "suite sin rojas · las saltadas están DECLARADAS y se ejercen en otro paso"
+    echo "$salida_salt" | sed 's/^/     /'
+  else
+    mal "hay pruebas SALTADAS sin declarar con --con-base: una omisión no es un verde"
+    echo "$salida_salt" | sed 's/^/     /'
+    grep -E "^\s*(Tasks|Cached|Time):" <<<"$salida" | sed 's/^/     turbo: /'
+    echo "     el verificador la ve: DATABASE_URL_PRUEBAS=${DATABASE_URL_PRUEBAS:+definida}${DATABASE_URL_PRUEBAS:-NO DEFINIDA}"
+    echo "     lo que turbo resuelve para la tarea:"
+    TURBO_TELEMETRY_DISABLED=1 pnpm exec turbo run test --filter=@ncr/api --dry=json 2>/dev/null |
+      node -e '
+        let e = "";
+        process.stdin.on("data", (d) => (e += d)).on("end", () => {
+          try {
+            const t = JSON.parse(e).tasks?.[0] ?? {};
+            const v = t.environmentVariables ?? {};
+            for (const k of ["specified", "configured", "inferred", "global", "passthrough"]) {
+              console.log(`       ${k}: ${JSON.stringify(v[k] ?? null)}`);
+            }
+          } catch (x) {
+            console.log(`       (no se pudo leer el plan de turbo: ${x.message})`);
+          }
+        });'
+  fi
 elif ! grep -qE "Tests +[0-9]" <<<"$salida"; then
   mal "la suite no informó ni una prueba: una salida sin recuento no es un verde"
+  # D-106 · esta rama imprimía CERO líneas. Saltó en la primera corrida del
+  # verificador en macOS —`pnpm test` terminó en 0 sin un solo recuento— y no
+  # dejó nada con lo que diagnosticarlo: ni el código, ni cuánto se escribió,
+  # ni la cola. Un fallo que no se nombra a sí mismo obliga a reproducirlo, y
+  # reproducir este cuesta otra corrida entera del runner.
+  echo "     código de salida: $codigo_pruebas · $(wc -c <"$salida_pruebas" | tr -d '[:space:]') bytes escritos"
+  echo "     últimas 20 líneas de lo que sí salió (ya sin colores):"
+  tail -20 <<<"$salida" | sed 's/^/       /'
+elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida"; then
+  # Sin base sí hay saltadas legítimas, y se dicen. «En verde» a secas con
+  # pruebas que no se han ejecutado es media verdad.
+  saltadas_totales=$(grep -oE "[0-9]+ (skipped|todo)" <<<"$salida" | grep -oE "^[0-9]+" |
+    awk '{s+=$1} END {print s+0}')
+  ok "suite completa sin rojas, CON $saltadas_totales prueba(s) SALTADA(S) por correr sin --con-base"
+  grep -E "Tests +[0-9]" <<<"$salida" | grep -E "skipped|todo" | sed 's/^/     /'
 else
-  ok "suite completa en verde"
+  ok "suite completa en verde, sin una sola prueba saltada"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -497,6 +599,7 @@ paso "7 · umbrales de cobertura por capa (§2.4)"
 # Se mide por CAPA, no en agregado: §2.4 exige 90 % en dominio y aplicación y
 # 70 % global, y un agregado alto puede esconder una capa por debajo — como
 # ocurrió con `aplicacion`, que estaba al 79 % sin que nadie lo midiera.
+SALIDA_PASO7="$(mktemp "${TMPDIR:-/tmp}/ncr-paso7.XXXXXX")"
 if salida_cob=$(con_limite "$LIMITE_LARGO" node scripts/lib/metricas.mjs 2>&1); then
   echo "$salida_cob" | grep -E "^  (OK|BAJO)" | sed 's/^/   /'
   ok "las tres capas cumplen su umbral"
@@ -519,7 +622,40 @@ else
     mal "alguna capa por debajo del umbral de §2.4"
   fi
   echo "$salida_cob" | grep -E "^  (OK|BAJO)|QUEDARON FUERA|NADIE ejecutó|NO terminaron|^     - |SIN RESUMEN|SIN INFORME" | sed 's/^/     /'
+  # ───────────────────────────────────────────────────────────────────────────
+  # D-105 · EL CONTROL IMPRIMÍA EL NOMBRE Y EL CONSUMIDOR LO TIRABA.
+  #
+  # D-100 hizo que `metricas.mjs` escribiera, por cada prueba roja, su nombre,
+  # su fichero y su aserción. Este filtro no los recogía: la primera corrida
+  # del verificador en macOS informó «SUITE EN ROJO · 5 prueba(s) fallaron de
+  # 658» y ni una sola línea más. Los nombres estaban a tres líneas de
+  # distancia, en la misma salida que este `grep` acababa de recortar.
+  #
+  # Es la misma familia una capa más arriba: se arregló que el control lo
+  # dijera y no que alguien lo escuchara. Dos rondas para el mismo defecto.
+  # ───────────────────────────────────────────────────────────────────────────
+  # El rango termina en la cabecera SIN dos puntos —`## @ncr/api`—, que es la
+  # del bloque siguiente; la de apertura sí los lleva —`## @ncr/api: PRUEBAS EN
+  # ROJO`—. Distinguirlas por los dos puntos conserva el encabezado del hallazgo
+  # y descarta el del bloque que viene detrás.
+  echo "$salida_cob" | sed -n '/: PRUEBAS EN ROJO/,/^## [^:]*$/p' | grep -v '^## [^:]*$' |
+    head -30 | sed 's/^/     /'
 fi
+printf '%s\n' "$salida_cob" >"$SALIDA_PASO7"
+
+paso "7b · los dos recuentos de la MISMA suite coinciden (D-112)"
+# El paso 5 corre la suite por turbo y el paso 7 por vitest directo. Los dos
+# daban verde discrepando: turbo informaba «653 passed | 5 skipped» y vitest
+# ejecutaba las 658. El dato estaba en la salida de los dos; faltaba compararlo.
+if salida_rec=$(con_limite "$LIMITE_CORTO" node scripts/lib/recuentos-coherentes.mjs \
+     "$RAIZ_DEL_REPO" "$SALIDA_PASO7" 2>&1); then
+  ok "$salida_rec"
+else
+  mal "los dos caminos de la suite NO dan el mismo resultado: uno de los dos miente"
+  echo "$salida_rec" | sed 's/^/     /'
+fi
+rm -f "$SALIDA_PASO5" "$SALIDA_PASO7"
+rm -f apps/*/.informe-paso5.json packages/*/.informe-paso5.json
 
 paso "8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)"
 # El entorno de desarrollo objetivo es macOS; el CI de la ETAPA 14 correrá en
@@ -760,11 +896,31 @@ if [[ "$CON_BASE" == "1" ]]; then
   # paso daba «✓ UPDATE y DELETE rechazados» con el servidor caído — que es
   # exactamente la familia de falso verde que este guion existe para impedir.
   con_base_o_omitida() {
-    local fichero="$1" etiqueta="$2" salida
+    local fichero="$1" etiqueta="$2" salida codigo
     salida=$(con_limite "$LIMITE_LARGO" pnpm --filter @ncr/api exec vitest run "$fichero" 2>&1)
-    if [[ $? -ne 0 ]]; then
+    # El código se guarda en su propia variable EN LA LÍNEA SIGUIENTE. Con
+    # `if [[ $? -ne 0 ]]` funcionaba, pero cualquier línea que alguien metiera
+    # entre medias —un `echo` de depuración— lo habría pisado en silencio.
+    codigo=$?
+    if [[ "$codigo" -ne 0 ]]; then
       mal "$etiqueta"
-      echo "$salida" | grep -E "×|→" | head -5 | sed 's/^/     /'
+      # D-104 · el diagnóstico decía el qué y no el porqué. Filtraba por `×` y
+      # `→`, que son los marcadores de vitest CUANDO hay una aserción rota; si
+      # el proceso moría antes —sin base, sin módulo, por tiempo límite— no
+      # casaba ninguno y el paso imprimía la etiqueta y NADA más. Es la misma
+      # familia que D-100 en el paso 7: un fallo que no se nombra a sí mismo
+      # obliga a reproducirlo a mano, y en el CI de macOS eso es otra corrida
+      # de cuarenta minutos. Ahora sale el código y la cola real.
+      echo "     código de salida: $codigo · fichero: $fichero"
+      local pistas
+      pistas=$(grep -E "×|→|FAIL|Error|error:|ECONN|timed out|AssertionError" <<<"$salida" |
+        head -8)
+      if [[ -n "$pistas" ]]; then
+        sed 's/^/     /' <<<"$pistas"
+      else
+        echo "     (ninguna línea reconocible; últimas 15 de la salida)"
+        tail -15 <<<"$salida" | sed 's/^/     /'
+      fi
     elif grep -q "OMITIDA" <<<"$salida"; then
       mal "$etiqueta — OMITIDA: no se alcanzó la base. Una omisión no es un verde."
     else

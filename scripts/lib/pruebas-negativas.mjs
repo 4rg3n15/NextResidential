@@ -1264,53 +1264,438 @@ try {
      * **no hay ninguna suite en rojo**, que es lo que la sonda va a provocar.
      */
     try {
-    const base = conConfig();
-    !/SUITE EN ROJO/.test(base.salida)
-      ? ok('el banco parte sin ninguna suite en rojo')
-      : mal('la línea base ya tiene pruebas rojas: la sonda no demostraría nada');
+      const base = conConfig();
+      !/SUITE EN ROJO/.test(base.salida)
+        ? ok('el banco parte sin ninguna suite en rojo')
+        : mal('la línea base ya tiene pruebas rojas: la sonda no demostraría nada');
 
-    writeFileSync(
-      sonda,
-      "import { describe, expect, it } from 'vitest';\n" +
-        "describe('sonda de D-100', () => {\n" +
-        "  it('esta prueba falla a proposito y su nombre tiene que aparecer', () => {\n" +
-        '    expect(1).toBe(2);\n' +
-        '  });\n' +
-        '});\n',
-    );
-    const conRoja = conConfig();
+      writeFileSync(
+        sonda,
+        "import { describe, expect, it } from 'vitest';\n" +
+          "describe('sonda de D-100', () => {\n" +
+          "  it('esta prueba falla a proposito y su nombre tiene que aparecer', () => {\n" +
+          '    expect(1).toBe(2);\n' +
+          '  });\n' +
+          // Y una SALTADA, para que el recuento de saltadas que D-112 añadió a
+          // `metricas.mjs` se ejercite de verdad: sin ella esa rama no la
+          // ejecutaba nadie, y el trinquete de D-81 lo cantó.
+          "  it.skip('esta se salta a proposito y tiene que contarse como saltada', () => {\n" +
+          '    expect(1).toBe(1);\n' +
+          '  });\n' +
+          '});\n',
+      );
+      const conRoja = conConfig();
 
-    conRoja.codigo !== 0
-      ? ok('una suite en rojo hace fallar la medición')
-      : mal('una prueba roja pasa inadvertida: el paquete se mediría igual');
+      conRoja.codigo !== 0
+        ? ok('una suite en rojo hace fallar la medición')
+        : mal('una prueba roja pasa inadvertida: el paquete se mediría igual');
 
-    // LO QUE IMPORTA: el nombre, no el recuento.
-    /esta prueba falla a proposito y su nombre tiene que aparecer/.test(conRoja.salida)
-      ? ok('el NOMBRE de la prueba roja aparece en la salida')
-      : mal('la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas');
+      // LO QUE IMPORTA: el nombre, no el recuento.
+      /esta prueba falla a proposito y su nombre tiene que aparecer/.test(conRoja.salida)
+        ? ok('el NOMBRE de la prueba roja aparece en la salida')
+        : mal('la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas');
 
-    /sonda-roja\.test\.ts/.test(conRoja.salida)
-      ? ok('y también su fichero')
-      : mal('no se dice en qué fichero está');
+      /sonda-roja\.test\.ts/.test(conRoja.salida)
+        ? ok('y también su fichero')
+        : mal('no se dice en qué fichero está');
 
-    // Y que NO se disfrace de corrida interrumpida, que es el otro remedio.
-    /SUITE EN ROJO/.test(conRoja.salida) && !/CORRIDA INTERRUMPIDA/.test(conRoja.salida)
-      ? ok('se clasifica como SUITE EN ROJO, no como corrida interrumpida')
-      : mal('una suite en rojo se informa como corrida interrumpida: remedio equivocado');
+      // Y que NO se disfrace de corrida interrumpida, que es el otro remedio.
+      /SUITE EN ROJO/.test(conRoja.salida) && !/CORRIDA INTERRUMPIDA/.test(conRoja.salida)
+        ? ok('se clasifica como SUITE EN ROJO, no como corrida interrumpida')
+        : mal('una suite en rojo se informa como corrida interrumpida: remedio equivocado');
 
-    // El eco de pnpm no es el nombre de ninguna prueba.
-    !/ERR_PNPM_/.test(conRoja.salida)
-      ? ok('la línea de pnpm no se cuela como si fuera una pista')
-      : mal('ERR_PNPM_* sigue apareciendo entre las pistas');
+      /saltadas=1\b/.test(conRoja.salida)
+        ? ok('la prueba SALTADA se cuenta y se publica para que otro la compare (D-112)')
+        : mal('una saltada no aparece en el recuento legible por máquina');
 
-    rmSync(sonda, { force: true });
-    !/SUITE EN ROJO/.test(conConfig().salida)
-      ? ok('el árbol real queda sin la sonda')
-      : mal('la sonda dejó rastro en el árbol real');
+      // El eco de pnpm no es el nombre de ninguna prueba.
+      !/ERR_PNPM_/.test(conRoja.salida)
+        ? ok('la línea de pnpm no se cuela como si fuera una pista')
+        : mal('ERR_PNPM_* sigue apareciendo entre las pistas');
+
+      /**
+       * D-102 · y NADA de la salida es un objeto sin serializar. El bloque
+       * «QUEDARON FUERA de la medición» interpolaba el fallo entero y escribía
+       * `[object Object]` — con el detalle correcto impreso diez líneas más
+       * arriba—. La sonda ya provocaba ese caso y no lo miraba: comprobaba lo
+       * que se había arreglado, no lo que el control imprime. Esta aserción es
+       * genérica a propósito: cubre ese sitio y cualquier otro que nazca igual.
+       */
+      !/\[object Object\]/.test(conRoja.salida)
+        ? ok('ningún objeto llega a la salida sin serializar')
+        : mal('la salida contiene [object Object]: un mensaje que no dice nada (D-102)');
+
+      // Y el segundo mensaje nombra la MISMA clase que el primero. Decir «la
+      // corrida no terminó» de una suite en rojo manda al remedio contrario.
+      !/(?:sin resumen de cobertura|QUEDARON FUERA)[\s\S]{0,200}?la corrida no terminó/i.test(
+        conRoja.salida,
+      )
+        ? ok('el resumen final no llama «corrida no terminada» a una suite en rojo')
+        : mal('el resumen final contradice la clasificación de D-100');
+
+      rmSync(sonda, { force: true });
+      !/SUITE EN ROJO/.test(conConfig().salida)
+        ? ok('el árbol real queda sin la sonda')
+        : mal('la sonda dejó rastro en el árbol real');
     } finally {
       // Si cualquier aserción de arriba lanzara, el fichero NO se queda.
       rmSync(sonda, { force: true });
     }
+  }
+
+  console.log('\n▸ 23 · un número de `wc` comparado como TEXTO se detecta (D-103)');
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * EL DEFECTO QUE ESTA SONDA CIERRA
+     *
+     * `30_concurrencia_placas.sh` capturaba `exitosos=$(… | wc -l)` en una
+     * línea y comparaba `[[ "$exitosos" != "1" ]]` en otra. En BSD `wc`
+     * almohadilla —«       1»— y en GNU no, así que en macOS el paso 12 fallaba
+     * **con el KPI-03 cumplido delante**: una sola inserción aceptada, cero
+     * duplicados, y el guion informando incumplimiento.
+     *
+     * Ninguna regla de LÍNEA podía verlo: las dos líneas son portables por
+     * separado; lo que no lo es, es la pareja. Por eso la regla nueva mira el
+     * fichero entero, y por eso esta sonda comprueba las tres respuestas:
+     * que detecta el defecto, que NO se queja de la comparación numérica, y
+     * que NO se queja de la captura ya normalizada. Un control que solo se ve
+     * decir «✗» tampoco está demostrado: hay que verlo callar cuando toca.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const escribirSonda = (cuerpo) => {
+      writeFileSync(join(clon, 'sonda-wc.sh'), `#!/usr/bin/env bash\nset -euo pipefail\n${cuerpo}`);
+      enClon('git', ['add', '--intent-to-add', 'sonda-wc.sh']);
+      return enClon('node', ['scripts/lib/portabilidad.mjs']);
+    };
+    const limpiar = () => {
+      rmSync(join(clon, 'sonda-wc.sh'), { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-wc.sh']);
+    };
+
+    try {
+      const roto = escribirSonda('n=$(ls | wc -l)\nif [[ "$n" != "1" ]]; then echo distinto; fi\n');
+      roto.codigo !== 0 && /wc/.test(roto.salida)
+        ? ok('detectado, con salida distinta de cero')
+        : mal(`NO detectado: el defecto que rompió el paso 12 en macOS (codigo ${roto.codigo})`);
+
+      // Que NOMBRE las dos líneas: sin eso hay que buscar la captura a mano, y
+      // es justo lo que hizo caro encontrarlo la primera vez.
+      /viene de la línea 3/.test(roto.salida)
+        ? ok('y dice en qué línea se capturó el número, no solo dónde se compara')
+        : mal('no enlaza la comparación con la captura: obliga a buscarla a mano');
+      limpiar();
+
+      const numerico = escribirSonda(
+        'n=$(ls | wc -l)\nif [[ "$n" -ne 1 ]]; then echo distinto; fi\n',
+      );
+      numerico.codigo === 0
+        ? ok('la comparación NUMÉRICA no se marca: no hay falso positivo')
+        : mal('marca `-ne`, que es exactamente el remedio que el control pide');
+      limpiar();
+
+      const normalizado = escribirSonda(
+        'n=$(ls | wc -l | tr -d "[:space:]")\nif [[ "$n" != "1" ]]; then echo distinto; fi\n',
+      );
+      normalizado.codigo === 0
+        ? ok('una captura ya normalizada tampoco se marca')
+        : mal('marca una captura limpia: el control obligaría a cambios inútiles');
+      limpiar();
+
+      /**
+       * Los otros dos productores que el usuario pidió revisar, y que fallan
+       * por motivos DISTINTOS al de `wc`. No basta con que la regla exista:
+       * hay que haberlos visto detectar, porque cada uno tiene su regex y una
+       * regex que no se ejercita es una rama que nadie ha visto correr (D-81).
+       */
+      const conPsql = escribirSonda(
+        'n=$(psql -t -c "select count(*) from t")\nif [[ "$n" != "1" ]]; then echo d; fi\n',
+      );
+      conPsql.codigo !== 0 && /psql/.test(conPsql.salida)
+        ? ok('`psql -t` sin `-A` también se detecta: alinea la columna con espacios')
+        : mal('`psql -t` sin `-A` pasa: devuelve el valor almohadillado y nadie lo ve');
+      limpiar();
+
+      // Y con `-A` NO se marca: `-Atq` es la forma correcta y el repositorio la
+      // usa en todas partes. Marcarla sería inutilizable.
+      const psqlCorrecto = escribirSonda(
+        'n=$(psql -Atq -c "select count(*) from t")\nif [[ "$n" != "1" ]]; then echo d; fi\n',
+      );
+      psqlCorrecto.codigo === 0
+        ? ok('y `psql -Atq`, que es la forma correcta, no se marca')
+        : mal('marca `psql -Atq`: la forma que el repositorio usa en todas partes');
+      limpiar();
+
+      const conGrepC = escribirSonda(
+        'n=$(grep -c foo a.txt b.txt)\nif [[ "$n" != "1" ]]; then echo d; fi\n',
+      );
+      conGrepC.codigo !== 0 && /grep -c/.test(conGrepC.salida)
+        ? ok('`grep -c` también: antepone «fichero:» cuando recibe varios')
+        : mal('`grep -c` pasa: con varios ficheros el valor no es un número');
+      limpiar();
+
+      // La forma de UNA línea, sin variable de por medio, que es la otra manera
+      // de escribir el mismo defecto.
+      const enUnaLinea = escribirSonda('if [[ "$(ls | wc -l)" == "1" ]]; then echo d; fi\n');
+      enUnaLinea.codigo !== 0
+        ? ok('la captura y la comparación en la MISMA línea también se detectan')
+        : mal('escrito en una sola línea, el mismo defecto pasa inadvertido');
+      limpiar();
+
+      enClon('node', ['scripts/lib/portabilidad.mjs']).codigo === 0
+        ? ok('el banco de pruebas queda limpio')
+        : mal('la sonda dejó rastro en el banco');
+    } finally {
+      limpiar();
+    }
+  }
+
+  console.log('\n▸ 24 · los colores de Vitest no pueden partir un recuento (D-108)');
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * EL DEFECTO QUE ESTA SONDA CIERRA, Y POR QUÉ ES EL TERCERO IGUAL
+     *
+     * Vitest escribe «Tests  648 passed» con códigos de color EN MEDIO:
+     * `Tests \e[22m \e[1m\e[32m648 passed`. Ninguna expresión regular del tipo
+     * `Tests +[0-9]` casa con eso.
+     *
+     * Ya había ocurrido una vez, en `estabilidad.mjs`, y su cabecera lo cuenta.
+     * Se arregló allí. El paso 5 de `verificar-etapa.sh` conservó el defecto
+     * intacto hasta la primera corrida del verificador en macOS, donde la
+     * suite informó 648 verdes de 658 y el paso dijo «la suite no informó ni
+     * una prueba».
+     *
+     * Lo que se exige aquí no es solo que limpie: es que **el recuento
+     * sobreviva entero**, porque un filtro demasiado ávido que se comiera el
+     * número sería el mismo fallo con otra cara.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const conColores =
+      'Tests \u001B[22m \u001B[1m\u001B[32m648 passed\u001B[39m\u001B[2m | \u001B[22m10 skipped\n' +
+      '\u001B[2K\u001B[1GTest Files \u001B[1m54 passed\u001B[22m\n';
+
+    const r = correr('node', ['scripts/lib/sin-colores.mjs'], { cwd: raiz, input: conColores });
+
+    /Tests {2}648 passed/.test(r.salida)
+      ? ok('«Tests  648 passed» vuelve a ser una sola cadena que se puede contar')
+      : mal('el recuento sigue partido: el paso 5 no podría contarlo');
+
+    /Test Files 54 passed/.test(r.salida)
+      ? ok('y también sobrevive a los borrados de línea que emite turbo')
+      : mal('un movimiento de cursor sigue partiendo la línea');
+
+    // eslint-disable-next-line no-control-regex
+    !/\u001B\[/.test(r.salida)
+      ? ok('no queda ni un escape en la salida')
+      : mal('quedan escapes ANSI sin limpiar');
+
+    // Y que NO se coma texto legítimo: un filtro demasiado ávido es el mismo
+    // defecto con otra cara.
+    const limpio = correr('node', ['scripts/lib/sin-colores.mjs'], {
+      cwd: raiz,
+      input: 'Tests  12 passed [corchetes] 3;4 m\n',
+    });
+    /Tests {2}12 passed \[corchetes\] 3;4 m/.test(limpio.salida)
+      ? ok('un texto sin escapes pasa intacto, corchetes y puntos y coma incluidos')
+      : mal('se come texto legítimo: el recuento podría desaparecer por el otro lado');
+  }
+
+  console.log('\n▸ 25 · dos recuentos de la MISMA suite que discrepan se detectan (D-112)');
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * EL DEFECTO QUE ESTA SONDA CIERRA
+     *
+     * El verificador ejecuta la suite dos veces: el paso 5 por turbo y el paso
+     * 7 por vitest directo. La corrida del usuario con la base ya correcta dejó
+     * a la vista que los dos daban verde DISCREPANDO: turbo informaba
+     * «@ncr/api: 653 passed | 5 skipped» y vitest ejecutaba las 658. Las cinco
+     * eran las de `residente-pg.test.ts`, y bajo turbo no llegaban a correr
+     * porque `turbo.json` no declaraba `DATABASE_URL_PRUEBAS` —Turborepo 2.x
+     * filtra el entorno— así que `it.runIf(...)` las saltaba en silencio.
+     *
+     * Las dos cifras estaban. Faltaba quien las comparase.
+     *
+     * Se exige que detecte la divergencia REAL, que NOMBRE la prueba saltada
+     * —si no, hay que reproducirla para saber cuál fue—, que NO se queje cuando
+     * coinciden, y que trate como fallo el quedarse sin nada que comparar por
+     * cualquiera de los dos lados. Esto último no es teórico: la primera
+     * versión de `estabilidad.mjs` daba «idéntico» comparando dos firmas
+     * vacías.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const arbol = join(banco, 'arbol-d112');
+    const dirApi = join(arbol, 'apps', 'api');
+    mkdirSync(dirApi, { recursive: true });
+    writeFileSync(join(dirApi, 'package.json'), JSON.stringify({ name: '@ncr/api' }));
+    const p7 = join(banco, 'paso7.txt');
+    const informe = join(dirApi, '.informe-paso5.json');
+
+    const comparar = () =>
+      correr('node', ['scripts/lib/recuentos-coherentes.mjs', arbol, p7], { cwd: raiz });
+
+    /** Un informe de vitest con el reparto que se le pida. */
+    const informeCon = (verdes, saltadas) => ({
+      numTotalTests: verdes + saltadas,
+      numPassedTests: verdes,
+      numFailedTests: 0,
+      numPendingTests: saltadas,
+      numTodoTests: 0,
+      testResults: [
+        {
+          name: '/x/apps/api/test/residente-pg.test.ts',
+          assertionResults: [
+            // Los tres estados que vitest usa para «no se ejecutó». Que sean
+            // tres y no uno importa: `todo` y `skipped` conviven con `pending`
+            // en el mismo informe, y una rama que solo mira uno deja pasar los
+            // otros dos.
+            ...Array.from({ length: saltadas }, (_, i) => ({
+              status: ['pending', 'skipped', 'todo'][i % 3],
+              fullName: `la consulta del titular encaja con el esquema ${i + 1}`,
+            })),
+          ],
+        },
+      ],
+    });
+    const RECUENTO_658 =
+      '   RECUENTO @ncr/api ficheros=56 pruebas=658 verdes=658 rojas=0 saltadas=0\n';
+
+    writeFileSync(informe, JSON.stringify(informeCon(658, 0)));
+    writeFileSync(p7, RECUENTO_658);
+    comparar().codigo === 0
+      ? ok('cuando los dos caminos coinciden, no se queja')
+      : mal('marca una coincidencia: el control sería inutilizable');
+
+    writeFileSync(informe, JSON.stringify(informeCon(653, 5)));
+    const r = comparar();
+    r.codigo !== 0
+      ? ok('la divergencia real de D-112 se detecta')
+      : mal('«653 passed | 5 skipped» frente a 658 ejecutadas pasa por buena');
+    /saltadas/.test(r.salida) && /653/.test(r.salida) && /658/.test(r.salida)
+      ? ok('y salen los DOS recuentos y el campo que difiere, no solo el aviso')
+      : mal('no enseña las dos cifras: obliga a buscarlas a mano');
+    /la consulta del titular encaja con el esquema 1/.test(r.salida)
+      ? ok('y NOMBRA la prueba que se quedó fuera, con su fichero')
+      : mal('no dice qué prueba se saltó: habría que reproducirlo para saberlo');
+
+    // Un paquete que el paso 7 mide y del que el paso 5 no dejó informe. Hace
+    // falta OTRO paquete con informe: si no queda ninguno, lo que salta es la
+    // comprobación de «no hay nada que comparar», que es un caso distinto.
+    const dirWeb = join(arbol, 'apps', 'web');
+    mkdirSync(dirWeb, { recursive: true });
+    writeFileSync(join(dirWeb, 'package.json'), JSON.stringify({ name: '@ncr/web' }));
+    writeFileSync(join(dirWeb, '.informe-paso5.json'), JSON.stringify(informeCon(350, 0)));
+    writeFileSync(
+      p7,
+      RECUENTO_658 + '   RECUENTO @ncr/web ficheros=30 pruebas=350 verdes=350 rojas=0 saltadas=0\n',
+    );
+    rmSync(informe, { force: true });
+    /el paso 5 no dejó informe de este paquete/.test(comparar().salida)
+      ? ok('un paquete del que un camino no informa se detecta, no se ignora')
+      : mal('un paquete ausente en un lado pasa inadvertido');
+    rmSync(dirWeb, { recursive: true, force: true });
+
+    // Y un paquete bajo `packages/`, no solo bajo `apps/`: el control recorre
+    // los dos grupos y hasta aquí solo se había visto recorrer uno.
+    const dirCfg = join(arbol, 'packages', 'config');
+    mkdirSync(dirCfg, { recursive: true });
+    writeFileSync(join(dirCfg, 'package.json'), JSON.stringify({ name: '@ncr/config' }));
+    writeFileSync(join(dirCfg, '.informe-paso5.json'), JSON.stringify(informeCon(144, 0)));
+    writeFileSync(informe, JSON.stringify(informeCon(658, 0)));
+    writeFileSync(
+      p7,
+      RECUENTO_658 +
+        '   RECUENTO @ncr/config ficheros=2 pruebas=144 verdes=144 rojas=0 saltadas=0\n',
+    );
+    comparar().codigo === 0
+      ? ok('también mira `packages/`, no solo `apps/`')
+      : mal('un paquete de packages/ no se compara: media medición');
+    rmSync(join(arbol, 'packages'), { recursive: true, force: true });
+
+    // Y las dos formas de quedarse sin nada que comparar.
+    writeFileSync(p7, 'sin una sola linea RECUENTO\n');
+    writeFileSync(informe, JSON.stringify(informeCon(658, 0)));
+    comparar().codigo !== 0
+      ? ok('una salida del paso 7 sin líneas RECUENTO es un FALLO, no un empate')
+      : mal('sin recuentos del paso 7 daría por bueno cualquier cosa');
+
+    writeFileSync(p7, RECUENTO_658);
+    rmSync(join(arbol, 'apps'), { recursive: true, force: true });
+    comparar().codigo !== 0
+      ? ok('y no encontrar ningún informe del paso 5, igual')
+      : mal('sin informes del paso 5 daría por bueno cualquier cosa');
+
+    // Un informe ilegible se dice; no se confunde con «cero divergencias».
+    mkdirSync(dirApi, { recursive: true });
+    writeFileSync(join(dirApi, 'package.json'), JSON.stringify({ name: '@ncr/api' }));
+    writeFileSync(informe, '{esto no es json');
+    const roto = comparar();
+    roto.codigo !== 0 && /no se pudo leer/.test(roto.salida)
+      ? ok('un informe ilegible se dice, no se confunde con un empate')
+      : mal('un informe corrupto pasa como si no hubiera divergencias');
+
+    correr('node', ['scripts/lib/recuentos-coherentes.mjs'], { cwd: raiz }).codigo !== 0
+      ? ok('invocarlo sin argumentos no devuelve verde')
+      : mal('sin argumentos da 0: un control que no mira nada y aprueba');
+
+    /**
+     * D-114 · y el modo que NOMBRA lo saltado. El paso 5 decía «5 saltadas» sin
+     * decir cuáles, y averiguarlo costó tres corridas del runner — con el
+     * nombre esperando dentro del informe JSON que ese mismo paso acababa de
+     * escribir. Es D-100 otra vez, un paso más allá.
+     */
+    writeFileSync(informe, JSON.stringify(informeCon(653, 5)));
+    const nombradas = correr(
+      'node',
+      ['scripts/lib/recuentos-coherentes.mjs', '--saltadas', arbol],
+      { cwd: raiz },
+    );
+    /la consulta del titular encaja con el esquema 1/.test(nombradas.salida) &&
+    /la consulta del titular encaja con el esquema 5/.test(nombradas.salida)
+      ? ok('`--saltadas` nombra TODAS las que no se ejecutaron, no solo la primera')
+      : mal('no nombra las saltadas: «5 saltadas» sin decir cuáles no sirve de nada');
+    nombradas.codigo !== 0
+      ? ok('y una saltada SIN declarar hace fallar el control')
+      : mal('una saltada sin declarar pasa por buena: la regla no sirve de nada');
+
+    /**
+     * Y el otro lado, que es el que hace útil a la regla: una saltada
+     * DECLARADA —las del arranque en frío, que el paso 12b ejecuta con los
+     * claims que él mismo escribe— no puede romper el paso 5. Sin esta mitad,
+     * la única salida sería relajar la regla para todas.
+     */
+    writeFileSync(
+      informe,
+      JSON.stringify({
+        ...informeCon(653, 5),
+        testResults: [
+          {
+            name: '/x/apps/api/test/arranque-en-frio.e2e.test.ts',
+            assertionResults: Array.from({ length: 5 }, (_, i) => ({
+              status: 'pending',
+              fullName: `el superadministrador recien aprovisionado PUEDE entrar ${i + 1}`,
+            })),
+          },
+        ],
+      }),
+    );
+    const declaradas = correr(
+      'node',
+      ['scripts/lib/recuentos-coherentes.mjs', '--saltadas', arbol],
+      { cwd: raiz },
+    );
+    declaradas.codigo === 0 && /DECLARADA/.test(declaradas.salida)
+      ? ok('una saltada DECLARADA no rompe, y dice por qué lo está')
+      : mal('una saltada declarada rompe igual: obligaría a relajar la regla entera');
+
+    writeFileSync(informe, JSON.stringify(informeCon(658, 0)));
+    /ninguna prueba saltada/.test(
+      correr('node', ['scripts/lib/recuentos-coherentes.mjs', '--saltadas', arbol], { cwd: raiz })
+        .salida,
+    )
+      ? ok('y lo dice con todas las letras cuando no hay ninguna')
+      : mal('con cero saltadas calla: el silencio se lee como «no miré»');
   }
 } finally {
   rmSync(banco, { recursive: true, force: true });

@@ -11,7 +11,11 @@ name: verificacion
 
 on:
   push:
-    branches: [develop, main, 'etapa-**']
+    # `correccion-**` entra aquí porque la primera rama de corrección se empujó
+    # y NO disparó nada: el patrón solo cubría `etapa-**`. Una rama que arregla
+    # el CI y a la que el CI no mira es la misma familia de defecto que esta
+    # rama viene a cerrar, en su forma más literal.
+    branches: [develop, main, 'etapa-**', 'correccion-**']
   pull_request:
     branches: [develop, main]
 
@@ -78,3 +82,89 @@ jobs:
 
       - name: El contrato y el cliente generado están al día
         run: node scripts/lib/contrato-desfasado.mjs
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # EL VERIFICADOR ENTERO, CON BASE, EN macOS.
+  #
+  # Hasta esta corrección el CI NO ejecutaba `verificar-etapa.sh` en absoluto.
+  # Corría los nueve controles de arriba, que son valiosos y no son el
+  # verificador: este tiene VEINTICINCO pasos. La consecuencia, escrita sin
+  # rodeos, es que los pasos 12, 12b, 12c y 13 —esquema, aislamiento, arranque
+  # en frío, KPI-03 e inmutabilidad contra PostgreSQL real— no se habían
+  # ejecutado NUNCA en ninguna máquina salvo la del usuario, y que el veredicto
+  # «25 de 25 pasos» de todos los informes anteriores salía siempre de una sola
+  # máquina.
+  #
+  # Se vio al primer intento: el paso 12 comparaba la salida de `wc` como texto
+  # y en BSD viene almohadillada, así que fallaba en macOS **con el KPI-03
+  # cumplido delante**. Un defecto de meses que ningún control podía ver porque
+  # en el único sitio donde el paso corría no había CI.
+  #
+  # Corre en macOS porque es el entorno de desarrollo declarado en §2.8.0 y el
+  # que tiene BSD. Es un trabajo aparte del de arriba, no un paso más, por tres
+  # razones: tarda mucho más, necesita SDK de Flutter y PostgreSQL, y su fallo
+  # debe poder leerse sin confundirse con el de los controles rápidos.
+  # ═══════════════════════════════════════════════════════════════════════════
+  verificador-con-base:
+    name: verificar-etapa.sh --con-base (macos)
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .flutter-version
+          cache: true
+
+      # El orden importa: el control de la base carga `pg` del árbol instalado,
+      # así que la instalación va ANTES. Al revés, el paso fallaría por no
+      # encontrar el módulo y el mensaje hablaría de otra cosa.
+      - name: Instalación reproducible
+        run: pnpm install --frozen-lockfile
+
+      # El paso 12c conduce Chromium y NO está declarado: sin navegador falla, y
+      # con razón —«la ausencia es un fallo inmediato y explícito»—. Se instala
+      # aquí para que el fallo, si llega, sea del camino y no del entorno.
+      - name: Chromium para el paso 12c
+        run: pnpm exec playwright install chromium
+
+      - name: PostgreSQL en el runner
+        run: |
+          brew install postgresql@16 || brew list postgresql@16
+          ./scripts/base-de-pruebas.sh arrancar | sed 's/^export //' >>"$GITHUB_ENV"
+
+      # PRUEBA NEGATIVA DEL CONTROL DE LA BASE, y sale gratis: en este punto el
+      # clúster está recién creado y VACÍO, que es exactamente la condición que
+      # el control tiene que rechazar. Hasta esta ronda la daba por buena —dijo
+      # «conectado como postgres» y cuatro minutos después aparecían cinco rojas
+      # de `residente-pg.test.ts` sin relación aparente con la base—. Un control
+      # que nadie ha visto fallar no está demostrado (§2.8.0), y este no tenía
+      # dónde demostrarse porque el banco de pruebas negativas no tiene
+      # PostgreSQL. Aquí sí lo hay, y en el único instante en que sirve.
+      - name: Una base SIN esquema se detecta como tal
+        run: |
+          if node scripts/lib/verificar-base-de-pruebas.mjs; then
+            echo "FALLO el control dio por buena una base sin esquema" >&2
+            exit 1
+          fi
+          echo "ok · una base que contesta pero no tiene esquema NO pasa por buena"
+
+      # Y ahora se deja en el estado del que parten los pasos 5, 7, 12b y 13:
+      # migrada y sembrada. En la máquina del usuario ese estado lleva puesto
+      # desde hace semanas y nadie lo declara; aquí se declara.
+      - name: Migraciones y semillas
+        run: ./supabase/verificar.sh --con-semillas --modo-supabase
+
+      - name: La base contesta, con esquema y semillas
+        run: node scripts/lib/verificar-base-de-pruebas.mjs
+
+      - name: El verificador completo, con base
+        run: ./scripts/verificar-etapa.sh --con-base

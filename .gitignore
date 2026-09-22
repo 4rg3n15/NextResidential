@@ -45,3 +45,6 @@ next-env.d.ts
 # (ADR-015: el cliente Dart se genera con `swagger_parser`). Los dos de 0 bytes.
 a.out
 openapitools.json
+
+# Informes JSON del paso 5 del verificador (D-113): se borran al terminar.
+.informe-paso5.json

@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-21 · **ETAPA 12 CERRADA** · con CI verde en `ubuntu-latest` **y** `macos-latest` sobre la SHA final, y `verificar-etapa.sh --con-base` correcto en local. Su primer cierre se retiró por apoyarse en un veredicto de una sola plataforma
+**Última actualización:** 2026-09-21 · **ETAPA 12 CERRADA** · y en curso la rama `correccion-macos`, que lleva el CI a ejecutar **el verificador entero con base en macOS** por primera vez en el proyecto. Hasta ella, los pasos 12, 12b, 12c y 13 no se habían ejercido nunca fuera de la máquina del usuario
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,16 +18,174 @@
 
 ## Resumen
 
-|                                |                                                                                                                 |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas             |
-| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento**                                                     |
-| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código) |
-| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos) |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                          |
-| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                   |
-| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)    |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                           |
+|                                |                                                                                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas                                                                                        |
+| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento** · recibe como INSUMO el hallazgo de cobertura de D-112 (`aplicacion` se medía sobre 5 archivos de 39; global sobre 156 de 306) |
+| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                            |
+| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos)                                                                            |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                                                                                                     |
+| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                                                                                              |
+| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)                                                                               |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                      |
+
+---
+
+## Corrección `correccion-macos` — entre la 12 y la 13
+
+**Rama:** `correccion-macos` · **PR:** [#22](https://github.com/4rg3n15/NextResidential/pull/22)
+· **No es una etapa:** no añade producto. Corrige el verificador y el CI.
+
+> **Procedencia, escrita como es y no como convenía.** La rama se sacó de la
+> punta de `etapa-12-edge-gateway-offline` cuando su PR #21 **seguía abierto**,
+> porque `develop` no contenía todavía la ETAPA 12 y el trabajo habría partido
+> de un árbol sin el código que hay que corregir. Era equivalente **en
+> contenido** a lo que `develop` iba a ser, y eso no autoriza a llamarlo
+> `develop` — es el mismo defecto que se corrigió en la ETAPA 12 aplicado a la
+> documentación. Fusionado el #21, `develop` se trajo aquí **por fusión**, y
+> ahora la procedencia es literal.
+
+### El hallazgo que la motiva, dicho sin suavizar
+
+**El CI no ejecutaba `verificar-etapa.sh`.** Ni con `--con-base` ni sin él, ni en
+Linux ni en macOS. El flujo corría nueve controles escogidos a mano; el
+verificador tiene **25 pasos**. Consecuencias, todas comprobadas:
+
+- Los pasos **12, 12b, 12c y 13** —esquema, aislamiento, arranque en frío,
+  KPI-03 e inmutabilidad contra PostgreSQL real— **no se habían ejecutado nunca
+  en ninguna máquina salvo la del usuario.**
+- Tampoco los pasos 5b a 5d (Flutter), 11 (latencia), 14 (estabilidad) ni 15.
+- Y el «25 de 25 pasos» que aparece en **todos** los informes anteriores salía
+  siempre de una sola máquina. Cuando esos informes decían «CI verde en las dos
+  plataformas», era cierto de los nueve controles y no del veredicto.
+
+Ahora hay un trabajo `verificador-con-base` en `macos-latest` que instala
+Flutter, Chromium y PostgreSQL, siembra la base y ejecuta el verificador entero.
+
+### Lo que encontró la primera corrida
+
+| ID        | Qué                                                                                                                                                                                                                                                                                                                                                     | Estado                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **D-102** | El bloque «QUEDARON FUERA de la medición» interpolaba el objeto de fallo: imprimía **`[object Object]`**. Y llamaba «la corrida no terminó» a una suite en rojo — la confusión que D-100 había cerrado diez líneas más arriba                                                                                                                           | **Corregido** · sonda 22 ampliada                                        |
+| **D-103** | El paso 12 comparaba como TEXTO un número de `wc`, que **BSD almohadilla y GNU no**. En macOS fallaba con el KPI-03 cumplido delante: una inserción aceptada, cero duplicados, e incumplimiento informado                                                                                                                                               | **Corregido** · sonda 23                                                 |
+| **D-104** | El diagnóstico del paso 13 filtraba por `×` y `→`. Si el proceso moría antes de una aserción no casaba ninguno, y el paso imprimía la etiqueta y **nada más**                                                                                                                                                                                           | **Corregido**                                                            |
+| **D-105** | D-100 hizo que el control imprimiera el nombre de cada prueba roja; **el filtro del paso 7 lo tiraba**. macOS informó «5 prueba(s) fallaron» y ni una línea más, con los nombres a tres líneas de distancia                                                                                                                                             | **Corregido**                                                            |
+| **D-106** | El paso 5 falló en macOS imprimiendo **cero líneas**: ni código, ni bytes, ni cola                                                                                                                                                                                                                                                                      | **Corregido** · y su instrumentación halló D-108 en la corrida siguiente |
+| **D-107** | El control de la base preguntaba `select version()` y daba por buena una base **vacía**. Cuatro minutos después aparecían cinco rojas de `residente-pg.test.ts` sin relación aparente. En las máquinas de desarrollo era invisible: sus clústeres llevan esquema y semillas puestos de antes                                                            | **Corregido** · prueba negativa en el propio trabajo de macOS            |
+| **D-108** | Los colores de Vitest **parten `Tests` de su número**, y el recuento del paso 5 no casaba. Con colores, la rama que detecta pruebas en rojo tampoco casa: la única defensa que quedaba era el código de salida                                                                                                                                          | **Corregido** · sonda 24                                                 |
+| **D-112** | `turbo.json` no declaraba las variables de las que dependen las pruebas. Turborepo 2.x filtra el entorno, así que `DATABASE_URL_PRUEBAS` no llegaba a vitest y cinco pruebas se saltaban **en silencio** bajo `pnpm test` mientras el paso 7 las ejecutaba. Los dos pasos verdes, discrepando                                                           | **Corregido** · paso 7b, sonda 25                                        |
+| **D-113** | El control de D-112 raspaba las líneas `@ncr/api:test: …` de turbo. En el CI de macOS turbo **no escribe ese prefijo**: agrupa la salida y la deja desnuda. El control falló por su propio formato, no por el defecto que vigila — y `metricas.mjs` existe precisamente para no raspar consola                                                          | **Corregido** · lee el JSON de vitest                                    |
+| **D-114** | El paso 5 decía «5 saltadas» y no decía CUÁLES. Tres corridas del runner se fueron en deducirlo, con el nombre esperando dentro del informe JSON que ese mismo paso acababa de escribir                                                                                                                                                                 | **Corregido** · `--saltadas`                                             |
+| **D-115** | **El `dist/` viejo de la ETAPA 04, con otro nombre.** `.arranque-en-frio.json` lo escribe el paso 12b, está en `.gitignore`, y `arranque-en-frio.e2e.test.ts` se salta entero si no está. El resultado del paso 5 dependía de **si alguien había corrido el verificador antes en esa carpeta**: aquí daba 658 sin saltadas, en un runner limpio 653 y 5 | **Corregido** · el paso 0 lo borra                                       |
+
+### D-112 · dos veredictos sobre lo mismo, los dos verdes, discrepando
+
+La corrida del usuario **con la base ya correcta** destapó lo que ninguna de las
+anteriores podía ver:
+
+| Camino                                      | `@ncr/api`                      |
+| ------------------------------------------- | ------------------------------- |
+| Paso 5 · `pnpm test`, es decir **turbo**    | `653 passed \| 5 skipped (658)` |
+| Paso 7 · `metricas.mjs`, **vitest directo** | `658 passed (658)`              |
+
+Las cinco son las de `residente-pg.test.ts`, que con la base buena **pasan**.
+Bajo turbo no llegaban a correr porque `turbo.json` no declaraba
+`DATABASE_URL_PRUEBAS`: **Turborepo 2.x filtra el entorno**, la variable no
+alcanzaba a vitest, y `it.runIf(URL_BASE !== undefined)` las saltaba en
+silencio. Comprobado por ejecución, y con la prueba más limpia que hay: **el
+hash de la tarea era idéntico con y sin la variable** —`0aee107cd4e37f5c`—, y
+tras declararla difiere (`c490ac73…` frente a `8ab752ab…`).
+
+Los dos pasos daban verde. Los dos mentían a medias. Y el verificador tenía las
+dos cifras delante **sin compararlas nunca** — la misma familia que «`@ncr/api`
+quedó FUERA de la medición»: el dato estaba, faltaba quien lo mirase. De ahí el
+paso **7b** y el control `recuentos-coherentes.mjs`, que exige que los dos
+caminos digan lo mismo —ejecutadas, saltadas y rojas— y enseña las dos cifras
+cuando no.
+
+Y una segunda mitad, porque la primera sola no basta: **una prueba saltada no
+suma al verde del paso 5.** Hasta aquí ese paso solo miraba `Tests N failed`, y
+una prueba que no llega a ejecutarse no falla —se descuenta del total y el
+resumen sigue diciendo «passed»—. Con `--con-base` una saltada es ahora un
+FALLO sin matices: la base está ahí, nada debería saltarse. Sin `--con-base` se
+cuentan y se nombran, en lugar de callarlas.
+
+### Las cinco saltadas de macOS: la hipótesis correcta, y la que no lo era
+
+La declaración de `turbo.json` es la causa del defecto que el usuario reprodujo,
+y está demostrada: con la variable declarada la suite da 658, sin ella 653 y 5
+saltadas, y **el hash de la tarea difiere**. Eso está cerrado.
+
+Lo que **no** era D-112 son las cinco saltadas que siguieron apareciendo en el
+CI de macOS. El diagnóstico lo descartó por ejecución —turbo resolvía la
+variable con valor: `configured: ["DATABASE_URL_PRUEBAS=7739001…"]`— y al
+nombrarlas resultaron ser otras:
+
+```
+@ncr/api: 5 saltada(s)
+  ⤷ el superadministrador recién aprovisionado PUEDE entrar …
+     en apps/api/test/arranque-en-frio.e2e.test.ts
+```
+
+Se saltan porque **el paso 5 corre antes que el 12b**, que es quien escribe los
+claims que necesitan. No es una omisión: es una dependencia de orden, y el paso
+12b las ejecuta y exige explícitamente que no se salten. Quedan **declaradas**,
+con el paso que las ejerce escrito al lado; cualquier otra saltada sigue siendo
+un fallo, que es lo que hace útil a la regla.
+
+Y por el camino apareció **D-115**, que es el hallazgo incómodo de esta parte:
+ese fichero de claims está en `.gitignore`, así que **el resultado del paso 5
+dependía de si alguien había corrido el verificador antes en esa carpeta**. Aquí
+existía de una corrida previa y el paso daba «658, sin una sola saltada»; en un
+runner recién creado daba «653 | 5 skipped». El verde local era falso, y lo era
+por el mismo mecanismo que motivó este guion en la ETAPA 04: un artefacto que
+envejece y que nadie declara. El paso 0 lo borra ahora.
+
+### Lo que esto significa para las cifras de cobertura anteriores
+
+**Hay que decirlo sin suavizarlo, y entra como insumo de la ETAPA 13.**
+
+| Capa         | Antes de esta rama | Ahora            |
+| ------------ | ------------------ | ---------------- |
+| `aplicacion` | **5 archivos**     | **39 archivos**  |
+| global       | **156 archivos**   | **306 archivos** |
+
+Los «✓ las tres capas cumplen su umbral» de los informes anteriores **se
+calcularon sobre una fracción del árbol**. El umbral del 90 % de §2.4 se
+verificaba contra cinco archivos de capa de aplicación cuando hay treinta y
+nueve, y el 70 % global contra ciento cincuenta y seis cuando hay trescientos
+seis. Las cifras nuevas siguen cumpliendo —`aplicacion` 96,92 %, global
+75,70 %—, así que la conclusión no cambia; **lo que cambia es que antes no
+estaba demostrada**. Un umbral medido sobre una muestra que nadie eligió no es
+una garantía.
+
+La ETAPA 13 lo recibe como insumo: la auditoría de seguridad se apoya en
+cobertura, y la cobertura que tenía delante hasta ahora no cubría lo que decía.
+
+### La lección, que es una sola y aparece tres veces
+
+**D-102, D-105 y D-108 son el mismo defecto: el arreglo se aplicó al sitio y no
+a la clase.**
+
+- D-102 · se arregló el mensaje de D-100 y sobrevivió intacto el de al lado.
+- D-105 · se arregló que el control lo dijera, no que alguien lo escuchara.
+- D-108 · **ya estaba descubierto y documentado** en la cabecera de
+  `estabilidad.mjs` —«los códigos de color de Vitest partían `Tests` de su
+  número»— y se corrigió solo allí. El paso 5 lo conservó intacto.
+
+De ahí que el patrón ANSI viva ahora en `scripts/lib/sin-colores.mjs`, uno solo
+para las tres superficies, y que la regla nueva del paso 8 mire el **fichero
+entero** y no la línea: el defecto de D-103 vivía en dos líneas que, por
+separado, son las dos portables.
+
+### Lo que queda abierto
+
+**El paso 13 en la máquina del usuario.** Se probó la hipótesis de que su fallo
+fuera consecuencia del paso 12 —si la suite SQL aborta, la base queda a medias—
+y **el experimento la refutó**: con el paso 12 abortado a propósito, las seis
+pruebas del paso 13 pasan. El paso 13 está verde en `macos-latest`, así que lo
+que el usuario vio es específico de su máquina. Con D-104 corregido, la próxima
+corrida suya lo nombrará.
 
 ---
 
