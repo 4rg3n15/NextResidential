@@ -333,14 +333,17 @@ arriba con sus catorce comprobaciones en verde.
 
 ### Suites
 
-| Paquete            | Pruebas | Notas                                                            |
-| ------------------ | ------: | ---------------------------------------------------------------- |
-| `@ncr/api`         |         | + 26 nuevas: observabilidad, planificación, contexto y bitácora  |
-| `@ncr/web`         |         | + 1 sobre la visibilidad de la pantalla nueva                    |
-| `@ncr/domain-core` |         | sin cambios                                                      |
-| `@ncr/edge`        |         | sin cambios                                                      |
-| Flutter            |     160 | `flutter analyze`: sin incidencias                               |
-| Rust (Tauri)       |       3 | política de red: prefijo de dominio, credenciales, canal interno |
+| Paquete            |   Pruebas | Notas                                                            |
+| ------------------ | --------: | ---------------------------------------------------------------- |
+| `@ncr/api`         |       818 | + 26 nuevas: observabilidad, planificación, contexto y bitácora  |
+| `@ncr/domain-core` |       398 | sin cambios                                                      |
+| `@ncr/web`         |       351 | + 1 sobre la visibilidad de la pantalla nueva                    |
+| `@ncr/config`      |       144 | sin cambios                                                      |
+| `@ncr/edge`        |       101 | sin cambios                                                      |
+| `@ncr/providers`   |        78 | sin cambios                                                      |
+| **TypeScript**     | **1 890** | las tres corridas del paso 14 dan la misma cifra                 |
+| Flutter            |       160 | `flutter analyze`: sin incidencias                               |
+| Rust (Tauri)       |         3 | política de red: prefijo de dominio, credenciales, canal interno |
 
 ### Cobertura por capa (§2.4)
 
@@ -590,20 +593,25 @@ a la ETAPA 16 con esa condición escrita.
 | `0e4e7d3` | Planificación: pg-boss invoca las tres operaciones huérfanas (D-31, D-36, D-40) |
 | `afb03a3` | PWA verificada, escritorio con Tauri y la paleta generada (D-78)                |
 | `044c764` | CI de los seis entregables, guías, y el instrumento de D-101                    |
-
-| `429367b` | El planificador deja de poder impedir el arranque de la API (paso 12c) |
-| `f7cfe97` | La actualización firmada del escritorio se apaga hasta que exista la clave |
-| `eee1a7c` | Cliente Dart regenerado y trinquete de ramas al día |
-| _(este)_ | Informe con el veredicto literal y la SHA final |
+| `429367b` | El planificador deja de poder impedir el arranque de la API (paso 12c)          |
+| `f7cfe97` | La actualización firmada del escritorio se apaga hasta que exista la clave      |
+| `eee1a7c` | Cliente Dart regenerado y trinquete de ramas al día                             |
+| _(este)_  | Informe con el veredicto literal y la SHA final                                 |
 
 ### Cómo se verificó, y con qué
 
-| Qué                             | Dónde                                                                       |
-| ------------------------------- | --------------------------------------------------------------------------- |
-| `verificar-etapa.sh --con-base` | Linux, PostgreSQL 16 efímero, Flutter 3.47.4, Chromium · **26 de 26 pasos** |
-| CI                              | Corrida sobre la SHA final, los cuatro trabajos                             |
-| Los cuatro diagramas del README | Renderizados en Chromium real: SVG de 15 826, 31 606, 27 567 y 22 305 bytes |
-| El `.deb` de escritorio         | `Next Control Residencial_0.1.0_amd64.deb`, en local y en CI                |
+| Qué                             | Dónde                                                                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `verificar-etapa.sh --con-base` | Linux, PostgreSQL 16 efímero, Flutter 3.47.4, Chromium · **26 de 26 pasos**                                                          |
+| CI                              | [Corrida 189](https://github.com/4rg3n15/NextResidential/actions/runs/35763744053) sobre `015c44d`, los **cuatro** trabajos en verde |
+| Los cuatro diagramas del README | Renderizados en Chromium real: SVG de 15 826, 31 606, 27 567 y 22 305 bytes                                                          |
+| El `.deb` de escritorio         | `Next Control Residencial_0.1.0_amd64.deb`, en local y en CI                                                                         |
+
+> **Sobre la SHA que cita el cuadro.** `015c44d` es el último commit con
+> **código**: lo que va después de él toca solo este informe. La corrida que lo
+> valida es la que se cita; la que dispara el commit de cierre repite los mismos
+> cuatro trabajos sobre un árbol cuyo código es idéntico, y su número se da en el
+> informe de chat porque no puede escribirse dentro del commit que lo provoca.
 
 > **Sobre «los TRES trabajos» de la DoD.** El flujo tenía tres y ahora tiene
 > **cuatro** —`controles` corre en dos sistemas y son dos trabajos—, porque esta
