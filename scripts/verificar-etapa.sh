@@ -191,6 +191,10 @@ codigo_pruebas=$?
 # aquí. Ahora el patrón vive en un solo sitio y lo usan los tres.
 # ─────────────────────────────────────────────────────────────────────────────
 salida=$(node "$RAIZ_DEL_REPO/scripts/lib/sin-colores.mjs" <"$salida_pruebas")
+# Se conserva en fichero porque el paso 7b compara estos recuentos con los del
+# paso 7. Dos pasos que deben decir lo mismo, y hasta D-112 nadie los comparaba.
+SALIDA_PASO5="$(mktemp "${TMPDIR:-/tmp}/ncr-paso5.XXXXXX")"
+printf '%s\n' "$salida" >"$SALIDA_PASO5"
 echo "$salida" | grep -E "Tests +[0-9]" | sed 's/^/   /'
 # ─────────────────────────────────────────────────────────────────────────────
 # D-79 · SE MIRA EL CÓDIGO DE SALIDA, y no solo el texto.
@@ -218,6 +222,25 @@ if [[ $codigo_pruebas -ne 0 ]]; then
 elif grep -qE "Tests +[0-9]+ failed|FAIL " <<<"$salida"; then
   mal "hay pruebas en rojo"
   echo "$salida" | grep -E "×|→" | head -10 | sed 's/^/     /'
+elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida" && [[ "$CON_BASE" == "1" ]]; then
+  # ───────────────────────────────────────────────────────────────────────────
+  # D-112 · UNA PRUEBA SALTADA NO SUMA AL VERDE.
+  #
+  # Hasta aquí este paso solo miraba `Tests N failed`. Una prueba que no llega a
+  # ejecutarse no falla: se descuenta del total y el resumen sigue diciendo
+  # «passed». Así es como «653 passed | 5 skipped» pasaba por verde mientras el
+  # paso 7 ejecutaba las 658 — y las cinco saltadas eran precisamente las que
+  # prueban que el SQL encaja con el esquema migrado.
+  #
+  # Con `--con-base` esto es un FALLO, sin matices: la base está ahí, así que no
+  # hay ninguna razón legítima para que una prueba se salte. Sin `--con-base` sí
+  # la hay, y entonces se cuentan y se nombran en lugar de callarlas.
+  # ───────────────────────────────────────────────────────────────────────────
+  mal "hay pruebas SALTADAS con --con-base: una omisión no es un verde"
+  grep -E "Tests +[0-9]" <<<"$salida" | grep -E "skipped|todo" | sed 's/^/     /'
+  echo "     La base está disponible: nada debería saltarse. Si turbo no le pasa una"
+  echo "     variable a vitest, las pruebas que dependen de ella se saltan en silencio"
+  echo "     (D-112). Compruebe \`env\` en las tareas de turbo.json."
 elif ! grep -qE "Tests +[0-9]" <<<"$salida"; then
   mal "la suite no informó ni una prueba: una salida sin recuento no es un verde"
   # D-106 · esta rama imprimía CERO líneas. Saltó en la primera corrida del
@@ -228,8 +251,15 @@ elif ! grep -qE "Tests +[0-9]" <<<"$salida"; then
   echo "     código de salida: $codigo_pruebas · $(wc -c <"$salida_pruebas" | tr -d '[:space:]') bytes escritos"
   echo "     últimas 20 líneas de lo que sí salió (ya sin colores):"
   tail -20 <<<"$salida" | sed 's/^/       /'
+elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida"; then
+  # Sin base sí hay saltadas legítimas, y se dicen. «En verde» a secas con
+  # pruebas que no se han ejecutado es media verdad.
+  saltadas_totales=$(grep -oE "[0-9]+ (skipped|todo)" <<<"$salida" | grep -oE "^[0-9]+" |
+    awk '{s+=$1} END {print s+0}')
+  ok "suite completa sin rojas, CON $saltadas_totales prueba(s) SALTADA(S) por correr sin --con-base"
+  grep -E "Tests +[0-9]" <<<"$salida" | grep -E "skipped|todo" | sed 's/^/     /'
 else
-  ok "suite completa en verde"
+  ok "suite completa en verde, sin una sola prueba saltada"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -523,6 +553,7 @@ paso "7 · umbrales de cobertura por capa (§2.4)"
 # Se mide por CAPA, no en agregado: §2.4 exige 90 % en dominio y aplicación y
 # 70 % global, y un agregado alto puede esconder una capa por debajo — como
 # ocurrió con `aplicacion`, que estaba al 79 % sin que nadie lo midiera.
+SALIDA_PASO7="$(mktemp "${TMPDIR:-/tmp}/ncr-paso7.XXXXXX")"
 if salida_cob=$(con_limite "$LIMITE_LARGO" node scripts/lib/metricas.mjs 2>&1); then
   echo "$salida_cob" | grep -E "^  (OK|BAJO)" | sed 's/^/   /'
   ok "las tres capas cumplen su umbral"
@@ -564,6 +595,20 @@ else
   echo "$salida_cob" | sed -n '/: PRUEBAS EN ROJO/,/^## [^:]*$/p' | grep -v '^## [^:]*$' |
     head -30 | sed 's/^/     /'
 fi
+printf '%s\n' "$salida_cob" >"$SALIDA_PASO7"
+
+paso "7b · los dos recuentos de la MISMA suite coinciden (D-112)"
+# El paso 5 corre la suite por turbo y el paso 7 por vitest directo. Los dos
+# daban verde discrepando: turbo informaba «653 passed | 5 skipped» y vitest
+# ejecutaba las 658. El dato estaba en la salida de los dos; faltaba compararlo.
+if salida_rec=$(con_limite "$LIMITE_CORTO" node scripts/lib/recuentos-coherentes.mjs \
+     "$SALIDA_PASO5" "$SALIDA_PASO7" 2>&1); then
+  ok "$salida_rec"
+else
+  mal "los dos caminos de la suite NO dan el mismo resultado: uno de los dos miente"
+  echo "$salida_rec" | sed 's/^/     /'
+fi
+rm -f "$SALIDA_PASO5" "$SALIDA_PASO7"
 
 paso "8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)"
 # El entorno de desarrollo objetivo es macOS; el CI de la ETAPA 14 correrá en

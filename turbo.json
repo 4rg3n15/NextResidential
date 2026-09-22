@@ -12,7 +12,14 @@
     },
     "typecheck": { "dependsOn": ["^build"] },
     "lint": {},
-    "test": { "dependsOn": ["^build"] },
-    "test:cobertura": { "dependsOn": ["^build"], "outputs": ["coverage/**"] }
+    "test": {
+      "dependsOn": ["^build"],
+      "env": ["DATABASE_URL_PRUEBAS", "NCR_CLAIMS_ARRANQUE"]
+    },
+    "test:cobertura": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "env": ["DATABASE_URL_PRUEBAS", "NCR_CLAIMS_ARRANQUE"]
+    }
   }
 }

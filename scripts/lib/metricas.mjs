@@ -301,10 +301,32 @@ for (const [paquete, dir] of paquetesAMedir) {
   const pruebas = informe.numTotalTests ?? 0;
   totalPruebas += pruebas;
   totalFicheros += suites.length;
+  // Los nueve campos `num*` los emite SIEMPRE el informe JSON de vitest, así
+  // que aquí no hay `??` de adorno: un valor por defecto que nunca se usa es
+  // una rama que nadie ejecuta, y el trinquete de D-81 la cuenta como tal.
+  const saltadas = informe.numPendingTests + informe.numTodoTests;
   console.log(`\n## ${paquete}`);
   console.log(
     `   ficheros ejecutados: ${suites.length} · pruebas: ${pruebas} ` +
-      `(${informe.numPassedTests ?? 0} verdes, ${informe.numFailedTests ?? 0} rojas)`,
+      `(${informe.numPassedTests ?? 0} verdes, ${informe.numFailedTests ?? 0} rojas, ` +
+      `${saltadas} saltadas)`,
+  );
+  /**
+   * D-112 · UNA LÍNEA QUE OTRA HERRAMIENTA PUEDA LEER.
+   *
+   * El paso 5 y el paso 7 ejecutan la MISMA suite por caminos distintos —turbo
+   * y vitest directo— y hasta ahora nadie comparaba sus recuentos. La corrida
+   * del usuario dejó a la vista lo que eso permite: el paso 5 informaba
+   * «653 passed | 5 skipped» y el paso 7 ejecutaba las 658 sin saltarse
+   * ninguna. Dos veredictos sobre lo mismo, los dos verdes, y discrepando.
+   *
+   * Esta línea existe para que `recuentos-coherentes.mjs` no tenga que raspar
+   * prosa. La prosa es para quien lee; esto es para quien compara.
+   */
+  console.log(
+    `   RECUENTO ${paquete} ficheros=${suites.length} pruebas=${pruebas} ` +
+      `verdes=${informe.numPassedTests ?? 0} rojas=${informe.numFailedTests ?? 0} ` +
+      `saltadas=${saltadas}`,
   );
   for (const s of suites) {
     const n = (s.assertionResults ?? []).length;

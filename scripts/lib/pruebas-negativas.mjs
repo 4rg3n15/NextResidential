@@ -1276,6 +1276,12 @@ try {
           "  it('esta prueba falla a proposito y su nombre tiene que aparecer', () => {\n" +
           '    expect(1).toBe(2);\n' +
           '  });\n' +
+          // Y una SALTADA, para que el recuento de saltadas que D-112 añadió a
+          // `metricas.mjs` se ejercite de verdad: sin ella esa rama no la
+          // ejecutaba nadie, y el trinquete de D-81 lo cantó.
+          "  it.skip('esta se salta a proposito y tiene que contarse como saltada', () => {\n" +
+          '    expect(1).toBe(1);\n' +
+          '  });\n' +
           '});\n',
       );
       const conRoja = conConfig();
@@ -1297,6 +1303,10 @@ try {
       /SUITE EN ROJO/.test(conRoja.salida) && !/CORRIDA INTERRUMPIDA/.test(conRoja.salida)
         ? ok('se clasifica como SUITE EN ROJO, no como corrida interrumpida')
         : mal('una suite en rojo se informa como corrida interrumpida: remedio equivocado');
+
+      /saltadas=1\b/.test(conRoja.salida)
+        ? ok('la prueba SALTADA se cuenta y se publica para que otro la compare (D-112)')
+        : mal('una saltada no aparece en el recuento legible por máquina');
 
       // El eco de pnpm no es el nombre de ninguna prueba.
       !/ERR_PNPM_/.test(conRoja.salida)
@@ -1489,6 +1499,90 @@ try {
     /Tests {2}12 passed \[corchetes\] 3;4 m/.test(limpio.salida)
       ? ok('un texto sin escapes pasa intacto, corchetes y puntos y coma incluidos')
       : mal('se come texto legítimo: el recuento podría desaparecer por el otro lado');
+  }
+
+  console.log('\n▸ 25 · dos recuentos de la MISMA suite que discrepan se detectan (D-112)');
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * EL DEFECTO QUE ESTA SONDA CIERRA
+     *
+     * El verificador ejecuta la suite dos veces: el paso 5 por turbo y el paso
+     * 7 por vitest directo. La corrida del usuario con la base ya correcta dejó
+     * a la vista que los dos daban verde DISCREPANDO: turbo informaba
+     * «@ncr/api: 653 passed | 5 skipped» y vitest ejecutaba las 658. Las cinco
+     * eran las de `residente-pg.test.ts`, y bajo turbo no llegaban a correr
+     * porque `turbo.json` no declaraba `DATABASE_URL_PRUEBAS` —Turborepo 2.x
+     * filtra el entorno— así que `it.runIf(...)` las saltaba en silencio.
+     *
+     * Las dos cifras estaban en la salida. Faltaba quien las comparase.
+     *
+     * Lo que se exige aquí son las cuatro respuestas, no solo la primera: que
+     * detecte la divergencia REAL de D-112, que NO se queje cuando coinciden,
+     * y que trate como fallo el quedarse sin nada que comparar por CUALQUIERA
+     * de los dos lados. Un comparador que ante una entrada vacía dice «todo
+     * igual» es el mismo defecto con otra cara — y ya pasó, en la primera
+     * versión de `estabilidad.mjs`, donde dos firmas vacías daban «idéntico».
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const p5 = join(banco, 'paso5.txt');
+    const p7 = join(banco, 'paso7.txt');
+    const comparar = () =>
+      correr('node', ['scripts/lib/recuentos-coherentes.mjs', p5, p7], { cwd: raiz });
+
+    const TURBO_BIEN = '@ncr/api:test:       Tests  658 passed (658)\n';
+    const TURBO_SALTA = '@ncr/api:test:       Tests  653 passed | 5 skipped (658)\n';
+    const DIRECTO_658 =
+      '   RECUENTO @ncr/api ficheros=56 pruebas=658 verdes=658 rojas=0 saltadas=0\n';
+
+    writeFileSync(p5, TURBO_BIEN);
+    writeFileSync(p7, DIRECTO_658);
+    comparar().codigo === 0
+      ? ok('cuando los dos caminos coinciden, no se queja')
+      : mal('marca una coincidencia: el control sería inutilizable');
+
+    writeFileSync(p5, TURBO_SALTA);
+    const r = comparar();
+    r.codigo !== 0
+      ? ok('la divergencia real de D-112 se detecta')
+      : mal('«653 passed | 5 skipped» frente a 658 ejecutadas pasa por buena');
+    /saltadas/.test(r.salida) && /653/.test(r.salida) && /658/.test(r.salida)
+      ? ok('y salen los DOS recuentos y el campo que difiere, no solo el aviso')
+      : mal('no enseña las dos cifras: obliga a buscarlas a mano');
+
+    // Un paquete que un camino ejecuta y el otro no informa en absoluto.
+    writeFileSync(p5, '@ncr/web:test:       Tests  350 passed (350)\n');
+    /el paso 5 no informó de este paquete/.test(comparar().salida)
+      ? ok('un paquete que un camino no informa se detecta, no se ignora')
+      : mal('un paquete ausente en un lado pasa inadvertido');
+
+    // Y las dos formas de quedarse sin nada que comparar.
+    writeFileSync(p5, 'sin un solo recuento\n');
+    writeFileSync(p7, DIRECTO_658);
+    comparar().codigo !== 0
+      ? ok('una salida del paso 5 sin recuentos es un FALLO, no un empate')
+      : mal('sin recuentos del paso 5 daría por bueno cualquier cosa');
+
+    writeFileSync(p5, TURBO_BIEN);
+    writeFileSync(p7, 'sin una sola linea RECUENTO\n');
+    comparar().codigo !== 0
+      ? ok('y una del paso 7 sin líneas RECUENTO, igual')
+      : mal('sin recuentos del paso 7 daría por bueno cualquier cosa');
+
+    // Un fichero que no existe no es «cero divergencias»: es que no se pudo
+    // comparar. Y sin argumentos, el uso — nunca un verde por omisión.
+    const sinFichero = correr(
+      'node',
+      ['scripts/lib/recuentos-coherentes.mjs', join(banco, 'no-existe.txt'), p7],
+      { cwd: raiz },
+    );
+    sinFichero.codigo !== 0 && /no se pudo leer/.test(sinFichero.salida)
+      ? ok('un fichero ilegible se dice, no se confunde con un empate')
+      : mal('un fichero que no existe pasa como si no hubiera divergencias');
+
+    correr('node', ['scripts/lib/recuentos-coherentes.mjs'], { cwd: raiz }).codigo !== 0
+      ? ok('invocarlo sin argumentos no devuelve verde')
+      : mal('sin argumentos da 0: un control que no mira nada y aprueba');
   }
 } finally {
   rmSync(banco, { recursive: true, force: true });

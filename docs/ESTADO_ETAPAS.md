@@ -18,16 +18,16 @@
 
 ## Resumen
 
-|                                |                                                                                                                                                                                        |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas                                                                                    |
-| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento**                                                                                                                            |
-| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                        |
-| **Defectos abiertos**          | **D-78** (colores a mano), **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos) y **D-106** (el paso 5 en macOS: causa hallada, ver `correccion-macos`) |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                                                                                                 |
-| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                                                                                          |
-| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)                                                                           |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                  |
+|                                |                                                                                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas                                                                                        |
+| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento** · recibe como INSUMO el hallazgo de cobertura de D-112 (`aplicacion` se medía sobre 5 archivos de 39; global sobre 156 de 306) |
+| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                            |
+| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos)                                                                            |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                                                                                                     |
+| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                                                                                              |
+| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)                                                                               |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                      |
 
 ---
 
@@ -64,15 +64,69 @@ Flutter, Chromium y PostgreSQL, siembra la base y ejecuta el verificador entero.
 
 ### Lo que encontró la primera corrida
 
-| ID        | Qué                                                                                                                                                                                                                                                                                          | Estado                                                                   |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **D-102** | El bloque «QUEDARON FUERA de la medición» interpolaba el objeto de fallo: imprimía **`[object Object]`**. Y llamaba «la corrida no terminó» a una suite en rojo — la confusión que D-100 había cerrado diez líneas más arriba                                                                | **Corregido** · sonda 22 ampliada                                        |
-| **D-103** | El paso 12 comparaba como TEXTO un número de `wc`, que **BSD almohadilla y GNU no**. En macOS fallaba con el KPI-03 cumplido delante: una inserción aceptada, cero duplicados, e incumplimiento informado                                                                                    | **Corregido** · sonda 23                                                 |
-| **D-104** | El diagnóstico del paso 13 filtraba por `×` y `→`. Si el proceso moría antes de una aserción no casaba ninguno, y el paso imprimía la etiqueta y **nada más**                                                                                                                                | **Corregido**                                                            |
-| **D-105** | D-100 hizo que el control imprimiera el nombre de cada prueba roja; **el filtro del paso 7 lo tiraba**. macOS informó «5 prueba(s) fallaron» y ni una línea más, con los nombres a tres líneas de distancia                                                                                  | **Corregido**                                                            |
-| **D-106** | El paso 5 falló en macOS imprimiendo **cero líneas**: ni código, ni bytes, ni cola                                                                                                                                                                                                           | **Corregido** · y su instrumentación halló D-108 en la corrida siguiente |
-| **D-107** | El control de la base preguntaba `select version()` y daba por buena una base **vacía**. Cuatro minutos después aparecían cinco rojas de `residente-pg.test.ts` sin relación aparente. En las máquinas de desarrollo era invisible: sus clústeres llevan esquema y semillas puestos de antes | **Corregido** · prueba negativa en el propio trabajo de macOS            |
-| **D-108** | Los colores de Vitest **parten `Tests` de su número**, y el recuento del paso 5 no casaba. Con colores, la rama que detecta pruebas en rojo tampoco casa: la única defensa que quedaba era el código de salida                                                                               | **Corregido** · sonda 24                                                 |
+| ID        | Qué                                                                                                                                                                                                                                                                                           | Estado                                                                   |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **D-102** | El bloque «QUEDARON FUERA de la medición» interpolaba el objeto de fallo: imprimía **`[object Object]`**. Y llamaba «la corrida no terminó» a una suite en rojo — la confusión que D-100 había cerrado diez líneas más arriba                                                                 | **Corregido** · sonda 22 ampliada                                        |
+| **D-103** | El paso 12 comparaba como TEXTO un número de `wc`, que **BSD almohadilla y GNU no**. En macOS fallaba con el KPI-03 cumplido delante: una inserción aceptada, cero duplicados, e incumplimiento informado                                                                                     | **Corregido** · sonda 23                                                 |
+| **D-104** | El diagnóstico del paso 13 filtraba por `×` y `→`. Si el proceso moría antes de una aserción no casaba ninguno, y el paso imprimía la etiqueta y **nada más**                                                                                                                                 | **Corregido**                                                            |
+| **D-105** | D-100 hizo que el control imprimiera el nombre de cada prueba roja; **el filtro del paso 7 lo tiraba**. macOS informó «5 prueba(s) fallaron» y ni una línea más, con los nombres a tres líneas de distancia                                                                                   | **Corregido**                                                            |
+| **D-106** | El paso 5 falló en macOS imprimiendo **cero líneas**: ni código, ni bytes, ni cola                                                                                                                                                                                                            | **Corregido** · y su instrumentación halló D-108 en la corrida siguiente |
+| **D-107** | El control de la base preguntaba `select version()` y daba por buena una base **vacía**. Cuatro minutos después aparecían cinco rojas de `residente-pg.test.ts` sin relación aparente. En las máquinas de desarrollo era invisible: sus clústeres llevan esquema y semillas puestos de antes  | **Corregido** · prueba negativa en el propio trabajo de macOS            |
+| **D-108** | Los colores de Vitest **parten `Tests` de su número**, y el recuento del paso 5 no casaba. Con colores, la rama que detecta pruebas en rojo tampoco casa: la única defensa que quedaba era el código de salida                                                                                | **Corregido** · sonda 24                                                 |
+| **D-112** | `turbo.json` no declaraba las variables de las que dependen las pruebas. Turborepo 2.x filtra el entorno, así que `DATABASE_URL_PRUEBAS` no llegaba a vitest y cinco pruebas se saltaban **en silencio** bajo `pnpm test` mientras el paso 7 las ejecutaba. Los dos pasos verdes, discrepando | **Corregido** · paso 7b, sonda 25                                        |
+
+### D-112 · dos veredictos sobre lo mismo, los dos verdes, discrepando
+
+La corrida del usuario **con la base ya correcta** destapó lo que ninguna de las
+anteriores podía ver:
+
+| Camino                                      | `@ncr/api`                      |
+| ------------------------------------------- | ------------------------------- |
+| Paso 5 · `pnpm test`, es decir **turbo**    | `653 passed \| 5 skipped (658)` |
+| Paso 7 · `metricas.mjs`, **vitest directo** | `658 passed (658)`              |
+
+Las cinco son las de `residente-pg.test.ts`, que con la base buena **pasan**.
+Bajo turbo no llegaban a correr porque `turbo.json` no declaraba
+`DATABASE_URL_PRUEBAS`: **Turborepo 2.x filtra el entorno**, la variable no
+alcanzaba a vitest, y `it.runIf(URL_BASE !== undefined)` las saltaba en
+silencio. Comprobado por ejecución, y con la prueba más limpia que hay: **el
+hash de la tarea era idéntico con y sin la variable** —`0aee107cd4e37f5c`—, y
+tras declararla difiere (`c490ac73…` frente a `8ab752ab…`).
+
+Los dos pasos daban verde. Los dos mentían a medias. Y el verificador tenía las
+dos cifras delante **sin compararlas nunca** — la misma familia que «`@ncr/api`
+quedó FUERA de la medición»: el dato estaba, faltaba quien lo mirase. De ahí el
+paso **7b** y el control `recuentos-coherentes.mjs`, que exige que los dos
+caminos digan lo mismo —ejecutadas, saltadas y rojas— y enseña las dos cifras
+cuando no.
+
+Y una segunda mitad, porque la primera sola no basta: **una prueba saltada no
+suma al verde del paso 5.** Hasta aquí ese paso solo miraba `Tests N failed`, y
+una prueba que no llega a ejecutarse no falla —se descuenta del total y el
+resumen sigue diciendo «passed»—. Con `--con-base` una saltada es ahora un
+FALLO sin matices: la base está ahí, nada debería saltarse. Sin `--con-base` se
+cuentan y se nombran, en lugar de callarlas.
+
+### Lo que esto significa para las cifras de cobertura anteriores
+
+**Hay que decirlo sin suavizarlo, y entra como insumo de la ETAPA 13.**
+
+| Capa         | Antes de esta rama | Ahora            |
+| ------------ | ------------------ | ---------------- |
+| `aplicacion` | **5 archivos**     | **39 archivos**  |
+| global       | **156 archivos**   | **306 archivos** |
+
+Los «✓ las tres capas cumplen su umbral» de los informes anteriores **se
+calcularon sobre una fracción del árbol**. El umbral del 90 % de §2.4 se
+verificaba contra cinco archivos de capa de aplicación cuando hay treinta y
+nueve, y el 70 % global contra ciento cincuenta y seis cuando hay trescientos
+seis. Las cifras nuevas siguen cumpliendo —`aplicacion` 96,92 %, global
+75,70 %—, así que la conclusión no cambia; **lo que cambia es que antes no
+estaba demostrada**. Un umbral medido sobre una muestra que nadie eligió no es
+una garantía.
+
+La ETAPA 13 lo recibe como insumo: la auditoría de seguridad se apoya en
+cobertura, y la cobertura que tenía delante hasta ahora no cubría lo que decía.
 
 ### La lección, que es una sola y aparece tres veces
 
