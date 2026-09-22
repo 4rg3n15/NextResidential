@@ -21,3 +21,11 @@ export * from './mock/intercom-simulado';
  */
 export * from './hikvision/contratos-de-evento';
 export * from './hikvision/publicacion-alarm-server';
+/**
+ * ETAPA 15 · el transporte compartido por los tres equipos, el catálogo de
+ * rutas con su procedencia, y los adaptadores de cada familia.
+ */
+export * from './equipo/cliente';
+export * from './equipo/catalogo-de-rutas';
+export * from './equipo/escucha-alertstream';
+export * from './terminal/terminal-facial';
