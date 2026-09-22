@@ -1912,6 +1912,12 @@ try {
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
     {
+      // Línea base del modo índice, antes de plantar nada: un control que
+      // siempre grita no distingue un hallazgo de su propio ruido.
+      enClon('node', ['scripts/lib/escanear-secretos.mjs', '--indice']).codigo === 0
+        ? ok('la línea base del modo índice está limpia')
+        : mal('el modo índice marca un árbol limpio: falso positivo');
+
       const fuga = join(clon, 'sonda-indice.ts');
       writeFileSync(fuga, `export const k = 'sb_secret_${'S1t2A3g4E5d6O7n8'}';\n`);
       enClon('git', ['add', 'sonda-indice.ts']);
@@ -1956,6 +1962,17 @@ try {
         ? ok('la llave que firma la ingesta se detecta')
         : mal(`INGESTA_FIRMA_SECRETO con valor real NO se detecta (codigo ${r.codigo})`);
 
+      // Y la OTRA forma que toma una llave real: hexadecimal largo, sin una
+      // sola mayúscula. La heurística la reconoce por su forma, no por su
+      // nombre —era el ejemplo que destapó H-13-19—.
+      writeFileSync(
+        fuga,
+        `export const BIOMETRIA_LLAVE = '${'a91f3c7e28b6d04a'}${'5f8c1e93b27d60a4'}${'f1e8c35b90d27a46'}';\n`,
+      );
+      enClon('node', ['scripts/lib/escanear-secretos.mjs']).codigo !== 0
+        ? ok('y la llave hexadecimal también, aunque no lleve mayúsculas')
+        : mal('una llave hexadecimal de 48 caracteres NO se detecta');
+
       // Contraprueba: el marcador legible que hay por todo el árbol NO puede
       // gritar, o el control se vuelve inservible a la semana.
       writeFileSync(
@@ -1968,6 +1985,51 @@ try {
 
       rmSync(fuga, { force: true });
       enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-propios.ts']);
+    }
+
+    // (c bis) MÁS DE VEINTE HALLAZGOS SE RECORTAN, Y SE DICE CUÁNTOS FALTAN.
+    //         Un volcado de doscientas líneas en el gancho de pre-commit es
+    //         ilegible, y un recorte que no avisa es peor que el volcado.
+    {
+      const muchas = join(clon, 'sonda-muchas.ts');
+      const lineas = Array.from(
+        { length: 25 },
+        (_, i) => `export const k${i} = 'sb_secret_${'A1b2C3d4E5f6G7h'}${i}';`,
+      );
+      writeFileSync(muchas, `${lineas.join('\n')}\n`);
+      enClon('git', ['add', '--intent-to-add', 'sonda-muchas.ts']);
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo !== 0 && /y 5 más/.test(r.salida)
+        ? ok('con 25 hallazgos se muestran 20 y se dice que faltan 5')
+        : mal(`el recorte de la salida no avisa de cuántos faltan (codigo ${r.codigo})`);
+      rmSync(muchas, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-muchas.ts']);
+    }
+
+    // (c ter) LO QUE NO SE PUEDE LEER NO SE INVENTA: ni se cuelga, ni pasa por
+    //         bueno en silencio. Dos caminos que el escáner tiene que sortear
+    //         sin morirse — un enlace roto y un fichero desmedido —, y que
+    //         existen de verdad en árboles reales.
+    {
+      const roto = join(clon, 'sonda-enlace-roto.ts');
+      symlinkSync(join(clon, 'no-existe-en-ninguna-parte.ts'), roto);
+      enClon('git', ['add', 'sonda-enlace-roto.ts']);
+
+      const grande = join(clon, 'sonda-desmedida.bin');
+      writeFileSync(grande, Buffer.alloc(6 * 1024 * 1024, 0x41));
+      enClon('git', ['add', '--intent-to-add', 'sonda-desmedida.bin']);
+
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo === 0
+        ? ok('un enlace roto y un fichero de 6 MB no rompen el escaneo')
+        : mal(
+            `el escaneo se cae con un enlace roto o un fichero grande: ${r.salida.slice(0, 120)}`,
+          );
+
+      rmSync(roto, { force: true });
+      rmSync(grande, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-enlace-roto.ts']);
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-desmedida.bin']);
     }
 
     // (d) LO QUE `.gitignore` PROHÍBE Y ESTÁ VERSIONADO · H-13-23.

@@ -64,7 +64,7 @@ export class GuardiaDeFirmaDeIngesta implements CanActivate {
      *
      * Línea base que descarta el falso positivo: firmando el cuerpo real, 401.
      *
-     * Importa ANTES de la ETAPA 15, no después: el Alarm Server de Hikvision
+     * Importa ANTES de la ETAPA 15, no después: el Alarm Server del fabricante
      * publica `multipart/form-data` —XML del evento, foto y recorte de placa—.
      * Con ese parser montado, `express.json` no ejecuta su `verify`,
      * `cuerpoCrudo` sería `undefined` en TODOS los POST de cámara, y una sola

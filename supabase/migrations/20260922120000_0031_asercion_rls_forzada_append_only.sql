@@ -2,22 +2,34 @@
 -- H-13-03 · LA ASERCIÓN DE ADR-005 CUBRÍA DOS DE LAS TRES CAPAS QUE SOSTIENE
 --
 -- Hallazgo de la ETAPA 13, medido por EJECUCIÓN contra el clúster de pruebas
--- con el dueño real (`sb_postgres_sim`, NO superusuario). La cadena completa:
+-- con el dueño real (`sb_postgres_sim`, NO superusuario). La cadena completa,
+-- reejecutada al cerrar la etapa:
 --
---   1. El dueño desactiva los triggers .................. ALTER TABLE → funciona
---      pero UPDATE sigue bloqueado ...................... permission denied
---   2. El dueño se reconcede UPDATE ..................... GRANT → funciona
---      y aun así el UPDATE no toca nada ................. UPDATE 0   ← RLS FORCE
---   3. El dueño AÑADE `NO FORCE ROW LEVEL SECURITY` ..... UPDATE 66  ← cae todo
+--   1. ALTER TABLE ... DISABLE TRIGGER ALL ............. PERMISSION DENIED
+--      («RI_ConstraintTrigger_... is a system trigger»: la clave ajena de la
+--       partición protege de paso al disparador de inmutabilidad)
+--   2. GRANT UPDATE ... TO <el propio dueño> ........... GRANT, y UPDATE 0
+--      ← la RLS en modo FORCE, sin política de UPDATE, no deja pasar ni una fila
+--   3. ALTER TABLE ... NO FORCE ROW LEVEL SECURITY ..... ALTER, y el UPDATE
+--      sigue bloqueado ................................. por el DISPARADOR
+--   4. ALTER TABLE <particion> DISABLE TRIGGER <nombre>. ALTER, y UPDATE 6
+--      ← hacen falta los cuatro, y el cuarto por el NOMBRE EXACTO
 --
--- Es decir: la tercera capa —RLS en modo FORCE sin política de UPDATE— es la
--- que de verdad detiene el paso 2, y la aserción de la 0017 **no la verificaba**.
--- Comprobaba (a) las concesiones y (b) los triggers habilitados. Un
--- `ALTER TABLE ... NO FORCE ROW LEVEL SECURITY` pasaba inadvertido al siguiente
--- despliegue, que es exactamente para lo que esa aserción existe.
+-- Es decir: el riesgo residual de D-08 no es «el dueño conserva DISABLE
+-- TRIGGER». Son CUATRO actos deliberados de DDL, cada uno de los cuales deja
+-- rastro y ninguno de los cuales es un `UPDATE` desde el código.
 --
--- El riesgo residual real de D-08 no es «el dueño conserva DISABLE TRIGGER»:
--- son TRES actos deliberados de DDL, y ahora el despliegue detecta los tres.
+-- Y de los cuatro, el tercero era el único que NADIE detectaba: la aserción de
+-- la 0017 comprueba (a) las concesiones —acto 2— y (b) los disparadores
+-- habilitados por tabla Y POR PARTICIÓN —acto 4, verificado aquí: nombra
+-- `eventos_2026_09:tg_prohibir_update`—. Un `NO FORCE ROW LEVEL SECURITY`
+-- pasaba inadvertido al siguiente despliegue, que es justo para lo que esa
+-- aserción existe. Esta migración cierra ese hueco.
+--
+-- NOTA DE MÉTODO, porque costó un diagnóstico falso: ejecutar el FICHERO de la
+-- 0017 para comprobar si detecta el acto 4 devuelve «verificado» aunque el
+-- disparador esté desactivado — la migración lo RECREA antes de aseverar. Hay
+-- que ejecutar el bloque de aserción SOLO. «Probable» no es «verificado».
 --
 -- Idempotente y sin efectos: solo verifica.
 -- =============================================================================

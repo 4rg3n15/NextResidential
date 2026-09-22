@@ -170,9 +170,11 @@ const esFuga = (texto) => {
   for (const [patron, descripcion, valida] of PATRONES) {
     const m = texto.match(patron);
     if (m === null || ES_DE_PRUEBA.test(m[0])) continue;
-    // Cuando el patrón captura el VALOR, se juzga el valor; si no, la
-    // coincidencia entera, que es lo que hacían los siete originales.
-    if (valida !== undefined && !valida(m[1] ?? m[0])) continue;
+    // Un patrón con validador SIEMPRE captura el valor en el grupo 1: es su
+    // contrato, y se declara aquí en vez de dejar un repliegue a `m[0]` que
+    // nadie ejecutaría nunca —una rama muerta es indistinguible de una rama
+    // rota hasta el día que se usa—.
+    if (valida !== undefined && !valida(m[1])) continue;
     return descripcion;
   }
   return null;
@@ -240,12 +242,16 @@ if (modo === 'historial') {
      * sí mismo se denunciaría. No es una excepción real; es no morderse la cola.
      * Se excluye por la RUTA que git asocia al objeto, no por su contenido.
      */
-    if (EXCLUIDOS.has(nombres.get(sha) ?? '')) continue;
+    // Se busca UNA vez y sin repliegue: `rev-list --objects` da nombre a todo
+    // blob alcanzable, así que un `?? ''` aquí sería una rama que nadie podría
+    // ejecutar jamás — y una rama muerta es indistinguible de una rota hasta el
+    // día que se usa. `Set.has(undefined)` es `false`, que es el comportamiento
+    // correcto si algún día dejara de cumplirse.
+    const nombre = nombres.get(sha);
+    if (EXCLUIDOS.has(nombre)) continue;
     if (BLOBS_CONOCIDOS.has(sha) || esBinarioDeVerdad(cuerpo)) continue;
     const descripcion = esFuga(cuerpo.toString('utf8').replace(/\0/g, ''));
-    if (descripcion !== null) {
-      hallazgos.push(`${sha}  ${descripcion}  (${nombres.get(sha) ?? 'sin nombre'})`);
-    }
+    if (descripcion !== null) hallazgos.push(`${sha}  ${descripcion}  (${nombre})`);
   }
 } else {
   const versionados = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })

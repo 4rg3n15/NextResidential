@@ -98,8 +98,8 @@ describe('ingesta de eventos de hardware', () => {
    * hacía `?? ''`: verificaba la firma **sobre la cadena vacía** y aceptaba un
    * cuerpo que esa firma no cubría. Medido: 202.
    *
-   * Es la regresión que hay que fijar ANTES de la ETAPA 15: el Alarm Server de
-   * Hikvision publica `multipart/form-data`, y con ese parser montado ninguna
+   * Es la regresión que hay que fijar ANTES de la ETAPA 15: el Alarm Server del
+   * fabricante publica `multipart/form-data`, y con ese parser montado ninguna
    * ingesta de cámara pasaría por `express.json`.
    * ═══════════════════════════════════════════════════════════════════════════
    */
