@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
+import { sobreDeLectura } from '@ncr/providers';
 import { COP_A, crearApp, crearFirmante } from './utilidades';
 
 /**
@@ -101,6 +102,54 @@ describe('receptor del servidor de alarma', () => {
     const otro = '<EventNotificationAlert><eventType>IO</eventType></EventNotificationAlert>';
     const respuesta = await publicar(SECRETO, sobre(otro)).expect(202);
     expect(respuesta.body.ignorado).toBe(true);
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LAS DOS MITADES DEL RECORRIDO DE PLACA, ENFRENTADAS · ADR-03
+   *
+   * El sobre lo construye **la cámara simulada de `@ncr/providers`**, no esta
+   * prueba. La diferencia no es de estilo: un sobre escrito aquí a la medida
+   * del receptor confirmaría lo que el autor ya creía. Con el simulado, lo que
+   * se comprueba es que lo que la cámara produce es exactamente lo que el
+   * receptor sabe abrir, y el día que la captura real cambie los nombres, el
+   * cambio va a un solo sitio y esto se pone rojo si no cuadra.
+   */
+  it('recorrido de placa completo con la cámara simulada', async () => {
+    const sobreReal = sobreDeLectura({ placa: 'TSM123', confianza: 91, referencia: 'ev-e2e-2' });
+    const respuesta = await request(app.getHttpServer())
+      .post(`/alarm-server/${SECRETO}`)
+      .set('content-type', sobreReal.tipoDeContenido)
+      .send(sobreReal.cuerpo)
+      .expect(202);
+    expect(respuesta.body).toMatchObject({ aceptado: true });
+    expect(respuesta.body.ignorado).toBeUndefined();
+  });
+
+  it('el mismo hecho DOS veces no produce dos accesos (RN-17)', async () => {
+    // La cámara reenvía cuando no recibe respuesta a tiempo. La referencia del
+    // equipo es lo que hace que el segundo envío se deduplique en vez de abrir
+    // la talanquera una segunda vez sin nadie delante.
+    const repetido = sobreDeLectura({ placa: 'DUP456', referencia: 'ev-repetido' });
+    const enviar = () =>
+      request(app.getHttpServer())
+        .post(`/alarm-server/${SECRETO}`)
+        .set('content-type', repetido.tipoDeContenido)
+        .send(repetido.cuerpo);
+
+    await enviar().expect(202);
+    await enviar().expect(202);
+  });
+
+  it('la cámara que sólo manda la escena tampoco rompe', async () => {
+    // Hay firmware que no envía recorte. Si no se prueba, nadie sabe que el
+    // receptor no lo distingue.
+    const sinRecorte = sobreDeLectura({ placa: 'ESC789' }, { conRecorte: false });
+    await request(app.getHttpServer())
+      .post(`/alarm-server/${SECRETO}`)
+      .set('content-type', sinRecorte.tipoDeContenido)
+      .send(sinRecorte.cuerpo)
+      .expect(202);
   });
 });
 
