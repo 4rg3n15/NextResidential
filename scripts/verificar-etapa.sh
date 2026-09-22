@@ -246,6 +246,10 @@ elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida" && [[ "$CON_BASE" == "1"
   # ───────────────────────────────────────────────────────────────────────────
   mal "hay pruebas SALTADAS con --con-base: una omisión no es un verde"
   grep -E "Tests +[0-9]" <<<"$salida" | grep -E "skipped|todo" | sed 's/^/     /'
+  # CUÁLES, que es lo único que sirve. El informe JSON que esta misma corrida
+  # acaba de escribir las tiene con nombre y fichero (D-114).
+  echo "     las que NO se ejecutaron:"
+  node scripts/lib/recuentos-coherentes.mjs --saltadas "$RAIZ_DEL_REPO" | sed 's/^/     /'
   # Y el resumen de turbo, porque una tarea SERVIDA DESDE CACHÉ reproduce el
   # resultado de otra corrida con otro entorno: sin esta línea, distinguir «no
   # le llegó la variable» de «no se ejecutó» exige otra corrida entera.

@@ -1638,6 +1638,31 @@ try {
     correr('node', ['scripts/lib/recuentos-coherentes.mjs'], { cwd: raiz }).codigo !== 0
       ? ok('invocarlo sin argumentos no devuelve verde')
       : mal('sin argumentos da 0: un control que no mira nada y aprueba');
+
+    /**
+     * D-114 · y el modo que NOMBRA lo saltado. El paso 5 decía «5 saltadas» sin
+     * decir cuáles, y averiguarlo costó tres corridas del runner — con el
+     * nombre esperando dentro del informe JSON que ese mismo paso acababa de
+     * escribir. Es D-100 otra vez, un paso más allá.
+     */
+    writeFileSync(informe, JSON.stringify(informeCon(653, 5)));
+    const nombradas = correr(
+      'node',
+      ['scripts/lib/recuentos-coherentes.mjs', '--saltadas', arbol],
+      { cwd: raiz },
+    );
+    /la consulta del titular encaja con el esquema 1/.test(nombradas.salida) &&
+    /la consulta del titular encaja con el esquema 5/.test(nombradas.salida)
+      ? ok('`--saltadas` nombra TODAS las que no se ejecutaron, no solo la primera')
+      : mal('no nombra las saltadas: «5 saltadas» sin decir cuáles no sirve de nada');
+
+    writeFileSync(informe, JSON.stringify(informeCon(658, 0)));
+    /ninguna prueba saltada/.test(
+      correr('node', ['scripts/lib/recuentos-coherentes.mjs', '--saltadas', arbol], { cwd: raiz })
+        .salida,
+    )
+      ? ok('y lo dice con todas las letras cuando no hay ninguna')
+      : mal('con cero saltadas calla: el silencio se lee como «no miré»');
   }
 } finally {
   rmSync(banco, { recursive: true, force: true });

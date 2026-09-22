@@ -38,9 +38,20 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const INFORME = '.informe-paso5.json';
-const [raiz, ruta7] = process.argv.slice(2);
-if (!raiz || !ruta7) {
-  console.error('uso: recuentos-coherentes.mjs <raiz> <salida-paso-7>');
+const argumentos = process.argv.slice(2);
+/**
+ * D-114 · `--saltadas` NOMBRA lo que no se ejecutó, y punto.
+ *
+ * El paso 5 detectaba «5 saltadas con --con-base» y no decía CUÁLES. Tres
+ * corridas del runner se fueron en deducir si eran las que dependen de la base
+ * o unas distintas que se saltan solo en macOS — cuando el nombre estaba en el
+ * informe JSON que el propio paso acababa de escribir. Es D-100 otra vez, en el
+ * paso de al lado: el dato está y nadie lo imprime.
+ */
+const soloSaltadas = argumentos[0] === '--saltadas';
+const [raiz, ruta7] = soloSaltadas ? [argumentos[1], null] : argumentos;
+if (!raiz || (!soloSaltadas && !ruta7)) {
+  console.error('uso: recuentos-coherentes.mjs [--saltadas] <raiz> [<salida-paso-7>]');
   process.exit(2);
 }
 
@@ -111,6 +122,19 @@ const delPaso7 = () => {
 };
 
 const cinco = delPaso5();
+
+if (soloSaltadas) {
+  let total = 0;
+  for (const [paquete, d] of cinco) {
+    if (d.saltadas === 0) continue;
+    console.log(`  ${paquete}: ${d.saltadas} saltada(s)`);
+    for (const n of d.nombresSaltadas) console.log(`    ⤷ ${n}`);
+    total += d.saltadas;
+  }
+  if (total === 0) console.log('  ninguna prueba saltada');
+  process.exit(0);
+}
+
 const siete = delPaso7();
 
 if (siete.size === 0) {
