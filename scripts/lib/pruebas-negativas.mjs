@@ -505,6 +505,76 @@ try {
       ? ok('detectada: dos corridas con resultado distinto son un fallo')
       : mal(`NO detectada (codigo ${r.codigo})`);
 
+    // Y el NOMBRE de la prueba roja tiene que salir. Es la mitad de D-100 que
+    // faltaba: el control recogía `× …`, y este paso ejecuta el comando con
+    // `CI=1`, donde Vitest cambia de reportero y emite `FAIL …` sin una sola
+    // línea con `×`. Medido en la ETAPA 13: la corrida 2 de 3 salió en rojo y
+    // debajo no había nada. Aquí se exige que el nombre aparezca.
+    /^ {5}× zonas/m.test(r.salida)
+      ? ok('y el nombre de la prueba roja sale con el reportero por omisión')
+      : mal('la roja no se nombra: el control informa «en rojo» y deja a oscuras');
+
+    const conCI = join(banco, 'suite-reportero-de-ci.sh');
+    writeFileSync(
+      conCI,
+      [
+        '#!/usr/bin/env bash',
+        `n=$(cat "${contador}-ci" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador}-ci"`,
+        'if [ $((n % 2)) -eq 0 ]; then',
+        '  echo "   Tests  85 passed (85)"; exit 0',
+        'else',
+        // Exactamente la forma que emite Vitest cuando `CI` está puesto.
+        '  echo " FAIL  test/zonas.e2e.test.ts > zonas > lista las zonas"',
+        '  echo "     → expected 200 to be 403"',
+        '  echo "   Tests  1 failed | 84 passed (85)"; exit 1',
+        'fi',
+      ].join('\n'),
+    );
+    chmodSync(conCI, 0o755);
+    const rci = correr('node', [
+      'scripts/lib/estabilidad.mjs',
+      '--repeticiones',
+      '2',
+      '--comando',
+      conCI,
+    ]);
+    // Un solo espacio: `firmaDe` normaliza los blancos antes de comparar, así
+    // que el `FAIL  ` de dos espacios de Vitest llega aquí con uno.
+    rci.codigo !== 0 && /FAIL test\/zonas\.e2e\.test\.ts > zonas > lista las zonas/.test(rci.salida)
+      ? ok('y con el reportero de CI, que no emite `×`, la nombra igual')
+      : mal(`con CI=1 la roja se queda anónima (codigo ${rci.codigo})`);
+
+    // Y el caso incómodo: una corrida en rojo de la que NO se puede sacar el
+    // nombre. El control tiene que DECIRLO —«es un defecto de ESTE control, no
+    // una roja anónima»— en vez de callar, que es justo lo que hizo en la
+    // ETAPA 13 y mandó a buscar la causa donde no estaba.
+    const anonima = join(banco, 'suite-roja-anonima.sh');
+    writeFileSync(
+      anonima,
+      [
+        '#!/usr/bin/env bash',
+        `n=$(cat "${contador}-anon" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador}-anon"`,
+        'if [ $((n % 2)) -eq 0 ]; then',
+        '  echo "   Tests  85 passed (85)"; exit 0',
+        'else',
+        '  echo "   Tests  1 failed | 84 passed (85)"; exit 1',
+        'fi',
+      ].join('\n'),
+    );
+    chmodSync(anonima, 0o755);
+    const ranon = correr('node', [
+      'scripts/lib/estabilidad.mjs',
+      '--repeticiones',
+      '2',
+      '--comando',
+      anonima,
+    ]);
+    ranon.codigo !== 0 && /defecto de ESTE control/.test(ranon.salida)
+      ? ok('y si no hay nombre que sacar, lo dice en vez de callar')
+      : mal(`una roja sin nombre se informa en silencio (codigo ${ranon.codigo})`);
+
     // Y el reverso: un control que fallara siempre tampoco serviría de nada.
     const estable = join(banco, 'suite-estable.sh');
     writeFileSync(estable, '#!/usr/bin/env bash\necho "   Tests  85 passed (85)"\nexit 0\n');
