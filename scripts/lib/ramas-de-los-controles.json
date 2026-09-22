@@ -26,6 +26,5 @@
   "scripts/lib/ramas-de-los-controles.mjs": 12,
   "scripts/lib/recuentos-coherentes.mjs": 3,
   "scripts/lib/sin-colores.mjs": 1,
-  "scripts/lib/verificar-base-de-pruebas.mjs": 11,
-  "scripts/lib/verificar-escritura.mjs": 8
+  "scripts/lib/verificar-base-de-pruebas.mjs": 11
 }
