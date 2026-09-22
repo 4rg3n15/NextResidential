@@ -1069,7 +1069,10 @@ try {
 
     writeFileSync(
       estado,
-      `${original}\n## ETAPA 14 — Observabilidad, CI/CD, PWA y escritorio · **CERRADA** · sonda\n`,
+      // La etapa de revisión la lee el control de `DECLARADOS`: si cambia allí,
+      // cambia aquí. Hoy es la 16, porque la 14 acotó la declaración del paso 5e
+      // a macOS en vez de dejarla valiendo en todas partes.
+      `${original}\n## ETAPA 16 — Documentación técnica final · **CERRADA** · sonda\n`,
     );
     const r = enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']);
     r.codigo !== 0 && /ya está CERRADA/.test(r.salida)

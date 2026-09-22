@@ -11,9 +11,8 @@
  * Uso: node scripts/lib/metricas.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync, mkdtempSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { tmpdir } from 'node:os';
 import { sinColores } from './sin-colores.mjs';
 
 const raiz = process.cwd();
@@ -66,9 +65,30 @@ for (const f of ficheros) console.log(`  ${f}`);
 // razón: una rama que nadie ha visto correr no está demostrada.
 const primeraLinea = (fallo) => String(fallo.detalle).split('\n')[0].trim();
 
+/**
+ * Dónde queda el informe JSON de cada paquete.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * INSTRUMENTO PARA D-101 · ETAPA 14
+ *
+ * D-100 arregló que una prueba roja se NOMBRARA. Falta lo siguiente: cuando
+ * D-101 —la intermitente de `@ncr/api` en Linux bajo cobertura— vuelva a
+ * aparecer en CI, el nombre solo no basta. Hace falta el registro completo:
+ * cada aserción con su estado, su duración y el orden en que corrieron, que es
+ * justo lo que el informe JSON trae y hasta ahora se escribía en un directorio
+ * temporal y se tiraba al terminar el proceso.
+ *
+ * Ahora se conserva en el árbol (ignorado por git) y el flujo de CI lo sube
+ * como artefacto **cuando el trabajo falla**. Una aparición cada cuarenta y
+ * cinco corridas no se puede reproducir a voluntad: hay que estar preparado
+ * para la que venga.
+ */
+const DIRECTORIO_DE_INFORMES = join(raiz, '.informes-de-prueba');
+
 /** Ejecuta vitest en un paquete y devuelve su informe JSON. */
 const correr = (paquete, dir) => {
-  const salida = join(mkdtempSync(join(tmpdir(), 'ncr-')), 'r.json');
+  mkdirSync(DIRECTORIO_DE_INFORMES, { recursive: true });
+  const salida = join(DIRECTORIO_DE_INFORMES, `${paquete.replace(/[^a-z0-9]+/gi, '-')}.json`);
   let codigoSalida = 0;
   let crudoSalida = '';
   let crudoError = '';

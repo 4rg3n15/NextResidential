@@ -34,16 +34,33 @@ export const DECLARADOS = new Map([
     '5e',
     {
       desde: '2026-09-19',
-      revision: 'ETAPA 14',
+      revision: 'ETAPA 16',
       titulo: 'el recorrido de la app en un navegador',
       motivo:
         'diferencia de ENTORNO en el enganche del campo por el motor de Flutter web: ' +
         'bajo Chromium en macOS el <input> recibe las pulsaciones —la instrumentación ' +
         'lee el valor de vuelta— y el widget no se entera, así que su validador sigue ' +
-        'reclamando el campo. Reproducible en macOS, no en Linux. No es un fallo de la ' +
-        'app: los otros tres controles móviles (análisis estático, 72 pruebas con ' +
-        'cobertura por capa, cliente generado sin diferencias ni secretos) sí se ejercen',
-      revisaCuando: 'el CI tenga entorno estable y se pueda fijar navegador y motor',
+        'reclamando el campo. En LINUX el paso se ejerce y pasa, así que la declaración ' +
+        'quedó acotada a macOS en la ETAPA 14 en vez de aplicar a todas partes',
+      revisaCuando:
+        'el motor de Flutter web enganche el campo bajo Chromium en macOS, o se fije ' +
+        'una versión de navegador donde lo haga',
+      /**
+       * ═════════════════════════════════════════════════════════════════════
+       * LA DECLARACIÓN SE ACOTA A LA PLATAFORMA QUE LA NECESITA · ETAPA 14
+       *
+       * Declararla en TODAS partes tenía un coste que se pagó: el paso no lo
+       * ejecutaba ninguna máquina, y una aserción suya envejeció sin que nadie
+       * lo viera. Buscaba el texto «en construcción» de la pestaña de
+       * visitantes, cierto en la 11-B y falso desde la 11, y el recorrido
+       * habría dado rojo el día que alguien volviera a ejecutarlo — que fue
+       * esta etapa.
+       *
+       * Acotarla por plataforma es la salida correcta: donde el paso PUEDE
+       * ejercerse, se ejerce y protege; donde no, sigue declarado con su
+       * motivo. `darwin` es macOS.
+       */
+      soloEn: ['darwin'],
     },
   ],
 ]);
@@ -77,14 +94,23 @@ if (argumentos[0] === '--auditar') {
       }
     }
   }
+  for (const [paso, d] of DECLARADOS) {
+    if (d.soloEn !== undefined && (!Array.isArray(d.soloEn) || d.soloEn.length === 0)) {
+      faltas.push(`la declaración del paso ${paso} tiene \`soloEn\` vacío o mal formado`);
+    }
+  }
   const vencidas = caducadas();
   if (faltas.length > 0 || vencidas.length > 0) {
     console.error('FALLO las declaraciones de «no ejercido» no están en regla:');
     for (const f of [...faltas, ...vencidas]) console.error(`  ✗ ${f}`);
     process.exit(1);
   }
+  const aqui = [...DECLARADOS.values()].filter(
+    (d) => d.soloEn === undefined || d.soloEn.includes(process.platform),
+  ).length;
   console.log(
-    `declaraciones: ${DECLARADOS.size} paso(s) declarado(s) no ejercido(s), con motivo y etapa de revisión vigente`,
+    `declaraciones: ${DECLARADOS.size} paso(s) declarado(s) no ejercido(s), ` +
+      `${aqui} de ellos en ${process.platform}, con motivo y etapa de revisión vigente`,
   );
   process.exit(0);
 }
@@ -92,6 +118,11 @@ if (argumentos[0] === '--auditar') {
 const paso = argumentos[0];
 const declaracion = paso === undefined ? undefined : DECLARADOS.get(paso);
 if (declaracion === undefined) process.exit(1);
+// Fuera de la plataforma declarada, el paso SE EJERCE: salir con 1 hace que el
+// verificador siga por la rama que lo ejecuta de verdad.
+if (Array.isArray(declaracion.soloEn) && !declaracion.soloEn.includes(process.platform)) {
+  process.exit(1);
+}
 
 console.log(
   `${declaracion.titulo} — DECLARADO NO EJERCIDO desde ${declaracion.desde}, ` +
