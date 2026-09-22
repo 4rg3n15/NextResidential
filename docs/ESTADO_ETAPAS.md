@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-21 · **ETAPA 12 CERRADA** · y en curso la rama `correccion-macos`, que lleva el CI a ejecutar **el verificador entero con base en macOS** por primera vez en el proyecto. Hasta ella, los pasos 12, 12b, 12c y 13 no se habían ejercido nunca fuera de la máquina del usuario
+**Última actualización:** 2026-09-22 · **ETAPA 13 EN CURSO** · la corrección de macOS quedó **fusionada en develop** (PR #22, `153df52`): desde ella el CI ejecuta el verificador entero con base en macOS, cosa que nunca se había hecho — hasta entonces los pasos 12, 12b, 12c y 13 no se ejercían fuera de la máquina del usuario
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -31,10 +31,17 @@
 
 ---
 
-## Corrección `correccion-macos` — entre la 12 y la 13
+## Corrección `correccion-macos` — entre la 12 y la 13 · **CERRADA**
 
 **Rama:** `correccion-macos` · **PR:** [#22](https://github.com/4rg3n15/NextResidential/pull/22)
-· **No es una etapa:** no añade producto. Corrige el verificador y el CI.
+— **FUSIONADO en develop el 2026-09-22** (`153df52`, fusión con dos padres, sin
+squash) · **No es una etapa:** no añade producto. Corrige el verificador y el CI.
+
+> **Corregido el 2026-09-22.** Esta ficha y la cabecera describían la rama como
+> «en curso» y el PR como abierto con la fusión ya hecha. El control del paso 1b
+> no lo veía porque solo comparaba el documento consigo mismo; desde la ETAPA 13
+> pregunta a **git**: una rama descrita como «en curso» cuya punta ya es ancestro
+> de HEAD está fusionada, y eso es un fallo.
 
 > **Procedencia, escrita como es y no como convenía.** La rama se sacó de la
 > punta de `etapa-12-edge-gateway-offline` cuando su PR #21 **seguía abierto**,

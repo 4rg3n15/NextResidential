@@ -851,6 +851,50 @@ try {
         ? ok('el recuento descuadrado: detectado')
         : mal(`un recuento descuadrado NO se detecta (codigo ${rc.codigo})`);
     }
+
+    /**
+     * (d) UNA RAMA «EN CURSO» QUE YA ESTÁ FUSIONADA · añadido en la ETAPA 13.
+     *
+     * Caso real: al abrir la etapa, la cabecera seguía diciendo «en curso la
+     * rama `correccion-macos`» y la ficha presentaba el PR #22 como abierto,
+     * con la fusión hecha hacía horas. El control no lo veía porque solo
+     * comparaba el documento CONSIGO MISMO. Ahora le pregunta a git.
+     *
+     * Se usa `develop` como rama de ejemplo: resuelve en cualquier clon del
+     * repositorio y es ancestro de toda rama de etapa, que es exactamente la
+     * condición que el control persigue.
+     */
+    const fusionada = join(banco, 'estado-rama-fusionada.md');
+    writeFileSync(
+      fusionada,
+      doc.replace(
+        /^(\*\*Última actualización:\*\*[^\n]*)$/m,
+        '$1 · y en curso la rama `develop` (sonda)',
+      ),
+    );
+    const rd = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', fusionada], {
+      cwd: raiz,
+    });
+    rd.codigo !== 0 && /ya está FUSIONADA/.test(rd.salida)
+      ? ok('una rama «en curso» que ya está fusionada: detectada contra git')
+      : mal(`una rama fusionada descrita como «en curso» NO se detecta (codigo ${rd.codigo})`);
+
+    // Y una rama que NO existe no puede dar un falso positivo: no se comprueba,
+    // y el recuento del veredicto lo dice en lugar de callarlo.
+    const inexistente = join(banco, 'estado-rama-inexistente.md');
+    writeFileSync(
+      inexistente,
+      doc.replace(
+        /^(\*\*Última actualización:\*\*[^\n]*)$/m,
+        '$1 · y en curso la rama `rama-que-no-existe-jamas`',
+      ),
+    );
+    const re = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', inexistente], {
+      cwd: raiz,
+    });
+    re.codigo === 0 && /0 de 1 rama\(s\)/.test(re.salida)
+      ? ok('una rama que git no resuelve no se da por buena en silencio: sale en el recuento')
+      : mal(`una rama no resoluble se cuenta mal o rompe (codigo ${re.codigo})`);
   }
 
   console.log('\n▸ 15 · `echo | grep -q` bajo pipefail se detecta (D-80)');

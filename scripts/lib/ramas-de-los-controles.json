@@ -1,5 +1,5 @@
 {
-  "scripts/lib/coherencia-estado-etapas.mjs": 21,
+  "scripts/lib/coherencia-estado-etapas.mjs": 24,
   "scripts/lib/contar-pruebas.mjs": 4,
   "scripts/lib/contrato-desfasado.mjs": 3,
   "scripts/lib/contrato-tipado.mjs": 20,

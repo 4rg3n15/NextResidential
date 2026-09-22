@@ -39,6 +39,7 @@
  *   node scripts/lib/coherencia-estado-etapas.mjs [ruta-del-documento]
  */
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 const ruta = process.argv[2] ?? 'docs/ESTADO_ETAPAS.md';
 const texto = readFileSync(ruta, 'utf8');
@@ -238,6 +239,62 @@ if (filaFecha === null) {
   }
 }
 
+// ─── 9 · una rama «en curso» que ya está fusionada ───────────────────────────
+/**
+ * AÑADIDO EN LA ETAPA 13, a petición del usuario, y por un caso real: al abrir
+ * la etapa, la cabecera seguía diciendo «en curso la rama `correccion-macos`» y
+ * su ficha presentaba el PR #22 como abierto. Estaba fusionado en develop desde
+ * hacía horas. El control no lo veía porque solo miraba el documento contra sí
+ * mismo, y esto es el documento contra **el repositorio**.
+ *
+ * Se pregunta a git, no a GitHub: una rama cuyo commit de punta ya es ancestro
+ * de la rama actual está fusionada, y eso es exactamente lo que significa un PR
+ * cerrado con merge. No hace falta red, ni credenciales, ni que el control se
+ * crea lo que le cuenten.
+ *
+ * Las ramas que git no puede resolver —un clon sin sus referencias, como el
+ * banco de pruebas negativas— NO se dan por buenas en silencio: el recuento de
+ * comprobadas sale en la línea de veredicto, y si es cero se ve.
+ */
+const enCurso = new Set();
+for (const linea of lineas) {
+  if (!/en curso/i.test(linea)) continue;
+  for (const m of linea.matchAll(/`([a-z0-9][a-z0-9._\/-]{3,})`/g)) {
+    const nombre = m[1];
+    // Solo lo que parece una RAMA. Se descartan rutas de fichero, comandos y
+    // —esto costó un falso positivo al escribirlo— las SHA abreviadas, que en
+    // este documento aparecen en la misma frase que la rama que las produjo.
+    if (/\.[a-z]{2,4}$/.test(nombre) || nombre.includes(' ')) continue;
+    if (/^[0-9a-f]{7,40}$/.test(nombre)) continue;
+    enCurso.add(nombre);
+  }
+}
+let comprobadas = 0;
+for (const rama of enCurso) {
+  let punta;
+  try {
+    punta = execFileSync('git', ['rev-parse', '--verify', '--quiet', `${rama}^{commit}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    continue; // no resoluble aquí; se refleja en el recuento final
+  }
+  if (punta === '') continue;
+  comprobadas += 1;
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', punta, 'HEAD'], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    mal(
+      `la rama \`${rama}\` se describe como «en curso» y ya está FUSIONADA ` +
+        `(su punta ${punta.slice(0, 7)} es ancestro de HEAD): un PR cerrado no es trabajo en curso`,
+    );
+  } catch {
+    /* no fusionada: en curso de verdad */
+  }
+}
+
 // ─── veredicto ───────────────────────────────────────────────────────────────
 if (problemas.length > 0) {
   console.error(`FALLO ${ruta} se contradice en ${problemas.length} punto(s):`);
@@ -250,5 +307,5 @@ if (problemas.length > 0) {
 
 console.log(
   `coherente: ${mapa.size} etapas en el mapa, ${cerradas.length} cerradas con ficha e informe, ` +
-    'cabecera al día',
+    `cabecera al día · ${comprobadas} de ${enCurso.size} rama(s) «en curso» comprobadas contra git`,
 );
