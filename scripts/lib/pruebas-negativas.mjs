@@ -24,10 +24,10 @@ import {
   writeFileSync,
   mkdtempSync,
   mkdirSync,
+  chmodSync,
   rmSync,
   readFileSync,
   cpSync,
-  chmodSync,
   symlinkSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -505,6 +505,76 @@ try {
       ? ok('detectada: dos corridas con resultado distinto son un fallo')
       : mal(`NO detectada (codigo ${r.codigo})`);
 
+    // Y el NOMBRE de la prueba roja tiene que salir. Es la mitad de D-100 que
+    // faltaba: el control recogía `× …`, y este paso ejecuta el comando con
+    // `CI=1`, donde Vitest cambia de reportero y emite `FAIL …` sin una sola
+    // línea con `×`. Medido en la ETAPA 13: la corrida 2 de 3 salió en rojo y
+    // debajo no había nada. Aquí se exige que el nombre aparezca.
+    /^ {5}× zonas/m.test(r.salida)
+      ? ok('y el nombre de la prueba roja sale con el reportero por omisión')
+      : mal('la roja no se nombra: el control informa «en rojo» y deja a oscuras');
+
+    const conCI = join(banco, 'suite-reportero-de-ci.sh');
+    writeFileSync(
+      conCI,
+      [
+        '#!/usr/bin/env bash',
+        `n=$(cat "${contador}-ci" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador}-ci"`,
+        'if [ $((n % 2)) -eq 0 ]; then',
+        '  echo "   Tests  85 passed (85)"; exit 0',
+        'else',
+        // Exactamente la forma que emite Vitest cuando `CI` está puesto.
+        '  echo " FAIL  test/zonas.e2e.test.ts > zonas > lista las zonas"',
+        '  echo "     → expected 200 to be 403"',
+        '  echo "   Tests  1 failed | 84 passed (85)"; exit 1',
+        'fi',
+      ].join('\n'),
+    );
+    chmodSync(conCI, 0o755);
+    const rci = correr('node', [
+      'scripts/lib/estabilidad.mjs',
+      '--repeticiones',
+      '2',
+      '--comando',
+      conCI,
+    ]);
+    // Un solo espacio: `firmaDe` normaliza los blancos antes de comparar, así
+    // que el `FAIL  ` de dos espacios de Vitest llega aquí con uno.
+    rci.codigo !== 0 && /FAIL test\/zonas\.e2e\.test\.ts > zonas > lista las zonas/.test(rci.salida)
+      ? ok('y con el reportero de CI, que no emite `×`, la nombra igual')
+      : mal(`con CI=1 la roja se queda anónima (codigo ${rci.codigo})`);
+
+    // Y el caso incómodo: una corrida en rojo de la que NO se puede sacar el
+    // nombre. El control tiene que DECIRLO —«es un defecto de ESTE control, no
+    // una roja anónima»— en vez de callar, que es justo lo que hizo en la
+    // ETAPA 13 y mandó a buscar la causa donde no estaba.
+    const anonima = join(banco, 'suite-roja-anonima.sh');
+    writeFileSync(
+      anonima,
+      [
+        '#!/usr/bin/env bash',
+        `n=$(cat "${contador}-anon" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador}-anon"`,
+        'if [ $((n % 2)) -eq 0 ]; then',
+        '  echo "   Tests  85 passed (85)"; exit 0',
+        'else',
+        '  echo "   Tests  1 failed | 84 passed (85)"; exit 1',
+        'fi',
+      ].join('\n'),
+    );
+    chmodSync(anonima, 0o755);
+    const ranon = correr('node', [
+      'scripts/lib/estabilidad.mjs',
+      '--repeticiones',
+      '2',
+      '--comando',
+      anonima,
+    ]);
+    ranon.codigo !== 0 && /defecto de ESTE control/.test(ranon.salida)
+      ? ok('y si no hay nombre que sacar, lo dice en vez de callar')
+      : mal(`una roja sin nombre se informa en silencio (codigo ${ranon.codigo})`);
+
     // Y el reverso: un control que fallara siempre tampoco serviría de nada.
     const estable = join(banco, 'suite-estable.sh');
     writeFileSync(estable, '#!/usr/bin/env bash\necho "   Tests  85 passed (85)"\nexit 0\n');
@@ -851,6 +921,61 @@ try {
         ? ok('el recuento descuadrado: detectado')
         : mal(`un recuento descuadrado NO se detecta (codigo ${rc.codigo})`);
     }
+
+    /**
+     * (d) UNA RAMA «EN CURSO» QUE YA ESTÁ FUSIONADA · añadido en la ETAPA 13.
+     *
+     * Caso real: al abrir la etapa, la cabecera seguía diciendo «en curso la
+     * rama `correccion-macos`» y la ficha presentaba el PR #22 como abierto,
+     * con la fusión hecha hacía horas. El control no lo veía porque solo
+     * comparaba el documento CONSIGO MISMO. Ahora le pregunta a git.
+     *
+     * LA RAMA SE CREA EN EL BANCO, no se toma prestada del repositorio.
+     *
+     * La primera versión usaba `develop` «porque resuelve en cualquier clon», y
+     * el CI demostró que no: `actions/checkout` deja como referencia LOCAL solo
+     * la rama del evento, así que en el runner `develop` no existe y la sonda
+     * caía en la rama de «no resuelta» —que, correctamente, no falla—. Verde en
+     * local, rojo en CI, y por una diferencia de entorno que no tenía nada que
+     * ver con lo que la sonda quiere demostrar.
+     *
+     * Aquí se crea `rama-sonda-fusionada` en el clon, apuntando a su propio
+     * `HEAD`: un commit es ancestro de sí mismo, que es exactamente la
+     * condición «ya fusionada» que el control persigue. Hermético, y da igual
+     * qué referencias traiga la máquina.
+     */
+    enClon('git', ['branch', '-f', 'rama-sonda-fusionada', 'HEAD']);
+    const fusionada = join(clon, 'estado-rama-fusionada.md');
+    writeFileSync(
+      fusionada,
+      doc.replace(
+        /^(\*\*Última actualización:\*\*[^\n]*)$/m,
+        '$1 · y en curso la rama `rama-sonda-fusionada`',
+      ),
+    );
+    const rd = correr('node', [join(raiz, 'scripts/lib/coherencia-estado-etapas.mjs'), fusionada], {
+      cwd: clon,
+    });
+    rd.codigo !== 0 && /ya está FUSIONADA/.test(rd.salida)
+      ? ok('una rama «en curso» que ya está fusionada: detectada contra git')
+      : mal(`una rama fusionada descrita como «en curso» NO se detecta (codigo ${rd.codigo})`);
+
+    // Y una rama que NO existe no puede dar un falso positivo: no se comprueba,
+    // y el recuento del veredicto lo dice en lugar de callarlo.
+    const inexistente = join(banco, 'estado-rama-inexistente.md');
+    writeFileSync(
+      inexistente,
+      doc.replace(
+        /^(\*\*Última actualización:\*\*[^\n]*)$/m,
+        '$1 · y en curso la rama `rama-que-no-existe-jamas`',
+      ),
+    );
+    const re = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', inexistente], {
+      cwd: raiz,
+    });
+    re.codigo === 0 && /0 de 1 rama\(s\)/.test(re.salida)
+      ? ok('una rama que git no resuelve no se da por buena en silencio: sale en el recuento')
+      : mal(`una rama no resoluble se cuenta mal o rompe (codigo ${re.codigo})`);
   }
 
   console.log('\n▸ 15 · `echo | grep -q` bajo pipefail se detecta (D-80)');
@@ -909,9 +1034,12 @@ try {
     // Y la otra mitad del trinquete: una exención que ya no corresponde. Sin
     // esto, la lista de deuda protegería para siempre a un control que ya tiene
     // prueba —o que ya nadie ejecuta— y volvería a ser una lista a mano.
+    // Se usa un control que SIGA en la lista DEUDA: si se apunta a uno que ya
+    // salió de ella, quitarlo del verificador no crea ningún zombi y la sonda
+    // pasa a probar nada. Ocurrió al liquidar cinco deudas en la ETAPA 13.
     writeFileSync(
       verificador,
-      original.replace('node scripts/lib/dependencias-acotadas.mjs', 'true'),
+      original.replace('node scripts/lib/cliente-dart-desfasado.mjs', 'true'),
     );
     const rz = enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']);
     rz.codigo !== 0 && /ya no le corresponde/.test(rz.salida)
@@ -1696,6 +1824,345 @@ try {
     )
       ? ok('y lo dice con todas las letras cuando no hay ninguna')
       : mal('con cero saltadas calla: el silencio se lee como «no miré»');
+  }
+
+  console.log('\n▸ 26 · cinco controles salen de la deuda de prueba negativa (ETAPA 13)');
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * LA DEUDA DECLARADA, PAGADA DONDE SE PUEDE PAGAR
+     *
+     * Siete controles entraron en `DEUDA` el 2026-09-19 con su motivo escrito.
+     * La ETAPA 13 los revisa uno por uno, que es lo que una auditoría hace con
+     * una deuda: no la hereda, la liquida o la justifica.
+     *
+     * Cinco son ganables sin SDK de Flutter porque aceptan la ruta que miran o
+     * se dejan apuntar con `cwd`. Los otros dos —`cliente-dart-desfasado` y
+     * `recorrido-web`— necesitan ejecutar Dart y un navegador contra la app
+     * compilada; se quedan en la deuda con el motivo actualizado, que es la
+     * otra mitad legítima de la regla.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const arbol13 = join(banco, 'deuda-13');
+
+    // (a) flutter-sin-secretos · un secreto incrustado en un .dart.
+    {
+      const app = join(arbol13, 'app-con-secreto');
+      mkdirSync(join(app, 'lib'), { recursive: true });
+      writeFileSync(
+        join(app, 'lib', 'config.dart'),
+        "const llave = 'sb_secret_" + 'A1b2C3d4E5f6G7h8I9j0' + "';\n",
+      );
+      const r = correr('node', ['scripts/lib/flutter-sin-secretos.mjs', app], { cwd: raiz });
+      r.codigo !== 0 && /config\.dart/.test(r.salida)
+        ? ok('flutter-sin-secretos: una llave secreta en un .dart se detecta, con su fichero')
+        : mal(`flutter-sin-secretos NO detecta una llave incrustada (codigo ${r.codigo})`);
+
+      const limpia = join(arbol13, 'app-limpia');
+      mkdirSync(join(limpia, 'lib'), { recursive: true });
+      writeFileSync(join(limpia, 'lib', 'config.dart'), "const base = 'https://api.example';\n");
+      correr('node', ['scripts/lib/flutter-sin-secretos.mjs', limpia], { cwd: raiz }).codigo === 0
+        ? ok('y una app sin secretos no se marca')
+        : mal('flutter-sin-secretos marca una app limpia: falso positivo');
+    }
+
+    // (b) cobertura-flutter · un lcov por debajo del umbral.
+    {
+      const bajo = join(arbol13, 'lcov-bajo.info');
+      // Una capa de dominio con 10 líneas y 1 cubierta: 10 %, muy por debajo del 90 %.
+      const lineas = Array.from({ length: 10 }, (_, i) => `DA:${i + 1},${i === 0 ? 1 : 0}`);
+      writeFileSync(bajo, `SF:lib/dominio/regla.dart\n${lineas.join('\n')}\nend_of_record\n`);
+      const r = correr('node', ['scripts/lib/cobertura-flutter.mjs', bajo], { cwd: raiz });
+      r.codigo !== 0
+        ? ok('cobertura-flutter: una capa por debajo del umbral se detecta')
+        : mal(`cobertura-flutter da por buena una capa al 10 % (codigo ${r.codigo})`);
+
+      const vacio = join(arbol13, 'lcov-vacio.info');
+      writeFileSync(vacio, '');
+      correr('node', ['scripts/lib/cobertura-flutter.mjs', vacio], { cwd: raiz }).codigo !== 0
+        ? ok('y un lcov VACÍO no se lee como «todo cubierto»')
+        : mal('un lcov vacío pasa por bueno: es el falso verde que el control persigue');
+    }
+
+    // (c) verificar-base-de-pruebas · un puerto muerto y una base sin esquema.
+    {
+      const muerto = correr('node', ['scripts/lib/verificar-base-de-pruebas.mjs'], {
+        cwd: raiz,
+        env: { ...process.env, DATABASE_URL_PRUEBAS: 'postgresql://nadie@127.0.0.1:1/ncr' },
+      });
+      muerto.codigo !== 0 && /no se pudo usar la base/.test(muerto.salida)
+        ? ok('verificar-base-de-pruebas: un puerto muerto se detecta y se nombra')
+        : mal(`un puerto muerto NO se detecta (codigo ${muerto.codigo})`);
+
+      const sinVariable = correr('node', ['scripts/lib/verificar-base-de-pruebas.mjs'], {
+        cwd: raiz,
+        env: { ...process.env, DATABASE_URL_PRUEBAS: '' },
+      });
+      sinVariable.codigo !== 0 && /no está definida/.test(sinVariable.salida)
+        ? ok('y la variable vacía tampoco pasa por buena')
+        : mal('una DATABASE_URL_PRUEBAS vacía se lee como definida');
+    }
+
+    // (d) dependencias-acotadas · una acotación sin motivo escrito.
+    {
+      const app = join(arbol13, 'pub-a-ciegas', 'apps', 'mobile');
+      mkdirSync(app, { recursive: true });
+      writeFileSync(
+        join(app, 'pubspec.yaml'),
+        'name: ncr\ndependency_overrides:\n  objective_c: 9.4.0\n',
+      );
+      // La ruta del guion va ABSOLUTA: con `cwd` cambiado, la relativa no
+      // resuelve y node sale 1 por MODULE_NOT_FOUND. La primera versión de esta
+      // sonda leía ese 1 como «detectado» — pasaba por la razón equivocada, que
+      // es exactamente la familia de defecto que esta suite existe para cerrar.
+      const r = correr('node', [join(raiz, 'scripts/lib/dependencias-acotadas.mjs')], {
+        cwd: join(arbol13, 'pub-a-ciegas'),
+      });
+      r.codigo !== 0 && /objective_c/.test(r.salida)
+        ? ok('dependencias-acotadas: una acotación SIN motivo escrito se detecta')
+        : mal(`una acotación a ciegas NO se detecta (codigo ${r.codigo})`);
+    }
+
+    // (e) verificar-escritura · una ruta que NO se puede usar.
+    {
+      /**
+       * La sonda no usa permisos: esta suite corre como root en el contenedor y
+       * root escribe donde quiera, así que un `chmod 500` no demuestra nada —la
+       * primera versión de esta sonda lo intentó y pasaba por la razón
+       * equivocada—. Se usa una condición que ningún privilegio salva: un
+       * FICHERO donde el control espera un DIRECTORIO.
+       */
+      const app = join(arbol13, 'sin-permiso');
+      mkdirSync(join(app, 'apps', 'mobile'), { recursive: true });
+      writeFileSync(join(app, 'apps', 'mobile', 'pubspec.yaml'), 'name: ncr\n');
+      writeFileSync(
+        join(app, 'apps', 'mobile', '.dart_tool'),
+        'esto es un fichero, no un directorio',
+      );
+      const r = correr('node', [join(raiz, 'scripts/lib/verificar-escritura.mjs')], { cwd: app });
+      r.codigo !== 0 && /dart_tool/.test(r.salida)
+        ? ok('verificar-escritura: una ruta inservible se detecta y se nombra')
+        : mal(`una ruta inservible pasa por buena (codigo ${r.codigo})`);
+
+      rmSync(join(app, 'apps', 'mobile', '.dart_tool'), { force: true });
+      correr('node', [join(raiz, 'scripts/lib/verificar-escritura.mjs')], { cwd: app }).codigo === 0
+        ? ok('y un árbol sano no se marca')
+        : mal('verificar-escritura marca un árbol sano: falso positivo');
+    }
+  }
+
+  console.log('\n▸ 27 · un campo de texto SIN longitud máxima se detecta (H-13-09)');
+  {
+    if (exigeControl('scripts/lib/longitud-por-campo.mjs')) {
+      enClon('node', ['scripts/lib/longitud-por-campo.mjs']).codigo === 0
+        ? ok('la línea base del banco está limpia')
+        : mal('el banco NO parte de una línea base limpia');
+
+      // Un DTO nuevo con `@IsString()` y sin cota. Es exactamente la forma en
+      // que §2.7.4 se pierde: nadie borra la regla, simplemente el campo
+      // siguiente nace sin ella.
+      const dto = join(clon, 'apps/api/src/sonda-dto.ts');
+      writeFileSync(
+        dto,
+        "import { IsString } from 'class-validator';\n" +
+          'export class SondaDto {\n  @IsString()\n  readonly notas!: string;\n}\n',
+      );
+      enClon('git', ['add', '--intent-to-add', 'apps/api/src/sonda-dto.ts']);
+      const r = enClon('node', ['scripts/lib/longitud-por-campo.mjs']);
+      r.codigo !== 0 && /sonda-dto/.test(r.salida)
+        ? ok('detectado, con salida distinta de cero')
+        : mal(`un campo sin cota NO se detecta (codigo ${r.codigo})`);
+
+      // Y con la cota puesta, el mismo fichero pasa: que no sea un control que
+      // siempre grita.
+      writeFileSync(
+        dto,
+        "import { IsString, MaxLength } from 'class-validator';\n" +
+          'export class SondaDto {\n  @IsString()\n  @MaxLength(512)\n  readonly notas!: string;\n}\n',
+      );
+      enClon('node', ['scripts/lib/longitud-por-campo.mjs']).codigo === 0
+        ? ok('y con @MaxLength el mismo campo pasa')
+        : mal('marca como sin cota un campo que SÍ la declara: falso positivo');
+
+      rmSync(dto, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'apps/api/src/sonda-dto.ts']);
+    }
+  }
+
+  console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
+  {
+    // (a) EL ÍNDICE, no el árbol · H-13-20.
+    {
+      // Línea base del modo índice, antes de plantar nada: un control que
+      // siempre grita no distingue un hallazgo de su propio ruido.
+      enClon('node', ['scripts/lib/escanear-secretos.mjs', '--indice']).codigo === 0
+        ? ok('la línea base del modo índice está limpia')
+        : mal('el modo índice marca un árbol limpio: falso positivo');
+
+      const fuga = join(clon, 'sonda-indice.ts');
+      writeFileSync(fuga, `export const k = 'sb_secret_${'S1t2A3g4E5d6O7n8'}';\n`);
+      enClon('git', ['add', 'sonda-indice.ts']);
+      writeFileSync(fuga, "export const k = 'inocuo';\n");
+
+      const arbol = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      const indice = enClon('node', ['scripts/lib/escanear-secretos.mjs', '--indice']);
+      arbol.codigo === 0 && indice.codigo !== 0 && /sonda-indice/.test(indice.salida)
+        ? ok('lo PREPARADO se inspecciona aunque el árbol ya sea inocuo')
+        : mal(
+            `el modo índice no ve lo que se confirmaría (arbol ${arbol.codigo}, indice ${indice.codigo})`,
+          );
+
+      rmSync(fuga, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-indice.ts']);
+    }
+
+    // (b) EL BYTE NUL ya no esconde el fichero · H-13-18.
+    {
+      const fuga = join(clon, 'sonda-nul.ts');
+      writeFileSync(fuga, `export const k = 'sb_secret_${'N1u2L3b4Y5p6A7s8'}';\nconst x = '\0';\n`);
+      enClon('git', ['add', '--intent-to-add', 'sonda-nul.ts']);
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo !== 0 && /sonda-nul/.test(r.salida)
+        ? ok('un byte NUL ya no hace invisible el fichero entero')
+        : mal(`el NUL sigue ocultando la llave (codigo ${r.codigo})`);
+      rmSync(fuga, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-nul.ts']);
+    }
+
+    // (c) LOS SECRETOS PROPIOS del proyecto · H-13-19, con su contraprueba.
+    {
+      const fuga = join(clon, 'sonda-propios.ts');
+      // El valor se ARMA por trozos: escrito entero, el propio escáner
+      // detectaría este fichero y el banco no podría ni arrancar. Es la misma
+      // precaución que toman las sondas de Supabase más arriba.
+      const material = `kJ8xQ2mVw9pL4nR7${'tY1zB6cF3hD5gS0a'}${'M8eU2iO4qW7v'}`;
+      writeFileSync(fuga, `export const INGESTA_FIRMA_SECRETO = '${material}';\n`);
+      enClon('git', ['add', '--intent-to-add', 'sonda-propios.ts']);
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo !== 0 && /sonda-propios/.test(r.salida)
+        ? ok('la llave que firma la ingesta se detecta')
+        : mal(`INGESTA_FIRMA_SECRETO con valor real NO se detecta (codigo ${r.codigo})`);
+
+      // Y la OTRA forma que toma una llave real: hexadecimal largo, sin una
+      // sola mayúscula. La heurística la reconoce por su forma, no por su
+      // nombre —era el ejemplo que destapó H-13-19—.
+      writeFileSync(
+        fuga,
+        `export const BIOMETRIA_LLAVE = '${'a91f3c7e28b6d04a'}${'5f8c1e93b27d60a4'}${'f1e8c35b90d27a46'}';\n`,
+      );
+      enClon('node', ['scripts/lib/escanear-secretos.mjs']).codigo !== 0
+        ? ok('y la llave hexadecimal también, aunque no lleve mayúsculas')
+        : mal('una llave hexadecimal de 48 caracteres NO se detecta');
+
+      // Contraprueba: el marcador legible que hay por todo el árbol NO puede
+      // gritar, o el control se vuelve inservible a la semana.
+      writeFileSync(
+        fuga,
+        "export const INGESTA_FIRMA_SECRETO = 'un-secreto-de-al-menos-treinta-y-dos';\n",
+      );
+      enClon('node', ['scripts/lib/escanear-secretos.mjs']).codigo === 0
+        ? ok('y un marcador legible no produce ruido')
+        : mal('el control marca un marcador de prueba: sería ruido en cada commit');
+
+      rmSync(fuga, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-propios.ts']);
+    }
+
+    // (c bis) MÁS DE VEINTE HALLAZGOS SE RECORTAN, Y SE DICE CUÁNTOS FALTAN.
+    //         Un volcado de doscientas líneas en el gancho de pre-commit es
+    //         ilegible, y un recorte que no avisa es peor que el volcado.
+    {
+      const muchas = join(clon, 'sonda-muchas.ts');
+      const lineas = Array.from(
+        { length: 25 },
+        (_, i) => `export const k${i} = 'sb_secret_${'A1b2C3d4E5f6G7h'}${i}';`,
+      );
+      writeFileSync(muchas, `${lineas.join('\n')}\n`);
+      enClon('git', ['add', '--intent-to-add', 'sonda-muchas.ts']);
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo !== 0 && /y 5 más/.test(r.salida)
+        ? ok('con 25 hallazgos se muestran 20 y se dice que faltan 5')
+        : mal(`el recorte de la salida no avisa de cuántos faltan (codigo ${r.codigo})`);
+      rmSync(muchas, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-muchas.ts']);
+    }
+
+    // (c ter) LO QUE NO SE PUEDE LEER NO SE INVENTA: ni se cuelga, ni pasa por
+    //         bueno en silencio. Dos caminos que el escáner tiene que sortear
+    //         sin morirse — un enlace roto y un fichero desmedido —, y que
+    //         existen de verdad en árboles reales.
+    {
+      const roto = join(clon, 'sonda-enlace-roto.ts');
+      symlinkSync(join(clon, 'no-existe-en-ninguna-parte.ts'), roto);
+      enClon('git', ['add', 'sonda-enlace-roto.ts']);
+
+      const grande = join(clon, 'sonda-desmedida.bin');
+      writeFileSync(grande, Buffer.alloc(6 * 1024 * 1024, 0x41));
+      enClon('git', ['add', '--intent-to-add', 'sonda-desmedida.bin']);
+
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo === 0
+        ? ok('un enlace roto y un fichero de 6 MB no rompen el escaneo')
+        : mal(
+            `el escaneo se cae con un enlace roto o un fichero grande: ${r.salida.slice(0, 120)}`,
+          );
+
+      rmSync(roto, { force: true });
+      rmSync(grande, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-enlace-roto.ts']);
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-desmedida.bin']);
+    }
+
+    // (d) LO QUE `.gitignore` PROHÍBE Y ESTÁ VERSIONADO · H-13-23.
+    {
+      const fuga = join(clon, 'sonda.pem');
+      writeFileSync(fuga, 'no es una llave, pero la extensión está prohibida\n');
+      enClon('git', ['add', '--force', 'sonda.pem']);
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo !== 0 && /sonda\.pem/.test(r.salida)
+        ? ok('un fichero ignorado por .gitignore y versionado se detecta')
+        : mal(`un *.pem versionado con --force pasa inadvertido (codigo ${r.codigo})`);
+      rmSync(fuga, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda.pem']);
+    }
+
+    // (e) EL HISTORIAL · H-13-17. Necesita clon PROFUNDO: el banco es --depth 1
+    //     y en un solo commit no hay historia que revisar. Es justo el error que
+    //     el propio control comete en CI si el checkout no trae `fetch-depth: 0`.
+    {
+      const profundo = join(banco, 'historia');
+      correr('git', ['clone', '--quiet', '--no-hardlinks', raiz, profundo]);
+      cpSync(
+        join(raiz, 'scripts/lib/escanear-secretos.mjs'),
+        join(profundo, 'scripts/lib/escanear-secretos.mjs'),
+      );
+      const enProfundo = (args) =>
+        correr('node', ['scripts/lib/escanear-secretos.mjs', ...args], { cwd: profundo });
+
+      enProfundo(['--historial']).codigo === 0
+        ? ok('la línea base del historial está limpia')
+        : mal('el historial del repositorio YA tiene un hallazgo real sin declarar');
+
+      correr('git', ['config', 'user.email', 'sonda@ncr.invalid'], { cwd: profundo });
+      correr('git', ['config', 'user.name', 'sonda'], { cwd: profundo });
+      writeFileSync(
+        join(profundo, 'sonda-historia.ts'),
+        `export const k = 'sb_secret_${'H1i2S3t4O5r6I7a8'}';\n`,
+      );
+      correr('git', ['add', 'sonda-historia.ts'], { cwd: profundo });
+      correr('git', ['commit', '--quiet', '-m', 'sonda'], { cwd: profundo });
+      correr('git', ['rm', '--quiet', 'sonda-historia.ts'], { cwd: profundo });
+      correr('git', ['commit', '--quiet', '-m', 'y se retira'], { cwd: profundo });
+
+      const arbol = enProfundo([]);
+      const historia = enProfundo(['--historial']);
+      arbol.codigo === 0 && historia.codigo !== 0 && /sonda-historia/.test(historia.salida)
+        ? ok('un secreto retirado del árbol SIGUE apareciendo en el historial')
+        : mal(
+            `el historial no lo ve (arbol ${arbol.codigo}, historial ${historia.codigo}): ` +
+              'borrarlo en el commit siguiente no retira la llave',
+          );
+    }
   }
 } finally {
   rmSync(banco, { recursive: true, force: true });

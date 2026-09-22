@@ -28,6 +28,12 @@ jobs:
     runs-on: ${{ matrix.so }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historia COMPLETA: el escaneo del historial (H-13-17) no puede
+          # mirar lo que el checkout no trajo, y el valor por omisión es 1.
+          # Un control que corre sobre un solo commit informaría «limpio»
+          # sobre un repositorio que no ha visto.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -47,6 +53,13 @@ jobs:
 
       - name: Escaneo de secretos
         run: node scripts/lib/escanear-secretos.mjs
+
+      # El alcance de la ETAPA 13 pide «ninguno está en el código NI EN EL
+      # HISTORIAL de Git». Hasta entonces la segunda mitad no tenía control:
+      # un secreto confirmado y retirado en el commit siguiente dejaba el
+      # escáner en «limpio» mientras la llave seguía siendo recuperable.
+      - name: Escaneo de secretos en el historial
+        run: node scripts/lib/escanear-secretos.mjs --historial
 
       - name: Pruebas negativas de los controles
         run: node scripts/lib/pruebas-negativas.mjs
@@ -111,6 +124,17 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historia COMPLETA, igual que en `controles`, y por el mismo motivo.
+          # Se descubrió comparando dos salidas del MISMO control en la misma
+          # corrida: el paso 10 de este trabajo informaba
+          #   «limpio (1136 blobs del historial alcanzable)»
+          # mientras que en local y en `controles` eran 2182. No es una
+          # diferencia de máquina: es que este checkout no traía la historia, y
+          # el escaneo del historial daba «limpio» sobre un repositorio que no
+          # había visto. Es LITERALMENTE el modo de fallo que H-13-17 documenta,
+          # reintroducido por la mitad del remedio.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 

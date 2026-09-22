@@ -37,6 +37,21 @@ export default tseslint.config(
       // desincroniza del generador y `contrato:desfasado` rompe el build en el
       // commit siguiente — ocurrió con el gancho de prettier el 2026-09-09.
       '**/src/generado/**',
+      // GENERADO por Next en cada compilación (`next-env.d.ts`). Su propio
+      // encabezado dice «This file should not be edited», y Next 15.5 empezó a
+      // emitir en él una `triple-slash reference` a `.next/types/routes.d.ts`
+      // que `@typescript-eslint/triple-slash-reference` rechaza.
+      //
+      // H-13-08 · esto no se veía porque las DOS superficies de lint miran
+      // cosas distintas: `pnpm lint` ejecuta `eslint src` y nunca llega a la
+      // raíz del paquete; `lint-staged` le pasa a eslint el fichero indexado
+      // tal cual. Verde en una, rojo en la otra, sobre el mismo árbol. La
+      // exclusión vive AQUÍ —en la configuración que ambas comparten— y no en
+      // un `--ignore-pattern` del gancho, para que no vuelvan a discrepar.
+      //
+      // El fichero además ya no se versiona: `.gitignore:31` lo declaraba
+      // ignorado desde la ETAPA 09 y seguía en el índice (H-13-23).
+      '**/next-env.d.ts',
     ],
   },
   js.configs.recommended,

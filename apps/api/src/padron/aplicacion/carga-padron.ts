@@ -173,7 +173,10 @@ export class CargarPadronDesdeArchivo {
         const personas = new Map<string, string>();
 
         const resolverVivienda = async (fila: FilaPadron): Promise<string> => {
-          const escrito = fila.vivienda.trim();
+          // NFC también aquí (H-13-16): una hoja de cálculo guardada en macOS
+          // trae los acentos DESCOMPUESTOS, así que la misma vivienda escrita
+          // por la pantalla y por el archivo daría dos filas distintas.
+          const escrito = fila.vivienda.normalize('NFC').trim();
           if (UUID.test(escrito)) return escrito;
 
           // «Casa 42» en la hoja se guarda como «42»: la palabra es de la
@@ -183,7 +186,7 @@ export class CargarPadronDesdeArchivo {
           const identificador = recortado ?? escrito;
           if (recortado !== null) identificadoresRecortados += 1;
 
-          const agrupacionEscrita = fila.agrupacion?.trim();
+          const agrupacionEscrita = fila.agrupacion?.normalize('NFC').trim();
           const agrupacion =
             agrupacionEscrita === undefined || agrupacionEscrita === ''
               ? null

@@ -47,10 +47,39 @@ export class GuardiaDeFirmaDeIngesta implements CanActivate {
       return Array.isArray(valor) ? valor[0] : valor;
     };
 
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * AQUÍ SE FALLA CERRADO · H-13-10
+     *
+     * La línea era `cuerpoCrudo: peticion.cuerpoCrudo ?? ''`, y ese `?? ''` era
+     * un repliegue ABIERTO: `guardarCuerpoCrudo` sólo se engancha en
+     * `express.json({ verify })`, así que con CUALQUIER otro content-type
+     * `cuerpoCrudo` queda `undefined` y la firma se verificaba **sobre la
+     * cadena vacía**. Medido:
+     *
+     *   POST /ingesta/latidos · Content-Type: application/x-www-form-urlencoded
+     *   x-ncr-firma: firmar(SECRETO, marca, '')      ← firma sobre ''
+     *   cuerpo: copropiedadId=…&dispositivoId=disp-1
+     *     -> 202 {"recibido":true}                   ← aceptado, sin cubrirlo
+     *
+     * Línea base que descarta el falso positivo: firmando el cuerpo real, 401.
+     *
+     * Importa ANTES de la ETAPA 15, no después: el Alarm Server del fabricante
+     * publica `multipart/form-data` —XML del evento, foto y recorte de placa—.
+     * Con ese parser montado, `express.json` no ejecuta su `verify`,
+     * `cuerpoCrudo` sería `undefined` en TODOS los POST de cámara, y una sola
+     * firma capturada valdría para cualquier cuerpo dentro de la ventana. Eso
+     * es forja de eventos sobre una tabla que RN-03 declara inalterable.
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    if (peticion.cuerpoCrudo === undefined) {
+      throw new UnauthorizedException('Firma de ingesta no válida');
+    }
+
     const veredicto = verificarFirma({
       firmaRecibida: cabecera(CABECERA_FIRMA),
       marcaTemporal: cabecera(CABECERA_MARCA),
-      cuerpoCrudo: peticion.cuerpoCrudo ?? '',
+      cuerpoCrudo: peticion.cuerpoCrudo,
       secreto: this.config.INGESTA_FIRMA_SECRETO,
       ahora: this.reloj.ahora(),
       ventanaSegundos: this.config.INGESTA_VENTANA_SEGUNDOS,

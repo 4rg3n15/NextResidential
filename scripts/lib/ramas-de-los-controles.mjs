@@ -183,6 +183,27 @@ const SENSIBLES_AL_ENTORNO = new Map([
     'scripts/lib/con-limite.mjs',
     'solo se carga si alguna sonda lo invoca, y qué sondas corren depende del host',
   ],
+  /**
+   * AÑADIDO EN LA ETAPA 13, con la medición delante.
+   *
+   * `verificar-escritura.mjs` ejercita la caché del SDK de Flutter sólo si
+   * encuentra el SDK. Con él presente entra en esa rama y deja sin ejercer el
+   * `catch` de «no hay Flutter en el PATH»; sin él, al revés. Medido sobre el
+   * MISMO commit, cambiando únicamente la variable del entorno:
+   *
+   *   sin NCR_FLUTTER -> 8 bloques sin ejercer
+   *   con NCR_FLUTTER -> 9 bloques sin ejercer
+   *
+   * Es literalmente D-96: una cifra fija estaría en rojo en una de las dos
+   * máquinas siempre, y un rojo que aparece por la máquina y no por el código
+   * enseña a ignorar el control. Lo que NO se relaja es que tenga prueba
+   * negativa —la tiene, sonda 26(e)—, y eso lo comprueba
+   * `controles-sin-prueba-negativa.mjs`, que lee ficheros y es determinista.
+   */
+  [
+    'scripts/lib/verificar-escritura.mjs',
+    'ejercita la caché del SDK de Flutter sólo si el SDK está: 8 bloques sin él, 9 con él',
+  ],
 ]);
 
 if (process.argv.includes('--actualizar')) {

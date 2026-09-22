@@ -9,7 +9,7 @@ import type { TestingModuleBuilder } from '@nestjs/testing';
 import express from 'express';
 import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
 import type { INestApplication } from '@nestjs/common';
-import { ValidationPipe } from '@nestjs/common';
+import { aplicarSaneamiento, aplicarSeguridad } from '../src/seguridad';
 import { AppModule } from '../src/app.module';
 import { SONDA_POSTGRES } from '../src/arranque/sonda-postgres';
 import { ProveedorDeJwks } from '../src/autenticacion/infraestructura/jwks';
@@ -228,13 +228,41 @@ export const crearApp = async (
   // firma del Alarm Server —que se calcula sobre el cuerpo CRUDO— no tendría
   // cuerpo crudo que verificar.
   const app = modulo.createNestApplication({ logger: false, bodyParser: false });
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * LA TUBERÍA DEL DESPLIEGUE, NO UNA IMITACIÓN · H-13-11
+   *
+   * Hasta la ETAPA 13 este fixture RECONSTRUÍA a mano el `ValidationPipe` y no
+   * llamaba a `aplicarSeguridad` en absoluto. La consecuencia, medida:
+   *
+   *   $ vitest run --coverage --coverage.include='src/seguridad.ts'
+   *     Tests  656 passed | 5 skipped (661)
+   *     seguridad.ts | 0 % Stmts | 0 % Lines | 1-57
+   *
+   * Cero. Las 656 pruebas en verde no ejercitaban NI UNA LÍNEA del
+   * endurecimiento HTTP: ni la lista blanca de CORS, ni la CSP, ni HSTS, ni el
+   * pipe real. Cambiar `origin:` por `true`, o borrar `forbidNonWhitelisted`,
+   * no ponía nada en rojo. Y los dos literales ya habían divergido: producción
+   * pasaba `transformOptions: { enableImplicitConversion: false }` y el fixture
+   * no, así que la suite validaba con reglas de conversión distintas.
+   *
+   * Es la familia de falso verde que §2.8.0 documenta —la metadata de
+   * decoradores en la 03, el `dist` viejo en la 04—, aplicada esta vez a §2.7.2,
+   * §2.7.3 y §2.7.7. Mientras estuvo así, toda afirmación de los informes de
+   * etapa sobre esas tres secciones se apoyaba en una tubería que el despliegue
+   * no usa.
+   *
+   * El orden replica `main.ts` exactamente, y el orden es parte del contrato:
+   * `aplicarSaneamiento` va DESPUÉS de los parsers porque antes no hay cuerpo.
+   * ═════════════════════════════════════════════════════════════════════════
+   */
+  aplicarSeguridad(app, configuracionDePrueba);
   app.use(
     express.json({ limit: configuracionDePrueba.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }),
   );
   app.use(express.urlencoded({ limit: configuracionDePrueba.LIMITE_PAYLOAD, extended: false }));
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-  );
+  aplicarSaneamiento(app);
   /**
    * EL MISMO FILTRO GLOBAL QUE PRODUCCIÓN.
    *

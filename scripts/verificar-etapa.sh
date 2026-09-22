@@ -737,6 +737,25 @@ else
   echo "$salida_mod" | head -8 | sed 's/^/     /'
 fi
 con_limite "$LIMITE_CORTO" ./scripts/escanear-secretos.sh >/dev/null 2>&1 && ok "sin secretos" || mal "secretos detectados"
+# ETAPA 13 · el alcance pide «ni en el código NI EN EL HISTORIAL de Git». Hasta
+# aquí la segunda mitad no tenía control: un secreto confirmado y retirado en el
+# commit siguiente dejaba el escáner en «limpio» mientras la llave seguía siendo
+# recuperable con una orden (H-13-17).
+if salida_hist=$(con_limite "$LIMITE_CORTO" ./scripts/escanear-secretos.sh --historial 2>&1); then
+  ok "$salida_hist"
+else
+  mal "hay un secreto en el HISTORIAL de Git: borrarlo del árbol no lo retira"
+  echo "$salida_hist" | head -8 | sed 's/^/     /'
+fi
+# §2.7.4 exige «longitud máxima POR CAMPO». Vivía como un techo global aplicado
+# con `.slice()`, que mutilaba en silencio las cargas base64 (H-13-09). La cota
+# está ahora en cada DTO, y esto impide que el campo siguiente nazca sin ella.
+if salida_long=$(con_limite "$LIMITE_CORTO" node scripts/lib/longitud-por-campo.mjs 2>&1); then
+  ok "$salida_long"
+else
+  mal "hay campos de texto sin longitud máxima declarada (§2.7.4)"
+  echo "$salida_long" | head -10 | sed 's/^/     /'
+fi
 # KPI-11 · la sustitución de MockProvider por HikvisionProvider en la ETAPA 15
 # solo es posible si nadie fuera de `packages/providers` conoce el protocolo.
 if salida_kpi11=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-hardware.mjs 2>&1); then

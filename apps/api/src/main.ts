@@ -45,7 +45,7 @@ import express from 'express';
 import { guardarCuerpoCrudo } from './autorizaciones';
 import { AppModule } from './app.module';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
-import { aplicarSeguridad } from './seguridad';
+import { aplicarSaneamiento, aplicarSeguridad } from './seguridad';
 import { FiltroGlobalDeExcepciones } from './comun/filtros/filtro-global';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import { BitacoraEstructurada } from './comun/bitacora/bitacora-estructurada';
@@ -81,6 +81,8 @@ async function arrancar(): Promise<void> {
   // produciría otra cadena con la que ninguna firma cuadraría (RNF-03.11).
   app.use(express.json({ limit: config.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
   app.use(express.urlencoded({ limit: config.LIMITE_PAYLOAD, extended: false }));
+  // §2.7.4 · saneamiento DESPUÉS de los parsers: antes no hay cuerpo que sanear.
+  aplicarSaneamiento(app);
 
   app.useGlobalFilters(new FiltroGlobalDeExcepciones(bitacora));
   app.useGlobalInterceptors(app.get(InterceptorDeCorrelacion));

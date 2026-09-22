@@ -88,4 +88,43 @@ describe('ingesta de eventos de hardware', () => {
     const conExtra = { ...evento, colada: 'x' };
     await enviar(conExtra, firmado(conExtra)).expect(400);
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * H-13-10 · sin cuerpo crudo NO hay firma que verificar: 401, no 202.
+   *
+   * `guardarCuerpoCrudo` sólo se engancha en `express.json({ verify })`. Con
+   * cualquier otro content-type, `cuerpoCrudo` quedaba `undefined` y el guard
+   * hacía `?? ''`: verificaba la firma **sobre la cadena vacía** y aceptaba un
+   * cuerpo que esa firma no cubría. Medido: 202.
+   *
+   * Es la regresión que hay que fijar ANTES de la ETAPA 15: el Alarm Server del
+   * fabricante publica `multipart/form-data`, y con ese parser montado ninguna
+   * ingesta de cámara pasaría por `express.json`.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  it('urlencoded con la firma calculada sobre la cadena vacía: 401 (H-13-10)', async () => {
+    const marca = String(Math.floor(Date.now() / 1000));
+    await request(app.getHttpServer())
+      .post('/ingesta/eventos')
+      .set(CABECERA_MARCA, marca)
+      .set(CABECERA_FIRMA, firmar(configuracionDePrueba.INGESTA_FIRMA_SECRETO, marca, ''))
+      .type('form')
+      .send({ copropiedadId: COP_A, dispositivoId: 'disp-talanquera-1' })
+      .expect(401);
+  });
+
+  it('y tampoco cuela firmando el cuerpo urlencoded de verdad (H-13-10)', async () => {
+    // El otro lado de la moneda: no es que falte la firma correcta, es que sin
+    // `express.json` no hay cuerpo crudo con el que compararla. Deniega igual.
+    const marca = String(Math.floor(Date.now() / 1000));
+    const crudo = `copropiedadId=${COP_A}&dispositivoId=disp-talanquera-1`;
+    await request(app.getHttpServer())
+      .post('/ingesta/eventos')
+      .set(CABECERA_MARCA, marca)
+      .set(CABECERA_FIRMA, firmar(configuracionDePrueba.INGESTA_FIRMA_SECRETO, marca, crudo))
+      .type('form')
+      .send(crudo)
+      .expect(401);
+  });
 });

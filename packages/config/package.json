@@ -12,7 +12,7 @@
     "test:cobertura": "vitest run --coverage"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "2.1.8",
-    "vitest": "2.1.8"
+    "@vitest/coverage-v8": "^3.2.6",
+    "vitest": "^3.2.6"
   }
 }

@@ -59,7 +59,27 @@ const firmaDe = (salida, codigo) => {
     .split('\n')
     .map((l) => l.replace(SIN_COLOR, '').replace(/\s+/g, ' ').trim());
   const recuentos = lineas.filter((l) => /(Tests|Test Files) \d|Tests \d+ failed/.test(l)).sort();
-  const rojas = lineas.filter((l) => l.startsWith('× ')).sort();
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * NOMBRAR LA ROJA · la mitad que D-100 dejó sin cerrar, encontrada en la 13
+   *
+   * Aquí solo se recogían las líneas que empiezan por `× `, que es como Vitest
+   * lista las pruebas fallidas con su reportero por omisión. Pero esta función
+   * corre el comando con `CI: '1'`, y **con `CI` puesto Vitest cambia de
+   * reportero**: imprime `FAIL  <fichero> > <suite> > <prueba>` y no emite ni
+   * una línea con `×`.
+   *
+   * Resultado medido en la ETAPA 13: la corrida 2 de 3 salió en rojo, el paso
+   * informó «la corrida 2 terminó en rojo (codigo 1)» — y debajo, nada. El
+   * mecanismo que D-100 añadió para que la próxima roja **se nombrara sola** no
+   * nombraba nada en el único modo en que este paso ejecuta la suite.
+   *
+   * Es la familia otra vez, y dentro de la corrección de la familia.
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  const rojas = lineas
+    .filter((l) => l.startsWith('× ') || l.startsWith('FAIL ') || /^\s*→ /.test(l))
+    .sort();
   const noManejados = lineas.filter((l) => /Unhandled Error|Uncaught Exception/.test(l)).length;
   return {
     codigo,
@@ -106,7 +126,12 @@ if (primera.recuentos.length === 0) {
 for (const [i, c] of corridas.entries()) {
   if (c.codigo !== 0) {
     console.log(`   ✗ la corrida ${i + 1} terminó en rojo (codigo ${c.codigo})`);
-    for (const r of c.rojas.slice(0, 5)) console.log(`     ${r}`);
+    c.rojas.length > 0
+      ? c.rojas.slice(0, 8).forEach((r) => console.log(`     ${r}`))
+      : console.log(
+          '     (sin nombre de prueba en la salida: el reportero no lo emitió. ' +
+            'Es un defecto de ESTE control, no una roja anónima — arréglelo antes de diagnosticar)',
+        );
     fallos += 1;
   }
   if (c.noManejados > 0) {
