@@ -1869,6 +1869,158 @@ try {
         : mal('verificar-escritura marca un árbol sano: falso positivo');
     }
   }
+
+  console.log('\n▸ 27 · un campo de texto SIN longitud máxima se detecta (H-13-09)');
+  {
+    if (exigeControl('scripts/lib/longitud-por-campo.mjs')) {
+      enClon('node', ['scripts/lib/longitud-por-campo.mjs']).codigo === 0
+        ? ok('la línea base del banco está limpia')
+        : mal('el banco NO parte de una línea base limpia');
+
+      // Un DTO nuevo con `@IsString()` y sin cota. Es exactamente la forma en
+      // que §2.7.4 se pierde: nadie borra la regla, simplemente el campo
+      // siguiente nace sin ella.
+      const dto = join(clon, 'apps/api/src/sonda-dto.ts');
+      writeFileSync(
+        dto,
+        "import { IsString } from 'class-validator';\n" +
+          'export class SondaDto {\n  @IsString()\n  readonly notas!: string;\n}\n',
+      );
+      enClon('git', ['add', '--intent-to-add', 'apps/api/src/sonda-dto.ts']);
+      const r = enClon('node', ['scripts/lib/longitud-por-campo.mjs']);
+      r.codigo !== 0 && /sonda-dto/.test(r.salida)
+        ? ok('detectado, con salida distinta de cero')
+        : mal(`un campo sin cota NO se detecta (codigo ${r.codigo})`);
+
+      // Y con la cota puesta, el mismo fichero pasa: que no sea un control que
+      // siempre grita.
+      writeFileSync(
+        dto,
+        "import { IsString, MaxLength } from 'class-validator';\n" +
+          'export class SondaDto {\n  @IsString()\n  @MaxLength(512)\n  readonly notas!: string;\n}\n',
+      );
+      enClon('node', ['scripts/lib/longitud-por-campo.mjs']).codigo === 0
+        ? ok('y con @MaxLength el mismo campo pasa')
+        : mal('marca como sin cota un campo que SÍ la declara: falso positivo');
+
+      rmSync(dto, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'apps/api/src/sonda-dto.ts']);
+    }
+  }
+
+  console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
+  {
+    // (a) EL ÍNDICE, no el árbol · H-13-20.
+    {
+      const fuga = join(clon, 'sonda-indice.ts');
+      writeFileSync(fuga, `export const k = 'sb_secret_${'S1t2A3g4E5d6O7n8'}';\n`);
+      enClon('git', ['add', 'sonda-indice.ts']);
+      writeFileSync(fuga, "export const k = 'inocuo';\n");
+
+      const arbol = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      const indice = enClon('node', ['scripts/lib/escanear-secretos.mjs', '--indice']);
+      arbol.codigo === 0 && indice.codigo !== 0 && /sonda-indice/.test(indice.salida)
+        ? ok('lo PREPARADO se inspecciona aunque el árbol ya sea inocuo')
+        : mal(
+            `el modo índice no ve lo que se confirmaría (arbol ${arbol.codigo}, indice ${indice.codigo})`,
+          );
+
+      rmSync(fuga, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-indice.ts']);
+    }
+
+    // (b) EL BYTE NUL ya no esconde el fichero · H-13-18.
+    {
+      const fuga = join(clon, 'sonda-nul.ts');
+      writeFileSync(fuga, `export const k = 'sb_secret_${'N1u2L3b4Y5p6A7s8'}';\nconst x = '\0';\n`);
+      enClon('git', ['add', '--intent-to-add', 'sonda-nul.ts']);
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo !== 0 && /sonda-nul/.test(r.salida)
+        ? ok('un byte NUL ya no hace invisible el fichero entero')
+        : mal(`el NUL sigue ocultando la llave (codigo ${r.codigo})`);
+      rmSync(fuga, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-nul.ts']);
+    }
+
+    // (c) LOS SECRETOS PROPIOS del proyecto · H-13-19, con su contraprueba.
+    {
+      const fuga = join(clon, 'sonda-propios.ts');
+      // El valor se ARMA por trozos: escrito entero, el propio escáner
+      // detectaría este fichero y el banco no podría ni arrancar. Es la misma
+      // precaución que toman las sondas de Supabase más arriba.
+      const material = `kJ8xQ2mVw9pL4nR7${'tY1zB6cF3hD5gS0a'}${'M8eU2iO4qW7v'}`;
+      writeFileSync(fuga, `export const INGESTA_FIRMA_SECRETO = '${material}';\n`);
+      enClon('git', ['add', '--intent-to-add', 'sonda-propios.ts']);
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo !== 0 && /sonda-propios/.test(r.salida)
+        ? ok('la llave que firma la ingesta se detecta')
+        : mal(`INGESTA_FIRMA_SECRETO con valor real NO se detecta (codigo ${r.codigo})`);
+
+      // Contraprueba: el marcador legible que hay por todo el árbol NO puede
+      // gritar, o el control se vuelve inservible a la semana.
+      writeFileSync(
+        fuga,
+        "export const INGESTA_FIRMA_SECRETO = 'un-secreto-de-al-menos-treinta-y-dos';\n",
+      );
+      enClon('node', ['scripts/lib/escanear-secretos.mjs']).codigo === 0
+        ? ok('y un marcador legible no produce ruido')
+        : mal('el control marca un marcador de prueba: sería ruido en cada commit');
+
+      rmSync(fuga, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda-propios.ts']);
+    }
+
+    // (d) LO QUE `.gitignore` PROHÍBE Y ESTÁ VERSIONADO · H-13-23.
+    {
+      const fuga = join(clon, 'sonda.pem');
+      writeFileSync(fuga, 'no es una llave, pero la extensión está prohibida\n');
+      enClon('git', ['add', '--force', 'sonda.pem']);
+      const r = enClon('node', ['scripts/lib/escanear-secretos.mjs']);
+      r.codigo !== 0 && /sonda\.pem/.test(r.salida)
+        ? ok('un fichero ignorado por .gitignore y versionado se detecta')
+        : mal(`un *.pem versionado con --force pasa inadvertido (codigo ${r.codigo})`);
+      rmSync(fuga, { force: true });
+      enClon('git', ['rm', '--cached', '--quiet', '--force', 'sonda.pem']);
+    }
+
+    // (e) EL HISTORIAL · H-13-17. Necesita clon PROFUNDO: el banco es --depth 1
+    //     y en un solo commit no hay historia que revisar. Es justo el error que
+    //     el propio control comete en CI si el checkout no trae `fetch-depth: 0`.
+    {
+      const profundo = join(banco, 'historia');
+      correr('git', ['clone', '--quiet', '--no-hardlinks', raiz, profundo]);
+      cpSync(
+        join(raiz, 'scripts/lib/escanear-secretos.mjs'),
+        join(profundo, 'scripts/lib/escanear-secretos.mjs'),
+      );
+      const enProfundo = (args) =>
+        correr('node', ['scripts/lib/escanear-secretos.mjs', ...args], { cwd: profundo });
+
+      enProfundo(['--historial']).codigo === 0
+        ? ok('la línea base del historial está limpia')
+        : mal('el historial del repositorio YA tiene un hallazgo real sin declarar');
+
+      correr('git', ['config', 'user.email', 'sonda@ncr.invalid'], { cwd: profundo });
+      correr('git', ['config', 'user.name', 'sonda'], { cwd: profundo });
+      writeFileSync(
+        join(profundo, 'sonda-historia.ts'),
+        `export const k = 'sb_secret_${'H1i2S3t4O5r6I7a8'}';\n`,
+      );
+      correr('git', ['add', 'sonda-historia.ts'], { cwd: profundo });
+      correr('git', ['commit', '--quiet', '-m', 'sonda'], { cwd: profundo });
+      correr('git', ['rm', '--quiet', 'sonda-historia.ts'], { cwd: profundo });
+      correr('git', ['commit', '--quiet', '-m', 'y se retira'], { cwd: profundo });
+
+      const arbol = enProfundo([]);
+      const historia = enProfundo(['--historial']);
+      arbol.codigo === 0 && historia.codigo !== 0 && /sonda-historia/.test(historia.salida)
+        ? ok('un secreto retirado del árbol SIGUE apareciendo en el historial')
+        : mal(
+            `el historial no lo ve (arbol ${arbol.codigo}, historial ${historia.codigo}): ` +
+              'borrarlo en el commit siguiente no retira la llave',
+          );
+    }
+  }
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }

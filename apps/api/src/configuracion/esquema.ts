@@ -266,5 +266,62 @@ export const cargarConfiguracion = (entorno: NodeJS.ProcessEnv): Configuracion =
   if (origenesPermitidos.includes('*')) {
     throw new ErrorDeConfiguracion(['CORS_ALLOWED_ORIGINS no admite `*` (§2.7.2)']);
   }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * CADA ORIGEN, VALIDADO COMO ORIGEN · H-13-21
+   *
+   * Hasta la ETAPA 13 las únicas comprobaciones eran «no vacío» y «no es `*`».
+   * Medido con NODE_ENV=production:
+   *
+   *   "http://consola.ejemplo.co"       -> ACEPTADO
+   *   "https://consola.ejemplo.co/"     -> ACEPTADO
+   *   "ftp://x"                         -> ACEPTADO
+   *   "no-es-una-url"                   -> ACEPTADO
+   *   "https://consola.ejemplo.co/ruta" -> ACEPTADO
+   *
+   * Y con el primero, la API emitía `Access-Control-Allow-Credentials: true`
+   * hacia un origen en **texto plano**, contra la exigencia de HTTPS de §2.7.8,
+   * sin que nada lo advirtiera. El valor de `.env.example` es
+   * `http://localhost:3001` —correcto en desarrollo y silenciosamente peligroso
+   * si se copia a producción—, que es exactamente cómo llega uno de estos a un
+   * despliegue.
+   *
+   * La barra final y la ruta importan aunque parezcan cosmética: el navegador
+   * envía `Origin` SIN barra ni ruta, así que `https://consola.ejemplo.co/`
+   * jamás casa y la consola se queda fuera con un fallo sin diagnóstico. Se
+   * compara contra `new URL(o).origin`, que es la forma canónica.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  const malFormados: string[] = [];
+  for (const origen of origenesPermitidos) {
+    let analizado: URL;
+    try {
+      analizado = new URL(origen);
+    } catch {
+      malFormados.push(`CORS_ALLOWED_ORIGINS: «${origen}» no es una URL`);
+      continue;
+    }
+    if (analizado.protocol !== 'https:' && analizado.protocol !== 'http:') {
+      malFormados.push(`CORS_ALLOWED_ORIGINS: «${origen}» no usa http ni https`);
+      continue;
+    }
+    if (origen !== analizado.origin) {
+      malFormados.push(
+        `CORS_ALLOWED_ORIGINS: «${origen}» no es un origen canónico ` +
+          `(sin barra final, sin ruta, sin credenciales): use «${analizado.origin}»`,
+      );
+      continue;
+    }
+    const esLocal = analizado.hostname === 'localhost' || analizado.hostname === '127.0.0.1';
+    if (resto.NODE_ENV === 'production' && analizado.protocol === 'http:' && !esLocal) {
+      malFormados.push(
+        `CORS_ALLOWED_ORIGINS: «${origen}» es texto plano y NODE_ENV=production ` +
+          `emite credenciales hacia él (§2.7.8 exige HTTPS)`,
+      );
+    }
+  }
+  if (malFormados.length > 0) throw new ErrorDeConfiguracion(malFormados);
+
   return { ...resto, origenesPermitidos };
 };

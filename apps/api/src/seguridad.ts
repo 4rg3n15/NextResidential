@@ -41,8 +41,31 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
   app.enableCors({
     origin: (origen, callback) =>
       callback(null, !origen || config.origenesPermitidos.includes(origen)),
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    /**
+     * Los verbos que la API expone DE VERDAD. `DELETE` estuvo anunciado hasta
+     * la ETAPA 13 sin que existiera una sola ruta que lo usara (H-13-22):
+     *
+     *   $ grep -rhoE "@(Get|Post|Put|Patch|Delete)\(" src --include=*.controller.ts | sort | uniq -c
+     *        34 @Get(   ·   1 @Patch(   ·   43 @Post(
+     *
+     * No era explotable —no hay ruta que alcanzar— pero sí una desviación de
+     * mínimo privilegio en lo anunciado. Y aquí no volverá por descuido: RN-19
+     * prohíbe el borrado físico, así que una ruta `DELETE` sería la excepción
+     * y merece decidirse, no heredarse de esta lista.
+     */
+    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id'],
+    /**
+     * Sin esto, la consola NO PODÍA LEER el identificador de correlación que el
+     * interceptor ya emitía en toda respuesta (H-13-22). `x-request-id` estaba
+     * en `allowedHeaders` —lo que el navegador puede ENVIAR— y no en
+     * `exposedHeaders` —lo que puede LEER—, y por CORS sólo son legibles las
+     * siete cabeceras seguras por omisión. Como la consola vive en un origen
+     * distinto por diseño, su JavaScript no alcanzaba el identificador con el
+     * que se correlaciona un incidente. Afecta a la trazabilidad, no a la
+     * confidencialidad, pero la trazabilidad es la mitad de esta etapa.
+     */
+    exposedHeaders: ['x-request-id', 'Retry-After'],
     credentials: true,
     maxAge: 600,
   });

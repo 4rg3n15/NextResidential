@@ -41,12 +41,14 @@ import { COP_A, COP_B, configuracionDePrueba, crearFirmante, tokenDe } from './u
 
 let app: INestApplication;
 let portero = '';
+let administrador = '';
 const OTRO = '00000000-0000-4000-8000-0000000000ff';
 const srv = () => app.getHttpServer();
 
 beforeAll(async () => {
   const f = await crearFirmante();
   portero = await tokenDe(f, { rol: 'portero', copropiedadId: COP_A });
+  administrador = await tokenDe(f, { rol: 'administrador', copropiedadId: COP_A });
   const modulo = await Test.createTestingModule({
     imports: [AppModule.conConfiguracion(configuracionDePrueba)],
   })
@@ -174,5 +176,40 @@ describe('H-13-07 · un cuerpo absurdamente anidado responde 400, no 500', () =>
       .send({ ...base, extra: anidado });
     expect(r.status).toBeGreaterThanOrEqual(400);
     expect(r.status).toBeLessThan(500);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * H-13-13 · un parámetro de consulta repetido o con sintaxis de objeto es
+ * entrada malformada: 400, no «Error interno».
+ *
+ * `qs` convierte `?b=1&b=2` en arreglo y `?b[x]=1` en objeto; la firma del
+ * controlador declara `string`, así que el primer `.trim()` reventaba. Medido
+ * antes del arreglo: escalar -> 200, arreglo -> 500, objeto -> 500.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('H-13-13 · parámetros de consulta no escalares', () => {
+  const PERSONAS = `/copropiedades/${COP_A}/padron/personas`;
+
+  it('el escalar sigue funcionando: no se rompe lo legítimo', async () => {
+    const r = await request(srv())
+      .get(`${PERSONAS}?busqueda=a`)
+      .set('authorization', `Bearer ${administrador}`);
+    expect(r.status).toBeLessThan(400);
+  });
+
+  it('repetido (?busqueda=a&busqueda=b) → 400', async () => {
+    const r = await request(srv())
+      .get(`${PERSONAS}?busqueda=a&busqueda=b`)
+      .set('authorization', `Bearer ${administrador}`);
+    expect(r.status).toBe(400);
+  });
+
+  it('con sintaxis de objeto (?busqueda[x]=1) → 400', async () => {
+    const r = await request(srv())
+      .get(`${PERSONAS}?busqueda[x]=1`)
+      .set('authorization', `Bearer ${administrador}`);
+    expect(r.status).toBe(400);
   });
 });

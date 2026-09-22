@@ -42,13 +42,15 @@ export default tseslint.config(
       // emitir en él una `triple-slash reference` a `.next/types/routes.d.ts`
       // que `@typescript-eslint/triple-slash-reference` rechaza.
       //
-      // H-13-08 · hasta hoy esto no se veía porque las DOS superficies de lint
-      // miran cosas distintas: `pnpm lint` ejecuta `eslint src` y nunca llega a
-      // la raíz del paquete; `lint-staged` le pasa a eslint el fichero indexado
+      // H-13-08 · esto no se veía porque las DOS superficies de lint miran
+      // cosas distintas: `pnpm lint` ejecuta `eslint src` y nunca llega a la
+      // raíz del paquete; `lint-staged` le pasa a eslint el fichero indexado
       // tal cual. Verde en una, rojo en la otra, sobre el mismo árbol. La
       // exclusión vive AQUÍ —en la configuración que ambas comparten— y no en
-      // un `--ignore-pattern` del gancho, precisamente para que no vuelvan a
-      // discrepar.
+      // un `--ignore-pattern` del gancho, para que no vuelvan a discrepar.
+      //
+      // El fichero además ya no se versiona: `.gitignore:31` lo declaraba
+      // ignorado desde la ETAPA 09 y seguía en el índice (H-13-23).
       '**/next-env.d.ts',
     ],
   },

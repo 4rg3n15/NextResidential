@@ -1,5 +1,8 @@
 # `--config` explícito: sin él, lint-staged descubre configuraciones antiguas
 # dentro de node_modules y aborta el commit por un fichero que no es nuestro.
 pnpm exec lint-staged --config .lintstagedrc.json
-./scripts/escanear-secretos.sh
+# `--indice` y no el árbol (H-13-20): `git ls-files` daba los NOMBRES del
+# índice y el contenido se leía del disco, así que un `git add .` seguido de
+# seguir editando hacía que el gancho validara una cosa y se confirmara otra.
+./scripts/escanear-secretos.sh --indice
 node scripts/lib/portabilidad.mjs

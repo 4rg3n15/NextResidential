@@ -1,4 +1,5 @@
 import type { EventoRegistrado } from '../aplicacion/puertos';
+import { escaparCsv } from '../../comun/csv';
 
 /**
  * Serializadores del histórico — HU-32, pantalla de Informes.
@@ -37,17 +38,11 @@ export const COLUMNAS: readonly (readonly [string, (f: EventoRegistrado) => stri
 const BOM = '\uFEFF';
 
 /**
- * Neutralización de fórmulas: un campo que empieza por `=`, `+`, `-` o `@` lo
- * interpreta Excel como fórmula al abrir el CSV. Es la inyección de fórmulas, y
- * los campos de este informe —motivo manual, identificadores de dispositivo—
- * vienen de entrada de usuario y de equipos de red, así que es una vía real.
+ * La neutralización de fórmulas vive en `comun/csv.ts` desde la ETAPA 13: este
+ * fichero la tenía y el exportador del padrón no (H-13-15). Un mismo riesgo
+ * resuelto en un sitio y olvidado en el otro deja de ser posible si sólo hay
+ * un sitio.
  */
-const PELIGROSOS = new Set(['=', '+', '-', '@', '\t', '\r']);
-
-const escaparCsv = (valor: string): string => {
-  const neutralizado = valor.length > 0 && PELIGROSOS.has(valor[0] as string) ? `'${valor}` : valor;
-  return `"${neutralizado.replace(/"/g, '""')}"`;
-};
 
 /**
  * CSV según RFC 4180, con BOM y CRLF.

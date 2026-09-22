@@ -175,6 +175,21 @@ describe('RegistrarVivienda', () => {
     expect(registrar.mock.calls[0]![0].agrupacion).toBe('B');
   });
 
+  it('normaliza a NFC el identificador y la agrupación (H-13-16)', async () => {
+    // El índice único parcial compara BYTES. Sin NFC, «Mañana» con la ñ
+    // precompuesta y «Mañana» con n + combinante son DOS viviendas para
+    // PostgreSQL y UNA sola para el portero — medido: dos filas activas que el
+    // usuario ve idénticas. Es el argumento que `persona.ts` ya escribía para
+    // el documento, aplicado donde faltaba.
+    const registrar = vi.fn().mockResolvedValue({ tipo: 'registrada', id: 'viv-7' });
+    await new RegistrarVivienda(repo({ registrarVivienda: registrar }), vocabulario()).ejecutar(
+      ctx,
+      { identificador: 'Man\u0303ana', agrupacion: 'Torre N\u0303' },
+    );
+    expect(registrar.mock.calls[0]![0].identificador).toBe('Mañana'.normalize('NFC'));
+    expect(registrar.mock.calls[0]![0].agrupacion).toBe('Torre Ñ'.normalize('NFC'));
+  });
+
   it('una agrupación vacía llega como NULL, no como cadena vacía', async () => {
     // Importa: el índice único usa `coalesce(agrupacion,'')`, así que '' y NULL
     // son la misma clave. Pero guardar '' dejaría la columna llena de cadenas

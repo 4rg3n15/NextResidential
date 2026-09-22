@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
-import { LONGITUD_MAXIMA_TEXTO, sanear, sanearTexto } from './saneamiento';
+import { sanear, sanearTexto } from './saneamiento';
 
 /**
  * H-13-05 y H-13-06 · el saneador, contra la función y sin dominio de por medio.
@@ -27,11 +27,34 @@ describe('sanearTexto', () => {
     expect(sanearTexto('e\u0301')).toBe('é');
   });
 
-  it('recorta los extremos y acota la longitud', () => {
+  it('recorta los extremos', () => {
     expect(sanearTexto('   hola   ')).toBe('hola');
-    expect(sanearTexto('M'.repeat(LONGITUD_MAXIMA_TEXTO + 500))).toHaveLength(
-      LONGITUD_MAXIMA_TEXTO,
-    );
+  });
+
+  it('quita los controles bidireccionales y los invisibles (H-13-14)', () => {
+    // U+202E hace que lo que sigue se LEA al revés. Sobre un motivo de apertura
+    // —registro que RN-03 declara inalterable— es falsificación de lo que verá
+    // quien audite, sin tocar un solo byte de la fila.
+    expect(sanearTexto('Apertura\u202Eadatuceje')).toBe('Aperturaadatuceje');
+    expect(sanearTexto('a\u200Bb\uFEFFc\u2066d\u2069e')).toBe('abcde');
+  });
+
+  it('pero NO se come el no-unidor ni el unidor de anchura cero', () => {
+    // U+200C y U+200D son ortografía legítima en persa y en hindi, y arman las
+    // secuencias de emoji. Un saneador que borra escritura válida es un
+    // defecto, no una defensa.
+    expect(sanearTexto('a\u200Cb\u200Dc')).toBe('a\u200Cb\u200Dc');
+  });
+
+  it('NO RECORTA POR LONGITUD: un base64 de 10 000 caracteres sale entero (H-13-09)', () => {
+    // El hallazgo: con techo de 4096 el XLSX del padrón llegaba mutilado con la
+    // firma PK intacta, así que la validación de tipo real lo daba por bueno y
+    // el DTO no protestaba —4096 cabe en @Length(1, 340_000)—. 2xx sobre un ZIP
+    // roto. La cota va en el DTO, que sabe de qué campo se trata.
+    const zip = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(8000, 0x41)]);
+    const base64 = zip.toString('base64');
+    expect(sanearTexto(base64)).toBe(base64);
+    expect(Buffer.from(sanearTexto(base64), 'base64')).toHaveLength(zip.length);
   });
 
   it('no inventa nada con una cadena que ya está limpia', () => {

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
@@ -48,6 +48,25 @@ describe('validación de DTOs activa en toda superficie con @Body()', () => {
     const ruta = `/copropiedades/${COP_A}/alertas/${ALERTA}/resolucion`;
     await post(ruta, { notas: 12345 }).expect(400);
     await post(ruta, { notas: 'motivo suficiente', colado: 'x' }).expect(400);
+  });
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * H-13-12 · el límite de payload responde 413, no «Error interno».
+   *
+   * `body-parser` no lanza `HttpException` sino `http-errors`, así que el
+   * filtro global lo degradaba a 500 y registraba nivel `error`. Medido antes
+   * del arreglo: 150 kB -> 400 (validación) y 300 kB -> 500. El límite SÍ
+   * funcionaba; lo que fallaba era decirlo. Un cliente torpe llenaba el
+   * registro de errores justo encima de la alerta que importa.
+   * ═════════════════════════════════════════════════════════════════════════
+   */
+  it('payload por encima de LIMITE_PAYLOAD → 413, y el cuerpo no filtra nada interno', async () => {
+    const r = await post(`/copropiedades/${COP_A}/alertas/${ALERTA}/resolucion`, {
+      notas: 'M'.repeat(300_000),
+    });
+    expect(r.status).toBe(413);
+    expect(JSON.stringify(r.body)).not.toMatch(/entity too large|body-parser|stack/i);
   });
 
   it('padrón · vehículo con identificadores no válidos → 400', async () => {

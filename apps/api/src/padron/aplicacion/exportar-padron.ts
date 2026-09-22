@@ -1,6 +1,7 @@
 import type { FilaExportada, RepositorioPadron } from './puertos';
 import { COLUMNAS_DEL_PADRON } from './carga-padron';
 import type { ContextoTenant } from '../../autenticacion';
+import { neutralizarFormula } from '../../comun/csv';
 
 /**
  * Exportación del padrón a CSV.
@@ -40,10 +41,18 @@ export const TOPE_DE_EXPORTACION = 10_000;
 
 const celda = (valor: string | null): string => {
   if (valor === null) return '';
+  /**
+   * H-13-15 · aquí sólo había entrecomillado de RFC 4180, y Excel lo deshace
+   * al abrir: una vivienda llamada `=HYPERLINK("http://malo.example","ver")`
+   * salía del CSV como fórmula viva. El exportador hermano de eventos ya lo
+   * trataba; éste no. La regla está ahora en `comun/csv.ts`, importada por los
+   * dos, para que no puedan volver a divergir.
+   */
+  const seguro = neutralizarFormula(valor);
   // Comillas si hay separador, comilla o salto: es el escape de RFC 4180, que
   // es el que Excel lee.
-  const necesitaComillas = /[",\r\n]/.test(valor);
-  const escapado = valor.replace(/"/g, '""');
+  const necesitaComillas = /[",\r\n]/.test(seguro);
+  const escapado = seguro.replace(/"/g, '""');
   return necesitaComillas ? `"${escapado}"` : escapado;
 };
 

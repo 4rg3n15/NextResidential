@@ -44,6 +44,53 @@ describe('configuración (DoD ETAPA 02: sin .env completo no arranca)', () => {
     ).toThrow(ErrorDeConfiguracion);
   });
 
+  it('rechaza el origen mal formado, la barra final y el esquema ajeno (H-13-21)', () => {
+    // Todos estos eran ACEPTADOS hasta la ETAPA 13, incluido `no-es-una-url`.
+    for (const origen of [
+      'no-es-una-url',
+      'ftp://x',
+      'https://consola.ejemplo.co/',
+      'https://consola.ejemplo.co/ruta',
+      'https://usuario:clave@consola.ejemplo.co',
+    ]) {
+      expect(() =>
+        cargarConfiguracion({
+          ...completo,
+          CORS_ALLOWED_ORIGINS: origen,
+        } as NodeJS.ProcessEnv),
+      ).toThrow(ErrorDeConfiguracion);
+    }
+  });
+
+  it('en producción rechaza el origen en texto plano, salvo localhost (H-13-21)', () => {
+    // El caso real: `.env.example` trae `http://localhost:3001` y alguien lo
+    // copia cambiando sólo el nombre del anfitrión. La API emitía
+    // `Access-Control-Allow-Credentials: true` hacia texto plano.
+    expect(() =>
+      cargarConfiguracion({
+        ...completo,
+        NODE_ENV: 'production',
+        CORS_ALLOWED_ORIGINS: 'http://consola.ejemplo.co',
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/HTTPS/);
+
+    expect(() =>
+      cargarConfiguracion({
+        ...completo,
+        NODE_ENV: 'production',
+        CORS_ALLOWED_ORIGINS: 'https://consola.ejemplo.co',
+      } as NodeJS.ProcessEnv),
+    ).not.toThrow();
+
+    // En desarrollo, el de siempre sigue valiendo.
+    expect(() =>
+      cargarConfiguracion({
+        ...completo,
+        CORS_ALLOWED_ORIGINS: 'http://localhost:3001',
+      } as NodeJS.ProcessEnv),
+    ).not.toThrow();
+  });
+
   it('el mensaje de error NUNCA incluye el valor de la llave secreta', () => {
     try {
       cargarConfiguracion({ ...completo, SUPABASE_URL: 'no-es-url' } as NodeJS.ProcessEnv);

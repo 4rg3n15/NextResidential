@@ -154,7 +154,28 @@ export class RegistrarVivienda {
     entrada: EntradaRegistrarVivienda,
   ): Promise<Resultado<{ id: string }, ErrorDominio>> {
     if (!ctx.copropiedadId) return fallo(sinCopropiedad());
-    const identificador = entrada.identificador.trim();
+    /**
+     * ═════════════════════════════════════════════════════════════════════
+     * NFC · H-13-16, la misma lección que ya estaba escrita para `Placa`
+     *
+     * `identificador` y `agrupacion` son los dos únicos campos de identidad del
+     * padrón SIN objeto de valor, y por eso se quedaron sin normalizar. El
+     * índice único parcial `(copropiedad_id, coalesce(agrupacion,''),
+     * identificador)` compara BYTES, así que «Mañana» con `ñ` precompuesta y
+     * «Mañana» con `n` + combinante son dos filas para PostgreSQL y una sola
+     * vivienda para el portero. Medido:
+     *
+     *   alta 1 (NFC): U+004D U+0061 U+00F1 U+0061 …           -> registrada
+     *   alta 2 (NFD): U+004D U+0061 U+006E U+0303 U+0061 …    -> registrada
+     *   filas ACTIVAS que el usuario ve como la misma vivienda: 2
+     *
+     * Es literalmente el argumento que `persona.ts` escribe para el documento
+     * —«12.345.678, 12345678 y 12 345 678 son tres filas para PostgreSQL y una
+     * sola persona para el portero»— aplicado donde faltaba. NFC y no NFKC, por
+     * el mismo motivo que allí: NFKC colapsa caracteres que aquí distinguen.
+     * ═════════════════════════════════════════════════════════════════════
+     */
+    const identificador = entrada.identificador.normalize('NFC').trim();
     if (identificador.length === 0) {
       return fallo(errorDominio('DATO_INVALIDO', 'El identificador no puede ir vacío', 'RN-13'));
     }
@@ -186,7 +207,10 @@ export class RegistrarVivienda {
       );
     }
 
-    const agrupacion = entrada.agrupacion?.trim();
+    // Misma normalización que el identificador (H-13-16): la agrupación forma
+    // parte de la clave única, así que su forma Unicode decide si dos altas son
+    // la misma vivienda o dos.
+    const agrupacion = entrada.agrupacion?.normalize('NFC').trim();
     const r = await this.repo.registrarVivienda({
       copropiedadId: ctx.copropiedadId,
       identificador,
