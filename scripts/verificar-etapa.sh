@@ -250,6 +250,26 @@ elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida" && [[ "$CON_BASE" == "1"
   # resultado de otra corrida con otro entorno: sin esta línea, distinguir «no
   # le llegó la variable» de «no se ejecutó» exige otra corrida entera.
   grep -E "^\s*(Tasks|Cached|Time):" <<<"$salida" | sed 's/^/     turbo: /'
+  # Y LAS TRES PREGUNTAS QUE DECIDEN DÓNDE SE PIERDE LA VARIABLE. Sin ellas
+  # hay que deducirlo, y deducir cuesta una corrida entera del runner por
+  # hipótesis. La primera dice si el guion la tiene; la segunda, si turbo la
+  # resolvió para la tarea; la tercera, si el hijo la recibe de verdad.
+  echo "     el verificador la ve: DATABASE_URL_PRUEBAS=${DATABASE_URL_PRUEBAS:+definida}${DATABASE_URL_PRUEBAS:-NO DEFINIDA}"
+  echo "     lo que turbo resuelve para la tarea:"
+  TURBO_TELEMETRY_DISABLED=1 pnpm exec turbo run test --filter=@ncr/api --dry=json 2>/dev/null |
+    node -e '
+      let e = "";
+      process.stdin.on("data", (d) => (e += d)).on("end", () => {
+        try {
+          const t = JSON.parse(e).tasks?.[0] ?? {};
+          const v = t.environmentVariables ?? {};
+          for (const k of ["specified", "configured", "inferred", "global", "passthrough"]) {
+            console.log(`       ${k}: ${JSON.stringify(v[k] ?? null)}`);
+          }
+        } catch (x) {
+          console.log(`       (no se pudo leer el plan de turbo: ${x.message})`);
+        }
+      });'
   echo "     La base está disponible: nada debería saltarse. Si turbo no le pasa una"
   echo "     variable a vitest, las pruebas que dependen de ella se saltan en silencio"
   echo "     (D-112). Compruebe \`env\` en las tareas de turbo.json."
