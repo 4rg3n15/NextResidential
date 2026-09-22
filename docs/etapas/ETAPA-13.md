@@ -562,6 +562,41 @@ una aparición no es un diagnóstico. Se reasigna a la ETAPA 14, que es donde vi
 la observabilidad, con el dato nuevo y con el control ya arreglado para que la
 próxima vez se nombre sola de verdad.
 
+### D-116 · la que SÍ se nombró, y resultó no ser D-101
+
+El control arreglado dio su primer resultado en la siguiente corrida de CI, y
+sirvió exactamente para lo que se arregló:
+
+```
+corrida 2/3: codigo 1 · Tests 1 failed | 349 passed (350) …
+  FAIL src/app/(consola)/viviendas/generacion.test.tsx
+    > el primer envío PREVISUALIZA, y solo el segundo crea      2273ms
+    → Unable to find role="button" and name `/Generar padrón/`
+```
+
+**No es D-101.** Es `@ncr/web` en macOS, no `@ncr/api` en Linux bajo cobertura.
+Son dos intermitentes distintas, y confundirlas habría cerrado la una con el
+diagnóstico de la otra — que es justo lo que un control que no nombra invita a
+hacer.
+
+**Causa, comprobada por ejecución y no supuesta.** Testing Library espera
+**1000 ms** por omisión en `findBy*` y `waitFor`, y la consola tiene **quince**
+consultas que dependen de esa cifra. Es una apuesta sobre lo rápida que es la
+máquina: en una ociosa gana siempre; en un runner ejecutando los seis paquetes
+en paralelo es una moneda al aire. La prueba: con `asyncUtilTimeout: 1` aparece
+el **mismo mensaje**, en la misma prueba y en las otras dos del fichero. Lo que
+falla es la espera, no la aserción.
+
+**Remediación:** la cifra se sube a 5 s **una vez**, en
+`apps/web/src/pruebas/preparacion.ts`, y no en los quince sitios —eso dejaría el
+problema vivo para la consulta número dieciséis—. No debilita nada, y conviene
+decir por qué: `findBy` devuelve en cuanto el elemento aparece, así que una
+prueba que pasaba en 1000 ms sigue pasando igual; y una rota de verdad sigue
+fallando, solo que cinco segundos más tarde. Lo único que deja de ocurrir es
+fallar por ir con prisa.
+
+**Cerrada.** Las 350 pruebas de `@ncr/web` en verde.
+
 ### Deuda que esta etapa NO cierra, y por qué
 
 | ID          | Qué                                                                         | Por qué sigue abierta                                                                                                                              |

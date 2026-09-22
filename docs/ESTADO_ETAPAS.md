@@ -18,16 +18,16 @@
 
 ## Resumen
 
-|                                |                                                                                                                                                                                                                                          |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **14 de 17** (ETAPAS 00 a 13) · la 13 cerrada el 2026-09-22                                                                                                                                                                              |
-| **Etapa siguiente habilitada** | **ETAPA 14 — Observabilidad, CI/CD, PWA instalable y escritorio** · recibe como insumo D-101 (**reproducida** en la 13 y sin diagnosticar), D-34 y D-78                                                                                  |
-| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                                                                          |
-| **Defectos abiertos**          | **D-78** (colores a mano), **D-34** (frontera de barril, reasignada a la 14) y **D-101** (roja intermitente de `@ncr/api`: **REPRODUCIDA** en la ETAPA 13, sin diagnosticar) · más **H-13-25**, abierto a propósito a la espera de firma |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                                                                                                                                                   |
-| **Decisiones pendientes**      | 9 abiertas — nueva P-14 (`secret scanning` y `push protection` de GitHub) · más **4 aceptaciones de riesgo redactadas y sin firmar** (AR-01 a AR-04)                                                                                     |
-| **Supuestos vigentes**         | 17 — nuevos S-25 (el rol de conexión de Supabase es dueño y NO superusuario) y S-26 (ningún DTO de consulta necesita un campo de tipo arreglo)                                                                                           |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                                                                    |
+|                                |                                                                                                                                                                                                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Etapas cerradas**            | **14 de 17** (ETAPAS 00 a 13) · la 13 cerrada el 2026-09-22                                                                                                                                                                                                                           |
+| **Etapa siguiente habilitada** | **ETAPA 14 — Observabilidad, CI/CD, PWA instalable y escritorio** · recibe como insumo D-101 (**reproducida** en la 13 y sin diagnosticar), D-34 y D-78                                                                                                                               |
+| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                                                                                                                       |
+| **Defectos abiertos**          | **D-78** (colores a mano), **D-34** (frontera de barril, reasignada a la 14) y **D-101** (roja intermitente de `@ncr/api`: **REPRODUCIDA** en la ETAPA 13, sin diagnosticar) · **D-116 CERRADA** en la 13, y no era D-101 · más **H-13-25**, abierto a propósito a la espera de firma |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                                                                                                                                                                                                |
+| **Decisiones pendientes**      | 9 abiertas — nueva P-14 (`secret scanning` y `push protection` de GitHub) · más **4 aceptaciones de riesgo redactadas y sin firmar** (AR-01 a AR-04)                                                                                                                                  |
+| **Supuestos vigentes**         | 17 — nuevos S-25 (el rol de conexión de Supabase es dueño y NO superusuario) y S-26 (ningún DTO de consulta necesita un campo de tipo arreglo)                                                                                                                                        |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                                                                                                                 |
 
 ---
 
@@ -729,6 +729,20 @@ COMPLETA en paralelo y 6 más del paso 14 — **26 sin reproducir**, sumadas a l
 bajo la suite completa en paralelo y no bajo `@ncr/api` a solas, lo que apunta a
 contención de recursos y no a la lógica de una prueba. **Una aparición no es un
 diagnóstico**, así que no se cierra.
+
+### D-116 · la que SÍ se nombró · **CERRADA**
+
+El control arreglado dio resultado en la corrida siguiente, y sirvió para lo que
+se arregló: nombró `src/app/(consola)/viviendas/generacion.test.tsx`, con su
+prueba y su mensaje. **No era D-101**: es `@ncr/web` en macOS, no `@ncr/api` en
+Linux bajo cobertura. Son dos intermitentes distintas, y confundirlas habría
+cerrado la una con el diagnóstico de la otra.
+
+Causa comprobada por ejecución: Testing Library espera **1000 ms** por omisión,
+y la consola tiene **quince** consultas que dependen de esa cifra. Con
+`asyncUtilTimeout: 1` sale el mismo mensaje en las mismas pruebas — falla la
+espera, no la aserción. La cifra sube a 5 s **una vez**, en
+`apps/web/src/pruebas/preparacion.ts`. Las 350 pruebas de `@ncr/web`, en verde.
 
 ### Aceptaciones de riesgo **pendientes de firma**
 
