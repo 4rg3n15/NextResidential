@@ -428,6 +428,27 @@ Y las **5 saltadas** de `@ncr/api` no son una omisión: son las de
 12b — que es quien las ejecuta y quien exige que no se salten—. En el paso 14,
 donde la base sí está, corren las 728.
 
+### De qué corrida sale este veredicto, y qué pasó después
+
+| Dónde                                          | SHA       | Resultado                                                                          |
+| ---------------------------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| Local, `--con-base` + SDK de Flutter           | `a6f702b` | **correcta**, cero ✗ — es el veredicto de arriba                                   |
+| **CI · los TRES trabajos**                     | `a6f702b` | **verde** · `controles` (ubuntu y macOS) + `verificar-etapa.sh --con-base (macos)` |
+| Local, `--con-base` + SDK de Flutter, repetida | `5cd2286` | **correcta**, cero ✗ — mismo veredicto                                             |
+
+Entre `a6f702b` y la punta de la rama **solo cambia documentación**, comprobado
+por máquina y no de memoria:
+
+```
+$ git diff --stat a6f702b..HEAD -- ':!docs'
+(sin salida: el árbol de código es idéntico)
+```
+
+Los tres commits que van después son el veredicto literal, el expediente de
+D-101 y la corrección del recuento por severidad. Se dice porque la alternativa
+—citar una corrida y dejar que el lector suponga que corresponde a la punta— es
+exactamente la clase de atajo que esta etapa audita.
+
 ---
 
 ## 7 · Verificación de seguridad de la etapa (§2.7)
