@@ -248,6 +248,44 @@ esta etapa. Las cifras definitivas y el veredicto literal, más abajo.
 | La prueba de banderas   | La ruta de **apertura** del canal de audio no estaba marcada como «deja rastro»: el guion la habría sondeado, quitándole el canal a quien estuviera hablando |
 | La suite de aislamiento | El receptor contestaba **500** donde debía contestar 401: sin la marca `_body`, `express.json` esperaba un flujo ya consumido                                |
 
+### D-101 · **segunda aparición, y esta vez CON NOMBRE**
+
+La roja intermitente de `@ncr/api` apareció durante esta etapa, en la corrida
+194 de CI sobre `834ffae` —un commit que **sólo añadía un guion de shell**, sin
+una línea de API—. Van **46 intentos y 2 apariciones**.
+
+Lo que cambia respecto de la primera vez: **el instrumento de D-100 funcionó y
+la nombró**.
+
+```
+✗ XSS reflejado · la respuesta nunca es interpretable como HTML
+  toda respuesta viaja como JSON y con nosniff, también las de error
+  en apps/api/test/xss.e2e.test.ts
+   SUITE EN ROJO · 1 prueba(s) fallaron de 818
+```
+
+Es la primera vez en cuarenta y seis corridas que se sabe **qué** prueba es.
+La de la ETAPA 13 no dejó nombre.
+
+**Y el instrumento de D-101 NO funcionó, que es el segundo hallazgo.** La
+ETAPA 14 añadió la conservación de los informes JSON y su subida como artefacto
+«cuando el trabajo falla». En su primera oportunidad real la subida dijo:
+
+```
+No files were found with the provided path: .informes-de-prueba/*.json.
+```
+
+El motivo: `.informes-de-prueba/` **empieza por punto**, y
+`upload-artifact@v4` excluye lo oculto por omisión. Los informes se escribieron
+—de ahí salió el nombre de la prueba— y la subida los ignoró en silencio, con
+`if-no-files-found: ignore` tapando el aviso. Corregido: `include-hidden-files:
+true` y `warn` en vez de `ignore`.
+
+**Lo que NO se puede afirmar todavía:** la causa. Quince intentos dirigidos del
+fichero bajo carga de CPU en este contenedor no la reprodujeron. El hecho de que
+aparezca sobre un commit que no toca la API descarta que sea del cambio, y el
+nombre acota la búsqueda a un fichero de ocho pruebas. **Sigue ABIERTA.**
+
 ### Y un defecto de prueba, que también cuenta
 
 La prueba del caso «sin equipo acreditado» pasaba `undefined` a un parámetro con
