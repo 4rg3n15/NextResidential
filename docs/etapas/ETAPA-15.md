@@ -322,6 +322,30 @@ fichero bajo carga de CPU en este contenedor no la reprodujeron. El hecho de que
 aparezca sobre un commit que no toca la API descarta que sea del cambio, y el
 nombre acota la búsqueda a un fichero de ocho pruebas. **Sigue ABIERTA.**
 
+### Una roja intermitente MÁS, ésta sí con causa: `too many clients`
+
+El paso de estabilidad del CI de macOS falló en la corrida 1 de 3 con:
+
+```
+FAIL test/concurrencia-padron.test.ts > KPI-03 · 100 inserciones simultáneas…
+  → sorry, too many clients already
+```
+
+**No es D-101 y no es un flake sin causa: la aritmética no daba.** PostgreSQL
+trae `max_connections = 100` y reserva unas cuantas para el superusuario. La
+prueba de KPI-03 abre **cien conexiones de verdad** —es el requisito, no un
+detalle: cien promesas sobre una sola conexión no probarían la restricción de
+la base (ADR-04)— y vitest ejecuta los ficheros en paralelo, así que a la vez
+hay otros cinco con su propio `Pool` contra esa misma base. El veredicto
+dependía de cómo el planificador repartiera los ficheros ese día.
+
+**Corregido donde corresponde:** la base efímera arranca con
+`max_connections=300`. Reducir las conexiones de la prueba habría sido dejar de
+comprobar KPI-03, que es exactamente lo que este proyecto no hace.
+
+Comprobado: tres corridas seguidas de los seis ficheros que tocan base, las
+tres en verde con 300.
+
 ### Y un defecto de prueba, que también cuenta
 
 La prueba del caso «sin equipo acreditado» pasaba `undefined` a un parámetro con
