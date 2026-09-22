@@ -287,6 +287,11 @@ NextResidential/
 
 ## 6. Puesta en marcha
 
+> Esta sección deja el sistema **corriendo en local**. Para llevarlo a un
+> servidor, la guía es [`docs/guias/DESPLIEGUE.md`](docs/guias/DESPLIEGUE.md);
+> para usarlo, [`docs/guias/MANUAL_USUARIO.md`](docs/guias/MANUAL_USUARIO.md),
+> que lo explica rol por rol.
+
 ### Prerrequisitos
 
 - Node **22.22.2** (declarado en `.nvmrc`; el arranque falla fuera del rango)

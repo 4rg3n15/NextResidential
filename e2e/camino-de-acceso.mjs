@@ -195,6 +195,19 @@ const entornoDeApi = (doble, puerto) => ({
   BIOMETRIA_LLAVE: 'llave-de-biometria-para-el-camino-e2e-32+',
   BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
   CORS_ALLOWED_ORIGINS: 'http://127.0.0.1:3100',
+  /**
+   * ETAPA 14 · este camino levanta la API con adaptadores EN MEMORIA y una
+   * `DATABASE_URL` de marcador: no hay cola que planificar. Se apaga
+   * explícitamente para que no intente conectar y para que su línea de aviso
+   * —«trabajo programado NO se ejecutará»— diga el motivo correcto.
+   *
+   * Que esté aquí NO es lo que impide el fallo que destapó este paso: la API
+   * moría con «getaddrinfo ENOTFOUND base» tras mapear todas sus rutas porque
+   * el arranque del planificador bloqueaba `listen()`. Eso se corrigió en el
+   * módulo, que ahora no espera y no puede tumbar el arranque. Esta línea solo
+   * evita el ruido.
+   */
+  PLANIFICADOR_HABILITADO: 'false',
 });
 
 const principal = async () => {

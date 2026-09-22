@@ -2091,7 +2091,25 @@ try {
        * y no viaja en el clon. Se monta un banco con el `dist` REAL enlazado y
        * una copia del generado, para poder estropear la copia sin tocar el
        * árbol de trabajo.
+       *
+       * ═══════════════════════════════════════════════════════════════════════
+       * Y LA SONDA SE ASEGURA DE QUE ESE `dist` EXISTA · corregido en CI
+       *
+       * En local pasaba y en CI fallaba las tres veces, con «el banco NO parte
+       * de una paleta al día». El motivo: este banco corre ANTES del paso de
+       * compilación del flujo, así que `packages/config/dist` no existía y el
+       * control informaba de su ausencia —correctamente— en los tres casos.
+       *
+       * La sonda depende de un artefacto y por tanto lo produce ella misma, en
+       * vez de dar por hecho que alguien lo dejó ahí. Es lo mismo que se hizo
+       * con la sonda 14 cuando dependía de una rama que el checkout no traía:
+       * una prueba negativa que solo funciona si el entorno viene preparado no
+       * demuestra nada en el entorno que no lo trae.
+       * ═══════════════════════════════════════════════════════════════════════
        */
+      if (!existsSync(join(raiz, 'packages/config/dist/temas.js'))) {
+        correr('pnpm', ['--filter', '@ncr/config', 'build'], { cwd: raiz });
+      }
       const banquito = mkdtempSync(join(tmpdir(), 'ncr-paleta-'));
       try {
         mkdirSync(join(banquito, 'packages/config'), { recursive: true });

@@ -81,7 +81,42 @@ export class CicloDelPlanificador implements OnApplicationBootstrap, OnApplicati
     )) {
       this.planificador.programar(trabajo);
     }
-    await this.planificador.arrancar();
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * NO SE ESPERA, Y NO PUEDE TUMBAR EL ARRANQUE.
+     *
+     * `onApplicationBootstrap` corre DENTRO de `app.listen()`: esperar aquí a
+     * que pg-boss abra su conexión retrasa la apertura del puerto, y si esa
+     * conexión falla, **la API no arranca en absoluto**.
+     *
+     * No es una hipótesis: el paso 12c del verificador levantó la API con una
+     * `DATABASE_URL` de marcador y el proceso murió con
+     * «Fallo al arrancar la API: getaddrinfo ENOTFOUND base» tras haber
+     * mapeado todas sus rutas. Una cola caída dejaba sin portería a una
+     * copropiedad entera.
+     *
+     * Es exactamente la decisión que `main.ts` ya había tomado para los
+     * recursos externos —comprobarlos DESPUÉS de `listen`, «si se hiciera
+     * antes, un endpoint lento retrasaría la apertura del puerto y el
+     * orquestador daría el despliegue por muerto»— aplicada aquí.
+     *
+     * El fallo NO se traga: se registra como `error` con su motivo, porque un
+     * planificador que no arrancó significa que RN-11 no se está cumpliendo y
+     * eso tiene que verse en el registro del arranque.
+     */
+    void this.planificador.arrancar().catch((error: unknown) => {
+      this.bitacora.registrar(
+        'error',
+        'el planificador NO arrancó: los barridos no se ejecutarán',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          consecuencia:
+            'RN-11 (supresión de plantillas en 24 h), CA-26 (terminal caída) y el reinicio ' +
+            'de aforos quedan sin ejecutar hasta que el planificador arranque',
+        },
+      );
+    });
   }
 
   async onApplicationShutdown(): Promise<void> {

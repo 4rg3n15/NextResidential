@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Bitacora } from '@ncr/domain-core';
 import { HORARIOS, trabajoPorCopropiedad } from './trabajos';
-import type { CatalogoDeCopropiedades } from './puertos';
+import type { CatalogoDeCopropiedades, Planificador } from './puertos';
 import { CatalogoDeCopropiedadesEnMemoria } from '../infraestructura/catalogo-copropiedades-pg';
 import { PlanificadorInerte } from '../infraestructura/planificador-inerte';
-import { trabajosDeMantenimiento } from '../planificacion.module';
+import { CicloDelPlanificador, trabajosDeMantenimiento } from '../planificacion.module';
 import type { CasosDeUsoDeMantenimiento } from '../planificacion.module';
 
 const bitacoraDePrueba = (): { bitacora: Bitacora; lineas: string[] } => {
@@ -238,5 +238,86 @@ describe('los TRES trabajos que la ETAPA 14 debía dar', () => {
       retiradas: 0,
       retiradasFallidas: 0,
     });
+  });
+});
+
+describe('CicloDelPlanificador · el arranque de la API no depende de la cola', () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * REGRESIÓN DE UN DEFECTO REAL, DESTAPADO POR EL PASO 12c.
+   *
+   * `onApplicationBootstrap` corre DENTRO de `app.listen()`. La primera versión
+   * de este módulo esperaba a que pg-boss abriera su conexión, y con una
+   * `DATABASE_URL` que no resuelve el proceso moría con
+   * «Fallo al arrancar la API: getaddrinfo ENOTFOUND base» **después de haber
+   * mapeado todas sus rutas**. Una cola caída dejaba sin portería a una
+   * copropiedad entera.
+   *
+   * Lo que se comprueba aquí: que el ciclo TERMINA aunque el planificador
+   * falle, y que el fallo no se traga —un planificador que no arrancó
+   * significa que RN-11 no se está cumpliendo—.
+   */
+  const cicloCon = (planificador: Planificador, bitacora: Bitacora) => {
+    const casos = {
+      latidos: {
+        ejecutar: async () => ({ revisados: 0, caidos: [], degradados: [], alertasAbiertas: 0 }),
+      },
+      aforos: { ejecutar: async () => ({ zonas: 0, reiniciadas: 0 }) },
+      plantillas: {
+        ejecutar: async () => ({
+          ok: true as const,
+          valor: { suprimidas: 0, retiradas: 0, retiradasFallidas: 0 },
+        }),
+      },
+    };
+    const referencia = {
+      get: (token: unknown) => {
+        const nombre = (token as { name?: string })?.name ?? '';
+        if (nombre.includes('Latidos')) return casos.latidos;
+        if (nombre.includes('Aforos')) return casos.aforos;
+        return casos.plantillas;
+      },
+    };
+    return new CicloDelPlanificador(
+      planificador,
+      new CatalogoDeCopropiedadesEnMemoria(['cop-a']),
+      bitacora,
+      referencia as never,
+    );
+  };
+
+  it('si el planificador NO arranca, el ciclo termina igual y lo REGISTRA', async () => {
+    const { bitacora, lineas } = bitacoraDePrueba();
+    const roto: Planificador = {
+      programados: [],
+      programar: () => undefined,
+      arrancar: async () => {
+        throw new Error('getaddrinfo ENOTFOUND servidor-que-no-existe.invalid');
+      },
+      detener: async () => undefined,
+    };
+    await expect(cicloCon(roto, bitacora).onApplicationBootstrap()).resolves.toBeUndefined();
+    // La promesa del arranque se resuelve fuera del `await`: se le da un turno.
+    await new Promise((r) => setTimeout(r, 0));
+    const error = lineas.find((l) => l.startsWith('error:'));
+    expect(error).toContain('el planificador NO arrancó');
+    expect(error).toContain('RN-11');
+  });
+
+  it('con un planificador sano, programa los TRES trabajos', async () => {
+    const { bitacora } = bitacoraDePrueba();
+    const programados: string[] = [];
+    const sano: Planificador = {
+      programados: [],
+      programar: (t) => void programados.push(t.nombre),
+      arrancar: async () => undefined,
+      detener: async () => undefined,
+    };
+    await cicloCon(sano, bitacora).onApplicationBootstrap();
+    expect(programados).toEqual([
+      'ncr.vigilar-latidos',
+      'ncr.reiniciar-aforos',
+      'ncr.barrer-plantillas',
+    ]);
   });
 });
