@@ -652,7 +652,7 @@ repetir la visita.
 
 ```bash
 pnpm --filter @ncr/providers build
-node --env-file=apps/api/.env scripts/puesta-en-marcha-hikvision.mjs
+node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs
 ```
 
 Sondea los tres equipos, **confirma o desmiente cada ruta documentada**, acciona

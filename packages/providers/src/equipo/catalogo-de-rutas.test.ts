@@ -45,6 +45,34 @@ describe('catálogo de rutas', () => {
     expect(() => rutaPara('teletransportar al visitante', 'terminal')).toThrow(/no catalogada/i);
   });
 
+  it('toda ruta que ACCIONA algo lleva su cuerpo aquí, y no en quien la invoca', () => {
+    /**
+     * El cuerpo es vocabulario del fabricante tanto como la ruta: nombres de
+     * elemento y de campo. KPI-11 lo demostró en cuanto el guion de puesta en
+     * marcha escribió el XML de la barrera por su cuenta. Un guion de operación
+     * no tiene por qué saber cómo se llama el campo de modo de una talanquera,
+     * y si lo supiera habría dos sitios que corregir el día que la captura real
+     * lo cambie.
+     */
+    for (const r of RUTAS.filter((x) => x.acciona === true)) {
+      expect(r.cuerpo, `${r.proposito}: acciona y no trae cuerpo`).toBeDefined();
+      expect(r.cuerpo?.tipo, r.proposito).toMatch(/\//);
+      expect((r.cuerpo?.contenido ?? '').length, r.proposito).toBeGreaterThan(10);
+    }
+  });
+
+  it('las rutas que dejan rastro están marcadas: no se sondean a ciegas', () => {
+    // Dar de alta o suprimir una plantilla deja rastro en el aparato, y abrir
+    // el canal de audio se lo quita a quien esté hablando. El guion las salta.
+    const conRastro = RUTAS.filter((r) => r.dejaRastro === true).map((r) => r.proposito);
+    expect(conRastro).toContain('cargar la plantilla facial');
+    expect(conRastro).toContain('suprimir la plantilla facial');
+    expect(conRastro).toContain('abrir el canal de audio bidireccional');
+    // Y ninguna que accione está marcada también como rastro: serían dos
+    // motivos distintos para saltarla y el mensaje diría el que no es.
+    expect(RUTAS.filter((r) => r.acciona === true && r.dejaRastro === true)).toEqual([]);
+  });
+
   it('ninguna ruta lleva una dirección de equipo dentro', () => {
     // KPI-11 lo comprueba en todo el árbol; aquí se fija en el sitio donde más
     // fácil sería colar una «para probar».

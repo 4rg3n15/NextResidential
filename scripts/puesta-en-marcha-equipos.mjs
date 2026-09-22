@@ -3,6 +3,16 @@
  * PUESTA EN MARCHA EN SITIO · un solo comando, delante de los equipos.
  *
  * ═════════════════════════════════════════════════════════════════════════════
+ * POR QUÉ NO SE LLAMA COMO EL FABRICANTE
+ *
+ * Porque KPI-11 no admite su nombre fuera de `packages/providers`, y el control
+ * lo rechazó en cuanto este fichero se llamó así. No es una molestia del
+ * control: es la misma regla que hace que la ETAPA 15 pueda sustituir un
+ * adaptador sin tocar nada más. Un guion de operación que lleva el nombre del
+ * fabricante en su ruta es una referencia al fabricante en el resto del
+ * sistema, y dentro de seis meses alguien la citaría en un flujo de CI.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
  * QUÉ HACE, EN ESTE ORDEN
  *
  *  1 · Acredita contra cada equipo y lee su identidad. Si esto falla, lo demás
@@ -31,8 +41,8 @@
  * ═════════════════════════════════════════════════════════════════════════════
  * USO
  *
- *   node --env-file=apps/api/.env scripts/puesta-en-marcha-hikvision.mjs
- *   node --env-file=apps/api/.env scripts/puesta-en-marcha-hikvision.mjs --sin-accionar
+ *   node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs
+ *   node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --sin-accionar
  *
  * Variables, por equipo (las tres familias son opcionales: se prueba lo que
  * esté declarado):
@@ -62,7 +72,7 @@ const argumentos = process.argv.slice(2);
 const sinAccionar = argumentos.includes('--sin-accionar');
 const destinoInforme =
   argumentos.find((a) => a.startsWith('--informe='))?.slice('--informe='.length) ??
-  join(process.env.TMPDIR ?? '/tmp', 'puesta-en-marcha-hikvision.md');
+  join(process.env.TMPDIR ?? '/tmp', 'puesta-en-marcha-equipos.md');
 
 /** Las tres familias, con el prefijo de sus variables. */
 const FAMILIAS = [
@@ -72,46 +82,18 @@ const FAMILIAS = [
 ];
 
 /**
- * Rutas que **accionan algo físico**. Se saltan con `--sin-accionar`, porque
- * una barrera que se abre sola mientras alguien está delante no es una prueba,
- * es un susto.
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ESTE GUION NO CONOCE NI UNA RUTA NI UN CUERPO
+ *
+ * Las dos cosas las declara el catálogo de `@ncr/providers`, con su procedencia
+ * al lado, y aquí sólo se leen sus banderas: `acciona` mueve algo físico y
+ * `dejaRastro` cambia el estado del equipo o se lo quita a otro.
+ *
+ * No es purismo: lo destapó **KPI-11** en cuanto este fichero escribió por su
+ * cuenta el XML de la barrera. Un guion de operación no tiene por qué saber
+ * cómo se llama el campo de modo de una talanquera, y si lo supiera, el día que
+ * la captura real lo cambie habría dos sitios que corregir y uno se olvidaría.
  */
-const ACCIONAN = new Set([
-  'accionar la barrera vehicular',
-  'abrir la puerta desde la plataforma',
-  'abrir la puerta del videoportero',
-]);
-
-/**
- * Rutas que **cambian el estado del equipo** y no se prueban nunca desde aquí:
- * dar de alta o suprimir una plantilla deja rastro en el aparato, y abrir el
- * canal de audio se lo quita a quien esté hablando.
- */
-const NO_SE_SONDEAN = new Set([
-  'dar de alta la persona a la que pertenece la plantilla',
-  'dar de baja a la persona y con ella su plantilla',
-  'cargar la plantilla facial',
-  'suprimir la plantilla facial',
-  'abrir el canal de audio bidireccional',
-  'cerrar el canal de audio bidireccional',
-  'escuchar los eventos que el equipo emite',
-]);
-
-const CUERPOS = {
-  'accionar la barrera vehicular': {
-    tipo: 'application/xml',
-    contenido:
-      '<?xml version="1.0" encoding="UTF-8"?><BarrierGate><ctrlMode>open</ctrlMode></BarrierGate>',
-  },
-  'abrir la puerta desde la plataforma': {
-    tipo: 'application/xml',
-    contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
-  },
-  'abrir la puerta del videoportero': {
-    tipo: 'application/xml',
-    contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
-  },
-};
 
 const NO_SOPORTADO = /notSupport|invalidOperation|notSupported/i;
 
@@ -138,7 +120,7 @@ const configuracionDe = ({ prefijo }) => {
 
 /** Un sondeo, con su veredicto ya interpretado. */
 const sondear = async (cliente, ruta) => {
-  const cuerpo = CUERPOS[ruta.proposito];
+  const cuerpo = ruta.cuerpo;
   try {
     const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta, cuerpo);
     if (respuesta.estado === 401) {
@@ -234,12 +216,12 @@ for (const entrada of FAMILIAS) {
   const aplicables = RUTAS.filter((r) => r.familia === entrada.familia || r.familia === 'comun');
 
   for (const ruta of aplicables) {
-    const omitida =
-      NO_SE_SONDEAN.has(ruta.proposito) || (sinAccionar && ACCIONAN.has(ruta.proposito));
+    const omitida = ruta.dejaRastro === true || (sinAccionar && ruta.acciona === true);
     if (omitida) {
-      const motivo = NO_SE_SONDEAN.has(ruta.proposito)
-        ? 'cambia el estado del equipo: se prueba a mano, con la guía delante'
-        : 'acciona un relé; se pidió no accionar';
+      const motivo =
+        ruta.dejaRastro === true
+          ? 'cambia el estado del equipo: se prueba a mano, con la guía delante'
+          : 'acciona un relé; se pidió no accionar';
       anotar(`   ${ICONO.omitida} ${ruta.proposito} — OMITIDA (${motivo})`);
       continue;
     }
@@ -264,7 +246,7 @@ for (const entrada of FAMILIAS) {
     }
 
     // KPI-13 · el accionamiento tiene umbral, y es el único que lo tiene.
-    if (ACCIONAN.has(ruta.proposito) && veredicto === 'confirmada' && ms !== null && ms > 3000) {
+    if (ruta.acciona === true && veredicto === 'confirmada' && ms !== null && ms > 3000) {
       huboProblema = true;
       anotar(`       ⚠ KPI-13: ${Math.round(ms)} ms supera el umbral de 3000 ms`);
     }

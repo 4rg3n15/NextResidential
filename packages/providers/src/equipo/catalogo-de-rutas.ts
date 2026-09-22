@@ -15,7 +15,7 @@
  * ISAPI del fabricante y están marcadas **DOCUMENTADA, NO VERIFICADA**: se han
  * escrito para poder construir y probar el adaptador entero sin equipo
  * (ADR-03), y se confirman o se desmienten en sitio con
- * `scripts/puesta-en-marcha-hikvision.mjs`.
+ * `scripts/puesta-en-marcha-equipos.mjs`.
  *
  * **Lo que una etiqueta `documentada` significa en la práctica:** que el
  * adaptador que la usa puede fallar contra el aparato con `notSupport` o con
@@ -47,6 +47,23 @@ export interface RutaDeEquipo {
    * lo están.
    */
   readonly confirmarEnSitio?: string;
+  /**
+   * El cuerpo de la petición, **cuando lo lleva**.
+   *
+   * Vive aquí y no en quien la invoca porque el cuerpo es vocabulario del
+   * fabricante tanto como la ruta: nombres de elemento y de campo. KPI-11 lo
+   * comprobó en cuanto el guion de puesta en marcha los escribió por su
+   * cuenta, y tenía razón — el guion no tiene por qué saber cómo se llama el
+   * campo de modo de una barrera.
+   */
+  readonly cuerpo?: { readonly tipo: string; readonly contenido: string };
+  /** `true` si mueve algo físico. Quien la invoca decide si eso le conviene. */
+  readonly acciona?: boolean;
+  /**
+   * `true` si CAMBIA el estado del equipo o se lo quita a otro: alta y
+   * supresión de plantilla, y el canal de audio. No se sondean a ciegas.
+   */
+  readonly dejaRastro?: boolean;
 }
 
 const CANAL_POR_OMISION = 1;
@@ -63,6 +80,12 @@ export const RUTAS: readonly RutaDeEquipo[] = [
       'Capturada del JavaScript de la interfaz del equipo el 15/09/2026 y reproducida ' +
       'con una petición manual. DS-TCG405-E, V5.4.0 build 250425. No es `Traffic` ni ' +
       '`System/IO`: los dos contestaron `notSupport`',
+    acciona: true,
+    cuerpo: {
+      tipo: 'application/xml',
+      contenido:
+        '<?xml version="1.0" encoding="UTF-8"?><BarrierGate><ctrlMode>open</ctrlMode></BarrierGate>',
+    },
   },
 
   // ── COMUNES · identidad y capacidades ────────────────────────────────────
@@ -105,6 +128,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     familia: 'terminal',
     fuente: 'Documentación ISAPI del fabricante, gestión de usuarios de control de acceso',
     confirmarEnSitio: 'el nombre exacto del campo de identificador y su longitud máxima',
+    dejaRastro: true,
   },
   {
     proposito: 'dar de baja a la persona y con ella su plantilla',
@@ -114,6 +138,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     familia: 'terminal',
     fuente: 'Documentación ISAPI del fabricante, gestión de usuarios de control de acceso',
     confirmarEnSitio: 'que borrar la persona borre TAMBIÉN su rostro, o hacen falta las dos',
+    dejaRastro: true,
   },
   {
     proposito: 'cargar la plantilla facial',
@@ -125,6 +150,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     confirmarEnSitio:
       'el identificador de la biblioteca del equipo, y si el envío es multipart con ' +
       'la imagen o lleva la imagen en base64',
+    dejaRastro: true,
   },
   {
     proposito: 'suprimir la plantilla facial',
@@ -136,6 +162,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     confirmarEnSitio:
       'que la supresión sea efectiva y VERIFICABLE: RN-11 exige poder demostrar que ' +
       'el dato ya no está, no sólo que la orden se aceptó',
+    dejaRastro: true,
   },
   {
     proposito: 'abrir la puerta desde la plataforma',
@@ -145,6 +172,11 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     familia: 'terminal',
     fuente: 'Documentación ISAPI del fabricante, control remoto de puerta',
     confirmarEnSitio: 'que abra el relé correcto: la terminal declara dos, y sólo uno es la puerta',
+    acciona: true,
+    cuerpo: {
+      tipo: 'application/xml',
+      contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
+    },
   },
 
   // ── FLUJO DE EVENTOS · terminal y videoportero ───────────────────────────
@@ -160,6 +192,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
       'la guía de validación',
     confirmarEnSitio:
       'cuántos eventos históricos vuelca al conectar y si todos traen `currentEvent`',
+    dejaRastro: true,
   },
 
   // ── VIDEOPORTERO · DS-KD9633-WBE6 ────────────────────────────────────────
@@ -171,6 +204,11 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     familia: 'videoportero',
     fuente: 'Documentación ISAPI del fabricante, control remoto de puerta',
     confirmarEnSitio: 'que sea la misma ruta que en la terminal, y no se dé por hecho que lo es',
+    acciona: true,
+    cuerpo: {
+      tipo: 'application/xml',
+      contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
+    },
   },
   {
     proposito: 'abrir el canal de audio bidireccional',
@@ -183,6 +221,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
       'midió el 18/09/2026 (§0.quater de la guía)',
     confirmarEnSitio:
       'que el canal quede exclusivo, y qué pasa si dos operadores lo piden a la vez',
+    dejaRastro: true,
   },
   {
     proposito: 'cerrar el canal de audio bidireccional',
@@ -192,6 +231,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     familia: 'videoportero',
     fuente: 'ADR-01, misma fuente que la apertura',
     confirmarEnSitio: 'que el cierre libere el canal aunque la sesión se haya caído antes',
+    dejaRastro: true,
   },
 ];
 
