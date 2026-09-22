@@ -745,6 +745,7 @@ autorizó expresamente adelantar parte del punto 4 de la ETAPA 16:
 | **D-121** | El registro de latencias es por proceso; con varias instancias hay que agregar fuera                                                                                                           | ETAPA 16    |
 | **D-122** | La actualización firmada del escritorio está cableada y **apagada** hasta que exista el par de claves. Lo destapó el CI: sin clave privada, el empaquetado falla DESPUÉS de producir el `.deb` | Operación   |
 | **D-123** | `pnpm audit --prod` arrastra 12 avisos `low`/`moderate` de Express 4 y Nest 10 sin versión corregida                                                                                           | ETAPA 16    |
+| **D-124** | El trinquete de ramas de `coherencia-estado-etapas.mjs` sube de 24 a 25 **sin que su código cambie**. Actualizado con el motivo escrito; falta identificar el bloque                           | ETAPA 16    |
 
 ### Supuestos nuevos
 

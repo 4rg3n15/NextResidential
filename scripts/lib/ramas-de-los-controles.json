@@ -1,10 +1,10 @@
 {
   "scripts/lib/cobertura-flutter.mjs": 7,
-  "scripts/lib/coherencia-estado-etapas.mjs": 24,
+  "scripts/lib/coherencia-estado-etapas.mjs": 25,
   "scripts/lib/contar-pruebas.mjs": 4,
   "scripts/lib/contrato-desfasado.mjs": 3,
   "scripts/lib/contrato-tipado.mjs": 20,
-  "scripts/lib/controles-declarados.mjs": 5,
+  "scripts/lib/controles-declarados.mjs": 1,
   "scripts/lib/controles-sin-prueba-negativa.mjs": 1,
   "scripts/lib/dependencias-acotadas.mjs": 6,
   "scripts/lib/entorno-declarado.mjs": 3,

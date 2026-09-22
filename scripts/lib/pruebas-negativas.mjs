@@ -1083,6 +1083,58 @@ try {
     enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']).codigo === 0
       ? ok('el banco de pruebas queda limpio')
       : mal('la sonda dejó rastro en el banco');
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * LA DECLARACIÓN ACOTADA POR PLATAFORMA · ETAPA 14
+     *
+     * Acotar una declaración a `soloEn: ['darwin']` es lo que permite que el
+     * paso SE EJERCITE donde puede ejercitarse. La rama que decide eso tiene
+     * que verse fallar, o sería una exención silenciosa con otro nombre: una
+     * lista mal escrita dejaría el paso declarado en TODAS partes sin que nada
+     * lo dijera.
+     */
+    const declarados = join(clon, 'scripts/lib/controles-declarados.mjs');
+    const fuente = readFileSync(declarados, 'utf8');
+
+    // (a) FUERA de su plataforma, el paso NO está declarado: código 1, que es
+    //     lo que hace al verificador tomar la rama que lo ejecuta de verdad.
+    const otra = process.platform === 'darwin' ? 'linux' : 'darwin';
+    writeFileSync(declarados, fuente.replace(/soloEn: \[[^\]]*\]/, `soloEn: ['${otra}']`));
+    enClon('node', ['scripts/lib/controles-declarados.mjs', '5e']).codigo !== 0
+      ? ok('fuera de su plataforma, el paso NO se da por declarado')
+      : mal('un paso declarado para OTRA plataforma se exime igual aquí');
+
+    // (b) DENTRO de su plataforma sí, y con su motivo impreso.
+    writeFileSync(
+      declarados,
+      fuente.replace(/soloEn: \[[^\]]*\]/, `soloEn: ['${process.platform}']`),
+    );
+    const dentro = enClon('node', ['scripts/lib/controles-declarados.mjs', '5e']);
+    dentro.codigo === 0 && /DECLARADO NO EJERCIDO/.test(dentro.salida)
+      ? ok('y dentro de ella sí, imprimiendo su motivo')
+      : mal(`la declaración no se aplica en su propia plataforma (codigo ${dentro.codigo})`);
+
+    // (c-bis) SIN `soloEn` la declaración vale en TODAS partes, que es el
+    //         comportamiento de siempre y tiene que seguir funcionando.
+    writeFileSync(declarados, fuente.replace(/\s*soloEn: \[[^\]]*\],/, ''));
+    const sinAcotar = enClon('node', ['scripts/lib/controles-declarados.mjs', '5e']);
+    const auditada = enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']);
+    sinAcotar.codigo === 0 && auditada.codigo === 0
+      ? ok('una declaración SIN acotar sigue valiendo en todas las plataformas')
+      : mal(
+          `quitar \`soloEn\` rompe la declaración (paso ${sinAcotar.codigo}, ` +
+            `auditoría ${auditada.codigo})`,
+        );
+
+    // (c) UNA LISTA MAL ESCRITA se detecta en la auditoría.
+    writeFileSync(declarados, fuente.replace(/soloEn: \[[^\]]*\]/, 'soloEn: []'));
+    const vacia = enClon('node', ['scripts/lib/controles-declarados.mjs', '--auditar']);
+    vacia.codigo !== 0 && /soloEn/.test(vacia.salida)
+      ? ok('una lista de plataformas vacía se detecta')
+      : mal(`\`soloEn: []\` pasa por buena (codigo ${vacia.codigo})`);
+
+    writeFileSync(declarados, fuente);
   }
 
   console.log('\n▸ 18 · una rama de control que nadie ejecuta se detecta (D-81, granularidad)');

@@ -19,6 +19,7 @@ import 'clients/tablero_api.dart';
 import 'clients/zonas_api.dart';
 import 'clients/salud_api.dart';
 import 'clients/ingesta_api.dart';
+import 'clients/observabilidad_api.dart';
 
 /// Next Control Residencial — API `v0.1.0`.
 ///
@@ -50,6 +51,7 @@ class RestClient {
   ZonasApi? _zonas;
   SaludApi? _salud;
   IngestaApi? _ingesta;
+  ObservabilidadApi? _observabilidad;
 
   AutenticacionApi get autenticacion => _autenticacion ??= AutenticacionApi(_dio, baseUrl: _baseUrl);
 
@@ -80,4 +82,6 @@ class RestClient {
   SaludApi get salud => _salud ??= SaludApi(_dio, baseUrl: _baseUrl);
 
   IngestaApi get ingesta => _ingesta ??= IngestaApi(_dio, baseUrl: _baseUrl);
+
+  ObservabilidadApi get observabilidad => _observabilidad ??= ObservabilidadApi(_dio, baseUrl: _baseUrl);
 }
