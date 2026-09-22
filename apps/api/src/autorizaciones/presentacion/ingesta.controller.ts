@@ -16,6 +16,7 @@ import {
   ResultadoDeReconciliacionDto,
 } from './dtos';
 import { LatidoDto } from '../../eventos';
+import { MideKpi } from '../../observabilidad';
 
 /**
  * Identidad con la que se atribuyen los eventos de hardware.
@@ -64,6 +65,9 @@ export class IngestaController {
   ) {}
 
   @Post('eventos')
+  // RNF-01.1 · tramo de servidor de KPI-13. Lo que NO mide está escrito en
+  // `KPIS['KPI-13'].noIncluye` y sale en el tablero junto a la cifra.
+  @MideKpi('KPI-13')
   @Publico()
   @SinRecursoDeTenant()
   @UseGuards(GuardiaDeFirmaDeIngesta)
@@ -167,10 +171,7 @@ export class IngestaController {
     const resultados: ResultadoDeReconciliacionDto[] = [];
 
     for (const evento of dto.eventos) {
-      const version = VersionDeReglas.crear(
-        evento.decision.versionDeReglas,
-        evento.copropiedadId,
-      );
+      const version = VersionDeReglas.crear(evento.decision.versionDeReglas, evento.copropiedadId);
       if (!version.ok) {
         resultados.push({
           claveIdempotencia: '',

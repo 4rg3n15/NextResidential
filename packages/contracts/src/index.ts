@@ -34,6 +34,10 @@ export type EventoRegistrado = Esquemas['EventoRegistradoDto'];
 export type PaginaDeEventos = Esquemas['PaginaDeEventosDto'];
 export type AlertaExpuesta = Esquemas['AlertaExpuestaDto'];
 export type ErrorApi = Esquemas['ErrorApiDto'];
+/** ETAPA 14 · tablero de las cinco latencias comprometidas (RNF-11.3). */
+export type Latencias = Esquemas['LatenciasDto'];
+export type FilaDeLatencia = Esquemas['FilaDeLatenciaDto'];
+export type DefinicionDeKpi = Esquemas['DefinicionKpiDto'];
 export type Copropiedad = Esquemas['CopropiedadDto'];
 /** Catálogo del alcance del token (ETAPA 09-B, `GET /copropiedades`). */
 export type AlcanceDeCopropiedades = Esquemas['AlcanceDeCopropiedadesDto'];

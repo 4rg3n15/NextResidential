@@ -804,6 +804,19 @@ else
   echo "$salida_append" | head -10 | sed 's/^/     /'
 fi
 
+# ETAPA 14 · TODO bloque ```mermaid del repositorio tiene que ANALIZAR, con
+# Mermaid de verdad y no con una expresión regular parecida. La DoD de la ETAPA
+# 16 exige «que los diagramas rendericen» y hasta ahora nadie lo comprobaba: los
+# cinco de `modelo-datos.md` llevaban desde la ETAPA 01 sin que ninguna máquina
+# los leyera. Es el control que no existe y la documentación que afirma como si
+# existiera. `LIMITE_MEDIO` y no corto: cargar Mermaid bajo jsdom tarda.
+if salida_mmd=$(con_limite "$LIMITE_MEDIO" node scripts/lib/mermaid-analizable.mjs 2>&1); then
+  ok "${salida_mmd#OK }"
+else
+  mal "hay un diagrama Mermaid que no analiza: GitHub lo mostraría como un recuadro de error"
+  echo "$salida_mmd" | head -12 | sed 's/^/     /'
+fi
+
 paso "10b · el contrato OpenAPI tiene tipos y el cliente generado está al día"
 # ETAPA 09-A · el cliente de la consola se GENERA (§2.6), y un generado que
 # nadie regenera describe la API de la semana pasada sin dar ningún error.

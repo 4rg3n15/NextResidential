@@ -1989,6 +1989,75 @@ try {
     }
   }
 
+  console.log('\n▸ 29 · un diagrama Mermaid que NO analiza se detecta (ETAPA 14)');
+  {
+    if (exigeControl('scripts/lib/mermaid-analizable.mjs')) {
+      // Este control se ejecuta desde la RAÍZ REAL y se le pasa el directorio a
+      // revisar. No corre dentro del clon porque necesita `mermaid` y `jsdom`
+      // resueltos, y el banco es un clon sin `node_modules`. Lo que se prueba
+      // es el control, no dónde vive el fichero: el argumento de raíz existe
+      // justamente para eso.
+      const banquito = mkdtempSync(join(tmpdir(), 'ncr-mermaid-'));
+      try {
+        const escribir = (nombre, cuerpo) => {
+          mkdirSync(join(banquito, 'docs'), { recursive: true });
+          writeFileSync(join(banquito, 'docs', nombre), cuerpo);
+        };
+        const correrControl = () =>
+          correr('node', ['scripts/lib/mermaid-analizable.mjs', banquito], { cwd: raiz });
+
+        // (a) LÍNEA BASE · sin ningún bloque, el control no inventa hallazgos.
+        escribir('sin-diagramas.md', '# solo prosa\n\nNada que analizar.\n');
+        correrControl().codigo === 0
+          ? ok('un documento sin diagramas no produce hallazgos')
+          : mal('el control grita sobre un documento que no tiene un solo bloque');
+
+        // (b) UNO CORRECTO · que no sea un control que siempre grita.
+        escribir(
+          'bueno.md',
+          '# bueno\n\n```mermaid\nflowchart TD\n  A["Dominio"] --> B["Aplicación"]\n```\n',
+        );
+        correrControl().codigo === 0
+          ? ok('un diagrama correcto pasa')
+          : mal('marca como roto un diagrama que Mermaid sí analiza: falso positivo');
+
+        // (c) LA VIOLACIÓN · el paréntesis suelto dentro de la etiqueta, que es
+        //     exactamente la forma en que estos diagramas se rompen al editarlos.
+        escribir(
+          'roto.md',
+          '# roto\n\n```mermaid\nflowchart TD\n  A[Presentación (driving)] --> B\n```\n',
+        );
+        const r = correrControl();
+        r.codigo !== 0 && /roto\.md:3/.test(r.salida) && /NO ANALIZA/.test(r.salida)
+          ? ok('detectado, con fichero y línea, y salida distinta de cero')
+          : mal(`un diagrama roto pasa por bueno (codigo ${r.codigo})`);
+
+        // (d) EL COLOR FIJADO A MANO · analiza perfectamente y aun así se
+        //     rechaza: en el tema oscuro de GitHub no se lee.
+        rmSync(join(banquito, 'docs', 'roto.md'), { force: true });
+        escribir(
+          'color.md',
+          '# color\n\n```mermaid\nflowchart TD\n  A["Dominio"] --> B["Aplicación"]\n' +
+            '  style A fill:#ffffff,stroke:#000000\n```\n',
+        );
+        const c = correrControl();
+        c.codigo !== 0 && /color fijado a mano/.test(c.salida)
+          ? ok('un color literal se rechaza aunque el diagrama analice')
+          : mal(`un color fijado a mano pasa (codigo ${c.codigo})`);
+
+        // (e) EL BLOQUE SIN CERRAR · no se descarta en silencio.
+        rmSync(join(banquito, 'docs', 'color.md'), { force: true });
+        escribir('abierto.md', '# abierto\n\n```mermaid\nflowchart TD\n  A --> B\n');
+        const a = correrControl();
+        a.codigo !== 0 && /no se cierra/.test(a.salida)
+          ? ok('un bloque ```mermaid sin cerrar se detecta')
+          : mal(`un bloque sin cerrar se descarta en silencio (codigo ${a.codigo})`);
+      } finally {
+        rmSync(banquito, { recursive: true, force: true });
+      }
+    }
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
@@ -2187,6 +2256,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 24 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 25 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

@@ -20,6 +20,7 @@ import type {
   ColaDeAtencion,
   ConfiguracionDeCopropiedad,
   OrdenEjecutada,
+  Latencias,
 } from '@ncr/contracts';
 import { cliente, desenvolver } from './cliente';
 
@@ -354,4 +355,22 @@ export const useOrdenesManuales = (
           params: { path: { id: copropiedadId } },
         }),
       ),
+  });
+
+/**
+ * ETAPA 14 · las cinco latencias comprometidas (RNF-11.3).
+ *
+ * **No lleva copropiedad en la clave, y es la única que no la lleva.** Estos
+ * son tiempos agregados del proceso, no datos de un tenant: no hay nada que
+ * pudiera mezclarse al conmutar de copropiedad. La API lo declara igual, con
+ * `@SinRecursoDeTenant()` y sin `:id` en la ruta.
+ *
+ * `refetchInterval` de 30 s: un tablero de latencias que hay que recargar a
+ * mano se mira una vez y no se vuelve a mirar.
+ */
+export const useLatencias = (): UseQueryResult<Latencias> =>
+  useQuery({
+    queryKey: ['observabilidad', 'latencias'] as const,
+    refetchInterval: 30_000,
+    queryFn: async () => desenvolver(await cliente.GET('/observabilidad/latencias', {})),
   });

@@ -19,6 +19,8 @@ import { limitadorPorDispositivo } from './eventos';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
 import { NucleoModule } from './nucleo/nucleo.module';
+import { ObservabilidadModule } from './observabilidad';
+import { VERSION_API } from './version';
 import { SaludController } from './salud/salud.controller';
 import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
 /**
@@ -50,6 +52,19 @@ export class AppModule {
       imports: [
         ConfiguracionModule.conValores(config),
         NucleoModule,
+        /**
+         * ETAPA 14 · justo después del núcleo, porque es `@Global` y provee el
+         * puerto de métricas que consumen tanto el interceptor de latencias
+         * —fuera de todo módulo de negocio— como `EscalarAlerta`, dentro de
+         * uno. Un proveedor global alcanza a lo que se registra DESPUÉS: el
+         * orden es funcional, igual que el de `MultiempresaModule` de abajo.
+         */
+        ObservabilidadModule.registrar({
+          ...(config.SENTRY_DSN === undefined ? {} : { sentryDsn: config.SENTRY_DSN }),
+          entorno: config.NODE_ENV,
+          version: VERSION_API,
+          ventana: config.METRICAS_VENTANA,
+        }),
         /**
          * **`MultiempresaModule` va ANTES de `AutenticacionModule`, y el orden
          * es funcional: no lo toque sin leer esto.**

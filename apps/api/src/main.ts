@@ -48,7 +48,12 @@ import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esque
 import { aplicarSaneamiento, aplicarSeguridad } from './seguridad';
 import { FiltroGlobalDeExcepciones } from './comun/filtros/filtro-global';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
+import { aplicarContextoDePeticion } from './comun/contexto/contexto-de-peticion';
 import { BitacoraEstructurada } from './comun/bitacora/bitacora-estructurada';
+import { InterceptorDeLatencias, REPORTE_DE_ERRORES } from './observabilidad';
+import type { ReporteDeErrores } from './observabilidad';
+import { GENERADOR_DE_ID } from '@ncr/domain-core';
+import type { GeneradorDeId } from '@ncr/domain-core';
 import { AdaptadorDeBitacoraNest } from './comun/bitacora/adaptador-nest';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
@@ -68,11 +73,24 @@ async function arrancar(): Promise<void> {
   // en vez de dentro del contenedor de inyección (§2.7.1).
   const config = cargarConfiguracion(process.env);
 
-  const bitacoraDeArranque = new BitacoraEstructurada();
+  const bitacoraDeArranque = new BitacoraEstructurada(undefined, config.LOG_LEVEL);
   const app = await NestFactory.create<NestExpressApplication>(AppModule.conConfiguracion(config), {
     logger: new AdaptadorDeBitacoraNest(bitacoraDeArranque),
   });
   const bitacora = app.get<Bitacora>(BITACORA);
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * EL PRIMERO DE TODOS, Y EL ORDEN ES FUNCIONAL (ETAPA 14).
+   *
+   * Todo lo que corra después —seguridad, parsers, saneamiento, Nest entero—
+   * queda dentro del `AsyncLocalStorage` de la petición, y por tanto toda
+   * línea de registro que escriban lleva su correlación. Colocado más abajo,
+   * las líneas de las capas que van antes saldrían sin ella, que es
+   * exactamente la mitad que faltaba: el identificador existía y los logs no
+   * lo llevaban.
+   */
+  aplicarContextoDePeticion(app, () => app.get<GeneradorDeId>(GENERADOR_DE_ID).nuevo());
 
   aplicarSeguridad(app, config);
   // Límite de tamaño de payload (§2.7.8), antes de cualquier ruta.
@@ -84,8 +102,12 @@ async function arrancar(): Promise<void> {
   // §2.7.4 · saneamiento DESPUÉS de los parsers: antes no hay cuerpo que sanear.
   aplicarSaneamiento(app);
 
-  app.useGlobalFilters(new FiltroGlobalDeExcepciones(bitacora));
-  app.useGlobalInterceptors(app.get(InterceptorDeCorrelacion));
+  app.useGlobalFilters(
+    new FiltroGlobalDeExcepciones(bitacora, app.get<ReporteDeErrores>(REPORTE_DE_ERRORES)),
+  );
+  // Correlación primero, latencias después: el cronómetro se lee en el log de
+  // la misma petición que lo produjo.
+  app.useGlobalInterceptors(app.get(InterceptorDeCorrelacion), app.get(InterceptorDeLatencias));
   app.enableShutdownHooks();
 
   await app.listen(config.PORT);

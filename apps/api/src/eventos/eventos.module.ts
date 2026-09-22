@@ -52,6 +52,8 @@ import {
 import { EventosController } from './presentacion/eventos.controller';
 import { InformesController } from './presentacion/informes.controller';
 import { AlertasController } from './presentacion/alertas.controller';
+import { METRICAS } from '../observabilidad';
+import type { Metricas } from '../observabilidad';
 
 /**
  * Raíz de composición del módulo de eventos.
@@ -162,14 +164,25 @@ export class EventosModule {
         },
         {
           provide: EscalarAlerta,
-          inject: [CANAL_TIEMPO_REAL, REPOSITORIO_ALERTAS, RELOJ, BITACORA, NOTIFICADOR_PUSH],
+          inject: [
+            CANAL_TIEMPO_REAL,
+            REPOSITORIO_ALERTAS,
+            RELOJ,
+            BITACORA,
+            NOTIFICADOR_PUSH,
+            // ETAPA 14 · opcional: este módulo se monta en bancos de prueba que
+            // no registran la observabilidad, y KPI-25 no puede ser el motivo
+            // de que un escalamiento no se pueda construir.
+            { token: METRICAS, optional: true },
+          ],
           useFactory: (
             canal: CanalTiempoReal,
             alertas: RepositorioAlertas,
             reloj: Reloj,
             bitacora: Bitacora,
             push: NotificadorPush,
-          ) => new EscalarAlerta(canal, alertas, reloj, bitacora, push),
+            metricas?: Metricas,
+          ) => new EscalarAlerta(canal, alertas, reloj, bitacora, push, metricas),
         },
         // Mismo objeto, publicado bajo el puerto que consumen otros módulos.
         { provide: ESCALAMIENTO_DE_ALERTA, useExisting: EscalarAlerta },

@@ -2,6 +2,7 @@ import { PLAZO_ESCALAMIENTO_MS } from '@ncr/domain-core';
 import type { Alerta, Bitacora, Reloj } from '@ncr/domain-core';
 import type { CanalTiempoReal, NotificadorPush, RepositorioAlertas } from './puertos';
 import { TEMA_ALERTAS } from './puertos';
+import type { Metricas } from '../../observabilidad';
 
 export interface ResultadoEscalamiento {
   readonly alerta: Alerta;
@@ -32,12 +33,25 @@ export interface ResultadoEscalamiento {
  * perder el instante) pero se registra el aviso y se dispara el respaldo.
  */
 export class EscalarAlerta {
+  /**
+   * `metricas` es OPCIONAL y va la última (ETAPA 14). KPI-25 es el único de los
+   * cinco que NO es una ruta HTTP —el escalamiento lo dispara la ingesta, no un
+   * operador—, así que no puede medirse con `@MideKpi` y se anota aquí.
+   *
+   * El cronómetro ya estaba: `latenciaMs` se calculaba desde antes para decidir
+   * si se escaló dentro de plazo. Lo único que se añade es publicarlo, y por eso
+   * la instrumentación no cambia ni una decisión de este caso de uso.
+   *
+   * Opcional para que las suites que ya lo construían —y son muchas— no tengan
+   * que montar el módulo de observabilidad para probar un escalamiento.
+   */
   constructor(
     private readonly canal: CanalTiempoReal,
     private readonly repositorio: RepositorioAlertas,
     private readonly reloj: Reloj,
     private readonly bitacora: Bitacora,
     private readonly respaldo?: NotificadorPush,
+    private readonly metricas?: Metricas,
   ) {}
 
   async ejecutar(alerta: Alerta, actorId: string): Promise<ResultadoEscalamiento> {
@@ -60,6 +74,11 @@ export class EscalarAlerta {
       plazoMs: PLAZO_ESCALAMIENTO_MS,
       dentroDelPlazo,
     });
+
+    // RNF-12.1 · evento crítico → operador, < 10 s. Se anota SIEMPRE, también
+    // cuando no hubo destinatarios: una alerta que tardó doce segundos y no
+    // llegó a nadie es justo la muestra que el tablero no puede perder.
+    this.metricas?.observar('KPI-25', latenciaMs);
 
     if (destinatarios === 0) await this.avisarSinOperador(escalada);
 

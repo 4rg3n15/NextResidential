@@ -14,6 +14,8 @@ const configuracionParaContrato: Configuracion = {
   SUPABASE_PUBLISHABLE_KEY: 'no-aplica',
   SUPABASE_SECRET_KEY: 'no-aplica',
   SUPABASE_JWKS_URL: 'https://generacion-de-contrato.invalid/auth/v1/.well-known/jwks.json',
+  LOG_LEVEL: 'info',
+  METRICAS_VENTANA: 2048,
   JWKS_CACHE_TTL_SEGUNDOS: 600,
   JWKS_REFRESCO_MINIMO_SEGUNDOS: 60,
   DATABASE_URL: 'no-aplica',

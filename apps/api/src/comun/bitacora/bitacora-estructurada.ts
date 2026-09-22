@@ -1,4 +1,5 @@
 import type { Bitacora, NivelBitacora } from '@ncr/domain-core';
+import { contextoActual } from '../contexto/contexto-de-peticion';
 
 /**
  * Bitácora estructurada con REDACCIÓN (§2.7.8: contraseñas y tokens jamás en
@@ -50,9 +51,23 @@ export const redactar = (valor: unknown, profundidad = 0): unknown => {
   return salida;
 };
 
+/**
+ * Orden de severidad. `LOG_LEVEL` fija el mínimo que se emite: con `info`, un
+ * `debug` no se escribe. Es lo que permite dejar trazas finas en el código sin
+ * inundar producción, y es la mitad que le faltaba a `LOG_LEVEL` —estaba en
+ * `.env.example` desde la ETAPA 02 y **nadie la leía** (deuda de la ETAPA 14)—.
+ */
+export const SEVERIDAD: Readonly<Record<NivelBitacora, number>> = {
+  debug: 10,
+  info: 20,
+  aviso: 30,
+  error: 40,
+};
+
 export class BitacoraEstructurada implements Bitacora {
   constructor(
     private readonly escribir: (linea: string) => void = (l) => process.stdout.write(`${l}\n`),
+    private readonly nivelMinimo: NivelBitacora = 'debug',
   ) {}
 
   registrar(
@@ -60,11 +75,32 @@ export class BitacoraEstructurada implements Bitacora {
     mensaje: string,
     contexto?: Readonly<Record<string, unknown>>,
   ): void {
+    if (SEVERIDAD[nivel] < SEVERIDAD[this.nivelMinimo]) return;
+    /**
+     * La correlación se toma del contexto de la petición en curso, no de un
+     * parámetro. Así la lleva TODA línea —incluidas las que escribe un
+     * repositorio tres capas más abajo, que no sabe nada de HTTP— y un
+     * `x-request-id` reportado por un usuario filtra el registro entero.
+     * Fuera de una petición —arranque, trabajo programado— simplemente no
+     * está, y su ausencia es información: esa línea no la provocó nadie.
+     */
+    const contextoDePeticion = contextoActual();
     this.escribir(
       JSON.stringify({
         nivel,
         mensaje,
         momento: new Date().toISOString(),
+        ...(contextoDePeticion === undefined
+          ? {}
+          : {
+              correlacion: contextoDePeticion.correlacion,
+              ...(contextoDePeticion.metodo === undefined
+                ? {}
+                : {
+                    peticion:
+                      `${contextoDePeticion.metodo} ${contextoDePeticion.ruta ?? ''}`.trim(),
+                  }),
+            }),
         ...(contexto ? { contexto: redactar(contexto) } : {}),
       }),
     );

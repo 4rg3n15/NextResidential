@@ -10,6 +10,12 @@ import express from 'express';
 import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
 import type { INestApplication } from '@nestjs/common';
 import { aplicarSaneamiento, aplicarSeguridad } from '../src/seguridad';
+import { aplicarContextoDePeticion } from '../src/comun/contexto/contexto-de-peticion';
+import { InterceptorDeCorrelacion } from '../src/comun/interceptores/correlacion';
+import { InterceptorDeLatencias, REPORTE_DE_ERRORES } from '../src/observabilidad';
+import type { ReporteDeErrores } from '../src/observabilidad';
+import { GENERADOR_DE_ID } from '@ncr/domain-core';
+import type { GeneradorDeId } from '@ncr/domain-core';
 import { AppModule } from '../src/app.module';
 import { SONDA_POSTGRES } from '../src/arranque/sonda-postgres';
 import { ProveedorDeJwks } from '../src/autenticacion/infraestructura/jwks';
@@ -60,6 +66,8 @@ export const configuracionDePrueba: Configuracion = {
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: 24,
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
+  LOG_LEVEL: 'aviso',
+  METRICAS_VENTANA: 2048,
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 100000, // el límite se prueba aparte; aquí estorbaría
   THROTTLE_DISPOSITIVO_LIMITE: 120,
@@ -257,6 +265,17 @@ export const crearApp = async (
    * `aplicarSaneamiento` va DESPUÉS de los parsers porque antes no hay cuerpo.
    * ═════════════════════════════════════════════════════════════════════════
    */
+  /**
+   * ETAPA 14 · el contexto de petición va PRIMERO, igual que en `main.ts`.
+   *
+   * Y está aquí por la misma lección de H-13-11: lo que el banco no monta, el
+   * banco no prueba. Si la correlación y el interceptor de latencias se
+   * cablearan solo en `main.ts`, la suite pasaría en verde sobre una API que
+   * no es la que se despliega — que es exactamente el defecto que se corrigió
+   * cuando se descubrió que `aplicarSeguridad` no se llamaba aquí.
+   */
+  aplicarContextoDePeticion(app, () => app.get<GeneradorDeId>(GENERADOR_DE_ID).nuevo());
+
   aplicarSeguridad(app, configuracionDePrueba);
   app.use(
     express.json({ limit: configuracionDePrueba.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }),
@@ -276,7 +295,13 @@ export const crearApp = async (
    * Apareció al montar el 422 de configuración (bloque 7), que es el primer
    * error cuyo CUERPO la consola necesita —los rechazos por campo—.
    */
-  app.useGlobalFilters(new FiltroGlobalDeExcepciones(app.get<Bitacora>(BITACORA)));
+  app.useGlobalFilters(
+    new FiltroGlobalDeExcepciones(
+      app.get<Bitacora>(BITACORA),
+      app.get<ReporteDeErrores>(REPORTE_DE_ERRORES),
+    ),
+  );
+  app.useGlobalInterceptors(app.get(InterceptorDeCorrelacion), app.get(InterceptorDeLatencias));
   await app.init();
 
   /**

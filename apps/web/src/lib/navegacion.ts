@@ -46,6 +46,7 @@ export const ICONOS_DE_NAVEGACION = [
   'Settings',
   'DoorOpen',
   'RadioTower',
+  'Gauge',
 ] as const;
 export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 
@@ -144,6 +145,19 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     roles: ADMINISTRACION,
     pendienteDeEtapa: null,
     icono: 'FileBarChart',
+  },
+  /**
+   * ETAPA 14 · junto a informes y antes de configuración: es otra vista del
+   * sistema, no un ajuste. La ve también el operador de central, que es quien
+   * primero nota una latencia de intercom que se va del techo.
+   */
+  {
+    clave: 'observabilidad',
+    etiqueta: 'Latencias',
+    ruta: '/observabilidad',
+    roles: ['superadministrador', 'administrador', 'operador_central'],
+    pendienteDeEtapa: null,
+    icono: 'Gauge',
   },
   {
     clave: 'configuracion',

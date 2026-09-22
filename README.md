@@ -16,6 +16,8 @@ Plataforma SaaS multiempresa de control de acceso para copropiedades —villas, 
 1. [Qué resuelve](#1-qué-resuelve)
 2. [Estado del proyecto](#2-estado-del-proyecto)
 3. [Arquitectura](#3-arquitectura)
+   - [Cinco capas](#cinco-capas) · [Nueve agregados raíz](#nueve-agregados-raíz) · [Objetos de valor](#objetos-de-valor)
+   - [El motor de reglas](#el-motor-de-reglas) · [El recorrido de una decisión de acceso](#el-recorrido-de-una-decisión-de-acceso) · [El monorepo desplegado](#el-monorepo-desplegado) · [El Edge sin WAN](#el-edge-sin-wan)
 4. [Stack tecnológico](#4-stack-tecnológico)
 5. [Estructura del repositorio](#5-estructura-del-repositorio)
 6. [Puesta en marcha](#6-puesta-en-marcha)
@@ -76,12 +78,12 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 
 ### Próximas etapas
 
-| #    | Etapa                                    | Alcance                                                                                                                                                    |
-| ---- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 13   | Auditoría de ciberseguridad              | Verificación y endurecimiento. No introduce la seguridad: la audita                                                                                        |
-| 14   | Observabilidad, CI/CD, PWA y escritorio  | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio                                                                      |
-| 15   | **Integración Hikvision**                | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio                                                                  |
-| 16   | Documentación técnica final              | Consolidación, README definitivo, OpenAPI navegable                                                                                                        |
+| #   | Etapa                                   | Alcance                                                                                   |
+| --- | --------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 13  | Auditoría de ciberseguridad             | Verificación y endurecimiento. No introduce la seguridad: la audita                       |
+| 14  | Observabilidad, CI/CD, PWA y escritorio | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio     |
+| 15  | **Integración Hikvision**               | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio |
+| 16  | Documentación técnica final             | Consolidación, README definitivo, OpenAPI navegable                                       |
 
 ### Pruebas con hardware
 
@@ -109,9 +111,29 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 
 La dirección de dependencia apunta siempre hacia adentro. **Ninguna flecha sale del dominio**, y eso no es una convención: el linter rompe la construcción si `domain/` importa infraestructura o si aparece un `any`.
 
+Mire la flecha tachada: es la única que no existe, y quien la impide es el linter, no la disciplina de quien escribe.
+
+```mermaid
+flowchart TB
+  P["Presentación · controladores, DTOs, Alarm Server, workers"]
+  A["Aplicación · casos de uso, transacciones, idempotencia, tenant"]
+  D["Dominio · agregados, políticas, motor de reglas"]
+  I["Infraestructura · repositorios, colas, storage, proveedores"]
+  F["Física · hardware Hikvision"]
+  P --> A
+  A --> D
+  I --> D
+  I --> F
+  D -. "PROHIBIDA · la rompe el linter, no la disciplina" .-x I
+```
+
+La tabla de arriba sigue siendo la fuente: el dibujo muestra la dirección, las prohibiciones por capa están escritas ahí.
+
 ### Nueve agregados raíz
 
-`Copropiedad` (frontera del tenant) · `Vivienda` · `Persona` · `Autorización` · `Acceso` (inmutable) · `Consentimiento` · `Zona` · `Dispositivo` · `ListaNegra`
+`Copropiedad` (frontera del tenant) · `Vivienda` · `Autorización` · `Acceso` (inmutable) · `ConsentimientoBiometrico` · `PlantillaBiometrica` · `Zona` · `ListaNegra` · `Dispositivo`
+
+> Esta lista se corrigió en la ETAPA 14. Antes decía `Persona` donde va `PlantillaBiometrica`, y `Persona` **no es un agregado raíz**: `padron/persona.ts` declara los objetos de valor `Documento` y `NombreDePersona`, y `personas` está clasificada como entidad de identidad compartida en [`modelo-datos.md` §2.10](docs/arquitectura/modelo-datos.md). Siguen siendo nueve, los mismos que fijó `[CONTRADICCIÓN]` C-02. Registro en [`contradicciones-y-supuestos.md` C-27](docs/auditoria/contradicciones-y-supuestos.md).
 
 ### Objetos de valor
 
@@ -130,6 +152,84 @@ Las políticas son componibles y devuelven `ResultadoAcceso | null`, donde `null
 **Cadena de precedencia vinculante:** `listaNegra > vigencia > patrón > zona`. Una persona en lista negra con autorización vigente recibe motivo `LISTA_NEGRA`, no `VIGENCIA_EXPIRADA`.
 
 Cada decisión sella la `VersiónDeReglas` con la que se tomó. Es lo que hará auditables las decisiones que el Edge Gateway tome sin conexión.
+
+### El recorrido de una decisión de acceso
+
+Mire el primer mensaje y el penúltimo: la cámara **reporta** y es el caso de uso quien manda abrir. Eso es «Next Control decide, el hardware ejecuta» dibujado.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant CAM as Cámara o lector · física
+  participant AS as Alarm Server · presentación
+  participant CU as RegistrarAcceso · aplicación
+  participant DOM as evaluarAcceso · dominio puro
+  participant EV as eventos · append-only
+  participant AP as AccessPointProvider · infraestructura
+  participant REL as Relé o talanquera · física
+  CAM->>AS: reporta la lectura firmada y NO abre
+  AS->>CU: contexto normalizado, sin protocolo de fabricante
+  CU->>DOM: evaluarAcceso con reloj inyectado y cero E/S
+  DOM-->>CU: Decisión, motivo tipado y VersiónDeReglas
+  CU->>EV: registra el intento, permitido o negado
+  CU->>AP: abrir el punto de acceso solo si la decisión permite
+  AP->>REL: acciona
+  REL-->>AP: estado de puerta
+```
+
+Si la cámara resolviera la apertura por su cuenta, los pasos 3 a 5 no existirían: el motor de reglas quedaría decorativo y el evento, sin decisión que registrar.
+
+### El monorepo desplegado
+
+Mire `domain-core`: lo comparten la API y el Edge sin una línea de diferencia, y eso es lo que hace demostrable OE-06 —la misma entrada produce la misma decisión en la nube y sin WAN—.
+
+```mermaid
+flowchart TB
+  subgraph apps["apps/"]
+    API["api · NestJS · monolito modular hexagonal"]
+    WEB["web · Next.js · PWA instalable y escritorio Tauri"]
+    MOV["mobile · Flutter · app del residente"]
+    EDGE["edge · Node.js y SQLite · offline"]
+  end
+  subgraph pkgs["packages/"]
+    DC["domain-core · dominio puro COMPARTIDO"]
+    PR["providers · puertos, MockProvider e Hikvision"]
+    CT["contracts · OpenAPI y clientes generados"]
+    CF["config · tsconfig, eslint, preset Tailwind"]
+  end
+  SB[("Supabase · PostgreSQL, Auth, Storage, tiempo real")]
+  API --> DC
+  EDGE --> DC
+  API --> PR
+  EDGE --> PR
+  API --> CT
+  WEB --> CT
+  MOV --> CT
+  WEB --> CF
+  API --> SB
+  WEB --> SB
+  API --> CF
+  EDGE -. "reconciliación con clave de idempotencia" .-> API
+```
+
+### El Edge sin WAN
+
+Mire la última flecha, la tachada: al reconectar, el Edge **no vuelve a decidir**. Envía lo que ya decidió, con la versión de reglas que usó.
+
+```mermaid
+flowchart LR
+  WAN{"¿Hay WAN?"}
+  WAN -- "sí" --> NUBE["Decide la API en la nube"]
+  WAN -- "no" --> CACHE[("Caché de reglas versionada")]
+  CACHE --> LOCAL["Decisión local que sella la VersiónDeReglas"]
+  LOCAL --> BAND[("Bandeja de salida · clave de idempotencia")]
+  BAND --> REC["Reconciliación ordenada al reconectar"]
+  REC --> EVT[("eventos · append-only, exactamente una vez")]
+  NUBE --> EVT
+  REC -. "NO vuelve a decidir" .-x LOCAL
+```
+
+Si la regla no está en la caché, la política de contingencia es configurable y su valor por defecto es **denegar** (§2.1.4 del contrato).
 
 ---
 

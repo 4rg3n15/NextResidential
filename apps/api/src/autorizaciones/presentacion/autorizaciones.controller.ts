@@ -35,6 +35,7 @@ import {
   IdAutorizacionDto,
   RevocacionDto,
 } from './respuestas';
+import { MideKpi } from '../../observabilidad';
 
 /**
  * Visitantes y autorizaciones — HU-07 a HU-10, HU-16, HU-17, CA-04 a CA-07.
@@ -92,6 +93,9 @@ export class AutorizacionesController {
   }
 
   @Post()
+  // RNF-01.2 · creada → disponible en el motor, < 5 s. El cronómetro para
+  // cuando la respuesta sale, y cuando sale la autorización ya está confirmada.
+  @MideKpi('KPI-09')
   @Roles('administrador', 'superadministrador', 'portero')
   @ApiOperation({ summary: 'Crea una autorización, única o recurrente (HU-07, HU-09, RN-22)' })
   @ApiOkResponse({ type: IdAutorizacionDto })

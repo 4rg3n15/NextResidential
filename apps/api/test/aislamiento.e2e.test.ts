@@ -10,7 +10,11 @@ import {
   rutasConMetadato,
   tokenDe,
 } from './utilidades';
-import { CLAVE_ALCANCE_DEL_LLAMANTE } from '../src/comun/decoradores';
+import {
+  CLAVE_ALCANCE_DEL_LLAMANTE,
+  CLAVE_PUBLICO,
+  CLAVE_SIN_RECURSO_TENANT,
+} from '../src/comun/decoradores';
 import type { Firmante, RutaExpuesta } from './utilidades';
 import { AuditoriaEnMemoria } from '../src/comun/auditoria';
 
@@ -29,16 +33,27 @@ let rutas: RutaExpuesta[];
 const PUBLICAS = new Set(['GET /health', 'GET /ready']);
 
 /**
- * Rutas que declaran `@SinRecursoDeTenant()`: operan sobre la identidad del
- * propio llamante. La lista se DERIVA del código, no se escribe aquí: si
- * alguien añade un endpoint sin ese decorador, entra en el recorrido de fuga
- * automáticamente.
+ * Rutas AUTENTICADAS que declaran `@SinRecursoDeTenant()`: operan sobre la
+ * identidad del propio llamante y no reciben identificador de copropiedad, así
+ * que el recorrido de fuga no tiene nada ajeno que pedirles.
+ *
+ * **Se escribe a mano, a propósito** —y el comentario anterior decía lo
+ * contrario, que «la lista se deriva del código»; no se derivaba, y eso es
+ * exactamente la familia de defecto que este proyecto persigue: la afirmación
+ * que nadie comprobó—. Derivarla haría que poner el decorador bastara para
+ * quedar exento, en silencio. Así hay que escribir una línea que se lee en la
+ * revisión, y la comprobación de abajo exige que las dos caras coincidan.
  */
 const SIN_RECURSO_TENANT = new Set([
   '/auth/sesion',
   '/auth/restablecimiento',
   '/auth/mfa/codigos',
   '/auth/mfa/recuperacion',
+  // ETAPA 14 · tiempos agregados del proceso. No lleva `:id` porque no hay
+  // copropiedad que exponer: ni identificadores, ni placas, ni personas. Aun
+  // así exige sesión y rol administrativo, porque un mapa de dónde tarda el
+  // sistema es información de operación.
+  '/observabilidad/latencias',
 ]);
 
 /**
@@ -108,6 +123,39 @@ describe('cobertura de la suite', () => {
         ruta,
       );
     }
+  });
+
+  it('la marca @SinRecursoDeTenant() del CÓDIGO coincide, exactamente, con la lista de la suite', () => {
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * LA MITAD QUE FALTABA · ETAPA 14
+     *
+     * La comprobación de arriba mira que cada ruta exenta EXISTA en el
+     * enrutador. Eso es cierto de cualquier ruta, lleve o no el decorador: dice
+     * comprobar la correspondencia «en los dos sitios» y solo comprueba uno.
+     * La dirección que faltaba es la peligrosa: una ruta marcada
+     * `@SinRecursoDeTenant()` en el controlador y ausente de esta lista queda
+     * fuera del recorrido de fuga **sin que nada lo diga**.
+     *
+     * Aquí se compara contra el metadato real, igual que con
+     * `@AlcanceDelLlamante()`. Con la igualdad exacta, las dos direcciones
+     * rompen el build: decorar sin declarar, y declarar sin decorar.
+     *
+     * Y la lista sigue siendo a mano A PROPÓSITO: derivarla del decorador
+     * haría que poner el decorador bastara para quedar exento, en silencio.
+     * Así hay que escribir una línea que se lee en la revisión.
+     */
+    /**
+     * Las rutas `@Publico()` se descuentan: ya están fuera del recorrido con
+     * token por otra vía —las tres de `/ingesta/*` llevan los dos decoradores,
+     * porque no tienen sesión de usuario y tampoco exponen copropiedad—, y
+     * meterlas en la lista las sacaría del recorrido que sí deben pasar.
+     */
+    const publicas = new Set(rutasConMetadato(app, CLAVE_PUBLICO));
+    const autenticadasExentas = rutasConMetadato(app, CLAVE_SIN_RECURSO_TENANT).filter(
+      (r) => !publicas.has(r),
+    );
+    expect(autenticadasExentas.sort()).toEqual([...SIN_RECURSO_TENANT].sort());
   });
 
   it('la marca @AlcanceDelLlamante() del CÓDIGO coincide, exactamente, con la lista de la suite', () => {
