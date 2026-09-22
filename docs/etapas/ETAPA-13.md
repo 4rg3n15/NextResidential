@@ -23,8 +23,8 @@ nivel 2 como listas formales—. **Ninguna quedó sin ejecutar**, y las que no s
 pueden demostrar desde este entorno están dichas con esas palabras y con lo que
 haría falta para cerrarlas.
 
-Salieron **26 hallazgos**: ninguno crítico, **tres altos**, catorce medios, seis
-bajos y tres informativos. Veinticinco quedan cerrados. El único abierto es de
+Salieron **26 hallazgos**: ninguno crítico, **tres altos**, quince medios, seis
+bajos y dos informativos. Veinticinco quedan cerrados. El único abierto es de
 severidad baja y es una **aceptación de riesgo redactada para su firma**, no una
 remediación pendiente.
 

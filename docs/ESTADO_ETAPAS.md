@@ -650,9 +650,9 @@ es el entregable.
 | --------------- | ----: | -------: | -------: |
 | **Crítica**     |     0 |        0 |    **0** |
 | **Alta**        |     3 |        3 |    **0** |
-| **Media**       |    14 |       14 |    **0** |
+| **Media**       |    15 |       15 |    **0** |
 | **Baja**        |     6 |        5 |    **1** |
-| **Informativa** |     3 |        3 |    **0** |
+| **Informativa** |     2 |        2 |    **0** |
 
 **DoD cumplido:** cero críticos o altos ABIERTOS. El único abierto —H-13-25, la
 contraseña inerte que sobrevive en el historial de Git— **lo está a propósito**:

@@ -47,9 +47,9 @@ DB-02 abierta durante semanas: _«probable» no es «verificado»_.
 | --------------- | ----: | -------: | -------: | --------------------------------------------- |
 | **Crítica**     |     0 |        0 |    **0** | —                                             |
 | **Alta**        |     3 |        3 |    **0** | —                                             |
-| **Media**       |    14 |       14 |    **0** | —                                             |
+| **Media**       |    15 |       15 |    **0** | —                                             |
 | **Baja**        |     6 |        5 |    **1** | H-13-25 (riesgo aceptado, pendiente de firma) |
-| **Informativa** |     3 |        3 |    **0** | —                                             |
+| **Informativa** |     2 |        2 |    **0** | —                                             |
 | **Total**       |    26 |       25 |    **1** |                                               |
 
 **DoD de la etapa:** cero hallazgos críticos o altos ABIERTOS → **cumplido**.
