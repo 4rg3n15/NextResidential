@@ -67,6 +67,40 @@ describe('apertura remota del videoportero', () => {
   });
 });
 
+describe('estado del videoportero', () => {
+  const con = (respuestas: () => Response | never): Videoportero =>
+    new Videoportero({
+      host: 'portero.invalid',
+      usuario: 'u',
+      clave: 'c',
+      peticion: (async () => respuestas()) as unknown as typeof fetch,
+    });
+
+  it('responde: en línea', async () => {
+    await expect(con(() => respuesta(200, '<DeviceInfo/>')).estado('p-1')).resolves.toBe(
+      'en_linea',
+    );
+  });
+
+  it('contesta pero rechaza las credenciales: DEGRADADO, no fuera de línea', async () => {
+    // Está vivo y mal configurado. Un técnico y un administrador resuelven
+    // cosas distintas, y mezclarlos manda al técnico a mirar un cable sano.
+    await expect(con(() => respuesta(401)).estado('p-1')).resolves.toBe('degradado');
+  });
+
+  it('contesta con error del equipo: también degradado', async () => {
+    await expect(con(() => respuesta(500)).estado('p-1')).resolves.toBe('degradado');
+  });
+
+  it('no contesta: fuera de línea', async () => {
+    await expect(
+      con(() => {
+        throw new Error('ECONNREFUSED');
+      }).estado('p-1'),
+    ).resolves.toBe('fuera_de_linea');
+  });
+});
+
 describe('el canal de audio está escrito y NO habilitado', () => {
   const montar = (habilitado: boolean, respuestas: () => Response = () => respuesta(200)) => {
     const peticion = vi.fn(async () => respuestas());

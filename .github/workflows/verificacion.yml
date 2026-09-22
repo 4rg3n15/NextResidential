@@ -93,12 +93,19 @@ jobs:
       # cuarenta y cinco corridas no se reproduce a voluntad; hay que estar
       # preparado para la que venga.
       # ═══════════════════════════════════════════════════════════════════════
+      # D-101 · `include-hidden-files` NO es opcional aquí, y costó la primera
+      # aparición que el instrumento tenía que capturar. `.informes-de-prueba/`
+      # empieza por punto, y `upload-artifact@v4` excluye lo oculto POR
+      # OMISIÓN: la subida decía «No files were found» y el trabajo seguía
+      # rojo sin artefacto, que es indistinguible de «no se escribió nada».
+      # `if-no-files-found: ignore` lo tapaba del todo.
       - name: Informes de prueba (solo si algo falló · D-101)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: informes-de-prueba-${{ matrix.so }}
-          if-no-files-found: ignore
+          if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 14
           path: .informes-de-prueba/*.json
 

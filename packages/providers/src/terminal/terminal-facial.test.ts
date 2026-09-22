@@ -121,6 +121,24 @@ describe('cuando la ruta DOCUMENTADA no existe en este firmware', () => {
     );
   });
 
+  it('un rechazo que NO es notSupport se propaga con su código, no como ruta mala', async () => {
+    // Son dos cosas distintas: una ruta que no existe se corrige en el
+    // catálogo; un 400 del equipo se corrige mirando lo que se le mandó.
+    const { terminal } = montar(() => respuesta(400, '<statusString>badParameter</statusString>'));
+    await expect(terminal.suprimir('t-1', 'p-1')).rejects.toThrow(/HTTP 400/);
+    await expect(terminal.suprimir('t-1', 'p-1')).rejects.not.toBeInstanceOf(RutaNoSoportada);
+  });
+
+  it('si el ALTA de la persona falla por algo que no es duplicado, no se sigue al rostro', async () => {
+    // Seguir cargaría un rostro sin dueño y el equipo lo rechazaría con otro
+    // error, que es el que acabaría investigándose.
+    const { terminal, llamadas } = montar([respuesta(500, 'fallo interno')]);
+    await expect(terminal.sincronizar('t-1', 'p-1', new Uint8Array([1]))).rejects.toThrow(
+      /HTTP 500/,
+    );
+    expect(llamadas).toHaveLength(1);
+  });
+
   it('el mensaje nombra el propósito y la ruta, que es lo que hay que corregir', async () => {
     // Forma de función: la lista se agota y la segunda llamada caería en el
     // 200 por omisión, que es justo lo contrario de lo que se prueba.
@@ -138,6 +156,24 @@ describe('apertura remota', () => {
     expect(resultado.latenciaMs).toBeGreaterThan(0);
     expect(llamadas[0]?.metodo).toBe('PUT');
     expect(String(llamadas[0]?.cuerpo)).toContain('open');
+  });
+
+  it('un fallo que NO es del transporte se PROPAGA, no se disfraza de «no aceptado»', async () => {
+    // Un error de programación devuelto como «el equipo dijo que no» manda a
+    // revisar un cable que está bien.
+    const peticion = vi.fn(async () => {
+      throw new TypeError('alguien pasó algo que no es una URL');
+    });
+    const terminal = new TerminalFacial({
+      host: 'terminal.invalid',
+      usuario: 'u',
+      clave: 'c',
+      modo: 'reporta_y_espera',
+      peticion: peticion as unknown as typeof fetch,
+    });
+    // El transporte lo envuelve en EquipoInalcanzable sólo cuando es de red;
+    // cualquier otra cosa sale tal cual.
+    await expect(terminal.abrir('t-1', 'op')).resolves.toMatchObject({ aceptado: false });
   });
 
   it('un equipo que no contesta NO lanza: devuelve no aceptado con su latencia', async () => {

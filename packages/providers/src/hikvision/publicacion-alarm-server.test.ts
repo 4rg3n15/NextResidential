@@ -128,6 +128,44 @@ describe('clasificarSobre', () => {
     expect(resultado.foto?.equals(escena)).toBe(true);
   });
 
+  it('con DOS imágenes y una sola PISTA de nombre, manda la pista y no el tamaño', () => {
+    // El desempate por tamaño es el repliegue. Cuando el nombre lo dice, se
+    // cree al nombre aunque el recorte salga más grande que la escena, que
+    // pasa con una escena muy comprimida y un recorte con mucho detalle.
+    const escenaPequena = Buffer.alloc(128, 1);
+    const recorteGrande = Buffer.alloc(4096, 2);
+    const resultado = clasificarSobre(
+      partirSobre(
+        sobre('B', [
+          { nombre: 'anpr.xml', tipo: 'text/xml', contenido: XML },
+          { nombre: 'escena', tipo: 'image/jpeg', contenido: escenaPequena },
+          { nombre: 'licensePlatePicture', tipo: 'image/jpeg', contenido: recorteGrande },
+        ]),
+        'B',
+      ),
+    );
+    expect(resultado.recorte?.equals(recorteGrande)).toBe(true);
+    expect(resultado.foto?.equals(escenaPequena)).toBe(true);
+  });
+
+  it('con DOS pistas a la vez, se cae al desempate por TAMAÑO', () => {
+    // Dos nombres que casan la pista no desempatan nada: el tamaño sí.
+    const grande = Buffer.alloc(4096, 1);
+    const pequena = Buffer.alloc(128, 2);
+    const resultado = clasificarSobre(
+      partirSobre(
+        sobre('B', [
+          { nombre: 'anpr.xml', tipo: 'text/xml', contenido: XML },
+          { nombre: 'platePictureA', tipo: 'image/jpeg', contenido: grande },
+          { nombre: 'platePictureB', tipo: 'image/jpeg', contenido: pequena },
+        ]),
+        'B',
+      ),
+    );
+    expect(resultado.recorte?.equals(pequena)).toBe(true);
+    expect(resultado.foto?.equals(grande)).toBe(true);
+  });
+
   it('con UNA sola imagen, es la escena y no el recorte', () => {
     // El recorte nunca viene solo; tratarlo como tal dejaría la evidencia sin
     // la foto de la escena, que es la que un incidente necesita.

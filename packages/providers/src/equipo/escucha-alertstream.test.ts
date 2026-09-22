@@ -163,6 +163,33 @@ describe('el volcado histórico NO llega al sistema', () => {
     expect(esperas[1]).toBeGreaterThan(esperas[0]!);
   });
 
+  it('la espera se TOPA: no crece sin límite aunque el equipo siga caído', async () => {
+    // Sin techo, un equipo caído toda la noche acabaría con esperas de horas y
+    // el primer timbre después de volver llegaría cuando ya no hay nadie.
+    const esperas: number[] = [];
+    const cancelar = new AbortController();
+    const escucha = new EscuchaDeAlertStream({
+      host: 'equipo.invalid',
+      usuario: 'u',
+      clave: 'c',
+      dispositivoId: 't',
+      familia: 'terminal',
+      esperaMaximaMs: 4000,
+      peticion: (async () => flujoDe([])) as unknown as typeof fetch,
+      esperar: async (ms) => {
+        esperas.push(ms);
+        if (esperas.length >= 8) cancelar.abort();
+      },
+      azar: () => 0.5,
+    });
+
+    for await (const evento of escucha.escuchar(cancelar.signal)) {
+      expect.unreachable(`no debía emitir nada y emitió ${evento.clase}`);
+    }
+
+    expect(Math.max(...esperas)).toBeLessThanOrEqual(4000);
+  });
+
   it('la dispersión evita que veinte equipos vuelvan a la vez', async () => {
     const esperas: number[] = [];
     const peticion = vi.fn(async () => flujoDe([]));
