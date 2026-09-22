@@ -228,17 +228,53 @@ facial real, no.
 
 ## 6 · Pruebas
 
+### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
+
+Ejecutado en Linux con PostgreSQL 16 efímero (`scripts/base-de-pruebas.sh`),
+Flutter 3.47.4 y Chromium. **Pegado de la ejecución:**
+
+```
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 26 de 26 pasos ejecutados
+
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+CODIGO=0
+```
+
+El «1 control declarado no ejercido» es el recuento del registro completo; el
+paso 9 lo precisa: **`0 de ellos en linux`**.
+
+**Cobertura por capa (§2.4), pegada del paso 7:**
+
+```
+     OK   dominio (packages/domain-core/src): lineas 97.73 % · ramas 96.48 % · funciones 97.42 % (umbral 90 %, 34 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 97.25 % · ramas 92.08 % · funciones 98.31 % (umbral 90 %, 44 archivos)
+     OK   global: lineas 77.07 % · ramas 85.17 % · funciones 81.06 % (umbral 70 %, 352 archivos)
+   ✓ las tres capas cumplen su umbral
+```
+
+**Estabilidad — tres corridas idénticas (paso 14):**
+
+```
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 862 passed (862) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 398 passed (398) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 161 passed (161) · @ncr/web:test: Tests 376 passed (376)
+      corrida 2/3: codigo 0 · … (idéntica)
+      corrida 3/3: codigo 0 · … (idéntica)
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+```
+
+**2 042 pruebas de TypeScript** en total, más 160 de Flutter y 3 de Rust.
+
 ### Suites
 
 | Paquete          | Pruebas | Nuevas en esta etapa                                        |
 | ---------------- | ------: | ----------------------------------------------------------- |
-| `@ncr/providers` |     146 | +68: catálogo, transporte, terminal, videoportero, simulado |
-| `@ncr/api`       |     857 | +44: receptor, registro de equipos, recorrido de placa      |
+| `@ncr/providers` |     161 | +83: catálogo, transporte, terminal, videoportero, simulado |
+| `@ncr/api`       |     862 | +44: receptor, registro de equipos, recorrido de placa      |
 | `@ncr/web`       |     376 | +25: medidas de calidad, pantalla de captura, panel         |
 | Flutter          |     160 | sin cambios; el cliente generado sí se regeneró             |
 
-`@ncr/api` informa además **5 omitidas**, que son las de siempre y no son de
-esta etapa. Las cifras definitivas y el veredicto literal, más abajo.
+Las cinco omitidas de `@ncr/api` son las de siempre y no son de esta etapa; el
+paso 14 las cuenta dentro de las 862.
 
 ### Los tres defectos que encontraron los controles al construir esto
 
