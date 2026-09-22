@@ -64,16 +64,19 @@ Flutter, Chromium y PostgreSQL, siembra la base y ejecuta el verificador entero.
 
 ### Lo que encontró la primera corrida
 
-| ID        | Qué                                                                                                                                                                                                                                                                                           | Estado                                                                   |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **D-102** | El bloque «QUEDARON FUERA de la medición» interpolaba el objeto de fallo: imprimía **`[object Object]`**. Y llamaba «la corrida no terminó» a una suite en rojo — la confusión que D-100 había cerrado diez líneas más arriba                                                                 | **Corregido** · sonda 22 ampliada                                        |
-| **D-103** | El paso 12 comparaba como TEXTO un número de `wc`, que **BSD almohadilla y GNU no**. En macOS fallaba con el KPI-03 cumplido delante: una inserción aceptada, cero duplicados, e incumplimiento informado                                                                                     | **Corregido** · sonda 23                                                 |
-| **D-104** | El diagnóstico del paso 13 filtraba por `×` y `→`. Si el proceso moría antes de una aserción no casaba ninguno, y el paso imprimía la etiqueta y **nada más**                                                                                                                                 | **Corregido**                                                            |
-| **D-105** | D-100 hizo que el control imprimiera el nombre de cada prueba roja; **el filtro del paso 7 lo tiraba**. macOS informó «5 prueba(s) fallaron» y ni una línea más, con los nombres a tres líneas de distancia                                                                                   | **Corregido**                                                            |
-| **D-106** | El paso 5 falló en macOS imprimiendo **cero líneas**: ni código, ni bytes, ni cola                                                                                                                                                                                                            | **Corregido** · y su instrumentación halló D-108 en la corrida siguiente |
-| **D-107** | El control de la base preguntaba `select version()` y daba por buena una base **vacía**. Cuatro minutos después aparecían cinco rojas de `residente-pg.test.ts` sin relación aparente. En las máquinas de desarrollo era invisible: sus clústeres llevan esquema y semillas puestos de antes  | **Corregido** · prueba negativa en el propio trabajo de macOS            |
-| **D-108** | Los colores de Vitest **parten `Tests` de su número**, y el recuento del paso 5 no casaba. Con colores, la rama que detecta pruebas en rojo tampoco casa: la única defensa que quedaba era el código de salida                                                                                | **Corregido** · sonda 24                                                 |
-| **D-112** | `turbo.json` no declaraba las variables de las que dependen las pruebas. Turborepo 2.x filtra el entorno, así que `DATABASE_URL_PRUEBAS` no llegaba a vitest y cinco pruebas se saltaban **en silencio** bajo `pnpm test` mientras el paso 7 las ejecutaba. Los dos pasos verdes, discrepando | **Corregido** · paso 7b, sonda 25                                        |
+| ID        | Qué                                                                                                                                                                                                                                                                                                                                                     | Estado                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **D-102** | El bloque «QUEDARON FUERA de la medición» interpolaba el objeto de fallo: imprimía **`[object Object]`**. Y llamaba «la corrida no terminó» a una suite en rojo — la confusión que D-100 había cerrado diez líneas más arriba                                                                                                                           | **Corregido** · sonda 22 ampliada                                        |
+| **D-103** | El paso 12 comparaba como TEXTO un número de `wc`, que **BSD almohadilla y GNU no**. En macOS fallaba con el KPI-03 cumplido delante: una inserción aceptada, cero duplicados, e incumplimiento informado                                                                                                                                               | **Corregido** · sonda 23                                                 |
+| **D-104** | El diagnóstico del paso 13 filtraba por `×` y `→`. Si el proceso moría antes de una aserción no casaba ninguno, y el paso imprimía la etiqueta y **nada más**                                                                                                                                                                                           | **Corregido**                                                            |
+| **D-105** | D-100 hizo que el control imprimiera el nombre de cada prueba roja; **el filtro del paso 7 lo tiraba**. macOS informó «5 prueba(s) fallaron» y ni una línea más, con los nombres a tres líneas de distancia                                                                                                                                             | **Corregido**                                                            |
+| **D-106** | El paso 5 falló en macOS imprimiendo **cero líneas**: ni código, ni bytes, ni cola                                                                                                                                                                                                                                                                      | **Corregido** · y su instrumentación halló D-108 en la corrida siguiente |
+| **D-107** | El control de la base preguntaba `select version()` y daba por buena una base **vacía**. Cuatro minutos después aparecían cinco rojas de `residente-pg.test.ts` sin relación aparente. En las máquinas de desarrollo era invisible: sus clústeres llevan esquema y semillas puestos de antes                                                            | **Corregido** · prueba negativa en el propio trabajo de macOS            |
+| **D-108** | Los colores de Vitest **parten `Tests` de su número**, y el recuento del paso 5 no casaba. Con colores, la rama que detecta pruebas en rojo tampoco casa: la única defensa que quedaba era el código de salida                                                                                                                                          | **Corregido** · sonda 24                                                 |
+| **D-112** | `turbo.json` no declaraba las variables de las que dependen las pruebas. Turborepo 2.x filtra el entorno, así que `DATABASE_URL_PRUEBAS` no llegaba a vitest y cinco pruebas se saltaban **en silencio** bajo `pnpm test` mientras el paso 7 las ejecutaba. Los dos pasos verdes, discrepando                                                           | **Corregido** · paso 7b, sonda 25                                        |
+| **D-113** | El control de D-112 raspaba las líneas `@ncr/api:test: …` de turbo. En el CI de macOS turbo **no escribe ese prefijo**: agrupa la salida y la deja desnuda. El control falló por su propio formato, no por el defecto que vigila — y `metricas.mjs` existe precisamente para no raspar consola                                                          | **Corregido** · lee el JSON de vitest                                    |
+| **D-114** | El paso 5 decía «5 saltadas» y no decía CUÁLES. Tres corridas del runner se fueron en deducirlo, con el nombre esperando dentro del informe JSON que ese mismo paso acababa de escribir                                                                                                                                                                 | **Corregido** · `--saltadas`                                             |
+| **D-115** | **El `dist/` viejo de la ETAPA 04, con otro nombre.** `.arranque-en-frio.json` lo escribe el paso 12b, está en `.gitignore`, y `arranque-en-frio.e2e.test.ts` se salta entero si no está. El resultado del paso 5 dependía de **si alguien había corrido el verificador antes en esa carpeta**: aquí daba 658 sin saltadas, en un runner limpio 653 y 5 | **Corregido** · el paso 0 lo borra                                       |
 
 ### D-112 · dos veredictos sobre lo mismo, los dos verdes, discrepando
 
@@ -106,6 +109,37 @@ una prueba que no llega a ejecutarse no falla —se descuenta del total y el
 resumen sigue diciendo «passed»—. Con `--con-base` una saltada es ahora un
 FALLO sin matices: la base está ahí, nada debería saltarse. Sin `--con-base` se
 cuentan y se nombran, en lugar de callarlas.
+
+### Las cinco saltadas de macOS: la hipótesis correcta, y la que no lo era
+
+La declaración de `turbo.json` es la causa del defecto que el usuario reprodujo,
+y está demostrada: con la variable declarada la suite da 658, sin ella 653 y 5
+saltadas, y **el hash de la tarea difiere**. Eso está cerrado.
+
+Lo que **no** era D-112 son las cinco saltadas que siguieron apareciendo en el
+CI de macOS. El diagnóstico lo descartó por ejecución —turbo resolvía la
+variable con valor: `configured: ["DATABASE_URL_PRUEBAS=7739001…"]`— y al
+nombrarlas resultaron ser otras:
+
+```
+@ncr/api: 5 saltada(s)
+  ⤷ el superadministrador recién aprovisionado PUEDE entrar …
+     en apps/api/test/arranque-en-frio.e2e.test.ts
+```
+
+Se saltan porque **el paso 5 corre antes que el 12b**, que es quien escribe los
+claims que necesitan. No es una omisión: es una dependencia de orden, y el paso
+12b las ejecuta y exige explícitamente que no se salten. Quedan **declaradas**,
+con el paso que las ejerce escrito al lado; cualquier otra saltada sigue siendo
+un fallo, que es lo que hace útil a la regla.
+
+Y por el camino apareció **D-115**, que es el hallazgo incómodo de esta parte:
+ese fichero de claims está en `.gitignore`, así que **el resultado del paso 5
+dependía de si alguien había corrido el verificador antes en esa carpeta**. Aquí
+existía de una corrida previa y el paso daba «658, sin una sola saltada»; en un
+runner recién creado daba «653 | 5 skipped». El verde local era falso, y lo era
+por el mismo mecanismo que motivó este guion en la ETAPA 04: un artefacto que
+envejece y que nadie declara. El paso 0 lo borra ahora.
 
 ### Lo que esto significa para las cifras de cobertura anteriores
 

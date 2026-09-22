@@ -48,6 +48,29 @@ const argumentos = process.argv.slice(2);
  * informe JSON que el propio paso acababa de escribir. Es D-100 otra vez, en el
  * paso de al lado: el dato está y nadie lo imprime.
  */
+/**
+ * SALTADAS DECLARADAS · las únicas que el paso 5 puede tener, y por qué.
+ *
+ * `arranque-en-frio.e2e.test.ts` comprueba que el superadministrador que el
+ * aprovisionamiento acaba de crear PUEDE entrar. Necesita los claims que el
+ * paso 12b escribe, y el paso 5 corre antes: allí no existen todavía, así que
+ * el fichero entero se salta. No es una omisión, es una dependencia de orden.
+ *
+ * Y NO quedan sin ejercer: el paso 12b las ejecuta con los claims recién
+ * escritos y exige explícitamente que NO se salten. Declararlas aquí es lo que
+ * permite que cualquier OTRA saltada siga siendo un fallo — que es lo que hace
+ * útil a la regla.
+ */
+const SALTADAS_DECLARADAS = new Map([
+  [
+    'apps/api/test/arranque-en-frio.e2e.test.ts',
+    'necesita los claims que escribe el paso 12b, que es quien las ejecuta y exige que no se salten',
+  ],
+]);
+
+const declaradaLa = (fichero) =>
+  [...SALTADAS_DECLARADAS].find(([f]) => fichero.replace(/\\/g, '/').endsWith(f));
+
 const soloSaltadas = argumentos[0] === '--saltadas';
 const [raiz, ruta7] = soloSaltadas ? [argumentos[1], null] : argumentos;
 if (!raiz || (!soloSaltadas && !ruta7)) {
@@ -80,7 +103,7 @@ const delPaso5 = () => {
       for (const s of d.testResults) {
         for (const a of s.assertionResults) {
           if (a.status === 'pending' || a.status === 'todo' || a.status === 'skipped') {
-            saltadas.push(`${a.fullName ?? a.title} · ${s.name ?? '?'}`);
+            saltadas.push({ nombre: a.fullName ?? a.title, fichero: s.name ?? '?' });
           }
         }
       }
@@ -125,14 +148,33 @@ const cinco = delPaso5();
 
 if (soloSaltadas) {
   let total = 0;
+  const indebidas = [];
   for (const [paquete, d] of cinco) {
     if (d.saltadas === 0) continue;
     console.log(`  ${paquete}: ${d.saltadas} saltada(s)`);
-    for (const n of d.nombresSaltadas) console.log(`    ⤷ ${n}`);
+    for (const s of d.nombresSaltadas) {
+      const declarada = declaradaLa(s.fichero);
+      console.log(`    ${declarada ? '⚠' : '✗'} ${s.nombre}`);
+      console.log(`       en ${s.fichero}`);
+      if (declarada) console.log(`       DECLARADA: ${declarada[1]}`);
+      else indebidas.push(`${s.nombre} · ${s.fichero}`);
+    }
     total += d.saltadas;
   }
-  if (total === 0) console.log('  ninguna prueba saltada');
-  process.exit(0);
+  if (total === 0) {
+    console.log('  ninguna prueba saltada');
+    process.exit(0);
+  }
+  if (indebidas.length === 0) {
+    console.log(`  las ${total} están DECLARADAS y se ejercen en otro paso`);
+    process.exit(0);
+  }
+  console.error(
+    `\n  ${indebidas.length} saltada(s) SIN declarar. Una prueba que no se ejecuta no falla:\n` +
+      '  se descuenta del total y el resumen sigue diciendo «passed». O se arregla lo que\n' +
+      '  impide ejecutarla, o se declara aquí con el paso que sí la ejerce.',
+  );
+  process.exit(1);
 }
 
 const siete = delPaso7();
@@ -175,7 +217,8 @@ if (divergen.length > 0) {
     console.error(`      paso 7 (directo) : ${comoTexto(d.b)}`);
     // D-100 aplicado aquí: la divergencia se NOMBRA. Sin esto habría que
     // reproducirla para saber qué prueba se quedó fuera.
-    for (const n of d.a?.nombresSaltadas ?? []) console.error(`      ⤷ saltada: ${n}`);
+    for (const s of d.a?.nombresSaltadas ?? [])
+      console.error(`      ⤷ saltada: ${s.nombre} · ${s.fichero}`);
   }
   console.error(
     '\n  Los dos pasos ejecutan la MISMA suite por caminos distintos. Si discrepan,\n' +

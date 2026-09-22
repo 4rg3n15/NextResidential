@@ -68,7 +68,27 @@ rm -rf packages/*/coverage apps/*/coverage
 # la compilación siguiente falle con «Cannot find module». Pasó al introducir
 # las referencias de proyecto, y este paso es justo el que lo provoca.
 rm -f packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo
-ok "dist, .turbo, coverage y registros de compilación eliminados"
+# ─────────────────────────────────────────────────────────────────────────────
+# D-115 · EL `dist/` VIEJO DE LA ETAPA 04, OTRA VEZ, CON OTRO NOMBRE.
+#
+# `.arranque-en-frio.json` lo escribe el paso 12b y está en `.gitignore`, así
+# que cada árbol tiene el suyo —o no tiene ninguno—. `arranque-en-frio.e2e.test.ts`
+# se salta entero si el fichero NO está, y se ejecuta si está: es decir, **el
+# resultado del paso 5 dependía de si alguien había corrido el verificador antes
+# en esa misma carpeta**.
+#
+# Se vio comparando dos corridas de la misma SHA: aquí, con el fichero de una
+# corrida previa, el paso 5 daba «658, sin una sola saltada»; en un runner
+# recién creado daba «653 | 5 skipped». Mi verde local era falso, y lo era por
+# exactamente el mismo mecanismo que motivó este guion: un artefacto que
+# envejece y que nadie declara.
+#
+# Borrándolo aquí, las dos máquinas parten igual: las cinco se saltan SIEMPRE en
+# el paso 5 —no hay claims todavía— y se ejecutan SIEMPRE en el 12b, que las
+# escribe y que ya exige que no se salten.
+# ─────────────────────────────────────────────────────────────────────────────
+rm -f .arranque-en-frio.json
+ok "dist, .turbo, coverage, registros de compilación y claims de arranque eliminados"
 
 paso "1 · entorno dentro de lo declarado"
 # La verificación depende ahora de Node y no del shell. Eso cierra la
@@ -236,47 +256,37 @@ elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida" && [[ "$CON_BASE" == "1"
   #
   # Hasta aquí este paso solo miraba `Tests N failed`. Una prueba que no llega a
   # ejecutarse no falla: se descuenta del total y el resumen sigue diciendo
-  # «passed». Así es como «653 passed | 5 skipped» pasaba por verde mientras el
-  # paso 7 ejecutaba las 658 — y las cinco saltadas eran precisamente las que
-  # prueban que el SQL encaja con el esquema migrado.
+  # «passed». Así es como «653 passed | 5 skipped» pasaba por verde.
   #
-  # Con `--con-base` esto es un FALLO, sin matices: la base está ahí, así que no
-  # hay ninguna razón legítima para que una prueba se salte. Sin `--con-base` sí
-  # la hay, y entonces se cuentan y se nombran en lugar de callarlas.
+  # Con `--con-base` la única omisión admisible es la DECLARADA, y la
+  # declaración nombra el paso que sí la ejerce —hoy, las del arranque en frío,
+  # que el paso 12b ejecuta con los claims que él mismo escribe—. Cualquier otra
+  # es un fallo, y las dos salen nombradas.
   # ───────────────────────────────────────────────────────────────────────────
-  mal "hay pruebas SALTADAS con --con-base: una omisión no es un verde"
-  grep -E "Tests +[0-9]" <<<"$salida" | grep -E "skipped|todo" | sed 's/^/     /'
-  # CUÁLES, que es lo único que sirve. El informe JSON que esta misma corrida
-  # acaba de escribir las tiene con nombre y fichero (D-114).
-  echo "     las que NO se ejecutaron:"
-  node scripts/lib/recuentos-coherentes.mjs --saltadas "$RAIZ_DEL_REPO" | sed 's/^/     /'
-  # Y el resumen de turbo, porque una tarea SERVIDA DESDE CACHÉ reproduce el
-  # resultado de otra corrida con otro entorno: sin esta línea, distinguir «no
-  # le llegó la variable» de «no se ejecutó» exige otra corrida entera.
-  grep -E "^\s*(Tasks|Cached|Time):" <<<"$salida" | sed 's/^/     turbo: /'
-  # Y LAS TRES PREGUNTAS QUE DECIDEN DÓNDE SE PIERDE LA VARIABLE. Sin ellas
-  # hay que deducirlo, y deducir cuesta una corrida entera del runner por
-  # hipótesis. La primera dice si el guion la tiene; la segunda, si turbo la
-  # resolvió para la tarea; la tercera, si el hijo la recibe de verdad.
-  echo "     el verificador la ve: DATABASE_URL_PRUEBAS=${DATABASE_URL_PRUEBAS:+definida}${DATABASE_URL_PRUEBAS:-NO DEFINIDA}"
-  echo "     lo que turbo resuelve para la tarea:"
-  TURBO_TELEMETRY_DISABLED=1 pnpm exec turbo run test --filter=@ncr/api --dry=json 2>/dev/null |
-    node -e '
-      let e = "";
-      process.stdin.on("data", (d) => (e += d)).on("end", () => {
-        try {
-          const t = JSON.parse(e).tasks?.[0] ?? {};
-          const v = t.environmentVariables ?? {};
-          for (const k of ["specified", "configured", "inferred", "global", "passthrough"]) {
-            console.log(`       ${k}: ${JSON.stringify(v[k] ?? null)}`);
+  if salida_salt=$(node scripts/lib/recuentos-coherentes.mjs --saltadas "$RAIZ_DEL_REPO" 2>&1); then
+    declarado "suite sin rojas · las saltadas están DECLARADAS y se ejercen en otro paso"
+    echo "$salida_salt" | sed 's/^/     /'
+  else
+    mal "hay pruebas SALTADAS sin declarar con --con-base: una omisión no es un verde"
+    echo "$salida_salt" | sed 's/^/     /'
+    grep -E "^\s*(Tasks|Cached|Time):" <<<"$salida" | sed 's/^/     turbo: /'
+    echo "     el verificador la ve: DATABASE_URL_PRUEBAS=${DATABASE_URL_PRUEBAS:+definida}${DATABASE_URL_PRUEBAS:-NO DEFINIDA}"
+    echo "     lo que turbo resuelve para la tarea:"
+    TURBO_TELEMETRY_DISABLED=1 pnpm exec turbo run test --filter=@ncr/api --dry=json 2>/dev/null |
+      node -e '
+        let e = "";
+        process.stdin.on("data", (d) => (e += d)).on("end", () => {
+          try {
+            const t = JSON.parse(e).tasks?.[0] ?? {};
+            const v = t.environmentVariables ?? {};
+            for (const k of ["specified", "configured", "inferred", "global", "passthrough"]) {
+              console.log(`       ${k}: ${JSON.stringify(v[k] ?? null)}`);
+            }
+          } catch (x) {
+            console.log(`       (no se pudo leer el plan de turbo: ${x.message})`);
           }
-        } catch (x) {
-          console.log(`       (no se pudo leer el plan de turbo: ${x.message})`);
-        }
-      });'
-  echo "     La base está disponible: nada debería saltarse. Si turbo no le pasa una"
-  echo "     variable a vitest, las pruebas que dependen de ella se saltan en silencio"
-  echo "     (D-112). Compruebe \`env\` en las tareas de turbo.json."
+        });'
+  fi
 elif ! grep -qE "Tests +[0-9]" <<<"$salida"; then
   mal "la suite no informó ni una prueba: una salida sin recuento no es un verde"
   # D-106 · esta rama imprimía CERO líneas. Saltó en la primera corrida del

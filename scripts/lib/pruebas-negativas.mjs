@@ -1655,6 +1655,39 @@ try {
     /la consulta del titular encaja con el esquema 5/.test(nombradas.salida)
       ? ok('`--saltadas` nombra TODAS las que no se ejecutaron, no solo la primera')
       : mal('no nombra las saltadas: «5 saltadas» sin decir cuáles no sirve de nada');
+    nombradas.codigo !== 0
+      ? ok('y una saltada SIN declarar hace fallar el control')
+      : mal('una saltada sin declarar pasa por buena: la regla no sirve de nada');
+
+    /**
+     * Y el otro lado, que es el que hace útil a la regla: una saltada
+     * DECLARADA —las del arranque en frío, que el paso 12b ejecuta con los
+     * claims que él mismo escribe— no puede romper el paso 5. Sin esta mitad,
+     * la única salida sería relajar la regla para todas.
+     */
+    writeFileSync(
+      informe,
+      JSON.stringify({
+        ...informeCon(653, 5),
+        testResults: [
+          {
+            name: '/x/apps/api/test/arranque-en-frio.e2e.test.ts',
+            assertionResults: Array.from({ length: 5 }, (_, i) => ({
+              status: 'pending',
+              fullName: `el superadministrador recien aprovisionado PUEDE entrar ${i + 1}`,
+            })),
+          },
+        ],
+      }),
+    );
+    const declaradas = correr(
+      'node',
+      ['scripts/lib/recuentos-coherentes.mjs', '--saltadas', arbol],
+      { cwd: raiz },
+    );
+    declaradas.codigo === 0 && /DECLARADA/.test(declaradas.salida)
+      ? ok('una saltada DECLARADA no rompe, y dice por qué lo está')
+      : mal('una saltada declarada rompe igual: obligaría a relajar la regla entera');
 
     writeFileSync(informe, JSON.stringify(informeCon(658, 0)));
     /ninguna prueba saltada/.test(
