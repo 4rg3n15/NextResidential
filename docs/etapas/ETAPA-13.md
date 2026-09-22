@@ -595,7 +595,25 @@ prueba que pasaba en 1000 ms sigue pasando igual; y una rota de verdad sigue
 fallando, solo que cinco segundos más tarde. Lo único que deja de ocurrir es
 fallar por ir con prisa.
 
-**Cerrada.** Las 350 pruebas de `@ncr/web` en verde.
+**Y una corroboración que no se puede fabricar.** El mismo commit `43ade01`
+produjo **dos corridas de CI con resultado opuesto**:
+
+| Corrida sobre `43ade01` | controles (ubuntu) | controles (macOS) | `--con-base` (macOS)  |
+| ----------------------- | ------------------ | ----------------- | --------------------- |
+| `pull_request`          | ✓                  | ✓                 | ✓                     |
+| `push`                  | ✓                  | ✓                 | ✗ — la roja de arriba |
+
+Mismo árbol, mismo runner, misma orden: verde en una y roja en la otra. Eso no
+lo produce un defecto de lógica; lo produce una carrera contra el reloj. Se
+anota porque es la forma más limpia de demostrar una intermitente que existe, y
+porque **obliga a decir algo incómodo**: si se hubiera elegido la corrida que
+pasó para declarar «CI verde en los tres trabajos», la afirmación habría sido
+literalmente cierta y materialmente falsa. El veredicto que vale es el del
+commit que arregla la causa.
+
+**Cerrada.** Las 350 pruebas de `@ncr/web` en verde, y **CI verde en los tres
+trabajos sobre `92bc330`, por los dos caminos** —`push` y `pull_request`—, que
+es el commit que sube el tiempo de espera.
 
 ### Deuda que esta etapa NO cierra, y por qué
 
