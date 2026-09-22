@@ -1200,7 +1200,7 @@ qué lo acota y qué lo reabriría.
 > **Se reabre si** se descubre que ese valor se reutilizó en alguna cuenta real,
 > o si el repositorio pasa a ser público.
 >
-> Firma: ****\*\*****\_\_****\*\***** Fecha: \***\*\_\_\_\_\*\***
+> Firma: \***\*\*\*\*\***\_\_\***\*\*\*\*\*** Fecha: \***\*\_\_\_\_\*\***
 
 ### AR-02 · Las 12 vulnerabilidades moderadas y bajas que quedan en producción (H-13-26)
 
@@ -1219,7 +1219,7 @@ qué lo acota y qué lo reabriría.
 >
 > **Se reabre si** alguna sube a alta o crítica, o si aparece versión corregida.
 >
-> Firma: ****\*\*****\_\_****\*\***** Fecha: \***\*\_\_\_\_\*\***
+> Firma: \***\*\*\*\*\***\_\_\***\*\*\*\*\*** Fecha: \***\*\_\_\_\_\*\***
 
 ### AR-03 · D-09 y D-12 demostrados en un clúster que REPRODUCE Supabase, no en Supabase
 
@@ -1241,7 +1241,7 @@ qué lo acota y qué lo reabriría.
 > **Se reabre** en el momento en que haya credenciales autorizadas, o en la
 > ETAPA 15 al conectar el entorno definitivo.
 >
-> Firma: ****\*\*****\_\_****\*\***** Fecha: \***\*\_\_\_\_\*\***
+> Firma: \***\*\*\*\*\***\_\_\***\*\*\*\*\*** Fecha: \***\*\_\_\_\_\*\***
 
 ### AR-04 · El ciclo de recuperación de contraseña, NO VERIFICABLE de punta a punta (BE-01)
 
@@ -1260,7 +1260,7 @@ qué lo acota y qué lo reabriría.
 >
 > **Se reabre** en cuanto haya permisos en el panel.
 >
-> Firma: ****\*\*****\_\_****\*\***** Fecha: \***\*\_\_\_\_\*\***
+> Firma: \***\*\*\*\*\***\_\_\***\*\*\*\*\*** Fecha: \***\*\_\_\_\_\*\***
 
 ---
 

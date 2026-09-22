@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-22 · **ETAPA 13 EN CURSO** · la corrección de macOS quedó **fusionada en develop** (PR #22, `153df52`): desde ella el CI ejecuta el verificador entero con base en macOS, cosa que nunca se había hecho — hasta entonces los pasos 12, 12b, 12c y 13 no se ejercían fuera de la máquina del usuario
+**Última actualización:** 2026-09-22 · **ETAPA 13 CERRADA** · la auditoría de ciberseguridad deja **26 hallazgos** —ninguno crítico, tres altos, los tres cerrados— y uno solo abierto, de severidad baja, que es una **aceptación de riesgo pendiente de su firma**. El que nadie esperaba: `src/seguridad.ts` —CORS, CSP, HSTS y el `ValidationPipe` real— tenía **0 % de cobertura con 656 pruebas en verde**
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,16 +18,16 @@
 
 ## Resumen
 
-|                                |                                                                                                                                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Etapas cerradas**            | **13 de 17** (ETAPAS 00 a 12) · la 12 cerrada el 2026-09-21 con CI verde en **las dos** plataformas                                                                                        |
-| **Etapa siguiente habilitada** | **ETAPA 13 — Auditoría de ciberseguridad y endurecimiento** · recibe como INSUMO el hallazgo de cobertura de D-112 (`aplicacion` se medía sobre 5 archivos de 39; global sobre 156 de 306) |
-| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                            |
-| **Defectos abiertos**          | **D-78** (colores a mano) y **D-101** (roja intermitente de `@ncr/api` en Linux; no reproducida en 11 intentos)                                                                            |
-| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                                                                                                     |
-| **Decisiones pendientes**      | 8 abiertas — nueva P-13 (copropiedad del operador de central)                                                                                                                              |
-| **Supuestos vigentes**         | 15 — nuevos S-23 (huso del horario de zonas, para la 16) y S-24 (la ruta que sirve la instantánea de reglas)                                                                               |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                      |
+|                                |                                                                                                                                                                                                                                          |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Etapas cerradas**            | **14 de 17** (ETAPAS 00 a 13) · la 13 cerrada el 2026-09-22                                                                                                                                                                              |
+| **Etapa siguiente habilitada** | **ETAPA 14 — Observabilidad, CI/CD, PWA instalable y escritorio** · recibe como insumo D-101 (**reproducida** en la 13 y sin diagnosticar), D-34 y D-78                                                                                  |
+| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                                                                          |
+| **Defectos abiertos**          | **D-78** (colores a mano), **D-34** (frontera de barril, reasignada a la 14) y **D-101** (roja intermitente de `@ncr/api`: **REPRODUCIDA** en la ETAPA 13, sin diagnosticar) · más **H-13-25**, abierto a propósito a la espera de firma |
+| **Contradicciones abiertas**   | Ninguna (14 registradas, 14 resueltas)                                                                                                                                                                                                   |
+| **Decisiones pendientes**      | 9 abiertas — nueva P-14 (`secret scanning` y `push protection` de GitHub) · más **4 aceptaciones de riesgo redactadas y sin firmar** (AR-01 a AR-04)                                                                                     |
+| **Supuestos vigentes**         | 17 — nuevos S-25 (el rol de conexión de Supabase es dueño y NO superusuario) y S-26 (ningún DTO de consulta necesita un campo de tipo arreglo)                                                                                           |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                                                                    |
 
 ---
 
@@ -213,8 +213,8 @@ corrida suya lo nombrará.
 | 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09 ✅                            | **CERRADA**                      | [ETAPA-10](etapas/ETAPA-10.md) |
 | 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                            | **CERRADA** — 11-A, 11-B y 11-C  | [ETAPA-11](etapas/ETAPA-11.md) |
 | 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                            | **CERRADA**                      | [ETAPA-12](etapas/ETAPA-12.md) |
-| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12 ✅                            | **PENDIENTE** — habilitada       | —                              |
-| 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13                               | PENDIENTE                        | —                              |
+| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12 ✅                            | **CERRADA**                      | [ETAPA-13](etapas/ETAPA-13.md) |
+| 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13 ✅                            | **PENDIENTE** — habilitada       | —                              |
 | 15     | Integración real con hardware Hikvision                       | `etapa-15-integracion-hikvision`       | 14                               | **PENDIENTE — con precondición** | —                              |
 | 16     | Documentación técnica final y README                          | `etapa-16-documentacion-final`         | 14 (ejecutable), 15 (definitiva) | PENDIENTE                        | —                              |
 
@@ -631,6 +631,116 @@ lecturas se puede borrar por API (`isSupportLPAuditDataDelete` es verdadero). La
 trazabilidad vive en `eventos`, append-only por permisos y por disparador
 (ADR-05). El equipo pasó además de control por cámara a **control por
 plataforma**: la decisión la toma Next Control.
+
+---
+
+## ETAPA 13 — Auditoría de ciberseguridad y endurecimiento · **CERRADA** · 2026-09-22
+
+**Rama:** `etapa-13-auditoria-seguridad`, sacada de `develop` (`153df52`) ·
+**Informe de etapa:** [`etapas/ETAPA-13.md`](etapas/ETAPA-13.md) ·
+**Informe de auditoría:** [`seguridad/AUDITORIA.md`](seguridad/AUDITORIA.md)
+
+**No añade producto.** Audita lo construido en las doce etapas anteriores y
+endurece lo que la auditoría encontró flojo. Aquí un hallazgo no es un fracaso:
+es el entregable.
+
+### 26 hallazgos
+
+| Severidad       | Total | Cerrados | Abiertos |
+| --------------- | ----: | -------: | -------: |
+| **Crítica**     |     0 |        0 |    **0** |
+| **Alta**        |     3 |        3 |    **0** |
+| **Media**       |    14 |       14 |    **0** |
+| **Baja**        |     6 |        5 |    **1** |
+| **Informativa** |     3 |        3 |    **0** |
+
+**DoD cumplido:** cero críticos o altos ABIERTOS. El único abierto —H-13-25, la
+contraseña inerte que sobrevive en el historial de Git— **lo está a propósito**:
+es una decisión del cliente, con su aceptación de riesgo redactada y sin firmar.
+
+**Los tres altos:**
+
+| Id          | Qué                                                                                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **H-13-05** | La lista blanca de DTOs rechazaba `colado` y **aceptaba** `__proto__`, `constructor`, `toString`, `valueOf` y `hasOwnProperty`                    |
+| **H-13-09** | El saneamiento **mutilaba en silencio** toda carga base64 —XLSX, CSV, vector biométrico— con la firma `PK\x03\x04` intacta: 2xx sobre un ZIP roto |
+| **H-13-26** | El árbol de dependencias tenía **4 vulnerabilidades críticas y 23 altas en producción**. Hoy, cero y cero                                         |
+
+### El hallazgo que nadie esperaba · H-13-11
+
+`src/seguridad.ts` —CORS, CSP, HSTS y el `ValidationPipe` real— tenía **0 % de
+cobertura con 656 pruebas en verde**. El fixture de la suite reconstruía su
+propia tubería y **nunca llamaba a `aplicarSeguridad`**. Cambiar `origin:` por
+`true`, o borrar `forbidNonWhitelisted`, no ponía nada en rojo. Y los dos
+literales ya habían divergido en `enableImplicitConversion`.
+
+**Durante doce etapas, toda afirmación de los informes sobre §2.7.2, §2.7.3 y
+§2.7.7 se apoyó en una tubería que el despliegue no usa.** Hoy `crearApp` monta
+la real: cobertura de 0 % a 100 %, sin que ninguna prueba se pusiera en rojo.
+
+### Qué deja construido, además de los hallazgos
+
+| Entregable                               | Qué es                                                                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `docs/seguridad/AUDITORIA.md`            | 26 hallazgos con evidencia reproducible, OWASP Top 10, ASVS nivel 2 y las 4 aceptaciones de riesgo             |
+| 7 suites de seguridad nuevas             | CORS y cabeceras, escalamiento de 6 roles, saneamiento, límite bajo carga, fugas por registro, XSS, CSV        |
+| 3 modos nuevos en el escaneo de secretos | `--indice` (lo que se va a confirmar), `--historial` (2 158 blobs en 0,75 s) y los prohibidos por `.gitignore` |
+| `scripts/lib/longitud-por-campo.mjs`     | «Longitud máxima POR CAMPO» de §2.7.4 donde de verdad puede estar: el DTO. 44 campos, todos con cota           |
+| Migración `0031`                         | La capa de ADR-005 que la aserción **no verificaba**: RLS activa Y FORZADA en las append-only                  |
+| `60_matriz_rls_completa.sql`             | La matriz derivada del catálogo: **42 tablas**, no las 26 de un `ARRAY[...]` escrito a mano                    |
+
+### Los insumos, uno a uno
+
+| Insumo                   | Resultado                                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| **D-112**                | **Cerrado.** Esta etapa mide `aplicacion` sobre 39 archivos y global sobre 308, y lo afirma por su propia ejecución        |
+| **D-08**                 | **Reformulado y cerrado** (H-13-03): no es un acto de DDL, son **cuatro**, y el despliegue detecta los cuatro              |
+| **D-09**                 | **Cerrado en el modo que reproduce la condición** (dueño NO superusuario). Contra el proyecto real: AR-03                  |
+| **D-12**                 | **VERIFICADO en el clúster local**, como superusuario y como dueño no superusuario. Contra el proyecto real: AR-03         |
+| **D-32**                 | **Cerrado por construcción**, no por un bloqueo: la fila referenciada no puede desaparecer porque `eventos` es append-only |
+| **D-41**                 | **Cerrado** (H-13-02): HKDF con la copropiedad como sal, y no una KDF con factor de trabajo — ASVS V6                      |
+| **7 controles en deuda** | **De 7 a 2.** Escribir una de las cinco destapó H-13-01: un lcov vacío se leía como «global 100 %»                         |
+| **D-101**                | **REPRODUCIDA.** Ver abajo                                                                                                 |
+| **BE-01**                | **Auditado como NO VERIFICABLE de punta a punta**, con esas palabras. AR-04 redactada                                      |
+
+### D-101 · reprodujo, y el mecanismo que debía nombrarla no la nombró
+
+La instrucción era explícita: _no la cierres por ausencia de síntoma_. No hizo
+falta. En el paso 14 del verificador:
+
+```
+corrida 1/3: codigo 0 · @ncr/api:test: Tests 728 passed (728)
+corrida 2/3: codigo 1 · @ncr/api:test: Tests 1 failed | 727 passed (728)
+corrida 3/3: codigo 0 · @ncr/api:test: Tests 728 passed (728)
+```
+
+**Y no la nombró.** `estabilidad.mjs` recogía las líneas que empiezan por `× `,
+que es como Vitest lista las fallidas con su reportero por omisión — pero este
+paso ejecuta el comando con `CI=1`, y con `CI` puesto **Vitest cambia de
+reportero** y emite `FAIL <fichero> > <suite> > <prueba>` sin una sola línea con
+`×`. El nombre estaba en la salida y el filtro no lo miraba. Es la mitad que
+D-100 dejó sin cerrar, y es la misma familia dentro de la corrección de la
+familia. Corregido en esta etapa.
+
+**Sigue ABIERTA**, y se reasigna a la ETAPA 14 con lo que se sabe: aparece sólo
+bajo la suite COMPLETA en paralelo —doce corridas de `@ncr/api` a solas dieron
+verde—, lo que apunta a contención de recursos y no a la lógica de una prueba.
+
+### Aceptaciones de riesgo **pendientes de firma**
+
+| Id        | Qué se acepta                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------------- |
+| **AR-01** | La contraseña inerte de `e2e/doble-gotrue.mjs` en el historial, sin reescribirlo (H-13-25)          |
+| **AR-02** | Las 12 vulnerabilidades moderadas y bajas que quedan en producción, sin versión corregida publicada |
+| **AR-03** | D-09 y D-12, demostrados en un clúster que REPRODUCE Supabase y no en Supabase                      |
+| **AR-04** | El ciclo de recuperación de contraseña, NO VERIFICABLE de punta a punta (BE-01)                     |
+
+### Reasignaciones
+
+- **D-34** (un módulo alcanza el interior de otro sin pasar por su barril) estaba
+  asignada a la 13 y **no se hizo**: es una frontera de arquitectura de §2.2, no
+  una medida de §2.7, y esta etapa no amplía su alcance. **Pasa a la 14**, con
+  esa razón escrita en vez de arrastrarse en silencio.
 
 ---
 
@@ -1337,62 +1447,67 @@ Sin trabajo iniciado. Cada etapa se habilita cuando la anterior queda cerrada.
 
 Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contradicciones-y-supuestos.md) §3.
 
-| ID   | Decisión                                                    | Bloquea a partir de              | Estado                                                                          |
-| ---- | ----------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------- |
-| P-01 | Firma de documentos de cesión, confidencialidad y seguridad | _(condición contractual previa)_ | Abierta                                                                         |
-| P-02 | Umbral de confianza de lectura de placa                     | ETAPA 15                         | Abierta — supuesto vigente: 0,85                                                |
-| P-03 | Plazo de respuesta al consentimiento                        | ETAPA 08                         | Abierta — supuesto vigente: 24 h                                                |
-| P-04 | Política de reinicio del contador de aforo                  | ETAPA 07                         | **RESUELTA** (ETAPA 07) — tres políticas por zona; `cierre_horario` por defecto |
-| P-05 | Margen de vigencia del caché de reglas                      | ETAPA 12                         | Abierta — supuesto vigente: 24 h                                                |
-| P-06 | Umbral de latido de dispositivo                             | ETAPA 06                         | **RESUELTA** (ETAPA 06) — 60 s / 1 tolerado / 300 s, por copropiedad            |
-| P-07 | Definición de «acceso dudoso»                               | ETAPA 06                         | **RESUELTA** (ETAPA 06) — ante la duda, escalar a un humano                     |
-| P-08 | Plataforma de despliegue de la API                          | ETAPA 14                         | Abierta                                                                         |
-| P-09 | ¿Compuerta de aprobación administrativa?                    | ETAPA 05                         | Abierta — no se construye                                                       |
-| P-10 | ¿Reservas de zonas sin cobro?                               | ETAPA 07                         | Abierta — no se construyen                                                      |
-| P-11 | «Nivel de acceso» por residente                             | ETAPA 04                         | Abierta — valor por defecto restrictivo                                         |
+| ID    | Decisión                                                             | Bloquea a partir de              | Estado                                                                                                                                                                                                   |
+| ----- | -------------------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P-01  | Firma de documentos de cesión, confidencialidad y seguridad          | _(condición contractual previa)_ | Abierta                                                                                                                                                                                                  |
+| P-02  | Umbral de confianza de lectura de placa                              | ETAPA 15                         | Abierta — supuesto vigente: 0,85                                                                                                                                                                         |
+| P-03  | Plazo de respuesta al consentimiento                                 | ETAPA 08                         | Abierta — supuesto vigente: 24 h                                                                                                                                                                         |
+| P-04  | Política de reinicio del contador de aforo                           | ETAPA 07                         | **RESUELTA** (ETAPA 07) — tres políticas por zona; `cierre_horario` por defecto                                                                                                                          |
+| P-05  | Margen de vigencia del caché de reglas                               | ETAPA 12                         | Abierta — supuesto vigente: 24 h                                                                                                                                                                         |
+| P-06  | Umbral de latido de dispositivo                                      | ETAPA 06                         | **RESUELTA** (ETAPA 06) — 60 s / 1 tolerado / 300 s, por copropiedad                                                                                                                                     |
+| P-07  | Definición de «acceso dudoso»                                        | ETAPA 06                         | **RESUELTA** (ETAPA 06) — ante la duda, escalar a un humano                                                                                                                                              |
+| P-08  | Plataforma de despliegue de la API                                   | ETAPA 14                         | Abierta                                                                                                                                                                                                  |
+| P-09  | ¿Compuerta de aprobación administrativa?                             | ETAPA 05                         | Abierta — no se construye                                                                                                                                                                                |
+| P-10  | ¿Reservas de zonas sin cobro?                                        | ETAPA 07                         | Abierta — no se construyen                                                                                                                                                                               |
+| P-11  | «Nivel de acceso» por residente                                      | ETAPA 04                         | Abierta — valor por defecto restrictivo                                                                                                                                                                  |
+| P-14  | `secret scanning` y `push protection` de GitHub                      | _(ajuste del servidor)_          | **Abierta (ETAPA 13)** — con ellos activos, H-13-17 tendría además una barrera antes de que el objeto llegue al remoto. Desde el árbol no se ve; se comprueba en _Settings → Code security and analysis_ |
+| AR-01 | Aceptar la contraseña inerte del historial sin reescribirlo          | _(decisión del cliente)_         | **Redactada, sin firmar** (ETAPA 13) — `seguridad/AUDITORIA.md` §7                                                                                                                                       |
+| AR-02 | Aceptar las 12 vulnerabilidades moderadas y bajas restantes          | _(decisión del cliente)_         | **Redactada, sin firmar** (ETAPA 13) — sin versión corregida publicada                                                                                                                                   |
+| AR-03 | Aceptar D-09 y D-12 demostrados en el clúster que reproduce Supabase | ETAPA 15                         | **Redactada, sin firmar** (ETAPA 13) — se cierra con credenciales del proyecto real                                                                                                                      |
+| AR-04 | Aceptar el ciclo de recuperación como NO VERIFICABLE                 | _(bloqueo de entorno)_           | **Redactada, sin firmar** (ETAPA 13) — se reabre en cuanto haya permisos en el panel                                                                                                                     |
 
 ---
 
 ## Deuda técnica acumulada
 
-| ID   | Deuda                                                                                                                                                                                                                                             | Origen                  | Se salda en                                                                                                                            |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| D-01 | `CLAUDE.md` §2.2 declara 6 agregados raíz donde el diagrama declara 9                                                                                                                                                                             | C-02                    | Corrección del contrato, a decisión del usuario                                                                                        |
-| D-02 | Dos pantallas no existen en los mockups: captura de rostro y consentimiento del visitante                                                                                                                                                         | M-02, M-03              | ETAPA 08 (diseño) · 11 (implementación)                                                                                                |
-| D-03 | Los 5 estados obligatorios (vacío, cargando, error, sin permiso, offline) no están diseñados en ninguna de las 18 pantallas                                                                                                                       | `03-mockups.md` §4      | ETAPAS 09, 10, 11                                                                                                                      |
-| D-04 | HU-03 (carga de padrón por archivo) sin punto de entrada en la interfaz                                                                                                                                                                           | M-04                    | ETAPA 09                                                                                                                               |
-| D-05 | El filtro de eventos del mockup no cubre HU-32 (falta fecha y vivienda; solo XLS)                                                                                                                                                                 | M-08                    | ETAPA 09                                                                                                                               |
-| D-06 | La consola operativa del mockup fusiona portería y guardia virtual y omite 4 exigencias                                                                                                                                                           | C-12                    | ETAPA 10                                                                                                                               |
-| D-07 | 9 indicadores solo verificables con hardware; hasta entonces se reportan como «pendiente de hardware»                                                                                                                                             | ADR-003                 | ETAPA 15                                                                                                                               |
-| D-08 | El dueño de las tablas (`postgres`) conserva `ALTER TABLE … DISABLE TRIGGER` sobre las append-only. Cerrarlo exigiría que el dueño no fuera `postgres`, lo que rompería `supabase db push`                                                        | ADR-005 Enmienda 1      | Mitigado por la aserción de `0017`; se reevalúa en la ETAPA 13                                                                         |
-| D-09 | La base local corre con un dueño **superusuario** y Supabase no. Un `REVOKE` al dueño no se puede demostrar por ejecución en el contenedor, solo leyendo el ACL                                                                                   | Hallazgo del 2026-09-06 | `verificar.sh` lo declara en cada ejecución; verificación real contra el proyecto antes de cerrar cada etapa                           |
-| D-10 | Las aserciones de las migraciones ya aplicadas (`0015`, `0016`) no se reejecutan: `supabase db push` solo aplica migraciones nuevas. Una corrección de aserción solo protege despliegues limpios                                                  | Hallazgo del 2026-09-06 | Toda corrección de garantía va en una migración **nueva**, nunca editando una aplicada                                                 |
-| D-11 | `tg_usuario_tenant` evalúa una invariante (D-02) consultando `roles_usuario` **bajo RLS**: su veredicto depende de la visibilidad del llamante. Es `DEFERRABLE INITIALLY DEFERRED`, así que corre en el `COMMIT` con el contexto que quede activo | Arnés `--modo-supabase` | ETAPA 03, al definir el contexto de sesión de la API. Mitigado en el seed restaurando el contexto antes del `COMMIT` ([SUPUESTO] S-11) |
-| D-12 | Que `postgres` pueda `GRANT authenticated TO app_api` es un supuesto sin verificar contra el proyecto real ([SUPUESTO] S-12). La documentación de Supabase concede en la dirección contraria                                                      | Enmienda 2 del ADR-005  | Sonda de `CONEXION_SUPABASE.md` §12.1, antes de crear el rol                                                                           |
+| ID   | Deuda                                                                                                                                                                                                                                             | Origen                  | Se salda en                                                                                                                                                   |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-01 | `CLAUDE.md` §2.2 declara 6 agregados raíz donde el diagrama declara 9                                                                                                                                                                             | C-02                    | Corrección del contrato, a decisión del usuario                                                                                                               |
+| D-02 | Dos pantallas no existen en los mockups: captura de rostro y consentimiento del visitante                                                                                                                                                         | M-02, M-03              | ETAPA 08 (diseño) · 11 (implementación)                                                                                                                       |
+| D-03 | Los 5 estados obligatorios (vacío, cargando, error, sin permiso, offline) no están diseñados en ninguna de las 18 pantallas                                                                                                                       | `03-mockups.md` §4      | ETAPAS 09, 10, 11                                                                                                                                             |
+| D-04 | HU-03 (carga de padrón por archivo) sin punto de entrada en la interfaz                                                                                                                                                                           | M-04                    | ETAPA 09                                                                                                                                                      |
+| D-05 | El filtro de eventos del mockup no cubre HU-32 (falta fecha y vivienda; solo XLS)                                                                                                                                                                 | M-08                    | ETAPA 09                                                                                                                                                      |
+| D-06 | La consola operativa del mockup fusiona portería y guardia virtual y omite 4 exigencias                                                                                                                                                           | C-12                    | ETAPA 10                                                                                                                                                      |
+| D-07 | 9 indicadores solo verificables con hardware; hasta entonces se reportan como «pendiente de hardware»                                                                                                                                             | ADR-003                 | ETAPA 15                                                                                                                                                      |
+| D-08 | El dueño de las tablas (`postgres`) conserva `ALTER TABLE … DISABLE TRIGGER` sobre las append-only. Cerrarlo exigiría que el dueño no fuera `postgres`, lo que rompería `supabase db push`                                                        | ADR-005 Enmienda 1      | **CERRADA en la ETAPA 13** (H-13-03): no es un acto de DDL, son **cuatro**, y el despliegue detecta los cuatro. La `0031` cubre la capa que faltaba           |
+| D-09 | La base local corre con un dueño **superusuario** y Supabase no. Un `REVOKE` al dueño no se puede demostrar por ejecución en el contenedor, solo leyendo el ACL                                                                                   | Hallazgo del 2026-09-06 | **CERRADA en la ETAPA 13** por ejecución en `--modo-supabase`, con el dueño `sb_postgres_sim` NO superusuario. Contra el proyecto real: **AR-03**, sin firmar |
+| D-10 | Las aserciones de las migraciones ya aplicadas (`0015`, `0016`) no se reejecutan: `supabase db push` solo aplica migraciones nuevas. Una corrección de aserción solo protege despliegues limpios                                                  | Hallazgo del 2026-09-06 | Toda corrección de garantía va en una migración **nueva**, nunca editando una aplicada                                                                        |
+| D-11 | `tg_usuario_tenant` evalúa una invariante (D-02) consultando `roles_usuario` **bajo RLS**: su veredicto depende de la visibilidad del llamante. Es `DEFERRABLE INITIALLY DEFERRED`, así que corre en el `COMMIT` con el contexto que quede activo | Arnés `--modo-supabase` | ETAPA 03, al definir el contexto de sesión de la API. Mitigado en el seed restaurando el contexto antes del `COMMIT` ([SUPUESTO] S-11)                        |
+| D-12 | Que `postgres` pueda `GRANT authenticated TO app_api` es un supuesto sin verificar contra el proyecto real ([SUPUESTO] S-12). La documentación de Supabase concede en la dirección contraria                                                      | Enmienda 2 del ADR-005  | Sonda de `CONEXION_SUPABASE.md` §12.1, antes de crear el rol                                                                                                  |
 
 ---
 
 ## Deuda de la ETAPA 08
 
-| ID   | Deuda                                                                                                         | Se salda en                                                 |
-| ---- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| D-34 | Importaciones que entran en un módulo por dentro y no por su barril                                           | **CERRADA** en la ETAPA 08, con control y prueba negativa   |
-| D-39 | Repositorios de biometría y almacén de sobres cifrados, en memoria                                            | Misma raíz que D-25, D-35 y D-17. La frontera es definitiva |
-| D-40 | `BarrerPlantillasVencidas` sin planificador: hoy se invoca por su ruta HTTP                                   | ETAPA 14, con pg-boss                                       |
-| D-41 | La derivación de la llave es `sha256` del secreto; procede una KDF con sal por copropiedad                    | ETAPA 13, con el procedimiento de rotación                  |
-| D-42 | El sistema no distingue a un menor de edad, cuyo dato biométrico exige consentimiento del representante legal | Decisión de Grupo Control antes de producción               |
-| D-43 | `LatidoDto` cruza de `eventos` a `autorizaciones`: el controlador de ingesta vive en el módulo equivocado     | ETAPA 15                                                    |
+| ID   | Deuda                                                                                                         | Se salda en                                                            |
+| ---- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| D-34 | Importaciones que entran en un módulo por dentro y no por su barril                                           | **CERRADA** en la ETAPA 08, con control y prueba negativa              |
+| D-39 | Repositorios de biometría y almacén de sobres cifrados, en memoria                                            | Misma raíz que D-25, D-35 y D-17. La frontera es definitiva            |
+| D-40 | `BarrerPlantillasVencidas` sin planificador: hoy se invoca por su ruta HTTP                                   | ETAPA 14, con pg-boss                                                  |
+| D-41 | La derivación de la llave es `sha256` del secreto; procede una KDF con sal por copropiedad                    | **CERRADA en la ETAPA 13** (H-13-02): HKDF con la copropiedad como sal |
+| D-42 | El sistema no distingue a un menor de edad, cuyo dato biométrico exige consentimiento del representante legal | Decisión de Grupo Control antes de producción                          |
+| D-43 | `LatidoDto` cruza de `eventos` a `autorizaciones`: el controlador de ingesta vive en el módulo equivocado     | ETAPA 15                                                               |
 
 ## Deuda de la ETAPA 07
 
-| ID   | Deuda                                                                                                                                                                                      | Se salda en                                                                                                                            |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| D-34 | El control de fronteras no exige que un módulo importe a otro **por su barril**: `multiempresa` y `salud` alcanzan el interior de `autenticacion` con rutas profundas, y nada se pone rojo | ETAPA 13. La violación de esta etapa (`zonas` → interior de `autorizaciones`) ya está corregida a mano; falta el control que la impida |
-| D-35 | `RepositorioZonasPg` existe y se prueba contra base real, pero lo cableado en runtime es el doble en memoria                                                                               | Misma raíz que D-25: sin contraseña de PostgreSQL (D-17). La frontera es definitiva; cambia la fábrica y nada más                      |
-| D-36 | El reinicio por `cierre_horario` se **proyecta al leer** y se persiste al ocupar: una zona que nadie toca en un mes conserva su fila con el conteo antiguo hasta el siguiente ingreso      | ETAPA 14, con pg-boss: un trabajo programado que lo aplique sin depender de que alguien entre                                          |
-| D-37 | `LiberarAforo` no exige identificar a quién sale: el contador baja pero no consta qué plaza se liberó                                                                                      | ETAPA 10, cuando la portería registre la salida contra el evento de entrada                                                            |
-| D-38 | El paso 14 ejecuta la suite tres veces: el cierre de etapa pasa de ~40 s de pruebas a ~2 min                                                                                               | Precio aceptado. ETAPA 14: en CI puede repartirse entre trabajos en paralelo                                                           |
-| P-10 | «¿Reservas de zonas sin cobro?» sigue abierta: esta etapa construye **aforo y horario**, no reservas, aunque el mockup muestre «Reservas del día»                                          | Decisión del usuario. Fuera de alcance mientras no se resuelva                                                                         |
+| ID   | Deuda                                                                                                                                                                                      | Se salda en                                                                                                                                                                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-34 | El control de fronteras no exige que un módulo importe a otro **por su barril**: `multiempresa` y `salud` alcanzan el interior de `autenticacion` con rutas profundas, y nada se pone rojo | **REASIGNADA a la ETAPA 14** el 2026-09-22: es una frontera de arquitectura (§2.2), no una medida de §2.7, y la 13 no amplía su alcance. La violación ya está corregida a mano; falta el control que la impida |
+| D-35 | `RepositorioZonasPg` existe y se prueba contra base real, pero lo cableado en runtime es el doble en memoria                                                                               | Misma raíz que D-25: sin contraseña de PostgreSQL (D-17). La frontera es definitiva; cambia la fábrica y nada más                                                                                              |
+| D-36 | El reinicio por `cierre_horario` se **proyecta al leer** y se persiste al ocupar: una zona que nadie toca en un mes conserva su fila con el conteo antiguo hasta el siguiente ingreso      | ETAPA 14, con pg-boss: un trabajo programado que lo aplique sin depender de que alguien entre                                                                                                                  |
+| D-37 | `LiberarAforo` no exige identificar a quién sale: el contador baja pero no consta qué plaza se liberó                                                                                      | ETAPA 10, cuando la portería registre la salida contra el evento de entrada                                                                                                                                    |
+| D-38 | El paso 14 ejecuta la suite tres veces: el cierre de etapa pasa de ~40 s de pruebas a ~2 min                                                                                               | Precio aceptado. ETAPA 14: en CI puede repartirse entre trabajos en paralelo                                                                                                                                   |
+| P-10 | «¿Reservas de zonas sin cobro?» sigue abierta: esta etapa construye **aforo y horario**, no reservas, aunque el mockup muestre «Reservas del día»                                          | Decisión del usuario. Fuera de alcance mientras no se resuelva                                                                                                                                                 |
 
 ## Deuda de la ETAPA 06
 
