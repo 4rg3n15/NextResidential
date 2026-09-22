@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes, hkdfSync } from 'node:crypto';
 import type { FaceTemplateProvider } from '@ncr/domain-core';
 import type { BovedaDePlantillas } from '../aplicacion/puertos';
 
@@ -50,7 +50,7 @@ export class AlmacenEnMemoria implements AlmacenDeBytes {
 }
 
 export class BovedaAesGcm implements BovedaDePlantillas {
-  private readonly llave: Buffer;
+  private readonly maestra: string;
 
   constructor(
     llaveSecreta: string,
@@ -61,10 +61,46 @@ export class BovedaAesGcm implements BovedaDePlantillas {
     if (llaveSecreta.length < 32) {
       throw new Error('La llave de plantillas biométricas necesita al menos 32 caracteres');
     }
-    // Derivación determinista de 32 bytes. Una KDF con sal por copropiedad es
-    // lo correcto y llega con la bóveda real; aquí se declara el paso en vez de
-    // pasarlo por alto en silencio.
-    this.llave = createHash('sha256').update(llaveSecreta).digest();
+    this.maestra = llaveSecreta;
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * H-13-02 · UNA LLAVE POR COPROPIEDAD, DERIVADA CON HKDF.
+   *
+   * Hasta la ETAPA 13 la llave era `sha256(secreto)`: **una sola para todas las
+   * copropiedades**, sin sal y sin separación de dominio. El propio código lo
+   * declaraba como paso pendiente (D-41), y una auditoría no hereda un pendiente
+   * declarado: lo cierra o lo eleva a hallazgo con severidad. Es hallazgo, y
+   * este es su remedio.
+   *
+   * Qué cambia, y por qué importa con datos biométricos bajo la Ley 1581:
+   *
+   *  · **Aislamiento por tenant.** Comprometer la llave derivada de una
+   *    copropiedad no descifra las plantillas de otra. Antes, una sola llave
+   *    abría el conjunto completo — y el aislamiento entre copropiedades es el
+   *    riesgo número uno declarado del proyecto (§2.7.6).
+   *  · **Separación de dominio.** El `info` de HKDF ata la llave a su propósito:
+   *    la misma maestra no produce la misma llave aquí que en cualquier otro uso
+   *    futuro del mismo secreto.
+   *
+   * POR QUÉ HKDF Y NO PBKDF2, scrypt O argon2 — la elección no es de moda. Esas
+   * tres son KDF con FACTOR DE TRABAJO, diseñadas para secretos de BAJA entropía
+   * (contraseñas humanas) a los que hay que encarecer la fuerza bruta. Aquí la
+   * entrada es un secreto de entorno de 32 caracteres o más, de alta entropía:
+   * no hay fuerza bruta que encarecer, y un factor de trabajo solo añadiría
+   * latencia a cada guardado. HKDF (RFC 5869) es exactamente la primitiva para
+   * este caso —extraer y expandir material de clave ya fuerte— y es lo que
+   * recomienda ASVS V6 para derivación a partir de llaves, no de contraseñas.
+   *
+   * La sal es el identificador de la copropiedad. No es secreta y no necesita
+   * serlo: en HKDF la sal aporta separación entre derivaciones, no secreto.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  private llaveDe(copropiedadId: string): Buffer {
+    return Buffer.from(
+      hkdfSync('sha256', this.maestra, copropiedadId, 'ncr:plantillas-biometricas:v1', 32),
+    );
   }
 
   private clave(copropiedadId: string, plantillaId: string): string {
@@ -80,7 +116,7 @@ export class BovedaAesGcm implements BovedaDePlantillas {
       throw new Error('No se cifra una plantilla vacía: sería una plantilla inservible cifrada');
     }
     const iv = randomBytes(LONGITUD_IV);
-    const cifrador = createCipheriv(ALGORITMO, this.llave, iv);
+    const cifrador = createCipheriv(ALGORITMO, this.llaveDe(copropiedadId), iv);
     const cuerpo = Buffer.concat([cifrador.update(Buffer.from(vector)), cifrador.final()]);
     // iv ‖ etiqueta ‖ cuerpo: todo lo necesario para descifrar salvo la llave.
     const sobre = Buffer.concat([iv, cifrador.getAuthTag(), cuerpo]);
@@ -88,12 +124,16 @@ export class BovedaAesGcm implements BovedaDePlantillas {
     return { llaveRef: this.llaveRef, algoritmo: 'AES-256-GCM' };
   }
 
-  /** Privado a propósito: el vector no sale de esta clase. */
-  private descifrar(sobre: Buffer): Buffer {
+  /**
+   * Privado a propósito: el vector no sale de esta clase. Recibe la copropiedad
+   * porque desde H-13-02 la llave se deriva por tenant: descifrar con la de otra
+   * falla en `final()`, que es justamente la garantía que se busca.
+   */
+  private descifrar(copropiedadId: string, sobre: Buffer): Buffer {
     const iv = sobre.subarray(0, LONGITUD_IV);
     const etiqueta = sobre.subarray(LONGITUD_IV, LONGITUD_IV + LONGITUD_ETIQUETA);
     const cuerpo = sobre.subarray(LONGITUD_IV + LONGITUD_ETIQUETA);
-    const descifrador = createDecipheriv(ALGORITMO, this.llave, iv);
+    const descifrador = createDecipheriv(ALGORITMO, this.llaveDe(copropiedadId), iv);
     descifrador.setAuthTag(etiqueta);
     // `final()` lanza si la etiqueta no cuadra: una plantilla manipulada no se
     // entrega a la terminal, se rechaza.
@@ -107,7 +147,7 @@ export class BovedaAesGcm implements BovedaDePlantillas {
   ): Promise<void> {
     const sobre = await this.almacen.tomar(this.clave(copropiedadId, plantillaId));
     if (sobre === null) throw new Error('No hay plantilla que sincronizar: ya fue suprimida');
-    const vector = this.descifrar(sobre);
+    const vector = this.descifrar(copropiedadId, sobre);
     try {
       await this.terminales.sincronizar(dispositivoId, plantillaId, new Uint8Array(vector));
     } finally {

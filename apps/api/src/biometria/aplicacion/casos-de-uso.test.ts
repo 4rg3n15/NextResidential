@@ -441,3 +441,81 @@ describe('ConsentimientoBiometrico · aislamiento por copropiedad', () => {
     expect(typeof ConsentimientoBiometrico.solicitar).toBe('function');
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * H-13-02 · LA LLAVE DE LA BÓVEDA SE DERIVA POR COPROPIEDAD (ETAPA 13)
+ *
+ * Hasta la auditoría la llave era `sha256(secreto)`: UNA SOLA para todas las
+ * copropiedades. Comprometerla abría el conjunto completo de plantillas
+ * biométricas, y el aislamiento entre copropiedades es el riesgo número uno
+ * declarado del proyecto (§2.7.6).
+ *
+ * Lo que se prueba aquí no es que HKDF exista —eso lo garantiza Node—, sino la
+ * consecuencia que importa: **el sobre cifrado de una copropiedad NO se
+ * descifra con la llave de otra.** Se comprueba por el único camino público
+ * que toca el descifrado, `empujarATerminal`, moviendo el sobre de un tenant al
+ * espacio de otro. Si la derivación volviera a ser única, el empuje tendría
+ * éxito y esta prueba se pondría roja.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('H-13-02 · la bóveda deriva una llave por copropiedad', () => {
+  const COP_A = '10000000-0000-4000-8000-00000000000a';
+  const COP_B = '10000000-0000-4000-8000-00000000000b';
+
+  it('un sobre de la copropiedad A no se descifra en la B', async () => {
+    const almacenPropio = new AlmacenEnMemoria();
+    const terminalPropia = new TerminalEspia();
+    const bovedaPropia = new BovedaAesGcm(
+      LLAVE,
+      'env:BIOMETRIA_LLAVE',
+      almacenPropio,
+      terminalPropia,
+    );
+
+    await bovedaPropia.guardar(COP_A, 'p-1', VECTOR);
+    const sobre = await almacenPropio.tomar(`${COP_A}/p-1`);
+    expect(sobre).not.toBeNull();
+
+    // El mismo sobre, colocado bajo la otra copropiedad: es el escenario de un
+    // almacén comprometido o de un error de enrutado entre tenants.
+    await almacenPropio.poner(`${COP_B}/p-1`, sobre as Buffer);
+
+    await expect(bovedaPropia.empujarATerminal(COP_B, 'p-1', 'disp-1')).rejects.toThrow();
+    expect(terminalPropia.recibidas).toHaveLength(0);
+  });
+
+  it('y en la suya propia sí se descifra y llega a la terminal', async () => {
+    const almacenPropio = new AlmacenEnMemoria();
+    const terminalPropia = new TerminalEspia();
+    const bovedaPropia = new BovedaAesGcm(
+      LLAVE,
+      'env:BIOMETRIA_LLAVE',
+      almacenPropio,
+      terminalPropia,
+    );
+
+    await bovedaPropia.guardar(COP_A, 'p-1', VECTOR);
+    await bovedaPropia.empujarATerminal(COP_A, 'p-1', 'disp-1');
+    expect(terminalPropia.recibidas).toHaveLength(1);
+  });
+
+  it('dos copropiedades cifran el MISMO vector en sobres distintos', async () => {
+    const almacenPropio = new AlmacenEnMemoria();
+    const boveda2 = new BovedaAesGcm(
+      LLAVE,
+      'env:BIOMETRIA_LLAVE',
+      almacenPropio,
+      new TerminalEspia(),
+    );
+    await boveda2.guardar(COP_A, 'p-1', VECTOR);
+    await boveda2.guardar(COP_B, 'p-1', VECTOR);
+    const a = (await almacenPropio.tomar(`${COP_A}/p-1`)) as Buffer;
+    const b = (await almacenPropio.tomar(`${COP_B}/p-1`)) as Buffer;
+    // El IV aleatorio ya los haría distintos; lo que se afirma es que el CUERPO
+    // cifrado difiere, que es lo que demuestra llaves distintas y no solo IV.
+    const cuerpoA = a.subarray(12 + 16);
+    const cuerpoB = b.subarray(12 + 16);
+    expect(Buffer.compare(cuerpoA, cuerpoB)).not.toBe(0);
+  });
+});
