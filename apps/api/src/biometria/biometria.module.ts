@@ -155,6 +155,9 @@ export class BiometriaModule {
       exports: [
         // Lo consume el módulo del residente para su propia ruta de captura.
         CapturarRostro,
+        // ETAPA 14 · lo consume el planificador (D-40): RN-11 da 24 h para
+        // suprimir, y hasta ahora el barrido solo salía por su ruta HTTP.
+        BarrerPlantillasVencidas,
         REPOSITORIO_CONSENTIMIENTOS,
         REPOSITORIO_PLANTILLAS,
         BOVEDA_DE_PLANTILLAS,

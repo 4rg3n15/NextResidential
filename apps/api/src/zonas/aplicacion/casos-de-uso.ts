@@ -81,6 +81,58 @@ export class ValidarAforo {
 }
 
 /**
+ * Caso de uso `ReiniciarAforosVencidos` — **D-36**, la mitad que faltaba.
+ *
+ * `ValidarAforo` ya reinicia el contador cuando alguien entra, y hasta la ETAPA
+ * 14 eso era todo: el reinicio se PROYECTABA al leer y se persistía al ocupar.
+ * La consecuencia, escrita sin rodeos: **una zona que nadie toca conserva su
+ * conteo antiguo indefinidamente**. El gimnasio cerró con dieciocho personas
+ * dentro, nadie vuelve a entrar en tres días, y durante esos tres días la
+ * consola y cualquier consulta de aforo dicen dieciocho. No es un error de
+ * cálculo —la proyección es correcta— es que nadie la escribe.
+ *
+ * Esto lo ejecuta un trabajo programado cada hora, y es idempotente por
+ * construcción: `debeReiniciarAforo` es falso en cuanto `ultimoReinicio` es
+ * posterior al último cierre de jornada, así que la segunda pasada de la misma
+ * hora no hace nada. Esa propiedad es la que permite que pg-boss reintente.
+ *
+ * Las zonas con política `manual` o `nunca` no se tocan: la decisión sigue
+ * siendo del dominio, aquí solo se le pregunta por cada zona.
+ */
+export interface ParteDeReinicio {
+  readonly zonas: number;
+  readonly reiniciadas: number;
+}
+
+export class ReiniciarAforosVencidos {
+  constructor(
+    private readonly repositorio: RepositorioZonas,
+    private readonly reloj: Reloj,
+  ) {}
+
+  async ejecutar(copropiedadId: string): Promise<ParteDeReinicio> {
+    const ahora = this.reloj.ahora();
+    const zonas = await this.repositorio.listar(copropiedadId);
+    let reiniciadas = 0;
+    for (const zona of zonas) {
+      if (
+        !debeReiniciarAforo({
+          politica: zona.politicaReinicio,
+          horario: zona.horario,
+          ultimoReinicio: zona.ultimoReinicio,
+          ahora,
+        })
+      ) {
+        continue;
+      }
+      await this.repositorio.reiniciar(copropiedadId, zona.id, ahora);
+      reiniciadas += 1;
+    }
+    return { zonas: zonas.length, reiniciadas };
+  }
+}
+
+/**
  * Caso de uso `LiberarAforo` — la salida. Devuelve el conteo resultante para
  * que la consola lo pinte sin una segunda consulta.
  */

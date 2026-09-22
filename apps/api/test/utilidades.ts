@@ -67,6 +67,10 @@ export const configuracionDePrueba: Configuracion = {
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   LOG_LEVEL: 'aviso',
+  PGBOSS_SCHEMA: 'pgboss',
+  // La suite NUNCA planifica: veinte aplicaciones montadas abrirían veinte
+  // conexiones de pg-boss contra una base que en este banco no existe.
+  PLANIFICADOR_HABILITADO: false,
   METRICAS_VENTANA: 2048,
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 100000, // el límite se prueba aparte; aquí estorbaría

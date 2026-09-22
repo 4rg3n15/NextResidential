@@ -18,7 +18,10 @@ export { BiometriaModule } from './biometria.module';
  *
  * Sigue sin salir nada que permita LEER un vector: ese método no existe.
  */
-export { CapturarRostro } from './aplicacion/casos-de-uso';
+// ETAPA 14 · el barrido sale por el barril porque lo invoca el planificador
+// (D-40). Antes solo lo alcanzaba su propio controlador.
+export { BarrerPlantillasVencidas, CapturarRostro } from './aplicacion/casos-de-uso';
+export type { ResultadoBarrido } from './aplicacion/casos-de-uso';
 export type { ResultadoCaptura, SolicitudDeCaptura } from './aplicacion/casos-de-uso';
 export {
   BOVEDA_DE_PLANTILLAS,

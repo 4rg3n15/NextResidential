@@ -33,3 +33,7 @@ export {
  * se reevalúa cuando la ETAPA 15 traiga el Alarm Server real.
  */
 export { LatidoDto } from './presentacion/dtos';
+// ETAPA 14 · la vigilancia de latidos sale por el barril porque la invoca el
+// planificador (D-31): era una operación idempotente sin nadie que la llamara.
+export { VigilarLatidos } from './aplicacion/vigilancia-latidos';
+export type { ParteDeVigilancia } from './aplicacion/vigilancia-latidos';

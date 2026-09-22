@@ -206,6 +206,32 @@ export const esquemaConfiguracion = z.object({
    */
   METRICAS_VENTANA: z.coerce.number().int().min(16).max(65536).default(2048),
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * PLANIFICADOR (ETAPA 14) · pg-boss sobre el mismo PostgreSQL (§2.6)
+   *
+   * `PGBOSS_SCHEMA` estaba en `.env.example` desde la ETAPA 02 con la nota «la
+   * lee la configuración de pg-boss, fuera del esquema de la API». No había
+   * tal configuración: no se leía en ningún sitio. Ahora sí.
+   *
+   * `PLANIFICADOR_HABILITADO` existe porque **no todo proceso debe planificar**.
+   * Con varias instancias de API, pg-boss ya garantiza que solo una ejecuta
+   * cada disparo —toma el cerrojo en PostgreSQL—, así que dejarlo encendido en
+   * todas es correcto; apagarlo permite dedicar un proceso a servir HTTP y otro
+   * a los barridos, que es lo que se quiere cuando el barrido de plantillas
+   * habla con terminales lentas. Apagado, el planificador ESCRIBE qué no va a
+   * ejecutar: el silencio dejaría creer que RN-11 se está cumpliendo.
+   */
+  PGBOSS_SCHEMA: z
+    .string()
+    .trim()
+    .regex(/^[a-z_][a-z0-9_]{0,62}$/, 'PGBOSS_SCHEMA es un nombre de esquema de PostgreSQL')
+    .default('pgboss'),
+  PLANIFICADOR_HABILITADO: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+
   THROTTLE_TTL_SEGUNDOS: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMITE: z.coerce.number().int().positive().default(120),
 
