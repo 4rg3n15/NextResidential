@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import type { Configuracion } from './configuracion/esquema';
+import { SaneamientoMiddleware } from './comun/saneamiento';
 
 /**
  * Endurecimiento HTTP (§2.7). Vive en un único archivo para que una auditoría
@@ -53,5 +54,30 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
       transform: true,
       transformOptions: { enableImplicitConversion: false },
     }),
+  );
+};
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * H-13-05 y H-13-06 · el saneamiento de §2.7.4, que nunca se construyó.
+ *
+ * VA APARTE DE `aplicarSeguridad`, y el motivo es el orden: `aplicarSeguridad`
+ * corre ANTES que los parsers de `express`, así que allí `req.body` todavía no
+ * existe y sanearlo no saneaba nada. Lo aprendí por ejecución —la prueba de
+ * H-13-06 siguió en rojo con el middleware puesto en el sitio cómodo—.
+ *
+ * Llamar a esto DESPUÉS de `express.json()` y `express.urlencoded()` y ANTES de
+ * cualquier ruta es la condición para que funcione, y por eso tiene su propia
+ * función con su propio nombre en lugar de esconderse dentro de la otra.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const aplicarSaneamiento = (app: INestApplication): void => {
+  const saneamiento = new SaneamientoMiddleware();
+  app.use(
+    (
+      req: Parameters<typeof saneamiento.use>[0],
+      res: Parameters<typeof saneamiento.use>[1],
+      next: Parameters<typeof saneamiento.use>[2],
+    ) => saneamiento.use(req, res, next),
   );
 };
