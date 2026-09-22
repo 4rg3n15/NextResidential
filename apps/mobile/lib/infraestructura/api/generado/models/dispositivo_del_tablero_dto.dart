@@ -6,6 +6,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'dispositivo_del_tablero_dto_estado.dart';
 import 'dispositivo_del_tablero_dto_tipo.dart';
+import 'dispositivo_del_tablero_dto_ultimo_resultado_de_sincronizacion.dart';
 
 part 'dispositivo_del_tablero_dto.g.dart';
 
@@ -24,6 +25,8 @@ class DispositivoDelTableroDto {
     required this.ultimoLatido,
     required this.ultimaSincronizacion,
     required this.segundosSinLatir,
+    required this.ultimoResultadoDeSincronizacion,
+    required this.sincronizacionesFallidas,
   });
   
   factory DispositivoDelTableroDto.fromJson(Map<String, Object?> json) => _$DispositivoDelTableroDtoFromJson(json);
@@ -44,6 +47,12 @@ class DispositivoDelTableroDto {
   final DateTime? ultimoLatido;
   final DateTime? ultimaSincronizacion;
   final num? segundosSinLatir;
+
+  /// Estado de la sincronización de plantilla más reciente de este equipo. Sale de plantilla_sincronizaciones, no de una copia en dispositivos: dos copias del mismo resultado se separan en cuanto alguien reintenta una sola plantilla.
+  final DispositivoDelTableroDtoUltimoResultadoDeSincronizacion? ultimoResultadoDeSincronizacion;
+
+  /// Cuántas plantillas siguen sin llegar a este equipo. Distingue «falló la última» de «hay catorce sin llegar».
+  final num sincronizacionesFallidas;
 
   Map<String, Object?> toJson() => _$DispositivoDelTableroDtoToJson(this);
 }

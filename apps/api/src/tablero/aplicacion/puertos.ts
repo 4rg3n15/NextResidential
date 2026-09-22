@@ -60,6 +60,9 @@ export interface FranjaDeAccesos {
  * `firmware` son datos de inventario, no secretos (C-11), y la presentación
  * decide para qué roles se rellenan.
  */
+/** Los mismos valores que el enumerado `estado_sincronizacion` de la base. */
+export type ResultadoDeSincronizacion = 'pendiente' | 'sincronizada' | 'fallida' | 'suprimida';
+
 export interface DispositivoDelTablero {
   readonly id: string;
   readonly nombre: string;
@@ -71,6 +74,18 @@ export interface DispositivoDelTablero {
   readonly firmware: string | null;
   readonly ultimoLatido: Date | null;
   readonly ultimaSincronizacion: Date | null;
+  /**
+   * ETAPA 15 · **el resultado, no sólo la fecha.**
+   *
+   * Una fecha de hace un minuto con la sincronización fallida se leía igual
+   * que una correcta, y ése es justo el caso en el que hay que actuar: una
+   * plantilla que no llegó a la terminal es una persona que no va a poder
+   * entrar. `null` significa que ese equipo no ha sincronizado nunca, que no
+   * es lo mismo que haberlo hecho mal.
+   */
+  readonly ultimoResultadoDeSincronizacion: ResultadoDeSincronizacion | null;
+  /** Distingue «falló la última» de «hay catorce sin llegar». */
+  readonly sincronizacionesFallidas: number;
 }
 
 /** El mismo dispositivo con el estado ya derivado por el dominio. */

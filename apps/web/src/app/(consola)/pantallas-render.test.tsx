@@ -133,6 +133,10 @@ const DISPOSITIVO = {
   estado: 'saludable',
   ultimoLatido: '2026-09-10T10:00:00.000Z',
   ultimaSincronizacion: '2026-09-10T09:00:00.000Z',
+  // ETAPA 15 · el resultado, no sólo la fecha: una fallida de hace un minuto se
+  // leía igual que una correcta.
+  ultimoResultadoDeSincronizacion: 'sincronizada',
+  sincronizacionesFallidas: 0,
   segundosSinLatir: 30,
 };
 
@@ -261,6 +265,69 @@ describe('dispositivos', () => {
     await waitFor(() => expect(screen.getByText('Talanquera principal')).toBeDefined());
     expect(screen.getByText('talanquera.equipo.invalid:80')).toBeDefined();
     await waitFor(() => expect(screen.getByText('Sincronizando')).toBeDefined());
+  });
+
+  /**
+   * ETAPA 15 · la fecha sola no decía nada.
+   *
+   * Una sincronización FALLIDA hace un minuto se leía igual que una correcta,
+   * y ése es justo el caso en el que hay que actuar: una plantilla que no llegó
+   * a la terminal es una persona que no va a poder entrar, y nadie se entera
+   * hasta que está delante de la puerta.
+   */
+  it('una sincronización FALLIDA se ve, y no se confunde con una correcta', async () => {
+    const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    espia.mockImplementation(async (entrada: Request | string) => {
+      const url = typeof entrada === 'string' ? entrada : entrada.url;
+      if (url.includes('/dispositivos/pendientes')) return respuesta({ dispositivos: [] });
+      if (url.includes('/tablero/dispositivos')) {
+        return respuesta({
+          dispositivos: [
+            {
+              ...DISPOSITIVO,
+              ultimoResultadoDeSincronizacion: 'fallida',
+              sincronizacionesFallidas: 14,
+            },
+          ],
+          umbralSegundos: 300,
+        });
+      }
+      return respuesta({});
+    });
+
+    montar(<PantallaDeDispositivos copropiedadId={COP} />);
+    await waitFor(() => expect(screen.getByText('Talanquera principal')).toBeDefined());
+    expect(screen.getByText('Falló')).toBeDefined();
+    // Y «falló la última» no es lo mismo que «hay catorce sin llegar»: se
+    // resuelven distinto y la pantalla lo separa.
+    expect(screen.getByText(/14 plantillas sin llegar/)).toBeDefined();
+  });
+
+  it('«nunca sincronizó» NO se muestra como un fallo', async () => {
+    const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    espia.mockImplementation(async (entrada: Request | string) => {
+      const url = typeof entrada === 'string' ? entrada : entrada.url;
+      if (url.includes('/dispositivos/pendientes')) return respuesta({ dispositivos: [] });
+      if (url.includes('/tablero/dispositivos')) {
+        return respuesta({
+          dispositivos: [
+            {
+              ...DISPOSITIVO,
+              ultimaSincronizacion: null,
+              ultimoResultadoDeSincronizacion: null,
+              sincronizacionesFallidas: 0,
+            },
+          ],
+          umbralSegundos: 300,
+        });
+      }
+      return respuesta({});
+    });
+
+    montar(<PantallaDeDispositivos copropiedadId={COP} />);
+    await waitFor(() => expect(screen.getByText('Nunca')).toBeDefined());
+    // Un equipo recién instalado no tiene ningún problema que resolver.
+    expect(screen.queryByText('Falló')).toBeNull();
   });
 
   it('NO aparece ninguna credencial ni referencia a bóveda (RN-21)', async () => {

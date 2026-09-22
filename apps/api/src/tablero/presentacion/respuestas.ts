@@ -132,6 +132,29 @@ export class DispositivoDelTableroDto {
     | string
     | null;
   @ApiProperty({ type: Number, nullable: true }) segundosSinLatir!: number | null;
+
+  /**
+   * ETAPA 15 · el resultado de la última sincronización, no sólo su fecha.
+   *
+   * `null` es «nunca sincronizó», que NO es lo mismo que haberlo hecho mal y
+   * por eso no se colapsa en `fallida`.
+   */
+  @ApiProperty({
+    enum: ['pendiente', 'sincronizada', 'fallida', 'suprimida'],
+    nullable: true,
+    description:
+      'Estado de la sincronización de plantilla más reciente de este equipo. Sale de ' +
+      'plantilla_sincronizaciones, no de una copia en dispositivos: dos copias del mismo ' +
+      'resultado se separan en cuanto alguien reintenta una sola plantilla.',
+  })
+  ultimoResultadoDeSincronizacion!: 'pendiente' | 'sincronizada' | 'fallida' | 'suprimida' | null;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Cuántas plantillas siguen sin llegar a este equipo. Distingue «falló la última» de «hay catorce sin llegar».',
+  })
+  sincronizacionesFallidas!: number;
 }
 
 export class EstadoDeDispositivosDto {

@@ -170,6 +170,7 @@ export 'models/copropiedad_dto_alcance.dart';
 export 'models/decision_del_edge_dto_motivo.dart';
 export 'models/dispositivo_del_tablero_dto_tipo.dart';
 export 'models/dispositivo_del_tablero_dto_estado.dart';
+export 'models/dispositivo_del_tablero_dto_ultimo_resultado_de_sincronizacion.dart';
 export 'models/en_atencion_dto_urgencia.dart';
 export 'models/estado_de_canal_dto_estado.dart';
 export 'models/evento_ingesta_dto_metodo.dart';

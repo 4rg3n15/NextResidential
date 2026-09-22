@@ -113,6 +113,8 @@ export class TableroController {
           ultimaSincronizacion:
             d.ultimaSincronizacion === null ? null : d.ultimaSincronizacion.toISOString(),
           segundosSinLatir: d.segundosSinLatir,
+          ultimoResultadoDeSincronizacion: d.ultimoResultadoDeSincronizacion,
+          sincronizacionesFallidas: d.sincronizacionesFallidas,
         }),
       ),
       saludables: r.saludables,

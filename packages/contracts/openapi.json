@@ -4973,6 +4973,21 @@
           "segundosSinLatir": {
             "type": "number",
             "nullable": true
+          },
+          "ultimoResultadoDeSincronizacion": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "sincronizada",
+              "fallida",
+              "suprimida"
+            ],
+            "nullable": true,
+            "description": "Estado de la sincronización de plantilla más reciente de este equipo. Sale de plantilla_sincronizaciones, no de una copia en dispositivos: dos copias del mismo resultado se separan en cuanto alguien reintenta una sola plantilla."
+          },
+          "sincronizacionesFallidas": {
+            "type": "number",
+            "description": "Cuántas plantillas siguen sin llegar a este equipo. Distingue «falló la última» de «hay catorce sin llegar»."
           }
         },
         "required": [
@@ -4987,7 +5002,9 @@
           "estado",
           "ultimoLatido",
           "ultimaSincronizacion",
-          "segundosSinLatir"
+          "segundosSinLatir",
+          "ultimoResultadoDeSincronizacion",
+          "sincronizacionesFallidas"
         ]
       },
       "EmergenciaDto": {

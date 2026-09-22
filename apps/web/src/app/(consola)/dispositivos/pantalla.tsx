@@ -9,6 +9,7 @@ import { TablaDeDatos } from '@/componentes/tabla-datos';
 import type { Columna } from '@/componentes/tabla-datos';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
+import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
 import { estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useDispositivos, useDispositivosPendientes } from '@/lib/api/consultas';
@@ -20,6 +21,24 @@ const ESTADO = {
   degradado: { tono: 'aviso', texto: 'Degradado' },
   caido: { tono: 'peligro', texto: 'Fuera de línea' },
 } as const;
+
+/**
+ * El resultado de la última sincronización, con su palabra.
+ *
+ * **El color nunca es el único portador de significado** (la misma regla que
+ * `Distintivo` ya impone): quien no distingue el rojo del verde lee el texto.
+ */
+const RESULTADO: Readonly<
+  Record<
+    'pendiente' | 'sincronizada' | 'fallida' | 'suprimida',
+    { tono: TonoDeDistintivo; texto: string }
+  >
+> = {
+  sincronizada: { tono: 'exito', texto: 'Correcta' },
+  fallida: { tono: 'peligro', texto: 'Falló' },
+  pendiente: { tono: 'aviso', texto: 'En cola' },
+  suprimida: { tono: 'neutro', texto: 'Suprimida' },
+};
 
 /**
  * Dispositivos y sincronización.
@@ -137,15 +156,40 @@ export const PantallaDeDispositivos = ({
     {
       clave: 'sincronizacion',
       titulo: 'Última sincronización',
+      /**
+       * ═══════════════════════════════════════════════════════════════════
+       * ETAPA 15 · LA FECHA SOLA NO DECÍA NADA
+       *
+       * Hasta hoy esta columna era sólo el instante. Una sincronización
+       * FALLIDA hace un minuto se leía igual que una correcta, y ése es
+       * justo el caso en el que hay que actuar: una plantilla que no llegó a
+       * la terminal es una persona que no va a poder entrar, y nadie se
+       * entera hasta que está delante de la puerta.
+       *
+       * «Nunca» y «falló» no se colapsan: un equipo recién instalado que no
+       * ha sincronizado nada no tiene ningún problema que resolver.
+       */
       celda: (d) => (
-        <span className="text-secundario text-texto-apagado">
-          {d.ultimaSincronizacion === null
-            ? 'Nunca'
-            : new Date(d.ultimaSincronizacion).toLocaleString('es-CO', {
-                dateStyle: 'short',
-                timeStyle: 'short',
-              })}
-        </span>
+        <div className="flex flex-col gap-1">
+          <span className="text-secundario text-texto-apagado">
+            {d.ultimaSincronizacion === null
+              ? 'Nunca'
+              : new Date(d.ultimaSincronizacion).toLocaleString('es-CO', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })}
+          </span>
+          {d.ultimoResultadoDeSincronizacion !== null ? (
+            <Distintivo tono={RESULTADO[d.ultimoResultadoDeSincronizacion].tono}>
+              {RESULTADO[d.ultimoResultadoDeSincronizacion].texto}
+            </Distintivo>
+          ) : null}
+          {d.sincronizacionesFallidas > 1 ? (
+            <span className="text-secundario text-peligro-texto">
+              {d.sincronizacionesFallidas} plantillas sin llegar
+            </span>
+          ) : null}
+        </div>
       ),
     },
     {

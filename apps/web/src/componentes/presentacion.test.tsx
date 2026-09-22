@@ -22,6 +22,10 @@ const dispositivo = (parcial: Partial<DispositivoDelTablero> = {}): DispositivoD
   ultimoLatido: '2026-09-09T12:00:00Z',
   ultimaSincronizacion: null,
   segundosSinLatir: 30,
+  // ETAPA 15 · «nunca sincronizó» es `null`, y NO se colapsa en «falló»: un
+  // equipo recién instalado no tiene ningún problema que resolver.
+  ultimoResultadoDeSincronizacion: null,
+  sincronizacionesFallidas: 0,
   ...parcial,
 });
 

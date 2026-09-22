@@ -1612,6 +1612,13 @@ export interface components {
             /** Format: date-time */
             ultimaSincronizacion: string | null;
             segundosSinLatir: number | null;
+            /**
+             * @description Estado de la sincronización de plantilla más reciente de este equipo. Sale de plantilla_sincronizaciones, no de una copia en dispositivos: dos copias del mismo resultado se separan en cuanto alguien reintenta una sola plantilla.
+             * @enum {string|null}
+             */
+            ultimoResultadoDeSincronizacion: "pendiente" | "sincronizada" | "fallida" | "suprimida" | null;
+            /** @description Cuántas plantillas siguen sin llegar a este equipo. Distingue «falló la última» de «hay catorce sin llegar». */
+            sincronizacionesFallidas: number;
         };
         EmergenciaDto: {
             /** @description Qué ocurre. Obligatorio. */

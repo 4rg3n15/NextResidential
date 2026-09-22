@@ -114,7 +114,7 @@ const cuerpoDeFlujo = (bloques: readonly Record<string, unknown>[]): ReadableStr
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   const sinSoporte = new Set(guion.sinSoporte ?? []);
 
-  return (async (entrada: RequestInfo | URL, opciones?: RequestInit): Promise<Response> => {
+  return (async (entrada: string | URL, opciones?: RequestInit): Promise<Response> => {
     const url = new URL(typeof entrada === 'string' ? entrada : String(entrada));
     const metodo = opciones?.method ?? 'GET';
     const cabeceras = (opciones?.headers ?? {}) as Record<string, string>;

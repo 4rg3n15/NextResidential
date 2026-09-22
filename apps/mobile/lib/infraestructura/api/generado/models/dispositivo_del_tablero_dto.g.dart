@@ -25,6 +25,13 @@ DispositivoDelTableroDto _$DispositivoDelTableroDtoFromJson(
       ? null
       : DateTime.parse(json['ultimaSincronizacion'] as String),
   segundosSinLatir: json['segundosSinLatir'] as num?,
+  ultimoResultadoDeSincronizacion:
+      json['ultimoResultadoDeSincronizacion'] == null
+      ? null
+      : DispositivoDelTableroDtoUltimoResultadoDeSincronizacion.fromJson(
+          json['ultimoResultadoDeSincronizacion'] as String,
+        ),
+  sincronizacionesFallidas: json['sincronizacionesFallidas'] as num,
 );
 
 Map<String, dynamic> _$DispositivoDelTableroDtoToJson(
@@ -42,4 +49,6 @@ Map<String, dynamic> _$DispositivoDelTableroDtoToJson(
   'ultimoLatido': instance.ultimoLatido?.toIso8601String(),
   'ultimaSincronizacion': instance.ultimaSincronizacion?.toIso8601String(),
   'segundosSinLatir': instance.segundosSinLatir,
+  'ultimoResultadoDeSincronizacion': instance.ultimoResultadoDeSincronizacion,
+  'sincronizacionesFallidas': instance.sincronizacionesFallidas,
 };

@@ -10,6 +10,7 @@ import type {
   DispositivoDelTablero,
   FranjaDeAccesos,
   RepositorioTablero,
+  ResultadoDeSincronizacion,
   SeveridadDeAlerta,
 } from '../aplicacion/puertos';
 
@@ -189,14 +190,51 @@ export class RepositorioTableroPg implements RepositorioTablero {
       firmware: string | null;
       ultimo_latido: Date | null;
       ultima_sincronizacion: Date | null;
+      ultimo_resultado: string | null;
+      sincronizaciones_fallidas: string;
     }>(
-      // Columnas enumeradas una a una, jamás `*`: es lo que mantiene
-      // `credencial_ref` fuera del proceso (RN-21).
-      `SELECT id, nombre, tipo::text AS tipo, zona_id, host, puerto, modelo, firmware,
-              ultimo_latido, ultima_sincronizacion
-         FROM public.dispositivos
-        WHERE copropiedad_id = $1 AND estado = 'activo'
-        ORDER BY nombre`,
+      /**
+       * Columnas enumeradas una a una, jamás `*`: es lo que mantiene
+       * `credencial_ref` fuera del proceso (RN-21).
+       *
+       * ═══════════════════════════════════════════════════════════════════
+       * ETAPA 15 · EL RESULTADO, NO SÓLO LA FECHA
+       *
+       * `ultima_sincronizacion` decía CUÁNDO se sincronizó por última vez y
+       * nada más. Una fecha de hace un minuto con la sincronización FALLIDA
+       * se leía igual que una correcta, y ése es justo el caso en el que hay
+       * que actuar: una plantilla que no llegó a la terminal es una persona
+       * que no va a poder entrar.
+       *
+       * Sale de `plantilla_sincronizaciones`, que ya lleva el estado por
+       * plantilla y equipo desde la ETAPA 08. **No se añade columna**: una
+       * segunda copia del resultado en `dispositivos` se separaría de la
+       * primera en cuanto alguien reintentara una sola plantilla.
+       *
+       * El `LATERAL` toma la fila más reciente de ese equipo; el conteo de
+       * fallidas es lo que distingue «falló la última» de «hay catorce sin
+       * llegar», que se resuelven distinto.
+       */
+      `SELECT d.id, d.nombre, d.tipo::text AS tipo, d.zona_id, d.host, d.puerto,
+              d.modelo, d.firmware, d.ultimo_latido, d.ultima_sincronizacion,
+              u.estado::text AS ultimo_resultado,
+              COALESCE(f.fallidas, 0) AS sincronizaciones_fallidas
+         FROM public.dispositivos d
+         LEFT JOIN LATERAL (
+           SELECT ps.estado
+             FROM public.plantilla_sincronizaciones ps
+            WHERE ps.dispositivo_id = d.id AND ps.copropiedad_id = d.copropiedad_id
+            ORDER BY ps.actualizado_en DESC
+            LIMIT 1
+         ) u ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT COUNT(*) AS fallidas
+             FROM public.plantilla_sincronizaciones ps
+            WHERE ps.dispositivo_id = d.id AND ps.copropiedad_id = d.copropiedad_id
+              AND ps.estado = 'fallida'
+         ) f ON TRUE
+        WHERE d.copropiedad_id = $1 AND d.estado = 'activo'
+        ORDER BY d.nombre`,
       [copropiedadId],
     );
     return rows.map((f) => ({
@@ -210,6 +248,9 @@ export class RepositorioTableroPg implements RepositorioTablero {
       firmware: f.firmware,
       ultimoLatido: f.ultimo_latido,
       ultimaSincronizacion: f.ultima_sincronizacion,
+      ultimoResultadoDeSincronizacion:
+        f.ultimo_resultado === null ? null : (f.ultimo_resultado as ResultadoDeSincronizacion),
+      sincronizacionesFallidas: Number(f.sincronizaciones_fallidas),
     }));
   }
 }
