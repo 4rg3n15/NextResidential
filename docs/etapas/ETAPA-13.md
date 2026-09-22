@@ -349,7 +349,84 @@ saneamiento.ts | 100 % Stmts | 100 % Branch | 100 % Funcs | 100 % Lines
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh --con-base`
 
-> Pendiente de pegar: la corrida que cierra la etapa. Ver §8, D-101.
+Corrida sobre `a6f702b`, con la base efímera levantada y el SDK de Flutter
+presente. **Los 26 pasos, ejecutados.** Sale copiado tal cual, incluidos los dos
+avisos, porque un veredicto recortado no es un veredicto:
+
+```
+▸ 1b · docs/ESTADO_ETAPAS.md no se contradice a sí mismo
+   ✓ coherente: 17 etapas en el mapa, 14 cerradas con ficha e informe, cabecera al día
+     · 0 de 0 rama(s) «en curso» comprobadas contra git
+
+▸ 5 · suite completa
+   @ncr/config:test:       Tests  144 passed (144)
+   @ncr/providers:test:    Tests   78 passed (78)
+   @ncr/edge:test:         Tests  101 passed (101)
+   @ncr/domain-core:test:  Tests  398 passed (398)
+   @ncr/web:test:          Tests  350 passed (350)
+   @ncr/api:test:          Tests  723 passed | 5 skipped (728)
+   ⚠ suite sin rojas · las saltadas están DECLARADAS y se ejercen en otro paso
+
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 145 de 145 ficheros de prueba ejecutados
+
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     OK   dominio (packages/domain-core/src): lineas 97.73 % · ramas 96.48 % · funciones 97.42 % (umbral 90 %, 34 archivos)
+     OK   aplicacion (**/aplicacion/**):      lineas 97.08 % · ramas 92.46 % · funciones 98.25 % (umbral 90 %, 39 archivos)
+     OK   global:                             lineas 76.48 % · ramas 85.04 % · funciones 80.00 % (umbral 70 %, 308 archivos)
+   ✓ las tres capas cumplen su umbral
+
+▸ 7b · los dos recuentos de la MISMA suite coinciden (D-112)
+   ✓ recuentos: 6 paquete(s) con el mismo resultado por los dos caminos · 1799 pruebas
+
+▸ 9 · pruebas negativas de los propios controles
+   ✓ controles: 31 de 33 con prueba negativa · 2 en deuda declarada (no puede crecer)
+   ✓ PRUEBAS NEGATIVAS: los 24 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ ramas: 30 controles medidos · 194 bloques sin ejercer (no puede subir)
+
+▸ 10 · fronteras de arquitectura y secretos
+   ✓ sin secretos
+   ✓ escaneo de secretos: limpio (2 182 blobs del historial alcanzable · 2 de línea base declarados)
+   ✓ longitud por campo: 44 campo(s) @IsString(), todos con cota declarada
+   ✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers/
+
+▸ 12 · esquema y aislamiento en --modo-supabase (requiere --con-base)
+   ✓ migraciones, semillas y suite SQL
+
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 728 passed (728) · …
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 728 passed (728) · …
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 728 passed (728) · …
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico
+
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 26 de 26 pasos ejecutados
+
+VERIFICACIÓN DE ETAPA: correcta CON 2 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+**Los dos «declarados no ejercidos», dichos sin suavizarlos**, porque el
+veredicto los nombra y esconderlos aquí sería justo lo contrario de esta etapa:
+
+1. **Paso 5e · el recorrido de la app en un navegador.** Declarado no ejercido
+   desde el 2026-09-19 por diferencia de entorno en el enganche del campo por el
+   motor de Flutter web. Revisión en la ETAPA 14. Los otros tres controles
+   móviles —análisis estático, 158 pruebas de Dart con cobertura por capa y
+   cliente generado sin diferencias ni secretos— **sí** se ejercen.
+2. **`cliente-dart-desfasado.mjs` y `apps/mobile/e2e/recorrido-web.mjs`**, los
+   dos controles que siguen en deuda de prueba negativa. El primero necesita el
+   SDK de Dart para regenerar y comparar; el segundo, compilar la app para web y
+   conducir un navegador. Ninguno es pereza, y la deuda **solo puede encoger**:
+   esta etapa la bajó de 7 a 2.
+
+Y las **5 saltadas** de `@ncr/api` no son una omisión: son las de
+`arranque-en-frio.e2e.test.ts`, que necesitan los claims que escribe el paso
+12b — que es quien las ejecuta y quien exige que no se salten—. En el paso 14,
+donde la base sí está, corren las 728.
 
 ---
 
