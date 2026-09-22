@@ -1515,33 +1515,59 @@ try {
      * porque `turbo.json` no declaraba `DATABASE_URL_PRUEBAS` —Turborepo 2.x
      * filtra el entorno— así que `it.runIf(...)` las saltaba en silencio.
      *
-     * Las dos cifras estaban en la salida. Faltaba quien las comparase.
+     * Las dos cifras estaban. Faltaba quien las comparase.
      *
-     * Lo que se exige aquí son las cuatro respuestas, no solo la primera: que
-     * detecte la divergencia REAL de D-112, que NO se queje cuando coinciden,
-     * y que trate como fallo el quedarse sin nada que comparar por CUALQUIERA
-     * de los dos lados. Un comparador que ante una entrada vacía dice «todo
-     * igual» es el mismo defecto con otra cara — y ya pasó, en la primera
-     * versión de `estabilidad.mjs`, donde dos firmas vacías daban «idéntico».
+     * Se exige que detecte la divergencia REAL, que NOMBRE la prueba saltada
+     * —si no, hay que reproducirla para saber cuál fue—, que NO se queje cuando
+     * coinciden, y que trate como fallo el quedarse sin nada que comparar por
+     * cualquiera de los dos lados. Esto último no es teórico: la primera
+     * versión de `estabilidad.mjs` daba «idéntico» comparando dos firmas
+     * vacías.
      * ════════════════════════════════════════════════════════════════════════
      */
-    const p5 = join(banco, 'paso5.txt');
+    const arbol = join(banco, 'arbol-d112');
+    const dirApi = join(arbol, 'apps', 'api');
+    mkdirSync(dirApi, { recursive: true });
+    writeFileSync(join(dirApi, 'package.json'), JSON.stringify({ name: '@ncr/api' }));
     const p7 = join(banco, 'paso7.txt');
-    const comparar = () =>
-      correr('node', ['scripts/lib/recuentos-coherentes.mjs', p5, p7], { cwd: raiz });
+    const informe = join(dirApi, '.informe-paso5.json');
 
-    const TURBO_BIEN = '@ncr/api:test:       Tests  658 passed (658)\n';
-    const TURBO_SALTA = '@ncr/api:test:       Tests  653 passed | 5 skipped (658)\n';
-    const DIRECTO_658 =
+    const comparar = () =>
+      correr('node', ['scripts/lib/recuentos-coherentes.mjs', arbol, p7], { cwd: raiz });
+
+    /** Un informe de vitest con el reparto que se le pida. */
+    const informeCon = (verdes, saltadas) => ({
+      numTotalTests: verdes + saltadas,
+      numPassedTests: verdes,
+      numFailedTests: 0,
+      numPendingTests: saltadas,
+      numTodoTests: 0,
+      testResults: [
+        {
+          name: '/x/apps/api/test/residente-pg.test.ts',
+          assertionResults: [
+            // Los tres estados que vitest usa para «no se ejecutó». Que sean
+            // tres y no uno importa: `todo` y `skipped` conviven con `pending`
+            // en el mismo informe, y una rama que solo mira uno deja pasar los
+            // otros dos.
+            ...Array.from({ length: saltadas }, (_, i) => ({
+              status: ['pending', 'skipped', 'todo'][i % 3],
+              fullName: `la consulta del titular encaja con el esquema ${i + 1}`,
+            })),
+          ],
+        },
+      ],
+    });
+    const RECUENTO_658 =
       '   RECUENTO @ncr/api ficheros=56 pruebas=658 verdes=658 rojas=0 saltadas=0\n';
 
-    writeFileSync(p5, TURBO_BIEN);
-    writeFileSync(p7, DIRECTO_658);
+    writeFileSync(informe, JSON.stringify(informeCon(658, 0)));
+    writeFileSync(p7, RECUENTO_658);
     comparar().codigo === 0
       ? ok('cuando los dos caminos coinciden, no se queja')
       : mal('marca una coincidencia: el control sería inutilizable');
 
-    writeFileSync(p5, TURBO_SALTA);
+    writeFileSync(informe, JSON.stringify(informeCon(653, 5)));
     const r = comparar();
     r.codigo !== 0
       ? ok('la divergencia real de D-112 se detecta')
@@ -1549,36 +1575,65 @@ try {
     /saltadas/.test(r.salida) && /653/.test(r.salida) && /658/.test(r.salida)
       ? ok('y salen los DOS recuentos y el campo que difiere, no solo el aviso')
       : mal('no enseña las dos cifras: obliga a buscarlas a mano');
+    /la consulta del titular encaja con el esquema 1/.test(r.salida)
+      ? ok('y NOMBRA la prueba que se quedó fuera, con su fichero')
+      : mal('no dice qué prueba se saltó: habría que reproducirlo para saberlo');
 
-    // Un paquete que un camino ejecuta y el otro no informa en absoluto.
-    writeFileSync(p5, '@ncr/web:test:       Tests  350 passed (350)\n');
-    /el paso 5 no informó de este paquete/.test(comparar().salida)
-      ? ok('un paquete que un camino no informa se detecta, no se ignora')
+    // Un paquete que el paso 7 mide y del que el paso 5 no dejó informe. Hace
+    // falta OTRO paquete con informe: si no queda ninguno, lo que salta es la
+    // comprobación de «no hay nada que comparar», que es un caso distinto.
+    const dirWeb = join(arbol, 'apps', 'web');
+    mkdirSync(dirWeb, { recursive: true });
+    writeFileSync(join(dirWeb, 'package.json'), JSON.stringify({ name: '@ncr/web' }));
+    writeFileSync(join(dirWeb, '.informe-paso5.json'), JSON.stringify(informeCon(350, 0)));
+    writeFileSync(
+      p7,
+      RECUENTO_658 + '   RECUENTO @ncr/web ficheros=30 pruebas=350 verdes=350 rojas=0 saltadas=0\n',
+    );
+    rmSync(informe, { force: true });
+    /el paso 5 no dejó informe de este paquete/.test(comparar().salida)
+      ? ok('un paquete del que un camino no informa se detecta, no se ignora')
       : mal('un paquete ausente en un lado pasa inadvertido');
+    rmSync(dirWeb, { recursive: true, force: true });
+
+    // Y un paquete bajo `packages/`, no solo bajo `apps/`: el control recorre
+    // los dos grupos y hasta aquí solo se había visto recorrer uno.
+    const dirCfg = join(arbol, 'packages', 'config');
+    mkdirSync(dirCfg, { recursive: true });
+    writeFileSync(join(dirCfg, 'package.json'), JSON.stringify({ name: '@ncr/config' }));
+    writeFileSync(join(dirCfg, '.informe-paso5.json'), JSON.stringify(informeCon(144, 0)));
+    writeFileSync(informe, JSON.stringify(informeCon(658, 0)));
+    writeFileSync(
+      p7,
+      RECUENTO_658 +
+        '   RECUENTO @ncr/config ficheros=2 pruebas=144 verdes=144 rojas=0 saltadas=0\n',
+    );
+    comparar().codigo === 0
+      ? ok('también mira `packages/`, no solo `apps/`')
+      : mal('un paquete de packages/ no se compara: media medición');
+    rmSync(join(arbol, 'packages'), { recursive: true, force: true });
 
     // Y las dos formas de quedarse sin nada que comparar.
-    writeFileSync(p5, 'sin un solo recuento\n');
-    writeFileSync(p7, DIRECTO_658);
-    comparar().codigo !== 0
-      ? ok('una salida del paso 5 sin recuentos es un FALLO, no un empate')
-      : mal('sin recuentos del paso 5 daría por bueno cualquier cosa');
-
-    writeFileSync(p5, TURBO_BIEN);
     writeFileSync(p7, 'sin una sola linea RECUENTO\n');
+    writeFileSync(informe, JSON.stringify(informeCon(658, 0)));
     comparar().codigo !== 0
-      ? ok('y una del paso 7 sin líneas RECUENTO, igual')
+      ? ok('una salida del paso 7 sin líneas RECUENTO es un FALLO, no un empate')
       : mal('sin recuentos del paso 7 daría por bueno cualquier cosa');
 
-    // Un fichero que no existe no es «cero divergencias»: es que no se pudo
-    // comparar. Y sin argumentos, el uso — nunca un verde por omisión.
-    const sinFichero = correr(
-      'node',
-      ['scripts/lib/recuentos-coherentes.mjs', join(banco, 'no-existe.txt'), p7],
-      { cwd: raiz },
-    );
-    sinFichero.codigo !== 0 && /no se pudo leer/.test(sinFichero.salida)
-      ? ok('un fichero ilegible se dice, no se confunde con un empate')
-      : mal('un fichero que no existe pasa como si no hubiera divergencias');
+    writeFileSync(p7, RECUENTO_658);
+    rmSync(join(arbol, 'apps'), { recursive: true, force: true });
+    comparar().codigo !== 0
+      ? ok('y no encontrar ningún informe del paso 5, igual')
+      : mal('sin informes del paso 5 daría por bueno cualquier cosa');
+
+    // Un informe ilegible se dice; no se confunde con «cero divergencias».
+    mkdirSync(dirApi, { recursive: true });
+    writeFileSync(join(dirApi, 'package.json'), JSON.stringify({ name: '@ncr/api' }));
+    writeFileSync(informe, '{esto no es json');
+    const roto = comparar();
+    roto.codigo !== 0 && /no se pudo leer/.test(roto.salida)
+      ? ok('un informe ilegible se dice, no se confunde con un empate')
+      : mal('un informe corrupto pasa como si no hubiera divergencias');
 
     correr('node', ['scripts/lib/recuentos-coherentes.mjs'], { cwd: raiz }).codigo !== 0
       ? ok('invocarlo sin argumentos no devuelve verde')

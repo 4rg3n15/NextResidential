@@ -1,91 +1,99 @@
 #!/usr/bin/env node
 /**
- * CONTROL · los dos recuentos del MISMO paquete tienen que coincidir.
+ * CONTROL · los dos recuentos de la MISMA suite tienen que coincidir.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * D-112 · DOS VEREDICTOS SOBRE LO MISMO, Y NADIE LOS COMPARABA
  *
  * El verificador ejecuta la suite DOS veces por caminos distintos:
  *
- *   · paso 5 → `pnpm test`, es decir **turbo**, que construye el entorno del
- *     proceso hijo a partir de lo que `turbo.json` declara.
+ *   · paso 5 → `turbo run test`, que construye el entorno del proceso hijo a
+ *     partir de lo que `turbo.json` declara.
  *   · paso 7 → `metricas.mjs`, que invoca **vitest directamente** y hereda el
  *     entorno entero.
  *
  * La corrida del usuario con la base ya correcta dejó la grieta a la vista: el
  * paso 5 informaba «@ncr/api: 653 passed | 5 skipped» y el paso 7 ejecutaba las
  * 658 sin saltarse ninguna. Las cinco eran las de `residente-pg.test.ts`, que
- * con la base buena PASAN. Bajo turbo no llegaban a correr porque
- * `turbo.json` no declaraba `DATABASE_URL_PRUEBAS`: Turborepo 2.x filtra el
- * entorno, la variable no alcanzaba a vitest y `it.runIf(URL_BASE !== undefined)`
- * las saltaba **en silencio**.
+ * con la base buena PASAN. Los dos pasos daban verde. Los dos mentían a medias.
  *
- * Los dos pasos daban verde. Los dos mentían a medias. Y el verificador tenía
- * las dos cifras delante sin compararlas nunca — que es exactamente la misma
- * familia que «@ncr/api quedó FUERA de la medición»: el dato estaba, faltaba
- * quien lo mirase.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * POR QUÉ NO SE LEE LA CONSOLA DE TURBO — D-113
  *
- * Por eso este control no comprueba un umbral ni un formato: comprueba que dos
- * fuentes que deben decir lo mismo lo digan. Una divergencia significa que uno
- * de los dos caminos NO está ejecutando lo que cree, y da igual cuál: las dos
- * posibilidades son un falso verde.
+ * La primera versión de este control raspaba las líneas `@ncr/api:test: Tests
+ * 658 passed (658)`. En el CI de macOS **turbo no escribe ese prefijo**: agrupa
+ * la salida por tarea y deja las líneas desnudas. El control no reconoció ni un
+ * recuento y falló por su propio formato, no por el defecto que vigila.
+ *
+ * Es el mismo error que `metricas.mjs` existe para no repetir —«las cifras se
+ * recalculan aquí, con el JSON del ejecutor y no con texto raspado de la
+ * consola»— y lo cometí igual, una capa más abajo. Así que el paso 5 pide
+ * también el informe JSON de vitest, cada paquete escribe el suyo en su propio
+ * directorio, y aquí se leen números, no prosa.
  * ═══════════════════════════════════════════════════════════════════════════
  *
- *   node scripts/lib/recuentos-coherentes.mjs <salida-paso-5> <salida-paso-7>
+ *   node scripts/lib/recuentos-coherentes.mjs <raiz> <salida-paso-7>
  */
-import { readFileSync } from 'node:fs';
-import { sinColores } from './sin-colores.mjs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
-const [ruta5, ruta7] = process.argv.slice(2);
-if (!ruta5 || !ruta7) {
-  console.error('uso: recuentos-coherentes.mjs <salida-paso-5> <salida-paso-7>');
+const INFORME = '.informe-paso5.json';
+const [raiz, ruta7] = process.argv.slice(2);
+if (!raiz || !ruta7) {
+  console.error('uso: recuentos-coherentes.mjs <raiz> <salida-paso-7>');
   process.exit(2);
 }
 
-const leer = (ruta) => {
-  try {
-    return sinColores(readFileSync(ruta, 'utf8'));
-  } catch (e) {
-    console.error(`FALLO no se pudo leer ${ruta}: ${e.message}`);
-    process.exit(1);
-  }
-};
-
-/**
- * Paso 5 · turbo prefija cada línea con `<paquete>:test:`, y vitest escribe su
- * resumen con las tres cifras en cualquier orden y solo las que no son cero:
- *
- *     @ncr/api:test:       Tests  658 passed (658)
- *     @ncr/api:test:       Tests  653 passed | 5 skipped (658)
- *     @ncr/api:test:       Tests  1 failed | 657 passed (658)
- *
- * Se lee el total del paréntesis y cada cifra por su etiqueta, para no depender
- * del orden ni de cuáles aparecen.
- */
-const delPaso5 = (texto) => {
+/** Los informes del paso 5, uno por paquete, junto a su `package.json`. */
+const delPaso5 = () => {
   const porPaquete = new Map();
-  for (const linea of texto.split('\n')) {
-    const m = linea.match(/^\s*(\S+):test:\s+Tests\s+(.+?)\s*\((\d+)\)\s*$/);
-    if (!m) continue;
-    const [, paquete, cuerpo, total] = m;
-    const cifra = (etiqueta) => {
-      const c = cuerpo.match(new RegExp(`(\\d+)\\s+${etiqueta}`));
-      return c ? Number(c[1]) : 0;
-    };
-    // El último resumen de un paquete es el que vale: con `--force` puede
-    // haber salidas repetidas y la buena es la que cierra la corrida.
-    porPaquete.set(paquete, {
-      pruebas: Number(total),
-      verdes: cifra('passed'),
-      rojas: cifra('failed'),
-      saltadas: cifra('skipped') + cifra('todo'),
-    });
+  for (const grupo of ['apps', 'packages']) {
+    const base = join(raiz, grupo);
+    if (!existsSync(base)) continue;
+    for (const dir of readdirSync(base)) {
+      const informe = join(base, dir, INFORME);
+      const manifiesto = join(base, dir, 'package.json');
+      if (!existsSync(informe) || !existsSync(manifiesto)) continue;
+      let nombre;
+      let d;
+      try {
+        nombre = JSON.parse(readFileSync(manifiesto, 'utf8')).name;
+        d = JSON.parse(readFileSync(informe, 'utf8'));
+      } catch (e) {
+        console.error(`FALLO ${informe} no se pudo leer: ${e.message}`);
+        process.exit(1);
+      }
+      // Sin `?? []`: el informe JSON de vitest trae SIEMPRE las dos listas, y un
+      // valor por defecto que nunca se usa es una rama que nadie ejecuta.
+      const saltadas = [];
+      for (const s of d.testResults) {
+        for (const a of s.assertionResults) {
+          if (a.status === 'pending' || a.status === 'todo' || a.status === 'skipped') {
+            saltadas.push(`${a.fullName ?? a.title} · ${s.name ?? '?'}`);
+          }
+        }
+      }
+      porPaquete.set(nombre, {
+        pruebas: d.numTotalTests,
+        verdes: d.numPassedTests,
+        rojas: d.numFailedTests,
+        saltadas: d.numPendingTests + d.numTodoTests,
+        nombresSaltadas: saltadas,
+      });
+    }
   }
   return porPaquete;
 };
 
-/** Paso 7 · la línea que `metricas.mjs` escribe para ser leída, no para leerse. */
-const delPaso7 = (texto) => {
+/** Paso 7 · la línea que `metricas.mjs` escribe para ser leída por máquina. */
+const delPaso7 = () => {
+  let texto;
+  try {
+    texto = readFileSync(ruta7, 'utf8');
+  } catch (e) {
+    console.error(`FALLO no se pudo leer ${ruta7}: ${e.message}`);
+    process.exit(1);
+  }
   const porPaquete = new Map();
   for (const linea of texto.split('\n')) {
     const m = linea.match(
@@ -102,8 +110,8 @@ const delPaso7 = (texto) => {
   return porPaquete;
 };
 
-const cinco = delPaso5(leer(ruta5));
-const siete = delPaso7(leer(ruta7));
+const cinco = delPaso5();
+const siete = delPaso7();
 
 if (siete.size === 0) {
   console.error(
@@ -114,8 +122,8 @@ if (siete.size === 0) {
 }
 if (cinco.size === 0) {
   console.error(
-    'FALLO no se reconoció ningún recuento del paso 5. O la suite no corrió, o turbo\n' +
-      '  cambió el formato de sus líneas. En ninguno de los dos casos hay verde.',
+    `FALLO no se encontró ningún ${INFORME}. O la suite del paso 5 no corrió, o no se le\n` +
+      '  pidió el informe JSON. En ninguno de los dos casos hay verde.',
   );
   process.exit(1);
 }
@@ -125,13 +133,12 @@ const divergen = [];
 for (const [paquete, b] of siete) {
   const a = cinco.get(paquete);
   if (a === undefined) {
-    divergen.push({ paquete, motivo: 'el paso 5 no informó de este paquete', a: null, b });
+    divergen.push({ paquete, motivo: 'el paso 5 no dejó informe de este paquete', a: null, b });
     continue;
   }
   const distintos = CAMPOS.filter((c) => a[c] !== b[c]);
-  if (distintos.length > 0) {
+  if (distintos.length > 0)
     divergen.push({ paquete, motivo: `difieren: ${distintos.join(', ')}`, a, b });
-  }
 }
 
 const comoTexto = (x) => (x === null ? '(ausente)' : CAMPOS.map((c) => `${c}=${x[c]}`).join(' '));
@@ -142,14 +149,17 @@ if (divergen.length > 0) {
     console.error(`  ✗ ${d.paquete} — ${d.motivo}`);
     console.error(`      paso 5 (turbo)   : ${comoTexto(d.a)}`);
     console.error(`      paso 7 (directo) : ${comoTexto(d.b)}`);
+    // D-100 aplicado aquí: la divergencia se NOMBRA. Sin esto habría que
+    // reproducirla para saber qué prueba se quedó fuera.
+    for (const n of d.a?.nombresSaltadas ?? []) console.error(`      ⤷ saltada: ${n}`);
   }
   console.error(
     '\n  Los dos pasos ejecutan la MISMA suite por caminos distintos. Si discrepan,\n' +
       '  uno de los dos NO está ejecutando lo que cree, y las dos posibilidades son\n' +
       '  un falso verde. La causa de D-112 fue que `turbo.json` no declaraba las\n' +
-      '  variables de entorno de las que dependen las pruebas, así que turbo las\n' +
-      '  filtraba y vitest saltaba en silencio las que necesitaban base de datos.\n' +
-      '  Compruebe `env` en las tareas `test` y `test:cobertura` de turbo.json.',
+      '  variables de entorno de las que dependen las pruebas: turbo las filtraba y\n' +
+      '  vitest saltaba en silencio las que necesitan base de datos. Compruebe `env`\n' +
+      '  en las tareas `test` y `test:cobertura` de turbo.json.',
   );
   process.exit(1);
 }

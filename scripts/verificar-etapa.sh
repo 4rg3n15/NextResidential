@@ -170,7 +170,15 @@ con_limite "$LIMITE_MEDIO" pnpm typecheck >/dev/null 2>&1 && ok "pnpm typecheck"
 
 paso "5 · suite completa"
 salida_pruebas="$(mktemp)"
-con_limite "$LIMITE_LARGO" pnpm test >"$salida_pruebas" 2>&1
+# `pnpm test` ES `turbo run test`; se invoca turbo directamente para poder
+# pedirle a vitest, ADEMÁS del informe de consola, el JSON que el paso 7b
+# compara. Cada paquete escribe el suyo en su propio directorio (D-113: la
+# consola de turbo no tiene el mismo formato en todas las máquinas, y un
+# control que depende del formato no vigila lo que cree).
+rm -f apps/*/.informe-paso5.json packages/*/.informe-paso5.json
+TURBO_TELEMETRY_DISABLED=1 con_limite "$LIMITE_LARGO" pnpm exec turbo run test -- \
+  --reporter=default --reporter=json --outputFile=.informe-paso5.json \
+  >"$salida_pruebas" 2>&1
 codigo_pruebas=$?
 # ─────────────────────────────────────────────────────────────────────────────
 # D-108 · SIN COLORES ANTES DE CONTAR NADA.
@@ -238,6 +246,10 @@ elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida" && [[ "$CON_BASE" == "1"
   # ───────────────────────────────────────────────────────────────────────────
   mal "hay pruebas SALTADAS con --con-base: una omisión no es un verde"
   grep -E "Tests +[0-9]" <<<"$salida" | grep -E "skipped|todo" | sed 's/^/     /'
+  # Y el resumen de turbo, porque una tarea SERVIDA DESDE CACHÉ reproduce el
+  # resultado de otra corrida con otro entorno: sin esta línea, distinguir «no
+  # le llegó la variable» de «no se ejecutó» exige otra corrida entera.
+  grep -E "^\s*(Tasks|Cached|Time):" <<<"$salida" | sed 's/^/     turbo: /'
   echo "     La base está disponible: nada debería saltarse. Si turbo no le pasa una"
   echo "     variable a vitest, las pruebas que dependen de ella se saltan en silencio"
   echo "     (D-112). Compruebe \`env\` en las tareas de turbo.json."
@@ -602,13 +614,14 @@ paso "7b · los dos recuentos de la MISMA suite coinciden (D-112)"
 # daban verde discrepando: turbo informaba «653 passed | 5 skipped» y vitest
 # ejecutaba las 658. El dato estaba en la salida de los dos; faltaba compararlo.
 if salida_rec=$(con_limite "$LIMITE_CORTO" node scripts/lib/recuentos-coherentes.mjs \
-     "$SALIDA_PASO5" "$SALIDA_PASO7" 2>&1); then
+     "$RAIZ_DEL_REPO" "$SALIDA_PASO7" 2>&1); then
   ok "$salida_rec"
 else
   mal "los dos caminos de la suite NO dan el mismo resultado: uno de los dos miente"
   echo "$salida_rec" | sed 's/^/     /'
 fi
 rm -f "$SALIDA_PASO5" "$SALIDA_PASO7"
+rm -f apps/*/.informe-paso5.json packages/*/.informe-paso5.json
 
 paso "8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)"
 # El entorno de desarrollo objetivo es macOS; el CI de la ETAPA 14 correrá en
