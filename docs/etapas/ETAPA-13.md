@@ -630,22 +630,29 @@ En el primer commit se cumplieron las tres precondiciones:
 
 ### Commits
 
-| SHA       | Qué                                                                                         |
-| --------- | ------------------------------------------------------------------------------------------- |
-| `590deab` | Fusión de `main`: trae `7a63c17`, con el README resuelto a favor de `develop`               |
-| `072abc9` | Precondiciones · base desde `develop`, cabecera corregida, control de coherencia contra git |
-| `9ac73c4` | La deuda de pruebas negativas baja de 7 a 2 — y escribir una destapó **H-13-01**            |
-| `7356701` | **H-13-02** (HKDF por copropiedad, cierra D-41) y **H-13-03** (la tercera capa de ADR-005)  |
-| `fa83f04` | **H-13-04** · la matriz de RLS derivada del catálogo: 42 tablas, no 26                      |
-| `730bd86` | **H-13-05, H-13-06, H-13-07** · el saneamiento de §2.7.4, que nunca se construyó            |
-| `5dd9b89` | **H-13-09 a H-13-23 y H-13-26** · nueve hallazgos, de ALTA a informativa                    |
-| `c419160` | Dos defectos del propio andamiaje, destapados por sus pruebas negativas                     |
-| `74c4335` | Las cinco dimensiones que no se habían medido nunca — y **H-13-24**                         |
-| `7395ac2` | **KPI-11 roto por un comentario mío**, y seis ramas de control que nadie ejercía            |
-| `2ef9899` | **D-96** · el trinquete contaba el SDK de Flutter como código nuevo                         |
+| SHA       | Qué                                                                                                |
+| --------- | -------------------------------------------------------------------------------------------------- |
+| `590deab` | Fusión de `main`: trae `7a63c17`, con el README resuelto a favor de `develop`                      |
+| `072abc9` | Precondiciones · base desde `develop`, cabecera corregida, control de coherencia contra git        |
+| `9ac73c4` | La deuda de pruebas negativas baja de 7 a 2 — y escribir una destapó **H-13-01**                   |
+| `7356701` | **H-13-02** (HKDF por copropiedad, cierra D-41) y **H-13-03** (la tercera capa de ADR-005)         |
+| `fa83f04` | **H-13-04** · la matriz de RLS derivada del catálogo: 42 tablas, no 26                             |
+| `730bd86` | **H-13-05, H-13-06, H-13-07** · el saneamiento de §2.7.4, que nunca se construyó                   |
+| `5dd9b89` | **H-13-09 a H-13-23 y H-13-26** · nueve hallazgos, de ALTA a informativa                           |
+| `c419160` | Dos defectos del propio andamiaje, destapados por sus pruebas negativas                            |
+| `74c4335` | Las cinco dimensiones que no se habían medido nunca — y **H-13-24**                                |
+| `7395ac2` | **KPI-11 roto por un comentario mío**, y seis ramas de control que nadie ejercía                   |
+| `2ef9899` | **D-96** · el trinquete contaba el SDK de Flutter como código nuevo                                |
+| `8bb90dc` | Informe de auditoría, informe de etapa y `ESTADO_ETAPAS.md` al día                                 |
+| `f6f46f1` | La sonda de «rama fusionada» tomaba prestada `develop`, y el CI no la tiene                        |
+| `a6f702b` | **La mitad de D-100 que faltaba**: con `CI=1` Vitest cambia de reportero y la roja quedaba anónima |
+| `3fec6f4` | El veredicto literal del verificador, con sus dos avisos a la vista                                |
+| `8124ddb` | **D-101** · 26 corridas más sin reproducir, y el único dato nuevo                                  |
+| `5cd2286` | El recuento por severidad no cuadraba con su propia tabla                                          |
+| `67f4b1a` | De qué corrida sale el veredicto, y qué cambió después                                             |
 
-> Los últimos tres commits no corrigen producto: corrigen **los controles y el
-> informe de esta misma etapa**, cada uno porque un control se puso en rojo. Que
-> estén en el historial en vez de aplastados en un `--amend` es deliberado: la
-> etapa que audita la disciplina del proyecto no puede esconder sus propios
-> tropiezos con ella.
+> **Cinco de los diecinueve no corrigen producto: corrigen los controles y el
+> informe de esta misma etapa**, cada uno porque algo se puso en rojo —tres de
+> ellos porque lo puso el CI y no la máquina local—. Que estén en el historial
+> en vez de aplastados en un `--amend` es deliberado: la etapa que audita la
+> disciplina del proyecto no puede esconder sus propios tropiezos con ella.
