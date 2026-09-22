@@ -29,3 +29,5 @@ export * from './equipo/cliente';
 export * from './equipo/catalogo-de-rutas';
 export * from './equipo/escucha-alertstream';
 export * from './terminal/terminal-facial';
+export * from './videoportero/videoportero';
+export * from './videoportero/intercom-equipo';
