@@ -513,6 +513,26 @@ Corregido en esta etapa: el filtro recoge también `FAIL ` y las líneas de
 detalle, y cuando aun así no encuentre nombre lo dirá con todas las letras —«es
 un defecto de ESTE control, no una roja anónima»— en vez de callar.
 
+**Y luego no volvió a aparecer.** Perseguida en el mismo entorno, sobre el mismo
+commit, con la base viva:
+
+| Intento                                                            | Corridas | Rojas |
+| ------------------------------------------------------------------ | -------: | ----: |
+| `CI=1 TURBO_FORCE=true pnpm --filter @ncr/api test`                |       12 | **0** |
+| `CI=1 TURBO_FORCE=true pnpm test` (la suite COMPLETA, en paralelo) |        8 | **0** |
+| Paso 14 del verificador (tres corridas por ejecución), después     |        6 | **0** |
+
+Van **26 corridas** sin reproducir, sumadas a los 11 intentos de la ETAPA 12.
+Lo único que la aparición añade al expediente es un dato: **salió bajo la suite
+COMPLETA en paralelo, no bajo `@ncr/api` a solas**, lo que apunta a contención
+de recursos entre los seis paquetes y no a la lógica de una prueba.
+
+**No se cierra.** La instrucción de la etapa era explícita —_no la cierres por
+ausencia de síntoma_— y sigue valiendo ahora que el síntoma apareció una vez:
+una aparición no es un diagnóstico. Se reasigna a la ETAPA 14, que es donde vive
+la observabilidad, con el dato nuevo y con el control ya arreglado para que la
+próxima vez se nombre sola de verdad.
+
 ### Deuda que esta etapa NO cierra, y por qué
 
 | ID          | Qué                                                                         | Por qué sigue abierta                                                                                                                              |

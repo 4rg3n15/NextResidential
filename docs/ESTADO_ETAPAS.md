@@ -722,9 +722,13 @@ reportero** y emite `FAIL <fichero> > <suite> > <prueba>` sin una sola línea co
 D-100 dejó sin cerrar, y es la misma familia dentro de la corrección de la
 familia. Corregido en esta etapa.
 
-**Sigue ABIERTA**, y se reasigna a la ETAPA 14 con lo que se sabe: aparece sólo
-bajo la suite COMPLETA en paralelo —doce corridas de `@ncr/api` a solas dieron
-verde—, lo que apunta a contención de recursos y no a la lógica de una prueba.
+**Sigue ABIERTA**, y se reasigna a la ETAPA 14 con lo que se sabe. Perseguida
+después sobre el mismo commit: 12 corridas de `@ncr/api` a solas, 8 de la suite
+COMPLETA en paralelo y 6 más del paso 14 — **26 sin reproducir**, sumadas a los
+11 intentos de la ETAPA 12. Lo único que la aparición añade es un dato: salió
+bajo la suite completa en paralelo y no bajo `@ncr/api` a solas, lo que apunta a
+contención de recursos y no a la lógica de una prueba. **Una aparición no es un
+diagnóstico**, así que no se cierra.
 
 ### Aceptaciones de riesgo **pendientes de firma**
 
