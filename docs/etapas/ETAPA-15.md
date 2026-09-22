@@ -233,8 +233,12 @@ facial real, no.
 | Paquete          | Pruebas | Nuevas en esta etapa                                        |
 | ---------------- | ------: | ----------------------------------------------------------- |
 | `@ncr/providers` |     146 | +68: catálogo, transporte, terminal, videoportero, simulado |
-| `@ncr/api`       |     862 | +41: receptor, registro de equipos, recorrido de placa      |
+| `@ncr/api`       |     857 | +44: receptor, registro de equipos, recorrido de placa      |
 | `@ncr/web`       |     376 | +25: medidas de calidad, pantalla de captura, panel         |
+| Flutter          |     160 | sin cambios; el cliente generado sí se regeneró             |
+
+`@ncr/api` informa además **5 omitidas**, que son las de siempre y no son de
+esta etapa. Las cifras definitivas y el veredicto literal, más abajo.
 
 ### Los tres defectos que encontraron los controles al construir esto
 
