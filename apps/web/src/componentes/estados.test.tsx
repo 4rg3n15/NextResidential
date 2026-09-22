@@ -75,12 +75,14 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
     expect(claves).not.toContain('viviendas');
   });
 
-  it('el administrador ve las doce entradas: nueve del mockup, dos consolas operativas y latencias', () => {
+  it('el administrador ve las trece entradas, y cada añadido tiene su etapa', () => {
     // Nueve hasta la ETAPA 09; la 10 añade Portería y Guardia virtual, que son
     // DOS superficies y no una (C-12); la 14 añade Latencias, que no está en
-    // el mockup porque el mockup no tenía tablero de observabilidad.
-    expect(navegacionDe('administrador')).toHaveLength(12);
-    expect(NAVEGACION).toHaveLength(12);
+    // el mockup porque el mockup no tenía tablero de observabilidad; y la 15
+    // añade Rostro del visitante, que tampoco estaba: la captura vivía sólo en
+    // la app del residente (ADR-016) y el escritorio no tenía por dónde.
+    expect(navegacionDe('administrador')).toHaveLength(13);
+    expect(NAVEGACION).toHaveLength(13);
   });
 
   it('el portero NO ve las latencias: no es información de su puesto', () => {

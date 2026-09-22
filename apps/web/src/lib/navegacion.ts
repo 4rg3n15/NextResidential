@@ -47,6 +47,8 @@ export const ICONOS_DE_NAVEGACION = [
   'DoorOpen',
   'RadioTower',
   'Gauge',
+  // ETAPA 15 · la captura biométrica desde la consola.
+  'ScanFace',
 ] as const;
 export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 
@@ -90,6 +92,22 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     roles: OPERACION,
     pendienteDeEtapa: null,
     icono: 'UserRoundCheck',
+  },
+  /**
+   * ETAPA 15 · anticipo autorizado del punto 4 de la ETAPA 16.
+   *
+   * Va junto a Visitantes y no en Dispositivos porque lo que se captura es el
+   * rostro de **una persona que visita**, y quien lo hace está atendiéndola.
+   * Colgarlo del inventario de equipos lo habría convertido en una tarea de
+   * mantenimiento, que es justo lo que no es.
+   */
+  {
+    clave: 'biometria',
+    etiqueta: 'Rostro del visitante',
+    ruta: '/biometria',
+    roles: OPERACION,
+    pendienteDeEtapa: null,
+    icono: 'ScanFace',
   },
   {
     clave: 'zonas',

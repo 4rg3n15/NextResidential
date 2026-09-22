@@ -69,9 +69,32 @@ export class CapturarRostroDto {
   @Type(() => MedidasDto)
   medidas!: MedidasDto;
 
-  @ApiProperty({ description: 'Vector biométrico en base64. No es la fotografía.' })
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * EL TECHO SUBE EN LA ETAPA 15, Y HAY QUE DECIR POR QUÉ
+   *
+   * Los 16 KiB de base64 daban 12 KiB de dato, que sirven para un vector y
+   * **no** para lo que la terminal de esta etapa necesita: el equipo construye
+   * la plantilla a partir de una IMAGEN y no acepta un vector nuestro. Con el
+   * techo anterior, el recorrido facial no cabía por esta ruta.
+   *
+   * Sube a 256 KiB de base64 —192 KiB de dato—, que es holgado para un rostro
+   * de 640 px y sigue siendo un techo: el navegador reduce y recorta antes de
+   * enviar (`lib/biometria/imagen.ts`, minimización de la Ley 1581 art. 4), y
+   * este límite es la red que impide que un cliente modificado suba una foto
+   * de doce megapíxeles a una bóveda cifrada.
+   *
+   * Lo que NO cambia: nada devuelve este dato. La bóveda cifra al guardar y
+   * ninguna ruta lo lee.
+   */
+  @ApiProperty({
+    description:
+      'Dato biométrico en base64, cifrado en la bóveda al guardarse. Con la terminal ' +
+      'de la ETAPA 15 es la imagen del rostro reducida, no un vector derivado: el ' +
+      'equipo construye la plantilla y no admite otra cosa.',
+  })
   @IsBase64()
-  @MaxLength(16384)
+  @MaxLength(262144)
   vector!: string;
 
   @ApiProperty({ description: 'Versión de la política de tratamiento aceptada' })

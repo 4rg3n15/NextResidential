@@ -1348,7 +1348,7 @@ export interface components {
             titularId: string;
             autorizacionId?: string;
             medidas: components["schemas"]["MedidasDto"];
-            /** @description Vector biométrico en base64. No es la fotografía. */
+            /** @description Dato biométrico en base64, cifrado en la bóveda al guardarse. Con la terminal de la ETAPA 15 es la imagen del rostro reducida, no un vector derivado: el equipo construye la plantilla y no admite otra cosa. */
             vector: string;
             /** @description Versión de la política de tratamiento aceptada */
             versionPolitica: string;

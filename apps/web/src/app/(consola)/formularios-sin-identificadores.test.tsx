@@ -385,6 +385,18 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
     'la entrada es un archivo, y su validación por fila la hace el servidor con reporte por fila',
   'configuracion/formulario.tsx':
     'campos numéricos con min/max declarados que el navegador impide enviar fuera de rango, y 422 por campo',
+  /**
+   * ETAPA 15 · no abre diálogo: es una secuencia de tres tarjetas en la propia
+   * página, así que el recorrido de arriba —que busca `role="dialog"` y su
+   * botón de envío— no la alcanza. El único identificador que viaja,
+   * `titularId`, sale del buscador compartido, que SÍ entra en este barrido
+   * por vivir en `componentes/`. Lo que aquí se declara lo comprueba
+   * `biometria/pantalla.test.tsx`, con lo propio de una captura encima: que no
+   * exista forma de aceptar el consentimiento desde la consola (RN-10) y que
+   * sin detector de rostros no se invente uno.
+   */
+  'biometria/pantalla.tsx':
+    'no es un diálogo; el único identificador lo aporta el buscador compartido, y tiene prueba propia',
 };
 
 /**

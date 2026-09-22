@@ -28,7 +28,7 @@ class CapturarRostroDto {
   final String? autorizacionId;
   final MedidasDto medidas;
 
-  /// Vector biométrico en base64. No es la fotografía.
+  /// Dato biométrico en base64, cifrado en la bóveda al guardarse. Con la terminal de la ETAPA 15 es la imagen del rostro reducida, no un vector derivado: el equipo construye la plantilla y no admite otra cosa.
   final String vector;
 
   /// Versión de la política de tratamiento aceptada
