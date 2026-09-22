@@ -860,20 +860,31 @@ try {
      * con la fusión hecha hacía horas. El control no lo veía porque solo
      * comparaba el documento CONSIGO MISMO. Ahora le pregunta a git.
      *
-     * Se usa `develop` como rama de ejemplo: resuelve en cualquier clon del
-     * repositorio y es ancestro de toda rama de etapa, que es exactamente la
-     * condición que el control persigue.
+     * LA RAMA SE CREA EN EL BANCO, no se toma prestada del repositorio.
+     *
+     * La primera versión usaba `develop` «porque resuelve en cualquier clon», y
+     * el CI demostró que no: `actions/checkout` deja como referencia LOCAL solo
+     * la rama del evento, así que en el runner `develop` no existe y la sonda
+     * caía en la rama de «no resuelta» —que, correctamente, no falla—. Verde en
+     * local, rojo en CI, y por una diferencia de entorno que no tenía nada que
+     * ver con lo que la sonda quiere demostrar.
+     *
+     * Aquí se crea `rama-sonda-fusionada` en el clon, apuntando a su propio
+     * `HEAD`: un commit es ancestro de sí mismo, que es exactamente la
+     * condición «ya fusionada» que el control persigue. Hermético, y da igual
+     * qué referencias traiga la máquina.
      */
-    const fusionada = join(banco, 'estado-rama-fusionada.md');
+    enClon('git', ['branch', '-f', 'rama-sonda-fusionada', 'HEAD']);
+    const fusionada = join(clon, 'estado-rama-fusionada.md');
     writeFileSync(
       fusionada,
       doc.replace(
         /^(\*\*Última actualización:\*\*[^\n]*)$/m,
-        '$1 · y en curso la rama `develop` (sonda)',
+        '$1 · y en curso la rama `rama-sonda-fusionada`',
       ),
     );
-    const rd = correr('node', ['scripts/lib/coherencia-estado-etapas.mjs', fusionada], {
-      cwd: raiz,
+    const rd = correr('node', [join(raiz, 'scripts/lib/coherencia-estado-etapas.mjs'), fusionada], {
+      cwd: clon,
     });
     rd.codigo !== 0 && /ya está FUSIONADA/.test(rd.salida)
       ? ok('una rama «en curso» que ya está fusionada: detectada contra git')
