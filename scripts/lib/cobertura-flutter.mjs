@@ -88,6 +88,28 @@ for (const { nombre, umbral } of CAPAS) {
   if (p < umbral) fallos += 1;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * H-13-01 · UN INFORME VACÍO NO ES «TODO CUBIERTO».
+ *
+ * Hallazgo de la ETAPA 13, encontrado escribiendo la prueba negativa que este
+ * control debía a la deuda declarada: con un `lcov.info` de CERO bytes el
+ * control imprimía «✓ global 100.00 %» y salía 0. La división 0/0 se resolvía
+ * a favor del verde.
+ *
+ * No es teórico: un `flutter test --coverage` que aborta antes de escribir
+ * nada deja exactamente ese fichero, y el paso 5c del verificador lo habría
+ * leído como una app enteramente cubierta. Es la familia entera de §2.8.0 —el
+ * verde que no se reproduce— dentro del control que la persigue.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+if (globalTotal === 0) {
+  console.error('FALLO el informe de cobertura no contiene ni una línea medible.');
+  console.error(`  ${ruta} existe pero está vacío o no tiene registros SF:/DA:.`);
+  console.error('  Una cobertura de cero líneas no es el 100 %: es una suite que no corrió.');
+  process.exit(1);
+}
+
 const global = porcentaje({ alcanzadas: globalAlcanzadas, total: globalTotal });
 const UMBRAL_GLOBAL = 70;
 console.log(

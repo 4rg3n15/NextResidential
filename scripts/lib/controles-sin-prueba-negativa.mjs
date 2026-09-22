@@ -71,22 +71,37 @@ const EXENTOS = new Map([
  * SOLO PUEDE ENCOGER.
  */
 const DEUDA = new Map([
-  ['scripts/lib/cliente-dart-desfasado.mjs', 'aquí vivió D-82; se prueba en 11-B'],
-  ['scripts/lib/flutter-sin-secretos.mjs', 'inyectar un secreto en un .dart y exigir detección'],
-  ['scripts/lib/cobertura-flutter.mjs', 'bajar un umbral y exigir que lo note'],
   [
-    'scripts/lib/verificar-escritura.mjs',
-    'ejercido a mano como usuario sin permisos, no en la suite',
+    'scripts/lib/cliente-dart-desfasado.mjs',
+    'exige REGENERAR el cliente con el SDK de Dart y comparar: sin SDK no hay nada ' +
+      'que comparar, y un banco sin Dart daría verde por ausencia. Se cierra donde ' +
+      'haya SDK — el trabajo de macOS del CI lo tiene (ETAPA 14)',
   ],
-  ['scripts/lib/verificar-base-de-pruebas.mjs', 'apuntar a un puerto muerto y exigir detección'],
-  ['apps/mobile/e2e/recorrido-web.mjs', 'romper una pantalla y exigir que el recorrido lo vea'],
-  ['scripts/lib/dependencias-acotadas.mjs', 'nacido hoy con este mismo control; se prueba en 11-B'],
-  // `scripts/lib/metricas.mjs` estuvo aquí desde 11-B con el motivo «su prueba
-  // negativa exige correr la suite entera». Salió de la deuda en la ETAPA 12,
-  // cuando D-100 demostró lo caro que era no tenerla: el control llevaba desde
-  // la 09 sin que nadie viera qué imprime con una roja de verdad, y lo que
-  // imprimía mandaba a buscar el defecto donde no estaba. La sonda 22 lo
-  // ejercita en dos segundos restringiendo la medición a un paquete.
+  [
+    'apps/mobile/e2e/recorrido-web.mjs',
+    'exige compilar la app para web, servirla y conducir un navegador. Es el paso 5e, ' +
+      'declarado no ejercido desde el 2026-09-19 por diferencia de entorno; su prueba ' +
+      'negativa no puede ser más firme que el propio paso (ETAPA 14)',
+  ],
+  // ───────────────────────────────────────────────────────────────────────────
+  // RETIRADOS EN LA ETAPA 13, con su prueba negativa escrita (sonda 26):
+  //
+  //   · `flutter-sin-secretos.mjs`     — acepta la ruta de la app: se le da un
+  //     árbol con una llave `sb_secret_` dentro de un `.dart` y se exige que la
+  //     nombre. Y uno limpio, para que no sea un control que siempre grita.
+  //   · `cobertura-flutter.mjs`        — acepta la ruta del lcov. Escribirle la
+  //     prueba DESTAPÓ UN DEFECTO: con un informe vacío decía «global 100 %» y
+  //     salía 0 (hallazgo H-13-01). Corregido y cubierto.
+  //   · `verificar-base-de-pruebas.mjs`— un puerto muerto y una variable vacía.
+  //   · `dependencias-acotadas.mjs`    — una acotación sin motivo escrito, en un
+  //     pubspec de sonda.
+  //   · `verificar-escritura.mjs`      — un FICHERO donde espera un DIRECTORIO.
+  //     No se usan permisos: esta suite corre como root y root escribe donde
+  //     quiera, así que un `chmod` no demostraría nada.
+  //
+  // La deuda baja de 7 a 2, y las dos que quedan no son pereza: necesitan
+  // ejecutar Dart y un navegador contra la app compilada.
+  // ───────────────────────────────────────────────────────────────────────────
 ]);
 
 const RUTA = /(?:scripts\/lib|e2e|apps\/mobile\/e2e)\/[a-z0-9-]+\.mjs/g;

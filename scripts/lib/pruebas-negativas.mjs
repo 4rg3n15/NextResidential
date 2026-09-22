@@ -24,10 +24,10 @@ import {
   writeFileSync,
   mkdtempSync,
   mkdirSync,
+  chmodSync,
   rmSync,
   readFileSync,
   cpSync,
-  chmodSync,
   symlinkSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -953,9 +953,12 @@ try {
     // Y la otra mitad del trinquete: una exención que ya no corresponde. Sin
     // esto, la lista de deuda protegería para siempre a un control que ya tiene
     // prueba —o que ya nadie ejecuta— y volvería a ser una lista a mano.
+    // Se usa un control que SIGA en la lista DEUDA: si se apunta a uno que ya
+    // salió de ella, quitarlo del verificador no crea ningún zombi y la sonda
+    // pasa a probar nada. Ocurrió al liquidar cinco deudas en la ETAPA 13.
     writeFileSync(
       verificador,
-      original.replace('node scripts/lib/dependencias-acotadas.mjs', 'true'),
+      original.replace('node scripts/lib/cliente-dart-desfasado.mjs', 'true'),
     );
     const rz = enClon('node', ['scripts/lib/controles-sin-prueba-negativa.mjs']);
     rz.codigo !== 0 && /ya no le corresponde/.test(rz.salida)
@@ -1740,6 +1743,131 @@ try {
     )
       ? ok('y lo dice con todas las letras cuando no hay ninguna')
       : mal('con cero saltadas calla: el silencio se lee como «no miré»');
+  }
+
+  console.log('\n▸ 26 · cinco controles salen de la deuda de prueba negativa (ETAPA 13)');
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * LA DEUDA DECLARADA, PAGADA DONDE SE PUEDE PAGAR
+     *
+     * Siete controles entraron en `DEUDA` el 2026-09-19 con su motivo escrito.
+     * La ETAPA 13 los revisa uno por uno, que es lo que una auditoría hace con
+     * una deuda: no la hereda, la liquida o la justifica.
+     *
+     * Cinco son ganables sin SDK de Flutter porque aceptan la ruta que miran o
+     * se dejan apuntar con `cwd`. Los otros dos —`cliente-dart-desfasado` y
+     * `recorrido-web`— necesitan ejecutar Dart y un navegador contra la app
+     * compilada; se quedan en la deuda con el motivo actualizado, que es la
+     * otra mitad legítima de la regla.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const arbol13 = join(banco, 'deuda-13');
+
+    // (a) flutter-sin-secretos · un secreto incrustado en un .dart.
+    {
+      const app = join(arbol13, 'app-con-secreto');
+      mkdirSync(join(app, 'lib'), { recursive: true });
+      writeFileSync(
+        join(app, 'lib', 'config.dart'),
+        "const llave = 'sb_secret_" + 'A1b2C3d4E5f6G7h8I9j0' + "';\n",
+      );
+      const r = correr('node', ['scripts/lib/flutter-sin-secretos.mjs', app], { cwd: raiz });
+      r.codigo !== 0 && /config\.dart/.test(r.salida)
+        ? ok('flutter-sin-secretos: una llave secreta en un .dart se detecta, con su fichero')
+        : mal(`flutter-sin-secretos NO detecta una llave incrustada (codigo ${r.codigo})`);
+
+      const limpia = join(arbol13, 'app-limpia');
+      mkdirSync(join(limpia, 'lib'), { recursive: true });
+      writeFileSync(join(limpia, 'lib', 'config.dart'), "const base = 'https://api.example';\n");
+      correr('node', ['scripts/lib/flutter-sin-secretos.mjs', limpia], { cwd: raiz }).codigo === 0
+        ? ok('y una app sin secretos no se marca')
+        : mal('flutter-sin-secretos marca una app limpia: falso positivo');
+    }
+
+    // (b) cobertura-flutter · un lcov por debajo del umbral.
+    {
+      const bajo = join(arbol13, 'lcov-bajo.info');
+      // Una capa de dominio con 10 líneas y 1 cubierta: 10 %, muy por debajo del 90 %.
+      const lineas = Array.from({ length: 10 }, (_, i) => `DA:${i + 1},${i === 0 ? 1 : 0}`);
+      writeFileSync(bajo, `SF:lib/dominio/regla.dart\n${lineas.join('\n')}\nend_of_record\n`);
+      const r = correr('node', ['scripts/lib/cobertura-flutter.mjs', bajo], { cwd: raiz });
+      r.codigo !== 0
+        ? ok('cobertura-flutter: una capa por debajo del umbral se detecta')
+        : mal(`cobertura-flutter da por buena una capa al 10 % (codigo ${r.codigo})`);
+
+      const vacio = join(arbol13, 'lcov-vacio.info');
+      writeFileSync(vacio, '');
+      correr('node', ['scripts/lib/cobertura-flutter.mjs', vacio], { cwd: raiz }).codigo !== 0
+        ? ok('y un lcov VACÍO no se lee como «todo cubierto»')
+        : mal('un lcov vacío pasa por bueno: es el falso verde que el control persigue');
+    }
+
+    // (c) verificar-base-de-pruebas · un puerto muerto y una base sin esquema.
+    {
+      const muerto = correr('node', ['scripts/lib/verificar-base-de-pruebas.mjs'], {
+        cwd: raiz,
+        env: { ...process.env, DATABASE_URL_PRUEBAS: 'postgresql://nadie@127.0.0.1:1/ncr' },
+      });
+      muerto.codigo !== 0 && /no se pudo usar la base/.test(muerto.salida)
+        ? ok('verificar-base-de-pruebas: un puerto muerto se detecta y se nombra')
+        : mal(`un puerto muerto NO se detecta (codigo ${muerto.codigo})`);
+
+      const sinVariable = correr('node', ['scripts/lib/verificar-base-de-pruebas.mjs'], {
+        cwd: raiz,
+        env: { ...process.env, DATABASE_URL_PRUEBAS: '' },
+      });
+      sinVariable.codigo !== 0 && /no está definida/.test(sinVariable.salida)
+        ? ok('y la variable vacía tampoco pasa por buena')
+        : mal('una DATABASE_URL_PRUEBAS vacía se lee como definida');
+    }
+
+    // (d) dependencias-acotadas · una acotación sin motivo escrito.
+    {
+      const app = join(arbol13, 'pub-a-ciegas', 'apps', 'mobile');
+      mkdirSync(app, { recursive: true });
+      writeFileSync(
+        join(app, 'pubspec.yaml'),
+        'name: ncr\ndependency_overrides:\n  objective_c: 9.4.0\n',
+      );
+      // La ruta del guion va ABSOLUTA: con `cwd` cambiado, la relativa no
+      // resuelve y node sale 1 por MODULE_NOT_FOUND. La primera versión de esta
+      // sonda leía ese 1 como «detectado» — pasaba por la razón equivocada, que
+      // es exactamente la familia de defecto que esta suite existe para cerrar.
+      const r = correr('node', [join(raiz, 'scripts/lib/dependencias-acotadas.mjs')], {
+        cwd: join(arbol13, 'pub-a-ciegas'),
+      });
+      r.codigo !== 0 && /objective_c/.test(r.salida)
+        ? ok('dependencias-acotadas: una acotación SIN motivo escrito se detecta')
+        : mal(`una acotación a ciegas NO se detecta (codigo ${r.codigo})`);
+    }
+
+    // (e) verificar-escritura · una ruta que NO se puede usar.
+    {
+      /**
+       * La sonda no usa permisos: esta suite corre como root en el contenedor y
+       * root escribe donde quiera, así que un `chmod 500` no demuestra nada —la
+       * primera versión de esta sonda lo intentó y pasaba por la razón
+       * equivocada—. Se usa una condición que ningún privilegio salva: un
+       * FICHERO donde el control espera un DIRECTORIO.
+       */
+      const app = join(arbol13, 'sin-permiso');
+      mkdirSync(join(app, 'apps', 'mobile'), { recursive: true });
+      writeFileSync(join(app, 'apps', 'mobile', 'pubspec.yaml'), 'name: ncr\n');
+      writeFileSync(
+        join(app, 'apps', 'mobile', '.dart_tool'),
+        'esto es un fichero, no un directorio',
+      );
+      const r = correr('node', [join(raiz, 'scripts/lib/verificar-escritura.mjs')], { cwd: app });
+      r.codigo !== 0 && /dart_tool/.test(r.salida)
+        ? ok('verificar-escritura: una ruta inservible se detecta y se nombra')
+        : mal(`una ruta inservible pasa por buena (codigo ${r.codigo})`);
+
+      rmSync(join(app, 'apps', 'mobile', '.dart_tool'), { force: true });
+      correr('node', [join(raiz, 'scripts/lib/verificar-escritura.mjs')], { cwd: app }).codigo === 0
+        ? ok('y un árbol sano no se marca')
+        : mal('verificar-escritura marca un árbol sano: falso positivo');
+    }
   }
 } finally {
   rmSync(banco, { recursive: true, force: true });

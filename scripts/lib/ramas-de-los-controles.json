@@ -1,14 +1,17 @@
 {
+  "scripts/lib/cobertura-flutter.mjs": 7,
   "scripts/lib/coherencia-estado-etapas.mjs": 24,
   "scripts/lib/contar-pruebas.mjs": 4,
   "scripts/lib/contrato-desfasado.mjs": 3,
   "scripts/lib/contrato-tipado.mjs": 20,
   "scripts/lib/controles-declarados.mjs": 5,
   "scripts/lib/controles-sin-prueba-negativa.mjs": 1,
+  "scripts/lib/dependencias-acotadas.mjs": 6,
   "scripts/lib/entorno-declarado.mjs": 3,
   "scripts/lib/escanear-secretos.mjs": 3,
   "scripts/lib/esquemas-unicos.mjs": 0,
   "scripts/lib/estabilidad.mjs": 8,
+  "scripts/lib/flutter-sin-secretos.mjs": 8,
   "scripts/lib/frontera-append-only.mjs": 1,
   "scripts/lib/frontera-construccion.mjs": 6,
   "scripts/lib/frontera-csp.mjs": 0,
@@ -21,5 +24,7 @@
   "scripts/lib/portabilidad.mjs": 2,
   "scripts/lib/ramas-de-los-controles.mjs": 12,
   "scripts/lib/recuentos-coherentes.mjs": 3,
-  "scripts/lib/sin-colores.mjs": 1
+  "scripts/lib/sin-colores.mjs": 1,
+  "scripts/lib/verificar-base-de-pruebas.mjs": 11,
+  "scripts/lib/verificar-escritura.mjs": 8
 }
