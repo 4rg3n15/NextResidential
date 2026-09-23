@@ -6,6 +6,7 @@ import type { Firmante } from './utilidades';
 import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
 import { SondaPorProveedor } from '../src/equipos/infraestructura/sonda-por-proveedor';
+import { equiposSimulados } from '@ncr/providers';
 
 /**
  * A · APROVISIONAMIENTO DE EQUIPOS DESDE LA CONSOLA
@@ -173,54 +174,105 @@ describe('A.2 · quién puede, rol a rol', () => {
  * probado el controlador y dejado sin probar justo lo que esta parte añade.
  * ═══════════════════════════════════════════════════════════════════════════
  */
-const respuesta = (estado: number, cuerpo: string): Response =>
-  new Response(cuerpo, { status: estado, headers: { 'content-type': 'application/xml' } });
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LA CÁMARA LA PONE EL PAQUETE DE PROVEEDORES, NO ESTE FICHERO · 15-C
+ *
+ * La primera versión escribía aquí el XML de cada documento del equipo, y
+ * KPI-11 la marcó **con razón**: el nombre de un elemento del fabricante es
+ * vocabulario del fabricante aunque esté en una prueba. Un banco que conoce el
+ * protocolo es un banco que hay que tocar cuando el protocolo cambia — que es
+ * exactamente lo que la frontera existe para evitar.
+ *
+ * Ahora el equipo simulado lo sirve `@ncr/providers`, con los documentos
+ * literales de la guía, y aquí sólo se dice **qué equipo** hay al otro lado:
+ * uno conforme, uno que decide por su cuenta, uno que no reconoce matrículas.
+ * Esta prueba no sabe cómo se escribe ninguna de esas tres cosas.
+ */
+const CAMARA = { familia: 'camara', usuario: ALTA.usuario, clave: ALTA.secreto } as const;
 
-const INFO = `<?xml version="1.0"?><DeviceInfo>
-  <model>DS-TCG405-E</model><firmwareVersion>V5.7.3</firmwareVersion></DeviceInfo>`;
+const camara = (guion: Record<string, unknown> = {}): typeof fetch =>
+  equiposSimulados({ [ALTA.host]: { ...CAMARA, ...guion } });
 
 describe('A.3 · «probar conexión» distingue cuatro situaciones, no una', () => {
-  const sondaCon = (manejar: (url: string) => Response): SondaPorProveedor =>
-    new SondaPorProveedor(((entrada: string | URL) =>
-      Promise.resolve(manejar(String(entrada)))) as typeof fetch);
+  const sondaCon = (peticion: typeof fetch): SondaPorProveedor => new SondaPorProveedor(peticion);
 
   it('alcanzado: guarda modelo y firmware del propio equipo', async () => {
-    const r = await sondaCon((url) =>
-      url.includes('entranceParam')
-        ? respuesta(
-            200,
-            '<EntranceParamList><EntranceParam><ctrlMod>1</ctrlMod></EntranceParam></EntranceParamList>',
-          )
-        : respuesta(200, INFO),
-    ).probar({ ...ALTA, tipo: 'camara_lpr' });
+    const r = await sondaCon(camara({ modelo: 'MODELO-DE-PRUEBA', firmware: 'V9.9.9' })).probar({
+      ...ALTA,
+      tipo: 'camara_lpr',
+    });
 
     expect(r.clase).toBe('alcanzado');
     expect(r.verificado).toBe(true);
-    expect(r.modelo).toBe('DS-TCG405-E');
-    expect(r.firmware).toBe('V5.7.3');
+    expect(r.modelo).toBe('MODELO-DE-PRUEBA');
+    expect(r.firmware).toBe('V9.9.9');
   });
 
-  it('decide por su cuenta: contesta, autentica, y ctrlMod ≠ 1 → NO VERIFICADO', async () => {
+  it('y trae la FICHA: qué se leyó, qué debería decir y si hay botón', async () => {
+    // Los cuatro desenlaces dicen si se puede operar; la ficha dice qué hay que
+    // cambiar. Sin ella, «la cámara decide por su cuenta» manda a recorrer la
+    // interfaz del aparato buscando cuál de tres cosas es.
+    const r = await sondaCon(camara()).probar({ ...ALTA, tipo: 'camara_lpr' });
+    expect(r.ficha?.hallazgos.length).toBeGreaterThan(0);
+    expect(r.ficha?.hallazgos.some((h) => /quién decide/.test(h.campo))).toBe(true);
+  });
+
+  it('decide por su cuenta: contesta, autentica, y el modo ≠ 1 → NO VERIFICADO', async () => {
     // Es el hallazgo de bloqueo de C.1 llevado al alta. Con la cámara
     // decidiendo, el motor de reglas queda decorativo y se pierde la traza.
-    const r = await sondaCon((url) =>
-      url.includes('entranceParam')
-        ? respuesta(
-            200,
-            '<EntranceParamList><EntranceParam><ctrlMod>0</ctrlMod></EntranceParam></EntranceParamList>',
-          )
-        : respuesta(200, INFO),
-    ).probar({ ...ALTA, tipo: 'camara_lpr' });
+    const r = await sondaCon(camara({ ctrlMod: '0', modelo: 'MODELO-DE-PRUEBA' })).probar({
+      ...ALTA,
+      tipo: 'camara_lpr',
+    });
 
     expect(r.clase).toBe('decide_solo');
     expect(r.verificado).toBe(false);
     // Y el modelo SÍ se conoce: el equipo contestó. Perder ese dato obligaría a
     // teclearlo a mano justo cuando el operador ya tiene un problema.
-    expect(r.modelo).toBe('DS-TCG405-E');
+    expect(r.modelo).toBe('MODELO-DE-PRUEBA');
+  });
+
+  it('LA SEGUNDA VÍA · la lista blanca del equipo abre sola y eso bloquea', async () => {
+    // El modo de control está BIEN. Lo que decide es la política interna: la
+    // cámara lleva su propio motor de reglas y abre para su lista blanca.
+    const r = await sondaCon(camara({ operacionDeListaBlanca: 'on' })).probar({
+      ...ALTA,
+      tipo: 'camara_lpr',
+    });
+    expect(r.clase).toBe('decide_solo');
+    expect(r.detalle).toMatch(/lista blanca/i);
+  });
+
+  it('LA TERCERA VÍA · un disparador vinculado acciona una salida y eso bloquea', async () => {
+    // Modo correcto y políticas correctas, y aun así el brazo sube al detectar
+    // un vehículo: la acción vinculada acciona el relé directamente.
+    const r = await sondaCon(camara({ disparadorAccionaPuerto: '1' })).probar({
+      ...ALTA,
+      tipo: 'camara_lpr',
+    });
+    expect(r.clase).toBe('decide_solo');
+    expect(r.detalle).toMatch(/salida/i);
+  });
+
+  it('un equipo que NO declara reconocer matrículas no se da por bueno', async () => {
+    // El fabricante lo dice con esas palabras: si ninguna de las cuatro
+    // consultas de capacidad lo confirma, no se sigue adelante. Este modelo no
+    // es una cámara de placa, y aceptarlo dejaría un punto de acceso mudo.
+    const r = await sondaCon(camara({ declaraReconocimiento: false })).probar({
+      ...ALTA,
+      tipo: 'camara_lpr',
+    });
+    expect(r.clase).toBe('decide_solo');
+    expect(r.detalle).toMatch(/matrícula/i);
   });
 
   it('credencial rechazada: lo dice, y AVISA de que no se reintente', async () => {
-    const r = await sondaCon(() => respuesta(401, '')).probar({ ...ALTA, tipo: 'camara_lpr' });
+    // Con una clave distinta de la del equipo, el simulado contesta con su
+    // desafío y nunca acepta: es exactamente lo que hace el aparato.
+    const r = await sondaCon(
+      equiposSimulados({ [ALTA.host]: { ...CAMARA, clave: 'otra-clave-distinta' } }),
+    ).probar({ ...ALTA, tipo: 'camara_lpr' });
     expect(r.clase).toBe('credencial');
     expect(r.detalle).toMatch(/bloquean la cuenta/);
     expect(r.verificado).toBe(false);
@@ -238,11 +290,10 @@ describe('A.3 · «probar conexión» distingue cuatro situaciones, no una', () 
     expect(r.verificado).toBe(false);
   });
 
-  it('una terminal facial NO se juzga por ctrlMod: no manda ninguna barrera', async () => {
-    const r = await sondaCon(() => respuesta(200, INFO)).probar({
-      ...ALTA,
-      tipo: 'terminal_facial',
-    });
+  it('una terminal facial NO se juzga por el modo de barrera: no manda ninguna', async () => {
+    const r = await sondaCon(
+      equiposSimulados({ [ALTA.host]: { ...CAMARA, familia: 'terminal' } }),
+    ).probar({ ...ALTA, tipo: 'terminal_facial' });
     expect(r.clase).toBe('alcanzado');
   });
 });

@@ -26,7 +26,6 @@ import {
   RepositorioConsentimientosEnMemoria,
   RepositorioPlantillasEnMemoria,
 } from './infraestructura/repositorios-en-memoria';
-import { MockProvider } from '@ncr/providers';
 import { BiometriaController } from './presentacion/biometria.controller';
 
 /**
@@ -60,17 +59,19 @@ export class BiometriaModule {
         },
         { provide: REPOSITORIO_PLANTILLAS, useFactory: () => new RepositorioPlantillasEnMemoria() },
         { provide: RepositorioPlantillasEnMemoria, useExisting: REPOSITORIO_PLANTILLAS },
-        {
-          /**
-           * ADR-03 · el hardware va al final, y eso es una prueba. Todo el
-           * ciclo biométrico —captura, consentimiento, sincronización,
-           * supresión— funciona contra `MockProvider`. La ETAPA 15 sustituye
-           * esta línea por `HikvisionFaceTemplateProvider` y no toca nada más;
-           * si hiciera falta tocar algo más, el desacople habría fallado.
-           */
-          provide: FACE_TEMPLATE_PROVIDER,
-          useFactory: () => new MockProvider({ semilla: 20260908 }),
-        },
+        /**
+         * ═════════════════════════════════════════════════════════════════════
+         * AQUÍ HABÍA UN `new MockProvider`, Y ERA EL AGUJERO DE ADR-03
+         *
+         * Este módulo construía su propio proveedor de plantillas. El ADR dice
+         * que cambiar de adaptador no debe tocar nada más, y con esa línea
+         * «cambiar de adaptador» significaba **editar este fichero**: la
+         * verificación que el ADR promete no se podía hacer.
+         *
+         * Desde la 15-C, `FACE_TEMPLATE_PROVIDER` lo sirve `ProveedoresModule`,
+         * que es global y es el único sitio del proyecto que decide entre el
+         * simulado y el real. Aquí sólo se inyecta.
+         */
         // El almacén es un proveedor propio y no un `new` dentro de la fábrica:
         // así hay UNA instancia por proceso —dos serían dos conjuntos de
         // plantillas y una supresión que no suprime la que la terminal tiene— y
@@ -161,7 +162,6 @@ export class BiometriaModule {
         REPOSITORIO_CONSENTIMIENTOS,
         REPOSITORIO_PLANTILLAS,
         BOVEDA_DE_PLANTILLAS,
-        FACE_TEMPLATE_PROVIDER,
         AlmacenEnMemoria,
       ],
     };

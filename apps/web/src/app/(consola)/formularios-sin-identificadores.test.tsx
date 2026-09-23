@@ -219,13 +219,26 @@ const rellenar = async (): Promise<void> => {
    * de envío seguía deshabilitado y el control informaba «algo pide un dato que
    * nadie tiene a mano». Tenía razón en la forma y no en el fondo: el dato lo
    * tenía a mano, era el barrido el que no sabía escribirlo.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * Y POR QUÉ EL TEXTO NO LLEVA ESPACIOS · 15-C
+   *
+   * El valor anterior sí los llevaba, y la 15-C lo destapó: el alta de equipos
+   * validó el usuario contra el juego de caracteres que el aparato admite, y
+   * ahí **el espacio no entra**. El barrido tecleaba algo que ningún equipo
+   * aceptaría y leía el rechazo como «pide un dato que nadie tiene a mano».
+   *
+   * El valor es genérico a propósito: letras y dígitos valen en TODOS los
+   * campos de texto del sistema, así que el barrido sigue sin saber nada de
+   * ninguna pantalla concreta — que es lo que lo hace un control y no una
+   * prueba de una pantalla.
    */
   for (const campo of Array.from(dialogo.querySelectorAll<HTMLInputElement>('input'))) {
     const tipo = campo.getAttribute('type');
     if (tipo !== 'text' && tipo !== 'password' && tipo !== null) continue;
     if (campo.getAttribute('role') === 'combobox') continue;
     if (campo.value !== '') continue;
-    escribir(campo, 'Texto que escribe una persona');
+    escribir(campo, 'TextoQueEscribeUnaPersona');
   }
 };
 

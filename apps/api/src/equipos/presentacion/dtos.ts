@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
-import { TIPOS_DE_EQUIPO } from '../aplicacion/puertos';
+import { CORRECCIONES, TIPOS_DE_EQUIPO } from '../aplicacion/puertos';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -117,6 +117,74 @@ export class EquipoDto {
   @ApiProperty({ type: String, enum: ['activo', 'inactivo'] }) estado!: string;
 }
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * LA FICHA · lo que la consola pinta de un equipo, con la MISMA forma por campo
+ *
+ * El diagnóstico devuelve seis veredictos con estructuras distintas, cada uno
+ * fiel a lo que el equipo declara. Eso está bien para razonar y mal para
+ * pintar: la consola acabaría con seis bloques que se parecen y no se parecen.
+ *
+ * Aquí todo es una lista de hallazgos con el mismo tipo. Y `no_comprobado` es
+ * un estado propio: una consulta que el equipo no contestó **no es un verde**,
+ * y pintarla igual sería el falso verde que este proyecto persigue.
+ */
+export class HallazgoDelEquipoDto {
+  @ApiProperty({ type: String }) campo!: string;
+  @ApiProperty({ type: String, enum: ['conforme', 'aviso', 'bloqueo', 'no_comprobado'] })
+  estado!: string;
+  @ApiProperty({ type: String, nullable: true }) valorLeido!: string | null;
+  @ApiProperty({ type: String, nullable: true }) valorCorrecto!: string | null;
+  @ApiProperty({ type: String }) detalle!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    enum: [...CORRECCIONES],
+    description: 'Qué corrección lo arregla desde la consola. Nulo si no la hay.',
+  })
+  correccion!: string | null;
+}
+
+export class FichaDelEquipoDto {
+  @ApiProperty({ type: String, nullable: true }) modelo!: string | null;
+  @ApiProperty({ type: String, nullable: true }) firmware!: string | null;
+  @ApiProperty({ type: String, nullable: true }) serie!: string | null;
+  @ApiProperty({ type: String, nullable: true }) horaDelEquipo!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) desvioDeRelojSegundos!: number | null;
+  @ApiProperty({ type: [HallazgoDelEquipoDto] }) hallazgos!: HallazgoDelEquipoDto[];
+  @ApiProperty({ type: [String] }) sinComprobar!: string[];
+}
+
+/**
+ * Lo que la consola envía para corregir un campo del equipo.
+ *
+ * `confirmadaPor` no es un adorno de auditoría: **sin él no se emite la
+ * petición al aparato**. Cambiar quién controla una barrera es la clase de
+ * acción que nadie ve venir si la hace un proceso automático.
+ */
+export class CorreccionDeEquipoDto {
+  @ApiProperty({ type: String, enum: [...CORRECCIONES] })
+  @IsIn([...CORRECCIONES])
+  correccion!: (typeof CORRECCIONES)[number];
+
+  @ApiProperty({
+    type: String,
+    maxLength: 300,
+    description: 'Por qué se corrige. Queda en la auditoría junto a quién y cuándo.',
+  })
+  @IsString()
+  @Length(3, 300)
+  motivo!: string;
+}
+
+export class ResultadoDeCorreccionDto {
+  @ApiProperty({ type: String, enum: [...CORRECCIONES] }) correccion!: string;
+  @ApiProperty({ type: Boolean }) aplicada!: boolean;
+  @ApiProperty({ type: String, nullable: true }) valorAnterior!: string | null;
+  @ApiProperty({ type: String, nullable: true }) valorNuevo!: string | null;
+  @ApiProperty({ type: String }) detalle!: string;
+}
+
 export class ResultadoDeSondeoDto {
   @ApiProperty({
     type: String,
@@ -131,6 +199,13 @@ export class ResultadoDeSondeoDto {
   @ApiProperty({ type: String, nullable: true }) firmware!: string | null;
   @ApiProperty({ type: Number, nullable: true }) latenciaMs!: number | null;
   @ApiProperty({ type: Boolean }) verificado!: boolean;
+  @ApiPropertyOptional({
+    type: FichaDelEquipoDto,
+    description:
+      'Qué hay que cambiar en el equipo, campo por campo. Ausente cuando no se sondeó: la ' +
+      'falta de ficha no es una ficha vacía.',
+  })
+  ficha?: FichaDelEquipoDto;
 }
 
 export class EquiposDto {

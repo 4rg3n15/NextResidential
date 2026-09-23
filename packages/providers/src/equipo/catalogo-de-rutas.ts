@@ -30,75 +30,14 @@
  * nombre de un módulo del fabricante.
  */
 
-/**
- * ═════════════════════════════════════════════════════════════════════════════
- * TRES GRADOS, NO DOS · añadido el 23/09/2026
- *
- * Hasta hoy una ruta era «verificada» —capturada del equipo— o «documentada»,
- * y ese segundo cajón mezclaba dos cosas muy distintas: lo que dice la guía
- * oficial del fabricante para ESTA familia de equipo, y lo que se dedujo de la
- * forma habitual de ISAPI. Tratarlas igual obliga a desconfiar de las dos por
- * igual, y entonces la etiqueta no informa de nada.
- *
- * | Grado           | Qué lo respalda                              | Qué falta          |
- * | --------------- | -------------------------------------------- | ------------------ |
- * | `verificada`    | Captura del equipo real                      | Nada               |
- * | `guia_oficial`  | La guía ANPR del fabricante                  | Verla en el equipo |
- * | `documentada`   | La forma habitual de ISAPI                   | Respaldo y equipo  |
- *
- * `guia_oficial` **no** es «verificada»: eso exige el aparato delante. Pero
- * tampoco es una deducción, y el guion de puesta en marcha las ordena por este
- * grado para que lo primero que se compruebe sea lo que menos respaldo tiene.
- */
-export type Procedencia = 'verificada' | 'guia_oficial' | 'documentada';
+import type { Procedencia, RutaDeEquipo } from './tipos-de-ruta';
+import { RUTAS_DE_LA_GUIA } from './catalogo-de-la-guia';
 
-export interface RutaDeEquipo {
-  /** Nombre en lenguaje del dominio: es lo que se lee en un informe. */
-  readonly proposito: string;
-  readonly metodo: string;
-  readonly ruta: string;
-  readonly procedencia: Procedencia;
-  /** Familia de equipo a la que aplica. */
-  readonly familia: 'camara' | 'terminal' | 'videoportero' | 'comun';
-  /** De dónde salió, literal. Una etiqueta sin procedencia no vale nada. */
-  readonly fuente: string;
-  /**
-   * Capítulo de la guía oficial, cuando la procedencia es `guia_oficial`.
-   *
-   * **Hoy dice de qué trata, no un número.** El destilado que respalda estas
-   * rutas llegó como texto y `docs/hikdocs/` no está en este árbol —es
-   * documentación propietaria del fabricante y no se versiona—, así que poner
-   * «§4.2» sería inventar una precisión que nadie puede comprobar. Cuando el
-   * documento esté a mano, aquí va su numeración.
-   */
-  readonly capitulo?: string;
-  /**
-   * Qué comprobar en sitio para ascenderla a VERIFICADA. Vacío en las que ya
-   * lo están.
-   */
-  readonly confirmarEnSitio?: string;
-  /**
-   * El cuerpo de la petición, **cuando lo lleva**.
-   *
-   * Vive aquí y no en quien la invoca porque el cuerpo es vocabulario del
-   * fabricante tanto como la ruta: nombres de elemento y de campo. KPI-11 lo
-   * comprobó en cuanto el guion de puesta en marcha los escribió por su
-   * cuenta, y tenía razón — el guion no tiene por qué saber cómo se llama el
-   * campo de modo de una barrera.
-   */
-  readonly cuerpo?: { readonly tipo: string; readonly contenido: string };
-  /** `true` si mueve algo físico. Quien la invoca decide si eso le conviene. */
-  readonly acciona?: boolean;
-  /**
-   * `true` si CAMBIA el estado del equipo o se lo quita a otro: alta y
-   * supresión de plantilla, y el canal de audio. No se sondean a ciegas.
-   */
-  readonly dejaRastro?: boolean;
-}
+export type { Procedencia, RutaDeEquipo } from './tipos-de-ruta';
 
 const CANAL_POR_OMISION = 1;
 
-export const RUTAS: readonly RutaDeEquipo[] = [
+const RUTAS_BASE: readonly RutaDeEquipo[] = [
   // ── VERIFICADA · la única ────────────────────────────────────────────────
   {
     proposito: 'accionar la barrera vehicular',
@@ -144,7 +83,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     fuente:
       'Guía oficial ANPR del fabricante, parámetros de entrada. El valor vive en ' +
       'EntranceParamList.EntranceParam.ctrlMod y debe ser 1 (plataforma)',
-    capitulo: 'parámetros de entrada · modo de control',
+    capitulo: '§11 API Reference · ITC/Entrance/entranceParam',
     confirmarEnSitio:
       'que valga 1. Con 0 o 2 el equipo decide por su cuenta y el sistema se NIEGA a operar',
   },
@@ -177,7 +116,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía oficial ANPR del fabricante, notificación HTTP · HttpHostNotificationCap',
-    capitulo: 'notificación HTTP · capacidades',
+    capitulo: '§11 API Reference · Event/notification/httpHosts/capabilities',
     confirmarEnSitio: 'cuántos servidores admite y si acepta el formato de línea base',
   },
   {
@@ -189,7 +128,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     fuente:
       'Guía oficial ANPR del fabricante, notificación HTTP. Admite también la forma ' +
       'con identificador de servidor al final de la ruta',
-    capitulo: 'notificación HTTP · configuración',
+    capitulo: '§11 API Reference · Event/notification/httpHosts',
     confirmarEnSitio: 'si este firmware exige el identificador en la ruta o lo admite sin él',
     dejaRastro: true,
   },
@@ -200,7 +139,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía oficial ANPR del fabricante, notificación HTTP · prueba de envío',
-    capitulo: 'notificación HTTP · prueba',
+    capitulo: '§11 API Reference · Event/notification/httpHosts/<id>/test',
     confirmarEnSitio: 'que el envío de prueba llegue al receptor y con qué forma de cuerpo',
     dejaRastro: true,
   },
@@ -218,7 +157,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     fuente:
       'Guía oficial ANPR del fabricante. El cuerpo lleva baseLineProtocolEnabled en true; ' +
       'sin él el equipo puede emitir un formato propietario antiguo',
-    capitulo: 'protocolo de envío de alarmas ANPR',
+    capitulo: '§9.1 Motor Vehicle Recognition · alarmHttpPushProtocol',
     confirmarEnSitio: 'qué formato usa de fábrica ESTE equipo antes de tocarlo',
     dejaRastro: true,
     cuerpo: {
@@ -235,7 +174,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía oficial ANPR del fabricante · plateCap',
-    capitulo: 'capacidades de tráfico',
+    capitulo: '§9.1.1 Motor Vehicle Recognition · plateCap',
     confirmarEnSitio: 'qué países y formatos de placa declara reconocer',
   },
   {
@@ -245,7 +184,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía oficial ANPR del fabricante · supportBarrierGateNum y supportRelayNum',
-    capitulo: 'capacidades de entrada',
+    capitulo: '§11 API Reference · ITC/Entrance/capabilities',
     confirmarEnSitio: 'cuántas barreras y relés hay de verdad, para no accionar el que no es',
   },
 
@@ -339,7 +278,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     fuente:
       'Guía oficial ANPR del fabricante, control de barrera de entrada. Operaciones: ' +
       'off, on, stop, locked. Los nombres de campo llevan la errata del fabricante',
-    capitulo: 'control de barrera de entrada',
+    capitulo: '§10.2 Entrance and Exit Barrier Control',
     confirmarEnSitio:
       'si este modelo la admite. La ruta de Parking está VERIFICADA: ésta es el repliegue',
     acciona: true,
@@ -365,7 +304,7 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     fuente:
       'Guía oficial ANPR del fabricante · 0 sin señal, 1 cerrada, 2 abierta. La consulta ' +
       'de estado del 15/09/2026 devolvió notSupport por OTRA ruta; ésta no se ha probado',
-    capitulo: 'estado de la barrera',
+    capitulo: '§10.2 Entrance and Exit Barrier Control · barrierGateStatus',
     confirmarEnSitio:
       'si responde o vuelve a dar notSupport. Sin señal de posición cableada (H-2), ' +
       'un «abierta» sigue sin demostrar que un vehículo pasó',
@@ -426,6 +365,15 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     dejaRastro: true,
   },
 ];
+
+/**
+ * El catálogo completo: lo que había más lo que la guía integral añade.
+ *
+ * Se concatena y no se fusiona: una ruta nueva **no sustituye** a una
+ * verificada. La de la barrera lo está contra este firmware, y cambiarla por
+ * una que sólo está documentada sería retroceder.
+ */
+export const RUTAS: readonly RutaDeEquipo[] = [...RUTAS_BASE, ...RUTAS_DE_LA_GUIA];
 
 export const rutasPor = (procedencia: Procedencia): readonly RutaDeEquipo[] =>
   RUTAS.filter((r) => r.procedencia === procedencia);

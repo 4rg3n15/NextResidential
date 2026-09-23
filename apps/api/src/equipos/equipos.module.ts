@@ -3,9 +3,10 @@ import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
-import { REPOSITORIO_DE_EQUIPOS, SONDA_DE_EQUIPO } from './aplicacion/puertos';
+import { CORRECTOR_DE_EQUIPO, REPOSITORIO_DE_EQUIPOS, SONDA_DE_EQUIPO } from './aplicacion/puertos';
 import { RepositorioDeEquiposPg } from './infraestructura/repositorio-equipos-pg';
 import { SondaPorProveedor } from './infraestructura/sonda-por-proveedor';
+import { CorrectorPorProveedor } from './infraestructura/corrector-por-proveedor';
 import { EquiposController } from './presentacion/equipos.controller';
 
 /**
@@ -25,6 +26,7 @@ export class EquiposModule {
       controllers: [EquiposController],
       providers: [
         { provide: SONDA_DE_EQUIPO, useFactory: () => new SondaPorProveedor() },
+        { provide: CORRECTOR_DE_EQUIPO, useFactory: () => new CorrectorPorProveedor() },
         {
           provide: REPOSITORIO_DE_EQUIPOS,
           inject: [Pool, CONFIGURACION],

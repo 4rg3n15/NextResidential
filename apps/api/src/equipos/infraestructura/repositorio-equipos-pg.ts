@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import type { ContextoTenant } from '../../autenticacion';
-import { PROPOSITOS, cifrar, derivarLlave } from '../../comun/cripto/sobre-aes-gcm';
+import { PROPOSITOS, cifrar, descifrar, derivarLlave } from '../../comun/cripto/sobre-aes-gcm';
 import type {
   AltaDeEquipo,
   DatosDeEquipo,
@@ -310,6 +310,68 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     equipoId: string,
   ): Promise<DatosDeEquipo | null> {
     return this.cambiarEstado(ctx, copropiedadId, equipoId, 'activo', null);
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LA CREDENCIAL, DESCIFRADA Y **SÓLO PARA HABLAR CON EL EQUIPO** · 15-C
+   *
+   * Es la única lectura del sobre en todo el proyecto, y existe porque
+   * corregir la configuración de un equipo exige presentarle su clave. Lo que
+   * se mantiene, y es lo que importa:
+   *
+   * · **no sale por ninguna ruta HTTP** — el DTO de lectura ni declara el
+   *   campo (A.2), y este método no lo alcanza ningún controlador de consulta;
+   * · **no se registra** en bitácora ni en auditoría: lo que se audita es que
+   *   hubo una corrección, quién la hizo y de qué valor a cuál;
+   * · vive en memoria el tiempo de una petición y se pasa directamente al
+   *   adaptador.
+   *
+   * Que exista es el precio de `H-15B-1`, que ya está declarado con su riesgo
+   * residual. Que sea el ÚNICO sitio es lo que lo mantiene auditable.
+   */
+  async credencialPara(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+  ): Promise<string | null> {
+    return this.conCliente(ctx, async (c) => {
+      const { rows } = await c.query<{
+        iv: Buffer;
+        cuerpo: Buffer;
+        etiqueta: Buffer;
+      }>(
+        `SELECT iv, cuerpo, etiqueta FROM public.credenciales_de_equipo
+          WHERE dispositivo_id = $1 AND copropiedad_id = $2 AND activa = true`,
+        [equipoId, copropiedadId],
+      );
+      const fila = rows[0];
+      if (fila === undefined) return null;
+      const llave = derivarLlave(this.llaveMaestra, copropiedadId, PROPOSITOS.credencialesDeEquipo);
+      return descifrar(llave, {
+        iv: fila.iv,
+        cuerpo: fila.cuerpo,
+        etiqueta: fila.etiqueta,
+      }).toString('utf8');
+    });
+  }
+
+  /**
+   * Deja constancia de una corrección aplicada en el equipo.
+   *
+   * Va aparte de la corrección misma porque la corrección la ejecuta el
+   * adaptador y la constancia la escribe la base: lo que se registra es **qué
+   * cambió y de qué valor a cuál**, que es lo que una auditoría necesita para
+   * reconstruir quién dejó el equipo como está.
+   */
+  async auditarCorreccion(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    detalle: string,
+  ): Promise<void> {
+    await this.conCliente(ctx, async (c) => {
+      await this.auditar(c, copropiedadId, ctx.usuarioId, 'equipos/correccion', detalle);
+    });
   }
 
   private async cambiarEstado(

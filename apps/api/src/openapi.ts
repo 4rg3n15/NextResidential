@@ -28,6 +28,10 @@ const configuracionParaContrato: Configuracion = {
   EQUIPOS_LLAVE: 'llave-solo-para-generar-el-contrato-32+',
   EQUIPOS_LLAVE_REF: 'env:EQUIPOS_LLAVE',
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: 24,
+  // El contrato se genera SIEMPRE contra el simulado: generar el documento no
+  // puede depender de que haya cámaras al otro lado.
+  PROVEEDOR_DE_EQUIPOS: 'simulado',
+  PROVEEDOR_SEMILLA: 20260908,
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   THROTTLE_TTL_SEGUNDOS: 60,

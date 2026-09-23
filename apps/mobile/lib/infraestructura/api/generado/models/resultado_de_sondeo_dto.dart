@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'ficha_del_equipo_dto.dart';
 import 'resultado_de_sondeo_dto_clase.dart';
 
 part 'resultado_de_sondeo_dto.g.dart';
@@ -17,6 +18,7 @@ class ResultadoDeSondeoDto {
     required this.firmware,
     required this.latenciaMs,
     required this.verificado,
+    this.ficha,
   });
   
   factory ResultadoDeSondeoDto.fromJson(Map<String, Object?> json) => _$ResultadoDeSondeoDtoFromJson(json);
@@ -28,6 +30,9 @@ class ResultadoDeSondeoDto {
   final String? firmware;
   final num? latenciaMs;
   final bool verificado;
+
+  /// Qué hay que cambiar en el equipo, campo por campo. Ausente cuando no se sondeó: la falta de ficha no es una ficha vacía.
+  final FichaDelEquipoDto? ficha;
 
   Map<String, Object?> toJson() => _$ResultadoDeSondeoDtoToJson(this);
 }

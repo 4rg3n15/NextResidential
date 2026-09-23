@@ -63,11 +63,44 @@ describe('cámara ANPR · XML que el equipo POSTea al Alarm Server', () => {
     });
   });
 
-  it('normaliza la confianza venga en porcentaje o en fracción', () => {
-    // Un umbral que solo funciona con la mitad de los firmware es un umbral que
-    // no funciona. `0.92` y `92` tienen que producir lo mismo.
-    const xmlFraccion = xmlAnpr().replace('<confidenceLevel>92<', '<confidenceLevel>0.92<');
-    expect(desdeAlarmServerXml(xmlFraccion, DISPOSITIVO, AHORA)?.confianza).toBeCloseTo(0.92);
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ESTA PRUEBA AFIRMABA LO CONTRARIO, Y AFIRMABA MAL · [CORREGIR · 15-C]
+   *
+   * Decía que `0.92` y `92` tenían que producir lo mismo, y con esa heurística
+   * el campo documentado quedaba roto en su valor más peligroso: el esquema
+   * declara `confidenceLevel` en `[0,100]`, así que **1 significa uno por
+   * ciento** — y la heurística lo dejaba pasar tal cual, es decir, como certeza
+   * total. La lectura más dudosa que el equipo puede emitir entraba como la más
+   * segura y abría la barrera.
+   *
+   * Ahora el campo documentado se divide entre 100 SIEMPRE, y se prueba en los
+   * cuatro puntos que importan: 0, 1, 50 y 100.
+   */
+  it.each([
+    ['0', 0],
+    ['1', 0.01],
+    ['50', 0.5],
+    ['100', 1],
+  ])('la confianza documentada %s es un porcentaje entero y vale %s', (crudo, esperado) => {
+    const xml = xmlAnpr().replace('<confidenceLevel>92<', `<confidenceLevel>${crudo}<`);
+    expect(desdeAlarmServerXml(xml, DISPOSITIVO, AHORA)?.confianza).toBeCloseTo(esperado);
+  });
+
+  it('EL CASO QUE ESTO EVITA · una confianza de 1 es 1 %, no certeza total', () => {
+    const xml = xmlAnpr().replace('<confidenceLevel>92<', '<confidenceLevel>1<');
+    const confianza = desdeAlarmServerXml(xml, DISPOSITIVO, AHORA)?.confianza;
+    expect(confianza).toBeLessThan(0.5);
+  });
+
+  it('el alias NO documentado conserva la heurística: ahí no se sabe la escala', () => {
+    // `confidence` no está en el esquema. Suponerle una escala sin base sería
+    // repetir el error con otro campo, así que se sigue admitiendo las dos.
+    const xml = xmlAnpr().replace(
+      '<confidenceLevel>92</confidenceLevel>',
+      '<confidence>0.92</confidence>',
+    );
+    expect(desdeAlarmServerXml(xml, DISPOSITIVO, AHORA)?.confianza).toBeCloseTo(0.92);
   });
 
   it('con una fecha ilegible usa la hora de recepción en vez de perder el evento', () => {
@@ -250,12 +283,29 @@ describe('normalización · los bordes que distinguen un firmware de otro', () =
     expect(desdeAlertStreamJson(otro, DISPOSITIVO, AHORA).clase).toBe('desconocido');
   });
 
-  it('por el alertStream la confianza también llega en fracción en algunos equipos', () => {
-    const conFraccion = {
+  it('por el alertStream la confianza es el MISMO campo y la misma escala', () => {
+    // Antes esta prueba afirmaba que por aquí llegaba en fracción. Es el mismo
+    // campo documentado del mismo esquema: una sola interpretación, o la misma
+    // cifra significaría dos cosas según por dónde entrara el evento.
+    const bloque = {
       eventType: 'ANPR',
       currentEvent: true,
-      ANPR: { licensePlate: 'ABC123', confidenceLevel: 0.77 },
+      ANPR: { licensePlate: 'ABC123', confidenceLevel: 77 },
     };
-    expect(desdeAlertStreamJson(conFraccion, DISPOSITIVO, AHORA).confianza).toBeCloseTo(0.77);
+    expect(desdeAlertStreamJson(bloque, DISPOSITIVO, AHORA).confianza).toBeCloseTo(0.77);
+  });
+
+  it('y una hora SIN desplazamiento no se interpreta: se usa la de recepción', () => {
+    // Interpretarla en la zona del proceso corre el evento las horas que
+    // separen al servidor del conjunto, en silencio y sin posible corrección.
+    const bloque = {
+      eventType: 'ANPR',
+      currentEvent: true,
+      dateTime: '2026-09-18T06:59:30',
+      ANPR: { licensePlate: 'ABC123', confidenceLevel: 90 },
+    };
+    const evento = desdeAlertStreamJson(bloque, DISPOSITIVO, AHORA);
+    expect(evento.ocurridoEn).toEqual(AHORA);
+    expect(evento.horaSinDesplazamiento).toBe(true);
   });
 });

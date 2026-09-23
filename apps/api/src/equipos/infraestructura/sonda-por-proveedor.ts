@@ -1,11 +1,4 @@
-import {
-  ClienteDeEquipo,
-  EquipoInalcanzable,
-  interpretarError,
-  juzgarModo,
-  leerCtrlMod,
-  rutaPara,
-} from '@ncr/providers';
+import { diagnosticarEquipo, fichaDe } from '@ncr/providers';
 import type { DatosDeSondeo, ResultadoDeSondeo, SondaDeEquipo } from '../aplicacion/puertos';
 
 /**
@@ -21,22 +14,17 @@ import type { DatosDeSondeo, ResultadoDeSondeo, SondaDeEquipo } from '../aplicac
  * conectado» que miente es peor que no tener el botón.
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * NI UNA RUTA ESCRITA AQUÍ, Y POR ESO NO SE LLAMA COMO EL PROTOCOLO
+ * ESTA CLASE YA NO SABE NADA DEL PROTOCOLO · 15-C
  *
- * Las rutas, el cliente con autenticación Digest y el mapa de errores salen
- * todos del catálogo de `@ncr/providers`, con su procedencia al lado. Esta
- * clase **no conoce el protocolo del fabricante**: conoce propósitos («leer la
- * identidad del equipo») y deja que el catálogo diga por dónde se piden.
+ * Hasta la 15-B pedía tres rutas del catálogo, interpretaba el modo de control
+ * y leía el modelo con una expresión regular sobre el XML. Nada de eso era del
+ * fabricante por nombre —KPI-11 pasaba— pero sí por **tipo**: importaba el
+ * cliente, el catálogo y el juez del modo de control.
  *
- * De ahí el nombre. La primera versión se llamaba por el protocolo, y el
- * control de frontera (KPI-11) la marcó: el nombre afirmaba un acoplamiento que
- * el código no tiene, y un nombre que miente acaba volviéndose verdad.
+ * Ahora llama a **una** función del paquete de proveedores y traduce su
+ * veredicto a los cuatro desenlaces de la consola. La frontera es real: si
+ * mañana el diagnóstico pide diez consultas más, este fichero no cambia.
  */
-
-const modeloYFirmware = (cuerpo: string): { modelo: string | null; firmware: string | null } => ({
-  modelo: /<model>\s*([^<]+)\s*<\/model>/i.exec(cuerpo)?.[1]?.trim() ?? null,
-  firmware: /<firmwareVersion>\s*([^<]+)\s*<\/firmwareVersion>/i.exec(cuerpo)?.[1]?.trim() ?? null,
-});
 
 /**
  * El aviso de la credencial rechazada es literal y se repite en la pantalla: el
@@ -52,109 +40,75 @@ export class SondaPorProveedor implements SondaDeEquipo {
   constructor(private readonly peticion?: typeof fetch) {}
 
   async probar(datos: DatosDeSondeo): Promise<ResultadoDeSondeo> {
-    const cliente = new ClienteDeEquipo({
+    const diagnostico = await diagnosticarEquipo({
       host: datos.host,
       puerto: datos.puerto,
       protocolo: datos.protocolo,
       usuario: datos.usuario,
       clave: datos.secreto,
+      familia: datos.tipo === 'camara_lpr' ? 'camara' : 'comun',
       ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
     });
 
-    const identidad = rutaPara('leer la identidad del equipo (modelo, firmware, serie)', 'comun');
-    let respuesta;
-    try {
-      respuesta = await cliente.pedir(identidad.metodo, identidad.ruta);
-    } catch (error) {
-      // Host y puerto SÍ se nombran: es lo que hay que revisar. El secreto no
-      // aparece por ninguna parte, tampoco en el texto del error.
-      const detalle =
-        error instanceof EquipoInalcanzable
-          ? `No hay respuesta de ${datos.host}:${String(datos.puerto)} por ${datos.protocolo.toUpperCase()}. ${error.detalle}`
-          : `No hay respuesta de ${datos.host}:${String(datos.puerto)}`;
-      return {
-        clase: 'inalcanzable',
-        detalle,
-        modelo: null,
-        firmware: null,
-        latenciaMs: null,
-        verificado: false,
-      };
-    }
-
-    if (respuesta.estado === 401 || respuesta.estado === 403) {
-      return {
-        clase: 'credencial',
-        detalle: AVISO_DE_CREDENCIAL,
-        modelo: null,
-        firmware: null,
-        latenciaMs: respuesta.latenciaMs,
-        verificado: false,
-      };
-    }
-
-    if (!respuesta.ok) {
-      const error = interpretarError(respuesta.cuerpo);
-      const esCredencial = error.reaccion === 'credencial_rechazada';
-      return {
-        clase: esCredencial ? 'credencial' : 'inalcanzable',
-        detalle: esCredencial
-          ? AVISO_DE_CREDENCIAL
-          : `El equipo respondió con un error: ${error.detalle}`,
-        modelo: null,
-        firmware: null,
-        latenciaMs: respuesta.latenciaMs,
-        verificado: false,
-      };
-    }
-
-    const { modelo, firmware } = modeloYFirmware(respuesta.cuerpo);
+    const ficha = fichaDe(diagnostico);
+    const base = {
+      modelo: diagnostico.modelo,
+      firmware: diagnostico.firmware,
+      latenciaMs: diagnostico.contacto.latenciaMs,
+      ficha,
+    };
 
     /**
-     * C.1 llevado al alta: una cámara LPR que decide por su cuenta no se da por
-     * buena aunque conteste y autentique. «Next Control decide, el hardware
-     * ejecuta» no es una frase del README: es esta comprobación.
+     * ═══════════════════════════════════════════════════════════════════════
+     * «NO CONTESTA» Y «CREDENCIAL MALA» YA NO SE CONFUNDEN
+     *
+     * La primera consulta del diagnóstico **no presenta credenciales**, así que
+     * distingue «no hay ningún equipo en esa dirección» de «hay uno y rechaza
+     * la clave». Antes las dos caían en `inalcanzable`, y la diferencia es
+     * cara: una manda a revisar el cable y la VLAN, la otra el usuario de
+     * servicio — y reintentar la segunda **bloquea la cuenta del equipo**.
      */
-    if (datos.tipo === 'camara_lpr') {
-      const modo = rutaPara('leer quién controla la barrera: la cámara o la plataforma', 'camara');
-      try {
-        const r = await cliente.pedir(modo.metodo, modo.ruta);
-        const veredicto = r.ok ? juzgarModo(leerCtrlMod(r.cuerpo)) : juzgarModo(null);
-        if (!veredicto.admisible) {
-          return {
-            clase: 'decide_solo',
-            detalle: veredicto.detalle,
-            modelo,
-            firmware,
-            latenciaMs: respuesta.latenciaMs,
-            verificado: false,
-          };
-        }
-      } catch {
-        // Si la identidad respondió y esta ruta no, el equipo está ahí pero no
-        // se pudo confirmar quién manda. No se da por bueno.
-        return {
-          clase: 'decide_solo',
-          detalle:
-            'El equipo responde, pero no se pudo leer quién controla la barrera. ' +
-            'Hasta confirmarlo, queda NO VERIFICADO.',
-          modelo,
-          firmware,
-          latenciaMs: respuesta.latenciaMs,
-          verificado: false,
-        };
-      }
+    if (diagnostico.contacto.clase === 'sin_equipo') {
+      return {
+        ...base,
+        clase: 'inalcanzable',
+        // Host y puerto SÍ se nombran: es lo que hay que revisar. El secreto no
+        // aparece por ninguna parte, tampoco en el texto del error.
+        detalle: `${diagnostico.contacto.detalle} (${datos.host}:${String(datos.puerto)} por ${datos.protocolo.toUpperCase()})`,
+        verificado: false,
+      };
     }
 
+    if (diagnostico.contacto.clase === 'credencial') {
+      return { ...base, clase: 'credencial', detalle: AVISO_DE_CREDENCIAL, verificado: false };
+    }
+
+    /**
+     * C.1 llevado al alta, y ahora por las TRES vías: modo de control,
+     * políticas internas del equipo y disparadores vinculados. Una cámara que
+     * abre por su cuenta no se da por buena aunque conteste y autentique.
+     * «Next Control decide, el hardware ejecuta» no es una frase del README:
+     * es esta comprobación.
+     */
+    const bloqueos = ficha.hallazgos.filter((h) => h.estado === 'bloqueo');
+    if (datos.tipo === 'camara_lpr' && bloqueos.length > 0) {
+      return {
+        ...base,
+        clase: 'decide_solo',
+        detalle: bloqueos.map((b) => `${b.campo}: ${b.detalle}`).join(' · '),
+        verificado: false,
+      };
+    }
+
+    const avisos = ficha.hallazgos.filter((h) => h.estado === 'aviso');
     return {
+      ...base,
       clase: 'alcanzado',
       detalle:
-        modelo === null
+        (diagnostico.modelo === null
           ? 'El equipo responde y acepta la credencial'
-          : `El equipo responde y acepta la credencial: ${modelo}`,
-      modelo,
-      firmware,
-      latenciaMs: respuesta.latenciaMs,
+          : `El equipo responde y acepta la credencial: ${diagnostico.modelo}`) +
+        (avisos.length === 0 ? '' : `. ${String(avisos.length)} aviso(s) de configuración`),
       verificado: true,
     };
   }

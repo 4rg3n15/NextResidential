@@ -483,6 +483,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/equipos/{equipoId}/correcciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Corrige un campo del equipo. Exige confirmación y deja constancia */
+        post: operations["EquiposController_corregir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
         parameters: {
             query?: never;
@@ -1668,6 +1685,12 @@ export interface components {
              */
             zonaHoraria: string;
         };
+        CorreccionDeEquipoDto: {
+            /** @enum {string} */
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor";
+            /** @description Por qué se corrige. Queda en la auditoría junto a quién y cuándo. */
+            motivo: string;
+        };
         CrearAutorizacionDto: {
             /** Format: uuid */
             viviendaId: string;
@@ -1926,6 +1949,15 @@ export interface components {
             agrupacion: string;
             cantidad: number;
         };
+        FichaDelEquipoDto: {
+            modelo: string | null;
+            firmware: string | null;
+            serie: string | null;
+            horaDelEquipo: string | null;
+            desvioDeRelojSegundos: number | null;
+            hallazgos: components["schemas"]["HallazgoDelEquipoDto"][];
+            sinComprobar: string[];
+        };
         FilaDeInformeDto: {
             /** Format: date-time */
             momento: string;
@@ -1992,6 +2024,19 @@ export interface components {
             primeras: string[];
             ultimas: string[];
             porExcepcion: boolean;
+        };
+        HallazgoDelEquipoDto: {
+            campo: string;
+            /** @enum {string} */
+            estado: "conforme" | "aviso" | "bloqueo" | "no_comprobado";
+            valorLeido: string | null;
+            valorCorrecto: string | null;
+            detalle: string;
+            /**
+             * @description Qué corrección lo arregla desde la consola. Nulo si no la hay.
+             * @enum {string|null}
+             */
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | null;
         };
         HistorialDeOrdenesDto: {
             ordenes: components["schemas"]["OrdenEjecutadaDto"][];
@@ -2430,6 +2475,14 @@ export interface components {
             /** @description Identificadores que traían la palabra dentro («Casa 42») y se guardaron sin ella. Se recorta y se cuenta: contarlo es lo que impide que el recorte sea silencioso. */
             identificadoresRecortados: number;
         };
+        ResultadoDeCorreccionDto: {
+            /** @enum {string} */
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor";
+            aplicada: boolean;
+            valorAnterior: string | null;
+            valorNuevo: string | null;
+            detalle: string;
+        };
         ResultadoDeOperacionDto: {
             encolada: boolean;
             /** @enum {string} */
@@ -2458,6 +2511,8 @@ export interface components {
             firmware: string | null;
             latenciaMs: number | null;
             verificado: boolean;
+            /** @description Qué hay que cambiar en el equipo, campo por campo. Ausente cuando no se sondeó: la falta de ficha no es una ficha vacía. */
+            ficha?: components["schemas"]["FichaDelEquipoDto"];
         };
         RevocacionDto: {
             revocada: boolean;
@@ -3463,6 +3518,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EquipoDto"];
+                };
+            };
+        };
+    };
+    EquiposController_corregir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorreccionDeEquipoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeCorreccionDto"];
                 };
             };
         };

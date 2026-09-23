@@ -12,6 +12,7 @@ import { PadronModule } from './padron';
 import { AutorizacionesModule } from './autorizaciones';
 import { EventosModule } from './eventos';
 import { ZonasModule } from './zonas';
+import { ProveedoresModule } from './proveedores';
 import { BiometriaModule } from './biometria';
 import { TableroModule } from './tablero';
 import { ResidenteModule } from './residente';
@@ -98,6 +99,24 @@ export class AppModule {
          * que nadie había tomado junta.
          */
         PoolModule.registrar(),
+        /**
+         * ETAPA 15-C · el ÚNICO punto de composición de los proveedores de
+         * hardware, y antes que cualquiera de sus consumidores.
+         *
+         * Es `@Global`, así que va aquí y no dentro de quien lo usa: biometría
+         * sincroniza plantillas, guardia abre puertas y el receptor publica
+         * placas, y los tres tienen que ver **la misma instancia**. Con una por
+         * módulo habría cuatro conjuntos de plantillas y una supresión que no
+         * suprime la que la terminal tiene.
+         *
+         * Cambiar `PROVEEDOR_DE_EQUIPOS` del adaptador simulado al real no
+         * toca una línea de dominio, aplicación ni interfaz: ésa es la
+         * verificación de OE-03 y de ADR-03, y ahora hay dónde hacerla.
+         */
+        ProveedoresModule.registrar({
+          clase: config.PROVEEDOR_DE_EQUIPOS,
+          semilla: config.PROVEEDOR_SEMILLA,
+        }),
         MultiempresaModule,
         AutenticacionModule.registrar(),
         PadronModule.registrar(),

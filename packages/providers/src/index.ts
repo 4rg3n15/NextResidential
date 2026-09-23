@@ -1,37 +1,84 @@
 /**
- * Adaptadores de los puertos de proveedor.
+ * Adaptadores de los puertos de proveedor · LA API PÚBLICA DEL PAQUETE.
  *
- * `MockProvider` (ETAPA 05) y `HikvisionProvider` (ETAPA 15) viven aquí y solo
- * aquí, detrás de las MISMAS interfaces declaradas en `@ncr/domain-core`
- * (ADR-03). Este es además el único paquete donde el análisis estático de
- * KPI-11 admite la palabra ISAPI o una IP de dispositivo: fuera de aquí, el
- * build se rompe.
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ESTE BARRIL SE ENCOGIÓ EN LA 15-C, Y ES LA MITAD QUE LE FALTABA A ADR-03
+ *
+ * Hasta ahora exportaba **todo**: `TerminalFacial`, `ControlDeBarreraVehicular`,
+ * `Videoportero`, `IntercomDeEquipo`, el cliente, el catálogo de rutas. El
+ * resto del sistema podía nombrar cada pieza de cada familia, y mientras pueda
+ * nombrarlas «el hardware es intercambiable» es una aspiración, no un hecho:
+ * basta que alguien importe `TerminalFacial` en un módulo de la API para que
+ * cambiar de fabricante deje de ser cambiar una línea.
+ *
+ * Lo que sale de aquí, y nada más:
+ *
+ * | Qué                        | Para qué                                     |
+ * | -------------------------- | -------------------------------------------- |
+ * | `MockProvider`             | El adaptador simulado (ADR-03)               |
+ * | `HikvisionProvider`        | El adaptador real                            |
+ * | La **fábrica**             | El único sitio que decide cuál se inyecta    |
+ * | El **registro de equipos** | El puerto que la API implementa con su base  |
+ * | La **fuente de placas**    | El puerto de eventos, y por dónde se publica |
+ * | La **recepción**           | Entrada única del transporte de escucha      |
+ * | El **diagnóstico**         | Lo que la consola enseña de un equipo        |
+ * | Los **contratos de evento**| El tipo normalizado que cruza la frontera    |
+ *
+ * Todo lo demás —clientes, rutas, cuerpos, erratas del fabricante— es interno.
+ * KPI-11 ya impedía que el vocabulario saliera en forma de cadena; esto impide
+ * además que salga en forma de **tipo**, que era la vía que quedaba abierta.
  */
-export * from './barrera/digest';
-export * from './barrera/control-barrera';
-export * from './barrera/desde-entorno';
-export * from './mock/simulacion';
+
+// ── Los dos adaptadores y su punto de composición ────────────────────────────
 export * from './mock/mock-provider';
 export * from './mock/intercom-simulado';
+export * from './mock/simulacion';
+export * from './hikvision/hikvision-provider';
+export * from './hikvision/registro-de-equipos';
+export * from './fabrica';
 
 /**
- * Los dos contratos de evento de Hikvision. Se exportan desde la ETAPA 11-A —antes
- * de que exista el adaptador— porque la normalización se prueba desde hoy: el día
- * que llegue el equipo, lo que se estrena es el transporte y no el analizador.
+ * El control de barrera se compone **dentro** de este paquete y se expone como
+ * función, no como clase: la API pregunta «¿hay un control configurado?» y
+ * recibe el puerto del dominio. Nunca nombra el adaptador.
  */
-export * from './hikvision/contratos-de-evento';
-export * from './hikvision/publicacion-alarm-server';
+export {
+  crearControlDeBarreraDesdeEntorno,
+  ConfiguracionDeBarreraIncompleta,
+} from './barrera/desde-entorno';
+
+// ── Los puertos de evento y su transporte ────────────────────────────────────
+export * from './equipo/fuente-de-placas';
+export * from './hikvision/recepcion';
+export type {
+  EventoDeEquipo,
+  QuienAbrio,
+  RecuadroDetectado,
+  BloqueDeAlertStream,
+} from './hikvision/contratos-de-evento';
+export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';
+
+// ── Diagnóstico y corrección de un equipo, para la consola ───────────────────
+export * from './diagnostico/diagnostico-de-equipo';
+export * from './diagnostico/correcciones';
+export * from './diagnostico/ficha';
+export type { VeredictoDeControl, HallazgoDeConfiguracion } from './camara/veredicto-de-control';
+export type { VeredictoDeDisparador } from './camara/disparadores-vinculados';
+export type { VeredictoDePais, ClaseDePais } from './camara/pais-del-algoritmo';
+export type { VeredictoDelReceptor, ImagenesDelEvento } from './camara/receptor-en-el-equipo';
+export { IMAGENES, IMAGENES_SIN_ROSTRO } from './camara/receptor-en-el-equipo';
+export type { VeredictoDeCapacidadAnpr } from './camara/capacidades-anpr';
+export { EquipoDecidePorSuCuenta } from './camara/modo-de-control';
+export type { VeredictoDeModo } from './camara/modo-de-control';
+export { EquipoInalcanzable } from './equipo/cliente';
+export type { ReaccionAlError, ErrorDelFabricante } from './equipo/errores-del-fabricante';
+export { LISTAS_DEL_EQUIPO_NO_SE_USAN } from './equipo/errores-del-fabricante';
+
+// ── El simulado de equipo, que es infraestructura de PRUEBA ──────────────────
 /**
- * ETAPA 15 · el transporte compartido por los tres equipos, el catálogo de
- * rutas con su procedencia, y los adaptadores de cada familia.
+ * Se exporta porque la suite de contrato de la API lo necesita para correr sin
+ * hardware, que es justo lo que ADR-03 exige poder hacer. No es una pieza de
+ * familia: es un `fetch` que se comporta como un aparato.
  */
-export * from './equipo/cliente';
-export * from './equipo/catalogo-de-rutas';
-export * from './equipo/errores-del-fabricante';
-export * from './camara/modo-de-control';
-export * from './equipo/escucha-alertstream';
-export * from './terminal/terminal-facial';
-export * from './videoportero/videoportero';
-export * from './videoportero/intercom-equipo';
 export * from './simulacion/equipo-simulado';
 export * from './simulacion/camara-que-publica';
