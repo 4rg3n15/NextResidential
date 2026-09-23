@@ -2182,6 +2182,42 @@ try {
         NCR_PGDATABASE: 'ncr_sonda',
       };
       const guion = join(raiz, 'scripts/base-de-pruebas.sh');
+
+      /**
+       * ═══════════════════════════════════════════════════════════════════
+       * D-115 · UN `pg_ctl` NO ES UN SERVIDOR
+       *
+       * La fórmula `libpq` de Homebrew —la que trae el runner de macOS—
+       * instala `psql`, `pg_ctl` e `initdb`, pero NO el ejecutable
+       * `postgres`. El guion elegía ese directorio porque encontraba
+       * `pg_ctl`, y el error llegaba a mitad de `initdb`, donde ya no se
+       * distingue de un control roto.
+       *
+       * Aquí se reproduce el escenario EXACTO en cualquier máquina: un
+       * directorio con `pg_ctl` e `initdb` y sin servidor. Tiene que
+       * negarse ANTES de tocar nada, y decirlo con esas palabras.
+       * ═══════════════════════════════════════════════════════════════════
+       */
+      {
+        const falso = mkdtempSync(join(tmpdir(), 'ncr-pgbin-sin-servidor-'));
+        for (const cliente of ['pg_ctl', 'initdb', 'psql']) {
+          const ruta = join(falso, cliente);
+          writeFileSync(ruta, '#!/bin/sh\nexit 0\n');
+          chmodSync(ruta, 0o755);
+        }
+        const aMedias = correr('bash', ['-c', `"${guion}" arrancar 2>&1`], {
+          cwd: raiz,
+          env: { ...entorno, NCR_PGBIN: falso },
+        });
+        aMedias.codigo !== 0 &&
+        /no encuentro un servidor PostgreSQL utilizable/.test(aMedias.salida)
+          ? ok('base-de-pruebas: un directorio con pg_ctl pero SIN servidor se rechaza, no se usa')
+          : mal(
+              'un directorio con pg_ctl y sin `postgres` se dio por bueno: ' +
+                `codigo ${aMedias.codigo} · ${aMedias.salida.trim().split('\n').slice(-2).join(' · ')}`,
+            );
+        rmSync(falso, { recursive: true, force: true });
+      }
       /**
        * Se invoca por `bash -c … 2>&1` a propósito: el aviso que esta sonda
        * tiene que leer se escribe en **stderr**, y `execFileSync` no devuelve
@@ -2210,12 +2246,16 @@ try {
        * forma de reproducir el estado que mataba los pasos 7, 7b y 14.
        *
        * La primera versión miraba si el mensaje decía «no encuentro pg_ctl», y
-       * el CI de macOS enseñó que eso era atarse a UNA de las formas de no
-       * poder: el trabajo `controles` no instala PostgreSQL, el guion falló de
-       * otra manera, y la sonda lo contó como control roto. Ahora se mira lo
-       * único que importa —si el clúster arrancó— y **se imprime el motivo**,
-       * que es lo que permite distinguir «aquí no se puede» de «el control
-       * está mal».
+       * el CI de macOS enseñó dos veces que eso era atarse a UNA de las formas
+       * de no poder. La segunda fue más instructiva que la primera: el runner
+       * SÍ tenía `pg_ctl` —la fórmula `libpq` lo instala— pero no el servidor,
+       * así que `base-de-pruebas.sh` lo daba por bueno y moría dentro de
+       * `initdb`. Eso ya está corregido en el guion, que ahora exige los tres
+       * binarios; aquí se lee el mensaje que produce esa comprobación.
+       *
+       * Se mira, además, lo único que de verdad importa —si el clúster
+       * arrancó— y **se imprime el motivo**, que es lo que permite distinguir
+       * «aquí no se puede» de «el control está mal».
        *
        * Cuenta como FALLO cuando la corrida lleva base (`DATABASE_URL_PRUEBAS`
        * definida), que es justo cuando este control está en juego. Es la misma
@@ -2225,12 +2265,13 @@ try {
        */
       if (corto.codigo !== 0) {
         const motivo = corto.salida.trim().split('\n').slice(-4).join(' · ') || '(sin salida)';
-        if (/no encuentro pg_ctl/.test(corto.salida)) {
-          // PostgreSQL AUSENTE: declarado, con esas palabras, y no como verde.
-          // Es la misma distinción de la sección 19 con Flutter.
+        if (/no encuentro un servidor PostgreSQL utilizable/.test(corto.salida)) {
+          // PostgreSQL AUSENTE —o a medias, que para esto es lo mismo—:
+          // declarado con esas palabras, y no como verde. Es la misma
+          // distinción de la sección 19 con Flutter.
           console.log(
-            '   · base-de-pruebas: sin PostgreSQL en esta máquina, la sonda de ' +
-              'max_connections NO se ejercitó (no se da por buena: no se ejecutó)',
+            '   · base-de-pruebas: sin servidor PostgreSQL en esta máquina, la sonda ' +
+              'de max_connections NO se ejercitó (no se da por buena: no se ejecutó)',
           );
         } else {
           // PostgreSQL está y aun así no arrancó: eso SÍ es un fallo, y el

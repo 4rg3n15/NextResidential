@@ -61,11 +61,40 @@ BITACORA="${BASE_DIR%/data}/postgres.log"
 # Localizar los binarios. `pg_ctl` no está en el PATH ni en Debian —vive en
 # /usr/lib/postgresql/NN/bin— ni en macOS con Homebrew. Buscarlo aquí evita el
 # «command not found» a mitad de una corrida de cuarenta minutos.
+#
+# Y NO basta con `pg_ctl`: hay que exigir el SERVIDOR (`postgres`) en el mismo
+# directorio. El CI de macOS enseñó por qué. El runner trae la fórmula `libpq`,
+# que instala los clientes —`psql`, `pg_ctl`, `initdb`— pero NO el servidor.
+# Con la comprobación antigua el guion elegía `/opt/homebrew/opt/libpq/bin`,
+# se daba por satisfecho, y reventaba a mitad de `initdb`:
+#
+#     initdb: error: program "postgres" is needed by initdb but was not found
+#     in the same directory as "/opt/homebrew/Cellar/libpq/18.6/bin/initdb"
+#
+# Es el mismo modo de fallo que persigue el resto del verificador: dar por
+# bueno un estado que no se comprobó. Aquí se comprueba lo que de verdad hace
+# falta —un servidor que se pueda levantar— y no un binario que se le parece.
 # ---------------------------------------------------------------------------
+sirve_como_bin() {
+  [[ -x "$1/pg_ctl" && -x "$1/initdb" && -x "$1/postgres" ]]
+}
+
 localizar_bin() {
+  # Un directorio impuesto por el operador gana, pero SE VALIDA igual: si no
+  # tiene servidor, es tan inservible como no tener nada.
+  if [[ -n "${NCR_PGBIN:-}" ]]; then
+    sirve_como_bin "$NCR_PGBIN" && printf '%s\n' "$NCR_PGBIN" && return 0
+    return 1
+  fi
   if command -v pg_ctl >/dev/null 2>&1; then
-    dirname "$(command -v pg_ctl)"
-    return 0
+    local delPath
+    delPath="$(dirname "$(command -v pg_ctl)")"
+    if sirve_como_bin "$delPath"; then
+      printf '%s\n' "$delPath"
+      return 0
+    fi
+    # Tiene pg_ctl y no sirve: se sigue buscando en vez de rendirse, porque la
+    # instalación completa puede estar en otro sitio (el caso de `libpq`).
   fi
   # Se recorren de mayor a menor versión sin `sort -V`, que no existe en BSD:
   # el orden lo da el glob y se queda la última coincidencia, que para
@@ -75,10 +104,8 @@ localizar_bin() {
   local d
   for d in /usr/lib/postgresql/*/bin \
            /opt/homebrew/opt/postgresql@*/bin \
-           /usr/local/opt/postgresql@*/bin \
-           /opt/homebrew/opt/libpq/bin \
-           /usr/local/opt/libpq/bin; do
-    [[ -x "$d/pg_ctl" ]] && elegido="$d"
+           /usr/local/opt/postgresql@*/bin; do
+    sirve_como_bin "$d" && elegido="$d"
   done
   [[ -n "$elegido" ]] && printf '%s\n' "$elegido" && return 0
   return 1
@@ -109,9 +136,11 @@ bajar_privilegio_si_root() {
 arrancar() {
   local bin
   if ! bin="$(localizar_bin)"; then
-    echo "FALLO no encuentro pg_ctl. Instale PostgreSQL antes de pedir --con-base." >&2
+    echo "FALLO no encuentro un servidor PostgreSQL utilizable (pg_ctl, initdb y postgres" >&2
+    echo "  en el mismo directorio). Instálelo antes de pedir --con-base." >&2
     echo "  Debian/Ubuntu: viene en la imagen, en /usr/lib/postgresql/NN/bin" >&2
-    echo "  macOS:         brew install postgresql@16" >&2
+    echo "  macOS:         brew install postgresql@16 — OJO: la fórmula libpq NO trae servidor" >&2
+    echo "  O exporte NCR_PGBIN con el directorio que los tenga los tres." >&2
     exit 1
   fi
 
