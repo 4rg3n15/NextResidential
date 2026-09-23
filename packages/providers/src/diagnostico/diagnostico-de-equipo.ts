@@ -86,6 +86,10 @@ export interface OpcionesDeDiagnostico extends OpcionesDeEquipo {
   readonly ahoraDelServidor?: () => Date;
 }
 
+/** Lo que el equipo contesta cuando la ruta no existe en ese firmware. */
+const rechazado = (cuerpo: string): boolean =>
+  /notSupport|invalidOperation|notSupported/i.test(cuerpo);
+
 export const diagnosticarEquipo = async (
   opciones: OpcionesDeDiagnostico,
 ): Promise<DiagnosticoDeEquipo> => {
@@ -97,7 +101,20 @@ export const diagnosticarEquipo = async (
     const ruta = rutaPara(proposito, familia);
     try {
       const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta);
-      if (!respuesta.ok) {
+      /**
+       * ═══════════════════════════════════════════════════════════════════════
+       * UN `200` CON UN RECHAZO DENTRO NO ES UNA RESPUESTA
+       *
+       * Así rechazan estos equipos: contestan `200` y meten el motivo en el
+       * cuerpo. Mirar sólo el código de estado daba por leído un documento que
+       * no existe, y el juez de turno lo interpretaba como «el equipo no
+       * declara nada» — que es un veredicto **sobre el equipo** construido con
+       * una respuesta que nunca vino.
+       *
+       * La diferencia importa: «no lo soporta» se anota y se enseña; «no lo
+       * declara» bloquea. Confundirlos acusa al aparato de lo que no hizo.
+       */
+      if (!respuesta.ok || rechazado(respuesta.cuerpo)) {
         sinRespuesta.push({ que: proposito, motivo: interpretarError(respuesta.cuerpo).detalle });
         return null;
       }

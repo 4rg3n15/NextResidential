@@ -383,3 +383,57 @@ describe('defensas del sobre · lo que el documento advierte', () => {
     expect(sobre.xml).toBe(xml);
   });
 });
+
+describe('sobres que NO declaran el tipo de cada parte', () => {
+  /**
+   * No todos los firmwares ponen `Content-Type` en las partes: algunos dejan
+   * sólo el nombre. Clasificar por el tipo y rendirse si falta dejaría el
+   * evento entero como ilegible —placa incluida— por una cabecera que el
+   * protocolo no obliga a enviar.
+   */
+  it('se clasifican por el nombre de la parte, no por el tipo declarado', () => {
+    const escena = Buffer.alloc(4096, 1);
+    const recorte = Buffer.alloc(256, 2);
+    const resultado = clasificarSobre(
+      partirSobre(
+        sobre('B', [
+          { nombre: 'anpr.xml', contenido: XML },
+          { nombre: 'scene.jpg', contenido: escena },
+          { nombre: 'plate.jpg', contenido: recorte },
+        ]),
+        'B',
+      ),
+    );
+    expect(resultado.xml).toContain('ABC123');
+    expect(resultado.recorte?.equals(recorte)).toBe(true);
+    expect(resultado.foto?.equals(escena)).toBe(true);
+  });
+
+  it('y por el nombre de FICHERO cuando la disposición lo trae', () => {
+    const resultado = clasificarSobre(
+      partirSobre(
+        sobre('B', [
+          { nombre: 'parte1', fichero: 'anpr.xml', contenido: XML },
+          { nombre: 'parte2', fichero: 'captura.jpeg', contenido: JPEG_FALSO },
+        ]),
+        'B',
+      ),
+    );
+    expect(resultado.xml).toContain('ABC123');
+    expect(resultado.foto?.equals(JPEG_FALSO)).toBe(true);
+  });
+
+  it('una parte que no es ni XML ni imagen se ignora sin romper el sobre', () => {
+    const resultado = clasificarSobre(
+      partirSobre(
+        sobre('B', [
+          { nombre: 'anpr.xml', contenido: XML },
+          { nombre: 'metadata.bin', contenido: Buffer.from([0x00, 0x01]) },
+        ]),
+        'B',
+      ),
+    );
+    expect(resultado.xml).toContain('ABC123');
+    expect(resultado.foto).toBeNull();
+  });
+});

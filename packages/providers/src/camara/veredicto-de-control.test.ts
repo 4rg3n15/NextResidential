@@ -158,3 +158,44 @@ describe('no poder leerlo NO es que esté bien', () => {
     expect(veredicto.admisible).toBe(false);
   });
 });
+
+describe('una política que el documento trae A MEDIAS', () => {
+  /**
+   * Un firmware puede emitir un bloque de política sin número y sin operación.
+   * Ninguna de las dos ausencias se da por inocua: no poder afirmar que esa
+   * política no abre el brazo es, aquí, lo mismo que saber que lo abre.
+   */
+  const documentoConPoliticaIncompleta = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<EntranceParamList version="2.0" xmlns="${ESPACIO}">`,
+    '<EntranceParam>',
+    '<laneNum>1</laneNum>',
+    '<ctrlMode>1</ctrlMode>',
+    '<vehInfoManagList>',
+    '<vehInfoManag><barrierGateOper>abrirElBrazoSiempre</barrierGateOper></vehInfoManag>',
+    '</vehInfoManagList>',
+    '<relayList><relay><relayNum>1</relayNum><relayOper>open</relayOper></relay></relayList>',
+    '</EntranceParam></EntranceParamList>',
+  ].join('');
+
+  it('sin número, la política se nombra igual y NO desaparece del veredicto', () => {
+    const veredicto = leerVeredictoDeControl(documentoConPoliticaIncompleta);
+    expect(veredicto.bloqueos.some((b) => /política interna \?/.test(b.campo))).toBe(true);
+  });
+
+  it('y una operación que el catálogo no conoce BLOQUEA, no se da por inocua', () => {
+    const veredicto = leerVeredictoDeControl(documentoConPoliticaIncompleta);
+    expect(veredicto.admisible).toBe(false);
+    expect(veredicto.bloqueos.some((b) => /no conoce|catalóguela/i.test(b.detalle))).toBe(true);
+  });
+
+  it('una política SIN operación ninguna tampoco se aprueba en silencio', () => {
+    const sinOperacion = documentoConPoliticaIncompleta.replace(
+      '<barrierGateOper>abrirElBrazoSiempre</barrierGateOper>',
+      '<upAlarmEnable>true</upAlarmEnable>',
+    );
+    const veredicto = leerVeredictoDeControl(sinOperacion);
+    expect(veredicto.reglasInternas[0]?.operacionDeBarrera).toBeNull();
+    expect(veredicto.reglasInternas[0]?.clase).toBe('desconocida');
+  });
+});

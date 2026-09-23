@@ -291,11 +291,25 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       });
     }
 
-    const catalogada = RUTAS.find(
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * SE BUSCA POR RUTA **Y MÉTODO**, y no sólo por ruta
+     *
+     * Varias entradas del catálogo comparten camino y se distinguen por el
+     * verbo: leer la configuración del receptor es un `GET` sobre la misma
+     * ruta en la que se escribe con `PUT`. Buscando sólo por ruta ganaba la
+     * primera del catálogo, así que una lectura se contestaba con la respuesta
+     * de una escritura — y el simulado dejaba de simular nada.
+     *
+     * Lo destapó la prueba del formato de notificación, que pedía un documento
+     * y recibía un `OK` genérico.
+     */
+    const delMismoCamino = RUTAS.filter(
       (r) =>
         r.ruta.split('?')[0] === url.pathname &&
         (r.familia === guion.familia || r.familia === 'comun'),
     );
+    const catalogada = delMismoCamino.find((r) => r.metodo === metodo) ?? delMismoCamino[0];
 
     // Una ruta que el adaptador pide y el catálogo no conoce es un error de
     // programación: el equipo contesta 404, igual que el de verdad.

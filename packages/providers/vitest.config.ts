@@ -9,7 +9,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/index.ts'],
+      /**
+       * Se excluye lo que no tiene código que ejecutar: el barril y el fichero
+       * de TIPOS del catálogo. `v8` informa 0 % de un fichero sin sentencias, y
+       * un cero que no significa «sin probar» enseña a desconfiar de la cifra.
+       */
+      exclude: ['src/**/*.test.ts', 'src/index.ts', 'src/equipo/tipos-de-ruta.ts'],
       thresholds: { lines: 90, functions: 90, branches: 90, statements: 90 },
     },
   },

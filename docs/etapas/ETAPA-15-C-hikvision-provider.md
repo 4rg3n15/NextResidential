@@ -249,7 +249,7 @@ misma instancia. El detalle está en **ADR-018**.
 
 | Suite              | Resultado              |
 | ------------------ | ---------------------- |
-| `@ncr/providers`   | 330 pasan (era 193)    |
+| `@ncr/providers`   | 431 pasan (era 193)    |
 | `@ncr/api`         | 911 pasan · 5 omitidas |
 | `@ncr/web`         | 408 pasan (era 385)    |
 | `@ncr/domain-core` | 400 pasan              |
@@ -275,6 +275,22 @@ adaptador, no en la aserción.
 | **KPI-11 marcó el XML del fabricante escrito en una prueba de la API.** Tenía razón: el nombre de un elemento es vocabulario del fabricante aunque esté en un banco de pruebas        | Los documentos los sirve ahora el equipo simulado del paquete de proveedores                        |
 | **La fábrica se iba al hardware con `undefined`.** Preguntaba `=== 'simulado'` y cualquier otra cosa era hardware. Lo destapó la suite entera pidiendo equipos que nadie había pedido | Se comprueba contra la lista, y lo desconocido rompe                                                |
 | **El barrido genérico de formularios tecleaba un valor con espacios en el campo de usuario**, que el equipo no admite                                                                 | El valor pasó a ser válido en todos los campos; el barrido sigue sin saber nada de ninguna pantalla |
+
+### El umbral de cobertura del paquete, que no era una formalidad
+
+El paquete de proveedores lleva su propio umbral del 90 %, y el código nuevo lo
+bajó al **88,81 % de ramas**. Subirlo obligó a escribir las pruebas de los
+caminos que nadie había recorrido, y tres de ellos eran defectos de verdad,
+no huecos decorativos:
+
+| Camino sin recorrer                                                                                                                                                        | Por qué importaba                                                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Diagnosticar un equipo que NO es una cámara.** Las seis preguntas de «quién decide» sólo existen en la cámara y nadie había probado que no se le hicieran a una terminal | Preguntárselas a una terminal facial llenaría su ficha de consultas sin respuesta que no son un defecto del aparato, sino una pregunta mal hecha                        |
+| **Un sobre cuyas partes no declaran `Content-Type`.** Toda la suite las traía declaradas                                                                                   | Ese firmware existe: clasificar sólo por el tipo declarado dejaría el evento entero como ilegible —placa incluida— por una cabecera que el protocolo no obliga a enviar |
+| **Una política interna sin número y con una operación fuera del catálogo**                                                                                                 | Es justo el caso que el veredicto tiene que bloquear, y era el único de los tres que ninguna prueba ejercitaba                                                          |
+
+El umbral no encontró los defectos: encontró **dónde no habíamos mirado**, que
+es para lo que está. La cobertura de ramas del paquete quedó en **91,05 %**.
 
 ### El veredicto literal de `./scripts/verificar-etapa.sh --con-base`
 

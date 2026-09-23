@@ -72,6 +72,15 @@ export interface OpcionesDeCorreccion extends OpcionesDeEquipo {
   readonly imagenes?: string;
 }
 
+/**
+ * Lo que el equipo contesta cuando la ruta no existe en ese firmware, **con
+ * HTTP 200**. Mirar sólo el código de estado daría por leído un documento que
+ * no existe, y escribir después lo que salga de ahí es cómo se borra la
+ * configuración de un equipo con una corrección.
+ */
+const rechazado = (cuerpo: string): boolean =>
+  /notSupport|invalidOperation|notSupported/i.test(cuerpo);
+
 const noAplicada = (
   clase: ClaseDeCorreccion,
   detalle: string,
@@ -99,7 +108,7 @@ const leerYModificar = async (
 ): Promise<{ anterior: string | null; documento: string } | null> => {
   const lectura = rutaPara(propositoDeLectura, 'camara');
   const respuesta = await cliente.pedir(lectura.metodo, lectura.ruta);
-  if (!respuesta.ok) return null;
+  if (!respuesta.ok || rechazado(respuesta.cuerpo)) return null;
   const anterior = etiqueta(respuesta.cuerpo, campo);
   const documento = reemplazarEtiqueta(respuesta.cuerpo, campo, valor);
   return documento === null ? null : { anterior, documento };
@@ -115,7 +124,7 @@ const escribir = async (
     tipo: 'application/xml',
     contenido: documento,
   });
-  return respuesta.ok
+  return respuesta.ok && !rechazado(respuesta.cuerpo)
     ? { ok: true, detalle: 'El equipo aceptó el cambio' }
     : { ok: false, detalle: interpretarError(respuesta.cuerpo).detalle };
 };
@@ -198,7 +207,7 @@ const corregirPais = async (
 ): Promise<ResultadoDeCorreccion> => {
   const lectura = rutaPara('leer el país con el que el algoritmo lee las placas', 'camara');
   const respuesta = await cliente.pedir(lectura.metodo, lectura.ruta);
-  if (!respuesta.ok) {
+  if (!respuesta.ok || rechazado(respuesta.cuerpo)) {
     return noAplicada('pais_del_algoritmo', 'El equipo no devolvió los datos básicos del canal');
   }
 

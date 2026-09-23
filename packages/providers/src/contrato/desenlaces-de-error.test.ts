@@ -178,3 +178,64 @@ describe('los demás desenlaces, cada uno con su reacción', () => {
     );
   });
 });
+
+describe('el estado que la consola pinta, y sus tres colores', () => {
+  /**
+   * Los tres son distintos y se resuelven distinto: `fuera_de_linea` manda a
+   * revisar el cable, `degradado` manda a revisar la configuración del aparato.
+   * Colapsarlos manda al técnico al sitio equivocado.
+   */
+  it('un equipo que responde y autentica está EN LÍNEA', async () => {
+    expect(await proveedorCon(camaraConforme()).estado(CAMARA)).toBe('en_linea');
+  });
+
+  it('uno que responde con un error suyo queda DEGRADADO: está vivo', async () => {
+    const conError: typeof fetch = () =>
+      Promise.resolve(
+        new Response(
+          '<ResponseStatus><statusCode>3</statusCode>' +
+            '<statusString>Device Error</statusString></ResponseStatus>',
+          { status: 500, headers: { 'content-type': 'application/xml' } },
+        ),
+      );
+    expect(await proveedorCon(conError).estado(CAMARA)).toBe('degradado');
+  });
+
+  it('y uno que no contesta, FUERA DE LÍNEA', async () => {
+    const muerto: typeof fetch = () => Promise.reject(new Error('connect ECONNREFUSED'));
+    expect(await proveedorCon(muerto).estado(CAMARA)).toBe('fuera_de_linea');
+  });
+
+  it('un dispositivo que no está en el registro tampoco se inventa: fuera de línea', async () => {
+    expect(await proveedorCon(camaraConforme()).estado('disp-que-no-existe')).toBe(
+      'fuera_de_linea',
+    );
+  });
+});
+
+describe('el canal de audio, antes de que haya canal', () => {
+  it('cerrar una sesión que no se abrió NO LANZA: cerrar es idempotente', async () => {
+    // El operador cierra la consola sin haber hablado, o se cierra dos veces
+    // por un reintento. Lanzar ahí dejaría el bloqueo del canal sin liberar.
+    await expect(proveedorCon(camaraConforme()).cerrarSesion('fin')).resolves.toBeUndefined();
+  });
+
+  it('y sin sesión el estado es CERRADA, no un error', async () => {
+    expect(await proveedorCon(camaraConforme()).estadoSesion()).toBe('cerrada');
+  });
+});
+
+describe('un relé suelto, sin cámara delante', () => {
+  it('se acciona como la barrera y NO se le exige el veredicto de control', async () => {
+    // Un relé no tiene documento de parámetros de entrada que leer: exigírselo
+    // bloquearía un equipo que no puede decidir nada por su cuenta.
+    const proveedor = proveedorCon(
+      equiposSimulados({
+        [HOST]: { familia: 'camara', usuario: 'servicio', clave: 'clave-de-prueba' },
+      }),
+      equipo({ tipo: 'rele' }),
+    );
+    const resultado = await proveedor.abrir(CAMARA, 'operador-1');
+    expect(typeof resultado.aceptado).toBe('boolean');
+  });
+});
