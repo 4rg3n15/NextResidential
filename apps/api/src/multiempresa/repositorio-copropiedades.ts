@@ -1,6 +1,6 @@
 import type { ContextoTenant } from '../autenticacion';
 import type { CambiosDeConfiguracion, ConfiguracionDeCopropiedad } from './configuracion';
-import { cambiosEfectivos } from './configuracion';
+import { UMBRAL_CONFIANZA_PLACA_FRACCION, cambiosEfectivos } from './configuracion';
 
 /**
  * Puerto de lectura del catálogo de copropiedades.
@@ -27,6 +27,13 @@ export interface CopropiedadResumen {
 
 export interface RepositorioCopropiedades {
   listarParaElAlcance(ctx: ContextoTenant): Promise<readonly CopropiedadResumen[]>;
+
+  /**
+   * ETAPA 15-D · el umbral vigente, para el motor y sin contexto de usuario:
+   * lo consume la ingesta de un equipo, que no tiene sesión. `null` si la
+   * copropiedad no existe; el valor por omisión lo pone quien llama.
+   */
+  umbralDeConfianzaPlaca(copropiedadId: string): Promise<number | null>;
 
   /** `null` si el token no alcanza esa copropiedad: la consola lo traduce a 404. */
   leerConfiguracion(ctx: ContextoTenant, id: string): Promise<ConfiguracionDeCopropiedad | null>;
@@ -103,7 +110,7 @@ export class RepositorioCopropiedadesEnMemoria implements RepositorioCopropiedad
           etiquetaVivienda: 'Vivienda',
           etiquetaAgrupacion: 'Torre o bloque',
           zonaHoraria: fila.zonaHoraria,
-          umbralConfianzaPlaca: 0.85,
+          umbralConfianzaPlaca: UMBRAL_CONFIANZA_PLACA_FRACCION,
           politicaContingenciaEdge: 'denegar',
           umbralLatidoMinutos: 5,
           nit: '900000000',
@@ -118,6 +125,10 @@ export class RepositorioCopropiedadesEnMemoria implements RepositorioCopropiedad
 
   async listarParaElAlcance(ctx: ContextoTenant): Promise<readonly CopropiedadResumen[]> {
     return filtrarPorAlcance(ctx, this.filas);
+  }
+
+  async umbralDeConfianzaPlaca(copropiedadId: string): Promise<number | null> {
+    return this.configuraciones.get(copropiedadId)?.umbralConfianzaPlaca ?? null;
   }
 
   private alcanza(ctx: ContextoTenant, id: string): boolean {

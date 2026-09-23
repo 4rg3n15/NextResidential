@@ -40,6 +40,9 @@ class RepoAutorizacionesFalso implements RepositorioAutorizaciones {
   async vigentesDePersona(): Promise<readonly Autorizacion[]> {
     return [...this.guardadas.values()];
   }
+  async activasParaLectura(): Promise<readonly Autorizacion[]> {
+    return [...this.guardadas.values()];
+  }
 }
 
 const entradaBase = {

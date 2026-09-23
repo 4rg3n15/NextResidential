@@ -31,6 +31,7 @@ const configuracionParaContrato: Configuracion = {
   // El contrato se genera SIEMPRE contra el simulado: generar el documento no
   // puede depender de que haya cámaras al otro lado.
   PROVEEDOR_DE_EQUIPOS: 'simulado',
+  CARGADOR_DE_CONTEXTO: 'conservador',
   PROVEEDOR_SEMILLA: 20260908,
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',

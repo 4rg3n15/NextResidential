@@ -241,6 +241,27 @@ describe('motor de reglas · un motivo por cada denegación (§2.4)', () => {
     expect(motivoDe(contexto({ placaConocida: false }))).toBe('PLACA_DESCONOCIDA');
   });
 
+  it('y también SIN vivienda: una placa que nadie registró no tiene vivienda (15-D)', () => {
+    // Éste es el caso real. Antes `politicaVivienda` iba primero y contestaba
+    // FALLO_TECNICO, así que PLACA_DESCONOCIDA sólo salía con una vivienda
+    // inventada por la prueba. Lo destapó el primer cargador con datos (D-25).
+    expect(motivoDe(contexto({ placaConocida: false, viviendaId: null }))).toBe(
+      'PLACA_DESCONOCIDA',
+    );
+  });
+
+  it('la precedencia vinculante no cambia: lista negra antes que placa desconocida', () => {
+    expect(
+      motivoDe(
+        contexto({
+          placaConocida: false,
+          viviendaId: null,
+          placasEnListaNegra: new Set(['ABC123']),
+        }),
+      ),
+    ).toBe('LISTA_NEGRA');
+  });
+
   it('CONFIANZA_INSUFICIENTE solo cuando la lectura es inservible (CU-01, 3a)', () => {
     expect(motivoDe(contexto({ confianza: 0.2 }))).toBe('CONFIANZA_INSUFICIENTE');
   });

@@ -197,7 +197,27 @@ export interface FilaExportada {
   readonly esTitular: boolean | null;
 }
 
+/**
+ * Lo que una PLACA dice del padrón, resuelto en una consulta — ETAPA 15-D, D-25.
+ *
+ * Es lo que el cargador de contexto del motor necesita saber de una lectura, y
+ * nada más: a qué vivienda pertenece el vehículo, si esa vivienda sigue en
+ * servicio y desde cuándo/hasta cuándo rige el derecho del residente (RN-13).
+ * `viviendaDesactivadaEn` es el instante en que ese derecho dejó de estar
+ * vigente: una vivienda dada de baja no genera accesos nuevos.
+ */
+export interface VehiculoResuelto {
+  readonly vehiculoId: string;
+  readonly viviendaId: string;
+  readonly viviendaActiva: boolean;
+  readonly viviendaDesactivadaEn: Date | null;
+  readonly personaId: string | null;
+  readonly registradoEn: Date;
+}
+
 export interface RepositorioPadron {
+  /** `null` si ninguna vivienda de la copropiedad tiene un vehículo ACTIVO con esa placa. */
+  resolverPlaca(copropiedadId: string, placa: Placa): Promise<VehiculoResuelto | null>;
   registrarVehiculo(alta: AltaVehiculo): Promise<ResultadoRegistroVehiculo>;
   registrarVivienda(alta: AltaVivienda): Promise<ResultadoAltaVivienda>;
   buscarPersonas(

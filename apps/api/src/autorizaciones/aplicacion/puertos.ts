@@ -13,10 +13,35 @@ import type {
  * todo el I/O ocurre aquí, antes de evaluar. El motor recibe el contexto ya
  * cerrado y no puede preguntar nada más.
  */
+/**
+ * Lo que una lectura trae para buscar autorizaciones — ETAPA 15-D, D-25.
+ *
+ * Una lectura de placa no viene con persona; una facial no viene con placa. El
+ * repositorio devuelve, en UNA consulta, las autorizaciones activas que casan
+ * con cualquiera de las dos, y el motor decide con todas delante.
+ */
+export interface CriterioDeLectura {
+  readonly placa: string | null;
+  readonly personaId: string | null;
+}
+
 export interface RepositorioAutorizaciones {
   guardar(copropiedadId: string, autorizacion: Autorizacion, actorId: string): Promise<void>;
   porId(copropiedadId: string, autorizacionId: string): Promise<Autorizacion | null>;
   vigentesDePersona(copropiedadId: string, personaId: string): Promise<readonly Autorizacion[]>;
+  /**
+   * Activas (no revocadas) que casan con la lectura, rehidratadas ENTERAS en
+   * una sola consulta: acompañantes, zonas y patrón incluidos. Sin N+1: es la
+   * consulta que el motor paga por cada evento, y una por política sería
+   * exactamente el defecto que §2.4 prohíbe.
+   *
+   * Las vencidas TAMBIÉN vuelven: distinguir «no hay autorización» de «la
+   * hubo y venció» es lo que separa PLACA_DESCONOCIDA de VIGENCIA_EXPIRADA.
+   */
+  activasParaLectura(
+    copropiedadId: string,
+    criterio: CriterioDeLectura,
+  ): Promise<readonly Autorizacion[]>;
 }
 
 /**
@@ -116,6 +141,43 @@ export interface ResolutorDeZona {
 }
 
 export const RESOLUTOR_DE_ZONA = Symbol.for('ncr.puerto.ResolutorDeZona');
+
+/**
+ * Lo que el motor necesita saber del PADRÓN por una placa — ETAPA 15-D, D-25.
+ *
+ * Mismo patrón que `ResolutorDeZona`: lo declara el consumidor, lo satisface el
+ * módulo de padrón desde su repositorio, y ninguno de los dos importa código
+ * interno del otro ni consulta sus tablas (§2.2). El cargador de contexto no
+ * sabe que existe `vehiculos`; sabe que alguien resuelve placas.
+ */
+export interface PlacaResuelta {
+  readonly vehiculoId: string;
+  readonly viviendaId: string;
+  readonly viviendaActiva: boolean;
+  /** Cuándo dejó de regir el derecho del residente, si la vivienda se dio de baja. */
+  readonly viviendaDesactivadaEn: Date | null;
+  readonly personaId: string | null;
+  readonly registradoEn: Date;
+}
+
+export interface ResolutorDePlaca {
+  resolver(copropiedadId: string, placa: string): Promise<PlacaResuelta | null>;
+}
+
+export const RESOLUTOR_DE_PLACA = Symbol.for('ncr.puerto.ResolutorDePlaca');
+
+/**
+ * El umbral de confianza VIGENTE de una copropiedad (P-02, resuelta en 80/100).
+ *
+ * Declarado aquí y satisfecho por quien guarda la configuración: el cargador
+ * necesita el número y no la tabla. Devuelve `null` cuando la copropiedad no
+ * existe, y quien llama aplica el valor por omisión del contrato.
+ */
+export interface LectorDeUmbralDeConfianza {
+  umbralDeConfianzaPlaca(copropiedadId: string): Promise<number | null>;
+}
+
+export const LECTOR_DE_UMBRAL = Symbol.for('ncr.puerto.LectorDeUmbralDeConfianza');
 
 export const REPOSITORIO_AUTORIZACIONES = Symbol.for('ncr.puerto.RepositorioAutorizaciones');
 export const REPOSITORIO_LISTA_NEGRA = Symbol.for('ncr.puerto.RepositorioListaNegra');

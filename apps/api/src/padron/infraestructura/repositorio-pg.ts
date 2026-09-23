@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import { Injectable } from '@nestjs/common';
 import type {
   HistorialDeVivienda,
+  VehiculoResuelto,
   AltaPersona,
   AltaResidente,
   AltaVehiculo,
@@ -67,6 +68,43 @@ export class RepositorioPadronPg implements RepositorioPadron {
     } finally {
       cliente.release();
     }
+  }
+
+  /**
+   * D-25 · una sola consulta por lectura. El índice único parcial de placa
+   * activa garantiza que aquí hay a lo sumo una fila viva; la vivienda se trae
+   * en el mismo viaje porque es lo único que el motor va a preguntar después.
+   */
+  async resolverPlaca(copropiedadId: string, placa: Placa): Promise<VehiculoResuelto | null> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{
+        vehiculo_id: string;
+        vivienda_id: string;
+        vivienda_estado: string;
+        desactivado_en: Date | null;
+        persona_id: string | null;
+        creado_en: Date;
+      }>(
+        `SELECT ve.id AS vehiculo_id, ve.vivienda_id, vi.estado::text AS vivienda_estado,
+                vi.desactivado_en, ve.persona_id, ve.creado_en
+           FROM public.vehiculos ve
+           JOIN public.viviendas vi
+             ON vi.copropiedad_id = ve.copropiedad_id AND vi.id = ve.vivienda_id
+          WHERE ve.copropiedad_id = $1 AND ve.placa = $2 AND ve.estado = 'activo'
+          LIMIT 1`,
+        [copropiedadId, placa.valor],
+      );
+      const f = rows[0];
+      if (f === undefined) return null;
+      return {
+        vehiculoId: f.vehiculo_id,
+        viviendaId: f.vivienda_id,
+        viviendaActiva: f.vivienda_estado === 'activo',
+        viviendaDesactivadaEn: f.desactivado_en,
+        personaId: f.persona_id,
+        registradoEn: f.creado_en,
+      };
+    });
   }
 
   async registrarVehiculo(alta: AltaVehiculo): Promise<ResultadoRegistroVehiculo> {

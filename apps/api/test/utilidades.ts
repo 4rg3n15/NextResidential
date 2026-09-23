@@ -76,6 +76,10 @@ export const configuracionDePrueba: Configuracion = {
    */
   PROVEEDOR_DE_EQUIPOS: 'simulado',
   PROVEEDOR_SEMILLA: 20260908,
+  // Este banco no tiene base: el cargador que lee de ella fallaría en cada
+  // lectura. El conservador deniega, que es lo que las suites de la API
+  // esperan; el cargador PostgreSQL tiene su propia suite contra base real.
+  CARGADOR_DE_CONTEXTO: 'conservador',
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   LOG_LEVEL: 'aviso',

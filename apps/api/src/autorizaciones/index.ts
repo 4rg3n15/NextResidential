@@ -13,15 +13,26 @@
 export { DecidirAcceso } from './aplicacion/evaluar-acceso';
 export {
   CARGADOR_DE_CONTEXTO,
+  LECTOR_DE_UMBRAL,
+  REPOSITORIO_AUTORIZACIONES,
+  REPOSITORIO_LISTA_NEGRA,
   REPOSITORIO_VERSION_REGLAS,
+  RESOLUTOR_DE_PLACA,
   RESOLUTOR_DE_ZONA,
 } from './aplicacion/puertos';
 export type {
   CargadorDeContexto,
+  CriterioDeLectura,
+  LectorDeUmbralDeConfianza,
+  PlacaResuelta,
+  RepositorioAutorizaciones,
+  RepositorioListaNegra,
   RepositorioVersionDeReglas,
+  ResolutorDePlaca,
   ResolutorDeZona,
   SolicitudDeAcceso,
 } from './aplicacion/puertos';
+export { CargadorDeContextoPg } from './infraestructura/cargador-pg';
 export { AutorizacionesModule } from './autorizaciones.module';
 // `main.ts` la necesita para montar el `express.json({ verify })` que guarda el
 // cuerpo crudo sobre el que se calcula la firma del Alarm Server.

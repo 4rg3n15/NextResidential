@@ -8,8 +8,15 @@ import type {
   SolicitudDeAcceso,
 } from '../aplicacion/puertos';
 
-/** [SUPUESTO] S-16 · P-02 sigue abierta; el umbral vigente es 0,85. */
-export const UMBRAL_DE_CONFIANZA_POR_DEFECTO = 0.85;
+import { UMBRAL_CONFIANZA_PLACA_FRACCION } from '../../multiempresa/configuracion';
+
+/**
+ * P-02 está RESUELTA (15-B): 80 en la escala 0–100 del evento. Este alias
+ * existía con su propio número —0,85, «P-02 sigue abierta»— y llevaba dos
+ * rondas desactualizado respecto de la constante y de la migración 0032. Desde
+ * la 15-D hay UNA definición y ésta la reexporta; no la duplica.
+ */
+export const UMBRAL_DE_CONFIANZA_POR_DEFECTO = UMBRAL_CONFIANZA_PLACA_FRACCION;
 
 /**
  * Cargador de contexto **conservador y provisional** — D-25, §2.1.4.

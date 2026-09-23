@@ -39,6 +39,7 @@ const vocabulario = (
 
 const repo = (parcial: Partial<RepositorioPadron> = {}): RepositorioPadron => {
   const base: RepositorioPadron = {
+    resolverPlaca: vi.fn().mockResolvedValue(null),
     registrarVehiculo: vi.fn().mockResolvedValue({ tipo: 'registrado', id: 'v1' }),
     desactivarVehiculo: vi.fn().mockResolvedValue(true),
     registrarResidente: vi.fn().mockResolvedValue({ id: 'r1' }),

@@ -4,6 +4,7 @@ import { Autorizacion, PatronRecurrencia, Vigencia, esExito } from '@ncr/domain-
 import type { Acompanante } from '@ncr/domain-core';
 import type {
   AutorizacionEnLista,
+  CriterioDeLectura,
   RepositorioAutorizaciones,
   RepositorioDeConsultaDeAutorizaciones,
 } from '../aplicacion/puertos';
@@ -291,6 +292,111 @@ export class RepositorioAutorizacionesPg
    * consulta por autorización— es la que convierte una lista de cincuenta
    * filas en ciento cincuenta viajes a la base.
    */
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * D-25 · LO QUE EL MOTOR PAGA POR CADA LECTURA: UNA CONSULTA
+   *
+   * `vigentesDePersona` rehidrata con `leer` fila a fila —cuatro consultas por
+   * autorización—, y para una pantalla está bien. Para el motor no: se llama
+   * por cada vehículo que pasa, y una lectura de placa con tres autorizaciones
+   * costaría trece viajes a la base. Aquí acompañantes, zonas y patrón salen
+   * como agregados JSON en la MISMA sentencia.
+   *
+   * Vuelven las ACTIVAS —no revocadas— aunque estén vencidas: el motor es
+   * quien decide que una vencida es VIGENCIA_EXPIRADA, y filtrarla aquí lo
+   * dejaría sin saber que existió, que es PLACA_DESCONOCIDA. Son dos motivos
+   * distintos del contrato, y la diferencia se decide en el dominio.
+   */
+  async activasParaLectura(
+    copropiedadId: string,
+    criterio: CriterioDeLectura,
+  ): Promise<readonly Autorizacion[]> {
+    if (criterio.placa === null && criterio.personaId === null) return [];
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{
+        id: string;
+        vivienda_id: string;
+        persona_id: string;
+        desde: Date;
+        hasta: Date;
+        estado: string;
+        revocada_en: Date | null;
+        motivo_revocacion: string | null;
+        zonas: string[] | null;
+        acompanantes: { persona_id: string; nombre_completo: string }[] | null;
+        patron: { dia_semana: number; hora_inicio: string; hora_fin: string }[] | null;
+      }>(
+        `SELECT a.id, a.vivienda_id, v.persona_id,
+                lower(a.vigencia) AS desde, upper(a.vigencia) AS hasta,
+                a.estado::text AS estado, a.revocada_en, a.motivo_revocacion,
+                (SELECT array_agg(z.zona_id) FROM public.autorizaciones_zona z
+                  WHERE z.copropiedad_id = a.copropiedad_id AND z.autorizacion_id = a.id) AS zonas,
+                (SELECT json_agg(json_build_object('persona_id', ac.persona_id,
+                                                   'nombre_completo', p.nombre_completo))
+                   FROM public.autorizacion_acompanantes ac
+                   JOIN public.personas p
+                     ON p.copropiedad_id = ac.copropiedad_id AND p.id = ac.persona_id
+                  WHERE ac.copropiedad_id = a.copropiedad_id
+                    AND ac.autorizacion_id = a.id) AS acompanantes,
+                (SELECT json_agg(json_build_object('dia_semana', pr.dia_semana,
+                                                   'hora_inicio', pr.hora_inicio::text,
+                                                   'hora_fin', pr.hora_fin::text)
+                                 ORDER BY pr.dia_semana)
+                   FROM public.patrones_recurrencia pr
+                  WHERE pr.copropiedad_id = a.copropiedad_id
+                    AND pr.autorizacion_id = a.id) AS patron
+           FROM public.autorizaciones a
+           JOIN public.visitantes v
+             ON v.copropiedad_id = a.copropiedad_id AND v.id = a.visitante_id
+          WHERE a.copropiedad_id = $1
+            AND a.estado = 'activa'
+            AND (($2::text IS NOT NULL AND a.placa = $2)
+                 OR ($3::uuid IS NOT NULL AND v.persona_id = $3))
+          ORDER BY upper(a.vigencia) DESC
+          LIMIT 50`,
+        [copropiedadId, criterio.placa, criterio.personaId],
+      );
+
+      const salida: Autorizacion[] = [];
+      for (const f of rows) {
+        const vigencia = Vigencia.crear(f.desde, f.hasta);
+        if (!esExito(vigencia)) continue;
+        let patron: PatronRecurrencia | null = null;
+        const primera = f.patron?.[0];
+        if (primera !== undefined && f.patron !== null) {
+          const reconstruido = PatronRecurrencia.crear({
+            dias: f.patron.map((x) => (x.dia_semana === 7 ? 0 : x.dia_semana)),
+            minutoInicio: horaAMinutos(primera.hora_inicio),
+            minutoFin: horaAMinutos(primera.hora_fin),
+            desplazamientoUtcMinutos: 0,
+          });
+          if (esExito(reconstruido)) patron = reconstruido.valor;
+        }
+        const acompanantes: Acompanante[] = (f.acompanantes ?? []).map((x) => ({
+          personaId: x.persona_id,
+          nombre: x.nombre_completo,
+        }));
+        salida.push(
+          Autorizacion.rehidratar({
+            id: f.id,
+            copropiedadId,
+            viviendaId: f.vivienda_id,
+            personaId: f.persona_id,
+            vigencia: vigencia.valor,
+            estado: f.estado === 'revocada' ? 'revocada' : 'vigente',
+            acompanantes,
+            zonasPermitidas: f.zonas ?? [],
+            patron,
+            maximoAcompanantes: Math.max(5, acompanantes.length),
+            revocadaEn: f.revocada_en,
+            motivoRevocacion: f.motivo_revocacion,
+          }),
+        );
+      }
+      return salida;
+    });
+  }
+
   async listar(
     copropiedadId: string,
     solo: 'activas' | 'historial',

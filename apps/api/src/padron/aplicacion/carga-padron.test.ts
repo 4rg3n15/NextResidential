@@ -16,6 +16,7 @@ const repoFalso = (
   registrar = vi.fn().mockResolvedValue({ tipo: 'registrado', id: 'v1' }),
 ): RepositorioPadron => {
   const repo: RepositorioPadron = {
+    resolverPlaca: vi.fn().mockResolvedValue(null),
     registrarVehiculo: registrar,
     desactivarVehiculo: vi.fn().mockResolvedValue(true),
     registrarResidente: vi.fn().mockResolvedValue({ id: 'r1' }),

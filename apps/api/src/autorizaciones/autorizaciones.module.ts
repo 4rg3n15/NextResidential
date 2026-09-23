@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
 import { GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
@@ -34,6 +34,14 @@ import {
  * verdad. No se elige memoria aquí: los visitantes de ayer tienen que seguir
  * estando mañana, y un adaptador en memoria los pierde al reiniciar.
  */
+/**
+ * `@Global` desde la 15-D, por la misma razón que zonas y padrón: el módulo de
+ * eventos compone el cargador de contexto del motor y necesita el repositorio
+ * de autorizaciones. Sin el global, el orden de registro decidía si el motor
+ * tenía o no de dónde leer, y eso es exactamente lo que D-25 no puede volver a
+ * depender de nadie.
+ */
+@Global()
 @Module({})
 export class AutorizacionesModule {
   static registrar(): DynamicModule {
