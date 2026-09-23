@@ -2,6 +2,16 @@
 
 **Rama:** `etapa-15c-hikvision-provider` · **Base:** `develop` (`6a06c08`)
 
+| Commit    | Qué trae                                                                                     |
+| --------- | -------------------------------------------------------------------------------------------- |
+| `ea69d9a` | `feat(etapa-15c)`: el proveedor real, la fábrica y lo que la guía integral obliga a corregir |
+| `272c422` | `docs(etapa-15c)`: informe, ADR-018, contradicciones y el estado que la 15 merece            |
+| `c7acab3` | `test(etapa-15c/proveedores)`: los caminos que el umbral de cobertura destapó                |
+
+**SHA de cierre:** `c7acab3`, con los cuatro trabajos de CI en verde.
+
+Esta ronda NO se fusiona: abre PR contra `develop` y se detiene ahí.
+
 > **ESTA ETAPA NO CIERRA LA 15.** Su definición de terminado exige los tres
 > hitos técnicos con equipo real. Lo que aquí se cierra es **la mitad que no
 > necesita hardware**, y en §11 está la lista exacta de lo que sigue sin
@@ -294,7 +304,81 @@ es para lo que está. La cobertura de ramas del paquete quedó en **91,05 %**.
 
 ### El veredicto literal de `./scripts/verificar-etapa.sh --con-base`
 
-_(se pega tras la ejecución de cierre)_
+```
+▸ 5 · suite completa
+   @ncr/api:test: Tests 916 passed (916) · @ncr/config:test: Tests 144 passed (144)
+   @ncr/domain-core:test: Tests 400 passed (400) · @ncr/edge:test: Tests 101 passed (101)
+   @ncr/providers:test: Tests 431 passed (431) · @ncr/web:test: Tests 408 passed (408)
+
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 181 de 181 ficheros de prueba ejecutados
+
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     OK   dominio (packages/domain-core/src): lineas 97.68 % · ramas 96.92 % · funciones 97.38 % (umbral 90 %, 34 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 96.58 % · ramas 91.22 % · funciones 98.39 % (umbral 90 %, 46 archivos)
+     OK   global: lineas 78.03 % · ramas 86.30 % · funciones 81.12 % (umbral 70 %, 386 archivos)
+   ✓ las tres capas cumplen su umbral
+
+▸ 7b · los dos recuentos de la MISMA suite coinciden (D-112)
+   ✓ recuentos: 6 paquete(s) con el mismo resultado por los dos caminos (turbo y vitest directo) · 2400 pruebas
+
+▸ 9 · pruebas negativas de los propios controles
+   ✓ controles: 34 de 36 con prueba negativa · 2 en deuda declarada (no puede crecer)
+   ✓ PRUEBAS NEGATIVAS: los 27 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ ramas: 35 controles medidos · 231 bloques sin ejercer (no puede subir)
+
+▸ 10 · fronteras de arquitectura y secretos
+   ✓ fronteras (DoD ETAPA 02)
+   ✓ frontera-modulos: 13 módulos, ninguna importación entra por dentro y un solo Pool de PostgreSQL (D-66)
+   ✓ escaneo de secretos: limpio
+   ✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers/ (los rangos de
+     documentación de RFC 5737 no cuentan: no son de nadie)
+
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico
+     y ningún error sin manejar
+
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 26 de 26 pasos ejecutados
+
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El control declarado y no ejercido es el de siempre y **no corre en Linux**: lleva
+su motivo escrito y su etapa de revisión vigente, que es la condición con la que
+el propio verificador lo admite.
+
+### Dos corridas que NO valen, y por qué se dicen
+
+La primera corrida de cierre salió **FALLIDA** y la segunda también. Ninguna de
+las dos fue un defecto del código, y las dos se dejan escritas porque un informe
+que sólo enseña la corrida que salió bien es la clase de documento que este
+proyecto no admite:
+
+| Corrida | Veredicto | Causa real                                                                                                                                                                                                    |
+| ------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.ª     | FALLIDA   | La base efímera no estaba levantada y el SDK de Flutter no estaba en el `PATH`. Los siete `✗` eran el mismo hecho contado varias veces: sin informe de `@ncr/api`, sus 78 ficheros figuran como no ejecutados |
+| 2.ª     | FALLIDA   | **D-112** · se lanzaron dos verificadores a la vez y el primero escribió `.arranque-en-frio.json` entre el paso 5 y el paso 7 del segundo, así que el paso 5 omitió cinco pruebas que el paso 7 ejecutó       |
+
+El segundo caso es el control haciendo exactamente su trabajo: dos recuentos
+distintos de la misma suite significan que uno de los dos no está ejecutando lo
+que cree, y eso no se ignora aunque la causa resulte ser del operador. La tercera
+corrida se hizo **en solitario y desde el mismo estado del que parte CI**.
+
+### CI sobre la SHA final
+
+Los cuatro trabajos en verde sobre **`c7acab3`**:
+
+| Trabajo                                 | Resultado |
+| --------------------------------------- | --------- |
+| `controles (ubuntu-latest)`             | success   |
+| `controles (macos-latest)`              | success   |
+| `los seis entregables (ubuntu)`         | success   |
+| `verificar-etapa.sh --con-base (macos)` | success   |
 
 ---
 
