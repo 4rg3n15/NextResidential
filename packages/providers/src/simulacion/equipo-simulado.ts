@@ -44,6 +44,13 @@ export interface GuionDeEquipo {
   /** Identidad que devuelve la ruta de `deviceInfo`. */
   readonly modelo?: string;
   readonly firmware?: string;
+  /**
+   * Quién controla la barrera, según el equipo: `0` cámara · `1` plataforma ·
+   * `2` ambos. Por omisión `1`, que es el único admisible — pero se puede
+   * declarar `0` o `2` **a propósito**, que es lo que permite probar que el
+   * sistema se niega a operar contra un equipo que decide por su cuenta.
+   */
+  readonly ctrlMod?: '0' | '1' | '2';
 }
 
 const md5 = (t: string): string => createHash('md5').update(t, 'utf8').digest('hex');
@@ -141,6 +148,15 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       const respuesta = respuestaDe(200, '');
       Object.defineProperty(respuesta, 'body', { value: cuerpoDeFlujo(guion.flujo ?? []) });
       return respuesta;
+    }
+
+    if (catalogada.proposito === 'leer quién controla la barrera: la cámara o la plataforma') {
+      return respuestaDe(
+        200,
+        '<EntranceParamList><EntranceParam>' +
+          `<ctrlMod>${guion.ctrlMod ?? '1'}</ctrlMod>` +
+          '</EntranceParam></EntranceParamList>',
+      );
     }
 
     if (catalogada.proposito === 'leer la identidad del equipo (modelo, firmware, serie)') {

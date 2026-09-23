@@ -66,7 +66,9 @@ if (!existsSync(compilado)) {
   console.error('  pnpm --filter @ncr/providers build');
   process.exit(2);
 }
-const { RUTAS, ClienteDeEquipo } = createRequire(import.meta.url)(compilado);
+const { RUTAS, ClienteDeEquipo, interpretarError, juzgarModo, leerCtrlMod } = createRequire(
+  import.meta.url,
+)(compilado);
 
 const argumentos = process.argv.slice(2);
 const sinAccionar = argumentos.includes('--sin-accionar');
@@ -96,6 +98,19 @@ const FAMILIAS = [
  */
 
 const NO_SOPORTADO = /notSupport|invalidOperation|notSupported/i;
+
+/** El propósito de la ruta que decide quién manda. Se trata aparte. */
+const PROPOSITO_DEL_MODO = 'leer quién controla la barrera: la cámara o la plataforma';
+
+/**
+ * Orden de sondeo: **primero lo que menos respaldo tiene**.
+ *
+ * Una ruta VERIFICADA ya se probó contra este firmware; una respaldada por la
+ * guía oficial tiene documento detrás; una deducida no tiene ninguna de las
+ * dos. Sondearlas en ese orden inverso pone las sorpresas al principio, que es
+ * cuando queda tiempo para reaccionar.
+ */
+const PESO = { documentada: 0, guia_oficial: 1, verificada: 2 };
 
 /** Nunca sale el host completo a un fichero que alguien puede adjuntar. */
 const elidir = (texto) => {
@@ -138,16 +153,19 @@ const sondear = async (cliente, ruta) => {
       };
     }
     if (NO_SOPORTADO.test(respuesta.cuerpo)) {
+      // El mapa de errores traduce el código del fabricante a lo que hay que
+      // HACER, que es lo único accionable delante del equipo.
       return {
         veredicto: 'desmentida',
-        detalle: 'el equipo contestó notSupport',
+        detalle: interpretarError(respuesta.cuerpo).detalle,
         ms: respuesta.latenciaMs,
       };
     }
     if (!respuesta.ok) {
+      const error = interpretarError(respuesta.cuerpo);
       return {
-        veredicto: 'desmentida',
-        detalle: `HTTP ${respuesta.estado}`,
+        veredicto: error.reaccion === 'credencial_rechazada' ? 'credenciales' : 'desmentida',
+        detalle: `HTTP ${respuesta.estado} · ${error.detalle}`,
         ms: respuesta.latenciaMs,
       };
     }
@@ -155,6 +173,7 @@ const sondear = async (cliente, ruta) => {
       veredicto: 'confirmada',
       detalle: `HTTP ${respuesta.estado}`,
       ms: respuesta.latenciaMs,
+      cuerpo: respuesta.cuerpo,
     };
   } catch (error) {
     return {
@@ -213,7 +232,9 @@ for (const entrada of FAMILIAS) {
     tiempoLimiteMs: 6000,
   });
 
-  const aplicables = RUTAS.filter((r) => r.familia === entrada.familia || r.familia === 'comun');
+  const aplicables = RUTAS.filter(
+    (r) => r.familia === entrada.familia || r.familia === 'comun',
+  ).sort((a, b) => (PESO[a.procedencia] ?? 0) - (PESO[b.procedencia] ?? 0));
 
   for (const ruta of aplicables) {
     const omitida = ruta.dejaRastro === true || (sinAccionar && ruta.acciona === true);
@@ -226,12 +247,38 @@ for (const entrada of FAMILIAS) {
       continue;
     }
 
-    const { veredicto, detalle, ms } = await sondear(cliente, ruta);
+    const { veredicto, detalle, ms, cuerpo } = await sondear(cliente, ruta);
     const tiempo = ms === null ? '' : ` · ${Math.round(ms)} ms`;
-    const etiqueta = ruta.procedencia === 'verificada' ? '[VERIFICADA]' : '[documentada]';
+    const etiqueta =
+      ruta.procedencia === 'verificada'
+        ? '[VERIFICADA]'
+        : ruta.procedencia === 'guia_oficial'
+          ? '[guía oficial]'
+          : '[deducida]';
     anotar(
       `   ${ICONO[veredicto]} ${ruta.proposito} ${etiqueta} — ${veredicto}: ${detalle}${tiempo}`,
     );
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * `ctrlMod` · AQUÍ NO BASTA CON QUE LA RUTA RESPONDA
+     *
+     * Todas las demás se sondean para saber si EXISTEN. Ésta, para saber QUÉ
+     * CONTESTA: con 0 o 2 la cámara abre por su cuenta, el motor de reglas
+     * queda decorativo y el sistema no puede operar contra ese equipo. Un
+     * «confirmada» a secas aquí sería el peor de los falsos verdes.
+     */
+    if (ruta.proposito === PROPOSITO_DEL_MODO && veredicto === 'confirmada') {
+      const modo = juzgarModo(leerCtrlMod(cuerpo ?? ''));
+      if (modo.admisible) {
+        anotar(`       ✓ quien manda: LA PLATAFORMA (ctrlMod = ${modo.valorLeido})`);
+      } else {
+        huboProblema = true;
+        anotar('       ✗ HALLAZGO DE BLOQUEO · el equipo NO opera bajo control de la plataforma');
+        anotar(`         ${modo.detalle}`);
+        anotar('         Cámbielo en la configuración del equipo (guía §8.2) y repita.');
+      }
+    }
 
     if (veredicto !== 'confirmada') {
       huboProblema = true;

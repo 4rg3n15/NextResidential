@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CAMPOS_IGNORADOS_A_PROPOSITO,
   desdeAlarmServerXml,
   desdeAlertStreamJson,
   esEventoEnVivo,
@@ -21,6 +22,7 @@ const xmlAnpr = (extra = '') => `<?xml version="1.0" encoding="UTF-8"?>
   <eventDescription>ANPR</eventDescription>
   <licensePlate>ABC123</licensePlate>
   <confidenceLevel>92</confidenceLevel>
+  <alarmDataType>0</alarmDataType>
   ${extra}
 </EventNotificationAlert>`;
 
@@ -34,10 +36,31 @@ describe('cámara ANPR · XML que el equipo POSTea al Alarm Server', () => {
     expect(evento?.ocurridoEn.toISOString()).toBe('2026-09-18T11:59:30.000Z');
   });
 
-  it('lo que empuja la cámara SIEMPRE es presente', () => {
-    // La diferencia con el videoportero, y por eso son dos adaptadores: la
-    // cámara solo POSTea cuando pasa algo.
-    expect(desdeAlarmServerXml(xmlAnpr(), DISPOSITIVO, AHORA)?.enVivo).toBe(true);
+  describe('`alarmDataType` · el volcado histórico, también por este canal', () => {
+    /**
+     * Lo que este bloque sustituye decía «lo que empuja la cámara SIEMPRE es
+     * presente», y razonaba que la cámara sólo POSTea cuando pasa algo. La
+     * documentación del fabricante lo desmiente: el equipo reenvía su
+     * historial por este mismo canal marcándolo con `alarmDataType: 1`, y sin
+     * filtrarlo la portería mostraría accesos de hace días como si estuvieran
+     * ocurriendo, en una tabla que no se puede limpiar.
+     */
+    it('`0` es tiempo real', () => {
+      expect(desdeAlarmServerXml(xmlAnpr(), DISPOSITIVO, AHORA)?.enVivo).toBe(true);
+    });
+
+    it('`1` es HISTÓRICO y no se trata como presente', () => {
+      const historico = xmlAnpr().replace('<alarmDataType>0<', '<alarmDataType>1<');
+      expect(desdeAlarmServerXml(historico, DISPOSITIVO, AHORA)?.enVivo).toBe(false);
+    });
+
+    it('SIN el campo se trata como histórico, que es la dirección segura', () => {
+      // Cuesta lo que cuesta y hay que saberlo: con un firmware que no lo
+      // emita, la cámara parece muda y la talanquera no abre. Eso se descubre
+      // en la primera prueba; eventos falsos en un histórico append-only, no.
+      const sinCampo = xmlAnpr().replace('<alarmDataType>0</alarmDataType>', '');
+      expect(desdeAlarmServerXml(sinCampo, DISPOSITIVO, AHORA)?.enVivo).toBe(false);
+    });
   });
 
   it('normaliza la confianza venga en porcentaje o en fracción', () => {
@@ -62,6 +85,95 @@ describe('cámara ANPR · XML que el equipo POSTea al Alarm Server', () => {
   it('un evento sin placa no se inventa una: queda nula', () => {
     const sinPlaca = xmlAnpr().replace('<licensePlate>ABC123</licensePlate>', '');
     expect(desdeAlarmServerXml(sinPlaca, DISPOSITIVO, AHORA)?.placa).toBeNull();
+  });
+
+  it('`noPlate` NO es una placa: es la ausencia de lectura', () => {
+    // Tratarlo como tal produciría un vehículo llamado «noPlate» en el padrón
+    // y un evento que afirma una lectura que no existió.
+    const sinLectura = xmlAnpr().replace('<licensePlate>ABC123<', '<licensePlate>noPlate<');
+    expect(desdeAlarmServerXml(sinLectura, DISPOSITIVO, AHORA)?.placa).toBeNull();
+  });
+
+  describe('`openGateType` · la declaración del equipo sobre QUIÉN abrió', () => {
+    /**
+     * Es evidencia de auditoría, no un adorno. Sólo existe cuando el control de
+     * barrera del equipo está habilitado, y entonces dice si abrió él o
+     * nosotros. `white` y `abnormal` significan que la cámara está decidiendo.
+     */
+    const con = (valor: string) =>
+      desdeAlarmServerXml(xmlAnpr(`<openGateType>${valor}</openGateType>`), DISPOSITIVO, AHORA);
+
+    it('`white` es la lista interna de la CÁMARA', () => {
+      expect(con('white')?.quienAbrio).toBe('lista');
+    });
+
+    it('`manual` es la PLATAFORMA, que es lo único admisible', () => {
+      expect(con('manual')?.quienAbrio).toBe('manual');
+    });
+
+    it('`abnormal` es una excepción de la cámara', () => {
+      expect(con('abnormal')?.quienAbrio).toBe('anomalo');
+    });
+
+    it('un valor que el fabricante no documenta NO se traduce a «manual»', () => {
+      // Eso afirmaría que abrimos nosotros sin saberlo, y es justo lo que la
+      // auditoría no puede permitirse dar por hecho.
+      expect(con('loQueSea')?.quienAbrio).toBe('anomalo');
+    });
+
+    it('sin el campo es `null`: el equipo NO tiene el control de barrera activo', () => {
+      expect(desdeAlarmServerXml(xmlAnpr(), DISPOSITIVO, AHORA)?.quienAbrio).toBeNull();
+    });
+  });
+
+  it('normaliza los campos que el motor y la auditoría necesitan', () => {
+    const completo = xmlAnpr(
+      '<plateType>civil</plateType><plateColor>yellow</plateColor>' +
+        '<country>210</country><line>2</line><direction>forward</direction>' +
+        '<vehicleType>smallCar</vehicleType><detectType>ANPR</detectType>' +
+        '<plateStandardStatus>true</plateStandardStatus>' +
+        '<X>10</X><Y>20</Y><width>120</width><height>40</height>',
+    );
+    const evento = desdeAlarmServerXml(completo, DISPOSITIVO, AHORA);
+    expect(evento?.tipoDePlaca).toBe('civil');
+    expect(evento?.colorDePlaca).toBe('yellow');
+    // 210 es Colombia. Se guarda el código tal cual: traducirlo aquí sería
+    // meter una tabla de países en un adaptador de transporte.
+    expect(evento?.pais).toBe(210);
+    expect(evento?.carril).toBe(2);
+    expect(evento?.sentido).toBe('forward');
+    expect(evento?.tipoDeVehiculo).toBe('smallCar');
+    expect(evento?.tipoDeDeteccion).toBe('ANPR');
+    expect(evento?.placaEstandar).toBe(true);
+    expect(evento?.recuadro).toEqual({ x: 10, y: 20, ancho: 120, alto: 40 });
+  });
+
+  it('un recuadro INCOMPLETO es nulo, no un recuadro con ceros', () => {
+    // Un recuadro a medias pintaría una caja en un sitio que no es.
+    const parcial = xmlAnpr('<X>10</X><Y>20</Y>');
+    expect(desdeAlarmServerXml(parcial, DISPOSITIVO, AHORA)?.recuadro).toBeNull();
+  });
+
+  it('los campos de fiscalización y conducta se ignoran A PROPÓSITO, y está escrito', () => {
+    /**
+     * No basta con no leerlos: la lista existe para que quien añada un campo
+     * mañana vea que la omisión fue una decisión. Registrarlos sería tratar
+     * datos que nadie pidió (Ley 1581 art. 4, principio de finalidad).
+     */
+    expect(CAMPOS_IGNORADOS_A_PROPOSITO).toContain('illegalInfo');
+    expect(CAMPOS_IGNORADOS_A_PROPOSITO).toContain('speedLimit');
+    expect(CAMPOS_IGNORADOS_A_PROPOSITO).toContain('belt');
+    expect(CAMPOS_IGNORADOS_A_PROPOSITO).toContain('frontChild');
+
+    // Y ninguno aparece en el evento normalizado.
+    const conBasura = xmlAnpr(
+      '<illegalInfo>algo</illegalInfo><speedLimit>60</speedLimit><belt>true</belt>',
+    );
+    const evento = desdeAlarmServerXml(conBasura, DISPOSITIVO, AHORA);
+    const texto = JSON.stringify(evento);
+    for (const campo of CAMPOS_IGNORADOS_A_PROPOSITO) {
+      expect(texto, campo).not.toContain(campo);
+    }
   });
 });
 

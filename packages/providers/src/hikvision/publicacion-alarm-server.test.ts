@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LIMITES,
+  esParteBiometrica,
   SobreIlegible,
   abrirSobreDeAlarmServer,
   clasificarSobre,
@@ -209,6 +210,102 @@ describe('clasificarSobre', () => {
       ),
     );
     expect(resultado.partesNoClasificadas).toBe(1);
+  });
+
+  describe('H-16-1 · los recortes de ROSTRO se rechazan, y se cuentan', () => {
+    /**
+     * El sobre admite diez partes y dos son rostros: conductor y acompañante.
+     * Si la configuración del equipo los activa entran datos biométricos de
+     * personas que no dieron consentimiento, por un canal que no pasa por el
+     * ciclo de la ETAPA 08 (RN-09, RN-10, Ley 1581). Y el equipo puede empezar
+     * a enviarlos SIN que nadie toque este código: basta una casilla.
+     */
+    const conRostros = (nombres: readonly string[]) =>
+      clasificarSobre(
+        partirSobre(
+          sobre('B', [
+            { nombre: 'anpr.xml', tipo: 'text/xml', contenido: XML },
+            {
+              nombre: 'detectionPicture.jpg',
+              tipo: 'image/jpeg',
+              contenido: Buffer.alloc(2048, 1),
+            },
+            ...nombres.map((n) => ({
+              nombre: n,
+              tipo: 'image/jpeg',
+              contenido: Buffer.alloc(512, 9),
+            })),
+          ]),
+          'B',
+        ),
+      );
+
+    it('ni la foto ni el recorte salen siendo un rostro', () => {
+      const r = conRostros(['pilotPicture.jpg', 'copilotPicture.jpg']);
+      expect(r.partesBiometricasRechazadas).toBe(2);
+      // La única imagen admisible era la escena: el recorte queda nulo en vez
+      // de quedarse con la cara del conductor por ser la más pequeña.
+      expect(r.recorte).toBeNull();
+      expect(r.foto?.length).toBe(2048);
+    });
+
+    it('los rechaza también con el sufijo numérico que usa el equipo', () => {
+      // Con varias del mismo tipo llegan como `_1`, `_2`.
+      expect(
+        conRostros(['pilotPicture_1.jpg', 'pilotPicture_2.jpg']).partesBiometricasRechazadas,
+      ).toBe(2);
+    });
+
+    it('los rechaza por el NOMBRE de la parte aunque no traiga fichero', () => {
+      expect(conRostros(['copilotPicture']).partesBiometricasRechazadas).toBe(1);
+    });
+
+    it('NO confunde con ellos a las partes legítimas', () => {
+      const r = conRostros([]);
+      expect(r.partesBiometricasRechazadas).toBe(0);
+      expect(esParteBiometrica('pedestrianPicture.jpg', null)).toBe(false);
+      expect(esParteBiometrica('compositePicture.jpg', null)).toBe(false);
+      expect(esParteBiometrica('licensePlatePicture.jpg', null)).toBe(false);
+    });
+
+    it('un sobre que SÓLO trae rostros además del XML no deja ninguna imagen', () => {
+      const r = conRostros([]);
+      expect(r.foto?.length).toBe(2048);
+      const soloRostros = clasificarSobre(
+        partirSobre(
+          sobre('B', [
+            { nombre: 'anpr.xml', tipo: 'text/xml', contenido: XML },
+            { nombre: 'pilotPicture.jpg', tipo: 'image/jpeg', contenido: Buffer.alloc(512, 9) },
+          ]),
+          'B',
+        ),
+      );
+      expect(soloRostros.foto).toBeNull();
+      expect(soloRostros.recorte).toBeNull();
+      expect(soloRostros.partesBiometricasRechazadas).toBe(1);
+    });
+  });
+
+  it('admite las DIEZ partes que la guía del fabricante enumera', () => {
+    // El techo anterior eran ocho y habría rechazado un sobre legítimo de un
+    // equipo bien configurado.
+    const diez = [
+      { nombre: 'anpr.xml', tipo: 'text/xml', contenido: XML },
+      ...[
+        'detectionPicture.jpg',
+        'licensePlatePicture.jpg',
+        'compositePicture.jpg',
+        'plateBinaryPicture.jpg',
+        'nonMotorPicture.jpg',
+        'pedestrianDetectionPicture.jpg',
+        'pedestrianPicture.jpg',
+      ].map((n, i) => ({
+        nombre: n,
+        tipo: 'image/jpeg',
+        contenido: Buffer.alloc(256 + i * 64, 1),
+      })),
+    ];
+    expect(() => clasificarSobre(partirSobre(sobre('B', diez), 'B'))).not.toThrow();
   });
 
   it('un sobre sin XML no es un evento', () => {
