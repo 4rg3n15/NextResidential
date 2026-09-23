@@ -13,6 +13,7 @@ const completo = {
   // así que es obligatoria como las demás y su ausencia impide el arranque.
   INGESTA_FIRMA_SECRETO: 'secreto-de-prueba-de-treinta-y-dos-o-mas',
   BIOMETRIA_LLAVE: 'llave-de-prueba-de-treinta-y-dos-o-mas',
+  EQUIPOS_LLAVE: 'llave-de-equipos-de-treinta-y-dos-o-mas',
 };
 
 describe('configuración (DoD ETAPA 02: sin .env completo no arranca)', () => {
@@ -110,6 +111,28 @@ describe('biometría · la llave de cifrado es requisito de arranque (ETAPA 08)'
 
   it('una llave corta se rechaza: 32 caracteres es el mínimo', () => {
     expect(() => cargarConfiguracion({ ...completo, BIOMETRIA_LLAVE: 'corta' })).toThrow();
+  });
+
+  it('sin EQUIPOS_LLAVE la aplicación tampoco arranca (A.1)', () => {
+    const sinLlave = { ...completo };
+    delete sinLlave.EQUIPOS_LLAVE;
+    expect(() => cargarConfiguracion(sinLlave)).toThrow();
+    // Y corta no vale: una llave de 12 caracteres es una llave de mentira.
+    expect(() => cargarConfiguracion({ ...completo, EQUIPOS_LLAVE: 'corta' })).toThrow();
+  });
+
+  it('EQUIPOS_LLAVE es DISTINTA de BIOMETRIA_LLAVE, y eso es el punto', () => {
+    // Comparten el sobre —un solo cifrado en el proyecto— y no el material de
+    // clave: comprometer las plantillas no entrega las cámaras.
+    const c = cargarConfiguracion(completo);
+    expect(c.EQUIPOS_LLAVE).not.toBe(c.BIOMETRIA_LLAVE);
+  });
+
+  it('EQUIPOS_LLAVE_REF es una REFERENCIA, no la llave', () => {
+    expect(() =>
+      cargarConfiguracion({ ...completo, EQUIPOS_LLAVE_REF: 'llave-secreta-en-claro' }),
+    ).toThrow();
+    expect(cargarConfiguracion(completo).EQUIPOS_LLAVE_REF).toBe('env:EQUIPOS_LLAVE');
   });
 
   it('BIOMETRIA_LLAVE_REF es una REFERENCIA, no la llave', () => {

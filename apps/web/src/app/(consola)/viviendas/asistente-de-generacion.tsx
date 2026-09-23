@@ -33,12 +33,26 @@ import { nombreDeGrupo } from '@/lib/vocabulario';
  * servidor recalcula el plan y le sale otro número, no crea nada — cierra la
  * ventana en que el formulario cambió después de previsualizar sin pedir al
  * usuario que teclee una confirmación que acabaría escribiendo sin leer.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * B.1 · LA PREGUNTA QUE FALTABA (ETAPA 15-B)
+ *
+ * Este asistente tenía tres formularios y el de apartamentos —el que usa un
+ * edificio— **nunca preguntaba cuántas viviendas hay**: pedía torres, pisos y
+ * viviendas por piso, y la cantidad salía de multiplicar. Además obligaba a
+ * poner un denominador incluso donde no existe.
+ *
+ * Ahora hay UN formulario para los tres tipos, y el orden de las preguntas es
+ * el de una conversación: ¿se divide el conjunto? (opcional) → ¿cuántas
+ * viviendas? (el total, o las de cada agrupación) → ¿cómo se numeran?
+ *
+ * El tipo de copropiedad ya no elige formulario: elige PALABRAS —y, como
+ * sugerencia inicial, si la numeración por piso viene marcada—.
  */
 
 interface Excepcion {
   readonly agrupacion: string;
-  readonly pisos: string;
-  readonly porPiso: string;
+  readonly cantidad: string;
 }
 
 const numero = (texto: string): number => {
@@ -61,18 +75,22 @@ export const AsistenteDeGeneracion = ({
   readonly alCerrar: () => void;
   readonly alTerminar: (creadas: number) => void;
 }): JSX.Element => {
-  const [agrupaciones, setAgrupaciones] = useState('1');
+  /**
+   * El denominador arranca APAGADO. Es la mitad de la corrección: preguntarlo
+   * primero y darlo por supuesto era lo que obligaba a inventarse una torre en
+   * un conjunto que no las tiene.
+   */
+  const [hayAgrupaciones, setHayAgrupaciones] = useState(false);
+  const [agrupaciones, setAgrupaciones] = useState('2');
   const [estilo, setEstilo] = useState<'letras' | 'numeros'>('numeros');
-  const [pisos, setPisos] = useState('5');
-  const [porPiso, setPorPiso] = useState('3');
+  const [cantidad, setCantidad] = useState('24');
+  // La numeración por piso viene marcada en apartamentos porque es lo que usan
+  // los edificios; es una sugerencia del tipo, no una regla.
+  const [porPisos, setPorPisos] = useState(tipo === 'apartamentos');
+  const [porPiso, setPorPiso] = useState('4');
+  const [reiniciar, setReiniciar] = useState(false);
   const [excepciones, setExcepciones] = useState<readonly Excepcion[]>([]);
   const [hayExcepciones, setHayExcepciones] = useState(false);
-
-  const [secciones, setSecciones] = useState('0');
-  const [total, setTotal] = useState('30');
-  const [reiniciar, setReiniciar] = useState(false);
-
-  const [cantidad, setCantidad] = useState('10');
 
   const [vista, setVista] = useState<VistaPreviaDeGeneracion | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -92,33 +110,22 @@ export const AsistenteDeGeneracion = ({
     };
   };
 
-  const plan = (): PlanDeGeneracion => {
-    if (tipo === 'apartamentos') {
-      return {
-        tipo: 'apartamentos',
-        agrupaciones: numero(agrupaciones),
-        estilo,
-        pisos: numero(pisos),
-        porPiso: numero(porPiso),
-        excepciones: hayExcepciones
-          ? excepciones.map((e) => ({
-              agrupacion: e.agrupacion.trim(),
-              pisos: numero(e.pisos),
-              porPiso: numero(e.porPiso),
-            }))
-          : [],
-      };
-    }
-    if (tipo === 'casas') {
-      return {
-        tipo: 'casas',
-        secciones: numero(secciones),
-        total: numero(total),
-        reiniciarNumeracion: reiniciar,
-      };
-    }
-    return { tipo: 'fincas', cantidad: numero(cantidad) };
-  };
+  const cuantasAgrupaciones = hayAgrupaciones ? numero(agrupaciones) : 0;
+
+  const plan = (): PlanDeGeneracion => ({
+    agrupaciones: cuantasAgrupaciones,
+    estilo,
+    cantidad: numero(cantidad),
+    porPiso: porPisos ? numero(porPiso) : 0,
+    reiniciarNumeracion: reiniciar,
+    excepciones:
+      hayExcepciones && cuantasAgrupaciones > 0
+        ? excepciones.map((e) => ({
+            agrupacion: e.agrupacion.trim(),
+            cantidad: numero(e.cantidad),
+          }))
+        : [],
+  });
 
   const previsualizar = async (): Promise<void> => {
     setEnviando(true);
@@ -182,7 +189,21 @@ export const AsistenteDeGeneracion = ({
         alCerrar();
       }}
     >
-      {tipo === 'apartamentos' ? (
+      <label className="flex items-start gap-2 text-secundario text-texto">
+        <input
+          type="checkbox"
+          checked={hayAgrupaciones}
+          onChange={(e) => cambiar(setHayAgrupaciones)(e.target.checked)}
+        />
+        <span>
+          El conjunto se divide en {vocabulario.agrupacion.toLowerCase()}s
+          <span className="block text-texto-apagado">
+            Déjelo sin marcar si las {vocabulario.vivienda.toLowerCase()}s son solo número.
+          </span>
+        </span>
+      </label>
+
+      {hayAgrupaciones ? (
         <>
           <Campo
             etiqueta={`Cuántas ${vocabulario.agrupacion.toLowerCase()}s`}
@@ -214,22 +235,64 @@ export const AsistenteDeGeneracion = ({
               ))}
             </div>
           </fieldset>
-          <Campo
-            etiqueta={`Cuántos pisos por ${vocabulario.agrupacion.toLowerCase()}`}
-            type="number"
-            min={1}
-            value={pisos}
-            onChange={(e) => cambiar(setPisos)(e.target.value)}
-          />
-          <Campo
-            etiqueta="Cuántas viviendas por piso"
-            type="number"
-            min={1}
-            value={porPiso}
-            onChange={(e) => cambiar(setPorPiso)(e.target.value)}
-            ayuda="Se numeran piso + número: con 3 por piso y 5 pisos, 101, 102, 103, 201… hasta 503."
-          />
+        </>
+      ) : null}
 
+      <Campo
+        etiqueta={
+          hayAgrupaciones
+            ? `Cuántas ${vocabulario.vivienda.toLowerCase()}s por cada ${vocabulario.agrupacion.toLowerCase()}`
+            : `Cuántas ${vocabulario.vivienda.toLowerCase()}s en total`
+        }
+        type="number"
+        min={1}
+        value={cantidad}
+        onChange={(e) => cambiar(setCantidad)(e.target.value)}
+        ayuda={
+          hayAgrupaciones
+            ? 'Si alguna tiene una cantidad distinta, se indica abajo como excepción.'
+            : undefined
+        }
+      />
+
+      <label className="flex items-start gap-2 text-secundario text-texto">
+        <input
+          type="checkbox"
+          checked={porPisos}
+          onChange={(e) => cambiar(setPorPisos)(e.target.checked)}
+        />
+        <span>
+          Numerar por piso
+          <span className="block text-texto-apagado">
+            101, 102, 201… Los pisos salen de la cantidad, no se preguntan.
+          </span>
+        </span>
+      </label>
+
+      {porPisos ? (
+        <Campo
+          etiqueta={`Cuántas ${vocabulario.vivienda.toLowerCase()}s por piso`}
+          type="number"
+          min={1}
+          value={porPiso}
+          onChange={(e) => cambiar(setPorPiso)(e.target.value)}
+          ayuda="Con 24 viviendas y 4 por piso salen 6 pisos: 101…104, 201…204, hasta 604."
+        />
+      ) : null}
+
+      {hayAgrupaciones && !porPisos ? (
+        <label className="flex items-center gap-2 text-secundario text-texto">
+          <input
+            type="checkbox"
+            checked={reiniciar}
+            onChange={(e) => cambiar(setReiniciar)(e.target.checked)}
+          />
+          Reiniciar la numeración en cada {vocabulario.agrupacion.toLowerCase()}
+        </label>
+      ) : null}
+
+      {hayAgrupaciones ? (
+        <>
           <label className="flex items-start gap-2 text-secundario text-texto">
             <input
               type="checkbox"
@@ -237,12 +300,12 @@ export const AsistenteDeGeneracion = ({
               onChange={(e) => {
                 cambiar(setHayExcepciones)(e.target.checked);
                 if (e.target.checked && excepciones.length === 0) {
-                  setExcepciones([{ agrupacion: '', pisos: '', porPiso: '' }]);
+                  setExcepciones([{ agrupacion: '', cantidad: '' }]);
                 }
               }}
             />
             <span>
-              Hay {vocabulario.agrupacion.toLowerCase()}s con menos pisos o menos viviendas
+              Hay {vocabulario.agrupacion.toLowerCase()}s con otra cantidad
               <span className="block text-texto-apagado">
                 Lo normal en un conjunto que se amplió por etapas.
               </span>
@@ -253,7 +316,7 @@ export const AsistenteDeGeneracion = ({
             ? excepciones.map((excepcion, indice) => (
                 <div
                   key={indice}
-                  className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2 rounded-md border border-borde p-3"
+                  className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 rounded-md border border-borde p-3"
                 >
                   <Campo
                     etiqueta={vocabulario.agrupacion}
@@ -267,27 +330,14 @@ export const AsistenteDeGeneracion = ({
                     }
                   />
                   <Campo
-                    etiqueta="Pisos"
+                    etiqueta={`Cuántas ${vocabulario.vivienda.toLowerCase()}s`}
                     type="number"
                     min={1}
-                    value={excepcion.pisos}
+                    value={excepcion.cantidad}
                     onChange={(e) =>
                       cambiar(setExcepciones)(
                         excepciones.map((x, i) =>
-                          i === indice ? { ...x, pisos: e.target.value } : x,
-                        ),
-                      )
-                    }
-                  />
-                  <Campo
-                    etiqueta="Por piso"
-                    type="number"
-                    min={1}
-                    value={excepcion.porPiso}
-                    onChange={(e) =>
-                      cambiar(setExcepciones)(
-                        excepciones.map((x, i) =>
-                          i === indice ? { ...x, porPiso: e.target.value } : x,
+                          i === indice ? { ...x, cantidad: e.target.value } : x,
                         ),
                       )
                     }
@@ -313,55 +363,13 @@ export const AsistenteDeGeneracion = ({
               tamano="sm"
               type="button"
               onClick={() =>
-                cambiar(setExcepciones)([
-                  ...excepciones,
-                  { agrupacion: '', pisos: '', porPiso: '' },
-                ])
+                cambiar(setExcepciones)([...excepciones, { agrupacion: '', cantidad: '' }])
               }
             >
               <Plus aria-hidden className="size-4" /> Incluir otra excepción
             </Boton>
           ) : null}
         </>
-      ) : null}
-
-      {tipo === 'casas' ? (
-        <>
-          <Campo
-            etiqueta={`Cuántas ${vocabulario.agrupacion.toLowerCase()}s`}
-            type="number"
-            min={0}
-            value={secciones}
-            onChange={(e) => cambiar(setSecciones)(e.target.value)}
-            ayuda="0 si el conjunto no se divide: las viviendas serán solo número."
-          />
-          <Campo
-            etiqueta={`Cuántas ${vocabulario.vivienda.toLowerCase()}s en total`}
-            type="number"
-            min={1}
-            value={total}
-            onChange={(e) => cambiar(setTotal)(e.target.value)}
-            ayuda="Se reparten por igual y el resto va a la última. La vista previa lo enseña antes de crear nada."
-          />
-          <label className="flex items-center gap-2 text-secundario text-texto">
-            <input
-              type="checkbox"
-              checked={reiniciar}
-              onChange={(e) => cambiar(setReiniciar)(e.target.checked)}
-            />
-            Reiniciar la numeración en cada {vocabulario.agrupacion.toLowerCase()}
-          </label>
-        </>
-      ) : null}
-
-      {tipo === 'fincas' ? (
-        <Campo
-          etiqueta={`Cuántas ${vocabulario.vivienda.toLowerCase()}s`}
-          type="number"
-          min={1}
-          value={cantidad}
-          onChange={(e) => cambiar(setCantidad)(e.target.value)}
-        />
       ) : null}
 
       {vista !== null ? (

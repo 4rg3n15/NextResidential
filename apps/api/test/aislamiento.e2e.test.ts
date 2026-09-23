@@ -514,18 +514,29 @@ describe('configuración de la copropiedad · editable, por quién, y con consta
     expect(res.status).toBe(404);
   });
 
-  it('el administrador que intenta el umbral de placa recibe 422 con el motivo', async () => {
+  it('el administrador que intenta la contingencia del Edge recibe 422 con el motivo', async () => {
     const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
     const res = await request(app.getHttpServer())
       .patch(`/copropiedades/${COP_B}/configuracion`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ umbralConfianzaPlaca: 0.5 });
+      .send({ politicaContingenciaEdge: 'escalar_portero' });
     expect(res.status).toBe(422);
     // El cuerpo es el que produce el filtro global de `main.ts`, que la suite
     // ahora registra igual que producción: `{ estado, correlacion, mensaje }`.
     // Antes no lo registraba, y esta misma aserción pasaba leyendo una forma
     // que el despliegue nunca devuelve.
-    expect(res.body.mensaje.rechazos[0].clave).toBe('umbralConfianzaPlaca');
+    expect(res.body.mensaje.rechazos[0].clave).toBe('politicaContingenciaEdge');
+  });
+
+  it('B.5 · el umbral de confianza ya no es un campo: lo rechaza el ValidationPipe', async () => {
+    // Un 400 explícito y no un 200 que acepta el número y lo descarta en
+    // silencio: una consola vieja tiene que enterarse.
+    const token = await tokenDe(firmante, { rol: 'superadministrador', copropiedadId: null });
+    const res = await request(app.getHttpServer())
+      .patch(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ umbralConfianzaPlaca: 0.5 });
+    expect(res.status).toBe(400);
   });
 
   it('un ajuste que la consola NO ofrece se rechaza con 400 por el ValidationPipe', async () => {
@@ -544,9 +555,19 @@ describe('configuración de la copropiedad · editable, por quién, y con consta
     const res = await request(app.getHttpServer())
       .patch(`/copropiedades/${COP_B}/configuracion`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ umbralLatidoMinutos: 9 });
+      .send({ nombre: 'Copropiedad B renombrada' });
     expect(res.status).toBe(200);
-    expect(res.body.umbralLatidoMinutos).toBe(9);
+    expect(res.body.nombre).toBe('Copropiedad B renombrada');
+  });
+
+  it('B.4 · una dirección sin número se rechaza con SU motivo, no con uno genérico', async () => {
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const res = await request(app.getHttpServer())
+      .patch(`/copropiedades/${COP_B}/configuracion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ direccion: 'Calle del Bosque' });
+    expect(res.status).toBe(422);
+    expect(res.body.mensaje.rechazos[0].motivo).toContain('número');
   });
 
   it('reenviar el formulario sin tocar nada NO escribe en la auditoría', async () => {

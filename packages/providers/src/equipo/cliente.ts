@@ -25,6 +25,13 @@ import { SesionDigest, cnonceAleatorio } from '../barrera/digest';
 export interface OpcionesDeEquipo {
   readonly host: string;
   readonly puerto?: number;
+  /**
+   * `http` por omisión, y es una medida, no una preferencia: la DS-TCG405-E
+   * responde por HTTP con Digest, comprobado en sitio. Forzar TLS la dejaría
+   * inalcanzable y el diagnóstico apuntaría a la red. Configurable porque otros
+   * modelos sí lo traen (A.1).
+   */
+  readonly protocolo?: 'http' | 'https';
   readonly usuario: string;
   readonly clave: string;
   readonly tiempoLimiteMs?: number;
@@ -78,7 +85,7 @@ export class ClienteDeEquipo {
     );
     // Los equipos medidos responden por HTTP con Digest, **no** por HTTPS:
     // forzar TLS aquí los dejaría inalcanzables. Anotado en la guía.
-    this.base = `http://${opciones.host}:${String(opciones.puerto ?? 80)}`;
+    this.base = `${opciones.protocolo ?? 'http'}://${opciones.host}:${String(opciones.puerto ?? 80)}`;
     this.tiempoLimiteMs = opciones.tiempoLimiteMs ?? TIEMPO_LIMITE_DE_EQUIPO_MS;
     this.peticion = opciones.peticion ?? fetch;
     this.ahora = opciones.ahora ?? (() => Date.now());

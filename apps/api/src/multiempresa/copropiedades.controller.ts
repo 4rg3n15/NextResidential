@@ -22,18 +22,7 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
-import {
-  IsEnum,
-  IsInt,
-  IsNumber,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Max,
-  MaxLength,
-  Min,
-  MinLength,
-} from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { Aislamiento } from './aislamiento';
 import { AlcanceDelLlamante, PermiteServicio, Roles } from '../comun/decoradores';
 import { Contexto } from '../comun/decoradores/contexto.decorator';
@@ -75,7 +64,7 @@ export class CambiosDeConfiguracionDto {
   @ApiProperty({ required: false, example: 'Kilómetro 4 vía La Calera, Bogotá' })
   @IsOptional()
   @IsString()
-  @MinLength(5)
+  @MinLength(8)
   @MaxLength(200)
   direccion?: string;
 
@@ -104,24 +93,18 @@ export class CambiosDeConfiguracionDto {
   @MaxLength(64)
   zonaHoraria?: string;
 
-  @ApiProperty({ required: false, example: 0.85 })
-  @IsOptional()
-  @IsNumber()
-  @Min(0.5)
-  @Max(1)
-  umbralConfianzaPlaca?: number;
-
   @ApiProperty({ required: false, enum: ['denegar', 'escalar_portero'] })
   @IsOptional()
   @IsEnum(['denegar', 'escalar_portero'])
   politicaContingenciaEdge?: 'denegar' | 'escalar_portero';
 
-  @ApiProperty({ required: false, example: 5 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(60)
-  umbralLatidoMinutos?: number;
+  /**
+   * B.5 · el umbral de confianza y el margen de latido YA NO SON CAMPOS. No se
+   * dejan aquí «por compatibilidad»: con `forbidNonWhitelisted` el servidor
+   * rechaza el cuerpo que los traiga, que es la respuesta correcta a una
+   * consola vieja — mejor un 400 explícito que un valor aceptado en silencio y
+   * descartado después.
+   */
 }
 
 /**

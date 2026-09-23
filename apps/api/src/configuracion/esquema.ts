@@ -155,6 +155,25 @@ export const esquemaConfiguracion = z.object({
     .string()
     .regex(/^(env|vault):[A-Za-z0-9_./-]+$/, 'BIOMETRIA_LLAVE_REF es una referencia, no la llave')
     .default('env:BIOMETRIA_LLAVE'),
+  /**
+   * ETAPA 15-B · Llave de cifrado del SECRETO DE LOS EQUIPOS (A.1).
+   *
+   * Es una llave distinta de la biométrica a propósito, aunque el sobre sea el
+   * mismo: comprometer la que cifra las plantillas no debe entregar además las
+   * credenciales de las cámaras. Lo que se comparte es el código —un solo
+   * cifrado en todo el proyecto— y no el material de clave.
+   *
+   * Se exige al arrancar, por el mismo motivo que la biométrica: una API que
+   * levanta sin llave y falla al guardar el primer equipo habría dejado a
+   * alguien teclear una credencial de cámara para nada. `EQUIPOS_LLAVE_REF` es
+   * lo único que se persiste junto al sobre (migración 0032).
+   */
+  EQUIPOS_LLAVE: secreto('EQUIPOS_LLAVE', 32),
+  EQUIPOS_LLAVE_REF: z
+    .string()
+    .regex(/^(env|vault):[A-Za-z0-9_./-]+$/, 'EQUIPOS_LLAVE_REF es una referencia, no la llave')
+    .default('env:EQUIPOS_LLAVE'),
+
   /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 

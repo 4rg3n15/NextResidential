@@ -40,6 +40,7 @@ import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
 import { GuardiaModule } from './guardia';
 import { AlarmServerModule } from './alarmserver';
 import { PlanificacionModule } from './planificacion';
+import { EquiposModule } from './equipos';
 
 /**
  * El límite de peticiones es GLOBAL desde el primer día (§2.7.5). Ponerlo solo
@@ -118,6 +119,12 @@ export class AppModule {
         AlarmServerModule.registrar(config.ALARM_SERVER_EQUIPOS),
         // Después de eventos: el tablero lee por los puertos que aquel publica.
         TableroModule.registrar(),
+        /**
+         * ETAPA 15-B · el alta de equipos desde la consola. Después del
+         * tablero, que es quien los muestra: el panel lee el inventario y este
+         * módulo lo escribe, y el orden deja claro cuál depende de cuál.
+         */
+        EquiposModule.registrar(),
         // La superficie del residente, después del padrón: lee por su propio
         // puerto y no entra en el de administración (ver `mi.controller.ts`).
         ResidenteModule.registrar(),

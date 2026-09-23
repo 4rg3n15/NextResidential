@@ -54,31 +54,19 @@ import {
  * el que el usuario debe leer (§2.7.3: el DTO valida forma, el dominio valida
  * verdad).
  */
-const planDesdeDto = (dto: PlanDeGeneracionDto): PlanDeGeneracion => {
-  if (dto.tipo === 'apartamentos') {
-    return {
-      tipo: 'apartamentos',
-      agrupaciones: dto.agrupaciones ?? 0,
-      estilo: dto.estilo ?? 'numeros',
-      pisos: dto.pisos ?? 0,
-      porPiso: dto.porPiso ?? 0,
-      excepciones: (dto.excepciones ?? []).map((e) => ({
-        agrupacion: e.agrupacion,
-        pisos: e.pisos,
-        porPiso: e.porPiso,
-      })),
-    };
-  }
-  if (dto.tipo === 'casas') {
-    return {
-      tipo: 'casas',
-      secciones: dto.secciones ?? 0,
-      total: dto.total ?? 0,
-      reiniciarNumeracion: dto.reiniciarNumeracion ?? false,
-    };
-  }
-  return { tipo: 'fincas', cantidad: dto.cantidad ?? 0 };
-};
+const planDesdeDto = (dto: PlanDeGeneracionDto): PlanDeGeneracion => ({
+  agrupaciones: dto.agrupaciones,
+  estilo: dto.estilo ?? 'numeros',
+  cantidad: dto.cantidad,
+  ...(dto.porPiso === undefined ? {} : { porPiso: dto.porPiso }),
+  ...(dto.reiniciarNumeracion === undefined
+    ? {}
+    : { reiniciarNumeracion: dto.reiniciarNumeracion }),
+  excepciones: (dto.excepciones ?? []).map((e) => ({
+    agrupacion: e.agrupacion,
+    cantidad: e.cantidad,
+  })),
+});
 
 /**
  * Traduce protocolo a casos de uso. **Cero reglas de negocio** (§2.2): lo único

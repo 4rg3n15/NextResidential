@@ -414,6 +414,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/equipos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Equipos de la copropiedad, sin credenciales */
+        get: operations["EquiposController_listar"];
+        put?: never;
+        /** Da de alta un equipo; el secreto se guarda cifrado */
+        post: operations["EquiposController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/prueba-de-conexion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prueba la conexión DESDE EL SERVIDOR, sin guardar nada */
+        post: operations["EquiposController_probar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edita un equipo. Sin «secreto» en el cuerpo, la clave no cambia */
+        put: operations["EquiposController_editar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}/baja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Baja lógica con motivo. Nunca borrado físico (RN-19) */
+        post: operations["EquiposController_desactivar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vuelve a poner en servicio un equipo dado de baja */
+        post: operations["EquiposController_reactivar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/eventos": {
         parameters: {
             query?: never;
@@ -1268,6 +1354,27 @@ export interface components {
             escaladaDentroDelPlazo: boolean | null;
             notas: string | null;
         };
+        AltaDeEquipoDto: {
+            nombre: string;
+            /** @enum {string} */
+            tipo: "camara_lpr" | "terminal_facial" | "intercom" | "rele" | "controlador_io";
+            /** @example 203.0.113.10 */
+            host: string;
+            /** @example 80 */
+            puerto: number;
+            /**
+             * @default http
+             * @enum {string}
+             */
+            protocolo: "http" | "https";
+            usuario: string;
+            secreto?: string;
+            canalBarrera?: number;
+            numeroDePuerta?: number;
+            canalDeAudio?: number;
+            /** @default true */
+            probarConexion: boolean;
+        };
         AparatoRegistradoDto: {
             /** Format: uuid */
             id: string;
@@ -1303,6 +1410,9 @@ export interface components {
             viviendaId: string;
             texto: string;
         };
+        BajaDeEquipoDto: {
+            motivo: string;
+        };
         BajaDto: {
             desactivado: boolean;
         };
@@ -1336,12 +1446,8 @@ export interface components {
             etiquetaAgrupacion?: string;
             /** @example America/Bogota */
             zonaHoraria?: string;
-            /** @example 0.85 */
-            umbralConfianzaPlaca?: number;
             /** @enum {string} */
             politicaContingenciaEdge?: "denegar" | "escalar_portero";
-            /** @example 5 */
-            umbralLatidoMinutos?: number;
         };
         CapturarRostroDto: {
             /** @description El TITULAR del dato: el visitante (RN-10) */
@@ -1461,18 +1567,13 @@ export interface components {
             abierta?: boolean;
         };
         ConfirmarGeneracionDto: {
-            /** @enum {string} */
-            tipo: "apartamentos" | "casas" | "fincas";
-            agrupaciones?: number;
+            agrupaciones: number;
             /** @enum {string} */
             estilo?: "letras" | "numeros";
-            pisos?: number;
+            cantidad: number;
             porPiso?: number;
-            excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
-            secciones?: number;
-            total?: number;
             reiniciarNumeracion?: boolean;
-            cantidad?: number;
+            excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
             totalEsperado: number;
         };
         ConteoDto: {
@@ -1644,6 +1745,31 @@ export interface components {
             /** @description Pasado el umbral de KPI-34 */
             demorado: boolean;
         };
+        EquipoDto: {
+            id: string;
+            nombre: string;
+            /** @enum {string} */
+            tipo: "camara_lpr" | "terminal_facial" | "intercom" | "rele" | "controlador_io";
+            host: string;
+            puerto: number;
+            /** @enum {string} */
+            protocolo: "http" | "https";
+            usuario: string | null;
+            modelo: string | null;
+            firmware: string | null;
+            canalBarrera: number | null;
+            numeroDePuerta: number | null;
+            canalDeAudio: number | null;
+            /** @enum {string} */
+            verificacion: "no_verificado" | "verificado" | "rechazado";
+            verificadoEn: string | null;
+            motivoNoVerificado: string | null;
+            /** @enum {string} */
+            estado: "activo" | "inactivo";
+        };
+        EquiposDto: {
+            equipos: components["schemas"]["EquipoDto"][];
+        };
         ErrorApiDto: {
             /**
              * @description Código HTTP, repetido en el cuerpo
@@ -1760,8 +1886,7 @@ export interface components {
         };
         ExcepcionDeAgrupacionDto: {
             agrupacion: string;
-            pisos: number;
-            porPiso: number;
+            cantidad: number;
         };
         FilaDeInformeDto: {
             /** Format: date-time */
@@ -2152,18 +2277,13 @@ export interface components {
             yaExistia: boolean;
         };
         PlanDeGeneracionDto: {
-            /** @enum {string} */
-            tipo: "apartamentos" | "casas" | "fincas";
-            agrupaciones?: number;
+            agrupaciones: number;
             /** @enum {string} */
             estilo?: "letras" | "numeros";
-            pisos?: number;
+            cantidad: number;
             porPiso?: number;
-            excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
-            secciones?: number;
-            total?: number;
             reiniciarNumeracion?: boolean;
-            cantidad?: number;
+            excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
         };
         PuntoDeFrecuenciaDto: {
             /** @description Lunes de la semana ISO, YYYY-MM-DD */
@@ -2288,6 +2408,18 @@ export interface components {
             duplicado: boolean;
             /** @description Por qué no se aceptó, si no se aceptó */
             detalle?: string;
+        };
+        ResultadoDeSondeoDto: {
+            /**
+             * @description Cuatro resultados distintos, nunca uno genérico: cada uno se resuelve de una manera.
+             * @enum {string}
+             */
+            clase: "alcanzado" | "decide_solo" | "credencial" | "inalcanzable";
+            detalle: string;
+            modelo: string | null;
+            firmware: string | null;
+            latenciaMs: number | null;
+            verificado: boolean;
         };
         RevocacionDto: {
             revocada: boolean;
@@ -3170,6 +3302,151 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultadoDeOperacionDto"];
+                };
+            };
+        };
+    };
+    EquiposController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquiposDto"];
+                };
+            };
+        };
+    };
+    EquiposController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AltaDeEquipoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipoDto"];
+                };
+            };
+        };
+    };
+    EquiposController_probar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AltaDeEquipoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeSondeoDto"];
+                };
+            };
+        };
+    };
+    EquiposController_editar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AltaDeEquipoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipoDto"];
+                };
+            };
+        };
+    };
+    EquiposController_desactivar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BajaDeEquipoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipoDto"];
+                };
+            };
+        };
+    };
+    EquiposController_reactivar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipoDto"];
                 };
             };
         };

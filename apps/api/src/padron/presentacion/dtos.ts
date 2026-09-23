@@ -77,7 +77,7 @@ export class RegistrarViviendaDto {
 }
 
 /**
- * Una excepción del plan: la torre que no sigue los valores generales. Un
+ * Una excepción del plan: la agrupación que no tiene la cantidad general. Un
  * conjunto real casi nunca es homogéneo.
  */
 export class ExcepcionDeAgrupacionDto {
@@ -86,40 +86,49 @@ export class ExcepcionDeAgrupacionDto {
   @Length(1, 24)
   agrupacion!: string;
 
-  @ApiProperty({ type: Number }) @IsInt() @Min(0) @Max(50) pisos!: number;
-  @ApiProperty({ type: Number }) @IsInt() @Min(0) @Max(99) porPiso!: number;
+  @ApiProperty({ type: Number }) @IsInt() @Min(0) @Max(2000) cantidad!: number;
 }
 
 /**
- * El plan de generación. **Un solo DTO con los campos de los tres tipos** y no
- * tres DTOs: `ValidationPipe` con `forbidNonWhitelisted` rechaza lo que sobre,
- * y el dominio valida lo que falte con su propio mensaje. Partirlo en tres
- * obligaría a la consola a elegir ruta según el tipo, que es la decisión que ya
- * toma el campo `tipo`.
+ * El plan de generación — **uno solo, para todos los tipos de copropiedad**
+ * (B.1, ETAPA 15-B).
+ *
+ * Antes había un DTO con los campos de tres planes distintos y un discriminador
+ * `tipo`. Se retira: el tipo de copropiedad decide las PALABRAS de la pantalla,
+ * no la forma del plan, y mezclarlos hacía que el formulario de apartamentos no
+ * preguntara nunca cuántas viviendas hay.
  *
  * Los mínimos de aquí son de FORMA (§2.7.3). La verdad —que una excepción
- * apunte a una torre que existe, que el total quepa en la cota— la decide
+ * apunte a una agrupación que existe, que el total quepa en la cota— la decide
  * `generarPlan` en el dominio.
  */
 export class PlanDeGeneracionDto {
-  @ApiProperty({ type: String, enum: ['apartamentos', 'casas', 'fincas'] })
-  @IsIn(['apartamentos', 'casas', 'fincas'])
-  tipo!: 'apartamentos' | 'casas' | 'fincas';
-
-  @ApiPropertyOptional({ type: Number })
-  @IsOptional()
+  /** `0` = el conjunto no se divide. El denominador es OPCIONAL. */
+  @ApiProperty({ type: Number })
   @IsInt()
   @Min(0)
   @Max(99)
-  agrupaciones?: number;
+  agrupaciones!: number;
 
   @ApiPropertyOptional({ type: String, enum: ['letras', 'numeros'] })
   @IsOptional()
   @IsIn(['letras', 'numeros'])
   estilo?: 'letras' | 'numeros';
 
-  @ApiPropertyOptional({ type: Number }) @IsOptional() @IsInt() @Min(0) @Max(50) pisos?: number;
+  /** Sin agrupaciones, el total. Con agrupaciones, la cantidad por cada una. */
+  @ApiProperty({ type: Number })
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  cantidad!: number;
+
+  /** Numeración por piso (101, 102, 201…). Ausente: correlativa. */
   @ApiPropertyOptional({ type: Number }) @IsOptional() @IsInt() @Min(0) @Max(99) porPiso?: number;
+
+  @ApiPropertyOptional({ type: Boolean })
+  @IsOptional()
+  @IsBoolean()
+  reiniciarNumeracion?: boolean;
 
   @ApiPropertyOptional({ type: [ExcepcionDeAgrupacionDto] })
   @IsOptional()
@@ -128,21 +137,6 @@ export class PlanDeGeneracionDto {
   @ValidateNested({ each: true })
   @Type(() => ExcepcionDeAgrupacionDto)
   excepciones?: ExcepcionDeAgrupacionDto[];
-
-  @ApiPropertyOptional({ type: Number }) @IsOptional() @IsInt() @Min(0) @Max(99) secciones?: number;
-  @ApiPropertyOptional({ type: Number }) @IsOptional() @IsInt() @Min(0) @Max(2000) total?: number;
-
-  @ApiPropertyOptional({ type: Boolean })
-  @IsOptional()
-  @IsBoolean()
-  reiniciarNumeracion?: boolean;
-
-  @ApiPropertyOptional({ type: Number })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(2000)
-  cantidad?: number;
 }
 
 export class ConfirmarGeneracionDto extends PlanDeGeneracionDto {

@@ -29,6 +29,8 @@ import type { Rol } from '../src/autenticacion/dominio/claims';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { FiltroGlobalDeExcepciones } from '../src/comun/filtros/filtro-global';
+import { REPOSITORIO_DE_EQUIPOS, SIN_PROBAR, SONDA_DE_EQUIPO } from '../src/equipos';
+import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
 import { COP_A, COP_B } from './constantes';
 import {
   AUTORIZACIONES_DEL_RESIDENTE,
@@ -64,6 +66,8 @@ export const configuracionDePrueba: Configuracion = {
   INGESTA_FIRMA_SECRETO: 'secreto-de-ingesta-solo-para-pruebas-32+',
   BIOMETRIA_LLAVE: 'llave-de-biometria-solo-para-pruebas-32+',
   BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
+  EQUIPOS_LLAVE: 'llave-de-equipos-solo-para-pruebas-32+',
+  EQUIPOS_LLAVE_REF: 'env:EQUIPOS_LLAVE',
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: 24,
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
@@ -157,7 +161,20 @@ export const crearApp = async (
    * recibe el valor por defecto sin que nadie lo note.
    */
   configuracion?: Partial<Configuracion>,
+  /**
+   * ETAPA 15-B · los dos puertos de equipos se pasan POR AQUÍ y no por
+   * `sustituir`, porque los `overrideProvider` de más abajo se aplican DESPUÉS
+   * y ganarían: una suite que los sustituyera con `sustituir` vería su doble
+   * ignorado y la prueba pasaría por la razón equivocada. Pasó, y por eso está
+   * escrito.
+   */
+  equipos?: {
+    readonly repositorio?: unknown;
+    readonly sonda?: { probar: (d: unknown) => Promise<unknown> };
+  },
 ): Promise<INestApplication> => {
+  const equiposPorOmision = equipos?.repositorio;
+  const sondaPorOmision = equipos?.sonda;
   const base = Test.createTestingModule({
     imports: [
       // `DiscoveryModule` para poder LEER los decoradores del código en la
@@ -213,6 +230,23 @@ export const crearApp = async (
     .useFactory({ factory: () => new ZonasDelResidenteEnMemoria() })
     .overrideProvider(NOTIFICACIONES_DEL_RESIDENTE)
     .useFactory({ factory: () => new NotificacionesDelResidenteEnMemoria() })
+    /**
+     * ETAPA 15-B · los equipos, con su doble en memoria y su sonda muda.
+     *
+     * El repositorio real habla con PostgreSQL y la sonda real habla con un
+     * aparato: los dos quedan fuera del alcance de esta suite por el mismo
+     * motivo (D-17 y ADR-03). Lo que aquí se ejercita es el camino completo de
+     * la petición —rol, alcance, forma del DTO y, sobre todo, que el secreto no
+     * vuelve— y eso no necesita ni base ni cámara.
+     *
+     * La sonda devuelve «guardado sin comprobar» porque es el veredicto
+     * honesto cuando no hay equipo al otro lado. Las suites que prueban los
+     * cuatro resultados la sustituyen por el suyo.
+     */
+    .overrideProvider(REPOSITORIO_DE_EQUIPOS)
+    .useFactory({ factory: () => equiposPorOmision ?? new RepositorioDeEquiposEnMemoria() })
+    .overrideProvider(SONDA_DE_EQUIPO)
+    .useValue(sondaPorOmision ?? { probar: async () => SIN_PROBAR })
     .overrideProvider(ProveedorDeJwks)
     .useValue({
       // `obtener()` devuelve la función que `jose` usa para resolver la clave

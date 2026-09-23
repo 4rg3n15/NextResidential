@@ -1,5 +1,12 @@
-import { createCipheriv, createDecipheriv, randomBytes, hkdfSync } from 'node:crypto';
 import type { FaceTemplateProvider } from '@ncr/domain-core';
+import {
+  PROPOSITOS,
+  aplanar,
+  cifrar,
+  derivarLlave,
+  desaplanar,
+  descifrar,
+} from '../../comun/cripto/sobre-aes-gcm';
 import type { BovedaDePlantillas } from '../aplicacion/puertos';
 
 /**
@@ -25,10 +32,6 @@ import type { BovedaDePlantillas } from '../aplicacion/puertos';
  * La llave llega por variable de entorno y se guarda **su referencia**, nunca
  * su valor (`plantillas_llave_es_referencia` de la migración 0008).
  */
-const ALGORITMO = 'aes-256-gcm';
-const LONGITUD_IV = 12;
-const LONGITUD_ETIQUETA = 16;
-
 export interface AlmacenDeBytes {
   poner(clave: string, datos: Buffer): Promise<void>;
   tomar(clave: string): Promise<Buffer | null>;
@@ -98,9 +101,7 @@ export class BovedaAesGcm implements BovedaDePlantillas {
    * ═══════════════════════════════════════════════════════════════════════════
    */
   private llaveDe(copropiedadId: string): Buffer {
-    return Buffer.from(
-      hkdfSync('sha256', this.maestra, copropiedadId, 'ncr:plantillas-biometricas:v1', 32),
-    );
+    return derivarLlave(this.maestra, copropiedadId, PROPOSITOS.plantillas);
   }
 
   private clave(copropiedadId: string, plantillaId: string): string {
@@ -115,11 +116,8 @@ export class BovedaAesGcm implements BovedaDePlantillas {
     if (vector.length === 0) {
       throw new Error('No se cifra una plantilla vacía: sería una plantilla inservible cifrada');
     }
-    const iv = randomBytes(LONGITUD_IV);
-    const cifrador = createCipheriv(ALGORITMO, this.llaveDe(copropiedadId), iv);
-    const cuerpo = Buffer.concat([cifrador.update(Buffer.from(vector)), cifrador.final()]);
     // iv ‖ etiqueta ‖ cuerpo: todo lo necesario para descifrar salvo la llave.
-    const sobre = Buffer.concat([iv, cifrador.getAuthTag(), cuerpo]);
+    const sobre = aplanar(cifrar(this.llaveDe(copropiedadId), Buffer.from(vector)));
     await this.almacen.poner(this.clave(copropiedadId, plantillaId), sobre);
     return { llaveRef: this.llaveRef, algoritmo: 'AES-256-GCM' };
   }
@@ -130,14 +128,9 @@ export class BovedaAesGcm implements BovedaDePlantillas {
    * falla en `final()`, que es justamente la garantía que se busca.
    */
   private descifrar(copropiedadId: string, sobre: Buffer): Buffer {
-    const iv = sobre.subarray(0, LONGITUD_IV);
-    const etiqueta = sobre.subarray(LONGITUD_IV, LONGITUD_IV + LONGITUD_ETIQUETA);
-    const cuerpo = sobre.subarray(LONGITUD_IV + LONGITUD_ETIQUETA);
-    const descifrador = createDecipheriv(ALGORITMO, this.llaveDe(copropiedadId), iv);
-    descifrador.setAuthTag(etiqueta);
-    // `final()` lanza si la etiqueta no cuadra: una plantilla manipulada no se
-    // entrega a la terminal, se rechaza.
-    return Buffer.concat([descifrador.update(cuerpo), descifrador.final()]);
+    // Si la etiqueta no cuadra, `descifrar` lanza: una plantilla manipulada no
+    // se entrega a la terminal, se rechaza.
+    return descifrar(this.llaveDe(copropiedadId), desaplanar(sobre));
   }
 
   async empujarATerminal(

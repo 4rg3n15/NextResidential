@@ -1183,6 +1183,284 @@
         ]
       }
     },
+    "/copropiedades/{id}/equipos": {
+      "get": {
+        "operationId": "EquiposController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquiposDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Equipos de la copropiedad, sin credenciales",
+        "tags": [
+          "equipos"
+        ]
+      },
+      "post": {
+        "operationId": "EquiposController_crear",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AltaDeEquipoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Da de alta un equipo; el secreto se guarda cifrado",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/equipos/prueba-de-conexion": {
+      "post": {
+        "operationId": "EquiposController_probar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AltaDeEquipoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeSondeoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Prueba la conexión DESDE EL SERVIDOR, sin guardar nada",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/equipos/{equipoId}": {
+      "put": {
+        "operationId": "EquiposController_editar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AltaDeEquipoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edita un equipo. Sin «secreto» en el cuerpo, la clave no cambia",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/equipos/{equipoId}/baja": {
+      "post": {
+        "operationId": "EquiposController_desactivar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaDeEquipoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Baja lógica con motivo. Nunca borrado físico (RN-19)",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
+      "post": {
+        "operationId": "EquiposController_reactivar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vuelve a poner en servicio un equipo dado de baja",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
     "/copropiedades/{id}/eventos": {
       "get": {
         "operationId": "EventosController_historial",
@@ -4019,6 +4297,71 @@
           "notas"
         ]
       },
+      "AltaDeEquipoDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "camara_lpr",
+              "terminal_facial",
+              "intercom",
+              "rele",
+              "controlador_io"
+            ]
+          },
+          "host": {
+            "type": "string",
+            "example": "203.0.113.10"
+          },
+          "puerto": {
+            "type": "number",
+            "example": 80
+          },
+          "protocolo": {
+            "type": "string",
+            "enum": [
+              "http",
+              "https"
+            ],
+            "default": "http"
+          },
+          "usuario": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "secreto": {
+            "type": "string",
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "canalBarrera": {
+            "type": "number"
+          },
+          "numeroDePuerta": {
+            "type": "number"
+          },
+          "canalDeAudio": {
+            "type": "number"
+          },
+          "probarConexion": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "nombre",
+          "tipo",
+          "host",
+          "puerto",
+          "protocolo",
+          "usuario"
+        ]
+      },
       "AparatoRegistradoDto": {
         "type": "object",
         "properties": {
@@ -4147,6 +4490,18 @@
           "texto"
         ]
       },
+      "BajaDeEquipoDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
       "BajaDto": {
         "type": "object",
         "properties": {
@@ -4253,20 +4608,12 @@
             "type": "string",
             "example": "America/Bogota"
           },
-          "umbralConfianzaPlaca": {
-            "type": "number",
-            "example": 0.85
-          },
           "politicaContingenciaEdge": {
             "type": "string",
             "enum": [
               "denegar",
               "escalar_portero"
             ]
-          },
-          "umbralLatidoMinutos": {
-            "type": "number",
-            "example": 5
           }
         }
       },
@@ -4553,14 +4900,6 @@
       "ConfirmarGeneracionDto": {
         "type": "object",
         "properties": {
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "apartamentos",
-              "casas",
-              "fincas"
-            ]
-          },
           "agrupaciones": {
             "type": "number"
           },
@@ -4571,11 +4910,14 @@
               "numeros"
             ]
           },
-          "pisos": {
+          "cantidad": {
             "type": "number"
           },
           "porPiso": {
             "type": "number"
+          },
+          "reiniciarNumeracion": {
+            "type": "boolean"
           },
           "excepciones": {
             "type": "array",
@@ -4583,24 +4925,13 @@
               "$ref": "#/components/schemas/ExcepcionDeAgrupacionDto"
             }
           },
-          "secciones": {
-            "type": "number"
-          },
-          "total": {
-            "type": "number"
-          },
-          "reiniciarNumeracion": {
-            "type": "boolean"
-          },
-          "cantidad": {
-            "type": "number"
-          },
           "totalEsperado": {
             "type": "number"
           }
         },
         "required": [
-          "tipo",
+          "agrupaciones",
+          "cantidad",
           "totalEsperado"
         ]
       },
@@ -5084,6 +5415,119 @@
           "demorado"
         ]
       },
+      "EquipoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "camara_lpr",
+              "terminal_facial",
+              "intercom",
+              "rele",
+              "controlador_io"
+            ]
+          },
+          "host": {
+            "type": "string"
+          },
+          "puerto": {
+            "type": "number"
+          },
+          "protocolo": {
+            "type": "string",
+            "enum": [
+              "http",
+              "https"
+            ]
+          },
+          "usuario": {
+            "type": "string",
+            "nullable": true
+          },
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "firmware": {
+            "type": "string",
+            "nullable": true
+          },
+          "canalBarrera": {
+            "type": "number",
+            "nullable": true
+          },
+          "numeroDePuerta": {
+            "type": "number",
+            "nullable": true
+          },
+          "canalDeAudio": {
+            "type": "number",
+            "nullable": true
+          },
+          "verificacion": {
+            "type": "string",
+            "enum": [
+              "no_verificado",
+              "verificado",
+              "rechazado"
+            ]
+          },
+          "verificadoEn": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivoNoVerificado": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "inactivo"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "tipo",
+          "host",
+          "puerto",
+          "protocolo",
+          "usuario",
+          "modelo",
+          "firmware",
+          "canalBarrera",
+          "numeroDePuerta",
+          "canalDeAudio",
+          "verificacion",
+          "verificadoEn",
+          "motivoNoVerificado",
+          "estado"
+        ]
+      },
+      "EquiposDto": {
+        "type": "object",
+        "properties": {
+          "equipos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipoDto"
+            }
+          }
+        },
+        "required": [
+          "equipos"
+        ]
+      },
       "ErrorApiDto": {
         "type": "object",
         "properties": {
@@ -5445,17 +5889,13 @@
             "type": "string",
             "maxLength": 24
           },
-          "pisos": {
-            "type": "number"
-          },
-          "porPiso": {
+          "cantidad": {
             "type": "number"
           }
         },
         "required": [
           "agrupacion",
-          "pisos",
-          "porPiso"
+          "cantidad"
         ]
       },
       "FilaDeInformeDto": {
@@ -6725,14 +7165,6 @@
       "PlanDeGeneracionDto": {
         "type": "object",
         "properties": {
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "apartamentos",
-              "casas",
-              "fincas"
-            ]
-          },
           "agrupaciones": {
             "type": "number"
           },
@@ -6743,33 +7175,25 @@
               "numeros"
             ]
           },
-          "pisos": {
+          "cantidad": {
             "type": "number"
           },
           "porPiso": {
             "type": "number"
+          },
+          "reiniciarNumeracion": {
+            "type": "boolean"
           },
           "excepciones": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ExcepcionDeAgrupacionDto"
             }
-          },
-          "secciones": {
-            "type": "number"
-          },
-          "total": {
-            "type": "number"
-          },
-          "reiniciarNumeracion": {
-            "type": "boolean"
-          },
-          "cantidad": {
-            "type": "number"
           }
         },
         "required": [
-          "tipo"
+          "agrupaciones",
+          "cantidad"
         ]
       },
       "PuntoDeFrecuenciaDto": {
@@ -7118,6 +7542,47 @@
           "claveIdempotencia",
           "aceptado",
           "duplicado"
+        ]
+      },
+      "ResultadoDeSondeoDto": {
+        "type": "object",
+        "properties": {
+          "clase": {
+            "type": "string",
+            "enum": [
+              "alcanzado",
+              "decide_solo",
+              "credencial",
+              "inalcanzable"
+            ],
+            "description": "Cuatro resultados distintos, nunca uno genérico: cada uno se resuelve de una manera."
+          },
+          "detalle": {
+            "type": "string"
+          },
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "firmware": {
+            "type": "string",
+            "nullable": true
+          },
+          "latenciaMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "verificado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "clase",
+          "detalle",
+          "modelo",
+          "firmware",
+          "latenciaMs",
+          "verificado"
         ]
       },
       "RevocacionDto": {

@@ -163,8 +163,8 @@ describe('no se crea nada sin haber visto antes qué se crea', () => {
     fireEvent.click(botonDeEnvio());
     await waitFor(() => expect(botonDeEnvio().textContent).toMatch(/Crear 39 viviendas/));
 
-    const torres = screen.getByLabelText(/Cuántas torres/i);
-    fireEvent.change(torres, { target: { value: '4' } });
+    const cuantas = screen.getByLabelText(/Cuántas apartamentos en total/i);
+    fireEvent.change(cuantas, { target: { value: '40' } });
 
     expect(botonDeEnvio().textContent).toMatch(/Ver qué se va a crear/);
     expect(screen.queryByRole('region', { name: /Vista previa/ })).toBeNull();
@@ -200,13 +200,78 @@ describe('las excepciones por torre se piden, no se adivinan', () => {
 
   it('la casilla despliega el bloque y el enlace repite otro', async () => {
     await abrirAsistente();
-    expect(screen.queryByLabelText(/^Pisos$/)).toBeNull();
+    // Sin denominador no hay excepciones que pedir: no hay a qué hacerlas.
+    expect(screen.queryByLabelText(/Hay torres con otra cantidad/i)).toBeNull();
 
-    fireEvent.click(screen.getByLabelText(/Hay torres con menos pisos/i));
-    expect(screen.getAllByLabelText(/^Pisos$/)).toHaveLength(1);
+    fireEvent.click(screen.getByLabelText(/El conjunto se divide en torres/i));
+    fireEvent.click(screen.getByLabelText(/Hay torres con otra cantidad/i));
+    expect(screen.getAllByLabelText(/^Cuántas apartamentos$/)).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: /Incluir otra excepción/ }));
-    expect(screen.getAllByLabelText(/^Pisos$/)).toHaveLength(2);
+    expect(screen.getAllByLabelText(/^Cuántas apartamentos$/)).toHaveLength(2);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * B.1 · LA PREGUNTA QUE FALTABA
+ *
+ * El asistente pedía torres, pisos y viviendas por piso, y **nunca** cuántas
+ * viviendas hay. Quien administra un conjunto sabe que tiene 120 apartamentos;
+ * que salgan de 4 × 6 × 5 es una cuenta que tenía que hacer él para poder
+ * contestar. Y el denominador era obligatorio incluso donde no existe.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('B.1 · se pregunta CUÁNTAS viviendas, y el denominador es opcional', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', servidorFalso());
+  });
+
+  it('el denominador arranca APAGADO y la cantidad se pide como total', async () => {
+    await abrirAsistente();
+    expect(screen.getByLabelText(/Cuántas apartamentos en total/i)).toBeDefined();
+    expect(screen.queryByLabelText(/^Cuántas torres$/i)).toBeNull();
+  });
+
+  it('al activarlo, la misma pregunta pasa a ser POR CADA UNO', async () => {
+    await abrirAsistente();
+    fireEvent.click(screen.getByLabelText(/El conjunto se divide en torres/i));
+    expect(screen.getByLabelText(/^Cuántas torres$/i)).toBeDefined();
+    expect(screen.getByLabelText(/Cuántas apartamentos por cada torre/i)).toBeDefined();
+    expect(screen.queryByLabelText(/Cuántas apartamentos en total/i)).toBeNull();
+  });
+
+  it('el cuerpo que sale lleva cantidad, no pisos', async () => {
+    await abrirAsistente();
+    fireEvent.click(screen.getByLabelText(/El conjunto se divide en torres/i));
+    fireEvent.change(screen.getByLabelText(/^Cuántas torres$/i), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText(/Cuántas apartamentos por cada torre/i), {
+      target: { value: '24' },
+    });
+    fireEvent.click(botonDeEnvio());
+
+    await waitFor(() => expect(escrituras()).toHaveLength(1));
+    const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const peticion = (espia.mock.calls as readonly unknown[][])
+      .map(([e]) => e)
+      .find((e): e is Request => e instanceof Request && e.method !== 'GET');
+    const cuerpo = (await peticion!.clone().json()) as Record<string, unknown>;
+    expect(cuerpo['agrupaciones']).toBe(3);
+    expect(cuerpo['cantidad']).toBe(24);
+    expect(cuerpo).not.toHaveProperty('pisos');
+    expect(cuerpo).not.toHaveProperty('total');
+  });
+
+  it('los pisos son una forma de NUMERAR, no de contar', async () => {
+    await abrirAsistente();
+    // En apartamentos viene marcada, que es lo que usan los edificios; y se
+    // puede apagar, porque no todos numeran así.
+    const porPiso = screen.getByLabelText(/Numerar por piso/i) as HTMLInputElement;
+    expect(porPiso.checked).toBe(true);
+    expect(screen.getByLabelText(/Cuántas apartamentos por piso/i)).toBeDefined();
+
+    fireEvent.click(porPiso);
+    expect(screen.queryByLabelText(/Cuántas apartamentos por piso/i)).toBeNull();
   });
 });
 

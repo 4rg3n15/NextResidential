@@ -89,6 +89,14 @@ export type ExcepcionDeAgrupacion = Esquemas['ExcepcionDeAgrupacionDto'];
 export type VistaPreviaDeGeneracion = Esquemas['VistaPreviaDeGeneracionDto'];
 export type GrupoProyectado = Esquemas['GrupoProyectadoDto'];
 export type ViviendaProyectada = Esquemas['ViviendaProyectadaDto'];
+
+/* ETAPA 15-B · aprovisionamiento de equipos (A). `EquipoDto` **no declara
+ * `secreto`**: el tipo que la consola ve no tiene dónde ponerlo, así que ni
+ * siquiera existe el descuido posible de pintarlo. */
+export type Equipo = Esquemas['EquipoDto'];
+export type AltaDeEquipo = Esquemas['AltaDeEquipoDto'];
+export type ResultadoDeSondeo = Esquemas['ResultadoDeSondeoDto'];
+export type TipoDeEquipo = Equipo['tipo'];
 /** Los cuatro tipos de conjunto, tomados del contrato. */
 export type TipoDeCopropiedad = NonNullable<ConfiguracionDeCopropiedad['tipo']>;
 
