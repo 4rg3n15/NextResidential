@@ -256,10 +256,31 @@ if (filaFecha === null) {
  * banco de pruebas negativas— NO se dan por buenas en silencio: el recuento de
  * comprobadas sale en la línea de veredicto, y si es cero se ve.
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SE RECOGE LO QUE VIENE DETRÁS DE «EN CURSO», NO TODO LO DE LA LÍNEA
+ *
+ * La primera versión tomaba **cualquier nombre entre acentos graves de una
+ * línea que mencionara «en curso»**, y eso confunde dos cosas distintas. En
+ * este documento una misma línea nombra a menudo varias ramas —la que se
+ * cierra y la que sigue— y la que está en curso es sólo una.
+ *
+ * Se vio en la ronda 15-B: la cabecera decía «RONDA `consola-superadmin-equipos`
+ * CERRADA», y en cuanto otra frase de la misma línea mencionaba una rama en
+ * curso, el control leía la CERRADA como en curso y la declaraba fusionada.
+ * Denunciaba como contradicción justo lo que el documento afirmaba bien.
+ *
+ * Ahora se exige la forma con la que el documento lo escribe de verdad:
+ * «en curso la rama `X`» o «en curso `X`». Es más estrecho y más fiel; el caso
+ * real que motivó el control —«en curso la rama `correccion-macos`» con el PR
+ * ya fusionado— lo sigue atrapando igual.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 const enCurso = new Set();
 for (const linea of lineas) {
-  if (!/en curso/i.test(linea)) continue;
-  for (const m of linea.matchAll(/`([a-z0-9][a-z0-9._\/-]{3,})`/g)) {
+  for (const m of linea.matchAll(
+    /en curso(?:\s+(?:la\s+)?rama)?\s+`([a-z0-9][a-z0-9._\/-]{3,})`/gi,
+  )) {
     const nombre = m[1];
     // Solo lo que parece una RAMA. Se descartan rutas de fichero, comandos y
     // —esto costó un falso positivo al escribirlo— las SHA abreviadas, que en

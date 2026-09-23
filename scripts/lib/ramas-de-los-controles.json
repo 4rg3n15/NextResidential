@@ -10,7 +10,7 @@
   "scripts/lib/entorno-declarado.mjs": 3,
   "scripts/lib/escanear-secretos.mjs": 2,
   "scripts/lib/esquemas-unicos.mjs": 0,
-  "scripts/lib/estabilidad.mjs": 8,
+  "scripts/lib/estabilidad.mjs": 13,
   "scripts/lib/flutter-sin-secretos.mjs": 8,
   "scripts/lib/frontera-append-only.mjs": 1,
   "scripts/lib/frontera-construccion.mjs": 6,
@@ -28,6 +28,7 @@
   "scripts/lib/pwa-instalable.mjs": 21,
   "scripts/lib/ramas-de-los-controles.mjs": 12,
   "scripts/lib/recuentos-coherentes.mjs": 3,
+  "scripts/lib/reporteros-de-prueba.mjs": 1,
   "scripts/lib/sin-colores.mjs": 1,
   "scripts/lib/verificar-base-de-pruebas.mjs": 11
 }

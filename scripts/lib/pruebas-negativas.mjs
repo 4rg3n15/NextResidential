@@ -660,6 +660,105 @@ try {
       ? ok('y un rojo sin aserciones rojas se atribuye a donde viene, no a las pruebas')
       : mal(`un fallo externo se confunde con una roja (codigo ${rfuera.codigo})`);
 
+    /**
+     * Y el informe ILEGIBLE, que es la cuarta situación y no una variante de
+     * las otras tres: el fichero existe, la suite lo escribió, y no se puede
+     * leer —truncado por un proceso que murió a mitad, disco lleno—. Callarlo
+     * dejaría al control diciendo «ninguna aserción en rojo» sobre un informe
+     * que nadie pudo abrir.
+     */
+    const contador4 = join(banco, 'contador-ilegible');
+    const ilegible = join(banco, 'suite-informe-ilegible.sh');
+    writeFileSync(
+      ilegible,
+      [
+        '#!/usr/bin/env bash',
+        `n=$(cat "${contador4}" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador4}"`,
+        `mkdir -p "${informes}"`,
+        `printf '{ \"testResults\": [' > "${informeSonda}"`,
+        'if [ $((n % 2)) -eq 0 ]; then',
+        '  echo "   Tests  85 passed (85)"; exit 0',
+        'else',
+        '  echo "   Tests  1 failed | 84 passed (85)"; exit 1',
+        'fi',
+      ].join('\n'),
+    );
+    chmodSync(ilegible, 0o755);
+    const rilegible = correr('node', [
+      'scripts/lib/estabilidad.mjs',
+      '--repeticiones',
+      '2',
+      '--comando',
+      ilegible,
+    ]);
+    rilegible.codigo !== 0 && /informe JSON ilegible/.test(rilegible.salida)
+      ? ok('y un informe JSON que no se puede leer se NOMBRA, no se descarta')
+      : mal(`un informe ilegible pasa por «sin rojas» (codigo ${rilegible.codigo})`);
+
+    /**
+     * Y con MUCHAS rojas: se enseñan las primeras y se dice cuántas faltan. Un
+     * volcado de doscientos nombres no se lee, y cortar sin decirlo hace creer
+     * que eran ocho. Es la misma disciplina que el escaneo de secretos ya
+     * aplica con sus veinte hallazgos.
+     *
+     * La misma sonda cubre el informe cuyo `name` falta: ahí el control dice
+     * «(fichero desconocido)» en vez de dejar el nombre a medias.
+     */
+    const contador5 = join(banco, 'contador-muchas');
+    const muchas = join(banco, 'suite-muchas-rojas.sh');
+    const informeConMuchas = JSON.stringify(
+      {
+        numTotalTests: 100,
+        numFailedTests: 9,
+        testResults: [
+          {
+            // Sin `name` a propósito.
+            assertionResults: Array.from({ length: 9 }, (_, i) => ({
+              status: 'failed',
+              fullName: `sonda > roja numero ${String(i + 1)}`,
+              title: `roja numero ${String(i + 1)}`,
+              failureMessages: [],
+            })),
+          },
+        ],
+      },
+      null,
+      2,
+    );
+    writeFileSync(
+      muchas,
+      [
+        '#!/usr/bin/env bash',
+        `n=$(cat "${contador5}" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador5}"`,
+        `mkdir -p "${informes}"`,
+        'if [ $((n % 2)) -eq 0 ]; then',
+        ...escribeInformeVerde,
+        '  echo "   Tests  100 passed (100)"; exit 0',
+        'else',
+        `cat > "${informeSonda}" <<'JSON'`,
+        informeConMuchas,
+        'JSON',
+        '  echo "   Tests  9 failed | 91 passed (100)"; exit 1',
+        'fi',
+      ].join('\n'),
+    );
+    chmodSync(muchas, 0o755);
+    const rmuchas = correr('node', [
+      'scripts/lib/estabilidad.mjs',
+      '--repeticiones',
+      '2',
+      '--comando',
+      muchas,
+    ]);
+    rmuchas.codigo !== 0 && /y 1 más/.test(rmuchas.salida)
+      ? ok('con nueve rojas se muestran ocho y se dice que falta una')
+      : mal(`un listado largo de rojas se corta sin decirlo (codigo ${rmuchas.codigo})`);
+    /fichero desconocido/.test(rmuchas.salida)
+      ? ok('y un informe sin fichero lo dice, en vez de dejar el nombre a medias')
+      : mal('un informe sin `name` produce un nombre incompleto');
+
     // Y el reverso: un control que fallara siempre tampoco serviría de nada.
     const estable = join(banco, 'suite-estable.sh');
     writeFileSync(
