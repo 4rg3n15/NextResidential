@@ -226,6 +226,34 @@ try {
       mal(`NO detectado (codigo ${r.codigo})`);
     }
     rmSync(sonda, { force: true });
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * LOS RANGOS DE DOCUMENTACIÓN NO SON UNA PUERTA TRASERA (ETAPA 15-B, A.7)
+     *
+     * El control acepta `192.0.2.x`, `198.51.100.x` y `203.0.113.x` porque el
+     * IETF los reserva para ejemplos (RFC 5737): no se enrutan y no pueden ser
+     * de ningún equipo. La tentación peligrosa era la contraria —aceptar
+     * `192.168.x.x` «porque es privada»—, y ésas SÍ son direcciones de equipos
+     * de verdad: la cámara de este proyecto vivía en una.
+     *
+     * Las dos direcciones se comprueban juntas y a propósito: una sola de las
+     * dos daría verde con el control roto en el otro sentido.
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    writeFileSync(sonda, `export const ejemplo = 'http://203.0.113.10:80/';\n`);
+    const doc = enClon('node', ['scripts/lib/frontera-hardware.mjs']);
+    doc.codigo === 0
+      ? ok('una IP de los rangos de documentación (RFC 5737) NO se marca')
+      : mal(`un ejemplo con 203.0.113.10 se marca como IP de equipo (codigo ${doc.codigo})`);
+
+    writeFileSync(sonda, `export const real = 'http://192.168.1.64:80/';\n`); // kpi-11-exento: sonda
+    const privada = enClon('node', ['scripts/lib/frontera-hardware.mjs']);
+    privada.codigo !== 0 && /sonda-hardware/.test(privada.salida)
+      ? ok('y una IP privada SIGUE marcándose: es la de un equipo de verdad')
+      : mal(`una IP privada pasó inadvertida (codigo ${privada.codigo})`);
+
+    rmSync(sonda, { force: true });
     enClon('node', ['scripts/lib/frontera-hardware.mjs']).salida === base
       ? ok('el banco de pruebas vuelve a su línea base')
       : mal('la sonda dejó rastro en el banco');
@@ -474,8 +502,49 @@ try {
      * Se sustituye la suite por un guion en vez de invocar Vitest tres veces:
      * lo que se pone a prueba es la comparación de firmas, y hacerlo contra la
      * suite real costaría minutos en cada verificación sin comprobar nada más.
-     * El análisis de la salida de Vitest lo ejercita el paso real.
+     *
+     * DESDE D-113 (ETAPA 15-B) el guion falso además **escribe un informe JSON**
+     * en `.informes-de-prueba/`, porque es de ahí —y ya no de la consola— de
+     * donde el control saca el nombre de la roja. Escribirlo es justo lo que
+     * hace Vitest en cada paquete.
      */
+    const informes = join(raiz, '.informes-de-prueba');
+    const informeSonda = join(informes, 'sonda.json');
+
+    /** Línea de bash que deja un informe JSON con una roja nombrada. */
+    const escribeInformeRojo = [
+      `mkdir -p "${informes}"`,
+      `cat > "${informeSonda}" <<'JSON'`,
+      JSON.stringify(
+        {
+          numTotalTests: 85,
+          numFailedTests: 1,
+          testResults: [
+            {
+              name: join(raiz, 'test/zonas.e2e.test.ts'),
+              assertionResults: [
+                {
+                  status: 'failed',
+                  fullName: 'zonas > lista las zonas',
+                  title: 'lista las zonas',
+                  failureMessages: ['expected 200 to be 403'],
+                },
+              ],
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      'JSON',
+    ];
+    const escribeInformeVerde = [
+      `mkdir -p "${informes}"`,
+      `cat > "${informeSonda}" <<'JSON'`,
+      JSON.stringify({ numTotalTests: 85, numFailedTests: 0, testResults: [] }, null, 2),
+      'JSON',
+    ];
+
     const contador = join(banco, 'contador');
     const inestable = join(banco, 'suite-inestable.sh');
     writeFileSync(
@@ -485,9 +554,15 @@ try {
         `n=$(cat "${contador}" 2>/dev/null || echo 0)`,
         `echo $((n + 1)) > "${contador}"`,
         'if [ $((n % 2)) -eq 0 ]; then',
+        ...escribeInformeVerde,
         '  echo "   Tests  85 passed (85)"; exit 0',
         'else',
-        '  echo "   × zonas · CU-05 por HTTP > lista las zonas"',
+        ...escribeInformeRojo,
+        // LA CONSOLA NO DICE QUÉ FALLÓ: ni `×` ni `FAIL`. Es exactamente la
+        // situación de la ETAPA 13 —Vitest cambia de reportero cuando `CI`
+        // está puesto, y este paso siempre pone `CI=1`— en la que el control
+        // informaba «en rojo» y debajo no había nada. Si el nombre sale de
+        // todas formas, sale del informe.
         '  echo "   Tests  1 failed | 84 passed (85)"; exit 1',
         'fi',
       ].join('\n'),
@@ -505,57 +580,103 @@ try {
       ? ok('detectada: dos corridas con resultado distinto son un fallo')
       : mal(`NO detectada (codigo ${r.codigo})`);
 
-    // Y el NOMBRE de la prueba roja tiene que salir. Es la mitad de D-100 que
-    // faltaba: el control recogía `× …`, y este paso ejecuta el comando con
-    // `CI=1`, donde Vitest cambia de reportero y emite `FAIL …` sin una sola
-    // línea con `×`. Medido en la ETAPA 13: la corrida 2 de 3 salió en rojo y
-    // debajo no había nada. Aquí se exige que el nombre aparezca.
-    /^ {5}× zonas/m.test(r.salida)
-      ? ok('y el nombre de la prueba roja sale con el reportero por omisión')
+    /**
+     * D-113 · EL NOMBRE SALE DEL INFORME, NO DE LA CONSOLA.
+     *
+     * La consola de la sonda no contiene ni `×` ni `FAIL`: el raspado antiguo
+     * no habría podido sacar nada. Que el nombre completo aparezca demuestra
+     * que se leyó el JSON.
+     */
+    /zonas > lista las zonas/.test(r.salida) && /sonda ›/.test(r.salida)
+      ? ok('y la roja se nombra desde el informe JSON, con la consola muda')
       : mal('la roja no se nombra: el control informa «en rojo» y deja a oscuras');
 
-    const conCI = join(banco, 'suite-reportero-de-ci.sh');
+    /**
+     * EL CASO INCÓMODO, AHORA CON DIAGNÓSTICO ÚTIL. Antes, una roja sin nombre
+     * obligaba al control a confesar «es un defecto de ESTE control». Ya no lo
+     * es: si no hay informe, la suite **no llegó a ejecutarse**, y eso es un
+     * fallo de arranque, no una prueba roja. El control tiene que decir eso.
+     */
+    const contador2 = join(banco, 'contador-sin-informe');
+    const sinInforme = join(banco, 'suite-sin-informe.sh');
     writeFileSync(
-      conCI,
+      sinInforme,
       [
         '#!/usr/bin/env bash',
-        `n=$(cat "${contador}-ci" 2>/dev/null || echo 0)`,
-        `echo $((n + 1)) > "${contador}-ci"`,
+        `n=$(cat "${contador2}" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador2}"`,
         'if [ $((n % 2)) -eq 0 ]; then',
+        ...escribeInformeVerde,
         '  echo "   Tests  85 passed (85)"; exit 0',
         'else',
-        // Exactamente la forma que emite Vitest cuando `CI` está puesto.
-        '  echo " FAIL  test/zonas.e2e.test.ts > zonas > lista las zonas"',
-        '  echo "     → expected 200 to be 403"',
         '  echo "   Tests  1 failed | 84 passed (85)"; exit 1',
         'fi',
       ].join('\n'),
     );
-    chmodSync(conCI, 0o755);
-    const rci = correr('node', [
+    chmodSync(sinInforme, 0o755);
+    const rsin = correr('node', [
       'scripts/lib/estabilidad.mjs',
       '--repeticiones',
       '2',
       '--comando',
-      conCI,
+      sinInforme,
     ]);
-    // Un solo espacio: `firmaDe` normaliza los blancos antes de comparar, así
-    // que el `FAIL  ` de dos espacios de Vitest llega aquí con uno.
-    rci.codigo !== 0 && /FAIL test\/zonas\.e2e\.test\.ts > zonas > lista las zonas/.test(rci.salida)
-      ? ok('y con el reportero de CI, que no emite `×`, la nombra igual')
-      : mal(`con CI=1 la roja se queda anónima (codigo ${rci.codigo})`);
+    rsin.codigo !== 0 && /no llegó a ejecutarse/.test(rsin.salida)
+      ? ok('y sin informe lo llama por su nombre: fallo de arranque, no roja anónima')
+      : mal(`una corrida sin informe se informa en silencio (codigo ${rsin.codigo})`);
 
-    // Y el caso incómodo: una corrida en rojo de la que NO se puede sacar el
-    // nombre. El control tiene que DECIRLO —«es un defecto de ESTE control, no
-    // una roja anónima»— en vez de callar, que es justo lo que hizo en la
-    // ETAPA 13 y mandó a buscar la causa donde no estaba.
-    const anonima = join(banco, 'suite-roja-anonima.sh');
+    /**
+     * Y el tercero: informe escrito, ninguna aserción en rojo, código ≠ 0. El
+     * fallo está FUERA de las pruebas —umbral de cobertura, error sin manejar,
+     * un paso posterior de turbo— y mandar a mirar las pruebas sería mandar al
+     * sitio equivocado.
+     */
+    const contador3 = join(banco, 'contador-fuera');
+    const fuera = join(banco, 'suite-roja-fuera-de-las-pruebas.sh');
     writeFileSync(
-      anonima,
+      fuera,
       [
         '#!/usr/bin/env bash',
-        `n=$(cat "${contador}-anon" 2>/dev/null || echo 0)`,
-        `echo $((n + 1)) > "${contador}-anon"`,
+        `n=$(cat "${contador3}" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador3}"`,
+        ...escribeInformeVerde,
+        'if [ $((n % 2)) -eq 0 ]; then',
+        '  echo "   Tests  85 passed (85)"; exit 0',
+        'else',
+        '  echo "   Tests  85 passed (85)"',
+        '  echo "ERROR: coverage threshold not met"; exit 1',
+        'fi',
+      ].join('\n'),
+    );
+    chmodSync(fuera, 0o755);
+    const rfuera = correr('node', [
+      'scripts/lib/estabilidad.mjs',
+      '--repeticiones',
+      '2',
+      '--comando',
+      fuera,
+    ]);
+    rfuera.codigo !== 0 && /fuera de las pruebas/.test(rfuera.salida)
+      ? ok('y un rojo sin aserciones rojas se atribuye a donde viene, no a las pruebas')
+      : mal(`un fallo externo se confunde con una roja (codigo ${rfuera.codigo})`);
+
+    /**
+     * Y el informe ILEGIBLE, que es la cuarta situación y no una variante de
+     * las otras tres: el fichero existe, la suite lo escribió, y no se puede
+     * leer —truncado por un proceso que murió a mitad, disco lleno—. Callarlo
+     * dejaría al control diciendo «ninguna aserción en rojo» sobre un informe
+     * que nadie pudo abrir.
+     */
+    const contador4 = join(banco, 'contador-ilegible');
+    const ilegible = join(banco, 'suite-informe-ilegible.sh');
+    writeFileSync(
+      ilegible,
+      [
+        '#!/usr/bin/env bash',
+        `n=$(cat "${contador4}" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador4}"`,
+        `mkdir -p "${informes}"`,
+        `printf '{ \"testResults\": [' > "${informeSonda}"`,
         'if [ $((n % 2)) -eq 0 ]; then',
         '  echo "   Tests  85 passed (85)"; exit 0',
         'else',
@@ -563,26 +684,102 @@ try {
         'fi',
       ].join('\n'),
     );
-    chmodSync(anonima, 0o755);
-    const ranon = correr('node', [
+    chmodSync(ilegible, 0o755);
+    const rilegible = correr('node', [
       'scripts/lib/estabilidad.mjs',
       '--repeticiones',
       '2',
       '--comando',
-      anonima,
+      ilegible,
     ]);
-    ranon.codigo !== 0 && /defecto de ESTE control/.test(ranon.salida)
-      ? ok('y si no hay nombre que sacar, lo dice en vez de callar')
-      : mal(`una roja sin nombre se informa en silencio (codigo ${ranon.codigo})`);
+    rilegible.codigo !== 0 && /informe JSON ilegible/.test(rilegible.salida)
+      ? ok('y un informe JSON que no se puede leer se NOMBRA, no se descarta')
+      : mal(`un informe ilegible pasa por «sin rojas» (codigo ${rilegible.codigo})`);
+
+    /**
+     * Y con MUCHAS rojas: se enseñan las primeras y se dice cuántas faltan. Un
+     * volcado de doscientos nombres no se lee, y cortar sin decirlo hace creer
+     * que eran ocho. Es la misma disciplina que el escaneo de secretos ya
+     * aplica con sus veinte hallazgos.
+     *
+     * La misma sonda cubre el informe cuyo `name` falta: ahí el control dice
+     * «(fichero desconocido)» en vez de dejar el nombre a medias.
+     */
+    const contador5 = join(banco, 'contador-muchas');
+    const muchas = join(banco, 'suite-muchas-rojas.sh');
+    const informeConMuchas = JSON.stringify(
+      {
+        numTotalTests: 100,
+        numFailedTests: 9,
+        testResults: [
+          {
+            // Sin `name` a propósito.
+            assertionResults: Array.from({ length: 9 }, (_, i) => ({
+              status: 'failed',
+              fullName: `sonda > roja numero ${String(i + 1)}`,
+              title: `roja numero ${String(i + 1)}`,
+              failureMessages: [],
+            })),
+          },
+        ],
+      },
+      null,
+      2,
+    );
+    writeFileSync(
+      muchas,
+      [
+        '#!/usr/bin/env bash',
+        `n=$(cat "${contador5}" 2>/dev/null || echo 0)`,
+        `echo $((n + 1)) > "${contador5}"`,
+        `mkdir -p "${informes}"`,
+        'if [ $((n % 2)) -eq 0 ]; then',
+        ...escribeInformeVerde,
+        '  echo "   Tests  100 passed (100)"; exit 0',
+        'else',
+        `cat > "${informeSonda}" <<'JSON'`,
+        informeConMuchas,
+        'JSON',
+        '  echo "   Tests  9 failed | 91 passed (100)"; exit 1',
+        'fi',
+      ].join('\n'),
+    );
+    chmodSync(muchas, 0o755);
+    const rmuchas = correr('node', [
+      'scripts/lib/estabilidad.mjs',
+      '--repeticiones',
+      '2',
+      '--comando',
+      muchas,
+    ]);
+    rmuchas.codigo !== 0 && /y 1 más/.test(rmuchas.salida)
+      ? ok('con nueve rojas se muestran ocho y se dice que falta una')
+      : mal(`un listado largo de rojas se corta sin decirlo (codigo ${rmuchas.codigo})`);
+    /fichero desconocido/.test(rmuchas.salida)
+      ? ok('y un informe sin fichero lo dice, en vez de dejar el nombre a medias')
+      : mal('un informe sin `name` produce un nombre incompleto');
 
     // Y el reverso: un control que fallara siempre tampoco serviría de nada.
     const estable = join(banco, 'suite-estable.sh');
-    writeFileSync(estable, '#!/usr/bin/env bash\necho "   Tests  85 passed (85)"\nexit 0\n');
+    writeFileSync(
+      estable,
+      [
+        '#!/usr/bin/env bash',
+        ...escribeInformeVerde,
+        'echo "   Tests  85 passed (85)"',
+        'exit 0',
+      ].join('\n'),
+    );
     chmodSync(estable, 0o755);
     correr('node', ['scripts/lib/estabilidad.mjs', '--repeticiones', '2', '--comando', estable])
       .codigo === 0
       ? ok('una suite reproducible sí pasa')
       : mal('el control rechaza una suite que es estable');
+
+    // El banco no deja residuos: el informe de la sonda se retira. Está en
+    // `.gitignore`, así que no alteraría el árbol, pero dejarlo confundiría la
+    // siguiente lectura de `.informes-de-prueba/`.
+    rmSync(informeSonda, { force: true });
   }
   console.log('\n▸ 8 · entrar en un módulo por dentro, y no por su barril, se detecta');
   {
@@ -1956,6 +2153,154 @@ try {
       sinVariable.codigo !== 0 && /no está definida/.test(sinVariable.salida)
         ? ok('y la variable vacía tampoco pasa por buena')
         : mal('una DATABASE_URL_PRUEBAS vacía se lee como definida');
+    }
+
+    // (c bis) base-de-pruebas · un clúster VIVO con `max_connections` corto.
+    {
+      /**
+       * ═══════════════════════════════════════════════════════════════════════
+       * D-114 · «UN CONTROL QUE DA POR BUENO UN ESTADO QUE NO COMPROBÓ»
+       *
+       * `base-de-pruebas.sh` aplicaba `max_connections=300` SÓLO al crear el
+       * clúster, y si encontraba uno vivo lo reutilizaba **sin mirar nada**. Un
+       * clúster levantado antes de esa corrección seguía con el 100 por
+       * omisión, y las pruebas de KPI-03 y de aforo morían con «sorry, too many
+       * clients already» en los pasos 7, 7b y 14 — de forma intermitente, según
+       * cómo repartiera vitest los ficheros ese día.
+       *
+       * La sonda levanta a propósito un clúster CORTO y exige que la siguiente
+       * invocación lo detecte, lo diga y lo reinicie. Es el estado exacto que
+       * producía el falso verde.
+       * ═══════════════════════════════════════════════════════════════════════
+       */
+      const dirPg = '/var/tmp/ncr-negativas-conexiones';
+      const entorno = {
+        ...process.env,
+        NCR_PGDATA: join(dirPg, 'data'),
+        NCR_PGSOCK: join(dirPg, 'sock'),
+        NCR_PGPORT: '55439',
+        NCR_PGDATABASE: 'ncr_sonda',
+      };
+      const guion = join(raiz, 'scripts/base-de-pruebas.sh');
+
+      /**
+       * ═══════════════════════════════════════════════════════════════════
+       * D-115 · UN `pg_ctl` NO ES UN SERVIDOR
+       *
+       * La fórmula `libpq` de Homebrew —la que trae el runner de macOS—
+       * instala `psql`, `pg_ctl` e `initdb`, pero NO el ejecutable
+       * `postgres`. El guion elegía ese directorio porque encontraba
+       * `pg_ctl`, y el error llegaba a mitad de `initdb`, donde ya no se
+       * distingue de un control roto.
+       *
+       * Aquí se reproduce el escenario EXACTO en cualquier máquina: un
+       * directorio con `pg_ctl` e `initdb` y sin servidor. Tiene que
+       * negarse ANTES de tocar nada, y decirlo con esas palabras.
+       * ═══════════════════════════════════════════════════════════════════
+       */
+      {
+        const falso = mkdtempSync(join(tmpdir(), 'ncr-pgbin-sin-servidor-'));
+        for (const cliente of ['pg_ctl', 'initdb', 'psql']) {
+          const ruta = join(falso, cliente);
+          writeFileSync(ruta, '#!/bin/sh\nexit 0\n');
+          chmodSync(ruta, 0o755);
+        }
+        const aMedias = correr('bash', ['-c', `"${guion}" arrancar 2>&1`], {
+          cwd: raiz,
+          env: { ...entorno, NCR_PGBIN: falso },
+        });
+        aMedias.codigo !== 0 &&
+        /no encuentro un servidor PostgreSQL utilizable/.test(aMedias.salida)
+          ? ok('base-de-pruebas: un directorio con pg_ctl pero SIN servidor se rechaza, no se usa')
+          : mal(
+              'un directorio con pg_ctl y sin `postgres` se dio por bueno: ' +
+                `codigo ${aMedias.codigo} · ${aMedias.salida.trim().split('\n').slice(-2).join(' · ')}`,
+            );
+        rmSync(falso, { recursive: true, force: true });
+      }
+      /**
+       * Se invoca por `bash -c … 2>&1` a propósito: el aviso que esta sonda
+       * tiene que leer se escribe en **stderr**, y `execFileSync` no devuelve
+       * stderr cuando el proceso sale con cero. Leerlo de stdout habría dado
+       * «no detectado» con el control funcionando — un falso negativo dentro
+       * del banco que existe para impedirlos.
+       */
+      const invocar = (orden, extra = {}) =>
+        correr('bash', ['-c', `"${guion}" ${orden} 2>&1`], {
+          cwd: raiz,
+          env: { ...entorno, ...extra },
+        });
+      const parar = () => invocar('parar');
+
+      parar();
+      rmSync(dirPg, { recursive: true, force: true });
+
+      // 1 · se levanta A 100, que es el clúster de antes de la corrección.
+      const corto = invocar('arrancar', { NCR_PGMAXCONN: '100' });
+
+      /**
+       * ═══════════════════════════════════════════════════════════════════
+       * SIN CLÚSTER NO HAY NADA QUE EJERCITAR — y eso NO es un verde
+       *
+       * Esta sonda necesita levantar un PostgreSQL de verdad: es la única
+       * forma de reproducir el estado que mataba los pasos 7, 7b y 14.
+       *
+       * La primera versión miraba si el mensaje decía «no encuentro pg_ctl», y
+       * el CI de macOS enseñó dos veces que eso era atarse a UNA de las formas
+       * de no poder. La segunda fue más instructiva que la primera: el runner
+       * SÍ tenía `pg_ctl` —la fórmula `libpq` lo instala— pero no el servidor,
+       * así que `base-de-pruebas.sh` lo daba por bueno y moría dentro de
+       * `initdb`. Eso ya está corregido en el guion, que ahora exige los tres
+       * binarios; aquí se lee el mensaje que produce esa comprobación.
+       *
+       * Se mira, además, lo único que de verdad importa —si el clúster
+       * arrancó— y **se imprime el motivo**, que es lo que permite distinguir
+       * «aquí no se puede» de «el control está mal».
+       *
+       * Cuenta como FALLO cuando la corrida lleva base (`DATABASE_URL_PRUEBAS`
+       * definida), que es justo cuando este control está en juego. Es la misma
+       * distinción que hace la sección 19 con Flutter: faltar no es lo mismo
+       * que tenerlo mal.
+       * ═══════════════════════════════════════════════════════════════════
+       */
+      if (corto.codigo !== 0) {
+        const motivo = corto.salida.trim().split('\n').slice(-4).join(' · ') || '(sin salida)';
+        if (/no encuentro un servidor PostgreSQL utilizable/.test(corto.salida)) {
+          // PostgreSQL AUSENTE —o a medias, que para esto es lo mismo—:
+          // declarado con esas palabras, y no como verde. Es la misma
+          // distinción de la sección 19 con Flutter.
+          console.log(
+            '   · base-de-pruebas: sin servidor PostgreSQL en esta máquina, la sonda ' +
+              'de max_connections NO se ejercitó (no se da por buena: no se ejecutó)',
+          );
+        } else {
+          // PostgreSQL está y aun así no arrancó: eso SÍ es un fallo, y el
+          // motivo va impreso para poder diagnosticarlo sin volver a correrlo.
+          mal(`no se pudo levantar el clúster de la sonda (codigo ${corto.codigo}): ${motivo}`);
+        }
+        rmSync(dirPg, { recursive: true, force: true });
+      } else {
+        ok('base-de-pruebas: la sonda levanta un clúster corto a propósito');
+
+        // 2 · la siguiente invocación lo encuentra vivo. Tiene que NEGARSE a
+        //     reutilizarlo, decir por qué, y dejarlo con el valor que la suite
+        //     necesita.
+        const r = invocar('arrancar');
+        r.codigo === 0 && /max_connections=100/.test(r.salida) && /Se reinicia/.test(r.salida)
+          ? ok('un clúster vivo con max_connections=100 se detecta, se nombra y se reinicia')
+          : mal(
+              `un clúster corto se reutiliza a ciegas (codigo ${r.codigo}): ` +
+                'es el estado que mataba los pasos 7, 7b y 14',
+            );
+
+        const ahora = invocar('arrancar');
+        /Se reinicia/.test(ahora.salida)
+          ? mal('el clúster reiniciado SIGUE por debajo del mínimo: se reinicia en bucle')
+          : ok('y la invocación siguiente ya lo reutiliza, porque ahora sí sirve');
+
+        parar();
+        rmSync(dirPg, { recursive: true, force: true });
+      }
     }
 
     // (d) dependencias-acotadas · una acotación sin motivo escrito.

@@ -4,20 +4,23 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+/// Cuatro resultados distintos, nunca uno genérico: cada uno se resuelve de una manera.
 @JsonEnum()
-enum PlanDeGeneracionDtoTipo {
-  @JsonValue('apartamentos')
-  apartamentos('apartamentos'),
-  @JsonValue('casas')
-  casas('casas'),
-  @JsonValue('fincas')
-  fincas('fincas'),
+enum ResultadoDeSondeoDtoClase {
+  @JsonValue('alcanzado')
+  alcanzado('alcanzado'),
+  @JsonValue('decide_solo')
+  decideSolo('decide_solo'),
+  @JsonValue('credencial')
+  credencial('credencial'),
+  @JsonValue('inalcanzable')
+  inalcanzable('inalcanzable'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 
-  const PlanDeGeneracionDtoTipo(this.json);
+  const ResultadoDeSondeoDtoClase(this.json);
 
-  factory PlanDeGeneracionDtoTipo.fromJson(String json) => values.firstWhere(
+  factory ResultadoDeSondeoDtoClase.fromJson(String json) => values.firstWhere(
         (e) => e.json == json,
         orElse: () => $unknown,
       );
@@ -35,5 +38,5 @@ enum PlanDeGeneracionDtoTipo {
   @override
   String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
-  static List<PlanDeGeneracionDtoTipo> get $valuesDefined => values.where((value) => value != $unknown).toList();
+  static List<ResultadoDeSondeoDtoClase> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }

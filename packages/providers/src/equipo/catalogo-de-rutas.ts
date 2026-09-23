@@ -30,7 +30,27 @@
  * nombre de un módulo del fabricante.
  */
 
-export type Procedencia = 'verificada' | 'documentada';
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * TRES GRADOS, NO DOS · añadido el 23/09/2026
+ *
+ * Hasta hoy una ruta era «verificada» —capturada del equipo— o «documentada»,
+ * y ese segundo cajón mezclaba dos cosas muy distintas: lo que dice la guía
+ * oficial del fabricante para ESTA familia de equipo, y lo que se dedujo de la
+ * forma habitual de ISAPI. Tratarlas igual obliga a desconfiar de las dos por
+ * igual, y entonces la etiqueta no informa de nada.
+ *
+ * | Grado           | Qué lo respalda                              | Qué falta          |
+ * | --------------- | -------------------------------------------- | ------------------ |
+ * | `verificada`    | Captura del equipo real                      | Nada               |
+ * | `guia_oficial`  | La guía ANPR del fabricante                  | Verla en el equipo |
+ * | `documentada`   | La forma habitual de ISAPI                   | Respaldo y equipo  |
+ *
+ * `guia_oficial` **no** es «verificada»: eso exige el aparato delante. Pero
+ * tampoco es una deducción, y el guion de puesta en marcha las ordena por este
+ * grado para que lo primero que se compruebe sea lo que menos respaldo tiene.
+ */
+export type Procedencia = 'verificada' | 'guia_oficial' | 'documentada';
 
 export interface RutaDeEquipo {
   /** Nombre en lenguaje del dominio: es lo que se lee en un informe. */
@@ -42,6 +62,16 @@ export interface RutaDeEquipo {
   readonly familia: 'camara' | 'terminal' | 'videoportero' | 'comun';
   /** De dónde salió, literal. Una etiqueta sin procedencia no vale nada. */
   readonly fuente: string;
+  /**
+   * Capítulo de la guía oficial, cuando la procedencia es `guia_oficial`.
+   *
+   * **Hoy dice de qué trata, no un número.** El destilado que respalda estas
+   * rutas llegó como texto y `docs/hikdocs/` no está en este árbol —es
+   * documentación propietaria del fabricante y no se versiona—, así que poner
+   * «§4.2» sería inventar una precisión que nadie puede comprobar. Cuando el
+   * documento esté a mano, aquí va su numeración.
+   */
+  readonly capitulo?: string;
   /**
    * Qué comprobar en sitio para ascenderla a VERIFICADA. Vacío en las que ya
    * lo están.
@@ -88,6 +118,37 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     },
   },
 
+  // ── EL MODO DE CONTROL · la ruta que decide quién manda ──────────────────
+  {
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * LA COMPROBACIÓN MÁS IMPORTANTE DE TODO ESTE CATÁLOGO
+     *
+     * `ctrlMod` dice quién abre la barrera cuando la cámara reconoce una placa:
+     *
+     *   0 = la CÁMARA, por su lista interna
+     *   1 = la PLATAFORMA  ← lo único admisible en este proyecto
+     *   2 = ambas
+     *
+     * Con 0 o con 2, el equipo abre por su cuenta y el motor de reglas se
+     * entera después —o no se entera—: el principio rector queda en una frase
+     * del README. No es una recomendación de puesta en marcha: es la condición
+     * bajo la cual este sistema puede operar contra este equipo, y por eso se
+     * comprueba al arrancar el proveedor y no en una guía que alguien leerá.
+     */
+    proposito: 'leer quién controla la barrera: la cámara o la plataforma',
+    metodo: 'GET',
+    ruta: '/ISAPI/ITC/Entrance/entranceParam',
+    procedencia: 'guia_oficial',
+    familia: 'camara',
+    fuente:
+      'Guía oficial ANPR del fabricante, parámetros de entrada. El valor vive en ' +
+      'EntranceParamList.EntranceParam.ctrlMod y debe ser 1 (plataforma)',
+    capitulo: 'parámetros de entrada · modo de control',
+    confirmarEnSitio:
+      'que valga 1. Con 0 o 2 el equipo decide por su cuenta y el sistema se NIEGA a operar',
+  },
+
   // ── COMUNES · identidad y capacidades ────────────────────────────────────
   {
     proposito: 'leer la identidad del equipo (modelo, firmware, serie)',
@@ -106,6 +167,86 @@ export const RUTAS: readonly RutaDeEquipo[] = [
     familia: 'comun',
     fuente: 'Documentación ISAPI del fabricante, sección de sistema',
     confirmarEnSitio: 'qué módulos declara soportar: decide qué rutas tienen sentido probar',
+  },
+
+  // ── CONFIGURAR EL RECEPTOR DESDE AQUÍ, en vez de a mano en la interfaz ───
+  {
+    proposito: 'leer qué admite el equipo al configurar su servidor de notificación',
+    metodo: 'GET',
+    ruta: '/ISAPI/Event/notification/httpHosts/capabilities',
+    procedencia: 'guia_oficial',
+    familia: 'camara',
+    fuente: 'Guía oficial ANPR del fabricante, notificación HTTP · HttpHostNotificationCap',
+    capitulo: 'notificación HTTP · capacidades',
+    confirmarEnSitio: 'cuántos servidores admite y si acepta el formato de línea base',
+  },
+  {
+    proposito: 'apuntar el equipo a nuestro receptor',
+    metodo: 'PUT',
+    ruta: '/ISAPI/Event/notification/httpHosts',
+    procedencia: 'guia_oficial',
+    familia: 'camara',
+    fuente:
+      'Guía oficial ANPR del fabricante, notificación HTTP. Admite también la forma ' +
+      'con identificador de servidor al final de la ruta',
+    capitulo: 'notificación HTTP · configuración',
+    confirmarEnSitio: 'si este firmware exige el identificador en la ruta o lo admite sin él',
+    dejaRastro: true,
+  },
+  {
+    proposito: 'pedir al equipo que pruebe el envío a nuestro receptor',
+    metodo: 'POST',
+    ruta: '/ISAPI/Event/notification/httpHosts/1/test',
+    procedencia: 'guia_oficial',
+    familia: 'camara',
+    fuente: 'Guía oficial ANPR del fabricante, notificación HTTP · prueba de envío',
+    capitulo: 'notificación HTTP · prueba',
+    confirmarEnSitio: 'que el envío de prueba llegue al receptor y con qué forma de cuerpo',
+    dejaRastro: true,
+  },
+  {
+    /**
+     * Sin esto, el equipo puede usar un formato propietario antiguo que el
+     * receptor no sabe abrir, y el fallo se manifiesta como «la cámara no
+     * reporta» cuando en realidad reporta en otro idioma.
+     */
+    proposito: 'exigir el formato de evento de línea base',
+    metodo: 'PUT',
+    ruta: '/ISAPI/Traffic/ANPR/alarmHttpPushProtocol',
+    procedencia: 'guia_oficial',
+    familia: 'camara',
+    fuente:
+      'Guía oficial ANPR del fabricante. El cuerpo lleva baseLineProtocolEnabled en true; ' +
+      'sin él el equipo puede emitir un formato propietario antiguo',
+    capitulo: 'protocolo de envío de alarmas ANPR',
+    confirmarEnSitio: 'qué formato usa de fábrica ESTE equipo antes de tocarlo',
+    dejaRastro: true,
+    cuerpo: {
+      tipo: 'application/xml',
+      contenido:
+        '<?xml version="1.0" encoding="UTF-8"?><AlarmHttpPushProtocol>' +
+        '<baseLineProtocolEnabled>true</baseLineProtocolEnabled></AlarmHttpPushProtocol>',
+    },
+  },
+  {
+    proposito: 'leer las capacidades de tráfico del equipo',
+    metodo: 'GET',
+    ruta: '/ISAPI/Traffic/capabilities',
+    procedencia: 'guia_oficial',
+    familia: 'camara',
+    fuente: 'Guía oficial ANPR del fabricante · plateCap',
+    capitulo: 'capacidades de tráfico',
+    confirmarEnSitio: 'qué países y formatos de placa declara reconocer',
+  },
+  {
+    proposito: 'leer cuántas barreras y relés declara el equipo',
+    metodo: 'GET',
+    ruta: '/ISAPI/ITC/Entrance/capabilities',
+    procedencia: 'guia_oficial',
+    familia: 'camara',
+    fuente: 'Guía oficial ANPR del fabricante · supportBarrierGateNum y supportRelayNum',
+    capitulo: 'capacidades de entrada',
+    confirmarEnSitio: 'cuántas barreras y relés hay de verdad, para no accionar el que no es',
   },
 
   // ── TERMINAL FACIAL · DS-K1T344MBFWX-E1 ──────────────────────────────────
@@ -177,6 +318,57 @@ export const RUTAS: readonly RutaDeEquipo[] = [
       tipo: 'application/xml',
       contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
     },
+  },
+
+  // ── LA SEGUNDA RUTA DE BARRERA, por si el modelo no tiene la primera ─────
+  {
+    /**
+     * Alternativa documentada a la ruta VERIFICADA de `Parking`. Se cataloga
+     * aparte y **no sustituye** a aquella: la verificada lo está contra este
+     * firmware, y cambiarla por una que no lo está sería retroceder.
+     *
+     * `barrietGateNum` y `barrietGateOper` llevan la errata del fabricante —le
+     * falta la «r»—. Se respeta: corregirla aquí produciría una petición que el
+     * equipo no entiende, y el error sería incomprensible.
+     */
+    proposito: 'accionar la barrera por la ruta de entrada (alternativa por modelo)',
+    metodo: 'PUT',
+    ruta: '/ISAPI/ITC/Entrance/barrierGateCtrl',
+    procedencia: 'guia_oficial',
+    familia: 'camara',
+    fuente:
+      'Guía oficial ANPR del fabricante, control de barrera de entrada. Operaciones: ' +
+      'off, on, stop, locked. Los nombres de campo llevan la errata del fabricante',
+    capitulo: 'control de barrera de entrada',
+    confirmarEnSitio:
+      'si este modelo la admite. La ruta de Parking está VERIFICADA: ésta es el repliegue',
+    acciona: true,
+    cuerpo: {
+      tipo: 'application/xml',
+      contenido:
+        '<?xml version="1.0" encoding="UTF-8"?><BarrierGateCtrl>' +
+        '<barrietGateNum>1</barrietGateNum><barrietGateOper>on</barrietGateOper></BarrierGateCtrl>',
+    },
+  },
+  {
+    /**
+     * **Informa del estado de la BARRERA, no de que un vehículo pasara.** La
+     * invariante del dominio no cambia (H-1, H-2): una orden aceptada nunca
+     * afirma paso franqueado, y leer «abierta» aquí tampoco lo afirma —dice
+     * que el brazo está arriba, no que alguien cruzara—.
+     */
+    proposito: 'leer si la barrera está abierta o cerrada',
+    metodo: 'GET',
+    ruta: '/ISAPI/Parking/channels/1/barrierGate/barrierGateStatus',
+    procedencia: 'guia_oficial',
+    familia: 'camara',
+    fuente:
+      'Guía oficial ANPR del fabricante · 0 sin señal, 1 cerrada, 2 abierta. La consulta ' +
+      'de estado del 15/09/2026 devolvió notSupport por OTRA ruta; ésta no se ha probado',
+    capitulo: 'estado de la barrera',
+    confirmarEnSitio:
+      'si responde o vuelve a dar notSupport. Sin señal de posición cableada (H-2), ' +
+      'un «abierta» sigue sin demostrar que un vehículo pasó',
   },
 
   // ── FLUJO DE EVENTOS · terminal y videoportero ───────────────────────────

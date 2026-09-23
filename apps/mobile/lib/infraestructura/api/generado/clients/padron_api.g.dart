@@ -426,6 +426,36 @@ class _PadronApi implements PadronApi {
   }
 
   @override
+  Future<BorradoDefinitivoDto> padronControllerBorrarViviendaDefinitivamente({
+    required String id,
+    required String viviendaId,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<BorradoDefinitivoDto>(
+      Options(method: 'DELETE', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/padron/viviendas/${viviendaId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late BorradoDefinitivoDto _value;
+    try {
+      _value = BorradoDefinitivoDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<BajaDto> padronControllerDesactivarVivienda({
     required String id,
     required String viviendaId,
@@ -441,6 +471,36 @@ class _PadronApi implements PadronApi {
           .compose(
             _dio.options,
             '/copropiedades/${id}/padron/viviendas/${viviendaId}/desactivacion',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late BajaDto _value;
+    try {
+      _value = BajaDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<BajaDto> padronControllerReactivarVivienda({
+    required String id,
+    required String viviendaId,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<BajaDto>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/padron/viviendas/${viviendaId}/reactivacion',
             queryParameters: queryParameters,
             data: _data,
           )

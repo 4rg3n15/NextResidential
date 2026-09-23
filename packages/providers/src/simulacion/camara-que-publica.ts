@@ -21,6 +21,14 @@ export interface LecturaSimulada {
   /** Identificador del equipo: es la clave de idempotencia del receptor. */
   readonly referencia?: string;
   readonly tipoDeEvento?: string;
+  /**
+   * `0` tiempo real · `1` HISTÓRICO. Por omisión tiempo real, que es lo que la
+   * cámara hace al detectar; declarar `1` es lo que permite probar que el
+   * receptor NO trata el volcado histórico como presente.
+   */
+  readonly alarmDataType?: '0' | '1';
+  /** Quién abrió según el equipo: `white` su lista · `manual` nosotros. */
+  readonly openGateType?: 'white' | 'manual' | 'abnormal';
 }
 
 /** Un JPEG mínimo pero REAL: cabecera SOI, marcador y EOI. */
@@ -40,6 +48,10 @@ export const xmlDeLectura = (lectura: LecturaSimulada): string =>
   `<eventType>${lectura.tipoDeEvento ?? 'ANPR'}</eventType>` +
   `<dateTime>${(lectura.ocurridoEn ?? new Date()).toISOString()}</dateTime>` +
   `<eventId>${lectura.referencia ?? `ev-${lectura.placa}`}</eventId>` +
+  `<alarmDataType>${lectura.alarmDataType ?? '0'}</alarmDataType>` +
+  (lectura.openGateType === undefined
+    ? ''
+    : `<openGateType>${lectura.openGateType}</openGateType>`) +
   '<ANPR>' +
   `<licensePlate>${lectura.placa}</licensePlate>` +
   `<confidenceLevel>${String(lectura.confianza ?? 93)}</confidenceLevel>` +
@@ -60,7 +72,15 @@ export interface SobrePublicado {
  */
 export const sobreDeLectura = (
   lectura: LecturaSimulada,
-  opciones: { readonly conRecorte?: boolean } = {},
+  opciones: {
+    readonly conRecorte?: boolean;
+    /**
+     * Añade los recortes de ROSTRO del conductor y del acompañante, que es lo
+     * que un equipo mal configurado envía. No se usa para simular un equipo
+     * sano: se usa para demostrar que el receptor los rechaza (H-16-1).
+     */
+    readonly conRostros?: boolean;
+  } = {},
 ): SobrePublicado => {
   const parte = (nombre: string, tipo: string, contenido: Buffer | string): Buffer =>
     Buffer.concat([
@@ -80,6 +100,10 @@ export const sobreDeLectura = (
     // El recorte es SIEMPRE el menor de los dos: es lo que el receptor usa
     // para desempatar cuando los nombres no dicen nada.
     partes.push(parte('licensePlatePicture', 'image/jpeg', jpegDePrueba(256, 11)));
+  }
+  if (opciones.conRostros === true) {
+    partes.push(parte('pilotPicture.jpg', 'image/jpeg', jpegDePrueba(128, 13)));
+    partes.push(parte('copilotPicture.jpg', 'image/jpeg', jpegDePrueba(128, 17)));
   }
   partes.push(Buffer.from(`--${SEPARADOR_DE_PRUEBA}--\r\n`));
 

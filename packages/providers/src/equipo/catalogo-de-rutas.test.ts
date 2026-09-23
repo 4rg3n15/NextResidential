@@ -10,10 +10,36 @@ describe('catálogo de rutas', () => {
   it('NINGUNA ruta se queda sin procedencia ni sin fuente', () => {
     for (const r of RUTAS) {
       expect(r.procedencia, `${r.proposito}: sin procedencia`).toMatch(
-        /^(verificada|documentada)$/,
+        /^(verificada|guia_oficial|documentada)$/,
       );
       expect(r.fuente.length, `${r.proposito}: la fuente está vacía`).toBeGreaterThan(20);
     }
+  });
+
+  it('toda ruta respaldada por la GUÍA OFICIAL cita de qué trata su capítulo', () => {
+    /**
+     * El grado intermedio se añadió el 23/09/2026 porque «documentada» mezclaba
+     * dos cosas: lo que dice la guía del fabricante para esta familia y lo que
+     * se dedujo de la forma habitual de ISAPI. Tratarlas igual obliga a
+     * desconfiar de las dos por igual, y entonces la etiqueta no informa.
+     *
+     * El `capitulo` dice DE QUÉ TRATA y no un número: el destilado llegó como
+     * texto y poner «§4.2» sería inventar una precisión que nadie puede
+     * comprobar.
+     */
+    for (const r of rutasPor('guia_oficial')) {
+      expect(r.capitulo, `${r.proposito}: sin capítulo citado`).toBeTruthy();
+      expect(r.fuente, r.proposito).toMatch(/guía oficial/i);
+    }
+  });
+
+  it('la ruta de `ctrlMod` está en el catálogo: es la que decide quién manda', () => {
+    // Antes del 23/09/2026 no aparecía en una sola línea del árbol, y el
+    // principio rector del producto no lo comprobaba nadie.
+    const modo = RUTAS.find((r) => /quién controla la barrera/.test(r.proposito));
+    expect(modo).toBeDefined();
+    expect(modo?.procedencia).toBe('guia_oficial');
+    expect(modo?.confirmarEnSitio).toMatch(/valga 1/);
   });
 
   it('toda ruta DOCUMENTADA dice qué comprobar en sitio para ascenderla', () => {

@@ -15,8 +15,34 @@ import { errorDominio } from '../compartido/errores';
  * generación calculada en el servidor son dos implementaciones del mismo
  * patrón, y el día que discrepen el usuario aprueba una cosa y recibe otra.
  *
- * Es el mismo argumento por el que `Documento.normalizarNumero` es público: la
- * consulta y la escritura pasan por el mismo sitio o divergen.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * B.1 · LA PREGUNTA QUE FALTABA (ETAPA 15-B) — el plan se invirtió
+ *
+ * Hasta aquí había TRES planes —apartamentos, casas, fincas— y el de
+ * apartamentos, que es el que usa un edificio, **nunca preguntaba cuántas
+ * viviendas hay**. Preguntaba cuántas torres, cuántos pisos y cuántas por
+ * piso, y la cantidad salía de multiplicar. Quien administra un conjunto sabe
+ * que tiene 120 apartamentos; que salgan de 4 × 6 × 5 es una cuenta que tiene
+ * que hacer él para poder contestar. Y el denominador —torre, sector,
+ * manzana— era obligatorio incluso donde no existe.
+ *
+ * Queda invertido, y con un solo plan para todos los tipos:
+ *
+ *   · **El denominador es OPCIONAL.** `agrupaciones = 0` significa que el
+ *     conjunto no se divide: las viviendas son sólo número.
+ *   · **La cantidad es la pregunta principal.** Sin denominador es el TOTAL;
+ *     con denominador es la cantidad **por cada uno**, que es como se describe
+ *     un conjunto de verdad («cinco torres de veinticuatro»).
+ *   · **Los pisos pasan a ser una forma de NUMERAR, no de contar.** `porPiso`
+ *     produce 101, 102, 201… a partir de la cantidad; sin él la numeración es
+ *     correlativa. Un edificio de 24 apartamentos con 4 por piso tiene 6
+ *     pisos: eso lo deduce el plan, no el usuario.
+ *
+ * Lo que NO se reabre, porque ya estaba resuelto: la identidad de una vivienda
+ * es el par (agrupación, identificador) y la sostiene el índice único compuesto
+ * de la base (ADR-04, migración 0029) — la Torre 1 y la Torre 2 tienen las dos
+ * un 101—; y la creación ocurre en UNA sola sentencia que se revierte entera si
+ * el `RETURNING` devuelve menos filas de las pedidas.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * LO QUE ESTA FUNCIÓN NO DECIDE
@@ -34,43 +60,54 @@ import { errorDominio } from '../compartido/errores';
 export const COTAS = {
   /**
    * Tope por operación. §2.4 prohíbe iterar sobre entrada no acotada del
-   * usuario: sin esta cota, «9999 torres de 99 pisos» construye un arreglo de
-   * cien millones de cadenas antes de que nadie pueda rechazarlo.
+   * usuario: sin esta cota, «99 torres de 2000» construye un arreglo de
+   * doscientas mil cadenas antes de que nadie pueda rechazarlo.
    */
   viviendas: 2_000,
-  torresConLetras: 26,
-  torresConNumeros: 99,
-  pisos: 50,
+  agrupacionesConLetras: 26,
+  agrupacionesConNumeros: 99,
   porPiso: 99,
-  secciones: 99,
 } as const;
 
 export type EstiloDeAgrupacion = 'letras' | 'numeros';
 
-/** Una agrupación que no sigue los valores generales. Las urbanizaciones crecen así. */
+/**
+ * Una agrupación que no sigue la cantidad general. Las urbanizaciones crecen
+ * por etapas y casi ninguna es homogénea: la torre 4 tiene 18 y el resto 24.
+ */
 export interface ExcepcionDeAgrupacion {
   readonly agrupacion: string;
-  readonly pisos: number;
-  readonly porPiso: number;
+  readonly cantidad: number;
 }
 
-export type PlanDeGeneracion =
-  | {
-      readonly tipo: 'apartamentos';
-      readonly agrupaciones: number;
-      readonly estilo: EstiloDeAgrupacion;
-      readonly pisos: number;
-      readonly porPiso: number;
-      readonly excepciones?: readonly ExcepcionDeAgrupacion[];
-    }
-  | {
-      readonly tipo: 'casas';
-      /** `0` = sin agrupación: las viviendas son solo número. */
-      readonly secciones: number;
-      readonly total: number;
-      readonly reiniciarNumeracion: boolean;
-    }
-  | { readonly tipo: 'fincas'; readonly cantidad: number };
+export interface PlanDeGeneracion {
+  /**
+   * Cuántos denominadores hay. **`0` = ninguno**: el conjunto no se divide y
+   * las viviendas son sólo número. Es el caso de una parcelación y el de
+   * cualquier conjunto pequeño.
+   */
+  readonly agrupaciones: number;
+  /** Cómo se nombran los denominadores. Irrelevante con `agrupaciones = 0`. */
+  readonly estilo: EstiloDeAgrupacion;
+  /**
+   * **La pregunta principal.** Sin denominador, el total de viviendas. Con
+   * denominador, cuántas hay **en cada uno**.
+   */
+  readonly cantidad: number;
+  /**
+   * Numeración por piso: `piso × 100 + n`. Con 4 por piso y 24 viviendas salen
+   * 101…104, 201…204, hasta 601…604. Ausente o `0`, la numeración es
+   * correlativa (1, 2, 3…).
+   */
+  readonly porPiso?: number;
+  /** Agrupaciones con una cantidad distinta de la general. */
+  readonly excepciones?: readonly ExcepcionDeAgrupacion[];
+  /**
+   * Con numeración correlativa y varias agrupaciones: ¿la numeración vuelve a
+   * empezar en cada una, o sigue corrida? Sin agrupaciones no aplica.
+   */
+  readonly reiniciarNumeracion?: boolean;
+}
 
 export interface ViviendaProyectada {
   readonly agrupacion: string | null;
@@ -83,7 +120,7 @@ export interface GrupoProyectado {
   readonly cantidad: number;
   readonly primeras: readonly string[];
   readonly ultimas: readonly string[];
-  /** `true` si esa agrupación salió de una excepción y no del patrón general. */
+  /** `true` si esa agrupación salió de una excepción y no de la cantidad general. */
   readonly porExcepcion: boolean;
 }
 
@@ -117,141 +154,22 @@ export const nombreDeAgrupacion = (indice: number, estilo: EstiloDeAgrupacion): 
   estilo === 'letras' ? String.fromCharCode(65 + indice) : String(indice + 1);
 
 /**
- * `piso × 100 + n`. Con 3 por piso y 5 pisos: 101…503. Con 11 por piso:
- * 101…111. Con 10 pisos, el piso 10 da 1001…1011, que sigue siendo legible y
- * es lo que usan los edificios reales.
+ * Los identificadores de UNA agrupación, dado cuántas viviendas tiene.
+ *
+ * `desde` es el contador corrido: sólo lo usa la numeración correlativa que no
+ * reinicia. Se pasa como argumento en vez de guardarse en una variable de
+ * módulo porque esta función tiene que poder llamarse dos veces con el mismo
+ * resultado — es lo que hace comparable la vista previa con la confirmación.
  */
-const numeroDeApartamento = (piso: number, n: number): string => String(piso * 100 + n);
-
-const apartamentos = (
-  plan: Extract<PlanDeGeneracion, { tipo: 'apartamentos' }>,
-): Resultado<readonly ViviendaProyectada[], ErrorDominio> => {
-  const problema =
-    enteroEntre(
-      plan.agrupaciones,
-      1,
-      plan.estilo === 'letras' ? COTAS.torresConLetras : COTAS.torresConNumeros,
-      'el número de agrupaciones',
-    ) ??
-    enteroEntre(plan.pisos, 1, COTAS.pisos, 'el número de pisos') ??
-    enteroEntre(plan.porPiso, 1, COTAS.porPiso, 'el número de viviendas por piso');
-  if (problema !== null) return malo(problema);
-
-  const nombres = Array.from({ length: plan.agrupaciones }, (_, i) =>
-    nombreDeAgrupacion(i, plan.estilo),
-  );
-
-  // Las excepciones se validan ANTES de generar nada: una excepción sobre una
-  // agrupación que no existe es una errata del formulario, y silenciarla
-  // generaría el conjunto equivocado sin que nadie lo notase hasta contar.
-  const porAgrupacion = new Map<string, { pisos: number; porPiso: number }>(
-    nombres.map((n) => [n, { pisos: plan.pisos, porPiso: plan.porPiso }]),
-  );
-  const vistas = new Set<string>();
-  for (const e of plan.excepciones ?? []) {
-    const nombre = e.agrupacion.trim();
-    if (!porAgrupacion.has(nombre)) {
-      const primera = nombres[0] ?? '';
-      const ultima = nombres[nombres.length - 1] ?? '';
-      return malo(
-        `La agrupación «${nombre}» no existe: hay ${String(plan.agrupaciones)}, ` +
-          `de la ${primera} a la ${ultima}`,
-      );
-    }
-    if (vistas.has(nombre)) {
-      return malo(`La agrupación «${nombre}» aparece dos veces en las excepciones`);
-    }
-    vistas.add(nombre);
-    // «0 pisos» merece su propio mensaje: no es un número fuera de rango, es
-    // una agrupación que el usuario cree estar describiendo y en realidad está
-    // borrando.
-    if (e.pisos === 0 || e.porPiso === 0) {
-      return malo(
-        `Una agrupación con 0 pisos o 0 viviendas por piso no es una excepción: ` +
-          `es una agrupación que no existe. Revise «${nombre}»`,
-      );
-    }
-    const problemaExcepcion =
-      enteroEntre(e.pisos, 1, COTAS.pisos, `los pisos de la agrupación «${nombre}»`) ??
-      enteroEntre(e.porPiso, 1, COTAS.porPiso, `las viviendas por piso de «${nombre}»`);
-    if (problemaExcepcion !== null) return malo(problemaExcepcion);
-    porAgrupacion.set(nombre, { pisos: e.pisos, porPiso: e.porPiso });
+const identificadoresDe = (cantidad: number, porPiso: number, desde: number): string[] => {
+  if (porPiso > 0) {
+    return Array.from({ length: cantidad }, (_, i) => {
+      const piso = Math.floor(i / porPiso) + 1;
+      const n = (i % porPiso) + 1;
+      return String(piso * 100 + n);
+    });
   }
-
-  // El total se comprueba ANTES de construir el arreglo, no después: la cota
-  // existe para que nadie pueda pedirle al proceso que reserve cien millones de
-  // cadenas, y comprobarla sobre el resultado ya construido llegaría tarde.
-  const total = [...porAgrupacion.values()].reduce((s, v) => s + v.pisos * v.porPiso, 0);
-  if (total > COTAS.viviendas) return malo(excedido(total));
-
-  const proyectadas: ViviendaProyectada[] = [];
-  for (const nombre of nombres) {
-    const medidas = porAgrupacion.get(nombre);
-    if (medidas === undefined) continue;
-    for (let piso = 1; piso <= medidas.pisos; piso++) {
-      for (let n = 1; n <= medidas.porPiso; n++) {
-        proyectadas.push({ agrupacion: nombre, identificador: numeroDeApartamento(piso, n) });
-      }
-    }
-  }
-  return exito(proyectadas);
-};
-
-/**
- * Casas. Reparto **uniforme entre secciones, y el resto en la última**
- * (decisión del usuario, 2026-09-16): 62 casas en 3 secciones dan 20 · 20 · 22.
- * Todo es editable después, y la vista previa lo enseña antes de confirmar.
- */
-const casas = (
-  plan: Extract<PlanDeGeneracion, { tipo: 'casas' }>,
-): Resultado<readonly ViviendaProyectada[], ErrorDominio> => {
-  const problema =
-    enteroEntre(plan.secciones, 0, COTAS.secciones, 'el número de secciones') ??
-    enteroEntre(plan.total, 1, COTAS.viviendas, 'el número de casas');
-  if (problema !== null) return malo(problema);
-  if (plan.secciones > plan.total) {
-    return malo(
-      `No se pueden repartir ${String(plan.total)} casas entre ` +
-        `${String(plan.secciones)} secciones: alguna quedaría vacía`,
-    );
-  }
-
-  if (plan.secciones === 0) {
-    return exito(
-      Array.from({ length: plan.total }, (_, i) => ({
-        agrupacion: null,
-        identificador: String(i + 1),
-      })),
-    );
-  }
-
-  const porSeccion = Math.floor(plan.total / plan.secciones);
-  const proyectadas: ViviendaProyectada[] = [];
-  let siguiente = 1;
-  for (let s = 1; s <= plan.secciones; s++) {
-    // La última carga con el resto: 62 en 3 son 20, 20 y 22.
-    const cuantas =
-      s === plan.secciones ? plan.total - porSeccion * (plan.secciones - 1) : porSeccion;
-    for (let i = 0; i < cuantas; i++) {
-      const numero = plan.reiniciarNumeracion ? i + 1 : siguiente;
-      proyectadas.push({ agrupacion: String(s), identificador: String(numero) });
-      siguiente += 1;
-    }
-  }
-  return exito(proyectadas);
-};
-
-const fincas = (
-  plan: Extract<PlanDeGeneracion, { tipo: 'fincas' }>,
-): Resultado<readonly ViviendaProyectada[], ErrorDominio> => {
-  const problema = enteroEntre(plan.cantidad, 1, COTAS.viviendas, 'el número de fincas');
-  if (problema !== null) return malo(problema);
-  return exito(
-    Array.from({ length: plan.cantidad }, (_, i) => ({
-      agrupacion: null,
-      identificador: String(i + 1),
-    })),
-  );
+  return Array.from({ length: cantidad }, (_, i) => String(desde + i));
 };
 
 /** Clave de igualdad de una vivienda proyectada: el par, no el número solo. */
@@ -264,23 +182,91 @@ const claveDe = (v: ViviendaProyectada): string =>
 export const generarPlan = (
   plan: PlanDeGeneracion,
 ): Resultado<readonly ViviendaProyectada[], ErrorDominio> => {
-  const r =
-    plan.tipo === 'apartamentos'
-      ? apartamentos(plan)
-      : plan.tipo === 'casas'
-        ? casas(plan)
-        : fincas(plan);
-  if (!r.ok) return r;
-  if (r.valor.length > COTAS.viviendas) return malo(excedido(r.valor.length));
+  const maximoDeAgrupaciones =
+    plan.estilo === 'letras' ? COTAS.agrupacionesConLetras : COTAS.agrupacionesConNumeros;
+  const porPiso = plan.porPiso ?? 0;
+
+  const problema =
+    enteroEntre(plan.agrupaciones, 0, maximoDeAgrupaciones, 'el número de agrupaciones') ??
+    enteroEntre(plan.cantidad, 1, COTAS.viviendas, 'la cantidad de viviendas') ??
+    (porPiso === 0 ? null : enteroEntre(porPiso, 1, COTAS.porPiso, 'las viviendas por piso'));
+  if (problema !== null) return malo(problema);
+
+  const excepciones = plan.excepciones ?? [];
+  if (plan.agrupaciones === 0 && excepciones.length > 0) {
+    // Sin denominador no hay a qué hacerle una excepción, y aceptarla en
+    // silencio generaría el conjunto equivocado sin que nadie lo notase.
+    return malo(
+      'Hay excepciones pero el conjunto no se divide: sin agrupaciones no hay ' +
+        'nada a lo que hacer excepción',
+    );
+  }
+
+  const nombres =
+    plan.agrupaciones === 0
+      ? [null]
+      : Array.from({ length: plan.agrupaciones }, (_, i) => nombreDeAgrupacion(i, plan.estilo));
+
+  const porAgrupacion = new Map<string | null, number>(nombres.map((n) => [n, plan.cantidad]));
+  const vistas = new Set<string>();
+  for (const e of excepciones) {
+    const nombre = e.agrupacion.trim();
+    if (!porAgrupacion.has(nombre)) {
+      const primera = nombres[0] ?? '';
+      const ultima = nombres[nombres.length - 1] ?? '';
+      return malo(
+        `La agrupación «${nombre}» no existe: hay ${String(plan.agrupaciones)}, ` +
+          `de la ${String(primera)} a la ${String(ultima)}`,
+      );
+    }
+    if (vistas.has(nombre)) {
+      return malo(`La agrupación «${nombre}» aparece dos veces en las excepciones`);
+    }
+    vistas.add(nombre);
+    // «0 viviendas» merece su propio mensaje: no es un número fuera de rango,
+    // es una agrupación que el usuario cree estar describiendo y en realidad
+    // está borrando.
+    if (e.cantidad === 0) {
+      return malo(
+        `Una agrupación con 0 viviendas no es una excepción: es una agrupación ` +
+          `que no existe. Revise «${nombre}»`,
+      );
+    }
+    const problemaExcepcion = enteroEntre(
+      e.cantidad,
+      1,
+      COTAS.viviendas,
+      `la cantidad de la agrupación «${nombre}»`,
+    );
+    if (problemaExcepcion !== null) return malo(problemaExcepcion);
+    porAgrupacion.set(nombre, e.cantidad);
+  }
+
+  // El total se comprueba ANTES de construir el arreglo, no después: la cota
+  // existe para que nadie pueda pedirle al proceso que reserve doscientas mil
+  // cadenas, y comprobarla sobre el resultado ya construido llegaría tarde.
+  const total = [...porAgrupacion.values()].reduce((s, v) => s + v, 0);
+  if (total > COTAS.viviendas) return malo(excedido(total));
+
+  const reinicia = plan.agrupaciones === 0 || (plan.reiniciarNumeracion ?? false);
+  const proyectadas: ViviendaProyectada[] = [];
+  let siguiente = 1;
+  for (const nombre of nombres) {
+    const cuantas = porAgrupacion.get(nombre) ?? 0;
+    for (const identificador of identificadoresDe(cuantas, porPiso, reinicia ? 1 : siguiente)) {
+      proyectadas.push({ agrupacion: nombre, identificador });
+    }
+    siguiente += cuantas;
+  }
 
   /**
    * Duplicado del plan **contra sí mismo**. La base lo rechazaría igual, pero
-   * este es un error de formulario —dos secciones numeradas igual— y decirlo
-   * aquí lo separa del choque contra un padrón que ya existe, que es otra cosa
-   * y se resuelve de otra manera.
+   * este es un error de formulario —una numeración que reinicia donde no
+   * debía— y decirlo aquí lo separa del choque contra un padrón que ya existe,
+   * que es otra cosa y se resuelve de otra manera.
    */
   const claves = new Set<string>();
-  for (const v of r.valor) {
+  for (const v of proyectadas) {
     const clave = claveDe(v);
     if (claves.has(clave)) {
       return malo(
@@ -290,7 +276,7 @@ export const generarPlan = (
     }
     claves.add(clave);
   }
-  return exito(r.valor);
+  return exito(proyectadas);
 };
 
 /**

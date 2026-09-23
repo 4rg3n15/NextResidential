@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-22 · **ETAPA 15 CERRADA CONTRA SIMULADO** · los tres adaptadores de equipo están escritos y **ninguno se ejecutó contra hardware**: el entorno de desarrollo deniega por diseño todo destino de rango privado, así que la LAN de los equipos es inalcanzable. Una ruta VERIFICADA y **doce DOCUMENTADAS, NO VERIFICADAS**, cada una con qué comprobar en sitio. **Nueve indicadores siguen pendientes de medición.** La regla dura se cumplió: no hubo que tocar dominio ni aplicación, y ésa es la prueba de OE-03 · _(anterior: **ETAPA 14** · el CI produce los **seis** entregables —hasta ahora compilaba tres—, toda línea de registro lleva su correlación, las cinco latencias comprometidas se miden con su tramo declarado, y tres operaciones idempotentes que **no invocaba nadie** pasan a tener planificador: entre ellas el barrido que RN-11 obliga a ejecutar en 24 h. El que nadie esperaba: el icono «enmascarable» de la PWA era **byte a byte el mismo fichero** que el normal, y en Android el logo salía recortado)_
+**Última actualización:** 2026-09-23 · **RONDA `consola-superadmin-equipos` CERRADA** · la guía oficial ANPR destapó lo que había que corregir en código ya fusionado: **`ctrlMod` decide quién abre la barrera**, la lectura de `barrierGateCtrlType` estaba invertida, y el evento trae **las caras del conductor y del acompañante** — dato biométrico por una puerta que nadie abrió (`H-15B-2`, Alta, cerrado). Se abre además el **alta de equipos desde la consola**, con la clave cifrada y un «probar conexión» que distingue cuatro situaciones en vez de una, al precio de un riesgo declarado (`H-15B-1`, Alta, mitigado y pendiente de firma). Seis correcciones de consola, entre ellas la que el usuario nombró primero: el asistente de alta **nunca preguntaba cuántas viviendas hay** · _(anterior: **ETAPA 15** · los tres adaptadores de equipo escritos y ninguno ejecutado contra hardware; el entorno deniega por diseño todo destino de rango privado. La regla dura se cumplió: no hubo que tocar dominio ni aplicación, y ésa es la prueba de OE-03)_
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -20,13 +20,13 @@
 
 |                                |                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **16 de 17** (ETAPAS 00 a 15) · la 15 cerrada el 2026-09-22, **contra simulado y no contra hardware**                                                                                                                                                                                                                                                                                 |
+| **Etapas cerradas**            | **16 de 17** (ETAPAS 00 a 15) · la 15 cerrada el 2026-09-22, **contra simulado y no contra hardware** · más la ronda `consola-superadmin-equipos` (2026-09-23), que no es etapa: corrige la 15 y abre el alta de equipos                                                                                                                                                              |
 | **Etapa siguiente habilitada** | **ETAPA 16 — Documentación técnica final y README**, ejecutable ya según §6. La **mitad física de la anterior queda abierta**: doce rutas por confirmar, nueve indicadores por medir y los tres hitos técnicos del reto sin ejecutar con equipo real                                                                                                                                  |
 | **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                                                                                                                                                                                                                       |
 | **Defectos abiertos**          | **D-101** (roja intermitente de `@ncr/api`: **46 corridas, 2 apariciones**; la segunda, en la 15, **con nombre**: `xss.e2e.test.ts`. NO cerrada) y **D-29** (canal de tiempo real por proceso, declarado en la guía de despliegue) · **D-78 y D-34 CERRADAS en la 14** —y D-34 resultó ser una colisión de identificador— · más **H-13-25**, abierto a propósito a la espera de firma |
 | **Contradicciones abiertas**   | Ninguna (**15** registradas, 15 resueltas)                                                                                                                                                                                                                                                                                                                                            |
-| **Decisiones pendientes**      | 9 abiertas — nueva P-14 (`secret scanning` y `push protection` de GitHub) · más **4 aceptaciones de riesgo redactadas y sin firmar** (AR-01 a AR-04)                                                                                                                                                                                                                                  |
-| **Supuestos vigentes**         | 21 — nuevos S-29 (las doce rutas documentadas corresponden a la forma ISAPI habitual de cada familia) y S-30 (el recorte de placa es siempre la menor de las dos imágenes del sobre)                                                                                                                                                                                                  |
+| **Decisiones pendientes**      | 8 abiertas — **P-02 RESUELTA** (umbral de confianza: 80 en la escala 0–100 del evento ANPR) y **P-06 SUSTITUIDA** (el margen de latido deja de ser configurable) en la ronda 15-B · más **5 aceptaciones de riesgo redactadas y sin firmar** (AR-01 a AR-04 y el riesgo residual de `H-15B-1`)                                                                                        |
+| **Supuestos vigentes**         | 22 — nuevo S-31 (un equipo pide **un** campo específico según su tipo: un modelo con dos barreras y dos relés a la vez necesitaría más de uno) · S-29 y S-30 siguen vigentes                                                                                                                                                                                                          |
 | **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                                                                                                                                                                                                                 |
 
 ---
@@ -759,6 +759,134 @@ autorizó expresamente adelantar parte del punto 4 de la ETAPA 16:
 sin ella y lo dice en su primera línea: enumera las **cuatro** secciones exactas
 que habrá que escribir cuando Grupo Control decida, y nada más de la guía depende
 de esa decisión.
+
+---
+
+## Ronda `consola-superadmin-equipos` — después de la 15 · **CERRADA** · 2026-09-23
+
+**Rama:** `consola-superadmin-equipos` · **Base:** `develop` (`f64b1d8`)
+**No es una etapa del mapa de §5:** no añade una etapa nueva. Corrige código ya
+fusionado a la luz de la documentación oficial del fabricante y construye el
+aprovisionamiento de equipos que la 15 dejó fuera.
+**Informe:** [`etapas/ETAPA-15-B-consola-y-equipos.md`](etapas/ETAPA-15-B-consola-y-equipos.md)
+
+| Frente | Qué cierra                                                                                                                                                                                             | Resultado   |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| **C**  | Lo que la guía ANPR obliga a corregir en código ya fusionado: `ctrlMod`, lectura invertida de la barrera, evento histórico, fotos de personas, idempotencia impuesta por el protocolo, mapa de errores | **Cerrado** |
+| **A**  | Alta de equipos desde la consola con el secreto cifrado, «probar conexión» en el servidor con **cuatro** resultados distintos, pantalla y aviso en pantalla                                            | **Cerrado** |
+| **B**  | Seis correcciones de consola: cantidad de viviendas, borrado definitivo y reactivación, nombre en «dirección», validación de dirección, dos ajustes que dejan de serlo, foto conectada                 | **Cerrado** |
+| **D**  | Dos defectos del verificador: el clúster reutilizado sin comprobar y la roja que no se nombraba                                                                                                        | **Cerrado** |
+
+### Lo que la documentación del fabricante destapó
+
+**`ctrlMod` decide quién abre la barrera.** Con `0` la abre la cámara; con `1`,
+la plataforma; con `2`, las dos. El principio rector del producto —«Next Control
+decide, el hardware ejecuta»— **depende de un valor de configuración del
+equipo**, y el proyecto no lo comprobaba. Ahora es una comprobación de arranque
+del proveedor y parte del alta de un equipo: con `0` o `2`, el sistema se niega
+a darlo por bueno y dice por qué.
+
+**La lectura de `barrierGateCtrlType` estaba invertida.** `0` es control de
+barrera **habilitado**, y lo demuestra `openGateType`, que sólo existe cuando
+vale `0`. Ese campo es además evidencia de auditoría: dice si abrió la lista de
+la cámara, la plataforma o una excepción, y ahora se normaliza y se registra
+siempre.
+
+**El evento puede ser histórico.** `alarmDataType = 1` significa que el equipo
+está reenviando algo pasado. Tratarlo como presente habría abierto una barrera
+por un coche que pasó ayer. Se aplica el mismo criterio que el videoportero ya
+aplicaba a su flujo de alertas.
+
+### H-15B-2 · dato biométrico por la puerta de atrás
+
+El POST del «servidor de alarma» trae diez partes, y dos son `pilotPicture` y
+`copilotPicture`: **las caras del conductor y del acompañante**. El proyecto
+tiene un ciclo de vida biométrico completo bajo la Ley 1581 —consentimiento
+previo, expreso e informado del titular, finalidad, supresión— y ninguna de esas
+garantías se aplicaría a una foto que llega sola dentro de un evento de placa.
+El visitante vino a que le leyeran la placa.
+
+El receptor las **aparta antes de clasificar el sobre** y las rechaza con el
+motivo en la bitácora. Severidad **Alta**, cerrado. Detalle en
+`seguridad/AUDITORIA.md`.
+
+### H-15B-1 · el precio de guardar credenciales en la base
+
+Abrir el alta de equipos significa que la clave de cada cámara vive en la base.
+**Comprometer la base pasa a comprometer los equipos**, y eso se dice sin
+adorno. Se toma igualmente porque la alternativa —una variable de entorno por
+equipo— no escala a multiempresa, y se paga con mitigaciones explícitas: cifrado
+en la aplicación con llave derivada por copropiedad, llave distinta de la
+biométrica, ninguna política de lectura para tokens de usuario, y un DTO de
+respuesta que **no declara el campo**.
+
+Severidad **Alta**, **mitigado con riesgo residual declarado** y procedimiento
+de rotación escrito. Pendiente de firma.
+
+### Lo que el usuario encontró usando la consola
+
+| Frente | Defecto                                                                                                                 |
+| ------ | ----------------------------------------------------------------------------------------------------------------------- |
+| B.1    | El asistente de alta preguntaba torres, pisos y viviendas por piso, y **nunca cuántas viviendas hay**                   |
+| B.2    | Una vivienda creada por error no se podía borrar: el disparador prohibía **todo** borrado, no sólo el que RN-19 prohíbe |
+| B.3    | El diálogo inicial no pedía el nombre de la copropiedad, así que acababa escrito en «dirección»                         |
+| B.4    | La dirección admitía cinco caracteres cualesquiera                                                                      |
+| B.5    | Dos números que no son del conjunto se ofrecían como ajustes de pantalla                                                |
+| B.6    | La captura de rostro existía y funcionaba, pero no había camino desde la autorización                                   |
+
+### Defectos del verificador, cerrados
+
+- **D.1** · `base-de-pruebas.sh` reutilizaba un clúster vivo **sin comprobar
+  nada**. Con `max_connections=100`, las pruebas de KPI-03 y de aforo morían con
+  «sorry, too many clients already» de forma intermitente. Ahora consulta el
+  valor y reinicia si no sirve.
+- **D.2 (D-113, un escalón más abajo)** · el paso de estabilidad **raspaba la
+  consola** para nombrar la prueba roja, y el formato de la consola depende del
+  reportero, que depende de `CI`. Ahora lee el informe JSON, que los seis
+  paquetes emiten siempre desde un solo sitio.
+
+### Lo que el verificador destapó al cerrar la ronda
+
+Cinco defectos que nadie había previsto, y todos de la familia que este
+proyecto persigue: **código nuevo que nadie había visto ejercitarse**. Los dos
+últimos los encontró el CI, no la máquina de desarrollo, que es justo para lo
+que existen las dos plataformas.
+
+1. **`generacion-padron.test.ts` usaba la forma antigua del plan.** Sólo corre
+   con base, así que la suite sin `--con-base` lo daba por bueno. Es el
+   argumento de `--con-base` en una línea.
+2. **El control de coherencia leía como «en curso» una rama que la cabecera
+   declara CERRADA.** Recogía cualquier nombre entre acentos graves de una
+   línea que mencionara «en curso», y en este documento una misma línea nombra
+   a menudo dos ramas. Ahora exige la frase con la que el documento lo escribe
+   de verdad.
+3. **El recorrido del navegador no arrancaba: `EQUIPOS_LLAVE: Required`.** Es
+   §2.7.1 funcionando —una variable obligatoria que falta impide el arranque—,
+   y el único paso capaz de verlo es el único que ejecuta el proceso compilado
+   en vez de montar la aplicación en memoria.
+4. **El cliente Dart se quedó atrás.** El contrato ganó los DTO de equipos y
+   cambió la forma del plan de viviendas; §2.6 exige que ese cliente sea
+   **generado**, así que se regeneró con el SDK fijado en `.flutter-version`
+   (207 ficheros) y se retiraron a mano los dos `*_tipo.dart` que el contrato
+   ya no produce —`swagger_parser` no borra lo que deja de generar—. Lo
+   confirma de paso: `EquipoDto`, el tipo de LECTURA, **no tiene el campo
+   `secreto`**.
+5. **D-115 · un `pg_ctl` no es un servidor.** La fórmula `libpq` de Homebrew
+   —la que trae el runner de macOS— instala `psql`, `pg_ctl` e `initdb` y **no**
+   el servidor. `base-de-pruebas.sh` elegía ese directorio porque encontraba
+   `pg_ctl`, y reventaba a mitad de `initdb`, donde ya no se distingue de un
+   control roto. Ahora exige los tres binarios, lo dice con esas palabras,
+   admite `NCR_PGBIN` —validado igual— y tiene prueba negativa que reproduce el
+   escenario en cualquier máquina.
+
+### Lo que NO se pudo hacer, dicho con esas palabras
+
+`docs/hikdocs/` —el destilado de la guía ANPR— vive en la máquina del usuario y
+está en `.gitignore`, correctamente: es documentación propiedad del fabricante.
+**No llegó a este entorno**, así que C.10 pedía citar el capítulo de cada ruta y
+el capítulo no se pudo citar por número. El catálogo lleva un campo `capitulo`
+relleno con **el tema** —«identidad del equipo», «control de la barrera»— y la
+sustitución por la referencia exacta queda como deuda mecánica.
 
 ---
 
@@ -1559,10 +1687,10 @@ Vivió cinco etapas invisible porque las dos tablas estaban vacías: **una restr
 
 ### P-06 y P-07, resueltas
 
-| ID   | Decisión                      | Resolución del usuario (2026-09-07)                                                                                                                                                               |
-| ---- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P-06 | Umbral de latido              | Conservador y **configurable por copropiedad** (migración 0020): latido cada 60 s, 1 latido tolerado, caído a los 300 s. Tres estados —`saludable`, `degradado`, `caido`— y solo el último alerta |
-| P-07 | Definición de «acceso dudoso» | **Escalar en vez de decidir.** No es un motivo concreto: es toda decisión que el motor no pudo cerrar con certeza (4 casos enumerados en `politica-alertas.ts`), y su consecuencia es un humano   |
+| ID   | Decisión                      | Resolución del usuario (2026-09-07)                                                                                                                                                                                                                                                           |
+| ---- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P-06 | Umbral de latido              | Conservador y **configurable por copropiedad** (migración 0020): latido cada 60 s, 1 latido tolerado, caído a los 300 s. Tres estados —`saludable`, `degradado`, `caido`— y solo el último alerta · **SUSTITUIDA en la 15-B**: deja de ser configurable (ver §P-06 en la tabla de decisiones) |
+| P-07 | Definición de «acceso dudoso» | **Escalar en vez de decidir.** No es un motivo concreto: es toda decisión que el motor no pudo cerrar con certeza (4 casos enumerados en `politica-alertas.ts`), y su consecuencia es un humano                                                                                               |
 
 ### KPI-25 medido bajo carga, no supuesto
 
@@ -1670,24 +1798,24 @@ Sin trabajo iniciado. Cada etapa se habilita cuando la anterior queda cerrada.
 
 Detalle completo en [`auditoria/contradicciones-y-supuestos.md`](auditoria/contradicciones-y-supuestos.md) §3.
 
-| ID    | Decisión                                                             | Bloquea a partir de              | Estado                                                                                                                                                                                                   |
-| ----- | -------------------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P-01  | Firma de documentos de cesión, confidencialidad y seguridad          | _(condición contractual previa)_ | Abierta                                                                                                                                                                                                  |
-| P-02  | Umbral de confianza de lectura de placa                              | ETAPA 15                         | Abierta — supuesto vigente: 0,85                                                                                                                                                                         |
-| P-03  | Plazo de respuesta al consentimiento                                 | ETAPA 08                         | Abierta — supuesto vigente: 24 h                                                                                                                                                                         |
-| P-04  | Política de reinicio del contador de aforo                           | ETAPA 07                         | **RESUELTA** (ETAPA 07) — tres políticas por zona; `cierre_horario` por defecto                                                                                                                          |
-| P-05  | Margen de vigencia del caché de reglas                               | ETAPA 12                         | Abierta — supuesto vigente: 24 h                                                                                                                                                                         |
-| P-06  | Umbral de latido de dispositivo                                      | ETAPA 06                         | **RESUELTA** (ETAPA 06) — 60 s / 1 tolerado / 300 s, por copropiedad                                                                                                                                     |
-| P-07  | Definición de «acceso dudoso»                                        | ETAPA 06                         | **RESUELTA** (ETAPA 06) — ante la duda, escalar a un humano                                                                                                                                              |
-| P-08  | Plataforma de despliegue de la API                                   | ETAPA 14                         | Abierta                                                                                                                                                                                                  |
-| P-09  | ¿Compuerta de aprobación administrativa?                             | ETAPA 05                         | Abierta — no se construye                                                                                                                                                                                |
-| P-10  | ¿Reservas de zonas sin cobro?                                        | ETAPA 07                         | Abierta — no se construyen                                                                                                                                                                               |
-| P-11  | «Nivel de acceso» por residente                                      | ETAPA 04                         | Abierta — valor por defecto restrictivo                                                                                                                                                                  |
-| P-14  | `secret scanning` y `push protection` de GitHub                      | _(ajuste del servidor)_          | **Abierta (ETAPA 13)** — con ellos activos, H-13-17 tendría además una barrera antes de que el objeto llegue al remoto. Desde el árbol no se ve; se comprueba en _Settings → Code security and analysis_ |
-| AR-01 | Aceptar la contraseña inerte del historial sin reescribirlo          | _(decisión del cliente)_         | **Redactada, sin firmar** (ETAPA 13) — `seguridad/AUDITORIA.md` §7                                                                                                                                       |
-| AR-02 | Aceptar las 12 vulnerabilidades moderadas y bajas restantes          | _(decisión del cliente)_         | **Redactada, sin firmar** (ETAPA 13) — sin versión corregida publicada                                                                                                                                   |
-| AR-03 | Aceptar D-09 y D-12 demostrados en el clúster que reproduce Supabase | ETAPA 15                         | **Redactada, sin firmar** (ETAPA 13) — se cierra con credenciales del proyecto real                                                                                                                      |
-| AR-04 | Aceptar el ciclo de recuperación como NO VERIFICABLE                 | _(bloqueo de entorno)_           | **Redactada, sin firmar** (ETAPA 13) — se reabre en cuanto haya permisos en el panel                                                                                                                     |
+| ID    | Decisión                                                             | Bloquea a partir de              | Estado                                                                                                                                                                                                                                                                                                                                                                            |
+| ----- | -------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P-01  | Firma de documentos de cesión, confidencialidad y seguridad          | _(condición contractual previa)_ | Abierta                                                                                                                                                                                                                                                                                                                                                                           |
+| P-02  | Umbral de confianza de lectura de placa                              | ETAPA 15                         | **RESUELTA** (15-B) — 80 en la escala **0–100 de `confidenceLevel`** del evento ANPR, no en centésimas inventadas. Deja de ser ajuste de pantalla y pasa a constante documentada, fijada por restricción (migración 0032)                                                                                                                                                         |
+| P-03  | Plazo de respuesta al consentimiento                                 | ETAPA 08                         | Abierta — supuesto vigente: 24 h                                                                                                                                                                                                                                                                                                                                                  |
+| P-04  | Política de reinicio del contador de aforo                           | ETAPA 07                         | **RESUELTA** (ETAPA 07) — tres políticas por zona; `cierre_horario` por defecto                                                                                                                                                                                                                                                                                                   |
+| P-05  | Margen de vigencia del caché de reglas                               | ETAPA 12                         | Abierta — supuesto vigente: 24 h                                                                                                                                                                                                                                                                                                                                                  |
+| P-06  | Umbral de latido de dispositivo                                      | ETAPA 06                         | **SUSTITUIDA** (15-B) — la resolución de la ETAPA 06 lo dejaba **configurable por copropiedad**; ya no lo es. La base lo ata al periodo de latido y a los latidos tolerados (0020), y dejarlo editable permitía contradecir esa restricción desde una pantalla. Constante documentada: 5 minutos. **Quien cambió la decisión: el usuario, en el encargo de la 15-B (frente B.5)** |
+| P-07  | Definición de «acceso dudoso»                                        | ETAPA 06                         | **RESUELTA** (ETAPA 06) — ante la duda, escalar a un humano                                                                                                                                                                                                                                                                                                                       |
+| P-08  | Plataforma de despliegue de la API                                   | ETAPA 14                         | Abierta                                                                                                                                                                                                                                                                                                                                                                           |
+| P-09  | ¿Compuerta de aprobación administrativa?                             | ETAPA 05                         | Abierta — no se construye                                                                                                                                                                                                                                                                                                                                                         |
+| P-10  | ¿Reservas de zonas sin cobro?                                        | ETAPA 07                         | Abierta — no se construyen                                                                                                                                                                                                                                                                                                                                                        |
+| P-11  | «Nivel de acceso» por residente                                      | ETAPA 04                         | Abierta — valor por defecto restrictivo                                                                                                                                                                                                                                                                                                                                           |
+| P-14  | `secret scanning` y `push protection` de GitHub                      | _(ajuste del servidor)_          | **Abierta (ETAPA 13)** — con ellos activos, H-13-17 tendría además una barrera antes de que el objeto llegue al remoto. Desde el árbol no se ve; se comprueba en _Settings → Code security and analysis_                                                                                                                                                                          |
+| AR-01 | Aceptar la contraseña inerte del historial sin reescribirlo          | _(decisión del cliente)_         | **Redactada, sin firmar** (ETAPA 13) — `seguridad/AUDITORIA.md` §7                                                                                                                                                                                                                                                                                                                |
+| AR-02 | Aceptar las 12 vulnerabilidades moderadas y bajas restantes          | _(decisión del cliente)_         | **Redactada, sin firmar** (ETAPA 13) — sin versión corregida publicada                                                                                                                                                                                                                                                                                                            |
+| AR-03 | Aceptar D-09 y D-12 demostrados en el clúster que reproduce Supabase | ETAPA 15                         | **Redactada, sin firmar** (ETAPA 13) — se cierra con credenciales del proyecto real                                                                                                                                                                                                                                                                                               |
+| AR-04 | Aceptar el ciclo de recuperación como NO VERIFICABLE                 | _(bloqueo de entorno)_           | **Redactada, sin firmar** (ETAPA 13) — se reabre en cuanto haya permisos en el panel                                                                                                                                                                                                                                                                                              |
 
 ---
 

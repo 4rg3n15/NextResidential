@@ -5,19 +5,19 @@
 import 'package:json_annotation/json_annotation.dart';
 
 @JsonEnum()
-enum ConfirmarGeneracionDtoTipo {
-  @JsonValue('apartamentos')
-  apartamentos('apartamentos'),
-  @JsonValue('casas')
-  casas('casas'),
-  @JsonValue('fincas')
-  fincas('fincas'),
+enum EquipoDtoVerificacion {
+  @JsonValue('no_verificado')
+  noVerificado('no_verificado'),
+  @JsonValue('verificado')
+  verificado('verificado'),
+  @JsonValue('rechazado')
+  rechazado('rechazado'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 
-  const ConfirmarGeneracionDtoTipo(this.json);
+  const EquipoDtoVerificacion(this.json);
 
-  factory ConfirmarGeneracionDtoTipo.fromJson(String json) => values.firstWhere(
+  factory EquipoDtoVerificacion.fromJson(String json) => values.firstWhere(
         (e) => e.json == json,
         orElse: () => $unknown,
       );
@@ -35,5 +35,5 @@ enum ConfirmarGeneracionDtoTipo {
   @override
   String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
-  static List<ConfirmarGeneracionDtoTipo> get $valuesDefined => values.where((value) => value != $unknown).toList();
+  static List<EquipoDtoVerificacion> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }

@@ -11,6 +11,7 @@ import type {
   VehiculoEnLista,
   ViviendaEnLista,
 } from './puertos';
+import { totalDeHistorial } from './puertos';
 import type { LectorDeVocabulario } from './vocabulario';
 import { VOCABULARIO_SIN_CONFIGURAR } from './vocabulario';
 
@@ -126,6 +127,96 @@ export class DesactivarVivienda {
     return hecho
       ? exito(undefined)
       : fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'Vivienda activa no encontrada'));
+  }
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * B.2 · BORRADO DEFINITIVO Y REACTIVACIÓN — el choque real con RN-19
+ *
+ * RN-19, CA-02 y KPI-04 prohíben el borrado físico **donde hay historial**. La
+ * baja lógica cubre el caso normal: una vivienda que existió y ya no se usa
+ * conserva sus eventos, que son la trazabilidad de accesos que RN-03 declara
+ * inmutable.
+ *
+ * Lo que no cubría es el caso que el usuario encontró: **«la creé por error
+ * hace un minuto»**. Una vivienda sin un solo residente, vehículo,
+ * autorización ni evento no tiene historial que proteger, y obligar a
+ * arrastrarla desactivada para siempre convierte una regla de trazabilidad en
+ * un estorbo — y enseña a desconfiar de la regla.
+ *
+ * La comprobación vive en el SERVIDOR, y en dos capas: este caso de uso
+ * cuenta el historial para poder DECIR qué lo impide y cuántos registros hay,
+ * y el disparador de la base lo impide de verdad, también frente al dueño de
+ * la tabla (migración 0032). Si sólo estuviera aquí, bastaría un `curl`.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export class BorrarViviendaDefinitivamente {
+  constructor(private readonly repo: RepositorioPadron) {}
+  async ejecutar(
+    ctx: ContextoTenant,
+    viviendaId: string,
+  ): Promise<Resultado<{ identificador: string }, ErrorDominio>> {
+    if (!ctx.copropiedadId) return fallo(sinCopropiedad());
+
+    const historial = await this.repo.historialDeVivienda(ctx.copropiedadId, viviendaId);
+    if (historial === null) {
+      return fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'Vivienda no encontrada'));
+    }
+
+    const total = totalDeHistorial(historial);
+    if (total > 0) {
+      // El mensaje NOMBRA lo que lo impide y CUÁNTO hay. «No se puede borrar»
+      // manda a adivinar; esto manda a dar de baja los tres residentes que
+      // quedan, que es lo que toca hacer.
+      const partes = [
+        historial.residentes > 0 ? `${String(historial.residentes)} residente(s)` : null,
+        historial.vehiculos > 0 ? `${String(historial.vehiculos)} vehículo(s)` : null,
+        historial.autorizaciones > 0
+          ? `${String(historial.autorizaciones)} autorización(es)`
+          : null,
+        historial.eventos > 0 ? `${String(historial.eventos)} evento(s)` : null,
+      ].filter((x): x is string => x !== null);
+      return fallo(
+        errorDominio(
+          'OPERACION_NO_PERMITIDA',
+          `La vivienda ${historial.identificador} tiene historial y no puede borrarse: ` +
+            `${partes.join(', ')}. Dele de baja en vez de borrarla (RN-19)`,
+          'RN-19',
+        ),
+      );
+    }
+
+    const r = await this.repo.borrarViviendaDefinitivamente(
+      ctx.copropiedadId,
+      viviendaId,
+      ctx.usuarioId,
+    );
+    return r.borrada
+      ? exito({ identificador: historial.identificador })
+      : fallo(
+          errorDominio(
+            'OPERACION_NO_PERMITIDA',
+            r.motivo ?? 'La base de datos rechazó el borrado',
+            'RN-19',
+          ),
+        );
+  }
+}
+
+export class ReactivarVivienda {
+  constructor(private readonly repo: RepositorioPadron) {}
+  async ejecutar(ctx: ContextoTenant, viviendaId: string): Promise<Resultado<void, ErrorDominio>> {
+    if (!ctx.copropiedadId) return fallo(sinCopropiedad());
+    const hecho = await this.repo.reactivarVivienda(ctx.copropiedadId, viviendaId, ctx.usuarioId);
+    return hecho
+      ? exito(undefined)
+      : fallo(
+          errorDominio(
+            'ENTIDAD_NO_ENCONTRADA',
+            'No hay una vivienda inactiva con ese identificador en esta copropiedad',
+          ),
+        );
   }
 }
 

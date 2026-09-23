@@ -33,7 +33,8 @@ const ORIGEN_DEL_BANCO = '127.0.0.1,::1';
 const XML =
   '<?xml version="1.0" encoding="UTF-8"?><EventNotificationAlert>' +
   '<eventType>ANPR</eventType><licensePlate>XYZ789</licensePlate>' +
-  '<confidenceLevel>88</confidenceLevel><eventId>ev-e2e-1</eventId></EventNotificationAlert>';
+  '<confidenceLevel>88</confidenceLevel><eventId>ev-e2e-1</eventId>' +
+  '<alarmDataType>0</alarmDataType></EventNotificationAlert>';
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x9a, 0xfe, 0xff, 0xd9]);
 
@@ -80,9 +81,45 @@ describe('receptor del servidor de alarma', () => {
     expect(JSON.stringify(respuesta.body)).not.toMatch(/secreto|origen|equipo/i);
   });
 
-  it('con el secreto correcto y desde el origen declarado: 202', async () => {
-    const respuesta = await publicar(SECRETO).expect(202);
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * 200 SIEMPRE, Y `Connection: close` · REQUISITO DEL PROTOCOLO
+   *
+   * Guía del fabricante: «si el integrador no responde, el dispositivo
+   * considerará la notificación perdida y la subirá otra vez». Este extremo
+   * devolvía 202 y, ante un sobre roto, 400 — que para el equipo significa «no
+   * te he recibido» y produce una cámara martilleando con el mismo envío malo.
+   */
+  it('con el secreto correcto y desde el origen declarado: 200 y Connection close', async () => {
+    const respuesta = await publicar(SECRETO).expect(200);
     expect(respuesta.body).toMatchObject({ aceptado: true });
+    expect(respuesta.headers['connection']).toBe('close');
+  });
+
+  it('un cuerpo ilegible también es 200: un error lo haría reenviar en bucle', async () => {
+    const respuesta = await publicar(SECRETO, Buffer.from('<EventNotificationAlert/>')).expect(200);
+    expect(respuesta.body).toMatchObject({ aceptado: true, ignorado: true });
+  });
+
+  it('el volcado HISTÓRICO del equipo se acepta y NO se procesa', async () => {
+    const historico = sobreDeLectura({ placa: 'HIS123', alarmDataType: '1' });
+    const respuesta = await request(app.getHttpServer())
+      .post(`/alarm-server/${SECRETO}`)
+      .set('content-type', historico.tipoDeContenido)
+      .send(historico.cuerpo)
+      .expect(200);
+    expect(respuesta.body.motivo).toMatch(/histórico/);
+  });
+
+  it('H-16-1 · un sobre con RECORTES DE ROSTRO se acepta y los descarta', async () => {
+    // Un equipo mal configurado enviando biometría sin consentimiento no puede
+    // tumbar el acceso, pero tampoco puede colar el rostro.
+    const conRostros = sobreDeLectura({ placa: 'ROS123' }, { conRostros: true });
+    await request(app.getHttpServer())
+      .post(`/alarm-server/${SECRETO}`)
+      .set('content-type', conRostros.tipoDeContenido)
+      .send(conRostros.cuerpo)
+      .expect(200);
   });
 
   it('acepta el secreto por `Basic`, que es la forma que no queda en los registros', async () => {
@@ -91,16 +128,14 @@ describe('receptor del servidor de alarma', () => {
       .set('content-type', 'multipart/form-data; boundary=LIMITE')
       .set('authorization', `Basic ${Buffer.from(`equipo:${SECRETO}`).toString('base64')}`)
       .send(sobre())
-      .expect(202);
-  });
-
-  it('un cuerpo que no es un sobre: 400, y no se inventa un evento', async () => {
-    await publicar(SECRETO, Buffer.from('<EventNotificationAlert/>')).expect(400);
+      .expect(200);
   });
 
   it('un evento que no es una lectura de placa se acepta y se ignora', async () => {
-    const otro = '<EventNotificationAlert><eventType>IO</eventType></EventNotificationAlert>';
-    const respuesta = await publicar(SECRETO, sobre(otro)).expect(202);
+    const otro =
+      '<EventNotificationAlert><eventType>IO</eventType>' +
+      '<alarmDataType>0</alarmDataType></EventNotificationAlert>';
+    const respuesta = await publicar(SECRETO, sobre(otro)).expect(200);
     expect(respuesta.body.ignorado).toBe(true);
   });
 
@@ -121,7 +156,7 @@ describe('receptor del servidor de alarma', () => {
       .post(`/alarm-server/${SECRETO}`)
       .set('content-type', sobreReal.tipoDeContenido)
       .send(sobreReal.cuerpo)
-      .expect(202);
+      .expect(200);
     expect(respuesta.body).toMatchObject({ aceptado: true });
     expect(respuesta.body.ignorado).toBeUndefined();
   });
@@ -137,8 +172,8 @@ describe('receptor del servidor de alarma', () => {
         .set('content-type', repetido.tipoDeContenido)
         .send(repetido.cuerpo);
 
-    await enviar().expect(202);
-    await enviar().expect(202);
+    await enviar().expect(200);
+    await enviar().expect(200);
   });
 
   it('la cámara que sólo manda la escena tampoco rompe', async () => {
@@ -149,7 +184,7 @@ describe('receptor del servidor de alarma', () => {
       .post(`/alarm-server/${SECRETO}`)
       .set('content-type', sinRecorte.tipoDeContenido)
       .send(sinRecorte.cuerpo)
-      .expect(202);
+      .expect(200);
   });
 });
 

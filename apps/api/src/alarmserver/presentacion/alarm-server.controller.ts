@@ -1,5 +1,4 @@
-import { Controller, HttpCode, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { BadRequestException } from '@nestjs/common';
+import { Controller, Header, HttpCode, Inject, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
@@ -59,6 +58,32 @@ import type { PeticionDeEquipo } from '../../comun/sobre-de-equipo';
  */
 export const ACCIONADOR_DEL_RECEPTOR = Symbol.for('ncr.alarmserver.Accionador');
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * LA IDEMPOTENCIA AQUÍ LA IMPONE EL PROTOCOLO, NO NOSOTROS
+ *
+ * Texto de la guía del fabricante: «si el integrador no responde, el
+ * dispositivo considerará la notificación perdida y la subirá otra vez». No es
+ * una decisión de diseño que podamos revisar: **el equipo va a reenviar**, y la
+ * única pregunta es si eso produce dos accesos o uno.
+ *
+ * De ahí las dos consecuencias que gobiernan este controlador:
+ *
+ * 1 · **Se responde SIEMPRE `200 OK`**, incluso a un sobre ilegible. Un `400`
+ *     no le dice al equipo «esto está mal»: le dice «no te he recibido», y lo
+ *     reenvía en bucle. El receptor devolvía `400` ante un sobre roto y eso
+ *     habría producido una cámara martilleando indefinidamente con el mismo
+ *     envío malo. Lo que se rechaza se rechaza en el registro, no en el código
+ *     de estado.
+ * 2 · **`Connection: close`**, que es lo que la guía pide: el equipo abre una
+ *     conexión por notificación y no reutiliza la anterior.
+ *
+ * La clave de idempotencia ya existía desde la ETAPA 06 (RN-17); lo que cambia
+ * es que aquí **no es una precaución nuestra sino un requisito del emisor**, y
+ * por eso está escrito junto al código y no sólo en un informe.
+ */
+export const RESPUESTA_AL_EQUIPO = { aceptado: true } as const;
+
 /** Techo del tramo de evidencia dentro del presupuesto de KPI-13 (3 s). */
 export const PRESUPUESTO_DE_EVIDENCIA_MS = 800;
 
@@ -86,7 +111,10 @@ export class AlarmServerController {
   @SinRecursoDeTenant()
   @UseGuards(GuardiaDeAlarmServer)
   @Throttle({ default: { limit: LIMITE_IP, ttl: 60_000 } })
-  @HttpCode(202)
+  // 200 y no 202: la guía del fabricante exige el 200 para dar la
+  // notificación por entregada. Con cualquier otra cosa, el equipo reenvía.
+  @HttpCode(200)
+  @Header('Connection', 'close')
   @ApiExcludeEndpoint()
   async publicar(
     @Req() peticion: PeticionDeEquipo,
@@ -95,11 +123,48 @@ export class AlarmServerController {
     const equipo = peticion.equipoAcreditado;
     // El guard no deja pasar sin acreditar; si faltara, es un error de cableado
     // y no se sigue adelante adivinando a quién atribuir el evento.
-    if (equipo === undefined) throw new BadRequestException('Equipo no acreditado');
+    if (equipo === undefined) {
+      this.bitacora.registrar('error', 'publicación sin equipo acreditado: error de cableado', {});
+      return RESPUESTA_AL_EQUIPO;
+    }
 
     const ahora = this.reloj.ahora();
-    const sobre = this.abrir(peticion);
+    const sobre = this.abrir(peticion, equipo.dispositivoId);
+    if (sobre === null) return { ...RESPUESTA_AL_EQUIPO, ignorado: true, motivo: 'sobre ilegible' };
+
+    /**
+     * H-16-1 · un rostro en el sobre es un INCIDENTE, no una curiosidad.
+     *
+     * Significa que hay un equipo de la red configurado para enviar datos
+     * biométricos por un canal que no pasa por el ciclo de consentimiento. El
+     * analizador ya los descartó; aquí se alerta, porque el analizador no puede
+     * saber a quién avisar.
+     */
+    if (sobre.partesBiometricasRechazadas > 0) {
+      this.bitacora.registrar('error', 'H-16-1 · el equipo envió recortes de ROSTRO', {
+        copropiedadId: equipo.copropiedadId,
+        dispositivoId: equipo.dispositivoId,
+        rechazadas: sobre.partesBiometricasRechazadas,
+        motivo:
+          'datos biométricos sin consentimiento del titular (RN-09, RN-10, Ley 1581). ' +
+          'Se descartaron. Desactive el envío de rostro en la configuración del equipo',
+      });
+    }
+
     const evento = desdeAlarmServerXml(sobre.xml, equipo.dispositivoId, ahora);
+
+    /**
+     * El equipo reenvía su HISTORIAL por este mismo canal (`alarmDataType: 1`).
+     * Sin este corte, la portería mostraría accesos de hace días como si
+     * ocurrieran ahora, en una tabla append-only que no se puede limpiar.
+     */
+    if (evento !== null && !evento.enVivo) {
+      this.bitacora.registrar('info', 'publicación HISTÓRICA descartada', {
+        dispositivoId: equipo.dispositivoId,
+        placa: evento.placa,
+      });
+      return { ...RESPUESTA_AL_EQUIPO, ignorado: true, motivo: 'el equipo lo marcó histórico' };
+    }
 
     if (evento === null || evento.clase !== 'placa' || evento.placa === null) {
       // El equipo publica más cosas que lecturas de placa. Se responde 202 y no
@@ -110,7 +175,7 @@ export class AlarmServerController {
         clase: evento?.clase ?? 'ilegible',
         partesNoClasificadas: sobre.partesNoClasificadas,
       });
-      return { aceptado: true, ignorado: true, motivo: 'sin lectura de placa' };
+      return { ...RESPUESTA_AL_EQUIPO, ignorado: true, motivo: 'sin lectura de placa' };
     }
 
     const referencia =
@@ -137,7 +202,15 @@ export class AlarmServerController {
       ACTOR_INGESTA,
     );
 
-    if (!constancia.ok) throw new BadRequestException(constancia.error.detalle);
+    if (!constancia.ok) {
+      // Tampoco aquí se devuelve un error al equipo: reenviaría en bucle un
+      // sobre que va a fallar igual. Se registra y se corta.
+      this.bitacora.registrar('error', 'el hecho de la cámara no se pudo registrar', {
+        dispositivoId: equipo.dispositivoId,
+        detalle: constancia.error.detalle,
+      });
+      return { ...RESPUESTA_AL_EQUIPO, ignorado: true, motivo: 'el hecho no se pudo registrar' };
+    }
 
     if (constancia.valor.permitido && !constancia.valor.duplicado) {
       const orden = await this.accionador.accionar(equipo.dispositivoId, true);
@@ -155,23 +228,54 @@ export class AlarmServerController {
       permitido: constancia.valor.permitido,
       duplicado: constancia.valor.duplicado,
       conEvidencia: evidenciaId !== null,
+      /**
+       * QUIÉN ABRIÓ, según el propio equipo. Es evidencia de auditoría: un
+       * `lista` o un `anomalo` significan que la cámara está decidiendo por su
+       * cuenta y que esta decisión nuestra llegó tarde. Se registra siempre,
+       * incluso cuando es `null` —que es lo normal y significa que el control
+       * de barrera del equipo está deshabilitado—.
+       */
+      quienAbrioSegunElEquipo: evento.quienAbrio,
+      tipoDePlaca: evento.tipoDePlaca,
+      pais: evento.pais,
+      carril: evento.carril,
     });
 
-    return { aceptado: true };
+    if (evento.quienAbrio === 'lista' || evento.quienAbrio === 'anomalo') {
+      this.bitacora.registrar('aviso', 'EL EQUIPO ABRIÓ POR SU CUENTA', {
+        dispositivoId: equipo.dispositivoId,
+        quienAbrio: evento.quienAbrio,
+        motivo:
+          'la cámara declaró haber abierto ella. El motor de reglas decidió después, ' +
+          'y su decisión no gobernó el paso. Revise `ctrlMod` del equipo (debe ser 1)',
+      });
+    }
+
+    return RESPUESTA_AL_EQUIPO;
   }
 
-  private abrir(peticion: PeticionDeEquipo): ReturnType<typeof abrirSobreDeAlarmServer> {
+  /**
+   * `null` cuando el sobre no se puede abrir. **No lanza**, y ése es el cambio
+   * que impone el protocolo: devolver un `400` haría que el equipo diera la
+   * notificación por perdida y la reenviara en bucle, con el mismo resultado.
+   * El rechazo va al registro, que es donde alguien puede verlo.
+   */
+  private abrir(
+    peticion: PeticionDeEquipo,
+    dispositivoId: string,
+  ): ReturnType<typeof abrirSobreDeAlarmServer> | null {
     try {
       return abrirSobreDeAlarmServer(
         peticion.sobreCrudo ?? Buffer.alloc(0),
         peticion.headers['content-type'],
       );
     } catch (error) {
-      // Un sobre ilegible es un equipo mal configurado o alguien probando. Se
-      // dice qué pasó sin devolver nada del cuerpo recibido.
-      throw new BadRequestException(
-        error instanceof Error ? error.message : 'Envío ilegible del equipo',
-      );
+      // Nada del cuerpo recibido sale al registro: sólo por qué no se pudo abrir.
+      this.bitacora.registrar('aviso', 'sobre ilegible del equipo', {
+        dispositivoId,
+        detalle: error instanceof Error ? error.message : 'envío ilegible',
+      });
+      return null;
     }
   }
 

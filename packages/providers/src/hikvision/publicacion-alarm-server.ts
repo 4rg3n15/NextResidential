@@ -31,10 +31,42 @@
 export const LIMITES = {
   /** El equipo publica una foto completa y un recorte. 8 MiB sobra. */
   cuerpoMaximoBytes: 8 * 1024 * 1024,
-  partesMaximas: 8,
+  /**
+   * DIEZ, no ocho. La guía del fabricante enumera diez partes posibles —y con
+   * varias del mismo tipo llegan con sufijo `_1`, `_2`—, así que el techo
+   * anterior habría rechazado un sobre legítimo de un equipo bien configurado.
+   * Sigue siendo un techo: lo que pase de aquí no es un evento, es un ataque.
+   */
+  partesMaximas: 12,
   /** El XML del evento son unos pocos KiB. */
   xmlMaximoBytes: 256 * 1024,
 } as const;
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * H-16-1 · LAS DOS PARTES QUE NO PUEDEN ENTRAR · severidad ALTA
+ *
+ * El sobre admite diez partes y **dos son recortes de rostro**: el del
+ * conductor y el del acompañante. Si la configuración del equipo los activa,
+ * entran datos biométricos de personas que no dieron consentimiento, por un
+ * canal que no pasa por el ciclo de la ETAPA 08 —calidad, consentimiento del
+ * TITULAR, supresión programada— y que los dejaría en el almacén de evidencia
+ * como si fueran la foto de una matrícula.
+ *
+ * Eso es RN-09, RN-10 y la Ley 1581 de 2012 a la vez, y el equipo puede
+ * empezar a enviarlos **sin que nadie toque este código**: basta una casilla en
+ * su interfaz.
+ *
+ * Por eso se rechazan AQUÍ y de forma explícita. Un adaptador que se limitara a
+ * no clasificarlas las estaría aceptando: seguirían llegando, ocupando memoria
+ * y a una edición de distancia de acabar guardadas. Se descartan, se CUENTAN, y
+ * quien recibe el sobre registra el hecho como incidente de seguridad — porque
+ * significa que hay un equipo mal configurado en la red.
+ */
+const PARTES_BIOMETRICAS = /^(pilot|copilot)Picture(_\d+)?(\.jpe?g)?$/i;
+
+export const esParteBiometrica = (nombre: string | null, fichero: string | null): boolean =>
+  PARTES_BIOMETRICAS.test((nombre ?? '').trim()) || PARTES_BIOMETRICAS.test((fichero ?? '').trim());
 
 export interface ParteDeSobre {
   readonly nombre: string | null;
@@ -151,6 +183,9 @@ export const partirSobre = (cuerpo: Buffer, separador: string): readonly ParteDe
  * de esto no coincide con la captura real, se corrige AQUÍ y en ningún otro
  * sitio, porque ningún otro fichero conoce estos nombres.
  */
+/** El separador de fábrica del equipo, confirmado en sitio. */
+export const SEPARADOR_DE_FABRICA = '7e13971310878';
+
 export const SELECTORES_A_CONFIRMAR = [
   'nombre de la parte del XML del evento (se supone que termina en «.xml»)',
   'nombre de la parte de la foto completa de la escena',
@@ -187,11 +222,23 @@ export interface SobreDeAlarmServer {
   readonly recorte: Buffer | null;
   /** Partes que llegaron y no se supieron clasificar; se cuentan, no se tiran en silencio. */
   readonly partesNoClasificadas: number;
+  /**
+   * Cuántos recortes de rostro venían y se RECHAZARON (H-16-1). Cualquier
+   * número distinto de cero es un equipo mal configurado en la red, no una
+   * curiosidad estadística: quien recibe el sobre tiene que alertarlo.
+   */
+  readonly partesBiometricasRechazadas: number;
 }
 
 export const clasificarSobre = (partes: readonly ParteDeSobre[]): SobreDeAlarmServer => {
-  const xmls = partes.filter(esXml);
-  const imagenes = partes.filter(esImagen);
+  // H-16-1 · PRIMERO se apartan los rostros, antes de clasificar nada. Si se
+  // filtraran después, habría un instante en que una de ellas es «la imagen
+  // más pequeña» y acaba de recorte de placa en el almacén de evidencia.
+  const biometricas = partes.filter((p) => esParteBiometrica(p.nombre, p.nombreDeFichero));
+  const admisibles = partes.filter((p) => !esParteBiometrica(p.nombre, p.nombreDeFichero));
+
+  const xmls = admisibles.filter(esXml);
+  const imagenes = admisibles.filter(esImagen);
 
   const primerXml = xmls[0];
   if (primerXml === undefined) {
@@ -223,7 +270,8 @@ export const clasificarSobre = (partes: readonly ParteDeSobre[]): SobreDeAlarmSe
     xml: primerXml.contenido.toString('utf8'),
     foto,
     recorte,
-    partesNoClasificadas: partes.filter((p) => !esXml(p) && !esImagen(p)).length,
+    partesNoClasificadas: admisibles.filter((p) => !esXml(p) && !esImagen(p)).length,
+    partesBiometricasRechazadas: biometricas.length,
   };
 };
 

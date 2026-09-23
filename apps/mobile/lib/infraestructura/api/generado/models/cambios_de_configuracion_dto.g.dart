@@ -17,13 +17,11 @@ CambiosDeConfiguracionDto _$CambiosDeConfiguracionDtoFromJson(
   etiquetaVivienda: json['etiquetaVivienda'] as String?,
   etiquetaAgrupacion: json['etiquetaAgrupacion'] as String?,
   zonaHoraria: json['zonaHoraria'] as String?,
-  umbralConfianzaPlaca: json['umbralConfianzaPlaca'] as num?,
   politicaContingenciaEdge: json['politicaContingenciaEdge'] == null
       ? null
       : CambiosDeConfiguracionDtoPoliticaContingenciaEdge.fromJson(
           json['politicaContingenciaEdge'] as String,
         ),
-  umbralLatidoMinutos: json['umbralLatidoMinutos'] as num?,
 );
 
 Map<String, dynamic> _$CambiosDeConfiguracionDtoToJson(
@@ -35,7 +33,5 @@ Map<String, dynamic> _$CambiosDeConfiguracionDtoToJson(
   'etiquetaVivienda': instance.etiquetaVivienda,
   'etiquetaAgrupacion': instance.etiquetaAgrupacion,
   'zonaHoraria': instance.zonaHoraria,
-  'umbralConfianzaPlaca': instance.umbralConfianzaPlaca,
   'politicaContingenciaEdge': instance.politicaContingenciaEdge,
-  'umbralLatidoMinutos': instance.umbralLatidoMinutos,
 };

@@ -43,6 +43,32 @@
  * hace quince días. `esEventoEnVivo()` de abajo es la línea que lo impide.
  */
 
+/**
+ * QUIÉN ABRIÓ, SEGÚN EL PROPIO EQUIPO.
+ *
+ * Sólo existe cuando el control de barrera del equipo está **habilitado**, y
+ * entonces declara si abrió él o nosotros:
+ *
+ * | Valor      | Significa                                              |
+ * | ---------- | ------------------------------------------------------ |
+ * | `lista`    | abrió LA CÁMARA por su lista interna de placas        |
+ * | `manual`   | abrió la PLATAFORMA, que es lo único admisible        |
+ * | `anomalo`  | abrió LA CÁMARA por una excepción suya                |
+ *
+ * Es **evidencia de auditoría**: la declaración del equipo sobre quién tomó la
+ * decisión. Un `lista` o un `anomalo` significan que la cámara está decidiendo
+ * y que el motor de reglas se enteró después —o no se enteró—.
+ */
+export type QuienAbrio = 'lista' | 'manual' | 'anomalo';
+
+/** Recuadro del objeto detectado, tal como lo da el equipo. */
+export interface RecuadroDetectado {
+  readonly x: number;
+  readonly y: number;
+  readonly ancho: number;
+  readonly alto: number;
+}
+
 /** Evento normalizado: lo único que sale de este módulo hacia el resto. */
 export interface EventoDeEquipo {
   readonly clase: 'placa' | 'timbre' | 'desconocido';
@@ -50,11 +76,56 @@ export interface EventoDeEquipo {
   readonly confianza: number | null;
   readonly dispositivoId: string;
   readonly ocurridoEn: Date;
-  /** `false` para lo que el equipo vuelca al conectar: historial, no presente. */
+  /** `false` para lo que el equipo declara como HISTÓRICO, no presente. */
   readonly enVivo: boolean;
   /** Identificador del equipo tal como lo emite, para la clave de idempotencia. */
   readonly referenciaDelEquipo: string | null;
+
+  // ── Campos del evento ANPR que el motor y la auditoría necesitan ──────────
+  /** `null` cuando el equipo tiene el control de barrera deshabilitado. */
+  readonly quienAbrio: QuienAbrio | null;
+  readonly tipoDePlaca: string | null;
+  readonly colorDePlaca: string | null;
+  /** Código de país del equipo. Colombia es 210. */
+  readonly pais: number | null;
+  readonly carril: number | null;
+  readonly sentido: string | null;
+  readonly tipoDeVehiculo: string | null;
+  readonly tipoDeDeteccion: string | null;
+  /** `true` si el equipo considera que la placa cumple el estándar del país. */
+  readonly placaEstandar: boolean | null;
+  readonly recuadro: RecuadroDetectado | null;
 }
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * LO QUE SE IGNORA A PROPÓSITO, Y POR QUÉ SE ESCRIBE AQUÍ
+ *
+ * El evento ANPR de este fabricante trae, además de la lectura, un bloque
+ * entero de **fiscalización de tráfico y analítica de conducta**. Registrarlo
+ * sería tratar datos personales que nadie pidió y que ninguna finalidad
+ * declarada de este sistema ampara (Ley 1581 art. 4, principio de finalidad):
+ * el residente autorizó el control de acceso de su copropiedad, no que se
+ * anotara si el conductor llevaba cinturón.
+ *
+ * No basta con «no leerlos»: se enumeran para que quien añada un campo mañana
+ * vea que la omisión fue una DECISIÓN y no un olvido.
+ */
+export const CAMPOS_IGNORADOS_A_PROPOSITO: readonly string[] = [
+  // Fiscalización de tráfico: no somos autoridad de tránsito.
+  'illegalInfo',
+  'redlightIllegalCode',
+  'speedLimit',
+  'blackness',
+  'noiseDecibel',
+  // Analítica de conducta del conductor: datos personales sin finalidad.
+  'smoking',
+  'phoning',
+  'belt',
+  'pendant',
+  'tissueBox',
+  'frontChild',
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · CÁMARA ANPR · XML que el equipo POSTea al Alarm Server
@@ -82,13 +153,63 @@ export const esXmlDeAlarmServer = (cuerpo: string): boolean =>
   /<EventNotificationAlert/i.test(cuerpo);
 
 /**
+ * `alarmDataType` · **0 en tiempo real · 1 HISTÓRICO**.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * EL MISMO CRITERIO QUE `esEventoEnVivo`, Y POR EL MISMO MOTIVO
+ *
+ * Sin filtrarlo, la portería mostraría accesos de hace días como si estuvieran
+ * ocurriendo, en una tabla **append-only que no se puede limpiar** (ADR-05).
+ *
+ * Y un evento que NO declara el campo se trata como **histórico**, igual que
+ * allí. Es la dirección segura y hay que saber lo que cuesta: con un firmware
+ * que no lo emita, la cámara parece muda y la talanquera no abre. Eso se
+ * descubre en la primera prueba y se corrige; lo contrario —eventos falsos en
+ * un histórico que es la única prueba que la auditoría acepta— no se corrige
+ * nunca. La guía de puesta en marcha dice qué mirar cuando la cámara «no
+ * reporta».
+ */
+export const esDatoEnVivo = (alarmDataType: string | null): boolean => alarmDataType === '0';
+
+/** `openGateType` del equipo → quién abrió, en lenguaje del dominio. */
+const quienAbrioDe = (crudo: string | null): QuienAbrio | null => {
+  if (crudo === null || crudo === '') return null;
+  const valor = crudo.toLowerCase();
+  if (valor === 'white') return 'lista';
+  if (valor === 'manual') return 'manual';
+  if (valor === 'abnormal') return 'anomalo';
+  // Un valor que el fabricante no documenta NO se traduce a «manual»: eso
+  // afirmaría que abrimos nosotros sin saberlo. Se trata como anómalo.
+  return 'anomalo';
+};
+
+const entero = (crudo: string | null): number | null => {
+  if (crudo === null || crudo.trim() === '') return null;
+  const n = Number(crudo);
+  return Number.isFinite(n) ? n : null;
+};
+
+const recuadroDe = (xml: string): RecuadroDetectado | null => {
+  const x = entero(etiqueta(xml, 'X'));
+  const y = entero(etiqueta(xml, 'Y'));
+  const ancho = entero(etiqueta(xml, 'width'));
+  const alto = entero(etiqueta(xml, 'height'));
+  if (x === null || y === null || ancho === null || alto === null) return null;
+  return { x, y, ancho, alto };
+};
+
+/**
  * XML del Alarm Server → evento normalizado.
  *
- * `enVivo` es SIEMPRE `true` aquí, y eso es una diferencia real y no una
- * simplificación: la cámara solo POSTea cuando ocurre algo. El historial de la
- * cámara se consulta por otra ruta y **no es fuente de verdad**: el propio
- * equipo declara `isSupportLPAuditDataDelete: true`, es decir, su registro se
- * puede borrar por API (validación en sitio, §0.ter).
+ * **`enVivo` sale de `alarmDataType`, y ya no es siempre `true`.** Lo era por
+ * un razonamiento que la documentación del fabricante desmiente: «la cámara
+ * sólo POSTea cuando ocurre algo». El equipo también reenvía su historial por
+ * este mismo canal, marcándolo con `alarmDataType: 1`, y sin filtrarlo la
+ * portería mostraría accesos de hace días como si ocurrieran ahora.
+ *
+ * Lo que no cambia: el registro del equipo **no es fuente de verdad**. Él mismo
+ * declara `isSupportLPAuditDataDelete: true` —su histórico se puede borrar por
+ * API—, así que la trazabilidad vive en `eventos` y no en el aparato.
  */
 export const desdeAlarmServerXml = (
   cuerpo: string,
@@ -113,17 +234,37 @@ export const desdeAlarmServerXml = (
         ? Number(confianzaCruda) / 100
         : Number(confianzaCruda);
 
+  /**
+   * `noPlate` es lo que el equipo emite cuando **no hubo lectura**, y no es una
+   * placa: tratarlo como tal produciría un vehículo llamado «noPlate» en el
+   * padrón y un evento que afirma una lectura que no existió.
+   */
+  const placaLegible = placa === null || placa === '' || /^noplate$/i.test(placa) ? null : placa;
+
   return {
     clase: /ANPR|vehicle|LPR/i.test(tipo ?? '') ? 'placa' : 'desconocido',
-    placa: placa === null || placa === '' ? null : placa,
+    placa: placaLegible,
     confianza: confianza === null || Number.isNaN(confianza) ? null : confianza,
+    quienAbrio: quienAbrioDe(etiqueta(cuerpo, 'openGateType')),
+    tipoDePlaca: etiqueta(cuerpo, 'plateType'),
+    colorDePlaca: etiqueta(cuerpo, 'plateColor'),
+    pais: entero(etiqueta(cuerpo, 'country')),
+    carril: entero(etiqueta(cuerpo, 'line')),
+    sentido: etiqueta(cuerpo, 'direction'),
+    tipoDeVehiculo: etiqueta(cuerpo, 'vehicleType'),
+    tipoDeDeteccion: etiqueta(cuerpo, 'detectType'),
+    placaEstandar: (() => {
+      const v = etiqueta(cuerpo, 'plateStandardStatus');
+      return v === null || v === '' ? null : /^(true|1|standard)$/i.test(v);
+    })(),
+    recuadro: recuadroDe(cuerpo),
     dispositivoId,
     // Un `dateTime` ilegible NO se descarta ni se inventa: se usa la hora de
     // recepción y el evento sigue su camino. Perder un acceso porque el reloj
     // del equipo emite un formato raro sería peor que registrarlo con la hora
     // en que llegó — y `eventos` guarda las dos (`ocurrido_en`, `registrado_en`).
     ocurridoEn: cuando !== null && !Number.isNaN(Date.parse(cuando)) ? new Date(cuando) : ahora,
-    enVivo: true,
+    enVivo: esDatoEnVivo(etiqueta(cuerpo, 'alarmDataType')),
     referenciaDelEquipo: etiqueta(cuerpo, 'eventId') ?? etiqueta(cuerpo, 'serialNumber'),
   };
 };
@@ -174,6 +315,22 @@ export const desdeAlertStreamJson = (
           : 'desconocido',
     placa,
     confianza: confianza === null ? null : confianza > 1 ? confianza / 100 : confianza,
+    /**
+     * El videoportero no emite ninguno de los campos del evento ANPR: son de
+     * la cámara. Se rellenan a `null` EXPLÍCITAMENTE y no por omisión, para
+     * que el día que un firmware empiece a emitirlos el compilador obligue a
+     * decidir qué hacer con ellos en vez de tirarlos en silencio.
+     */
+    quienAbrio: null,
+    tipoDePlaca: null,
+    colorDePlaca: null,
+    pais: null,
+    carril: null,
+    sentido: null,
+    tipoDeVehiculo: null,
+    tipoDeDeteccion: null,
+    placaEstandar: null,
+    recuadro: null,
     dispositivoId,
     ocurridoEn:
       cuando !== undefined && !Number.isNaN(Date.parse(cuando)) ? new Date(cuando) : ahora,

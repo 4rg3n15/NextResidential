@@ -63,6 +63,28 @@ const PALABRAS = [
 // además un incumplimiento de RN-21 y de §2.7.1.
 const IPV4 = /(?<![\d.])((?:\d{1,3}\.){3}\d{1,3})(?![\d.])/g;
 const IPS_NEUTRAS = new Set(['127.0.0.1', '0.0.0.0', '255.255.255.255', '1.1.1.1']);
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * LOS RANGOS DE DOCUMENTACIÓN (RFC 5737), Y POR QUÉ NO SON UNA EXENCIÓN
+ *
+ * `192.0.2.0/24`, `198.51.100.0/24` y `203.0.113.0/24` están RESERVADOS por el
+ * IETF para ejemplos y documentación: no se enrutan, no los usa nadie y no
+ * pueden pertenecer a ningún equipo de ningún conjunto. Escribir una de ellas
+ * en un ejemplo no es lo que este control persigue.
+ *
+ * Lo que persigue es **la IP de un equipo real**, y por eso la tentación
+ * correcta a resistir es la contraria: aceptar `192.168.x.x` «porque es una red
+ * privada». Ésas sí son direcciones de equipos de verdad —la cámara del
+ * proyecto vivía en una—, y siguen prohibidas.
+ *
+ * Con estos rangos, un ejemplo de la guía o una semilla pueden enseñar una
+ * dirección con forma de dirección sin que nadie tenga que inventarse una que
+ * podría ser la de alguien.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+const RANGOS_DE_DOCUMENTACION = [/^192\.0\.2\./, /^198\.51\.100\./, /^203\.0\.113\./];
+const esDeDocumentacion = (ip) => RANGOS_DE_DOCUMENTACION.some((r) => r.test(ip));
 const esIpValida = (ip) => ip.split('.').every((o) => Number(o) <= 255 && !/^0\d/.test(o));
 
 /** Una línea puede eximirse de forma explícita y auditable, nunca en silencio. */
@@ -103,7 +125,7 @@ for (const raiz of RAICES) {
         }
       }
       for (const [, ip] of linea.matchAll(IPV4)) {
-        if (IPS_NEUTRAS.has(ip) || !esIpValida(ip)) continue;
+        if (IPS_NEUTRAS.has(ip) || esDeDocumentacion(ip) || !esIpValida(ip)) continue;
         hallazgos.push({ relativa, n: i + 1, que: `IP ${ip}`, linea: linea.trim() });
       }
     });
@@ -120,4 +142,7 @@ if (hallazgos.length > 0) {
   process.exit(1);
 }
 
-console.log(`KPI-11: sin ISAPI ni IPs de dispositivo fuera de ${PAQUETE_PERMITIDO}/`);
+console.log(
+  `KPI-11: sin ISAPI ni IPs de dispositivo fuera de ${PAQUETE_PERMITIDO}/ ` +
+    '(los rangos de documentación de RFC 5737 no cuentan: no son de nadie)',
+);

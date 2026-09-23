@@ -173,3 +173,13 @@ export class PersonaResueltaDto {
   @ApiProperty({ type: String }) nombreCompleto!: string;
   @ApiProperty({ type: Boolean }) yaExistia!: boolean;
 }
+
+/**
+ * B.2 · resultado del borrado definitivo. Devuelve el identificador que se
+ * borró para que la consola pueda decir «se borró la 42» y no «listo»: la
+ * confirmación de un borrado tiene que nombrar lo borrado.
+ */
+export class BorradoDefinitivoDto {
+  @ApiProperty({ type: Boolean }) borrada!: boolean;
+  @ApiProperty({ type: String }) identificador!: string;
+}

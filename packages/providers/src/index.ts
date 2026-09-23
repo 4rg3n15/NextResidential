@@ -27,6 +27,8 @@ export * from './hikvision/publicacion-alarm-server';
  */
 export * from './equipo/cliente';
 export * from './equipo/catalogo-de-rutas';
+export * from './equipo/errores-del-fabricante';
+export * from './camara/modo-de-control';
 export * from './equipo/escucha-alertstream';
 export * from './terminal/terminal-facial';
 export * from './videoportero/videoportero';

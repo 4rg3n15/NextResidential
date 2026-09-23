@@ -25,6 +25,8 @@ const configuracionParaContrato: Configuracion = {
   INGESTA_FIRMA_SECRETO: 'no-aplica-para-la-generacion-del-contrato',
   BIOMETRIA_LLAVE: 'llave-solo-para-generar-el-contrato-32+',
   BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
+  EQUIPOS_LLAVE: 'llave-solo-para-generar-el-contrato-32+',
+  EQUIPOS_LLAVE_REF: 'env:EQUIPOS_LLAVE',
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: 24,
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',

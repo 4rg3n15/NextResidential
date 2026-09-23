@@ -41,11 +41,14 @@ const repo = (parcial: Partial<RepositorioPadron> = {}): RepositorioPadron => {
   return base;
 };
 
+/**
+ * B.1 · dos agrupaciones de cuatro, numeradas por piso (2 por piso ⇒ 2 pisos).
+ * Se describe como lo describiría alguien en voz alta: «dos torres de cuatro».
+ */
 const PLAN: PlanDeGeneracion = {
-  tipo: 'apartamentos',
   agrupaciones: 2,
   estilo: 'numeros',
-  pisos: 2,
+  cantidad: 4,
   porPiso: 2,
 };
 
@@ -60,7 +63,7 @@ describe('vista previa · lo que se va a crear, antes de crearlo', () => {
   it('un plan inválido NO llega a la base', async () => {
     const existentes = vi.fn();
     const caso = new GenerarViviendas(repo({ viviendasExistentes: existentes }));
-    const r = await caso.previsualizar(ctx, { ...PLAN, pisos: 0 });
+    const r = await caso.previsualizar(ctx, { ...PLAN, cantidad: 0 });
     expect(r.ok).toBe(false);
     expect(existentes).not.toHaveBeenCalled();
   });
@@ -121,7 +124,10 @@ describe('confirmación · la vista previa y la creación salen del MISMO cálcu
   it('el plan queda en el rastro de auditoría, no solo el número', async () => {
     const generar = vi.fn().mockResolvedValue({ creadas: 8, colisiones: [] });
     await new GenerarViviendas(repo({ generarViviendas: generar })).confirmar(ctx, PLAN, 8);
-    expect(generar.mock.calls[0]![0].resumenDelPlan).toMatch(/apartamentos/);
+    // El resumen dice CUÁNTAS, que es el dato que alguien busca al leer esta
+    // auditoría; antes, con tres redacciones, la de apartamentos ni lo nombraba.
+    expect(generar.mock.calls[0]![0].resumenDelPlan).toMatch(/2 agrupaciones/);
+    expect(generar.mock.calls[0]![0].resumenDelPlan).toMatch(/de 4/);
     expect(generar.mock.calls[0]![0].resumenDelPlan).toMatch(/8 viviendas/);
   });
 

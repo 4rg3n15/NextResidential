@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Header, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  Inject,
+  Param,
+  ParseUUIDPipe,
+  Post,
+} from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { ErrorDominio, PlanDeGeneracion, Resultado } from '@ncr/domain-core';
@@ -13,8 +23,10 @@ import type { LectorDeVocabulario } from '../aplicacion/vocabulario';
 import { GenerarViviendas } from '../aplicacion/generar-viviendas';
 import { ExportarPadron } from '../aplicacion/exportar-padron';
 import {
+  BorrarViviendaDefinitivamente,
   DesactivarVehiculo,
   DesactivarVivienda,
+  ReactivarVivienda,
   RegistrarPersona,
   RegistrarResidente,
   RegistrarVehiculo,
@@ -36,6 +48,7 @@ import {
 } from './dtos';
 import {
   BajaDto,
+  BorradoDefinitivoDto,
   GeneracionAplicadaDto,
   IdCreadoDto,
   PersonaResueltaDto,
@@ -54,31 +67,19 @@ import {
  * el que el usuario debe leer (§2.7.3: el DTO valida forma, el dominio valida
  * verdad).
  */
-const planDesdeDto = (dto: PlanDeGeneracionDto): PlanDeGeneracion => {
-  if (dto.tipo === 'apartamentos') {
-    return {
-      tipo: 'apartamentos',
-      agrupaciones: dto.agrupaciones ?? 0,
-      estilo: dto.estilo ?? 'numeros',
-      pisos: dto.pisos ?? 0,
-      porPiso: dto.porPiso ?? 0,
-      excepciones: (dto.excepciones ?? []).map((e) => ({
-        agrupacion: e.agrupacion,
-        pisos: e.pisos,
-        porPiso: e.porPiso,
-      })),
-    };
-  }
-  if (dto.tipo === 'casas') {
-    return {
-      tipo: 'casas',
-      secciones: dto.secciones ?? 0,
-      total: dto.total ?? 0,
-      reiniciarNumeracion: dto.reiniciarNumeracion ?? false,
-    };
-  }
-  return { tipo: 'fincas', cantidad: dto.cantidad ?? 0 };
-};
+const planDesdeDto = (dto: PlanDeGeneracionDto): PlanDeGeneracion => ({
+  agrupaciones: dto.agrupaciones,
+  estilo: dto.estilo ?? 'numeros',
+  cantidad: dto.cantidad,
+  ...(dto.porPiso === undefined ? {} : { porPiso: dto.porPiso }),
+  ...(dto.reiniciarNumeracion === undefined
+    ? {}
+    : { reiniciarNumeracion: dto.reiniciarNumeracion }),
+  excepciones: (dto.excepciones ?? []).map((e) => ({
+    agrupacion: e.agrupacion,
+    cantidad: e.cantidad,
+  })),
+});
 
 /**
  * Traduce protocolo a casos de uso. **Cero reglas de negocio** (§2.2): lo único
@@ -168,6 +169,50 @@ export class PadronController {
     // recordar cuál toca en cada pantalla, y ese es el tipo de detalle que se
     // recuerda mal.
     return { desactivado: true };
+  }
+
+  @Post('viviendas/:viviendaId/reactivacion')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({
+    summary: 'Vuelve a poner en servicio una vivienda dada de baja (B.2, RN-13)',
+  })
+  @ApiOkResponse({ type: BajaDto })
+  async reactivarVivienda(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('viviendaId', ParseUUIDPipe) id: string,
+  ): Promise<BajaDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/viviendas');
+    this.desenvolver(await new ReactivarVivienda(this.repo).ejecutar(destino, id));
+    return { desactivado: false };
+  }
+
+  /**
+   * B.2 · el caso «la creé por error». **Sólo sin historial**, y quien lo
+   * decide es el servidor: la consola puede ofrecer el botón, pero la negativa
+   * —con el recuento de lo que lo impide— sale de aquí, y la garantía última
+   * está en el disparador de la base (migración 0032).
+   *
+   * Es `DELETE` y no `POST /borrado` porque esto sí borra: el verbo tiene que
+   * decir lo que pasa. La baja lógica, que es lo normal, sigue siendo un POST
+   * a `/desactivacion`.
+   */
+  @Delete('viviendas/:viviendaId')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({
+    summary: 'Borrado DEFINITIVO, sólo si la vivienda no tiene historial (B.2, RN-19)',
+  })
+  @ApiOkResponse({ type: BorradoDefinitivoDto })
+  async borrarViviendaDefinitivamente(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('viviendaId', ParseUUIDPipe) id: string,
+  ): Promise<BorradoDefinitivoDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/viviendas');
+    const r = this.desenvolver(
+      await new BorrarViviendaDefinitivamente(this.repo).ejecutar(destino, id),
+    );
+    return { borrada: true, identificador: r.identificador };
   }
 
   @Post('carga')

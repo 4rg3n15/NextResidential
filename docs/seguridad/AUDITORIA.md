@@ -78,34 +78,36 @@ tubería que el despliegue no usa.
 
 Cada fila remite a §3, donde está la evidencia reproducible completa.
 
-| Id          | Severidad   | Dimensión            | Hallazgo                                                                          | Estado                        |
-| ----------- | ----------- | -------------------- | --------------------------------------------------------------------------------- | ----------------------------- |
-| **H-13-01** | Media       | Controles            | Un informe de cobertura VACÍO se leía como «global 100 %» y salía con 0           | **CERRADO**                   |
-| **H-13-02** | Media       | Criptografía (D-41)  | La llave de la bóveda biométrica era `sha256(secreto)`, igual para todo tenant    | **CERRADO**                   |
-| **H-13-03** | Media       | Base de datos (D-08) | La aserción de ADR-005 no verificaba la capa que de verdad detiene al dueño       | **CERRADO**                   |
-| **H-13-04** | Media       | RLS                  | La matriz de RLS recorría 26 tablas escritas a mano; el catálogo tiene 42         | **CERRADO**                   |
-| **H-13-05** | **Alta**    | Validación           | `forbidNonWhitelisted` no ve las claves heredadas de `Object.prototype`           | **CERRADO**                   |
-| **H-13-06** | Media       | Saneamiento          | §2.7.4 nunca se construyó: bytes NUL y controles llegaban a la traza inmutable    | **CERRADO**                   |
-| **H-13-07** | Media       | Validación           | Sin cota de profundidad: un cuerpo a 1 500 niveles desbordaba la pila (500)       | **CERRADO**                   |
-| **H-13-08** | Baja        | Herramientas         | Las dos superficies de lint miraban árboles distintos: verde en una, rojo en otra | **CERRADO**                   |
-| **H-13-09** | **Alta**    | Saneamiento          | El propio saneamiento mutilaba en silencio toda carga base64                      | **CERRADO**                   |
-| **H-13-10** | Media       | Autenticación        | La firma HMAC de ingesta se verificaba sobre la CADENA VACÍA (repliegue abierto)  | **CERRADO**                   |
-| **H-13-11** | Media       | Falso verde          | `src/seguridad.ts` al **0 %** de cobertura con 656 pruebas en verde               | **CERRADO**                   |
-| **H-13-12** | Media       | Errores              | El 413 del límite de payload salía como 500 «Error interno», a nivel `error`      | **CERRADO**                   |
-| **H-13-13** | Media       | Validación           | Un parámetro de consulta repetido o con sintaxis de objeto producía 500           | **CERRADO**                   |
-| **H-13-14** | Baja        | Saneamiento          | Los controles bidireccionales de Unicode llegaban a la traza inmutable            | **CERRADO**                   |
-| **H-13-15** | Media       | Inyección            | Inyección de fórmulas CSV en la exportación del padrón                            | **CERRADO**                   |
-| **H-13-16** | Media       | Integridad           | Sin NFC, dos formas Unicode del mismo identificador esquivan el índice único      | **CERRADO**                   |
-| **H-13-17** | Media       | Secretos             | El escaneo NUNCA miraba el historial de Git: cumplía la mitad del alcance         | **CERRADO**                   |
-| **H-13-18** | Media       | Secretos             | Un solo byte NUL hacía invisible al escáner un fichero fuente completo            | **CERRADO**                   |
-| **H-13-19** | Media       | Secretos             | Sin patrón para los tres secretos propios del proyecto ni para tokens de nube     | **CERRADO**                   |
-| **H-13-20** | Baja        | Secretos             | El escáner leía el ÁRBOL y no el ÍNDICE: un secreto ya preparado pasaba           | **CERRADO**                   |
-| **H-13-21** | Baja        | CORS                 | Aceptaba `ftp://x`, `no-es-una-url` y `http://` con credenciales en producción    | **CERRADO**                   |
-| **H-13-22** | Informativa | CORS                 | `DELETE` anunciado sin ruta que lo use; `x-request-id` no legible por la consola  | **CERRADO**                   |
-| **H-13-23** | Baja        | Higiene              | Ficheros que `.gitignore` prohíbe y que estaban versionados                       | **CERRADO**                   |
-| **H-13-24** | Informativa | Fugas por error      | El cuerpo del 429 nombraba `ThrottlerException`                                   | **CERRADO**                   |
-| **H-13-25** | Baja        | Secretos (historial) | Una contraseña literal inerte sobrevive en el historial y es alcanzable           | **ABIERTO · riesgo aceptado** |
-| **H-13-26** | **Alta**    | Dependencias         | 4 vulnerabilidades críticas y 23 altas en **producción**                          | **CERRADO**                   |
+| Id          | Severidad   | Dimensión            | Hallazgo                                                                                  | Estado                         |
+| ----------- | ----------- | -------------------- | ----------------------------------------------------------------------------------------- | ------------------------------ |
+| **H-13-01** | Media       | Controles            | Un informe de cobertura VACÍO se leía como «global 100 %» y salía con 0                   | **CERRADO**                    |
+| **H-13-02** | Media       | Criptografía (D-41)  | La llave de la bóveda biométrica era `sha256(secreto)`, igual para todo tenant            | **CERRADO**                    |
+| **H-13-03** | Media       | Base de datos (D-08) | La aserción de ADR-005 no verificaba la capa que de verdad detiene al dueño               | **CERRADO**                    |
+| **H-13-04** | Media       | RLS                  | La matriz de RLS recorría 26 tablas escritas a mano; el catálogo tiene 42                 | **CERRADO**                    |
+| **H-13-05** | **Alta**    | Validación           | `forbidNonWhitelisted` no ve las claves heredadas de `Object.prototype`                   | **CERRADO**                    |
+| **H-13-06** | Media       | Saneamiento          | §2.7.4 nunca se construyó: bytes NUL y controles llegaban a la traza inmutable            | **CERRADO**                    |
+| **H-13-07** | Media       | Validación           | Sin cota de profundidad: un cuerpo a 1 500 niveles desbordaba la pila (500)               | **CERRADO**                    |
+| **H-13-08** | Baja        | Herramientas         | Las dos superficies de lint miraban árboles distintos: verde en una, rojo en otra         | **CERRADO**                    |
+| **H-13-09** | **Alta**    | Saneamiento          | El propio saneamiento mutilaba en silencio toda carga base64                              | **CERRADO**                    |
+| **H-13-10** | Media       | Autenticación        | La firma HMAC de ingesta se verificaba sobre la CADENA VACÍA (repliegue abierto)          | **CERRADO**                    |
+| **H-13-11** | Media       | Falso verde          | `src/seguridad.ts` al **0 %** de cobertura con 656 pruebas en verde                       | **CERRADO**                    |
+| **H-13-12** | Media       | Errores              | El 413 del límite de payload salía como 500 «Error interno», a nivel `error`              | **CERRADO**                    |
+| **H-13-13** | Media       | Validación           | Un parámetro de consulta repetido o con sintaxis de objeto producía 500                   | **CERRADO**                    |
+| **H-13-14** | Baja        | Saneamiento          | Los controles bidireccionales de Unicode llegaban a la traza inmutable                    | **CERRADO**                    |
+| **H-13-15** | Media       | Inyección            | Inyección de fórmulas CSV en la exportación del padrón                                    | **CERRADO**                    |
+| **H-13-16** | Media       | Integridad           | Sin NFC, dos formas Unicode del mismo identificador esquivan el índice único              | **CERRADO**                    |
+| **H-13-17** | Media       | Secretos             | El escaneo NUNCA miraba el historial de Git: cumplía la mitad del alcance                 | **CERRADO**                    |
+| **H-13-18** | Media       | Secretos             | Un solo byte NUL hacía invisible al escáner un fichero fuente completo                    | **CERRADO**                    |
+| **H-13-19** | Media       | Secretos             | Sin patrón para los tres secretos propios del proyecto ni para tokens de nube             | **CERRADO**                    |
+| **H-13-20** | Baja        | Secretos             | El escáner leía el ÁRBOL y no el ÍNDICE: un secreto ya preparado pasaba                   | **CERRADO**                    |
+| **H-13-21** | Baja        | CORS                 | Aceptaba `ftp://x`, `no-es-una-url` y `http://` con credenciales en producción            | **CERRADO**                    |
+| **H-13-22** | Informativa | CORS                 | `DELETE` anunciado sin ruta que lo use; `x-request-id` no legible por la consola          | **CERRADO**                    |
+| **H-13-23** | Baja        | Higiene              | Ficheros que `.gitignore` prohíbe y que estaban versionados                               | **CERRADO**                    |
+| **H-13-24** | Informativa | Fugas por error      | El cuerpo del 429 nombraba `ThrottlerException`                                           | **CERRADO**                    |
+| **H-13-25** | Baja        | Secretos (historial) | Una contraseña literal inerte sobrevive en el historial y es alcanzable                   | **ABIERTO · riesgo aceptado**  |
+| **H-13-26** | **Alta**    | Dependencias         | 4 vulnerabilidades críticas y 23 altas en **producción**                                  | **CERRADO**                    |
+| **H-15B-1** | **Alta**    | Criptografía         | Guardar credenciales de equipo en la base: quien vuelque la base abre los equipos         | **MITIGADO · riesgo residual** |
+| **H-15B-2** | **Alta**    | Datos personales     | El evento ANPR empuja `pilotPicture` y `copilotPicture`: biometría por la puerta de atrás | **CERRADO**                    |
 
 ---
 
@@ -1070,6 +1072,113 @@ Severity: 5 low | 14 moderate           ← 0 altas, 0 críticas
 Las 12 restantes en producción son **moderadas y bajas**, todas de dependencias
 transitivas sin versión corregida publicada. Se declaran, no se ocultan: §7
 lleva su aceptación de riesgo redactada.
+
+---
+
+### H-15B-1 · **ALTA** · Guardar la credencial del equipo en la base amplía lo que cuesta un volcado
+
+**Qué es.** La ETAPA 15-B abre el alta de equipos desde la consola (A.1). Eso
+significa que el usuario, la dirección y **la clave** de cada cámara, terminal
+y videoportero pasan a vivir en la base de datos. Antes no estaban: la
+credencial era una referencia a una variable de entorno, y el precio de esa
+pureza era que dar de alta una cámara exigía acceso al servidor y una redespliegue.
+
+El riesgo es directo y hay que decirlo sin adorno: **comprometer la base de
+datos pasa a comprometer los equipos**. Antes, un volcado entregaba datos
+personales; ahora entregaría además la puerta de entrada al hardware que abre
+las barreras del conjunto. No es teórico: es la consecuencia mecánica de la
+decisión.
+
+**Por qué se toma igualmente.** La alternativa —una variable de entorno por
+equipo— no escala a multiempresa: cuarenta conjuntos con seis aparatos cada uno
+son doscientas cuarenta variables, y cada alta pasa a ser un despliegue. Un
+producto SaaS en el que registrar una cámara exige tocar el servidor no es un
+producto. La decisión es guardar la credencial y **pagar el precio en
+mitigaciones explícitas**, no fingir que el riesgo no existe.
+
+**Severidad: Alta.** No por probabilidad —requiere ya haber comprometido la
+base— sino por impacto: control físico de accesos.
+
+**Mitigaciones implantadas.**
+
+1. **Cifrado en la APLICACIÓN, no en la base** (D-10). La llave no toca
+   PostgreSQL: llega por `EQUIPOS_LLAVE` y la aplicación no arranca sin ella.
+   Un volcado entrega `bytea` sin sentido, no credenciales.
+2. **AES-256-GCM con llave derivada POR COPROPIEDAD** (HKDF, el mismo sobre que
+   H-13-02). Comprometer la llave derivada de un conjunto no abre los equipos
+   de otro, y la etiqueta de integridad impide sustituir el contenido: quien
+   tuviera escritura en la base no puede cambiar la credencial por una suya.
+3. **Llave distinta de la biométrica.** Se comparte el código de cifrado —uno
+   solo en el proyecto— y no el material de clave: comprometer las plantillas
+   no entrega las cámaras.
+4. **Ningún token de usuario lee la tabla.** `credenciales_de_equipo` no tiene
+   política de `SELECT` para `authenticated`: ni el superadministrador la lee.
+   Sólo el camino de servicio, que es el que va a hablar con el equipo.
+   Probado por ejecución en `supabase/policies/tests/70_…`.
+5. **La API nunca devuelve el secreto**, y no por disciplina: el DTO de
+   respuesta no declara el campo, así que el tipo generado para la consola no
+   tiene dónde ponerlo.
+6. **Usuario de servicio con privilegio mínimo** en el equipo, no el de
+   fábrica: lo pide la pantalla de alta y lo detalla la guía de integración.
+
+**Riesgo residual declarado.** Quien comprometa a la vez la base **y** la
+variable de entorno del proceso obtiene las credenciales. Eso es equivalente a
+haber comprometido el servidor entero, y en ese escenario el atacante ya puede
+pedirle al propio sistema que abra la barrera. La mitigación real de ese caso no
+es criptográfica: es que el usuario de servicio del equipo tenga el privilegio
+mínimo y que el acceso quede auditado, que es lo que hacen las capas 6 y la
+auditoría en la misma transacción.
+
+**Procedimiento de rotación.** En este orden, y sin caída:
+
+1. Cambiar la clave **en el equipo** (usuario de servicio, no el de fábrica).
+2. Editar el equipo en la consola con la clave nueva y **probar la conexión**
+   antes de guardar. La escritura desactiva la credencial anterior y escribe la
+   nueva en la misma transacción: nunca hay dos vigentes ni un hueco sin
+   ninguna.
+3. Si lo que rota es `EQUIPOS_LLAVE` —no la clave del equipo—, hay que volver a
+   escribir la clave de cada aparato desde la consola, porque el sobre anterior
+   deja de descifrarse. Es deliberado: una rotación de llave maestra que
+   descifrase con la vieja para recifrar con la nueva obligaría a tener las dos
+   a la vez en el proceso, que es exactamente el momento en que una fuga las
+   entrega juntas.
+4. Comprobar en la pantalla de Dispositivos que cada equipo vuelve a
+   **verificado**; el que quede en «no verificado» dice por qué.
+
+---
+
+### H-15B-2 · **ALTA** · El evento de la cámara empuja fotografías de personas
+
+**Qué es.** La guía oficial del fabricante para el evento ANPR enumera diez
+partes en el POST multipart del «servidor de alarma». Dos de ellas son
+`pilotPicture.jpg` y `copilotPicture.jpg`: **las caras del conductor y del
+acompañante**.
+
+Eso es dato biométrico entrando por una puerta que nadie abrió. El proyecto
+tiene un ciclo de vida biométrico completo bajo la Ley 1581 de 2012
+—consentimiento previo, expreso e informado del **titular**, finalidad,
+supresión programada— y ninguna de esas garantías se aplicaría a una fotografía
+que llega sola dentro de un evento de placa. El visitante no consintió: vino a
+que le leyeran la placa.
+
+**Severidad: Alta**, por la naturaleza del dato y por el régimen legal que lo
+gobierna. Un incumplimiento aquí no es una vulnerabilidad técnica: es un
+tratamiento de dato sensible sin base legal.
+
+**Remediación.** El receptor **aparta esas partes antes de clasificar el
+sobre** y las rechaza explícitamente, con el nombre y el motivo en la bitácora
+a nivel `error`. No se guardan, no se reenvían y no llegan a ningún caso de
+uso. El recuento de partes rechazadas viaja en el sobre normalizado para que la
+auditoría pueda verlo.
+
+**Verificación.** `packages/providers/src/hikvision/publicacion-alarm-server.test.ts`
+—una cámara simulada que publica con `conRostros`— y el registro de la
+petición, que nombra las partes apartadas.
+
+**Lo que NO se hace, y es deliberado:** desactivar esa función en la cámara no
+es suficiente como única medida. La configuración del equipo puede cambiarla
+cualquiera con acceso a su panel; el rechazo en el receptor es la barrera que
+no depende de la configuración del aparato.
 
 ---
 

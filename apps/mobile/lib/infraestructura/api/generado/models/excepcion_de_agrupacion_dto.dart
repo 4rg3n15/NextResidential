@@ -10,15 +10,13 @@ part 'excepcion_de_agrupacion_dto.g.dart';
 class ExcepcionDeAgrupacionDto {
   const ExcepcionDeAgrupacionDto({
     required this.agrupacion,
-    required this.pisos,
-    required this.porPiso,
+    required this.cantidad,
   });
   
   factory ExcepcionDeAgrupacionDto.fromJson(Map<String, Object?> json) => _$ExcepcionDeAgrupacionDtoFromJson(json);
   
   final String agrupacion;
-  final num pisos;
-  final num porPiso;
+  final num cantidad;
 
   Map<String, Object?> toJson() => _$ExcepcionDeAgrupacionDtoToJson(this);
 }

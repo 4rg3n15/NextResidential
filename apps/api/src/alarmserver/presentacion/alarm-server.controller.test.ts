@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { exito, fallo, errorDominio, ordenAceptada } from '@ncr/domain-core';
 import type { ResultadoDeAccionamiento } from '@ncr/domain-core';
@@ -30,7 +29,8 @@ const EQUIPO: EquipoDeclarado = {
 const XML_DE_PLACA =
   '<?xml version="1.0" encoding="UTF-8"?><EventNotificationAlert>' +
   '<eventType>ANPR</eventType><licensePlate>ABC123</licensePlate>' +
-  '<confidenceLevel>92</confidenceLevel><eventId>ev-1</eventId></EventNotificationAlert>';
+  '<confidenceLevel>92</confidenceLevel><eventId>ev-1</eventId>' +
+  '<alarmDataType>0</alarmDataType></EventNotificationAlert>';
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x80, 0xfe, 0xff, 0xd9]);
 
@@ -63,7 +63,7 @@ const peticion = (cuerpo: Buffer, equipo: EquipoDeclarado | null = EQUIPO): Peti
     ...(equipo === null ? {} : { equipoAcreditado: equipo }),
   }) as unknown as PeticionDeEquipo;
 
-const bitacora: Bitacora = { registrar: vi.fn() };
+const bitacoraSilenciosa: Bitacora = { registrar: vi.fn() };
 const reloj: Reloj = { ahora: () => new Date('2026-09-22T12:00:00Z') };
 const ids: GeneradorDeId = { nuevo: () => 'id-fijo' };
 
@@ -80,6 +80,7 @@ const montar = (opciones: {
   registroFalla?: boolean;
   evidencia?: () => Promise<string>;
   orden?: ResultadoDeAccionamiento;
+  bitacora?: Bitacora;
 }): Montaje => {
   const ejecutar = vi.fn(async () =>
     opciones.registroFalla === true
@@ -101,7 +102,7 @@ const montar = (opciones: {
     { ejecutar } as unknown as RegistrarAcceso,
     { accionar },
     almacen,
-    bitacora,
+    opciones.bitacora ?? bitacoraSilenciosa,
     reloj,
     ids,
   );
@@ -194,36 +195,105 @@ describe('lo que se entrega al caso de uso', () => {
 
 describe('lo que NO es una lectura de placa', () => {
   it('un evento de otra clase se acepta y se ignora, sin llegar al caso de uso', async () => {
-    const otro = '<EventNotificationAlert><eventType>IO</eventType></EventNotificationAlert>';
+    const otro =
+      '<EventNotificationAlert><eventType>IO</eventType>' +
+      '<alarmDataType>0</alarmDataType></EventNotificationAlert>';
     const { controlador, ejecutar, accionar } = montar({});
     const respuesta = await controlador.publicar(peticion(sobre(otro)), 'x');
-    // 202 y no 400: un 400 haría que la cámara reintentara ese mismo aviso para
-    // siempre. Lo que hay que decirle es «recibido, no me sirve».
+    // Aceptado y no rechazado: un error haría que la cámara reintentara ese
+    // mismo aviso para siempre. Lo que hay que decirle es «recibido, no sirve».
     expect(respuesta).toEqual({ aceptado: true, ignorado: true, motivo: 'sin lectura de placa' });
     expect(ejecutar).not.toHaveBeenCalled();
     expect(accionar).not.toHaveBeenCalled();
   });
 
-  it('un sobre ilegible es 400, y no se inventa un evento', async () => {
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * NADA DE ESTO DEVUELVE UN ERROR AL EQUIPO, Y ES UN REQUISITO DEL PROTOCOLO
+   *
+   * La guía del fabricante: «si el integrador no responde, el dispositivo
+   * considerará la notificación perdida y la subirá otra vez». Un `400` no le
+   * dice al equipo «esto está mal»: le dice «no te he recibido», y lo reenvía
+   * en bucle con el mismo resultado. Lo que se rechaza se rechaza en el
+   * registro, no en el código de estado.
+   */
+  it('un sobre ilegible se ACEPTA y se ignora: un 400 lo haría reenviar en bucle', async () => {
     const { controlador, ejecutar } = montar({});
     const rota = peticion(Buffer.from('esto no es un multipart'));
-    await expect(controlador.publicar(rota, 'x')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(controlador.publicar(rota, 'x')).resolves.toMatchObject({
+      aceptado: true,
+      ignorado: true,
+    });
     expect(ejecutar).not.toHaveBeenCalled();
   });
 
   it('sin equipo acreditado no se sigue adivinando a quién atribuir el evento', async () => {
-    const { controlador } = montar({});
-    await expect(
-      controlador.publicar(peticion(sobre(XML_DE_PLACA), null), 'x'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const { controlador, ejecutar } = montar({});
+    await expect(controlador.publicar(peticion(sobre(XML_DE_PLACA), null), 'x')).resolves.toEqual({
+      aceptado: true,
+    });
+    expect(ejecutar).not.toHaveBeenCalled();
   });
 
-  it('un fallo del caso de uso se propaga como 400 y no como apertura', async () => {
+  it('un fallo del caso de uso tampoco devuelve error, y NO abre', async () => {
     const { controlador, accionar } = montar({ registroFalla: true });
-    await expect(controlador.publicar(peticion(sobre(XML_DE_PLACA)), 'x')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(controlador.publicar(peticion(sobre(XML_DE_PLACA)), 'x')).resolves.toMatchObject({
+      aceptado: true,
+      ignorado: true,
+    });
     expect(accionar).not.toHaveBeenCalled();
+  });
+
+  it('un evento que el equipo marca HISTÓRICO no llega al caso de uso', async () => {
+    // El equipo reenvía su historial por este mismo canal. Sin el corte, la
+    // portería mostraría accesos de hace días como si ocurrieran ahora, en una
+    // tabla append-only que no se puede limpiar.
+    const historico = XML_DE_PLACA.replace('<alarmDataType>0<', '<alarmDataType>1<');
+    const { controlador, ejecutar, accionar } = montar({ permitido: true });
+    const respuesta = await controlador.publicar(peticion(sobre(historico)), 'x');
+    expect(respuesta).toMatchObject({ ignorado: true, motivo: 'el equipo lo marcó histórico' });
+    expect(ejecutar).not.toHaveBeenCalled();
+    expect(accionar).not.toHaveBeenCalled();
+  });
+});
+
+describe('H-16-1 · los recortes de rostro del sobre', () => {
+  const conRostro = (): Buffer =>
+    Buffer.concat([
+      Buffer.from('--B\r\nContent-Disposition: form-data; name="anpr.xml"\r\n'),
+      Buffer.from('Content-Type: text/xml\r\n\r\n'),
+      Buffer.from(XML_DE_PLACA),
+      Buffer.from('\r\n--B\r\nContent-Disposition: form-data; name="pilotPicture.jpg"\r\n'),
+      Buffer.from('Content-Type: image/jpeg\r\n\r\n'),
+      JPEG,
+      Buffer.from('\r\n--B--\r\n'),
+    ]);
+
+  it('no se guardan como evidencia: el almacén no los ve', async () => {
+    const { controlador, guardar } = montar({ permitido: true });
+    await controlador.publicar(peticion(conRostro()), 'x');
+    // La única imagen del sobre era un rostro. El almacén no recibe nada.
+    expect(guardar).not.toHaveBeenCalled();
+  });
+
+  it('se registran como INCIDENTE, no como curiosidad', async () => {
+    // Significa que hay un equipo de la red configurado para enviar datos
+    // biométricos por un canal que no pasa por el consentimiento.
+    const registrar = vi.fn();
+    const { controlador } = montar({ permitido: true, bitacora: { registrar } });
+    await controlador.publicar(peticion(conRostro()), 'x');
+    const incidente = registrar.mock.calls.find((c) => /H-16-1/.test(String(c[1])));
+    expect(incidente, 'no se registró el incidente').toBeDefined();
+    expect(incidente?.[0]).toBe('error');
+    expect(JSON.stringify(incidente?.[2])).toMatch(/1581|consentimiento/i);
+  });
+
+  it('el acceso SIGUE su curso: la lectura de placa era legítima', async () => {
+    // Tirar el evento entero dejaría la talanquera cerrada por una casilla mal
+    // puesta en la configuración del equipo.
+    const { controlador, ejecutar } = montar({ permitido: true });
+    await controlador.publicar(peticion(conRostro()), 'x');
+    expect(ejecutar).toHaveBeenCalledOnce();
   });
 });
 

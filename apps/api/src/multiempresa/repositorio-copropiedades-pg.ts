@@ -181,9 +181,15 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
       etiquetaVivienda: 'etiqueta_vivienda = $#',
       etiquetaAgrupacion: 'etiqueta_agrupacion = $#',
       zonaHoraria: 'zona_horaria = $#',
-      umbralConfianzaPlaca: 'umbral_confianza_placa = $#',
       politicaContingenciaEdge: 'politica_contingencia_edge = $#::politica_contingencia',
-      umbralLatidoMinutos: 'umbral_latido_dispositivo = make_interval(mins => $#)',
+      /**
+       * B.5 · `umbral_confianza_placa` y `umbral_latido_dispositivo` YA NO se
+       * escriben desde aquí. No es que el mapa los ignore: es que no hay
+       * camino. El primero lo fija una constante documentada respaldada por la
+       * escala 0–100 de `confidenceLevel` (migración 0032), y el segundo lo ata
+       * la restricción de coherencia con el periodo de latido (0020). Un
+       * `UPDATE` desde la consola podía contradecir a cualquiera de los dos.
+       */
     };
 
     const asignaciones: string[] = [];

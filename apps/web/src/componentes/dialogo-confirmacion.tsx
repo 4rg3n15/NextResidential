@@ -31,6 +31,17 @@ export interface PropiedadesDeConfirmacion {
   /** Longitud mínima del motivo. Cinco caracteres: «error» es un motivo; «x» no. */
   readonly minimoMotivo?: number;
   readonly sugerencias?: readonly string[];
+  /**
+   * B.2 · confirmación **sin motivo**, para el borrado definitivo de una
+   * vivienda sin historial.
+   *
+   * No es una excepción a «toda baja exige motivo» (RN-19): es que ahí no hay
+   * baja. Una vivienda creada por error, sin un residente, un vehículo, una
+   * autorización ni un evento, no tiene nada que explicar — y pedir un motivo
+   * para borrarla enseña a escribir «error» sin pensar, que es justo lo que
+   * vacía de valor el campo donde SÍ importa.
+   */
+  readonly sinMotivo?: boolean;
   readonly enviando?: boolean;
   readonly error?: string | undefined;
   readonly alConfirmar: (motivo: string) => void;
@@ -48,6 +59,7 @@ export const DialogoDeConfirmacion = ({
   variante = 'peligro',
   minimoMotivo = MINIMO_MOTIVO,
   sugerencias = [],
+  sinMotivo = false,
   enviando = false,
   error,
   alConfirmar,
@@ -57,7 +69,7 @@ export const DialogoDeConfirmacion = ({
   const referencia = useRef<HTMLDialogElement>(null);
   const idMotivo = useId();
   const [motivo, setMotivo] = useState('');
-  const suficiente = motivo.trim().length >= minimoMotivo;
+  const suficiente = sinMotivo || motivo.trim().length >= minimoMotivo;
 
   useEffect(() => {
     const dialogo = referencia.current;
@@ -95,7 +107,7 @@ export const DialogoDeConfirmacion = ({
           <p className="text-cuerpo text-texto-apagado">{descripcion}</p>
           {children}
 
-          <div className="space-y-1.5">
+          <div className={sinMotivo ? 'hidden' : 'space-y-1.5'}>
             <label htmlFor={idMotivo} className="block text-secundario font-medium">
               Motivo <span className="text-peligro-texto">(obligatorio)</span>
             </label>

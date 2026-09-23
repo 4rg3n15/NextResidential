@@ -41,9 +41,7 @@ export type ClaveEditable =
   | 'etiquetaVivienda'
   | 'etiquetaAgrupacion'
   | 'zonaHoraria'
-  | 'umbralConfianzaPlaca'
-  | 'politicaContingenciaEdge'
-  | 'umbralLatidoMinutos';
+  | 'politicaContingenciaEdge';
 
 export type PoliticaContingencia = 'denegar' | 'escalar_portero';
 
@@ -69,6 +67,99 @@ export const ETIQUETAS_SUGERIDAS: Readonly<
   otro: { vivienda: 'Vivienda', agrupacion: 'Agrupación' },
 };
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * B.5 · DOS AJUSTES QUE DEJAN DE SER AJUSTES (ETAPA 15-B)
+ *
+ * El «umbral de confianza de placa» y el «margen de latido» salían de esta
+ * pantalla, y no debían. Un campo de formulario dice «esto es tuyo, elige»; y
+ * ninguno de los dos lo es:
+ *
+ *  · **El umbral de confianza no era un número del conjunto: era un número del
+ *    fabricante.** La cámara publica `confidenceLevel` en la escala 0–100 del
+ *    evento ANPR, y el criterio de qué lectura decide sola sale de ahí, no del
+ *    gusto de un administrador. Mientras fue editable, el valor por omisión
+ *    —0,85— eran **centésimas inventadas**: nadie podía decir de dónde salía.
+ *    Ahora sale de la documentación del equipo y está escrito aquí.
+ *  · **El margen de latido no es independiente**: la base ya lo ata al periodo
+ *    de latido y a los latidos tolerados con una restricción de coherencia
+ *    (`copropiedades_umbral_latido_coherente`, migración 0020). Dejar que se
+ *    escribiera por separado permitía contradecir esa restricción desde una
+ *    pantalla, y entonces el rechazo llegaba como un error de base de datos que
+ *    no le sirve a nadie.
+ *
+ * Los dos siguen **viéndose** en la pantalla con su motivo, que es la diferencia
+ * entre «solo lectura» y «oculto» que este mismo fichero defiende más arriba.
+ * Cambiarlos ahora exige una migración, que es exactamente lo que debe costar.
+ *
+ * P-02 queda RESUELTA (el umbral tiene respaldo documental) y P-06 SUSTITUIDA
+ * (ya no se busca dónde ponerlo en la pantalla: no va en la pantalla).
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Umbral de confianza de lectura de placa, **en la escala del evento ANPR**
+ * (`confidenceLevel`, 0–100). Por debajo de este valor la lectura NO decide
+ * sola: escala al portero (CU-01, excepción 3a).
+ */
+export const UMBRAL_CONFIANZA_PLACA_ANPR = 80;
+
+/**
+ * El mismo umbral como fracción, que es como lo expresa el dominio
+ * (`contexto.umbralDeConfianza`, 0–1) y como lo guarda la columna
+ * `umbral_confianza_placa numeric(4,3)`. Se deriva, no se escribe dos veces:
+ * dos literales que significan lo mismo acaban divergiendo.
+ */
+export const UMBRAL_CONFIANZA_PLACA_FRACCION = UMBRAL_CONFIANZA_PLACA_ANPR / 100;
+
+/** Margen de latido de dispositivo, en minutos. Ver el bloque de arriba. */
+export const MARGEN_LATIDO_MINUTOS = 5;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * B.4 · LA DIRECCIÓN SE VALIDA, Y CADA CAUSA DICE LO SUYO
+ *
+ * Antes bastaban cinco caracteres cualesquiera: «aaaaa» pasaba, y también el
+ * nombre del conjunto escrito por error en el campo equivocado —que es
+ * justamente lo que ocurrió (B.3)—. Una dirección colombiana tiene siempre las
+ * dos cosas: una vía («Calle», «Carrera», «Km») y un número. Exigir ambas no es
+ * cosmética: es lo que distingue una dirección de una etiqueta.
+ *
+ * El saneamiento es el de §2.7.4 y va ANTES de medir: se recorta, se normaliza
+ * a Unicode NFC y se quitan los caracteres de control y el byte nulo. Sin eso,
+ * una cadena de ocho caracteres de control pasaría por dirección, y lo que se
+ * guardaría no sería lo que se midió.
+ *
+ * **Un mensaje por causa.** «No es válida» obliga a adivinar; «le falta el
+ * número» se corrige a la primera.
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+export const DIRECCION_MINIMA = 8;
+export const DIRECCION_MAXIMA = 200;
+
+/** Saneamiento de §2.7.4, aplicado antes de medir y antes de persistir. */
+export const sanearTexto = (valor: string): string =>
+  valor
+    .normalize('NFC')
+    // eslint-disable-next-line no-control-regex -- es justo lo que hay que quitar
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .trim();
+
+export const validarDireccion = (valor: string | number): string | null => {
+  if (typeof valor !== 'string') return 'se esperaba texto';
+  const limpio = sanearTexto(valor);
+  if (limpio.length === 0) return 'la dirección no puede quedar vacía';
+  if (limpio.length < DIRECCION_MINIMA) {
+    return `una dirección necesita al menos ${String(DIRECCION_MINIMA)} caracteres: «Cl 4 # 5-6» los tiene`;
+  }
+  if (limpio.length > DIRECCION_MAXIMA) {
+    return `no puede pasar de ${String(DIRECCION_MAXIMA)} caracteres`;
+  }
+  if (!/\p{L}/u.test(limpio)) return 'le falta la vía: «Calle», «Carrera», «Km»…';
+  if (!/\d/.test(limpio)) return 'le falta el número: una dirección lleva al menos una cifra';
+  return null;
+};
+
 /** Lo que la consola pinta: lo editable y lo que solo se consulta. */
 export interface ConfiguracionDeCopropiedad {
   readonly nombre: string;
@@ -83,10 +174,15 @@ export interface ConfiguracionDeCopropiedad {
   readonly etiquetaVivienda: string;
   readonly etiquetaAgrupacion: string;
   readonly zonaHoraria: string;
-  readonly umbralConfianzaPlaca: number;
   readonly politicaContingenciaEdge: PoliticaContingencia;
-  readonly umbralLatidoMinutos: number;
   /* ── Solo lectura ── */
+  /**
+   * Se siguen exponiendo para que la pantalla los MUESTRE con su motivo; ya no
+   * se editan (ETAPA 15-B, B.5). Lo que la consola recibe es el valor efectivo,
+   * que es el de la constante documentada.
+   */
+  readonly umbralConfianzaPlaca: number;
+  readonly umbralLatidoMinutos: number;
   readonly nit: string;
   readonly estado: string;
   readonly plazoConsentimientoHoras: number;
@@ -107,9 +203,7 @@ export interface CambiosDeConfiguracion {
   readonly etiquetaVivienda?: string;
   readonly etiquetaAgrupacion?: string;
   readonly zonaHoraria?: string;
-  readonly umbralConfianzaPlaca?: number;
   readonly politicaContingenciaEdge?: PoliticaContingencia;
-  readonly umbralLatidoMinutos?: number;
 }
 
 interface Ajuste {
@@ -156,9 +250,7 @@ const AJUSTES: readonly Ajuste[] = [
     clave: 'direccion',
     etiqueta: 'Dirección del conjunto',
     editablePor: ['superadministrador', 'administrador'],
-    // Cinco caracteres como mínimo: «Cll 4» es una dirección y «—» no lo es.
-    // El mínimo evita que el diálogo inicial se despache con un guion.
-    validar: textoAcotado(5, 200),
+    validar: validarDireccion,
   },
   {
     clave: 'tipo',
@@ -206,22 +298,6 @@ const AJUSTES: readonly Ajuste[] = [
     },
   },
   {
-    clave: 'umbralConfianzaPlaca',
-    /**
-     * Solo el superadministrador. No es una preferencia: por debajo de este
-     * número la lectura de placa NO decide sola y escala al portero (CU-01,
-     * excepción 3a). Bajarlo convierte lecturas dudosas en aperturas
-     * automáticas, y eso no es una decisión de un administrador de conjunto.
-     */
-    etiqueta: 'Umbral de confianza de placa',
-    editablePor: ['superadministrador'],
-    validar: (valor) => {
-      if (typeof valor !== 'number' || !Number.isFinite(valor)) return 'se esperaba un número';
-      if (valor < 0.5 || valor > 1) return 'debe estar entre 0,500 y 1,000';
-      return null;
-    },
-  },
-  {
     clave: 'politicaContingenciaEdge',
     /**
      * Igual: es la respuesta del Edge cuando la regla NO está en su caché
@@ -235,16 +311,6 @@ const AJUSTES: readonly Ajuste[] = [
       valor === 'denegar' || valor === 'escalar_portero'
         ? null
         : 'debe ser «denegar» o «escalar_portero»',
-  },
-  {
-    clave: 'umbralLatidoMinutos',
-    etiqueta: 'Margen de latido de dispositivo',
-    editablePor: ['superadministrador', 'administrador'],
-    validar: (valor) => {
-      if (typeof valor !== 'number' || !Number.isInteger(valor)) return 'se esperaba un entero';
-      if (valor < 1 || valor > 60) return 'debe estar entre 1 y 60 minutos';
-      return null;
-    },
   },
 ];
 
@@ -307,9 +373,9 @@ export const cambiosEfectivos = (
   actual: ConfiguracionDeCopropiedad,
   p: CambiosDeConfiguracion,
 ): CambiosDeConfiguracion => {
-  const nombre = p.nombre?.trim();
+  const nombre = p.nombre === undefined ? undefined : sanearTexto(p.nombre);
   const zonaHoraria = p.zonaHoraria?.trim();
-  const direccion = p.direccion?.trim();
+  const direccion = p.direccion === undefined ? undefined : sanearTexto(p.direccion);
   const etiquetaVivienda = p.etiquetaVivienda?.trim();
   const etiquetaAgrupacion = p.etiquetaAgrupacion?.trim();
   return {
@@ -323,16 +389,9 @@ export const cambiosEfectivos = (
     ...(etiquetaAgrupacion !== undefined && etiquetaAgrupacion !== actual.etiquetaAgrupacion
       ? { etiquetaAgrupacion }
       : {}),
-    ...(p.umbralConfianzaPlaca !== undefined &&
-    p.umbralConfianzaPlaca !== actual.umbralConfianzaPlaca
-      ? { umbralConfianzaPlaca: p.umbralConfianzaPlaca }
-      : {}),
     ...(p.politicaContingenciaEdge !== undefined &&
     p.politicaContingenciaEdge !== actual.politicaContingenciaEdge
       ? { politicaContingenciaEdge: p.politicaContingenciaEdge }
-      : {}),
-    ...(p.umbralLatidoMinutos !== undefined && p.umbralLatidoMinutos !== actual.umbralLatidoMinutos
-      ? { umbralLatidoMinutos: p.umbralLatidoMinutos }
       : {}),
   };
 };

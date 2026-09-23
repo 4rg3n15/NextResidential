@@ -194,6 +194,11 @@ const entornoDeApi = (doble, puerto) => ({
   INGESTA_FIRMA_SECRETO: 'secreto-de-ingesta-para-el-camino-e2e-32',
   BIOMETRIA_LLAVE: 'llave-de-biometria-para-el-camino-e2e-32+',
   BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
+  // ETAPA 15-B · la llave de los secretos de equipo. Distinta de la
+  // biométrica también aquí: si este recorrido las igualara, dejaría de
+  // reproducir la configuración que el despliegue tiene de verdad.
+  EQUIPOS_LLAVE: 'llave-de-equipos-para-el-camino-e2e-32+',
+  EQUIPOS_LLAVE_REF: 'env:EQUIPOS_LLAVE',
   CORS_ALLOWED_ORIGINS: 'http://127.0.0.1:3100',
   /**
    * ETAPA 14 · este camino levanta la API con adaptadores EN MEMORIA y una

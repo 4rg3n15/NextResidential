@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DirectorioDeViviendas } from './viviendas/directorio';
 import { PantallaDeVehiculos } from './vehiculos/pantalla';
 import { PantallaDeVisitantes } from './visitantes/pantalla';
+import { PantallaDeDispositivos } from './dispositivos/pantalla';
 
 /**
  * **Barrido de formularios — D-72 y D-73, y no ruta a ruta.**
@@ -144,6 +145,18 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
       return respuesta({ totales: { activas: 1, inactivas: 0 }, viviendas: [VIVIENDA] });
     }
     if (url.includes('/padron/vehiculos')) return respuesta([]);
+    if (url.includes('/dispositivos/pendientes')) return respuesta({ dispositivos: [] });
+    if (url.includes('/tablero/dispositivos')) return respuesta({ dispositivos: [] });
+    if (url.includes('/equipos/prueba-de-conexion')) {
+      return respuesta({
+        clase: 'alcanzado',
+        detalle: 'El equipo responde',
+        modelo: null,
+        firmware: null,
+        latenciaMs: 10,
+        verificado: true,
+      });
+    }
     if (url.includes('/autorizaciones')) return respuesta([]);
     return respuesta({ id: PERSONA.id, nombreCompleto: PERSONA.nombreCompleto, yaExistia: false });
   });
@@ -198,9 +211,18 @@ const rellenar = async (): Promise<void> => {
     escribir(campo, enHoras(indice === 0 ? 1 : 24));
   }
 
+  /**
+   * Texto corriente en todo campo de texto, **incluidos los de contraseña**.
+   *
+   * `password` faltaba, y el hueco se vio al añadir el alta de equipos: su
+   * formulario pide la clave del aparato, el barrido no la rellenaba, el botón
+   * de envío seguía deshabilitado y el control informaba «algo pide un dato que
+   * nadie tiene a mano». Tenía razón en la forma y no en el fondo: el dato lo
+   * tenía a mano, era el barrido el que no sabía escribirlo.
+   */
   for (const campo of Array.from(dialogo.querySelectorAll<HTMLInputElement>('input'))) {
     const tipo = campo.getAttribute('type');
-    if (tipo !== 'text' && tipo !== null) continue;
+    if (tipo !== 'text' && tipo !== 'password' && tipo !== null) continue;
     if (campo.getAttribute('role') === 'combobox') continue;
     if (campo.value !== '') continue;
     escribir(campo, 'Texto que escribe una persona');
@@ -266,6 +288,17 @@ const PANTALLAS = [
     nombre: 'visitantes',
     elemento: <PantallaDeVisitantes copropiedadId={COP} />,
     boton: /Nueva autorización/,
+  },
+  {
+    // ETAPA 15-B · el alta de equipos. Entra en el barrido como una pantalla
+    // más: escribe, y la regla de D-72 se le aplica igual. Aquí lo que se
+    // comprueba de paso es que un formulario de conexión —el sitio natural
+    // para pedir «el id del dispositivo»— no pide ningún identificador
+    // interno: pide dirección, usuario y clave, que es lo que el operador
+    // tiene delante.
+    nombre: 'equipos',
+    elemento: <PantallaDeDispositivos copropiedadId={COP} />,
+    boton: /Agregar equipo/,
   },
 ] as const;
 
@@ -431,6 +464,7 @@ describe('cobertura del barrido', () => {
       'viviendas/asistente-de-generacion.tsx',
       'vehiculos/pantalla.tsx',
       'visitantes/pantalla.tsx',
+      'dispositivos/alta-de-equipo.tsx',
     ]);
     const sinClasificar = todasLasEscrituras().filter(
       (f) => !conFormulario.has(f) && SIN_FORMULARIO[f] === undefined,

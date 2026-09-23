@@ -50,6 +50,21 @@ const SUGERENCIAS: Readonly<Record<TipoDeCopropiedad, { vivienda: string; agrupa
   otro: { vivienda: 'Vivienda', agrupacion: 'Agrupación' },
 };
 
+/**
+ * B.4 · lo mismo que valida el servidor, dicho en la pantalla.
+ *
+ * **La del servidor es la real** (§2.7.3): esta sólo existe para no dejar
+ * pulsar un botón que va a fallar, y su mensaje coincide a propósito con el
+ * que devolvería la API. Si algún día discrepan, manda el 422.
+ */
+const MOTIVO_DIRECCION =
+  'Una dirección necesita al menos 8 caracteres, con vía y número: «Km 4 Via La Calera».';
+
+const direccionValida = (valor: string): boolean => {
+  const limpio = valor.trim();
+  return limpio.length >= 8 && /\p{L}/u.test(limpio) && /\d/.test(limpio);
+};
+
 const OPCIONES: readonly (readonly [TipoDeCopropiedad, string])[] = [
   ['apartamentos', 'Apartamentos — edificios con torres y pisos'],
   ['casas', 'Casas — conjunto o urbanización, con secciones o sin ellas'],
@@ -72,6 +87,8 @@ export const ConfiguracionInicial = ({
   const clientes = useQueryClient();
 
   const [aplazado, setAplazado] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [tocoElNombre, setTocoElNombre] = useState(false);
   const [direccion, setDireccion] = useState('');
   const [tipo, setTipo] = useState<TipoDeCopropiedad | ''>('');
   const [etiquetaVivienda, setEtiquetaVivienda] = useState('');
@@ -81,6 +98,25 @@ export const ConfiguracionInicial = ({
 
   if (!puede || copropiedadId === null || aplazado) return null;
   if (!sinConfigurar(consulta.data)) return null;
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * B.3 · EL NOMBRE SE ESCRIBÍA EN «DIRECCIÓN»
+   *
+   * Este diálogo pedía la dirección, el tipo y las dos etiquetas, y **no
+   * pedía el nombre**. La copropiedad llega aquí con el nombre que le puso el
+   * guion de aprovisionamiento —«Copropiedad de arranque» en el caso normal—,
+   * así que quien entra por primera vez busca dónde poner el nombre de su
+   * conjunto, encuentra el único campo de texto libre que hay, y escribe el
+   * nombre en la dirección. No es un error del usuario: es el formulario
+   * preguntando otra cosa.
+   *
+   * Ahora el nombre es el primer campo, viene relleno con el que hay, y lo
+   * que se envía SOBRESCRIBE el nombre.
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  const nombreActual = consulta.data?.nombre ?? '';
+  const nombreEnPantalla = tocoElNombre ? nombre : nombreActual;
 
   const elegirTipo = (elegido: TipoDeCopropiedad): void => {
     setTipo(elegido);
@@ -99,6 +135,7 @@ export const ConfiguracionInicial = ({
         await cliente.PATCH('/copropiedades/{id}/configuracion', {
           params: { path: { id: copropiedadId } },
           body: {
+            nombre: nombreEnPantalla.trim(),
             direccion: direccion.trim(),
             tipo,
             etiquetaVivienda: etiquetaVivienda.trim(),
@@ -122,15 +159,29 @@ export const ConfiguracionInicial = ({
       etiquetaEnviar="Guardar configuración"
       enviando={enviando}
       error={error}
-      puedeEnviar={tipo !== '' && direccion.trim().length >= 5}
+      puedeEnviar={tipo !== '' && nombreEnPantalla.trim().length > 0 && direccionValida(direccion)}
       alEnviar={() => void guardar()}
       alCancelar={() => setAplazado(true)}
     >
       <Campo
+        etiqueta="Nombre de la copropiedad"
+        value={nombreEnPantalla}
+        onChange={(e) => {
+          setTocoElNombre(true);
+          setNombre(e.target.value);
+        }}
+        ayuda="Como se llama el conjunto. Es lo que verán los residentes y lo que sale en los informes."
+        required
+      />
+
+      <Campo
         etiqueta="Dirección del conjunto"
         value={direccion}
         onChange={(e) => setDireccion(e.target.value)}
-        ayuda="La misma para todas las viviendas. Lo que cambia entre ellas es la agrupación y el número."
+        ayuda="La misma para todas las viviendas. Lo que cambia entre ellas es la agrupación y el número. Por ejemplo: «Km 4 Via La Calera»."
+        error={
+          direccion.trim().length > 0 && !direccionValida(direccion) ? MOTIVO_DIRECCION : undefined
+        }
         required
       />
 

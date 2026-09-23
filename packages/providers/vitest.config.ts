@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
+import { informeDe } from '../../scripts/lib/reporteros-de-prueba.mjs';
 
 export default defineConfig({
   test: {
+    ...informeDe('providers'),
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',

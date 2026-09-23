@@ -52,19 +52,33 @@ export interface GeneracionAplicada {
 }
 
 const excepcionesDe = (plan: PlanDeGeneracion): readonly string[] =>
-  plan.tipo === 'apartamentos' ? (plan.excepciones ?? []).map((e) => e.agrupacion) : [];
+  (plan.excepciones ?? []).map((e) => e.agrupacion);
 
-/** Resumen del plan para el rastro de auditoría. Corto y legible por un humano. */
+/**
+ * Resumen del plan para el rastro de auditoría. Corto y legible por un humano.
+ *
+ * B.1 · con un solo plan, el resumen dice lo que de verdad se preguntó: cuántas
+ * viviendas, y si hay denominador, cuántas por cada uno. Antes había tres
+ * redacciones —una por tipo— y la de apartamentos ni siquiera nombraba la
+ * cantidad, que es el dato que alguien busca cuando lee esta auditoría.
+ */
 export const resumenDelPlan = (plan: PlanDeGeneracion, total: number): string => {
-  const cabeza =
-    plan.tipo === 'apartamentos'
-      ? `${String(plan.agrupaciones)} agrupaciones (${plan.estilo}), ${String(plan.pisos)} pisos, ` +
-        `${String(plan.porPiso)} por piso, ${String((plan.excepciones ?? []).length)} excepciones`
-      : plan.tipo === 'casas'
-        ? `${String(plan.total)} casas en ${String(plan.secciones)} secciones` +
-          `${plan.reiniciarNumeracion ? ', numeración reiniciada' : ', numeración corrida'}`
-        : `${String(plan.cantidad)} fincas`;
-  return `${plan.tipo}: ${cabeza} → ${String(total)} viviendas`;
+  const denominador =
+    plan.agrupaciones === 0
+      ? 'sin agrupación'
+      : `${String(plan.agrupaciones)} agrupaciones (${plan.estilo}) de ${String(plan.cantidad)}`;
+  const numeracion =
+    (plan.porPiso ?? 0) > 0
+      ? `numeración por piso (${String(plan.porPiso)} por piso)`
+      : plan.agrupaciones > 0 && (plan.reiniciarNumeracion ?? false)
+        ? 'numeración reiniciada por agrupación'
+        : 'numeración correlativa';
+  const excepciones = (plan.excepciones ?? []).length;
+  return (
+    `${denominador}, ${numeracion}` +
+    (excepciones === 0 ? '' : `, ${String(excepciones)} excepciones`) +
+    ` → ${String(total)} viviendas`
+  );
 };
 
 const listar = (colisiones: readonly ViviendaProyectada[]): string =>

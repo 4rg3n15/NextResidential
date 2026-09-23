@@ -46,10 +46,11 @@ const contexto = (): ContextoTenant => ({
  * anterior no admitía.
  */
 const PLAN: PlanDeGeneracion = {
-  tipo: 'apartamentos',
   agrupaciones: 3,
   estilo: 'numeros',
-  pisos: 2,
+  // B.1 · se dice CUÁNTAS hay en cada una (4) y cómo se numeran (2 por piso),
+  // que es la forma en que alguien describe su conjunto en voz alta.
+  cantidad: 4,
   porPiso: 2,
 };
 
@@ -126,7 +127,7 @@ describe('generación del padrón contra base', () => {
     );
     // Sin esta fila, «¿quién creó estas 300 viviendas?» se contesta leyendo 300
     // valores de `creado_por` idénticos.
-    expect(rows[0]?.identificador_solicitado).toMatch(/apartamentos/);
+    expect(rows[0]?.identificador_solicitado).toMatch(/3 agrupaciones/);
     expect(rows[0]?.identificador_solicitado).toMatch(/12 viviendas/);
   });
 

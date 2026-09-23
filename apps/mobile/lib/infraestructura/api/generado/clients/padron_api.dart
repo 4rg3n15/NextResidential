@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/baja_dto.dart';
+import '../models/borrado_definitivo_dto.dart';
 import '../models/cargar_padron_dto.dart';
 import '../models/cargar_padron_xlsx_dto.dart';
 import '../models/confirmar_generacion_dto.dart';
@@ -124,11 +125,25 @@ abstract class PadronApi {
     @Body() required PlanDeGeneracionDto body,
   });
 
+  /// Borrado DEFINITIVO, sólo si la vivienda no tiene historial (B.2, RN-19)
+  @DELETE('/copropiedades/{id}/padron/viviendas/{viviendaId}')
+  Future<BorradoDefinitivoDto> padronControllerBorrarViviendaDefinitivamente({
+    @Path('id') required String id,
+    @Path('viviendaId') required String viviendaId,
+  });
+
   /// Baja lógica de la vivienda; conserva su historial (RN-19, CA-02)
   @POST('/copropiedades/{id}/padron/viviendas/{viviendaId}/desactivacion')
   Future<BajaDto> padronControllerDesactivarVivienda({
     @Path('id') required String id,
     @Path('viviendaId') required String viviendaId,
     @Body() required DesactivarDto body,
+  });
+
+  /// Vuelve a poner en servicio una vivienda dada de baja (B.2, RN-13)
+  @POST('/copropiedades/{id}/padron/viviendas/{viviendaId}/reactivacion')
+  Future<BajaDto> padronControllerReactivarVivienda({
+    @Path('id') required String id,
+    @Path('viviendaId') required String viviendaId,
   });
 }

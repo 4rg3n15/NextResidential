@@ -3,6 +3,7 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import type { Autorizacion } from '@ncr/contracts';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { Boton } from '@/componentes/ui/boton';
@@ -49,6 +50,8 @@ export const PantallaDeVisitantes = ({
 
   const [viviendaId, setViviendaId] = useState('');
   const [persona, setPersona] = useState<PersonaElegida | null>(null);
+  /** B.6 · a quién se acaba de autorizar, para ofrecerle la foto sin buscarlo otra vez. */
+  const [recienAutorizado, setRecienAutorizado] = useState<PersonaElegida | null>(null);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [recurrente, setRecurrente] = useState(false);
@@ -98,6 +101,24 @@ export const PantallaDeVisitantes = ({
           },
         }),
       );
+      /**
+       * ═══════════════════════════════════════════════════════════════════
+       * B.6 · LA FOTO, CONECTADA AL FLUJO
+       *
+       * La captura de rostro ya existía como pantalla propia (`/biometria`) y
+       * funcionaba; lo que no existía era el camino desde aquí. Quien acaba de
+       * autorizar a un visitante es justo quien puede tomarle la foto, y
+       * obligarle a ir al menú, buscar la pantalla y volver a buscar a la
+       * persona por su nombre era pedirle que repitiera un trabajo que el
+       * sistema ya tenía hecho.
+       *
+       * **Se CONECTA, no se rehace.** La captura sigue siendo la misma: la
+       * misma validación de calidad (CA-08), el mismo consentimiento del
+       * TITULAR —el visitante, no el residente (RN-09, RN-10)—, la misma
+       * plantilla que no se expone y la misma validación por tipo real de
+       * fichero. Lo único que se añade es el titular preseleccionado.
+       */
+      setRecienAutorizado(persona);
       setAlta(false);
       setPersona(null);
       await refrescar();
@@ -147,6 +168,31 @@ export const PantallaDeVisitantes = ({
         descripcion="Quién puede entrar, a qué vivienda y hasta cuándo. Revocar conserva el registro: no se borra."
         acciones={<Boton onClick={() => setAlta(true)}>Nueva autorización</Boton>}
       />
+
+      {recienAutorizado !== null ? (
+        <p
+          role="status"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-borde bg-lienzo px-3 py-2 text-secundario text-texto"
+        >
+          <span>
+            Autorización creada para <strong>{recienAutorizado.nombreCompleto}</strong>. Si va a
+            entrar por reconocimiento facial, tómele la foto ahora.
+          </span>
+          <Link
+            href={`/biometria?titular=${encodeURIComponent(recienAutorizado.id)}&nombre=${encodeURIComponent(recienAutorizado.nombreCompleto)}`}
+            className="rounded-distintivo bg-marca-suave px-3 py-1.5 font-medium text-marca-texto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+          >
+            Tomar la foto del visitante
+          </Link>
+          <button
+            type="button"
+            onClick={() => setRecienAutorizado(null)}
+            className="ml-auto text-texto-apagado underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+          >
+            Ahora no
+          </button>
+        </p>
+      ) : null}
 
       <div role="tablist" aria-label="Vista de autorizaciones" className="mb-4 flex gap-2">
         {(['activas', 'historial'] as const).map((v) => (
