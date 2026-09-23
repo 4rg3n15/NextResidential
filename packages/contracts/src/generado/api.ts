@@ -1033,6 +1033,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/padron/viviendas/{viviendaId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Borrado DEFINITIVO, sólo si la vivienda no tiene historial (B.2, RN-19) */
+        delete: operations["PadronController_borrarViviendaDefinitivamente"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/padron/viviendas/{viviendaId}/desactivacion": {
         parameters: {
             query?: never;
@@ -1044,6 +1061,23 @@ export interface paths {
         put?: never;
         /** Baja lógica de la vivienda; conserva su historial (RN-19, CA-02) */
         post: operations["PadronController_desactivarVivienda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/padron/viviendas/{viviendaId}/reactivacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vuelve a poner en servicio una vivienda dada de baja (B.2, RN-13) */
+        post: operations["PadronController_reactivarVivienda"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1432,6 +1466,10 @@ export interface components {
         };
         BloqueosVigentesDto: {
             bloqueos: components["schemas"]["BloqueoVigenteDto"][];
+        };
+        BorradoDefinitivoDto: {
+            borrada: boolean;
+            identificador: string;
         };
         CambiosDeConfiguracionDto: {
             /** @example Urbanización Mira */
@@ -4498,6 +4536,28 @@ export interface operations {
             };
         };
     };
+    PadronController_borrarViviendaDefinitivamente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                viviendaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BorradoDefinitivoDto"];
+                };
+            };
+        };
+    };
     PadronController_desactivarVivienda: {
         parameters: {
             query?: never;
@@ -4513,6 +4573,28 @@ export interface operations {
                 "application/json": components["schemas"]["DesactivarDto"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BajaDto"];
+                };
+            };
+        };
+    };
+    PadronController_reactivarVivienda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                viviendaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {

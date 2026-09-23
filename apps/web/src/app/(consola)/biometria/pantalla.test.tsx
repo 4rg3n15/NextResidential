@@ -133,3 +133,54 @@ describe('el fichero que no es una imagen', () => {
     );
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * B.6 · LA FOTO, CONECTADA AL FLUJO DE AUTORIZACIÓN
+ *
+ * La pantalla ya existía y funcionaba. Lo que no existía era el camino desde
+ * «Nueva autorización»: quien acaba de autorizar a un visitante tenía que ir al
+ * menú, abrir esta pantalla y volver a buscar a la misma persona por su nombre.
+ *
+ * Lo que se conecta es sólo eso. Aquí se comprueba que el atajo **no relaja
+ * nada**: el titular llega puesto, sigue siendo editable, y la captura no
+ * avanza ni un paso por venir preseleccionada.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('B.6 · el titular puede llegar preseleccionado', () => {
+  it('lo pinta como elegido, sin que nadie lo busque otra vez', () => {
+    render(
+      <Envoltura>
+        <PantallaDeBiometria
+          copropiedadId={COP}
+          titularInicial={{
+            id: '40000000-0000-4000-8000-000000000103',
+            nombreCompleto: 'Ana Pérez',
+            documento: '',
+          }}
+        />
+      </Envoltura>,
+    );
+    expect(screen.getByText(/Ana Pérez/)).toBeDefined();
+  });
+
+  it('y venir preseleccionado NO adelanta la captura ni el consentimiento', () => {
+    render(
+      <Envoltura>
+        <PantallaDeBiometria
+          copropiedadId={COP}
+          titularInicial={{
+            id: '40000000-0000-4000-8000-000000000103',
+            nombreCompleto: 'Ana Pérez',
+            documento: '',
+          }}
+        />
+      </Envoltura>,
+    );
+    // Sin fotografía no hay nada que enviar: el titular es el paso 1, no el
+    // único paso. Si esto pasara a `false`, el atajo se habría llevado por
+    // delante la validación de calidad (CA-08).
+    const enviar = screen.getByRole('button', { name: /Registrar|Solicitar/i });
+    expect((enviar as HTMLButtonElement).disabled).toBe(true);
+  });
+});

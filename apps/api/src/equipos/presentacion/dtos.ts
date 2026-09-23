@@ -27,7 +27,7 @@ export class AltaDeEquipoDto {
   tipo!: (typeof TIPOS_DE_EQUIPO)[number];
 
   /**
-   * IP o nombre. El patrón es de FORMA: impide que un «192.168.1.10 (la de la
+   * IP o nombre. El patrón es de FORMA: impide que un «203.0.113.10 (la de la
    * entrada)» entre como host y produzca un «no responde» incomprensible.
    */
   @ApiProperty({ type: String, example: '203.0.113.10' })

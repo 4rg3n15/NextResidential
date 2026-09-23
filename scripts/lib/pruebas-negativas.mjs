@@ -226,6 +226,34 @@ try {
       mal(`NO detectado (codigo ${r.codigo})`);
     }
     rmSync(sonda, { force: true });
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * LOS RANGOS DE DOCUMENTACIÓN NO SON UNA PUERTA TRASERA (ETAPA 15-B, A.7)
+     *
+     * El control acepta `192.0.2.x`, `198.51.100.x` y `203.0.113.x` porque el
+     * IETF los reserva para ejemplos (RFC 5737): no se enrutan y no pueden ser
+     * de ningún equipo. La tentación peligrosa era la contraria —aceptar
+     * `192.168.x.x` «porque es privada»—, y ésas SÍ son direcciones de equipos
+     * de verdad: la cámara de este proyecto vivía en una.
+     *
+     * Las dos direcciones se comprueban juntas y a propósito: una sola de las
+     * dos daría verde con el control roto en el otro sentido.
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    writeFileSync(sonda, `export const ejemplo = 'http://203.0.113.10:80/';\n`);
+    const doc = enClon('node', ['scripts/lib/frontera-hardware.mjs']);
+    doc.codigo === 0
+      ? ok('una IP de los rangos de documentación (RFC 5737) NO se marca')
+      : mal(`un ejemplo con 203.0.113.10 se marca como IP de equipo (codigo ${doc.codigo})`);
+
+    writeFileSync(sonda, `export const real = 'http://192.168.1.64:80/';\n`); // kpi-11-exento: sonda
+    const privada = enClon('node', ['scripts/lib/frontera-hardware.mjs']);
+    privada.codigo !== 0 && /sonda-hardware/.test(privada.salida)
+      ? ok('y una IP privada SIGUE marcándose: es la de un equipo de verdad')
+      : mal(`una IP privada pasó inadvertida (codigo ${privada.codigo})`);
+
+    rmSync(sonda, { force: true });
     enClon('node', ['scripts/lib/frontera-hardware.mjs']).salida === base
       ? ok('el banco de pruebas vuelve a su línea base')
       : mal('la sonda dejó rastro en el banco');

@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import type { PoolClient } from 'pg';
 import { Injectable } from '@nestjs/common';
 import type {
+  HistorialDeVivienda,
   AltaPersona,
   AltaResidente,
   AltaVehiculo,
@@ -678,6 +679,91 @@ export class RepositorioPadronPg implements RepositorioPadron {
         [copropiedadId, viviendaId, motivo, actorId],
       );
       return (rowCount ?? 0) > 0;
+    });
+  }
+
+  async reactivarVivienda(
+    copropiedadId: string,
+    viviendaId: string,
+    actorId: string,
+  ): Promise<boolean> {
+    return this.conContexto(async (c) => {
+      const { rowCount } = await c.query(
+        `UPDATE public.viviendas
+            SET estado='activo', desactivado_en=NULL, desactivado_por=NULL,
+                motivo_desactivacion=NULL, actualizado_por=$3
+          WHERE copropiedad_id=$1 AND id=$2 AND estado='inactivo'`,
+        [copropiedadId, viviendaId, actorId],
+      );
+      return (rowCount ?? 0) > 0;
+    });
+  }
+
+  async historialDeVivienda(
+    copropiedadId: string,
+    viviendaId: string,
+  ): Promise<HistorialDeVivienda | null> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{
+        identificador: string;
+        residentes: string;
+        vehiculos: string;
+        autorizaciones: string;
+        eventos: string;
+      }>(
+        `SELECT v.identificador,
+                (SELECT count(*) FROM public.residentes     r WHERE r.vivienda_id = v.id)::text AS residentes,
+                (SELECT count(*) FROM public.vehiculos      x WHERE x.vivienda_id = v.id)::text AS vehiculos,
+                (SELECT count(*) FROM public.autorizaciones a WHERE a.vivienda_id = v.id)::text AS autorizaciones,
+                (SELECT count(*) FROM public.eventos        e WHERE e.vivienda_id = v.id)::text AS eventos
+           FROM public.viviendas v
+          WHERE v.copropiedad_id = $1 AND v.id = $2`,
+        [copropiedadId, viviendaId],
+      );
+      const f = rows[0];
+      if (f === undefined) return null;
+      return {
+        identificador: f.identificador,
+        residentes: Number(f.residentes),
+        vehiculos: Number(f.vehiculos),
+        autorizaciones: Number(f.autorizaciones),
+        eventos: Number(f.eventos),
+      };
+    });
+  }
+
+  /**
+   * El borrado NO se hace con un `DELETE` desde aquí, y no es rodeo: ni
+   * `authenticated` ni `service_role` tienen el privilegio (migración 0015,
+   * D-20). Pasa por una función `SECURITY DEFINER` que vuelve a comprobar la
+   * copropiedad, vuelve a comprobar el historial y escribe el rastro en la
+   * MISMA transacción que el borrado. El disparador de `viviendas` sigue en
+   * pie y alcanza también al dueño de la tabla: si esta función se equivocara,
+   * la base seguiría negándose.
+   */
+  async borrarViviendaDefinitivamente(
+    copropiedadId: string,
+    viviendaId: string,
+    actorId: string,
+  ): Promise<{ borrada: boolean; motivo?: string }> {
+    return this.conContexto(async (c) => {
+      try {
+        await c.query('SELECT app.borrar_vivienda_definitivamente($1, $2, $3)', [
+          copropiedadId,
+          viviendaId,
+          actorId,
+        ]);
+        return { borrada: true };
+      } catch (e) {
+        const codigo = (e as { code?: string }).code;
+        // `restrict_violation` es la negativa por historial; `no_data_found`,
+        // la vivienda que no existe en esta copropiedad. Cualquier otra cosa
+        // es un fallo de verdad y sube.
+        if (codigo === '2BP01' || codigo === '23001' || codigo === 'P0002') {
+          return { borrada: false, motivo: (e as Error).message };
+        }
+        throw e;
+      }
     });
   }
 

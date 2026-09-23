@@ -5,7 +5,7 @@ import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { REPOSITORIO_DE_EQUIPOS, SONDA_DE_EQUIPO } from './aplicacion/puertos';
 import { RepositorioDeEquiposPg } from './infraestructura/repositorio-equipos-pg';
-import { SondaIsapi } from './infraestructura/sonda-isapi';
+import { SondaPorProveedor } from './infraestructura/sonda-por-proveedor';
 import { EquiposController } from './presentacion/equipos.controller';
 
 /**
@@ -24,7 +24,7 @@ export class EquiposModule {
       module: EquiposModule,
       controllers: [EquiposController],
       providers: [
-        { provide: SONDA_DE_EQUIPO, useFactory: () => new SondaIsapi() },
+        { provide: SONDA_DE_EQUIPO, useFactory: () => new SondaPorProveedor() },
         {
           provide: REPOSITORIO_DE_EQUIPOS,
           inject: [Pool, CONFIGURACION],

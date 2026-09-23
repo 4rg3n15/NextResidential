@@ -317,6 +317,66 @@ describe('el diálogo de configuración inicial', () => {
     );
   });
 
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * B.3 · EL NOMBRE SE ESCRIBÍA EN «DIRECCIÓN»
+   *
+   * El diálogo no pedía el nombre. La copropiedad llega con el que le puso el
+   * guion de aprovisionamiento, así que quien entra por primera vez busca
+   * dónde poner el de su conjunto y escribe en el único campo de texto libre
+   * que hay: la dirección. No era un error del usuario, era el formulario
+   * preguntando otra cosa — y no había ni una prueba que lo mirara.
+   * ═════════════════════════════════════════════════════════════════════════
+   */
+  it('B.3 · pide el NOMBRE, relleno con el que hay, y lo sobrescribe', async () => {
+    montarDialogo(
+      { ...CONFIGURACION, tipo: null, nombre: 'Copropiedad de arranque' },
+      'administrador',
+    );
+    await screen.findByRole('dialog');
+
+    const nombre = screen.getByLabelText(/Nombre de la copropiedad/) as HTMLInputElement;
+    expect(nombre.value).toBe('Copropiedad de arranque');
+
+    fireEvent.change(nombre, { target: { value: 'Torres del Parque' } });
+    fireEvent.change(screen.getByLabelText(/Dirección del conjunto/), {
+      target: { value: 'Km 4 Via La Calera' },
+    });
+    fireEvent.click(screen.getByLabelText(/Apartamentos/));
+    fireEvent.click(screen.getByRole('button', { name: /Guardar configuración/ }));
+
+    await waitFor(() => {
+      const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+      const escritura = (espia.mock.calls as readonly unknown[][])
+        .map(([e]) => e)
+        .find((e): e is Request => e instanceof Request && e.method !== 'GET');
+      expect(escritura).toBeDefined();
+    });
+
+    const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const escritura = (espia.mock.calls as readonly unknown[][])
+      .map(([e]) => e)
+      .find((e): e is Request => e instanceof Request && e.method !== 'GET');
+    const cuerpo = (await escritura!.clone().json()) as Record<string, unknown>;
+    // El nombre va al nombre, y la dirección a la dirección.
+    expect(cuerpo['nombre']).toBe('Torres del Parque');
+    expect(cuerpo['direccion']).toBe('Km 4 Via La Calera');
+  });
+
+  it('B.4 · una dirección sin número no deja enviar, y dice por qué', async () => {
+    montarDialogo({ ...CONFIGURACION, tipo: null }, 'administrador');
+    await screen.findByRole('dialog');
+
+    fireEvent.click(screen.getByLabelText(/Apartamentos/));
+    fireEvent.change(screen.getByLabelText(/Dirección del conjunto/), {
+      target: { value: 'Calle del Bosque' },
+    });
+
+    const enviar = screen.getByRole('button', { name: /Guardar configuración/ });
+    expect((enviar as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/al menos 8 caracteres, con vía y número/)).toBeDefined();
+  });
+
   it('a quien no puede configurar no se le pregunta, y ni siquiera se consulta', () => {
     // La API le responde 404 a un portero; pedirlo para luego no pintar nada
     // sería una petición que solo sirve para llenar el registro de errores.

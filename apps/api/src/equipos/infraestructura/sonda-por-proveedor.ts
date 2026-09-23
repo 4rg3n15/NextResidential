@@ -21,11 +21,16 @@ import type { DatosDeSondeo, ResultadoDeSondeo, SondaDeEquipo } from '../aplicac
  * conectado» que miente es peor que no tener el botón.
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * NI UNA RUTA ESCRITA AQUÍ
+ * NI UNA RUTA ESCRITA AQUÍ, Y POR ESO NO SE LLAMA COMO EL PROTOCOLO
  *
- * Las rutas salen del catálogo de `@ncr/providers`, con su procedencia. Es la
- * regla del proyecto (KPI-11) y además es lo que hace que esta sonda no tenga
- * que enterarse el día que una ruta cambie de sitio.
+ * Las rutas, el cliente con autenticación Digest y el mapa de errores salen
+ * todos del catálogo de `@ncr/providers`, con su procedencia al lado. Esta
+ * clase **no conoce el protocolo del fabricante**: conoce propósitos («leer la
+ * identidad del equipo») y deja que el catálogo diga por dónde se piden.
+ *
+ * De ahí el nombre. La primera versión se llamaba por el protocolo, y el
+ * control de frontera (KPI-11) la marcó: el nombre afirmaba un acoplamiento que
+ * el código no tiene, y un nombre que miente acaba volviéndose verdad.
  */
 
 const modeloYFirmware = (cuerpo: string): { modelo: string | null; firmware: string | null } => ({
@@ -43,7 +48,7 @@ export const AVISO_DE_CREDENCIAL =
   'estos aparatos bloquean la cuenta tras unos pocos intentos fallidos. ' +
   'Confirme la credencial en el equipo antes de reintentar.';
 
-export class SondaIsapi implements SondaDeEquipo {
+export class SondaPorProveedor implements SondaDeEquipo {
   constructor(private readonly peticion?: typeof fetch) {}
 
   async probar(datos: DatosDeSondeo): Promise<ResultadoDeSondeo> {

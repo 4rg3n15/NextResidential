@@ -253,9 +253,50 @@ export interface RepositorioPadron {
     motivo: string,
     actorId: string,
   ): Promise<boolean>;
+  /**
+   * B.2 · reactivación auditada de una vivienda dada de baja.
+   *
+   * Respeta RN-13 sin tocarla: una vivienda inactiva no genera autorizaciones
+   * nuevas pero conserva las vigentes, así que volver a activarla no resucita
+   * nada — sólo deja de bloquear lo nuevo.
+   */
+  reactivarVivienda(copropiedadId: string, viviendaId: string, actorId: string): Promise<boolean>;
+  /**
+   * B.2 · qué historial tiene una vivienda, contado por clase.
+   *
+   * Es una LECTURA para informar y para poder decir «no se puede, y esto es lo
+   * que lo impide». La garantía no está aquí: está en el disparador de la base
+   * (migración 0032), que alcanza también al dueño de la tabla.
+   */
+  historialDeVivienda(
+    copropiedadId: string,
+    viviendaId: string,
+  ): Promise<HistorialDeVivienda | null>;
+  /**
+   * B.2 · borrado DEFINITIVO, y sólo donde no hay historial. Devuelve el
+   * motivo del rechazo cuando la base se niega, para que el mensaje diga qué lo
+   * impide en vez de «error inesperado».
+   */
+  borrarViviendaDefinitivamente(
+    copropiedadId: string,
+    viviendaId: string,
+    actorId: string,
+  ): Promise<{ readonly borrada: boolean; readonly motivo?: string }>;
   contarVehiculosActivos(copropiedadId: string, placa: Placa): Promise<number>;
   /** Ejecuta varias operaciones en una sola transacción (carga de padrón). */
   enTransaccion<T>(operacion: (repo: RepositorioPadron) => Promise<T>): Promise<T>;
 }
+
+/** Cuántos registros de cada clase cuelgan de una vivienda. */
+export interface HistorialDeVivienda {
+  readonly identificador: string;
+  readonly residentes: number;
+  readonly vehiculos: number;
+  readonly autorizaciones: number;
+  readonly eventos: number;
+}
+
+export const totalDeHistorial = (h: HistorialDeVivienda): number =>
+  h.residentes + h.vehiculos + h.autorizaciones + h.eventos;
 
 export const REPOSITORIO_PADRON = Symbol.for('ncr.puerto.RepositorioPadron');

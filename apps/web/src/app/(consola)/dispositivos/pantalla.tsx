@@ -13,6 +13,7 @@ import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
 import { estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useDispositivos, useDispositivosPendientes } from '@/lib/api/consultas';
+import { AltaDeEquipo } from './alta-de-equipo';
 
 type Operacion = 'configuracion' | 'sincronizacion' | 'reinicio';
 
@@ -66,6 +67,7 @@ export const PantallaDeDispositivos = ({
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enCurso, setEnCurso] = useState<string | null>(null);
+  const [dandoDeAlta, setDandoDeAlta] = useState(false);
 
   /**
    * Las tres rutas se escriben ENTERAS y no se componen con una plantilla. El
@@ -222,6 +224,17 @@ export const PantallaDeDispositivos = ({
   const equipos = consulta.data?.dispositivos ?? [];
   const enLinea = equipos.filter((d) => d.estado === 'saludable').length;
 
+  /**
+   * A.4 · «Sincronizar todo» encola la orden en CADA equipo, una por una y por
+   * la misma ruta que el botón de la fila. No hay un endpoint «todos» a
+   * propósito: el rastro de auditoría tiene que decir qué equipo se sincronizó
+   * y quién lo pidió, y un lote colapsaría eso en una sola línea.
+   */
+  const sincronizarTodo = async (): Promise<void> => {
+    for (const d of equipos) await ordenar(d.id, 'sincronizacion');
+    setAviso(`Se encoló la sincronización de ${String(equipos.length)} equipo(s)`);
+  };
+
   return (
     <>
       <EncabezadoDePantalla
@@ -240,6 +253,27 @@ export const PantallaDeDispositivos = ({
             </>
           )
         }
+        acciones={
+          <div className="flex gap-2">
+            <Boton
+              variante="secundario"
+              tamano="sm"
+              disabled={enCurso !== null || equipos.length === 0}
+              onClick={() => void sincronizarTodo()}
+            >
+              Sincronizar todo
+            </Boton>
+            <Boton tamano="sm" onClick={() => setDandoDeAlta(true)}>
+              + Agregar equipo
+            </Boton>
+          </div>
+        }
+      />
+
+      <AltaDeEquipo
+        copropiedadId={copropiedadId}
+        abierto={dandoDeAlta}
+        alCerrar={() => setDandoDeAlta(false)}
       />
 
       {aviso !== null ? (
@@ -269,7 +303,7 @@ export const PantallaDeDispositivos = ({
         vacio={{
           titulo: 'Sin dispositivos',
           descripcion:
-            'No hay equipos registrados en esta copropiedad. Se registran con la integración de hardware.',
+            'No hay equipos registrados en esta copropiedad. Use «Agregar equipo» con la dirección, el usuario y la clave del aparato.',
         }}
       />
     </>

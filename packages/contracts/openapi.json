@@ -3544,6 +3544,50 @@
         ]
       }
     },
+    "/copropiedades/{id}/padron/viviendas/{viviendaId}": {
+      "delete": {
+        "operationId": "PadronController_borrarViviendaDefinitivamente",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BorradoDefinitivoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Borrado DEFINITIVO, sólo si la vivienda no tiene historial (B.2, RN-19)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
     "/copropiedades/{id}/padron/viviendas/{viviendaId}/desactivacion": {
       "post": {
         "operationId": "PadronController_desactivarVivienda",
@@ -3593,6 +3637,50 @@
           }
         ],
         "summary": "Baja lógica de la vivienda; conserva su historial (RN-19, CA-02)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
+    "/copropiedades/{id}/padron/viviendas/{viviendaId}/reactivacion": {
+      "post": {
+        "operationId": "PadronController_reactivarVivienda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BajaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vuelve a poner en servicio una vivienda dada de baja (B.2, RN-13)",
         "tags": [
           "padron"
         ]
@@ -4574,6 +4662,21 @@
         },
         "required": [
           "bloqueos"
+        ]
+      },
+      "BorradoDefinitivoDto": {
+        "type": "object",
+        "properties": {
+          "borrada": {
+            "type": "boolean"
+          },
+          "identificador": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "borrada",
+          "identificador"
         ]
       },
       "CambiosDeConfiguracionDto": {

@@ -5,7 +5,7 @@ import { COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import type { Firmante } from './utilidades';
 import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
-import { SondaIsapi } from '../src/equipos/infraestructura/sonda-isapi';
+import { SondaPorProveedor } from '../src/equipos/infraestructura/sonda-por-proveedor';
 
 /**
  * A · APROVISIONAMIENTO DE EQUIPOS DESDE LA CONSOLA
@@ -21,7 +21,7 @@ import { SondaIsapi } from '../src/equipos/infraestructura/sonda-isapi';
  *
  * El `fetch` se inyecta. Un doble de `fetch` no es una simulación del equipo:
  * es la respuesta EXACTA que el equipo daría en cada uno de los cuatro casos,
- * escrita a mano a partir de la documentación ISAPI.
+ * escrita a mano a partir de la documentación del fabricante.
  */
 let app: INestApplication;
 
@@ -168,7 +168,7 @@ describe('A.2 · quién puede, rol a rol', () => {
  * ═══════════════════════════════════════════════════════════════════════════
  * A.3 · LOS CUATRO RESULTADOS, CON LA RESPUESTA EXACTA DEL EQUIPO
  *
- * Aquí la sonda NO se sustituye: se ejercita `SondaIsapi` de verdad, con un
+ * Aquí la sonda NO se sustituye: se ejercita `SondaPorProveedor` de verdad, con un
  * `fetch` que devuelve lo que devolvería el aparato. Sustituir la sonda habría
  * probado el controlador y dejado sin probar justo lo que esta parte añade.
  * ═══════════════════════════════════════════════════════════════════════════
@@ -180,8 +180,8 @@ const INFO = `<?xml version="1.0"?><DeviceInfo>
   <model>DS-TCG405-E</model><firmwareVersion>V5.7.3</firmwareVersion></DeviceInfo>`;
 
 describe('A.3 · «probar conexión» distingue cuatro situaciones, no una', () => {
-  const sondaCon = (manejar: (url: string) => Response): SondaIsapi =>
-    new SondaIsapi(((entrada: string | URL) =>
+  const sondaCon = (manejar: (url: string) => Response): SondaPorProveedor =>
+    new SondaPorProveedor(((entrada: string | URL) =>
       Promise.resolve(manejar(String(entrada)))) as typeof fetch);
 
   it('alcanzado: guarda modelo y firmware del propio equipo', async () => {
@@ -227,7 +227,7 @@ describe('A.3 · «probar conexión» distingue cuatro situaciones, no una', () 
   });
 
   it('inalcanzable: nombra host y puerto, y NUNCA el secreto', async () => {
-    const r = await new SondaIsapi((() =>
+    const r = await new SondaPorProveedor((() =>
       Promise.reject(new Error('connect ECONNREFUSED'))) as typeof fetch).probar({
       ...ALTA,
       tipo: 'camara_lpr',

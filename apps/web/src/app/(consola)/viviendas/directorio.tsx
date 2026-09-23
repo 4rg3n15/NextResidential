@@ -51,6 +51,7 @@ export const DirectorioDeViviendas = ({
   const [alta, setAlta] = useState<{ readonly agrupacion: string } | null>(null);
   const [generando, setGenerando] = useState(false);
   const [baja, setBaja] = useState<Vivienda | null>(null);
+  const [borrado, setBorrado] = useState<Vivienda | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -101,6 +102,61 @@ export const DirectorioDeViviendas = ({
       // reinterpretarlo aquí produciría un texto que no coincide con lo que
       // ocurrió.
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo crear la vivienda');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * B.2 · REACTIVAR Y BORRAR DE VERDAD
+   *
+   * La baja lógica es lo normal y no cambia. Lo que faltaba eran los dos
+   * extremos: volver a poner en servicio una vivienda dada de baja, y borrar
+   * de verdad la que se creó por error.
+   *
+   * **La decisión es del SERVIDOR.** Aquí se ofrece el botón y se muestra lo
+   * que conteste; si tiene historial, la API responde con el recuento exacto
+   * de lo que lo impide y ese texto viaja tal cual. Adivinar aquí produciría
+   * un mensaje que no coincide con lo que ocurrió.
+   */
+  const reactivar = async (v: Vivienda): Promise<void> => {
+    setEnviando(true);
+    setError(undefined);
+    try {
+      desenvolver(
+        await cliente.POST('/copropiedades/{id}/padron/viviendas/{viviendaId}/reactivacion', {
+          params: { path: { id: copropiedadId, viviendaId: v.id } },
+        }),
+      );
+      setAviso(
+        `${nombreDeVivienda(vocabulario, v.identificador, v.agrupacion)} vuelve a estar en servicio.`,
+      );
+      await refrescar();
+    } catch (e) {
+      setError(e instanceof ErrorDeApi ? e.message : 'No se pudo reactivar');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const borrarDefinitivamente = async (): Promise<void> => {
+    if (borrado === null) return;
+    setEnviando(true);
+    setError(undefined);
+    try {
+      const r = desenvolver(
+        await cliente.DELETE('/copropiedades/{id}/padron/viviendas/{viviendaId}', {
+          params: { path: { id: copropiedadId, viviendaId: borrado.id } },
+        }),
+      );
+      setBorrado(null);
+      setAviso(`Se borró definitivamente ${r.identificador}. No queda rastro de la vivienda.`);
+      await refrescar();
+    } catch (e) {
+      // El mensaje de la API dice CUÁNTOS residentes, vehículos, autorizaciones
+      // y eventos lo impiden. Sustituirlo por «no se puede» mandaría a adivinar.
+      setError(e instanceof ErrorDeApi ? e.message : 'No se pudo borrar');
     } finally {
       setEnviando(false);
     }
@@ -287,8 +343,21 @@ export const DirectorioDeViviendas = ({
                         Desactivar
                       </Boton>
                     ) : (
-                      <span className="text-secundario text-texto-apagado">
-                        {v.motivoDesactivacion ?? 'Sin motivo registrado'}
+                      <span className="flex items-center gap-2">
+                        <span className="text-secundario text-texto-apagado">
+                          {v.motivoDesactivacion ?? 'Sin motivo registrado'}
+                        </span>
+                        <Boton
+                          variante="secundario"
+                          tamano="sm"
+                          disabled={enviando}
+                          onClick={() => void reactivar(v)}
+                        >
+                          Reactivar
+                        </Boton>
+                        <Boton variante="peligro" tamano="sm" onClick={() => setBorrado(v)}>
+                          Borrar
+                        </Boton>
                       </span>
                     )}
                   </span>
@@ -352,6 +421,26 @@ export const DirectorioDeViviendas = ({
           }}
         />
       ) : null}
+
+      <DialogoDeConfirmacion
+        abierto={borrado !== null}
+        titulo={`Borrar definitivamente ${borrado === null ? '' : nombreDeVivienda(vocabulario, borrado.identificador, borrado.agrupacion)}`}
+        descripcion="Esto BORRA la vivienda. Solo se permite si no tiene ningún residente, vehículo, autorización ni evento: con historial, el sistema lo rechaza y dice qué lo impide."
+        etiquetaConfirmar="Borrar definitivamente"
+        enviando={enviando}
+        error={error}
+        sinMotivo
+        alConfirmar={() => void borrarDefinitivamente()}
+        alCancelar={() => {
+          setBorrado(null);
+          setError(undefined);
+        }}
+      >
+        <p className="rounded-md border border-peligro bg-peligro-suave px-3 py-2 text-secundario text-peligro-texto">
+          Es para la vivienda <strong>creada por error</strong>. Si ya tiene historial, use
+          «Desactivar»: el historial de accesos no se borra nunca (RN-19).
+        </p>
+      </DialogoDeConfirmacion>
 
       <DialogoDeConfirmacion
         abierto={baja !== null}

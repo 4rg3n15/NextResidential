@@ -54,10 +54,16 @@ const HORAS_DE_VIDA = 24;
 
 export const PantallaDeBiometria = ({
   copropiedadId,
+  titularInicial,
 }: {
   readonly copropiedadId: string;
+  /**
+   * B.6 · quien llega desde «Nueva autorización» trae ya al visitante elegido.
+   * Sigue siendo editable: el buscador está donde estaba y se puede cambiar.
+   */
+  readonly titularInicial?: PersonaElegida;
 }): JSX.Element => {
-  const [titular, setTitular] = useState<PersonaElegida | null>(null);
+  const [titular, setTitular] = useState<PersonaElegida | null>(titularInicial ?? null);
   const [preparada, setPreparada] = useState<Preparada | null>(null);
   const [confirmaEncuadre, setConfirmaEncuadre] = useState(false);
   const [versionPolitica, setVersionPolitica] = useState('v1');
