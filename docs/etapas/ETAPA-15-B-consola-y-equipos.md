@@ -272,7 +272,56 @@ Y una consecuencia del trinquete de ramas: las dos sondas nuevas de
 quedan sobre la base anterior —guardas defensivas del lector de informes— se
 declararon con `--actualizar`, que es justo para lo que existe.
 
-El veredicto literal de `./scripts/verificar-etapa.sh --con-base` está en §10.
+### El veredicto literal de `./scripts/verificar-etapa.sh --con-base`
+
+Corrido sobre `a0e8baf`, con base PostgreSQL 16.13 y Chromium:
+
+```
+VERIFICACIÓN DE ETAPA: FALLIDA — NO se cierra la etapa
+```
+
+**Y hay que leer POR QUÉ, porque no es lo que parece.** Los cuatro fallos son
+uno solo, repetido:
+
+```
+✗ no hay SDK de Flutter (flutter). Instálelo o exporte NCR_FLUTTER; una omisión no es un verde
+✗ no hay SDK de Flutter (flutter): la suite de la app no se ejecutó
+✗ no hay SDK de Flutter (flutter): no se pudo comprobar si el cliente Dart está al día
+✗ no hay SDK de Flutter (flutter): la app no se compiló ni se recorrió
+```
+
+**El contenedor donde se construyó esta ronda no tiene SDK de Flutter.** El
+verificador lo dice con esas palabras y se pone rojo a propósito: «una omisión
+no es un verde» es su regla, y sería deshonesto presentarla como otra cosa. No
+es un fallo del código de esta rama: es la app móvil sin medir aquí.
+
+**Quien sí la mide es el CI**, en el trabajo `verificar-etapa.sh --con-base
+(macos)`, que ejecuta este mismo guion con el SDK instalado. Ése es el veredicto
+que cubre los cuatro pasos y el que hay que mirar para la app.
+
+**Todo lo demás, en verde**, incluidos los pasos que esta ronda tocaba:
+
+```
+✓ pnpm lint · pnpm typecheck
+✓ suite completa: 2 129 pruebas, 5 saltadas DECLARADAS y ejercidas en el paso 12b
+✓ 167 de 167 ficheros de prueba ejecutados
+✓ las tres capas cumplen su umbral
+     dominio 97.68 % · aplicacion 97.27 % · global 76.86 %
+✓ recuentos: 6 paquete(s) con el mismo resultado por los dos caminos · 2129 pruebas
+✓ PRUEBAS NEGATIVAS: los 27 controles detectan su violación y aceptan el caso
+  legítimo, sin tocar el árbol
+✓ ramas: 35 controles medidos · 231 bloques sin ejercer (no puede subir)
+✓ fronteras (DoD ETAPA 02)
+✓ frontera-modulos: 13 módulos (… equipos …), ninguna importación entra por dentro
+✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers
+✓ migraciones, semillas y suite SQL
+✓ el camino completo se recorre en el navegador
+✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
+✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico
+✓ OK 26 de 26 pasos ejecutados
+```
 
 ---
 
