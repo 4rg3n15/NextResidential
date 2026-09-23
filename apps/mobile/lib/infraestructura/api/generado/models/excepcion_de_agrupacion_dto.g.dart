@@ -10,14 +10,12 @@ ExcepcionDeAgrupacionDto _$ExcepcionDeAgrupacionDtoFromJson(
   Map<String, dynamic> json,
 ) => ExcepcionDeAgrupacionDto(
   agrupacion: json['agrupacion'] as String,
-  pisos: json['pisos'] as num,
-  porPiso: json['porPiso'] as num,
+  cantidad: json['cantidad'] as num,
 );
 
 Map<String, dynamic> _$ExcepcionDeAgrupacionDtoToJson(
   ExcepcionDeAgrupacionDto instance,
 ) => <String, dynamic>{
   'agrupacion': instance.agrupacion,
-  'pisos': instance.pisos,
-  'porPiso': instance.porPiso,
+  'cantidad': instance.cantidad,
 };

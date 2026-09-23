@@ -5,7 +5,6 @@
 import 'package:json_annotation/json_annotation.dart';
 
 import 'confirmar_generacion_dto_estilo.dart';
-import 'confirmar_generacion_dto_tipo.dart';
 import 'excepcion_de_agrupacion_dto.dart';
 
 part 'confirmar_generacion_dto.g.dart';
@@ -13,31 +12,23 @@ part 'confirmar_generacion_dto.g.dart';
 @JsonSerializable()
 class ConfirmarGeneracionDto {
   const ConfirmarGeneracionDto({
-    required this.tipo,
+    required this.agrupaciones,
+    required this.cantidad,
     required this.totalEsperado,
-    this.agrupaciones,
     this.estilo,
-    this.pisos,
     this.porPiso,
-    this.excepciones,
-    this.secciones,
-    this.total,
     this.reiniciarNumeracion,
-    this.cantidad,
+    this.excepciones,
   });
   
   factory ConfirmarGeneracionDto.fromJson(Map<String, Object?> json) => _$ConfirmarGeneracionDtoFromJson(json);
   
-  final ConfirmarGeneracionDtoTipo tipo;
-  final num? agrupaciones;
+  final num agrupaciones;
   final ConfirmarGeneracionDtoEstilo? estilo;
-  final num? pisos;
+  final num cantidad;
   final num? porPiso;
-  final List<ExcepcionDeAgrupacionDto>? excepciones;
-  final num? secciones;
-  final num? total;
   final bool? reiniciarNumeracion;
-  final num? cantidad;
+  final List<ExcepcionDeAgrupacionDto>? excepciones;
   final num totalEsperado;
 
   Map<String, Object?> toJson() => _$ConfirmarGeneracionDtoToJson(this);

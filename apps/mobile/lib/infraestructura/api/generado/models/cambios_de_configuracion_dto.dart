@@ -18,9 +18,7 @@ class CambiosDeConfiguracionDto {
     this.etiquetaVivienda,
     this.etiquetaAgrupacion,
     this.zonaHoraria,
-    this.umbralConfianzaPlaca,
     this.politicaContingenciaEdge,
-    this.umbralLatidoMinutos,
   });
   
   factory CambiosDeConfiguracionDto.fromJson(Map<String, Object?> json) => _$CambiosDeConfiguracionDtoFromJson(json);
@@ -31,9 +29,7 @@ class CambiosDeConfiguracionDto {
   final String? etiquetaVivienda;
   final String? etiquetaAgrupacion;
   final String? zonaHoraria;
-  final num? umbralConfianzaPlaca;
   final CambiosDeConfiguracionDtoPoliticaContingenciaEdge? politicaContingenciaEdge;
-  final num? umbralLatidoMinutos;
 
   Map<String, Object?> toJson() => _$CambiosDeConfiguracionDtoToJson(this);
 }
