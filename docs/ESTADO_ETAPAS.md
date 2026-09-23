@@ -845,6 +845,24 @@ de rotación escrito. Pendiente de firma.
   reportero, que depende de `CI`. Ahora lee el informe JSON, que los seis
   paquetes emiten siempre desde un solo sitio.
 
+### Lo que el verificador destapó al cerrar la ronda
+
+Tres defectos que nadie había previsto, y los tres de la familia que este
+proyecto persigue: **código nuevo que nadie había visto ejercitarse**.
+
+1. **`generacion-padron.test.ts` usaba la forma antigua del plan.** Sólo corre
+   con base, así que la suite sin `--con-base` lo daba por bueno. Es el
+   argumento de `--con-base` en una línea.
+2. **El control de coherencia leía como «en curso» una rama que la cabecera
+   declara CERRADA.** Recogía cualquier nombre entre acentos graves de una
+   línea que mencionara «en curso», y en este documento una misma línea nombra
+   a menudo dos ramas. Ahora exige la frase con la que el documento lo escribe
+   de verdad.
+3. **El recorrido del navegador no arrancaba: `EQUIPOS_LLAVE: Required`.** Es
+   §2.7.1 funcionando —una variable obligatoria que falta impide el arranque—,
+   y el único paso capaz de verlo es el único que ejecuta el proceso compilado
+   en vez de montar la aplicación en memoria.
+
 ### Lo que NO se pudo hacer, dicho con esas palabras
 
 `docs/hikdocs/` —el destilado de la guía ANPR— vive en la máquina del usuario y

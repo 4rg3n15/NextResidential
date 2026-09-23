@@ -256,6 +256,22 @@ ejecutarse, y rojo que viene de fuera de las pruebas.
 | `@ncr/config`                               | 144 pasan                                                              |
 | Suite SQL (`--con-pruebas --modo-supabase`) | verificación completa, incluido `70_equipos_y_borrado_de_vivienda.sql` |
 
+### Lo que el verificador destapó AL CERRAR, y que no estaba previsto
+
+Tres, y los tres son de la misma familia que este proyecto persigue: código
+nuevo que nadie había visto ejercitarse.
+
+| Hallazgo                                                                                                                                                                                                                                           | Corregido en |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| **`generacion-padron.test.ts` usaba la forma antigua del plan.** Sólo corre con base, así que la suite sin `--con-base` la daba por buena                                                                                                          | `d90a233`    |
+| **`coherencia-estado-etapas.mjs` leía como «en curso» una rama que la cabecera declara CERRADA.** Recogía cualquier nombre entre acentos graves de una línea que mencionara «en curso», y en este documento una línea nombra a menudo varias ramas | `a1c4dae`    |
+| **El recorrido del navegador no arrancaba: `EQUIPOS_LLAVE: Required`.** Es §2.7.1 funcionando — una variable obligatoria que falta impide el arranque—, y el único paso que lo podía ver es el único que ejecuta el proceso compilado              | `70f6455`    |
+
+Y una consecuencia del trinquete de ramas: las dos sondas nuevas de
+`estabilidad.mjs` bajaron los bloques sin ejecutar de 16 a 13, y los cinco que
+quedan sobre la base anterior —guardas defensivas del lector de informes— se
+declararon con `--actualizar`, que es justo para lo que existe.
+
 El veredicto literal de `./scripts/verificar-etapa.sh --con-base` está en §10.
 
 ---
