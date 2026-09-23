@@ -847,8 +847,10 @@ de rotación escrito. Pendiente de firma.
 
 ### Lo que el verificador destapó al cerrar la ronda
 
-Tres defectos que nadie había previsto, y los tres de la familia que este
-proyecto persigue: **código nuevo que nadie había visto ejercitarse**.
+Cinco defectos que nadie había previsto, y todos de la familia que este
+proyecto persigue: **código nuevo que nadie había visto ejercitarse**. Los dos
+últimos los encontró el CI, no la máquina de desarrollo, que es justo para lo
+que existen las dos plataformas.
 
 1. **`generacion-padron.test.ts` usaba la forma antigua del plan.** Sólo corre
    con base, así que la suite sin `--con-base` lo daba por bueno. Es el
@@ -862,6 +864,20 @@ proyecto persigue: **código nuevo que nadie había visto ejercitarse**.
    §2.7.1 funcionando —una variable obligatoria que falta impide el arranque—,
    y el único paso capaz de verlo es el único que ejecuta el proceso compilado
    en vez de montar la aplicación en memoria.
+4. **El cliente Dart se quedó atrás.** El contrato ganó los DTO de equipos y
+   cambió la forma del plan de viviendas; §2.6 exige que ese cliente sea
+   **generado**, así que se regeneró con el SDK fijado en `.flutter-version`
+   (207 ficheros) y se retiraron a mano los dos `*_tipo.dart` que el contrato
+   ya no produce —`swagger_parser` no borra lo que deja de generar—. Lo
+   confirma de paso: `EquipoDto`, el tipo de LECTURA, **no tiene el campo
+   `secreto`**.
+5. **D-115 · un `pg_ctl` no es un servidor.** La fórmula `libpq` de Homebrew
+   —la que trae el runner de macOS— instala `psql`, `pg_ctl` e `initdb` y **no**
+   el servidor. `base-de-pruebas.sh` elegía ese directorio porque encontraba
+   `pg_ctl`, y reventaba a mitad de `initdb`, donde ya no se distingue de un
+   control roto. Ahora exige los tres binarios, lo dice con esas palabras,
+   admite `NCR_PGBIN` —validado igual— y tiene prueba negativa que reproduce el
+   escenario en cualquier máquina.
 
 ### Lo que NO se pudo hacer, dicho con esas palabras
 

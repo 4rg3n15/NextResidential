@@ -258,14 +258,18 @@ ejecutarse, y rojo que viene de fuera de las pruebas.
 
 ### Lo que el verificador destapó AL CERRAR, y que no estaba previsto
 
-Tres, y los tres son de la misma familia que este proyecto persigue: código
-nuevo que nadie había visto ejercitarse.
+Cinco, y todos de la misma familia que este proyecto persigue: código nuevo que
+nadie había visto ejercitarse. Los dos últimos los encontró el CI y no la
+máquina de desarrollo — que es exactamente para lo que el flujo corre en dos
+plataformas.
 
-| Hallazgo                                                                                                                                                                                                                                           | Corregido en |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| **`generacion-padron.test.ts` usaba la forma antigua del plan.** Sólo corre con base, así que la suite sin `--con-base` la daba por buena                                                                                                          | `d90a233`    |
-| **`coherencia-estado-etapas.mjs` leía como «en curso» una rama que la cabecera declara CERRADA.** Recogía cualquier nombre entre acentos graves de una línea que mencionara «en curso», y en este documento una línea nombra a menudo varias ramas | `a1c4dae`    |
-| **El recorrido del navegador no arrancaba: `EQUIPOS_LLAVE: Required`.** Es §2.7.1 funcionando — una variable obligatoria que falta impide el arranque—, y el único paso que lo podía ver es el único que ejecuta el proceso compilado              | `70f6455`    |
+| Hallazgo                                                                                                                                                                                                                                                                    | Corregido en |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| **`generacion-padron.test.ts` usaba la forma antigua del plan.** Sólo corre con base, así que la suite sin `--con-base` la daba por buena                                                                                                                                   | `d90a233`    |
+| **`coherencia-estado-etapas.mjs` leía como «en curso» una rama que la cabecera declara CERRADA.** Recogía cualquier nombre entre acentos graves de una línea que mencionara «en curso», y en este documento una línea nombra a menudo varias ramas                          | `a1c4dae`    |
+| **El recorrido del navegador no arrancaba: `EQUIPOS_LLAVE: Required`.** Es §2.7.1 funcionando — una variable obligatoria que falta impide el arranque—, y el único paso que lo podía ver es el único que ejecuta el proceso compilado                                       | `70f6455`    |
+| **El cliente Dart se quedó atrás** respecto del contrato, que ganó los DTO de equipos y cambió la forma del plan de viviendas. §2.6 exige que sea generado: se regeneró con el SDK fijado (207 ficheros) y se retiraron los dos `*_tipo.dart` que el contrato ya no produce | `767793e`    |
+| **D-115 · un `pg_ctl` no es un servidor.** La fórmula `libpq` del runner de macOS trae los clientes y no el servidor; `base-de-pruebas.sh` daba ese directorio por bueno y moría dentro de `initdb`, donde ya no se distingue de un control roto                            | `2360dee`    |
 
 Y una consecuencia del trinquete de ramas: las dos sondas nuevas de
 `estabilidad.mjs` bajaron los bloques sin ejecutar de 16 a 13, y los cinco que
@@ -320,12 +324,12 @@ Lo que el verificador dio por bueno, literal:
 Los **cuatro** trabajos de `verificacion.yml` sobre `2360dee`
 ([corrida 215](https://github.com/4rg3n15/NextResidential/actions/runs/35830127119)):
 
-| Trabajo                                 | Resultado             |
-| --------------------------------------- | --------------------- |
-| `controles (ubuntu-latest)`             | verde                 |
-| `controles (macos-latest)`              | verde                 |
-| `los seis entregables (ubuntu)`         | verde                 |
-| `verificar-etapa.sh --con-base (macos)` | PENDIENTE AL ESCRIBIR |
+| Trabajo                                 | Resultado |
+| --------------------------------------- | --------- |
+| `controles (ubuntu-latest)`             | verde     |
+| `controles (macos-latest)`              | verde     |
+| `los seis entregables (ubuntu)`         | verde     |
+| `verificar-etapa.sh --con-base (macos)` | verde     |
 
 ---
 
@@ -397,9 +401,20 @@ Los **cuatro** trabajos de `verificacion.yml` sobre `2360dee`
 
 **Rama:** `consola-superadmin-equipos` · **Base:** `develop` (`f64b1d8`)
 
-| Commit    | Qué cierra                                                       |
-| --------- | ---------------------------------------------------------------- |
-| `5b8aaf9` | Frente C · lo que la documentación ISAPI obliga a corregir       |
-| `900f8d2` | Frente D · el clúster reutilizado y la roja que no se nombraba   |
-| `00a373a` | Frente A (alta, cifrado, sondeo) y B.1, B.4, B.5, B.2 en la base |
-| `3f1673c` | Frente A (pantalla) y B.2, B.3, B.6 en la consola                |
+| Commit    | Qué cierra                                                              |
+| --------- | ----------------------------------------------------------------------- |
+| `5b8aaf9` | Frente C · lo que la documentación ISAPI obliga a corregir              |
+| `900f8d2` | Frente D · el clúster reutilizado y la roja que no se nombraba          |
+| `00a373a` | Frente A (alta, cifrado, sondeo) y B.1, B.4, B.5, B.2 en la base        |
+| `3f1673c` | Frente A (pantalla) y B.2, B.3, B.6 en la consola                       |
+| `d90a233` | Informe, hallazgos de seguridad y estado · corrige la prueba del plan   |
+| `95c6f9b` | El flujo de CI también dispara para una rama de ronda                   |
+| `93ab01d` | Registrar un equipo desde la consola, en la guía de sitio               |
+| `a1c4dae` | La rama «en curso» se lee de su frase · trinquete de ramas con motivo   |
+| `70f6455` | El recorrido del navegador levanta la API con `EQUIPOS_LLAVE`           |
+| `a0e8baf` | Los tres hallazgos que el verificador destapó al cerrar                 |
+| `83fccb2` | El veredicto literal, con su motivo                                     |
+| `77f4bf6` | La sonda del clúster distingue «aquí no se puede» de «está roto»        |
+| `767793e` | Cliente Dart regenerado tras los DTO de equipos y el plan de viviendas  |
+| `2360dee` | **D-115** · un `pg_ctl` no es un servidor, y el guion lo daba por bueno |
+| `c0b3fd9` | El veredicto, ya con el SDK de Flutter instalado                        |
