@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config';
+import { informeDe } from '../../scripts/lib/reporteros-de-prueba.mjs';
 export default defineConfig({
   test: {
+    ...informeDe('domain-core'),
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
+import { informeDe } from '../../scripts/lib/reporteros-de-prueba.mjs';
 
 export default defineConfig({
   plugins: [react()],
@@ -21,6 +22,7 @@ export default defineConfig({
     },
   },
   test: {
+    ...informeDe('web'),
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     globals: false,

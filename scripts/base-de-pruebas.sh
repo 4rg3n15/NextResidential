@@ -35,6 +35,26 @@ SOCK_DIR="${NCR_PGSOCK:-/var/tmp/ncr/sock}"
 PUERTO="${NCR_PGPORT:-55432}"
 BASE="${NCR_PGDATABASE:-ncr}"
 SUPERUSUARIO="${NCR_PGUSER:-postgres}"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CUÁNTAS CONEXIONES NECESITA LA SUITE, y por qué no es el valor por omisión
+#
+# PostgreSQL trae 100 y reserva unas cuantas para el superusuario. La prueba de
+# KPI-03 abre **cien conexiones de verdad** —es el requisito, no un detalle:
+# cien promesas sobre una sola conexión no prueban la restricción de la base
+# (ADR-04)— y vitest ejecuta los ficheros en paralelo, de modo que a la vez hay
+# otros cinco con su propio `Pool` contra esta misma base.
+#
+# Con 100, la corrida 1 de 3 del paso de estabilidad moría con «sorry, too many
+# clients already» y las otras dos pasaban: el veredicto dependía de cómo el
+# planificador repartiera los ficheros ese día. Se vio en el CI de macOS el
+# 22/09/2026.
+#
+# 300 no cuesta nada: un proceso de PostgreSQL sólo se crea cuando alguien se
+# conecta. `CONEXIONES_MINIMAS` es lo que un clúster REUTILIZADO tiene que
+# tener para darse por bueno.
+CONEXIONES="${NCR_PGMAXCONN:-300}"
+CONEXIONES_MINIMAS="${NCR_PGMAXCONN_MINIMAS:-200}"
 BITACORA="${BASE_DIR%/data}/postgres.log"
 
 # ---------------------------------------------------------------------------
@@ -97,11 +117,36 @@ arrancar() {
 
   mkdir -p "$SOCK_DIR" "$(dirname "$BASE_DIR")"
 
-  # Si ya hay un clúster vivo en este directorio, se reutiliza: repetir el paso
-  # no puede costar un `initdb` entero ni, peor, fallar por estar ya arrancado.
+  # ═══════════════════════════════════════════════════════════════════════════
+  # REUTILIZAR UN CLÚSTER VIVO, PERO NO A CIEGAS
+  #
+  # Repetir el paso no puede costar un `initdb` entero ni fallar por estar ya
+  # arrancado, así que un clúster vivo se reutiliza. Lo que NO puede hacerse es
+  # darlo por bueno sin mirar: `max_connections` se aplica **al arrancar**, de
+  # modo que un clúster levantado antes de que este guion lo subiera sigue con
+  # el 100 por omisión, y las pruebas de KPI-03 y de aforo mueren con «sorry,
+  # too many clients already» en los pasos 7, 7b y 14.
+  #
+  # Es la misma familia de defecto que persigue todo este proyecto: **un control
+  # que da por bueno un estado que no comprobó**. Aquí se comprueba, y si el
+  # clúster vivo no sirve se reinicia con la configuración correcta en vez de
+  # dejar que la suite se estrelle media hora después con un error que no
+  # nombra la causa.
+  # ═══════════════════════════════════════════════════════════════════════════
   if "$bin/pg_ctl" -D "$BASE_DIR" status >/dev/null 2>&1; then
-    emitir_variables
-    return 0
+    local conexiones
+    conexiones="$("$bin/psql" -Atq -h "$SOCK_DIR" -p "$PUERTO" -U "$SUPERUSUARIO" -d postgres \
+      -c 'SHOW max_connections;' 2>/dev/null | tr -d '[:space:]')"
+
+    if [[ "$conexiones" =~ ^[0-9]+$ ]] && (( conexiones >= CONEXIONES_MINIMAS )); then
+      emitir_variables
+      return 0
+    fi
+
+    echo "base-de-pruebas: el clúster vivo tiene max_connections=${conexiones:-desconocido}," >&2
+    echo "  y la suite necesita al menos $CONEXIONES_MINIMAS. Se reinicia con la" >&2
+    echo "  configuración correcta en vez de dejar que las pruebas se estrellen." >&2
+    "$bin/pg_ctl" -D "$BASE_DIR" -m fast stop >/dev/null 2>&1 || true
   fi
 
   if [[ ! -s "$BASE_DIR/PG_VERSION" ]]; then
@@ -132,7 +177,7 @@ arrancar() {
   # prueba: reducir sus conexiones sería dejar de comprobar KPI-03.
   # ═══════════════════════════════════════════════════════════════════════════
   "$bin/pg_ctl" -D "$BASE_DIR" -l "$BITACORA" -w -o \
-    "-k $SOCK_DIR -p $PUERTO -h 127.0.0.1 -c fsync=off -c synchronous_commit=off -c max_connections=300" \
+    "-k $SOCK_DIR -p $PUERTO -h 127.0.0.1 -c fsync=off -c synchronous_commit=off -c max_connections=$CONEXIONES" \
     start >/dev/null
 
   # `createdb` falla si ya existe; se pregunta primero, y la respuesta se

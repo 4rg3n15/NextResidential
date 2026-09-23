@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import swc from 'unplugin-swc';
+import { informeDe } from '../../scripts/lib/reporteros-de-prueba.mjs';
 
 /**
  * Las pruebas se transpilan con SWC y `decoratorMetadata: true`.
@@ -46,6 +47,7 @@ export default defineConfig({
     },
   },
   test: {
+    ...informeDe('api'),
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     coverage: {
       provider: 'v8',
