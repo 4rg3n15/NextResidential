@@ -2202,27 +2202,44 @@ try {
       // 1 · se levanta A 100, que es el clúster de antes de la corrección.
       const corto = invocar('arrancar', { NCR_PGMAXCONN: '100' });
 
-      if (/no encuentro pg_ctl/.test(corto.salida)) {
-        /**
-         * Sin PostgreSQL no hay nada que ejercitar. NO se da por buena: un
-         * banco que aprueba por ausencia es exactamente el falso verde que
-         * esta suite persigue. Se cuenta como fallo sólo cuando la corrida
-         * lleva base —que es cuando este control está en juego— y se dice en
-         * voz alta en cualquier caso.
-         */
-        const conBase = (process.env.DATABASE_URL_PRUEBAS ?? '').length > 0;
-        conBase
-          ? mal(
-              'base-de-pruebas: no hay PostgreSQL y la corrida lleva base: la sonda no se pudo ejercitar',
-            )
-          : console.log(
-              '   · base-de-pruebas: sin PostgreSQL en esta máquina, la sonda de ' +
-                'max_connections no se ejercita (no se da por buena: no se ejecutó)',
-            );
+      /**
+       * ═══════════════════════════════════════════════════════════════════
+       * SIN CLÚSTER NO HAY NADA QUE EJERCITAR — y eso NO es un verde
+       *
+       * Esta sonda necesita levantar un PostgreSQL de verdad: es la única
+       * forma de reproducir el estado que mataba los pasos 7, 7b y 14.
+       *
+       * La primera versión miraba si el mensaje decía «no encuentro pg_ctl», y
+       * el CI de macOS enseñó que eso era atarse a UNA de las formas de no
+       * poder: el trabajo `controles` no instala PostgreSQL, el guion falló de
+       * otra manera, y la sonda lo contó como control roto. Ahora se mira lo
+       * único que importa —si el clúster arrancó— y **se imprime el motivo**,
+       * que es lo que permite distinguir «aquí no se puede» de «el control
+       * está mal».
+       *
+       * Cuenta como FALLO cuando la corrida lleva base (`DATABASE_URL_PRUEBAS`
+       * definida), que es justo cuando este control está en juego. Es la misma
+       * distinción que hace la sección 19 con Flutter: faltar no es lo mismo
+       * que tenerlo mal.
+       * ═══════════════════════════════════════════════════════════════════
+       */
+      if (corto.codigo !== 0) {
+        const motivo = corto.salida.trim().split('\n').slice(-4).join(' · ') || '(sin salida)';
+        if (/no encuentro pg_ctl/.test(corto.salida)) {
+          // PostgreSQL AUSENTE: declarado, con esas palabras, y no como verde.
+          // Es la misma distinción de la sección 19 con Flutter.
+          console.log(
+            '   · base-de-pruebas: sin PostgreSQL en esta máquina, la sonda de ' +
+              'max_connections NO se ejercitó (no se da por buena: no se ejecutó)',
+          );
+        } else {
+          // PostgreSQL está y aun así no arrancó: eso SÍ es un fallo, y el
+          // motivo va impreso para poder diagnosticarlo sin volver a correrlo.
+          mal(`no se pudo levantar el clúster de la sonda (codigo ${corto.codigo}): ${motivo}`);
+        }
+        rmSync(dirPg, { recursive: true, force: true });
       } else {
-        corto.codigo === 0
-          ? ok('base-de-pruebas: la sonda levanta un clúster corto a propósito')
-          : mal(`no se pudo levantar el clúster de la sonda (codigo ${corto.codigo})`);
+        ok('base-de-pruebas: la sonda levanta un clúster corto a propósito');
 
         // 2 · la siguiente invocación lo encuentra vivo. Tiene que NEGARSE a
         //     reutilizarlo, decir por qué, y dejarlo con el valor que la suite
