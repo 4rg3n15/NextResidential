@@ -111,8 +111,28 @@ arrancar() {
   fi
 
   # `-k` da el socket, `-h 127.0.0.1` el TCP: los dos caminos, un solo servidor.
+  #
+  # ═══════════════════════════════════════════════════════════════════════════
+  # `max_connections` NO PUEDE QUEDARSE EN EL VALOR POR OMISIÓN
+  #
+  # PostgreSQL trae 100, y de ésas reserva unas cuantas para el superusuario.
+  # La prueba de KPI-03 abre **cien conexiones de verdad** —es el requisito, no
+  # un detalle: cien promesas sobre una sola conexión no prueban la restricción
+  # de la base (ADR-04)—, y vitest ejecuta los ficheros en paralelo, así que a
+  # la vez hay otros cinco con su propio `Pool` contra esta misma base.
+  #
+  # El resultado era una roja INTERMITENTE, que es la peor clase: la corrida 1
+  # de 3 del paso de estabilidad moría con `sorry, too many clients already` y
+  # las otras dos pasaban, de modo que el veredicto dependía de cómo el
+  # planificador hubiera repartido los ficheros ese día. Se vio en el CI de
+  # macOS el 22/09/2026.
+  #
+  # 300 es holgado y no cuesta nada: un proceso de PostgreSQL sólo se crea
+  # cuando alguien se conecta. Subirlo aquí es lo correcto y no tocar la
+  # prueba: reducir sus conexiones sería dejar de comprobar KPI-03.
+  # ═══════════════════════════════════════════════════════════════════════════
   "$bin/pg_ctl" -D "$BASE_DIR" -l "$BITACORA" -w -o \
-    "-k $SOCK_DIR -p $PUERTO -h 127.0.0.1 -c fsync=off -c synchronous_commit=off" \
+    "-k $SOCK_DIR -p $PUERTO -h 127.0.0.1 -c fsync=off -c synchronous_commit=off -c max_connections=300" \
     start >/dev/null
 
   # `createdb` falla si ya existe; se pregunta primero, y la respuesta se

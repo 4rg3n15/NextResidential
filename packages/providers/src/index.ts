@@ -20,3 +20,16 @@ export * from './mock/intercom-simulado';
  * que llegue el equipo, lo que se estrena es el transporte y no el analizador.
  */
 export * from './hikvision/contratos-de-evento';
+export * from './hikvision/publicacion-alarm-server';
+/**
+ * ETAPA 15 · el transporte compartido por los tres equipos, el catálogo de
+ * rutas con su procedencia, y los adaptadores de cada familia.
+ */
+export * from './equipo/cliente';
+export * from './equipo/catalogo-de-rutas';
+export * from './equipo/escucha-alertstream';
+export * from './terminal/terminal-facial';
+export * from './videoportero/videoportero';
+export * from './videoportero/intercom-equipo';
+export * from './simulacion/equipo-simulado';
+export * from './simulacion/camara-que-publica';

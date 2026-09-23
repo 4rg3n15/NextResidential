@@ -74,7 +74,17 @@ export class BiometriaController {
   ) {}
 
   @Post('capturas')
-  @Roles('administrador', 'portero', 'operador_central')
+  /**
+   * `superadministrador` entra desde la ETAPA 15, y el motivo no es de
+   * comodidad: **no había ninguna superficie por la que adjuntar un rostro
+   * desde la consola** —la captura vivía sólo en la app del residente
+   * (ADR-016)—, así que el recorrido facial no se podía originar desde el
+   * escritorio. Este proyecto no da jerarquía implícita a los roles
+   * (`GuardaDeRoles` compara pertenencia, no rango), de modo que omitirlo aquí
+   * lo dejaba fuera de verdad. Añadirlo NO relaja RN-10: el consentimiento lo
+   * sigue respondiendo el titular y ninguna de las otras rutas cambia.
+   */
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central')
   @ApiOperation({
     summary: 'Valida la calidad y solicita el consentimiento al TITULAR (CU-02, CA-08)',
   })
@@ -190,7 +200,7 @@ export class BiometriaController {
   }
 
   @Post('plantillas/:plantillaId/sincronizacion')
-  @Roles('administrador')
+  @Roles('superadministrador', 'administrador')
   @ApiOperation({ summary: 'Empuja la plantilla a una terminal, si hay consentimiento (RN-09)' })
   async sincronizarPlantilla(
     @Param('id', ParseUUIDPipe) copropiedadId: string,

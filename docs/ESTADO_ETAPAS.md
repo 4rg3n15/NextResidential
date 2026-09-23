@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-22 · **ETAPA 14 CERRADA** · el CI produce los **seis** entregables —hasta ahora compilaba tres—, toda línea de registro lleva su correlación, las cinco latencias comprometidas se miden con su tramo declarado, y tres operaciones idempotentes que **no invocaba nadie** pasan a tener planificador: entre ellas el barrido que RN-11 obliga a ejecutar en 24 h. El que nadie esperaba: el icono «enmascarable» de la PWA era **byte a byte el mismo fichero** que el normal, y en Android el logo salía recortado
+**Última actualización:** 2026-09-22 · **ETAPA 15 CERRADA CONTRA SIMULADO** · los tres adaptadores de equipo están escritos y **ninguno se ejecutó contra hardware**: el entorno de desarrollo deniega por diseño todo destino de rango privado, así que la LAN de los equipos es inalcanzable. Una ruta VERIFICADA y **doce DOCUMENTADAS, NO VERIFICADAS**, cada una con qué comprobar en sitio. **Nueve indicadores siguen pendientes de medición.** La regla dura se cumplió: no hubo que tocar dominio ni aplicación, y ésa es la prueba de OE-03 · _(anterior: **ETAPA 14** · el CI produce los **seis** entregables —hasta ahora compilaba tres—, toda línea de registro lleva su correlación, las cinco latencias comprometidas se miden con su tramo declarado, y tres operaciones idempotentes que **no invocaba nadie** pasan a tener planificador: entre ellas el barrido que RN-11 obliga a ejecutar en 24 h. El que nadie esperaba: el icono «enmascarable» de la PWA era **byte a byte el mismo fichero** que el normal, y en Android el logo salía recortado)_
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,16 +18,16 @@
 
 ## Resumen
 
-|                                |                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **15 de 17** (ETAPAS 00 a 14) · la 14 cerrada el 2026-09-22                                                                                                                                                                                                                                                                                                     |
-| **Etapa siguiente habilitada** | **ETAPA 15 — Integración real con hardware Hikvision** · **con precondición**: exige acceso al equipo y un prompt con la documentación ISAPI del modelo, IPs y credenciales. La **ETAPA 16** es ejecutable ya, según §6 del contrato                                                                                                                            |
-| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                                                                                                                                                                                                 |
-| **Defectos abiertos**          | **D-101** (roja intermitente de `@ncr/api`: **45 corridas, 1 aparición**; perseguida en la 14 e instrumentada, NO cerrada) y **D-29** (canal de tiempo real por proceso, declarado en la guía de despliegue) · **D-78 y D-34 CERRADAS en la 14** —y D-34 resultó ser una colisión de identificador— · más **H-13-25**, abierto a propósito a la espera de firma |
-| **Contradicciones abiertas**   | Ninguna (**15** registradas, 15 resueltas) · nueva **C-27**: cuál era la lista real de los nueve agregados raíz                                                                                                                                                                                                                                                 |
-| **Decisiones pendientes**      | 9 abiertas — nueva P-14 (`secret scanning` y `push protection` de GitHub) · más **4 aceptaciones de riesgo redactadas y sin firmar** (AR-01 a AR-04)                                                                                                                                                                                                            |
-| **Supuestos vigentes**         | 19 — nuevos S-27 (los horarios de los tres trabajos programados) y S-28 (la ventana de 2 048 muestras del registro de latencias)                                                                                                                                                                                                                                |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                                                                                                                                                                                           |
+|                                |                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Etapas cerradas**            | **16 de 17** (ETAPAS 00 a 15) · la 15 cerrada el 2026-09-22, **contra simulado y no contra hardware**                                                                                                                                                                                                                                                                                 |
+| **Etapa siguiente habilitada** | **ETAPA 16 — Documentación técnica final y README**, ejecutable ya según §6. La **mitad física de la anterior queda abierta**: doce rutas por confirmar, nueve indicadores por medir y los tres hitos técnicos del reto sin ejecutar con equipo real                                                                                                                                  |
+| **Bloqueos activos**           | **BE-01 · SMTP y URLs de redirección: sin permisos en el panel, en gestión** (bloqueo de ENTORNO, no de código)                                                                                                                                                                                                                                                                       |
+| **Defectos abiertos**          | **D-101** (roja intermitente de `@ncr/api`: **46 corridas, 2 apariciones**; la segunda, en la 15, **con nombre**: `xss.e2e.test.ts`. NO cerrada) y **D-29** (canal de tiempo real por proceso, declarado en la guía de despliegue) · **D-78 y D-34 CERRADAS en la 14** —y D-34 resultó ser una colisión de identificador— · más **H-13-25**, abierto a propósito a la espera de firma |
+| **Contradicciones abiertas**   | Ninguna (**15** registradas, 15 resueltas)                                                                                                                                                                                                                                                                                                                                            |
+| **Decisiones pendientes**      | 9 abiertas — nueva P-14 (`secret scanning` y `push protection` de GitHub) · más **4 aceptaciones de riesgo redactadas y sin firmar** (AR-01 a AR-04)                                                                                                                                                                                                                                  |
+| **Supuestos vigentes**         | 21 — nuevos S-29 (las doce rutas documentadas corresponden a la forma ISAPI habitual de cada familia) y S-30 (el recorte de placa es siempre la menor de las dos imágenes del sobre)                                                                                                                                                                                                  |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                                                                                                                                                                                                                 |
 
 ---
 
@@ -198,25 +198,25 @@ corrida suya lo nombrará.
 
 ## Mapa de etapas
 
-| Etapa  | Nombre                                                        | Rama                                   | Depende de                          | Estado                           | Informe                        |
-| ------ | ------------------------------------------------------------- | -------------------------------------- | ----------------------------------- | -------------------------------- | ------------------------------ |
-| **00** | Auditoría documental y plan maestro                           | `etapa00` ⚠️                           | —                                   | **CERRADA**                      | [ETAPA-00](etapas/ETAPA-00.md) |
-| 01     | Modelo de datos y Supabase + guía de conexión                 | `etapa-01-modelo-datos-supabase`       | 00 ✅                               | **CERRADA**                      | [ETAPA-01](etapas/ETAPA-01.md) |
-| 02     | Andamiaje del monorepo y núcleo hexagonal                     | `etapa-02-andamiaje-monorepo`          | 01 ✅                               | **CERRADA**                      | [ETAPA-02](etapas/ETAPA-02.md) |
-| 03     | Auth, RBAC, MFA y aislamiento multiempresa                    | `etapa-03-auth-rbac-multiempresa`      | 02 ✅                               | **CERRADA**                      | [ETAPA-03](etapas/ETAPA-03.md) |
-| 04     | Padrón: viviendas, residentes, vehículos                      | `etapa-04-padron`                      | 03 ✅                               | **CERRADA**                      | [ETAPA-04](etapas/ETAPA-04.md) |
-| 05     | Autorizaciones y motor de reglas + MockProvider               | `etapa-05-autorizaciones-motor-reglas` | 04 ✅                               | **CERRADA**                      | [ETAPA-05](etapas/ETAPA-05.md) |
-| 06     | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05 ✅                               | **CERRADA**                      | [ETAPA-06](etapas/ETAPA-06.md) |
-| 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06 ✅                               | **CERRADA**                      | [ETAPA-07](etapas/ETAPA-07.md) |
-| 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                               | **CERRADA**                      | [ETAPA-08](etapas/ETAPA-08.md) |
-| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                        | **CERRADA**                      | [ETAPA-09](etapas/ETAPA-09.md) |
-| 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09 ✅                               | **CERRADA**                      | [ETAPA-10](etapas/ETAPA-10.md) |
-| 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                               | **CERRADA** — 11-A, 11-B y 11-C  | [ETAPA-11](etapas/ETAPA-11.md) |
-| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                               | **CERRADA**                      | [ETAPA-12](etapas/ETAPA-12.md) |
-| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12 ✅                               | **CERRADA**                      | [ETAPA-13](etapas/ETAPA-13.md) |
-| 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13 ✅                               | **CERRADA**                      | [ETAPA-14](etapas/ETAPA-14.md) |
-| 15     | Integración real con hardware Hikvision                       | `etapa-15-integracion-hikvision`       | 14 ✅                               | **PENDIENTE — con precondición** | —                              |
-| 16     | Documentación técnica final y README                          | `etapa-16-documentacion-final`         | 14 ✅ (ejecutable), 15 (definitiva) | **PENDIENTE — habilitada**       | —                              |
+| Etapa  | Nombre                                                        | Rama                                   | Depende de                          | Estado                                                      | Informe                        |
+| ------ | ------------------------------------------------------------- | -------------------------------------- | ----------------------------------- | ----------------------------------------------------------- | ------------------------------ |
+| **00** | Auditoría documental y plan maestro                           | `etapa00` ⚠️                           | —                                   | **CERRADA**                                                 | [ETAPA-00](etapas/ETAPA-00.md) |
+| 01     | Modelo de datos y Supabase + guía de conexión                 | `etapa-01-modelo-datos-supabase`       | 00 ✅                               | **CERRADA**                                                 | [ETAPA-01](etapas/ETAPA-01.md) |
+| 02     | Andamiaje del monorepo y núcleo hexagonal                     | `etapa-02-andamiaje-monorepo`          | 01 ✅                               | **CERRADA**                                                 | [ETAPA-02](etapas/ETAPA-02.md) |
+| 03     | Auth, RBAC, MFA y aislamiento multiempresa                    | `etapa-03-auth-rbac-multiempresa`      | 02 ✅                               | **CERRADA**                                                 | [ETAPA-03](etapas/ETAPA-03.md) |
+| 04     | Padrón: viviendas, residentes, vehículos                      | `etapa-04-padron`                      | 03 ✅                               | **CERRADA**                                                 | [ETAPA-04](etapas/ETAPA-04.md) |
+| 05     | Autorizaciones y motor de reglas + MockProvider               | `etapa-05-autorizaciones-motor-reglas` | 04 ✅                               | **CERRADA**                                                 | [ETAPA-05](etapas/ETAPA-05.md) |
+| 06     | Eventos, auditoría inmutable, alertas, tiempo real            | `etapa-06-eventos-auditoria`           | 05 ✅                               | **CERRADA**                                                 | [ETAPA-06](etapas/ETAPA-06.md) |
+| 07     | Zonas comunes: horario y aforo                                | `etapa-07-zonas-comunes`               | 06 ✅                               | **CERRADA**                                                 | [ETAPA-07](etapas/ETAPA-07.md) |
+| 08     | Biometría: consentimiento, calidad, sincronización, supresión | `etapa-08-biometria-consentimiento`    | 06 ✅                               | **CERRADA**                                                 | [ETAPA-08](etapas/ETAPA-08.md) |
+| 09     | Consola web de administración                                 | `etapa-09-consola-administracion`      | 07 ✅, 08 ✅                        | **CERRADA**                                                 | [ETAPA-09](etapas/ETAPA-09.md) |
+| 10     | Consolas de portería y guardia virtual                        | `etapa-10-consolas-operativas`         | 09 ✅                               | **CERRADA**                                                 | [ETAPA-10](etapas/ETAPA-10.md) |
+| 11     | App móvil Flutter del residente                               | `etapa-11-app-flutter-residente`       | 09 ✅                               | **CERRADA** — 11-A, 11-B y 11-C                             | [ETAPA-11](etapas/ETAPA-11.md) |
+| 12     | Edge Gateway: offline y reconciliación                        | `etapa-12-edge-gateway-offline`        | 06 ✅                               | **CERRADA**                                                 | [ETAPA-12](etapas/ETAPA-12.md) |
+| 13     | Auditoría de ciberseguridad y endurecimiento                  | `etapa-13-auditoria-seguridad`         | 12 ✅                               | **CERRADA**                                                 | [ETAPA-13](etapas/ETAPA-13.md) |
+| 14     | Observabilidad, CI/CD, PWA instalable y escritorio            | `etapa-14-cicd-pwa-escritorio`         | 13 ✅                               | **CERRADA**                                                 | [ETAPA-14](etapas/ETAPA-14.md) |
+| 15     | Integración real con hardware Hikvision                       | `etapa-15-integracion-hikvision`       | 14 ✅                               | **CERRADA contra simulado** · la mitad física sigue abierta | [ETAPA-15](etapas/ETAPA-15.md) |
+| 16     | Documentación técnica final y README                          | `etapa-16-documentacion-final`         | 14 ✅ (ejecutable), 15 (definitiva) | **PENDIENTE — habilitada**                                  | —                              |
 
 > ⚠️ **Desviación de nomenclatura registrada.** `CLAUDE.md` §2.5 exige ramas `etapa-NN-slug`; la ETAPA 00 se ejecutó en **`etapa00`** por indicación expresa del usuario. A partir de la ETAPA 01 se retomó la convención del contrato.
 >
@@ -230,7 +230,7 @@ corrida suya lo nombrará.
 > git checkout -b etapa-NN-slug
 > ```
 
-**Precondición de la ETAPA 15** (`CLAUDE.md` §6): se ejecuta **solo** cuando el usuario tenga acceso al equipo y entregue un prompt adicional con la documentación ISAPI del modelo concreto, IPs, credenciales y llaves de referencia.
+**Precondición de la ETAPA 15** (`CLAUDE.md` §6): su **mitad física** se ejecuta **solo** cuando el usuario tenga acceso al equipo. La mitad de código se cerró el 2026-09-22 contra simulado, sin tocar ningún aparato, y el guion `scripts/puesta-en-marcha-equipos.mjs` es lo que la cierra del todo delante del hardware.
 
 ---
 
@@ -759,6 +759,83 @@ autorizó expresamente adelantar parte del punto 4 de la ETAPA 16:
 sin ella y lo dice en su primera línea: enumera las **cuatro** secciones exactas
 que habrá que escribir cuando Grupo Control decida, y nada más de la guía depende
 de esa decisión.
+
+---
+
+## ETAPA 15 — Integración con hardware Hikvision · **CERRADA CONTRA SIMULADO** · 2026-09-22
+
+**Rama:** `etapa-15-integracion-hikvision` · **Base:** `develop` (`b9d2a60`)
+**Informe:** [`etapas/ETAPA-15.md`](etapas/ETAPA-15.md) ·
+**Guía:** [`guias/VALIDACION_HIKVISION_EN_SITIO.md`](guias/VALIDACION_HIKVISION_EN_SITIO.md) §8
+
+> **El título dice «contra simulado» a propósito, y no es una matización.**
+> Nada de esta etapa se ejecutó contra un equipo. El entorno de desarrollo
+> deniega por diseño todo destino de rango privado —`x-deny-reason:
+private_dest_ip`—, de modo que la LAN donde viven los tres aparatos es
+> inalcanzable desde donde se escribió el código, hoy y siempre. Llamar a esto
+> «ETAPA 15 cerrada» sin más sería exactamente el falso verde que este proyecto
+> persigue, con la peor consecuencia posible: creer que el hardware está
+> integrado.
+
+**Lo que sí quedó demostrado, y es lo que la etapa venía a demostrar.** La regla
+dura de §6 —«si necesitas modificar el dominio, la aplicación o la interfaz, es
+un defecto de diseño de las etapas anteriores»— **se cumplió**: lo que se
+escribió son adaptadores de puertos que ya existían más una capa de presentación
+nueva. Ni una línea de dominio, ni una de aplicación. Esa verificación es la
+prueba de OE-03.
+
+### Las rutas, por procedencia
+
+| Procedencia                    | Cuántas | Cuáles                                                       |
+| ------------------------------ | ------: | ------------------------------------------------------------ |
+| **VERIFICADA**                 |   **1** | La barrera, capturada del equipo el 15/09/2026               |
+| **DOCUMENTADA, NO VERIFICADA** |  **12** | Identidad, capacidades, plantillas, aperturas, flujo y audio |
+
+Cada documentada dice **qué comprobar en sitio** para ascenderla. Una etiqueta
+«pendiente de verificar» que no dice qué verificar es media etiqueta, y delante
+del equipo no sirve de nada.
+
+### Nueve indicadores siguen pendientes de medición
+
+KPI-13, KPI-14, KPI-17, KPI-18, KPI-22, KPI-26, KPI-27, KPI-32 y KPI-33. Son los
+nueve que la matriz de trazabilidad marca con **H**. Ninguno se puede medir sin
+los equipos, y los tres hitos técnicos del reto —prototipo, prueba LPR real,
+prueba facial real— **siguen sin ejecutarse de punta a punta con hardware**.
+
+### H-15-1 · la acreditación del receptor es más débil que la firma
+
+**Severidad media, aceptada y declarada.** La cámara no firma y no hay ajuste
+que lo cambie, así que su extremo se acredita con secreto largo por equipo más
+origen: sin integridad de cuerpo, sin anti-repetición, sin resistencia a quien
+vea la URL. **El endurecimiento real es la VLAN de equipos, no el código.**
+
+### Lo que esta etapa NO construyó, y por qué
+
+| Elemento                              | Por qué                                                                                                                                                         |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/guias/INTEGRACION_HIKVISION.md` | Sus diez apartados están escritos para ejecutarse frente al equipo. Sin haber tocado ninguno serían diez apartados de suposiciones con aspecto de procedimiento |
+| Descubrimiento ONVIF                  | Inventariar la red exige estar en esa red                                                                                                                       |
+| Controlador de E/S y sabotaje         | KPI-26 se mide abriendo un gabinete                                                                                                                             |
+| Vídeo RTSP → WebRTC                   | El puente necesita un flujo real que medir                                                                                                                      |
+| Mapa de errores del fabricante        | Hoy se distinguen los tres códigos que el simulado puede producir                                                                                               |
+
+### Trabajo fuera del alcance, **autorizado por el usuario**
+
+La **captura de rostro en la consola** es anticipo del punto 4 de la ETAPA 16 y
+se registra como tal. Hasta hoy la captura vivía sólo en la app del residente
+(ADR-016) y el escritorio no tenía por dónde, así que el recorrido facial no
+podía originarse desde la consola.
+
+### Deuda nueva
+
+| Id        | Qué                                                                                                     | Se salda en |
+| --------- | ------------------------------------------------------------------------------------------------------- | ----------- |
+| **D-125** | Doce rutas DOCUMENTADAS, NO VERIFICADAS                                                                 | Con equipos |
+| **D-126** | `INTEGRACION_HIKVISION.md` sin escribir: exige la sesión con hardware                                   | Con equipos |
+| **D-127** | El transporte de audio lanza: faltan códec, cadencia y duplex medidos                                   | Con equipos |
+| **D-128** | El campo `vector` transporta una imagen con esta terminal; el nombre miente                             | ETAPA 16    |
+| **D-129** | `FaceDetector` falta en la mayoría de navegadores de escritorio: el encuadre lo confirma quien opera    | ETAPA 16    |
+| **D-130** | El modo de la terminal se declara por configuración y **nada comprueba** que coincida con el del equipo | Con equipos |
 
 ---
 

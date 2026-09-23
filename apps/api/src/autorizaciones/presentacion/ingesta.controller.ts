@@ -17,17 +17,15 @@ import {
 } from './dtos';
 import { LatidoDto } from '../../eventos';
 import { MideKpi } from '../../observabilidad';
+import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 
 /**
- * Identidad con la que se atribuyen los eventos de hardware.
- *
- * Un evento tiene `creado_por NOT NULL`: alguien lo registró. Cuando el emisor
- * es una cámara no hay usuario, y poner el del último administrador que tocó el
- * sistema sería falsear la auditoría. Se usa una identidad de servicio fija y
- * declarada, que es lo que la ETAPA 15 sustituirá por la del dispositivo
- * registrado en `dispositivos`.
+ * La identidad con la que se atribuyen los eventos de hardware vive ahora en
+ * `comun/actores-de-servicio.ts`: desde la ETAPA 15 hay DOS receptores de
+ * equipo y tiene que ser el mismo valor para los dos. Se re-exporta para que
+ * las referencias que ya la nombraban por aquí sigan resolviendo.
  */
-export const ACTOR_INGESTA = '00000000-0000-4000-8000-000000000002';
+export { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 
 /**
  * Tope por IP de las rutas de ingesta. Es una CONSTANTE y no la variable de

@@ -119,6 +119,8 @@ const CON_DATOS = (url: string): Response => {
                       estado: 'saludable',
                       ultimoLatido: null,
                       ultimaSincronizacion: null,
+                      ultimoResultadoDeSincronizacion: null,
+                      sincronizacionesFallidas: 0,
                       segundosSinLatir: null,
                     },
                   ],

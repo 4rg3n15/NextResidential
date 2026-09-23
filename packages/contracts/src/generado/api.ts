@@ -1348,7 +1348,7 @@ export interface components {
             titularId: string;
             autorizacionId?: string;
             medidas: components["schemas"]["MedidasDto"];
-            /** @description Vector biométrico en base64. No es la fotografía. */
+            /** @description Dato biométrico en base64, cifrado en la bóveda al guardarse. Con la terminal de la ETAPA 15 es la imagen del rostro reducida, no un vector derivado: el equipo construye la plantilla y no admite otra cosa. */
             vector: string;
             /** @description Versión de la política de tratamiento aceptada */
             versionPolitica: string;
@@ -1612,6 +1612,13 @@ export interface components {
             /** Format: date-time */
             ultimaSincronizacion: string | null;
             segundosSinLatir: number | null;
+            /**
+             * @description Estado de la sincronización de plantilla más reciente de este equipo. Sale de plantilla_sincronizaciones, no de una copia en dispositivos: dos copias del mismo resultado se separan en cuanto alguien reintenta una sola plantilla.
+             * @enum {string|null}
+             */
+            ultimoResultadoDeSincronizacion: "pendiente" | "sincronizada" | "fallida" | "suprimida" | null;
+            /** @description Cuántas plantillas siguen sin llegar a este equipo. Distingue «falló la última» de «hay catorce sin llegar». */
+            sincronizacionesFallidas: number;
         };
         EmergenciaDto: {
             /** @description Qué ocurre. Obligatorio. */

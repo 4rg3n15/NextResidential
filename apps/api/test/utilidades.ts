@@ -8,6 +8,7 @@ import { CLAVE_ROLES } from '../src/comun/decoradores';
 import type { TestingModuleBuilder } from '@nestjs/testing';
 import express from 'express';
 import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
+import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../src/comun/sobre-de-equipo';
 import type { INestApplication } from '@nestjs/common';
 import { aplicarSaneamiento, aplicarSeguridad } from '../src/seguridad';
 import { aplicarContextoDePeticion } from '../src/comun/contexto/contexto-de-peticion';
@@ -281,6 +282,13 @@ export const crearApp = async (
   aplicarContextoDePeticion(app, () => app.get<GeneradorDeId>(GENERADOR_DE_ID).nuevo());
 
   aplicarSeguridad(app, configuracionDePrueba);
+  /**
+   * ETAPA 15 · el acumulador del sobre crudo, ANTES de `express.json` y sólo
+   * bajo su ruta — igual que en `main.ts`, y por la misma lección de H-13-11.
+   * Si se cableara sólo allí, la suite probaría un receptor de «servidor de
+   * alarma» que nunca recibe cuerpo, y estaría en verde.
+   */
+  app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
   app.use(
     express.json({ limit: configuracionDePrueba.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }),
   );

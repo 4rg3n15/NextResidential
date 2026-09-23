@@ -38,6 +38,7 @@ import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
  * es lo que DT-13 dejó escrito.
  */
 import { GuardiaModule } from './guardia';
+import { AlarmServerModule } from './alarmserver';
 import { PlanificacionModule } from './planificacion';
 
 /**
@@ -106,6 +107,15 @@ export class AppModule {
         // Después de eventos y autorizaciones: la guardia lee la cola del
         // repositorio de eventos y escala por el mismo camino que la ingesta.
         GuardiaModule.registrar(),
+        /**
+         * ETAPA 15 · el receptor del «servidor de alarma».
+         *
+         * Después de `eventos` y `guardia` porque consume el caso de uso de
+         * uno y el accionador del otro por sus barriles. Sin equipos
+         * declarados no acredita a nadie y el extremo queda cerrado, que es
+         * la configuración por omisión y la dirección segura.
+         */
+        AlarmServerModule.registrar(config.ALARM_SERVER_EQUIPOS),
         // Después de eventos: el tablero lee por los puertos que aquel publica.
         TableroModule.registrar(),
         // La superficie del residente, después del padrón: lee por su propio
