@@ -174,6 +174,45 @@ export const esquemaConfiguracion = z.object({
     .regex(/^(env|vault):[A-Za-z0-9_./-]+$/, 'EQUIPOS_LLAVE_REF es una referencia, no la llave')
     .default('env:EQUIPOS_LLAVE'),
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ETAPA 15-C · QUÉ PROVEEDOR DE HARDWARE SE INYECTA
+   *
+   * Es **la única decisión** que separa correr contra el simulado de correr
+   * contra los equipos, y vive aquí —validada al arranque— y no dentro de un
+   * módulo. Hasta la 15-C no existía: el módulo de biometría hacía
+   * `new MockProvider` en su fábrica, de modo que cambiar de adaptador exigía
+   * editar código de la API. ADR-03 promete lo contrario, y no había dónde
+   * comprobarlo.
+   *
+   * `simulado` es el valor por omisión y lo seguirá siendo. ADR-03 dice que
+   * todo el sistema debe funcionar completo contra él, y un despliegue que se
+   * pusiera en modo hardware por descuido informaría de aperturas que nunca
+   * ocurrieron. Un valor desconocido **impide el arranque**: entre «no es
+   * ninguno de los dos» y «me quedo con el que había», la segunda opción es
+   * cómo un despliegue acaba en un modo que nadie eligió.
+   */
+  /**
+   * LA ÚNICA LÍNEA DEL PROYECTO QUE NOMBRA AL FABRICANTE FUERA DEL PAQUETE DE
+   * PROVEEDORES, eximida de KPI-11 **en la línea y con motivo escrito**.
+   *
+   * KPI-11 persigue que el **protocolo** no salga del paquete: rutas, nombres
+   * de elemento, direcciones de equipo. Esto no es protocolo: es el nombre del
+   * adaptador que hay que componer, y el punto de composición es el único sitio
+   * del sistema que por definición tiene que poder nombrar a los dos.
+   *
+   * Se exime esta línea y **sólo ésta**. Nada del resto de la aplicación sabe
+   * qué ruta abre una barrera ni en qué dirección vive una cámara, y el control
+   * lo sigue comprobando en cada construcción.
+   */
+  PROVEEDOR_DE_EQUIPOS: z.enum(['simulado', 'hikvision']).default('simulado'), // kpi-11-exento
+  /**
+   * Semilla del simulado. La adversidad que genera —latencia, fallos,
+   * duplicados— tiene que ser **reproducible**: una prueba que falla con una
+   * semilla y pasa con otra no es una prueba.
+   */
+  PROVEEDOR_SEMILLA: z.coerce.number().int().default(20260908),
+
   /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 

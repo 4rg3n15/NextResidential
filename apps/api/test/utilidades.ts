@@ -69,6 +69,13 @@ export const configuracionDePrueba: Configuracion = {
   EQUIPOS_LLAVE: 'llave-de-equipos-solo-para-pruebas-32+',
   EQUIPOS_LLAVE_REF: 'env:EQUIPOS_LLAVE',
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: 24,
+  /**
+   * La suite corre SIEMPRE contra el simulado, que es lo que ADR-03 exige poder
+   * hacer: el sistema completo tiene que demostrarse sin hardware. El adaptador
+   * real se ejercita en la suite de contrato, contra el equipo simulado.
+   */
+  PROVEEDOR_DE_EQUIPOS: 'simulado',
+  PROVEEDOR_SEMILLA: 20260908,
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   LOG_LEVEL: 'aviso',

@@ -52,6 +52,13 @@ export type ReaccionAlError =
   | 'equipo_ocupado'
   /** La placa no cumple el formato que el equipo espera. */
   | 'placa_no_reconocible'
+  /** Avería del propio equipo. Es FALLO_TECNICO y no se arregla reintentando. */
+  | 'equipo_averiado'
+  /**
+   * El equipo exige **reinicio** para que el cambio surta efecto. Reintentar es
+   * inútil y ruidoso: hay que decírselo al operador, que es quien reinicia.
+   */
+  | 'reinicio_necesario'
   /** No lo conocemos. Se trata como fallo técnico y se registra el código. */
   | 'desconocida';
 
@@ -62,7 +69,82 @@ export interface ErrorDelFabricante {
   readonly detalle: string;
   /** `true` sólo donde reintentar tiene sentido y no cuesta nada. */
   readonly reintentable: boolean;
+  /**
+   * El código de estado general de la respuesta, cuando viene. Se conserva
+   * aparte del código detallado porque son dos ejes distintos: uno dice **qué
+   * clase de problema** es y el otro **cuál en concreto**.
+   */
+  readonly estado: number | null;
+  /**
+   * Códigos por módulo funcional, que el esquema declara junto a los demás. No
+   * se interpretan —no hay tabla— pero **se conservan**: son lo único que
+   * permite buscarlos en la guía cuando aparecen por primera vez, y tirarlos
+   * convertiría un diagnóstico posible en uno imposible.
+   */
+  readonly codigoDeModulo: string | null;
+  readonly codigoDeEquipo: string | null;
 }
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * EL CÓDIGO DE ESTADO GENERAL · ocho valores, cinco reacciones distintas
+ *
+ * | Valor | Qué significa            | Qué hay que hacer                      |
+ * | ----- | ------------------------ | -------------------------------------- |
+ * | 0, 1  | Correcto                 | Nada                                   |
+ * | 2     | Equipo ocupado           | Reintentar **con espera**              |
+ * | 3     | Error del equipo         | Fallo técnico; no se arregla insistiendo |
+ * | 4     | Operación no válida      | ESE modelo no la admite: degradar      |
+ * | 5, 6  | XML mal formado o inválido | Defecto NUESTRO: no se reintenta nunca |
+ * | 7     | Requiere reinicio        | Decírselo al operador; reintentar es ruido |
+ *
+ * Las cinco reacciones no son matices. `2` y `3` se parecen —«el equipo no
+ * pudo»— y se tratan al revés: uno se reintenta y el otro no. `5` y `6` son la
+ * tentación contraria: parecen del equipo y son nuestros, así que reintentar
+ * repite el mismo error para siempre. Y `4` es la que más cuesta confundir: no
+ * significa «ahora no», significa «este modelo no», y la salida es la ruta
+ * alternativa del catálogo, no insistir en la misma.
+ */
+const POR_ESTADO: Readonly<
+  Record<string, { reaccion: ReaccionAlError; detalle: string; reintentable: boolean }>
+> = {
+  '2': {
+    reaccion: 'equipo_ocupado',
+    detalle: 'El equipo está ocupado. Es un fallo técnico, no una denegación de acceso',
+    reintentable: true,
+  },
+  '3': {
+    reaccion: 'equipo_averiado',
+    detalle: 'El equipo informa de un error propio. Reintentar no lo arregla',
+    reintentable: false,
+  },
+  '4': {
+    reaccion: 'ruta_inexistente',
+    detalle:
+      'Este modelo no admite esta operación. La salida es la ruta alternativa del catálogo, ' +
+      'no insistir en la misma',
+    reintentable: false,
+  },
+  '5': {
+    reaccion: 'peticion_mal_formada',
+    detalle: 'El equipo no pudo analizar lo que se le envió. El defecto es NUESTRO, no suyo',
+    reintentable: false,
+  },
+  '6': {
+    reaccion: 'peticion_mal_formada',
+    detalle:
+      'El equipo entendió el documento y rechazó su contenido. El defecto es NUESTRO: revise ' +
+      'qué campos exige el esquema antes de escribir',
+    reintentable: false,
+  },
+  '7': {
+    reaccion: 'reinicio_necesario',
+    detalle:
+      'El cambio no surte efecto hasta que el equipo se reinicie. Reintentar es inútil y ' +
+      'ruidoso: hay que reiniciarlo',
+    reintentable: false,
+  },
+};
 
 const POR_CODIGO: Readonly<
   Record<string, { reaccion: ReaccionAlError; detalle: string; reintentable: boolean }>
@@ -114,23 +196,53 @@ const codigoEn = (cuerpo: string): string | null => {
   return encontrado === undefined ? null : encontrado[1].toLowerCase();
 };
 
+const enteroDe = (crudo: string | undefined): number | null => {
+  if (crudo === undefined) return null;
+  const n = Number(crudo.trim());
+  return Number.isInteger(n) ? n : null;
+};
+
+/** Lo que el sobre trae además del código: los ejes que no se interpretan. */
+const extras = (
+  cuerpo: string,
+): { estado: number | null; codigoDeModulo: string | null; codigoDeEquipo: string | null } => ({
+  estado: enteroDe(/<statusCode>\s*(-?\d+)\s*<\/statusCode>/i.exec(cuerpo)?.[1]),
+  codigoDeModulo:
+    /<MErrCode>\s*([^<]+)\s*<\/MErrCode>/i.exec(cuerpo)?.[1]?.trim() ??
+    /"errorCode"\s*:\s*"?([^",}]+)"?/i.exec(cuerpo)?.[1]?.trim() ??
+    null,
+  codigoDeEquipo:
+    /<MErrDevSelfEx>\s*([^<]+)\s*<\/MErrDevSelfEx>/i.exec(cuerpo)?.[1]?.trim() ?? null,
+});
+
 export const interpretarError = (cuerpo: string): ErrorDelFabricante => {
   const codigo = codigoEn(cuerpo);
+  const aparte = extras(cuerpo);
   const conocido = codigo === null ? undefined : POR_CODIGO[codigo];
-  if (conocido === undefined) {
-    return {
-      codigo,
-      reaccion: 'desconocida',
-      // El código se conserva aunque no se sepa qué es: es lo único que
-      // permite buscarlo en la guía cuando aparezca por primera vez.
-      detalle:
-        codigo === null
-          ? 'El equipo rechazó la operación sin decir por qué'
-          : `El equipo devolvió un código que este mapa no conoce: ${codigo}`,
-      reintentable: false,
-    };
-  }
-  return { codigo, ...conocido };
+
+  if (conocido !== undefined) return { codigo, ...conocido, ...aparte };
+
+  /**
+   * Sin código detallado, manda el general. Es lo que llega de la mayoría de
+   * los extremos, y tratarlo como «desconocido» perdía cinco reacciones
+   * distintas en un solo cajón: un equipo ocupado —que se reintenta— acababa
+   * indistinguible de un XML mal formado nuestro, que no se reintenta nunca.
+   */
+  const porEstado = aparte.estado === null ? undefined : POR_ESTADO[String(aparte.estado)];
+  if (porEstado !== undefined) return { codigo, ...porEstado, ...aparte };
+
+  return {
+    codigo,
+    reaccion: 'desconocida',
+    // El código se conserva aunque no se sepa qué es: es lo único que
+    // permite buscarlo en la guía cuando aparezca por primera vez.
+    detalle:
+      codigo === null
+        ? 'El equipo rechazó la operación sin decir por qué'
+        : `El equipo devolvió un código que este mapa no conoce: ${codigo}`,
+    reintentable: false,
+    ...aparte,
+  };
 };
 
 /**

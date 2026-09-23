@@ -13,10 +13,17 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
+import type { FichaDelEquipo } from '@ncr/providers';
 import { Aislamiento } from '../../multiempresa/aislamiento';
-import { REPOSITORIO_DE_EQUIPOS, SIN_PROBAR, SONDA_DE_EQUIPO } from '../aplicacion/puertos';
+import {
+  CORRECTOR_DE_EQUIPO,
+  REPOSITORIO_DE_EQUIPOS,
+  SIN_PROBAR,
+  SONDA_DE_EQUIPO,
+} from '../aplicacion/puertos';
 import type {
   AltaDeEquipo,
+  CorrectorDeEquipo,
   DatosDeEquipo,
   RepositorioDeEquipos,
   ResultadoDeSondeo,
@@ -25,8 +32,11 @@ import type {
 import {
   AltaDeEquipoDto,
   BajaDeEquipoDto,
+  CorreccionDeEquipoDto,
   EquipoDto,
   EquiposDto,
+  FichaDelEquipoDto,
+  ResultadoDeCorreccionDto,
   ResultadoDeSondeoDto,
 } from './dtos';
 
@@ -50,6 +60,29 @@ import {
  * credencial. Y no hay ninguna respuesta que devuelva el secreto: no existe el
  * campo (ver `dtos.ts`).
  */
+/**
+ * La ficha del proveedor a su DTO. Se copia campo a campo y no con un `spread`
+ * porque lo que sale por HTTP tiene que ser una decisión explícita: un `spread`
+ * publicaría mañana cualquier campo que alguien añada al tipo interno, y este
+ * módulo es justo el que tiene un secreto que no puede salir.
+ */
+const aFicha = (ficha: FichaDelEquipo): FichaDelEquipoDto => ({
+  modelo: ficha.modelo,
+  firmware: ficha.firmware,
+  serie: ficha.serie,
+  horaDelEquipo: ficha.horaDelEquipo,
+  desvioDeRelojSegundos: ficha.desvioDeRelojSegundos,
+  sinComprobar: [...ficha.sinComprobar],
+  hallazgos: ficha.hallazgos.map((h) => ({
+    campo: h.campo,
+    estado: h.estado,
+    valorLeido: h.valorLeido,
+    valorCorrecto: h.valorCorrecto,
+    detalle: h.detalle,
+    correccion: h.correccion,
+  })),
+});
+
 @ApiTags('equipos')
 @ApiBearerAuth()
 @Controller('copropiedades/:id/equipos')
@@ -57,6 +90,7 @@ export class EquiposController {
   constructor(
     @Inject(REPOSITORIO_DE_EQUIPOS) private readonly repo: RepositorioDeEquipos,
     @Inject(SONDA_DE_EQUIPO) private readonly sonda: SondaDeEquipo,
+    @Inject(CORRECTOR_DE_EQUIPO) private readonly corrector: CorrectorDeEquipo,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
 
@@ -129,7 +163,18 @@ export class EquiposController {
     @Body() dto: AltaDeEquipoDto,
   ): Promise<ResultadoDeSondeoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/prueba');
-    return { ...(await this.sondear({ ...dto, probarConexion: true })) };
+    const veredicto = await this.sondear({ ...dto, probarConexion: true });
+    // La ficha se omite cuando no la hay, en vez de enviarse vacía: la falta de
+    // ficha no es una ficha sin hallazgos (`exactOptionalPropertyTypes`).
+    return {
+      clase: veredicto.clase,
+      detalle: veredicto.detalle,
+      modelo: veredicto.modelo,
+      firmware: veredicto.firmware,
+      latenciaMs: veredicto.latenciaMs,
+      verificado: veredicto.verificado,
+      ...(veredicto.ficha === undefined ? {} : { ficha: aFicha(veredicto.ficha) }),
+    };
   }
 
   @Post()
@@ -168,6 +213,69 @@ export class EquiposController {
     );
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
     return this.aDto(equipo);
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * CORREGIR UN CAMPO DEL EQUIPO DESDE LA CONSOLA
+   *
+   * El diagnóstico dice qué está mal y cuál debería ser el valor. Sin esto, el
+   * operador tiene que ir al panel del aparato, encontrar el campo y cambiarlo
+   * a mano — y en un conjunto con doce cámaras eso no lo hace nadie.
+   *
+   * Tres cosas que no se negocian:
+   *
+   * 1 · **Confirmación de una persona.** El identificador de quien la pide
+   *     viaja hasta el adaptador, y sin él la petición al equipo no se emite.
+   * 2 · **Constancia del valor anterior y el nuevo** en `auditoria_seguridad`.
+   *     «Alguien corrigió algo» no permite reconstruir nada.
+   * 3 · **La credencial no viaja de vuelta.** Se lee del sobre cifrado en el
+   *     servidor, se usa, y no sale por ninguna respuesta.
+   */
+  @Post(':equipoId/correcciones')
+  @Roles('superadministrador', 'administrador')
+  @ApiOperation({ summary: 'Corrige un campo del equipo. Exige confirmación y deja constancia' })
+  @ApiOkResponse({ type: ResultadoDeCorreccionDto })
+  async corregir(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('equipoId', ParseUUIDPipe) equipoId: string,
+    @Body() dto: CorreccionDeEquipoDto,
+  ): Promise<ResultadoDeCorreccionDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/correccion');
+
+    const equipos = await this.repo.listar(ctx, copropiedadId);
+    const equipo = equipos.find((e) => e.id === equipoId);
+    // El 404 no dice qué equipo era: un equipo de otra copropiedad y uno que no
+    // existe se ven igual desde fuera, que es lo que RN-15 exige.
+    if (equipo === undefined) throw new NotFoundException('No se encontró el equipo');
+
+    const secreto = await this.repo.credencialPara(ctx, copropiedadId, equipoId);
+    if (secreto === null) {
+      throw new NotFoundException(
+        'El equipo no tiene credencial guardada: vuelva a escribirla en la edición antes de ' +
+          'corregirlo, porque el sistema no la muestra ni la reenvía',
+      );
+    }
+
+    const resultado = await this.corrector.corregir({
+      host: equipo.host,
+      puerto: equipo.puerto,
+      protocolo: equipo.protocolo,
+      usuario: equipo.usuario ?? '',
+      secreto,
+      correccion: dto.correccion,
+      confirmadaPor: ctx.usuarioId,
+    });
+
+    await this.repo.auditarCorreccion(
+      ctx,
+      copropiedadId,
+      `${equipo.nombre} · ${dto.correccion}: ${resultado.valorAnterior ?? '(sin valor)'} → ` +
+        `${resultado.valorNuevo ?? '(sin cambio)'} · ${dto.motivo}`,
+    );
+
+    return { ...resultado };
   }
 
   @Post(':equipoId/baja')

@@ -56,13 +56,40 @@ export interface VeredictoDeModo {
   readonly detalle: string;
 }
 
-/** Lee `ctrlMod` de la respuesta, venga en XML o en JSON. */
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * [CORREGIR · 15-C] LAS DOS GRAFÍAS, Y POR QUÉ HAY DOS
+ *
+ * Este lector buscaba **sólo** `<ctrlMod>`. El esquema XML del capítulo de
+ * referencia de la guía declara `<ctrlMode>`, **con «e»**:
+ *
+ *   <EntranceParamList version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+ *     <EntranceParam>
+ *       <laneNum>1</laneNum>
+ *       <bEnable>true</bEnable>
+ *       <ctrlMode>1</ctrlMode>
+ *
+ * La expresión anterior no casaba nunca contra un equipo real, así que devolvía
+ * `null`, y `juzgarModo(null)` rechaza el equipo por «no declaró quién controla
+ * la barrera». **Falla cerrado, que es lo correcto**, y el efecto era el peor
+ * posible de un fallo correcto: una cámara BIEN configurada se rechazaba, y el
+ * mensaje mandaba a revisar justo lo que estaba bien.
+ *
+ * Se aceptan las dos porque el propio documento usa las dos: el capítulo de
+ * control de barrera de entrada y salida la nombra `ctrlMod` en la ruta JSON, y
+ * el esquema XML la declara `ctrlMode`. Queda registrado como contradicción
+ * C-16 en `docs/auditoria/contradicciones-y-supuestos.md`. **Al ESCRIBIR se usa
+ * la del esquema**, que es la que el equipo valida.
+ */
 export const leerCtrlMod = (cuerpo: string): string | null => {
-  const enXml = /<ctrlMod>\s*(-?\d+)\s*<\/ctrlMod>/i.exec(cuerpo)?.[1];
+  const enXml = /<ctrlMode?>\s*(-?\d+)\s*<\/ctrlMode?>/i.exec(cuerpo)?.[1];
   if (enXml !== undefined) return enXml;
-  const enJson = /"ctrlMod"\s*:\s*"?(-?\d+)"?/i.exec(cuerpo)?.[1];
+  const enJson = /"ctrlMode?"\s*:\s*"?(-?\d+)"?/i.exec(cuerpo)?.[1];
   return enJson ?? null;
 };
+
+/** La grafía con la que se ESCRIBE: la del esquema XML. */
+export const ETIQUETA_DE_MODO = 'ctrlMode';
 
 export const juzgarModo = (valorLeido: string | null): VeredictoDeModo => {
   if (valorLeido === null) {
@@ -109,9 +136,19 @@ export const juzgarModo = (valorLeido: string | null): VeredictoDeModo => {
  * **qué hay que cambiar**, no sólo que algo va mal.
  */
 export class EquipoDecidePorSuCuenta extends Error {
-  constructor(readonly veredicto: VeredictoDeModo) {
+  /**
+   * `motivos` lleva TODOS los bloqueos del veredicto completo, no sólo el del
+   * modo de control. Desde la 15-C hay tres vías por las que un equipo puede
+   * abrir por su cuenta, y decir sólo la primera manda a corregir un campo que
+   * a veces ya está bien.
+   */
+  constructor(
+    readonly veredicto: VeredictoDeModo,
+    readonly motivos: readonly string[] = [],
+  ) {
     super(
       `El equipo no opera bajo control de la plataforma: ${veredicto.detalle}. ` +
+        (motivos.length > 0 ? `Además: ${motivos.join(' · ')}. ` : '') +
         'Cámbielo en la configuración del aparato antes de integrarlo (guía §8.2)',
     );
     this.name = 'EquipoDecidePorSuCuenta';

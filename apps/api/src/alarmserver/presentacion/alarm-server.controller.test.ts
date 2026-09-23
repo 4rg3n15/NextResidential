@@ -5,7 +5,12 @@ import type { ResultadoDeAccionamiento } from '@ncr/domain-core';
 import type { RegistrarAcceso } from '../../eventos';
 import type { EquipoDeclarado } from '../../comun/equipos-de-alarm-server';
 import type { PeticionDeEquipo } from '../../comun/sobre-de-equipo';
-import { AlarmServerController, PRESUPUESTO_DE_EVIDENCIA_MS } from './alarm-server.controller';
+import { FuenteDePlacas } from '@ncr/providers';
+import { AlarmServerController } from './alarm-server.controller';
+import {
+  IngestorDeEquipos,
+  PRESUPUESTO_DE_EVIDENCIA_MS,
+} from '../aplicacion/ingestor-de-publicaciones';
 
 /**
  * LA PRUEBA DEL PRINCIPIO RECTOR, EN UNA FRASE: el relé se acciona **cuando y
@@ -17,6 +22,18 @@ import { AlarmServerController, PRESUPUESTO_DE_EVIDENCIA_MS } from './alarm-serv
  * ramas se recorren enteras y lo que se comprueba es exactamente lo que este
  * controlador decide: **nada**, salvo a quién entrega el hecho y qué hace con
  * la respuesta.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * QUÉ CAMBIÓ EN LA 15-C, Y POR QUÉ LAS ASERCIONES SON LAS MISMAS
+ *
+ * El controlador ya no orquesta: acredita, abre el sobre y **publica en el
+ * puerto**. La evidencia, el caso de uso y el relé viven en el ingestor, que es
+ * el único suscriptor de esa fuente.
+ *
+ * Las aserciones de abajo **no se han tocado**, y eso es lo que demuestra que
+ * el refactor no cambió el comportamiento: el mismo sobre entra por el mismo
+ * sitio y produce exactamente las mismas llamadas. Lo único que cambia es el
+ * montaje, que ahora cablea la fuente y el ingestor como lo hace el módulo.
  */
 
 const EQUIPO: EquipoDeclarado = {
@@ -98,14 +115,18 @@ const montar = (opciones: {
 
   const almacen: AlmacenEvidencia = { guardar, urlFirmada: async () => 'https://x.invalid' };
 
-  const controlador = new AlarmServerController(
-    { ejecutar } as unknown as RegistrarAcceso,
-    { accionar },
-    almacen,
-    opciones.bitacora ?? bitacoraSilenciosa,
-    reloj,
-    ids,
+  const bitacora = opciones.bitacora ?? bitacoraSilenciosa;
+  const fuente = new FuenteDePlacas(
+    new IngestorDeEquipos(
+      { ejecutar } as unknown as RegistrarAcceso,
+      { accionar },
+      almacen,
+      bitacora,
+      ids,
+      [EQUIPO],
+    ),
   );
+  const controlador = new AlarmServerController(fuente, bitacora, reloj);
   return { controlador, accionar, guardar, ejecutar };
 };
 

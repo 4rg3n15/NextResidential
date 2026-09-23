@@ -16,21 +16,39 @@ describe('catálogo de rutas', () => {
     }
   });
 
-  it('toda ruta respaldada por la GUÍA OFICIAL cita de qué trata su capítulo', () => {
+  it('toda ruta respaldada por la GUÍA cita su SECCIÓN, con número', () => {
     /**
      * El grado intermedio se añadió el 23/09/2026 porque «documentada» mezclaba
      * dos cosas: lo que dice la guía del fabricante para esta familia y lo que
      * se dedujo de la forma habitual de ISAPI. Tratarlas igual obliga a
      * desconfiar de las dos por igual, y entonces la etiqueta no informa.
      *
-     * El `capitulo` dice DE QUÉ TRATA y no un número: el destilado llegó como
-     * texto y poner «§4.2» sería inventar una precisión que nadie puede
-     * comprobar.
+     * **Y desde la 15-C el capítulo es un NÚMERO.** Antes decía de qué trataba
+     * —«control de la barrera»— porque el destilado llegó como texto suelto.
+     * Con la guía integral delante, una referencia sin número obliga a buscar
+     * por palabras delante del equipo, que es justo cuando menos tiempo hay.
      */
     for (const r of rutasPor('guia_oficial')) {
-      expect(r.capitulo, `${r.proposito}: sin capítulo citado`).toBeTruthy();
-      expect(r.fuente, r.proposito).toMatch(/guía oficial/i);
+      expect(r.capitulo, `${r.proposito}: sin sección citada`).toBeTruthy();
+      expect(r.capitulo, `${r.proposito}: la sección no lleva número`).toMatch(/§\d/);
+      expect(r.fuente, r.proposito).toMatch(/gu[ií]a (oficial|ISAPI)/i);
     }
+  });
+
+  it('citar la sección NO asciende una ruta a verificada', () => {
+    // La única verificada sigue siendo la barrera, capturada del aparato. Que
+    // el fabricante lo documente no demuestra que ESTE firmware lo implemente.
+    expect(rutasPor('verificada')).toHaveLength(1);
+    expect(rutasPor('verificada')[0]?.proposito).toMatch(/barrera/i);
+  });
+
+  it('la primera pregunta del sondeo NO exige credenciales', () => {
+    // Es lo que separa «no hay equipo en esa dirección» de «la credencial es
+    // mala», que se resuelven de formas distintas y una de ellas bloquea la
+    // cuenta del equipo si se reintenta.
+    const activacion = RUTAS.find((r) => /sin presentar credenciales/.test(r.proposito));
+    expect(activacion).toBeDefined();
+    expect(activacion?.metodo).toBe('GET');
   });
 
   it('la ruta de `ctrlMod` está en el catálogo: es la que decide quién manda', () => {

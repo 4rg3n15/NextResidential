@@ -8,6 +8,8 @@ import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
+import { motivoDeRechazo } from '@/lib/equipos/caracteres-admitidos';
+import { FichaDeEquipo } from './ficha-del-equipo';
 
 /**
  * Alta de un equipo desde la consola — A.1, A.3, A.4 y A.5.
@@ -122,8 +124,24 @@ export const AltaDeEquipo = ({
     ...(campoEspecifico === null ? {} : { [campoEspecifico.clave]: numero(especifico) ?? 1 }),
   });
 
+  /**
+   * Se comprueba AQUÍ lo que el equipo va a rechazar. No es cortesía de UX: un
+   * carácter no admitido llega como «el equipo rechazó la credencial», que es
+   * el mensaje de una clave equivocada, y el operador vuelve a intentarlo —
+   * hasta que el aparato le bloquea la cuenta.
+   */
+  const rechazoDeNombre = nombre === '' ? null : motivoDeRechazo('nombre', nombre.trim());
+  const rechazoDeUsuario = usuario === '' ? null : motivoDeRechazo('usuario', usuario.trim());
+  const rechazoDeClave = secreto === '' ? null : motivoDeRechazo('clave', secreto);
+
   const completo =
-    nombre.trim() !== '' && host.trim() !== '' && usuario.trim() !== '' && secreto !== '';
+    nombre.trim() !== '' &&
+    host.trim() !== '' &&
+    usuario.trim() !== '' &&
+    secreto !== '' &&
+    rechazoDeNombre === null &&
+    rechazoDeUsuario === null &&
+    rechazoDeClave === null;
 
   const probar = async (): Promise<void> => {
     setEnviando(true);
@@ -189,6 +207,7 @@ export const AltaDeEquipo = ({
         onChange={(e) => setNombre(e.target.value)}
         ayuda="Cómo lo llaman aquí: «Cámara de la entrada», «Torniquete del gimnasio»."
         required
+        {...(rechazoDeNombre === null ? {} : { error: rechazoDeNombre })}
       />
 
       <div className="space-y-1.5">
@@ -259,8 +278,9 @@ export const AltaDeEquipo = ({
         etiqueta="Usuario del equipo"
         value={usuario}
         onChange={(e) => setUsuario(e.target.value)}
-        ayuda="Use un usuario de servicio con el mínimo privilegio, no el de fábrica."
+        ayuda="Use un usuario de servicio con el mínimo privilegio, no el de fábrica: la guía del fabricante define un perfil de OPERADOR, y es el que hace falta."
         required
+        {...(rechazoDeUsuario === null ? {} : { error: rechazoDeUsuario })}
       />
       <Campo
         etiqueta="Clave del equipo"
@@ -270,6 +290,7 @@ export const AltaDeEquipo = ({
         onChange={(e) => setSecreto(e.target.value)}
         ayuda="Se guarda cifrada y no vuelve a mostrarse. Para volver a probar la conexión más adelante habrá que escribirla otra vez."
         required
+        {...(rechazoDeClave === null ? {} : { error: rechazoDeClave })}
       />
 
       {campoEspecifico === null ? null : (
@@ -298,6 +319,12 @@ export const AltaDeEquipo = ({
         <p className="mt-1">
           El equipo necesita <strong>dirección IP fija</strong>. Con IP asignada automáticamente, el
           aparato cambia de dirección al reiniciar el router y el sistema deja de encontrarlo.
+        </p>
+        <p className="mt-1">
+          Estos equipos traen <strong>HTTPS activo de fábrica con certificado autofirmado</strong>.
+          Next Control lo tolera <em>para este equipo</em> sin desactivar la verificación de
+          certificados en el resto del proceso: apagarla globalmente por un aparato dejaría sin
+          protección todas las demás conexiones salientes.
         </p>
       </aside>
 
@@ -330,6 +357,14 @@ export const AltaDeEquipo = ({
           )}
         </p>
       )}
+
+      {/*
+        LA FICHA · qué hay que cambiar, campo por campo.
+        No lleva botón de corrección: el equipo todavía no está guardado, así que
+        no hay contra qué identificarlo ni dónde dejar constancia de quién lo
+        corrigió. Se corrige desde su ficha, ya dado de alta.
+      */}
+      {sondeo?.ficha === undefined ? null : <FichaDeEquipo ficha={sondeo.ficha} />}
     </DialogoDeFormulario>
   );
 };

@@ -94,6 +94,27 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     plantillaId: string,
     plantilla: Uint8Array,
   ): Promise<void> {
+    /**
+     * ═════════════════════════════════════════════════════════════════════════
+     * LO ENCONTRÓ LA SUITE DE CONTRATO · 15-C
+     *
+     * `MockProvider` rechazaba una plantilla vacía desde la ETAPA 05 y este
+     * adaptador la aceptaba. No eran intercambiables, y la diferencia caía del
+     * lado peor: contra el equipo real, una captura fallida que nadie comprobó
+     * se subía igual y dejaba en la terminal **una plantilla que no reconoce a
+     * nadie, nunca**. El síntoma en sitio es un residente al que la puerta no
+     * le abre, con todo el sistema diciendo que su rostro está sincronizado.
+     *
+     * Es justo lo que la prueba de LSP existe para destapar, y el arreglo va en
+     * el adaptador —aquí— y no en la aserción.
+     */
+    if (plantilla.length === 0) {
+      throw new Error(
+        `No se sincroniza una plantilla VACÍA para ${plantillaId}: es lo que llega cuando la ` +
+          'captura falló y nadie lo comprobó, y dejaría en la terminal un rostro que no ' +
+          'reconoce a nadie (RN-11)',
+      );
+    }
     await this.altaDePersona(plantillaId);
 
     const ruta = rutaPara('cargar la plantilla facial', 'terminal');

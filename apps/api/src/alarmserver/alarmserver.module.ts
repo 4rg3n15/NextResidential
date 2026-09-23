@@ -1,20 +1,39 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID } from '@ncr/domain-core';
+import type { AlmacenEvidencia, Bitacora, GeneradorDeId } from '@ncr/domain-core';
+import { FuenteDePlacas } from '@ncr/providers';
 import { ACCIONADOR_DE_PUERTA } from '../guardia';
 import type { AccionadorDePuerta } from '../guardia';
+import { RegistrarAcceso } from '../eventos';
 import { AlarmServerController } from './presentacion/alarm-server.controller';
 import { GuardiaDeAlarmServer, EQUIPOS_DE_ALARM_SERVER } from './presentacion/guardia-alarm-server';
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
-import { ACCIONADOR_DEL_RECEPTOR } from './presentacion/alarm-server.controller';
+import type { EquipoDeclarado } from '../comun/equipos-de-alarm-server';
+import { FUENTE_DE_PLACAS } from './presentacion/alarm-server.controller';
+import { IngestorDeEquipos } from './aplicacion/ingestor-de-publicaciones';
 
 /**
- * El receptor del «servidor de alarma», y nada más.
+ * El receptor del «servidor de alarma», y la fuente por la que entran las
+ * placas.
  *
  * No trae casos de uso propios: reutiliza `RegistrarAcceso` de `eventos` —que
  * es `@Global` y lo exporta— y el accionador de `guardia`. Si algún día
  * necesitara uno, sería la señal de que la decisión se está duplicando fuera
  * del motor de reglas.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * UNA SOLA FUENTE Y UN SOLO INGESTOR · 15-C
+ *
+ * La fuente se registra aquí y **con un solo ingestor**. Dos producirían dos
+ * eventos por cada lectura en una tabla que no admite borrado, y el defecto no
+ * se vería hasta que alguien contara los accesos del día. La propia fuente se
+ * niega a aceptar un segundo.
+ *
+ * Que se exporte importa: el transporte de ARMADO —el flujo que mantenemos
+ * abierto contra el equipo— publica en esta misma instancia, y si cada uno
+ * tuviera la suya habría otra vez dos caminos a `RegistrarAcceso`.
  *
  * ═════════════════════════════════════════════════════════════════════════════
  * POR QUÉ EL ACCIONADOR SE RESUELVE POR `ModuleRef` Y NO SE IMPORTA
@@ -44,18 +63,41 @@ export class AlarmServerModule {
         GuardiaDeAlarmServer,
         { provide: EQUIPOS_DE_ALARM_SERVER, useValue: equipos },
         {
-          /**
-           * Token PROPIO, y no el de `guardia`. Con el mismo token, la fábrica
-           * se buscaría a sí misma: `strict: false` recorre todo el contenedor
-           * y este proveedor también está en él. Un alias distinto hace que
-           * «de dónde sale el accionador» tenga una sola respuesta posible.
-           */
-          provide: ACCIONADOR_DEL_RECEPTOR,
-          inject: [ModuleRef],
-          useFactory: (referencia: ModuleRef): AccionadorDePuerta =>
-            referencia.get<AccionadorDePuerta>(ACCIONADOR_DE_PUERTA, { strict: false }),
+          provide: FUENTE_DE_PLACAS,
+          inject: [
+            ModuleRef,
+            RegistrarAcceso,
+            ALMACEN_EVIDENCIA,
+            BITACORA,
+            GENERADOR_DE_ID,
+            EQUIPOS_DE_ALARM_SERVER,
+          ],
+          useFactory: (
+            referencia: ModuleRef,
+            registrar: RegistrarAcceso,
+            evidencia: AlmacenEvidencia,
+            bitacora: Bitacora,
+            ids: GeneradorDeId,
+            declarados: readonly EquipoDeclarado[],
+          ) =>
+            new FuenteDePlacas(
+              new IngestorDeEquipos(
+                registrar,
+                /**
+                 * Token PROPIO no hace falta aquí: el accionador se resuelve
+                 * por `ModuleRef` con `strict: false`, que busca la instancia
+                 * ÚNICA que `app.module.ts` registró. Ver la nota de arriba.
+                 */
+                referencia.get<AccionadorDePuerta>(ACCIONADOR_DE_PUERTA, { strict: false }),
+                evidencia,
+                bitacora,
+                ids,
+                declarados,
+              ),
+            ),
         },
       ],
+      exports: [FUENTE_DE_PLACAS],
     };
   }
 }

@@ -96,6 +96,14 @@ export type ViviendaProyectada = Esquemas['ViviendaProyectadaDto'];
 export type Equipo = Esquemas['EquipoDto'];
 export type AltaDeEquipo = Esquemas['AltaDeEquipoDto'];
 export type ResultadoDeSondeo = Esquemas['ResultadoDeSondeoDto'];
+/**
+ * Lo que la consola pinta de un equipo: qué se leyó, qué debería decir, y si
+ * hay un botón que lo arregle. Todos los hallazgos con **el mismo tipo**, para
+ * que la pantalla pinte una lista y no seis bloques que se parecen.
+ */
+export type FichaDelEquipo = Esquemas['FichaDelEquipoDto'];
+export type HallazgoDelEquipo = Esquemas['HallazgoDelEquipoDto'];
+export type ResultadoDeCorreccion = Esquemas['ResultadoDeCorreccionDto'];
 export type TipoDeEquipo = Equipo['tipo'];
 /** Los cuatro tipos de conjunto, tomados del contrato. */
 export type TipoDeCopropiedad = NonNullable<ConfiguracionDeCopropiedad['tipo']>;

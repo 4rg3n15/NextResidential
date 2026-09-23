@@ -95,6 +95,16 @@ export interface EventoDeEquipo {
   /** `true` si el equipo considera que la placa cumple el estándar del país. */
   readonly placaEstandar: boolean | null;
   readonly recuadro: RecuadroDetectado | null;
+  /**
+   * `true` cuando el equipo emitió una hora **sin desplazamiento horario**.
+   *
+   * No es un detalle de formato: interpretarla en la zona del proceso corre el
+   * evento las horas que separen al servidor del conjunto —cinco, en el caso de
+   * este proyecto— y el histórico queda desplazado sin que nada falle. Cuando
+   * ocurre se usa el reloj inyectado y **se deja esta traza**, que es lo que
+   * permite verlo en la puesta en marcha en vez de descubrirlo en una auditoría.
+   */
+  readonly horaSinDesplazamiento: boolean;
 }
 
 /**
@@ -171,6 +181,66 @@ export const esXmlDeAlarmServer = (cuerpo: string): boolean =>
  */
 export const esDatoEnVivo = (alarmDataType: string | null): boolean => alarmDataType === '0';
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * [CORREGIR · 15-C] LA CONFIANZA ES UN PORCENTAJE ENTERO, SIEMPRE
+ *
+ * El esquema del evento declara `confidenceLevel` como **requerido** y con
+ * rango `[0,100]`. No hay firmware que lo emita en fracción: la ambigüedad que
+ * este código creía manejar **no existe para ese campo**.
+ *
+ * Lo que había era una heurística —«si vale más de 1, divide entre 100»— y
+ * tenía el peor fallo posible: con una confianza de **1**, que en la escala
+ * real significa **uno por ciento**, la condición no se cumple y el valor pasa
+ * tal cual, es decir **1.0: certeza total**. Exactamente al revés. La lectura
+ * más dudosa que el equipo puede declarar entraba como la más segura, se
+ * saltaba el umbral de lectura dudosa (CU-01, excepción 3a) y abría la barrera.
+ *
+ * Ahora `confidenceLevel` **se divide entre 100 sin condición**. La heurística
+ * sobrevive sólo para el alias `confidence`, que el documento no declara: ahí
+ * no se sabe la escala, y suponer una de las dos sin base sería repetir el
+ * error con otro campo.
+ */
+export const confianzaDelEvento = (
+  nivelDocumentado: string | null,
+  aliasNoDocumentado: string | null,
+): number | null => {
+  if (nivelDocumentado !== null && nivelDocumentado.trim() !== '') {
+    const n = Number(nivelDocumentado);
+    return Number.isFinite(n) ? n / 100 : null;
+  }
+  if (aliasNoDocumentado === null || aliasNoDocumentado.trim() === '') return null;
+  const n = Number(aliasNoDocumentado);
+  if (!Number.isFinite(n)) return null;
+  return n > 1 ? n / 100 : n;
+};
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * UNA HORA SIN DESPLAZAMIENTO NO SE INTERPRETA
+ *
+ * `2026-09-23T10:15:00` sin `Z` ni `+HH:MM` no dice **cuándo** fue: lo dice
+ * quien la lee, y quien la lee es un proceso que puede estar en otra zona. Los
+ * motores de JavaScript interpretan esa forma en la zona **local del proceso**,
+ * así que un servidor en UTC leyendo un equipo en Bogotá corre cada evento
+ * **cinco horas**, en silencio y en una tabla que no admite corrección.
+ *
+ * La salida no es adivinar la zona del equipo: es usar el reloj inyectado —la
+ * hora de recepción, que sí es cierta— y **dejar la traza** para que la puesta
+ * en marcha lo vea. Perder la precisión de unos milisegundos es barato; un
+ * histórico desplazado cinco horas no se arregla nunca.
+ */
+export const traeDesplazamiento = (marca: string): boolean =>
+  /(?:Z|[+-]\d{2}:?\d{2})\s*$/i.test(marca.trim());
+
+/** La hora del equipo cuando es utilizable; la de recepción cuando no lo es. */
+export const fechaDelEquipo = (marca: string | null, ahora: Date): Date => {
+  if (marca === null || marca.trim() === '') return ahora;
+  if (!traeDesplazamiento(marca)) return ahora;
+  const analizada = Date.parse(marca);
+  return Number.isNaN(analizada) ? ahora : new Date(analizada);
+};
+
 /** `openGateType` del equipo → quién abrió, en lenguaje del dominio. */
 const quienAbrioDe = (crudo: string | null): QuienAbrio | null => {
   if (crudo === null || crudo === '') return null;
@@ -220,19 +290,11 @@ export const desdeAlarmServerXml = (
 
   const tipo = etiqueta(cuerpo, 'eventType');
   const placa = etiqueta(cuerpo, 'licensePlate') ?? etiqueta(cuerpo, 'plateNumber');
-  const confianzaCruda = etiqueta(cuerpo, 'confidenceLevel') ?? etiqueta(cuerpo, 'confidence');
   const cuando = etiqueta(cuerpo, 'dateTime');
-
-  // La confianza llega en porcentaje entero (0-100) en unos firmware y en
-  // fracción en otros. Se normaliza a 0..1, que es lo que el dominio compara
-  // contra el umbral configurable. Dividir siempre —o nunca— produce un umbral
-  // que solo funciona con la mitad de los equipos.
-  const confianza =
-    confianzaCruda === null || confianzaCruda === ''
-      ? null
-      : Number(confianzaCruda) > 1
-        ? Number(confianzaCruda) / 100
-        : Number(confianzaCruda);
+  const confianza = confianzaDelEvento(
+    etiqueta(cuerpo, 'confidenceLevel'),
+    etiqueta(cuerpo, 'confidence'),
+  );
 
   /**
    * `noPlate` es lo que el equipo emite cuando **no hubo lectura**, y no es una
@@ -263,7 +325,9 @@ export const desdeAlarmServerXml = (
     // recepción y el evento sigue su camino. Perder un acceso porque el reloj
     // del equipo emite un formato raro sería peor que registrarlo con la hora
     // en que llegó — y `eventos` guarda las dos (`ocurrido_en`, `registrado_en`).
-    ocurridoEn: cuando !== null && !Number.isNaN(Date.parse(cuando)) ? new Date(cuando) : ahora,
+    // Y una marca SIN desplazamiento tampoco se interpreta: ver arriba.
+    ocurridoEn: fechaDelEquipo(cuando, ahora),
+    horaSinDesplazamiento: cuando !== null && cuando !== '' && !traeDesplazamiento(cuando),
     enVivo: esDatoEnVivo(etiqueta(cuerpo, 'alarmDataType')),
     referenciaDelEquipo: etiqueta(cuerpo, 'eventId') ?? etiqueta(cuerpo, 'serialNumber'),
   };
@@ -314,7 +378,10 @@ export const desdeAlertStreamJson = (
           ? 'timbre'
           : 'desconocido',
     placa,
-    confianza: confianza === null ? null : confianza > 1 ? confianza / 100 : confianza,
+    // Mismo campo documentado y misma escala que en el sobre del Alarm Server:
+    // porcentaje entero. Se normaliza por el mismo sitio para que no haya dos
+    // interpretaciones de la misma cifra según por dónde entre el evento.
+    confianza: confianzaDelEvento(confianza === null ? null : String(confianza), null),
     /**
      * El videoportero no emite ninguno de los campos del evento ANPR: son de
      * la cámara. Se rellenan a `null` EXPLÍCITAMENTE y no por omisión, para
@@ -332,8 +399,8 @@ export const desdeAlertStreamJson = (
     placaEstandar: null,
     recuadro: null,
     dispositivoId,
-    ocurridoEn:
-      cuando !== undefined && !Number.isNaN(Date.parse(cuando)) ? new Date(cuando) : ahora,
+    ocurridoEn: fechaDelEquipo(cuando ?? null, ahora),
+    horaSinDesplazamiento: cuando !== undefined && cuando !== '' && !traeDesplazamiento(cuando),
     enVivo: esEventoEnVivo(bloque),
     referenciaDelEquipo:
       bloque.channelID === undefined ? null : `${dispositivoId}:${bloque.channelID}`,

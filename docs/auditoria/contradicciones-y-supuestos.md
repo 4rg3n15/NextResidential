@@ -15,7 +15,7 @@
 
 ---
 
-## 1. Contradicciones · 15 registradas, 15 resueltas
+## 1. Contradicciones · 18 registradas, 18 resueltas
 
 ### C-01 · Protocolo del intercom — **Alta**
 
@@ -236,6 +236,82 @@ Y el modelo de datos ya lo había zanjado sin que nadie lo cruzara con el README
 
 ---
 
+### C-16 · El modo de control se llama de dos formas en el mismo documento — **Alta** · registrada en la ETAPA 15-C
+
+|                |                                                                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | El capítulo de control de barrera de entrada y salida, que nombra el campo **`ctrlMod`** en la ruta con formato JSON                      |
+| **Fuente B**   | El capítulo de referencia de la API, cuyo esquema XML del documento de parámetros de entrada declara **`<ctrlMode>`**, con «e»            |
+| **Resolución** | **Al LEER se aceptan las dos. Al ESCRIBIR se usa la del esquema (`ctrlMode`)**, que es la que el equipo valida cuando recibe el documento |
+
+**Por qué esto era grave y no cosmético.** El lector de la ETAPA 15-B buscaba
+sólo `ctrlMod`. Contra el documento real del equipo la expresión **no casaba
+nunca**, así que devolvía «no declarado» y el veredicto rechazaba el equipo por
+«no declaró quién controla la barrera».
+
+Falla cerrado, que es lo correcto, y por eso el efecto era el peor posible de un
+fallo correcto: **una cámara BIEN configurada se rechazaba**, y el mensaje
+mandaba al operador a revisar justo el campo que estaba bien. Un fallo abierto
+se descubre; uno cerrado que acusa al sitio equivocado se convierte en «esta
+integración no funciona».
+
+**Dónde vive:** `packages/providers/src/camara/modo-de-control.ts` ·
+`veredicto-de-control.test.ts` lo prueba con un cuerpo real de cada grafía.
+
+**Afecta a:** ETAPAS 15, 15-B, 15-C
+
+---
+
+### C-17 · La región del canal se enumera de dos formas en el mismo capítulo — **Media** · registrada en la ETAPA 15-C
+
+|                |                                                                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | La descripción del documento básico del canal: `AFandAM`, `APAC`, `All`, `ER`, `EU`, `EUandCIS`, `HKandMO`, `ME`, `THAandLA`, `other` |
+| **Fuente B**   | Las capacidades del mismo documento, unas páginas después: `opt="default,EU,CIS,EU_CIS,ME"`                                           |
+| **Resolución** | **NUNCA se envía una región fija.** Se lee el documento del equipo y se devuelve **la que vino**, intacta                             |
+
+**Por qué no se elige una de las dos.** Porque no hace falta, y elegir sería
+apostar. El `PUT` exige el documento básico completo, así que el flujo obligado
+es leer-modificar-escribir: se cambia el índice de país y **todo lo demás sale
+tal como entró**. Con eso, cuál de las dos enumeraciones implemente ESE firmware
+deja de importar — y si un día importara, el equipo lo diría rechazando su
+propio valor, que es un error muy fácil de leer.
+
+Elegir la lista B «porque es la de las capacidades» habría escrito `default` en
+un equipo que espera `other`, y el rechazo no nombraría el campo.
+
+**Dónde vive:** `packages/providers/src/camara/pais-del-algoritmo.ts`
+(`conPaisCorregido` conserva la región) · prueba en
+`configuracion-de-la-camara.test.ts`.
+
+**Afecta a:** ETAPA 15-C
+
+---
+
+### C-18 · Qué debe contestar el receptor al equipo — **Media** · registrada en la ETAPA 15-C
+
+|                |                                                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**   | El capítulo del servicio de escucha: exige `Content-Length: 0` y **recomienda `Connection: keep-alive`**         |
+| **Fuente B**   | Los ejemplos del capítulo ANPR y del servidor de alarma: `200 OK` con **`Connection: close`**, sin exigir cuerpo |
+| **Resolución** | **Se sigue la fuente B**, por ser la del capítulo de la familia de equipo que esta cámara es                     |
+
+**Y la salida está escrita al lado del código, no sólo aquí.** Si en sitio la
+cámara reenvía **pese a recibir `200`**, la primera prueba es devolver cuerpo
+vacío con `Content-Length: 0`. Quien esté delante del equipo tiene que
+encontrarlo sin buscar en un informe, y por eso vive en el comentario de
+`RESPUESTA_AL_EQUIPO`.
+
+**Qué NO se cambia mientras tanto:** el `200 OK` siempre —incluso ante un sobre
+ilegible—, porque un `400` no le dice al equipo «esto está mal» sino «no te he
+recibido», y lo reenvía en bucle.
+
+**Dónde vive:** `apps/api/src/alarmserver/presentacion/alarm-server.controller.ts`.
+
+**Afecta a:** ETAPAS 15, 15-C
+
+---
+
 ## 2. Supuestos · 11 registrados
 
 Cada supuesto se marca `[SUPUESTO]` en el código donde se materialice, y todos son **configurables**, no constantes escondidas.
@@ -300,12 +376,12 @@ código.
 
 | Categoría                   | Cantidad                              | Estado                                                                                                                             |
 | --------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `[CONTRADICCIÓN]`           | **14**                                | **14 resueltas**, ninguna abierta                                                                                                  |
+| `[CONTRADICCIÓN]`           | **18**                                | **18 resueltas**, ninguna abierta                                                                                                  |
 | `[SUPUESTO]`                | **9**                                 | 7 de la ETAPA 00 más S-08 y S-09 de la ETAPA 01. Todos con valor conservador; los de umbral, además, configurables por copropiedad |
 | `PENDIENTE DE DEFINICIÓN`   | **12** — **2 resueltos** (P-11, P-12) | Los 10 abiertos tienen comportamiento conservador vigente; ninguno bloquea la ETAPA 02. P-12 queda sujeto a confirmación legal     |
 | **Extensiones al contrato** | **1**                                 | E-01 · `FUERA_DE_HORARIO`, aprobada                                                                                                |
 
-**Contradicciones por severidad:** **5 altas** (C-01, C-02, C-03, C-05, C-12) · **5 medias** (C-04, C-06, C-07, C-22, C-27) · **5 bajas** (C-11, C-14, C-15, C-23, C-26). Total 15.
+**Contradicciones por severidad:** **6 altas** (C-01, C-02, C-03, C-05, C-12, C-16) · **7 medias** (C-04, C-06, C-07, C-17, C-18, C-22, C-27) · **5 bajas** (C-11, C-14, C-15, C-23, C-26). Total 18.
 
 **Contradicción con mayor impacto en el código:** **C-02**. Es la única que cambia el modelo de dominio, y sin resolverla cinco reglas de negocio no tendrían agregado que las sostuviera.
 

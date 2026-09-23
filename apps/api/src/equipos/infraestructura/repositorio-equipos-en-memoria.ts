@@ -1,5 +1,5 @@
 import type { ContextoTenant } from '../../autenticacion';
-import { PROPOSITOS, cifrar, derivarLlave } from '../../comun/cripto/sobre-aes-gcm';
+import { PROPOSITOS, cifrar, descifrar, derivarLlave } from '../../comun/cripto/sobre-aes-gcm';
 import type {
   AltaDeEquipo,
   DatosDeEquipo,
@@ -158,5 +158,35 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
         recurso: 'equipos/reactivacion',
       });
     return nuevo;
+  }
+
+  /**
+   * Descifra el sobre, igual que la versión de PostgreSQL.
+   *
+   * El doble **no guarda el texto en claro** en ninguna parte: lo cifra al
+   * escribirlo y lo descifra aquí, que es lo único que mantiene honesta la
+   * prueba de que lo guardado no es la credencial.
+   */
+  async credencialPara(
+    _ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+  ): Promise<string | null> {
+    const sobre = this.sobres.get(`${copropiedadId}/${equipoId}`);
+    if (sobre === undefined) return null;
+    const llave = derivarLlave(this.llaveMaestra, copropiedadId, PROPOSITOS.credencialesDeEquipo);
+    return descifrar(llave, {
+      iv: sobre.subarray(0, 12),
+      etiqueta: sobre.subarray(12, 28),
+      cuerpo: sobre.subarray(28),
+    }).toString('utf8');
+  }
+
+  async auditarCorreccion(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    _detalle: string,
+  ): Promise<void> {
+    this.auditoria.push({ copropiedadId, actorId: ctx.usuarioId, recurso: 'equipos/correccion' });
   }
 }

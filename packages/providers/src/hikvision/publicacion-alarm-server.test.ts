@@ -345,3 +345,41 @@ describe('abrirSobreDeAlarmServer', () => {
     );
   });
 });
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * DOS DEFENSAS QUE LA GUÍA INTEGRAL OBLIGA A COMPROBAR · 15-C
+ *
+ * No son casos raros: son advertencias explícitas del propio documento sobre
+ * cómo se comporta el equipo. Estaban cubiertas por construcción —el analizador
+ * nunca miró la longitud de una parte— pero **nadie lo había comprobado**, y
+ * «funciona por casualidad» y «funciona a propósito» se distinguen el día que
+ * alguien optimiza el analizador.
+ */
+describe('defensas del sobre · lo que el documento advierte', () => {
+  it('una parte SIN `Content-Length` se analiza igual', () => {
+    // El documento avisa de que el RFC no obliga a declararlo y pide
+    // contemplar su ausencia. El sobre se delimita por el separador, no por la
+    // longitud: exigirla habría rechazado sobres legítimos.
+    const cuerpo = Buffer.concat([
+      Buffer.from('--B\r\nContent-Disposition: form-data; name="anpr.xml"\r\n'),
+      Buffer.from('Content-Type: text/xml\r\n\r\n'),
+      Buffer.from('<EventNotificationAlert><eventType>ANPR</eventType></EventNotificationAlert>'),
+      Buffer.from('\r\n--B--\r\n'),
+    ]);
+    const sobre = abrirSobreDeAlarmServer(cuerpo, 'multipart/form-data; boundary=B');
+    expect(sobre.xml).toContain('ANPR');
+  });
+
+  it('y CON `Content-Length` declarado tampoco cambia nada', () => {
+    const xml = '<EventNotificationAlert><eventType>ANPR</eventType></EventNotificationAlert>';
+    const cuerpo = Buffer.concat([
+      Buffer.from('--B\r\nContent-Disposition: form-data; name="anpr.xml"\r\n'),
+      Buffer.from(`Content-Type: text/xml\r\nContent-Length: ${String(xml.length)}\r\n\r\n`),
+      Buffer.from(xml),
+      Buffer.from('\r\n--B--\r\n'),
+    ]);
+    const sobre = abrirSobreDeAlarmServer(cuerpo, 'multipart/form-data; boundary=B');
+    expect(sobre.xml).toBe(xml);
+  });
+});

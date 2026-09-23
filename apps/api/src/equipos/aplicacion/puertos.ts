@@ -1,3 +1,4 @@
+import type { FichaDelEquipo } from '@ncr/providers';
 import type { ContextoTenant } from '../../autenticacion';
 
 /**
@@ -108,6 +109,67 @@ export interface RepositorioDeEquipos {
     copropiedadId: string,
     equipoId: string,
   ): Promise<DatosDeEquipo | null>;
+  /**
+   * La credencial descifrada, **sólo para hablar con el equipo**.
+   *
+   * No sale por ninguna ruta HTTP: el DTO de lectura ni declara el campo. Está
+   * en el puerto porque corregir la configuración de un aparato exige
+   * presentarle su clave, y la alternativa —pedírsela otra vez al operador cada
+   * vez— haría que nadie corrigiera nada.
+   */
+  credencialPara(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+  ): Promise<string | null>;
+  /** Constancia de una corrección aplicada: qué cambió, de qué valor a cuál. */
+  auditarCorreccion(ctx: ContextoTenant, copropiedadId: string, detalle: string): Promise<void>;
+}
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * CORREGIR LA CONFIGURACIÓN DE UN EQUIPO DESDE LA CONSOLA
+ *
+ * El diagnóstico dice qué está mal y cuál debería ser el valor. Sin esto, el
+ * operador tiene que ir al panel del aparato, encontrar el campo y cambiarlo a
+ * mano — y en un conjunto con doce cámaras eso no lo hace nadie.
+ *
+ * **Nada de esto se aplica solo.** Cambiar quién controla una barrera es la
+ * clase de acción que nadie ve venir si la hace un arranque automático: hace
+ * falta confirmación explícita de una persona, y queda constancia de quién,
+ * cuándo y de qué valor a cuál.
+ */
+export const CORRECTOR_DE_EQUIPO = Symbol.for('ncr.puerto.CorrectorDeEquipo');
+
+export const CORRECCIONES = [
+  'modo_de_control',
+  'pais_del_algoritmo',
+  'imagenes_del_receptor',
+  'formato_del_receptor',
+] as const;
+export type CorreccionDeEquipo = (typeof CORRECCIONES)[number];
+
+export interface DatosDeCorreccion {
+  readonly host: string;
+  readonly puerto: number;
+  readonly protocolo: ProtocoloDeEquipo;
+  readonly usuario: string;
+  readonly secreto: string;
+  readonly correccion: CorreccionDeEquipo;
+  /** Quién la autoriza. Sin esto no se emite la petición al equipo. */
+  readonly confirmadaPor: string;
+}
+
+export interface ResultadoDeCorreccionDeEquipo {
+  readonly correccion: CorreccionDeEquipo;
+  readonly aplicada: boolean;
+  readonly valorAnterior: string | null;
+  readonly valorNuevo: string | null;
+  readonly detalle: string;
+}
+
+export interface CorrectorDeEquipo {
+  corregir(datos: DatosDeCorreccion): Promise<ResultadoDeCorreccionDeEquipo>;
 }
 
 /**
@@ -138,6 +200,18 @@ export interface ResultadoDeSondeo {
   readonly modelo: string | null;
   readonly firmware: string | null;
   readonly latenciaMs: number | null;
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LA FICHA · lo que la consola enseña del equipo, añadido en la 15-C
+   *
+   * Los cuatro desenlaces dicen si se puede operar. La ficha dice **qué hay que
+   * cambiar**, campo por campo, con el valor leído, el que debería tener y si
+   * hay un botón que lo arregle. Sin ella, «la cámara decide por su cuenta»
+   * manda a recorrer la interfaz del aparato buscando cuál de tres cosas es.
+   *
+   * `undefined` cuando no se sondeó: la ausencia de ficha no es una ficha vacía.
+   */
+  readonly ficha?: FichaDelEquipo;
   /**
    * `true` sólo con `alcanzado`. Guardar un equipo que no contesta es legítimo
    * —se instala el lunes— pero queda NO VERIFICADO y se dice por qué.

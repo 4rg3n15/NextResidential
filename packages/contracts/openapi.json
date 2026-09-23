@@ -1417,6 +1417,60 @@
         ]
       }
     },
+    "/copropiedades/{id}/equipos/{equipoId}/correcciones": {
+      "post": {
+        "operationId": "EquiposController_corregir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorreccionDeEquipoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeCorreccionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Corrige un campo del equipo. Exige confirmación y deja constancia",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
     "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
       "post": {
         "operationId": "EquiposController_reactivar",
@@ -5167,6 +5221,29 @@
           "zonaHoraria"
         ]
       },
+      "CorreccionDeEquipoDto": {
+        "type": "object",
+        "properties": {
+          "correccion": {
+            "type": "string",
+            "enum": [
+              "modo_de_control",
+              "pais_del_algoritmo",
+              "imagenes_del_receptor",
+              "formato_del_receptor"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Por qué se corrige. Queda en la auditoría junto a quién y cuándo."
+          }
+        },
+        "required": [
+          "correccion",
+          "motivo"
+        ]
+      },
       "CrearAutorizacionDto": {
         "type": "object",
         "properties": {
@@ -6001,6 +6078,52 @@
           "cantidad"
         ]
       },
+      "FichaDelEquipoDto": {
+        "type": "object",
+        "properties": {
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "firmware": {
+            "type": "string",
+            "nullable": true
+          },
+          "serie": {
+            "type": "string",
+            "nullable": true
+          },
+          "horaDelEquipo": {
+            "type": "string",
+            "nullable": true
+          },
+          "desvioDeRelojSegundos": {
+            "type": "number",
+            "nullable": true
+          },
+          "hallazgos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HallazgoDelEquipoDto"
+            }
+          },
+          "sinComprobar": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "modelo",
+          "firmware",
+          "serie",
+          "horaDelEquipo",
+          "desvioDeRelojSegundos",
+          "hallazgos",
+          "sinComprobar"
+        ]
+      },
       "FilaDeInformeDto": {
         "type": "object",
         "properties": {
@@ -6222,6 +6345,53 @@
           "primeras",
           "ultimas",
           "porExcepcion"
+        ]
+      },
+      "HallazgoDelEquipoDto": {
+        "type": "object",
+        "properties": {
+          "campo": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "conforme",
+              "aviso",
+              "bloqueo",
+              "no_comprobado"
+            ]
+          },
+          "valorLeido": {
+            "type": "string",
+            "nullable": true
+          },
+          "valorCorrecto": {
+            "type": "string",
+            "nullable": true
+          },
+          "detalle": {
+            "type": "string"
+          },
+          "correccion": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "modo_de_control",
+              "pais_del_algoritmo",
+              "imagenes_del_receptor",
+              "formato_del_receptor"
+            ],
+            "description": "Qué corrección lo arregla desde la consola. Nulo si no la hay."
+          }
+        },
+        "required": [
+          "campo",
+          "estado",
+          "valorLeido",
+          "valorCorrecto",
+          "detalle",
+          "correccion"
         ]
       },
       "HistorialDeOrdenesDto": {
@@ -7591,6 +7761,41 @@
           "identificadoresRecortados"
         ]
       },
+      "ResultadoDeCorreccionDto": {
+        "type": "object",
+        "properties": {
+          "correccion": {
+            "type": "string",
+            "enum": [
+              "modo_de_control",
+              "pais_del_algoritmo",
+              "imagenes_del_receptor",
+              "formato_del_receptor"
+            ]
+          },
+          "aplicada": {
+            "type": "boolean"
+          },
+          "valorAnterior": {
+            "type": "string",
+            "nullable": true
+          },
+          "valorNuevo": {
+            "type": "string",
+            "nullable": true
+          },
+          "detalle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "correccion",
+          "aplicada",
+          "valorAnterior",
+          "valorNuevo",
+          "detalle"
+        ]
+      },
       "ResultadoDeOperacionDto": {
         "type": "object",
         "properties": {
@@ -7677,6 +7882,14 @@
           },
           "verificado": {
             "type": "boolean"
+          },
+          "ficha": {
+            "description": "Qué hay que cambiar en el equipo, campo por campo. Ausente cuando no se sondeó: la falta de ficha no es una ficha vacía.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FichaDelEquipoDto"
+              }
+            ]
           }
         },
         "required": [
