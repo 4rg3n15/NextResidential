@@ -782,3 +782,46 @@ las dos cosas sin adivinar.
 Con los estados previos que anotó en §8.2 y §8.4. Y si apareció el hallazgo de
 bloqueo de §8.2 —la cámara que abre sola y no se puede separar—, dígalo antes
 que nada: cambia lo que hay que construir.
+
+---
+
+## 9 · Registrar el equipo en Next Control · **desde la consola, no con `psql`**
+
+_Añadido en la ronda `consola-superadmin-equipos` (2026-09-23)._
+
+Hasta esta ronda, dar de alta un equipo exigía escribir la fila a mano en la
+base. Ya no: se hace desde **Dispositivos → + Agregar equipo**, y lo que pide es
+exactamente lo que usted tiene delante del aparato.
+
+### 9.1 · Lo que hay que tener resuelto ANTES de abrir el formulario
+
+| Prerrequisito                                 | Por qué                                                                                                                                                                                |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **IP fija en el equipo**                      | Este proyecto ya pagó el precio de no tenerla: la cámara **desapareció de su dirección entre dos sesiones**. Con IP por DHCP, el sistema deja de encontrarla al reiniciar el router.   |
+| **Usuario de servicio con privilegio mínimo** | No el de fábrica y no el de administrador. Lo que Next Control necesita es leer eventos y accionar, no administrar el equipo.                                                          |
+| **El servidor en la misma red que el equipo** | Quien tiene que alcanzar el aparato es el **servidor** de Next Control, no el navegador desde el que usted rellena el formulario. Si está fuera, la conexión pasa por el Edge Gateway. |
+| **`ctrlMod = 1` en las cámaras LPR**          | Es quien decide si abre la cámara o la plataforma. Con `0` o `2` el alta lo rechaza y dice por qué: ver §4.                                                                            |
+
+### 9.2 · Qué hace «Probar conexión», y qué significa cada respuesta
+
+La prueba corre **en el servidor** y devuelve una de cuatro cosas. Ninguna es
+genérica, porque cada una se resuelve de una manera distinta:
+
+| Respuesta                         | Qué hacer                                                                                                                         |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Responde y acepta la credencial   | Nada. Se guardan el modelo y el firmware que informó el propio equipo.                                                            |
+| **El equipo abre por su cuenta**  | `ctrlMod` ≠ 1. **No lo ponga en servicio así**: cámbielo en el panel del equipo. Con la cámara decidiendo, la traza se pierde.    |
+| **Rechazó el usuario o la clave** | **NO reintente a ciegas.** Unos pocos fallos seguidos bloquean la cuenta en el equipo. Confirme la credencial en su panel.        |
+| No hay respuesta de `host:puerto` | Revise red, IP y puerto. Puede guardar igualmente: queda **NO VERIFICADO** con ese motivo, y se comprueba cuando esté disponible. |
+
+### 9.3 · La clave no vuelve a mostrarse
+
+Se guarda cifrada con AES-256-GCM y llave derivada por copropiedad, y **la API
+no la devuelve nunca**. La consecuencia práctica: para volver a probar la
+conexión de un equipo ya registrado hay que escribirla otra vez. No es un fallo
+de la pantalla — es lo que hace que un volcado de la base no entregue las
+credenciales de los equipos (`H-15B-1` en `docs/seguridad/AUDITORIA.md`).
+
+Editar un equipo **sin** escribir la clave significa «no la cambies», y en ese
+caso el sistema **no prueba la conexión**: dice que no la probó en vez de
+inventar un rechazo, porque un rechazo falso invita a reintentar.
