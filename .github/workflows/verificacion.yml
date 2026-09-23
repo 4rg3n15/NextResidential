@@ -21,7 +21,12 @@ on:
     # y NO disparó nada: el patrón solo cubría `etapa-**`. Una rama que arregla
     # el CI y a la que el CI no mira es la misma familia de defecto que esta
     # rama viene a cerrar, en su forma más literal.
-    branches: [develop, main, 'etapa-**', 'correccion-**']
+    # `consola-**` se añade por el mismo motivo que `correccion-**` en su día:
+    # la rama `consola-superadmin-equipos` se empujó y NO disparó nada. El
+    # patrón `etapa-**` cubre las ramas del mapa de §5, y las rondas que
+    # corrigen lo ya fusionado no llevan número de etapa. Sin esta línea, la
+    # única señal llegaba al abrir el PR, que es tarde.
+    branches: [develop, main, 'etapa-**', 'correccion-**', 'consola-**']
   pull_request:
     branches: [develop, main]
 
