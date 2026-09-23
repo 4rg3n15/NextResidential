@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DeviceCap version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<SysCap>
+<isSupportDst>false</isSupportDst>
+<NetworkCap>
+<isSupportWireless>false</isSupportWireless>
+<isSupportNtp>true</isSupportNtp>
+<isSupportFtp>true</isSupportFtp>
+<isSupportHttps>true</isSupportHttps>
+<isSupportEZVIZ>true</isSupportEZVIZ>
+<isSupportEZVIZQRcode>true</isSupportEZVIZQRcode>
+<isSupportEZVIZUnbind>true</isSupportEZVIZUnbind>
+<isSupportEhome>false</isSupportEhome>
+<isSupportSip>true</isSupportSip>
+</NetworkCap>
+<SerialCap >
+<rs485PortNums>2</rs485PortNums>
+<supportRS232Config>false</supportRS232Config>
+<rs422PortNums>0</rs422PortNums>
+<rs232PortNums>1</rs232PortNums>
+</SerialCap>
+<AudioCap>
+<audioInputNums>1</audioInputNums>
+<audioOutputNums>1</audioOutputNums>
+</AudioCap>
+<isSupportSubscribeEvent>true</isSupportSubscribeEvent>
+</SysCap>
+<SecurityCap>
+<supportUserNums>32</supportUserNums>
+<userBondIpNums>0</userBondIpNums>
+<userBondMacNums>0</userBondMacNums>
+<isSupCertificate>false</isSupCertificate>
+<issupIllegalLoginLock>true</issupIllegalLoginLock>
+<isSupportOnlineUser>true</isSupportOnlineUser>
+<isSupportAnonymous>false</isSupportAnonymous>
+<isSupportStreamEncryption>false</isSupportStreamEncryption>
+<securityVersion opt="1,2">1</securityVersion>
+<keyIterateNum>100</keyIterateNum>
+<isSupportUserCheck>true</isSupportUserCheck>
+<isSupportConfigFileImport>true</isSupportConfigFileImport>
+<isSupportConfigFileExport>true</isSupportConfigFileExport>
+<isSupportSecurityEmail>true</isSupportSecurityEmail>
+<isSupportSecurityQuestionConfig>true</isSupportSecurityQuestionConfig>
+<isIrreversible>true</isIrreversible>
+<salt>REDACTADO</salt>
+<RSAKeyLength opt="1024,2048">2048</RSAKeyLength>
+<isSupportDeviceCertificatesManagement>true</isSupportDeviceCertificatesManagement>
+<isSupportEncryptCertificate>true</isSupportEncryptCertificate>
+<isSupportCertificateCustomID>true</isSupportCertificateCustomID>
+</SecurityCap>
+<EventCap>
+<isSupportHDFull>false</isSupportHDFull>
+<isSupportHDError>false</isSupportHDError>
+<isSupportNicBroken>false</isSupportNicBroken>
+<isSupportIpConflict>false</isSupportIpConflict>
+<isSupportIllAccess>false</isSupportIllAccess>
+<isSupportViException>false</isSupportViException>
+<isSupportViMismatch>false</isSupportViMismatch>
+<isSupportRecordException>false</isSupportRecordException>
+<isSupportMotionDetection>true</isSupportMotionDetection>
+<isSupportVideoLoss>false</isSupportVideoLoss>
+<isSupportTamperDetection>false</isSupportTamperDetection>
+<isSupportHumanRecognition>true</isSupportHumanRecognition>
+<isSupportFaceContrast>true</isSupportFaceContrast>
+</EventCap>
+<isSupportGIS>true</isSupportGIS>
+<isSupportCompass>true</isSupportCompass>
+<isSupportFaceCaptureStatistics>true</isSupportFaceCaptureStatistics>
+<VideoIntercomCap>
+<isSupportDeviceId>true</isSupportDeviceId>
+<isSupportOperationTime>true</isSupportOperationTime>
+<isSupportRemoteOpenDoor>true</isSupportRemoteOpenDoor>
+<isSupportAlarmUploadCfg>true</isSupportAlarmUploadCfg>
+<isSupportCardSectorCheck>true</isSupportCardSectorCheck>
+<isSupportWorkModeCfg>false</isSupportWorkModeCfg>
+<isSupportDeviceLanguageCfg>true</isSupportDeviceLanguageCfg>
+<isSupportAlarmControlByPhone>false</isSupportAlarmControlByPhone>
+<isSupportWorkStatus>true</isSupportWorkStatus>
+<isSupportCallElevator>true</isSupportCallElevator>
+<isSupportPrivilegePasswordStatus>true</isSupportPrivilegePasswordStatus>
+<isSupportDeviceCommunication>true</isSupportDeviceCommunication>
+<isSupportCallSignal>false</isSupportCallSignal>
+<isSupportElevatorControlCfg>true</isSupportElevatorControlCfg>
+<isSupportPrivilegePassword>true</isSupportPrivilegePassword>
+<isSupportSendCardCfg>true</isSupportSendCardCfg>
+<isSupportRingBackTone>true</isSupportRingBackTone>
+<isSupportCallPriority>true</isSupportCallPriority>
+<isSupportProtocolFileManage>false</isSupportProtocolFileManage>
+<isSupportPhoneCfg>true</isSupportPhoneCfg>
+<isSupportUpdateData>true</isSupportUpdateData>
+<isSupportUpdateStrategy>true</isSupportUpdateStrategy>
+<isSupportMetaInfo>true</isSupportMetaInfo>
+<platform opt="R0,R1,E7,B1PRO,A2"></platform>
+<isSupportSecurityMode>true</isSupportSecurityMode>
+<isSupportBroadcastRealtime>true</isSupportBroadcastRealtime>
+</VideoIntercomCap>
+<isSupportAcsUpdate>true</isSupportAcsUpdate>
+<IOTCap>
+<supportChannelNum>1000</supportChannelNum>
+<isSupportIOTChannelCap>true</isSupportIOTChannelCap>
+<satusSearchTaskCap>
+<maxResults>30</maxResults>
+<filterType opt="all,online,offline"/>
+</satusSearchTaskCap>
+<channelConfigList>
+<channelConfig>
+<unitType>outdoor</unitType>
+<floorNumber min="-10" max="10"/>
+<roomNumber  min="1" max="99"/>
+<isSupportZeroFloorNumber>true</isSupportZeroFloorNumber>
+<isSupportMoreFeatures>true</isSupportMoreFeatures>
+</channelConfig>
+<channelConfig>
+<unitType>indoor</unitType>
+<floorNumber min="0" max="999"/>
+<roomNumber  min="1" max="9999"/>
+<isSupportMoreFeatures>true</isSupportMoreFeatures>
+<mappingRoomNumber min="0" max="5"/>
+</channelConfig>
+</channelConfigList>
+<isSupportConfigTemplate>true</isSupportConfigTemplate>
+<isSupportConfigReport>true</isSupportConfigReport>
+<isSupportSearchMoreIOTSource>true</isSupportSearchMoreIOTSource>
+</IOTCap>
+<isSupportAccessControlCap>true</isSupportAccessControlCap>
+<isSupportMultiDeviceID>false</isSupportMultiDeviceID>
+</DeviceCap>

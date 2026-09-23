@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DeviceCap version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<isSupportPreview>true</isSupportPreview>
+<isSupportSystemMaintain>true</isSupportSystemMaintain>
+<isSupportReboot>true</isSupportReboot>
+<isSupportFactoryReset>true</isSupportFactoryReset>
+<isSupportConfigurationData >true</isSupportConfigurationData >
+<isSupportUpdatefirmware>true</isSupportUpdatefirmware>
+<isSupportDeviceInfo >true</isSupportDeviceInfo >
+<isSupportTime >true</isSupportTime >
+<SysCap>
+<isSupportDst>true</isSupportDst>
+<NetworkCap>
+<isSupportGetLinkSocketIP>true</isSupportGetLinkSocketIP>
+<isSupportWireless>false</isSupportWireless>
+<isSupportPPPoE>false</isSupportPPPoE>
+<isSupportBond>false</isSupportBond>
+<isSupport802_1x>true</isSupport802_1x>
+<isSupportNtp>true</isSupportNtp>
+<isSupportFtp>true</isSupportFtp>
+<isSupportUpnp>false</isSupportUpnp>
+<isSupportDdns>true</isSupportDdns>
+<isSupportHttps>true</isSupportHttps>
+<isSupportWebSocket>true</isSupportWebSocket>
+<isSupportWebSocketS>true</isSupportWebSocketS>
+<isSupportEventDataOverWebSocket>true</isSupportEventDataOverWebSocket>
+<isSupportTSOverWebSocket>false</isSupportTSOverWebSocket>
+<SnmpCap>
+<isSupport>true</isSupport>
+</SnmpCap>
+<isSupportIPFilter>true</isSupportIPFilter>
+<isSupportEhome>true</isSupportEhome>
+<isSupportWirelessDial>false</isSupportWirelessDial>
+<isSupportWifiProbe>false</isSupportWifiProbe>
+<isSupportPingDeny>true</isSupportPingDeny>
+<isSupportClusterIntercom>false</isSupportClusterIntercom>
+<VerificationCodeModification>
+<verificationCodeType>normal</verificationCodeType>
+</VerificationCodeModification>
+</NetworkCap>
+<SerialCap>
+<rs485PortNums>1</rs485PortNums>
+<supportRS232Config>true</supportRS232Config>
+<rs422PortNums>0</rs422PortNums>
+<rs232PortNums>1</rs232PortNums>
+<rs485WorkMode opt="Led,CaptureTrigger">CaptureTrigger</rs485WorkMode>
+</SerialCap>
+<isSupportSubscribeEvent>true</isSupportSubscribeEvent>
+<isSupportSubscribeIOTInfo>false</isSupportSubscribeIOTInfo>
+</SysCap>
+<ITCCap>
+<isSupportVehicleDetection>true</isSupportVehicleDetection>
+<isSupportSyncSignalOutput>true</isSupportSyncSignalOutput>
+<isSupportlicencePlateAuditData>true</isSupportlicencePlateAuditData>
+</ITCCap>
+<isSupportDumpData>false</isSupportDumpData>
+<isSupportVehicleFaceRecognition>false</isSupportVehicleFaceRecognition>
+<isSupportVehicleIllegalType opt=""></isSupportVehicleIllegalType>
+<isSupportRadar>false</isSupportRadar>
+<isSupportDrivingDirectionAtIntersection>false</isSupportDrivingDirectionAtIntersection>
+<isSupportLCDScreen>false</isSupportLCDScreen>
+<supportQuickConfigType opt=""></supportQuickConfigType>
+<TestCap>
+<isSupportEmailTest>true</isSupportEmailTest>
+</TestCap>
+<isSupportUsersLoginNotification>true</isSupportUsersLoginNotification>
+<VideoIntercomCap>
+<platform>N4</platform>
+</VideoIntercomCap>
+<isSupportISUPHttpPassthrough>true</isSupportISUPHttpPassthrough>
+<isSupportDetectorMotionAlarm>true</isSupportDetectorMotionAlarm>
+<isSupportOnlineUpgradeTask>true</isSupportOnlineUpgradeTask>
+<isSupportPowerIndicatorLightCtrlParams>false</isSupportPowerIndicatorLightCtrlParams>
+<isSupportEmmcInfo>true</isSupportEmmcInfo>
+</DeviceCap>

@@ -10,6 +10,7 @@ google-services.json
 GoogleService-Info.plist
 /coverage
 /dist
+docs/hikdocs/
 /build
 *.sqlite
 # ETAPA 02 — monorepo
@@ -53,3 +54,4 @@ openapitools.json
 # Informes JSON de las suites (instrumento de D-101, ETAPA 14): se conservan
 # para poder subirlos como artefacto cuando el CI se pone rojo, y no se versionan.
 /.informes-de-prueba/
+docs/insumos/hikvision/evento-anpr-*.txt

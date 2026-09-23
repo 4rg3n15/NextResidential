@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>OUTDOOR STATION</deviceName>
+<deviceID>7d49925b-4fc7-406b-a0ec-04031231880c</deviceID>
+<deviceDescription>Visitor</deviceDescription>
+<deviceLocation>STD-CGI</deviceLocation>
+<systemContact>STD-CGI</systemContact>
+<model>DS-KD9633-WBE6</model>
+<serialNumber>REDACTADO</serialNumber>
+<macAddress>00:00:00:00:00:00</macAddress>
+<firmwareVersion>V2.3.9</firmwareVersion>
+<firmwareReleasedDate>build 230905</firmwareReleasedDate>
+<bootVersion>33751049</bootVersion>
+<bootReleasedDate>1509637</bootReleasedDate>
+<hardwareVersion>0x0</hardwareVersion>
+<deviceType>Visitor</deviceType>
+<telecontrolID>88</telecontrolID>
+<supportBeep>true</supportBeep>
+<supportVideoLoss>true</supportVideoLoss>
+<alarmOutNum>2</alarmOutNum>
+<RS485Num>2</RS485Num>
+<customizedInfo></customizedInfo>
+<OEMCode>1</OEMCode>
+<touchScreenVersionInfo>C2131_V7.0.0.0.6.75.73.73</touchScreenVersionInfo>
+<alarmInNum>4</alarmInNum>
+<encryptionModel>e23a</encryptionModel>
+<displayInterfaceSize>10</displayInterfaceSize>
+<releaseRegion>abroad</releaseRegion>
+</DeviceInfo>
