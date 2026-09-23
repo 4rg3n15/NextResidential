@@ -15,6 +15,9 @@ ResultadoDeSondeoDto _$ResultadoDeSondeoDtoFromJson(
   firmware: json['firmware'] as String?,
   latenciaMs: json['latenciaMs'] as num?,
   verificado: json['verificado'] as bool,
+  ficha: json['ficha'] == null
+      ? null
+      : FichaDelEquipoDto.fromJson(json['ficha'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$ResultadoDeSondeoDtoToJson(
@@ -26,4 +29,5 @@ Map<String, dynamic> _$ResultadoDeSondeoDtoToJson(
   'firmware': instance.firmware,
   'latenciaMs': instance.latenciaMs,
   'verificado': instance.verificado,
+  'ficha': instance.ficha,
 };

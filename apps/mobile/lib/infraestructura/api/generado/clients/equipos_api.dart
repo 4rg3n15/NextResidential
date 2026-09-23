@@ -7,8 +7,10 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/alta_de_equipo_dto.dart';
 import '../models/baja_de_equipo_dto.dart';
+import '../models/correccion_de_equipo_dto.dart';
 import '../models/equipo_dto.dart';
 import '../models/equipos_dto.dart';
+import '../models/resultado_de_correccion_dto.dart';
 import '../models/resultado_de_sondeo_dto.dart';
 
 part 'equipos_api.g.dart';
@@ -51,6 +53,14 @@ abstract class EquiposApi {
     @Path('id') required String id,
     @Path('equipoId') required String equipoId,
     @Body() required BajaDeEquipoDto body,
+  });
+
+  /// Corrige un campo del equipo. Exige confirmación y deja constancia
+  @POST('/copropiedades/{id}/equipos/{equipoId}/correcciones')
+  Future<ResultadoDeCorreccionDto> equiposControllerCorregir({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+    @Body() required CorreccionDeEquipoDto body,
   });
 
   /// Vuelve a poner en servicio un equipo dado de baja
