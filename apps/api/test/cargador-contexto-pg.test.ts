@@ -34,7 +34,7 @@ const CORRIDA = randomBytes(3).toString('hex').toUpperCase();
 
 /** Placas de la semilla (`supabase/seed/seed.sql`). */
 const PLACA_RESIDENTE = 'PCH2145'; // vehículo activo de la vivienda A-01, activa
-const PLACA_VISITANTE_VIGENTE = 'ABC9999'; // autorización única vigente, vivienda B-42
+const PLACA_VISITANTE_VIGENTE = 'ABC9999'; // sembrada con 8 h de vigencia: puede haber vencido (D-134)
 const PLACA_VISITANTE_VENCIDA = 'XYZ9999'; // autorización vencida, vivienda C-89
 const PLACA_VETADA = 'XYZ0000'; // en lista negra, sin autorización en la semilla
 const PLACA_DE_OTRA_COPROPIEDAD = 'ABC1234'; // existe en A y en B: RN-15
@@ -185,7 +185,36 @@ describe('D-25 · el motor decide con el contexto de la base (tabla 9.1)', () =>
 
   it('4 bis · autorización de visitante VIGENTE con placa → PERMITIDO (CA-04)', async () => {
     if (!disponible) return;
-    expect(motivoDe(await decidir(COP_A, PLACA_VISITANTE_VIGENTE))).toBe('PERMITIDO');
+    /**
+     * D-134 · la autorización SEMBRADA (`ABC9999`) vale ocho horas desde que se
+     * siembra, así que esta prueba se ponía roja sola cuando la base llevaba
+     * más de una tarde levantada. La vigente se crea AQUÍ, con la misma forma
+     * que la de la prueba 3: lo que se verifica es el motor, no la edad de la
+     * semilla.
+     */
+    const p = pool as Pool;
+    const placaVigente = `VI${CORRIDA}`;
+    const cliente = await p.connect();
+    try {
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
+        JSON.stringify(claims(COP_A)),
+      ]);
+      await cliente.query(
+        `INSERT INTO public.autorizaciones
+           (copropiedad_id, vivienda_id, visitante_id, autorizado_por, tipo, placa, vigencia,
+            permite_acceso_vehicular, creado_por, actualizado_por)
+         VALUES ($1, '30000000-0000-4000-8000-000000000042', '60000000-0000-4000-8000-000000000101',
+                 '50000000-0000-4000-8000-000000000042', 'unica', $2,
+                 tstzrange(now() - interval '1 hour', now() + interval '2 hours', '[)'),
+                 true, $3, $3)`,
+        [COP_A, placaVigente, actorId],
+      );
+    } finally {
+      cliente.release();
+    }
+    expect(motivoDe(await decidir(COP_A, placaVigente))).toBe('PERMITIDO');
+    // Y la sembrada, si ya venció, dice VIGENCIA_EXPIRADA: nunca FALLO_TECNICO.
+    expect(motivoDe(await decidir(COP_A, PLACA_VISITANTE_VIGENTE))).not.toBe('FALLO_TECNICO');
   });
 
   it('5 · placa inexistente en el padrón → PLACA_DESCONOCIDA', async () => {
