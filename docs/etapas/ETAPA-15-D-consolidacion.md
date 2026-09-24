@@ -13,7 +13,7 @@
 | `8513b54`  | `docs(etapa-15d)`: informe, ADR-019/020/021, contradicciones C-28 a C-31, auditoría de exposición y ESTADO                |
 | `495d7ee`  | `test(etapa-15d/autorizaciones)`: la prueba 4 bis de D-25 crea su propia autorización vigente (D-134) · `affd441` ESTADO  |
 | `f630595`  | `fix(etapa-15d/verificador)`: variables del guion de sitio una por línea y con lector declarado (D-135)                   |
-| _(D-136)_  | `test(etapa-15d/padron)`: claims reales en la prueba de borrado definitivo; base del trinquete de ramas al día            |
+| `c21d94e`  | `test(etapa-15d/padron)`: claims reales en la prueba de borrado definitivo (D-136); base del trinquete al día (D-135)     |
 | _(cierre)_ | `chore(etapa-15d)`: cierre de ronda con el veredicto literal del verificador                                              |
 
 Esta ronda **NO se fusiona**: abre PR contra `develop` y se detiene ahí.
@@ -222,7 +222,50 @@ y disparador), `zonas-pg`, `registro-de-equipos-pg`.
 
 ### El veredicto literal de `./scripts/verificar-etapa.sh --con-base`
 
-<!-- VEREDICTO -->
+Tres corridas en `c21d94e` y sus antecesoras, y sólo la tercera vale:
+
+| Corrida | Sobre     | Resultado                                                                                                                                                        |
+| ------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1       | `8513b54` | **FALLIDA** · paso 5: una roja en `cargador-contexto-pg` (D-134, la autorización sembrada había caducado)                                                        |
+| 2       | `495d7ee` | **FALLIDA** · paso 7b: los dos caminos difieren (la roja de D-134 se corrigió a mitad de corrida) · paso 9: D-135 · paso 14: `padron-edicion-pg` roja ×3 (D-136) |
+| 3       | `c21d94e` | **correcta** · árbol limpio, sin una sola ✗ en 26 pasos                                                                                                          |
+
+Veredicto literal de la corrida 3 (`./scripts/verificar-etapa.sh --con-base`, 2026-09-24):
+
+```
+▸ 1 · entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2 · Flutter 3.47.4 (Dart 3.13.3)
+▸ 2 · ✓ pnpm install --frozen-lockfile
+▸ 3 · ✓ pnpm build          ▸ 4 · ✓ pnpm lint · ✓ pnpm typecheck
+▸ 5 · suite completa
+   @ncr/config:test:       Tests  144 passed (144)
+   @ncr/edge:test:         Tests  101 passed (101)
+   @ncr/domain-core:test:  Tests  402 passed (402)
+   @ncr/providers:test:    Tests  564 passed (564)
+   @ncr/web:test:          Tests  413 passed (413)
+   @ncr/api:test:          Tests  988 passed | 5 skipped (993)
+▸ 6 · ✓ 197 de 197 ficheros de prueba ejecutados
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     OK   dominio (packages/domain-core/src): lineas 95.67 % · ramas 96.70 % · funciones 95.92 % (umbral 90 %, 34 archivos)
+     OK   aplicacion (**/aplicacion/**):      lineas 95.87 % · ramas 88.87 % · funciones 98.55 % (umbral 90 %, 47 archivos)
+     OK   global:                             lineas 79.80 % · ramas 84.53 % · funciones 81.48 % (umbral 70 %, 403 archivos)
+▸ 7b · ✓ los dos recuentos de la MISMA suite coinciden (D-112)
+▸ 9 · ✓ declaraciones: 1 paso(s) declarado(s) no ejercido(s), 0 de ellos en linux, con motivo y etapa de revisión vigente
+      ✓ controles: 35 de 37 con prueba negativa · 2 en deuda declarada (no puede crecer)
+      ✓ ramas: 36 controles medidos · 234 bloques sin ejercer (no puede subir)
+▸ 12 · ✓ esquema y aislamiento en --modo-supabase   ▸ 12b/12c · ✓ arranque en frío y camino del navegador
+▸ 13 · ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03) · ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+▸ 14 · ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+▸ 15 · ✓ OK 26 de 26 pasos ejecutados
+
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El único «control declarado no ejercido» es el ⚠ del paso 5: «suite sin rojas ·
+las saltadas están DECLARADAS y se ejercen en otro paso». Son las cinco pruebas
+de `arranque-en-frio` que exigen el fichero de claims que produce el paso 12b,
+donde se ejecutan (993 de 993 en las tres pasadas del paso 14). No es una
+deuda de esta ronda: es la declaración que D-112 exige para que una saltada no
+sume al verde.
 
 ### El guion de sitio, ejecutado en modo SIMULADO
 
