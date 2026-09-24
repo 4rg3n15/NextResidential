@@ -222,7 +222,16 @@ describe('O3 · regeneración con modos, edición y borrado definitivo contra ba
 
   it('borrar definitivamente: sin historial se va; con una autorización, ni el caso de uso ni la base lo permiten', async () => {
     if (!disponible || pool === undefined) return;
-    const padron = new RepositorioPadronPg(pool, {});
+    // D-136 · con los claims REALES, no vacíos. La función de borrado es
+    // SECURITY DEFINER a propósito (0032, prueba 70): dentro manda el dueño de
+    // la tabla, sujeto a la RLS forzada, y con claims vacíos el vehículo «no
+    // existe». Con el dueño superusuario de una base local la prueba salía
+    // verde igual; con el dueño que replica Supabase (`--modo-supabase`), no.
+    const padron = new RepositorioPadronPg(pool, {
+      rol: 'administrador',
+      usuario_id: actorId,
+      copropiedad_id: COP,
+    });
     const caso = new BorrarVehiculoDefinitivamente(padron);
     const sinHistorial = await pool.query<{ id: string }>(
       `SELECT id FROM public.vehiculos WHERE copropiedad_id=$1 AND placa=$2`,
