@@ -13,7 +13,7 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
-import type { FichaDelEquipo } from '@ncr/providers';
+import type { CapacidadesDeEquipo, FichaDelEquipo } from '@ncr/providers';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import {
   CORRECTOR_DE_EQUIPO,
@@ -32,6 +32,7 @@ import type {
 import {
   AltaDeEquipoDto,
   BajaDeEquipoDto,
+  CapacidadesDeEquipoDto,
   CorreccionDeEquipoDto,
   EquipoDto,
   EquiposDto,
@@ -83,6 +84,20 @@ const aFicha = (ficha: FichaDelEquipo): FichaDelEquipoDto => ({
   })),
 });
 
+/** Campo a campo, por la misma razón que la ficha: lo que sale es una decisión. */
+const aCapacidades = (c: CapacidadesDeEquipo): CapacidadesDeEquipoDto => ({
+  origen: c.origen,
+  aperturaRemota: c.aperturaRemota,
+  verificacionRemota: c.verificacionRemota,
+  bibliotecaDeRostros: { ...c.bibliotecaDeRostros },
+  gestionDePersonas: c.gestionDePersonas,
+  audioBidireccional: { ...c.audioBidireccional },
+  senalizacionDeLlamada: c.senalizacionDeLlamada,
+  suscripcionDeEventos: c.suscripcionDeEventos,
+  reconocimientoDePlacas: c.reconocimientoDePlacas,
+  estadoDeBarrera: c.estadoDeBarrera,
+});
+
 @ApiTags('equipos')
 @ApiBearerAuth()
 @Controller('copropiedades/:id/equipos')
@@ -95,7 +110,7 @@ export class EquiposController {
   ) {}
 
   private aDto(e: DatosDeEquipo): EquipoDto {
-    return { ...e };
+    return { ...e, capacidades: e.capacidades === null ? null : aCapacidades(e.capacidades) };
   }
 
   private altaDesdeDto(dto: AltaDeEquipoDto): AltaDeEquipo {
@@ -110,6 +125,9 @@ export class EquiposController {
       canalBarrera: dto.canalBarrera ?? null,
       numeroDePuerta: dto.numeroDePuerta ?? null,
       canalDeAudio: dto.canalDeAudio ?? null,
+      fabricante: dto.fabricante ?? null,
+      modoDeTerminal: dto.modoDeTerminal ?? null,
+      canalDeAudioHabilitado: dto.canalDeAudioHabilitado ?? false,
     };
   }
 
@@ -136,6 +154,7 @@ export class EquiposController {
       usuario: dto.usuario,
       secreto: dto.secreto,
       tipo: dto.tipo,
+      canalBarrera: dto.canalBarrera ?? null,
     });
   }
 
@@ -174,6 +193,9 @@ export class EquiposController {
       latenciaMs: veredicto.latenciaMs,
       verificado: veredicto.verificado,
       ...(veredicto.ficha === undefined ? {} : { ficha: aFicha(veredicto.ficha) }),
+      ...(veredicto.capacidades === undefined
+        ? {}
+        : { capacidades: aCapacidades(veredicto.capacidades) }),
     };
   }
 

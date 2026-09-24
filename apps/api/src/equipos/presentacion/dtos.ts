@@ -1,5 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 import { CORRECCIONES, TIPOS_DE_EQUIPO } from '../aplicacion/puertos';
 
 /**
@@ -81,6 +91,25 @@ export class AltaDeEquipoDto {
   @Max(16)
   canalDeAudio?: number;
 
+  /** INFORMATIVO (O2): se muestra y se audita; ninguna decisión lo mira. */
+  @ApiPropertyOptional({ type: String, maxLength: 80 })
+  @IsOptional()
+  @IsString()
+  @Length(1, 80)
+  fabricante?: string;
+
+  /** Terminal facial: lo que DECLARA ser. No se deduce del aparato (D2). */
+  @ApiPropertyOptional({ type: String, enum: ['reporta_y_espera', 'decide_el_equipo'] })
+  @IsOptional()
+  @IsIn(['reporta_y_espera', 'decide_el_equipo'])
+  modoDeTerminal?: 'reporta_y_espera' | 'decide_el_equipo';
+
+  /** Si una persona habilitó el canal de audio EN EL APARATO (ADR-01). */
+  @ApiPropertyOptional({ type: Boolean, default: false })
+  @IsOptional()
+  @IsBoolean()
+  canalDeAudioHabilitado?: boolean;
+
   /**
    * Guardar un equipo que todavía no está instalado es legítimo: se monta el
    * lunes. Lo que no es legítimo es que la pantalla diga que está verificado.
@@ -97,6 +126,42 @@ export class BajaDeEquipoDto {
   motivo!: string;
 }
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * LAS CAPACIDADES · O2, ETAPA 15-D
+ *
+ * Tres estados por capacidad, y `desconocida` NO se pinta como `si`: es lo
+ * que la consola tiene que enseñar para que quien mira la ficha sepa qué
+ * puede pedirle a ese equipo y qué falta por descubrir.
+ */
+const ESTADOS_DE_CAPACIDAD = ['si', 'no', 'desconocida'] as const;
+
+export class CapacidadDeBibliotecaDto {
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) estado!: string;
+  @ApiProperty({ type: Number, nullable: true }) maximo!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) almacenadas!: number | null;
+}
+
+export class CapacidadDeAudioDto {
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) estado!: string;
+  @ApiProperty({ type: Number, nullable: true }) canal!: number | null;
+  @ApiProperty({ type: String, nullable: true }) formato!: string | null;
+}
+
+export class CapacidadesDeEquipoDto {
+  @ApiProperty({ type: String, enum: ['descubiertas', 'declaradas', 'sin_consultar'] })
+  origen!: string;
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) aperturaRemota!: string;
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) verificacionRemota!: string;
+  @ApiProperty({ type: CapacidadDeBibliotecaDto }) bibliotecaDeRostros!: CapacidadDeBibliotecaDto;
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) gestionDePersonas!: string;
+  @ApiProperty({ type: CapacidadDeAudioDto }) audioBidireccional!: CapacidadDeAudioDto;
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) senalizacionDeLlamada!: string;
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) suscripcionDeEventos!: string;
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) reconocimientoDePlacas!: string;
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) estadoDeBarrera!: string;
+}
+
 export class EquipoDto {
   @ApiProperty({ type: String }) id!: string;
   @ApiProperty({ type: String }) nombre!: string;
@@ -110,6 +175,12 @@ export class EquipoDto {
   @ApiProperty({ type: Number, nullable: true }) canalBarrera!: number | null;
   @ApiProperty({ type: Number, nullable: true }) numeroDePuerta!: number | null;
   @ApiProperty({ type: Number, nullable: true }) canalDeAudio!: number | null;
+  @ApiProperty({ type: String, nullable: true }) fabricante!: string | null;
+  @ApiProperty({ type: String, nullable: true, enum: ['reporta_y_espera', 'decide_el_equipo'] })
+  modoDeTerminal!: string | null;
+  @ApiProperty({ type: Boolean }) canalDeAudioHabilitado!: boolean;
+  @ApiProperty({ type: CapacidadesDeEquipoDto, nullable: true })
+  capacidades!: CapacidadesDeEquipoDto | null;
   @ApiProperty({ type: String, enum: ['no_verificado', 'verificado', 'rechazado'] })
   verificacion!: string;
   @ApiProperty({ type: String, nullable: true }) verificadoEn!: string | null;
@@ -206,6 +277,11 @@ export class ResultadoDeSondeoDto {
       'falta de ficha no es una ficha vacía.',
   })
   ficha?: FichaDelEquipoDto;
+  @ApiPropertyOptional({
+    type: CapacidadesDeEquipoDto,
+    description: 'Lo que el equipo declaró poder hacer. Ausente cuando no se alcanzó.',
+  })
+  capacidades?: CapacidadesDeEquipoDto;
 }
 
 export class EquiposDto {

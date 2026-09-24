@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Videoportero, VideoporteroSinOperador } from './videoportero';
-import { CanalDeEquipoNoHabilitado, IntercomDeEquipo } from './intercom-equipo';
+import {
+  CanalDeAudioSinDescubrir,
+  CanalDeEquipoNoHabilitado,
+  IntercomDeEquipo,
+} from './intercom-equipo';
 
 const respuesta = (estado: number, cuerpo = ''): Response =>
   ({
@@ -29,6 +33,7 @@ describe('apertura remota del videoportero', () => {
       host: 'portero.invalid',
       usuario: 'u',
       clave: 'c',
+      numeroDePuerta: 1,
       peticion: peticion as unknown as typeof fetch,
     });
 
@@ -42,6 +47,7 @@ describe('apertura remota del videoportero', () => {
       host: 'portero.invalid',
       usuario: 'u',
       clave: 'c',
+      numeroDePuerta: 1,
       peticion: peticion as unknown as typeof fetch,
       ahora: (() => {
         let t = 0;
@@ -61,6 +67,7 @@ describe('apertura remota del videoportero', () => {
       host: 'portero.invalid',
       usuario: 'u',
       clave: 'c',
+      numeroDePuerta: 1,
       peticion: peticion as unknown as typeof fetch,
     });
     await expect(equipo.abrir('portero-1', 'op')).resolves.toMatchObject({ aceptado: false });
@@ -73,6 +80,7 @@ describe('estado del videoportero', () => {
       host: 'portero.invalid',
       usuario: 'u',
       clave: 'c',
+      numeroDePuerta: 1,
       peticion: (async () => respuestas()) as unknown as typeof fetch,
     });
 
@@ -111,6 +119,7 @@ describe('el canal de audio está escrito y NO habilitado', () => {
       clave: 'c',
       reloj,
       canalHabilitado: habilitado,
+      canal: 1,
       peticion: peticion as unknown as typeof fetch,
     });
     return { intercom, peticion, avanzar };
@@ -157,12 +166,56 @@ describe('el canal de audio está escrito y NO habilitado', () => {
     await expect(intercom.abrirSesion('portero-1', 'op-2')).rejects.toThrow(/no abrió el canal/);
   });
 
-  it('el audio NO se simula: lanza diciendo qué falta medir', async () => {
-    // Devolver silencio simularía que funciona, y la consola daría por bueno un
-    // canal que nunca se ha abierto contra este firmware.
+  it('el audio SIN sesión abierta lanza: no hay a quién hablarle', async () => {
     const { intercom } = montar(true);
-    await expect(intercom.enviarAudio(new Uint8Array([1]))).rejects.toThrow(/códec|codec/i);
-    expect(() => intercom.recibirAudio()).toThrow(/duplex/i);
+    await expect(intercom.enviarAudio(new Uint8Array([1]))).rejects.toThrow(/sesión/i);
+  });
+
+  it('con sesión, el audio viaja por el canal DESCUBIERTO, nunca por un 1 supuesto (D4)', async () => {
+    // El transporte está escrito según la documentación y probado aquí; lo que
+    // NO tiene es medida contra el aparato: códec, cadencia, duplex, latencia.
+    const llamadas: string[] = [];
+    const peticion = vi.fn(async (url: string) => {
+      llamadas.push(url);
+      return respuesta(200);
+    });
+    const { reloj } = relojFijo();
+    const intercom = new IntercomDeEquipo({
+      host: 'portero.invalid',
+      usuario: 'u',
+      clave: 'c',
+      reloj,
+      canalHabilitado: true,
+      canal: 3,
+      peticion: peticion as unknown as typeof fetch,
+    });
+    await intercom.abrirSesion('portero-1', 'op-1');
+    await intercom.enviarAudio(new Uint8Array([1, 2, 3]));
+    expect(llamadas[0]).toMatch(/channels\/3\/open$/);
+    expect(llamadas[1]).toMatch(/channels\/3\/audioData$/);
+    expect(llamadas.some((u) => /channels\/1\//.test(u))).toBe(false);
+  });
+
+  it('sin canal descubierto NO se abre: se dice que falta, no se supone 1 (D4)', async () => {
+    const peticion = vi.fn(async () => respuesta(200));
+    const { reloj } = relojFijo();
+    const intercom = new IntercomDeEquipo({
+      host: 'portero.invalid',
+      usuario: 'u',
+      clave: 'c',
+      reloj,
+      canalHabilitado: true,
+      canal: null,
+      peticion: peticion as unknown as typeof fetch,
+    });
+    await expect(intercom.abrirSesion('portero-1', 'op-1')).rejects.toBeInstanceOf(
+      CanalDeAudioSinDescubrir,
+    );
+    expect(peticion).not.toHaveBeenCalled();
+    // Y el turno se soltó: el siguiente no se queda en espera de un canal muerto.
+    await expect(intercom.abrirSesion('portero-1', 'op-2')).rejects.toBeInstanceOf(
+      CanalDeAudioSinDescubrir,
+    );
   });
 
   it('cerrar manda el cierre al equipo aunque el turno ya hubiera caducado', async () => {

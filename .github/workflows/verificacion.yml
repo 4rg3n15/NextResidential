@@ -120,6 +120,9 @@ jobs:
       - name: KPI-11 · el protocolo del fabricante no sale de packages/providers
         run: node scripts/lib/frontera-hardware.mjs
 
+      - name: O2 · el hardware se elige por capacidades, nunca por marca (ETAPA 15-D)
+        run: node scripts/lib/frontera-extensibilidad.mjs
+
       # Añadidos el 2026-09-09 tras la revisión que pidió el usuario. Estos
       # cuatro controles EXISTÍAN y se probaban en «Pruebas negativas» —donde se
       # comprueba que detectan su violación—, pero no se ejecutaban nunca contra

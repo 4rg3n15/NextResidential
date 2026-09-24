@@ -2,14 +2,18 @@ import { Global, Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import {
   ACCESS_POINT_PROVIDER,
+  BITACORA,
   FACE_TEMPLATE_PROVIDER,
   INTERCOM_PROVIDER,
   PLATE_EVENT_SOURCE,
   RELOJ,
 } from '@ncr/domain-core';
-import type { Reloj } from '@ncr/domain-core';
+import type { Bitacora, Reloj } from '@ncr/domain-core';
+import { Pool } from 'pg';
 import { crearProveedorDeEquipos } from '@ncr/providers';
 import type { ClaseDeProveedor, ProveedorDeEquipos, RegistroDeEquipos } from '@ncr/providers';
+import { CONFIGURACION } from '../configuracion/configuracion.module';
+import type { Configuracion } from '../configuracion/esquema';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -49,6 +53,17 @@ export class ProveedoresModule {
   static registrar(opciones: {
     readonly clase: ClaseDeProveedor;
     readonly registro?: RegistroDeEquipos;
+    /**
+     * ETAPA 15-D (D5) · cómo construir el registro de equipos cuando la clase
+     * es de hardware. Recibe el `Pool` y la configuración del proceso, porque
+     * el registro lee la base y descifra el sobre con la llave de equipos.
+     * Sin esto, el modo hardware estaba escrito y no se podía encender: la
+     * fábrica lanzaba al arrancar por falta de registro.
+     */
+    readonly registroDesde?: (dependencias: {
+      readonly pool: Pool;
+      readonly configuracion: Configuracion;
+    }) => RegistroDeEquipos;
     /** Semilla del simulado: la adversidad tiene que ser reproducible. */
     readonly semilla?: number;
   }): DynamicModule {
@@ -76,14 +91,39 @@ export class ProveedoresModule {
       providers: [
         {
           provide: PROVEEDOR,
-          inject: [RELOJ],
-          useFactory: (reloj: Reloj) =>
-            crearProveedorDeEquipos({
+          inject: [RELOJ, BITACORA, Pool, CONFIGURACION],
+          useFactory: (
+            reloj: Reloj,
+            bitacora: Bitacora,
+            pool: Pool,
+            configuracion: Configuracion,
+          ) => {
+            const registro =
+              opciones.registro ??
+              (opciones.clase === 'simulado' || opciones.registroDesde === undefined
+                ? undefined
+                : opciones.registroDesde({ pool, configuracion }));
+            /**
+             * Se dice al arrancar cuál es el adaptador ACTIVO. Un despliegue en
+             * modo simulado que cree hablar con las cámaras es el modo de fallo
+             * que ADR-03 más teme, y esta línea en el registro es lo que lo
+             * destapa antes de la primera apertura que no ocurre.
+             */
+            bitacora.registrar('info', `proveedor de equipos activo: ${opciones.clase}`, {
+              clase: opciones.clase,
+              conRegistroDeEquipos: registro !== undefined,
+              consecuencia:
+                opciones.clase === 'simulado'
+                  ? 'ningún equipo físico recibe órdenes; las aperturas son simuladas'
+                  : 'las órdenes van a los equipos dados de alta en la consola',
+            });
+            return crearProveedorDeEquipos({
               clase: opciones.clase,
               reloj,
-              ...(opciones.registro === undefined ? {} : { registro: opciones.registro }),
+              ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
-            }),
+            });
+          },
         },
         ...alias,
       ],

@@ -14,6 +14,7 @@ import type { VeredictoDePais } from '../camara/pais-del-algoritmo';
 import { juzgarReceptor } from '../camara/receptor-en-el-equipo';
 import type { VeredictoDelReceptor } from '../camara/receptor-en-el-equipo';
 import { reportaEstadoDeBarrera } from '../barrera/barrera-de-entrada';
+import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -84,6 +85,8 @@ export interface OpcionesDeDiagnostico extends OpcionesDeEquipo {
   /** `camara` pide las consultas que sólo tienen sentido en una cámara. */
   readonly familia: 'camara' | 'terminal' | 'videoportero' | 'comun';
   readonly ahoraDelServidor?: () => Date;
+  /** Carril de la cámara. Si no se declaró, el VERIFICADO (ver `camara/carril.ts`). */
+  readonly canal?: number;
 }
 
 /** Lo que el equipo contesta cuando la ruta no existe en ese firmware. */
@@ -98,7 +101,7 @@ export const diagnosticarEquipo = async (
 
   /** Pide una ruta del catálogo. `null` sin lanzar, anotando el motivo. */
   const pedir = async (proposito: string, familia = opciones.familia): Promise<string | null> => {
-    const ruta = rutaPara(proposito, familia);
+    const ruta = rutaPara(proposito, familia, opciones.canal ?? CARRIL_VERIFICADO_DE_LA_CAMARA);
     try {
       const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta);
       /**

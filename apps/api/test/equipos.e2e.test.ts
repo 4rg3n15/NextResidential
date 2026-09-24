@@ -6,7 +6,7 @@ import type { Firmante } from './utilidades';
 import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
 import { SondaPorProveedor } from '../src/equipos/infraestructura/sonda-por-proveedor';
-import { equiposSimulados } from '@ncr/providers';
+import { capacidadesDescubiertas, equiposSimulados } from '@ncr/providers';
 
 /**
  * A · APROVISIONAMIENTO DE EQUIPOS DESDE LA CONSOLA
@@ -58,6 +58,49 @@ const ALCANZADO: ResultadoDeSondeo = {
   latenciaMs: 41,
   verificado: true,
 };
+
+describe('O2 · las capacidades DESCUBIERTAS al sondear se persisten y se enseñan', () => {
+  it('lo que la sonda descubre vuelve en el alta y en el listado, con su origen', async () => {
+    const capacidades = capacidadesDescubiertas({
+      aperturaRemota: 'si',
+      senalizacionDeLlamada: 'no',
+      audioBidireccional: { estado: 'si', canal: 1, formato: 'g711u' },
+    });
+    const { app: a, firmante } = await conEquipos({
+      probar: async () => ({ ...ALCANZADO, capacidades }),
+    });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const res = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, tipo: 'intercom', fabricante: 'Una marca', canalDeAudioHabilitado: true });
+
+    expect(res.status).toBe(201);
+    expect(res.body.capacidades.origen).toBe('descubiertas');
+    expect(res.body.capacidades.aperturaRemota).toBe('si');
+    expect(res.body.capacidades.senalizacionDeLlamada).toBe('no');
+    // Lo no descubierto se enseña como DESCONOCIDA, nunca como sí.
+    expect(res.body.capacidades.bibliotecaDeRostros.estado).toBe('desconocida');
+    expect(res.body.fabricante).toBe('Una marca');
+    expect(res.body.canalDeAudioHabilitado).toBe(true);
+
+    const lista = await request(a.getHttpServer())
+      .get(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(lista.body.equipos[0].capacidades.audioBidireccional.canal).toBe(1);
+  });
+
+  it('sin sondeo no hay capacidades: `null`, no un objeto de síes', async () => {
+    const { app: a, firmante } = await conEquipos({ probar: async () => ALCANZADO });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const res = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, probarConexion: false });
+    expect(res.status).toBe(201);
+    expect(res.body.capacidades).toBeNull();
+  });
+});
 
 describe('A.2 · el secreto es de ESCRITURA: entra y no vuelve', () => {
   it('ninguna respuesta del alta lleva el secreto, ni enmascarado', async () => {

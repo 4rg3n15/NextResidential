@@ -1,4 +1,5 @@
-import { diagnosticarEquipo, fichaDe } from '@ncr/providers';
+import { descubrirCapacidadesDe, diagnosticarEquipo, fichaDe } from '@ncr/providers';
+import type { CapacidadesDeEquipo } from '@ncr/providers';
 import type { DatosDeSondeo, ResultadoDeSondeo, SondaDeEquipo } from '../aplicacion/puertos';
 
 /**
@@ -31,6 +32,10 @@ import type { DatosDeSondeo, ResultadoDeSondeo, SondaDeEquipo } from '../aplicac
  * modo de fallo real no es teclear mal la clave una vez, es **volver a
  * intentarlo cinco veces** y dejar la cuenta de servicio bloqueada en el equipo.
  */
+/** De tipo de equipo a familia de rutas. Por CAPACIDADES después; esto sólo elige qué preguntar. */
+const familiaDe = (tipo: DatosDeSondeo['tipo']): 'camara' | 'terminal' | 'videoportero' =>
+  tipo === 'terminal_facial' ? 'terminal' : tipo === 'intercom' ? 'videoportero' : 'camara';
+
 export const AVISO_DE_CREDENCIAL =
   'El equipo rechazó el usuario o la clave. NO vuelva a intentarlo a ciegas: ' +
   'estos aparatos bloquean la cuenta tras unos pocos intentos fallidos. ' +
@@ -39,6 +44,31 @@ export const AVISO_DE_CREDENCIAL =
 export class SondaPorProveedor implements SondaDeEquipo {
   constructor(private readonly peticion?: typeof fetch) {}
 
+  private async capacidadesSi(
+    alcanzado: boolean,
+    datos: DatosDeSondeo,
+  ): Promise<CapacidadesDeEquipo | null> {
+    if (!alcanzado) return null;
+    try {
+      return await descubrirCapacidadesDe({
+        host: datos.host,
+        puerto: datos.puerto,
+        protocolo: datos.protocolo,
+        usuario: datos.usuario,
+        clave: datos.secreto,
+        ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
+        familia: familiaDe(datos.tipo),
+        ...(datos.canalBarrera === undefined || datos.canalBarrera === null
+          ? {}
+          : { canal: datos.canalBarrera }),
+      });
+    } catch {
+      // Un fallo al descubrir no invalida el sondeo: el equipo contestó. Lo que
+      // no se pudo leer queda sin persistir y el proveedor lo preguntará.
+      return null;
+    }
+  }
+
   async probar(datos: DatosDeSondeo): Promise<ResultadoDeSondeo> {
     const diagnostico = await diagnosticarEquipo({
       host: datos.host,
@@ -46,16 +76,24 @@ export class SondaPorProveedor implements SondaDeEquipo {
       protocolo: datos.protocolo,
       usuario: datos.usuario,
       clave: datos.secreto,
-      familia: datos.tipo === 'camara_lpr' ? 'camara' : 'comun',
+      familia: familiaDe(datos.tipo) === 'camara' ? 'camara' : 'comun',
       ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
     });
 
     const ficha = fichaDe(diagnostico);
+    /**
+     * O2 · las CAPACIDADES se descubren en el mismo sondeo y viajan con el
+     * veredicto para que el alta las persista. Sólo cuando el equipo contestó:
+     * unas capacidades «descubiertas» de un aparato que no se alcanzó serían
+     * una mentira, y `desconocida` es la dirección segura.
+     */
+    const capacidades = await this.capacidadesSi(diagnostico.contacto.clase === 'alcanzado', datos);
     const base = {
       modelo: diagnostico.modelo,
       firmware: diagnostico.firmware,
       latenciaMs: diagnostico.contacto.latenciaMs,
       ficha,
+      ...(capacidades === null ? {} : { capacidades }),
     };
 
     /**

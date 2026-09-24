@@ -2,6 +2,7 @@ import type { AccessPointProvider, ResultadoAccionamiento } from '@ncr/domain-co
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
+import { comoErrorNeutral } from '../equipo/errores-del-fabricante';
 
 /**
  * VIDEOPORTERO · `DS-KD9633-WBE6` · V2.3.9 build 230905.
@@ -31,26 +32,41 @@ export class VideoporteroSinOperador extends Error {
   }
 }
 
+export interface OpcionesDeVideoportero extends OpcionesDeEquipo {
+  /** Qué puerta abre. Declarada en el alta; sin ella no se abre (D4). */
+  readonly numeroDePuerta?: number | null;
+}
+
 export class Videoportero implements AccessPointProvider {
   private readonly cliente: ClienteDeEquipo;
 
-  constructor(opciones: OpcionesDeEquipo) {
+  constructor(private readonly opciones: OpcionesDeVideoportero) {
     this.cliente = new ClienteDeEquipo(opciones);
   }
 
-  async abrir(_dispositivoId: string, actorId: string): Promise<ResultadoAccionamiento> {
+  async abrir(dispositivoId: string, actorId: string): Promise<ResultadoAccionamiento> {
     // Se comprueba AQUÍ, delante de la llamada al equipo, no después: la
     // diferencia entre una puerta con trazabilidad y una puerta con un campo
     // de texto al lado es que la orden no se ejecuta.
     if (actorId.trim() === '') throw new VideoporteroSinOperador();
 
-    const ruta = rutaPara('abrir la puerta del videoportero', 'videoportero');
+    const ruta = rutaPara(
+      'abrir la puerta del videoportero',
+      'videoportero',
+      this.opciones.numeroDePuerta ?? undefined,
+    );
     try {
       const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
         tipo: 'application/xml',
         contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
       });
-      return { aceptado: respuesta.ok, latenciaMs: respuesta.latenciaMs };
+      // Un rechazo del equipo sale con su clase neutral: ocupado se reintenta,
+      // credencial no, avería tampoco. «aceptado: false» a secas escondía cuál.
+      const codigo = /<statusCode>\s*(\d+)\s*<\/statusCode>/i.exec(respuesta.cuerpo)?.[1];
+      if (!respuesta.ok || (codigo !== undefined && codigo !== '0' && codigo !== '1')) {
+        throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
+      }
+      return { aceptado: true, latenciaMs: respuesta.latenciaMs };
     } catch (error) {
       if (error instanceof EquipoInalcanzable) {
         return { aceptado: false, latenciaMs: error.latenciaMs };

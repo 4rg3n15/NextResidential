@@ -6,6 +6,8 @@ import type {
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
+import { comoErrorNeutral } from '../equipo/errores-del-fabricante';
+import { BibliotecaLlena } from '../nucleo/errores';
 
 /**
  * TERMINAL FACIAL · `DS-K1T344MBFWX-E1` · V4.47.0 build 250722.
@@ -39,9 +41,18 @@ import { rutaPara } from '../equipo/catalogo-de-rutas';
  * supresión llega, el equipo abre. `latenciaDeRevocacionMs` mide esa ventana y
  * es la cifra que hace la diferencia visible en vez de teórica.
  *
- * El modo NO se adivina: se declara. Un adaptador que lo dedujera de una
- * respuesta del equipo escondería la decisión arquitectónica más importante de
- * esta etapa dentro de una rama.
+ * El modo NO se adivina: se declara. Y desde la 15-D, **declararlo no basta**:
+ * `reporta_y_espera` exige que el equipo tenga la verificación remota activa,
+ * y eso lo comprueba el proveedor por capacidades antes de operar (D2).
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * LO QUE LA 15-D CAMBIA AQUÍ
+ *
+ * · `FDSetUp` va por **PUT** (D3): el catálogo decía POST.
+ * · La puerta que abre se **declara** (`numeroDePuerta`), no es 1 (D4).
+ * · Los rechazos del equipo salen como **errores neutrales** tipados.
+ * · La supresión se **verifica**: se vuelve a preguntar por la plantilla y se
+ *   cuenta la biblioteca. Un `OK` a la orden no demuestra que el dato no está.
  */
 
 export type ModoDeTerminal = 'reporta_y_espera' | 'decide_el_equipo';
@@ -55,6 +66,10 @@ export interface OpcionesDeTerminal extends OpcionesDeEquipo {
   readonly modo: ModoDeTerminal;
   /** Biblioteca de rostros del equipo. Se confirma en sitio. */
   readonly bibliotecaId?: string;
+  /** Qué puerta abre esta terminal. Declarada en el alta; sin ella no se abre. */
+  readonly numeroDePuerta?: number | null;
+  /** Máximo de plantillas que el equipo declara. `null` si no lo dijo. */
+  readonly bibliotecaMaximo?: number | null;
 }
 
 /** Lo que el equipo contesta cuando la ruta no existe en ese firmware. */
@@ -71,6 +86,14 @@ export class RutaNoSoportada extends Error {
     );
     this.name = 'RutaNoSoportada';
   }
+}
+
+export interface VerificacionDeSupresion {
+  /** `true` si la búsqueda posterior ya no encuentra la plantilla. */
+  readonly ausente: boolean | null;
+  /** Recuento de la biblioteca después de suprimir. `null` si no contestó. */
+  readonly enBiblioteca: number | null;
+  readonly latenciaMs: number;
 }
 
 export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider {
@@ -115,12 +138,22 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
           'reconoce a nadie (RN-11)',
       );
     }
-    await this.altaDePersona(plantillaId);
+
+    // Antes de subir: ¿cabe? Preguntar cuesta una consulta; no preguntar deja
+    // un rechazo del equipo que hay que interpretar después.
+    const maximo = this.opciones.bibliotecaMaximo ?? null;
+    if (maximo !== null) {
+      const ahora = await this.contar();
+      if (ahora !== null && ahora >= maximo) throw new BibliotecaLlena(dispositivoId, maximo);
+    }
+
+    await this.altaDePersona(dispositivoId, plantillaId);
 
     const ruta = rutaPara('cargar la plantilla facial', 'terminal');
     const separador = `----ncr${String(plantilla.byteLength)}`;
     const descriptor = JSON.stringify({
       FaceDataRecord: {
+        faceLibType: 'blackFD',
         FDID: this.opciones.bibliotecaId ?? '1',
         FPID: plantillaId,
       },
@@ -136,11 +169,26 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
 
   /**
    * Supresión. **No se da por buena porque la orden se aceptara**: RN-11 exige
-   * poder demostrar que el dato ya no está. Lo que este método garantiza es que
-   * se pidió y que el equipo no la rechazó; la comprobación de que desapareció
-   * es del guion de puesta en marcha, que vuelve a preguntar por ella.
+   * poder demostrar que el dato ya no está. Este método pide la supresión y,
+   * si el equipo la acepta, **vuelve a preguntar** con `suprimirYVerificar`;
+   * aquí se conserva la firma del puerto y se lanza si el equipo la rechazó.
    */
   async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
+    await this.suprimirYVerificar(dispositivoId, plantillaId);
+  }
+
+  /**
+   * La supresión CON su prueba: búsqueda posterior y recuento. Es lo que el
+   * guion de puesta en marcha imprime como evidencia de RN-11 (CA-10, CA-11).
+   *
+   * En `decide_el_equipo` esto NO es limpieza: es el único modo que tenemos
+   * de revocar un acceso, y por eso la latencia de esta llamada es la ventana
+   * durante la cual una autorización vencida seguía abriendo.
+   */
+  async suprimirYVerificar(
+    dispositivoId: string,
+    plantillaId: string,
+  ): Promise<VerificacionDeSupresion> {
     const ruta = rutaPara('suprimir la plantilla facial', 'terminal');
     const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
       tipo: 'application/json',
@@ -151,21 +199,68 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     });
     this.exigir(respuesta, ruta.proposito, ruta.ruta, dispositivoId);
 
-    // En `decide_el_equipo` esto NO es limpieza: es el único modo que tenemos
-    // de revocar un acceso, y por eso la latencia de esta llamada es la ventana
-    // durante la cual una autorización vencida seguía abriendo.
+    const ausente = await this.existe(plantillaId);
+    return {
+      ausente: ausente === null ? null : !ausente,
+      enBiblioteca: await this.contar(),
+      latenciaMs: respuesta.latenciaMs,
+    };
+  }
+
+  /** Cuántas plantillas hay en la biblioteca. `null` si el equipo no contesta. */
+  async contar(): Promise<number | null> {
+    const ruta = rutaPara('contar las plantillas de la biblioteca de rostros', 'terminal');
+    try {
+      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
+        tipo: 'application/json',
+        contenido: JSON.stringify({ FDID: this.opciones.bibliotecaId ?? '1' }),
+      });
+      if (!respuesta.ok || NO_SOPORTADO.test(respuesta.cuerpo)) return null;
+      const n = /"totalNum"\s*:\s*(\d+)/.exec(respuesta.cuerpo)?.[1];
+      return n === undefined ? null : Number(n);
+    } catch (error) {
+      if (error instanceof EquipoInalcanzable) return null;
+      throw error;
+    }
+  }
+
+  /** ¿Está la plantilla en la biblioteca? `null` si no se pudo preguntar. */
+  async existe(plantillaId: string): Promise<boolean | null> {
+    const ruta = rutaPara('buscar una plantilla en la biblioteca de rostros', 'terminal');
+    try {
+      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
+        tipo: 'application/json',
+        contenido: JSON.stringify({
+          searchResultPosition: 0,
+          maxResults: 1,
+          FDID: this.opciones.bibliotecaId ?? '1',
+          FPID: plantillaId,
+        }),
+      });
+      if (!respuesta.ok || NO_SOPORTADO.test(respuesta.cuerpo)) return null;
+      const n = /"(?:numOfMatches|totalMatches)"\s*:\s*(\d+)/.exec(respuesta.cuerpo)?.[1];
+      return n === undefined ? null : Number(n) > 0;
+    } catch (error) {
+      if (error instanceof EquipoInalcanzable) return null;
+      throw error;
+    }
   }
 
   /** Apertura remota. El relé lo acciona la plataforma, no el reconocimiento. */
-  async abrir(_dispositivoId: string, _actorId: string): Promise<ResultadoAccionamiento> {
-    const ruta = rutaPara('abrir la puerta desde la plataforma', 'terminal');
+  async abrir(dispositivoId: string, _actorId: string): Promise<ResultadoAccionamiento> {
+    const ruta = rutaPara(
+      'abrir la puerta desde la plataforma',
+      'terminal',
+      this.opciones.numeroDePuerta ?? undefined,
+    );
     try {
       const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
         tipo: 'application/xml',
         contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
       });
       if (NO_SOPORTADO.test(respuesta.cuerpo)) throw new RutaNoSoportada(ruta.proposito, ruta.ruta);
-      return { aceptado: respuesta.ok, latenciaMs: respuesta.latenciaMs };
+      if (!respuesta.ok) throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
+      return { aceptado: true, latenciaMs: respuesta.latenciaMs };
     } catch (error) {
       if (error instanceof EquipoInalcanzable) {
         return { aceptado: false, latenciaMs: error.latenciaMs };
@@ -187,27 +282,41 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     }
   }
 
-  private async altaDePersona(plantillaId: string): Promise<void> {
+  /**
+   * Alta de la persona. Si ya existe, se **modifica** en vez de fallar: la
+   * sincronización tiene que poder reintentarse sin que la segunda vez rompa.
+   */
+  private async altaDePersona(dispositivoId: string, plantillaId: string): Promise<void> {
     const ruta = rutaPara('dar de alta la persona a la que pertenece la plantilla', 'terminal');
+    const persona = JSON.stringify({
+      UserInfo: {
+        employeeNo: plantillaId,
+        // El nombre NO viaja: el equipo no es fuente de verdad y no hay
+        // motivo para dejar datos personales en un aparato cuyo registro se
+        // puede borrar por API. La identidad vive en `plantillas_biometricas`.
+        name: plantillaId,
+        userType: 'normal',
+        Valid: { enable: false },
+      },
+    });
     const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
       tipo: 'application/json',
-      contenido: JSON.stringify({
-        UserInfo: {
-          employeeNo: plantillaId,
-          // El nombre NO viaja: el equipo no es fuente de verdad y no hay
-          // motivo para dejar datos personales en un aparato cuyo registro se
-          // puede borrar por API. La identidad vive en `plantillas_biometricas`.
-          name: plantillaId,
-          userType: 'normal',
-          Valid: { enable: false },
-        },
-      }),
+      contenido: persona,
     });
-    // Un alta repetida no es un fallo: la sincronización tiene que poder
-    // reintentarse sin que la segunda vez rompa.
-    if (!respuesta.ok && !/exist|duplicat/i.test(respuesta.cuerpo)) {
-      this.exigir(respuesta, ruta.proposito, ruta.ruta, plantillaId);
+    if (respuesta.ok) return;
+    if (/exist|duplicat/i.test(respuesta.cuerpo)) {
+      const modificar = rutaPara(
+        'modificar la persona a la que pertenece la plantilla',
+        'terminal',
+      );
+      const segunda = await this.cliente.pedir(modificar.metodo, modificar.ruta, {
+        tipo: 'application/json',
+        contenido: persona,
+      });
+      this.exigir(segunda, modificar.proposito, modificar.ruta, dispositivoId);
+      return;
     }
+    this.exigir(respuesta, ruta.proposito, ruta.ruta, dispositivoId);
   }
 
   private sobre(separador: string, descriptor: string, imagen: Uint8Array): Uint8Array {
@@ -224,15 +333,16 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     respuesta: { ok: boolean; cuerpo: string; estado: number },
     proposito: string,
     ruta: string,
-    referencia: string,
+    dispositivoId: string,
   ): void {
     if (NO_SOPORTADO.test(respuesta.cuerpo) || respuesta.estado === 404) {
       throw new RutaNoSoportada(proposito, ruta);
     }
-    if (!respuesta.ok) {
-      throw new Error(
-        `El equipo rechazó «${proposito}» para ${referencia} (HTTP ${String(respuesta.estado)})`,
-      );
+    // Un `200` con código de estado de error dentro también es un rechazo: así
+    // contestan estos equipos cuando exigen reinicio.
+    const codigo = /<statusCode>\s*(\d+)\s*<\/statusCode>/i.exec(respuesta.cuerpo)?.[1];
+    if (!respuesta.ok || (codigo !== undefined && codigo !== '0' && codigo !== '1')) {
+      throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
     }
   }
 }

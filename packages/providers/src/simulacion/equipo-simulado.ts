@@ -82,6 +82,44 @@ export interface GuionDeEquipo {
   readonly hora?: string;
   /** `false` deja al equipo sin declarar reconocimiento de matrícula. */
   readonly declaraReconocimiento?: boolean;
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LO QUE LA 15-D AÑADE · CAPACIDADES Y DESENLACES DE ERROR
+   *
+   * El proveedor ya no decide por tipo declarado sino por lo que el equipo
+   * DECLARA, y un simulado que no pudiera declarar «no» a una capacidad
+   * dejaría sin ejercitar la mitad nueva: la que niega con motivo tipado. Cada
+   * mando de abajo produce un equipo CAPAZ por omisión y un equipo INCAPAZ o
+   * AVERIADO a petición — nunca al revés.
+   */
+  /** `false` → `isSupportRemoteOpenDoor=false`: la plataforma no puede abrir. */
+  readonly aperturaRemota?: boolean;
+  /** Por omisión `false`, que es lo que declara el DS-KD9633 real. */
+  readonly senalizaLlamadas?: boolean;
+  /** `false` → `isSupportSubscribeEvent=false`. */
+  readonly admiteSuscripcion?: boolean;
+  /** Canales de audio bidireccional que declara. Vacío = sin audio. */
+  readonly canalesDeAudio?: readonly {
+    readonly id: number;
+    readonly habilitado: boolean;
+    readonly codec?: string;
+  }[];
+  /** `false` → `AcsCfg.remoteCheck=false`: la terminal decide sola. */
+  readonly verificacionRemota?: boolean;
+  /** Capacidad y ocupación de la biblioteca de rostros. */
+  readonly bibliotecaMaximo?: number;
+  readonly bibliotecaAlmacenadas?: number;
+  /** Órdenes que la puerta admite desde la plataforma. */
+  readonly ordenesDePuerta?: readonly string[];
+  /** El equipo no contesta a la consulta de capacidades: todo queda DESCONOCIDO. */
+  readonly sinCapacidades?: boolean;
+  /** Desenlaces de error, cada uno con su código del fabricante. */
+  readonly ocupado?: boolean;
+  readonly averiado?: boolean;
+  readonly reinicioNecesario?: boolean;
+  /** Rechaza la credencial aunque el Digest sea correcto: cuenta bloqueada. */
+  readonly rechazaCredencial?: boolean;
 }
 
 /**
@@ -201,15 +239,78 @@ const receptor = (guion: GuionDeEquipo): string =>
     '</HttpHostNotificationList>',
   ].join('');
 
-const capacidadesDelSistema = (guion: GuionDeEquipo): string =>
-  [
+/**
+ * El documento de capacidades, con las claves de los VOLCADOS REALES del
+ * 23/09/2026 (`docs/insumos/hikvision/hik-*.xml`): `ITCCap` en la cámara,
+ * `VideoIntercomCap` y `AudioCap` en el videoportero, `isSupportSubscribeEvent`
+ * en los dos. Lo que el simulado declara se lee con el mismo lector que leerá
+ * el aparato.
+ */
+const capacidadesDelSistema = (guion: GuionDeEquipo): string => {
+  const canales = guion.canalesDeAudio ?? CANALES_POR_OMISION;
+  const conAudio = canales.length > 0;
+  return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<DeviceCap version="2.0" xmlns="${ESPACIO}">`,
-    '<ITCCap>',
-    `<isSupportVehicleDetection>${guion.declaraReconocimiento === false ? 'false' : 'true'}</isSupportVehicleDetection>`,
-    '</ITCCap>',
+    '<SysCap>',
+    ...(guion.familia === 'camara'
+      ? []
+      : [
+          '<AudioCap>',
+          `<audioInputNums>${conAudio ? '1' : '0'}</audioInputNums>`,
+          `<audioOutputNums>${conAudio ? '1' : '0'}</audioOutputNums>`,
+          '</AudioCap>',
+        ]),
+    `<isSupportSubscribeEvent>${guion.admiteSuscripcion === false ? 'false' : 'true'}</isSupportSubscribeEvent>`,
+    '</SysCap>',
+    ...(guion.familia === 'camara'
+      ? [
+          '<ITCCap>',
+          `<isSupportVehicleDetection>${guion.declaraReconocimiento === false ? 'false' : 'true'}</isSupportVehicleDetection>`,
+          '</ITCCap>',
+        ]
+      : [
+          '<VideoIntercomCap>',
+          `<isSupportRemoteOpenDoor>${guion.aperturaRemota === false ? 'false' : 'true'}</isSupportRemoteOpenDoor>`,
+          `<isSupportCallSignal>${guion.senalizaLlamadas === true ? 'true' : 'false'}</isSupportCallSignal>`,
+          '</VideoIntercomCap>',
+        ]),
     '</DeviceCap>',
   ].join('');
+};
+
+/** Un canal habilitado con G.711 µ-law: lo que el equipo real declara, salvo que viene deshabilitado. */
+const CANALES_POR_OMISION = [{ id: 1, habilitado: true, codec: 'G.711ulaw' }] as const;
+
+const canalesDeAudio = (guion: GuionDeEquipo): string =>
+  [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<TwoWayAudioChannelList version="2.0" xmlns="${ESPACIO}">`,
+    ...(guion.canalesDeAudio ?? CANALES_POR_OMISION).map(
+      (c) =>
+        `<TwoWayAudioChannel><id>${String(c.id)}</id><enabled>${c.habilitado ? 'true' : 'false'}</enabled>` +
+        `<audioCompressionType>${c.codec ?? 'G.711ulaw'}</audioCompressionType>` +
+        '<audioInputType>MicIn</audioInputType><speakerVolume>50</speakerVolume>' +
+        '<noisereduce>false</noisereduce></TwoWayAudioChannel>',
+    ),
+    '</TwoWayAudioChannelList>',
+  ].join('');
+
+const ordenesDePuerta = (guion: GuionDeEquipo): string =>
+  '<?xml version="1.0" encoding="UTF-8"?>' +
+  `<RemoteControlDoorCap version="2.0" xmlns="${ESPACIO}">` +
+  `<cmd opt="${(guion.ordenesDePuerta ?? ['open', 'close']).join(',')}"/>` +
+  '</RemoteControlDoorCap>';
+
+/** Respuestas de error con el código de estado general del fabricante. */
+const ERROR_OCUPADO =
+  '<ResponseStatus><statusCode>2</statusCode><statusString>Device Busy</statusString>' +
+  '<subStatusCode>deviceBusy</subStatusCode></ResponseStatus>';
+const ERROR_AVERIADO =
+  '<ResponseStatus><statusCode>3</statusCode><statusString>Device Error</statusString></ResponseStatus>';
+const ERROR_REINICIO =
+  '<ResponseStatus><statusCode>7</statusCode><statusString>Reboot Required</statusString></ResponseStatus>';
+const LLENA = '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"faceLibraryFull"}';
 
 const md5 = (t: string): string => createHash('md5').update(t, 'utf8').digest('hex');
 
@@ -270,22 +371,64 @@ const cuerpoDeFlujo = (bloques: readonly Record<string, unknown>[]): ReadableStr
   } as unknown as ReadableStream<Uint8Array>;
 };
 
+/** Flujo de bytes tal cual: lo que se usa para devolver audio. */
+const cuerpoBinario = (trozos: readonly Uint8Array[]): ReadableStream<Uint8Array> => {
+  let i = 0;
+  return {
+    getReader: () => ({
+      read: async () =>
+        i < trozos.length ? { done: false, value: trozos[i++] } : { done: true, value: undefined },
+      cancel: async () => undefined,
+    }),
+  } as unknown as ReadableStream<Uint8Array>;
+};
+
 /**
  * Devuelve un `fetch` que se comporta como el equipo descrito.
  *
  * Se inyecta en cualquier adaptador —todos aceptan `peticion`— y con él la
  * suite recorre el camino entero sin un solo aparato.
  */
+/**
+ * ¿Casa la ruta del catálogo con el camino pedido? Las rutas con `{canal}` se
+ * comparan como patrón: el simulado acepta cualquier número, igual que el
+ * aparato acepta cualquier canal que exista. Qué canal era el bueno lo decide
+ * la prueba mirando la petición, no el emparejamiento.
+ */
+const caminoCasa = (rutaDelCatalogo: string, camino: string): boolean => {
+  const base = rutaDelCatalogo.split('?')[0] ?? rutaDelCatalogo;
+  if (!base.includes('{canal}')) return base === camino;
+  const patron = new RegExp(
+    '^' +
+      base
+        .split('{canal}')
+        .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('\\d+') +
+      '$',
+  );
+  return patron.test(camino);
+};
+
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   const sinSoporte = new Set(guion.sinSoporte ?? []);
+  /** Estado de la biblioteca de rostros: lo que se carga se cuenta y se busca. */
+  const plantillas = new Set<string>();
+  const almacenadasSinNombre = guion.bibliotecaAlmacenadas ?? 0;
+  const enBiblioteca = (): number => almacenadasSinNombre + plantillas.size;
+  /** Audio recibido, para devolverlo como eco por el flujo de salida. */
+  const audioRecibido: Uint8Array[] = [];
 
   return (async (entrada: string | URL, opciones?: RequestInit): Promise<Response> => {
     const url = new URL(typeof entrada === 'string' ? entrada : String(entrada));
     const metodo = opciones?.method ?? 'GET';
     const cabeceras = (opciones?.headers ?? {}) as Record<string, string>;
 
-    // Primer viaje: sin credenciales, el equipo contesta con su desafío.
-    if (!digestCorrecto(cabeceras['authorization'] ?? null, metodo, guion)) {
+    // Primer viaje: sin credenciales, el equipo contesta con su desafío. Y con
+    // la cuenta bloqueada contesta 401 aunque el Digest sea correcto.
+    if (
+      guion.rechazaCredencial === true ||
+      !digestCorrecto(cabeceras['authorization'] ?? null, metodo, guion)
+    ) {
       return respuestaDe(401, '', {
         'www-authenticate': `Digest realm="${REINO}", nonce="${NONCE}", qop="auth"`,
       });
@@ -306,8 +449,7 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
      */
     const delMismoCamino = RUTAS.filter(
       (r) =>
-        r.ruta.split('?')[0] === url.pathname &&
-        (r.familia === guion.familia || r.familia === 'comun'),
+        caminoCasa(r.ruta, url.pathname) && (r.familia === guion.familia || r.familia === 'comun'),
     );
     const catalogada = delMismoCamino.find((r) => r.metodo === metodo) ?? delMismoCamino[0];
 
@@ -315,6 +457,95 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     // programación: el equipo contesta 404, igual que el de verdad.
     if (catalogada === undefined) return respuestaDe(404, 'not found');
     if (sinSoporte.has(catalogada.proposito)) return respuestaDe(200, NO_SOPORTA);
+    if (
+      guion.sinCapacidades === true &&
+      /capacidades|qué admite|canales de audio|espera el veredicto|contar las plantillas|qué órdenes admite/.test(
+        catalogada.proposito,
+      )
+    ) {
+      return respuestaDe(200, NO_SOPORTA);
+    }
+
+    /**
+     * Los desenlaces de error, ANTES de contestar nada: un equipo ocupado o
+     * averiado lo está para todas las escrituras, y el adaptador tiene que
+     * traducirlo a la clase neutral correcta, no a «no se pudo».
+     */
+    const escribe = metodo !== 'GET';
+    if (escribe && guion.ocupado === true) return respuestaDe(503, ERROR_OCUPADO);
+    if (escribe && guion.averiado === true) return respuestaDe(500, ERROR_AVERIADO);
+    if (escribe && guion.reinicioNecesario === true) return respuestaDe(200, ERROR_REINICIO);
+
+    if (catalogada.proposito === 'leer los canales de audio bidireccional del equipo') {
+      return respuestaDe(200, canalesDeAudio(guion));
+    }
+    if (catalogada.proposito === 'leer qué órdenes admite la puerta desde la plataforma') {
+      return respuestaDe(200, ordenesDePuerta(guion));
+    }
+    if (catalogada.proposito === 'leer si la terminal espera el veredicto de la plataforma') {
+      return respuestaDe(
+        200,
+        JSON.stringify({ AcsCfg: { remoteCheck: guion.verificacionRemota !== false } }),
+      );
+    }
+    if (catalogada.proposito === 'leer qué admite la biblioteca de rostros') {
+      return respuestaDe(
+        200,
+        JSON.stringify({ FDLibCap: { maxFDRecordNum: guion.bibliotecaMaximo ?? 5000 } }),
+      );
+    }
+    if (catalogada.proposito === 'contar las plantillas de la biblioteca de rostros') {
+      return respuestaDe(200, JSON.stringify({ FDRecordCount: { totalNum: enBiblioteca() } }));
+    }
+    if (catalogada.proposito === 'buscar una plantilla en la biblioteca de rostros') {
+      const pedido = /"FPID"\s*:\s*"([^"]+)"/.exec(String(opciones?.body ?? ''))?.[1] ?? null;
+      const encontrada = pedido !== null && plantillas.has(pedido);
+      return respuestaDe(
+        200,
+        JSON.stringify({
+          MatchList: encontrada ? [{ FPID: pedido }] : [],
+          numOfMatches: encontrada ? 1 : 0,
+          totalMatches: encontrada ? 1 : 0,
+        }),
+      );
+    }
+    if (catalogada.proposito === 'cargar la plantilla facial') {
+      const maximo = guion.bibliotecaMaximo ?? 5000;
+      if (enBiblioteca() >= maximo) return respuestaDe(400, LLENA);
+      const cuerpo = Buffer.isBuffer(opciones?.body)
+        ? opciones.body.toString('latin1')
+        : String(opciones?.body ?? '');
+      const fpid = /"FPID"\s*:\s*"([^"]+)"/.exec(cuerpo)?.[1];
+      if (fpid !== undefined) plantillas.add(fpid);
+      return respuestaDe(200, OK);
+    }
+    if (catalogada.proposito === 'suprimir la plantilla facial') {
+      const cuerpo = String(opciones?.body ?? '');
+      for (const m of cuerpo.matchAll(/"value"\s*:\s*"([^"]+)"/g)) {
+        const id = m[1];
+        if (id !== undefined) plantillas.delete(id);
+      }
+      return respuestaDe(200, OK);
+    }
+    if (catalogada.proposito === 'enviar audio al equipo') {
+      const cuerpo = opciones?.body;
+      if (cuerpo instanceof Uint8Array) audioRecibido.push(cuerpo);
+      return respuestaDe(200, '');
+    }
+    if (catalogada.proposito === 'recibir audio del equipo') {
+      const respuesta = respuestaDe(200, '');
+      const trozos = audioRecibido.splice(0, audioRecibido.length);
+      Object.defineProperty(respuesta, 'body', { value: cuerpoBinario(trozos) });
+      return respuesta;
+    }
+    if (catalogada.proposito === 'contestar o rechazar una llamada del videoportero') {
+      return respuestaDe(200, guion.senalizaLlamadas === true ? OK : NO_SOPORTA);
+    }
+    if (catalogada.proposito === 'suscribirse a los eventos del equipo') {
+      const respuesta = respuestaDe(200, '');
+      Object.defineProperty(respuesta, 'body', { value: cuerpoDeFlujo(guion.flujo ?? []) });
+      return respuesta;
+    }
 
     if (catalogada.proposito === 'escuchar los eventos que el equipo emite') {
       const respuesta = respuestaDe(200, '');

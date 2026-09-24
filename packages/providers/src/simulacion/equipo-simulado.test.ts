@@ -21,6 +21,7 @@ describe('la terminal facial contra un equipo simulado', () => {
       host: 'terminal.invalid',
       ...CREDENCIALES,
       modo: 'reporta_y_espera',
+      numeroDePuerta: 1,
       peticion: equipoSimulado({ familia: 'terminal', ...CREDENCIALES, sinSoporte }),
     });
 
@@ -122,6 +123,7 @@ describe('el videoportero contra un equipo simulado', () => {
     const portero = new Videoportero({
       host: 'portero.invalid',
       ...CREDENCIALES,
+      numeroDePuerta: 1,
       peticion: equipoSimulado({ familia: 'videoportero', ...CREDENCIALES }),
     });
     await expect(portero.abrir('p-1', 'operador-1')).resolves.toMatchObject({ aceptado: true });

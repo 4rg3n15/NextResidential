@@ -9,6 +9,9 @@ import type {
 } from '@ncr/domain-core';
 import type { PerfilDeSimulacion } from './simulacion';
 import { Azar, FalloDeHardwareSimulado, PERFIL_REALISTA, RelojSimulado } from './simulacion';
+import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
+import { CAPACIDADES_COMPLETAS, CAPACIDADES_SIN_CONSULTAR } from '../nucleo/capacidades';
+import type { ProveedorDeEquipos } from '../nucleo/proveedor';
 
 export interface OpcionesMock {
   readonly perfil?: PerfilDeSimulacion;
@@ -38,7 +41,12 @@ import {
 import type { BloqueDeAlertStream } from '../hikvision/contratos-de-evento';
 
 export class MockProvider
-  implements AccessPointProvider, PlateEventSource, FaceTemplateProvider, IntercomProvider
+  implements
+    AccessPointProvider,
+    PlateEventSource,
+    FaceTemplateProvider,
+    IntercomProvider,
+    ProveedorDeEquipos
 {
   private readonly perfil: PerfilDeSimulacion;
   private readonly azar: Azar;
@@ -60,6 +68,13 @@ export class MockProvider
     this.azar = new Azar(opciones.semilla);
     this.reloj = opciones.reloj ?? new RelojSimulado();
     this.dispositivos = new Set(opciones.dispositivos ?? ['disp-porteria', 'disp-talanquera']);
+  }
+
+  // ── Capacidades ──────────────────────────────────────────────────────────
+
+  /** El simulado finge un equipo completo: todo `si`. Lo desconocido, nada. */
+  async capacidadesDe(dispositivoId: string): Promise<CapacidadesDeEquipo> {
+    return this.dispositivos.has(dispositivoId) ? CAPACIDADES_COMPLETAS : CAPACIDADES_SIN_CONSULTAR;
   }
 
   // ── AccessPointProvider ──────────────────────────────────────────────────

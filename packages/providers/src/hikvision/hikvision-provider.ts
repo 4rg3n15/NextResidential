@@ -20,41 +20,51 @@ import { leerVeredictoDeControl } from '../camara/veredicto-de-control';
 import { leerDisparador } from '../camara/disparadores-vinculados';
 import { EquipoNoRegistrado } from './registro-de-equipos';
 import type { EquipoRegistrado, RegistroDeEquipos } from './registro-de-equipos';
+import { descubrirCapacidades } from './capacidades-hikvision';
+import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
+import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
+import { CAPACIDADES_SIN_CONSULTAR, estadoDe } from '../nucleo/capacidades';
+import { CapacidadNoSoportada } from '../nucleo/errores';
+import type { ProveedorDeEquipos } from '../nucleo/proveedor';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * `HikvisionProvider` · UNA CLASE, LOS CUATRO PUERTOS
  *
- * Misma firma exacta que `MockProvider`. Es la condición de LSP (§2.3) y de
- * KPI-12: la suite de contrato corre contra los dos **sin una sola rama por
- * implementación**, y si hiciera falta un `if (esMock)` no serían
- * intercambiables y el arreglo iría en el adaptador, no en la prueba.
+ * Misma firma exacta que `MockProvider` y que el adaptador ficticio. Es la
+ * condición de LSP (§2.3) y de KPI-12: la suite de contrato corre contra los
+ * tres **sin una sola rama por implementación**.
  *
  * ═════════════════════════════════════════════════════════════════════════════
  * NO REIMPLEMENTA PROTOCOLO. RESUELVE Y DELEGA
  *
  * Los adaptadores de cada familia ya existen y están probados. Esta clase hace
  * lo único que faltaba: **resolver el equipo por su identificador** contra el
- * registro que la consola alimenta, y delegar. Reescribir aquí lo que ya hacen
- * habría producido dos implementaciones del mismo protocolo divergiendo.
+ * registro que la consola alimenta, y delegar.
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * LA GUARDA QUE NO SE NEGOCIA
+ * DESDE LA 15-D DECIDE POR CAPACIDADES, NO POR TIPO (O2, D2)
  *
- * Antes de aceptar un equipo de tipo cámara se exige el veredicto COMPLETO:
- * modo de control, políticas internas y disparadores vinculados. Si alguna de
- * las tres vías dice que el equipo abre por su cuenta, se lanza
- * `EquipoDecidePorSuCuenta` con el detalle de qué campo falla.
+ * Antes: «si es cámara, exige veredicto; si es terminal, sincroniza; si es
+ * intercom, abre canal». El tipo es una palabra de un formulario. Ahora cada
+ * operación pregunta primero `capacidadesDe(dispositivo)` —persistidas por la
+ * consola o descubiertas del aparato UNA vez por proceso— y niega con
+ * `CapacidadNoSoportada` lo que el equipo no declara. `desconocida` cuenta
+ * como no, y el motivo lo dice.
  *
- * **Que el sistema pueda corregirlo desde la consola NO relaja la guarda.**
- * Poder arreglarlo y estar arreglado son cosas distintas, y operar mientras
- * tanto produce un histórico que afirma que nosotros decidimos cuando no fue
- * así. Hasta que el equipo esté conforme, se niega.
+ * Y la guarda del principio rector alcanza a **los tres tipos** (D2):
+ *
+ * | Equipo        | Cómo podría decidir solo                 | Qué se exige                          |
+ * | ------------- | ---------------------------------------- | ------------------------------------- |
+ * | Cámara        | ctrlMode ≠ 1, lista blanca, disparador   | El veredicto COMPLETO (15-C)          |
+ * | Terminal      | Reconoce y abre sin preguntar            | `verificacionRemota = si` si se declaró `reporta_y_espera` |
+ * | Videoportero  | No decide: reporta y abre por orden      | `aperturaRemota = si` para abrir      |
+ *
+ * En `decide_el_equipo` la terminal se acepta **porque se declaró así**: es el
+ * modo débil, está documentado, y el sistema gobierna sólo qué plantillas hay.
  *
  * El veredicto se calcula **una vez por dispositivo** y se recuerda: es una
- * comprobación de arranque, no un peaje por cada apertura. Cambiar la
- * configuración del equipo exige darlo de alta otra vez, que es exactamente
- * cuando se quiere volver a comprobar.
+ * comprobación de arranque, no un peaje por cada apertura.
  */
 
 export interface OpcionesDeHikvision {
@@ -71,11 +81,25 @@ export interface OpcionesDeHikvision {
   readonly exigirVeredictoDeControl?: boolean;
 }
 
+const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
+  camara_lpr: 'camara',
+  rele: 'camara',
+  controlador_io: 'camara',
+  terminal_facial: 'terminal',
+  intercom: 'videoportero',
+};
+
 export class HikvisionProvider
-  implements AccessPointProvider, PlateEventSource, FaceTemplateProvider, IntercomProvider
+  implements
+    AccessPointProvider,
+    PlateEventSource,
+    FaceTemplateProvider,
+    IntercomProvider,
+    ProveedorDeEquipos
 {
   private readonly fuente: FuenteDePlacas;
   private readonly aprobados = new Set<string>();
+  private readonly capacidades = new Map<string, CapacidadesDeEquipo>();
   private readonly puertas = new Map<string, AccessPointProvider>();
   private readonly terminales = new Map<string, TerminalFacial>();
   private readonly intercomos = new Map<string, IntercomDeEquipo>();
@@ -90,12 +114,70 @@ export class HikvisionProvider
     return this.fuente;
   }
 
+  // ── Capacidades ──────────────────────────────────────────────────────────
+
+  /**
+   * Lo que el equipo puede hacer. Del registro si la consola ya lo descubrió
+   * y persistió; del aparato, una vez, si no. Un equipo desconocido devuelve
+   * «sin consultar»: nadie sabe nada de él.
+   */
+  async capacidadesDe(dispositivoId: string): Promise<CapacidadesDeEquipo> {
+    const guardadas = this.capacidades.get(dispositivoId);
+    if (guardadas !== undefined) return guardadas;
+
+    const equipo = await this.buscar(dispositivoId);
+    if (equipo === null) return CAPACIDADES_SIN_CONSULTAR;
+
+    const declaradas = equipo.capacidades;
+    if (declaradas !== undefined && declaradas.origen !== 'sin_consultar') {
+      this.capacidades.set(dispositivoId, declaradas);
+      return declaradas;
+    }
+    // Inalcanzable LANZA: unas capacidades «descubiertas» sin haber hablado
+    // con nadie serían una mentira. Quien pide una apertura lo traduce a «no
+    // aceptado», que es lo que el puerto del dominio devuelve.
+    const descubiertas = await descubrirCapacidades({
+      cliente: this.cliente(equipo),
+      familia: FAMILIA_DE[equipo.tipo],
+      dispositivoId,
+      ...(equipo.canalBarrera === null || equipo.canalBarrera === undefined
+        ? {}
+        : { canal: equipo.canalBarrera }),
+    });
+    if (descubiertas.origen !== 'sin_consultar') this.capacidades.set(dispositivoId, descubiertas);
+    return descubiertas;
+  }
+
+  private async exigirCapacidad(
+    dispositivoId: string,
+    nombre: NombreDeCapacidad,
+  ): Promise<CapacidadesDeEquipo> {
+    const capacidades = await this.capacidadesDe(dispositivoId);
+    const estado = estadoDe(capacidades, nombre);
+    if (estado !== 'si') {
+      throw new CapacidadNoSoportada(dispositivoId, nombre, estado === 'desconocida');
+    }
+    return capacidades;
+  }
+
   // ── AccessPointProvider ──────────────────────────────────────────────────
 
   async abrir(dispositivoId: string, actorId: string): Promise<ResultadoAccionamiento> {
     const equipo = await this.resolver(dispositivoId);
-    await this.exigirQueNoDecidaSolo(equipo);
-    const puerta = this.puertaDe(equipo);
+    try {
+      await this.exigirQueNoDecidaSolo(equipo);
+      if (equipo.tipo !== 'camara_lpr' && equipo.tipo !== 'rele') {
+        // Terminal y videoportero abren SÓLO si declaran apertura remota. El
+        // DS-KD9633 real la declara; un modelo que no, se niega aquí con motivo.
+        await this.exigirCapacidad(dispositivoId, 'aperturaRemota');
+      }
+    } catch (error) {
+      if (error instanceof EquipoInalcanzable) {
+        return { aceptado: false, latenciaMs: error.latenciaMs };
+      }
+      throw error;
+    }
+    const puerta = await this.puertaDe(equipo);
 
     if (equipo.tipo === 'camara_lpr' || equipo.tipo === 'rele') {
       // La barrera implementa el puerto del dominio con otra forma de
@@ -129,8 +211,8 @@ export class HikvisionProvider
   // ── PlateEventSource ─────────────────────────────────────────────────────
 
   /**
-   * El puerto que la ETAPA 05 declaró y nadie implementaba. Los dos
-   * transportes —armado y escucha— convergen en esta misma fuente.
+   * El puerto que la ETAPA 05 declaró y nadie implementaba. Los transportes
+   * —armado, escucha y suscripción— convergen en esta misma fuente.
    */
   async suscribir(alLeer: (lectura: LecturaDePlaca) => Promise<void>): Promise<void> {
     await this.fuente.suscribir(alLeer);
@@ -143,11 +225,15 @@ export class HikvisionProvider
     plantillaId: string,
     plantilla: Uint8Array,
   ): Promise<void> {
+    await this.exigirQueSeaTerminal(dispositivoId);
+    await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
     const terminal = await this.terminalDe(dispositivoId);
     await terminal.sincronizar(dispositivoId, plantillaId, plantilla);
   }
 
   async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
+    await this.exigirQueSeaTerminal(dispositivoId);
+    await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
     const terminal = await this.terminalDe(dispositivoId);
     await terminal.suprimir(dispositivoId, plantillaId);
   }
@@ -224,16 +310,23 @@ export class HikvisionProvider
   }
 
   /**
-   * La guarda del principio rector. Se hace **una vez por dispositivo**.
+   * La guarda del principio rector, para los TRES tipos. Se hace **una vez
+   * por dispositivo**.
    *
    * Un equipo inalcanzable NO se da por bueno: no poder comprobarlo es no
    * saberlo, y la dirección segura de este proyecto es la misma en todas
    * partes. Lanza `EquipoInalcanzable`, que quien llama ya sabe tratar.
    */
   private async exigirQueNoDecidaSolo(equipo: EquipoRegistrado): Promise<void> {
-    if (equipo.tipo !== 'camara_lpr') return;
     if (this.opciones.exigirVeredictoDeControl === false) return;
     if (this.aprobados.has(equipo.dispositivoId)) return;
+
+    if (equipo.tipo === 'terminal_facial') {
+      await this.exigirQueLaTerminalEspere(equipo);
+      this.aprobados.add(equipo.dispositivoId);
+      return;
+    }
+    if (equipo.tipo !== 'camara_lpr') return;
 
     const cliente = this.cliente(equipo);
     const control = rutaPara('leer quién controla la barrera: la cámara o la plataforma', 'camara');
@@ -243,7 +336,11 @@ export class HikvisionProvider
     // La TERCERA vía: un disparador vinculado con acción de E/S abre el relé
     // valga lo que valga el modo de control. Que esta consulta falle no se
     // trata como conforme — se trata como no comprobado, que bloquea igual.
-    const disparador = rutaPara('leer si un disparador vinculado acciona la barrera', 'camara');
+    const disparador = rutaPara(
+      'leer si un disparador vinculado acciona la barrera',
+      'camara',
+      equipo.canalBarrera ?? CARRIL_VERIFICADO_DE_LA_CAMARA,
+    );
     let abrePorDisparador = true;
     let detalleDelDisparador = 'no se pudo leer el disparador de detección';
     try {
@@ -264,7 +361,32 @@ export class HikvisionProvider
     this.aprobados.add(equipo.dispositivoId);
   }
 
-  private puertaDe(equipo: EquipoRegistrado): AccessPointProvider {
+  /**
+   * La terminal en `reporta_y_espera` tiene que TENER verificación remota. Si
+   * se declaró ese modo y el equipo no la declara, es el mismo hallazgo que
+   * una cámara con `ctrlMode 0`: cree decidir el sistema y decide el aparato.
+   */
+  private async exigirQueLaTerminalEspere(equipo: EquipoRegistrado): Promise<void> {
+    if ((equipo.modoDeTerminal ?? 'decide_el_equipo') !== 'reporta_y_espera') return;
+    const capacidades = await this.capacidadesDe(equipo.dispositivoId);
+    const estado = estadoDe(capacidades, 'verificacionRemota');
+    if (estado === 'si') return;
+    throw new EquipoDecidePorSuCuenta(
+      {
+        admisible: false,
+        modo: 'camara',
+        valorLeido: estado,
+        detalle:
+          'la terminal se declaró en modo reporta_y_espera y ' +
+          (estado === 'no'
+            ? 'el equipo declara que NO espera el veredicto de la plataforma'
+            : 'el equipo no declara si espera el veredicto de la plataforma'),
+      },
+      ['verificación remota: con eso, la terminal reconoce y abre sola'],
+    );
+  }
+
+  private async puertaDe(equipo: EquipoRegistrado): Promise<AccessPointProvider> {
     const guardado = this.puertas.get(equipo.dispositivoId);
     if (guardado !== undefined) return guardado;
 
@@ -273,11 +395,37 @@ export class HikvisionProvider
       equipo.tipo === 'camara_lpr' || equipo.tipo === 'rele'
         ? (new ControlDeBarreraVehicular(conexion) as unknown as AccessPointProvider)
         : equipo.tipo === 'terminal_facial'
-          ? new TerminalFacial({ ...conexion, modo: equipo.modoDeTerminal ?? 'decide_el_equipo' })
-          : new Videoportero(conexion);
+          ? await this.nuevaTerminal(equipo)
+          : new Videoportero({ ...conexion, numeroDePuerta: equipo.numeroDePuerta ?? null });
 
     this.puertas.set(equipo.dispositivoId, creado);
     return creado;
+  }
+
+  private async nuevaTerminal(equipo: EquipoRegistrado): Promise<TerminalFacial> {
+    const guardada = this.terminales.get(equipo.dispositivoId);
+    if (guardada !== undefined) return guardada;
+    // El máximo de la biblioteca se LEE de lo que el equipo declara: es lo
+    // que evita subir la plantilla que no cabe y recibir un rechazo opaco.
+    const capacidades = await this.capacidadesDe(equipo.dispositivoId);
+    const creada = new TerminalFacial({
+      ...this.conexionDe(equipo),
+      modo: equipo.modoDeTerminal ?? 'decide_el_equipo',
+      numeroDePuerta: equipo.numeroDePuerta ?? null,
+      bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
+    });
+    this.terminales.set(equipo.dispositivoId, creada);
+    return creada;
+  }
+
+  private async exigirQueSeaTerminal(dispositivoId: string): Promise<void> {
+    const equipo = await this.resolver(dispositivoId);
+    if (equipo.tipo !== 'terminal_facial') {
+      throw new Error(
+        `El equipo ${dispositivoId} no es una terminal facial (${equipo.tipo}): sincronizar ` +
+          'una plantilla contra otro aparato dejaría el dato biométrico donde nadie lo busca',
+      );
+    }
   }
 
   private async terminalDe(dispositivoId: string): Promise<TerminalFacial> {
@@ -291,12 +439,7 @@ export class HikvisionProvider
           'una plantilla contra otro aparato dejaría el dato biométrico donde nadie lo busca',
       );
     }
-    const creado = new TerminalFacial({
-      ...this.conexionDe(equipo),
-      modo: equipo.modoDeTerminal ?? 'decide_el_equipo',
-    });
-    this.terminales.set(dispositivoId, creado);
-    return creado;
+    return await this.nuevaTerminal(equipo);
   }
 
   private async intercomDe(dispositivoId: string): Promise<IntercomDeEquipo> {
@@ -304,10 +447,14 @@ export class HikvisionProvider
     if (guardado !== undefined) return guardado;
 
     const equipo = await this.resolver(dispositivoId);
+    // El canal se LEE de lo que el equipo declara (D4): sin capacidad de audio
+    // no hay sesión, y sin canal descubierto tampoco.
+    const capacidades = await this.exigirCapacidad(dispositivoId, 'audioBidireccional');
     const creado = new IntercomDeEquipo({
       ...this.conexionDe(equipo),
       reloj: this.opciones.reloj,
       canalHabilitado: equipo.canalDeAudioHabilitado ?? false,
+      canal: capacidades.audioBidireccional.canal ?? equipo.canalDeAudio ?? null,
     });
     this.intercomos.set(dispositivoId, creado);
     return creado;

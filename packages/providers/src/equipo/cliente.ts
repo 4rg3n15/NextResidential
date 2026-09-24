@@ -143,6 +143,26 @@ export class ClienteDeEquipo {
     }
   }
 
+  /**
+   * Como `flujo`, pero entrega los BYTES tal cual: es lo que necesita el audio,
+   * donde decodificar como texto corrompería el códec.
+   */
+  async *flujoBinario(ruta: string, cancelar?: AbortSignal): AsyncIterable<Uint8Array> {
+    const respuesta = await this.abrirFlujo(ruta, cancelar);
+    const cuerpo = respuesta.body;
+    if (cuerpo === null) return;
+    const lector = cuerpo.getReader();
+    try {
+      for (;;) {
+        const { done, value } = await lector.read();
+        if (done) return;
+        if (value !== undefined) yield value;
+      }
+    } finally {
+      await lector.cancel().catch(() => undefined);
+    }
+  }
+
   private async abrirFlujo(ruta: string, cancelar?: AbortSignal): Promise<Response> {
     const primera = await this.enviar('GET', ruta, undefined, cancelar);
     if (primera.status !== 401) return primera;

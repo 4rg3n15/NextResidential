@@ -46,6 +46,7 @@ const montar = (
     usuario: 'servicio',
     clave: 'secreta',
     modo,
+    numeroDePuerta: 1,
     peticion: peticion as unknown as typeof fetch,
     ahora: (() => {
       let t = 1000;
@@ -169,6 +170,7 @@ describe('apertura remota', () => {
       usuario: 'u',
       clave: 'c',
       modo: 'reporta_y_espera',
+      numeroDePuerta: 1,
       peticion: peticion as unknown as typeof fetch,
     });
     // El transporte lo envuelve en EquipoInalcanzable sólo cuando es de red;
@@ -189,6 +191,7 @@ describe('apertura remota', () => {
       usuario: 'u',
       clave: 'c',
       modo: 'reporta_y_espera',
+      numeroDePuerta: 1,
       peticion: peticion as unknown as typeof fetch,
     });
     const resultado = await terminal.abrir('terminal-1', 'op');
@@ -218,6 +221,7 @@ describe('estado del equipo', () => {
       usuario: 'u',
       clave: 'c',
       modo: 'reporta_y_espera',
+      numeroDePuerta: 1,
       peticion: peticion as unknown as typeof fetch,
     });
     await expect(terminal.estado('t-1')).resolves.toBe('fuera_de_linea');

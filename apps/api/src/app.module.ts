@@ -41,7 +41,7 @@ import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
 import { GuardiaModule } from './guardia';
 import { AlarmServerModule } from './alarmserver';
 import { PlanificacionModule } from './planificacion';
-import { EquiposModule } from './equipos';
+import { EquiposModule, RegistroDeEquiposPg } from './equipos';
 
 /**
  * El límite de peticiones es GLOBAL desde el primer día (§2.7.5). Ponerlo solo
@@ -116,6 +116,11 @@ export class AppModule {
         ProveedoresModule.registrar({
           clase: config.PROVEEDOR_DE_EQUIPOS,
           semilla: config.PROVEEDOR_SEMILLA,
+          // D5 · con el adaptador real, el registro lee `dispositivos` y descifra
+          // el sobre de la credencial. Antes no había registro y la API no
+          // arrancaba en modo hardware.
+          registroDesde: ({ pool, configuracion }) =>
+            new RegistroDeEquiposPg(pool, configuracion.EQUIPOS_LLAVE),
         }),
         MultiempresaModule,
         AutenticacionModule.registrar(),

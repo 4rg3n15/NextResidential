@@ -114,6 +114,9 @@ for (const raiz of RAICES) {
     // El propio verificador nombra lo que persigue; excluirlo evita que se
     // denuncie a sí mismo, que es el falso positivo más tonto posible.
     if (relativa === join('scripts', 'lib', 'frontera-hardware.mjs')) continue;
+    // Y el control de extensibilidad (O2, ETAPA 15-D) nombra los adaptadores de
+    // marca para impedir que alguien los construya fuera del paquete: mismo caso.
+    if (relativa === join('scripts', 'lib', 'frontera-extensibilidad.mjs')) continue;
     if (relativa.startsWith(PAQUETE_PERMITIDO + sep)) continue;
 
     const lineas = readFileSync(ruta, 'utf8').split('\n');
