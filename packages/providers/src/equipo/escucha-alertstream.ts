@@ -3,6 +3,9 @@ import { desdeAlertStreamJson, esEventoEnVivo } from '../hikvision/contratos-de-
 import { ClienteDeEquipo } from './cliente';
 import type { OpcionesDeEquipo } from './cliente';
 import { rutaPara } from './catalogo-de-rutas';
+import type { RutaDeEquipo } from './catalogo-de-rutas';
+import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
+import { soporta } from '../nucleo/capacidades';
 
 /**
  * ESCUCHA DEL FLUJO DE EVENTOS · terminal facial y videoportero.
@@ -30,9 +33,40 @@ import { rutaPara } from './catalogo-de-rutas';
  * vuelven todos a la vez y tiran lo que acaba de levantarse.
  */
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * DOS FORMAS DE MANTENER EL FLUJO ABIERTO · 6.5, ETAPA 15-D
+ *
+ * · `alertStream` — un GET que el equipo mantiene abierto y por el que vuelca
+ *   TODO, historial incluido. Es el que existía.
+ * · `subscribeEvent` — un POST con un cuerpo que dice qué eventos se quieren.
+ *   Los dos equipos reales declaran `isSupportSubscribeEvent=true`. Que el
+ *   volcado histórico también venga por aquí es lo que se confirma en sitio.
+ *
+ * Cuál se usa lo decide la CAPACIDAD del equipo (`transporteSegunCapacidades`),
+ * no su tipo ni su marca. El filtrado de lo histórico es el mismo para los dos:
+ * la trampa de la puesta en marcha no depende del transporte.
+ */
+export type TransporteDeFlujo = 'alertStream' | 'subscribeEvent';
+
+export const transporteSegunCapacidades = (capacidades: CapacidadesDeEquipo): TransporteDeFlujo =>
+  soporta(capacidades, 'suscripcionDeEventos') ? 'subscribeEvent' : 'alertStream';
+
+/**
+ * Lo que se pide al suscribirse. DOCUMENTADO, NO VERIFICADO: la forma del
+ * cuerpo sale de la documentación de suscripción del fabricante. `all` para
+ * que el filtrado lo haga el sistema —que sabe qué clases usa— y no un
+ * firmware cuyo vocabulario de tipos varía por modelo.
+ */
+const CUERPO_DE_SUSCRIPCION =
+  '<?xml version="1.0" encoding="UTF-8"?><SubscribeEvent version="2.0" ' +
+  'xmlns="http://www.isapi.org/ver20/XMLSchema"><eventMode>all</eventMode></SubscribeEvent>';
+
 export interface OpcionesDeEscucha extends OpcionesDeEquipo {
   readonly dispositivoId: string;
   readonly familia: 'terminal' | 'videoportero';
+  /** Por omisión `alertStream`, que es el que existía. */
+  readonly transporte?: TransporteDeFlujo;
   /** Techo de la espera entre reintentos. */
   readonly esperaMaximaMs?: number;
   /** Inyectable: sin esto, una prueba de reconexión tardaría lo que espera. */
@@ -119,7 +153,10 @@ export class EscuchaDeAlertStream {
    * mejor que documentar que hay que filtrarlo.
    */
   async *escuchar(cancelar?: AbortSignal): AsyncIterable<EventoDeEquipo> {
-    const ruta = rutaPara('escuchar los eventos que el equipo emite', this.opciones.familia);
+    const ruta: RutaDeEquipo =
+      this.transporte === 'subscribeEvent'
+        ? rutaPara('suscribirse a los eventos del equipo', this.opciones.familia)
+        : rutaPara('escuchar los eventos que el equipo emite', this.opciones.familia);
     let espera = ESPERA_INICIAL_MS;
 
     while (cancelar === undefined || !cancelar.aborted) {
@@ -141,9 +178,18 @@ export class EscuchaDeAlertStream {
     }
   }
 
+  /** Qué transporte usa esta escucha. Se enseña en el diagnóstico. */
+  get transporte(): TransporteDeFlujo {
+    return this.opciones.transporte ?? 'alertStream';
+  }
+
   private async *unaConexion(ruta: string, cancelar?: AbortSignal): AsyncIterable<EventoDeEquipo> {
     let acumulado = '';
-    for await (const trozo of this.cliente.flujo(ruta, cancelar)) {
+    const peticion =
+      this.transporte === 'subscribeEvent'
+        ? { metodo: 'POST', cuerpo: { tipo: 'application/xml', contenido: CUERPO_DE_SUSCRIPCION } }
+        : undefined;
+    for await (const trozo of this.cliente.flujo(ruta, cancelar, peticion)) {
       acumulado += trozo;
       const { objetos, resto } = extraerObjetos(acumulado);
       acumulado = resto;

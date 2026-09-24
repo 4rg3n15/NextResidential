@@ -200,6 +200,18 @@ const esXml = (parte: ParteDeSobre): boolean =>
   /\.xml$/i.test(parte.nombreDeFichero ?? '') ||
   /\.xml$/i.test(parte.nombre ?? '');
 
+/**
+ * 6.7a · la parte del evento también puede venir en JSON, si el receptor del
+ * equipo está en `parameterFormatType=JSON`. Se clasifica igual que el XML:
+ * primero por tipo de contenido, después por nombre.
+ */
+const esJson = (parte: ParteDeSobre): boolean =>
+  /json/i.test(parte.tipoDeContenido ?? '') ||
+  /\.json$/i.test(parte.nombreDeFichero ?? '') ||
+  /\.json$/i.test(parte.nombre ?? '');
+
+const esEvento = (parte: ParteDeSobre): boolean => esXml(parte) || esJson(parte);
+
 const esImagen = (parte: ParteDeSobre): boolean =>
   /image\//i.test(parte.tipoDeContenido ?? '') ||
   /\.(jpe?g|png)$/i.test(parte.nombreDeFichero ?? '') ||
@@ -215,7 +227,9 @@ const esImagen = (parte: ParteDeSobre): boolean =>
 const PISTAS_DE_RECORTE = /plate|licen[cs]e|cut|clip|small|vehiclepic/i;
 
 export interface SobreDeAlarmServer {
-  readonly xml: string;
+  /** El documento del evento, en el formato que `formato` declara. */
+  readonly documento: string;
+  readonly formato: 'xml' | 'json';
   /** Escena completa, si vino. */
   readonly foto: Buffer | null;
   /** Recorte de la placa, si vino. */
@@ -237,15 +251,15 @@ export const clasificarSobre = (partes: readonly ParteDeSobre[]): SobreDeAlarmSe
   const biometricas = partes.filter((p) => esParteBiometrica(p.nombre, p.nombreDeFichero));
   const admisibles = partes.filter((p) => !esParteBiometrica(p.nombre, p.nombreDeFichero));
 
-  const xmls = admisibles.filter(esXml);
+  const eventos = admisibles.filter(esEvento);
   const imagenes = admisibles.filter(esImagen);
 
-  const primerXml = xmls[0];
-  if (primerXml === undefined) {
-    throw new SobreIlegible('El envío no trae ninguna parte con el XML del evento');
+  const primerEvento = eventos[0];
+  if (primerEvento === undefined) {
+    throw new SobreIlegible('El envío no trae ninguna parte con el evento (XML o JSON)');
   }
-  if (primerXml.contenido.length > LIMITES.xmlMaximoBytes) {
-    throw new SobreIlegible('El XML del evento es desproporcionado');
+  if (primerEvento.contenido.length > LIMITES.xmlMaximoBytes) {
+    throw new SobreIlegible('El documento del evento es desproporcionado');
   }
 
   let recorte: Buffer | null = null;
@@ -267,10 +281,11 @@ export const clasificarSobre = (partes: readonly ParteDeSobre[]): SobreDeAlarmSe
   }
 
   return {
-    xml: primerXml.contenido.toString('utf8'),
+    documento: primerEvento.contenido.toString('utf8'),
+    formato: esXml(primerEvento) ? 'xml' : 'json',
     foto,
     recorte,
-    partesNoClasificadas: admisibles.filter((p) => !esXml(p) && !esImagen(p)).length,
+    partesNoClasificadas: admisibles.filter((p) => !esEvento(p) && !esImagen(p)).length,
     partesBiometricasRechazadas: biometricas.length,
   };
 };

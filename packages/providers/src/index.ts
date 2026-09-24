@@ -68,10 +68,13 @@ export * from './equipo/fuente-de-placas';
 export * from './hikvision/recepcion';
 export type {
   EventoDeEquipo,
+  ClaseDeEvento,
   QuienAbrio,
   RecuadroDetectado,
   BloqueDeAlertStream,
 } from './hikvision/contratos-de-evento';
+export { EscuchaDeAlertStream, transporteSegunCapacidades } from './equipo/escucha-alertstream';
+export type { TransporteDeFlujo, OpcionesDeEscucha } from './equipo/escucha-alertstream';
 export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';
 
 // ── Diagnóstico y corrección de un equipo, para la consola ───────────────────

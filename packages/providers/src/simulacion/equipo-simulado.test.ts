@@ -170,7 +170,7 @@ describe('la cámara que publica', () => {
     // construye tiene que ser exactamente lo que el receptor sabe abrir.
     const sobre = sobreDeLectura({ placa: 'ABC123', confianza: 91, referencia: 'ev-9' });
     const abierto = abrirSobreDeAlarmServer(sobre.cuerpo, sobre.tipoDeContenido);
-    const evento = desdeAlarmServerXml(abierto.xml, 'camara-1', new Date());
+    const evento = desdeAlarmServerXml(abierto.documento, 'camara-1', new Date());
 
     expect(evento?.clase).toBe('placa');
     expect(evento?.placa).toBe('ABC123');

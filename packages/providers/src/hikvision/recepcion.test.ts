@@ -136,3 +136,38 @@ describe('lo que el receptor tiene que poder alertar', () => {
     expect(r.publicacion?.foto).not.toBeNull();
   });
 });
+
+describe('6.7a · el evento en JSON entra por el mismo receptor', () => {
+  const sobreJson = (cuerpo: string): Buffer =>
+    Buffer.concat([
+      Buffer.from('--B\r\nContent-Disposition: form-data; name="anpr.json"\r\n'),
+      Buffer.from('Content-Type: application/json\r\n\r\n'),
+      Buffer.from(cuerpo),
+      Buffer.from('\r\n--B--\r\n'),
+    ]);
+
+  it('una lectura en JSON produce la misma publicación que en XML', () => {
+    const json = JSON.stringify({
+      eventType: 'ANPR',
+      alarmDataType: 0,
+      ANPR: { licensePlate: 'ABC123', confidenceLevel: 92 },
+    });
+    const r = recibirPublicacionDeEquipo(sobreJson(json), TIPO, DISPOSITIVO, AHORA);
+    expect(r.desenlace).toBe('lectura');
+    expect(r.publicacion?.evento.placa).toBe('ABC123');
+    expect(r.publicacion?.evento.confianza).toBe(0.92);
+  });
+
+  it('un JSON histórico se descarta como histórico, no como ilegible', () => {
+    const json = JSON.stringify({ eventType: 'ANPR', ANPR: { licensePlate: 'ABC123' } });
+    expect(recibirPublicacionDeEquipo(sobreJson(json), TIPO, DISPOSITIVO, AHORA).desenlace).toBe(
+      'historico',
+    );
+  });
+
+  it('un JSON roto es ilegible, y NO lanza', () => {
+    expect(recibirPublicacionDeEquipo(sobreJson('{roto'), TIPO, DISPOSITIVO, AHORA).desenlace).toBe(
+      'ilegible',
+    );
+  });
+});
