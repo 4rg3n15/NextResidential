@@ -206,6 +206,36 @@ class _EquiposApi implements EquiposApi {
   }
 
   @override
+  Future<ResultadoDeSondeoDto> equiposControllerDiagnosticar({
+    required String id,
+    required String equipoId,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<ResultadoDeSondeoDto>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/equipos/${equipoId}/diagnostico',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late ResultadoDeSondeoDto _value;
+    try {
+      _value = ResultadoDeSondeoDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<EquipoDto> equiposControllerReactivar({
     required String id,
     required String equipoId,

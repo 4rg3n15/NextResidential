@@ -63,6 +63,13 @@ abstract class EquiposApi {
     @Body() required CorreccionDeEquipoDto body,
   });
 
+  /// Sondea un equipo en servicio con su clave guardada y devuelve su ficha
+  @POST('/copropiedades/{id}/equipos/{equipoId}/diagnostico')
+  Future<ResultadoDeSondeoDto> equiposControllerDiagnosticar({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+  });
+
   /// Vuelve a poner en servicio un equipo dado de baja
   @POST('/copropiedades/{id}/equipos/{equipoId}/reactivacion')
   Future<EquipoDto> equiposControllerReactivar({

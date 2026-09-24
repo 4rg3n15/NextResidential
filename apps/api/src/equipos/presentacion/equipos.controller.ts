@@ -137,14 +137,20 @@ export class EquiposController {
    * «rechazada» falso, y un rechazo falso invita a reintentar — que es
    * justamente lo que bloquea la cuenta en el equipo.
    */
-  private async sondear(dto: AltaDeEquipoDto): Promise<ResultadoDeSondeo> {
+  private async sondear(
+    dto: AltaDeEquipoDto,
+    secretoGuardado: string | null = null,
+  ): Promise<ResultadoDeSondeo> {
     if (dto.probarConexion === false) return SIN_PROBAR;
-    if (dto.secreto === undefined) {
+    // O4 · al editar sin reescribir la clave se usa la GUARDADA, que sólo
+    // existe en el servidor: el sondeo sigue sin necesitar que nadie la vea.
+    const secreto = dto.secreto ?? secretoGuardado;
+    if (secreto === null || secreto === undefined) {
       return {
         ...SIN_PROBAR,
         detalle:
-          'Guardado sin comprobar: para probar la conexión hay que volver a escribir la clave ' +
-          'del equipo, porque el sistema no la muestra ni la reenvía.',
+          'Guardado sin comprobar: el equipo no tiene clave guardada y no se escribió una. ' +
+          'Escríbala en la edición para que el sistema pueda sondearlo.',
       };
     }
     return this.sonda.probar({
@@ -152,10 +158,27 @@ export class EquiposController {
       puerto: dto.puerto,
       protocolo: dto.protocolo,
       usuario: dto.usuario,
-      secreto: dto.secreto,
+      secreto,
       tipo: dto.tipo,
       canalBarrera: dto.canalBarrera ?? null,
+      modoDeTerminal: dto.modoDeTerminal ?? null,
     });
+  }
+
+  /** El veredicto a su DTO: la ficha y las capacidades se omiten cuando no las hay. */
+  private aResultado(veredicto: ResultadoDeSondeo): ResultadoDeSondeoDto {
+    return {
+      clase: veredicto.clase,
+      detalle: veredicto.detalle,
+      modelo: veredicto.modelo,
+      firmware: veredicto.firmware,
+      latenciaMs: veredicto.latenciaMs,
+      verificado: veredicto.verificado,
+      ...(veredicto.ficha === undefined ? {} : { ficha: aFicha(veredicto.ficha) }),
+      ...(veredicto.capacidades === undefined
+        ? {}
+        : { capacidades: aCapacidades(veredicto.capacidades) }),
+    };
   }
 
   @Get()
@@ -185,18 +208,7 @@ export class EquiposController {
     const veredicto = await this.sondear({ ...dto, probarConexion: true });
     // La ficha se omite cuando no la hay, en vez de enviarse vacía: la falta de
     // ficha no es una ficha sin hallazgos (`exactOptionalPropertyTypes`).
-    return {
-      clase: veredicto.clase,
-      detalle: veredicto.detalle,
-      modelo: veredicto.modelo,
-      firmware: veredicto.firmware,
-      latenciaMs: veredicto.latenciaMs,
-      verificado: veredicto.verificado,
-      ...(veredicto.ficha === undefined ? {} : { ficha: aFicha(veredicto.ficha) }),
-      ...(veredicto.capacidades === undefined
-        ? {}
-        : { capacidades: aCapacidades(veredicto.capacidades) }),
-    };
+    return this.aResultado(veredicto);
   }
 
   @Post()
@@ -225,7 +237,12 @@ export class EquiposController {
     @Body() dto: AltaDeEquipoDto,
   ): Promise<EquipoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/edicion');
-    const veredicto = await this.sondear(dto);
+    const veredicto = await this.sondear(
+      dto,
+      dto.secreto === undefined
+        ? await this.repo.credencialPara(ctx, copropiedadId, equipoId)
+        : null,
+    );
     const equipo = await this.repo.editar(
       ctx,
       copropiedadId,
@@ -235,6 +252,53 @@ export class EquiposController {
     );
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
     return this.aDto(equipo);
+  }
+
+  /**
+   * O4 · LA FICHA DE UN EQUIPO YA DADO DE ALTA
+   *
+   * Hasta ahora la ficha sólo existía en el alta, con la clave recién tecleada.
+   * Un equipo en servicio no tenía forma de volver a diagnosticarse sin
+   * reescribirla. Aquí se sondea con la credencial GUARDADA —que no sale del
+   * servidor—, se persiste lo que cambió (verificación, modelo, firmware,
+   * capacidades) y se devuelve la ficha por tipo, con sus botones de
+   * corrección. Deja rastro: es una lectura del equipo, no un cambio, pero
+   * «quién lo sondeó y cuándo» es lo que explica un `verificado_en` nuevo.
+   */
+  @Post(':equipoId/diagnostico')
+  @Roles('superadministrador', 'administrador')
+  @ApiOperation({
+    summary: 'Sondea un equipo en servicio con su clave guardada y devuelve su ficha',
+  })
+  @ApiOkResponse({ type: ResultadoDeSondeoDto })
+  async diagnosticar(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('equipoId', ParseUUIDPipe) equipoId: string,
+  ): Promise<ResultadoDeSondeoDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/diagnostico');
+    const equipos = await this.repo.listar(ctx, copropiedadId);
+    const equipo = equipos.find((e) => e.id === equipoId);
+    if (equipo === undefined) throw new NotFoundException('No se encontró el equipo');
+    const secreto = await this.repo.credencialPara(ctx, copropiedadId, equipoId);
+    if (secreto === null) {
+      throw new NotFoundException(
+        'El equipo no tiene credencial guardada: vuelva a escribirla en la edición antes de ' +
+          'sondearlo, porque el sistema no la muestra ni la reenvía',
+      );
+    }
+    const veredicto = await this.sonda.probar({
+      host: equipo.host,
+      puerto: equipo.puerto,
+      protocolo: equipo.protocolo,
+      usuario: equipo.usuario ?? '',
+      secreto,
+      tipo: equipo.tipo,
+      canalBarrera: equipo.canalBarrera,
+      modoDeTerminal: equipo.modoDeTerminal,
+    });
+    await this.repo.registrarSondeo(ctx, copropiedadId, equipoId, veredicto);
+    return this.aResultado(veredicto);
   }
 
   /**

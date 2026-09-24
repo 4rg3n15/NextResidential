@@ -142,6 +142,30 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
     return nuevo;
   }
 
+  async registrarSondeo(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+    veredicto: ResultadoDeSondeo,
+  ): Promise<DatosDeEquipo | null> {
+    const nuevo = this.reemplazar(copropiedadId, equipoId, (actual) => ({
+      ...actual,
+      modelo: veredicto.modelo ?? actual.modelo,
+      firmware: veredicto.firmware ?? actual.firmware,
+      capacidades: veredicto.capacidades ?? actual.capacidades,
+      verificacion: this.verificacionDe(veredicto),
+      verificadoEn: veredicto.verificado ? new Date(0).toISOString() : null,
+      motivoNoVerificado: veredicto.verificado ? null : veredicto.detalle,
+    }));
+    if (nuevo !== null)
+      this.auditoria.push({
+        copropiedadId,
+        actorId: ctx.usuarioId,
+        recurso: 'equipos/diagnostico',
+      });
+    return nuevo;
+  }
+
   async desactivar(
     ctx: ContextoTenant,
     copropiedadId: string,

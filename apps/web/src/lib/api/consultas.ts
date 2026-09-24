@@ -22,6 +22,7 @@ import type {
   OrdenEjecutada,
   Latencias,
   UrlDeFotografia,
+  Equipos,
 } from '@ncr/contracts';
 import { cliente, desenvolver } from './cliente';
 
@@ -399,6 +400,25 @@ export const useFotografiaDeVisitante = (
       desenvolver(
         await cliente.GET('/copropiedades/{id}/autorizaciones/{autorizacionId}/fotografia', {
           params: { path: { id: copropiedadId, autorizacionId } },
+        }),
+      ),
+  });
+
+/* ── ETAPA 15-D (O4) · inventario de equipos con lo que declaran ──────────── */
+
+/**
+ * El inventario COMPLETO de equipos (sin credenciales, por construcción): tipo,
+ * capacidades descubiertas, verificación, modo declarado. El tablero sólo trae
+ * el estado en línea; la ficha y la edición necesitan esto. Cuelga de la misma
+ * clave `['dispositivos', copropiedad]` que invalidan el alta y las órdenes.
+ */
+export const useEquipos = (copropiedadId: string): UseQueryResult<Equipos> =>
+  useQuery({
+    queryKey: ['dispositivos', copropiedadId, 'equipos'] as const,
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/equipos', {
+          params: { path: { id: copropiedadId } },
         }),
       ),
   });

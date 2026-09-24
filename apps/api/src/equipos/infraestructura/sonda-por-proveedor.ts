@@ -1,5 +1,4 @@
-import { descubrirCapacidadesDe, diagnosticarEquipo, fichaDe } from '@ncr/providers';
-import type { CapacidadesDeEquipo } from '@ncr/providers';
+import { diagnosticarEquipo, fichaDe } from '@ncr/providers';
 import type { DatosDeSondeo, ResultadoDeSondeo, SondaDeEquipo } from '../aplicacion/puertos';
 
 /**
@@ -44,50 +43,35 @@ export const AVISO_DE_CREDENCIAL =
 export class SondaPorProveedor implements SondaDeEquipo {
   constructor(private readonly peticion?: typeof fetch) {}
 
-  private async capacidadesSi(
-    alcanzado: boolean,
-    datos: DatosDeSondeo,
-  ): Promise<CapacidadesDeEquipo | null> {
-    if (!alcanzado) return null;
-    try {
-      return await descubrirCapacidadesDe({
-        host: datos.host,
-        puerto: datos.puerto,
-        protocolo: datos.protocolo,
-        usuario: datos.usuario,
-        clave: datos.secreto,
-        ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
-        familia: familiaDe(datos.tipo),
-        ...(datos.canalBarrera === undefined || datos.canalBarrera === null
-          ? {}
-          : { canal: datos.canalBarrera }),
-      });
-    } catch {
-      // Un fallo al descubrir no invalida el sondeo: el equipo contestó. Lo que
-      // no se pudo leer queda sin persistir y el proveedor lo preguntará.
-      return null;
-    }
-  }
-
   async probar(datos: DatosDeSondeo): Promise<ResultadoDeSondeo> {
+    /**
+     * O4 · el diagnóstico es POLIMÓRFICO: se le dice la familia real y él
+     * decide qué preguntar. Una terminal ya no recibe la ficha de una cámara
+     * con cinco «no comprobado» que no le aplican, sino la suya: si espera el
+     * veredicto, si su biblioteca cabe, si abre desde aquí.
+     */
     const diagnostico = await diagnosticarEquipo({
       host: datos.host,
       puerto: datos.puerto,
       protocolo: datos.protocolo,
       usuario: datos.usuario,
       clave: datos.secreto,
-      familia: familiaDe(datos.tipo) === 'camara' ? 'camara' : 'comun',
+      familia: familiaDe(datos.tipo),
       ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
+      ...(datos.canalBarrera === undefined || datos.canalBarrera === null
+        ? {}
+        : { canal: datos.canalBarrera }),
     });
 
     const ficha = fichaDe(diagnostico);
     /**
-     * O2 · las CAPACIDADES se descubren en el mismo sondeo y viajan con el
-     * veredicto para que el alta las persista. Sólo cuando el equipo contestó:
-     * unas capacidades «descubiertas» de un aparato que no se alcanzó serían
-     * una mentira, y `desconocida` es la dirección segura.
+     * O2 · las CAPACIDADES viajan con el veredicto para que el alta las
+     * persista; O4 las trae el propio diagnóstico, en la misma ronda de
+     * consultas. Sólo cuando el equipo contestó: unas capacidades
+     * «descubiertas» de un aparato que no se alcanzó serían una mentira.
      */
-    const capacidades = await this.capacidadesSi(diagnostico.contacto.clase === 'alcanzado', datos);
+    const capacidades =
+      diagnostico.contacto.clase === 'alcanzado' ? diagnostico.capacidadesDelEquipo : null;
     const base = {
       modelo: diagnostico.modelo,
       firmware: diagnostico.firmware,
@@ -137,8 +121,31 @@ export class SondaPorProveedor implements SondaDeEquipo {
         verificado: false,
       };
     }
+    /**
+     * O4 · la terminal, al nivel de la cámara: si no espera el veredicto de la
+     * plataforma decide sola, y eso no se da por bueno… salvo que la consola
+     * lo haya DECLARADO a sabiendas («decide el equipo»). Entonces no es un
+     * hallazgo oculto sino una decisión registrada, y el equipo queda
+     * verificado con el aviso a la vista.
+     */
+    const decideSola = bloqueos.find((b) => /quién decide/.test(b.campo));
+    if (
+      datos.tipo === 'terminal_facial' &&
+      decideSola !== undefined &&
+      datos.modoDeTerminal !== 'decide_el_equipo'
+    ) {
+      return {
+        ...base,
+        clase: 'decide_solo',
+        detalle: `${decideSola.campo}: ${decideSola.detalle}`,
+        verificado: false,
+      };
+    }
 
     const avisos = ficha.hallazgos.filter((h) => h.estado === 'aviso');
+    // Un bloqueo que no es «decide sola» —una puerta que no abre desde aquí,
+    // una biblioteca inexistente— se CUENTA en el detalle: el equipo contesta y
+    // autentica, pero la ficha dice que hay algo que impide operar.
     return {
       ...base,
       clase: 'alcanzado',
@@ -146,6 +153,7 @@ export class SondaPorProveedor implements SondaDeEquipo {
         (diagnostico.modelo === null
           ? 'El equipo responde y acepta la credencial'
           : `El equipo responde y acepta la credencial: ${diagnostico.modelo}`) +
+        (bloqueos.length === 0 ? '' : `. ${String(bloqueos.length)} bloqueo(s) en la ficha`) +
         (avisos.length === 0 ? '' : `. ${String(avisos.length)} aviso(s) de configuración`),
       verificado: true,
     };

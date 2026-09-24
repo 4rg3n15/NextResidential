@@ -293,6 +293,53 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     });
   }
 
+  async registrarSondeo(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+    veredicto: ResultadoDeSondeo,
+  ): Promise<DatosDeEquipo | null> {
+    const actorId = ctx.usuarioId;
+    return this.conCliente(ctx, async (c) => {
+      await c.query('BEGIN');
+      try {
+        const { rows } = await c.query<FilaDeEquipo>(
+          `UPDATE public.dispositivos
+              SET modelo = COALESCE($3, modelo), firmware = COALESCE($4, firmware),
+                  verificacion = $5::verificacion_equipo, verificado_en = $6,
+                  motivo_no_verificado = $7, actualizado_por = $8,
+                  capacidades = COALESCE($9::jsonb, capacidades),
+                  capacidades_descubiertas_en = CASE WHEN $9::jsonb IS NULL
+                    THEN capacidades_descubiertas_en ELSE now() END
+            WHERE id = $2 AND copropiedad_id = $1
+        RETURNING ${CAMPOS}`,
+          [
+            copropiedadId,
+            equipoId,
+            veredicto.modelo,
+            veredicto.firmware,
+            verificacionDe(veredicto),
+            veredicto.verificado ? new Date() : null,
+            veredicto.verificado ? null : veredicto.detalle,
+            actorId,
+            veredicto.capacidades === undefined ? null : JSON.stringify(veredicto.capacidades),
+          ],
+        );
+        const fila = rows[0];
+        if (fila === undefined) {
+          await c.query('ROLLBACK');
+          return null;
+        }
+        await this.auditar(c, copropiedadId, actorId, 'equipos/diagnostico', fila.nombre);
+        await c.query('COMMIT');
+        return aDatos(fila);
+      } catch (error) {
+        await c.query('ROLLBACK');
+        throw error;
+      }
+    });
+  }
+
   async editar(
     ctx: ContextoTenant,
     copropiedadId: string,

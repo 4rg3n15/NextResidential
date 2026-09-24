@@ -535,6 +535,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/equipos/{equipoId}/diagnostico": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sondea un equipo en servicio con su clave guardada y devuelve su ficha */
+        post: operations["EquiposController_diagnosticar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
         parameters: {
             query?: never;
@@ -3811,6 +3828,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultadoDeCorreccionDto"];
+                };
+            };
+        };
+    };
+    EquiposController_diagnosticar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeSondeoDto"];
                 };
             };
         };

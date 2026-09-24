@@ -140,6 +140,17 @@ export interface RepositorioDeEquipos {
   ): Promise<string | null>;
   /** Constancia de una corrección aplicada: qué cambió, de qué valor a cuál. */
   auditarCorreccion(ctx: ContextoTenant, copropiedadId: string, detalle: string): Promise<void>;
+  /**
+   * O4 · un sondeo posterior al alta —desde la ficha, con la credencial
+   * guardada— actualiza verificación, modelo, firmware y capacidades sin tocar
+   * lo que la consola declaró. `null` si el equipo no es de esta copropiedad.
+   */
+  registrarSondeo(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+    veredicto: ResultadoDeSondeo,
+  ): Promise<DatosDeEquipo | null>;
 }
 
 /**
@@ -249,6 +260,11 @@ export interface DatosDeSondeo {
   readonly tipo: TipoDeEquipo;
   /** Carril de la cámara, si se declaró. */
   readonly canalBarrera?: number | null;
+  /**
+   * O4 · lo que la consola DECLARÓ de una terminal. Una terminal que decide
+   * sola es un bloqueo salvo que alguien lo haya declarado a sabiendas.
+   */
+  readonly modoDeTerminal?: ModoDeTerminalDeclarado | null;
 }
 
 export interface SondaDeEquipo {

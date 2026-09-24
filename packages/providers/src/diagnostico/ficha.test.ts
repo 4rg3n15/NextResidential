@@ -15,6 +15,7 @@ import type { DiagnosticoDeEquipo } from './diagnostico-de-equipo';
  */
 
 const VACIO: DiagnosticoDeEquipo = {
+  familia: 'camara',
   contacto: { clase: 'alcanzado', detalle: 'responde', latenciaMs: 10 },
   modelo: null,
   firmware: null,
@@ -25,6 +26,7 @@ const VACIO: DiagnosticoDeEquipo = {
   receptor: null,
   capacidades: null,
   reportaEstadoDeBarrera: null,
+  capacidadesDelEquipo: null,
   hora: null,
   sinRespuesta: [],
 };

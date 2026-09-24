@@ -1,6 +1,7 @@
 import type { DiagnosticoDeEquipo } from './diagnostico-de-equipo';
 import type { ClaseDeCorreccion } from './correcciones';
 import { IMAGENES } from '../camara/receptor-en-el-equipo';
+import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -55,8 +56,216 @@ const noComprobado = (campo: string, detalle: string): HallazgoDelEquipo => ({
   correccion: null,
 });
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * LA FICHA ES POLIMÓRFICA · O4
+ *
+ * Hasta la 15-C toda ficha tenía las seis secciones de la cámara: una terminal
+ * facial salía con «quién decide la apertura: no se pudo leer», «país del
+ * algoritmo: sin comprobar»… cinco hallazgos que no le aplican, y NINGUNO de
+ * los que sí: si espera el veredicto de la plataforma, si su biblioteca cabe,
+ * si abre desde aquí. Eso es un diagnóstico de cámara aplicado a lo que no lo
+ * es, y se leía como un equipo a medio comprobar.
+ *
+ * Ahora la familia decide las secciones. Las de la terminal y el videoportero
+ * salen de las CAPACIDADES NEUTRALES (O2) — el mismo vocabulario que mira el
+ * proveedor antes de pedir algo—, así que lo que la ficha dice y lo que el
+ * sistema hará después no pueden discrepar.
+ */
+const desdeCapacidad = (
+  campo: string,
+  estado: EstadoDeCapacidad,
+  textos: {
+    readonly si: { readonly valor: string; readonly detalle: string };
+    readonly no: { readonly estado: 'aviso' | 'bloqueo'; readonly detalle: string };
+    readonly desconocida: string;
+    readonly valorCorrecto: string;
+  },
+): HallazgoDelEquipo =>
+  estado === 'si'
+    ? {
+        campo,
+        estado: 'conforme',
+        valorLeido: textos.si.valor,
+        valorCorrecto: textos.valorCorrecto,
+        detalle: textos.si.detalle,
+        correccion: null,
+      }
+    : estado === 'no'
+      ? {
+          campo,
+          estado: textos.no.estado,
+          valorLeido: 'no',
+          valorCorrecto: textos.valorCorrecto,
+          detalle: textos.no.detalle,
+          correccion: null,
+        }
+      : noComprobado(campo, textos.desconocida);
+
+const hallazgosDeTerminal = (c: CapacidadesDeEquipo): HallazgoDelEquipo[] => {
+  const biblioteca = c.bibliotecaDeRostros;
+  const ocupacion =
+    biblioteca.maximo !== null && biblioteca.almacenadas !== null && biblioteca.maximo > 0
+      ? biblioteca.almacenadas / biblioteca.maximo
+      : null;
+  return [
+    desdeCapacidad('quién decide la apertura', c.verificacionRemota, {
+      si: {
+        valor: 'reporta y espera el veredicto',
+        detalle:
+          'La terminal reconoce, REPORTA y espera a que la plataforma decida. Es lo que ' +
+          '«Next Control decide, el hardware ejecuta» exige de este equipo',
+      },
+      no: {
+        estado: 'bloqueo',
+        detalle:
+          'La terminal decide por su cuenta: reconoce y abre sin preguntar. El motor de reglas ' +
+          'quedaría decorativo y la traza, incompleta. Actívele la verificación remota en el ' +
+          'propio equipo, o declárela como «decide el equipo» sabiendo lo que eso significa',
+      },
+      desconocida:
+        'No se pudo leer si la terminal espera el veredicto de la plataforma. Sin eso no se ' +
+        'puede afirmar que no decida sola',
+      valorCorrecto: 'reporta y espera el veredicto',
+    }),
+    biblioteca.estado === 'si'
+      ? {
+          campo: 'biblioteca de rostros',
+          estado: ocupacion !== null && ocupacion >= 0.9 ? 'aviso' : 'conforme',
+          valorLeido:
+            biblioteca.almacenadas === null || biblioteca.maximo === null
+              ? 'declarada'
+              : `${String(biblioteca.almacenadas)} de ${String(biblioteca.maximo)} plantillas`,
+          valorCorrecto: 'con espacio para las plantillas vigentes',
+          detalle:
+            ocupacion !== null && ocupacion >= 0.9
+              ? 'La biblioteca está al 90 % o más: la siguiente sincronización puede fallar por ' +
+                'falta de espacio. Suprima las plantillas vencidas antes'
+              : 'La terminal admite plantillas y tiene espacio',
+          correccion: null,
+        }
+      : desdeCapacidad('biblioteca de rostros', biblioteca.estado, {
+          si: { valor: 'declarada', detalle: 'La terminal admite plantillas' },
+          no: {
+            estado: 'bloqueo',
+            detalle:
+              'La terminal no declara biblioteca de rostros: no se le puede sincronizar ' +
+              'ninguna plantilla y no reconocerá a nadie',
+          },
+          desconocida: 'No se pudo leer si la terminal admite plantillas ni cuántas',
+          valorCorrecto: 'con espacio para las plantillas vigentes',
+        }),
+    desdeCapacidad('gestión de personas', c.gestionDePersonas, {
+      si: { valor: 'sí', detalle: 'La terminal admite dar de alta y de baja personas' },
+      no: {
+        estado: 'bloqueo',
+        detalle: 'Sin gestión de personas no hay a quién asociar una plantilla',
+      },
+      desconocida: 'No se pudo leer si la terminal admite gestionar personas',
+      valorCorrecto: 'sí',
+    }),
+    desdeCapacidad('apertura desde la plataforma', c.aperturaRemota, {
+      si: { valor: 'sí', detalle: 'La puerta admite la orden de apertura desde la plataforma' },
+      no: {
+        estado: 'bloqueo',
+        detalle:
+          'La puerta no admite abrirse desde la plataforma: el veredicto favorable no podría ' +
+          'ejecutarse',
+      },
+      desconocida: 'No se pudo leer qué órdenes admite la puerta desde la plataforma',
+      valorCorrecto: 'sí',
+    }),
+  ];
+};
+
+const hallazgosDeVideoportero = (c: CapacidadesDeEquipo): HallazgoDelEquipo[] => [
+  desdeCapacidad('apertura desde la plataforma', c.aperturaRemota, {
+    si: {
+      valor: 'sí',
+      detalle: 'La central puede abrir la puerta desde la consola (KPI-32)',
+    },
+    no: {
+      estado: 'bloqueo',
+      detalle:
+        'El videoportero no admite la apertura remota: la guardia virtual no podría abrir y ' +
+        'KPI-32 sería imposible con este equipo',
+    },
+    desconocida: 'No se pudo leer si el videoportero admite la apertura remota',
+    valorCorrecto: 'sí',
+  }),
+  desdeCapacidad('canal de audio bidireccional', c.audioBidireccional.estado, {
+    si: {
+      valor:
+        c.audioBidireccional.canal === null
+          ? 'declarado'
+          : `canal ${String(c.audioBidireccional.canal)}` +
+            (c.audioBidireccional.formato === null ? '' : ` · ${c.audioBidireccional.formato}`),
+      detalle:
+        'El equipo declara un canal de audio habilitado: la guardia virtual tiene voz (ADR-01)',
+    },
+    no: {
+      estado: 'aviso',
+      detalle:
+        'Ningún canal de audio habilitado: la guardia virtual verá pero no hablará. Habilítelo en ' +
+        'el equipo y vuelva a sondear; si el modelo no lo trae, es la contingencia del ADR-01',
+    },
+    desconocida: 'No se pudo leer si el equipo tiene canales de audio bidireccional',
+    valorCorrecto: 'al menos un canal habilitado',
+  }),
+  desdeCapacidad('señalización de llamada', c.senalizacionDeLlamada, {
+    si: {
+      valor: 'sí',
+      detalle: 'La central puede contestar o rechazar la llamada desde la consola',
+    },
+    no: {
+      estado: 'aviso',
+      detalle:
+        'El equipo no admite señalizar la llamada: la central no podrá contestarla desde aquí',
+    },
+    desconocida: 'No se pudo leer si el equipo admite señalizar llamadas',
+    valorCorrecto: 'sí',
+  }),
+  desdeCapacidad('suscripción a eventos', c.suscripcionDeEventos, {
+    si: { valor: 'sí', detalle: 'El equipo admite que la plataforma se suscriba a sus eventos' },
+    no: {
+      estado: 'aviso',
+      detalle: 'Sin suscripción, los timbres sólo llegan si el equipo publica o se le escucha',
+    },
+    desconocida: 'No se pudo leer si el equipo admite suscripciones',
+    valorCorrecto: 'sí',
+  }),
+];
+
 export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
   const hallazgos: HallazgoDelEquipo[] = [];
+
+  if (diagnostico.familia === 'terminal' || diagnostico.familia === 'videoportero') {
+    const c = diagnostico.capacidadesDelEquipo;
+    if (c === null) {
+      hallazgos.push(
+        noComprobado(
+          'lo que el equipo declara poder hacer',
+          'No se pudo leer qué admite el equipo. Sin eso la ficha no puede afirmar nada de él',
+        ),
+      );
+    } else {
+      hallazgos.push(
+        ...(diagnostico.familia === 'terminal'
+          ? hallazgosDeTerminal(c)
+          : hallazgosDeVideoportero(c)),
+      );
+    }
+    hallazgos.push(hallazgoDelReloj(diagnostico));
+    return {
+      modelo: diagnostico.modelo,
+      firmware: diagnostico.firmware,
+      serie: diagnostico.serie,
+      horaDelEquipo: diagnostico.hora?.leida ?? null,
+      desvioDeRelojSegundos: diagnostico.hora?.desvioSegundos ?? null,
+      hallazgos,
+      sinComprobar: diagnostico.sinRespuesta.map((s) => `${s.que}: ${s.motivo}`),
+    };
+  }
 
   // ── 1 · Quién decide, por las tres vías ────────────────────────────────────
   const control = diagnostico.control;
@@ -216,24 +425,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
   }
 
   // ── 6 · El reloj, invisible hasta que corrompe la trazabilidad ────────────
-  const hora = diagnostico.hora;
-  if (hora === null) {
-    hallazgos.push(
-      noComprobado(
-        'reloj del equipo',
-        'No se pudo leer su hora. Un reloj desviado no produce errores: fecha mal los eventos',
-      ),
-    );
-  } else {
-    hallazgos.push({
-      campo: 'reloj del equipo',
-      estado: hora.excesiva ? 'aviso' : hora.desvioSegundos === null ? 'no_comprobado' : 'conforme',
-      valorLeido: hora.leida,
-      valorCorrecto: 'la hora del servidor, con desplazamiento horario',
-      detalle: hora.detalle,
-      correccion: null,
-    });
-  }
+  hallazgos.push(hallazgoDelReloj(diagnostico));
 
   if (diagnostico.reportaEstadoDeBarrera === false) {
     hallazgos.push({
@@ -256,5 +448,24 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
     desvioDeRelojSegundos: diagnostico.hora?.desvioSegundos ?? null,
     hallazgos,
     sinComprobar: diagnostico.sinRespuesta.map((s) => `${s.que}: ${s.motivo}`),
+  };
+};
+
+/** El reloj se juzga igual en las tres familias. */
+const hallazgoDelReloj = (diagnostico: DiagnosticoDeEquipo): HallazgoDelEquipo => {
+  const hora = diagnostico.hora;
+  if (hora === null) {
+    return noComprobado(
+      'reloj del equipo',
+      'No se pudo leer su hora. Un reloj desviado no produce errores: fecha mal los eventos',
+    );
+  }
+  return {
+    campo: 'reloj del equipo',
+    estado: hora.excesiva ? 'aviso' : hora.desvioSegundos === null ? 'no_comprobado' : 'conforme',
+    valorLeido: hora.leida,
+    valorCorrecto: 'la hora del servidor, con desplazamiento horario',
+    detalle: hora.detalle,
+    correccion: null,
   };
 };

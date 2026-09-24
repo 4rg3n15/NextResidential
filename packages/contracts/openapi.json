@@ -1621,6 +1621,50 @@
         ]
       }
     },
+    "/copropiedades/{id}/equipos/{equipoId}/diagnostico": {
+      "post": {
+        "operationId": "EquiposController_diagnosticar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeSondeoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sondea un equipo en servicio con su clave guardada y devuelve su ficha",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
     "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
       "post": {
         "operationId": "EquiposController_reactivar",

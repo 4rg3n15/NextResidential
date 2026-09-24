@@ -15,6 +15,8 @@ import { juzgarReceptor } from '../camara/receptor-en-el-equipo';
 import type { VeredictoDelReceptor } from '../camara/receptor-en-el-equipo';
 import { reportaEstadoDeBarrera } from '../barrera/barrera-de-entrada';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
+import { descubrirCapacidades } from '../hikvision/capacidades-hikvision';
+import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -60,7 +62,11 @@ export interface HoraDelEquipo {
   readonly detalle: string;
 }
 
+export type FamiliaDiagnosticada = 'camara' | 'terminal' | 'videoportero' | 'comun';
+
 export interface DiagnosticoDeEquipo {
+  /** De qué familia se preguntó: decide qué secciones tiene la ficha (O4). */
+  readonly familia: FamiliaDiagnosticada;
   readonly contacto: ContactoConElEquipo;
   readonly modelo: string | null;
   readonly firmware: string | null;
@@ -73,6 +79,14 @@ export interface DiagnosticoDeEquipo {
   readonly capacidades: VeredictoDeCapacidadAnpr | null;
   /** `null` cuando el equipo no declara si sabe informar del brazo. */
   readonly reportaEstadoDeBarrera: boolean | null;
+  /**
+   * O4 · lo que el equipo declara poder hacer, en el vocabulario NEUTRAL del
+   * núcleo: verificación remota, biblioteca de rostros, apertura remota, canal
+   * de audio… Es la misma pregunta que hace el proveedor antes de pedirle algo
+   * (O2), hecha aquí una sola vez para que la ficha de una terminal o de un
+   * videoportero tenga veredictos propios y no los de una cámara.
+   */
+  readonly capacidadesDelEquipo: CapacidadesDeEquipo | null;
   readonly hora: HoraDelEquipo | null;
   /** Consultas que no contestaron, con el motivo. Se enseñan, no se ocultan. */
   readonly sinRespuesta: readonly { readonly que: string; readonly motivo: string }[];
@@ -83,7 +97,7 @@ export const DESVIO_TOLERABLE_SEGUNDOS = 60;
 
 export interface OpcionesDeDiagnostico extends OpcionesDeEquipo {
   /** `camara` pide las consultas que sólo tienen sentido en una cámara. */
-  readonly familia: 'camara' | 'terminal' | 'videoportero' | 'comun';
+  readonly familia: FamiliaDiagnosticada;
   readonly ahoraDelServidor?: () => Date;
   /** Carril de la cámara. Si no se declaró, el VERIFICADO (ver `camara/carril.ts`). */
   readonly canal?: number;
@@ -134,6 +148,7 @@ export const diagnosticarEquipo = async (
   const contacto = await contactar(cliente, opciones);
   if (contacto.clase !== 'alcanzado') {
     return {
+      familia: opciones.familia,
       contacto,
       modelo: null,
       firmware: null,
@@ -144,6 +159,7 @@ export const diagnosticarEquipo = async (
       receptor: null,
       capacidades: null,
       reportaEstadoDeBarrera: null,
+      capacidadesDelEquipo: null,
       hora: null,
       sinRespuesta,
     };
@@ -180,7 +196,28 @@ export const diagnosticarEquipo = async (
     : null;
   const hora = await pedir('leer la hora del equipo', 'comun');
 
+  /**
+   * Las capacidades neutrales, con el mismo cliente y en la misma ronda. Un
+   * fallo aquí no vacía la ficha: se anota qué no se pudo leer y el resto se
+   * enseña. Una credencial rechazada a estas alturas no puede ocurrir —el
+   * contacto ya la aceptó—, y si ocurriera se anota igual, sin reintentar.
+   */
+  let capacidadesDelEquipo: CapacidadesDeEquipo | null = null;
+  try {
+    capacidadesDelEquipo = await descubrirCapacidades({
+      cliente,
+      familia: opciones.familia,
+      ...(opciones.canal === undefined ? {} : { canal: opciones.canal }),
+    });
+  } catch (error) {
+    sinRespuesta.push({
+      que: 'descubrir lo que el equipo declara poder hacer',
+      motivo: error instanceof Error ? error.message : 'no se pudo consultar',
+    });
+  }
+
   return {
+    familia: opciones.familia,
     contacto,
     modelo: identidad === null ? null : etiqueta(identidad, 'model'),
     firmware: identidad === null ? null : etiqueta(identidad, 'firmwareVersion'),
@@ -198,6 +235,7 @@ export const diagnosticarEquipo = async (
         })
       : null,
     reportaEstadoDeBarrera: barrera === null ? null : reportaEstadoDeBarrera(barrera),
+    capacidadesDelEquipo,
     hora:
       hora === null ? null : juzgarHora(hora, (opciones.ahoraDelServidor ?? (() => new Date()))()),
     sinRespuesta,
