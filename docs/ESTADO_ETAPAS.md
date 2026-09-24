@@ -1,7 +1,7 @@
 # Estado de las etapas
 
 **Proyecto:** Next Control Residencial · **Contrato:** `CLAUDE.md` v3.0
-**Última actualización:** 2026-09-23 · **ETAPA 15-C CERRADA · LA ETAPA 15 PASA A BLOQUEADA** · la 15-C cierra todo lo que la 15 puede cerrar sin hardware: `HikvisionProvider` con los cuatro puertos, el **punto de composición que ADR-003 prometía y no existía** (ADR-018), y el puerto `PlateEventSource` —declarado desde la ETAPA 05 y con cero implementaciones— por sus dos transportes. La guía ISAPI integral obligó a cuatro correcciones en código ya fusionado, y **dos fallaban en la dirección segura**, que es la peor forma de fallar bien: el modo de control se leía con una grafía que el esquema no usa, así que una cámara BIEN configurada se rechazaba; y la confianza de una lectura del 1 % entraba como certeza total. **La 15 no se cierra y vuelve al vocabulario que le corresponde —BLOQUEADA, `BE-02`—**: sus tres hitos técnicos y nueve indicadores siguen sin ejecutarse contra un aparato, y eso no depende de escribir más código · _(anterior: **RONDA `consola-superadmin-equipos`** · alta de equipos desde la consola con la clave cifrada, seis correcciones de consola y dos hallazgos de seguridad)_
+**Última actualización:** 2026-09-24 · **RONDA 15-D CERRADA · LA ETAPA 15 SIGUE BLOQUEADA** · la 15-D cierra D-25 (el motor decide con la base), elige el hardware por capacidades (ADR-019, con un fabricante inventado que pasa la suite de contrato y un control de CI), completa el CRUD de la consola con fotografía de visitante no biométrica (ADR-021), lleva terminal y videoportero al nivel de la cámara, saca la red del equipo del contrato (C-28) y repara el guion de sitio (D-132). Destapó **D-131**: ninguna autorización creada desde la consola existía contra base real desde la 09-B (ADR-020, S-38 por ratificar). Nada se ejecutó contra un aparato · _(anterior: **ETAPA 15-C CERRADA · LA ETAPA 15 PASA A BLOQUEADA** · la 15-C cierra todo lo que la 15 puede cerrar sin hardware: `HikvisionProvider` con los cuatro puertos, el **punto de composición que ADR-003 prometía y no existía** (ADR-018), y el puerto `PlateEventSource` —declarado desde la ETAPA 05 y con cero implementaciones— por sus dos transportes. La guía ISAPI integral obligó a cuatro correcciones en código ya fusionado, y **dos fallaban en la dirección segura**, que es la peor forma de fallar bien: el modo de control se leía con una grafía que el esquema no usa, así que una cámara BIEN configurada se rechazaba; y la confianza de una lectura del 1 % entraba como certeza total. **La 15 no se cierra y vuelve al vocabulario que le corresponde —BLOQUEADA, `BE-02`—**: sus tres hitos técnicos y nueve indicadores siguen sin ejecutarse contra un aparato, y eso no depende de escribir más código · _(anterior: **RONDA `consola-superadmin-equipos`** · alta de equipos desde la consola con la clave cifrada, seis correcciones de consola y dos hallazgos de seguridad)\_
 
 > **Regla añadida al DoD de toda etapa (usuario, 2026-09-08).** El cierre de una
 > etapa actualiza **la cabecera y el mapa de etapas de este documento**, no solo
@@ -18,16 +18,16 @@
 
 ## Resumen
 
-|                                |                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Etapas cerradas**            | **15 de 17** (ETAPAS 00 a 14) · **la ETAPA 15 pasa a BLOQUEADA**: su DoD exige los tres hitos técnicos con equipo real y el entorno no alcanza ningún aparato · más las rondas `consola-superadmin-equipos` y **15-C** (2026-09-23), que no son etapas: cierran lo que la 15 puede cerrar sin hardware                                                                                |
-| **Etapa siguiente habilitada** | **ETAPA 16 — Documentación técnica final y README**, ejecutable ya según §6 y de nuevo tras la 15. La mitad física de la 15 sigue bloqueada: 33 de 34 rutas por confirmar, nueve indicadores por medir y los tres hitos técnicos sin ejecutar                                                                                                                                         |
-| **Bloqueos activos**           | **BE-02 · la ETAPA 15 espera el equipo**: sin acceso físico a los aparatos no hay hitos técnicos ni KPI de latencia · **BE-01 · SMTP y URLs de redirección**, sin permisos en el panel (bloqueo de ENTORNO, no de código)                                                                                                                                                             |
-| **Defectos abiertos**          | **D-101** (roja intermitente de `@ncr/api`: **46 corridas, 2 apariciones**; la segunda, en la 15, **con nombre**: `xss.e2e.test.ts`. NO cerrada) y **D-29** (canal de tiempo real por proceso, declarado en la guía de despliegue) · **D-78 y D-34 CERRADAS en la 14** —y D-34 resultó ser una colisión de identificador— · más **H-13-25**, abierto a propósito a la espera de firma |
-| **Contradicciones abiertas**   | Ninguna (**18** registradas, 18 resueltas) — C-16, C-17 y C-18 añadidas en la 15-C                                                                                                                                                                                                                                                                                                    |
-| **Decisiones pendientes**      | 8 abiertas — **P-02 RESUELTA** (umbral de confianza: 80 en la escala 0–100 del evento ANPR) y **P-06 SUSTITUIDA** (el margen de latido deja de ser configurable) en la ronda 15-B · más **5 aceptaciones de riesgo redactadas y sin firmar** (AR-01 a AR-04 y el riesgo residual de `H-15B-1`)                                                                                        |
-| **Supuestos vigentes**         | 23 — nuevo **S-32** (el juego exacto de caracteres que el equipo admite en usuario y clave no se transcribió: lo implementado es más permisivo en los especiales e igual de estricto en lo que puede hacer daño) · S-31, S-30 y S-29 siguen vigentes                                                                                                                                  |
-| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                                                                                                                                                                                                                 |
+|                                |                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Etapas cerradas**            | **15 de 17** (ETAPAS 00 a 14) · **la ETAPA 15 sigue BLOQUEADA**: su DoD exige los tres hitos técnicos con equipo real y el entorno no alcanza ningún aparato · más las rondas `consola-superadmin-equipos`, **15-C** (2026-09-23) y **15-D** (2026-09-24), que no son etapas: cierran lo que la 15 puede cerrar sin hardware                              |
+| **Etapa siguiente habilitada** | **ETAPA 16 — Documentación técnica final y README**, ejecutable ya según §6 y de nuevo tras la 15. La mitad física de la 15 sigue bloqueada: 33 de 34 rutas por confirmar, nueve indicadores por medir y los tres hitos técnicos sin ejecutar                                                                                                             |
+| **Bloqueos activos**           | **BE-02 · la ETAPA 15 espera el equipo**: sin acceso físico a los aparatos no hay hitos técnicos ni KPI de latencia · **BE-01 · SMTP y URLs de redirección**, sin permisos en el panel (bloqueo de ENTORNO, no de código)                                                                                                                                 |
+| **Defectos abiertos**          | **D-101** (roja intermitente de `@ncr/api`: no reapareció en la 15-D; NO cerrada), **D-133** (control contra claves ajenas a tablas append-only, 15-D) y **D-29** (canal de tiempo real por proceso) · **D-25, D-130, D-131 y D-132 CERRADOS en la 15-D** · **D-78 y D-34 CERRADAS en la 14** · más **H-13-25**, abierto a propósito a la espera de firma |
+| **Contradicciones abiertas**   | Ninguna (**22** registradas, 22 resueltas) — C-28 a C-31 añadidas en la 15-D; C-28 revoca C-11                                                                                                                                                                                                                                                            |
+| **Decisiones pendientes**      | 8 abiertas — **P-02 RESUELTA** (umbral de confianza: 80 en la escala 0–100 del evento ANPR) y **P-06 SUSTITUIDA** (el margen de latido deja de ser configurable) en la ronda 15-B · más **5 aceptaciones de riesgo redactadas y sin firmar** (AR-01 a AR-04 y el riesgo residual de `H-15B-1`)                                                            |
+| **Supuestos vigentes**         | 23 — nuevo **S-32** (el juego exacto de caracteres que el equipo admite en usuario y clave no se transcribió: lo implementado es más permisivo en los especiales e igual de estricto en lo que puede hacer daño) · S-31, S-30 y S-29 siguen vigentes                                                                                                      |
+| **Extensiones al contrato**    | 1 — E-01 `FUERA_DE_HORARIO`, aprobada                                                                                                                                                                                                                                                                                                                     |
 
 ---
 
@@ -887,6 +887,50 @@ está en `.gitignore`, correctamente: es documentación propiedad del fabricante
 el capítulo no se pudo citar por número. El catálogo lleva un campo `capitulo`
 relleno con **el tema** —«identidad del equipo», «control de la barrera»— y la
 sustitución por la referencia exacta queda como deuda mecánica.
+
+---
+
+## Ronda `etapa-15d-integracion-extensible` — consolidación funcional, desacople de hardware y cierre de D-25 · **CERRADA** · 2026-09-24
+
+**Rama:** `etapa-15d-integracion-extensible` · **Base:** `develop` (`e075e82`)
+**Informe:** [`etapas/ETAPA-15-D-consolidacion.md`](etapas/ETAPA-15-D-consolidacion.md) ·
+**Decisiones:** [`ADR-019`](decisiones/ADR-019-el-hardware-se-elige-por-capacidades.md) ·
+[`ADR-020`](decisiones/ADR-020-el-autorizante-desde-la-consola-es-el-titular.md) ·
+[`ADR-021`](decisiones/ADR-021-la-fotografia-del-visitante-no-es-dato-biometrico.md) ·
+**Seguridad:** [`seguridad/AUDITORIA-EXPOSICION-15D.md`](seguridad/AUDITORIA-EXPOSICION-15D.md)
+
+> **Esta ronda NO cierra la ETAPA 15, que sigue BLOQUEADA (`BE-02`).** Nada de
+> lo que trae se ejecutó contra un aparato; todo está clasificado en el informe
+> como documentado, simulado o probado contra mock. Lo que sí cierra es lo que
+> el motor, la consola y el paquete de proveedores tenían a medias.
+
+### Lo que faltaba y ahora está
+
+| Qué                                                                                     | Por qué importaba                                                                                                                                           |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D-25 cerrado**: el motor lee autorizaciones, padrón y lista negra de la base          | Hasta aquí toda lectura de placa era `FALLO_TECNICO`; el motor era decorativo contra base real                                                              |
+| **El hardware se elige por capacidades** (ADR-019)                                      | Nada impedía un `if (fabricante === …)`; ahora un fabricante inventado pasa la suite de contrato y un control de CI vigila que siga siendo así              |
+| **CRUD completo de la consola**: zonas, viviendas, vehículos, visitantes con fotografía | Zonas no se creaban; vehículos y viviendas no se editaban; el visitante no tenía foto. Y **ninguna autorización de la consola existía contra base** (D-131) |
+| **Terminal y videoportero al nivel de la cámara** (O4)                                  | Recibían la ficha de una cámara con cinco «sin comprobar» que no les aplicaban y ninguno de sus propios veredictos; D-130 no se cotejaba con el equipo      |
+| **Ninguna respuesta lleva la red del equipo** (C-28)                                    | La dirección privada salía en el tablero y en el inventario para los administradores; §7.1 lo prohíbe y la VLAN de H-15-1 perdía sentido                    |
+| **El guion de sitio funciona otra vez** (D-132)                                         | Llevaba roto desde la 15-C sin que nada lo ejecutara; ahora tiene entrada propia, ficha por familia, KPI-13/32 y proxy de KPI-33, y modo `--simulado`       |
+
+### Lo que se encontró por el camino
+
+| Id        | Qué                                                                                                                           | Estado                                   |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **D-131** | `autorizado_por` recibía el usuario de la consola y el disparador RN-05 lo rechazaba: cinco rondas de falso verde con dobles  | Corregido · ADR-020 · S-38 por ratificar |
+| **D-132** | El guion de puesta en marcha importaba símbolos que el barril ya no exporta                                                   | Corregido · `@ncr/providers/operacion`   |
+| **D-133** | Tercera clave ajena hacia una tabla append-only (0034); falta el control que lo impida                                        | **Abierto** · ETAPA 16                   |
+| **D-130** | El modo de la terminal ahora se coteja con lo que el equipo declara: «decide sola» es `decide_solo` salvo declaración expresa | Corregido contra simulado                |
+
+### Contradicciones y supuestos registrados
+
+**C-28** (Alta) · la red del equipo fuera del contrato, revoca C-11 · **C-29**
+(Media) · clave ajena hacia `evidencias` frente a ADR-005 · **C-30** (Media) · el
+barril mínimo frente al guion de sitio · **C-31** (Alta) · RN-05 y la
+autorización creada desde la consola. **S-35 a S-38**; S-38 pendiente de
+ratificación del cliente.
 
 ---
 
