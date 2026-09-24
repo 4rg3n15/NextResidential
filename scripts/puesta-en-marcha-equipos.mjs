@@ -83,7 +83,7 @@ import { fileURLToPath } from 'node:url';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 /**
- * ETAPA 15-D · la entrada de OPERACIÓN del paquete, no su barril (D-114). El
+ * ETAPA 15-D · la entrada de OPERACIÓN del paquete, no su barril (D-132). El
  * barril es la API pública para la aplicación y la 15-C lo dejó mínimo a
  * propósito: sin catálogo, sin cliente, sin jueces. Este guion es el único que
  * los necesita, y los recibe por una entrada propia.

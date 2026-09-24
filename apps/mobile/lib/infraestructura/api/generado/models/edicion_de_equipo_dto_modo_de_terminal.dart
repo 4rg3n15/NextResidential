@@ -5,17 +5,17 @@
 import 'package:json_annotation/json_annotation.dart';
 
 @JsonEnum()
-enum EquipoDtoProtocolo {
-  @JsonValue('http')
-  http('http'),
-  @JsonValue('https')
-  https('https'),
+enum EdicionDeEquipoDtoModoDeTerminal {
+  @JsonValue('reporta_y_espera')
+  reportaYEspera('reporta_y_espera'),
+  @JsonValue('decide_el_equipo')
+  decideElEquipo('decide_el_equipo'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 
-  const EquipoDtoProtocolo(this.json);
+  const EdicionDeEquipoDtoModoDeTerminal(this.json);
 
-  factory EquipoDtoProtocolo.fromJson(String json) => values.firstWhere(
+  factory EdicionDeEquipoDtoModoDeTerminal.fromJson(String json) => values.firstWhere(
         (e) => e.json == json,
         orElse: () => $unknown,
       );
@@ -33,5 +33,5 @@ enum EquipoDtoProtocolo {
   @override
   String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
-  static List<EquipoDtoProtocolo> get $valuesDefined => values.where((value) => value != $unknown).toList();
+  static List<EdicionDeEquipoDtoModoDeTerminal> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }

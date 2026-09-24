@@ -1485,7 +1485,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AltaDeEquipoDto"
+                "$ref": "#/components/schemas/EdicionDeEquipoDto"
               }
             }
           }
@@ -6149,15 +6149,6 @@
             "format": "uuid",
             "nullable": true
           },
-          "host": {
-            "type": "string",
-            "nullable": true,
-            "description": "IP o FQDN del equipo. Solo se rellena para roles administrativos (C-11); para el resto llega null. NUNCA sale la credencial ni su referencia (RN-21)."
-          },
-          "puerto": {
-            "type": "number",
-            "nullable": true
-          },
           "modelo": {
             "type": "string",
             "nullable": true
@@ -6210,8 +6201,6 @@
           "nombre",
           "tipo",
           "zonaId",
-          "host",
-          "puerto",
           "modelo",
           "firmware",
           "estado",
@@ -6232,6 +6221,78 @@
         "required": [
           "editado"
         ]
+      },
+      "EdicionDeEquipoDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "camara_lpr",
+              "terminal_facial",
+              "intercom",
+              "rele",
+              "controlador_io"
+            ]
+          },
+          "host": {
+            "type": "string",
+            "example": "203.0.113.10"
+          },
+          "puerto": {
+            "type": "number",
+            "example": 80
+          },
+          "protocolo": {
+            "type": "string",
+            "enum": [
+              "http",
+              "https"
+            ],
+            "default": "http"
+          },
+          "usuario": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "secreto": {
+            "type": "string",
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "canalBarrera": {
+            "type": "number"
+          },
+          "numeroDePuerta": {
+            "type": "number"
+          },
+          "canalDeAudio": {
+            "type": "number"
+          },
+          "fabricante": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "modoDeTerminal": {
+            "type": "string",
+            "enum": [
+              "reporta_y_espera",
+              "decide_el_equipo"
+            ]
+          },
+          "canalDeAudioHabilitado": {
+            "type": "boolean",
+            "default": false
+          },
+          "probarConexion": {
+            "type": "boolean",
+            "default": true
+          }
+        }
       },
       "EditarVehiculoDto": {
         "type": "object",
@@ -6388,23 +6449,6 @@
               "controlador_io"
             ]
           },
-          "host": {
-            "type": "string"
-          },
-          "puerto": {
-            "type": "number"
-          },
-          "protocolo": {
-            "type": "string",
-            "enum": [
-              "http",
-              "https"
-            ]
-          },
-          "usuario": {
-            "type": "string",
-            "nullable": true
-          },
           "modelo": {
             "type": "string",
             "nullable": true
@@ -6476,10 +6520,6 @@
           "id",
           "nombre",
           "tipo",
-          "host",
-          "puerto",
-          "protocolo",
-          "usuario",
           "modelo",
           "firmware",
           "canalBarrera",

@@ -7,7 +7,7 @@
  * fabricante (KPI-11). Pero el guion de puesta en marcha en sitio sí necesita
  * exactamente eso —recorrer el catálogo ruta por ruta y decir cuál contesta—,
  * y al perder el barril esas exportaciones se quedó roto sin que nada lo
- * detectara (D-114, ETAPA 15-D).
+ * detectara (D-132, ETAPA 15-D).
  *
  * Esta entrada existe para ese único consumidor y se publica como subruta
  * `@ncr/providers/operacion`. El control de extensibilidad sigue vigente: nada

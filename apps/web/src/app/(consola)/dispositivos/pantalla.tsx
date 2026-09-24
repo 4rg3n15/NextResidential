@@ -231,19 +231,15 @@ export const PantallaDeDispositivos = ({
       ),
     },
     {
-      clave: 'red',
-      titulo: 'Dirección · firmware',
-      texto: (d) => `${d.host ?? ''} ${d.firmware ?? ''}`,
+      // Sin dirección ni puerto (ETAPA 15-D, §7.1): la red del conjunto no llega
+      // a este navegador. Con el equipo habla el servidor.
+      clave: 'modelo',
+      titulo: 'Modelo · firmware',
+      texto: (d) => `${d.modelo ?? ''} ${d.firmware ?? ''}`,
       celda: (d) => (
-        <div>
-          <p className="font-mono text-secundario text-texto">
-            {d.host ?? '—'}
-            {d.puerto === null ? '' : `:${d.puerto}`}
-          </p>
-          <p className="text-secundario text-texto-apagado">
-            {d.modelo ?? 'Modelo sin registrar'} · {d.firmware ?? 'firmware desconocido'}
-          </p>
-        </div>
+        <p className="text-secundario text-texto-apagado">
+          {d.modelo ?? 'Modelo sin registrar'} · {d.firmware ?? 'firmware desconocido'}
+        </p>
       ),
     },
     {
@@ -460,7 +456,7 @@ export const PantallaDeDispositivos = ({
         filas={equipos}
         claveDeFila={(d) => d.id}
         cargando={consulta.isLoading}
-        buscador={{ marcador: 'Buscar por nombre, tipo o dirección' }}
+        buscador={{ marcador: 'Buscar por nombre, tipo o modelo' }}
         vacio={{
           titulo: 'Sin dispositivos',
           descripcion:

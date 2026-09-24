@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsIn,
@@ -119,6 +119,17 @@ export class AltaDeEquipoDto {
   probarConexion?: boolean;
 }
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * EDICIÓN · todo opcional, y lo ausente se CONSERVA (§6.1: leer-modificar-escribir)
+ *
+ * El cliente no recibe nunca la dirección ni el usuario del equipo (§7.1), así
+ * que tampoco puede reenviarlos «tal cual» al editar. Lo que no viene, se deja
+ * como está; lo que viene, sustituye. El secreto sigue la misma regla desde la
+ * 15-B: ausente = no lo cambies.
+ */
+export class EdicionDeEquipoDto extends PartialType(AltaDeEquipoDto) {}
+
 export class BajaDeEquipoDto {
   @ApiProperty({ type: String, maxLength: 300 })
   @IsString()
@@ -162,14 +173,16 @@ export class CapacidadesDeEquipoDto {
   @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) estadoDeBarrera!: string;
 }
 
+/**
+ * Lo que la consola RECIBE de un equipo. **Sin dirección, puerto, protocolo ni
+ * usuario** (ETAPA 15-D, §7.1): el cliente nunca necesita conocer la red
+ * privada del conjunto; con el equipo habla el servidor. Hasta la 15-C la
+ * dirección salía para los roles administrativos (C-11); C-28 lo revoca.
+ */
 export class EquipoDto {
   @ApiProperty({ type: String }) id!: string;
   @ApiProperty({ type: String }) nombre!: string;
   @ApiProperty({ type: String, enum: TIPOS_DE_EQUIPO }) tipo!: string;
-  @ApiProperty({ type: String }) host!: string;
-  @ApiProperty({ type: Number }) puerto!: number;
-  @ApiProperty({ type: String, enum: ['http', 'https'] }) protocolo!: string;
-  @ApiProperty({ type: String, nullable: true }) usuario!: string | null;
   @ApiProperty({ type: String, nullable: true }) modelo!: string | null;
   @ApiProperty({ type: String, nullable: true }) firmware!: string | null;
   @ApiProperty({ type: Number, nullable: true }) canalBarrera!: number | null;

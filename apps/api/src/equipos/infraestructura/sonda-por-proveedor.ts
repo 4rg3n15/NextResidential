@@ -35,6 +35,15 @@ import type { DatosDeSondeo, ResultadoDeSondeo, SondaDeEquipo } from '../aplicac
 const familiaDe = (tipo: DatosDeSondeo['tipo']): 'camara' | 'terminal' | 'videoportero' =>
   tipo === 'terminal_facial' ? 'terminal' : tipo === 'intercom' ? 'videoportero' : 'camara';
 
+/**
+ * §7.1 · la dirección del equipo NO forma parte del contrato público. En el
+ * detalle de «inalcanzable» se nombra ELIDIDA —lo justo para reconocerla—: quien
+ * la tecleó hace un momento la reconoce, y quien lee la ficha de un equipo en
+ * servicio no se la lleva.
+ */
+export const elidir = (texto: string): string =>
+  texto.length <= 4 ? '****' : `${texto.slice(0, 2)}…${texto.slice(-2)}`;
+
 export const AVISO_DE_CREDENCIAL =
   'El equipo rechazó el usuario o la clave. NO vuelva a intentarlo a ciegas: ' +
   'estos aparatos bloquean la cuenta tras unos pocos intentos fallidos. ' +
@@ -96,7 +105,7 @@ export class SondaPorProveedor implements SondaDeEquipo {
         clase: 'inalcanzable',
         // Host y puerto SÍ se nombran: es lo que hay que revisar. El secreto no
         // aparece por ninguna parte, tampoco en el texto del error.
-        detalle: `${diagnostico.contacto.detalle} (${datos.host}:${String(datos.puerto)} por ${datos.protocolo.toUpperCase()})`,
+        detalle: `${diagnostico.contacto.detalle.replaceAll(datos.host, elidir(datos.host))} (${elidir(datos.host)}:${String(datos.puerto)} por ${datos.protocolo.toUpperCase()})`,
         verificado: false,
       };
     }

@@ -39,6 +39,7 @@ import {
   FichaDelEquipoDto,
   ResultadoDeCorreccionDto,
   ResultadoDeSondeoDto,
+  EdicionDeEquipoDto,
 } from './dtos';
 
 /**
@@ -109,8 +110,66 @@ export class EquiposController {
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
 
+  /**
+   * Campo a campo y NUNCA con `spread` (§7.1): `DatosDeEquipo` lleva host,
+   * puerto, protocolo y usuario porque la sonda y el corrector los necesitan
+   * en el servidor; ninguno cruza al cliente.
+   */
   private aDto(e: DatosDeEquipo): EquipoDto {
-    return { ...e, capacidades: e.capacidades === null ? null : aCapacidades(e.capacidades) };
+    return {
+      id: e.id,
+      nombre: e.nombre,
+      tipo: e.tipo,
+      modelo: e.modelo,
+      firmware: e.firmware,
+      canalBarrera: e.canalBarrera,
+      numeroDePuerta: e.numeroDePuerta,
+      canalDeAudio: e.canalDeAudio,
+      fabricante: e.fabricante,
+      modoDeTerminal: e.modoDeTerminal,
+      canalDeAudioHabilitado: e.canalDeAudioHabilitado,
+      capacidades: e.capacidades === null ? null : aCapacidades(e.capacidades),
+      verificacion: e.verificacion,
+      verificadoEn: e.verificadoEn,
+      motivoNoVerificado: e.motivoNoVerificado,
+      estado: e.estado,
+    };
+  }
+
+  /**
+   * O5 · la edición llega PARCIAL: lo ausente se conserva de lo guardado
+   * (leer-modificar-escribir, §6.1). El cliente no conoce la dirección ni el
+   * usuario, así que no puede reenviarlos; y «ausente» nunca significa «borra».
+   */
+  private altaDesdeEdicion(dto: EdicionDeEquipoDto, actual: DatosDeEquipo): AltaDeEquipoDto {
+    const fusion = new AltaDeEquipoDto();
+    Object.assign(fusion, {
+      nombre: dto.nombre ?? actual.nombre,
+      tipo: dto.tipo ?? actual.tipo,
+      host: dto.host ?? actual.host,
+      puerto: dto.puerto ?? actual.puerto,
+      protocolo: dto.protocolo ?? actual.protocolo,
+      usuario: dto.usuario ?? actual.usuario ?? '',
+      ...(dto.secreto === undefined ? {} : { secreto: dto.secreto }),
+      ...((dto.canalBarrera ?? actual.canalBarrera ?? undefined) === undefined
+        ? {}
+        : { canalBarrera: dto.canalBarrera ?? actual.canalBarrera }),
+      ...((dto.numeroDePuerta ?? actual.numeroDePuerta ?? undefined) === undefined
+        ? {}
+        : { numeroDePuerta: dto.numeroDePuerta ?? actual.numeroDePuerta }),
+      ...((dto.canalDeAudio ?? actual.canalDeAudio ?? undefined) === undefined
+        ? {}
+        : { canalDeAudio: dto.canalDeAudio ?? actual.canalDeAudio }),
+      ...((dto.fabricante ?? actual.fabricante ?? undefined) === undefined
+        ? {}
+        : { fabricante: dto.fabricante ?? actual.fabricante }),
+      ...((dto.modoDeTerminal ?? actual.modoDeTerminal ?? undefined) === undefined
+        ? {}
+        : { modoDeTerminal: dto.modoDeTerminal ?? actual.modoDeTerminal }),
+      canalDeAudioHabilitado: dto.canalDeAudioHabilitado ?? actual.canalDeAudioHabilitado,
+      ...(dto.probarConexion === undefined ? {} : { probarConexion: dto.probarConexion }),
+    });
+    return fusion;
   }
 
   private altaDesdeDto(dto: AltaDeEquipoDto): AltaDeEquipo {
@@ -234,11 +293,14 @@ export class EquiposController {
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('equipoId', ParseUUIDPipe) equipoId: string,
-    @Body() dto: AltaDeEquipoDto,
+    @Body() dto: EdicionDeEquipoDto,
   ): Promise<EquipoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/edicion');
+    const actual = (await this.repo.listar(ctx, copropiedadId)).find((e) => e.id === equipoId);
+    if (actual === undefined) throw new NotFoundException('No se encontró el equipo');
+    const completo = this.altaDesdeEdicion(dto, actual);
     const veredicto = await this.sondear(
-      dto,
+      completo,
       dto.secreto === undefined
         ? await this.repo.credencialPara(ctx, copropiedadId, equipoId)
         : null,
@@ -247,7 +309,7 @@ export class EquiposController {
       ctx,
       copropiedadId,
       equipoId,
-      this.altaDesdeDto(dto),
+      this.altaDesdeDto(completo),
       veredicto,
     );
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');

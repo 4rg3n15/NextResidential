@@ -1913,9 +1913,6 @@ export interface components {
             tipo: "camara_lpr" | "terminal_facial" | "rele" | "intercom" | "controlador_io";
             /** Format: uuid */
             zonaId: string | null;
-            /** @description IP o FQDN del equipo. Solo se rellena para roles administrativos (C-11); para el resto llega null. NUNCA sale la credencial ni su referencia (RN-21). */
-            host: string | null;
-            puerto: number | null;
             modelo: string | null;
             firmware: string | null;
             /**
@@ -1938,6 +1935,32 @@ export interface components {
         };
         EdicionAplicadaDto: {
             editado: boolean;
+        };
+        EdicionDeEquipoDto: {
+            nombre?: string;
+            /** @enum {string} */
+            tipo?: "camara_lpr" | "terminal_facial" | "intercom" | "rele" | "controlador_io";
+            /** @example 203.0.113.10 */
+            host?: string;
+            /** @example 80 */
+            puerto?: number;
+            /**
+             * @default http
+             * @enum {string}
+             */
+            protocolo: "http" | "https";
+            usuario?: string;
+            secreto?: string;
+            canalBarrera?: number;
+            numeroDePuerta?: number;
+            canalDeAudio?: number;
+            fabricante?: string;
+            /** @enum {string} */
+            modoDeTerminal?: "reporta_y_espera" | "decide_el_equipo";
+            /** @default false */
+            canalDeAudioHabilitado: boolean;
+            /** @default true */
+            probarConexion: boolean;
         };
         EditarVehiculoDto: {
             placa?: string;
@@ -1984,11 +2007,6 @@ export interface components {
             nombre: string;
             /** @enum {string} */
             tipo: "camara_lpr" | "terminal_facial" | "intercom" | "rele" | "controlador_io";
-            host: string;
-            puerto: number;
-            /** @enum {string} */
-            protocolo: "http" | "https";
-            usuario: string | null;
             modelo: string | null;
             firmware: string | null;
             canalBarrera: number | null;
@@ -3766,7 +3784,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AltaDeEquipoDto"];
+                "application/json": components["schemas"]["EdicionDeEquipoDto"];
             };
         };
         responses: {

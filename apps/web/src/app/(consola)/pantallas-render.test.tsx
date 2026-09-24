@@ -126,8 +126,6 @@ const DISPOSITIVO = {
   // Nombre de equipo y NO una IP: KPI-11 prohíbe direccionamiento con forma
   // real fuera de `packages/providers`, y un dato de prueba con esa forma acaba
   // copiado en un fichero de configuración. Ya ocurrió en la 09-A.
-  host: 'talanquera.equipo.invalid',
-  puerto: 80,
   modelo: 'Modelo X',
   firmware: 'v1.2',
   estado: 'saludable',
@@ -263,7 +261,8 @@ describe('dispositivos', () => {
   it('muestra inventario y estado «sincronizando» cuando hay una orden encolada', async () => {
     montar(<PantallaDeDispositivos copropiedadId={COP} />);
     await waitFor(() => expect(screen.getByText('Talanquera principal')).toBeDefined());
-    expect(screen.getByText('talanquera.equipo.invalid:80')).toBeDefined();
+    // §7.1 (C-28): la dirección del equipo ya no llega ni se pinta.
+    expect(screen.queryByText(/\.invalid/)).toBeNull();
     await waitFor(() => expect(screen.getByText('Sincronizando')).toBeDefined());
   });
 
@@ -339,7 +338,9 @@ describe('dispositivos', () => {
     // de bóveda entre los datos del equipo.
     const tabla = screen.getByRole('table').textContent ?? '';
     expect(tabla).not.toMatch(/vault:|env:|contrase|secret|password/i);
-    expect(tabla).toContain('talanquera.equipo.invalid');
+    // Y tampoco la dirección: desde la 15-D la API no la envía a nadie (§7.1).
+    expect(tabla).not.toMatch(/\.invalid|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/);
+    expect(tabla).toContain('Talanquera principal');
   });
 });
 

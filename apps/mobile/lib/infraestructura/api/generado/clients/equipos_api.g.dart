@@ -113,7 +113,7 @@ class _EquiposApi implements EquiposApi {
   Future<EquipoDto> equiposControllerEditar({
     required String id,
     required String equipoId,
-    required AltaDeEquipoDto body,
+    required EdicionDeEquipoDto body,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};

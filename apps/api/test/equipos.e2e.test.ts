@@ -321,14 +321,16 @@ describe('A.3 · «probar conexión» distingue cuatro situaciones, no una', () 
     expect(r.verificado).toBe(false);
   });
 
-  it('inalcanzable: nombra host y puerto, y NUNCA el secreto', async () => {
+  it('inalcanzable: nombra el host ELIDIDO y el puerto, y NUNCA el secreto (§7.1)', async () => {
     const r = await new SondaPorProveedor((() =>
       Promise.reject(new Error('connect ECONNREFUSED'))) as typeof fetch).probar({
       ...ALTA,
       tipo: 'camara_lpr',
     });
     expect(r.clase).toBe('inalcanzable');
-    expect(r.detalle).toContain('203.0.113.10:80');
+    // Lo justo para reconocerla; la dirección completa no forma parte del contrato.
+    expect(r.detalle).toContain('20…10:80');
+    expect(r.detalle).not.toContain('203.0.113.10');
     expect(r.detalle).not.toContain(ALTA.secreto);
     expect(r.verificado).toBe(false);
   });
@@ -564,5 +566,72 @@ describe('O4 · la ficha es por tipo y el sondeo posterior usa la clave guardada
     expect(editado.body.nombre).toBe('Terminal renombrada');
     expect(editado.body.verificacion).toBe('verificado');
     expect(editado.body.capacidades?.verificacionRemota).toBe('si');
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O5 · §7.1 · EL CLIENTE NUNCA CONOCE LA RED DEL CONJUNTO
+ *
+ * Hasta la 15-C la dirección, el puerto y el usuario del equipo volvían en el
+ * alta y en el listado (C-11 los consideraba inventario). C-28 lo revoca: con
+ * el equipo habla el servidor, y lo que no cruza no se puede filtrar. La
+ * edición pasa a ser PARCIAL: lo que no viene se conserva de lo guardado.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('O5 · ninguna respuesta lleva dirección, puerto, protocolo ni usuario del equipo', () => {
+  it('ni el alta ni el listado ni la ficha: los campos NO EXISTEN en la respuesta', async () => {
+    const { app: a, firmante } = await conEquipos({ probar: async () => ALCANZADO });
+    const token = await tokenDe(firmante, { rol: 'superadministrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(ALTA)
+      .expect(201);
+    for (const campo of ['host', 'puerto', 'protocolo', 'usuario', 'secreto']) {
+      expect(creado.body).not.toHaveProperty(campo);
+    }
+    const lista = await request(a.getHttpServer())
+      .get(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const cuerpo = JSON.stringify(lista.body);
+    expect(cuerpo).not.toContain(ALTA.host);
+    expect(cuerpo).not.toContain(ALTA.usuario);
+    expect(cuerpo).not.toContain(ALTA.secreto);
+  });
+
+  it('editar es PARCIAL: sólo el nombre viaja y la dirección guardada sigue sirviendo para sondear', async () => {
+    const sondeos: { host: string; usuario: string }[] = [];
+    const {
+      app: a,
+      repo,
+      firmante,
+    } = await conEquipos({
+      probar: async (d) => {
+        sondeos.push(d as { host: string; usuario: string });
+        return ALCANZADO;
+      },
+    });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, canalBarrera: 2 })
+      .expect(201);
+    const antes = repo.sobreDe(COP_B, creado.body.id as string);
+
+    const editado = await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Cámara renombrada' })
+      .expect(200);
+    expect(editado.body.nombre).toBe('Cámara renombrada');
+    expect(editado.body.canalBarrera).toBe(2);
+    expect(editado.body.verificacion).toBe('verificado');
+    // El sondeo de la edición usó la dirección y el usuario GUARDADOS, que el
+    // cliente nunca vio, y el sobre del secreto no se tocó.
+    expect(sondeos.at(-1)).toMatchObject({ host: ALTA.host, usuario: ALTA.usuario });
+    expect(repo.sobreDe(COP_B, creado.body.id as string)).toEqual(antes);
   });
 });

@@ -25,6 +25,7 @@ import {
   RegistroDeBloqueosEnMemoria,
 } from './infraestructura/adaptadores-en-memoria';
 import { AccionadorSegunDispositivo } from './infraestructura/accionador-segun-dispositivo';
+import { anunciarAccionador } from './infraestructura/aviso-de-arranque-del-accionador';
 
 /**
  * Consolas operativas — ETAPA 10.
@@ -61,13 +62,20 @@ export class GuardiaModule {
            */
           provide: ACCIONADOR_DE_PUERTA,
           inject: [BITACORA],
-          useFactory: (bitacora: Bitacora) =>
-            new AccionadorSegunDispositivo(
+          useFactory: (bitacora: Bitacora) => {
+            const real = crearControlDeBarreraDesdeEntorno();
+            const dispositivoReal = (process.env['BARRERA_DISPOSITIVO_ID'] ?? '').trim();
+            // O5 · qué accionador quedó activo se DICE al arrancar, con su
+            // consecuencia: un simulado que entra en silencio abre «con éxito»
+            // en la bitácora y no mueve ningún brazo.
+            anunciarAccionador(bitacora, { hayControlReal: real !== null, dispositivoReal });
+            return new AccionadorSegunDispositivo(
               new AccionadorSimulado(bitacora),
               bitacora,
-              crearControlDeBarreraDesdeEntorno(),
-              (process.env['BARRERA_DISPOSITIVO_ID'] ?? '').trim(),
-            ),
+              real,
+              dispositivoReal,
+            );
+          },
         },
         {
           // El mismo objeto atiende los dos puertos: es un aparato, no dos.

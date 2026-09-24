@@ -135,10 +135,13 @@ export const AltaDeEquipo = ({
     if (!abierto) return;
     setNombre(equipo?.nombre ?? '');
     setTipo(equipo?.tipo ?? 'camara_lpr');
-    setHost(equipo?.host ?? '');
-    setPuerto(String(equipo?.puerto ?? 80));
-    setProtocolo(equipo?.protocolo ?? 'http');
-    setUsuario(equipo?.usuario ?? '');
+    // La dirección, el puerto, el protocolo y el usuario NO llegan al navegador
+    // (§7.1): al editar arrancan en blanco y en blanco significan «conserva lo
+    // guardado». Sólo se escriben para cambiarlos.
+    setHost('');
+    setPuerto(editando ? '' : '80');
+    setProtocolo('http');
+    setUsuario('');
     setSecreto('');
     setFabricante(equipo?.fabricante ?? '');
     setModoDeTerminal(equipo?.modoDeTerminal ?? 'reporta_y_espera');
@@ -155,10 +158,11 @@ export const AltaDeEquipo = ({
   const cuerpo = (): Record<string, unknown> => ({
     nombre: nombre.trim(),
     tipo,
-    host: host.trim(),
-    puerto: numero(puerto) ?? 80,
-    protocolo,
-    usuario: usuario.trim(),
+    // Al editar, lo vacío no viaja: el servidor conserva lo guardado (§6.1).
+    ...(editando && host.trim() === '' ? {} : { host: host.trim() }),
+    ...(editando && puerto.trim() === '' ? {} : { puerto: numero(puerto) ?? 80 }),
+    ...(editando && host.trim() === '' ? {} : { protocolo }),
+    ...(editando && usuario.trim() === '' ? {} : { usuario: usuario.trim() }),
     ...(secreto === '' ? {} : { secreto }),
     ...(campoEspecifico === null ? {} : { [campoEspecifico.clave]: numero(especifico) ?? 1 }),
     ...(fabricante.trim() === '' ? {} : { fabricante: fabricante.trim() }),
@@ -178,9 +182,9 @@ export const AltaDeEquipo = ({
 
   const completo =
     nombre.trim() !== '' &&
-    host.trim() !== '' &&
-    usuario.trim() !== '' &&
-    // Al editar, la clave en blanco CONSERVA la guardada: no es un campo vacío.
+    // Al editar, dirección, usuario y clave en blanco CONSERVAN lo guardado.
+    (editando || host.trim() !== '') &&
+    (editando || usuario.trim() !== '') &&
     (editando || secreto !== '') &&
     rechazoDeNombre === null &&
     rechazoDeUsuario === null &&
@@ -286,11 +290,15 @@ export const AltaDeEquipo = ({
 
       <div className="grid grid-cols-[2fr_1fr] gap-2">
         <Campo
-          etiqueta="Dirección del equipo"
+          etiqueta={editando ? 'Nueva dirección del equipo (opcional)' : 'Dirección del equipo'}
           value={host}
           onChange={(e) => setHost(e.target.value)}
-          ayuda="La IP fija del aparato en la red del conjunto."
-          required
+          ayuda={
+            editando
+              ? 'La guardada no se muestra: el navegador nunca conoce la red del conjunto. En blanco se conserva.'
+              : 'La IP fija del aparato en la red del conjunto. No vuelve a mostrarse: con el equipo habla el servidor.'
+          }
+          required={!editando}
         />
         <Campo
           etiqueta="Puerto"
@@ -328,11 +336,15 @@ export const AltaDeEquipo = ({
       </fieldset>
 
       <Campo
-        etiqueta="Usuario del equipo"
+        etiqueta={editando ? 'Nuevo usuario del equipo (opcional)' : 'Usuario del equipo'}
         value={usuario}
         onChange={(e) => setUsuario(e.target.value)}
-        ayuda="Use un usuario de servicio con el mínimo privilegio, no el de fábrica: la guía del fabricante define un perfil de OPERADOR, y es el que hace falta."
-        required
+        ayuda={
+          editando
+            ? 'En blanco se conserva el guardado.'
+            : 'Use un usuario de servicio con el mínimo privilegio, no el de fábrica: la guía del fabricante define un perfil de OPERADOR, y es el que hace falta.'
+        }
+        required={!editando}
         {...(rechazoDeUsuario === null ? {} : { error: rechazoDeUsuario })}
       />
       <Campo
@@ -438,14 +450,14 @@ export const AltaDeEquipo = ({
           variante="secundario"
           tamano="sm"
           type="button"
-          disabled={!completo || enviando || (editando && secreto === '')}
+          disabled={!completo || enviando || editando}
           onClick={() => void probar()}
         >
           Probar conexión
         </Boton>
         <span className="text-secundario text-texto-apagado">
-          {editando && secreto === ''
-            ? 'Con la clave en blanco, el sondeo lo hace el servidor al guardar, con la guardada.'
+          {editando
+            ? 'Al guardar, el servidor vuelve a sondear el equipo con lo guardado y lo que cambie aquí.'
             : 'La prueba la hace el servidor, no este navegador.'}
         </span>
       </div>

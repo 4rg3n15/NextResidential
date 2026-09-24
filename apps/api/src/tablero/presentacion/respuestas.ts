@@ -106,16 +106,8 @@ export class DispositivoDelTableroDto {
 
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) zonaId!: string | null;
 
-  @ApiProperty({
-    type: String,
-    nullable: true,
-    description:
-      'IP o FQDN del equipo. Solo se rellena para roles administrativos (C-11); ' +
-      'para el resto llega null. NUNCA sale la credencial ni su referencia (RN-21).',
-  })
-  host!: string | null;
-
-  @ApiProperty({ type: Number, nullable: true }) puerto!: number | null;
+  // Sin `host` ni `puerto` desde la ETAPA 15-D (§7.1, C-28): la red privada del
+  // conjunto no forma parte del contrato público. La credencial nunca salió (RN-21).
   @ApiProperty({ type: String, nullable: true }) modelo!: string | null;
   @ApiProperty({ type: String, nullable: true }) firmware!: string | null;
 

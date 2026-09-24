@@ -93,9 +93,8 @@ export class TableroController {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'tablero/dispositivos');
     const r = await sinCopropiedad(() => this.dispositivos.ejecutar(copropiedadId));
 
-    // C-11 · el direccionamiento del equipo es dato de inventario, no secreto,
-    // pero solo lo ven los roles administrativos. Se decide AQUÍ, en el borde,
-    // y no en la consulta: el caso de uso no debe conocer el rol de quien mira.
+    // C-28 (ETAPA 15-D, §7.1) · el direccionamiento del equipo ya NO sale para
+    // nadie. El firmware sigue siendo de inventario y lo ven los administrativos.
     const administrativo = ROLES_ADMINISTRATIVOS.includes(ctx.rol);
     return {
       dispositivos: r.dispositivos.map(
@@ -104,8 +103,6 @@ export class TableroController {
           nombre: d.nombre,
           tipo: d.tipo,
           zonaId: d.zonaId,
-          host: administrativo ? d.host : null,
-          puerto: administrativo ? d.puerto : null,
           modelo: d.modelo,
           firmware: administrativo ? d.firmware : null,
           estado: d.estado,

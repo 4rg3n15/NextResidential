@@ -112,8 +112,6 @@ const CON_DATOS = (url: string): Response => {
                       nombre: 'Talanquera principal',
                       tipo: 'camara_lpr',
                       zonaId: null,
-                      host: 'talanquera.equipo.invalid',
-                      puerto: 80,
                       modelo: null,
                       firmware: null,
                       estado: 'saludable',

@@ -56,9 +56,10 @@ export interface FranjaDeAccesos {
 }
 
 /**
- * Dispositivo tal como lo ve el tablero. `host`, `puerto`, `modelo` y
- * `firmware` son datos de inventario, no secretos (C-11), y la presentación
- * decide para qué roles se rellenan.
+ * Dispositivo tal como lo ve el tablero. `modelo` y `firmware` son datos de
+ * inventario. **La dirección y el puerto NO viajan** (ETAPA 15-D, §7.1, C-28):
+ * el cliente nunca necesita conocer la red privada del conjunto; hasta la 15-C
+ * salían para los roles administrativos (C-11).
  */
 /** Los mismos valores que el enumerado `estado_sincronizacion` de la base. */
 export type ResultadoDeSincronizacion = 'pendiente' | 'sincronizada' | 'fallida' | 'suprimida';
@@ -68,8 +69,6 @@ export interface DispositivoDelTablero {
   readonly nombre: string;
   readonly tipo: string;
   readonly zonaId: string | null;
-  readonly host: string;
-  readonly puerto: number;
   readonly modelo: string | null;
   readonly firmware: string | null;
   readonly ultimoLatido: Date | null;

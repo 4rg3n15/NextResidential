@@ -14,7 +14,7 @@ import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
 /**
  * O3 · la autorización creada DESDE LA CONSOLA contra base real.
  *
- * D-113 · hasta la 15-D, `guardar` escribía el identificador del USUARIO de la
+ * D-131 · hasta la 15-D, `guardar` escribía el identificador del USUARIO de la
  * consola en `autorizado_por`, y el disparador `tg_autorizacion_coherente`
  * (RN-05) lo rechazaba: ninguna autorización creada por un administrador o un
  * portero llegaba a existir contra una base real. Las pruebas con dobles no lo
@@ -67,7 +67,7 @@ afterAll(async () => {
   await pool?.end();
 });
 
-describe('O3 · autorizaciones de la consola contra base (D-113, S-38, RN-05)', () => {
+describe('O3 · autorizaciones de la consola contra base (D-131, S-38, RN-05)', () => {
   it('la base de pruebas contesta', () => {
     if (!URL_BASE) return;
     expect(disponible, 'DATABASE_URL_PRUEBAS definida pero la base no contesta').toBe(true);

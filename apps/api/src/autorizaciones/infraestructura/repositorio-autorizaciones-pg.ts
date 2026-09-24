@@ -37,7 +37,7 @@ import type {
  *    titular activo de la vivienda destino (RN-05, `tg_autorizacion_coherente`),
  *    y hasta ahora se escribía el identificador del USUARIO de la consola: el
  *    disparador lo rechazaba y ninguna autorización creada desde administración
- *    o portería llegaba a existir contra base real (D-113). El administrador
+ *    o portería llegaba a existir contra base real (D-131). El administrador
  *    autoriza EN NOMBRE de la vivienda; `creado_por` conserva quién fue.
  */
 @Injectable()
