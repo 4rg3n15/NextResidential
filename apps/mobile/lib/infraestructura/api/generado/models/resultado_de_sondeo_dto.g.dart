@@ -18,6 +18,11 @@ ResultadoDeSondeoDto _$ResultadoDeSondeoDtoFromJson(
   ficha: json['ficha'] == null
       ? null
       : FichaDelEquipoDto.fromJson(json['ficha'] as Map<String, dynamic>),
+  capacidades: json['capacidades'] == null
+      ? null
+      : CapacidadesDeEquipoDto.fromJson(
+          json['capacidades'] as Map<String, dynamic>,
+        ),
 );
 
 Map<String, dynamic> _$ResultadoDeSondeoDtoToJson(
@@ -30,4 +35,5 @@ Map<String, dynamic> _$ResultadoDeSondeoDtoToJson(
   'latenciaMs': instance.latenciaMs,
   'verificado': instance.verificado,
   'ficha': instance.ficha,
+  'capacidades': instance.capacidades,
 };

@@ -8,6 +8,7 @@ import { DirectorioDeViviendas } from './viviendas/directorio';
 import { PantallaDeVehiculos } from './vehiculos/pantalla';
 import { PantallaDeVisitantes } from './visitantes/pantalla';
 import { PantallaDeDispositivos } from './dispositivos/pantalla';
+import { PantallaDeZonas } from './zonas/pantalla';
 
 /**
  * **Barrido de formularios — D-72 y D-73, y no ruta a ruta.**
@@ -158,6 +159,7 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
       });
     }
     if (url.includes('/autorizaciones')) return respuesta([]);
+    if (url.includes('/zonas')) return respuesta([]);
     return respuesta({ id: PERSONA.id, nombreCompleto: PERSONA.nombreCompleto, yaExistia: false });
   });
 
@@ -313,6 +315,13 @@ const PANTALLAS = [
     elemento: <PantallaDeDispositivos copropiedadId={COP} />,
     boton: /Agregar equipo/,
   },
+  {
+    // ETAPA 15-D (O3) · el alta de zonas. Pide nombre, tipo, aforo e icono
+    // —lo que el administrador tiene delante— y ningún identificador.
+    nombre: 'zonas',
+    elemento: <PantallaDeZonas copropiedadId={COP} />,
+    boton: /Nueva zona/,
+  },
 ] as const;
 
 beforeEach(() => {
@@ -443,6 +452,14 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    */
   'biometria/pantalla.tsx':
     'no es un diálogo; el único identificador lo aporta el buscador compartido, y tiene prueba propia',
+  /**
+   * ETAPA 15-D (O3) · la fotografía del visitante: la entrada es un archivo de
+   * imagen elegido con el selector del navegador, y el identificador de la
+   * autorización viaja en la RUTA desde la tarjeta que lo muestra. No hay un
+   * solo campo de texto.
+   */
+  'componentes/fotografia-visitante.tsx':
+    'la entrada es un archivo; el identificador viaja en la ruta desde la tarjeta, nadie lo teclea',
 };
 
 /**
@@ -478,6 +495,7 @@ describe('cobertura del barrido', () => {
       'vehiculos/pantalla.tsx',
       'visitantes/pantalla.tsx',
       'dispositivos/alta-de-equipo.tsx',
+      'zonas/pantalla.tsx',
     ]);
     const sinClasificar = todasLasEscrituras().filter(
       (f) => !conFormulario.has(f) && SIN_FORMULARIO[f] === undefined,

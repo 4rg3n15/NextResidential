@@ -18,6 +18,8 @@ class CrearAutorizacionDto {
     this.zonasPermitidas,
     this.maximoAcompanantes,
     this.patron,
+    this.placa,
+    this.observaciones,
   });
   
   factory CrearAutorizacionDto.fromJson(Map<String, Object?> json) => _$CrearAutorizacionDtoFromJson(json);
@@ -33,6 +35,8 @@ class CrearAutorizacionDto {
 
   /// Su presencia es lo único que distingue una recurrente de una única (HU-09).
   final PatronDeEntradaDto? patron;
+  final String? placa;
+  final String? observaciones;
 
   Map<String, Object?> toJson() => _$CrearAutorizacionDtoToJson(this);
 }

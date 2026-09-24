@@ -37,6 +37,9 @@ export { AutorizacionesModule } from './autorizaciones.module';
 // `main.ts` la necesita para montar el `express.json({ verify })` que guarda el
 // cuerpo crudo sobre el que se calcula la firma del Alarm Server.
 export { guardarCuerpoCrudo } from './presentacion/guardia-firma';
+// Y el tope propio de la ruta de la fotografía del visitante (O3), que se monta
+// antes del `express.json` general por la misma razón que el sobre del equipo.
+export { LIMITE_DE_FOTOGRAFIA, RUTA_DE_FOTOGRAFIA_DE_VISITANTE } from './presentacion/limites';
 export {
   CargadorDeContextoConservador,
   UMBRAL_DE_CONFIANZA_POR_DEFECTO,

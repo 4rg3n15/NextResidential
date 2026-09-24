@@ -85,6 +85,13 @@ export type ResultadoDeCarga = Esquemas['ResultadoDeCargaDto'];
  * contrato, no de una copia en la consola: el día que el dominio añada un campo
  * al plan, el asistente deja de compilar hasta que alguien lo pinte. */
 export type PlanDeGeneracion = Esquemas['PlanDeGeneracionDto'];
+/** ETAPA 15-D (O3) · lo que devuelve la generación con modos, y la fotografía del visitante. */
+export type GeneracionAplicada = Esquemas['GeneracionAplicadaDto'];
+export type ModoDeRegeneracion = NonNullable<Esquemas['ConfirmarGeneracionDto']['modo']>;
+export type UrlDeFotografia = Esquemas['UrlDeFotografiaDto'];
+export type EstadoAdministrativo = NonNullable<
+  Esquemas['EditarViviendaDto']['estadoAdministrativo']
+>;
 export type ExcepcionDeAgrupacion = Esquemas['ExcepcionDeAgrupacionDto'];
 export type VistaPreviaDeGeneracion = Esquemas['VistaPreviaDeGeneracionDto'];
 export type GrupoProyectado = Esquemas['GrupoProyectadoDto'];

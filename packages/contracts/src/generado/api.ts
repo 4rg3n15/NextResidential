@@ -192,6 +192,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/autorizaciones/{autorizacionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cambia fin de vigencia, placa u observaciones de una viva (O3) */
+        put: operations["AutorizacionesController_modificarAutorizacion"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/autorizaciones/{autorizacionId}/acompanantes": {
         parameters: {
             query?: never;
@@ -203,6 +220,24 @@ export interface paths {
         put?: never;
         /** Añade un acompañante por su propia identidad (HU-08, D-01) */
         post: operations["AutorizacionesController_agregarAcompanante"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/autorizaciones/{autorizacionId}/fotografia": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** URL firmada de vida corta de la fotografía del visitante (RN-21) */
+        get: operations["AutorizacionesController_fotografia"];
+        put?: never;
+        /** Adjunta la fotografía de identificación del visitante (O3, RN-21) */
+        post: operations["AutorizacionesController_adjuntarFotografia"];
         delete?: never;
         options?: never;
         head?: never;
@@ -981,6 +1016,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/padron/vehiculos/{vehiculoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edita un vehículo; la placa única activa la garantiza la base */
+        put: operations["PadronController_editarVehiculo"];
+        post?: never;
+        /** Borrado DEFINITIVO del vehículo, sólo sin historial (RN-19) */
+        delete: operations["PadronController_borrarVehiculoDefinitivamente"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/padron/vehiculos/{vehiculoId}/desactivacion": {
         parameters: {
             query?: never;
@@ -1058,7 +1111,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /** Edita identificador, agrupación o dirección de la vivienda (HU-02) */
+        put: operations["PadronController_editarVivienda"];
         post?: never;
         /** Borrado DEFINITIVO, sólo si la vivienda no tiene historial (B.2, RN-19) */
         delete: operations["PadronController_borrarViviendaDefinitivamente"];
@@ -1162,7 +1216,8 @@ export interface paths {
         /** Zonas con su aforo y su disponibilidad de ahora mismo (HU-19) */
         get: operations["ZonasController_listar"];
         put?: never;
-        post?: never;
+        /** Crea una zona común (HU-18). Horario y normas, después */
+        post: operations["ZonasController_crearZona"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1180,6 +1235,23 @@ export interface paths {
         put?: never;
         /** Da permiso sobre la zona a una autorización (HU-19, HU-20) */
         post: operations["ZonasController_permiso"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/zonas/{zonaId}/baja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Baja lógica de la zona con motivo; nunca borrado (RN-19) */
+        post: operations["ZonasController_darDeBaja"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1423,6 +1495,11 @@ export interface components {
             canalBarrera?: number;
             numeroDePuerta?: number;
             canalDeAudio?: number;
+            fabricante?: string;
+            /** @enum {string} */
+            modoDeTerminal?: "reporta_y_espera" | "decide_el_equipo";
+            /** @default false */
+            canalDeAudioHabilitado: boolean;
             /** @default true */
             probarConexion: boolean;
         };
@@ -1452,6 +1529,8 @@ export interface components {
             /** Format: date-time */
             revocadaEn: string | null;
             motivoRevocacion: string | null;
+            observaciones: string | null;
+            tieneFotografia: boolean;
         };
         AutorizarZonaDto: {
             autorizacionId: string;
@@ -1462,6 +1541,12 @@ export interface components {
             texto: string;
         };
         BajaDeEquipoDto: {
+            motivo: string;
+        };
+        BajaDeZonaAplicadaDto: {
+            desactivada: boolean;
+        };
+        BajaDeZonaDto: {
             motivo: string;
         };
         BajaDto: {
@@ -1484,6 +1569,10 @@ export interface components {
         BloqueosVigentesDto: {
             bloqueos: components["schemas"]["BloqueoVigenteDto"][];
         };
+        BorradoDefinitivoDeVehiculoDto: {
+            borrado: boolean;
+            placa: string;
+        };
         BorradoDefinitivoDto: {
             borrada: boolean;
             identificador: string;
@@ -1503,6 +1592,38 @@ export interface components {
             zonaHoraria?: string;
             /** @enum {string} */
             politicaContingenciaEdge?: "denegar" | "escalar_portero";
+        };
+        CapacidadDeAudioDto: {
+            /** @enum {string} */
+            estado: "si" | "no" | "desconocida";
+            canal: number | null;
+            formato: string | null;
+        };
+        CapacidadDeBibliotecaDto: {
+            /** @enum {string} */
+            estado: "si" | "no" | "desconocida";
+            maximo: number | null;
+            almacenadas: number | null;
+        };
+        CapacidadesDeEquipoDto: {
+            /** @enum {string} */
+            origen: "descubiertas" | "declaradas" | "sin_consultar";
+            /** @enum {string} */
+            aperturaRemota: "si" | "no" | "desconocida";
+            /** @enum {string} */
+            verificacionRemota: "si" | "no" | "desconocida";
+            bibliotecaDeRostros: components["schemas"]["CapacidadDeBibliotecaDto"];
+            /** @enum {string} */
+            gestionDePersonas: "si" | "no" | "desconocida";
+            audioBidireccional: components["schemas"]["CapacidadDeAudioDto"];
+            /** @enum {string} */
+            senalizacionDeLlamada: "si" | "no" | "desconocida";
+            /** @enum {string} */
+            suscripcionDeEventos: "si" | "no" | "desconocida";
+            /** @enum {string} */
+            reconocimientoDePlacas: "si" | "no" | "desconocida";
+            /** @enum {string} */
+            estadoDeBarrera: "si" | "no" | "desconocida";
         };
         CapturarRostroDto: {
             /** @description El TITULAR del dato: el visitante (RN-10) */
@@ -1575,7 +1696,7 @@ export interface components {
             zonaHoraria: string;
             /**
              * @description Por debajo de este valor la lectura de placa NO decide sola: escala al portero (CU-01, excepción 3a). Sólo el superadministrador lo cambia.
-             * @example 0.85
+             * @example 0.8
              */
             umbralConfianzaPlaca: number;
             /**
@@ -1620,6 +1741,8 @@ export interface components {
             normas?: string[];
             /** @description Cierre manual del operador, sin presencia física (PB-04) */
             abierta?: boolean;
+            /** @example waves */
+            icono?: string | null;
         };
         ConfirmarGeneracionDto: {
             agrupaciones: number;
@@ -1629,6 +1752,8 @@ export interface components {
             porPiso?: number;
             reiniciarNumeracion?: boolean;
             excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
+            /** @enum {string} */
+            modo?: "estricto" | "conservar" | "sobrescribir";
             totalEsperado: number;
         };
         ConteoDto: {
@@ -1707,6 +1832,18 @@ export interface components {
             maximoAcompanantes?: number;
             /** @description Su presencia es lo único que distingue una recurrente de una única (HU-09). */
             patron?: components["schemas"]["PatronDeEntradaDto"];
+            placa?: string | null;
+            observaciones?: string | null;
+        };
+        CrearZonaDto: {
+            nombre: string;
+            /** @enum {string} */
+            tipo: "vehicular" | "peatonal" | "comun";
+            /** @description Aforo máximo simultáneo (RN-14). 0 = sin límite práctico. */
+            aforoMaximo: number;
+            /** @example dumbbell */
+            icono?: string | null;
+            normas?: string[];
         };
         DecisionDelEdgeDto: {
             /** @description Lo que el Edge resolvió en la portería */
@@ -1782,6 +1919,25 @@ export interface components {
             /** @description Cuántas plantillas siguen sin llegar a este equipo. Distingue «falló la última» de «hay catorce sin llegar». */
             sincronizacionesFallidas: number;
         };
+        EdicionAplicadaDto: {
+            editado: boolean;
+        };
+        EditarVehiculoDto: {
+            placa?: string;
+            /** Format: uuid */
+            personaId?: string | null;
+            marca?: string | null;
+            modelo?: string | null;
+            color?: string | null;
+            /** @enum {string} */
+            tipo?: "automovil" | "motocicleta" | "bicicleta" | "otro";
+        };
+        EditarViviendaDto: {
+            identificador?: string;
+            agrupacion?: string | null;
+            /** @enum {string} */
+            estadoAdministrativo?: "al_dia" | "en_mora" | "suspendida";
+        };
         EmergenciaDto: {
             /** @description Qué ocurre. Obligatorio. */
             motivo: string;
@@ -1821,6 +1977,11 @@ export interface components {
             canalBarrera: number | null;
             numeroDePuerta: number | null;
             canalDeAudio: number | null;
+            fabricante: string | null;
+            /** @enum {string|null} */
+            modoDeTerminal: "reporta_y_espera" | "decide_el_equipo" | null;
+            canalDeAudioHabilitado: boolean;
+            capacidades: components["schemas"]["CapacidadesDeEquipoDto"] | null;
             /** @enum {string} */
             verificacion: "no_verificado" | "verificado" | "rechazado";
             verificadoEn: string | null;
@@ -1985,6 +2146,17 @@ export interface components {
             /** @description `null` significa SIN MUESTRAS, que no es lo mismo que incumplir */
             cumple?: boolean | null;
         };
+        FotografiaAdjuntadaDto: {
+            adjuntada: boolean;
+            tipoMime: string;
+            tamanoBytes: number;
+        };
+        FotografiaDeVisitanteDto: {
+            /** @enum {string} */
+            tipoMime: "image/jpeg" | "image/png";
+            /** @description Imagen JPEG o PNG en base64, máximo 1,5 MiB. */
+            contenidoBase64: string;
+        };
         FranjaDeAccesosDto: {
             /** @description Hora local de la copropiedad */
             hora: number;
@@ -2017,6 +2189,10 @@ export interface components {
         };
         GeneracionAplicadaDto: {
             creadas: number;
+            /** @description Ya existían y se dejaron como estaban. */
+            conservadas: number;
+            /** @description De baja, reactivadas por «sobrescribir». */
+            reactivadas: number;
         };
         GrupoProyectadoDto: {
             agrupacion: string | null;
@@ -2216,6 +2392,15 @@ export interface components {
             nivelAcceso: string | null;
             /** @description RN-19: el desactivado conserva historial. */
             activo: boolean;
+        };
+        ModificacionDto: {
+            modificada: boolean;
+        };
+        ModificarAutorizacionDto: {
+            /** Format: date-time */
+            hasta?: string;
+            placa?: string | null;
+            observaciones?: string | null;
         };
         NotasDeAlertaDto: {
             notas: string;
@@ -2513,6 +2698,8 @@ export interface components {
             verificado: boolean;
             /** @description Qué hay que cambiar en el equipo, campo por campo. Ausente cuando no se sondeó: la falta de ficha no es una ficha vacía. */
             ficha?: components["schemas"]["FichaDelEquipoDto"];
+            /** @description Lo que el equipo declaró poder hacer. Ausente cuando no se alcanzó. */
+            capacidades?: components["schemas"]["CapacidadesDeEquipoDto"];
         };
         RevocacionDto: {
             revocada: boolean;
@@ -2592,6 +2779,10 @@ export interface components {
         UrlDeEvidenciaDto: {
             /** @description URL firmada de vida corta (120 s) al bucket privado. No se cachea ni se persiste: el enlace acaba en el historial del navegador y ahí sigue siendo válido (RN-21). */
             url: string;
+        };
+        UrlDeFotografiaDto: {
+            url: string;
+            expiraEnSegundos: number;
         };
         VehiculoDto: {
             /** Format: uuid */
@@ -2678,6 +2869,8 @@ export interface components {
             id: string;
             nombre: string;
             tipo: string;
+            icono: string | null;
+            activa: boolean;
             abierta: boolean;
             politicaReinicio: string;
             normas: string[];
@@ -3057,6 +3250,32 @@ export interface operations {
             };
         };
     };
+    AutorizacionesController_modificarAutorizacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModificarAutorizacionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModificacionDto"];
+                };
+            };
+        };
+    };
     AutorizacionesController_agregarAcompanante: {
         parameters: {
             query?: never;
@@ -3079,6 +3298,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AcompananteAgregadoDto"];
+                };
+            };
+        };
+    };
+    AutorizacionesController_fotografia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UrlDeFotografiaDto"];
+                };
+            };
+        };
+    };
+    AutorizacionesController_adjuntarFotografia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FotografiaDeVisitanteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FotografiaAdjuntadaDto"];
                 };
             };
         };
@@ -4492,6 +4759,54 @@ export interface operations {
             };
         };
     };
+    PadronController_editarVehiculo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                vehiculoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditarVehiculoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EdicionAplicadaDto"];
+                };
+            };
+        };
+    };
+    PadronController_borrarVehiculoDefinitivamente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                vehiculoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BorradoDefinitivoDeVehiculoDto"];
+                };
+            };
+        };
+    };
     PadronController_desactivarVehiculo: {
         parameters: {
             query?: never;
@@ -4613,6 +4928,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VistaPreviaDeGeneracionDto"];
+                };
+            };
+        };
+    };
+    PadronController_editarVivienda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                viviendaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditarViviendaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EdicionAplicadaDto"];
                 };
             };
         };
@@ -4771,6 +5112,31 @@ export interface operations {
             };
         };
     };
+    ZonasController_crearZona: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrearZonaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZonaDto"];
+                };
+            };
+        };
+    };
     ZonasController_permiso: {
         parameters: {
             query?: never;
@@ -4793,6 +5159,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PermisoDeZonaDto"];
+                };
+            };
+        };
+    };
+    ZonasController_darDeBaja: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                zonaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BajaDeZonaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BajaDeZonaAplicadaDto"];
                 };
             };
         };

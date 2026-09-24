@@ -1,6 +1,8 @@
 import {
   ArrayMaxSize,
   IsArray,
+  IsBase64,
+  IsIn,
   IsInt,
   IsISO8601,
   IsOptional,
@@ -8,11 +10,14 @@ import {
   IsUUID,
   Length,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { TIPOS_DE_IMAGEN_ADMITIDOS } from '../../comun/archivos/tipo-real';
+import { MAX_BASE64_FOTOGRAFIA } from '../aplicacion/fotografia-de-visitante';
 
 /**
  * DTOs de ENTRADA de visitantes y autorizaciones.
@@ -90,6 +95,59 @@ export class CrearAutorizacionDto {
   @ValidateNested()
   @Type(() => PatronDeEntradaDto)
   patron?: PatronDeEntradaDto;
+
+  /** O3 · placa del vehículo del visitante; el objeto de valor la normaliza. */
+  @ApiPropertyOptional({ type: String, nullable: true, minLength: 5, maxLength: 12 })
+  @IsOptional()
+  @IsString()
+  @Length(5, 12)
+  placa?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 1000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  observaciones?: string | null;
+}
+
+/**
+ * O3 · lo que se puede cambiar de una autorización viva. Cada campo es
+ * opcional; `null` en placa u observaciones las QUITA, ausente las deja.
+ */
+export class ModificarAutorizacionDto {
+  @ApiPropertyOptional({ type: String, format: 'date-time' })
+  @IsOptional()
+  @IsISO8601()
+  hasta?: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true, minLength: 5, maxLength: 12 })
+  @IsOptional()
+  @IsString()
+  @Length(5, 12)
+  placa?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 1000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  observaciones?: string | null;
+}
+
+/**
+ * O3 · la fotografía de identificación, en base64 dentro del JSON. El tope de
+ * la cadena se valida aquí (forma) y el de los bytes reales en el caso de uso
+ * (verdad); el tipo declarado se contrasta con los bytes de cabecera.
+ */
+export class FotografiaDeVisitanteDto {
+  @ApiProperty({ type: String, enum: TIPOS_DE_IMAGEN_ADMITIDOS })
+  @IsIn(TIPOS_DE_IMAGEN_ADMITIDOS)
+  tipoMime!: string;
+
+  @ApiProperty({ type: String, description: 'Imagen JPEG o PNG en base64, máximo 1,5 MiB.' })
+  @IsString()
+  @MaxLength(MAX_BASE64_FOTOGRAFIA)
+  @IsBase64()
+  contenidoBase64!: string;
 }
 
 export class RevocarAutorizacionDto {

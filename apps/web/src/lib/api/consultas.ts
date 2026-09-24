@@ -21,6 +21,7 @@ import type {
   ConfiguracionDeCopropiedad,
   OrdenEjecutada,
   Latencias,
+  UrlDeFotografia,
 } from '@ncr/contracts';
 import { cliente, desenvolver } from './cliente';
 
@@ -373,4 +374,31 @@ export const useLatencias = (): UseQueryResult<Latencias> =>
     queryKey: ['observabilidad', 'latencias'] as const,
     refetchInterval: 30_000,
     queryFn: async () => desenvolver(await cliente.GET('/observabilidad/latencias', {})),
+  });
+
+/* ── ETAPA 15-D (O3) · fotografía de identificación del visitante ─────────── */
+
+/**
+ * La URL FIRMADA de la fotografía (RN-21). Caduca a los 120 s, así que se
+ * vuelve a pedir pasados 90: una URL caducada en pantalla es una imagen rota.
+ * Sin reintento: el 404 de «no tiene fotografía» es una respuesta, no un fallo.
+ * La clave cuelga de `['autorizaciones', copropiedad]`, la misma que invalida
+ * la pantalla al adjuntar, revocar o modificar.
+ */
+export const useFotografiaDeVisitante = (
+  copropiedadId: string,
+  autorizacionId: string,
+  habilitada: boolean,
+): UseQueryResult<UrlDeFotografia> =>
+  useQuery({
+    enabled: habilitada && copropiedadId !== '' && autorizacionId !== '',
+    retry: false,
+    staleTime: 90_000,
+    queryKey: ['autorizaciones', copropiedadId, 'fotografia', autorizacionId] as const,
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/autorizaciones/{autorizacionId}/fotografia', {
+          params: { path: { id: copropiedadId, autorizacionId } },
+        }),
+      ),
   });

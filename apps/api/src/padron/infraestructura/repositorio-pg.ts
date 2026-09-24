@@ -2,24 +2,29 @@ import type { Pool } from 'pg';
 import type { PoolClient } from 'pg';
 import { Injectable } from '@nestjs/common';
 import type {
-  HistorialDeVivienda,
-  VehiculoResuelto,
   AltaPersona,
   AltaResidente,
   AltaVehiculo,
   AltaVivienda,
+  EdicionDeVehiculo,
+  EdicionDeVivienda,
   FilaExportada,
   FiltroDeViviendas,
   GeneracionDeViviendas,
+  HistorialDeVehiculo,
+  HistorialDeVivienda,
   PersonaEnLista,
   RepositorioPadron,
   ResultadoAltaPersona,
   ResultadoAltaVivienda,
   ResultadoDeGeneracion,
+  ResultadoEdicionVehiculo,
+  ResultadoEdicionVivienda,
   ResultadoRegistroVehiculo,
   TipoDeVehiculo,
   TotalesDePadron,
   VehiculoEnLista,
+  VehiculoResuelto,
   ViviendaEnLista,
 } from '../aplicacion/puertos';
 import type { Placa, TipoDeDocumento, ViviendaProyectada } from '@ncr/domain-core';
@@ -548,6 +553,37 @@ export class RepositorioPadronPg implements RepositorioPadron {
       ]);
       await cliente.query('BEGIN');
       try {
+        const modo = generacion.modo ?? 'estricto';
+        let reactivadas = 0;
+        if (modo === 'sobrescribir') {
+          /**
+           * O3 · «sobrescribir» sólo escribe encima de lo que RN-19 permite: el
+           * estado de baja. Una vivienda inactiva cuya identidad está en el
+           * plan vuelve a estar activa —con su historial intacto— y así la
+           * inserción de abajo la encuentra como colisión y la conserva.
+           */
+          const { rowCount } = await cliente.query(
+            `UPDATE public.viviendas v
+                SET estado = 'activo', desactivado_en = NULL, desactivado_por = NULL,
+                    motivo_desactivacion = NULL, actualizado_en = now(), actualizado_por = $4
+               FROM unnest($2::text[], $3::text[]) AS p(agrupacion, identificador)
+              WHERE v.copropiedad_id = $1 AND v.estado = 'inactivo'
+                AND coalesce(v.agrupacion, '') = p.agrupacion
+                AND v.identificador = p.identificador
+                AND NOT EXISTS (SELECT 1 FROM public.viviendas a
+                                 WHERE a.copropiedad_id = v.copropiedad_id AND a.estado = 'activo'
+                                   AND coalesce(a.agrupacion, '') = p.agrupacion
+                                   AND a.identificador = p.identificador)`,
+            [
+              copropiedadId,
+              viviendas.map((v) => v.agrupacion ?? ''),
+              viviendas.map((v) => v.identificador),
+              actorId,
+            ],
+          );
+          reactivadas = rowCount ?? 0;
+        }
+
         const { rows } = await cliente.query<{ agrupacion: string | null; identificador: string }>(
           `INSERT INTO public.viviendas
              (copropiedad_id, agrupacion, identificador, creado_por, actualizado_por)
@@ -565,13 +601,13 @@ export class RepositorioPadronPg implements RepositorioPadron {
           ],
         );
 
-        if (rows.length !== viviendas.length) {
-          const entraron = new Set(
-            rows.map((f) => JSON.stringify([f.agrupacion ?? '', f.identificador])),
-          );
-          const colisiones = viviendas.filter(
-            (v) => !entraron.has(JSON.stringify([v.agrupacion ?? '', v.identificador])),
-          );
+        const entraron = new Set(
+          rows.map((f) => JSON.stringify([f.agrupacion ?? '', f.identificador])),
+        );
+        const colisiones = viviendas.filter(
+          (v) => !entraron.has(JSON.stringify([v.agrupacion ?? '', v.identificador])),
+        );
+        if (colisiones.length > 0 && modo === 'estricto') {
           await cliente.query('ROLLBACK');
           return { creadas: 0, colisiones };
         }
@@ -590,7 +626,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
         );
 
         await cliente.query('COMMIT');
-        return { creadas: rows.length, colisiones: [] };
+        return { creadas: rows.length, colisiones, reactivadas };
       } catch (e) {
         await cliente.query('ROLLBACK');
         throw e;
@@ -598,6 +634,124 @@ export class RepositorioPadronPg implements RepositorioPadron {
     } finally {
       cliente.release();
     }
+  }
+
+  // ═══════════════════════════ O3 · edición y borrado ═══════════════════════
+  async editarVivienda(edicion: EdicionDeVivienda): Promise<ResultadoEdicionVivienda> {
+    return this.conContexto(async (c) => {
+      try {
+        const { rowCount } = await c.query(
+          `UPDATE public.viviendas
+              SET identificador = COALESCE($3, identificador),
+                  agrupacion = CASE WHEN $4::boolean THEN nullif($5, '') ELSE agrupacion END,
+                  estado_administrativo = COALESCE($6::estado_administrativo, estado_administrativo),
+                  actualizado_en = now(), actualizado_por = $7
+            WHERE copropiedad_id = $1 AND id = $2`,
+          [
+            edicion.copropiedadId,
+            edicion.viviendaId,
+            edicion.identificador ?? null,
+            edicion.agrupacion !== undefined,
+            edicion.agrupacion ?? '',
+            edicion.estadoAdministrativo ?? null,
+            edicion.actorId,
+          ],
+        );
+        return (rowCount ?? 0) > 0 ? { tipo: 'editada' } : { tipo: 'no_encontrada' };
+      } catch (e) {
+        if ((e as { code?: string }).code === VIOLACION_UNICA) {
+          return { tipo: 'identificador_duplicado' };
+        }
+        throw e;
+      }
+    });
+  }
+
+  async editarVehiculo(edicion: EdicionDeVehiculo): Promise<ResultadoEdicionVehiculo> {
+    return this.conContexto(async (c) => {
+      try {
+        const { rowCount } = await c.query(
+          `UPDATE public.vehiculos
+              SET placa = COALESCE($3, placa),
+                  persona_id = CASE WHEN $4::boolean THEN $5::uuid ELSE persona_id END,
+                  marca = CASE WHEN $6::boolean THEN $7 ELSE marca END,
+                  modelo = CASE WHEN $8::boolean THEN $9 ELSE modelo END,
+                  color = CASE WHEN $10::boolean THEN $11 ELSE color END,
+                  tipo = COALESCE($12::tipo_vehiculo, tipo),
+                  actualizado_en = now(), actualizado_por = $13
+            WHERE copropiedad_id = $1 AND id = $2`,
+          [
+            edicion.copropiedadId,
+            edicion.vehiculoId,
+            edicion.placa?.valor ?? null,
+            edicion.personaId !== undefined,
+            edicion.personaId ?? null,
+            edicion.marca !== undefined,
+            edicion.marca ?? null,
+            edicion.modelo !== undefined,
+            edicion.modelo ?? null,
+            edicion.color !== undefined,
+            edicion.color ?? null,
+            edicion.tipo ?? null,
+            edicion.actorId,
+          ],
+        );
+        return (rowCount ?? 0) > 0 ? { tipo: 'editado' } : { tipo: 'no_encontrado' };
+      } catch (e) {
+        if ((e as { code?: string }).code === VIOLACION_UNICA) {
+          return { tipo: 'placa_activa_duplicada' };
+        }
+        throw e;
+      }
+    });
+  }
+
+  async historialDeVehiculo(
+    copropiedadId: string,
+    vehiculoId: string,
+  ): Promise<HistorialDeVehiculo | null> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{ placa: string; eventos: string; autorizaciones: string }>(
+        `SELECT ve.placa,
+                (SELECT count(*) FROM public.eventos e
+                  WHERE e.copropiedad_id = ve.copropiedad_id AND e.placa_detectada = ve.placa)::text AS eventos,
+                (SELECT count(*) FROM public.autorizaciones a
+                  WHERE a.copropiedad_id = ve.copropiedad_id AND a.placa = ve.placa)::text AS autorizaciones
+           FROM public.vehiculos ve
+          WHERE ve.copropiedad_id = $1 AND ve.id = $2`,
+        [copropiedadId, vehiculoId],
+      );
+      const f = rows[0];
+      if (f === undefined) return null;
+      return {
+        placa: f.placa,
+        eventos: Number(f.eventos),
+        autorizaciones: Number(f.autorizaciones),
+      };
+    });
+  }
+
+  async borrarVehiculoDefinitivamente(
+    copropiedadId: string,
+    vehiculoId: string,
+    actorId: string,
+  ): Promise<{ borrado: boolean; motivo?: string }> {
+    return this.conContexto(async (c) => {
+      try {
+        await c.query('SELECT app.borrar_vehiculo_definitivamente($1, $2, $3)', [
+          copropiedadId,
+          vehiculoId,
+          actorId,
+        ]);
+        return { borrado: true };
+      } catch (e) {
+        const codigo = (e as { code?: string }).code;
+        if (codigo === '2BP01' || codigo === '23001' || codigo === 'P0002') {
+          return { borrado: false, motivo: (e as Error).message };
+        }
+        throw e;
+      }
+    });
   }
 
   /**

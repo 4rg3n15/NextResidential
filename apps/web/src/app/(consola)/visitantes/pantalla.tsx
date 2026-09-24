@@ -14,6 +14,7 @@ import { BuscadorDePersonas } from '@/componentes/buscador-personas';
 import type { PersonaElegida } from '@/componentes/buscador-personas';
 import { DialogoDeConfirmacion } from '@/componentes/dialogo-confirmacion';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
+import { FotografiaDeVisitante } from '@/componentes/fotografia-visitante';
 import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useAutorizaciones, useViviendas } from '@/lib/api/consultas';
@@ -58,6 +59,15 @@ export const PantallaDeVisitantes = ({
   const [dias, setDias] = useState<number[]>([1, 2, 3, 4, 5]);
   const [horaInicio, setHoraInicio] = useState('08:00');
   const [horaFin, setHoraFin] = useState('18:00');
+  /** O3 · con qué placa entra, y lo que el residente quiso dejar dicho. */
+  const [placa, setPlaca] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+
+  /** O3 · edición de una viva: fin de vigencia, placa y observaciones. */
+  const [editar, setEditar] = useState<Autorizacion | null>(null);
+  const [nuevoHasta, setNuevoHasta] = useState('');
+  const [nuevaPlaca, setNuevaPlaca] = useState('');
+  const [nuevasObservaciones, setNuevasObservaciones] = useState('');
 
   /**
    * **Las restricciones del dominio se señalan AQUÍ, antes de enviarlas.**
@@ -69,6 +79,18 @@ export const PantallaDeVisitantes = ({
    */
   const problemaVigencia = problemaDeVigencia(desde, hasta);
   const problemaPatron = recurrente ? problemaDePatron(dias, horaInicio, horaFin) : null;
+  const problemaNuevoHasta =
+    editar !== null && nuevoHasta !== ''
+      ? problemaDeVigencia(aLocal(editar.desde), nuevoHasta)
+      : null;
+
+  const abrirEdicion = (a: Autorizacion): void => {
+    setEditar(a);
+    setNuevoHasta(aLocal(a.hasta));
+    setNuevaPlaca(a.placa ?? '');
+    setNuevasObservaciones(a.observaciones ?? '');
+    setError(undefined);
+  };
 
   const refrescar = async (): Promise<void> => {
     await clientes.invalidateQueries({ queryKey: ['autorizaciones', copropiedadId] });
@@ -86,6 +108,8 @@ export const PantallaDeVisitantes = ({
             personaId: persona?.id ?? '',
             desde: new Date(desde).toISOString(),
             hasta: new Date(hasta).toISOString(),
+            ...(placa.trim() === '' ? {} : { placa: placa.trim() }),
+            ...(observaciones.trim() === '' ? {} : { observaciones: observaciones.trim() }),
             ...(recurrente
               ? {
                   patron: {
@@ -121,9 +145,46 @@ export const PantallaDeVisitantes = ({
       setRecienAutorizado(persona);
       setAlta(false);
       setPersona(null);
+      setPlaca('');
+      setObservaciones('');
       await refrescar();
     } catch (e) {
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo crear la autorización');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const guardarEdicion = async (): Promise<void> => {
+    if (editar === null) return;
+    setEnviando(true);
+    setError(undefined);
+    try {
+      desenvolver(
+        await cliente.PUT('/copropiedades/{id}/autorizaciones/{autorizacionId}', {
+          params: { path: { id: copropiedadId, autorizacionId: editar.id } },
+          body: {
+            // Sólo viaja lo que cambió. `null` QUITA la placa o las
+            // observaciones; ausente las deja como están.
+            ...(nuevoHasta === aLocal(editar.hasta)
+              ? {}
+              : { hasta: new Date(nuevoHasta).toISOString() }),
+            ...(nuevaPlaca.trim() === (editar.placa ?? '')
+              ? {}
+              : { placa: nuevaPlaca.trim() === '' ? null : nuevaPlaca.trim() }),
+            ...(nuevasObservaciones.trim() === (editar.observaciones ?? '')
+              ? {}
+              : {
+                  observaciones:
+                    nuevasObservaciones.trim() === '' ? null : nuevasObservaciones.trim(),
+                }),
+          },
+        }),
+      );
+      setEditar(null);
+      await refrescar();
+    } catch (e) {
+      setError(e instanceof ErrorDeApi ? e.message : 'No se pudo modificar la autorización');
     } finally {
       setEnviando(false);
     }
@@ -256,13 +317,29 @@ export const PantallaDeVisitantes = ({
                   Acompañantes: {a.acompanantes.join(', ')}
                 </p>
               ) : null}
+              {a.observaciones !== null && a.observaciones !== '' ? (
+                <p className="text-secundario text-texto">
+                  <span className="text-texto-apagado">Observaciones: </span>
+                  {a.observaciones}
+                </p>
+              ) : null}
+              <FotografiaDeVisitante
+                copropiedadId={copropiedadId}
+                autorizacionId={a.id}
+                visitante={a.visitante}
+                tieneFotografia={a.tieneFotografia}
+                editable={a.estado === 'activa'}
+              />
               {a.estado === 'revocada' ? (
                 <p className="text-secundario text-texto-apagado">
                   Revocada{a.revocadaEn === null ? '' : ` el ${fecha(a.revocadaEn)}`}:{' '}
                   {a.motivoRevocacion ?? 'sin motivo registrado'}
                 </p>
               ) : (
-                <div className="pt-1">
+                <div className="flex gap-2 pt-1">
+                  <Boton variante="secundario" tamano="sm" onClick={() => abrirEdicion(a)}>
+                    Editar
+                  </Boton>
                   <Boton variante="peligro" tamano="sm" onClick={() => setRevocar(a)}>
                     Revocar
                   </Boton>
@@ -336,6 +413,23 @@ export const PantallaDeVisitantes = ({
           required
         />
 
+        <Campo
+          etiqueta="Placa del vehículo (opcional)"
+          value={placa}
+          onChange={(e) => setPlaca(e.target.value)}
+          ayuda="Si el visitante entra en vehículo. Se normaliza al guardar; si no es una placa, se rechaza."
+        />
+        <label className="block space-y-1.5">
+          <span className="block text-secundario font-medium">Observaciones (opcional)</span>
+          <textarea
+            value={observaciones}
+            onChange={(e) => setObservaciones(e.target.value)}
+            maxLength={1000}
+            rows={2}
+            className="w-full rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+          />
+        </label>
+
         <fieldset className="space-y-2 rounded-campo border border-borde p-3">
           <legend className="px-1 text-secundario font-medium text-texto">Repetición</legend>
           <label className="flex items-center gap-2 text-secundario text-texto">
@@ -400,6 +494,46 @@ export const PantallaDeVisitantes = ({
         </fieldset>
       </DialogoDeFormulario>
 
+      <DialogoDeFormulario
+        abierto={editar !== null}
+        titulo={`Modificar la autorización de ${editar?.visitante ?? ''}`}
+        descripcion="Se puede cambiar hasta cuándo vale, la placa y las observaciones. Ni la vivienda ni el visitante: eso es otra autorización. No se acorta por debajo de ahora: para eso está revocar, con motivo."
+        etiquetaEnviar="Guardar cambios"
+        enviando={enviando}
+        error={error}
+        puedeEnviar={nuevoHasta !== '' && problemaNuevoHasta === null}
+        alEnviar={() => void guardarEdicion()}
+        alCancelar={() => {
+          setEditar(null);
+          setError(undefined);
+        }}
+      >
+        <Campo
+          etiqueta="Hasta"
+          type="datetime-local"
+          value={nuevoHasta}
+          onChange={(e) => setNuevoHasta(e.target.value)}
+          error={problemaNuevoHasta ?? undefined}
+          required
+        />
+        <Campo
+          etiqueta="Placa del vehículo"
+          value={nuevaPlaca}
+          onChange={(e) => setNuevaPlaca(e.target.value)}
+          ayuda="Déjela vacía para quitarla."
+        />
+        <label className="block space-y-1.5">
+          <span className="block text-secundario font-medium">Observaciones</span>
+          <textarea
+            value={nuevasObservaciones}
+            onChange={(e) => setNuevasObservaciones(e.target.value)}
+            maxLength={1000}
+            rows={2}
+            className="w-full rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+          />
+        </label>
+      </DialogoDeFormulario>
+
       <DialogoDeConfirmacion
         abierto={revocar !== null}
         titulo={`Revocar la autorización de ${revocar?.visitante ?? ''}`}
@@ -416,4 +550,15 @@ export const PantallaDeVisitantes = ({
       />
     </>
   );
+};
+
+/**
+ * ISO → valor de `datetime-local` en el huso del navegador, que es el mismo en
+ * el que quien edita está pensando la hora. Sin segundos: el control no los
+ * muestra y compararlos haría que «sin cambios» pareciera un cambio.
+ */
+const aLocal = (iso: string): string => {
+  const d = new Date(iso);
+  const dos = (n: number): string => String(n).padStart(2, '0');
+  return `${String(d.getFullYear())}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}T${dos(d.getHours())}:${dos(d.getMinutes())}`;
 };

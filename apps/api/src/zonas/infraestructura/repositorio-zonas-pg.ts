@@ -2,7 +2,12 @@ import type { Pool, PoolClient } from 'pg';
 import { Injectable } from '@nestjs/common';
 import { Aforo, FranjaHoraria, HorarioDeZona, Zona, esFallo } from '@ncr/domain-core';
 import type { PoliticaReinicio, TipoDeZona } from '@ncr/domain-core';
-import type { RepositorioZonas, ResultadoOcupacion } from '../aplicacion/puertos';
+import type {
+  PresentacionDeZona,
+  RepositorioAutorizacionesZona,
+  RepositorioZonas,
+  ResultadoOcupacion,
+} from '../aplicacion/puertos';
 
 /**
  * `zona_horarios.dia_semana` es ISO 1..7 (lunes..domingo); el dominio usa
@@ -154,11 +159,23 @@ export class RepositorioZonasPg implements RepositorioZonas {
     await this.conContexto(async (c) => {
       await c.query('BEGIN');
       try {
+        /**
+         * 15-D (P1) · crea o actualiza en UNA sentencia. Hasta ahora sólo
+         * actualizaba: una zona que la consola quisiera crear no existía en
+         * ninguna parte. El `tipo` sólo se fija al crear: cambiarlo después
+         * cambiaría qué reglas la gobiernan sin que nadie lo viera.
+         */
         await c.query(
-          `UPDATE public.zonas
-              SET nombre=$3, abierta=$4, politica_reinicio_aforo=$5, normas=$6,
-                  actualizado_en=now(), actualizado_por=$7
-            WHERE copropiedad_id=$1 AND id=$2`,
+          `INSERT INTO public.zonas
+             (id, copropiedad_id, nombre, tipo, abierta, politica_reinicio_aforo, normas,
+              creado_por, actualizado_por)
+           VALUES ($2, $1, $3, $8::tipo_zona, $4, $5::politica_reinicio, $6, $7, $7)
+           ON CONFLICT (id) DO UPDATE
+             SET nombre = EXCLUDED.nombre, abierta = EXCLUDED.abierta,
+                 politica_reinicio_aforo = EXCLUDED.politica_reinicio_aforo,
+                 normas = EXCLUDED.normas, actualizado_en = now(),
+                 actualizado_por = EXCLUDED.actualizado_por
+           WHERE public.zonas.copropiedad_id = EXCLUDED.copropiedad_id`,
           [
             zona.copropiedadId,
             zona.id,
@@ -167,14 +184,18 @@ export class RepositorioZonasPg implements RepositorioZonas {
             zona.politicaReinicio,
             zona.normas,
             actorId,
+            zona.tipo,
           ],
         );
         // El máximo se actualiza; el CONTEO no se toca aquí. Reconfigurar una
         // zona con gente dentro no la vacía, y el único camino que mueve el
-        // contador es el atómico.
+        // contador es el atómico. Al crear, el contador nace en cero.
         await c.query(
-          `UPDATE public.zona_aforo SET aforo_maximo=$3, actualizado_en=now()
-            WHERE copropiedad_id=$1 AND zona_id=$2`,
+          `INSERT INTO public.zona_aforo (copropiedad_id, zona_id, aforo_maximo, conteo_actual)
+           VALUES ($1, $2, $3, 0)
+           ON CONFLICT (zona_id) DO UPDATE
+             SET aforo_maximo = EXCLUDED.aforo_maximo, actualizado_en = now()
+           WHERE public.zona_aforo.copropiedad_id = EXCLUDED.copropiedad_id`,
           [zona.copropiedadId, zona.id, zona.aforo.maximo],
         );
 
@@ -205,6 +226,50 @@ export class RepositorioZonasPg implements RepositorioZonas {
         throw e;
       }
     });
+  }
+
+  async desactivar(
+    copropiedadId: string,
+    zonaId: string,
+    motivo: string,
+    actorId: string,
+  ): Promise<boolean> {
+    return this.conContexto(async (c) => {
+      const { rowCount } = await c.query(
+        `UPDATE public.zonas
+            SET estado = 'inactivo', desactivado_en = now(), desactivado_por = $4,
+                motivo_desactivacion = $3, abierta = false, actualizado_en = now(),
+                actualizado_por = $4
+          WHERE copropiedad_id = $1 AND id = $2 AND estado = 'activo'`,
+        [copropiedadId, zonaId, motivo, actorId],
+      );
+      return (rowCount ?? 0) > 0;
+    });
+  }
+
+  async presentacionDe(copropiedadId: string): Promise<ReadonlyMap<string, PresentacionDeZona>> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{ id: string; icono: string | null }>(
+        'SELECT id, icono FROM public.zonas WHERE copropiedad_id = $1',
+        [copropiedadId],
+      );
+      return new Map(rows.map((f) => [f.id, { icono: f.icono }]));
+    });
+  }
+
+  async fijarIcono(
+    copropiedadId: string,
+    zonaId: string,
+    icono: string | null,
+    actorId: string,
+  ): Promise<void> {
+    await this.conContexto((c) =>
+      c.query(
+        `UPDATE public.zonas SET icono = $3, actualizado_en = now(), actualizado_por = $4
+          WHERE copropiedad_id = $1 AND id = $2`,
+        [copropiedadId, zonaId, icono, actorId],
+      ),
+    );
   }
 
   private async cargar(copropiedadId: string, zonaId: string | null): Promise<Zona[]> {
@@ -297,5 +362,58 @@ export class RepositorioZonasPg implements RepositorioZonas {
       activa: fila.estado === 'activo',
     });
     return esFallo(zona) ? null : zona.valor;
+  }
+}
+
+/**
+ * Permisos de zona por autorización, en PostgreSQL (tabla `autorizaciones_zona`).
+ * Hasta la 15-D sólo existía el doble en memoria, y el módulo lo cableaba en
+ * producción (P1): un permiso dado desde la consola se perdía al reiniciar.
+ */
+export class RepositorioAutorizacionesZonaPg implements RepositorioAutorizacionesZona {
+  constructor(
+    private readonly pool: Pool,
+    private readonly claims: Record<string, unknown>,
+  ) {}
+
+  private async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
+        JSON.stringify(this.claims),
+      ]);
+      return await fn(cliente);
+    } finally {
+      cliente.release();
+    }
+  }
+
+  async autorizar(
+    copropiedadId: string,
+    autorizacionId: string,
+    zonaId: string,
+    actorId: string,
+  ): Promise<boolean> {
+    return this.conContexto(async (c) => {
+      const { rowCount } = await c.query(
+        `INSERT INTO public.autorizaciones_zona
+           (copropiedad_id, autorizacion_id, zona_id, creado_por, actualizado_por)
+         VALUES ($1, $2, $3, $4, $4)
+         ON CONFLICT (autorizacion_id, zona_id) DO NOTHING`,
+        [copropiedadId, autorizacionId, zonaId, actorId],
+      );
+      return (rowCount ?? 0) > 0;
+    });
+  }
+
+  async zonasDe(copropiedadId: string, autorizacionId: string): Promise<readonly string[]> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{ zona_id: string }>(
+        `SELECT zona_id FROM public.autorizaciones_zona
+          WHERE copropiedad_id = $1 AND autorizacion_id = $2`,
+        [copropiedadId, autorizacionId],
+      );
+      return rows.map((f) => f.zona_id);
+    });
   }
 }

@@ -42,7 +42,11 @@ if (process.env.NCR_IGNORAR_ENV_FILE !== '1') {
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import express from 'express';
-import { guardarCuerpoCrudo } from './autorizaciones';
+import {
+  LIMITE_DE_FOTOGRAFIA,
+  RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
+  guardarCuerpoCrudo,
+} from './autorizaciones';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from './comun/sobre-de-equipo';
 import { AppModule } from './app.module';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
@@ -107,6 +111,11 @@ async function arrancar(): Promise<void> {
    * crudo, acotado en tamaño, y `@ncr/providers` lo abre.
    */
   app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
+  // O3 · la fotografía del visitante: más que el tope general, SÓLO en su ruta.
+  app.use(
+    RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
+    express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
+  );
   app.use(express.json({ limit: config.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
   app.use(express.urlencoded({ limit: config.LIMITE_PAYLOAD, extended: false }));
   // §2.7.4 · saneamiento DESPUÉS de los parsers: antes no hay cuerpo que sanear.

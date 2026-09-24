@@ -4,7 +4,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Download, Plus } from 'lucide-react';
-import type { Vivienda } from '@ncr/contracts';
+import type { EstadoAdministrativo, Vivienda } from '@ncr/contracts';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
@@ -17,6 +17,16 @@ import { useConfiguracion, useViviendas } from '@/lib/api/consultas';
 import { nombreDeGrupo, nombreDeVivienda, sinConfigurar, vocabularioDe } from '@/lib/vocabulario';
 import { CargaDePadron } from './carga-de-padron';
 import { AsistenteDeGeneracion } from './asistente-de-generacion';
+
+/** El mismo catálogo cerrado de la base (`estado_administrativo`, migración 0002). */
+const ESTADOS_ADMINISTRATIVOS: readonly {
+  readonly valor: EstadoAdministrativo;
+  readonly etiqueta: string;
+}[] = [
+  { valor: 'al_dia', etiqueta: 'Al día' },
+  { valor: 'en_mora', etiqueta: 'En mora' },
+  { valor: 'suspendida', etiqueta: 'Suspendida' },
+];
 
 /**
  * Directorio de viviendas.
@@ -58,6 +68,9 @@ export const DirectorioDeViviendas = ({
 
   const [identificador, setIdentificador] = useState('');
   const [agrupacion, setAgrupacion] = useState('');
+  /** O3 · edición: número, agrupación y estado administrativo. */
+  const [editar, setEditar] = useState<Vivienda | null>(null);
+  const [estadoAdministrativo, setEstadoAdministrativo] = useState<EstadoAdministrativo>('al_dia');
 
   const consulta = useViviendas(copropiedadId, { estado, busqueda });
   const configuracion = useConfiguracion(copropiedadId);
@@ -66,6 +79,50 @@ export const DirectorioDeViviendas = ({
 
   const refrescar = async (): Promise<void> => {
     await clientes.invalidateQueries({ queryKey: ['viviendas', copropiedadId] });
+  };
+
+  const abrirEdicion = (v: Vivienda): void => {
+    setIdentificador(v.identificador);
+    setAgrupacion(v.agrupacion ?? '');
+    setEstadoAdministrativo(
+      ESTADOS_ADMINISTRATIVOS.some((e) => e.valor === v.estadoAdministrativo)
+        ? (v.estadoAdministrativo as EstadoAdministrativo)
+        : 'al_dia',
+    );
+    setError(undefined);
+    setEditar(v);
+  };
+
+  const guardarEdicion = async (): Promise<void> => {
+    if (editar === null) return;
+    setEnviando(true);
+    setError(undefined);
+    try {
+      desenvolver(
+        await cliente.PUT('/copropiedades/{id}/padron/viviendas/{viviendaId}', {
+          params: { path: { id: copropiedadId, viviendaId: editar.id } },
+          body: {
+            ...(identificador.trim() === editar.identificador
+              ? {}
+              : { identificador: identificador.trim() }),
+            ...(agrupacion.trim() === (editar.agrupacion ?? '')
+              ? {}
+              : { agrupacion: agrupacion.trim() === '' ? null : agrupacion.trim() }),
+            ...(estadoAdministrativo === editar.estadoAdministrativo
+              ? {}
+              : { estadoAdministrativo }),
+          },
+        }),
+      );
+      setEditar(null);
+      await refrescar();
+    } catch (e) {
+      // «Ya existe ese número en la torre» lo dice la base por el índice
+      // (ADR-04) y la API lo traduce; aquí viaja tal cual.
+      setError(e instanceof ErrorDeApi ? e.message : 'No se pudo editar la vivienda');
+    } finally {
+      setEnviando(false);
+    }
   };
 
   const abrirAlta = (deGrupo: string): void => {
@@ -339,9 +396,20 @@ export const DirectorioDeViviendas = ({
                   ) : null}
                   <span className="ml-auto">
                     {v.estado === 'activo' ? (
-                      <Boton variante="secundario" tamano="sm" onClick={() => setBaja(v)}>
-                        Desactivar
-                      </Boton>
+                      <span className="flex items-center gap-2">
+                        {v.estadoAdministrativo !== 'al_dia' ? (
+                          <Distintivo tono="aviso">
+                            {ESTADOS_ADMINISTRATIVOS.find((e) => e.valor === v.estadoAdministrativo)
+                              ?.etiqueta ?? v.estadoAdministrativo}
+                          </Distintivo>
+                        ) : null}
+                        <Boton variante="secundario" tamano="sm" onClick={() => abrirEdicion(v)}>
+                          Editar
+                        </Boton>
+                        <Boton variante="secundario" tamano="sm" onClick={() => setBaja(v)}>
+                          Desactivar
+                        </Boton>
+                      </span>
                     ) : (
                       <span className="flex items-center gap-2">
                         <span className="text-secundario text-texto-apagado">
@@ -407,6 +475,48 @@ export const DirectorioDeViviendas = ({
         />
       </DialogoDeFormulario>
 
+      <DialogoDeFormulario
+        abierto={editar !== null}
+        titulo={`Editar ${editar === null ? '' : nombreDeVivienda(vocabulario, editar.identificador, editar.agrupacion)}`}
+        descripcion={`Número, ${vocabulario.agrupacion.toLowerCase()} y estado administrativo. El número sigue siendo único dentro de su ${vocabulario.agrupacion.toLowerCase()}: lo garantiza la base de datos.`}
+        etiquetaEnviar="Guardar cambios"
+        enviando={enviando}
+        error={error}
+        puedeEnviar={identificador.trim().length > 0}
+        alEnviar={() => void guardarEdicion()}
+        alCancelar={() => {
+          setEditar(null);
+          setError(undefined);
+        }}
+      >
+        <Campo
+          etiqueta="Número"
+          value={identificador}
+          onChange={(e) => setIdentificador(e.target.value)}
+          required
+        />
+        <Campo
+          etiqueta={vocabulario.agrupacion}
+          value={agrupacion}
+          onChange={(e) => setAgrupacion(e.target.value)}
+          ayuda={`Vacío si esta ${vocabulario.vivienda.toLowerCase()} no pertenece a ninguna.`}
+        />
+        <label className="block space-y-1.5">
+          <span className="block text-secundario font-medium">Estado administrativo</span>
+          <select
+            value={estadoAdministrativo}
+            onChange={(e) => setEstadoAdministrativo(e.target.value as EstadoAdministrativo)}
+            className="w-full rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+          >
+            {ESTADOS_ADMINISTRATIVOS.map((e) => (
+              <option key={e.valor} value={e.valor}>
+                {e.etiqueta}
+              </option>
+            ))}
+          </select>
+        </label>
+      </DialogoDeFormulario>
+
       {tipo !== null && tipo !== 'otro' ? (
         <AsistenteDeGeneracion
           copropiedadId={copropiedadId}
@@ -414,9 +524,17 @@ export const DirectorioDeViviendas = ({
           vocabulario={vocabulario}
           abierto={generando}
           alCerrar={() => setGenerando(false)}
-          alTerminar={(creadas) => {
+          alTerminar={(r) => {
             setGenerando(false);
-            setAviso(`Se crearon ${String(creadas)} viviendas.`);
+            setAviso(
+              [
+                `Se crearon ${String(r.creadas)} viviendas.`,
+                r.conservadas > 0 ? `${String(r.conservadas)} ya existían y se conservaron.` : null,
+                r.reactivadas > 0 ? `${String(r.reactivadas)} volvieron a estar activas.` : null,
+              ]
+                .filter((x): x is string => x !== null)
+                .join(' '),
+            );
             void refrescar();
           }}
         />

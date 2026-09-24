@@ -1,7 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
-import { RELOJ } from '@ncr/domain-core';
-import type { Reloj } from '@ncr/domain-core';
+import { Pool } from 'pg';
+import { GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
+import type { GeneradorDeId, Reloj } from '@ncr/domain-core';
 // Por el barril del módulo, nunca por su interior (§2.2): lo único que zonas
 // sabe de autorizaciones es que declara este puerto y qué forma tiene.
 import { RESOLUTOR_DE_ZONA } from '../autorizaciones';
@@ -11,11 +12,17 @@ import type { RepositorioAutorizacionesZona, RepositorioZonas } from './aplicaci
 import {
   AutorizarZonaAVisitante,
   ConfigurarZona,
+  CrearZona,
+  DarDeBajaZona,
   LiberarAforo,
   ReiniciarAforosVencidos,
   ValidarAforo,
 } from './aplicacion/casos-de-uso';
 import { RepositorioZonasEnMemoria } from './infraestructura/repositorio-zonas-memoria';
+import {
+  RepositorioAutorizacionesZonaPg,
+  RepositorioZonasPg,
+} from './infraestructura/repositorio-zonas-pg';
 import { ZonasController } from './presentacion/zonas.controller';
 
 /**
@@ -27,11 +34,13 @@ import { ZonasController } from './presentacion/zonas.controller';
  * otro (§2.2): el de zonas no sabe que existe un motor de reglas, y el de
  * autorizaciones no sabe que hay una tabla `zona_aforo`.
  *
- * **Por qué los adaptadores son los de memoria.** Sin contraseña de PostgreSQL
- * (D-17) la API no puede conectarse en tiempo de ejecución. `RepositorioZonasPg`
- * existe, cumple el mismo puerto y se prueba contra una base real —incluida la
- * prueba de concurrencia que demuestra el aforo—; lo que se elige aquí es qué se
- * cablea, no qué se construyó.
+ * **ETAPA 15-D (P1) · los adaptadores son los de PostgreSQL.** Hasta aquí se
+ * cableaba el doble en memoria «por D-17» —sin contraseña la API no se
+ * conectaba— y D-17 llevaba cerrado desde la 09-B: padrón y autorizaciones ya
+ * persistían de verdad mientras cada zona creada o configurada desde la consola
+ * se perdía al reiniciar. El doble sigue existiendo y se sigue proveyendo por su
+ * clase para que las suites sin base lo sustituyan (`test/utilidades.ts`), pero
+ * ya no es lo que un despliegue usa.
  */
 @Global()
 @Module({})
@@ -43,9 +52,29 @@ export class ZonasModule {
       module: ZonasModule,
       controllers: [ZonasController],
       providers: [
-        { provide: REPOSITORIO_ZONAS, useValue: enMemoria },
+        // Los claims viajan vacíos por el mismo motivo que en padrón: el filtro
+        // de tenant lo pone la capa de aplicación en cada consulta (§2.7.6).
+        {
+          provide: REPOSITORIO_ZONAS,
+          inject: [Pool],
+          useFactory: (pool: Pool) => new RepositorioZonasPg(pool, {}),
+        },
         { provide: RepositorioZonasEnMemoria, useValue: enMemoria },
-        { provide: REPOSITORIO_AUTORIZACIONES_ZONA, useValue: enMemoria.permisosDeZona },
+        {
+          provide: REPOSITORIO_AUTORIZACIONES_ZONA,
+          inject: [Pool],
+          useFactory: (pool: Pool) => new RepositorioAutorizacionesZonaPg(pool, {}),
+        },
+        {
+          provide: CrearZona,
+          inject: [REPOSITORIO_ZONAS, GENERADOR_DE_ID],
+          useFactory: (repo: RepositorioZonas, ids: GeneradorDeId) => new CrearZona(repo, ids),
+        },
+        {
+          provide: DarDeBajaZona,
+          inject: [REPOSITORIO_ZONAS],
+          useFactory: (repo: RepositorioZonas) => new DarDeBajaZona(repo),
+        },
         {
           provide: ValidarAforo,
           inject: [REPOSITORIO_ZONAS, RELOJ],

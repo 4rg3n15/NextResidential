@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
-import { Autorizacion, PatronRecurrencia, Vigencia, esExito } from '@ncr/domain-core';
+import { Autorizacion, PatronRecurrencia, Placa, Vigencia, esExito } from '@ncr/domain-core';
 import type { Acompanante } from '@ncr/domain-core';
+import { ViviendaSinTitular } from '../aplicacion/puertos';
 import type {
   AutorizacionEnLista,
   CriterioDeLectura,
+  FotografiaDeVisitante,
   RepositorioAutorizaciones,
   RepositorioDeConsultaDeAutorizaciones,
 } from '../aplicacion/puertos';
@@ -30,6 +32,13 @@ import type {
  *    siempre.
  * 3. **La revocación no borra.** RN-19 y CA-02: `estado='revocada'` con su
  *    momento y su motivo. El historial es la mitad del producto.
+ * 4. **Quien «autoriza» es el titular de la vivienda, no quien pulsa** —ETAPA
+ *    15-D, [SUPUESTO] S-38—. La base exige que `autorizado_por` sea un residente
+ *    titular activo de la vivienda destino (RN-05, `tg_autorizacion_coherente`),
+ *    y hasta ahora se escribía el identificador del USUARIO de la consola: el
+ *    disparador lo rechazaba y ninguna autorización creada desde administración
+ *    o portería llegaba a existir contra base real (D-113). El administrador
+ *    autoriza EN NOMBRE de la vivienda; `creado_por` conserva quién fue.
  */
 @Injectable()
 export class RepositorioAutorizacionesPg
@@ -38,6 +47,8 @@ export class RepositorioAutorizacionesPg
   constructor(
     private readonly pool: Pool,
     private readonly claims: Record<string, unknown> = {},
+    /** Nombre del bucket que figura en `evidencias.bucket` (D-19). */
+    private readonly bucket: string = 'en-memoria',
   ) {}
 
   private async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
@@ -73,19 +84,52 @@ export class RepositorioAutorizacionesPg
     return creado.rows[0]!.id;
   }
 
+  /**
+   * Quién figura como autorizante (decisión 4): el que ya tiene la fila si
+   * existe —cambiarlo al editar sería reescribir la historia— y, si es nueva,
+   * el titular activo de la vivienda destino. Sin titular no hay a nombre de
+   * quién autorizar, y se dice con un error tipado en vez de con un 500.
+   */
+  private async autorizanteDe(
+    c: PoolClient,
+    copropiedadId: string,
+    a: Autorizacion,
+  ): Promise<string> {
+    const actual = await c.query<{ autorizado_por: string }>(
+      `SELECT autorizado_por FROM public.autorizaciones WHERE copropiedad_id=$1 AND id=$2`,
+      [copropiedadId, a.id],
+    );
+    if (actual.rows[0] !== undefined) return actual.rows[0].autorizado_por;
+    const titular = await c.query<{ id: string }>(
+      `SELECT id FROM public.residentes
+        WHERE copropiedad_id=$1 AND vivienda_id=$2 AND es_titular AND estado='activo'
+        ORDER BY creado_en LIMIT 1`,
+      [copropiedadId, a.viviendaId],
+    );
+    if (titular.rows[0] === undefined) throw new ViviendaSinTitular(a.viviendaId);
+    return titular.rows[0].id;
+  }
+
   async guardar(copropiedadId: string, a: Autorizacion, actorId: string): Promise<void> {
     await this.conContexto(async (c) => {
       await c.query('BEGIN');
       try {
         const visitanteId = await this.visitanteDe(c, copropiedadId, a.personaId, actorId);
+        const autorizanteId = await this.autorizanteDe(c, copropiedadId, a);
         await c.query(
           `INSERT INTO public.autorizaciones
              (id, copropiedad_id, vivienda_id, visitante_id, autorizado_por, tipo,
-              vigencia, observaciones, estado, creado_por, actualizado_por,
+              vigencia, placa, permite_acceso_vehicular, observaciones,
+              estado, creado_por, actualizado_por,
               revocada_en, revocada_por, motivo_revocacion)
-           VALUES ($1,$2,$3,$4,$5,$6, tstzrange($7,$8,'[)'), NULL, $9, $5,$5, $10, $11, $12)
+           VALUES ($1,$2,$3,$4,$5,$6, tstzrange($7,$8,'[)'), $13::text, $13::text IS NOT NULL, $14::text,
+                   $9, $15,$15, $10, $11, $12)
            ON CONFLICT (id) DO UPDATE
-             SET estado = EXCLUDED.estado,
+             SET vigencia = EXCLUDED.vigencia,
+                 placa = EXCLUDED.placa,
+                 permite_acceso_vehicular = EXCLUDED.permite_acceso_vehicular,
+                 observaciones = EXCLUDED.observaciones,
+                 estado = EXCLUDED.estado,
                  revocada_en = EXCLUDED.revocada_en,
                  revocada_por = EXCLUDED.revocada_por,
                  motivo_revocacion = EXCLUDED.motivo_revocacion,
@@ -96,7 +140,7 @@ export class RepositorioAutorizacionesPg
             copropiedadId,
             a.viviendaId,
             visitanteId,
-            actorId,
+            autorizanteId,
             a.esRecurrente ? 'recurrente' : 'unica',
             a.vigencia.desde,
             a.vigencia.hasta,
@@ -104,6 +148,9 @@ export class RepositorioAutorizacionesPg
             a.revocadaEn,
             a.estado === 'revocada' ? actorId : null,
             a.motivoRevocacion,
+            a.placa === null ? null : a.placa.valor,
+            a.observaciones,
+            actorId,
           ],
         );
 
@@ -163,6 +210,12 @@ export class RepositorioAutorizacionesPg
         await c.query('COMMIT');
       } catch (e) {
         await c.query('ROLLBACK');
+        // `check_violation` con la marca RN-05: el disparador de la base dijo
+        // lo mismo que `autorizanteDe`, sólo que después (carrera con una baja).
+        const error = e as { code?: string; message?: string };
+        if (error.code === '23514' && (error.message ?? '').includes('RN-05')) {
+          throw new ViviendaSinTitular(a.viviendaId);
+        }
         throw e;
       }
     });
@@ -186,10 +239,13 @@ export class RepositorioAutorizacionesPg
       estado: string;
       revocada_en: Date | null;
       motivo_revocacion: string | null;
+      placa: string | null;
+      observaciones: string | null;
     }>(
       `SELECT a.id, a.vivienda_id, v.persona_id,
               lower(a.vigencia) AS desde, upper(a.vigencia) AS hasta,
-              a.estado::text AS estado, a.revocada_en, a.motivo_revocacion
+              a.estado::text AS estado, a.revocada_en, a.motivo_revocacion,
+              a.placa, a.observaciones
          FROM public.autorizaciones a
          JOIN public.visitantes v
            ON v.copropiedad_id = a.copropiedad_id AND v.id = a.visitante_id
@@ -260,6 +316,8 @@ export class RepositorioAutorizacionesPg
       maximoAcompanantes: Math.max(5, lista.length),
       revocadaEn: fila.revocada_en,
       motivoRevocacion: fila.motivo_revocacion,
+      placa: placaDesde(fila.placa),
+      observaciones: fila.observaciones,
     });
   }
 
@@ -322,6 +380,8 @@ export class RepositorioAutorizacionesPg
         estado: string;
         revocada_en: Date | null;
         motivo_revocacion: string | null;
+        placa: string | null;
+        observaciones: string | null;
         zonas: string[] | null;
         acompanantes: { persona_id: string; nombre_completo: string }[] | null;
         patron: { dia_semana: number; hora_inicio: string; hora_fin: string }[] | null;
@@ -329,6 +389,7 @@ export class RepositorioAutorizacionesPg
         `SELECT a.id, a.vivienda_id, v.persona_id,
                 lower(a.vigencia) AS desde, upper(a.vigencia) AS hasta,
                 a.estado::text AS estado, a.revocada_en, a.motivo_revocacion,
+                a.placa, a.observaciones,
                 (SELECT array_agg(z.zona_id) FROM public.autorizaciones_zona z
                   WHERE z.copropiedad_id = a.copropiedad_id AND z.autorizacion_id = a.id) AS zonas,
                 (SELECT json_agg(json_build_object('persona_id', ac.persona_id,
@@ -390,6 +451,8 @@ export class RepositorioAutorizacionesPg
             maximoAcompanantes: Math.max(5, acompanantes.length),
             revocadaEn: f.revocada_en,
             motivoRevocacion: f.motivo_revocacion,
+            placa: placaDesde(f.placa),
+            observaciones: f.observaciones,
           }),
         );
       }
@@ -419,12 +482,15 @@ export class RepositorioAutorizacionesPg
         hora_fin: string | null;
         revocada_en: Date | null;
         motivo_revocacion: string | null;
+        observaciones: string | null;
+        tiene_fotografia: boolean;
       }>(
         `SELECT a.id, a.vivienda_id, vi.identificador AS vivienda,
                 p.nombre_completo AS visitante, p.numero_documento AS documento,
                 lower(a.vigencia) AS desde, upper(a.vigencia) AS hasta,
                 a.tipo::text AS tipo, a.estado::text AS estado, a.placa,
-                a.revocada_en, a.motivo_revocacion,
+                a.revocada_en, a.motivo_revocacion, a.observaciones,
+                (a.evidencia_foto_id IS NOT NULL) AS tiene_fotografia,
                 (SELECT array_agg(pa.nombre_completo ORDER BY pa.nombre_completo)
                    FROM public.autorizacion_acompanantes ac
                    JOIN public.personas pa
@@ -478,10 +544,86 @@ export class RepositorioAutorizacionesPg
               },
         revocadaEn: f.revocada_en === null ? null : f.revocada_en.toISOString(),
         motivoRevocacion: f.motivo_revocacion,
+        observaciones: f.observaciones,
+        tieneFotografia: f.tiene_fotografia,
       }));
     });
   }
+
+  /**
+   * La fotografía entra como fila de `evidencias` —bucket, ruta, hash, tamaño;
+   * nunca una URL (D-19)— y la autorización pasa a apuntarle. La fila anterior,
+   * si la había, se conserva: la evidencia no se reescribe, se sustituye la
+   * referencia. Todo en una transacción: una evidencia sin autorización que la
+   * señale sería un objeto huérfano en el bucket.
+   */
+  async adjuntarFotografia(
+    copropiedadId: string,
+    autorizacionId: string,
+    fotografia: FotografiaDeVisitante,
+    actorId: string,
+  ): Promise<boolean> {
+    return this.conContexto(async (c) => {
+      await c.query('BEGIN');
+      try {
+        const evidencia = await c.query<{ id: string }>(
+          `INSERT INTO public.evidencias
+             (copropiedad_id, bucket, ruta, tipo, hash_sha256, tipo_mime, tamano_bytes, creado_por)
+           VALUES ($1,$2,$3,'foto_visitante',$4,$5,$6,$7) RETURNING id`,
+          [
+            copropiedadId,
+            this.bucket,
+            fotografia.clave,
+            fotografia.hashSha256,
+            fotografia.tipoMime,
+            fotografia.tamanoBytes,
+            actorId,
+          ],
+        );
+        const enlazada = await c.query(
+          `UPDATE public.autorizaciones
+              SET evidencia_foto_id = $3, actualizado_en = now(), actualizado_por = $4
+            WHERE copropiedad_id = $1 AND id = $2`,
+          [copropiedadId, autorizacionId, evidencia.rows[0]!.id, actorId],
+        );
+        if ((enlazada.rowCount ?? 0) === 0) {
+          await c.query('ROLLBACK');
+          return false;
+        }
+        await c.query('COMMIT');
+        return true;
+      } catch (e) {
+        await c.query('ROLLBACK');
+        throw e;
+      }
+    });
+  }
+
+  async fotografiaDe(
+    copropiedadId: string,
+    autorizacionId: string,
+  ): Promise<Pick<FotografiaDeVisitante, 'clave' | 'tipoMime'> | null> {
+    return this.conContexto(async (c) => {
+      const { rows } = await c.query<{ ruta: string; tipo_mime: string }>(
+        `SELECT e.ruta, e.tipo_mime
+           FROM public.autorizaciones a
+           JOIN public.evidencias e
+             ON e.copropiedad_id = a.copropiedad_id AND e.id = a.evidencia_foto_id
+          WHERE a.copropiedad_id = $1 AND a.id = $2`,
+        [copropiedadId, autorizacionId],
+      );
+      const fila = rows[0];
+      return fila === undefined ? null : { clave: fila.ruta, tipoMime: fila.tipo_mime };
+    });
+  }
 }
+
+/** Una placa guardada que no pase el objeto de valor se trata como ausente. */
+const placaDesde = (texto: string | null): Placa | null => {
+  if (texto === null) return null;
+  const placa = Placa.crear(texto);
+  return esExito(placa) ? placa.valor : null;
+};
 
 const minutosAHora = (minutos: number): string => {
   const acotado = Math.min(minutos, 24 * 60 - 1);

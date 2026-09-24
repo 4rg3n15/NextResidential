@@ -18,6 +18,7 @@ class ConfigurarZonaDto {
     this.politicaReinicio,
     this.normas,
     this.abierta,
+    this.icono,
   });
   
   factory ConfigurarZonaDto.fromJson(Map<String, Object?> json) => _$ConfigurarZonaDtoFromJson(json);
@@ -32,6 +33,7 @@ class ConfigurarZonaDto {
 
   /// Cierre manual del operador, sin presencia física (PB-04)
   final bool? abierta;
+  final String? icono;
 
   Map<String, Object?> toJson() => _$ConfigurarZonaDtoToJson(this);
 }

@@ -20,6 +20,9 @@ ConfirmarGeneracionDto _$ConfirmarGeneracionDtoFromJson(
   excepciones: (json['excepciones'] as List<dynamic>?)
       ?.map((e) => ExcepcionDeAgrupacionDto.fromJson(e as Map<String, dynamic>))
       .toList(),
+  modo: json['modo'] == null
+      ? null
+      : ConfirmarGeneracionDtoModo.fromJson(json['modo'] as String),
 );
 
 Map<String, dynamic> _$ConfirmarGeneracionDtoToJson(
@@ -31,5 +34,6 @@ Map<String, dynamic> _$ConfirmarGeneracionDtoToJson(
   'porPiso': instance.porPiso,
   'reiniciarNumeracion': instance.reiniciarNumeracion,
   'excepciones': instance.excepciones,
+  'modo': instance.modo,
   'totalEsperado': instance.totalEsperado,
 };

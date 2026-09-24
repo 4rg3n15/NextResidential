@@ -15,6 +15,8 @@ class ZonaDto {
     required this.id,
     required this.nombre,
     required this.tipo,
+    required this.icono,
+    required this.activa,
     required this.abierta,
     required this.politicaReinicio,
     required this.normas,
@@ -33,6 +35,8 @@ class ZonaDto {
   final String id;
   final String nombre;
   final String tipo;
+  final String? icono;
+  final bool activa;
   final bool abierta;
   final String politicaReinicio;
   final List<String> normas;

@@ -30,6 +30,8 @@ AutorizacionDto _$AutorizacionDtoFromJson(Map<String, dynamic> json) =>
           ? null
           : DateTime.parse(json['revocadaEn'] as String),
       motivoRevocacion: json['motivoRevocacion'] as String?,
+      observaciones: json['observaciones'] as String?,
+      tieneFotografia: json['tieneFotografia'] as bool,
     );
 
 Map<String, dynamic> _$AutorizacionDtoToJson(AutorizacionDto instance) =>
@@ -48,4 +50,6 @@ Map<String, dynamic> _$AutorizacionDtoToJson(AutorizacionDto instance) =>
       'patron': instance.patron,
       'revocadaEn': instance.revocadaEn?.toIso8601String(),
       'motivoRevocacion': instance.motivoRevocacion,
+      'observaciones': instance.observaciones,
+      'tieneFotografia': instance.tieneFotografia,
     };

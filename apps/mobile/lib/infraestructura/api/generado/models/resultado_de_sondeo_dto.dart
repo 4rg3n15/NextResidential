@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'capacidades_de_equipo_dto.dart';
 import 'ficha_del_equipo_dto.dart';
 import 'resultado_de_sondeo_dto_clase.dart';
 
@@ -19,6 +20,7 @@ class ResultadoDeSondeoDto {
     required this.latenciaMs,
     required this.verificado,
     this.ficha,
+    this.capacidades,
   });
   
   factory ResultadoDeSondeoDto.fromJson(Map<String, Object?> json) => _$ResultadoDeSondeoDtoFromJson(json);
@@ -33,6 +35,9 @@ class ResultadoDeSondeoDto {
 
   /// Qué hay que cambiar en el equipo, campo por campo. Ausente cuando no se sondeó: la falta de ficha no es una ficha vacía.
   final FichaDelEquipoDto? ficha;
+
+  /// Lo que el equipo declaró poder hacer. Ausente cuando no se alcanzó.
+  final CapacidadesDeEquipoDto? capacidades;
 
   Map<String, Object?> toJson() => _$ResultadoDeSondeoDtoToJson(this);
 }

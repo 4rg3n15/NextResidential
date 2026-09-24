@@ -2,12 +2,19 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Autorizacion, ContextoDeAcceso, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { VersionDeReglas, esExito, esFallo } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
-import { AgregarAcompanante, CrearAutorizacion, RevocarAutorizacion } from './casos-de-uso';
+import {
+  AgregarAcompanante,
+  CrearAutorizacion,
+  ModificarAutorizacion,
+  RevocarAutorizacion,
+} from './casos-de-uso';
 import { LevantarListaNegra, VetarEnListaNegra } from './listas-negras';
 import { DecidirAcceso } from './evaluar-acceso';
+import { ViviendaSinTitular } from './puertos';
 import type {
   CargadorDeContexto,
   EntradaListaNegra,
+  FotografiaDeVisitante,
   RepositorioAutorizaciones,
   RepositorioListaNegra,
   SolicitudDeAcceso,
@@ -42,6 +49,19 @@ class RepoAutorizacionesFalso implements RepositorioAutorizaciones {
   }
   async activasParaLectura(): Promise<readonly Autorizacion[]> {
     return [...this.guardadas.values()];
+  }
+  readonly fotografias = new Map<string, FotografiaDeVisitante>();
+  async adjuntarFotografia(
+    _cop: string,
+    id: string,
+    fotografia: FotografiaDeVisitante,
+  ): Promise<boolean> {
+    if (!this.guardadas.has(id)) return false;
+    this.fotografias.set(id, fotografia);
+    return true;
+  }
+  async fotografiaDe(_cop: string, id: string): Promise<FotografiaDeVisitante | null> {
+    return this.fotografias.get(id) ?? null;
   }
 }
 
@@ -123,6 +143,84 @@ describe('CrearAutorizacion (HU-07, HU-09)', () => {
     const operador = ctx({ rol: 'operador_central', copropiedadesAtendidas: [] });
     expect(esFallo(await caso.ejecutar(operador, entradaBase))).toBe(true);
     expect(repo.guardadas.size).toBe(0);
+  });
+});
+
+describe('O3 · placa, observaciones y modificación de una autorización viva', () => {
+  let repo: RepoAutorizacionesFalso;
+  let crear: CrearAutorizacion;
+  beforeEach(() => {
+    repo = new RepoAutorizacionesFalso();
+    crear = new CrearAutorizacion(repo, reloj, ids);
+  });
+
+  it('la placa entra por el objeto de valor: se normaliza o se rechaza, nunca se guarda cruda', async () => {
+    const r = await crear.ejecutar(ctx(), {
+      ...entradaBase,
+      placa: ' abc-123 ',
+      observaciones: 'Trae mercado',
+    });
+    expect(esExito(r)).toBe(true);
+    const guardada = [...repo.guardadas.values()][0];
+    expect(guardada?.placa?.valor).toBe('ABC123');
+    expect(guardada?.observaciones).toBe('Trae mercado');
+
+    expect(esFallo(await crear.ejecutar(ctx(), { ...entradaBase, placa: 'A!' }))).toBe(true);
+    expect(
+      esFallo(await crear.ejecutar(ctx(), { ...entradaBase, observaciones: 'x'.repeat(1001) })),
+    ).toBe(true);
+    expect(repo.guardadas.size).toBe(1);
+  });
+
+  it('S-38 · la vivienda sin titular la dice el adaptador y la aplicación la tipa (RN-05)', async () => {
+    class SinTitular extends RepoAutorizacionesFalso {
+      override async guardar(): Promise<void> {
+        throw new ViviendaSinTitular(entradaBase.viviendaId);
+      }
+    }
+    const r = await new CrearAutorizacion(new SinTitular(), reloj, ids).ejecutar(
+      ctx(),
+      entradaBase,
+    );
+    expect(esFallo(r) && r.error.codigo).toBe('INVARIANTE_VIOLADA');
+    expect(esFallo(r) && r.error.detalle).toMatch(/titular/);
+  });
+
+  it('modifica fin de vigencia, placa y observaciones; `null` quita, ausente conserva', async () => {
+    const creada = await crear.ejecutar(ctx(), { ...entradaBase, placa: 'ABC123' });
+    if (!esExito(creada)) throw new Error('inesperado');
+    const modificar = new ModificarAutorizacion(repo, reloj);
+
+    const r = await modificar.ejecutar(ctx(), creada.valor.id, {
+      hasta: '2026-09-12T00:00:00Z',
+      observaciones: 'Llega tarde',
+    });
+    expect(esExito(r)).toBe(true);
+    const a = repo.guardadas.get(creada.valor.id);
+    expect(a?.vigencia.hasta.toISOString()).toBe('2026-09-12T00:00:00.000Z');
+    expect(a?.placa?.valor).toBe('ABC123');
+    expect(a?.observaciones).toBe('Llega tarde');
+
+    expect(esExito(await modificar.ejecutar(ctx(), creada.valor.id, { placa: null }))).toBe(true);
+    expect(repo.guardadas.get(creada.valor.id)?.placa).toBeNull();
+  });
+
+  it('no acorta por debajo de «ahora», no acepta fecha inválida y no toca una revocada', async () => {
+    const creada = await crear.ejecutar(ctx(), entradaBase);
+    if (!esExito(creada)) throw new Error('inesperado');
+    const modificar = new ModificarAutorizacion(repo, reloj);
+
+    const pasada = await modificar.ejecutar(ctx(), creada.valor.id, {
+      hasta: '2026-09-08T01:00:00Z',
+    });
+    expect(esFallo(pasada) && pasada.error.detalle).toMatch(/revoque/i);
+    const invalida = await modificar.ejecutar(ctx(), creada.valor.id, { hasta: 'ayer' });
+    expect(esFallo(invalida) && invalida.error.codigo).toBe('DATO_INVALIDO');
+    expect(esFallo(await modificar.ejecutar(ctx(), 'no-existe', { placa: null }))).toBe(true);
+
+    await new RevocarAutorizacion(repo, reloj).ejecutar(ctx(), creada.valor.id, 'ya no viene');
+    const revocada = await modificar.ejecutar(ctx(), creada.valor.id, { observaciones: 'x' });
+    expect(esFallo(revocada) && revocada.error.codigo).toBe('OPERACION_NO_PERMITIDA');
   });
 });
 

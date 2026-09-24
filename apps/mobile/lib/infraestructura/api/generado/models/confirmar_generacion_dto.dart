@@ -5,6 +5,7 @@
 import 'package:json_annotation/json_annotation.dart';
 
 import 'confirmar_generacion_dto_estilo.dart';
+import 'confirmar_generacion_dto_modo.dart';
 import 'excepcion_de_agrupacion_dto.dart';
 
 part 'confirmar_generacion_dto.g.dart';
@@ -19,6 +20,7 @@ class ConfirmarGeneracionDto {
     this.porPiso,
     this.reiniciarNumeracion,
     this.excepciones,
+    this.modo,
   });
   
   factory ConfirmarGeneracionDto.fromJson(Map<String, Object?> json) => _$ConfirmarGeneracionDtoFromJson(json);
@@ -29,6 +31,7 @@ class ConfirmarGeneracionDto {
   final num? porPiso;
   final bool? reiniciarNumeracion;
   final List<ExcepcionDeAgrupacionDto>? excepciones;
+  final ConfirmarGeneracionDtoModo? modo;
   final num totalEsperado;
 
   Map<String, Object?> toJson() => _$ConfirmarGeneracionDtoToJson(this);

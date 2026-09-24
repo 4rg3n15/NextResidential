@@ -17,6 +17,8 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ESTADOS_ADMINISTRATIVOS } from '../aplicacion/puertos';
+import type { EstadoAdministrativo } from '../aplicacion/puertos';
 
 /**
  * DTOs de ENTRADA del padrón.
@@ -139,7 +141,73 @@ export class PlanDeGeneracionDto {
   excepciones?: ExcepcionDeAgrupacionDto[];
 }
 
+/** O3 · edición de vivienda. Lo ausente no se toca; `null` vacía el campo. */
+export class EditarViviendaDto {
+  @ApiPropertyOptional({ type: String, minLength: 1, maxLength: 60 })
+  @IsOptional()
+  @IsString()
+  @Length(1, 60)
+  identificador?: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 24 })
+  @IsOptional()
+  @IsString()
+  @Length(0, 24)
+  agrupacion?: string | null;
+
+  @ApiPropertyOptional({ type: String, enum: ESTADOS_ADMINISTRATIVOS })
+  @IsOptional()
+  @IsIn([...ESTADOS_ADMINISTRATIVOS])
+  estadoAdministrativo?: EstadoAdministrativo;
+}
+
+/** O3 · edición de vehículo. Lo ausente no se toca; `null` vacía el campo. */
+export class EditarVehiculoDto {
+  @ApiPropertyOptional({ type: String, minLength: 4, maxLength: 16 })
+  @IsOptional()
+  @IsString()
+  @Length(4, 16)
+  placa?: string;
+
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  personaId?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @Length(0, 60)
+  marca?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @Length(0, 60)
+  modelo?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @Length(0, 30)
+  color?: string | null;
+
+  @ApiPropertyOptional({ type: String, enum: ['automovil', 'motocicleta', 'bicicleta', 'otro'] })
+  @IsOptional()
+  @IsIn(['automovil', 'motocicleta', 'bicicleta', 'otro'])
+  tipo?: 'automovil' | 'motocicleta' | 'bicicleta' | 'otro';
+}
+
 export class ConfirmarGeneracionDto extends PlanDeGeneracionDto {
+  /**
+   * O3 · qué hacer con las que ya existen. `estricto` (por omisión) no crea
+   * ninguna si hay una colisión; `conservar` las deja y crea las demás;
+   * `sobrescribir` además reactiva las de baja cuya identidad está en el plan.
+   * Todos en UNA transacción.
+   */
+  @ApiPropertyOptional({ type: String, enum: ['estricto', 'conservar', 'sobrescribir'] })
+  @IsOptional()
+  @IsIn(['estricto', 'conservar', 'sobrescribir'])
+  modo?: 'estricto' | 'conservar' | 'sobrescribir';
+
   /**
    * El total que la vista previa enseñó. Si el servidor recalcula el plan y le
    * sale otro número, no crea nada: cierra la ventana en que el formulario

@@ -6,8 +6,11 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/autorizar_zona_dto.dart';
+import '../models/baja_de_zona_aplicada_dto.dart';
+import '../models/baja_de_zona_dto.dart';
 import '../models/configurar_zona_dto.dart';
 import '../models/conteo_dto.dart';
+import '../models/crear_zona_dto.dart';
 import '../models/permiso_de_zona_dto.dart';
 import '../models/veredicto_de_ingreso_dto.dart';
 import '../models/zona_dto.dart';
@@ -17,6 +20,13 @@ part 'zonas_api.g.dart';
 @RestApi()
 abstract class ZonasApi {
   factory ZonasApi(Dio dio, {String? baseUrl}) = _ZonasApi;
+
+  /// Crea una zona común (HU-18). Horario y normas, después
+  @POST('/copropiedades/{id}/zonas')
+  Future<ZonaDto> zonasControllerCrearZona({
+    @Path('id') required String id,
+    @Body() required CrearZonaDto body,
+  });
 
   /// Zonas con su aforo y su disponibilidad de ahora mismo (HU-19)
   @GET('/copropiedades/{id}/zonas')
@@ -30,6 +40,14 @@ abstract class ZonasApi {
     @Path('id') required String id,
     @Path('zonaId') required String zonaId,
     @Body() required AutorizarZonaDto body,
+  });
+
+  /// Baja lógica de la zona con motivo; nunca borrado (RN-19)
+  @POST('/copropiedades/{id}/zonas/{zonaId}/baja')
+  Future<BajaDeZonaAplicadaDto> zonasControllerDarDeBaja({
+    @Path('id') required String id,
+    @Path('zonaId') required String zonaId,
+    @Body() required BajaDeZonaDto body,
   });
 
   /// Configura horario, aforo, normas y apertura de la zona (HU-18)

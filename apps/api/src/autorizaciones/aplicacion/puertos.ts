@@ -42,6 +42,52 @@ export interface RepositorioAutorizaciones {
     copropiedadId: string,
     criterio: CriterioDeLectura,
   ): Promise<readonly Autorizacion[]>;
+  /**
+   * ETAPA 15-D (O3) · enlaza la fotografía de IDENTIFICACIÓN del visitante.
+   * Recibe la referencia al objeto ya guardado en el bucket privado —nunca los
+   * bytes— y devuelve `false` si la autorización no existe en esa copropiedad.
+   */
+  adjuntarFotografia(
+    copropiedadId: string,
+    autorizacionId: string,
+    fotografia: FotografiaDeVisitante,
+    actorId: string,
+  ): Promise<boolean>;
+  /** La referencia al objeto, para firmar una URL de vida corta. Nunca una URL. */
+  fotografiaDe(
+    copropiedadId: string,
+    autorizacionId: string,
+  ): Promise<Pick<FotografiaDeVisitante, 'clave' | 'tipoMime'> | null>;
+}
+
+/**
+ * Referencia a la fotografía del visitante en el almacén de evidencia (RN-21).
+ *
+ * NO es un dato biométrico: no se genera plantilla, no viaja a ninguna terminal
+ * y no la compara ningún algoritmo; la mira el portero para confrontar. Es la
+ * decisión documentada en el ADR-021, y por eso vive en `evidencias` con tipo
+ * `foto_visitante` y no en `plantillas_biometricas`.
+ */
+export interface FotografiaDeVisitante {
+  /** Clave del objeto en el bucket (`visitantes/<cop>/<autorización>/<id>.jpg`). */
+  readonly clave: string;
+  readonly tipoMime: string;
+  readonly hashSha256: string;
+  readonly tamanoBytes: number;
+}
+
+/**
+ * El adaptador la lanza cuando la vivienda destino no tiene residente titular
+ * activo: la base exige que `autorizado_por` sea uno (RN-05, disparador
+ * `tg_autorizacion_coherente`), y desde la consola quien crea es un
+ * administrador o un portero que autoriza EN NOMBRE de la vivienda
+ * ([SUPUESTO] S-38). La aplicación la traduce a un error tipado.
+ */
+export class ViviendaSinTitular extends Error {
+  constructor(readonly viviendaId: string) {
+    super('La vivienda no tiene un residente titular activo que pueda autorizar (RN-05)');
+    this.name = 'ViviendaSinTitular';
+  }
 }
 
 /**
@@ -74,6 +120,9 @@ export interface AutorizacionEnLista {
   readonly patron: PatronExpuesto | null;
   readonly revocadaEn: string | null;
   readonly motivoRevocacion: string | null;
+  /** ETAPA 15-D (O3) · observaciones del residente y si hay fotografía adjunta. */
+  readonly observaciones: string | null;
+  readonly tieneFotografia: boolean;
 }
 
 export interface RepositorioDeConsultaDeAutorizaciones {

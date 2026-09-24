@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'alta_de_equipo_dto_modo_de_terminal.dart';
 import 'alta_de_equipo_dto_protocolo.dart';
 import 'alta_de_equipo_dto_tipo.dart';
 
@@ -21,7 +22,10 @@ class AltaDeEquipoDto {
     this.canalBarrera,
     this.numeroDePuerta,
     this.canalDeAudio,
+    this.fabricante,
+    this.modoDeTerminal,
     this.protocolo = AltaDeEquipoDtoProtocolo.http,
+    this.canalDeAudioHabilitado = false,
     this.probarConexion = true,
   });
   
@@ -37,6 +41,9 @@ class AltaDeEquipoDto {
   final num? canalBarrera;
   final num? numeroDePuerta;
   final num? canalDeAudio;
+  final String? fabricante;
+  final AltaDeEquipoDtoModoDeTerminal? modoDeTerminal;
+  final bool canalDeAudioHabilitado;
   final bool probarConexion;
 
   Map<String, Object?> toJson() => _$AltaDeEquipoDtoToJson(this);

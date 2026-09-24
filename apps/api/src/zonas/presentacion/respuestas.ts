@@ -35,6 +35,10 @@ export class ZonaDto {
   @ApiProperty({ type: String, format: 'uuid' }) id!: string;
   @ApiProperty({ type: String }) nombre!: string;
   @ApiProperty({ type: String }) tipo!: string;
+  /** Icono de la tarjeta (ADR-013). Presentación: el dominio no lo lee. */
+  @ApiProperty({ type: String, nullable: true }) icono!: string | null;
+  /** `false` = dada de baja (RN-19). Se lista igual: su historial sigue ahí. */
+  @ApiProperty({ type: Boolean }) activa!: boolean;
   @ApiProperty({ type: Boolean }) abierta!: boolean;
   @ApiProperty({ type: String }) politicaReinicio!: string;
   @ApiProperty({ type: [String] }) normas!: string[];
@@ -53,6 +57,10 @@ export class ZonaDto {
       'muestra el estado vacío, que es información honesta, y no un número inventado.',
   })
   reservasDelDia!: ReservaDelDiaDto[];
+}
+
+export class BajaDeZonaAplicadaDto {
+  @ApiProperty({ type: Boolean }) desactivada!: boolean;
 }
 
 export class VeredictoDeIngresoDto {

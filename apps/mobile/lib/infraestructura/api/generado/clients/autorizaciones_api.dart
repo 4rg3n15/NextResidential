@@ -9,9 +9,14 @@ import '../models/acompanante_agregado_dto.dart';
 import '../models/agregar_acompanante_dto.dart';
 import '../models/autorizacion_dto.dart';
 import '../models/crear_autorizacion_dto.dart';
+import '../models/fotografia_adjuntada_dto.dart';
+import '../models/fotografia_de_visitante_dto.dart';
 import '../models/id_autorizacion_dto.dart';
+import '../models/modificacion_dto.dart';
+import '../models/modificar_autorizacion_dto.dart';
 import '../models/revocacion_dto.dart';
 import '../models/revocar_autorizacion_dto.dart';
+import '../models/url_de_fotografia_dto.dart';
 import '../models/ver.dart';
 
 part 'autorizaciones_api.g.dart';
@@ -34,12 +39,35 @@ abstract class AutorizacionesApi {
     @Body() required CrearAutorizacionDto body,
   });
 
+  /// Cambia fin de vigencia, placa u observaciones de una viva (O3)
+  @PUT('/copropiedades/{id}/autorizaciones/{autorizacionId}')
+  Future<ModificacionDto> autorizacionesControllerModificarAutorizacion({
+    @Path('id') required String id,
+    @Path('autorizacionId') required String autorizacionId,
+    @Body() required ModificarAutorizacionDto body,
+  });
+
   /// Añade un acompañante por su propia identidad (HU-08, D-01)
   @POST('/copropiedades/{id}/autorizaciones/{autorizacionId}/acompanantes')
   Future<AcompananteAgregadoDto> autorizacionesControllerAgregarAcompanante({
     @Path('id') required String id,
     @Path('autorizacionId') required String autorizacionId,
     @Body() required AgregarAcompananteDto body,
+  });
+
+  /// Adjunta la fotografía de identificación del visitante (O3, RN-21)
+  @POST('/copropiedades/{id}/autorizaciones/{autorizacionId}/fotografia')
+  Future<FotografiaAdjuntadaDto> autorizacionesControllerAdjuntarFotografia({
+    @Path('id') required String id,
+    @Path('autorizacionId') required String autorizacionId,
+    @Body() required FotografiaDeVisitanteDto body,
+  });
+
+  /// URL firmada de vida corta de la fotografía del visitante (RN-21)
+  @GET('/copropiedades/{id}/autorizaciones/{autorizacionId}/fotografia')
+  Future<UrlDeFotografiaDto> autorizacionesControllerFotografia({
+    @Path('id') required String id,
+    @Path('autorizacionId') required String autorizacionId,
   });
 
   /// Revoca con motivo obligatorio; no borra (HU-10, RN-19)

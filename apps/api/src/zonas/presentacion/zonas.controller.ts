@@ -22,11 +22,20 @@ import type { RepositorioZonas } from '../aplicacion/puertos';
 import {
   AutorizarZonaAVisitante,
   ConfigurarZona,
+  CrearZona,
+  DarDeBajaZona,
   LiberarAforo,
   ValidarAforo,
 } from '../aplicacion/casos-de-uso';
-import { AutorizarZonaDto, ConfigurarZonaDto } from './dtos';
-import { ConteoDto, PermisoDeZonaDto, VeredictoDeIngresoDto, ZonaDto } from './respuestas';
+import { AutorizarZonaDto, BajaDeZonaDto, ConfigurarZonaDto, CrearZonaDto } from './dtos';
+import {
+  BajaDeZonaAplicadaDto,
+  ConteoDto,
+  PermisoDeZonaDto,
+  VeredictoDeIngresoDto,
+  ZonaDto,
+} from './respuestas';
+import type { PresentacionDeZona } from '../aplicacion/puertos';
 
 /**
  * Zonas comunes — HU-18, HU-19, HU-20, CU-05.
@@ -45,8 +54,51 @@ export class ZonasController {
     @Inject(LiberarAforo) private readonly liberar: LiberarAforo,
     @Inject(ConfigurarZona) private readonly configurar: ConfigurarZona,
     @Inject(AutorizarZonaAVisitante) private readonly autorizar: AutorizarZonaAVisitante,
+    @Inject(CrearZona) private readonly crear: CrearZona,
+    @Inject(DarDeBajaZona) private readonly baja: DarDeBajaZona,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
+
+  /**
+   * O3 · alta de zona. Nace sin horario —abierta según política— y con el
+   * aforo declarado; horario y normas se ajustan después por `configuracion`.
+   */
+  @Post()
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Crea una zona común (HU-18). Horario y normas, después' })
+  @ApiOkResponse({ type: ZonaDto })
+  async crearZona(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Body() dto: CrearZonaDto,
+  ): Promise<ZonaDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'zonas/alta');
+    const zona = desenvolver(
+      await this.crear.ejecutar(copropiedadId, ctx.usuarioId, {
+        nombre: dto.nombre,
+        tipo: dto.tipo,
+        aforoMaximo: dto.aforoMaximo,
+        ...(dto.normas === undefined ? {} : { normas: dto.normas }),
+        ...(dto.icono === undefined ? {} : { icono: dto.icono }),
+      }),
+    );
+    return exponer(zona, new Date(), { icono: dto.icono ?? null });
+  }
+
+  @Post(':zonaId/baja')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Baja lógica de la zona con motivo; nunca borrado (RN-19)' })
+  @ApiOkResponse({ type: BajaDeZonaAplicadaDto })
+  async darDeBaja(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('zonaId', ParseUUIDPipe) zonaId: string,
+    @Body() dto: BajaDeZonaDto,
+  ): Promise<BajaDeZonaAplicadaDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'zonas/baja');
+    desenvolver(await this.baja.ejecutar(copropiedadId, zonaId, dto.motivo, ctx.usuarioId));
+    return { desactivada: true };
+  }
 
   @Get()
   @Roles('administrador', 'superadministrador', 'portero', 'operador_central', 'residente')
@@ -58,7 +110,10 @@ export class ZonasController {
   ): Promise<ZonaDto[]> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'zonas');
     const ahora = new Date();
-    return (await this.zonas.listar(copropiedadId)).map((z) => exponer(z, ahora));
+    const presentacion = await this.zonas.presentacionDe(copropiedadId);
+    return (await this.zonas.listar(copropiedadId)).map((z) =>
+      exponer(z, ahora, presentacion.get(z.id) ?? { icono: null }),
+    );
   }
 
   @Post(':zonaId/configuracion')
@@ -108,7 +163,11 @@ export class ZonasController {
     const actualizada = desenvolver(
       await this.configurar.ejecutar(copropiedadId, zonaId, ctx.usuarioId, cambios),
     );
-    return exponer(actualizada, new Date());
+    if (dto.icono !== undefined) {
+      await this.zonas.fijarIcono(copropiedadId, zonaId, dto.icono, ctx.usuarioId);
+    }
+    const presentacion = (await this.zonas.presentacionDe(copropiedadId)).get(zonaId);
+    return exponer(actualizada, new Date(), presentacion ?? { icono: dto.icono ?? null });
   }
 
   @Post(':zonaId/ingresos')
@@ -179,13 +238,15 @@ export class ZonasController {
 }
 
 /** El agregado NO se serializa crudo (§2.2): sale un DTO. */
-const exponer = (zona: Zona, ahora: Date): ZonaDto => {
+const exponer = (zona: Zona, ahora: Date, presentacion: PresentacionDeZona): ZonaDto => {
   const alDia = zona.conAforoAlDia(ahora);
   const disponibilidad = zona.disponibilidadEn(ahora);
   return {
     id: alDia.id,
     nombre: alDia.nombre,
     tipo: alDia.tipo,
+    icono: presentacion.icono,
+    activa: alDia.activa,
     abierta: alDia.abierta,
     politicaReinicio: alDia.politicaReinicio,
     normas: [...alDia.normas],

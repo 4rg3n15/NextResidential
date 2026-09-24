@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
 } from '@nestjs/common';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -23,9 +24,12 @@ import type { LectorDeVocabulario } from '../aplicacion/vocabulario';
 import { GenerarViviendas } from '../aplicacion/generar-viviendas';
 import { ExportarPadron } from '../aplicacion/exportar-padron';
 import {
+  BorrarVehiculoDefinitivamente,
   BorrarViviendaDefinitivamente,
   DesactivarVehiculo,
   DesactivarVivienda,
+  EditarVehiculo,
+  EditarVivienda,
   ReactivarVivienda,
   RegistrarPersona,
   RegistrarResidente,
@@ -40,6 +44,8 @@ import {
   CargarPadronXlsxDto,
   ConfirmarGeneracionDto,
   DesactivarDto,
+  EditarVehiculoDto,
+  EditarViviendaDto,
   PlanDeGeneracionDto,
   RegistrarPersonaDto,
   RegistrarResidenteDto,
@@ -48,7 +54,9 @@ import {
 } from './dtos';
 import {
   BajaDto,
+  BorradoDefinitivoDeVehiculoDto,
   BorradoDefinitivoDto,
+  EdicionAplicadaDto,
   GeneracionAplicadaDto,
   IdCreadoDto,
   PersonaResueltaDto,
@@ -135,6 +143,57 @@ export class PadronController {
   ): Promise<IdCreadoDto> {
     const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/vehiculos');
     return this.desenvolver(await new RegistrarVehiculo(this.repo).ejecutar(destino, dto));
+  }
+
+  /** O3 · edición. `null` vacía un campo; ausente lo deja. La placa pasa por el VO. */
+  @Put('vehiculos/:vehiculoId')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Edita un vehículo; la placa única activa la garantiza la base' })
+  @ApiOkResponse({ type: EdicionAplicadaDto })
+  async editarVehiculo(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('vehiculoId', ParseUUIDPipe) id: string,
+    @Body() dto: EditarVehiculoDto,
+  ): Promise<EdicionAplicadaDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/vehiculos');
+    this.desenvolver(await new EditarVehiculo(this.repo).ejecutar(destino, id, dto));
+    return { editado: true };
+  }
+
+  /**
+   * O3 · borrado DEFINITIVO de un vehículo, sólo sin historial. `DELETE` porque
+   * esto sí borra; la baja lógica sigue siendo `POST /desactivacion`.
+   */
+  @Delete('vehiculos/:vehiculoId')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Borrado DEFINITIVO del vehículo, sólo sin historial (RN-19)' })
+  @ApiOkResponse({ type: BorradoDefinitivoDeVehiculoDto })
+  async borrarVehiculoDefinitivamente(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('vehiculoId', ParseUUIDPipe) id: string,
+  ): Promise<BorradoDefinitivoDeVehiculoDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/vehiculos');
+    const r = this.desenvolver(
+      await new BorrarVehiculoDefinitivamente(this.repo).ejecutar(destino, id),
+    );
+    return { borrado: true, placa: r.placa };
+  }
+
+  @Put('viviendas/:viviendaId')
+  @Roles('administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Edita identificador, agrupación o dirección de la vivienda (HU-02)' })
+  @ApiOkResponse({ type: EdicionAplicadaDto })
+  async editarVivienda(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('viviendaId', ParseUUIDPipe) id: string,
+    @Body() dto: EditarViviendaDto,
+  ): Promise<EdicionAplicadaDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'padron/viviendas');
+    this.desenvolver(await new EditarVivienda(this.repo).ejecutar(destino, id, dto));
+    return { editado: true };
   }
 
   @Post('vehiculos/:vehiculoId/desactivacion')
@@ -363,6 +422,7 @@ export class PadronController {
         destino,
         planDesdeDto(dto),
         dto.totalEsperado,
+        dto.modo ?? 'estricto',
       ),
     );
   }

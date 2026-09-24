@@ -19,6 +19,16 @@ EquipoDto _$EquipoDtoFromJson(Map<String, dynamic> json) => EquipoDto(
   canalBarrera: json['canalBarrera'] as num?,
   numeroDePuerta: json['numeroDePuerta'] as num?,
   canalDeAudio: json['canalDeAudio'] as num?,
+  fabricante: json['fabricante'] as String?,
+  modoDeTerminal: json['modoDeTerminal'] == null
+      ? null
+      : EquipoDtoModoDeTerminal.fromJson(json['modoDeTerminal'] as String),
+  canalDeAudioHabilitado: json['canalDeAudioHabilitado'] as bool,
+  capacidades: json['capacidades'] == null
+      ? null
+      : CapacidadesDeEquipoDto.fromJson(
+          json['capacidades'] as Map<String, dynamic>,
+        ),
   verificacion: EquipoDtoVerificacion.fromJson(json['verificacion'] as String),
   verificadoEn: json['verificadoEn'] as String?,
   motivoNoVerificado: json['motivoNoVerificado'] as String?,
@@ -38,6 +48,10 @@ Map<String, dynamic> _$EquipoDtoToJson(EquipoDto instance) => <String, dynamic>{
   'canalBarrera': instance.canalBarrera,
   'numeroDePuerta': instance.numeroDePuerta,
   'canalDeAudio': instance.canalDeAudio,
+  'fabricante': instance.fabricante,
+  'modoDeTerminal': instance.modoDeTerminal,
+  'canalDeAudioHabilitado': instance.canalDeAudioHabilitado,
+  'capacidades': instance.capacidades,
   'verificacion': instance.verificacion,
   'verificadoEn': instance.verificadoEn,
   'motivoNoVerificado': instance.motivoNoVerificado,

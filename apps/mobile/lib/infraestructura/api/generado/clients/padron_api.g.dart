@@ -266,6 +266,69 @@ class _PadronApi implements PadronApi {
   }
 
   @override
+  Future<EdicionAplicadaDto> padronControllerEditarVehiculo({
+    required String id,
+    required String vehiculoId,
+    required EditarVehiculoDto body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body.toJson());
+    final _options = _setStreamType<EdicionAplicadaDto>(
+      Options(method: 'PUT', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/padron/vehiculos/${vehiculoId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late EdicionAplicadaDto _value;
+    try {
+      _value = EdicionAplicadaDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<BorradoDefinitivoDeVehiculoDto>
+  padronControllerBorrarVehiculoDefinitivamente({
+    required String id,
+    required String vehiculoId,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<BorradoDefinitivoDeVehiculoDto>(
+      Options(method: 'DELETE', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/padron/vehiculos/${vehiculoId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late BorradoDefinitivoDeVehiculoDto _value;
+    try {
+      _value = BorradoDefinitivoDeVehiculoDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<BajaDto> padronControllerDesactivarVehiculo({
     required String id,
     required String vehiculoId,
@@ -418,6 +481,38 @@ class _PadronApi implements PadronApi {
     late VistaPreviaDeGeneracionDto _value;
     try {
       _value = VistaPreviaDeGeneracionDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<EdicionAplicadaDto> padronControllerEditarVivienda({
+    required String id,
+    required String viviendaId,
+    required EditarViviendaDto body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body.toJson());
+    final _options = _setStreamType<EdicionAplicadaDto>(
+      Options(method: 'PUT', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/padron/viviendas/${viviendaId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late EdicionAplicadaDto _value;
+    try {
+      _value = EdicionAplicadaDto.fromJson(_result.data!);
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
       rethrow;
