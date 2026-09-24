@@ -94,6 +94,21 @@ const FUERA_DE_ZOD = new Map([
   ['API:BARRERA_CLAVE', 'ídem'],
   ['API:BARRERA_TIEMPO_LIMITE_MS', 'ídem'],
   ['API:BARRERA_DISPOSITIVO_ID', 'la lee apps/api/src/guardia/guardia.module.ts'],
+  // El guion de puesta en marcha en sitio (ETAPA 15-D, O4) se ejecuta con
+  // `node --env-file=apps/api/.env` y lee estas por `process.env`. La API NO
+  // las lee: por eso van comentadas en el ejemplo y exentas aquí, y por eso
+  // el ejemplo mismo lo dice.
+  ['API:BARRERA_CANAL', 'la lee scripts/puesta-en-marcha-equipos.mjs'],
+  ['API:TERMINAL_HOST', 'la lee scripts/puesta-en-marcha-equipos.mjs'],
+  ['API:TERMINAL_PUERTO', 'ídem'],
+  ['API:TERMINAL_USUARIO', 'ídem'],
+  ['API:TERMINAL_CLAVE', 'ídem'],
+  ['API:TERMINAL_CANAL', 'ídem'],
+  ['API:VIDEOPORTERO_HOST', 'la lee scripts/puesta-en-marcha-equipos.mjs'],
+  ['API:VIDEOPORTERO_PUERTO', 'ídem'],
+  ['API:VIDEOPORTERO_USUARIO', 'ídem'],
+  ['API:VIDEOPORTERO_CLAVE', 'ídem'],
+  ['API:VIDEOPORTERO_CANAL', 'ídem'],
   // De las SEIS registradas como deuda en ESTADO_ETAPAS quedan CUATRO. La ETAPA
   // 14 saldó las dos suyas —`LOG_LEVEL` y `SENTRY_DSN`— dándoles uso, no
   // borrándolas del ejemplo: ahora Zod las valida y el código las lee, así que
