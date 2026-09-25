@@ -22,6 +22,13 @@ export { BiometriaModule } from './biometria.module';
 // (D-40). Antes solo lo alcanzaba su propio controlador.
 export { BarrerPlantillasVencidas, CapturarRostro } from './aplicacion/casos-de-uso';
 export type { ResultadoBarrido } from './aplicacion/casos-de-uso';
+/**
+ * A3 (15-E) · el residente entrega a su visitante el enlace con el que éste
+ * responde. Sale el caso de uso, no el firmante: quien lo llama recibe un
+ * token ya firmado y no sabe cómo se firma.
+ */
+export { EmitirEnlaceDeConsentimiento } from './aplicacion/enlace-de-consentimiento';
+export type { EnlaceEmitido } from './aplicacion/enlace-de-consentimiento';
 export type { ResultadoCaptura, SolicitudDeCaptura } from './aplicacion/casos-de-uso';
 export {
   BOVEDA_DE_PLANTILLAS,

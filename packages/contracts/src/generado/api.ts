@@ -312,6 +312,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Emite el enlace firmado con el que el TITULAR responde (RN-10) */
+        post: operations["BiometriaController_emitirEnlaceDeConsentimiento"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta": {
         parameters: {
             query?: never;
@@ -357,6 +374,23 @@ export interface paths {
         put?: never;
         /** Empuja la plantilla a una terminal, si hay consentimiento (RN-09) */
         post: operations["BiometriaController_sincronizarPlantilla"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/biometria/plantillas/{plantillaId}/sincronizacion-total": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Empuja la plantilla a todos los equipos con biblioteca de rostros (RN-09) */
+        post: operations["BiometriaController_sincronizarEnTodas"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1829,7 +1863,7 @@ export interface components {
         };
         CorreccionDeEquipoDto: {
             /** @enum {string} */
-            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor";
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota";
             /** @description Por qué se corrige. Queda en la auditoría junto a quién y cuándo. */
             motivo: string;
         };
@@ -2002,6 +2036,20 @@ export interface components {
             /** @description Pasado el umbral de KPI-34 */
             demorado: boolean;
         };
+        EnlaceDeConsentimientoDto: {
+            /** Format: uuid */
+            consentimientoId: string;
+            /** @description Estado del consentimiento al emitir el enlace */
+            estado: string;
+            /** @description Token firmado; vale sólo para este consentimiento y caduca */
+            token: string;
+            /** @description Ruta en la API: /consentimiento/<token> */
+            ruta: string;
+            /** @description URL completa si API_URL_PUBLICA está declarada; null si no lo está */
+            url: string | null;
+            /** @description Caducidad del enlace (ISO 8601) */
+            expiraEn: string;
+        };
         EquipoDto: {
             id: string;
             nombre: string;
@@ -2059,6 +2107,13 @@ export interface components {
             titular: string | null;
             /** @description Segundos tras los que el canal se libera solo por inactividad */
             timeoutSegundos: number;
+            /**
+             * @description Por dónde va el audio: «equipo» si el proveedor abrió el canal del aparato; «ninguno» si hay turno pero no transporte (el equipo no declara audio o no está en el registro).
+             * @enum {string}
+             */
+            transporte: "equipo" | "ninguno";
+            /** @description Por qué no hay transporte, si no lo hay */
+            detalleTransporte: string | null;
         };
         EstadoDeDispositivosDto: {
             dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
@@ -2247,7 +2302,7 @@ export interface components {
              * @description Qué corrección lo arregla desde la consola. Nulo si no la hay.
              * @enum {string|null}
              */
-            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | null;
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota" | null;
         };
         HistorialDeOrdenesDto: {
             ordenes: components["schemas"]["OrdenEjecutadaDto"][];
@@ -2674,6 +2729,12 @@ export interface components {
             /** @description Evidencia de la aceptación (RN-09) */
             evidenciaId?: string;
         };
+        RespuestaDeConsentimientoDto: {
+            /** @description Estado resultante del consentimiento */
+            estado: string;
+            /** @description Si el titular aceptó: el resultado de empujar cada plantilla a todas las terminales. Vacío si rechazó o si no había plantilla pendiente. */
+            propagacion: components["schemas"]["SincronizacionTotalDto"][];
+        };
         RestablecimientoRegistradoDto: {
             /**
              * @description Siempre true; la respuesta es 204 sin cuerpo
@@ -2697,7 +2758,7 @@ export interface components {
         };
         ResultadoDeCorreccionDto: {
             /** @enum {string} */
-            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor";
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota";
             aplicada: boolean;
             valorAnterior: string | null;
             valorNuevo: string | null;
@@ -2735,6 +2796,13 @@ export interface components {
             ficha?: components["schemas"]["FichaDelEquipoDto"];
             /** @description Lo que el equipo declaró poder hacer. Ausente cuando no se alcanzó. */
             capacidades?: components["schemas"]["CapacidadesDeEquipoDto"];
+        };
+        ResultadoPorTerminalDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            nombre: string;
+            sincronizada: boolean;
+            detalle: string;
         };
         RevocacionDto: {
             revocada: boolean;
@@ -2792,6 +2860,15 @@ export interface components {
             copropiedadesAtendidas: string[];
             /** @description aal2 en el token. Los roles administrativos no operan sin él (RN-20, CA-25): la consola debe llevar al paso de segundo factor mientras sea false. */
             mfaVerificado: boolean;
+        };
+        SincronizacionTotalDto: {
+            /** Format: uuid */
+            plantillaId: string;
+            /** @description Equipos activos con biblioteca de rostros */
+            terminales: number;
+            sincronizadas: number;
+            fallidas: number;
+            porTerminal: components["schemas"]["ResultadoPorTerminalDto"][];
         };
         SincronizarPlantillaDto: {
             dispositivoId: string;
@@ -3473,6 +3550,28 @@ export interface operations {
             };
         };
     };
+    BiometriaController_emitirEnlaceDeConsentimiento: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                consentimientoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnlaceDeConsentimientoDto"];
+                };
+            };
+        };
+    };
     BiometriaController_responderConsentimiento: {
         parameters: {
             query?: never;
@@ -3489,11 +3588,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RespuestaDeConsentimientoDto"];
+                };
             };
         };
     };
@@ -3538,6 +3639,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    BiometriaController_sincronizarEnTodas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                plantillaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SincronizacionTotalDto"];
+                };
             };
         };
     };

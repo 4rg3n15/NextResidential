@@ -109,7 +109,7 @@ export class RepositorioPlantillasEnMemoria implements RepositorioPlantillas {
     for (const p of this.filas.values()) {
       if (p.copropiedadId !== copropiedadId || !p.suprimida) continue;
       for (const dispositivoId of this.sincronizaciones.get(p.id) ?? []) {
-        destinos.push({ plantillaId: p.id, dispositivoId });
+        destinos.push({ copropiedadId, plantillaId: p.id, dispositivoId });
       }
     }
     return destinos;

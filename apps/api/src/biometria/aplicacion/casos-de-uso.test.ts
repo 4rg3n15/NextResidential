@@ -144,7 +144,7 @@ describe('CapturarRostro · CU-02, el orden es la regla', () => {
 
   it('el vector se guarda CIFRADO: el claro no aparece en el almacén', async () => {
     const r = await capturaValida();
-    const guardado = await almacen.tomar(`${COP}/${r.plantillaId}`);
+    const guardado = await almacen.tomar(COP, r.plantillaId);
     expect(guardado).not.toBeNull();
     expect(guardado?.includes(Buffer.from(VECTOR))).toBe(false);
   });
@@ -261,9 +261,9 @@ describe('RevocarConsentimiento · RN-11, CA-11', () => {
 
   it('revocar borra el vector del almacén, no lo etiqueta', async () => {
     const r = await cicloCompleto();
-    expect(await almacen.tomar(`${COP}/${r.plantillaId}`)).not.toBeNull();
+    expect(await almacen.tomar(COP, r.plantillaId)).not.toBeNull();
     await revocar.ejecutar(ctx, { consentimientoId: r.consentimientoId, quienRevoca: TITULAR });
-    expect(await almacen.tomar(`${COP}/${r.plantillaId}`)).toBeNull();
+    expect(await almacen.tomar(COP, r.plantillaId)).toBeNull();
   });
 
   it('la plantilla queda suprimida y el consentimiento revocado', async () => {
@@ -285,14 +285,30 @@ describe('RevocarConsentimiento · RN-11, CA-11', () => {
       quienRevoca: RESIDENTE,
     });
     expect(esFallo(res)).toBe(true);
-    expect(await almacen.tomar(`${COP}/${r.plantillaId}`)).not.toBeNull();
+    expect(await almacen.tomar(COP, r.plantillaId)).not.toBeNull();
   });
 
-  it('tras revocar, la plantilla queda en la cola de retirada de la terminal', async () => {
+  it('A3 · tras revocar, la terminal la suelta EN EL ACTO y la cola queda vacía', async () => {
     const r = await cicloCompleto();
-    await revocar.ejecutar(ctx, { consentimientoId: r.consentimientoId, quienRevoca: TITULAR });
+    const res = await revocar.ejecutar(ctx, {
+      consentimientoId: r.consentimientoId,
+      quienRevoca: TITULAR,
+    });
+    expect(esExito(res) && res.valor).toMatchObject({ retiradas: 1, retiradasPendientes: 0 });
+    expect(terminal.retiradas).toEqual([`disp-1/${r.plantillaId}`]);
+    expect(await plantillas.porRetirar(COP)).toEqual([]);
+  });
+
+  it('con la terminal caída, la plantilla queda en la cola de retirada (CA-10)', async () => {
+    const r = await cicloCompleto();
+    terminal.falla = true;
+    const res = await revocar.ejecutar(ctx, {
+      consentimientoId: r.consentimientoId,
+      quienRevoca: TITULAR,
+    });
+    expect(esExito(res) && res.valor).toMatchObject({ retiradas: 0, retiradasPendientes: 1 });
     expect(await plantillas.porRetirar(COP)).toEqual([
-      { plantillaId: r.plantillaId, dispositivoId: 'disp-1' },
+      { copropiedadId: COP, plantillaId: r.plantillaId, dispositivoId: 'disp-1' },
     ]);
   });
 });
@@ -304,7 +320,7 @@ describe('BarrerPlantillasVencidas · RN-11, KPI-21', () => {
     const res = await barrer.ejecutar(ctx);
     expect(esExito(res)).toBe(true);
     if (esExito(res)) expect(res.valor.suprimidas).toBe(1);
-    expect(await almacen.tomar(`${COP}/${r.plantillaId}`)).toBeNull();
+    expect(await almacen.tomar(COP, r.plantillaId)).toBeNull();
   });
 
   it('antes del plazo no suprime nada', async () => {
@@ -364,14 +380,16 @@ describe('BovedaAesGcm · el vector no sale de la bóveda', () => {
 
   it('una plantilla manipulada en la base no llega a la terminal', async () => {
     const r = await capturaValida();
-    const clave = `${COP}/${r.plantillaId}`;
-    const sobre = await almacen.tomar(clave);
+    const sobre = await almacen.tomar(COP, r.plantillaId);
     if (sobre === null) throw new Error('debía existir');
     // Se altera un byte del cuerpo cifrado: sin GCM, la terminal habría
     // aceptado una plantilla que ya no es la del titular.
     const manipulado = Buffer.from(sobre);
     manipulado[manipulado.length - 1] ^= 0xff;
-    await almacen.poner(clave, manipulado);
+    await almacen.poner(COP, r.plantillaId, manipulado, {
+      llaveRef: 'env:BIOMETRIA_LLAVE',
+      algoritmo: 'AES-256-GCM',
+    });
 
     await expect(boveda.empujarATerminal(COP, r.plantillaId, 'disp-1')).rejects.toThrow();
     expect(terminal.recibidas).toEqual([]);
@@ -474,7 +492,7 @@ describe('H-13-02 · la bóveda deriva una llave por copropiedad', () => {
     );
 
     await bovedaPropia.guardar(COP_A, 'p-1', VECTOR);
-    const sobre = await almacenPropio.tomar(`${COP_A}/p-1`);
+    const sobre = await almacenPropio.tomar(COP_A, 'p-1');
     expect(sobre).not.toBeNull();
 
     // El mismo sobre, colocado bajo la otra copropiedad: es el escenario de un
@@ -510,8 +528,8 @@ describe('H-13-02 · la bóveda deriva una llave por copropiedad', () => {
     );
     await boveda2.guardar(COP_A, 'p-1', VECTOR);
     await boveda2.guardar(COP_B, 'p-1', VECTOR);
-    const a = (await almacenPropio.tomar(`${COP_A}/p-1`)) as Buffer;
-    const b = (await almacenPropio.tomar(`${COP_B}/p-1`)) as Buffer;
+    const a = (await almacenPropio.tomar(COP_A, 'p-1')) as Buffer;
+    const b = (await almacenPropio.tomar(COP_B, 'p-1')) as Buffer;
     // El IV aleatorio ya los haría distintos; lo que se afirma es que el CUERPO
     // cifrado difiere, que es lo que demuestra llaves distintas y no solo IV.
     const cuerpoA = a.subarray(12 + 16);

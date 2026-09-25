@@ -243,6 +243,27 @@ export const esquemaConfiguracion = z.object({
    */
   PERSISTENCIA_DE_EVENTOS: z.enum(['postgres', 'memoria']).default('postgres'),
 
+  /**
+   * A3 (15-E) · dónde viven consentimientos, plantillas y sincronizaciones.
+   * Mismo criterio que el histórico: `postgres` es el único con el que los
+   * cerrojos de RN-09 y RN-11 —disparadores y CHECK de la base— actúan de
+   * verdad; `memoria` es el doble de la suite y avisa al arrancar.
+   */
+  PERSISTENCIA_DE_BIOMETRIA: z.enum(['postgres', 'memoria']).default('postgres'),
+
+  /**
+   * A3 (15-E) · el origen PÚBLICO con el que se construye el enlace que
+   * recibe el titular para responder su consentimiento (`/consentimiento/…`).
+   * Opcional: sin él la API entrega el token y la ruta, y la consola dice
+   * qué falta. Tiene que ser lo que el teléfono del visitante alcanza, que en
+   * sitio es la IP del Mac —no `localhost`—.
+   */
+  API_URL_PUBLICA: z
+    .string()
+    .trim()
+    .url('API_URL_PUBLICA debe ser una URL absoluta (http://<IP>:3000)')
+    .optional(),
+
   /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 

@@ -183,7 +183,23 @@ export class ResponderConsentimiento {
  * guardara primero y el borrado fallara, quedaría un consentimiento revocado
  * con el dato todavía en la base. Al revés, un fallo deja el consentimiento
  * vigente y el dato borrado — que es el error que se puede vivir.
+ *
+ * A3 (15-E) · **y retira de las terminales en el acto**. CA-11 dice «de
+ * inmediato», y hasta aquí «inmediato» era el vector en la base: la retirada
+ * del equipo esperaba al barrido. Ahora se intenta aquí mismo, terminal por
+ * terminal; la que no responda queda en la cola derivada de CA-10 y el
+ * barrido la reintenta. Se devuelven las dos cuentas por separado, porque
+ * «suprimida en base» y «retirada del equipo» son hechos distintos y la hoja
+ * de resultados en sitio los coteja por separado.
  */
+export interface ResultadoDeRevocacion {
+  readonly plantillasSuprimidas: number;
+  /** Retiradas de terminal confirmadas por el proveedor en esta llamada. */
+  readonly retiradas: number;
+  /** Terminales que no respondieron: siguen en la cola de CA-10. */
+  readonly retiradasPendientes: number;
+}
+
 export class RevocarConsentimiento {
   constructor(
     private readonly consentimientos: RepositorioConsentimientos,
@@ -195,7 +211,7 @@ export class RevocarConsentimiento {
   async ejecutar(
     ctx: ContextoTenant,
     entrada: { readonly consentimientoId: string; readonly quienRevoca: string },
-  ): Promise<Resultado<{ readonly plantillasSuprimidas: number }, ErrorDominio>> {
+  ): Promise<Resultado<ResultadoDeRevocacion, ErrorDominio>> {
     const copropiedadId = ctx.copropiedadId;
     if (copropiedadId === null) return fallo(noEncontrado('La copropiedad'));
 
@@ -207,17 +223,35 @@ export class RevocarConsentimiento {
     if (esFallo(revocado)) return revocado;
 
     const afectadas = await this.plantillas.deConsentimiento(copropiedadId, actual.id);
-    let suprimidas = 0;
+    const suprimidasAhora = new Set<string>();
     for (const p of afectadas) {
       if (p.suprimida) continue;
       await this.boveda.olvidar(copropiedadId, p.id);
       await this.plantillas.suprimirVector(copropiedadId, p.id, ctx.usuarioId);
       await this.plantillas.guardar(p.suprimirPorRevocacion(ahora), ctx.usuarioId);
-      suprimidas += 1;
+      suprimidasAhora.add(p.id);
     }
 
     await this.consentimientos.guardar(revocado.valor, ctx.usuarioId);
-    return exito({ plantillasSuprimidas: suprimidas });
+
+    // La retirada inmediata: sólo de las plantillas de ESTE consentimiento.
+    let retiradas = 0;
+    let retiradasPendientes = 0;
+    const propias = new Set(afectadas.map((p) => p.id));
+    for (const destino of await this.plantillas.porRetirar(copropiedadId)) {
+      if (!propias.has(destino.plantillaId)) continue;
+      try {
+        await this.boveda.retirarDeTerminal(destino.plantillaId, destino.dispositivoId);
+        await this.plantillas.registrarRetirada(destino, ctx.usuarioId);
+        retiradas += 1;
+      } catch {
+        // La terminal no respondió: la fila sigue en la cola y el barrido
+        // lo reintenta. No se marca retirada lo que no se retiró.
+        retiradasPendientes += 1;
+      }
+    }
+
+    return exito({ plantillasSuprimidas: suprimidasAhora.size, retiradas, retiradasPendientes });
   }
 }
 
@@ -282,7 +316,7 @@ export class SincronizarPlantilla {
       );
     }
     await this.plantillas.registrarSincronizacion(
-      { plantillaId: plantilla.id, dispositivoId: entrada.dispositivoId },
+      { copropiedadId, plantillaId: plantilla.id, dispositivoId: entrada.dispositivoId },
       ctx.usuarioId,
     );
     const marcada = plantilla.marcarSincronizada(ahora);

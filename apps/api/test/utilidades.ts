@@ -88,6 +88,7 @@ export const configuracionDePrueba: Configuracion = {
   CARGADOR_DE_CONTEXTO: 'conservador',
   // La suite no tiene base: el histórico va en memoria, y lo dice al arrancar.
   PERSISTENCIA_DE_EVENTOS: 'memoria',
+  PERSISTENCIA_DE_BIOMETRIA: 'memoria',
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   LOG_LEVEL: 'aviso',

@@ -20,6 +20,7 @@ import {
   prepararImagen,
 } from '@/lib/biometria/imagen';
 import type { ImagenPreparada } from '@/lib/biometria/imagen';
+import { SeguimientoDeConsentimiento } from './seguimiento';
 
 /**
  * ROSTRO DEL VISITANTE, DESDE LA CONSOLA.
@@ -69,12 +70,15 @@ export const PantallaDeBiometria = ({
   const [versionPolitica, setVersionPolitica] = useState('v1');
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
-  const [consentimientoId, setConsentimientoId] = useState<string | null>(null);
+  const [capturada, setCapturada] = useState<{
+    readonly consentimientoId: string;
+    readonly plantillaId: string;
+  } | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
 
   const medir = useCallback(async (fichero: File): Promise<void> => {
     setError(undefined);
-    setConsentimientoId(null);
+    setCapturada(null);
     setProcesando(true);
     try {
       const mapa = await createImageBitmap(fichero);
@@ -163,9 +167,11 @@ export const PantallaDeBiometria = ({
           },
         }),
       );
-      setConsentimientoId(
-        (respuesta as { consentimientoId?: string }).consentimientoId ?? 'solicitado',
-      );
+      const r = respuesta as { consentimientoId?: string; plantillaId?: string };
+      setCapturada({
+        consentimientoId: r.consentimientoId ?? 'solicitado',
+        plantillaId: r.plantillaId ?? '',
+      });
     } catch (fallo) {
       setError(
         fallo instanceof ErrorDeApi
@@ -302,14 +308,12 @@ export const PantallaDeBiometria = ({
               </p>
             )}
 
-            {consentimientoId !== null && (
-              <div className="rounded-md border p-4 text-sm" role="status">
-                <p className="font-medium">Consentimiento solicitado · pendiente del titular</p>
-                <p className="mt-1 text-muted-foreground">
-                  La plantilla queda retenida hasta que el titular acepte. Se suprime
-                  automáticamente a las {HORAS_DE_VIDA} horas si no responde (RN-11).
-                </p>
-              </div>
+            {capturada !== null && (
+              <SeguimientoDeConsentimiento
+                copropiedadId={copropiedadId}
+                consentimientoId={capturada.consentimientoId}
+                plantillaId={capturada.plantillaId}
+              />
             )}
 
             <Boton onClick={() => void enviar()} disabled={!puedeEnviar}>

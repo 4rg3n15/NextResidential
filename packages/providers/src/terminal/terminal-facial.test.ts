@@ -74,9 +74,48 @@ describe('alta de plantilla', () => {
     const { terminal, llamadas } = montar([respuesta(200, OK_XML), respuesta(200, OK_XML)]);
     await terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1, 2, 3]));
 
-    expect(llamadas).toHaveLength(2);
-    expect(llamadas[0]?.url).toContain('UserInfo/Record');
-    expect(llamadas[1]?.url).toContain('FDLib');
+    // A3 · el recuento previo abre la secuencia y la búsqueda posterior la
+    // cierra: un 200 de la carga no acredita nada por sí solo (RN-09).
+    expect(llamadas.map((l) => l.url)).toEqual([
+      expect.stringContaining('FDLib/Count'),
+      expect.stringContaining('UserInfo/Record'),
+      expect.stringContaining('FDLib'),
+      expect.stringContaining('FDSearch'),
+      expect.stringContaining('FDLib/Count'),
+    ]);
+  });
+
+  it('A3 · si el equipo dice que la plantilla NO está tras aceptarla, no se da por sincronizada', async () => {
+    const { terminal } = montar((llamada) =>
+      llamada.url.includes('FDSearch')
+        ? respuesta(200, '{"numOfMatches":0,"totalMatches":0}')
+        : respuesta(200, OK_XML),
+    );
+    await expect(
+      terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])),
+    ).rejects.toThrow(/NO aparece en su biblioteca/);
+  });
+
+  it('A3 · sin búsqueda, el recuento que no sube tampoco acredita la carga', async () => {
+    const { terminal } = montar((llamada) =>
+      llamada.url.includes('FDLib/Count')
+        ? respuesta(200, '{"FDRecordCount":{"totalNum":7}}')
+        : respuesta(200, OK_XML),
+    );
+    await expect(
+      terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])),
+    ).rejects.toThrow(/recuento de la biblioteca no subió/);
+  });
+
+  it('A3 · y con la búsqueda afirmativa, sincronizada', async () => {
+    const { terminal } = montar((llamada) =>
+      llamada.url.includes('FDSearch')
+        ? respuesta(200, '{"numOfMatches":1,"totalMatches":1,"MatchList":[{"FPID":"plantilla-7"}]}')
+        : respuesta(200, OK_XML),
+    );
+    await expect(
+      terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])),
+    ).resolves.toBeUndefined();
   });
 
   it('NO manda el nombre real de la persona al equipo', async () => {
@@ -84,12 +123,14 @@ describe('alta de plantilla', () => {
     // No hay motivo para dejarle datos personales.
     const { terminal, llamadas } = montar([respuesta(200, OK_XML), respuesta(200, OK_XML)]);
     await terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1]));
-    expect(String(llamadas[0]?.cuerpo)).not.toMatch(/nombre|apellido/i);
-    expect(String(llamadas[0]?.cuerpo)).toContain('plantilla-7');
+    const alta = llamadas.find((l) => l.url.includes('UserInfo/Record'));
+    expect(String(alta?.cuerpo)).not.toMatch(/nombre|apellido/i);
+    expect(String(alta?.cuerpo)).toContain('plantilla-7');
   });
 
   it('un alta repetida NO es un fallo: la sincronización tiene que poder reintentarse', async () => {
     const { terminal } = montar([
+      respuesta(200, OK_XML), // recuento previo
       respuesta(400, '{"statusString":"employeeNo already exist"}'),
       respuesta(200, OK_XML),
     ]);
@@ -103,8 +144,9 @@ describe('alta de plantilla', () => {
     const { terminal, llamadas } = montar([respuesta(200, OK_XML), respuesta(200, OK_XML)]);
     await terminal.sincronizar('terminal-1', 'p-1', imagen);
 
-    expect(llamadas[1]?.tipo).toMatch(/multipart\/form-data; boundary=/);
-    const enviado = Buffer.from(llamadas[1]?.cuerpo as Uint8Array);
+    const carga = llamadas.find((l) => l.tipo?.startsWith('multipart/form-data'));
+    expect(carga?.tipo).toMatch(/multipart\/form-data; boundary=/);
+    const enviado = Buffer.from(carga?.cuerpo as Uint8Array);
     expect(enviado.includes(Buffer.from(imagen))).toBe(true);
   });
 });
@@ -114,6 +156,7 @@ describe('cuando la ruta DOCUMENTADA no existe en este firmware', () => {
     // Es la regla del repositorio: capturar la buena, no deducirla por
     // analogía. Suponerla costó dos intentos fallidos contra la cámara.
     const { terminal } = montar([
+      respuesta(200, OK_XML), // recuento previo
       respuesta(200, OK_XML),
       respuesta(200, '<statusString>notSupport</statusString>'),
     ]);
@@ -133,11 +176,15 @@ describe('cuando la ruta DOCUMENTADA no existe en este firmware', () => {
   it('si el ALTA de la persona falla por algo que no es duplicado, no se sigue al rostro', async () => {
     // Seguir cargaría un rostro sin dueño y el equipo lo rechazaría con otro
     // error, que es el que acabaría investigándose.
-    const { terminal, llamadas } = montar([respuesta(500, 'fallo interno')]);
+    const { terminal, llamadas } = montar([
+      respuesta(200, OK_XML), // recuento previo
+      respuesta(500, 'fallo interno'),
+    ]);
     await expect(terminal.sincronizar('t-1', 'p-1', new Uint8Array([1]))).rejects.toThrow(
       /HTTP 500/,
     );
-    expect(llamadas).toHaveLength(1);
+    expect(llamadas).toHaveLength(2);
+    expect(llamadas[1]?.url).toContain('UserInfo/Record');
   });
 
   it('el mensaje nombra el propósito y la ruta, que es lo que hay que corregir', async () => {

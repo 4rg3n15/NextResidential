@@ -193,7 +193,7 @@ describe('biometría · CU-02 por HTTP', () => {
       `${base}/consentimientos/${consentimientoId}/revocacion`,
     ).expect(201);
     expect(r.body.plantillasSuprimidas).toBeGreaterThanOrEqual(1);
-    expect(await almacen.tomar(`${COP_A}/${plantillaId}`)).toBeNull();
+    expect(await almacen.tomar(COP_A, plantillaId)).toBeNull();
   });
 
   it('un plazo de conservación fuera de la cota se rechaza (RN-11)', async () => {

@@ -16,6 +16,9 @@ export {
   SIN_PROBAR,
   TIPOS_DE_EQUIPO,
 } from './aplicacion/puertos';
+/** A3 (15-E) · las terminales con biblioteca de rostros, por capacidad. */
+export { TERMINALES_DE_ROSTROS } from './aplicacion/terminales-de-rostros';
+export type { TerminalDeRostros } from './aplicacion/terminales-de-rostros';
 export type {
   AltaDeEquipo,
   ClaseDeSondeo,

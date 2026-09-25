@@ -33,6 +33,7 @@ const configuracionParaContrato: Configuracion = {
   PROVEEDOR_DE_EQUIPOS: 'simulado',
   CARGADOR_DE_CONTEXTO: 'conservador',
   PERSISTENCIA_DE_EVENTOS: 'memoria',
+  PERSISTENCIA_DE_BIOMETRIA: 'memoria',
   PROVEEDOR_SEMILLA: 20260908,
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',

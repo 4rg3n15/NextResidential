@@ -30,7 +30,21 @@ let app: INestApplication;
 let firmante: Firmante;
 let rutas: RutaExpuesta[];
 
-const PUBLICAS = new Set(['GET /health', 'GET /ready']);
+const PUBLICAS = new Set([
+  'GET /health',
+  'GET /ready',
+  /**
+   * A3 (15-E) · la puerta del TITULAR del dato biométrico (RN-10). No hay
+   * sesión porque el visitante no es usuario: lo que sustituye al token es un
+   * enlace FIRMADO por copropiedad, con caducidad, que nombra un solo
+   * consentimiento. Sin él responden 404 y no revelan nada; su prueba está en
+   * `consentimiento-publico.e2e.test.ts`, incluido el token de otra
+   * copropiedad.
+   */
+  'GET /consentimiento/:token',
+  'POST /consentimiento/:token/respuesta',
+  'POST /consentimiento/:token/revocacion',
+]);
 
 /**
  * Rutas AUTENTICADAS que declaran `@SinRecursoDeTenant()`: operan sobre la
