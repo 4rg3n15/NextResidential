@@ -249,7 +249,54 @@ de rondas anteriores.
 
 ### El veredicto literal de `./scripts/verificar-etapa.sh --con-base`
 
-_(se pega en el commit de cierre)_
+Cinco corridas; sólo la quinta vale. Las cuatro anteriores destaparon lo que
+las corridas dirigidas no vieron, y cada hallazgo tiene su commit:
+
+| Corrida | Sobre     | Resultado                                                                                                                                                       |
+| ------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1       | `4f942fb` | **FALLIDA** · paso 5: `biometria/seguimiento.tsx` escribía sin estar clasificada en el barrido de la consola (`dcf863e`)                                        |
+| 2       | `dcf863e` | **FALLIDA** · pasos 9 y 10b: exención del contrato que sobraba y un `204` sin declarar; paso 12b: el arranque en frío contaba un actor tras la 0035 (`437e552`) |
+| 3       | `437e552` | Detenida por el usuario: las cinco comprobaciones la dejaban obsoleta                                                                                           |
+| 4       | `e04c563` | **FALLIDA** · pasos 9 y 10: `bg-white` en el QR, fuera del sistema de temas (`f1c7fdb`)                                                                         |
+| 5       | `f1c7fdb` | **correcta** · 26 de 26 pasos, sin una sola ✗                                                                                                                   |
+
+Veredicto literal de la quinta corrida (`./scripts/verificar-etapa.sh --con-base`, base efímera migrada hasta la 0036 con semillas, Flutter en el PATH, Chromium):
+
+```
+▸ 5 · suite completa
+   @ncr/config:test:       Tests  144 passed (144)
+   @ncr/edge:test:         Tests  101 passed (101)
+   @ncr/domain-core:test:  Tests  402 passed (402)
+   @ncr/providers:test:    Tests  629 passed (629)
+   @ncr/web:test:          Tests  459 passed (459)
+   @ncr/api:test:          Tests  1129 passed | 5 skipped (1134)
+▸ 5c · app móvil: suite de Dart y cobertura POR CAPA
+   ✓ dominio           95.87 % (umbral 90 %, 116/121 líneas)
+   ✓ aplicacion        95.03 % (umbral 90 %, 153/161 líneas)
+   ✓ configuracion    100.00 % (umbral 70 %, 33/33 líneas)
+   ✓ infraestructura   84.47 % (umbral 60 %, 261/309 líneas)
+   ✓ presentacion      83.46 % (umbral 50 %, 1075/1288 líneas)
+▸ 7 · umbrales de cobertura por capa (§2.4)
+   OK   dominio (packages/domain-core/src): lineas 95.67 % · ramas 96.70 % · funciones 95.92 % (umbral 90 %, 34 archivos)
+   OK   aplicacion (**/aplicacion/**): lineas 96.15 % · ramas 89.15 % · funciones 98.75 % (umbral 90 %, 54 archivos)
+   OK   global: lineas 80.66 % · ramas 84.98 % · funciones 82.44 % (umbral 70 %, 440 archivos)
+   ✓ las tres capas cumplen su umbral
+▸ 9 · pruebas negativas de los propios controles
+   ✓ entorno declarado: 53 variables de 2 esquemas, todas en su .env.example · 21 leídas fuera de Zod, con motivo
+   ✓ declaraciones: 1 paso(s) declarado(s) no ejercido(s), 0 de ellos en linux, con motivo y etapa de revisión vigente
+   ✓ controles: 35 de 37 con prueba negativa · 2 en deuda declarada (no puede crecer)
+▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
+   p50 / p95 / p99   : 7 / 39 / 50 ms
+   ✓ KPI-25 con margen sobre el umbral
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 26 de 26 pasos ejecutados
+
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+Las 5 pruebas saltadas de `@ncr/api` en el paso 5 son las de la base en el camino de `turbo` y corren en el paso 7 y en el 13 con `--con-base`; el control 7b lo comprueba. El control declarado y no ejercido es el que sólo corre en macOS, con motivo y etapa de revisión vigentes desde antes de esta ronda.
 
 ### El guion de sitio, ejecutado en modo SIMULADO
 
