@@ -40,7 +40,12 @@ class Ambiente {
   });
 
   factory Ambiente.deCompilacion() => const Ambiente(
-        apiUrl: String.fromEnvironment('API_URL', defaultValue: 'http://localhost:3000'),
+        // Sin `localhost` por omisión, a propósito. En un teléfono físico
+        // `localhost` es el propio teléfono: la app arrancaba, pedía y fallaba
+        // con «sin conexión» sin decir que nadie le había dicho dónde está la
+        // API. Vacío cae en `aserciones()` y se explica en pantalla ANTES de
+        // la primera petición, que es donde se puede corregir.
+        apiUrl: String.fromEnvironment('API_URL', defaultValue: ''),
         supabaseUrl: String.fromEnvironment('SUPABASE_URL'),
         supabaseClavePublicable: String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY'),
       );
@@ -67,7 +72,17 @@ class Ambiente {
         );
       }
     }
-    if (apiUrl.isEmpty) problemas.add('API_URL vacía: la app no sabría a quién preguntar.');
+    if (apiUrl.isEmpty) {
+      // El texto lleva el remedio, no sólo el diagnóstico: quien lo ve es quien
+      // compiló, y lo que necesita es la línea que le faltó. En un iPhone
+      // físico la IP es la del Mac, no `localhost`; en el emulador Android es
+      // el alias de la máquina anfitriona que documenta `.env.example`.
+      problemas.add(
+        'Falta API_URL: la app no sabe a quién preguntar. Compile con '
+        '--dart-define=API_URL=http://<IP-del-Mac>:3000 (en el emulador Android, '
+        'el alias de la máquina anfitriona; ver apps/mobile/.env.example).',
+      );
+    }
     return problemas;
   }
 

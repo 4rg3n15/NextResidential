@@ -1,2 +1,13 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+
+// A6 · App Transport Security SOLO en depuración.
+//
+// La API de desarrollo habla HTTP por la IP privada del Mac y ATS lo bloquea en
+// un iPhone físico. La excepción no puede vivir en Info.plist a secas —viajaría
+// también en Release—, así que Xcode preprocesa Info.plist con el preprocesador
+// de C y el bloque `NSAppTransportSecurity` está bajo `#if NCR_DEPURACION`, que
+// SOLO se define aquí. Release.xcconfig activa el preprocesado sin definirlo:
+// en Release y Profile el bloque no existe. Nunca `NSAllowsArbitraryLoads`.
+INFOPLIST_PREPROCESS = YES
+INFOPLIST_PREPROCESSOR_DEFINITIONS = NCR_DEPURACION=1

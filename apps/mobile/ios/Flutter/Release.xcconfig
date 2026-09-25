@@ -1,2 +1,8 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
+
+// A6 · El preprocesado de Info.plist se activa también aquí, y A PROPÓSITO sin
+// definir `NCR_DEPURACION`: así el bloque de App Transport Security que
+// Debug.xcconfig habilita se elimina del plist de Release y de Profile (que
+// hereda de este fichero), y el binario que se distribuye sólo habla HTTPS.
+INFOPLIST_PREPROCESS = YES
