@@ -26,6 +26,28 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!--
+	A6 · Excepción de App Transport Security SOLO en depuración.
+	Xcode preprocesa este fichero con el preprocesador de C (INFOPLIST_PREPROCESS
+	en ios/Flutter/Debug.xcconfig y Release.xcconfig). NCR_DEPURACION sólo se
+	define en Debug.xcconfig, así que en Release y Profile el bloque de abajo se
+	elimina y la app compilada NO lleva NSAppTransportSecurity. Las directivas
+	van envueltas en comentarios XML para que el fichero crudo siga siendo un
+	plist válido para cualquier herramienta que lo lea sin preprocesar.
+	NSAllowsLocalNetworking cubre la API de desarrollo por IP privada; nunca
+	NSAllowsArbitraryLoads.
+	-->
+	<!--
+#if NCR_DEPURACION
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<!--
+#endif
+	-->
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

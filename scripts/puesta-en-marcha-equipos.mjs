@@ -32,6 +32,13 @@
  *      extremo): el extremo a extremo exige el navegador del operador y NO se
  *      mide aquí. El informe lo dice con esas palabras.
  *  6 · Escribe un informe con lo que contestó cada equipo, ruta por ruta.
+ *  7 · **Escribe la HOJA DE RESULTADOS** (ETAPA 15-E · A8): la plantilla de los
+ *      dieciséis escenarios de aceptación —5 de la cámara, 5 de la terminal,
+ *      6 del videoportero— con lo que este guion ya sabe (fecha, modo, qué
+ *      familias estaban declaradas, las latencias que midió como referencia)
+ *      y las columnas que rellena la persona delante del equipo: esperado ·
+ *      obtenido · motivo en consola · latencia · evento en /eventos ·
+ *      evidencia · veredicto. Sin esa hoja rellenada la ETAPA 15 no se cierra.
  *
  * ═════════════════════════════════════════════════════════════════════════════
  * LO QUE NO HACE, Y ES DELIBERADO
@@ -56,6 +63,7 @@
  *   node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --sin-accionar
  *   node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --con-audio
  *   node scripts/puesta-en-marcha-equipos.mjs --simulado --con-audio
+ *   node scripts/puesta-en-marcha-equipos.mjs --simulado --hoja=./hoja.md --informe=./informe.md
  *
  * `--simulado` NO habla con ningún aparato: monta los tres equipos simulados de
  * `@ncr/providers` y recorre exactamente el mismo guion. Sirve para ensayar el
@@ -77,6 +85,7 @@
  * configuración incompleta.
  */
 import { createRequire } from 'node:module';
+import { hojaDeResultados } from './lib/hoja-de-resultados.mjs';
 import { existsSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -115,6 +124,13 @@ const simulado = argumentos.includes('--simulado');
 const destinoInforme =
   argumentos.find((a) => a.startsWith('--informe='))?.slice('--informe='.length) ??
   join(process.env.TMPDIR ?? '/tmp', 'puesta-en-marcha-equipos.md');
+/** A8 · la hoja de resultados sale junto al informe, fuera del árbol por omisión. */
+const destinoHoja =
+  argumentos.find((a) => a.startsWith('--hoja='))?.slice('--hoja='.length) ??
+  join(process.env.TMPDIR ?? '/tmp', 'hoja-de-resultados-en-sitio.md');
+/** Qué familias se declararon y qué latencias se midieron: van a la hoja como referencia. */
+const declaradas = {};
+const referencias = [];
 
 /** Las tres familias, con el prefijo de sus variables y el KPI de su accionamiento. */
 const FAMILIAS = [
@@ -324,6 +340,7 @@ for (const entrada of FAMILIAS) {
   }
 
   algunEquipo = true;
+  declaradas[entrada.familia] = true;
   anotar(`── ${entrada.rotulo} · ${elidir(config.host)}:${config.puerto} · canal ${config.canal}`);
 
   const conexion = {
@@ -415,6 +432,11 @@ for (const entrada of FAMILIAS) {
         `       ${entrada.kpi}: ${Math.round(ms)} ms, dentro del umbral (< ${UMBRAL_DE_ACCIONAMIENTO_MS} ms)`,
       );
     }
+    if (ruta.acciona === true && veredicto === 'confirmada' && ms !== null) {
+      referencias.push(
+        `${entrada.rotulo} · ${ruta.proposito}: ${Math.round(ms)} ms API → equipo (${entrada.kpi})`,
+      );
+    }
   }
 
   /**
@@ -485,6 +507,9 @@ for (const entrada of FAMILIAS) {
           (apertura.ms === null ? '' : ` · ${Math.round(apertura.ms)} ms`),
       );
       if (apertura.veredicto === 'confirmada' && apertura.ms !== null) {
+        referencias.push(
+          `${entrada.rotulo} · apertura del canal de audio: ${Math.round(apertura.ms)} ms (proxy de KPI-33)`,
+        );
         if (apertura.ms > UMBRAL_DE_AUDIO_MS) {
           huboProblema = true;
           anotar(
@@ -549,6 +574,25 @@ try {
   console.log('Host y usuario salen ELIDIDOS: el informe se puede adjuntar.');
 } catch (error) {
   console.error(`No se pudo escribir el informe: ${String(error?.message ?? error)}`);
+}
+
+/**
+ * A8 · la hoja de resultados. Es una PLANTILLA: lo que el guion sabe va
+ * rellenado, lo que sólo se sabe delante del equipo va en blanco. Sale aunque
+ * el veredicto de arriba sea malo, porque el veredicto del guion y el de la
+ * hoja miden cosas distintas: aquél, que las rutas existen; ésta, que el
+ * sistema cumple sus criterios de aceptación.
+ */
+try {
+  writeFileSync(
+    resolve(destinoHoja),
+    hojaDeResultados({ modo: simulado ? 'simulado' : 'real', declaradas, referencias }),
+    'utf8',
+  );
+  console.log(`Hoja de resultados (16 escenarios) escrita en ${resolve(destinoHoja)}`);
+  console.log('Rellénela delante de los equipos: sin ella, la ETAPA 15 no se cierra (BE-02).');
+} catch (error) {
+  console.error(`No se pudo escribir la hoja de resultados: ${String(error?.message ?? error)}`);
 }
 
 process.exit(huboProblema ? 1 : 0);

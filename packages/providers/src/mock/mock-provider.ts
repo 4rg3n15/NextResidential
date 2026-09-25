@@ -6,12 +6,17 @@ import type {
   LecturaDePlaca,
   PlateEventSource,
   ResultadoAccionamiento,
+  ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
+import { ordenAceptada } from '@ncr/domain-core';
 import type { PerfilDeSimulacion } from './simulacion';
 import { Azar, FalloDeHardwareSimulado, PERFIL_REALISTA, RelojSimulado } from './simulacion';
 import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
+import type { EscuchaActiva } from '../nucleo/escucha';
+import type { OrigenDeVideo } from '../nucleo/video';
 import { CAPACIDADES_COMPLETAS, CAPACIDADES_SIN_CONSULTAR } from '../nucleo/capacidades';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
+import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
 export interface OpcionesMock {
   readonly perfil?: PerfilDeSimulacion;
@@ -55,6 +60,10 @@ export class MockProvider
 
   /** Bitácora de lo ocurrido, para que las pruebas afirmen sobre hechos. */
   readonly aperturas: { dispositivoId: string; actorId: string }[] = [];
+  /** Bloqueos vigentes por dispositivo (H-3): estado, no pulso. */
+  readonly bloqueos = new Map<string, boolean>();
+  /** Veredictos devueltos a terminales que esperaban (A2), para afirmar sobre ellos. */
+  readonly veredictos: { dispositivoId: string; veredicto: VeredictoRemoto }[] = [];
   readonly plantillas = new Map<string, Set<string>>();
   private readonly suscriptores: ((l: LecturaDePlaca) => Promise<void>)[] = [];
 
@@ -77,6 +86,32 @@ export class MockProvider
     return this.dispositivos.has(dispositivoId) ? CAPACIDADES_COMPLETAS : CAPACIDADES_SIN_CONSULTAR;
   }
 
+  /**
+   * A4 · el simulado no tiene flujo que escuchar: sus lecturas entran por la
+   * fuente (`entregarLectura`) o por el receptor. Lo dice, y un equipo que no
+   * conoce lo rechaza, como el real.
+   */
+  async escuchar(dispositivoId: string): Promise<EscuchaActiva> {
+    if (!this.dispositivos.has(dispositivoId)) {
+      throw new FalloDeHardwareSimulado(dispositivoId, 'escuchar');
+    }
+    return {
+      dispositivoId,
+      transporte: 'ninguna',
+      detalle:
+        'simulado: no hay flujo que escuchar; los eventos entran por la fuente o el receptor',
+      detener: () => undefined,
+    };
+  }
+
+  /** A5 · el simulado no tiene cámara que mostrar; un equipo que no conoce, rechaza. */
+  async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
+    if (!this.dispositivos.has(dispositivoId)) {
+      throw new FalloDeHardwareSimulado(dispositivoId, 'origenDeVideo');
+    }
+    return null;
+  }
+
   // ── AccessPointProvider ──────────────────────────────────────────────────
 
   async abrir(dispositivoId: string, actorId: string): Promise<ResultadoAccionamiento> {
@@ -88,6 +123,31 @@ export class MockProvider
   async estado(dispositivoId: string): Promise<'en_linea' | 'fuera_de_linea' | 'degradado'> {
     if (!this.dispositivos.has(dispositivoId)) return 'fuera_de_linea';
     return this.azar.ocurre(this.perfil.probabilidadDeFallo) ? 'degradado' : 'en_linea';
+  }
+
+  /**
+   * Bloqueo persistente (H-3). El simulado lo GUARDA en vez de olvidarlo: una
+   * prueba puede afirmar que el acceso quedó bloqueado, que es el hecho que
+   * importa, y no sólo que la orden «pasó».
+   */
+  async fijarBloqueo(dispositivoId: string, bloqueado: boolean): Promise<ResultadoDeAccionamiento> {
+    const latencia = await this.conReintentos(dispositivoId, 'fijarBloqueo');
+    this.bloqueos.set(dispositivoId, bloqueado);
+    return ordenAceptada(latencia);
+  }
+
+  /**
+   * A2 · la respuesta a una terminal que espera. El simulado la GUARDA: una
+   * prueba afirma que se contestó, con qué veredicto y a qué serie, que es lo
+   * que un motor «decorativo» dejaría sin contestar.
+   */
+  async responderVerificacionRemota(
+    dispositivoId: string,
+    veredicto: VeredictoRemoto,
+  ): Promise<ResultadoAccionamiento> {
+    const latencia = await this.conReintentos(dispositivoId, 'responderVerificacionRemota');
+    this.veredictos.push({ dispositivoId, veredicto });
+    return { aceptado: true, latenciaMs: latencia };
   }
 
   // ── PlateEventSource ─────────────────────────────────────────────────────

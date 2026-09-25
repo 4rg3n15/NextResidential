@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso';
 import type { INestApplication } from '@nestjs/common';
 import { sobreDeLectura } from '@ncr/providers';
 import { COP_A, crearApp, crearFirmante } from './utilidades';
@@ -129,6 +130,69 @@ describe('receptor del servidor de alarma', () => {
       .set('authorization', `Basic ${Buffer.from(`equipo:${SECRETO}`).toString('base64')}`)
       .send(sobre())
       .expect(200);
+  });
+
+  /**
+   * A2 (ETAPA 15-E) · la terminal facial publica en el MISMO receptor, como
+   * JSON a secas cuando no adjunta foto. Sin plantilla gestionada el motor
+   * niega —no hay a quién atribuirlo— y el equipo recibe su veredicto por el
+   * proveedor; lo que se afirma por HTTP es que el sobre ENTRA y se procesa.
+   */
+  it('A2 · el evento JSON de una terminal entra por el mismo receptor y se procesa', async () => {
+    const evento = JSON.stringify({
+      eventType: 'AccessControllerEvent',
+      dateTime: '2026-09-25T07:00:00-05:00',
+      alarmDataType: 0,
+      AccessControllerEvent: {
+        employeeNoString: 'plantilla-sin-gestionar',
+        remoteCheck: true,
+        serialNo: 1,
+      },
+    });
+    const respuesta = await request(app.getHttpServer())
+      .post(`/alarm-server/${SECRETO}`)
+      .set('content-type', 'application/json')
+      .send(evento)
+      .expect(200);
+    // No es «ignorado»: el rostro se ingirió y quedó evento (negado). Que no
+    // haya `ignorado: true` es lo que distingue un receptor que lo procesa de
+    // uno que lo tira con un 200.
+    expect(respuesta.body).toEqual({ aceptado: true });
+  });
+
+  it('A4 · la llamada JSON del videoportero se AVISA por el canal de tiempo real, sin evento', async () => {
+    const canal = app.get(CanalEnProceso, { strict: false });
+    const recibidos: { tema: string; carga: unknown }[] = [];
+    const baja = canal.suscribir(COP_A, {
+      entregar: (tema, carga) => {
+        recibidos.push({ tema, carga });
+        return true;
+      },
+    });
+    const llamada = JSON.stringify({
+      eventType: 'videoIntercomEvent',
+      dateTime: '2026-09-25T07:00:00-05:00',
+      alarmDataType: 0,
+      CallInfo: { buildingNumber: 1, unitNumber: 'no-existe-99' },
+    });
+    const respuesta = await request(app.getHttpServer())
+      .post(`/alarm-server/${SECRETO}`)
+      .set('content-type', 'application/json')
+      .send(llamada)
+      .expect(200);
+    baja();
+    // Aceptada y NO registrada como acceso: el motivo lo dice. Un timbre no es
+    // una fila en `eventos`; es un aviso a quien atiende.
+    expect(respuesta.body.aceptado).toBe(true);
+    expect(respuesta.body.motivo).toMatch(/avisada a las consolas/);
+    const aviso = recibidos.find((r) => r.tema === 'llamadas');
+    expect(aviso?.carga).toMatchObject({
+      dispositivoId: DISPOSITIVO,
+      clase: 'llamada',
+      viviendaId: null,
+      vivienda: 'no-existe-99',
+      origen: expect.stringContaining('unidad no-existe-99'),
+    });
   });
 
   it('un evento que no es una lectura de placa se acepta y se ignora', async () => {

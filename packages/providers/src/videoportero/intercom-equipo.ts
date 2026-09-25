@@ -57,6 +57,13 @@ export class CanalDeEquipoNoHabilitado extends Error {
 export interface OpcionesDeIntercom extends OpcionesDeEquipo {
   readonly reloj: Reloj;
   /**
+   * A4 · si el equipo DECLARA señalización de llamada (`senalizacionDeLlamada`
+   * = `si`). Con ella, abrir la sesión envía «contestar» y cerrarla «colgar»;
+   * sin ella no se emite ninguna señal: la llamada la atiende el aparato. Se
+   * declara desde las capacidades, nunca se supone.
+   */
+  readonly senalizacion?: boolean;
+  /**
    * Se **declara**, no se descubre. Mientras sea `false`, este adaptador no
    * emite una sola petición hacia el canal de audio del equipo.
    */
@@ -80,11 +87,78 @@ export class CanalDeAudioSinDescubrir extends Error {
   }
 }
 
+/**
+ * A4 · LA COLA DEL FLUJO DE SUBIDA.
+ *
+ * El audio hacia el equipo va por UN `PUT` que dura la sesión: cada trozo que
+ * el operador envía se encola aquí y el flujo lo toma cuando la red lo admite.
+ * `empujar` resuelve en el acto mientras la cola vaya corta, y espera al
+ * consumo cuando se llena —eso es la contrapresión: si el equipo no lee, el
+ * operador no acumula segundos de audio que llegarán tarde—.
+ */
+const TROZOS_EN_VUELO = 8;
+
+class ColaDeSalida {
+  private pendientes: { readonly datos: Uint8Array; readonly tomado: () => void }[] = [];
+  private esperando: ((r: IteratorResult<Uint8Array>) => void) | null = null;
+  private cerrada = false;
+
+  empujar(datos: Uint8Array): Promise<void> {
+    if (this.cerrada) return Promise.reject(new Error('El flujo de audio ya se cerró'));
+    if (this.esperando !== null) {
+      const entregar = this.esperando;
+      this.esperando = null;
+      entregar({ value: datos, done: false });
+      return Promise.resolve();
+    }
+    return new Promise((tomado) => {
+      this.pendientes.push({ datos, tomado });
+      if (this.pendientes.length <= TROZOS_EN_VUELO) tomado();
+    });
+  }
+
+  cerrar(): void {
+    this.cerrada = true;
+    for (const p of this.pendientes) p.tomado();
+    this.pendientes = [];
+    if (this.esperando !== null) {
+      const entregar = this.esperando;
+      this.esperando = null;
+      entregar({ value: undefined, done: true });
+    }
+  }
+
+  /** Un flujo nuevo sobre la misma cola: lo que un reintento de Digest necesita. */
+  flujo(): ReadableStream<Uint8Array> {
+    return new ReadableStream<Uint8Array>({
+      pull: async (controlador) => {
+        const siguiente = await this.siguiente();
+        if (siguiente.done === true) controlador.close();
+        else controlador.enqueue(siguiente.value);
+      },
+    });
+  }
+
+  private siguiente(): Promise<IteratorResult<Uint8Array>> {
+    const pendiente = this.pendientes.shift();
+    if (pendiente !== undefined) {
+      pendiente.tomado();
+      return Promise.resolve({ value: pendiente.datos, done: false });
+    }
+    if (this.cerrada) return Promise.resolve({ value: undefined, done: true });
+    return new Promise((resolver) => {
+      this.esperando = resolver;
+    });
+  }
+}
+
 export class IntercomDeEquipo implements IntercomProvider {
   private readonly cliente: ClienteDeEquipo;
   private readonly canales = new Map<string, EstadoDelCanal>();
   private readonly ultimoDispositivo = new Map<string, string>();
   private abierto: string | null = null;
+  /** A4 · el flujo de subida de la sesión abierta, si ya se abrió. */
+  private salida: { readonly cola: ColaDeSalida; fallo: Error | null } | null = null;
 
   constructor(private readonly opciones: OpcionesDeIntercom) {
     this.cliente = new ClienteDeEquipo(opciones);
@@ -136,7 +210,34 @@ export class IntercomDeEquipo implements IntercomProvider {
       throw new Error(`El equipo no abrió el canal de audio (HTTP ${String(respuesta.estado)})`);
     }
     this.abierto = dispositivoId;
+    // A4 · con señalización declarada, abrir el audio ES contestar la llamada.
+    await this.senalizar('answer');
     return 'abierta';
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * A4 · SEÑALIZACIÓN DE LLAMADA · DOCUMENTADA, NO VERIFICADA
+   *
+   * `PUT /ISAPI/VideoIntercom/callSignal` con `{ CallSignal: { cmdType } }`:
+   * `answer` al abrir el audio, `hangUp` al cerrarlo. Es el [SUPUESTO] S-45
+   * del catálogo: la forma sale de la documentación del fabricante y ningún
+   * equipo del proyecto la admite (`isSupportCallSignal=false`), así que aquí
+   * no se envía nunca salvo que la capacidad lo declare. Un rechazo del
+   * equipo NO tumba la sesión: el audio ya está abierto, y la señal es un
+   * complemento del que la ficha dice si se puede contar.
+   */
+  private async senalizar(orden: 'answer' | 'hangUp'): Promise<void> {
+    if (this.opciones.senalizacion !== true) return;
+    const ruta = rutaPara('contestar o rechazar una llamada del videoportero', 'videoportero');
+    try {
+      await this.cliente.pedir(ruta.metodo, ruta.ruta, {
+        tipo: 'application/json',
+        contenido: JSON.stringify({ CallSignal: { cmdType: orden } }),
+      });
+    } catch {
+      // El equipo no contestó a la señal: el audio sigue; se confirma en sitio.
+    }
   }
 
   /**
@@ -151,18 +252,44 @@ export class IntercomDeEquipo implements IntercomProvider {
    * medida: códec real, tamaño de paquete, cadencia, semiduplex y latencia
    * (KPI-33). **Nada de eso tiene cifra**, y el informe lo dice así.
    */
+  /**
+   * A4 · UN flujo de subida por sesión, no un `PUT` por trozo.
+   *
+   * El primer trozo abre el `PUT` a `audioData` —`application/octet-stream`,
+   * sin `Content-Length`, en el formato que el canal declara— y los siguientes
+   * se encolan en él. Un `PUT` por trozo, que es lo que había, obligaba al
+   * equipo a abrir y cerrar la sesión de audio con cada paquete de 20 ms: eso
+   * no es una conversación, es un tartamudeo. La respuesta del equipo llega
+   * cuando llega; si rechaza el flujo, el siguiente trozo lo dice.
+   */
   async enviarAudio(fragmento: Uint8Array): Promise<void> {
     const dispositivoId = this.abierto;
     if (dispositivoId === null) throw new Error('No hay ninguna sesión de audio abierta');
     if (this.opciones.canal === null) throw new CanalDeAudioSinDescubrir(dispositivoId);
-    const ruta = rutaPara('enviar audio al equipo', 'videoportero', this.opciones.canal);
-    const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
-      tipo: 'application/octet-stream',
-      contenido: fragmento,
-    });
-    if (!respuesta.ok) {
-      throw new Error(`El equipo no aceptó el audio (HTTP ${String(respuesta.estado)})`);
-    }
+    if (this.salida === null) this.salida = this.abrirSalida(this.opciones.canal);
+    if (this.salida.fallo !== null) throw this.salida.fallo;
+    await this.salida.cola.empujar(fragmento);
+  }
+
+  private abrirSalida(canal: number): { readonly cola: ColaDeSalida; fallo: Error | null } {
+    const cola = new ColaDeSalida();
+    const salida: { readonly cola: ColaDeSalida; fallo: Error | null } = { cola, fallo: null };
+    const ruta = rutaPara('enviar audio al equipo', 'videoportero', canal);
+    void this.cliente
+      .subirFlujo(ruta.ruta, () => cola.flujo(), 'application/octet-stream')
+      .then((respuesta) => {
+        if (!respuesta.ok) {
+          salida.fallo = new Error(
+            `El equipo no aceptó el flujo de audio (HTTP ${String(respuesta.estado)})`,
+          );
+          cola.cerrar();
+        }
+      })
+      .catch((error: unknown) => {
+        salida.fallo = error instanceof Error ? error : new Error(String(error));
+        cola.cerrar();
+      });
+    return salida;
   }
 
   async *recibirAudio(): AsyncIterable<Uint8Array> {
@@ -177,6 +304,13 @@ export class IntercomDeEquipo implements IntercomProvider {
     const dispositivoId = this.abierto;
     this.abierto = null;
     if (dispositivoId === null) return;
+
+    // A4 · el flujo de subida termina con la sesión: un `PUT` que sobrevive a
+    // la conversación dejaría el canal del equipo tomado para el siguiente.
+    this.salida?.cola.cerrar();
+    this.salida = null;
+    // Y con señalización declarada, cerrar el audio ES colgar.
+    await this.senalizar('hangUp');
 
     const ahora = this.opciones.reloj.ahora();
     const titular = this.estado(dispositivoId).titular;

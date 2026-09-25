@@ -42,7 +42,9 @@ export type ClaseDeCorreccion =
   | 'modo_de_control'
   | 'pais_del_algoritmo'
   | 'imagenes_del_receptor'
-  | 'formato_del_receptor';
+  | 'formato_del_receptor'
+  /** A2 · la terminal pasa a REPORTAR Y ESPERAR el veredicto de la plataforma. */
+  | 'verificacion_remota';
 
 export interface ResultadoDeCorreccion {
   readonly clase: ClaseDeCorreccion;
@@ -165,6 +167,8 @@ export const aplicarCorreccion = async (
           'parameterFormatType',
           'XML',
         );
+      case 'verificacion_remota':
+        return await corregirVerificacionRemota(cliente);
     }
   } catch (error) {
     if (error instanceof EquipoInalcanzable) {
@@ -172,6 +176,71 @@ export const aplicarCorreccion = async (
     }
     throw error;
   }
+};
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * A2 · ACTIVAR LA VERIFICACIÓN REMOTA ES CAMBIAR QUIÉN DECIDE
+ *
+ * Con `remoteCheck` la terminal reconoce, REPORTA y espera; sin él abre sola y
+ * el motor de reglas queda decorativo. Es la corrección que hace posible el
+ * modo `reporta_y_espera`, y por eso exige lo mismo que las demás: confirmación
+ * de una persona, valor anterior y nuevo para `auditoria_seguridad`, y
+ * leer-modificar-escribir del documento completo. El documento es JSON —el de
+ * `AcsCfg`—, así que no vale el reemplazo de etiquetas del XML: se analiza, se
+ * cambia UN campo y se devuelve entero. Un documento que no trae el campo NO se
+ * escribe: este firmware no lo tiene, y eso es un hallazgo de bloqueo, no algo
+ * que se inventa.
+ */
+const corregirVerificacionRemota = async (
+  cliente: ClienteDeEquipo,
+): Promise<ResultadoDeCorreccion> => {
+  const lectura = rutaPara('leer si la terminal espera el veredicto de la plataforma', 'terminal');
+  const respuesta = await cliente.pedir(lectura.metodo, lectura.ruta);
+  if (!respuesta.ok || rechazado(respuesta.cuerpo)) {
+    return noAplicada(
+      'verificacion_remota',
+      'El equipo no devolvió su configuración de control de acceso: este firmware no ' +
+        'declara la verificación remota y no se escribe a ciegas',
+    );
+  }
+  let documento: Record<string, unknown>;
+  try {
+    documento = JSON.parse(respuesta.cuerpo) as Record<string, unknown>;
+  } catch {
+    return noAplicada('verificacion_remota', 'La configuración del equipo no es JSON legible');
+  }
+  const acs = documento['AcsCfg'];
+  if (typeof acs !== 'object' || acs === null || !('remoteCheck' in acs)) {
+    return noAplicada(
+      'verificacion_remota',
+      'La configuración del equipo no trae el campo de verificación remota: este modelo ' +
+        'no la admite. Es un hallazgo de BLOQUEO: no se opera contra una terminal que decide sola',
+    );
+  }
+  const anterior = String((acs as Record<string, unknown>)['remoteCheck']);
+  const corregido = {
+    ...documento,
+    AcsCfg: { ...(acs as Record<string, unknown>), remoteCheck: true },
+  };
+  const escritura = rutaPara(
+    'fijar que la terminal espere el veredicto de la plataforma',
+    'terminal',
+  );
+  const escrito = await cliente.pedir(escritura.metodo, escritura.ruta, {
+    tipo: 'application/json',
+    contenido: JSON.stringify(corregido),
+  });
+  const ok = escrito.ok && !rechazado(escrito.cuerpo);
+  return {
+    clase: 'verificacion_remota',
+    aplicada: ok,
+    valorAnterior: anterior,
+    valorNuevo: ok ? 'true' : null,
+    detalle: ok
+      ? 'La terminal pasa a reportar y esperar el veredicto de la plataforma (remoteCheck)'
+      : interpretarError(escrito.cuerpo).detalle,
+  };
 };
 
 const corregirModo = async (cliente: ClienteDeEquipo): Promise<ResultadoDeCorreccion> => {

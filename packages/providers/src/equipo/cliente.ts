@@ -167,6 +167,66 @@ export class ClienteDeEquipo {
     }
   }
 
+  /**
+   * A4 · SUBE un flujo al equipo y lo deja abierto: un solo `PUT` sin
+   * `Content-Length`, en trozos, que dura lo que dure la sesión de audio.
+   *
+   * Resuelve cuando el equipo CONTESTA (o rechaza), no cuando el flujo acaba:
+   * quien habla no puede esperar a colgar para saber si el equipo aceptó. Si
+   * el equipo pide Digest en este momento, se reintenta UNA vez con un flujo
+   * nuevo sobre la misma cola: los trozos que el primer intento ya había
+   * tomado se pierden, y es lo que hay —un flujo no se rebobina—.
+   */
+  async subirFlujo(
+    ruta: string,
+    cuerpo: () => ReadableStream<Uint8Array>,
+    tipo: string,
+    cancelar?: AbortSignal,
+  ): Promise<RespuestaDeEquipo> {
+    const comienzo = this.ahora();
+    try {
+      let respuesta = await this.enviarFlujo('PUT', ruta, cuerpo(), tipo, cancelar);
+      if (
+        respuesta.status === 401 &&
+        this.sesion.aceptarDesafio(respuesta.headers.get('www-authenticate'))
+      ) {
+        respuesta = await this.enviarFlujo('PUT', ruta, cuerpo(), tipo, cancelar);
+      }
+      return {
+        estado: respuesta.status,
+        ok: respuesta.ok,
+        cuerpo: '',
+        latenciaMs: this.ahora() - comienzo,
+      };
+    } catch (error) {
+      throw new EquipoInalcanzable(this.motivoDe(error), this.ahora() - comienzo);
+    }
+  }
+
+  private enviarFlujo(
+    metodo: string,
+    ruta: string,
+    cuerpo: ReadableStream<Uint8Array>,
+    tipo: string,
+    cancelar?: AbortSignal,
+  ): Promise<Response> {
+    const autorizacion = this.sesion.autorizacionPara(metodo, ruta);
+    const cabeceras: Record<string, string> = { 'content-type': tipo };
+    if (autorizacion !== null) cabeceras['authorization'] = autorizacion;
+    // `duplex: 'half'` es lo que `fetch` exige para un cuerpo en flujo; no
+    // está en el tipo de `RequestInit` de la biblioteca y sí en la
+    // especificación, de ahí el cast. Sin tiempo límite: el flujo vive lo que
+    // viva la sesión.
+    const opciones = {
+      method: metodo,
+      headers: cabeceras,
+      body: cuerpo,
+      duplex: 'half',
+      ...(cancelar === undefined ? {} : { signal: cancelar }),
+    } as RequestInit;
+    return this.peticion(`${this.base}${ruta}`, opciones);
+  }
+
   private async abrirFlujo(
     ruta: string,
     cancelar?: AbortSignal,

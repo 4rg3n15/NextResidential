@@ -398,3 +398,19 @@ export const totalDeHistorial = (h: HistorialDeVivienda): number =>
   h.residentes + h.vehiculos + h.autorizaciones + h.eventos;
 
 export const REPOSITORIO_PADRON = Symbol.for('ncr.puerto.RepositorioPadron');
+
+/**
+ * A4 (ETAPA 15-E) · lo que OTROS módulos pueden preguntarle al padrón sobre
+ * una vivienda sin conocer su repositorio: dónde está «la unidad 305 del
+ * edificio 2». Lo consume el receptor de equipos para la llamada del
+ * videoportero, por su propia interfaz declarada; ésta la satisface por forma.
+ */
+export const LOCALIZADOR_DE_VIVIENDA = Symbol.for('ncr.padron.LocalizadorDeVivienda');
+
+export interface LocalizadorDeVivienda {
+  porUnidad(
+    copropiedadId: string,
+    agrupacion: string | null,
+    identificador: string,
+  ): Promise<{ readonly id: string; readonly identificador: string } | null>;
+}

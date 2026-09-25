@@ -2,7 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { Placa, esExito } from '@ncr/domain-core';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
-import { REPOSITORIO_PADRON } from './aplicacion/puertos';
+import { REPOSITORIO_PADRON, LOCALIZADOR_DE_VIVIENDA } from './aplicacion/puertos';
+import type { LocalizadorDeVivienda } from './aplicacion/puertos';
 import { LECTOR_DE_VOCABULARIO } from './aplicacion/vocabulario';
 import { REPOSITORIO_COPROPIEDADES } from '../multiempresa/repositorio-copropiedades';
 import type { RepositorioCopropiedades } from '../multiempresa/repositorio-copropiedades';
@@ -66,13 +67,39 @@ export class PadronModule {
           }),
         },
         {
+          // A4 · la vivienda de una llamada, por unidad y agrupación. Si el
+          // equipo declara edificio y no cuadra con la agrupación, se vuelve a
+          // buscar sin ella: un conjunto de una sola torre no la escribe.
+          provide: LOCALIZADOR_DE_VIVIENDA,
+          inject: [REPOSITORIO_PADRON],
+          useFactory: (repo: RepositorioPadron): LocalizadorDeVivienda => ({
+            porUnidad: async (copropiedadId, agrupacion, identificador) => {
+              const buscada =
+                (await repo.buscarViviendaPorIdentificador(
+                  copropiedadId,
+                  agrupacion,
+                  identificador,
+                )) ??
+                (agrupacion === null
+                  ? null
+                  : await repo.buscarViviendaPorIdentificador(copropiedadId, null, identificador));
+              return buscada === null ? null : { id: buscada.id, identificador };
+            },
+          }),
+        },
+        {
           provide: LECTOR_DE_VOCABULARIO,
           inject: [REPOSITORIO_COPROPIEDADES],
           useFactory: (copropiedades: RepositorioCopropiedades) =>
             new VocabularioDesdeCopropiedad(copropiedades),
         },
       ],
-      exports: [REPOSITORIO_PADRON, LECTOR_DE_VOCABULARIO, RESOLUTOR_DE_PLACA],
+      exports: [
+        REPOSITORIO_PADRON,
+        LECTOR_DE_VOCABULARIO,
+        RESOLUTOR_DE_PLACA,
+        LOCALIZADOR_DE_VIVIENDA,
+      ],
     };
   }
 }

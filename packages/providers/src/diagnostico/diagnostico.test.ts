@@ -202,7 +202,8 @@ describe('las correcciones · ninguna se aplica sola', () => {
       | 'modo_de_control'
       | 'pais_del_algoritmo'
       | 'imagenes_del_receptor'
-      | 'formato_del_receptor',
+      | 'formato_del_receptor'
+      | 'verificacion_remota',
     extra: Record<string, unknown> = {},
   ) =>
     aplicarCorreccion({
@@ -520,5 +521,72 @@ describe('cuando el equipo acepta la lectura y RECHAZA la escritura', () => {
     expect(r.aplicada).toBe(false);
     expect(r.valorAnterior).toBe('0');
     expect(r.valorNuevo).toBeNull();
+  });
+});
+
+/**
+ * A2 (ETAPA 15-E) · activar la verificación remota es cambiar QUIÉN decide.
+ * Se lee, se modifica UN campo y se escribe el documento entero; el simulado
+ * lo recuerda, así que la lectura siguiente —la de la ficha— lo ve.
+ */
+describe('A2 · la corrección de verificación remota de la terminal', () => {
+  const terminalQueDecideSola = () =>
+    equipoSimulado({ familia: 'terminal', ...CREDENCIAL, verificacionRemota: false });
+
+  it('lee-modifica-escribe AcsCfg y devuelve el valor anterior y el nuevo', async () => {
+    const peticion = terminalQueDecideSola();
+    const r = await aplicarCorreccion({
+      host: HOST,
+      puerto: 80,
+      protocolo: 'http',
+      ...CREDENCIAL,
+      clase: 'verificacion_remota',
+      confirmadaPor: 'operador-1',
+      peticion,
+    });
+    expect(r.aplicada).toBe(true);
+    expect(r.valorAnterior).toBe('false');
+    expect(r.valorNuevo).toBe('true');
+
+    // Y la ficha, después, ya no la marca como bloqueo: el equipo cambió.
+    const ficha = fichaDe(
+      await diagnosticarEquipo({
+        host: HOST,
+        puerto: 80,
+        protocolo: 'http',
+        ...CREDENCIAL,
+        familia: 'terminal',
+        peticion,
+      }),
+    );
+    expect(ficha.hallazgos.find((h) => /quién decide/.test(h.campo))?.estado).toBe('conforme');
+  });
+
+  it('SIN confirmación no se toca el equipo', async () => {
+    await expect(
+      aplicarCorreccion({
+        host: HOST,
+        puerto: 80,
+        protocolo: 'http',
+        ...CREDENCIAL,
+        clase: 'verificacion_remota',
+        confirmadaPor: '',
+        peticion: terminalQueDecideSola(),
+      }),
+    ).rejects.toThrow(/confirmación/);
+  });
+
+  it('un firmware que no declara el campo NO se escribe a ciegas: es un bloqueo', async () => {
+    const r = await aplicarCorreccion({
+      host: HOST,
+      puerto: 80,
+      protocolo: 'http',
+      ...CREDENCIAL,
+      clase: 'verificacion_remota',
+      confirmadaPor: 'operador-1',
+      peticion: equipoSimulado({ familia: 'terminal', ...CREDENCIAL, sinCapacidades: true }),
+    });
+    expect(r.aplicada).toBe(false);
+    expect(r.detalle).toMatch(/no declara|a ciegas/i);
   });
 });

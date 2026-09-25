@@ -48,6 +48,8 @@ import {
   guardarCuerpoCrudo,
 } from './autorizaciones';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from './comun/sobre-de-equipo';
+import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from './comun/ruta-de-audio';
+import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from './comun/ruta-de-video';
 import { AppModule } from './app.module';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
 import { aplicarSaneamiento, aplicarSeguridad } from './seguridad';
@@ -111,6 +113,13 @@ async function arrancar(): Promise<void> {
    * crudo, acotado en tamaño, y `@ncr/providers` lo abre.
    */
   app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
+  // A4 · el audio del operador, crudo y acotado, sólo bajo su ruta.
+  app.use(
+    RUTA_DE_AUDIO_DE_INTERCOM,
+    express.raw({ type: 'application/octet-stream', limit: LIMITE_DE_TROZO_DE_AUDIO }),
+  );
+  // A5 · la oferta SDP del navegador, como texto y acotada, sólo bajo su ruta.
+  app.use(RUTA_DE_WHEP_DE_VIDEO, express.text({ type: TIPO_SDP, limit: LIMITE_DE_OFERTA_SDP }));
   // O3 · la fotografía del visitante: más que el tope general, SÓLO en su ruta.
   app.use(
     RUTA_DE_FOTOGRAFIA_DE_VISITANTE,

@@ -37,7 +37,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { errorDominio, exito, fallo } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
-import type { CapturarRostro } from '../../biometria';
+import type { CapturarRostro, EmitirEnlaceDeConsentimiento } from '../../biometria';
 import type { ResultadoCaptura } from '../../biometria';
 import type { ResolverMiAmbito } from './casos-de-uso';
 import { AUTORIZACIONES_DEL_RESIDENTE } from './puertos';
@@ -63,6 +63,12 @@ export type ResultadoDeRostro = ResultadoCaptura & {
   /** A QUIÉN se le pidió el consentimiento. Para que la app lo diga por su
    *  nombre y el residente entienda que no le toca a él responder. */
   readonly titular?: string;
+  /**
+   * A3 (15-E) · el enlace que el residente le ENTREGA al visitante para que
+   * responda desde su propio teléfono. URL completa si la API declara su
+   * origen público; si no, la ruta. Nunca lo abre el residente por él.
+   */
+  readonly enlaceDeConsentimiento?: string;
 };
 
 @Injectable()
@@ -72,6 +78,7 @@ export class CapturarRostroDeMiVisitante {
     @Inject(AUTORIZACIONES_DEL_RESIDENTE)
     private readonly autorizaciones: AutorizacionesDelResidente,
     private readonly capturar: CapturarRostro,
+    private readonly emitirEnlace: EmitirEnlaceDeConsentimiento,
   ) {}
 
   async ejecutar(
@@ -107,11 +114,17 @@ export class CapturarRostroDeMiVisitante {
       suprimirEn: new Date(entrada.suprimirEn),
     });
     if (!capturada.ok) return capturada;
+    if (!capturada.valor.aceptada) return exito(capturada.valor);
 
-    return exito(
-      capturada.valor.aceptada
-        ? { ...capturada.valor, titular: titular.nombre }
-        : capturada.valor,
-    );
+    // El enlace se emite con el contexto del residente y lleva al TITULAR
+    // dentro, firmado: el residente lo entrega, no lo responde (RN-10).
+    const enlace = await this.emitirEnlace.ejecutar(ctx, {
+      consentimientoId: capturada.valor.consentimientoId,
+    });
+    return exito({
+      ...capturada.valor,
+      titular: titular.nombre,
+      ...(enlace.ok ? { enlaceDeConsentimiento: enlace.valor.url ?? enlace.valor.ruta } : {}),
+    });
   }
 }

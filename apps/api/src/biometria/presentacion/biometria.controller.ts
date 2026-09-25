@@ -10,7 +10,7 @@ import {
   Post,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { esFallo } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
@@ -26,7 +26,28 @@ import {
   RevocarConsentimiento,
   SincronizarPlantilla,
 } from '../aplicacion/casos-de-uso';
-import { CapturarRostroDto, ResponderConsentimientoDto, SincronizarPlantillaDto } from './dtos';
+import { EmitirEnlaceDeConsentimiento } from '../aplicacion/enlace-de-consentimiento';
+import {
+  PropagarConsentimientoAceptado,
+  SincronizarPlantillaEnTerminales,
+} from '../aplicacion/sincronizacion-total';
+import type { ResultadoDeSincronizacionTotal } from '../aplicacion/sincronizacion-total';
+import {
+  CapturarRostroDto,
+  EnlaceDeConsentimientoDto,
+  RespuestaDeConsentimientoDto,
+  ResponderConsentimientoDto,
+  SincronizacionTotalDto,
+  SincronizarPlantillaDto,
+} from './dtos';
+
+const aSincronizacionDto = (r: ResultadoDeSincronizacionTotal): SincronizacionTotalDto => ({
+  plantillaId: r.plantillaId,
+  terminales: r.terminales,
+  sincronizadas: r.sincronizadas,
+  fallidas: r.fallidas,
+  porTerminal: r.porTerminal.map((t) => ({ ...t })),
+});
 
 /**
  * Superficie HTTP de la biometría.
@@ -68,6 +89,9 @@ export class BiometriaController {
     private readonly revocar: RevocarConsentimiento,
     private readonly sincronizar: SincronizarPlantilla,
     private readonly barrer: BarrerPlantillasVencidas,
+    private readonly emitirEnlace: EmitirEnlaceDeConsentimiento,
+    private readonly sincronizarEnTerminales: SincronizarPlantillaEnTerminales,
+    private readonly propagar: PropagarConsentimientoAceptado,
     @Inject(REPOSITORIO_CONSENTIMIENTOS)
     private readonly consentimientos: RepositorioConsentimientos,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
@@ -152,15 +176,46 @@ export class BiometriaController {
     };
   }
 
+  /**
+   * A3 (15-E) · el enlace con el que el TITULAR responde desde su teléfono.
+   * Lo emite quien atiende la captura; lo responde el titular. Ver
+   * `ConsentimientoPublicoController` y `EmitirEnlaceDeConsentimiento`.
+   */
+  @Post('consentimientos/:consentimientoId/enlace')
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central')
+  @ApiOperation({ summary: 'Emite el enlace firmado con el que el TITULAR responde (RN-10)' })
+  @ApiOkResponse({ type: EnlaceDeConsentimientoDto })
+  async emitirEnlaceDeConsentimiento(
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
+    @Contexto() ctx: ContextoTenant,
+  ): Promise<EnlaceDeConsentimientoDto> {
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'biometria/consentimientos/enlace',
+    );
+    const e = desenvolver(await this.emitirEnlace.ejecutar(destino, { consentimientoId }));
+    return {
+      consentimientoId: e.consentimientoId,
+      estado: e.estado,
+      token: e.token,
+      ruta: e.ruta,
+      url: e.url,
+      expiraEn: e.expiraEn.toISOString(),
+    };
+  }
+
   @Post('consentimientos/:consentimientoId/respuesta')
   @Roles('residente', 'administrador', 'portero', 'operador_central')
   @ApiOperation({ summary: 'El TITULAR acepta o rechaza. Nadie responde por él (RN-10)' })
+  @ApiOkResponse({ type: RespuestaDeConsentimientoDto })
   async responderConsentimiento(
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
     @Contexto() ctx: ContextoTenant,
     @Body() dto: ResponderConsentimientoDto,
-  ) {
+  ): Promise<RespuestaDeConsentimientoDto> {
     const destino = await this.aislamiento.exigirAlcance(
       ctx,
       copropiedadId,
@@ -168,7 +223,7 @@ export class BiometriaController {
     );
     // `quienResponde` sale del TOKEN, nunca del cuerpo: si el cliente lo
     // pusiera, RN-10 sería una casilla que cualquiera marca.
-    return desenvolver(
+    const r = desenvolver(
       await this.responder.ejecutar(destino, {
         consentimientoId,
         quienResponde: ctx.personaId ?? ctx.usuarioId,
@@ -176,6 +231,10 @@ export class BiometriaController {
         ...(dto.evidenciaId === undefined ? {} : { evidenciaId: dto.evidenciaId }),
       }),
     );
+    // A3 · aceptado = hacia todas las terminales, ya. Lo que no llegue se dice.
+    const propagacion =
+      r.estado === 'vigente' ? await this.propagar.ejecutar(destino, { consentimientoId }) : [];
+    return { estado: r.estado, propagacion: propagacion.map(aSincronizacionDto) };
   }
 
   @Post('consentimientos/:consentimientoId/revocacion')
@@ -215,6 +274,33 @@ export class BiometriaController {
     );
     return desenvolver(
       await this.sincronizar.ejecutar(destino, { plantillaId, dispositivoId: dto.dispositivoId }),
+    );
+  }
+
+  /**
+   * A3 (15-E) · a TODAS las terminales y videoporteros con biblioteca de
+   * rostros de la copropiedad, por capacidad (ADR-019). Relanzable: el equipo
+   * que ya la tiene la vuelve a aceptar y la fila de sincronización no se
+   * duplica.
+   */
+  @Post('plantillas/:plantillaId/sincronizacion-total')
+  @Roles('superadministrador', 'administrador')
+  @ApiOperation({
+    summary: 'Empuja la plantilla a todos los equipos con biblioteca de rostros (RN-09)',
+  })
+  @ApiOkResponse({ type: SincronizacionTotalDto })
+  async sincronizarEnTodas(
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('plantillaId', ParseUUIDPipe) plantillaId: string,
+    @Contexto() ctx: ContextoTenant,
+  ): Promise<SincronizacionTotalDto> {
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'biometria/plantillas',
+    );
+    return aSincronizacionDto(
+      desenvolver(await this.sincronizarEnTerminales.ejecutar(destino, { plantillaId })),
     );
   }
 

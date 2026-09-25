@@ -3,7 +3,17 @@ import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
-import { CORRECTOR_DE_EQUIPO, REPOSITORIO_DE_EQUIPOS, SONDA_DE_EQUIPO } from './aplicacion/puertos';
+import {
+  CORRECTOR_DE_EQUIPO,
+  EQUIPOS_QUE_EMITEN,
+  REPOSITORIO_DE_EQUIPOS,
+  SONDA_DE_EQUIPO,
+} from './aplicacion/puertos';
+import type { RepositorioDeEquipos } from './aplicacion/puertos';
+import {
+  TERMINALES_DE_ROSTROS,
+  TerminalesDeRostrosDesdeRegistro,
+} from './aplicacion/terminales-de-rostros';
 import { RepositorioDeEquiposPg } from './infraestructura/repositorio-equipos-pg';
 import { SondaPorProveedor } from './infraestructura/sonda-por-proveedor';
 import { CorrectorPorProveedor } from './infraestructura/corrector-por-proveedor';
@@ -33,8 +43,23 @@ export class EquiposModule {
           useFactory: (pool: Pool, c: Configuracion) =>
             new RepositorioDeEquiposPg(pool, c.EQUIPOS_LLAVE, c.EQUIPOS_LLAVE_REF),
         },
+        {
+          // A4 · lo que el receptor de equipos pregunta: a quién escuchar.
+          provide: EQUIPOS_QUE_EMITEN,
+          inject: [REPOSITORIO_DE_EQUIPOS],
+          useFactory: (equipos: RepositorioDeEquipos) => ({
+            activos: () => equipos.activosQueEmiten(),
+          }),
+        },
+        {
+          // A3 · lo que biometría pregunta: a qué equipos llega una plantilla.
+          provide: TERMINALES_DE_ROSTROS,
+          inject: [REPOSITORIO_DE_EQUIPOS],
+          useFactory: (equipos: RepositorioDeEquipos) =>
+            new TerminalesDeRostrosDesdeRegistro(equipos),
+        },
       ],
-      exports: [REPOSITORIO_DE_EQUIPOS],
+      exports: [REPOSITORIO_DE_EQUIPOS, TERMINALES_DE_ROSTROS, EQUIPOS_QUE_EMITEN],
     };
   }
 }

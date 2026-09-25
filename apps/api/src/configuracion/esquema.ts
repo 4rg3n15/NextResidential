@@ -229,6 +229,56 @@ export const esquemaConfiguracion = z.object({
    */
   CARGADOR_DE_CONTEXTO: z.enum(['postgres', 'conservador']).default('postgres'),
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * DÓNDE VIVE EL HISTÓRICO DE EVENTOS · ETAPA 15-E
+   *
+   *   postgres  (por omisión) — `eventos` y `recepciones_evento` de la base,
+   *              con los claims de servicio de cada copropiedad por llamada.
+   *              Es el único con el que un acceso sobrevive a un reinicio y
+   *              con el que la hoja de resultados en sitio se puede cotejar.
+   *   memoria   — el doble de la ETAPA 06. Es el de la suite, que no tiene
+   *              base, y sirve para ensayar sin ella. Un despliegue en
+   *              `memoria` NO tiene trazabilidad: el arranque lo avisa.
+   */
+  PERSISTENCIA_DE_EVENTOS: z.enum(['postgres', 'memoria']).default('postgres'),
+
+  /**
+   * A3 (15-E) · dónde viven consentimientos, plantillas y sincronizaciones.
+   * Mismo criterio que el histórico: `postgres` es el único con el que los
+   * cerrojos de RN-09 y RN-11 —disparadores y CHECK de la base— actúan de
+   * verdad; `memoria` es el doble de la suite y avisa al arrancar.
+   */
+  PERSISTENCIA_DE_BIOMETRIA: z.enum(['postgres', 'memoria']).default('postgres'),
+
+  /**
+   * A3 (15-E) · el origen PÚBLICO con el que se construye el enlace que
+   * recibe el titular para responder su consentimiento (`/consentimiento/…`).
+   * Opcional: sin él la API entrega el token y la ruta, y la consola dice
+   * qué falta. Tiene que ser lo que el teléfono del visitante alcanza, que en
+   * sitio es la IP del Mac —no `localhost`—.
+   */
+  API_URL_PUBLICA: z
+    .string()
+    .trim()
+    .url('API_URL_PUBLICA debe ser una URL absoluta (http://<IP>:3000)')
+    .optional(),
+
+  /**
+   * A5 (15-E) · el puente de video RTSP → WebRTC (go2rtc), visto DESDE LA API.
+   * Opcional: sin él la vista en vivo responde 503 con motivo y el resto de la
+   * consola sigue. Es una dirección INTERNA (`http://127.0.0.1:1984` cuando
+   * go2rtc corre junto a la API) y nunca llega al navegador: el navegador
+   * negocia WebRTC contra la API, que valida sesión, rol y copropiedad antes
+   * de hablar con el puente, y la URL RTSP con la credencial del equipo sólo
+   * viaja de la API a go2rtc (RN-12, RN-21).
+   */
+  GO2RTC_URL: z
+    .string()
+    .trim()
+    .url('GO2RTC_URL debe ser una URL absoluta (http://127.0.0.1:1984)')
+    .optional(),
+
   /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 

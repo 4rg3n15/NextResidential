@@ -55,6 +55,19 @@ VALUES ('00000000-0000-4000-8000-000000000002', NULL,
         '00000000-0000-4000-8000-000000000001')
 ON CONFLICT (id) DO NOTHING;
 
+-- ETAPA 15-E · el actor de INGESTA (migración 0035). Idéntico criterio que la
+-- fila de sistema: la crea la migración y se conserva aquí, idempotente, para
+-- que el seed siga siendo ejecutable por sí solo. NO es el superadministrador
+-- de arriba: lo que escriben los equipos se firma con esta identidad.
+INSERT INTO public.usuarios (id, copropiedad_id, auth_user_id, correo, nombre,
+                             creado_por, actualizado_por)
+VALUES ('00000000-0000-4000-8000-000000000003', NULL,
+        '00000000-0000-4000-8000-0000000000a3',
+        'ingesta@nextcontrol.invalid', 'Actor de ingesta de equipos',
+        '00000000-0000-4000-8000-000000000001',
+        '00000000-0000-4000-8000-000000000001')
+ON CONFLICT (id) DO NOTHING;
+
 SET LOCAL request.jwt.claims = '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002"}';
 
 -- Copropiedad ------------------------------------------------------------------

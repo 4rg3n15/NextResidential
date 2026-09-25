@@ -340,6 +340,41 @@ describe('las clases `rostro` y `llamada` · 6.5', () => {
     expect(evento.placa).toBeNull();
   });
 
+  it('A2 · el evento trae la SERIE con la que la terminal identifica su petición', () => {
+    const evento = desdeAlertStreamJson(
+      {
+        currentEvent: true,
+        AccessControllerEvent: { employeeNoString: 'p-1', remoteCheck: true, serialNo: 4711 },
+      },
+      'disp-terminal',
+      AHORA2,
+    );
+    expect(evento.serieDelEquipo).toBe(4711);
+    expect(evento.esResultadoDeVerificacion).toBe(false);
+  });
+
+  it('A2 · un remoteCheckResult es un RESULTADO informativo: no espera veredicto', () => {
+    // Firmwares de 2024 en adelante avisan del desenlace de una verificación
+    // ya contestada. Tratarlo como petición produciría dos eventos por un hecho.
+    const evento = desdeAlertStreamJson(
+      {
+        currentEvent: true,
+        eventType: 'AccessControllerEvent',
+        AccessControllerEvent: {
+          employeeNoString: 'p-1',
+          remoteCheck: true,
+          remoteCheckResult: 'success',
+          serialNo: 4711,
+        },
+      },
+      'disp-terminal',
+      AHORA2,
+    );
+    expect(evento.clase).toBe('rostro');
+    expect(evento.esResultadoDeVerificacion).toBe(true);
+    expect(evento.esperaVeredicto).toBe(false);
+  });
+
   it('sin `remoteCheck` la terminal decidió sola: rostro que NO espera', () => {
     const evento = desdeAlertStreamJson(
       { currentEvent: true, AccessControllerEvent: { employeeNo: 12 } },
@@ -430,5 +465,44 @@ describe('el evento ANPR en JSON · 6.7a · DOCUMENTADO, NO VERIFICADO', () => {
     expect(desdeAlarmServerJson('42', 'd', AHORA2)).toBeNull();
     expect(esJsonDeAlarmServer('{"eventType":"ANPR"}')).toBe(true);
     expect(esJsonDeAlarmServer('<EventNotificationAlert/>')).toBe(false);
+  });
+});
+
+describe('A4 · el origen de la llamada, en partes que el padrón puede cotejar', () => {
+  it('CallInfo: unidad y edificio como texto', () => {
+    const e = desdeAlertStreamJson(
+      {
+        eventType: 'videoIntercomEvent',
+        currentEvent: true,
+        CallInfo: { buildingNumber: 1, unitNumber: 12, periodNumber: 1 },
+      },
+      'portero-1',
+      new Date('2026-09-25T10:00:00Z'),
+    );
+    expect(e.clase).toBe('llamada');
+    expect(e.unidadDeLlamada).toBe('12');
+    expect(e.edificioDeLlamada).toBe('1');
+    expect(e.origenDeLlamada).toContain('unidad 12');
+  });
+
+  it('voiceTalkEvent.src también vale; lo que no viene es null, nunca una cadena vacía', () => {
+    const e = desdeAlertStreamJson(
+      {
+        eventType: 'voiceTalkEvent',
+        currentEvent: true,
+        voiceTalkEvent: { src: { unitNumber: ' 7 ' } },
+      },
+      'portero-1',
+      new Date('2026-09-25T10:00:00Z'),
+    );
+    expect(e.unidadDeLlamada).toBe('7');
+    expect(e.edificioDeLlamada).toBeNull();
+    const sin = desdeAlertStreamJson(
+      { eventType: 'AccessControllerEvent', currentEvent: true, AccessControllerEvent: {} },
+      't-1',
+      new Date('2026-09-25T10:00:00Z'),
+    );
+    expect(sin.unidadDeLlamada).toBeNull();
+    expect(sin.edificioDeLlamada).toBeNull();
   });
 });

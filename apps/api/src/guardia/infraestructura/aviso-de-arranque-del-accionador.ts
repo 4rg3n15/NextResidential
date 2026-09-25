@@ -2,23 +2,24 @@ import type { Bitacora } from '@ncr/domain-core';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * QUÉ ACCIONADOR ESTÁ ACTIVO SE DICE AL ARRANCAR · ETAPA 15-D (O5)
+ * QUÉ ACCIONADOR ATIENDE A CADA DISPOSITIVO SE DICE AL ARRANCAR · O5, 15-E
  *
- * El accionador de puerta se elige por entorno: con `BARRERA_HOST`, usuario y
- * clave hay un control REAL de barrera; sin ellos, todo es simulado. Hasta
- * ahora la elección era muda, y un despliegue en el que faltara una variable
- * —o sobrara: barrera real declarada y `BARRERA_DISPOSITIVO_ID` en blanco—
- * arrancaba igual, abría «con éxito» en la bitácora y no movía ningún brazo.
+ * Desde la 15-E hay una regla y no un `if`: **todo dispositivo** va por el
+ * proveedor de equipos (`PROVEEDOR_DE_EQUIPOS`, resuelto por registro y por
+ * capacidad), salvo el que `BARRERA_DISPOSITIVO_ID` nombre, que va por el
+ * control de barrera del entorno mientras esa compatibilidad exista. El aviso
+ * enuncia la regla completa para que quien lea el arranque sepa, sin abrir el
+ * código, por dónde saldrá cada orden.
  *
- * Igual que el proveedor de equipos y el cargador de contexto, se dice en la
- * primera línea del arranque, con su consecuencia. Es una función pura sobre
- * el veredicto de la composición, para que se pueda probar sin arrancar Nest.
+ * Es una función pura sobre el veredicto de la composición: se prueba sin Nest.
  */
 export interface EstadoDelAccionador {
+  /** La clase del proveedor de equipos activa: `simulado` o el adaptador real. */
+  readonly clase: string;
   /** Si `crearControlDeBarreraDesdeEntorno` devolvió un control real. */
-  readonly hayControlReal: boolean;
+  readonly hayControlDeEntorno: boolean;
   /** `BARRERA_DISPOSITIVO_ID`, ya recortado. */
-  readonly dispositivoReal: string;
+  readonly dispositivoDeEntorno: string;
 }
 
 export interface AvisoDeArranque {
@@ -28,39 +29,49 @@ export interface AvisoDeArranque {
 }
 
 export const avisoDeArranqueDelAccionador = (estado: EstadoDelAccionador): AvisoDeArranque => {
-  if (!estado.hayControlReal) {
+  const simulado = estado.clase === 'simulado';
+  const reglaDelProveedor = simulado
+    ? 'todo dispositivo lo atiende el proveedor SIMULADO: ninguna orden mueve un brazo real'
+    : `todo dispositivo dado de alta en la consola lo atiende el proveedor ${estado.clase}, ` +
+      'resuelto por registro de equipos y decidido por capacidades';
+
+  if (!estado.hayControlDeEntorno) {
     return {
-      nivel: 'aviso',
-      mensaje: 'accionador de puerta activo: SIMULADO',
+      nivel: simulado ? 'aviso' : 'info',
+      mensaje: `accionador de puertas: proveedor ${estado.clase} para todos los dispositivos`,
       contexto: {
-        accionador: 'simulado',
-        consecuencia:
-          'ninguna orden de apertura mueve un brazo real; toda apertura queda registrada como ' +
-          'atendida por el proveedor SIMULADO. Declare BARRERA_HOST, BARRERA_USUARIO, ' +
-          'BARRERA_CLAVE y BARRERA_DISPOSITIVO_ID para la barrera real',
+        accionador: simulado ? 'simulado' : 'proveedor',
+        clase: estado.clase,
+        compatibilidadBarrera: false,
+        consecuencia: `${reglaDelProveedor}. BARRERA_* no está declarada`,
       },
     };
   }
-  if (estado.dispositivoReal === '') {
+  if (estado.dispositivoDeEntorno === '') {
     return {
       nivel: 'aviso',
-      mensaje: 'accionador de puerta: barrera REAL declarada pero SIN dispositivo asignado',
+      mensaje: 'accionador de puertas: BARRERA_* declarada pero SIN dispositivo asignado',
       contexto: {
-        accionador: 'simulado',
+        accionador: simulado ? 'simulado' : 'proveedor',
+        clase: estado.clase,
+        compatibilidadBarrera: true,
         consecuencia:
-          'BARRERA_HOST está declarada y BARRERA_DISPOSITIVO_ID no: ninguna orden llegará a la ' +
-          'barrera real, todas las atenderá el simulado. Declare el identificador del equipo',
+          'BARRERA_HOST está declarada y BARRERA_DISPOSITIVO_ID no: ninguna orden irá por el ' +
+          `control de barrera del entorno. ${reglaDelProveedor}`,
       },
     };
   }
   return {
     nivel: 'info',
-    mensaje: 'accionador de puerta activo: barrera REAL por entorno',
+    mensaje: `accionador de puertas: barrera por entorno para ${estado.dispositivoDeEntorno}; proveedor ${estado.clase} para el resto`,
     contexto: {
-      accionador: 'real',
-      dispositivoId: estado.dispositivoReal,
+      accionador: 'mixto',
+      clase: estado.clase,
+      compatibilidadBarrera: true,
+      dispositivoId: estado.dispositivoDeEntorno,
       consecuencia:
-        'las órdenes de ese dispositivo se emiten al equipo declarado por entorno; el resto, al simulado',
+        'las órdenes de ese dispositivo van por el control de barrera VERIFICADO del entorno ' +
+        `(compatibilidad declarada); ${reglaDelProveedor}`,
     },
   };
 };

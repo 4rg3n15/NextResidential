@@ -171,3 +171,55 @@ describe('6.7a · el evento en JSON entra por el mismo receptor', () => {
     );
   });
 });
+
+/**
+ * A2 (ETAPA 15-E) · la terminal facial entra por el MISMO receptor que la
+ * cámara. Publica JSON —dentro de un multipart cuando adjunta foto, a secas
+ * cuando no— y lo que cruza la frontera es un `rostro` que sigue adelante.
+ */
+describe('A2 · el rostro de la terminal sigue adelante', () => {
+  const EVENTO_DE_TERMINAL = JSON.stringify({
+    eventType: 'AccessControllerEvent',
+    dateTime: '2026-09-25T07:00:00-05:00',
+    alarmDataType: 0,
+    AccessControllerEvent: { employeeNoString: 'plantilla-77', remoteCheck: true, serialNo: 9 },
+  });
+
+  it('como cuerpo JSON a secas (sin foto), el desenlace es `rostro` con su publicación', () => {
+    const r = recibirPublicacionDeEquipo(
+      Buffer.from(EVENTO_DE_TERMINAL),
+      'application/json',
+      'disp-terminal',
+      AHORA,
+    );
+    expect(r.desenlace).toBe('rostro');
+    expect(r.publicacion?.evento.clase).toBe('rostro');
+    expect(r.publicacion?.evento.personaId).toBe('plantilla-77');
+    expect(r.publicacion?.evento.esperaVeredicto).toBe(true);
+    expect(r.publicacion?.evento.serieDelEquipo).toBe(9);
+    expect(r.publicacion?.foto).toBeNull();
+  });
+
+  it('dentro de un multipart, la parte del evento se reconoce por su Content-Type JSON', () => {
+    const cuerpo = Buffer.concat([
+      Buffer.from('--B\r\nContent-Disposition: form-data; name="event_log"\r\n'),
+      Buffer.from('Content-Type: application/json\r\n\r\n'),
+      Buffer.from(EVENTO_DE_TERMINAL),
+      Buffer.from('\r\n--B--\r\n'),
+    ]);
+    const r = recibirPublicacionDeEquipo(cuerpo, TIPO, 'disp-terminal', AHORA);
+    expect(r.desenlace).toBe('rostro');
+    expect(r.motivo).toMatch(/espera veredicto/);
+  });
+
+  it('un rostro HISTÓRICO tampoco sigue adelante', () => {
+    const historico = EVENTO_DE_TERMINAL.replace('"alarmDataType":0', '"alarmDataType":1');
+    const r = recibirPublicacionDeEquipo(
+      Buffer.from(historico),
+      'application/json',
+      'disp-terminal',
+      AHORA,
+    );
+    expect(r.desenlace).toBe('historico');
+  });
+});

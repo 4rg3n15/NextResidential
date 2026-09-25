@@ -312,6 +312,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Emite el enlace firmado con el que el TITULAR responde (RN-10) */
+        post: operations["BiometriaController_emitirEnlaceDeConsentimiento"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta": {
         parameters: {
             query?: never;
@@ -357,6 +374,23 @@ export interface paths {
         put?: never;
         /** Empuja la plantilla a una terminal, si hay consentimiento (RN-09) */
         post: operations["BiometriaController_sincronizarPlantilla"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/biometria/plantillas/{plantillaId}/sincronizacion-total": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Empuja la plantilla a todos los equipos con biblioteca de rostros (RN-09) */
+        post: operations["BiometriaController_sincronizarEnTodas"];
         delete?: never;
         options?: never;
         head?: never;
@@ -757,6 +791,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Audio que el equipo emite, en flujo, para quien tiene la palabra */
+        get: operations["GuardiaController_escucharAudio"];
+        put?: never;
+        /** Un trozo de audio del operador hacia el equipo */
+        post: operations["GuardiaController_hablar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/guardia/ordenes": {
         parameters: {
             query?: never;
@@ -769,6 +821,23 @@ export interface paths {
         put?: never;
         /** Abre o niega a mano, con motivo obligatorio (RN-08) */
         post: operations["GuardiaController_ordenar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/guardia/video/{dispositivoId}/whep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Negocia la vista en vivo del equipo (WHEP): oferta SDP dentro, respuesta SDP fuera */
+        post: operations["VideoController_whep"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1829,7 +1898,7 @@ export interface components {
         };
         CorreccionDeEquipoDto: {
             /** @enum {string} */
-            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor";
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota";
             /** @description Por qué se corrige. Queda en la auditoría junto a quién y cuándo. */
             motivo: string;
         };
@@ -2002,6 +2071,20 @@ export interface components {
             /** @description Pasado el umbral de KPI-34 */
             demorado: boolean;
         };
+        EnlaceDeConsentimientoDto: {
+            /** Format: uuid */
+            consentimientoId: string;
+            /** @description Estado del consentimiento al emitir el enlace */
+            estado: string;
+            /** @description Token firmado; vale sólo para este consentimiento y caduca */
+            token: string;
+            /** @description Ruta en la API: /consentimiento/<token> */
+            ruta: string;
+            /** @description URL completa si API_URL_PUBLICA está declarada; null si no lo está */
+            url: string | null;
+            /** @description Caducidad del enlace (ISO 8601) */
+            expiraEn: string;
+        };
         EquipoDto: {
             id: string;
             nombre: string;
@@ -2059,6 +2142,15 @@ export interface components {
             titular: string | null;
             /** @description Segundos tras los que el canal se libera solo por inactividad */
             timeoutSegundos: number;
+            /**
+             * @description Por dónde va el audio: «equipo» si el proveedor abrió el canal del aparato; «ninguno» si hay turno pero no transporte (el equipo no declara audio o no está en el registro).
+             * @enum {string}
+             */
+            transporte: "equipo" | "ninguno";
+            /** @description Por qué no hay transporte, si no lo hay */
+            detalleTransporte: string | null;
+            /** @description A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice. */
+            formatoDeAudio: string | null;
         };
         EstadoDeDispositivosDto: {
             dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
@@ -2247,7 +2339,7 @@ export interface components {
              * @description Qué corrección lo arregla desde la consola. Nulo si no la hay.
              * @enum {string|null}
              */
-            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | null;
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota" | null;
         };
         HistorialDeOrdenesDto: {
             ordenes: components["schemas"]["OrdenEjecutadaDto"][];
@@ -2674,6 +2766,12 @@ export interface components {
             /** @description Evidencia de la aceptación (RN-09) */
             evidenciaId?: string;
         };
+        RespuestaDeConsentimientoDto: {
+            /** @description Estado resultante del consentimiento */
+            estado: string;
+            /** @description Si el titular aceptó: el resultado de empujar cada plantilla a todas las terminales. Vacío si rechazó o si no había plantilla pendiente. */
+            propagacion: components["schemas"]["SincronizacionTotalDto"][];
+        };
         RestablecimientoRegistradoDto: {
             /**
              * @description Siempre true; la respuesta es 204 sin cuerpo
@@ -2697,7 +2795,7 @@ export interface components {
         };
         ResultadoDeCorreccionDto: {
             /** @enum {string} */
-            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor";
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota";
             aplicada: boolean;
             valorAnterior: string | null;
             valorNuevo: string | null;
@@ -2736,6 +2834,13 @@ export interface components {
             /** @description Lo que el equipo declaró poder hacer. Ausente cuando no se alcanzó. */
             capacidades?: components["schemas"]["CapacidadesDeEquipoDto"];
         };
+        ResultadoPorTerminalDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            nombre: string;
+            sincronizada: boolean;
+            detalle: string;
+        };
         RevocacionDto: {
             revocada: boolean;
         };
@@ -2753,6 +2858,8 @@ export interface components {
              * @description El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10).
              */
             consentimientoId: string | null;
+            /** @description A3 (15-E) · el enlace que el residente ENTREGA al visitante para que responda desde su teléfono, sin cuenta. De un solo uso y con caducidad. URL completa si la API declara API_URL_PUBLICA; si no, la ruta. Nulo cuando la captura no se aceptó. */
+            enlaceDeConsentimiento: string | null;
             /** @description A quién se le pidió: el visitante, no el residente que tomó la foto */
             titular: string | null;
             calidad: number | null;
@@ -2792,6 +2899,15 @@ export interface components {
             copropiedadesAtendidas: string[];
             /** @description aal2 en el token. Los roles administrativos no operan sin él (RN-20, CA-25): la consola debe llevar al paso de segundo factor mientras sea false. */
             mfaVerificado: boolean;
+        };
+        SincronizacionTotalDto: {
+            /** Format: uuid */
+            plantillaId: string;
+            /** @description Equipos activos con biblioteca de rostros */
+            terminales: number;
+            sincronizadas: number;
+            fallidas: number;
+            porTerminal: components["schemas"]["ResultadoPorTerminalDto"][];
         };
         SincronizarPlantillaDto: {
             dispositivoId: string;
@@ -3473,6 +3589,28 @@ export interface operations {
             };
         };
     };
+    BiometriaController_emitirEnlaceDeConsentimiento: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                consentimientoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnlaceDeConsentimientoDto"];
+                };
+            };
+        };
+    };
     BiometriaController_responderConsentimiento: {
         parameters: {
             query?: never;
@@ -3489,11 +3627,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RespuestaDeConsentimientoDto"];
+                };
             };
         };
     };
@@ -3538,6 +3678,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    BiometriaController_sincronizarEnTodas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                plantillaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SincronizacionTotalDto"];
+                };
             };
         };
     };
@@ -4000,7 +4162,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado y «alertas» por cada escalamiento. La carga de cada mensaje es un EventoRegistradoDto o un AlertaExpuestaDto según el tema. */
+            /** @description Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado, «alertas» por cada escalamiento y «llamadas» por cada llamada de videoportero (A4: dispositivoId, clase, viviendaId, vivienda, origen, ocurridoEn, referenciaExterna). La carga de cada mensaje es un EventoRegistradoDto, un AlertaExpuestaDto o la de la llamada según el tema. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4320,6 +4482,66 @@ export interface operations {
             };
         };
     };
+    GuardiaController_escucharAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Flujo de audio en el formato que `formatoDeAudio` del canal anuncia */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_hablar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        /** @description Bytes en el formato anunciado */
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
     GuardiaController_historialDeOrdenes: {
         parameters: {
             query?: never;
@@ -4389,6 +4611,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    VideoController_whep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        /** @description Oferta SDP del navegador (`v=0…`) */
+        requestBody: {
+            content: {
+                "application/sdp": string;
+            };
+        };
+        responses: {
+            /** @description Respuesta SDP del puente */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/sdp": string;
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/sdp": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description El equipo no ofrece video */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/sdp": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description La vista en vivo no está configurada (GO2RTC_URL) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/sdp": components["schemas"]["ErrorApiDto"];
                 };
             };
         };

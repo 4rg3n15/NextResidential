@@ -297,6 +297,45 @@ desplegar el resto:
   la app rechaza una llave con forma de secreta, y una prueba lo verifica.
 - Cambiar el dominio de la API obliga a **volver a publicar** la app. Tenga eso
   en cuenta antes de elegir el dominio en P-08.
+- `API_URL` **no tiene valor por omisión**. Sin ella la app arranca en una
+  pantalla que lo dice y que enseña la línea que faltó, en vez de fallar con
+  «sin conexión»: en un teléfono físico `localhost` es el propio teléfono.
+
+### 8.1 · Probar en un iPhone físico contra la API que corre en el Mac
+
+```
+flutter run -d <id-del-iPhone> \
+  --dart-define=API_URL=http://<IP-del-Mac>:3000 \
+  --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=<sb_publishable_…>
+```
+
+`<id-del-iPhone>` sale de `flutter devices`; `<IP-del-Mac>` es la dirección del
+Mac en la red local (`ipconfig getifaddr en0`). En el emulador Android, en su
+lugar, va el alias de la máquina anfitriona que trae `apps/mobile/.env.example`.
+
+- **El Mac y el iPhone en la misma red.** El teléfono alcanza la API por la IP
+  privada del Mac; desde datos móviles o desde otra red no hay ruta.
+- **La API ya escucha en todas las interfaces.** `app.listen(PORT)` sin host
+  (`apps/api/src/main.ts`) enlaza `0.0.0.0` / `::`, no sólo `localhost`; lo
+  único que puede estorbar es el cortafuegos de macOS, que pide permiso para
+  `node` la primera vez.
+- **`CORS_ALLOWED_ORIGINS` no aplica a la app nativa.** CORS lo impone el
+  navegador; la app no envía cabecera `Origin` y la API acepta las peticiones
+  sin ella (`apps/api/src/seguridad.ts`). No añada la IP del teléfono a esa
+  lista: no haría nada.
+- **HTTP por IP privada sólo en depuración (iOS).** App Transport Security lo
+  bloquea; la excepción `NSAllowsLocalNetworking` —nunca
+  `NSAllowsArbitraryLoads`— sólo existe en la configuración Debug, porque
+  `Info.plist` se preprocesa y el bloque está bajo `#if NCR_DEPURACION`, que
+  define `ios/Flutter/Debug.xcconfig` y no `Release.xcconfig`. Un binario de
+  Release no lleva la excepción y sólo habla HTTPS.
+- **Ningún secreto va en el binario.** Todo `--dart-define` es extraíble del
+  `.ipa` con `strings`; por eso sólo viajan la URL de la API, la de Supabase y
+  la llave **publicable**. El paso 5d del verificador
+  (`scripts/lib/flutter-sin-secretos.mjs`) falla si el código de la app nombra
+  una variable prohibida o contiene una llave con forma de secreta, y la app
+  misma rechaza arrancar con una `sb_secret_…`.
 
 ---
 

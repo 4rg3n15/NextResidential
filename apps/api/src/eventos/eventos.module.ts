@@ -21,6 +21,8 @@ import type {
   ResolutorDePlaca,
   ResolutorDeZona,
 } from '../autorizaciones';
+import { BiometriaModule, IDENTIDAD_BIOMETRICA } from '../biometria';
+import type { IdentidadBiometricaDesdeRepositorios } from '../biometria';
 import { REPOSITORIO_COPROPIEDADES } from '../multiempresa/repositorio-copropiedades';
 import type { RepositorioCopropiedades } from '../multiempresa/repositorio-copropiedades';
 import {
@@ -49,6 +51,8 @@ import {
 } from './aplicacion/consultar-eventos';
 import { VigilarLatidos } from './aplicacion/vigilancia-latidos';
 import { CanalEnProceso } from './infraestructura/canal-en-proceso';
+import { RepositorioEventosPgDeServicio } from './infraestructura/repositorio-eventos-pg-de-servicio';
+import { RepositorioAlertasPg } from './infraestructura/repositorio-alertas-pg';
 import { AlmacenEvidenciaSupabase } from './infraestructura/evidencia-supabase';
 import {
   AlmacenEvidenciaFirmado,
@@ -90,10 +94,56 @@ export class EventosModule {
   static registrar(): DynamicModule {
     return {
       module: EventosModule,
+      /**
+       * A2 · biometría dice de quién es una plantilla y si tiene consentimiento.
+       * Se importa por su barril, como hace `residente`; Nest registra UNA
+       * instancia por metadatos idénticos, y la prueba de recorrido facial es
+       * lo que lo demuestra: la captura y el reconocimiento ven el mismo dato.
+       */
+      imports: [BiometriaModule.registrar()],
       controllers: [EventosController, AlertasController, InformesController],
       providers: [
-        { provide: REPOSITORIO_EVENTOS, useFactory: () => new RepositorioEventosEnMemoria() },
-        { provide: REPOSITORIO_ALERTAS, useFactory: () => new RepositorioAlertasEnMemoria() },
+        {
+          /**
+           * ETAPA 15-E · el histórico va a PostgreSQL por omisión. La nota de
+           * arriba («sin contraseña de PostgreSQL») dejó de ser cierta en la
+           * 09-B, cuando el `Pool` único empezó a servir al padrón y a las
+           * autorizaciones; el histórico se quedó en memoria por inercia. Se
+           * elige por configuración y el arranque dice cuál quedó activo,
+           * igual que el proveedor de equipos y el cargador de contexto.
+           */
+          provide: REPOSITORIO_EVENTOS,
+          inject: [CONFIGURACION, Pool, BITACORA],
+          useFactory: (config: Configuracion, pool: Pool, bitacora: Bitacora) => {
+            const enBase = config.PERSISTENCIA_DE_EVENTOS === 'postgres';
+            bitacora.registrar(
+              enBase ? 'info' : 'aviso',
+              `histórico de eventos activo: ${config.PERSISTENCIA_DE_EVENTOS}`,
+              {
+                persistencia: config.PERSISTENCIA_DE_EVENTOS,
+                consecuencia: enBase
+                  ? 'cada acceso queda en la tabla append-only de la base (RN-03, CA-23)'
+                  : 'los eventos viven en este proceso y se PIERDEN al reiniciar: sin trazabilidad',
+              },
+            );
+            return enBase
+              ? new RepositorioEventosPgDeServicio(pool)
+              : new RepositorioEventosEnMemoria();
+          },
+        },
+        {
+          /**
+           * D-139 (15-E) · las alertas van a la base con el mismo interruptor
+           * que el histórico: una alerta de lista negra o una emergencia que
+           * se pierde al reiniciar no es evidencia de CA-18.
+           */
+          provide: REPOSITORIO_ALERTAS,
+          inject: [CONFIGURACION, Pool, BITACORA],
+          useFactory: (config: Configuracion, pool: Pool, bitacora: Bitacora) =>
+            config.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new RepositorioAlertasPg(pool, bitacora)
+              : new RepositorioAlertasEnMemoria(),
+        },
         {
           provide: REPOSITORIO_DISPOSITIVOS,
           useFactory: () => new RepositorioDispositivosEnMemoria(),
@@ -178,6 +228,7 @@ export class EventosModule {
             REPOSITORIO_AUTORIZACIONES,
             RESOLUTOR_DE_PLACA,
             REPOSITORIO_COPROPIEDADES,
+            IDENTIDAD_BIOMETRICA,
           ],
           useFactory: (
             reloj: Reloj,
@@ -188,6 +239,8 @@ export class EventosModule {
             autorizaciones: RepositorioAutorizaciones,
             placas: ResolutorDePlaca,
             copropiedades: RepositorioCopropiedades,
+            // A2 · cierra S-34: el consentimiento vigente lo dice biometría.
+            identidad: IdentidadBiometricaDesdeRepositorios,
           ): MotorDeDecision => {
             const listaNegra = new RepositorioListaNegraPg(pool);
             const cargador: CargadorDeContexto =
@@ -200,6 +253,7 @@ export class EventosModule {
                     copropiedades,
                     bitacora,
                     zonas,
+                    identidad,
                   )
                 : new CargadorDeContextoConservador(
                     new VersionDeReglasFija(),

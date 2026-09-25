@@ -132,8 +132,29 @@ export interface EventoDeEquipo {
    * (verificación remota). `false` cuando decidió sola o no aplica.
    */
   readonly esperaVeredicto: boolean;
+  /**
+   * A2 · el número con el que la terminal identifica SU petición pendiente. Es
+   * lo que hay que devolverle con el veredicto; sin él no sabe a cuál
+   * corresponde. `null` fuera de `rostro` o si el equipo no lo emitió.
+   */
+  readonly serieDelEquipo: number | null;
+  /**
+   * A2 · `true` cuando el bloque NO es una petición sino el RESULTADO de una
+   * verificación remota anterior (`remoteCheckResult`, firmwares de 2024 en
+   * adelante). Es informativo: la decisión ya se registró cuando se contestó,
+   * y volver a decidirla produciría dos eventos por un mismo hecho.
+   */
+  readonly esResultadoDeVerificacion: boolean;
   /** De dónde llama (`llamada`): edificio/unidad/periodo tal como los declara. */
   readonly origenDeLlamada: string | null;
+  /**
+   * A4 · las dos partes del origen que la plataforma puede cotejar con el
+   * padrón: la UNIDAD (número de la vivienda) y el EDIFICIO (agrupación).
+   * `[SUPUESTO]` S-42: `unitNumber` es la vivienda y `buildingNumber` la
+   * agrupación. `null` en las demás clases o si el equipo no lo declara.
+   */
+  readonly unidadDeLlamada: string | null;
+  readonly edificioDeLlamada: string | null;
 }
 
 /**
@@ -361,7 +382,11 @@ export const desdeAlarmServerXml = (
     referenciaDelEquipo: etiqueta(cuerpo, 'eventId') ?? etiqueta(cuerpo, 'serialNumber'),
     personaId: null,
     esperaVeredicto: false,
+    serieDelEquipo: null,
+    esResultadoDeVerificacion: false,
     origenDeLlamada: null,
+    unidadDeLlamada: null,
+    edificioDeLlamada: null,
   };
 };
 
@@ -436,6 +461,10 @@ export interface BloqueDeAlertStream {
     readonly employeeNoString?: string;
     readonly employeeNo?: string | number;
     readonly remoteCheck?: boolean;
+    /** A2 · el resultado de una verificación ya contestada: informativo. */
+    readonly remoteCheckResult?: boolean | string | number;
+    /** A2 · identifica la petición pendiente; se devuelve con el veredicto. */
+    readonly serialNo?: number | string;
     readonly majorEventType?: number;
     readonly subEventType?: number;
     readonly verifyNo?: number;
@@ -468,6 +497,18 @@ const origenDeLlamadaDe = (bloque: BloqueDeAlertStream): string | null => {
     .filter(([, v]) => v !== undefined && v !== null && String(v) !== '')
     .map(([k, v]) => `${String(k)} ${String(v)}`);
   return partes.length === 0 ? null : partes.join(' · ');
+};
+
+/** Una parte del origen, como texto, o `null` si el equipo no la declara. */
+const parteDeLlamada = (
+  bloque: BloqueDeAlertStream,
+  clave: 'unitNumber' | 'buildingNumber',
+): string | null => {
+  const origen = bloque.CallInfo ?? bloque.voiceTalkEvent?.src;
+  const valor = origen?.[clave];
+  if (valor === undefined || valor === null) return null;
+  const texto = String(valor).trim();
+  return texto === '' ? null : texto;
 };
 
 /** La clase de un bloque JSON, por lo que TRAE y no sólo por su tipo. */
@@ -511,6 +552,12 @@ export const desdeAlertStreamJson = (
   const personaId =
     acceso?.employeeNoString ??
     (acceso?.employeeNo === undefined ? null : String(acceso.employeeNo));
+  const serie =
+    acceso?.serialNo === undefined || acceso.serialNo === null ? null : Number(acceso.serialNo);
+  // Un RESULTADO no es una petición: aunque traiga `remoteCheck`, no se
+  // espera veredicto de él. Lo detecta el campo o el tipo del evento.
+  const esResultado =
+    acceso?.remoteCheckResult !== undefined || /remoteCheckResult/i.test(bloque.eventType ?? '');
 
   return {
     clase: claseDeBloque(bloque),
@@ -542,8 +589,12 @@ export const desdeAlertStreamJson = (
     referenciaDelEquipo:
       bloque.channelID === undefined ? null : `${dispositivoId}:${bloque.channelID}`,
     personaId: personaId === null || personaId === '' ? null : personaId,
-    esperaVeredicto: acceso?.remoteCheck === true,
+    esperaVeredicto: acceso?.remoteCheck === true && !esResultado,
+    serieDelEquipo: serie === null || Number.isNaN(serie) ? null : serie,
+    esResultadoDeVerificacion: esResultado,
     origenDeLlamada: origenDeLlamadaDe(bloque),
+    unidadDeLlamada: parteDeLlamada(bloque, 'unitNumber'),
+    edificioDeLlamada: parteDeLlamada(bloque, 'buildingNumber'),
   };
 };
 

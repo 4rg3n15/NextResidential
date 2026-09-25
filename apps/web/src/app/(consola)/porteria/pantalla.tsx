@@ -4,7 +4,8 @@ import type { JSX } from 'react';
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DoorOpen, ShieldAlert, ShieldX } from 'lucide-react';
-import type { EnAtencion } from '@ncr/contracts';
+import { AvisoDeLlamada } from '@/componentes/aviso-de-llamada';
+import type { LlamadaEntrante } from '@/lib/sse/llamadas';
 import { cliente, desenvolver, ErrorDeApi } from '@/lib/api/cliente';
 import { useColaDeAtencion, useOrdenesManuales } from '@/lib/api/consultas';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
@@ -61,26 +62,34 @@ export const PantallaDePorteria = ({
   const cola = useColaDeAtencion(copropiedadId);
   const ordenes = useOrdenesManuales(copropiedadId);
   const clienteDeConsulta = useQueryClient();
+  /**
+   * A4 · una orden nace de un evento de la cola O de una llamada del
+   * videoportero. La llamada no tiene `eventoId`: no es un acceso todavía. La
+   * orden sí lleva siempre el equipo y el motivo (RN-08, CA-16).
+   */
   const [pidiendo, setPidiendo] = useState<{
     accion: 'abrir' | 'negar';
-    evento: EnAtencion;
+    dispositivoId: string;
+    eventoId?: string;
   } | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [llamada, setLlamada] = useState<LlamadaEntrante | null>(null);
 
   const ordenar = useMutation({
     mutationFn: async (entrada: {
       accion: 'abrir' | 'negar';
-      evento: EnAtencion;
+      dispositivoId: string;
+      eventoId?: string;
       motivo: string;
     }) =>
       desenvolver(
         await cliente.POST('/copropiedades/{id}/guardia/ordenes', {
           params: { path: { id: copropiedadId } },
           body: {
-            dispositivoId: entrada.evento.dispositivoId,
+            dispositivoId: entrada.dispositivoId,
             accion: entrada.accion,
             motivo: entrada.motivo,
-            eventoId: entrada.evento.eventoId,
+            ...(entrada.eventoId === undefined ? {} : { eventoId: entrada.eventoId }),
           },
         }),
       ),
@@ -115,6 +124,50 @@ export const PantallaDePorteria = ({
         titulo="Portería"
         descripcion="Lo que está pasando en las puertas ahora mismo. Toda apertura o negación queda con tu nombre y su motivo."
       />
+
+      {llamada !== null ? (
+        <Tarjeta>
+          <CabeceraDeTarjeta
+            titulo={`${llamada.clase === 'timbre' ? 'Timbre' : 'Llamada'} desde ${llamada.vivienda ?? 'vivienda sin identificar'}`}
+            descripcion={`${llamada.origen ?? 'Sin origen declarado'} · ${CUANDO(llamada.ocurridoEn)} · equipo ${llamada.dispositivoId.slice(0, 8)}`}
+            accion={
+              <Boton variante="secundario" tamano="sm" onClick={() => setLlamada(null)}>
+                Cerrar
+              </Boton>
+            }
+          />
+          <CuerpoDeTarjeta>
+            <div className="flex flex-wrap gap-2">
+              <Boton
+                variante="exito"
+                onClick={() => {
+                  setError(undefined);
+                  setPidiendo({ accion: 'abrir', dispositivoId: llamada.dispositivoId });
+                }}
+              >
+                <DoorOpen className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
+                Abrir con motivo
+              </Boton>
+              <Boton
+                variante="peligro"
+                onClick={() => {
+                  setError(undefined);
+                  setPidiendo({ accion: 'negar', dispositivoId: llamada.dispositivoId });
+                }}
+              >
+                <ShieldX className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
+                Negar con motivo
+              </Boton>
+            </div>
+            {llamada.viviendaId === null ? (
+              <p className="mt-3 text-distintivo text-aviso-texto">
+                El padrón no reconoce la unidad que declara el equipo; la apertura queda igualmente
+                con tu nombre y el motivo.
+              </p>
+            ) : null}
+          </CuerpoDeTarjeta>
+        </Tarjeta>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Tarjeta>
@@ -173,7 +226,11 @@ export const PantallaDePorteria = ({
                     variante="exito"
                     onClick={() => {
                       setError(undefined);
-                      setPidiendo({ accion: 'abrir', evento: actual });
+                      setPidiendo({
+                        accion: 'abrir',
+                        dispositivoId: actual.dispositivoId,
+                        eventoId: actual.eventoId,
+                      });
                     }}
                   >
                     <DoorOpen className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
@@ -183,7 +240,11 @@ export const PantallaDePorteria = ({
                     variante="peligro"
                     onClick={() => {
                       setError(undefined);
-                      setPidiendo({ accion: 'negar', evento: actual });
+                      setPidiendo({
+                        accion: 'negar',
+                        dispositivoId: actual.dispositivoId,
+                        eventoId: actual.eventoId,
+                      });
                     }}
                   >
                     <ShieldX className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
@@ -301,10 +362,23 @@ export const PantallaDePorteria = ({
             setError(undefined);
           }}
           alConfirmar={(motivo) => {
-            ordenar.mutate({ accion: pidiendo.accion, evento: pidiendo.evento, motivo });
+            ordenar.mutate({
+              accion: pidiendo.accion,
+              dispositivoId: pidiendo.dispositivoId,
+              ...(pidiendo.eventoId === undefined ? {} : { eventoId: pidiendo.eventoId }),
+              motivo,
+            });
           }}
         />
       ) : null}
+
+      <AvisoDeLlamada
+        copropiedadId={copropiedadId}
+        alAtender={(entrante) => {
+          setError(undefined);
+          setLlamada(entrante);
+        }}
+      />
     </>
   );
 };

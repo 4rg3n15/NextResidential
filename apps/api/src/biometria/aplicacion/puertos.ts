@@ -1,4 +1,6 @@
+import type { EstadoConsentimiento } from '@ncr/domain-core';
 import type { ConsentimientoBiometrico, PlantillaBiometrica } from '@ncr/domain-core';
+import type { ContextoTenant } from '../../autenticacion';
 
 /**
  * Puertos del módulo de biometría.
@@ -17,6 +19,22 @@ import type { ConsentimientoBiometrico, PlantillaBiometrica } from '@ncr/domain-
 export const REPOSITORIO_CONSENTIMIENTOS = Symbol.for('ncr.puerto.RepositorioConsentimientos');
 export const REPOSITORIO_PLANTILLAS = Symbol.for('ncr.puerto.RepositorioPlantillas');
 export const BOVEDA_DE_PLANTILLAS = Symbol.for('ncr.puerto.BovedaDePlantillas');
+/**
+ * A2 (ETAPA 15-E) · lo que este módulo SABE y otros necesitan preguntar: a
+ * quién pertenece una plantilla y si esa persona puede ser reconocida ahora.
+ * Lo consumen el receptor de equipos (para traducir el `FPID` de la terminal
+ * a una persona) y el cargador de contexto del motor (RN-09), cada uno por su
+ * propia interfaz declarada; ésta las satisface a las dos.
+ */
+export const IDENTIDAD_BIOMETRICA = Symbol.for('ncr.puerto.IdentidadBiometrica');
+/**
+ * A3 (ETAPA 15-E) · las terminales a las que una plantilla DEBE llegar: las
+ * activas de la copropiedad con biblioteca de rostros declarada (capacidad,
+ * nunca marca ni modelo · ADR-019). Lo satisface el módulo de equipos.
+ */
+export const CATALOGO_DE_TERMINALES = Symbol.for('ncr.puerto.CatalogoDeTerminales');
+/** A3 · quien firma y verifica el enlace con el que el TITULAR responde. */
+export const FIRMANTE_DE_ENLACES = Symbol.for('ncr.puerto.FirmanteDeEnlaces');
 
 export interface RepositorioConsentimientos {
   porId(copropiedadId: string, id: string): Promise<ConsentimientoBiometrico | null>;
@@ -29,14 +47,21 @@ export interface RepositorioConsentimientos {
   guardar(consentimiento: ConsentimientoBiometrico, actorId: string): Promise<void>;
 }
 
-/** Una terminal donde la plantilla está o estuvo. */
+/**
+ * Una terminal donde la plantilla está o estuvo. Lleva la copropiedad porque
+ * el adaptador de PostgreSQL presenta claims de servicio POR copropiedad
+ * (§2.7.6): sin ella no sabría con qué identidad escribir la fila.
+ */
 export interface DestinoDePlantilla {
+  readonly copropiedadId: string;
   readonly plantillaId: string;
   readonly dispositivoId: string;
 }
 
 export interface RepositorioPlantillas {
   porId(copropiedadId: string, id: string): Promise<PlantillaBiometrica | null>;
+  /** A2 · las plantillas de una persona, suprimidas incluidas: el dominio decide. */
+  deTitular(copropiedadId: string, titularId: string): Promise<readonly PlantillaBiometrica[]>;
   deConsentimiento(
     copropiedadId: string,
     consentimientoId: string,
@@ -70,4 +95,50 @@ export interface BovedaDePlantillas {
   ): Promise<void>;
   retirarDeTerminal(plantillaId: string, dispositivoId: string): Promise<void>;
   olvidar(copropiedadId: string, plantillaId: string): Promise<void>;
+}
+
+/** Una terminal (o videoportero) con biblioteca de rostros, tal como se nombra. */
+export interface TerminalConBiblioteca {
+  readonly dispositivoId: string;
+  readonly nombre: string;
+}
+
+/**
+ * El contexto viaja en la llamada (§2.7.6): quien lo satisface lee el registro
+ * de equipos con los claims de ESTA petición y el filtro de aplicación.
+ */
+export interface CatalogoDeTerminales {
+  conBibliotecaDeRostros(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+  ): Promise<readonly TerminalConBiblioteca[]>;
+}
+
+/** Lo que el enlace del titular lleva dentro. Nada más: ni nombre ni dato. */
+export interface DatosDelEnlace {
+  readonly copropiedadId: string;
+  readonly consentimientoId: string;
+  readonly titularId: string;
+  /** Instante de caducidad. Un enlace sin caducidad es una contraseña. */
+  readonly expiraEn: Date;
+  /**
+   * Estado del consentimiento AL EMITIR. Es lo que hace al enlace de UN SOLO
+   * USO: usarlo cambia el estado —aceptado, rechazado, revocado— y con ese
+   * cambio todo enlace emitido para el estado anterior deja de valer. No hace
+   * falta una lista de tokens usados ni depender del reloj: el propio agregado
+   * dice en qué estado está.
+   */
+  readonly estadoAlEmitir: EstadoConsentimiento;
+}
+
+/**
+ * El enlace es una credencial AL PORTADOR, acotada a UN consentimiento y con
+ * caducidad. Quien lo tiene responde como titular: por eso lo firma el
+ * servidor con una llave derivada por copropiedad, y por eso el token no es
+ * un identificador que se pueda adivinar ni reutilizar en otra copropiedad.
+ */
+export interface FirmanteDeEnlaces {
+  firmar(datos: DatosDelEnlace): string;
+  /** `null` si la firma no cuadra, el token está malformado o caducó. */
+  verificar(token: string, ahora: Date): DatosDelEnlace | null;
 }

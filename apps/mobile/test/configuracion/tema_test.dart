@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/configuracion/ambiente.dart';
 import 'package:ncr_residente/configuracion/paleta.g.dart';
 import 'package:ncr_residente/configuracion/tema.dart';
+import 'package:ncr_residente/main.dart' show PantallaDeArranqueBloqueado;
 
 /// El tema de la app contra el preset de la consola — **D-78 cerrada**.
 ///
@@ -96,13 +97,56 @@ void main() {
       expect(bueno.faltaSupabase, isFalse);
     });
 
-    test('sin API_URL no arranca: no sabría a quién preguntar', () {
+    test('sin API_URL no arranca, y DICE cómo pasarla', () {
+      // A6 · antes había `localhost:3000` por omisión: en un teléfono físico
+      // eso es el propio teléfono, y la app fallaba con «sin conexión» sin
+      // explicar que nadie le había dicho dónde está la API. Ahora la ausencia
+      // se detecta al arrancar y el mensaje lleva la línea que faltó.
       final sinApi = Ambiente(
         apiUrl: '',
         supabaseUrl: 'https://proyecto.invalid',
         supabaseClavePublicable: llavePublicableFalsa(),
       );
-      expect(sinApi.aserciones(), isNotEmpty);
+      final problemas = sinApi.aserciones();
+      expect(problemas, hasLength(1));
+      expect(problemas.single, contains('Falta API_URL'));
+      expect(problemas.single, contains('--dart-define=API_URL=http://<IP-del-Mac>:3000'));
+    });
+
+    test('la compilación no inventa una API_URL: sin --dart-define, vacía', () {
+      // Lo que `deCompilacion()` lee es EXACTAMENTE lo que se pasó al compilar,
+      // sin un `defaultValue` que lo disimule. La igualdad vale con y sin
+      // `--dart-define`: si alguien volviera a poner `localhost` por omisión,
+      // la corrida normal de `flutter test` —que no define nada— lo vería.
+      expect(Ambiente.deCompilacion().apiUrl, const String.fromEnvironment('API_URL'));
+    });
+
+    test('con API_URL por dart-define arranca', () {
+      // Lo que recibe la app cuando se compila como manda el README:
+      // `--dart-define=API_URL=http://<IP-del-Mac>:3000`. La IP es del rango
+      // de documentación (RFC 5737), que KPI-11 admite en un ejemplo.
+      final conApi = Ambiente(
+        apiUrl: 'http://192.0.2.10:3000',
+        supabaseUrl: 'https://proyecto.invalid',
+        supabaseClavePublicable: llavePublicableFalsa(),
+      );
+      expect(conApi.aserciones(), isEmpty);
+      expect(conApi.faltaSupabase, isFalse);
+    });
+
+    testWidgets('la ausencia de API_URL se ve en pantalla, no como «sin conexión»', (t) async {
+      // La pantalla de arranque bloqueado es la MISMA que ya explica una llave
+      // secreta compilada: un problema de configuración se cuenta donde se
+      // puede corregir, antes de que exista una petición que pueda fallar.
+      final sinApi = Ambiente(
+        apiUrl: '',
+        supabaseUrl: 'https://proyecto.invalid',
+        supabaseClavePublicable: llavePublicableFalsa(),
+      );
+      await t.pumpWidget(PantallaDeArranqueBloqueado(problemas: sinApi.aserciones()));
+      expect(find.text('La app no puede arrancar con esta configuración'), findsOneWidget);
+      expect(find.textContaining('--dart-define=API_URL='), findsOneWidget);
+      expect(find.textContaining('sin conexión'), findsNothing);
     });
   });
 }

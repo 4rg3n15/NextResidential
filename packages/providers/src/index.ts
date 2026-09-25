@@ -39,6 +39,7 @@
 export * from './nucleo/capacidades';
 export * from './nucleo/errores';
 export type { ProveedorDeEquipos } from './nucleo/proveedor';
+export type { VeredictoRemoto } from './nucleo/verificacion-remota';
 
 // ── Los dos adaptadores y su punto de composición ────────────────────────────
 export * from './mock/mock-provider';
@@ -75,6 +76,10 @@ export type {
 } from './hikvision/contratos-de-evento';
 export { EscuchaDeAlertStream, transporteSegunCapacidades } from './equipo/escucha-alertstream';
 export type { TransporteDeFlujo, OpcionesDeEscucha } from './equipo/escucha-alertstream';
+/** A4 (15-E) · lo que el proveedor devuelve al pedirle que escuche un equipo. */
+export type { EscuchaActiva, TransporteDeEscucha } from './nucleo/escucha';
+/** A5 (15-E) · el origen RTSP que el proveedor entrega al puente de video. */
+export type { OrigenDeVideo } from './nucleo/video';
 export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';
 
 // ── Diagnóstico y corrección de un equipo, para la consola ───────────────────

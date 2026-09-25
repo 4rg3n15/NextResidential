@@ -272,3 +272,37 @@ describe('6.5 · el tercer transporte: suscripción, elegido por CAPACIDAD', () 
     expect(escucha.historicosDescartados).toBe(1);
   });
 });
+
+describe('A4 · detener durante la espera entre reintentos', () => {
+  it('termina en el acto: no queda un temporizador de medio minuto colgando', async () => {
+    let esperasPedidas = 0;
+    const escucha = new EscuchaDeAlertStream({
+      host: 'equipo.invalid',
+      usuario: 'u',
+      clave: 'c',
+      dispositivoId: 'd-1',
+      familia: 'videoportero',
+      // El flujo termina en el acto: la escucha entra en espera de reconexión.
+      peticion: (async () => new Response('', { status: 200 })) as unknown as typeof fetch,
+      // Una espera que NUNCA resuelve por sí sola: sólo la cancelación la corta.
+      esperar: async () => {
+        esperasPedidas += 1;
+        await new Promise<void>(() => undefined);
+      },
+    });
+    const control = new AbortController();
+    const recorrido = (async () => {
+      for await (const evento of escucha.escuchar(control.signal)) void evento;
+    })();
+    // Se deja llegar a la espera y se cancela.
+    await new Promise((listo) => setTimeout(listo, 5));
+    expect(esperasPedidas).toBeGreaterThan(0);
+    control.abort();
+    await expect(
+      Promise.race([
+        recorrido,
+        new Promise((_, no) => setTimeout(() => no(new Error('colgado')), 500)),
+      ]),
+    ).resolves.toBeUndefined();
+  });
+});

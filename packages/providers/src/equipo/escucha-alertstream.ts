@@ -173,9 +173,27 @@ export class EscuchaDeAlertStream {
         // cambiaría lo que hay que hacer.
       }
       if (cancelar !== undefined && cancelar.aborted) return;
-      await this.esperar(this.conDispersion(espera));
+      await this.esperarSalvoCancelacion(this.conDispersion(espera), cancelar);
       espera = Math.min(espera * 2, this.opciones.esperaMaximaMs ?? ESPERA_MAXIMA_POR_OMISION_MS);
     }
+  }
+
+  /**
+   * A4 · la espera entre reintentos termina en el acto si se cancela. Sin
+   * esto, `detener()` durante la espera dejaba el bucle vivo hasta medio
+   * minuto, y el proceso —o la suite— con un temporizador colgando.
+   */
+  private esperarSalvoCancelacion(ms: number, cancelar?: AbortSignal): Promise<void> {
+    if (cancelar === undefined) return this.esperar(ms);
+    if (cancelar.aborted) return Promise.resolve();
+    return new Promise((listo) => {
+      const alCancelar = (): void => listo();
+      cancelar.addEventListener('abort', alCancelar, { once: true });
+      void this.esperar(ms).then(() => {
+        cancelar.removeEventListener('abort', alCancelar);
+        listo();
+      });
+    });
   }
 
   /** Qué transporte usa esta escucha. Se enseña en el diagnóstico. */

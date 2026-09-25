@@ -116,17 +116,24 @@ const montar = (opciones: {
   const almacen: AlmacenEvidencia = { guardar, urlFirmada: async () => 'https://x.invalid' };
 
   const bitacora = opciones.bitacora ?? bitacoraSilenciosa;
-  const fuente = new FuenteDePlacas(
-    new IngestorDeEquipos(
-      { ejecutar } as unknown as RegistrarAcceso,
-      { accionar },
-      almacen,
-      bitacora,
-      ids,
-      [EQUIPO],
-    ),
+  // El mismo montaje que el módulo desde la 15-E: la fuente es COMPARTIDA y el
+  // ingestor se le fija después, no se construye dentro de ella.
+  const ingestor = new IngestorDeEquipos(
+    { ejecutar } as unknown as RegistrarAcceso,
+    { accionar },
+    almacen,
+    bitacora,
+    ids,
+    [EQUIPO],
+    { titularDePlantilla: async () => null },
+    { responderVerificacionRemota: async () => ({ aceptado: true, latenciaMs: 5 }) },
+    reloj,
+    { porUnidad: async () => null },
+    { llamadaEntrante: async () => undefined },
   );
-  const controlador = new AlarmServerController(fuente, bitacora, reloj);
+  const fuente = new FuenteDePlacas();
+  fuente.fijarIngestor(ingestor);
+  const controlador = new AlarmServerController(fuente, bitacora, reloj, ingestor);
   return { controlador, accionar, guardar, ejecutar };
 };
 
@@ -134,7 +141,9 @@ describe('el relé se acciona SÓLO si el motor permitió', () => {
   it('permitido: se acciona, y con el dispositivo del equipo acreditado', async () => {
     const { controlador, accionar } = montar({ permitido: true });
     await controlador.publicar(peticion(sobre(XML_DE_PLACA)), 'da-igual');
-    expect(accionar).toHaveBeenCalledWith('camara-entrada', true);
+    // Y atribuida a la identidad de servicio de la ingesta: el proveedor exige
+    // un actor (RN-08) y aquí decide el motor, no una persona.
+    expect(accionar).toHaveBeenCalledWith('camara-entrada', true, expect.any(String));
   });
 
   it('DENEGADO: no se acciona nada, y aun así hubo evento (RN-02)', async () => {

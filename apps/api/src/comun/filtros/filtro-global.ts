@@ -1,4 +1,5 @@
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
+import { mensajeExpuesto } from './error-expuesto';
 import { Catch, HttpException, HttpStatus } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { Bitacora } from '@ncr/domain-core';
@@ -129,7 +130,9 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
         ? sinNombreDeClase(excepcion.getResponse())
         : codigoDeBiblioteca === undefined
           ? 'Error interno'
-          : 'Petición rechazada',
+          : // A3 (15-E) · sólo un error PROPIO marcado dice su motivo; el de
+            // una dependencia sigue normalizado (H-13-12).
+            (mensajeExpuesto(excepcion) ?? 'Petición rechazada'),
     });
   }
 }

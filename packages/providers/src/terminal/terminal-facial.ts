@@ -8,6 +8,7 @@ import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { comoErrorNeutral } from '../equipo/errores-del-fabricante';
 import { BibliotecaLlena } from '../nucleo/errores';
+import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
 /**
  * TERMINAL FACIAL · `DS-K1T344MBFWX-E1` · V4.47.0 build 250722.
@@ -140,11 +141,12 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     }
 
     // Antes de subir: ¿cabe? Preguntar cuesta una consulta; no preguntar deja
-    // un rechazo del equipo que hay que interpretar después.
+    // un rechazo del equipo que hay que interpretar después. Y el recuento
+    // previo es, además, la mitad de la evidencia de A3: lo que había ANTES.
+    const antes = await this.contar();
     const maximo = this.opciones.bibliotecaMaximo ?? null;
-    if (maximo !== null) {
-      const ahora = await this.contar();
-      if (ahora !== null && ahora >= maximo) throw new BibliotecaLlena(dispositivoId, maximo);
+    if (maximo !== null && antes !== null && antes >= maximo) {
+      throw new BibliotecaLlena(dispositivoId, maximo);
     }
 
     await this.altaDePersona(dispositivoId, plantillaId);
@@ -165,6 +167,45 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     });
 
     this.exigir(respuesta, ruta.proposito, ruta.ruta, dispositivoId);
+    await this.exigirPresencia(dispositivoId, plantillaId, antes);
+  }
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * A3 (15-E) · UN 200 NO ES UNA PLANTILLA EN LA BIBLIOTECA
+   *
+   * El equipo puede aceptar la carga y descartarla después —imagen sin rostro
+   * utilizable, biblioteca en otro estado, FPID que no cuadra— y contestar
+   * `OK` igual. Si se diera por buena, el sistema marcaría `activa` una
+   * plantilla que la terminal no tiene, y el síntoma en sitio sería un
+   * visitante con consentimiento y sin puerta.
+   *
+   * Se pregunta de dos formas y se acepta la que el firmware conteste: la
+   * BÚSQUEDA por FPID (concluyente cuando responde) y, si no responde, el
+   * RECUENTO antes/después (subió = está). Sólo cuando ninguna de las dos se
+   * puede hacer se confía en el 200, y la ficha ya dice que ese equipo no
+   * permite verificar.
+   */
+  private async exigirPresencia(
+    dispositivoId: string,
+    plantillaId: string,
+    antes: number | null,
+  ): Promise<void> {
+    const presente = await this.existe(plantillaId);
+    if (presente === true) return;
+    if (presente === false) {
+      throw new Error(
+        `La terminal ${dispositivoId} aceptó la carga pero la plantilla ${plantillaId} NO ` +
+          'aparece en su biblioteca de rostros: no se da por sincronizada (RN-09, CA-09)',
+      );
+    }
+    const despues = await this.contar();
+    if (antes !== null && despues !== null && despues <= antes) {
+      throw new Error(
+        `La terminal ${dispositivoId} aceptó la carga pero el recuento de la biblioteca no ` +
+          `subió (${String(antes)} → ${String(despues)}): no se da por sincronizada (RN-09)`,
+      );
+    }
   }
 
   /**
@@ -174,7 +215,15 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
    * aquí se conserva la firma del puerto y se lanza si el equipo la rechazó.
    */
   async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
-    await this.suprimirYVerificar(dispositivoId, plantillaId);
+    const veredicto = await this.suprimirYVerificar(dispositivoId, plantillaId);
+    // A3 · la supresión se acredita por la búsqueda posterior, no por el 200:
+    // si la plantilla sigue ahí, la orden NO se cumplió y se dice (RN-11).
+    if (veredicto.ausente === false) {
+      throw new Error(
+        `La terminal ${dispositivoId} aceptó la supresión pero la plantilla ${plantillaId} ` +
+          'SIGUE en su biblioteca de rostros: no se da por retirada (RN-11, CA-10)',
+      );
+    }
   }
 
   /**
@@ -242,6 +291,48 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       return n === undefined ? null : Number(n) > 0;
     } catch (error) {
       if (error instanceof EquipoInalcanzable) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * A2 · LA RESPUESTA A LA VERIFICACIÓN REMOTA · DOCUMENTADA, NO VERIFICADA
+   *
+   * La terminal en `reporta_y_espera` publicó el evento con `remoteCheck` y
+   * se quedó esperando. Esto le devuelve el veredicto del motor: con
+   * `success` abre; con `failed` niega y muestra el motivo. La forma del cuerpo
+   * es el [SUPUESTO] S-39 del catálogo. Lo que NO hace: accionar el relé por
+   * otra vía. Con la terminal esperando, quien abre es la propia terminal al
+   * recibir `success`; una segunda orden de apertura abriría dos veces.
+   *
+   * Sin `serie` se contesta igual —el equipo puede aceptar la última pendiente
+   * en algunos firmwares— y se dice en el registro: es lo que se confirma en
+   * sitio, no se supone.
+   */
+  async responderVerificacion(
+    dispositivoId: string,
+    veredicto: VeredictoRemoto,
+  ): Promise<ResultadoAccionamiento> {
+    const ruta = rutaPara('responder la verificación remota de la terminal', 'terminal');
+    try {
+      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
+        tipo: 'application/json',
+        contenido: JSON.stringify({
+          RemoteCheck: {
+            ...(veredicto.serie === null ? {} : { serialNo: veredicto.serie }),
+            checkResult: veredicto.permitido ? 'success' : 'failed',
+            info: veredicto.motivo.slice(0, 64),
+          },
+        }),
+      });
+      if (NO_SOPORTADO.test(respuesta.cuerpo)) throw new RutaNoSoportada(ruta.proposito, ruta.ruta);
+      if (!respuesta.ok) throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
+      return { aceptado: true, latenciaMs: respuesta.latenciaMs };
+    } catch (error) {
+      if (error instanceof EquipoInalcanzable) {
+        return { aceptado: false, latenciaMs: error.latenciaMs };
+      }
       throw error;
     }
   }

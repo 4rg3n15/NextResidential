@@ -924,6 +924,50 @@
         ]
       }
     },
+    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace": {
+      "post": {
+        "operationId": "BiometriaController_emitirEnlaceDeConsentimiento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "consentimientoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnlaceDeConsentimientoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Emite el enlace firmado con el que el TITULAR responde (RN-10)",
+        "tags": [
+          "biometria"
+        ]
+      }
+    },
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta": {
       "post": {
         "operationId": "BiometriaController_responderConsentimiento",
@@ -956,8 +1000,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespuestaDeConsentimientoDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1050,6 +1101,50 @@
           }
         ],
         "summary": "Empuja la plantilla a una terminal, si hay consentimiento (RN-09)",
+        "tags": [
+          "biometria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/biometria/plantillas/{plantillaId}/sincronizacion-total": {
+      "post": {
+        "operationId": "BiometriaController_sincronizarEnTodas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "plantillaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SincronizacionTotalDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Empuja la plantilla a todos los equipos con biblioteca de rostros (RN-09)",
         "tags": [
           "biometria"
         ]
@@ -2084,7 +2179,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado y «alertas» por cada escalamiento. La carga de cada mensaje es un EventoRegistradoDto o un AlertaExpuestaDto según el tema.",
+            "description": "Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado, «alertas» por cada escalamiento y «llamadas» por cada llamada de videoportero (A4: dispositivoId, clase, viviendaId, vivienda, origen, ocurridoEn, referenciaExterna). La carga de cada mensaje es un EventoRegistradoDto, un AlertaExpuestaDto o la de la llamada según el tema.",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -2604,6 +2699,115 @@
         ]
       }
     },
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}/audio": {
+      "get": {
+        "operationId": "GuardiaController_escucharAudio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flujo de audio en el formato que `formatoDeAudio` del canal anuncia",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Audio que el equipo emite, en flujo, para quien tiene la palabra",
+        "tags": [
+          "guardia"
+        ]
+      },
+      "post": {
+        "operationId": "GuardiaController_hablar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Bytes en el formato anunciado",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Un trozo de audio del operador hacia el equipo",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
     "/copropiedades/{id}/guardia/ordenes": {
       "post": {
         "operationId": "GuardiaController_ordenar",
@@ -2709,6 +2913,91 @@
           }
         ],
         "summary": "Últimas órdenes manuales de la copropiedad (HU-23)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/video/{dispositivoId}/whep": {
+      "post": {
+        "operationId": "VideoController_whep",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Oferta SDP del navegador (`v=0…`)",
+          "content": {
+            "application/sdp": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Respuesta SDP del puente",
+            "content": {
+              "application/sdp": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/sdp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "El equipo no ofrece video",
+            "content": {
+              "application/sdp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "La vista en vivo no está configurada (GO2RTC_URL)",
+            "content": {
+              "application/sdp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Negocia la vista en vivo del equipo (WHEP): oferta SDP dentro, respuesta SDP fuera",
         "tags": [
           "guardia"
         ]
@@ -5885,7 +6174,8 @@
               "modo_de_control",
               "pais_del_algoritmo",
               "imagenes_del_receptor",
-              "formato_del_receptor"
+              "formato_del_receptor",
+              "verificacion_remota"
             ]
           },
           "motivo": {
@@ -6430,6 +6720,44 @@
           "demorado"
         ]
       },
+      "EnlaceDeConsentimientoDto": {
+        "type": "object",
+        "properties": {
+          "consentimientoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estado": {
+            "type": "string",
+            "description": "Estado del consentimiento al emitir el enlace"
+          },
+          "token": {
+            "type": "string",
+            "description": "Token firmado; vale sólo para este consentimiento y caduca"
+          },
+          "ruta": {
+            "type": "string",
+            "description": "Ruta en la API: /consentimiento/<token>"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL completa si API_URL_PUBLICA está declarada; null si no lo está"
+          },
+          "expiraEn": {
+            "type": "string",
+            "description": "Caducidad del enlace (ISO 8601)"
+          }
+        },
+        "required": [
+          "consentimientoId",
+          "estado",
+          "token",
+          "ruta",
+          "url",
+          "expiraEn"
+        ]
+      },
       "EquipoDto": {
         "type": "object",
         "properties": {
@@ -6623,6 +6951,24 @@
           "timeoutSegundos": {
             "type": "number",
             "description": "Segundos tras los que el canal se libera solo por inactividad"
+          },
+          "transporte": {
+            "type": "string",
+            "enum": [
+              "equipo",
+              "ninguno"
+            ],
+            "description": "Por dónde va el audio: «equipo» si el proveedor abrió el canal del aparato; «ninguno» si hay turno pero no transporte (el equipo no declara audio o no está en el registro)."
+          },
+          "detalleTransporte": {
+            "type": "string",
+            "nullable": true,
+            "description": "Por qué no hay transporte, si no lo hay"
+          },
+          "formatoDeAudio": {
+            "type": "string",
+            "nullable": true,
+            "description": "A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice."
           }
         },
         "required": [
@@ -6630,7 +6976,10 @@
           "estado",
           "porDelante",
           "titular",
-          "timeoutSegundos"
+          "timeoutSegundos",
+          "transporte",
+          "detalleTransporte",
+          "formatoDeAudio"
         ]
       },
       "EstadoDeDispositivosDto": {
@@ -7270,7 +7619,8 @@
               "modo_de_control",
               "pais_del_algoritmo",
               "imagenes_del_receptor",
-              "formato_del_receptor"
+              "formato_del_receptor",
+              "verificacion_remota"
             ],
             "description": "Qué corrección lo arregla desde la consola. Nulo si no la hay."
           }
@@ -8626,6 +8976,26 @@
           "acepta"
         ]
       },
+      "RespuestaDeConsentimientoDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "description": "Estado resultante del consentimiento"
+          },
+          "propagacion": {
+            "description": "Si el titular aceptó: el resultado de empujar cada plantilla a todas las terminales. Vacío si rechazó o si no había plantilla pendiente.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SincronizacionTotalDto"
+            }
+          }
+        },
+        "required": [
+          "estado",
+          "propagacion"
+        ]
+      },
       "RestablecimientoRegistradoDto": {
         "type": "object",
         "properties": {
@@ -8691,7 +9061,8 @@
               "modo_de_control",
               "pais_del_algoritmo",
               "imagenes_del_receptor",
-              "formato_del_receptor"
+              "formato_del_receptor",
+              "verificacion_remota"
             ]
           },
           "aplicada": {
@@ -8830,6 +9201,30 @@
           "verificado"
         ]
       },
+      "ResultadoPorTerminalDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "sincronizada": {
+            "type": "boolean"
+          },
+          "detalle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "nombre",
+          "sincronizada",
+          "detalle"
+        ]
+      },
       "RevocacionDto": {
         "type": "object",
         "properties": {
@@ -8878,6 +9273,11 @@
             "nullable": true,
             "description": "El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10)."
           },
+          "enlaceDeConsentimiento": {
+            "type": "string",
+            "nullable": true,
+            "description": "A3 (15-E) · el enlace que el residente ENTREGA al visitante para que responda desde su teléfono, sin cuenta. De un solo uso y con caducidad. URL completa si la API declara API_URL_PUBLICA; si no, la ruta. Nulo cuando la captura no se aceptó."
+          },
           "titular": {
             "type": "string",
             "nullable": true,
@@ -8893,6 +9293,7 @@
           "motivos",
           "plantillaId",
           "consentimientoId",
+          "enlaceDeConsentimiento",
           "titular",
           "calidad"
         ]
@@ -8985,6 +9386,38 @@
           "copropiedadId",
           "copropiedadesAtendidas",
           "mfaVerificado"
+        ]
+      },
+      "SincronizacionTotalDto": {
+        "type": "object",
+        "properties": {
+          "plantillaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "terminales": {
+            "type": "number",
+            "description": "Equipos activos con biblioteca de rostros"
+          },
+          "sincronizadas": {
+            "type": "number"
+          },
+          "fallidas": {
+            "type": "number"
+          },
+          "porTerminal": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResultadoPorTerminalDto"
+            }
+          }
+        },
+        "required": [
+          "plantillaId",
+          "terminales",
+          "sincronizadas",
+          "fallidas",
+          "porTerminal"
         ]
       },
       "SincronizarPlantillaDto": {

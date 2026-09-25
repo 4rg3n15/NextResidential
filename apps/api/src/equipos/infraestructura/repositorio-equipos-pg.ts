@@ -11,9 +11,11 @@ import type {
   RepositorioDeEquipos,
   ResultadoDeSondeo,
   TipoDeEquipo,
+  EquipoQueEmite,
 } from '../aplicacion/puertos';
 import { capacidadesDesdeJson } from '@ncr/providers';
-import { ACTOR_INGESTA as ACTOR_DE_SERVICIO } from '../../comun/actores-de-servicio';
+import { claimsDeServicio } from '../../comun/claims-de-servicio';
+import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 
 /**
  * Equipos en PostgreSQL — A.1 y A.2.
@@ -96,13 +98,8 @@ const aDatos = (f: FilaDeEquipo): DatosDeEquipo => ({
 const verificacionDe = (v: ResultadoDeSondeo): EstadoDeVerificacion =>
   v.verificado ? 'verificado' : v.clase === 'decide_solo' ? 'rechazado' : 'no_verificado';
 
-/** Claims de SERVICIO para una copropiedad: lo único que lee el sobre. */
-export const claimsDeServicio = (copropiedadId: string): Record<string, unknown> => ({
-  rol: 'servicio',
-  usuario_id: ACTOR_DE_SERVICIO,
-  copropiedad_id: copropiedadId,
-  copropiedades: [copropiedadId],
-});
+/** Claims de SERVICIO para una copropiedad: lo único que lee el sobre (viven en `comun`). */
+export { claimsDeServicio };
 
 /**
  * El sobre, descifrado, **sólo para hablar con el equipo**. Lo comparten el
@@ -163,6 +160,34 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     } finally {
       cliente.release();
     }
+  }
+
+  /**
+   * A4 · lectura de SERVICIO, sin usuario: el proceso decide a quién escuchar.
+   * Misma identidad de lectura que el registro del proveedor (D5): el rol
+   * `superadministrador` de plataforma, que la política de `dispositivos`
+   * admite, sobre las tres columnas que hacen falta y ninguna credencial.
+   */
+  async activosQueEmiten(): Promise<readonly EquipoQueEmite[]> {
+    const lectura: ContextoTenant = {
+      usuarioId: ACTOR_INGESTA,
+      rol: 'superadministrador',
+      copropiedadId: null,
+      copropiedadesAtendidas: [],
+      mfaVerificado: true,
+    };
+    return this.conCliente(lectura, async (c) => {
+      const { rows } = await c.query<{ id: string; copropiedad_id: string; nombre: string }>(
+        `SELECT id, copropiedad_id, nombre FROM public.dispositivos
+          WHERE estado = 'activo' AND tipo IN ('terminal_facial', 'intercom')
+          ORDER BY copropiedad_id, nombre`,
+      );
+      return rows.map((r) => ({
+        dispositivoId: r.id,
+        copropiedadId: r.copropiedad_id,
+        nombre: r.nombre,
+      }));
+    });
   }
 
   async listar(ctx: ContextoTenant, copropiedadId: string): Promise<readonly DatosDeEquipo[]> {

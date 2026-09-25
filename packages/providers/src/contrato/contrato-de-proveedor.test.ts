@@ -235,7 +235,11 @@ registrarAdaptadorFicticio();
 const equiposFicticios = (mundo: MundoDeContrato): readonly EquipoFicticio[] => [
   {
     dispositivoId: BARRERA,
-    capacidades: capacidadesDeclaradas({ aperturaRemota: 'si', reconocimientoDePlacas: 'si' }),
+    capacidades: capacidadesDeclaradas({
+      aperturaRemota: 'si',
+      reconocimientoDePlacas: 'si',
+      bloqueoDeAcceso: 'si',
+    }),
   },
   {
     dispositivoId: TERMINAL,
@@ -344,6 +348,40 @@ describe.each(CASOS)('contrato de proveedor · $nombre', (caso) => {
     });
   });
 
+  describe('bloqueo de acceso · H-3, por capacidad (ETAPA 15-E)', () => {
+    it('la barrera declara bloqueo y la orden se ACEPTA, con latencia medida', async () => {
+      const { proveedor } = caso.montar();
+      expect(soporta(await proveedor.capacidadesDe(BARRERA), 'bloqueoDeAcceso')).toBe(true);
+      const resultado = await proveedor.fijarBloqueo(BARRERA, true);
+      expect(resultado.estado).toBe('aceptada');
+      expect(resultado.latenciaMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('bloquear y desbloquear son la misma capacidad en los dos sentidos', async () => {
+      const { proveedor } = caso.montar();
+      await proveedor.fijarBloqueo(BARRERA, true);
+      expect((await proveedor.fijarBloqueo(BARRERA, false)).estado).toBe('aceptada');
+    });
+
+    it('quien NO declara bloqueo se niega con CapacidadNoSoportada, nunca «aceptada»', async () => {
+      // La misma frase para los tres: si la capacidad es sí, resuelve; si no,
+      // el error nombra la capacidad. Un simulado completo declara sí en todo
+      // y por eso la aserción se escribe contra lo que el equipo declara.
+      const { proveedor } = caso.montar();
+      const capacidades = await proveedor.capacidadesDe(PORTERO);
+      if (soporta(capacidades, 'bloqueoDeAcceso')) {
+        expect((await proveedor.fijarBloqueo(PORTERO, true)).estado).toBe('aceptada');
+        return;
+      }
+      const error = await proveedor
+        .fijarBloqueo(PORTERO, true)
+        .then(() => null)
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CapacidadNoSoportada);
+      expect((error as CapacidadNoSoportada).capacidad).toBe('bloqueoDeAcceso');
+    });
+  });
+
   describe('PlateEventSource', () => {
     it('una lectura entregada llega al suscriptor, con su placa y su momento', async () => {
       const { proveedor, entregarLectura } = caso.montar();
@@ -410,6 +448,94 @@ describe.each(CASOS)('contrato de proveedor · $nombre', (caso) => {
       // terminal quedaría una plantilla que no reconoce a nadie, nunca.
       const { proveedor } = caso.montar();
       await expect(proveedor.sincronizar(TERMINAL, 'vacia', new Uint8Array())).rejects.toThrow();
+    });
+  });
+
+  describe('verificación remota · A2, por capacidad (ETAPA 15-E)', () => {
+    it('una terminal que declara esperar el veredicto recibe la respuesta, con latencia', async () => {
+      const { proveedor } = caso.montar();
+      expect(soporta(await proveedor.capacidadesDe(TERMINAL), 'verificacionRemota')).toBe(true);
+      const r = await proveedor.responderVerificacionRemota(TERMINAL, {
+        serie: 17,
+        permitido: true,
+        motivo: 'autorización vigente',
+      });
+      expect(r.aceptado).toBe(true);
+      expect(r.latenciaMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('una negación también viaja al equipo: es la terminal la que muestra el motivo', async () => {
+      const { proveedor } = caso.montar();
+      const r = await proveedor.responderVerificacionRemota(TERMINAL, {
+        serie: 18,
+        permitido: false,
+        motivo: 'SIN_CONSENTIMIENTO',
+      });
+      expect(r.aceptado).toBe(true);
+    });
+
+    it('quien no declara verificación remota no tiene a quién contestar: CapacidadNoSoportada', async () => {
+      const { proveedor } = caso.montar();
+      const capacidades = await proveedor.capacidadesDe(BARRERA);
+      if (soporta(capacidades, 'verificacionRemota')) {
+        // El simulado completo declara sí en todo; la aserción va por lo declarado.
+        expect(
+          (
+            await proveedor.responderVerificacionRemota(BARRERA, {
+              serie: null,
+              permitido: false,
+              motivo: 'x',
+            })
+          ).aceptado,
+        ).toBe(true);
+        return;
+      }
+      const error = await proveedor
+        .responderVerificacionRemota(BARRERA, { serie: null, permitido: false, motivo: 'x' })
+        .then(() => null)
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CapacidadNoSoportada);
+      expect((error as CapacidadNoSoportada).capacidad).toBe('verificacionRemota');
+    });
+  });
+
+  describe('escucha de lo que el equipo emite · A4, por capacidad (ETAPA 15-E)', () => {
+    it('el videoportero se escucha, o dice por qué no; y detener es idempotente', async () => {
+      const { proveedor } = caso.montar();
+      const escucha = await proveedor.escuchar(PORTERO);
+      expect(['escucha', 'suscripcion', 'ninguna']).toContain(escucha.transporte);
+      expect(escucha.detalle).not.toBe('');
+      // Pedirla dos veces no abre dos flujos: es la misma.
+      expect((await proveedor.escuchar(PORTERO)).transporte).toBe(escucha.transporte);
+      escucha.detener();
+      escucha.detener();
+    });
+
+    it('un equipo desconocido no se escucha: rechaza', async () => {
+      const { proveedor } = caso.montar();
+      await expect(proveedor.escuchar(DESCONOCIDO)).rejects.toThrow();
+    });
+
+    it('la cámara no se escucha por un segundo camino: `ninguna`, o rechazo por capacidad', async () => {
+      const { proveedor } = caso.montar();
+      const resultado = await proveedor.escuchar(BARRERA).catch((e: unknown) => e);
+      expect(
+        resultado instanceof Error ||
+          (resultado as { transporte: string }).transporte === 'ninguna',
+      ).toBe(true);
+    });
+  });
+
+  describe('origen de video · A5 (ETAPA 15-E)', () => {
+    it('un equipo desconocido rechaza; uno conocido devuelve origen o null, nunca lanza', async () => {
+      const { proveedor } = caso.montar();
+      await expect(proveedor.origenDeVideo(DESCONOCIDO)).rejects.toThrow();
+      const origen = await proveedor.origenDeVideo(PORTERO);
+      if (origen !== null) {
+        // La credencial va DENTRO del origen y el origen es sólo para el puente.
+        expect(origen.rtsp).toMatch(/^rtsp:\/\//);
+        expect(origen.detalle).not.toBe('');
+      }
     });
   });
 

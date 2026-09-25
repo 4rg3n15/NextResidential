@@ -656,6 +656,7 @@ node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs
 node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --sin-accionar
 node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --con-audio
 node scripts/puesta-en-marcha-equipos.mjs --simulado --con-audio   # ensayo, sin aparatos
+node scripts/puesta-en-marcha-equipos.mjs --simulado --hoja=./hoja.md --informe=./informe.md
 ```
 
 Sondea los tres equipos, **confirma o desmiente cada ruta documentada**, acciona
@@ -676,6 +677,18 @@ a extremo exige el navegador del operador y NO se mide aquí; el informe lo dice
 con esas palabras. Con `--simulado` no habla con ningún aparato: recorre el
 mismo guion contra los tres equipos simulados, y el informe sale rotulado
 SIMULADO.
+
+**Desde la ETAPA 15-E (A8) el guion escribe además la HOJA DE RESULTADOS**:
+la plantilla de los **dieciséis escenarios de aceptación** —5 de la cámara LPR,
+5 de la terminal facial y 6 del videoportero— con las columnas _esperado ·
+obtenido · motivo en consola · latencia · evento en `/eventos` · evidencia ·
+veredicto_. Sale junto al informe (`--hoja=<ruta>`; por omisión en el
+directorio temporal) con lo que el guion ya sabe rellenado: fecha, modo, qué
+familias estaban declaradas y las latencias que midió, que son **cotas
+inferiores** del tramo API → equipo. Lo demás se rellena delante del aparato,
+escenario por escenario, y **sin la hoja completa la ETAPA 15 no se cierra**
+(`BE-02`). El procedimiento de cada escenario está en
+[`INTEGRACION_HIKVISION.md`](INTEGRACION_HIKVISION.md) §9.
 
 | Salida         | Qué significa                                                                          |
 | -------------- | -------------------------------------------------------------------------------------- |

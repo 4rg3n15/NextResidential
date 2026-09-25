@@ -228,6 +228,23 @@ export interface LectorDeUmbralDeConfianza {
 
 export const LECTOR_DE_UMBRAL = Symbol.for('ncr.puerto.LectorDeUmbralDeConfianza');
 
+/**
+ * A2 (ETAPA 15-E) · ¿tiene esta persona consentimiento biométrico VIGENTE y una
+ * plantilla activa en este instante? Cierra el [SUPUESTO] S-34: hasta aquí el
+ * cargador fijaba `consentimientoVigente: false` y el motor negaba TODO acceso
+ * facial con SIN_CONSENTIMIENTO, también los legítimos.
+ *
+ * Lo declara el consumidor, como `ResolutorDeZona`: el cargador necesita un
+ * sí o un no, y no le importa quién lo diga. Lo satisface el módulo de
+ * biometría con `puedeReconocer` del dominio, y la raíz de composición los une
+ * sin que ninguno importe el interior del otro (§2.2).
+ */
+export interface LectorDeConsentimientoBiometrico {
+  consentimientoVigente(copropiedadId: string, personaId: string, ahora: Date): Promise<boolean>;
+}
+
+export const LECTOR_DE_CONSENTIMIENTO = Symbol.for('ncr.puerto.LectorDeConsentimientoBiometrico');
+
 export const REPOSITORIO_AUTORIZACIONES = Symbol.for('ncr.puerto.RepositorioAutorizaciones');
 export const REPOSITORIO_LISTA_NEGRA = Symbol.for('ncr.puerto.RepositorioListaNegra');
 export const REPOSITORIO_VERSION_REGLAS = Symbol.for('ncr.puerto.RepositorioVersionDeReglas');

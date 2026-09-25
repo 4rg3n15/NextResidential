@@ -11,9 +11,13 @@ import type {
   LecturaDePlaca,
   Reloj,
   ResultadoAccionamiento,
+  ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
+import { ordenAceptada, ordenInalcanzable } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe } from '../nucleo/capacidades';
+import type { EscuchaActiva } from '../nucleo/escucha';
+import type { OrigenDeVideo } from '../nucleo/video';
 import {
   BibliotecaLlena,
   CapacidadNoSoportada,
@@ -23,6 +27,7 @@ import {
   ReinicioNecesario,
 } from '../nucleo/errores';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
+import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -84,6 +89,8 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
   private readonly equipos = new Map<string, EquipoFicticio>();
   private readonly suscriptores: ((l: LecturaDePlaca) => Promise<void>)[] = [];
   readonly plantillas = new Map<string, Set<string>>();
+  readonly bloqueos = new Map<string, boolean>();
+  readonly veredictos: { dispositivoId: string; veredicto: VeredictoRemoto }[] = [];
   private readonly canales = new Map<string, EstadoDelCanal>();
   private readonly audio: Uint8Array[] = [];
   private enSesion: string | null = null;
@@ -145,6 +152,30 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
     return { aceptado: true, latenciaMs: this.latencia() };
   }
 
+  /** Bloqueo persistente (H-3): sólo si Órbita lo declara para ese equipo. */
+  async fijarBloqueo(dispositivoId: string, bloqueado: boolean): Promise<ResultadoDeAccionamiento> {
+    const equipo = this.exigir(dispositivoId, 'bloqueoDeAcceso');
+    if (equipo.adversidad === 'inalcanzable') {
+      return ordenInalcanzable('el equipo no respondió', this.latencia());
+    }
+    this.adversidadDe(equipo);
+    this.bloqueos.set(dispositivoId, bloqueado);
+    return ordenAceptada(this.latencia());
+  }
+
+  /** A2 · sólo una terminal que declare esperar el veredicto puede recibirlo. */
+  async responderVerificacionRemota(
+    dispositivoId: string,
+    veredicto: VeredictoRemoto,
+  ): Promise<ResultadoAccionamiento> {
+    const equipo = this.exigir(dispositivoId, 'verificacionRemota');
+    if (equipo.adversidad === 'inalcanzable')
+      return { aceptado: false, latenciaMs: this.latencia() };
+    this.adversidadDe(equipo);
+    this.veredictos.push({ dispositivoId, veredicto });
+    return { aceptado: true, latenciaMs: this.latencia() };
+  }
+
   async estado(dispositivoId: string): Promise<'en_linea' | 'fuera_de_linea' | 'degradado'> {
     const equipo = this.equipos.get(dispositivoId);
     if (equipo === undefined || equipo.adversidad === 'inalcanzable') return 'fuera_de_linea';
@@ -196,6 +227,42 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
     const equipo = this.exigir(dispositivoId, 'bibliotecaDeRostros');
     this.adversidadDe(equipo);
     this.plantillas.get(dispositivoId)?.delete(plantillaId);
+  }
+
+  /**
+   * A4 · escuchar exige la CAPACIDAD de suscripción, como todo lo demás aquí.
+   * Órbita no emite nada por sí mismo: la escucha existe para que el contrato
+   * pueda pedirla y detenerla, y para que un equipo que no la declara la
+   * niegue con el error neutral que corresponde.
+   */
+  async escuchar(dispositivoId: string): Promise<EscuchaActiva> {
+    const equipo = this.equipos.get(dispositivoId);
+    // Desconocido: rechaza, como los otros dos. Conocido sin la capacidad: no
+    // se escucha y se dice por qué, que es lo que el contrato pide.
+    if (equipo === undefined) this.exigir(dispositivoId, 'suscripcionDeEventos');
+    if (
+      estadoDe(equipo?.capacidades ?? CAPACIDADES_SIN_CONSULTAR, 'suscripcionDeEventos') !== 'si'
+    ) {
+      return {
+        dispositivoId,
+        transporte: 'ninguna',
+        detalle: 'Órbita: el equipo no declara suscripción a eventos; no se le abre flujo',
+        detener: () => undefined,
+      };
+    }
+    if (equipo !== undefined) this.adversidadDe(equipo);
+    return {
+      dispositivoId,
+      transporte: 'suscripcion',
+      detalle: 'Órbita: suscripción declarada; el equipo ficticio no emite eventos',
+      detener: () => undefined,
+    };
+  }
+
+  /** A5 · Órbita no publica video: `null` para lo conocido; lo desconocido rechaza. */
+  async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
+    if (!this.equipos.has(dispositivoId)) this.exigir(dispositivoId, 'aperturaRemota');
+    return null;
   }
 
   // ── IntercomProvider ─────────────────────────────────────────────────────

@@ -128,3 +128,51 @@ export class SincronizarPlantillaDto {
   @IsUUID()
   dispositivoId!: string;
 }
+
+/** La respuesta del TITULAR por su enlace: un formulario de dos botones. */
+export class RespuestaDelTitularDto {
+  @ApiProperty({ enum: ['si', 'no'] })
+  @IsIn(['si', 'no'])
+  acepta!: 'si' | 'no';
+}
+
+export class EnlaceDeConsentimientoDto {
+  @ApiProperty({ format: 'uuid' }) consentimientoId!: string;
+  @ApiProperty({ description: 'Estado del consentimiento al emitir el enlace' }) estado!: string;
+  @ApiProperty({ description: 'Token firmado; vale sólo para este consentimiento y caduca' })
+  token!: string;
+  @ApiProperty({ description: 'Ruta en la API: /consentimiento/<token>' }) ruta!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'URL completa si API_URL_PUBLICA está declarada; null si no lo está',
+  })
+  url!: string | null;
+  @ApiProperty({ description: 'Caducidad del enlace (ISO 8601)' }) expiraEn!: string;
+}
+
+export class ResultadoPorTerminalDto {
+  @ApiProperty({ format: 'uuid' }) dispositivoId!: string;
+  @ApiProperty() nombre!: string;
+  @ApiProperty() sincronizada!: boolean;
+  @ApiProperty() detalle!: string;
+}
+
+export class SincronizacionTotalDto {
+  @ApiProperty({ format: 'uuid' }) plantillaId!: string;
+  @ApiProperty({ description: 'Equipos activos con biblioteca de rostros' }) terminales!: number;
+  @ApiProperty() sincronizadas!: number;
+  @ApiProperty() fallidas!: number;
+  @ApiProperty({ type: [ResultadoPorTerminalDto] }) porTerminal!: ResultadoPorTerminalDto[];
+}
+
+export class RespuestaDeConsentimientoDto {
+  @ApiProperty({ description: 'Estado resultante del consentimiento' }) estado!: string;
+  @ApiProperty({
+    type: [SincronizacionTotalDto],
+    description:
+      'Si el titular aceptó: el resultado de empujar cada plantilla a todas las terminales. ' +
+      'Vacío si rechazó o si no había plantilla pendiente.',
+  })
+  propagacion!: SincronizacionTotalDto[];
+}

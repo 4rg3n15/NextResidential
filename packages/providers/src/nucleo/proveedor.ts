@@ -3,8 +3,13 @@ import type {
   FaceTemplateProvider,
   IntercomProvider,
   PlateEventSource,
+  ResultadoAccionamiento,
+  ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo } from './capacidades';
+import type { EscuchaActiva } from './escucha';
+import type { OrigenDeVideo } from './video';
+import type { VeredictoRemoto } from './verificacion-remota';
 
 /**
  * LO QUE TODO ADAPTADOR CUMPLE: los cuatro puertos del dominio, más UNA
@@ -16,9 +21,51 @@ import type { CapacidadesDeEquipo } from './capacidades';
  * Vive aquí, en el tipo del paquete, y la suite de contrato lo exige igual a
  * los tres adaptadores.
  */
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * `fijarBloqueo` · ETAPA 15-E · TAMPOCO ES UN PUERTO DEL DOMINIO, Y SE DICE
+ *
+ * El dominio declara `ControlDeBarrera` con las dos operaciones —accionar y
+ * bloquear (H-3)— para el adaptador de barrera. `AccessPointProvider`, el
+ * puerto que la API consume por dispositivo, sólo sabe abrir. Hasta la 15-E el
+ * bloqueo llegaba al equipo por un segundo camino: el control de barrera que
+ * `BARRERA_*` construye por entorno, para UN dispositivo. Con el registro de
+ * equipos (D5) ese camino queda como compatibilidad, y el bloqueo tiene que
+ * poder resolverse por dispositivo y por capacidad como todo lo demás.
+ *
+ * Se declara aquí y no en el dominio por la misma razón que `capacidadesDe`:
+ * el motor de reglas no bloquea accesos; lo hace la administración (H-3), y el
+ * puerto que la consola consume es de aplicación. Los tres adaptadores lo
+ * cumplen y la suite de contrato lo exige: `bloqueoDeAcceso = si` → orden
+ * aceptada; en otro caso `CapacidadNoSoportada`, nunca una orden que «pasa».
+ */
 export type ProveedorDeEquipos = AccessPointProvider &
   PlateEventSource &
   FaceTemplateProvider &
   IntercomProvider & {
     capacidadesDe(dispositivoId: string): Promise<CapacidadesDeEquipo>;
+    fijarBloqueo(dispositivoId: string, bloqueado: boolean): Promise<ResultadoDeAccionamiento>;
+    /**
+     * A2 · contesta a una terminal que reconoció y ESPERA (`verificacionRemota`).
+     * Con `permitido` el equipo abre; sin él, niega. Sólo se admite en un equipo
+     * que declare la capacidad; en otro caso `CapacidadNoSoportada`.
+     */
+    responderVerificacionRemota(
+      dispositivoId: string,
+      veredicto: VeredictoRemoto,
+    ): Promise<ResultadoAccionamiento>;
+    /**
+     * A4 · abre y mantiene la escucha de lo que el equipo EMITE —llamadas,
+     * rostros, timbres— y lo publica en la fuente compartida. Devuelve cómo
+     * quedó (transporte elegido por capacidad, o `ninguna` con su motivo) y
+     * cómo detenerla. Un equipo desconocido rechaza.
+     */
+    escuchar(dispositivoId: string): Promise<EscuchaActiva>;
+    /**
+     * A5 · el origen RTSP del video de un equipo, para el puente de video del
+     * servidor. `null` cuando el equipo no tiene video (relé, controlador) o
+     * el proveedor no lo puede construir (simulado). Un equipo desconocido
+     * rechaza. La credencial va dentro: nunca cruza a la presentación.
+     */
+    origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null>;
   };

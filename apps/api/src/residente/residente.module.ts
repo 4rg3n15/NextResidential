@@ -30,7 +30,7 @@ import {
   VerMisVehiculos,
   VerMiVivienda,
 } from './aplicacion/casos-de-uso';
-import { BiometriaModule, CapturarRostro } from '../biometria';
+import { BiometriaModule, CapturarRostro, EmitirEnlaceDeConsentimiento } from '../biometria';
 import { MiController } from './presentacion/mi.controller';
 
 /**
@@ -106,12 +106,18 @@ export class ResidenteModule {
         },
         {
           provide: CapturarRostroDeMiVisitante,
-          inject: [ResolverMiAmbito, AUTORIZACIONES_DEL_RESIDENTE, CapturarRostro],
+          inject: [
+            ResolverMiAmbito,
+            AUTORIZACIONES_DEL_RESIDENTE,
+            CapturarRostro,
+            EmitirEnlaceDeConsentimiento,
+          ],
           useFactory: (
             r: ResolverMiAmbito,
             a: AutorizacionesDelResidente,
             c: CapturarRostro,
-          ) => new CapturarRostroDeMiVisitante(r, a, c),
+            e: EmitirEnlaceDeConsentimiento,
+          ) => new CapturarRostroDeMiVisitante(r, a, c, e),
         },
         {
           provide: VerMisZonas,

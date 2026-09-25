@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fichaDe } from './ficha';
 import type { DiagnosticoDeEquipo } from './diagnostico-de-equipo';
+import { capacidadesDeclaradas } from '../nucleo/capacidades';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -207,5 +208,72 @@ describe('el reloj y lo que no contestó', () => {
       con({ sinRespuesta: [{ que: 'leer la hora del equipo', motivo: 'no lo admite' }] }),
     );
     expect(ficha.sinComprobar[0]).toContain('no lo admite');
+  });
+});
+
+/**
+ * A2 (ETAPA 15-E) · la ficha de la terminal que decide sola OFRECE la
+ * corrección desde la consola; con «desconocida» no hay documento que
+ * modificar y no la ofrece.
+ */
+describe('A2 · la terminal que decide sola ofrece la corrección', () => {
+  it('con verificación remota en «no»: bloqueo con corrección `verificacion_remota`', () => {
+    const ficha = fichaDe(
+      con({
+        familia: 'terminal',
+        capacidadesDelEquipo: capacidadesDeclaradas({ verificacionRemota: 'no' }),
+      }),
+    );
+    const hallazgo = ficha.hallazgos.find((h) => /quién decide/.test(h.campo));
+    expect(hallazgo?.estado).toBe('bloqueo');
+    expect(hallazgo?.correccion).toBe('verificacion_remota');
+  });
+
+  it('con «desconocida» no hay corrección: no se escribe lo que no se leyó', () => {
+    const ficha = fichaDe(
+      con({ familia: 'terminal', capacidadesDelEquipo: capacidadesDeclaradas({}) }),
+    );
+    const hallazgo = ficha.hallazgos.find((h) => /quién decide/.test(h.campo));
+    expect(hallazgo?.estado).toBe('no_comprobado');
+    expect(hallazgo?.correccion).toBeNull();
+  });
+});
+
+describe('A4 · el videoportero dice qué NO aplica por capacidad', () => {
+  const videoportero = (parcial: Parameters<typeof capacidadesDeclaradas>[0]) =>
+    fichaDe(
+      con({
+        familia: 'videoportero',
+        capacidadesDelEquipo: capacidadesDeclaradas({
+          aperturaRemota: 'si',
+          audioBidireccional: { estado: 'si', canal: 1, formato: 'g711u' },
+          ...parcial,
+        }),
+      }),
+    );
+
+  it('sin biblioteca de rostros: el reconocimiento facial en este equipo NO APLICA', () => {
+    const ficha = videoportero({
+      bibliotecaDeRostros: { estado: 'no', maximo: null, almacenadas: null },
+    });
+    const h = ficha.hallazgos.find((x) => x.campo === 'reconocimiento facial en este equipo');
+    expect(h?.estado).toBe('aviso');
+    expect(h?.detalle).toMatch(/NO APLICA POR CAPACIDAD/);
+  });
+
+  it('con biblioteca declarada: conforme, y dice cuántos caben', () => {
+    const ficha = videoportero({
+      bibliotecaDeRostros: { estado: 'si', maximo: 500, almacenadas: 3 },
+    });
+    const h = ficha.hallazgos.find((x) => x.campo === 'reconocimiento facial en este equipo');
+    expect(h?.estado).toBe('conforme');
+    expect(h?.valorLeido).toContain('500');
+  });
+
+  it('sin señalización de llamada (el DS-KD9633 real): NO APLICA, y se dice quién atiende', () => {
+    const ficha = videoportero({ senalizacionDeLlamada: 'no' });
+    const h = ficha.hallazgos.find((x) => x.campo === 'señalización de llamada');
+    expect(h?.estado).toBe('aviso');
+    expect(h?.detalle).toMatch(/NO APLICA POR CAPACIDAD/);
   });
 });

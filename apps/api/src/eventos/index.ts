@@ -9,6 +9,7 @@ export { EventosModule } from './eventos.module';
 export { RegistrarAcceso } from './aplicacion/registrar-acceso';
 export {
   CANAL_TIEMPO_REAL,
+  TEMA_LLAMADAS,
   ESCALAMIENTO_DE_ALERTA,
   REPOSITORIO_ALERTAS,
   REPOSITORIO_DISPOSITIVOS,

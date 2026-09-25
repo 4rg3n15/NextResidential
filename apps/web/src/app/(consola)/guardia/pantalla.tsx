@@ -3,7 +3,11 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Mic, MicOff, PhoneCall, Siren, Video } from 'lucide-react';
+import { Mic, MicOff, PhoneCall, PhoneOff, Siren } from 'lucide-react';
+import { AvisoDeLlamada } from '@/componentes/aviso-de-llamada';
+import { ControlesDeAudio } from '@/componentes/controles-de-audio';
+import { VideoEnVivo } from '@/componentes/video-en-vivo';
+import type { LlamadaEntrante } from '@/lib/sse/llamadas';
 import type { EnAtencion } from '@ncr/contracts';
 import { cliente, desenvolver, ErrorDeApi } from '@/lib/api/cliente';
 import { useColaDeAtencion } from '@/lib/api/consultas';
@@ -69,18 +73,44 @@ export const PantallaDeGuardiaVirtual = ({
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [pidiendo, setPidiendo] = useState<'abrir' | 'negar' | 'emergencia' | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
+  /** A4 · la llamada que el operador decidió atender. Manda sobre la cola hasta que la cierre. */
+  const [llamada, setLlamada] = useState<LlamadaEntrante | null>(null);
 
   const lista = cola.data?.cola ?? [];
   const actual: EnAtencion | undefined = lista.find((e) => e.eventoId === seleccionado) ?? lista[0];
 
+  /**
+   * Lo que se atiende: un evento de la cola o una llamada del videoportero.
+   * Las dos cosas tienen equipo y vivienda, que es lo que el audio, la
+   * apertura y el aviso al residente necesitan; el resto es descripción.
+   */
+  const foco =
+    llamada !== null
+      ? {
+          dispositivoId: llamada.dispositivoId,
+          viviendaId: llamada.viviendaId,
+          eventoId: undefined,
+          descripcion: `Llamada desde ${llamada.vivienda ?? 'vivienda sin identificar'}${
+            llamada.origen === null ? '' : ` · ${llamada.origen}`
+          }`,
+        }
+      : actual !== undefined
+        ? {
+            dispositivoId: actual.dispositivoId,
+            viviendaId: actual.viviendaId,
+            eventoId: actual.eventoId as string | undefined,
+            descripcion: `Vivienda ${actual.viviendaId ?? 'sin asociar'} · esperando ${String(actual.esperaSegundos)} s`,
+          }
+        : undefined;
+
   const canal = useQuery({
-    queryKey: ['guardia', copropiedadId, 'canal', actual?.dispositivoId],
-    enabled: actual !== undefined,
+    queryKey: ['guardia', copropiedadId, 'canal', foco?.dispositivoId],
+    enabled: foco !== undefined,
     refetchInterval: 5000,
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/guardia/intercom/{dispositivoId}', {
-          params: { path: { id: copropiedadId, dispositivoId: actual?.dispositivoId ?? '' } },
+          params: { path: { id: copropiedadId, dispositivoId: foco?.dispositivoId ?? '' } },
         }),
       ),
   });
@@ -99,11 +129,11 @@ export const PantallaDeGuardiaVirtual = ({
         accion === 'abrir'
           ? await cliente.POST('/copropiedades/{id}/guardia/intercom/abrir', {
               params: { path: { id: copropiedadId } },
-              body: { dispositivoId: actual?.dispositivoId ?? '' },
+              body: { dispositivoId: foco?.dispositivoId ?? '' },
             })
           : await cliente.POST('/copropiedades/{id}/guardia/intercom/cerrar', {
               params: { path: { id: copropiedadId } },
-              body: { dispositivoId: actual?.dispositivoId ?? '' },
+              body: { dispositivoId: foco?.dispositivoId ?? '' },
             }),
       ),
     onSuccess: invalidar,
@@ -116,13 +146,13 @@ export const PantallaDeGuardiaVirtual = ({
         await cliente.POST('/copropiedades/{id}/guardia/ordenes', {
           params: { path: { id: copropiedadId } },
           body: {
-            dispositivoId: actual?.dispositivoId ?? '',
+            dispositivoId: foco?.dispositivoId ?? '',
             accion: entrada.accion,
             motivo: entrada.motivo,
             // `exactOptionalPropertyTypes`: el campo se omite si no hay evento,
             // en vez de viajar como `undefined`. El DTO lo declara opcional, no
             // «opcional o nulo», y la diferencia la comprueba el compilador.
-            ...(actual?.eventoId === undefined ? {} : { eventoId: actual.eventoId }),
+            ...(foco?.eventoId === undefined ? {} : { eventoId: foco.eventoId }),
           },
         }),
       ),
@@ -141,7 +171,7 @@ export const PantallaDeGuardiaVirtual = ({
           params: { path: { id: copropiedadId } },
           body: {
             motivo,
-            ...(actual?.dispositivoId === undefined ? {} : { dispositivoId: actual.dispositivoId }),
+            ...(foco?.dispositivoId === undefined ? {} : { dispositivoId: foco.dispositivoId }),
           },
         }),
       ),
@@ -158,7 +188,7 @@ export const PantallaDeGuardiaVirtual = ({
         await cliente.POST('/copropiedades/{id}/guardia/avisar-residente', {
           params: { path: { id: copropiedadId } },
           body: {
-            viviendaId: actual?.viviendaId ?? copropiedadId,
+            viviendaId: foco?.viviendaId ?? copropiedadId,
             texto: 'Tienes una visita esperando en la portería',
           },
         }),
@@ -208,7 +238,10 @@ export const PantallaDeGuardiaVirtual = ({
                   <li key={e.eventoId}>
                     <button
                       type="button"
-                      onClick={() => setSeleccionado(e.eventoId)}
+                      onClick={() => {
+                        setSeleccionado(e.eventoId);
+                        setLlamada(null);
+                      }}
                       aria-current={e.eventoId === actual?.eventoId}
                       className={
                         e.eventoId === actual?.eventoId
@@ -248,39 +281,29 @@ export const PantallaDeGuardiaVirtual = ({
             <CabeceraDeTarjeta
               titulo="Atención"
               descripcion={
-                actual === undefined
-                  ? 'Elige a quién atender en la cola.'
-                  : `Vivienda ${actual.viviendaId ?? 'sin asociar'} · esperando ${String(actual.esperaSegundos)} s`
+                foco === undefined ? 'Elige a quién atender en la cola.' : foco.descripcion
+              }
+              accion={
+                llamada === null ? undefined : (
+                  <Boton variante="secundario" tamano="sm" onClick={() => setLlamada(null)}>
+                    <PhoneOff className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
+                    Terminar llamada
+                  </Boton>
+                )
               }
             />
             <CuerpoDeTarjeta>
-              {actual === undefined ? (
+              {foco === undefined ? (
                 <EstadoVacio titulo="Nadie seleccionado" descripcion="La cola está vacía." />
               ) : (
                 <div className="space-y-4">
                   {/*
-                    VIDEO EN VIVO. El puente RTSP→WebRTC (go2rtc) llega con el
-                    hardware en la ETAPA 15, y el navegador **exige contexto
-                    seguro** para reproducir una cámara: por IP sin TLS no se
-                    puede demostrar. Se dice aquí en vez de dejar un recuadro
-                    negro que parezca una cámara caída.
+                    A5 (15-E) · VIDEO EN VIVO por WHEP a través de la API: el
+                    navegador nunca ve RTSP ni credenciales. El componente
+                    mide negociación y primer cuadro (KPI-33) y dice con su
+                    causa cada negativa.
                   */}
-                  <div className="flex aspect-video w-full items-center justify-center rounded-tarjeta border border-borde bg-oscuro text-center">
-                    <div className="px-6">
-                      <Video
-                        className="mx-auto h-8 w-8 text-texto-invertidoApagado"
-                        aria-hidden="true"
-                        strokeWidth={1.5}
-                      />
-                      <p className="mt-2 text-secundario text-texto-invertido">
-                        Video en vivo del equipo {actual.dispositivoId.slice(0, 8)}
-                      </p>
-                      <p className="mt-1 text-distintivo text-texto-invertidoApagado">
-                        El puente RTSP → WebRTC llega con la ETAPA 15. Requiere HTTPS: el navegador
-                        no reproduce cámara fuera de un contexto seguro.
-                      </p>
-                    </div>
-                  </div>
+                  <VideoEnVivo copropiedadId={copropiedadId} dispositivoId={foco.dispositivoId} />
 
                   {/* ── Audio: exclusivo por dispositivo (ADR-01) ── */}
                   <div className="flex flex-wrap items-center gap-2 rounded-tarjeta border border-borde px-3 py-2">
@@ -314,6 +337,20 @@ export const PantallaDeGuardiaVirtual = ({
                       {String(canal.data?.timeoutSegundos ?? 90)} s sin actividad.
                     </span>
                   </div>
+
+                  {/* ── A4 · el audio en sí, sólo con la palabra y con transporte ── */}
+                  {tienePalabra && canal.data?.transporte === 'equipo' ? (
+                    <ControlesDeAudio
+                      copropiedadId={copropiedadId}
+                      dispositivoId={foco.dispositivoId}
+                      formatoAnunciado={canal.data.formatoDeAudio}
+                    />
+                  ) : tienePalabra ? (
+                    <p className="text-distintivo text-aviso-texto" role="status">
+                      Tienes la palabra y no hay audio:{' '}
+                      {canal.data?.detalleTransporte ?? 'sin transporte'}.
+                    </p>
+                  ) : null}
 
                   <div className="flex flex-wrap gap-2">
                     <Boton
@@ -407,6 +444,14 @@ export const PantallaDeGuardiaVirtual = ({
           }}
         />
       ) : null}
+
+      <AvisoDeLlamada
+        copropiedadId={copropiedadId}
+        alAtender={(entrante) => {
+          setError(undefined);
+          setLlamada(entrante);
+        }}
+      />
     </>
   );
 };

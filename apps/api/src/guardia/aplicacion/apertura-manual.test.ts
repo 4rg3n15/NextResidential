@@ -36,7 +36,7 @@ const banco = (responde: ResultadoDeAccionamiento = ordenAceptada(12)) => {
     registrar: async (o) => {
       registradas.push(o);
     },
-    anotarResultado: async (id, resultado, detalle) => {
+    anotarResultado: async (_copropiedadId, id, resultado, detalle) => {
       anotados.push({ id, resultado, detalle });
     },
     ultimas: async () => registradas,

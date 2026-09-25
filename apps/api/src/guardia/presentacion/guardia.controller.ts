@@ -7,8 +7,10 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
+  Res,
 } from '@nestjs/common';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -17,9 +19,19 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiBody,
+  ApiConsumes,
+  ApiProduces,
 } from '@nestjs/swagger';
-import { Alerta, FiltroDeEventos, GENERADOR_DE_ID, RELOJ, esFallo } from '@ncr/domain-core';
-import type { ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
+import {
+  Alerta,
+  BITACORA,
+  FiltroDeEventos,
+  GENERADOR_DE_ID,
+  RELOJ,
+  esFallo,
+} from '@ncr/domain-core';
+import type { Bitacora, ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
@@ -33,8 +45,13 @@ import type { BitacoraDeOrdenes } from '../aplicacion/apertura-manual';
 import { FijarBloqueoDeAcceso, REGISTRO_DE_BLOQUEOS } from '../aplicacion/bloqueo-de-acceso';
 import type { BloqueoVigente, RegistroDeBloqueos } from '../aplicacion/bloqueo-de-acceso';
 import { construirCola, resumenDeCola } from '../aplicacion/cola-de-atencion';
-import { CANAL_DE_INTERCOM } from '../aplicacion/puertos';
+import {
+  CANAL_DE_INTERCOM,
+  SinTransporteDeAudio,
+  TransporteDeAudioNoDisponible,
+} from '../aplicacion/puertos';
 import type { CanalDeIntercom } from '../aplicacion/puertos';
+import type { Request, Response } from 'express';
 import {
   AceptadoDto,
   AvisoAlResidenteDto,
@@ -78,6 +95,7 @@ export class GuardiaController {
     @Inject(BITACORA_DE_ORDENES) private readonly ordenes: BitacoraDeOrdenes,
     @Inject(REPOSITORIO_EVENTOS) private readonly eventos: RepositorioEventos,
     @Inject(CANAL_DE_INTERCOM) private readonly intercom: CanalDeIntercom,
+    @Inject(BITACORA) private readonly bitacora: Bitacora,
     @Inject(ESCALAMIENTO_DE_ALERTA) private readonly escalar: EscalamientoDeAlerta,
     @Inject(RELOJ) private readonly reloj: Reloj,
     @Inject(GENERADOR_DE_ID) private readonly ids: GeneradorDeId,
@@ -297,7 +315,19 @@ export class GuardiaController {
     @Body() dto: SolicitudDeCanalDto,
   ): Promise<EstadoDeCanalDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom');
-    return this.intercom.pedir(copropiedadId, dto.dispositivoId, ctx.usuarioId);
+    try {
+      return await this.intercom.pedir(copropiedadId, dto.dispositivoId, ctx.usuarioId);
+    } catch (error) {
+      /**
+       * 15-E · el turno se concedió y el EQUIPO no abrió su canal: canal
+       * deshabilitado en el aparato, capacidad ausente, equipo mudo. Es un
+       * conflicto con el estado del equipo, no un fallo del servidor, y el
+       * operador necesita el motivo tal cual para resolverlo (guía §8.4).
+       */
+      if (error instanceof TransporteDeAudioNoDisponible)
+        throw new ConflictException(error.message);
+      throw error;
+    }
   }
 
   @Post('intercom/cerrar')
@@ -327,6 +357,105 @@ export class GuardiaController {
   ): Promise<EstadoDeCanalDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom');
     return this.intercom.estado(copropiedadId, dispositivoId, ctx.usuarioId);
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * A4 (15-E) · EL AUDIO DE LA SESIÓN, POR LA API
+   *
+   * El navegador NUNCA habla con el equipo (RN-12, RN-21): baja el audio por
+   * este `GET` —un flujo `application/octet-stream` que dura lo que dure la
+   * sesión, en el códec que el equipo anuncia (`formatoDeAudio`)— y sube el
+   * suyo por el `POST`, trozo a trozo. Los dos exigen tener la PALABRA: quien
+   * espera en cola no oye ni habla. La apertura de la puerta sigue siendo una
+   * orden aparte (`/ordenes`), atribuida al operador (RN-08, CA-20).
+   */
+  @Get('intercom/:dispositivoId/audio')
+  @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Audio que el equipo emite, en flujo, para quien tiene la palabra' })
+  @ApiProduces('application/octet-stream')
+  @ApiOkResponse({
+    description: 'Flujo de audio en el formato que `formatoDeAudio` del canal anuncia',
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiNotFoundResponse({ type: ErrorApiDto, description: 'Copropiedad fuera del alcance' })
+  async escucharAudio(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('dispositivoId', ParseUUIDPipe) dispositivoId: string,
+    @Res() respuesta: Response,
+  ): Promise<void> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom/audio');
+    const estado = await this.intercom.estado(copropiedadId, dispositivoId, ctx.usuarioId);
+    if (estado.transporte !== 'equipo') {
+      // Antes de abrir el flujo: una vez enviadas las cabeceras ya no hay
+      // forma de decir «no». 409 porque el conflicto es con el estado del
+      // canal, no con la petición.
+      throw new ConflictException(
+        estado.detalleTransporte ?? 'no hay transporte de audio para este operador',
+      );
+    }
+    respuesta.setHeader('Content-Type', 'application/octet-stream');
+    respuesta.setHeader('Cache-Control', 'no-store');
+    respuesta.setHeader('X-Accel-Buffering', 'no');
+    if (estado.formatoDeAudio !== null) {
+      respuesta.setHeader('X-Formato-De-Audio', estado.formatoDeAudio);
+    }
+    respuesta.flushHeaders();
+
+    const iterable = this.intercom.recibirAudio(copropiedadId, dispositivoId, ctx.usuarioId);
+    const flujo = iterable[Symbol.asyncIterator]();
+    let cerrado = false;
+    respuesta.on('close', () => {
+      cerrado = true;
+      void flujo.return?.(undefined);
+    });
+    try {
+      for (;;) {
+        const { done, value } = await flujo.next();
+        if (done === true || cerrado) break;
+        respuesta.write(Buffer.from(value));
+      }
+    } catch (error) {
+      // Con las cabeceras enviadas, el error se registra y el flujo termina:
+      // la consola lo ve como fin de audio y vuelve a pedir el estado.
+      this.bitacora.registrar('aviso', 'el flujo de audio terminó con error', {
+        dispositivoId,
+        operadorId: ctx.usuarioId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      respuesta.end();
+    }
+  }
+
+  @Post('intercom/:dispositivoId/audio')
+  @HttpCode(204)
+  @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Un trozo de audio del operador hacia el equipo' })
+  @ApiConsumes('application/octet-stream')
+  @ApiBody({
+    schema: { type: 'string', format: 'binary' },
+    description: 'Bytes en el formato anunciado',
+  })
+  @ApiNotFoundResponse({ type: ErrorApiDto, description: 'Copropiedad fuera del alcance' })
+  async hablar(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('dispositivoId', ParseUUIDPipe) dispositivoId: string,
+    @Req() peticion: Request,
+  ): Promise<void> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom/audio');
+    const cuerpo: unknown = peticion.body;
+    if (!Buffer.isBuffer(cuerpo) || cuerpo.length === 0) {
+      throw new BadRequestException('El audio viaja como application/octet-stream, no vacío');
+    }
+    try {
+      await this.intercom.enviarAudio(copropiedadId, dispositivoId, ctx.usuarioId, cuerpo);
+    } catch (error) {
+      if (error instanceof SinTransporteDeAudio) throw new ConflictException(error.message);
+      throw error;
+    }
   }
 
   /**

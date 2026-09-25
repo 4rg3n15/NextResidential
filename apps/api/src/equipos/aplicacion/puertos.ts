@@ -22,6 +22,8 @@ import type { ContextoTenant } from '../../autenticacion';
  */
 
 export const REPOSITORIO_DE_EQUIPOS = Symbol.for('ncr.puerto.RepositorioDeEquipos');
+/** A4 · `{ activos() }`: los equipos que emiten y hay que escuchar. */
+export const EQUIPOS_QUE_EMITEN = Symbol.for('ncr.equipos.EquiposQueEmiten');
 export const SONDA_DE_EQUIPO = Symbol.for('ncr.puerto.SondaDeEquipo');
 
 export const TIPOS_DE_EQUIPO = [
@@ -98,8 +100,20 @@ export interface DatosDeEquipo {
  * aplicación —el único que protege las rutas que usan la llave secreta, porque
  * esa omite la RLS— necesita saber quién pregunta.
  */
+/** A4 · un equipo que EMITE (terminal o videoportero) y está activo. */
+export interface EquipoQueEmite {
+  readonly dispositivoId: string;
+  readonly copropiedadId: string;
+  readonly nombre: string;
+}
+
 export interface RepositorioDeEquipos {
   listar(ctx: ContextoTenant, copropiedadId: string): Promise<readonly DatosDeEquipo[]>;
+  /**
+   * A4 · los equipos activos que emiten eventos, de TODAS las copropiedades:
+   * es el proceso quien los escucha, no un usuario. Lectura de servicio.
+   */
+  activosQueEmiten(): Promise<readonly EquipoQueEmite[]>;
   crear(
     ctx: ContextoTenant,
     copropiedadId: string,
@@ -173,6 +187,8 @@ export const CORRECCIONES = [
   'pais_del_algoritmo',
   'imagenes_del_receptor',
   'formato_del_receptor',
+  /** A2 (15-E) · la terminal pasa a reportar y esperar. Cambia quién decide. */
+  'verificacion_remota',
 ] as const;
 export type CorreccionDeEquipo = (typeof CORRECCIONES)[number];
 

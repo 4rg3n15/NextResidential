@@ -7,6 +7,9 @@ import { recibirPublicacionDeEquipo } from '@ncr/providers';
 import type { FuenteDePlacas } from '@ncr/providers';
 import { Publico, SinRecursoDeTenant } from '../../comun/decoradores';
 import { MideKpi } from '../../observabilidad';
+import { FUENTE_DE_PLACAS } from '../../proveedores';
+import { INGESTOR_DE_EQUIPOS } from '../aplicacion/ingestor-de-publicaciones';
+import type { IngestorDeEquipos } from '../aplicacion/ingestor-de-publicaciones';
 import { GuardiaDeAlarmServer } from './guardia-alarm-server';
 import type { PeticionDeEquipo } from '../../comun/sobre-de-equipo';
 
@@ -76,18 +79,23 @@ import type { PeticionDeEquipo } from '../../comun/sobre-de-equipo';
  */
 export const RESPUESTA_AL_EQUIPO = { aceptado: true } as const;
 
-/** El puerto por el que entran las placas. Lo comparte el transporte de armado. */
-export const FUENTE_DE_PLACAS = Symbol.for('ncr.alarmserver.FuenteDePlacas');
-
 /** Alto a propósito: una cámara en hora punta publica muchas veces por minuto. */
 const LIMITE_IP = 3000;
 
 @Controller('alarm-server')
 export class AlarmServerController {
   constructor(
+    /** La fuente COMPARTIDA con el adaptador (A1): la construye `ProveedoresModule`. */
     @Inject(FUENTE_DE_PLACAS) private readonly fuente: FuenteDePlacas,
     @Inject(BITACORA) private readonly bitacora: Bitacora,
     @Inject(RELOJ) private readonly reloj: Reloj,
+    /**
+     * Se inyecta para que el ingestor exista antes de la primera publicación:
+     * quien fija el ingestor en la fuente es su fábrica, y esta dependencia
+     * es lo que garantiza que esa fábrica corrió antes de atender a nadie.
+     * Aquí no se usa para nada más, y por eso no es un campo.
+     */
+    @Inject(INGESTOR_DE_EQUIPOS) _ingestor: IngestorDeEquipos,
   ) {}
 
   /**
@@ -147,7 +155,12 @@ export class AlarmServerController {
       });
     }
 
-    if (recepcion.desenlace !== 'lectura' || recepcion.publicacion === null) {
+    // A2/A4 · placa, rostro y llamada siguen adelante; lo demás se registra.
+    const sigueAdelante =
+      recepcion.desenlace === 'lectura' ||
+      recepcion.desenlace === 'rostro' ||
+      recepcion.desenlace === 'llamada';
+    if (!sigueAdelante || recepcion.publicacion === null) {
       this.bitacora.registrar(
         recepcion.desenlace === 'ilegible' ? 'aviso' : 'info',
         `publicación de equipo ignorada: ${recepcion.motivo}`,

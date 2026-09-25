@@ -146,3 +146,5 @@ export const NOTIFICADOR_PUSH = Symbol.for('ncr.puerto.NotificadorPush');
 /** Temas del canal. Se enumeran para que consola y API no se desincronicen. */
 export const TEMA_EVENTOS = 'eventos';
 export const TEMA_ALERTAS = 'alertas';
+/** A4 (15-E) · la llamada del videoportero: aviso emergente a las consolas. */
+export const TEMA_LLAMADAS = 'llamadas';

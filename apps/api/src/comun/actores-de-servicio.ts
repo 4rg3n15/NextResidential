@@ -22,5 +22,14 @@
  * que es el nombre que recibe un símbolo todavía sin evaluar.
  */
 
-/** Emisores de hardware: cámaras, terminales y gateways. */
-export const ACTOR_INGESTA = '00000000-0000-4000-8000-000000000002';
+/**
+ * Emisores de hardware: cámaras, terminales y gateways; y el enlace por el que
+ * el titular responde su consentimiento sin sesión (15-E, A3).
+ *
+ * Es `app.actor_de_ingesta()` de la migración 0035. Hasta la 15-E valía
+ * `…0002`, que es el superadministrador de DEMOSTRACIÓN del seed: en una base
+ * con sólo migraciones no existía —la primera escritura de una cámara habría
+ * fallado por la clave ajena a `usuarios`— y en la de demostración firmaba lo
+ * de las cámaras con un humano. Ninguna de las dos cosas es una auditoría.
+ */
+export const ACTOR_INGESTA = '00000000-0000-4000-8000-000000000003';

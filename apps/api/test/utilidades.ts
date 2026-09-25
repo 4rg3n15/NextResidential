@@ -13,6 +13,8 @@ import {
   RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
 } from '../src/autorizaciones/presentacion/limites';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../src/comun/sobre-de-equipo';
+import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from '../src/comun/ruta-de-audio';
+import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from '../src/comun/ruta-de-video';
 import type { INestApplication } from '@nestjs/common';
 import { aplicarSaneamiento, aplicarSeguridad } from '../src/seguridad';
 import { aplicarContextoDePeticion } from '../src/comun/contexto/contexto-de-peticion';
@@ -86,6 +88,9 @@ export const configuracionDePrueba: Configuracion = {
   // lectura. El conservador deniega, que es lo que las suites de la API
   // esperan; el cargador PostgreSQL tiene su propia suite contra base real.
   CARGADOR_DE_CONTEXTO: 'conservador',
+  // La suite no tiene base: el histórico va en memoria, y lo dice al arrancar.
+  PERSISTENCIA_DE_EVENTOS: 'memoria',
+  PERSISTENCIA_DE_BIOMETRIA: 'memoria',
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   LOG_LEVEL: 'aviso',
@@ -355,6 +360,13 @@ export const crearApp = async (
    * alarma» que nunca recibe cuerpo, y estaría en verde.
    */
   app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
+  // A4 · el audio del operador, crudo y acotado, sólo bajo su ruta.
+  app.use(
+    RUTA_DE_AUDIO_DE_INTERCOM,
+    express.raw({ type: 'application/octet-stream', limit: LIMITE_DE_TROZO_DE_AUDIO }),
+  );
+  // A5 · la oferta SDP del navegador, como texto y acotada, sólo bajo su ruta.
+  app.use(RUTA_DE_WHEP_DE_VIDEO, express.text({ type: TIPO_SDP, limit: LIMITE_DE_OFERTA_SDP }));
   app.use(
     RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
     express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),

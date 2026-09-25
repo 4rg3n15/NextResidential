@@ -10,7 +10,9 @@ import {
 } from '@ncr/domain-core';
 import type { Bitacora, GeneradorDeId, Reloj, UnidadDeTrabajo } from '@ncr/domain-core';
 import { BitacoraEstructurada } from '../comun/bitacora/bitacora-estructurada';
-import { AuditoriaEnMemoria, REGISTRO_AUDITORIA } from '../comun/auditoria';
+import { AuditoriaEnMemoria, REGISTRO_AUDITORIA, RegistroDeAuditoriaPg } from '../comun/auditoria';
+import type { RegistroDeAuditoria } from '../comun/auditoria';
+import { Pool } from 'pg';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 
@@ -47,7 +49,30 @@ class UnidadDeTrabajoSinTransaccion implements UnidadDeTrabajo {
 @Module({
   providers: [
     AuditoriaEnMemoria,
-    { provide: REGISTRO_AUDITORIA, useExisting: AuditoriaEnMemoria },
+    {
+      /**
+       * D-139 (15-E) · con base y `PERSISTENCIA_DE_EVENTOS=postgres` la
+       * auditoría de seguridad va a `auditoria_seguridad`; sin Pool o en
+       * `memoria` (la suite, un ensayo sin base) queda el doble. Los dos son
+       * OPCIONALES a propósito: hay bancos que montan el núcleo a solas.
+       */
+      provide: REGISTRO_AUDITORIA,
+      inject: [
+        AuditoriaEnMemoria,
+        BITACORA,
+        { token: Pool, optional: true },
+        { token: CONFIGURACION, optional: true },
+      ],
+      useFactory: (
+        enMemoria: AuditoriaEnMemoria,
+        bitacora: Bitacora,
+        pool?: Pool,
+        configuracion?: Configuracion,
+      ): RegistroDeAuditoria =>
+        pool !== undefined && configuracion?.PERSISTENCIA_DE_EVENTOS === 'postgres'
+          ? new RegistroDeAuditoriaPg(pool, bitacora)
+          : enMemoria,
+    },
     { provide: RELOJ, useValue: relojDelSistema },
     { provide: GENERADOR_DE_ID, useValue: generadorUuid },
     /**

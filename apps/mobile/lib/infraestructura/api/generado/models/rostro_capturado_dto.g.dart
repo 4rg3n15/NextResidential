@@ -14,6 +14,7 @@ RostroCapturadoDto _$RostroCapturadoDtoFromJson(Map<String, dynamic> json) =>
           .toList(),
       plantillaId: json['plantillaId'] as String?,
       consentimientoId: json['consentimientoId'] as String?,
+      enlaceDeConsentimiento: json['enlaceDeConsentimiento'] as String?,
       titular: json['titular'] as String?,
       calidad: json['calidad'] as num?,
     );
@@ -24,6 +25,7 @@ Map<String, dynamic> _$RostroCapturadoDtoToJson(RostroCapturadoDto instance) =>
       'motivos': instance.motivos,
       'plantillaId': instance.plantillaId,
       'consentimientoId': instance.consentimientoId,
+      'enlaceDeConsentimiento': instance.enlaceDeConsentimiento,
       'titular': instance.titular,
       'calidad': instance.calidad,
     };

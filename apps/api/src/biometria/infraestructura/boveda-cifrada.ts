@@ -32,23 +32,43 @@ import type { BovedaDePlantillas } from '../aplicacion/puertos';
  * La llave llega por variable de entorno y se guarda **su referencia**, nunca
  * su valor (`plantillas_llave_es_referencia` de la migración 0008).
  */
-export interface AlmacenDeBytes {
-  poner(clave: string, datos: Buffer): Promise<void>;
-  tomar(clave: string): Promise<Buffer | null>;
-  quitar(clave: string): Promise<void>;
+/** Con qué se cifró: lo ÚNICO que se persiste junto al sobre (0008). */
+export interface ReferenciaDeCifrado {
+  readonly llaveRef: string;
+  readonly algoritmo: string;
 }
 
-/** Almacén en memoria: el adaptador PostgreSQL llega con la credencial (D-17). */
+/**
+ * Dónde vive el sobre cifrado. Se identifica por copropiedad y plantilla, no
+ * por una clave compuesta a mano: el adaptador de PostgreSQL (A3, 15-E) lo
+ * escribe en la fila de `plantillas_biometricas`, y esa fila tiene esos dos
+ * identificadores y no un texto que haya que partir.
+ */
+export interface AlmacenDeBytes {
+  poner(
+    copropiedadId: string,
+    plantillaId: string,
+    datos: Buffer,
+    referencia: ReferenciaDeCifrado,
+  ): Promise<void>;
+  tomar(copropiedadId: string, plantillaId: string): Promise<Buffer | null>;
+  quitar(copropiedadId: string, plantillaId: string): Promise<void>;
+}
+
+/** Almacén en memoria: el doble de la suite (`PERSISTENCIA_DE_BIOMETRIA=memoria`). */
 export class AlmacenEnMemoria implements AlmacenDeBytes {
   private readonly datos = new Map<string, Buffer>();
-  async poner(clave: string, datos: Buffer): Promise<void> {
-    this.datos.set(clave, datos);
+  private clave(copropiedadId: string, plantillaId: string): string {
+    return `${copropiedadId}/${plantillaId}`;
   }
-  async tomar(clave: string): Promise<Buffer | null> {
-    return this.datos.get(clave) ?? null;
+  async poner(copropiedadId: string, plantillaId: string, datos: Buffer): Promise<void> {
+    this.datos.set(this.clave(copropiedadId, plantillaId), datos);
   }
-  async quitar(clave: string): Promise<void> {
-    this.datos.delete(clave);
+  async tomar(copropiedadId: string, plantillaId: string): Promise<Buffer | null> {
+    return this.datos.get(this.clave(copropiedadId, plantillaId)) ?? null;
+  }
+  async quitar(copropiedadId: string, plantillaId: string): Promise<void> {
+    this.datos.delete(this.clave(copropiedadId, plantillaId));
   }
 }
 
@@ -104,10 +124,6 @@ export class BovedaAesGcm implements BovedaDePlantillas {
     return derivarLlave(this.maestra, copropiedadId, PROPOSITOS.plantillas);
   }
 
-  private clave(copropiedadId: string, plantillaId: string): string {
-    return `${copropiedadId}/${plantillaId}`;
-  }
-
   async guardar(
     copropiedadId: string,
     plantillaId: string,
@@ -118,8 +134,9 @@ export class BovedaAesGcm implements BovedaDePlantillas {
     }
     // iv ‖ etiqueta ‖ cuerpo: todo lo necesario para descifrar salvo la llave.
     const sobre = aplanar(cifrar(this.llaveDe(copropiedadId), Buffer.from(vector)));
-    await this.almacen.poner(this.clave(copropiedadId, plantillaId), sobre);
-    return { llaveRef: this.llaveRef, algoritmo: 'AES-256-GCM' };
+    const referencia = { llaveRef: this.llaveRef, algoritmo: 'AES-256-GCM' };
+    await this.almacen.poner(copropiedadId, plantillaId, sobre, referencia);
+    return referencia;
   }
 
   /**
@@ -138,7 +155,7 @@ export class BovedaAesGcm implements BovedaDePlantillas {
     plantillaId: string,
     dispositivoId: string,
   ): Promise<void> {
-    const sobre = await this.almacen.tomar(this.clave(copropiedadId, plantillaId));
+    const sobre = await this.almacen.tomar(copropiedadId, plantillaId);
     if (sobre === null) throw new Error('No hay plantilla que sincronizar: ya fue suprimida');
     const vector = this.descifrar(copropiedadId, sobre);
     try {
@@ -154,6 +171,6 @@ export class BovedaAesGcm implements BovedaDePlantillas {
   }
 
   async olvidar(copropiedadId: string, plantillaId: string): Promise<void> {
-    await this.almacen.quitar(this.clave(copropiedadId, plantillaId));
+    await this.almacen.quitar(copropiedadId, plantillaId);
   }
 }

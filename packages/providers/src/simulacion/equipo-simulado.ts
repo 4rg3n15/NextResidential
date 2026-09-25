@@ -107,6 +107,8 @@ export interface GuionDeEquipo {
   }[];
   /** `false` → `AcsCfg.remoteCheck=false`: la terminal decide sola. */
   readonly verificacionRemota?: boolean;
+  /** Rótulo para consultar después qué veredictos recibió (A2). Opcional. */
+  readonly destino?: string;
   /** Capacidad y ocupación de la biblioteca de rostros. */
   readonly bibliotecaMaximo?: number;
   readonly bibliotecaAlmacenadas?: number;
@@ -409,7 +411,14 @@ const caminoCasa = (rutaDelCatalogo: string, camino: string): boolean => {
   return patron.test(camino);
 };
 
+/** Lo que cada terminal simulada recibió como veredicto, por destino (A2). */
+export const veredictosRecibidosPor = new Map<string, string[]>();
+
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
+  /** Estado mutable del equipo: la corrección lo cambia y la lectura lo ve. */
+  let verificacionRemota = guion.verificacionRemota !== false;
+  const veredictosRecibidos: string[] = [];
+  if (guion.destino !== undefined) veredictosRecibidosPor.set(guion.destino, veredictosRecibidos);
   const sinSoporte = new Set(guion.sinSoporte ?? []);
   /** Estado de la biblioteca de rostros: lo que se carga se cuenta y se busca. */
   const plantillas = new Set<string>();
@@ -483,10 +492,24 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       return respuestaDe(200, ordenesDePuerta(guion));
     }
     if (catalogada.proposito === 'leer si la terminal espera el veredicto de la plataforma') {
-      return respuestaDe(
-        200,
-        JSON.stringify({ AcsCfg: { remoteCheck: guion.verificacionRemota !== false } }),
-      );
+      return respuestaDe(200, JSON.stringify({ AcsCfg: { remoteCheck: verificacionRemota } }));
+    }
+    if (catalogada.proposito === 'fijar que la terminal espere el veredicto de la plataforma') {
+      // Leer-modificar-escribir de verdad: lo que se escribe es lo que la
+      // siguiente lectura devuelve. Sin esto, la corrección parecería aplicada
+      // y la ficha seguiría en bloqueo.
+      const cuerpo = String(opciones?.body ?? '');
+      const pedido = /"remoteCheck"\s*:\s*(true|false)/.exec(cuerpo)?.[1];
+      if (pedido === undefined) return respuestaDe(400, ERROR_AVERIADO);
+      verificacionRemota = pedido === 'true';
+      return respuestaDe(200, OK);
+    }
+    if (catalogada.proposito === 'responder la verificación remota de la terminal') {
+      // Sin verificación remota activa no hay petición pendiente que contestar.
+      if (!verificacionRemota) return respuestaDe(200, NO_SOPORTA);
+      const cuerpo = String(opciones?.body ?? '');
+      veredictosRecibidos.push(cuerpo);
+      return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'leer qué admite la biblioteca de rostros') {
       return respuestaDe(
@@ -530,9 +553,26 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     if (catalogada.proposito === 'enviar audio al equipo') {
       const cuerpo = opciones?.body;
       if (cuerpo instanceof Uint8Array) audioRecibido.push(cuerpo);
+      // A4 · el adaptador sube el audio como UN flujo que dura la sesión: el
+      // equipo lo lee según llega, como el real, y contesta en el acto.
+      if (cuerpo instanceof ReadableStream) {
+        const lector = (cuerpo as ReadableStream<Uint8Array>).getReader();
+        void (async () => {
+          for (;;) {
+            const { done, value } = await lector
+              .read()
+              .catch(() => ({ done: true, value: undefined }));
+            if (done === true) return;
+            if (value !== undefined) audioRecibido.push(value);
+          }
+        })();
+      }
       return respuestaDe(200, '');
     }
     if (catalogada.proposito === 'recibir audio del equipo') {
+      // Lo que el flujo de subida ya entregó se vuelca aquí; un tic deja que
+      // el lector del flujo apunte lo último que llegó.
+      await new Promise((listo) => setTimeout(listo, 0));
       const respuesta = respuestaDe(200, '');
       const trozos = audioRecibido.splice(0, audioRecibido.length);
       Object.defineProperty(respuesta, 'body', { value: cuerpoBinario(trozos) });

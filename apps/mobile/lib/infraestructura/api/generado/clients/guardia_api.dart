@@ -2,6 +2,10 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, unused_import, invalid_annotation_target, unnecessary_import
 
+import 'dart:convert';
+import 'dart:io';
+
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
@@ -78,6 +82,22 @@ abstract class GuardiaApi {
     @Path('dispositivoId') required String dispositivoId,
   });
 
+  /// Audio que el equipo emite, en flujo, para quien tiene la palabra
+  @GET('/copropiedades/{id}/guardia/intercom/{dispositivoId}/audio')
+  @DioResponseType(ResponseType.stream)
+  Stream<String> guardiaControllerEscucharAudio({
+    @Path('id') required String id,
+    @Path('dispositivoId') required String dispositivoId,
+  });
+
+  /// Un trozo de audio del operador hacia el equipo
+  @POST('/copropiedades/{id}/guardia/intercom/{dispositivoId}/audio')
+  Future<void> guardiaControllerHablar({
+    @Path('id') required String id,
+    @Path('dispositivoId') required String dispositivoId,
+    @Body() required File body,
+  });
+
   /// Abre o niega a mano, con motivo obligatorio (RN-08)
   @POST('/copropiedades/{id}/guardia/ordenes')
   Future<OrdenEjecutadaDto> guardiaControllerOrdenar({
@@ -89,5 +109,13 @@ abstract class GuardiaApi {
   @GET('/copropiedades/{id}/guardia/ordenes')
   Future<HistorialDeOrdenesDto> guardiaControllerHistorialDeOrdenes({
     @Path('id') required String id,
+  });
+
+  /// Negocia la vista en vivo del equipo (WHEP): oferta SDP dentro, respuesta SDP fuera
+  @POST('/copropiedades/{id}/guardia/video/{dispositivoId}/whep')
+  Future<String> videoControllerWhep({
+    @Path('id') required String id,
+    @Path('dispositivoId') required String dispositivoId,
+    @Body() required String body,
   });
 }

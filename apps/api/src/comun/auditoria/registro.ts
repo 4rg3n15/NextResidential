@@ -42,6 +42,25 @@ export interface RegistroDeAuditoria {
     ip: string | null;
     userAgent: string | null;
   }): Promise<void>;
+
+  /**
+   * ETAPA 15-E (A3) · la respuesta del TITULAR por su enlace (RN-10, Ley 1581):
+   * qué contestó, a qué versión de la política, desde dónde y cuándo. Es la
+   * evidencia de la aceptación —o del rechazo, o de la revocación— y va a la
+   * tabla append-only, no a un log que rota.
+   */
+  registrarRespuestaDeTitular(entrada: {
+    copropiedadId: string;
+    consentimientoId: string;
+    respuesta: 'aceptado' | 'rechazado' | 'revocado';
+    versionPolitica: string;
+    ip: string | null;
+    userAgent: string | null;
+  }): Promise<void>;
 }
+
+export type RespuestaDeTitularAuditada = Parameters<
+  RegistroDeAuditoria['registrarRespuestaDeTitular']
+>[0];
 
 export const REGISTRO_AUDITORIA = Symbol.for('ncr.puerto.RegistroDeAuditoria');

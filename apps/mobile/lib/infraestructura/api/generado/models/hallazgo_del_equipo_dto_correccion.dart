@@ -15,6 +15,8 @@ enum HallazgoDelEquipoDtoCorreccion {
   imagenesDelReceptor('imagenes_del_receptor'),
   @JsonValue('formato_del_receptor')
   formatoDelReceptor('formato_del_receptor'),
+  @JsonValue('verificacion_remota')
+  verificacionRemota('verificacion_remota'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

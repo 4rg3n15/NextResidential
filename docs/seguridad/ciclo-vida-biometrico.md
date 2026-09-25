@@ -81,6 +81,20 @@ Esto no se sostiene con una comprobación, sino con una **ausencia**:
 Se registran: titular, finalidad, **versión de la política aceptada**, canal,
 instante de solicitud, instante de otorgamiento y evidencia.
 
+**Cómo responde el titular (ETAPA 15-E, A3).** El visitante no tiene cuenta.
+Quien captura su rostro —el residente desde la app, el portero desde la
+consola— recibe un **enlace firmado** y se lo entrega; el visitante lo abre en
+su propio teléfono, sin sesión, y acepta, rechaza o revoca. El enlace nombra
+UN consentimiento, caduca al plazo de respuesta y va firmado (HMAC-SHA256 con
+llave derivada por copropiedad): no se fabrica, no se altera y no vale en otra
+copropiedad. Lleva al titular dentro, así que `quienAcepta === titularId` se
+sigue comprobando en el agregado igual que con la ruta autenticada. Es una
+credencial **al portador**: la garantía de identidad la da el canal por el que
+se entrega (`[SUPUESTO]` S-43, canal a definir por Grupo Control, P-15). La
+página que ve es HTML sin JavaScript y sin estilos en línea, bajo la misma
+CSP de la API, y no muestra ningún dato del titular más allá de lo que él está
+decidiendo.
+
 **Si el titular no responde** dentro del plazo (`[SUPUESTO]` S-03, 24 h
 configurables), el consentimiento **expira**. Expirar no es rechazar: el titular
 no dijo que no, no dijo nada. La consecuencia práctica es la misma —no hay
@@ -107,6 +121,20 @@ garantía es estructural y tiene **tres cerrojos**, no uno:
 La capa de aplicación **vuelve a preguntar en el instante de empujar**, aunque
 el estado ya diga `pendiente_sincronizacion`: entre habilitar y sincronizar
 pueden pasar minutos, y en esos minutos el titular pudo revocar.
+
+**A todas las terminales, por capacidad (ETAPA 15-E, A3).** Al aceptar, la
+plantilla sale hacia **todos los equipos activos de la copropiedad que
+declaran biblioteca de rostros** —terminal o videoportero, da igual la marca
+(ADR-019)—, y el resumen dice equipo por equipo si llegó. Una terminal
+apagada no impide las demás ni deshace la aceptación: queda anotada y la
+sincronización total se relanza desde la consola sin duplicar filas.
+
+**Un `200` no acredita nada.** El adaptador de la terminal pregunta después de
+cargar: busca la plantilla por su identificador en la biblioteca del equipo y,
+si el firmware no contesta a la búsqueda, compara el recuento antes y después.
+Si el equipo aceptó la carga y la plantilla no aparece, **no se da por
+sincronizada** y se dice por qué. La supresión se acredita igual: por la
+búsqueda posterior, no por la respuesta a la orden.
 
 ### 3.4 Dónde vive la plantilla
 
@@ -168,6 +196,13 @@ origen; una consulta, no. Si el lector no responde, la fila sigue en la cola y
 el próximo barrido lo reintenta: **no se marca retirado lo que no se retiró**,
 porque CA-10 se acredita con esa cola vacía.
 
+**Y al revocar, la retirada se intenta en el acto (ETAPA 15-E, A3).** Hasta la
+15-E «inmediato» era el vector en la base; la terminal esperaba al barrido.
+Ahora la revocación —por la ruta autenticada o por el enlace del titular—
+recorre la cola de sus propias plantillas y las retira equipo por equipo en la
+misma llamada, devolviendo dos cuentas separadas: `retiradas` y
+`retiradasPendientes`. La que no respondió sigue en la cola.
+
 ---
 
 ## 4 · Derechos del titular y cómo se ejercen
@@ -200,6 +235,11 @@ más comprobación que la de titularidad.
 | Una plantilla manipulada no llega a la terminal          | `casos-de-uso.test.ts` (etiqueta GCM)            | —                       |
 | Ninguna ruta expone un vector                            | `biometria.e2e.test.ts`, enumerando el enrutador | —                       |
 | Nadie consiente por otro                                 | dominio, aplicación y HTTP                       | —                       |
+| CU-02 entero por los adaptadores PostgreSQL de la API    | `biometria-pg.test.ts` (15-E)                    | —                       |
+| El titular responde por su enlace, sin sesión            | `consentimiento-publico.e2e.test.ts` (15-E)      | —                       |
+| Aceptar propaga a todo equipo con biblioteca de rostros  | `sincronizacion-total.test.ts` · e2e (15-E)      | —                       |
+| Revocar retira de las terminales en la misma llamada     | `casos-de-uso.test.ts` · `biometria-pg.test.ts`  | —                       |
+| La carga se acredita por búsqueda o recuento, no por 200 | `terminal-facial.test.ts` (15-E)                 | —                       |
 
 **Verificado por mutación** significa que se desactivó la garantía y se comprobó
 que la prueba se pone roja. Un control que nadie ha visto fallar no está
@@ -216,9 +256,12 @@ Se declara en vez de insinuar cumplimiento:
    demuestra contra `MockProvider`, incluido el caso del lector caído. La
    verificación con equipo es de la **ETAPA 15**, y el ciclo alta →
    reconocimiento → supresión es uno de sus hitos.
-2. **La persistencia en PostgreSQL desde la API en tiempo de ejecución.** Sin
-   credencial (D-17) lo cableado son dobles en memoria. La frontera es
-   definitiva y los cerrojos son de la base, probados contra base real.
+2. ~~**La persistencia en PostgreSQL desde la API en tiempo de ejecución.**~~
+   **Cerrado en la ETAPA 15-E (A3):** `PERSISTENCIA_DE_BIOMETRIA=postgres` es
+   el valor por omisión; consentimientos, plantillas —con su vector cifrado en
+   la fila— y sincronizaciones viven en las tablas de 0008/0022, y la suite
+   `biometria-pg.test.ts` recorre CU-02 entero contra la base real. Lo que
+   sigue sin poder demostrarse aquí es el punto 1: la terminal física.
 3. **El barrido programado.** `BarrerPlantillasVencidas` es idempotente y está
    probado, pero nadie lo invoca todavía: el planificador de pg-boss es de la
    **ETAPA 14**. Hoy se ejecuta por su ruta HTTP.
@@ -241,6 +284,11 @@ Ninguna de estas es una decisión de ingeniería, y ninguna se ha inventado:
 5. **Menores de edad**: hoy el sistema no distingue. Tratar datos biométricos de
    un menor exige el consentimiento de su representante legal, y eso es un
    requisito nuevo, no un ajuste — se anota como riesgo abierto.
+6. **Canal de entrega del enlace de consentimiento** (P-15). El sistema lo
+   emite y lo muestra a quien capturó; enviarlo por SMS o WhatsApp exige un
+   proveedor de mensajería y una decisión sobre qué canal acredita al titular.
+   Hasta entonces, el enlace se entrega en mano y así queda registrado el
+   canal (`presencial`, `sms`, `app`) en el consentimiento.
 
 ---
 

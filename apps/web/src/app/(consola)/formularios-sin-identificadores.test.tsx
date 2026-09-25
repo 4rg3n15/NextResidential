@@ -463,6 +463,17 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
   'biometria/pantalla.tsx':
     'no es un diálogo; el único identificador lo aporta el buscador compartido, y tiene prueba propia',
   /**
+   * ETAPA 15-E (A3) · el seguimiento tras la captura: dos botones —emitir el
+   * enlace del titular y comprobar la respuesta para sincronizar a todas las
+   * terminales—. Los dos identificadores (consentimiento y plantilla) vienen de
+   * la captura recién hecha y viajan en la RUTA del POST; el único `<input>` es
+   * de sólo lectura, para copiar el enlace. No hay nada que teclear. Lo que sí
+   * comprueba `seguimiento.test.tsx` es que se muestre por terminal el estado
+   * que la API devuelve.
+   */
+  'biometria/seguimiento.tsx':
+    'dos botones; consentimiento y plantilla vienen de la captura y viajan en la ruta; el único input es de sólo lectura',
+  /**
    * ETAPA 15-D (O3) · la fotografía del visitante: la entrada es un archivo de
    * imagen elegido con el selector del navegador, y el identificador de la
    * autorización viaja en la RUTA desde la tarjeta que lo muestra. No hay un

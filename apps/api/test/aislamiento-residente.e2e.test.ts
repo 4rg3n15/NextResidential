@@ -502,6 +502,46 @@ describe('CU-02 · RN-10 · el rostro es de MI visitante, y el consentimiento es
     expect(res.body.titular).toBe('Visitante de rostro-propio-0001');
   });
 
+  it('CU-02 flujo alterno · el visitante RECHAZA por su enlace y la visita sigue viva sólo por placa', async () => {
+    const token = await tokenResidente(USUARIO_R1, COP_A);
+    const autorizacionId = await crearPara(token, 'rostro-rechazado-0001');
+    const captura = await enviar(rutaPara(autorizacionId), COP_A, token, ROSTRO_BUENO);
+    expect(captura.status, JSON.stringify(captura.body)).toBe(201);
+    const enlace = String(captura.body.enlaceDeConsentimiento ?? '');
+    const tokenDelTitular = enlace.slice(enlace.lastIndexOf('/') + 1);
+    expect(tokenDelTitular.length, JSON.stringify(captura.body)).toBeGreaterThan(20);
+
+    // El VISITANTE, sin sesión, dice que no.
+    const rechazo = await request(app.getHttpServer())
+      .post(`/consentimiento/${tokenDelTitular}/respuesta`)
+      .type('form')
+      .send({ acepta: 'no' });
+    expect(rechazo.status).toBe(303);
+
+    // La visita sigue VIVA para el residente: la misma autorización admite una
+    // captura nueva (una autorización revocada respondería 404). Se entra por
+    // placa o por el portero, sin reconocimiento facial; el motor no consulta
+    // consentimiento en una lectura de placa (cargador-pg, S-34).
+    const otraCaptura = await enviar(rutaPara(autorizacionId), COP_A, token, ROSTRO_BUENO);
+    expect(otraCaptura.status, JSON.stringify(otraCaptura.body)).toBe(201);
+    expect(otraCaptura.body.consentimientoId).not.toBe(captura.body.consentimientoId);
+
+    // Y el consentimiento quedó RECHAZADO, no pendiente ni vigente.
+    const admin = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
+    const c = await request(app.getHttpServer())
+      .get(
+        `/copropiedades/${COP_A}/biometria/consentimientos/${String(captura.body.consentimientoId)}`,
+      )
+      .set('Authorization', `Bearer ${admin}`);
+    expect(c.status).toBe(200);
+    expect(c.body.estado).toBe('rechazado');
+
+    // El enlace ya se usó: muestra lo decidido y no admite cambiar de opinión.
+    const otraVez = await request(app.getHttpServer()).get(`/consentimiento/${tokenDelTitular}`);
+    expect(otraVez.status).toBe(200);
+    expect(otraVez.text).not.toContain('<form');
+  });
+
   it('EL EJE 2 · contra la autorización del VECINO responde 404', async () => {
     const tokenR2 = await tokenResidente(USUARIO_R2, COP_A);
     const delVecino = await crearPara(tokenR2, 'rostro-del-vecino-0001');

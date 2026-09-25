@@ -45,6 +45,8 @@ export const LONGITUD_ETIQUETA = 16;
 export const PROPOSITOS = {
   plantillas: 'ncr:plantillas-biometricas:v1',
   credencialesDeEquipo: 'ncr:credenciales-de-equipo:v1',
+  /** A3 (15-E) · firma HMAC del enlace con el que el TITULAR responde. */
+  enlaceDeConsentimiento: 'ncr:enlace-de-consentimiento:v1',
 } as const;
 
 export type Proposito = (typeof PROPOSITOS)[keyof typeof PROPOSITOS];
