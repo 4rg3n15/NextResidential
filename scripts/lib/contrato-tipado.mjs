@@ -55,12 +55,21 @@ const EXENTAS = new Map([
 
   ['POST /copropiedades/{id}/biometria/capturas', 'ETAPA 11 · captura desde la app'],
   ['GET /copropiedades/{id}/biometria/consentimientos/{consentimientoId}', 'ETAPA 11'],
-  ['POST /copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta', 'ETAPA 11'],
   ['POST /copropiedades/{id}/biometria/consentimientos/{consentimientoId}/revocacion', 'ETAPA 11'],
   ['POST /copropiedades/{id}/biometria/plantillas/{plantillaId}/sincronizacion', 'ETAPA 15'],
   ['POST /copropiedades/{id}/biometria/barrido', 'ETAPA 15 · sin consumidor de interfaz'],
   ['POST /ingesta/eventos', 'ETAPA 15 · lo consume la cámara, no una interfaz'],
   ['POST /ingesta/latidos', 'ETAPA 15 · lo consume el dispositivo, no una interfaz'],
+  /**
+   * ETAPA 15-E (A4) · un trozo de audio del operador hacia el equipo responde
+   * `204` SIN cuerpo por definición: no hay nada que tipar y nunca lo habrá.
+   * No es una deuda que una etapa vaya a saldar; es la forma de la ruta. Se
+   * declara aquí para que el control siga exigiendo tipo a todo lo demás.
+   */
+  [
+    'POST /copropiedades/{id}/guardia/intercom/{dispositivoId}/audio',
+    'ETAPA 15-E · 204 sin cuerpo: un trozo de audio no devuelve nada',
+  ],
 ]);
 
 const destino = resolve(process.argv[2] ?? 'packages/contracts/openapi.json');

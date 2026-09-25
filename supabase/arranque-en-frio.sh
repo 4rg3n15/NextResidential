@@ -60,8 +60,15 @@ BEGIN
   SELECT count(*) INTO n FROM public.copropiedades;
   ASSERT n = 0, format('la base no está vacía: hay %s copropiedades', n);
 
+  -- ETAPA 15-E (D-137): la 0035 añade el actor de INGESTA junto al de sistema,
+  -- así que una base recién migrada tiene exactamente dos usuarios, y los dos
+  -- son los que las migraciones declaran. Se comprueba por identidad, no sólo
+  -- por recuento: un tercer usuario colado con un actor de menos daría 2 igual.
   SELECT count(*) INTO n FROM public.usuarios;
-  ASSERT n = 1, format('en una base recién migrada solo debe estar el actor de sistema, hay %s', n);
+  ASSERT n = 2, format('en una base recién migrada solo deben estar los dos actores de sistema (0025 y 0035), hay %s', n);
+  SELECT count(*) INTO n FROM public.usuarios
+   WHERE id IN (app.actor_de_sistema(), app.actor_de_ingesta());
+  ASSERT n = 2, 'los dos usuarios de una base recién migrada no son los actores de sistema e ingesta';
 
   -- ===== 1 · el actor de sistema rompe el ciclo de auditoría ===============
   SELECT count(*) INTO n FROM public.usuarios
