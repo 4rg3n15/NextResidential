@@ -144,12 +144,28 @@ export class FuenteDePlacas implements PlateEventSource {
     }
 
     const lectura = lecturaDe(publicacion.evento);
-    if (lectura === null) return { desenlace: 'sin_placa', motivo: 'sin lectura de placa' };
+    const clase = publicacion.evento.clase;
+    /**
+     * A2/A4 (ETAPA 15-E) · un rostro o una llamada no son una placa y el
+     * puerto del dominio no tiene forma para ellos: van al ingestor —que sí
+     * sabe qué hacer— y no a los observadores del puerto. Es el mismo canal
+     * de este paquete por el que ya entraba la evidencia que el puerto no
+     * expresa; el puerto sigue intacto.
+     */
+    if (lectura === null && clase !== 'rostro' && clase !== 'llamada' && clase !== 'timbre') {
+      return { desenlace: 'sin_placa', motivo: 'sin lectura de placa' };
+    }
 
     const ingesta =
       this.ingestor === null
         ? { registrado: true, motivo: null }
         : await this.ingestor.ingerir(publicacion);
+
+    if (lectura === null) {
+      return ingesta.registrado
+        ? { desenlace: 'ingerida', motivo: null }
+        : { desenlace: 'no_registrada', motivo: ingesta.motivo ?? 'el hecho no se pudo registrar' };
+    }
 
     /**
      * Los observadores del puerto se avisan **aunque la ingesta falle**: la

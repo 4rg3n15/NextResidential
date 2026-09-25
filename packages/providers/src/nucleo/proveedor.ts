@@ -3,9 +3,11 @@ import type {
   FaceTemplateProvider,
   IntercomProvider,
   PlateEventSource,
+  ResultadoAccionamiento,
   ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo } from './capacidades';
+import type { VeredictoRemoto } from './verificacion-remota';
 
 /**
  * LO QUE TODO ADAPTADOR CUMPLE: los cuatro puertos del dominio, más UNA
@@ -41,4 +43,13 @@ export type ProveedorDeEquipos = AccessPointProvider &
   IntercomProvider & {
     capacidadesDe(dispositivoId: string): Promise<CapacidadesDeEquipo>;
     fijarBloqueo(dispositivoId: string, bloqueado: boolean): Promise<ResultadoDeAccionamiento>;
+    /**
+     * A2 · contesta a una terminal que reconoció y ESPERA (`verificacionRemota`).
+     * Con `permitido` el equipo abre; sin él, niega. Sólo se admite en un equipo
+     * que declare la capacidad; en otro caso `CapacidadNoSoportada`.
+     */
+    responderVerificacionRemota(
+      dispositivoId: string,
+      veredicto: VeredictoRemoto,
+    ): Promise<ResultadoAccionamiento>;
   };

@@ -166,3 +166,47 @@ describe('la lectura que sale del evento', () => {
     expect(lecturaDe(otro!)).toBeNull();
   });
 });
+
+/**
+ * A2 (ETAPA 15-E) · un rostro no es una placa: va al ingestor, que sabe qué
+ * hacer, y no a los observadores del puerto del dominio, cuya forma es una
+ * lectura de placa. El puerto queda intacto.
+ */
+describe('A2 · rostro y llamada van al ingestor, no a los suscriptores del puerto', () => {
+  const rostro = (): PublicacionDeEquipo => ({
+    evento: {
+      ...publicacionDe(xml()).evento,
+      clase: 'rostro',
+      placa: null,
+      confianza: null,
+      personaId: 'plantilla-1',
+      esperaVeredicto: true,
+      serieDelEquipo: 3,
+    },
+    foto: null,
+    recorte: null,
+    transporte: 'escucha',
+  });
+
+  it('el ingestor lo recibe y el desenlace es `ingerida`', async () => {
+    const ingestor = ingestorQueCuenta();
+    const fuente = new FuenteDePlacas(ingestor);
+    let observadas = 0;
+    await fuente.suscribir(async () => {
+      observadas += 1;
+    });
+    const r = await fuente.publicar(rostro());
+    expect(r.desenlace).toBe('ingerida');
+    expect(ingestor.veces).toBe(1);
+    expect(observadas).toBe(0);
+  });
+
+  it('si el ingestor no lo registra, el desenlace lo dice', async () => {
+    const fuente = new FuenteDePlacas({
+      ingerir: async () => ({ registrado: false, motivo: 'sin copropiedad' }),
+    });
+    const r = await fuente.publicar(rostro());
+    expect(r.desenlace).toBe('no_registrada');
+    expect(r.motivo).toBe('sin copropiedad');
+  });
+});

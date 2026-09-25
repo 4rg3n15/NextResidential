@@ -451,6 +451,54 @@ describe.each(CASOS)('contrato de proveedor · $nombre', (caso) => {
     });
   });
 
+  describe('verificación remota · A2, por capacidad (ETAPA 15-E)', () => {
+    it('una terminal que declara esperar el veredicto recibe la respuesta, con latencia', async () => {
+      const { proveedor } = caso.montar();
+      expect(soporta(await proveedor.capacidadesDe(TERMINAL), 'verificacionRemota')).toBe(true);
+      const r = await proveedor.responderVerificacionRemota(TERMINAL, {
+        serie: 17,
+        permitido: true,
+        motivo: 'autorización vigente',
+      });
+      expect(r.aceptado).toBe(true);
+      expect(r.latenciaMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('una negación también viaja al equipo: es la terminal la que muestra el motivo', async () => {
+      const { proveedor } = caso.montar();
+      const r = await proveedor.responderVerificacionRemota(TERMINAL, {
+        serie: 18,
+        permitido: false,
+        motivo: 'SIN_CONSENTIMIENTO',
+      });
+      expect(r.aceptado).toBe(true);
+    });
+
+    it('quien no declara verificación remota no tiene a quién contestar: CapacidadNoSoportada', async () => {
+      const { proveedor } = caso.montar();
+      const capacidades = await proveedor.capacidadesDe(BARRERA);
+      if (soporta(capacidades, 'verificacionRemota')) {
+        // El simulado completo declara sí en todo; la aserción va por lo declarado.
+        expect(
+          (
+            await proveedor.responderVerificacionRemota(BARRERA, {
+              serie: null,
+              permitido: false,
+              motivo: 'x',
+            })
+          ).aceptado,
+        ).toBe(true);
+        return;
+      }
+      const error = await proveedor
+        .responderVerificacionRemota(BARRERA, { serie: null, permitido: false, motivo: 'x' })
+        .then(() => null)
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CapacidadNoSoportada);
+      expect((error as CapacidadNoSoportada).capacidad).toBe('verificacionRemota');
+    });
+  });
+
   describe('IntercomProvider · ADR-01', () => {
     it('el primer operador recibe el canal', async () => {
       const { proveedor } = caso.montar();

@@ -109,25 +109,31 @@ const hallazgosDeTerminal = (c: CapacidadesDeEquipo): HallazgoDelEquipo[] => {
       ? biblioteca.almacenadas / biblioteca.maximo
       : null;
   return [
-    desdeCapacidad('quién decide la apertura', c.verificacionRemota, {
-      si: {
-        valor: 'reporta y espera el veredicto',
-        detalle:
-          'La terminal reconoce, REPORTA y espera a que la plataforma decida. Es lo que ' +
-          '«Next Control decide, el hardware ejecuta» exige de este equipo',
-      },
-      no: {
-        estado: 'bloqueo',
-        detalle:
-          'La terminal decide por su cuenta: reconoce y abre sin preguntar. El motor de reglas ' +
-          'quedaría decorativo y la traza, incompleta. Actívele la verificación remota en el ' +
-          'propio equipo, o declárela como «decide el equipo» sabiendo lo que eso significa',
-      },
-      desconocida:
-        'No se pudo leer si la terminal espera el veredicto de la plataforma. Sin eso no se ' +
-        'puede afirmar que no decida sola',
-      valorCorrecto: 'reporta y espera el veredicto',
-    }),
+    {
+      ...desdeCapacidad('quién decide la apertura', c.verificacionRemota, {
+        si: {
+          valor: 'reporta y espera el veredicto',
+          detalle:
+            'La terminal reconoce, REPORTA y espera a que la plataforma decida. Es lo que ' +
+            '«Next Control decide, el hardware ejecuta» exige de este equipo',
+        },
+        no: {
+          estado: 'bloqueo',
+          detalle:
+            'La terminal decide por su cuenta: reconoce y abre sin preguntar. El motor de reglas ' +
+            'quedaría decorativo y la traza, incompleta. Actívele la verificación remota desde ' +
+            'aquí (cambia quién decide: exige confirmación y queda en auditoría) o en el propio ' +
+            'equipo; si el modelo no la admite, es un hallazgo de BLOQUEO y el equipo no se opera',
+        },
+        desconocida:
+          'No se pudo leer si la terminal espera el veredicto de la plataforma. Sin eso no se ' +
+          'puede afirmar que no decida sola',
+        valorCorrecto: 'reporta y espera el veredicto',
+      }),
+      // A2 · la corrección existe desde la consola SÓLO cuando el equipo dijo
+      // «no»: con `desconocida` no hay documento que leer-modificar-escribir.
+      correccion: c.verificacionRemota === 'no' ? 'verificacion_remota' : null,
+    },
     biblioteca.estado === 'si'
       ? {
           campo: 'biblioteca de rostros',

@@ -33,10 +33,14 @@ export type DesenlaceDeRecepcion =
   | 'ilegible'
   /** El equipo marcó el evento como histórico: no ocurre ahora. */
   | 'historico'
-  /** Llegó, pero no traía lectura de placa. */
+  /** Llegó, pero no era una placa, un rostro ni una llamada. */
   | 'sin_placa'
-  /** Una lectura utilizable. Es lo único que sigue adelante. */
-  | 'lectura';
+  /** Una lectura de placa utilizable. */
+  | 'lectura'
+  /** A2 · una terminal reconoció a alguien (y quizá espera veredicto). */
+  | 'rostro'
+  /** A4 · un videoportero señala una llamada hacia una vivienda. */
+  | 'llamada';
 
 export interface RecepcionDeEquipo {
   readonly desenlace: DesenlaceDeRecepcion;
@@ -111,23 +115,36 @@ export const recibirPublicacionDeEquipo = (
       horaSinDesplazamiento: evento.horaSinDesplazamiento,
     });
   }
-  if (evento.clase !== 'placa' || evento.placa === null) {
-    return sinPublicacion('sin_placa', 'sin lectura de placa', {
-      ...comunes,
-      horaSinDesplazamiento: evento.horaSinDesplazamiento,
-    });
-  }
-
-  return {
-    desenlace: 'lectura',
-    publicacion: {
-      evento,
-      foto: sobre.foto,
-      recorte: sobre.recorte,
-      transporte: 'escucha',
-    },
+  const publicacion: PublicacionDeEquipo = {
+    evento,
+    foto: sobre.foto,
+    recorte: sobre.recorte,
+    transporte: 'escucha',
+  };
+  const adelante = (desenlace: DesenlaceDeRecepcion, motivo: string): RecepcionDeEquipo => ({
+    desenlace,
+    publicacion,
     ...comunes,
     horaSinDesplazamiento: evento.horaSinDesplazamiento,
-    motivo: 'lectura de placa',
-  };
+    motivo,
+  });
+
+  if (evento.clase === 'placa' && evento.placa !== null) {
+    return adelante('lectura', 'lectura de placa');
+  }
+  // A2 · el rostro sigue adelante AUNQUE sea un resultado informativo: quien
+  // decide qué hacer con él es el ingestor, que tiene la traza para decirlo.
+  if (evento.clase === 'rostro') {
+    return adelante(
+      'rostro',
+      evento.esperaVeredicto ? 'rostro reconocido que espera veredicto' : 'rostro reconocido',
+    );
+  }
+  if (evento.clase === 'llamada' || evento.clase === 'timbre') {
+    return adelante('llamada', 'llamada del videoportero');
+  }
+  return sinPublicacion('sin_placa', 'sin lectura de placa', {
+    ...comunes,
+    horaSinDesplazamiento: evento.horaSinDesplazamiento,
+  });
 };

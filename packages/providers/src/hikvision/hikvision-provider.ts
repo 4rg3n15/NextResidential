@@ -28,6 +28,7 @@ import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidad
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe } from '../nucleo/capacidades';
 import { CapacidadNoSoportada } from '../nucleo/errores';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
+import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -264,6 +265,24 @@ export class HikvisionProvider
     await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
     const terminal = await this.terminalDe(dispositivoId);
     await terminal.suprimir(dispositivoId, plantillaId);
+  }
+
+  /**
+   * A2 · el veredicto del motor, de vuelta a la terminal que espera. Exige la
+   * capacidad `verificacionRemota` —una terminal que decide sola no tiene a
+   * quién contestar— y delega en el adaptador de la familia, que es el único
+   * que conoce la forma del cuerpo (S-39).
+   */
+  async responderVerificacionRemota(
+    dispositivoId: string,
+    veredicto: VeredictoRemoto,
+  ): Promise<ResultadoAccionamiento> {
+    // La capacidad ANTES que el tipo: una cámara no la declara y la negativa
+    // tiene que decir «no soporta verificación remota», no «no es terminal».
+    await this.exigirCapacidad(dispositivoId, 'verificacionRemota');
+    await this.exigirQueSeaTerminal(dispositivoId);
+    const terminal = await this.terminalDe(dispositivoId);
+    return terminal.responderVerificacion(dispositivoId, veredicto);
   }
 
   // ── IntercomProvider ─────────────────────────────────────────────────────

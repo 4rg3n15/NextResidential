@@ -2,6 +2,7 @@ import { Autorizacion, Placa, Vigencia, esExito } from '@ncr/domain-core';
 import type { Bitacora, ContextoDeAcceso } from '@ncr/domain-core';
 import type {
   CargadorDeContexto,
+  LectorDeConsentimientoBiometrico,
   LectorDeUmbralDeConfianza,
   PlacaResuelta,
   RepositorioAutorizaciones,
@@ -66,6 +67,12 @@ export class CargadorDeContextoPg implements CargadorDeContexto {
     private readonly umbrales: LectorDeUmbralDeConfianza,
     private readonly bitacora: Bitacora,
     private readonly zonas?: ResolutorDeZona,
+    /**
+     * A2 · quien dice si hay consentimiento biométrico vigente. Opcional a
+     * propósito: sin él, el cargador sigue siendo CONSERVADOR (`false`), que
+     * es exactamente lo que S-34 dejaba y lo que la suite sin biometría espera.
+     */
+    private readonly consentimientos?: LectorDeConsentimientoBiometrico,
   ) {}
 
   async cargar(solicitud: SolicitudDeAcceso, ahora: Date): Promise<ContextoDeAcceso> {
@@ -78,6 +85,7 @@ export class CargadorDeContextoPg implements CargadorDeContexto {
     ]);
 
     const personaId = solicitud.personaId ?? vehiculo?.personaId ?? null;
+    const consentimientoVigente = await this.consentimiento(solicitud, personaId, ahora);
     const autorizaciones = await this.autorizaciones.activasParaLectura(solicitud.copropiedadId, {
       placa,
       personaId,
@@ -107,11 +115,39 @@ export class CargadorDeContextoPg implements CargadorDeContexto {
       zona: await this.zona(solicitud, ahora),
       confianza: solicitud.confianza,
       umbralDeConfianza: umbral,
-      // [SUPUESTO] S-34 · el consentimiento biométrico vigente lo sostiene el
-      // módulo de biometría; el recorrido facial entra por su propio puerto en
-      // la ETAPA 08 y este cargador atiende hoy el de placa. Conservador.
-      consentimientoVigente: false,
+      consentimientoVigente,
     };
+  }
+
+  /**
+   * S-34, cerrado en la 15-E · el consentimiento SÓLO se consulta en un acceso
+   * facial con persona identificada. Para la placa no aplica y el motor no lo
+   * mira; y ante un fallo del lector se registra y queda en `false`: negar por
+   * SIN_CONSENTIMIENTO es la dirección segura de RN-09.
+   */
+  private async consentimiento(
+    solicitud: SolicitudDeAcceso,
+    personaId: string | null,
+    ahora: Date,
+  ): Promise<boolean> {
+    if (solicitud.metodo !== 'facial' || personaId === null || this.consentimientos === undefined) {
+      return false;
+    }
+    try {
+      return await this.consentimientos.consentimientoVigente(
+        solicitud.copropiedadId,
+        personaId,
+        ahora,
+      );
+    } catch (error) {
+      this.bitacora.registrar('error', 'no se pudo leer el consentimiento biométrico', {
+        copropiedadId: solicitud.copropiedadId,
+        personaId,
+        error: error instanceof Error ? error.message : String(error),
+        motivo: 'RN-09 · sin lectura no hay consentimiento: el motor negará',
+      });
+      return false;
+    }
   }
 
   /**

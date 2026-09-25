@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID } from '@ncr/domain-core';
-import type { AlmacenEvidencia, Bitacora, GeneradorDeId } from '@ncr/domain-core';
-import type { FuenteDePlacas } from '@ncr/providers';
-import { FUENTE_DE_PLACAS } from '../proveedores';
+import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
+import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
+import type { FuenteDePlacas, ProveedorDeEquipos } from '@ncr/providers';
+import { FUENTE_DE_PLACAS, PROVEEDOR_DE_EQUIPOS } from '../proveedores';
+import { BiometriaModule, IDENTIDAD_BIOMETRICA } from '../biometria';
+import type { IdentidadBiometricaDesdeRepositorios } from '../biometria';
 import { ACCIONADOR_DE_PUERTA } from '../guardia';
 import type { AccionadorDePuerta } from '../guardia';
 import { RegistrarAcceso } from '../eventos';
@@ -58,6 +60,8 @@ export class AlarmServerModule {
     const equipos = leerEquiposDeclarados(equiposCrudos);
     return {
       module: AlarmServerModule,
+      // A2 · la identidad biométrica, por el barril (misma instancia: ver `eventos`).
+      imports: [BiometriaModule.registrar()],
       controllers: [AlarmServerController],
       providers: [
         GuardiaDeAlarmServer,
@@ -78,6 +82,9 @@ export class AlarmServerModule {
             GENERADOR_DE_ID,
             EQUIPOS_DE_ALARM_SERVER,
             FUENTE_DE_PLACAS,
+            IDENTIDAD_BIOMETRICA,
+            PROVEEDOR_DE_EQUIPOS,
+            RELOJ,
           ],
           useFactory: (
             referencia: ModuleRef,
@@ -87,6 +94,9 @@ export class AlarmServerModule {
             ids: GeneradorDeId,
             declarados: readonly EquipoDeclarado[],
             fuente: FuenteDePlacas,
+            identidad: IdentidadBiometricaDesdeRepositorios,
+            proveedor: ProveedorDeEquipos,
+            reloj: Reloj,
           ) => {
             const ingestor = new IngestorDeEquipos(
               registrar,
@@ -100,6 +110,11 @@ export class AlarmServerModule {
               bitacora,
               ids,
               declarados,
+              // A2 · la terminal reconoce plantillas; biometría sabe de quién son.
+              identidad,
+              // A2 · el veredicto vuelve por el MISMO proveedor que abre puertas.
+              proveedor,
+              reloj,
             );
             fuente.fijarIngestor(ingestor);
             return ingestor;

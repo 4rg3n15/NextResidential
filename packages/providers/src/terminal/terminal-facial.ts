@@ -8,6 +8,7 @@ import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { comoErrorNeutral } from '../equipo/errores-del-fabricante';
 import { BibliotecaLlena } from '../nucleo/errores';
+import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
 /**
  * TERMINAL FACIAL · `DS-K1T344MBFWX-E1` · V4.47.0 build 250722.
@@ -242,6 +243,48 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       return n === undefined ? null : Number(n) > 0;
     } catch (error) {
       if (error instanceof EquipoInalcanzable) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * A2 · LA RESPUESTA A LA VERIFICACIÓN REMOTA · DOCUMENTADA, NO VERIFICADA
+   *
+   * La terminal en `reporta_y_espera` publicó el evento con `remoteCheck` y
+   * se quedó esperando. Esto le devuelve el veredicto del motor: con
+   * `success` abre; con `failed` niega y muestra el motivo. La forma del cuerpo
+   * es el [SUPUESTO] S-39 del catálogo. Lo que NO hace: accionar el relé por
+   * otra vía. Con la terminal esperando, quien abre es la propia terminal al
+   * recibir `success`; una segunda orden de apertura abriría dos veces.
+   *
+   * Sin `serie` se contesta igual —el equipo puede aceptar la última pendiente
+   * en algunos firmwares— y se dice en el registro: es lo que se confirma en
+   * sitio, no se supone.
+   */
+  async responderVerificacion(
+    dispositivoId: string,
+    veredicto: VeredictoRemoto,
+  ): Promise<ResultadoAccionamiento> {
+    const ruta = rutaPara('responder la verificación remota de la terminal', 'terminal');
+    try {
+      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
+        tipo: 'application/json',
+        contenido: JSON.stringify({
+          RemoteCheck: {
+            ...(veredicto.serie === null ? {} : { serialNo: veredicto.serie }),
+            checkResult: veredicto.permitido ? 'success' : 'failed',
+            info: veredicto.motivo.slice(0, 64),
+          },
+        }),
+      });
+      if (NO_SOPORTADO.test(respuesta.cuerpo)) throw new RutaNoSoportada(ruta.proposito, ruta.ruta);
+      if (!respuesta.ok) throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
+      return { aceptado: true, latenciaMs: respuesta.latenciaMs };
+    } catch (error) {
+      if (error instanceof EquipoInalcanzable) {
+        return { aceptado: false, latenciaMs: error.latenciaMs };
+      }
       throw error;
     }
   }

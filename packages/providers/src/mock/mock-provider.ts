@@ -14,6 +14,7 @@ import { Azar, FalloDeHardwareSimulado, PERFIL_REALISTA, RelojSimulado } from '.
 import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
 import { CAPACIDADES_COMPLETAS, CAPACIDADES_SIN_CONSULTAR } from '../nucleo/capacidades';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
+import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
 export interface OpcionesMock {
   readonly perfil?: PerfilDeSimulacion;
@@ -59,6 +60,8 @@ export class MockProvider
   readonly aperturas: { dispositivoId: string; actorId: string }[] = [];
   /** Bloqueos vigentes por dispositivo (H-3): estado, no pulso. */
   readonly bloqueos = new Map<string, boolean>();
+  /** Veredictos devueltos a terminales que esperaban (A2), para afirmar sobre ellos. */
+  readonly veredictos: { dispositivoId: string; veredicto: VeredictoRemoto }[] = [];
   readonly plantillas = new Map<string, Set<string>>();
   private readonly suscriptores: ((l: LecturaDePlaca) => Promise<void>)[] = [];
 
@@ -103,6 +106,20 @@ export class MockProvider
     const latencia = await this.conReintentos(dispositivoId, 'fijarBloqueo');
     this.bloqueos.set(dispositivoId, bloqueado);
     return ordenAceptada(latencia);
+  }
+
+  /**
+   * A2 · la respuesta a una terminal que espera. El simulado la GUARDA: una
+   * prueba afirma que se contestó, con qué veredicto y a qué serie, que es lo
+   * que un motor «decorativo» dejaría sin contestar.
+   */
+  async responderVerificacionRemota(
+    dispositivoId: string,
+    veredicto: VeredictoRemoto,
+  ): Promise<ResultadoAccionamiento> {
+    const latencia = await this.conReintentos(dispositivoId, 'responderVerificacionRemota');
+    this.veredictos.push({ dispositivoId, veredicto });
+    return { aceptado: true, latenciaMs: latencia };
   }
 
   // ── PlateEventSource ─────────────────────────────────────────────────────

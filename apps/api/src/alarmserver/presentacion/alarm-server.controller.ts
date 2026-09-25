@@ -155,7 +155,12 @@ export class AlarmServerController {
       });
     }
 
-    if (recepcion.desenlace !== 'lectura' || recepcion.publicacion === null) {
+    // A2/A4 · placa, rostro y llamada siguen adelante; lo demás se registra.
+    const sigueAdelante =
+      recepcion.desenlace === 'lectura' ||
+      recepcion.desenlace === 'rostro' ||
+      recepcion.desenlace === 'llamada';
+    if (!sigueAdelante || recepcion.publicacion === null) {
       this.bitacora.registrar(
         recepcion.desenlace === 'ilegible' ? 'aviso' : 'info',
         `publicación de equipo ignorada: ${recepcion.motivo}`,

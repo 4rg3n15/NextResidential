@@ -131,6 +131,34 @@ describe('receptor del servidor de alarma', () => {
       .expect(200);
   });
 
+  /**
+   * A2 (ETAPA 15-E) · la terminal facial publica en el MISMO receptor, como
+   * JSON a secas cuando no adjunta foto. Sin plantilla gestionada el motor
+   * niega —no hay a quién atribuirlo— y el equipo recibe su veredicto por el
+   * proveedor; lo que se afirma por HTTP es que el sobre ENTRA y se procesa.
+   */
+  it('A2 · el evento JSON de una terminal entra por el mismo receptor y se procesa', async () => {
+    const evento = JSON.stringify({
+      eventType: 'AccessControllerEvent',
+      dateTime: '2026-09-25T07:00:00-05:00',
+      alarmDataType: 0,
+      AccessControllerEvent: {
+        employeeNoString: 'plantilla-sin-gestionar',
+        remoteCheck: true,
+        serialNo: 1,
+      },
+    });
+    const respuesta = await request(app.getHttpServer())
+      .post(`/alarm-server/${SECRETO}`)
+      .set('content-type', 'application/json')
+      .send(evento)
+      .expect(200);
+    // No es «ignorado»: el rostro se ingirió y quedó evento (negado). Que no
+    // haya `ignorado: true` es lo que distingue un receptor que lo procesa de
+    // uno que lo tira con un 200.
+    expect(respuesta.body).toEqual({ aceptado: true });
+  });
+
   it('un evento que no es una lectura de placa se acepta y se ignora', async () => {
     const otro =
       '<EventNotificationAlert><eventType>IO</eventType>' +

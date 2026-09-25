@@ -132,6 +132,19 @@ export interface EventoDeEquipo {
    * (verificación remota). `false` cuando decidió sola o no aplica.
    */
   readonly esperaVeredicto: boolean;
+  /**
+   * A2 · el número con el que la terminal identifica SU petición pendiente. Es
+   * lo que hay que devolverle con el veredicto; sin él no sabe a cuál
+   * corresponde. `null` fuera de `rostro` o si el equipo no lo emitió.
+   */
+  readonly serieDelEquipo: number | null;
+  /**
+   * A2 · `true` cuando el bloque NO es una petición sino el RESULTADO de una
+   * verificación remota anterior (`remoteCheckResult`, firmwares de 2024 en
+   * adelante). Es informativo: la decisión ya se registró cuando se contestó,
+   * y volver a decidirla produciría dos eventos por un mismo hecho.
+   */
+  readonly esResultadoDeVerificacion: boolean;
   /** De dónde llama (`llamada`): edificio/unidad/periodo tal como los declara. */
   readonly origenDeLlamada: string | null;
 }
@@ -361,6 +374,8 @@ export const desdeAlarmServerXml = (
     referenciaDelEquipo: etiqueta(cuerpo, 'eventId') ?? etiqueta(cuerpo, 'serialNumber'),
     personaId: null,
     esperaVeredicto: false,
+    serieDelEquipo: null,
+    esResultadoDeVerificacion: false,
     origenDeLlamada: null,
   };
 };
@@ -436,6 +451,10 @@ export interface BloqueDeAlertStream {
     readonly employeeNoString?: string;
     readonly employeeNo?: string | number;
     readonly remoteCheck?: boolean;
+    /** A2 · el resultado de una verificación ya contestada: informativo. */
+    readonly remoteCheckResult?: boolean | string | number;
+    /** A2 · identifica la petición pendiente; se devuelve con el veredicto. */
+    readonly serialNo?: number | string;
     readonly majorEventType?: number;
     readonly subEventType?: number;
     readonly verifyNo?: number;
@@ -511,6 +530,12 @@ export const desdeAlertStreamJson = (
   const personaId =
     acceso?.employeeNoString ??
     (acceso?.employeeNo === undefined ? null : String(acceso.employeeNo));
+  const serie =
+    acceso?.serialNo === undefined || acceso.serialNo === null ? null : Number(acceso.serialNo);
+  // Un RESULTADO no es una petición: aunque traiga `remoteCheck`, no se
+  // espera veredicto de él. Lo detecta el campo o el tipo del evento.
+  const esResultado =
+    acceso?.remoteCheckResult !== undefined || /remoteCheckResult/i.test(bloque.eventType ?? '');
 
   return {
     clase: claseDeBloque(bloque),
@@ -542,7 +567,9 @@ export const desdeAlertStreamJson = (
     referenciaDelEquipo:
       bloque.channelID === undefined ? null : `${dispositivoId}:${bloque.channelID}`,
     personaId: personaId === null || personaId === '' ? null : personaId,
-    esperaVeredicto: acceso?.remoteCheck === true,
+    esperaVeredicto: acceso?.remoteCheck === true && !esResultado,
+    serieDelEquipo: serie === null || Number.isNaN(serie) ? null : serie,
+    esResultadoDeVerificacion: esResultado,
     origenDeLlamada: origenDeLlamadaDe(bloque),
   };
 };

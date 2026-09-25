@@ -339,10 +339,42 @@ describe('abrirSobreDeAlarmServer', () => {
     expect(abierto.documento).toContain('<eventType>ANPR</eventType>');
   });
 
-  it('un cuerpo que no es multipart se rechaza sin intentar adivinar', () => {
-    expect(() => abrirSobreDeAlarmServer(Buffer.from(XML), 'application/xml')).toThrow(
-      /multipart/i,
+  /**
+   * A2 (ETAPA 15-E) · sin multipart no hay foto, pero SÍ puede haber evento:
+   * la terminal facial publica el evento de control de acceso como JSON a
+   * secas cuando no adjunta imagen, y la cámara puede publicar el XML a secas.
+   * Hasta la 15-E eso era «ilegible» y un equipo bien configurado parecía mudo.
+   */
+  it('un cuerpo XML a secas se acepta como el documento del evento, sin imágenes', () => {
+    const abierto = abrirSobreDeAlarmServer(Buffer.from(XML), 'application/xml');
+    expect(abierto.formato).toBe('xml');
+    expect(abierto.documento).toContain('<eventType>ANPR</eventType>');
+    expect(abierto.foto).toBeNull();
+    expect(abierto.recorte).toBeNull();
+  });
+
+  it('un cuerpo JSON a secas también, y se clasifica por el tipo de contenido', () => {
+    const abierto = abrirSobreDeAlarmServer(
+      Buffer.from('{"eventType":"AccessControllerEvent"}'),
+      'application/json; charset=utf-8',
     );
+    expect(abierto.formato).toBe('json');
+    expect(abierto.partesBiometricasRechazadas).toBe(0);
+  });
+
+  it('sin tipo de contenido se decide por el primer carácter; lo que no es ni JSON ni XML se rechaza', () => {
+    expect(abrirSobreDeAlarmServer(Buffer.from('  {"a":1}'), null).formato).toBe('json');
+    expect(() => abrirSobreDeAlarmServer(Buffer.from('hola'), 'text/plain')).toThrow(
+      /multipart ni un documento/i,
+    );
+    expect(() => abrirSobreDeAlarmServer(Buffer.alloc(0), 'application/json')).toThrow(
+      /ningún cuerpo/i,
+    );
+  });
+
+  it('un documento a secas también respeta el techo de tamaño del evento', () => {
+    const enorme = Buffer.from('{' + 'x'.repeat(300 * 1024) + '}');
+    expect(() => abrirSobreDeAlarmServer(enorme, 'application/json')).toThrow(/desproporcionado/);
   });
 });
 

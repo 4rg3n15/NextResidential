@@ -17,6 +17,14 @@ import type { ConsentimientoBiometrico, PlantillaBiometrica } from '@ncr/domain-
 export const REPOSITORIO_CONSENTIMIENTOS = Symbol.for('ncr.puerto.RepositorioConsentimientos');
 export const REPOSITORIO_PLANTILLAS = Symbol.for('ncr.puerto.RepositorioPlantillas');
 export const BOVEDA_DE_PLANTILLAS = Symbol.for('ncr.puerto.BovedaDePlantillas');
+/**
+ * A2 (ETAPA 15-E) · lo que este módulo SABE y otros necesitan preguntar: a
+ * quién pertenece una plantilla y si esa persona puede ser reconocida ahora.
+ * Lo consumen el receptor de equipos (para traducir el `FPID` de la terminal
+ * a una persona) y el cargador de contexto del motor (RN-09), cada uno por su
+ * propia interfaz declarada; ésta las satisface a las dos.
+ */
+export const IDENTIDAD_BIOMETRICA = Symbol.for('ncr.puerto.IdentidadBiometrica');
 
 export interface RepositorioConsentimientos {
   porId(copropiedadId: string, id: string): Promise<ConsentimientoBiometrico | null>;
@@ -37,6 +45,8 @@ export interface DestinoDePlantilla {
 
 export interface RepositorioPlantillas {
   porId(copropiedadId: string, id: string): Promise<PlantillaBiometrica | null>;
+  /** A2 · las plantillas de una persona, suprimidas incluidas: el dominio decide. */
+  deTitular(copropiedadId: string, titularId: string): Promise<readonly PlantillaBiometrica[]>;
   deConsentimiento(
     copropiedadId: string,
     consentimientoId: string,

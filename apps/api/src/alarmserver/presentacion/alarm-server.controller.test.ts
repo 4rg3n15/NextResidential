@@ -125,6 +125,9 @@ const montar = (opciones: {
     bitacora,
     ids,
     [EQUIPO],
+    { titularDePlantilla: async () => null },
+    { responderVerificacionRemota: async () => ({ aceptado: true, latenciaMs: 5 }) },
+    reloj,
   );
   const fuente = new FuenteDePlacas();
   fuente.fijarIngestor(ingestor);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fichaDe } from './ficha';
 import type { DiagnosticoDeEquipo } from './diagnostico-de-equipo';
+import { capacidadesDeclaradas } from '../nucleo/capacidades';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -207,5 +208,33 @@ describe('el reloj y lo que no contestó', () => {
       con({ sinRespuesta: [{ que: 'leer la hora del equipo', motivo: 'no lo admite' }] }),
     );
     expect(ficha.sinComprobar[0]).toContain('no lo admite');
+  });
+});
+
+/**
+ * A2 (ETAPA 15-E) · la ficha de la terminal que decide sola OFRECE la
+ * corrección desde la consola; con «desconocida» no hay documento que
+ * modificar y no la ofrece.
+ */
+describe('A2 · la terminal que decide sola ofrece la corrección', () => {
+  it('con verificación remota en «no»: bloqueo con corrección `verificacion_remota`', () => {
+    const ficha = fichaDe(
+      con({
+        familia: 'terminal',
+        capacidadesDelEquipo: capacidadesDeclaradas({ verificacionRemota: 'no' }),
+      }),
+    );
+    const hallazgo = ficha.hallazgos.find((h) => /quién decide/.test(h.campo));
+    expect(hallazgo?.estado).toBe('bloqueo');
+    expect(hallazgo?.correccion).toBe('verificacion_remota');
+  });
+
+  it('con «desconocida» no hay corrección: no se escribe lo que no se leyó', () => {
+    const ficha = fichaDe(
+      con({ familia: 'terminal', capacidadesDelEquipo: capacidadesDeclaradas({}) }),
+    );
+    const hallazgo = ficha.hallazgos.find((h) => /quién decide/.test(h.campo));
+    expect(hallazgo?.estado).toBe('no_comprobado');
+    expect(hallazgo?.correccion).toBeNull();
   });
 });

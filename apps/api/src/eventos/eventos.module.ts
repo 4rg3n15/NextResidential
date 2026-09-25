@@ -21,6 +21,8 @@ import type {
   ResolutorDePlaca,
   ResolutorDeZona,
 } from '../autorizaciones';
+import { BiometriaModule, IDENTIDAD_BIOMETRICA } from '../biometria';
+import type { IdentidadBiometricaDesdeRepositorios } from '../biometria';
 import { REPOSITORIO_COPROPIEDADES } from '../multiempresa/repositorio-copropiedades';
 import type { RepositorioCopropiedades } from '../multiempresa/repositorio-copropiedades';
 import {
@@ -91,6 +93,13 @@ export class EventosModule {
   static registrar(): DynamicModule {
     return {
       module: EventosModule,
+      /**
+       * A2 · biometría dice de quién es una plantilla y si tiene consentimiento.
+       * Se importa por su barril, como hace `residente`; Nest registra UNA
+       * instancia por metadatos idénticos, y la prueba de recorrido facial es
+       * lo que lo demuestra: la captura y el reconocimiento ven el mismo dato.
+       */
+      imports: [BiometriaModule.registrar()],
       controllers: [EventosController, AlertasController, InformesController],
       providers: [
         {
@@ -206,6 +215,7 @@ export class EventosModule {
             REPOSITORIO_AUTORIZACIONES,
             RESOLUTOR_DE_PLACA,
             REPOSITORIO_COPROPIEDADES,
+            IDENTIDAD_BIOMETRICA,
           ],
           useFactory: (
             reloj: Reloj,
@@ -216,6 +226,8 @@ export class EventosModule {
             autorizaciones: RepositorioAutorizaciones,
             placas: ResolutorDePlaca,
             copropiedades: RepositorioCopropiedades,
+            // A2 · cierra S-34: el consentimiento vigente lo dice biometría.
+            identidad: IdentidadBiometricaDesdeRepositorios,
           ): MotorDeDecision => {
             const listaNegra = new RepositorioListaNegraPg(pool);
             const cargador: CargadorDeContexto =
@@ -228,6 +240,7 @@ export class EventosModule {
                     copropiedades,
                     bitacora,
                     zonas,
+                    identidad,
                   )
                 : new CargadorDeContextoConservador(
                     new VersionDeReglasFija(),

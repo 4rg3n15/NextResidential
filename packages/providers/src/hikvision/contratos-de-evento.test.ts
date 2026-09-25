@@ -340,6 +340,41 @@ describe('las clases `rostro` y `llamada` · 6.5', () => {
     expect(evento.placa).toBeNull();
   });
 
+  it('A2 · el evento trae la SERIE con la que la terminal identifica su petición', () => {
+    const evento = desdeAlertStreamJson(
+      {
+        currentEvent: true,
+        AccessControllerEvent: { employeeNoString: 'p-1', remoteCheck: true, serialNo: 4711 },
+      },
+      'disp-terminal',
+      AHORA2,
+    );
+    expect(evento.serieDelEquipo).toBe(4711);
+    expect(evento.esResultadoDeVerificacion).toBe(false);
+  });
+
+  it('A2 · un remoteCheckResult es un RESULTADO informativo: no espera veredicto', () => {
+    // Firmwares de 2024 en adelante avisan del desenlace de una verificación
+    // ya contestada. Tratarlo como petición produciría dos eventos por un hecho.
+    const evento = desdeAlertStreamJson(
+      {
+        currentEvent: true,
+        eventType: 'AccessControllerEvent',
+        AccessControllerEvent: {
+          employeeNoString: 'p-1',
+          remoteCheck: true,
+          remoteCheckResult: 'success',
+          serialNo: 4711,
+        },
+      },
+      'disp-terminal',
+      AHORA2,
+    );
+    expect(evento.clase).toBe('rostro');
+    expect(evento.esResultadoDeVerificacion).toBe(true);
+    expect(evento.esperaVeredicto).toBe(false);
+  });
+
   it('sin `remoteCheck` la terminal decidió sola: rostro que NO espera', () => {
     const evento = desdeAlertStreamJson(
       { currentEvent: true, AccessControllerEvent: { employeeNo: 12 } },

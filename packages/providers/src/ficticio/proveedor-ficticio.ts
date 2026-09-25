@@ -25,6 +25,7 @@ import {
   ReinicioNecesario,
 } from '../nucleo/errores';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
+import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -87,6 +88,7 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
   private readonly suscriptores: ((l: LecturaDePlaca) => Promise<void>)[] = [];
   readonly plantillas = new Map<string, Set<string>>();
   readonly bloqueos = new Map<string, boolean>();
+  readonly veredictos: { dispositivoId: string; veredicto: VeredictoRemoto }[] = [];
   private readonly canales = new Map<string, EstadoDelCanal>();
   private readonly audio: Uint8Array[] = [];
   private enSesion: string | null = null;
@@ -157,6 +159,19 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
     this.adversidadDe(equipo);
     this.bloqueos.set(dispositivoId, bloqueado);
     return ordenAceptada(this.latencia());
+  }
+
+  /** A2 · sólo una terminal que declare esperar el veredicto puede recibirlo. */
+  async responderVerificacionRemota(
+    dispositivoId: string,
+    veredicto: VeredictoRemoto,
+  ): Promise<ResultadoAccionamiento> {
+    const equipo = this.exigir(dispositivoId, 'verificacionRemota');
+    if (equipo.adversidad === 'inalcanzable')
+      return { aceptado: false, latenciaMs: this.latencia() };
+    this.adversidadDe(equipo);
+    this.veredictos.push({ dispositivoId, veredicto });
+    return { aceptado: true, latenciaMs: this.latencia() };
   }
 
   async estado(dispositivoId: string): Promise<'en_linea' | 'fuera_de_linea' | 'degradado'> {

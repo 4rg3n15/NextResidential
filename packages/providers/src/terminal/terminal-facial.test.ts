@@ -244,3 +244,72 @@ describe('Digest', () => {
     expect(llamadas[1]?.metodo).toBe('PUT');
   });
 });
+
+/**
+ * A2 (ETAPA 15-E) · la mitad que faltaba: el veredicto de vuelta a la
+ * terminal que espera. Lo que se afirma es la forma del cuerpo (S-39) y que
+ * un rechazo del equipo no se convierte en «aceptado».
+ */
+describe('A2 · responder la verificación remota', () => {
+  it('envía un PUT JSON con la serie, el resultado y el motivo acotado', async () => {
+    const { terminal, llamadas } = montar([respuesta(200, OK_XML)]);
+    const r = await terminal.responderVerificacion('disp-terminal', {
+      serie: 4711,
+      permitido: true,
+      motivo: 'autorización vigente',
+    });
+    expect(r.aceptado).toBe(true);
+    const put = llamadas.find((l) => /remoteCheck/.test(l.url));
+    expect(put?.metodo).toBe('PUT');
+    expect(put?.tipo).toBe('application/json');
+    const cuerpo = JSON.parse(String(put?.cuerpo)) as {
+      RemoteCheck: { serialNo: number; checkResult: string; info: string };
+    };
+    expect(cuerpo.RemoteCheck.serialNo).toBe(4711);
+    expect(cuerpo.RemoteCheck.checkResult).toBe('success');
+    expect(cuerpo.RemoteCheck.info).toBe('autorización vigente');
+  });
+
+  it('una negación viaja como `failed`; sin serie no se inventa una', async () => {
+    const { terminal, llamadas } = montar([respuesta(200, OK_XML)]);
+    await terminal.responderVerificacion('disp-terminal', {
+      serie: null,
+      permitido: false,
+      motivo: 'SIN_CONSENTIMIENTO',
+    });
+    const cuerpo = JSON.parse(String(llamadas[0]?.cuerpo)) as {
+      RemoteCheck: Record<string, unknown>;
+    };
+    expect(cuerpo.RemoteCheck['checkResult']).toBe('failed');
+    expect('serialNo' in cuerpo.RemoteCheck).toBe(false);
+  });
+
+  it('un equipo que no soporta la ruta lo dice como RutaNoSoportada, no como éxito', async () => {
+    const { terminal } = montar([
+      respuesta(
+        200,
+        '<ResponseStatus><statusCode>4</statusCode><statusString>notSupport</statusString></ResponseStatus>',
+      ),
+    ]);
+    await expect(
+      terminal.responderVerificacion('disp-terminal', { serie: 1, permitido: true, motivo: 'x' }),
+    ).rejects.toBeInstanceOf(RutaNoSoportada);
+  });
+
+  it('inalcanzable: no aceptado, con la latencia que costó saberlo', async () => {
+    const peticion: typeof fetch = () => Promise.reject(new Error('connect ECONNREFUSED'));
+    const terminal = new TerminalFacial({
+      host: 'terminal.invalid',
+      usuario: 'servicio',
+      clave: 'secreta',
+      modo: 'reporta_y_espera',
+      peticion,
+    });
+    const r = await terminal.responderVerificacion('disp-terminal', {
+      serie: 1,
+      permitido: true,
+      motivo: 'x',
+    });
+    expect(r.aceptado).toBe(false);
+  });
+});

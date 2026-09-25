@@ -308,6 +308,30 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
       'decide si el modo reporta_y_espera es posible en este firmware',
   },
   {
+    /**
+     * A2 (ETAPA 15-E) · la mitad que faltaba de la verificación remota. La
+     * terminal publica el evento con `remoteCheck: true` y se queda esperando;
+     * ESTA es la ruta por la que la plataforma contesta con el veredicto del
+     * motor. **DOCUMENTADA, NO VERIFICADA**: forma del cuerpo y nombre de los
+     * campos son un [SUPUESTO] (S-39) hasta capturarlos del equipo. `dejaRastro`
+     * porque la terminal abre o niega a alguien que está delante: el guion de
+     * sitio no la sondea a ciegas; se ejercita con el recorrido completo.
+     */
+    proposito: 'responder la verificación remota de la terminal',
+    metodo: 'PUT',
+    ruta: '/ISAPI/AccessControl/remoteCheck?format=json',
+    procedencia: 'documentada',
+    familia: 'terminal',
+    fuente:
+      'Documentación ISAPI del fabricante, control de acceso (remoteCheck). Cuerpo ' +
+      '{RemoteCheck:{serialNo, checkResult: success|failed, info}}: [SUPUESTO] S-39',
+    confirmarEnSitio:
+      'que la terminal abra con checkResult=success y niegue con failed; el nombre exacto ' +
+      'de serialNo en el evento y en la respuesta; y qué hace el equipo si no se contesta ' +
+      'dentro de su plazo (se supone que NIEGA)',
+    dejaRastro: true,
+  },
+  {
     proposito: 'fijar que la terminal espere el veredicto de la plataforma',
     metodo: 'PUT',
     ruta: '/ISAPI/AccessControl/AcsCfg?format=json',

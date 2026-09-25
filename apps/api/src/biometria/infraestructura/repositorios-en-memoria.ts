@@ -84,6 +84,15 @@ export class RepositorioPlantillasEnMemoria implements RepositorioPlantillas {
     );
   }
 
+  async deTitular(
+    copropiedadId: string,
+    titularId: string,
+  ): Promise<readonly PlantillaBiometrica[]> {
+    return [...this.filas.values()].filter(
+      (p) => p.copropiedadId === copropiedadId && p.titularId === titularId,
+    );
+  }
+
   async vencidas(copropiedadId: string, ahora: Date): Promise<readonly PlantillaBiometrica[]> {
     return [...this.filas.values()].filter(
       (p) => p.copropiedadId === copropiedadId && !p.suprimida && p.venceEn(ahora),

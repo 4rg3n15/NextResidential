@@ -6,9 +6,11 @@ import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import {
   BOVEDA_DE_PLANTILLAS,
+  IDENTIDAD_BIOMETRICA,
   REPOSITORIO_CONSENTIMIENTOS,
   REPOSITORIO_PLANTILLAS,
 } from './aplicacion/puertos';
+import { IdentidadBiometricaDesdeRepositorios } from './aplicacion/identidad-biometrica';
 import type {
   BovedaDePlantillas,
   RepositorioConsentimientos,
@@ -59,6 +61,16 @@ export class BiometriaModule {
         },
         { provide: REPOSITORIO_PLANTILLAS, useFactory: () => new RepositorioPlantillasEnMemoria() },
         { provide: RepositorioPlantillasEnMemoria, useExisting: REPOSITORIO_PLANTILLAS },
+        {
+          // A2 · lo que otros módulos preguntan de una plantilla, servido por
+          // los mismos repositorios: una sola verdad sobre quién es quién.
+          provide: IDENTIDAD_BIOMETRICA,
+          inject: [REPOSITORIO_PLANTILLAS, REPOSITORIO_CONSENTIMIENTOS],
+          useFactory: (
+            plantillas: RepositorioPlantillas,
+            consentimientos: RepositorioConsentimientos,
+          ) => new IdentidadBiometricaDesdeRepositorios(plantillas, consentimientos),
+        },
         /**
          * ═════════════════════════════════════════════════════════════════════
          * AQUÍ HABÍA UN `new MockProvider`, Y ERA EL AGUJERO DE ADR-03
@@ -156,6 +168,8 @@ export class BiometriaModule {
       exports: [
         // Lo consume el módulo del residente para su propia ruta de captura.
         CapturarRostro,
+        // A2 · lo consumen el receptor de equipos y el cargador del motor.
+        IDENTIDAD_BIOMETRICA,
         // ETAPA 14 · lo consume el planificador (D-40): RN-11 da 24 h para
         // suprimir, y hasta ahora el barrido solo salía por su ruta HTTP.
         BarrerPlantillasVencidas,

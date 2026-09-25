@@ -107,6 +107,8 @@ export interface GuionDeEquipo {
   }[];
   /** `false` → `AcsCfg.remoteCheck=false`: la terminal decide sola. */
   readonly verificacionRemota?: boolean;
+  /** Rótulo para consultar después qué veredictos recibió (A2). Opcional. */
+  readonly destino?: string;
   /** Capacidad y ocupación de la biblioteca de rostros. */
   readonly bibliotecaMaximo?: number;
   readonly bibliotecaAlmacenadas?: number;
@@ -409,7 +411,14 @@ const caminoCasa = (rutaDelCatalogo: string, camino: string): boolean => {
   return patron.test(camino);
 };
 
+/** Lo que cada terminal simulada recibió como veredicto, por destino (A2). */
+export const veredictosRecibidosPor = new Map<string, string[]>();
+
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
+  /** Estado mutable del equipo: la corrección lo cambia y la lectura lo ve. */
+  let verificacionRemota = guion.verificacionRemota !== false;
+  const veredictosRecibidos: string[] = [];
+  if (guion.destino !== undefined) veredictosRecibidosPor.set(guion.destino, veredictosRecibidos);
   const sinSoporte = new Set(guion.sinSoporte ?? []);
   /** Estado de la biblioteca de rostros: lo que se carga se cuenta y se busca. */
   const plantillas = new Set<string>();
@@ -483,10 +492,24 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       return respuestaDe(200, ordenesDePuerta(guion));
     }
     if (catalogada.proposito === 'leer si la terminal espera el veredicto de la plataforma') {
-      return respuestaDe(
-        200,
-        JSON.stringify({ AcsCfg: { remoteCheck: guion.verificacionRemota !== false } }),
-      );
+      return respuestaDe(200, JSON.stringify({ AcsCfg: { remoteCheck: verificacionRemota } }));
+    }
+    if (catalogada.proposito === 'fijar que la terminal espere el veredicto de la plataforma') {
+      // Leer-modificar-escribir de verdad: lo que se escribe es lo que la
+      // siguiente lectura devuelve. Sin esto, la corrección parecería aplicada
+      // y la ficha seguiría en bloqueo.
+      const cuerpo = String(opciones?.body ?? '');
+      const pedido = /"remoteCheck"\s*:\s*(true|false)/.exec(cuerpo)?.[1];
+      if (pedido === undefined) return respuestaDe(400, ERROR_AVERIADO);
+      verificacionRemota = pedido === 'true';
+      return respuestaDe(200, OK);
+    }
+    if (catalogada.proposito === 'responder la verificación remota de la terminal') {
+      // Sin verificación remota activa no hay petición pendiente que contestar.
+      if (!verificacionRemota) return respuestaDe(200, NO_SOPORTA);
+      const cuerpo = String(opciones?.body ?? '');
+      veredictosRecibidos.push(cuerpo);
+      return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'leer qué admite la biblioteca de rostros') {
       return respuestaDe(

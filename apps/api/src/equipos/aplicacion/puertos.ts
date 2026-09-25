@@ -173,6 +173,8 @@ export const CORRECCIONES = [
   'pais_del_algoritmo',
   'imagenes_del_receptor',
   'formato_del_receptor',
+  /** A2 (15-E) · la terminal pasa a reportar y esperar. Cambia quién decide. */
+  'verificacion_remota',
 ] as const;
 export type CorreccionDeEquipo = (typeof CORRECCIONES)[number];
 

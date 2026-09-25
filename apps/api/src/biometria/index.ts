@@ -25,9 +25,16 @@ export type { ResultadoBarrido } from './aplicacion/casos-de-uso';
 export type { ResultadoCaptura, SolicitudDeCaptura } from './aplicacion/casos-de-uso';
 export {
   BOVEDA_DE_PLANTILLAS,
+  IDENTIDAD_BIOMETRICA,
   REPOSITORIO_CONSENTIMIENTOS,
   REPOSITORIO_PLANTILLAS,
 } from './aplicacion/puertos';
+/**
+ * A2 (ETAPA 15-E) · la identidad biométrica sale como TIPO para que la raíz de
+ * composición pueda pasarla a quien la consume; los consumidores declaran su
+ * propia interfaz (§2.2) y ésta las satisface por forma, no por nombre.
+ */
+export type { IdentidadBiometricaDesdeRepositorios } from './aplicacion/identidad-biometrica';
 export type {
   BovedaDePlantillas,
   DestinoDePlantilla,

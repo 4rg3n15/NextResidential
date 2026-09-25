@@ -301,8 +301,50 @@ export const abrirSobreDeAlarmServer = (
   tipoDeContenido: string | null | undefined,
 ): SobreDeAlarmServer => {
   const separador = separadorDe(tipoDeContenido);
-  if (separador === null) {
-    throw new SobreIlegible('El envío no es un multipart con separador declarado');
-  }
+  if (separador === null) return sobreSinPartes(cuerpo, tipoDeContenido);
   return clasificarSobre(partirSobre(cuerpo, separador));
+};
+
+/**
+ * A2 (ETAPA 15-E) · **sin multipart no hay foto, pero sí puede haber evento.**
+ *
+ * La terminal facial publica el evento de control de acceso como un cuerpo
+ * `application/json` a secas cuando no adjunta imagen —y la cámara puede
+ * hacerlo en XML—. Hasta aquí eso era «ilegible» y el receptor lo tiraba con un
+ * 200: un equipo bien configurado que no manda fotos parecía mudo. El cuerpo se
+ * clasifica por su tipo de contenido y, si falta, por su primer carácter; el
+ * techo de tamaño es el mismo que el de la parte del evento.
+ */
+const sobreSinPartes = (
+  cuerpo: Buffer,
+  tipoDeContenido: string | null | undefined,
+): SobreDeAlarmServer => {
+  if (cuerpo.length === 0) throw new SobreIlegible('El envío no trae ningún cuerpo');
+  if (cuerpo.length > LIMITES.xmlMaximoBytes) {
+    throw new SobreIlegible('El documento del evento es desproporcionado');
+  }
+  const texto = cuerpo.toString('utf8').trim();
+  const tipo = (tipoDeContenido ?? '').toLowerCase();
+  const esJsonPorTipo = /json/.test(tipo);
+  const esXmlPorTipo = /xml/.test(tipo);
+  const formato: 'json' | 'xml' | null = esJsonPorTipo
+    ? 'json'
+    : esXmlPorTipo
+      ? 'xml'
+      : texto.startsWith('{')
+        ? 'json'
+        : texto.startsWith('<')
+          ? 'xml'
+          : null;
+  if (formato === null) {
+    throw new SobreIlegible('El envío no es un multipart ni un documento JSON o XML');
+  }
+  return {
+    documento: texto,
+    formato,
+    foto: null,
+    recorte: null,
+    partesNoClasificadas: 0,
+    partesBiometricasRechazadas: 0,
+  };
 };

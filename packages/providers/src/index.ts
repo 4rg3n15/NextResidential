@@ -39,6 +39,7 @@
 export * from './nucleo/capacidades';
 export * from './nucleo/errores';
 export type { ProveedorDeEquipos } from './nucleo/proveedor';
+export type { VeredictoRemoto } from './nucleo/verificacion-remota';
 
 // ── Los dos adaptadores y su punto de composición ────────────────────────────
 export * from './mock/mock-provider';
