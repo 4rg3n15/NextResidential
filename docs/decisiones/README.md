@@ -22,6 +22,7 @@ Registro de las decisiones de arquitectura del proyecto. Una decisión **aceptad
 | [ADR-019](ADR-019-el-hardware-se-elige-por-capacidades.md)              | El hardware se elige por **capacidades** declaradas o descubiertas, nunca por marca ni modelo       | Aceptada | ETAPA 15-D     |
 | [ADR-020](ADR-020-el-autorizante-desde-la-consola-es-el-titular.md)     | Una autorización creada desde la consola se registra a nombre del **titular** (S-38, por ratificar) | Aceptada | ETAPA 15-D     |
 | [ADR-021](ADR-021-la-fotografia-del-visitante-no-es-dato-biometrico.md) | La fotografía del visitante **no es dato biométrico** y sigue el camino de la evidencia             | Aceptada | ETAPA 15-D     |
+| [ADR-022](ADR-022-el-navegador-negocia-el-video-con-la-api.md)          | La vista en vivo se negocia con la **API** (WHEP); el navegador nunca ve RTSP ni el puente          | Aceptada | ETAPA 15-E     |
 
 **Los números 009, 010 y 011 no existen** y no es un error de numeración que
 haya que corregir: se reservaron para decisiones de la 09-A que acabaron siendo

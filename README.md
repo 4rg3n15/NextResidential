@@ -73,25 +73,30 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 | **11-B** | · segunda mitad · el servidor que escribe | Crear la visita con patrón, acompañantes nominales y zonas, con los cuatro rechazos **tipados**; zonas con aforo y horario; registro del token del aparato. El segundo eje ampliado a las **escrituras**: una lectura mal acotada enseña la vida del vecino, una escritura **le abre la puerta** |
 | **11-C** | · tercera mitad · las pantallas y la cámara | M-4, M-5 y M-7; la bandeja de salida conectada al cliente HTTP; y la captura de rostro con el consentimiento **del visitante, no del residente** (RN-10) desde una ruta que no admite `titularId`. KPI-10 medido: la parte del sistema es **p95 ≈ 5 ms** de los 60 000 |
 | **12** | Edge Gateway: offline y reconciliación | El diferenciador técnico. Un equipo en la portería que decide sin internet **con el mismo motor de reglas que la nube** —cero lógica de acceso propia, probado por los dos caminos— y reconcilia al volver exactamente una vez. DoD ejecutada: 30 minutos de corte, 20 accesos, los 20 en la nube sin un duplicado |
+| **13** | Auditoría de ciberseguridad y endurecimiento | Verifica y endurece lo que §2.7 exigía desde la 01: secretos, CORS, validación, inyección, rate limiting, matriz RLS política por política, CSP, IDOR, escalamiento entre roles, dependencias. Informe en [`docs/seguridad/AUDITORIA.md`](docs/seguridad/AUDITORIA.md) |
+| **14** | Observabilidad, CI/CD, PWA y escritorio | Métricas de las latencias comprometidas, pipeline que verifica arquitectura, aislamiento, seguridad y cobertura, PWA instalable y empaquetado con Tauri (ADR-02) |
+| **15-B a 15-E** | Integración Hikvision · la mitad que no necesita hardware | `HikvisionProvider` con los cuatro puertos, alta de equipos desde la consola con la clave cifrada, el hardware elegido **por capacidades** (ADR-019), y en la **15-E**: apertura, intercom y placas por los puertos del proveedor, verificación remota de la terminal, CU-02 contra PostgreSQL con el enlace del visitante, llamada del videoportero con audio persistente, **vista en vivo por WHEP a través de la API** (ADR-022) y la hoja de resultados de los 16 escenarios de sitio. **La ETAPA 15 sigue BLOQUEADA**: nada de esto se ejecutó contra un aparato |
 
 **Métricas al cierre de la ETAPA 11:** ver el veredicto literal en [`docs/etapas/ETAPA-11.md`](docs/etapas/ETAPA-11.md) §6 · TypeScript y Dart se miden **por separado y por capa**, porque un agregado alto esconde una capa por debajo
 
 ### Próximas etapas
 
-| #   | Etapa                                   | Alcance                                                                                   |
-| --- | --------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 13  | Auditoría de ciberseguridad             | Verificación y endurecimiento. No introduce la seguridad: la audita                       |
-| 14  | Observabilidad, CI/CD, PWA y escritorio | Métricas de las latencias comprometidas, pipeline completo, empaquetado de escritorio     |
-| 15  | **Integración Hikvision**               | ISAPI sobre Digest, Alarm Server, relés, terminales faciales, ONVIF, intercom TwoWayAudio |
-| 16  | Documentación técnica final             | Consolidación, README definitivo, OpenAPI navegable                                       |
+| #   | Etapa                                    | Alcance                                                                                                                                               |
+| --- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 15  | **Integración Hikvision** · mitad física | **BLOQUEADA (BE-02)** hasta tener los tres equipos delante: los 16 escenarios de la hoja de resultados, los tres hitos técnicos y los KPI de latencia |
+| 16  | Documentación técnica final              | Consolidación, README definitivo, OpenAPI navegable                                                                                                   |
 
 ### Pruebas con hardware
 
-| Momento                          | Requiere         | Qué se prueba                                                               |
-| -------------------------------- | ---------------- | --------------------------------------------------------------------------- |
-| Validación técnica temprana      | Nada del sistema | Autenticación ISAPI, recepción de un evento de placa, accionamiento de relé |
-| Prueba LPR de punta a punta      | ETAPA 10 cerrada | Registrar placa → detectar → validar → abrir talanquera → registrar evento  |
-| Prueba facial y portería virtual | ETAPAS 11 y 15   | Foto desde la app → sincronizar terminal → reconocer → liberar acceso       |
+| Momento                          | Requiere         | Qué se prueba                                                                                                         | Estado                                                                     |
+| -------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Validación técnica temprana      | Nada del sistema | Autenticación ISAPI, recepción de un evento de placa, accionamiento de relé                                           | Barrera **verificada** (2026-09-15); terminal y videoportero por confirmar |
+| Prueba LPR de punta a punta      | ETAPA 10 cerrada | Registrar placa → detectar → validar → abrir talanquera → registrar evento                                            | Probada contra mock; **pendiente en sitio** (hoja L1–L5)                   |
+| Prueba facial y portería virtual | ETAPAS 11 y 15-E | Foto desde la app → consentimiento del visitante → sincronizar terminal → reconocer → liberar acceso; llamada y video | Probada contra mock; **pendiente en sitio** (hoja T1–T5, V1–V6)            |
+
+El procedimiento completo delante de los equipos —qué levantar, qué registrar,
+qué ruta escribe cada aparato y los 16 escenarios— está en
+[`docs/guias/INTEGRACION_HIKVISION.md`](docs/guias/INTEGRACION_HIKVISION.md).
 
 ---
 
@@ -337,6 +342,42 @@ pnpm --filter @ncr/api start:dev
 ```
 
 Endpoints de salud: `/health` (proceso vivo) y `/ready` (dependencias alcanzables, incluida una sonda real contra JWKS).
+
+### Las tres aplicaciones contra una base, y los tres equipos (ETAPA 15-E)
+
+Lo anterior levanta la API sola. Para la prueba en sitio hacen falta la API, la
+consola y la app del residente **contra la misma base**, y los tres equipos
+dados de alta. En orden:
+
+1. **Base.** `supabase db push` con todas las migraciones (la 0035 incluida) y,
+   para ensayar con datos, la semilla: `./supabase/verificar.sh --con-semillas`.
+2. **API** (`apps/api/.env`): `PERSISTENCIA_DE_EVENTOS=postgres` y
+   `PERSISTENCIA_DE_BIOMETRIA=postgres` (con `memoria` el arranque avisa que no
+   hay trazabilidad); `PROVEEDOR_DE_EQUIPOS=hikvision`; `API_URL_PUBLICA` con la
+   IP de la máquina, porque el teléfono del visitante abre el enlace de
+   consentimiento contra ella; `GO2RTC_URL=http://127.0.0.1:1984` si va a
+   haber video; `ALARM_SERVER_EQUIPOS` con la cámara. Arranque:
+   `pnpm --filter @ncr/api start:dev`. La bitácora dice al arrancar qué
+   persistencia, qué accionador y qué puente quedaron activos.
+3. **go2rtc** en la misma máquina, con `api.listen: "127.0.0.1:1984"` y
+   `webrtc.listen: ":8555"` (`candidates` con la IP de la máquina). No lleva
+   ningún equipo en su fichero: la API registra cada flujo al pedirlo.
+4. **Consola** (`apps/web/.env`): `API_URL=http://<IP>:3000`, `PUENTE_VIDEO_URL`
+   vacío (ADR-022). Arranque: `pnpm --filter @ncr/web dev`. Por IP sin TLS se
+   ve el video; el micrófono exige `https` o `localhost`
+   ([`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](docs/guias/CONSOLA_EN_RED_Y_DESPLIEGUE.md)).
+5. **App del residente**: `flutter run --dart-define=API_URL=http://<IP>:3000`
+   desde `apps/mobile`; sin `API_URL` la app no arranca (no hay `localhost` por
+   omisión, A6).
+6. **Los tres equipos**, desde **Dispositivos → + Agregar equipo** con el
+   usuario de servicio de cada uno: la clave se guarda cifrada, «Probar
+   conexión» descubre modelo, firmware y **capacidades**, y la ficha dice qué
+   corregir antes de operar. La cámara, además, se apunta a
+   `http://<IP>:3000/alarm-server/<secreto>`; la terminal y el videoportero no
+   se configuran hacia la API: es la API la que se suscribe a sus eventos.
+7. **Guion de sitio** (`scripts/puesta-en-marcha-equipos.mjs --sin-accionar`
+   primero) y la **hoja de resultados** que escribe: los 16 escenarios de
+   [`INTEGRACION_HIKVISION.md`](docs/guias/INTEGRACION_HIKVISION.md) §9.
 
 ---
 

@@ -446,12 +446,12 @@ código.
 
 ## 4. Resumen
 
-| Categoría                   | Cantidad                              | Estado                                                                                                                                                  |
-| --------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[CONTRADICCIÓN]`           | **22**                                | **22 resueltas**, ninguna abierta (C-28 a C-31 añadidas en la 15-D)                                                                                     |
-| `[SUPUESTO]`                | **15**                                | 7 de la ETAPA 00, S-08 y S-09 de la ETAPA 01, S-25 y S-26 de la 13, y S-35 a S-38 de la 15-D (S-38 pendiente de ratificar). Todos con valor conservador |
-| `PENDIENTE DE DEFINICIÓN`   | **12** — **2 resueltos** (P-11, P-12) | Los 10 abiertos tienen comportamiento conservador vigente; ninguno bloquea la ETAPA 02. P-12 queda sujeto a confirmación legal                          |
-| **Extensiones al contrato** | **1**                                 | E-01 · `FUERA_DE_HORARIO`, aprobada                                                                                                                     |
+| Categoría                   | Cantidad                              | Estado                                                                                                                                                                                                                 |
+| --------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[CONTRADICCIÓN]`           | **22**                                | **22 resueltas**, ninguna abierta (C-28 a C-31 añadidas en la 15-D)                                                                                                                                                    |
+| `[SUPUESTO]`                | **24**                                | 7 de la ETAPA 00, S-08 y S-09 de la ETAPA 01, S-25 y S-26 de la 13, S-35 a S-38 de la 15-D (S-38 pendiente de ratificar) y **S-39 a S-47 de la 15-E** (S-46 y S-47 se confirman en sitio). Todos con valor conservador |
+| `PENDIENTE DE DEFINICIÓN`   | **12** — **2 resueltos** (P-11, P-12) | Los 10 abiertos tienen comportamiento conservador vigente; ninguno bloquea la ETAPA 02. P-12 queda sujeto a confirmación legal                                                                                         |
+| **Extensiones al contrato** | **1**                                 | E-01 · `FUERA_DE_HORARIO`, aprobada                                                                                                                                                                                    |
 
 **Contradicciones por severidad:** **8 altas** (C-01, C-02, C-03, C-05, C-12, C-16, C-28, C-31) · **9 medias** (C-04, C-06, C-07, C-17, C-18, C-22, C-27, C-29, C-30) · **5 bajas** (C-11, C-14, C-15, C-23, C-26). Total 22. C-28 **revoca** C-11.
 

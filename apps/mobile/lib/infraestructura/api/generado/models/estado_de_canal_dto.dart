@@ -5,6 +5,7 @@
 import 'package:json_annotation/json_annotation.dart';
 
 import 'estado_de_canal_dto_estado.dart';
+import 'estado_de_canal_dto_transporte.dart';
 
 part 'estado_de_canal_dto.g.dart';
 
@@ -16,6 +17,9 @@ class EstadoDeCanalDto {
     required this.porDelante,
     required this.titular,
     required this.timeoutSegundos,
+    required this.transporte,
+    required this.detalleTransporte,
+    required this.formatoDeAudio,
   });
   
   factory EstadoDeCanalDto.fromJson(Map<String, Object?> json) => _$EstadoDeCanalDtoFromJson(json);
@@ -33,6 +37,15 @@ class EstadoDeCanalDto {
 
   /// Segundos tras los que el canal se libera solo por inactividad
   final num timeoutSegundos;
+
+  /// Por dónde va el audio: «equipo» si el proveedor abrió el canal del aparato; «ninguno» si hay turno pero no transporte (el equipo no declara audio o no está en el registro).
+  final EstadoDeCanalDtoTransporte transporte;
+
+  /// Por qué no hay transporte, si no lo hay
+  final String? detalleTransporte;
+
+  /// A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice.
+  final String? formatoDeAudio;
 
   Map<String, Object?> toJson() => _$EstadoDeCanalDtoToJson(this);
 }

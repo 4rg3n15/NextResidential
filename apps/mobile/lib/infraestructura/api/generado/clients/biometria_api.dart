@@ -6,7 +6,10 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/capturar_rostro_dto.dart';
+import '../models/enlace_de_consentimiento_dto.dart';
 import '../models/responder_consentimiento_dto.dart';
+import '../models/respuesta_de_consentimiento_dto.dart';
+import '../models/sincronizacion_total_dto.dart';
 import '../models/sincronizar_plantilla_dto.dart';
 
 part 'biometria_api.g.dart';
@@ -35,9 +38,16 @@ abstract class BiometriaApi {
     @Path('consentimientoId') required String consentimientoId,
   });
 
+  /// Emite el enlace firmado con el que el TITULAR responde (RN-10)
+  @POST('/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace')
+  Future<EnlaceDeConsentimientoDto> biometriaControllerEmitirEnlaceDeConsentimiento({
+    @Path('id') required String id,
+    @Path('consentimientoId') required String consentimientoId,
+  });
+
   /// El TITULAR acepta o rechaza. Nadie responde por él (RN-10)
   @POST('/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta')
-  Future<void> biometriaControllerResponderConsentimiento({
+  Future<RespuestaDeConsentimientoDto> biometriaControllerResponderConsentimiento({
     @Path('id') required String id,
     @Path('consentimientoId') required String consentimientoId,
     @Body() required ResponderConsentimientoDto body,
@@ -56,5 +66,12 @@ abstract class BiometriaApi {
     @Path('id') required String id,
     @Path('plantillaId') required String plantillaId,
     @Body() required SincronizarPlantillaDto body,
+  });
+
+  /// Empuja la plantilla a todos los equipos con biblioteca de rostros (RN-09)
+  @POST('/copropiedades/{id}/biometria/plantillas/{plantillaId}/sincronizacion-total')
+  Future<SincronizacionTotalDto> biometriaControllerSincronizarEnTodas({
+    @Path('id') required String id,
+    @Path('plantillaId') required String plantillaId,
   });
 }

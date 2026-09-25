@@ -4,24 +4,19 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+/// Por dónde va el audio: «equipo» si el proveedor abrió el canal del aparato; «ninguno» si hay turno pero no transporte (el equipo no declara audio o no está en el registro).
 @JsonEnum()
-enum ResultadoDeCorreccionDtoCorreccion {
-  @JsonValue('modo_de_control')
-  modoDeControl('modo_de_control'),
-  @JsonValue('pais_del_algoritmo')
-  paisDelAlgoritmo('pais_del_algoritmo'),
-  @JsonValue('imagenes_del_receptor')
-  imagenesDelReceptor('imagenes_del_receptor'),
-  @JsonValue('formato_del_receptor')
-  formatoDelReceptor('formato_del_receptor'),
-  @JsonValue('verificacion_remota')
-  verificacionRemota('verificacion_remota'),
+enum EstadoDeCanalDtoTransporte {
+  @JsonValue('equipo')
+  equipo('equipo'),
+  @JsonValue('ninguno')
+  ninguno('ninguno'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 
-  const ResultadoDeCorreccionDtoCorreccion(this.json);
+  const EstadoDeCanalDtoTransporte(this.json);
 
-  factory ResultadoDeCorreccionDtoCorreccion.fromJson(String json) => values.firstWhere(
+  factory EstadoDeCanalDtoTransporte.fromJson(String json) => values.firstWhere(
         (e) => e.json == json,
         orElse: () => $unknown,
       );
@@ -39,5 +34,5 @@ enum ResultadoDeCorreccionDtoCorreccion {
   @override
   String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
-  static List<ResultadoDeCorreccionDtoCorreccion> get $valuesDefined => values.where((value) => value != $unknown).toList();
+  static List<EstadoDeCanalDtoTransporte> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }
