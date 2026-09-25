@@ -206,3 +206,86 @@ describe('HU-29 · emergencia', () => {
     expect(conMotivo.body.aceptado).toBe(true);
   });
 });
+
+/**
+ * A5 (15-E) · LA VISTA EN VIVO POR WHEP, A TRAVÉS DE LA API.
+ *
+ * Sin `GO2RTC_URL` en el banco, así que lo que se demuestra es el ORDEN de las
+ * negativas y que ninguna revele más de lo que debe: fuera del alcance, 404
+ * antes que nada; cuerpo que no es SDP, 400; puente ausente, 503 con el nombre
+ * de la variable. El 201 con respuesta SDP se prueba en la unidad
+ * (`vista-en-vivo.test.ts`, `puente-go2rtc.test.ts`) y se verifica en sitio.
+ */
+describe('A5 · vista en vivo (WHEP) por la API', () => {
+  const OFERTA = 'v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\ns=-\r\nt=0 0\r\n';
+  // El operador de central alcanza las copropiedades de su TURNO, no una del
+  // token (KPI-35): se firma como la emite el gancho de claims.
+  const operadorDe = (...copropiedades: string[]) =>
+    tokenDe(firmante, { rol: 'operador_central', copropiedadId: null, copropiedades });
+
+  it('fuera del alcance responde 404 antes de mirar el puente', async () => {
+    const token = await operadorDe(COP_A);
+    const res = await request(app.getHttpServer())
+      .post(`/copropiedades/${COP_B}/guardia/video/${DISPOSITIVO}/whep`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/sdp')
+      .send(OFERTA);
+    expect(res.status).toBe(404);
+  });
+
+  it('un cuerpo que no es application/sdp es 400, con el tipo esperado en el mensaje', async () => {
+    const token = await operadorDe(COP_B);
+    const res = await request(app.getHttpServer())
+      .post(`/copropiedades/${COP_B}/guardia/video/${DISPOSITIVO}/whep`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ sdp: OFERTA });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('application/sdp');
+  });
+
+  it('sin GO2RTC_URL responde 503 y dice qué falta', async () => {
+    const token = await operadorDe(COP_B);
+    const res = await request(app.getHttpServer())
+      .post(`/copropiedades/${COP_B}/guardia/video/${DISPOSITIVO}/whep`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/sdp')
+      .send(OFERTA);
+    expect(res.status).toBe(503);
+    expect(JSON.stringify(res.body)).toContain('GO2RTC_URL');
+  });
+
+  it('el residente no negocia video: 403', async () => {
+    const token = await como('residente', COP_B);
+    const res = await request(app.getHttpServer())
+      .post(`/copropiedades/${COP_B}/guardia/video/${DISPOSITIVO}/whep`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/sdp')
+      .send(OFERTA);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('A5 · con puente y proveedor simulado: el equipo no ofrece video', () => {
+  let conPuente: INestApplication;
+  beforeAll(async () => {
+    // Un puente que NO se alcanza: la negativa tiene que llegar antes, del
+    // proveedor, porque el simulado no tiene origen de video para ningún equipo.
+    conPuente = await crearApp(firmante, undefined, { GO2RTC_URL: 'http://127.0.0.1:9' });
+  });
+  afterAll(async () => {
+    await conPuente?.close();
+  });
+  const operadorDe = (...copropiedades: string[]) =>
+    tokenDe(firmante, { rol: 'operador_central', copropiedadId: null, copropiedades });
+
+  it('responde 409 con el motivo del proveedor, sin tocar el puente', async () => {
+    const token = await operadorDe(COP_B);
+    const res = await request(conPuente.getHttpServer())
+      .post(`/copropiedades/${COP_B}/guardia/video/${DISPOSITIVO}/whep`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/sdp')
+      .send('v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\n');
+    expect(res.status).toBe(409);
+    expect(JSON.stringify(res.body)).toContain('no ofrece video');
+  });
+});

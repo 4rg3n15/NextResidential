@@ -96,3 +96,55 @@ export interface EscalamientoDeAlerta {
     actorId: string,
   ): Promise<{ readonly destinatarios: number; readonly latenciaMs: number }>;
 }
+
+/* ── A5 (15-E) · vista en vivo ───────────────────────────────────────────── */
+
+/**
+ * El PUENTE DE VIDEO, declarado por el consumidor. Traduce el flujo del equipo
+ * (RTSP) a WebRTC para el navegador; hoy lo implementa go2rtc, pero el puerto
+ * no lo nombra. Dos operaciones y nada más:
+ *
+ *  - `asegurarFlujo` registra —o reemplaza— la FUENTE bajo un nombre. La
+ *    fuente es la URL RTSP con la credencial del equipo, que sale del
+ *    proveedor y entra aquí sin pasar por ningún otro sitio: ni respuesta,
+ *    ni bitácora, ni cliente (RN-12, RN-21).
+ *  - `negociar` entrega la oferta SDP del navegador y devuelve la respuesta.
+ *    La API la reenvía tal cual: el navegador negocia con la API, nunca con
+ *    el puente, y la API sólo llega aquí tras validar sesión, rol y
+ *    copropiedad.
+ */
+export interface PuenteDeVideo {
+  asegurarFlujo(nombre: string, fuente: string): Promise<void>;
+  negociar(nombre: string, ofertaSdp: string): Promise<string>;
+}
+
+export const PUENTE_DE_VIDEO = Symbol.for('ncr.puerto.PuenteDeVideo');
+
+/** No hay `GO2RTC_URL`: la vista en vivo no está desplegada. 503 con motivo. */
+export class PuenteDeVideoNoConfigurado extends Error {
+  constructor() {
+    super(
+      'La vista en vivo no está configurada en esta API: falta GO2RTC_URL (puente RTSP → WebRTC)',
+    );
+    this.name = 'PuenteDeVideoNoConfigurado';
+  }
+}
+
+/** El equipo no ofrece video —por tipo, por registro o por fallo al resolverlo—. 409. */
+export class SinOrigenDeVideo extends Error {
+  constructor(
+    readonly dispositivoId: string,
+    readonly motivo: string,
+  ) {
+    super(`El equipo ${dispositivoId} no ofrece video: ${motivo}`);
+    this.name = 'SinOrigenDeVideo';
+  }
+}
+
+/** El puente respondió mal o no respondió. 502: la API es pasarela hacia él. */
+export class PuenteDeVideoFallo extends Error {
+  constructor(readonly motivo: string) {
+    super(`El puente de video no atendió la petición: ${motivo}`);
+    this.name = 'PuenteDeVideoFallo';
+  }
+}

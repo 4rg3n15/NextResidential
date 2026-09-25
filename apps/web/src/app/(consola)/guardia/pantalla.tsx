@@ -3,9 +3,10 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Mic, MicOff, PhoneCall, PhoneOff, Siren, Video } from 'lucide-react';
+import { Mic, MicOff, PhoneCall, PhoneOff, Siren } from 'lucide-react';
 import { AvisoDeLlamada } from '@/componentes/aviso-de-llamada';
 import { ControlesDeAudio } from '@/componentes/controles-de-audio';
+import { VideoEnVivo } from '@/componentes/video-en-vivo';
 import type { LlamadaEntrante } from '@/lib/sse/llamadas';
 import type { EnAtencion } from '@ncr/contracts';
 import { cliente, desenvolver, ErrorDeApi } from '@/lib/api/cliente';
@@ -297,28 +298,12 @@ export const PantallaDeGuardiaVirtual = ({
               ) : (
                 <div className="space-y-4">
                   {/*
-                    VIDEO EN VIVO. El puente RTSP→WebRTC (go2rtc) llega con el
-                    hardware en la ETAPA 15, y el navegador **exige contexto
-                    seguro** para reproducir una cámara: por IP sin TLS no se
-                    puede demostrar. Se dice aquí en vez de dejar un recuadro
-                    negro que parezca una cámara caída.
+                    A5 (15-E) · VIDEO EN VIVO por WHEP a través de la API: el
+                    navegador nunca ve RTSP ni credenciales. El componente
+                    mide negociación y primer cuadro (KPI-33) y dice con su
+                    causa cada negativa.
                   */}
-                  <div className="flex aspect-video w-full items-center justify-center rounded-tarjeta border border-borde bg-oscuro text-center">
-                    <div className="px-6">
-                      <Video
-                        className="mx-auto h-8 w-8 text-texto-invertidoApagado"
-                        aria-hidden="true"
-                        strokeWidth={1.5}
-                      />
-                      <p className="mt-2 text-secundario text-texto-invertido">
-                        Video en vivo del equipo {foco.dispositivoId.slice(0, 8)}
-                      </p>
-                      <p className="mt-1 text-distintivo text-texto-invertidoApagado">
-                        El puente RTSP → WebRTC llega con la ETAPA 15. Requiere HTTPS: el navegador
-                        no reproduce cámara fuera de un contexto seguro.
-                      </p>
-                    </div>
-                  </div>
+                  <VideoEnVivo copropiedadId={copropiedadId} dispositivoId={foco.dispositivoId} />
 
                   {/* ── Audio: exclusivo por dispositivo (ADR-01) ── */}
                   <div className="flex flex-wrap items-center gap-2 rounded-tarjeta border border-borde px-3 py-2">

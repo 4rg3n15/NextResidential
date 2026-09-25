@@ -105,7 +105,12 @@ const base = z.object({
    */
   COOKIE_SEGURA: z.enum(['true', 'false']).optional(),
 
-  /** Puente de video de la ETAPA 10. Vacío o ausente significa «todavía no». */
+  /**
+   * Origen del puente de video SÓLO si se expone directamente al navegador.
+   * Desde la 15-E (A5) la vista en vivo negocia contra la API por el proxy, así
+   * que lo normal es dejarlo vacío: entonces no entra en la CSP y el navegador
+   * no tiene ningún origen de video que no sea el propio.
+   */
   PUENTE_VIDEO_URL: z
     .union([urlAbsoluta('PUENTE_VIDEO_URL'), z.literal('')])
     .optional()

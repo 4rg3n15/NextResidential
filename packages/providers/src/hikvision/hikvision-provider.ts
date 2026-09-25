@@ -19,6 +19,8 @@ import { Videoportero } from '../videoportero/videoportero';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
 import { EscuchaDeAlertStream, transporteSegunCapacidades } from '../equipo/escucha-alertstream';
 import type { EscuchaActiva } from '../nucleo/escucha';
+import type { OrigenDeVideo } from '../nucleo/video';
+import { origenRtspDe } from './video-rtsp';
 import { EquipoDecidePorSuCuenta } from '../camara/modo-de-control';
 import { leerVeredictoDeControl } from '../camara/veredicto-de-control';
 import { leerDisparador } from '../camara/disparadores-vinculados';
@@ -249,6 +251,19 @@ export class HikvisionProvider
    */
   async suscribir(alLeer: (lectura: LecturaDePlaca) => Promise<void>): Promise<void> {
     await this.fuente.suscribir(alLeer);
+  }
+
+  // ── Video (A5) ───────────────────────────────────────────────────────────
+
+  /**
+   * El origen RTSP, construido aquí porque aquí viven la marca y la
+   * credencial. Cámara, terminal y videoportero tienen video; relé y
+   * controlador de E/S, no. El puerto RTSP y el camino del flujo son el
+   * [SUPUESTO] S-46 del catálogo (documentado, se confirma en sitio).
+   */
+  async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
+    const equipo = await this.resolver(dispositivoId);
+    return origenRtspDe(equipo);
   }
 
   // ── Escucha de lo que el equipo emite (A4) ───────────────────────────────

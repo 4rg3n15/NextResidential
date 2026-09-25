@@ -13,6 +13,7 @@ import type { PerfilDeSimulacion } from './simulacion';
 import { Azar, FalloDeHardwareSimulado, PERFIL_REALISTA, RelojSimulado } from './simulacion';
 import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
 import type { EscuchaActiva } from '../nucleo/escucha';
+import type { OrigenDeVideo } from '../nucleo/video';
 import { CAPACIDADES_COMPLETAS, CAPACIDADES_SIN_CONSULTAR } from '../nucleo/capacidades';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
@@ -101,6 +102,14 @@ export class MockProvider
         'simulado: no hay flujo que escuchar; los eventos entran por la fuente o el receptor',
       detener: () => undefined,
     };
+  }
+
+  /** A5 · el simulado no tiene cámara que mostrar; un equipo que no conoce, rechaza. */
+  async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
+    if (!this.dispositivos.has(dispositivoId)) {
+      throw new FalloDeHardwareSimulado(dispositivoId, 'origenDeVideo');
+    }
+    return null;
   }
 
   // ── AccessPointProvider ──────────────────────────────────────────────────

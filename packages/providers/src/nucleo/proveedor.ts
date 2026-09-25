@@ -8,6 +8,7 @@ import type {
 } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo } from './capacidades';
 import type { EscuchaActiva } from './escucha';
+import type { OrigenDeVideo } from './video';
 import type { VeredictoRemoto } from './verificacion-remota';
 
 /**
@@ -60,4 +61,11 @@ export type ProveedorDeEquipos = AccessPointProvider &
      * cómo detenerla. Un equipo desconocido rechaza.
      */
     escuchar(dispositivoId: string): Promise<EscuchaActiva>;
+    /**
+     * A5 · el origen RTSP del video de un equipo, para el puente de video del
+     * servidor. `null` cuando el equipo no tiene video (relé, controlador) o
+     * el proveedor no lo puede construir (simulado). Un equipo desconocido
+     * rechaza. La credencial va dentro: nunca cruza a la presentación.
+     */
+    origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null>;
   };

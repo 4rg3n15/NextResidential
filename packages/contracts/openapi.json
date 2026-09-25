@@ -2918,6 +2918,91 @@
         ]
       }
     },
+    "/copropiedades/{id}/guardia/video/{dispositivoId}/whep": {
+      "post": {
+        "operationId": "VideoController_whep",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Oferta SDP del navegador (`v=0…`)",
+          "content": {
+            "application/sdp": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Respuesta SDP del puente",
+            "content": {
+              "application/sdp": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/sdp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "El equipo no ofrece video",
+            "content": {
+              "application/sdp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "La vista en vivo no está configurada (GO2RTC_URL)",
+            "content": {
+              "application/sdp": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Negocia la vista en vivo del equipo (WHEP): oferta SDP dentro, respuesta SDP fuera",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
     "/copropiedades/{id}/informes": {
       "get": {
         "operationId": "InformesController_generar",

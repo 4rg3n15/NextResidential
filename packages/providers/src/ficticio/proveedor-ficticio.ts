@@ -17,6 +17,7 @@ import { ordenAceptada, ordenInalcanzable } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe } from '../nucleo/capacidades';
 import type { EscuchaActiva } from '../nucleo/escucha';
+import type { OrigenDeVideo } from '../nucleo/video';
 import {
   BibliotecaLlena,
   CapacidadNoSoportada,
@@ -256,6 +257,12 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
       detalle: 'Órbita: suscripción declarada; el equipo ficticio no emite eventos',
       detener: () => undefined,
     };
+  }
+
+  /** A5 · Órbita no publica video: `null` para lo conocido; lo desconocido rechaza. */
+  async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
+    if (!this.equipos.has(dispositivoId)) this.exigir(dispositivoId, 'aperturaRemota');
+    return null;
   }
 
   // ── IntercomProvider ─────────────────────────────────────────────────────

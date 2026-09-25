@@ -264,6 +264,21 @@ export const esquemaConfiguracion = z.object({
     .url('API_URL_PUBLICA debe ser una URL absoluta (http://<IP>:3000)')
     .optional(),
 
+  /**
+   * A5 (15-E) · el puente de video RTSP → WebRTC (go2rtc), visto DESDE LA API.
+   * Opcional: sin él la vista en vivo responde 503 con motivo y el resto de la
+   * consola sigue. Es una dirección INTERNA (`http://127.0.0.1:1984` cuando
+   * go2rtc corre junto a la API) y nunca llega al navegador: el navegador
+   * negocia WebRTC contra la API, que valida sesión, rol y copropiedad antes
+   * de hablar con el puente, y la URL RTSP con la credencial del equipo sólo
+   * viaja de la API a go2rtc (RN-12, RN-21).
+   */
+  GO2RTC_URL: z
+    .string()
+    .trim()
+    .url('GO2RTC_URL debe ser una URL absoluta (http://127.0.0.1:1984)')
+    .optional(),
+
   /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 

@@ -3,6 +3,7 @@ import type { DynamicModule } from '@nestjs/common';
 import { BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { GuardiaController } from './presentacion/guardia.controller';
+import { VideoController } from './presentacion/video.controller';
 import { crearControlDeBarreraDesdeEntorno } from '@ncr/providers';
 import type { ProveedorDeEquipos } from '@ncr/providers';
 import { PROVEEDOR_DE_EQUIPOS } from '../proveedores';
@@ -21,7 +22,10 @@ import type {
 } from './aplicacion/apertura-manual';
 import { FijarBloqueoDeAcceso, REGISTRO_DE_BLOQUEOS } from './aplicacion/bloqueo-de-acceso';
 import type { RegistroDeBloqueos } from './aplicacion/bloqueo-de-acceso';
-import { CANAL_DE_INTERCOM } from './aplicacion/puertos';
+import { CANAL_DE_INTERCOM, PUENTE_DE_VIDEO } from './aplicacion/puertos';
+import type { PuenteDeVideo } from './aplicacion/puertos';
+import { NegociarVistaEnVivo } from './aplicacion/vista-en-vivo';
+import { PuenteGo2rtc } from './infraestructura/puente-go2rtc';
 import { CanalIntercomEnProceso } from './infraestructura/canal-intercom-en-proceso';
 import {
   BitacoraDeOrdenesEnMemoria,
@@ -54,7 +58,7 @@ export class GuardiaModule {
   static registrar(): DynamicModule {
     return {
       module: GuardiaModule,
-      controllers: [GuardiaController],
+      controllers: [GuardiaController, VideoController],
       providers: [
         {
           /**
@@ -121,6 +125,37 @@ export class GuardiaModule {
           inject: [RELOJ, PROVEEDOR_DE_EQUIPOS, BITACORA],
           useFactory: (reloj: Reloj, proveedor: ProveedorDeEquipos, bitacora: Bitacora) =>
             new CanalIntercomConTransporte(new CanalIntercomEnProceso(reloj), proveedor, bitacora),
+        },
+        {
+          /**
+           * A5 · el puente de video existe sólo si `GO2RTC_URL` está: sin él
+           * se inyecta `null` y la vista en vivo responde 503 con motivo. Se
+           * anuncia al arrancar SIN el valor —es una dirección interna— para
+           * que «no hay video» no se confunda con «el puente cayó».
+           */
+          provide: PUENTE_DE_VIDEO,
+          inject: [CONFIGURACION, BITACORA],
+          useFactory: (configuracion: Configuracion, bitacora: Bitacora): PuenteDeVideo | null => {
+            const url = configuracion.GO2RTC_URL;
+            bitacora.registrar(
+              url === undefined ? 'aviso' : 'info',
+              url === undefined
+                ? 'vista en vivo SIN puente: GO2RTC_URL no está; el WHEP responde 503'
+                : 'vista en vivo con puente go2rtc configurado (RTSP → WebRTC por la API)',
+              { configurado: url !== undefined },
+            );
+            return url === undefined ? null : new PuenteGo2rtc(url);
+          },
+        },
+        {
+          provide: NegociarVistaEnVivo,
+          inject: [PROVEEDOR_DE_EQUIPOS, PUENTE_DE_VIDEO, BITACORA, RELOJ],
+          useFactory: (
+            proveedor: ProveedorDeEquipos,
+            puente: PuenteDeVideo | null,
+            bitacora: Bitacora,
+            reloj: Reloj,
+          ) => new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj),
         },
         {
           provide: AccionarPuertaAMano,

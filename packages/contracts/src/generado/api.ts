@@ -827,6 +827,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/guardia/video/{dispositivoId}/whep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Negocia la vista en vivo del equipo (WHEP): oferta SDP dentro, respuesta SDP fuera */
+        post: operations["VideoController_whep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/informes": {
         parameters: {
             query?: never;
@@ -4592,6 +4609,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    VideoController_whep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        /** @description Oferta SDP del navegador (`v=0…`) */
+        requestBody: {
+            content: {
+                "application/sdp": string;
+            };
+        };
+        responses: {
+            /** @description Respuesta SDP del puente */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/sdp": string;
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/sdp": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description El equipo no ofrece video */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/sdp": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description La vista en vivo no está configurada (GO2RTC_URL) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/sdp": components["schemas"]["ErrorApiDto"];
                 };
             };
         };

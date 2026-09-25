@@ -526,6 +526,19 @@ describe.each(CASOS)('contrato de proveedor · $nombre', (caso) => {
     });
   });
 
+  describe('origen de video · A5 (ETAPA 15-E)', () => {
+    it('un equipo desconocido rechaza; uno conocido devuelve origen o null, nunca lanza', async () => {
+      const { proveedor } = caso.montar();
+      await expect(proveedor.origenDeVideo(DESCONOCIDO)).rejects.toThrow();
+      const origen = await proveedor.origenDeVideo(PORTERO);
+      if (origen !== null) {
+        // La credencial va DENTRO del origen y el origen es sólo para el puente.
+        expect(origen.rtsp).toMatch(/^rtsp:\/\//);
+        expect(origen.detalle).not.toBe('');
+      }
+    });
+  });
+
   describe('IntercomProvider · ADR-01', () => {
     it('el primer operador recibe el canal', async () => {
       const { proveedor } = caso.montar();

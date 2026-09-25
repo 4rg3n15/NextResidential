@@ -14,6 +14,7 @@ import {
 } from '../src/autorizaciones/presentacion/limites';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../src/comun/sobre-de-equipo';
 import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from '../src/comun/ruta-de-audio';
+import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from '../src/comun/ruta-de-video';
 import type { INestApplication } from '@nestjs/common';
 import { aplicarSaneamiento, aplicarSeguridad } from '../src/seguridad';
 import { aplicarContextoDePeticion } from '../src/comun/contexto/contexto-de-peticion';
@@ -364,6 +365,8 @@ export const crearApp = async (
     RUTA_DE_AUDIO_DE_INTERCOM,
     express.raw({ type: 'application/octet-stream', limit: LIMITE_DE_TROZO_DE_AUDIO }),
   );
+  // A5 · la oferta SDP del navegador, como texto y acotada, sólo bajo su ruta.
+  app.use(RUTA_DE_WHEP_DE_VIDEO, express.text({ type: TIPO_SDP, limit: LIMITE_DE_OFERTA_SDP }));
   app.use(
     RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
     express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
