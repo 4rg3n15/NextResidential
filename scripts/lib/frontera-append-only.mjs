@@ -32,7 +32,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Tablas con UPDATE y DELETE revocados a todos, dueño incluido (ADR-005). */
-const APPEND_ONLY = ['eventos', 'evidencias', 'auditoria_seguridad', 'recepciones_evento'];
+const APPEND_ONLY = [
+  'eventos',
+  'evidencias',
+  'auditoria_seguridad',
+  'recepciones_evento',
+  // ETAPA 15-H (ADR-024) · el rastro del panel de supervisión del superadministrador.
+  'bitacora_de_porteria',
+];
 
 /**
  * Se lee el DIRECTORIO, no `git ls-files`. Una migración recién escrita todavía
