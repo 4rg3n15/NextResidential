@@ -1,6 +1,152 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/auth/acceso": {
+      "post": {
+        "operationId": "CuentasController_acceso",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccesoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SesionDeAccesoDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Usuario, NIT o contraseña incorrectos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Contraseña correcta, pero la sesión no se concede (sin rol, fuera de turno)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "5/min por cuenta, 10/min por origen declarado, 30/min por dirección (S-50)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Inicio de sesión por correo o por NIT y usuario",
+        "tags": [
+          "cuentas"
+        ]
+      }
+    },
+    "/auth/cierre": {
+      "post": {
+        "operationId": "CuentasController_cierre",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HechoDeCuentaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cierra la sesión del token presentado",
+        "tags": [
+          "cuentas"
+        ]
+      }
+    },
+    "/auth/contrasena": {
+      "post": {
+        "operationId": "CuentasController_contrasena",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioDeContrasenaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HechoDeCuentaDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Política, igual a la actual o actual incorrecta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol administrativo sin segundo factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia la propia contraseña; cierra el primer ingreso",
+        "tags": [
+          "cuentas"
+        ]
+      }
+    },
     "/auth/mfa/codigos": {
       "post": {
         "operationId": "AutenticacionController_generarCodigos",
@@ -4371,6 +4517,219 @@
         ]
       }
     },
+    "/copropiedades/{id}/porteria/bitacora": {
+      "get": {
+        "operationId": "SupervisionController_bitacora",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "inicio_de_sesion",
+                "acceso_rechazado",
+                "cierre_de_sesion",
+                "inicio_de_patrullaje",
+                "fin_de_patrullaje",
+                "codigo_incorrecto",
+                "turno_asignado",
+                "turno_extra",
+                "turno_editado",
+                "turno_retirado",
+                "solape_de_turno",
+                "alta_de_portero",
+                "edicion_de_portero",
+                "restablecimiento_de_contrasena",
+                "cambio_de_contrasena"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BitacoraDePorteriaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bitácora append-only: ingresos con origen, patrullajes, turnos, restablecimientos",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/porteros": {
+      "get": {
+        "operationId": "SupervisionController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PorterosDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Porteros de la copropiedad, quién está de turno y con sesión",
+        "tags": [
+          "porteria"
+        ]
+      },
+      "post": {
+        "operationId": "SupervisionController_alta",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AltaDePorteroDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PorteroCreadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alta de portero con usuario y contraseña inicial (cambio obligatorio)",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/porteros/{usuarioId}": {
+      "put": {
+        "operationId": "SupervisionController_editar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosDelPorteroDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HechoDePorteriaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Datos del portero (nombre, teléfono, correo de contacto, portería, sectores)",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
     "/copropiedades/{id}/tablero/accesos-por-hora": {
       "get": {
         "operationId": "TableroController_leerAccesosPorHora",
@@ -4479,6 +4838,286 @@
         ]
       }
     },
+    "/copropiedades/{id}/turnos": {
+      "get": {
+        "operationId": "SupervisionController_turnos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnosDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Calendario de turnos en un rango (hasta 62 días)",
+        "tags": [
+          "porteria"
+        ]
+      },
+      "post": {
+        "operationId": "SupervisionController_asignar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosDeTurnoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnoGuardadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asigna un turno (programado o extra con motivo); los solapes se registran",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/turnos/{turnoId}": {
+      "put": {
+        "operationId": "SupervisionController_editarTurno",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "turnoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosDeTurnoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnoGuardadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edita un turno que no ha terminado",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/turnos/{turnoId}/retiro": {
+      "post": {
+        "operationId": "SupervisionController_retirar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "turnoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetiroDeTurnoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HechoDePorteriaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retira un turno que no ha terminado, con motivo",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/usuarios/{usuarioId}/restablecimiento": {
+      "post": {
+        "operationId": "CuentasController_restablecimiento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestablecimientoDeContrasenaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HechoDeCuentaDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La temporal no cumple la política",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Su rol no restablece a esa cuenta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restablece la contraseña de una cuenta con una temporal y cambio obligatorio",
+        "tags": [
+          "cuentas"
+        ]
+      }
+    },
     "/copropiedades/{id}/zonas": {
       "post": {
         "operationId": "ZonasController_crearZona",
@@ -4557,6 +5196,60 @@
           }
         ],
         "summary": "Zonas con su aforo y su disponibilidad de ahora mismo (HU-19)",
+        "tags": [
+          "zonas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/zonas/{zonaId}/apertura": {
+      "post": {
+        "operationId": "ZonasController_apertura",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "zonaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AperturaDeZonaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZonaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Abre o cierra la zona a mano, con motivo (portería, C-32)",
         "tags": [
           "zonas"
         ]
@@ -4946,6 +5639,124 @@
         ]
       }
     },
+    "/porteria/perfil": {
+      "get": {
+        "operationId": "PorteriaController_miPerfil",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PorteroDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El perfil del propio portero, de solo lectura",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/porteria/sesion": {
+      "get": {
+        "operationId": "PorteriaController_sesion",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeSesionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado de la sesión: activa (con código), patrullaje, cerrada o fuera de turno",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/porteria/sesion/desbloqueo": {
+      "post": {
+        "operationId": "PorteriaController_desbloqueo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesbloqueoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeDesbloqueoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Termina el patrullaje con el código; el 5.º fallo cierra la sesión",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/porteria/sesion/patrullaje": {
+      "post": {
+        "operationId": "PorteriaController_iniciarPatrullaje",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeSesionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pone la sesión en patrullaje: la API rechaza toda acción hasta el código",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
     "/ready": {
       "get": {
         "operationId": "SaludController_listo",
@@ -4996,6 +5807,34 @@
       }
     },
     "schemas": {
+      "AccesoDto": {
+        "type": "object",
+        "properties": {
+          "correo": {
+            "type": "string",
+            "maxLength": 254,
+            "description": "Cuentas por correo"
+          },
+          "nit": {
+            "type": "string",
+            "maxLength": 20,
+            "description": "NIT de la copropiedad"
+          },
+          "usuario": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Nombre de usuario"
+          },
+          "contrasena": {
+            "type": "string",
+            "maxLength": 256,
+            "format": "password"
+          }
+        },
+        "required": [
+          "contrasena"
+        ]
+      },
       "AccesosPorHoraDto": {
         "type": "object",
         "properties": {
@@ -5248,6 +6087,54 @@
           "usuario"
         ]
       },
+      "AltaDePorteroDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 30,
+            "nullable": true
+          },
+          "correoContacto": {
+            "type": "string",
+            "maxLength": 254,
+            "nullable": true
+          },
+          "porteria": {
+            "type": "string",
+            "maxLength": 80,
+            "nullable": true
+          },
+          "sectores": {
+            "maxItems": 50,
+            "description": "Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "usuario": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Identificación del portero como usuario"
+          },
+          "contrasenaInicial": {
+            "type": "string",
+            "maxLength": 256,
+            "format": "password"
+          }
+        },
+        "required": [
+          "nombre",
+          "sectores",
+          "usuario",
+          "contrasenaInicial"
+        ]
+      },
       "AparatoRegistradoDto": {
         "type": "object",
         "properties": {
@@ -5258,6 +6145,24 @@
         },
         "required": [
           "id"
+        ]
+      },
+      "AperturaDeZonaDto": {
+        "type": "object",
+        "properties": {
+          "abierta": {
+            "type": "boolean",
+            "description": "false cierra la zona; true la vuelve a abrir"
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "abierta",
+          "motivo"
         ]
       },
       "AutorizacionDto": {
@@ -5432,6 +6337,20 @@
           "desactivado"
         ]
       },
+      "BitacoraDePorteriaDto": {
+        "type": "object",
+        "properties": {
+          "hechos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HechoDeBitacoraDto"
+            }
+          }
+        },
+        "required": [
+          "hechos"
+        ]
+      },
       "BloqueoVigenteDto": {
         "type": "object",
         "properties": {
@@ -5523,6 +6442,25 @@
         "required": [
           "borrada",
           "identificador"
+        ]
+      },
+      "CambioDeContrasenaDto": {
+        "type": "object",
+        "properties": {
+          "actual": {
+            "type": "string",
+            "maxLength": 256,
+            "format": "password"
+          },
+          "nueva": {
+            "type": "string",
+            "maxLength": 256,
+            "format": "password"
+          }
+        },
+        "required": [
+          "actual",
+          "nueva"
         ]
       },
       "CambiosDeConfiguracionDto": {
@@ -6286,6 +7224,89 @@
           "aforoMaximo"
         ]
       },
+      "DatosDeTurnoDto": {
+        "type": "object",
+        "properties": {
+          "porteroId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "porteria": {
+            "type": "string",
+            "maxLength": 80,
+            "nullable": true
+          },
+          "dia": {
+            "type": "string",
+            "example": "2026-09-25",
+            "description": "Día en la zona de la copropiedad"
+          },
+          "horaInicio": {
+            "type": "string",
+            "example": "22:00"
+          },
+          "horaFin": {
+            "type": "string",
+            "example": "06:00",
+            "description": "Si no es posterior al inicio, cruza la medianoche"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "programado",
+              "extra"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Obligatorio en un turno extra"
+          }
+        },
+        "required": [
+          "porteroId",
+          "dia",
+          "horaInicio",
+          "horaFin",
+          "tipo"
+        ]
+      },
+      "DatosDelPorteroDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 30,
+            "nullable": true
+          },
+          "correoContacto": {
+            "type": "string",
+            "maxLength": 254,
+            "nullable": true
+          },
+          "porteria": {
+            "type": "string",
+            "maxLength": 80,
+            "nullable": true
+          },
+          "sectores": {
+            "maxItems": 50,
+            "description": "Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "nombre",
+          "sectores"
+        ]
+      },
       "DecisionDelEdgeDto": {
         "type": "object",
         "properties": {
@@ -6381,6 +7402,19 @@
         },
         "required": [
           "motivo"
+        ]
+      },
+      "DesbloqueoDto": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "example": "0427",
+            "description": "El código que la consola mostraba"
+          }
+        },
+        "required": [
+          "codigo"
         ]
       },
       "DetalleDeErrorDto": {
@@ -7011,6 +8045,63 @@
           "caidos"
         ]
       },
+      "EstadoDeSesionDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activa",
+              "patrullaje",
+              "cerrada",
+              "fuera_de_turno",
+              "sin_registro"
+            ]
+          },
+          "codigo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sólo con la sesión activa"
+          },
+          "turnoInicio": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "turnoFin": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "porteria": {
+            "type": "string",
+            "nullable": true
+          },
+          "intentosRestantes": {
+            "type": "number",
+            "nullable": true
+          },
+          "patrullajeDesde": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "motivoCierre": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "estado",
+          "codigo",
+          "turnoInicio",
+          "turnoFin",
+          "porteria",
+          "intentosRestantes",
+          "patrullajeDesde",
+          "motivoCierre"
+        ]
+      },
       "EventoIngestaDto": {
         "type": "object",
         "properties": {
@@ -7632,6 +8723,130 @@
           "valorCorrecto",
           "detalle",
           "correccion"
+        ]
+      },
+      "HechoDeBitacoraDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "inicio_de_sesion",
+              "acceso_rechazado",
+              "cierre_de_sesion",
+              "inicio_de_patrullaje",
+              "fin_de_patrullaje",
+              "codigo_incorrecto",
+              "turno_asignado",
+              "turno_extra",
+              "turno_editado",
+              "turno_retirado",
+              "solape_de_turno",
+              "alta_de_portero",
+              "edicion_de_portero",
+              "restablecimiento_de_contrasena",
+              "cambio_de_contrasena"
+            ]
+          },
+          "ocurridoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usuarioId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "nombreUsuario": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "nombreActor": {
+            "type": "string",
+            "nullable": true
+          },
+          "turnoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "duracionSegundos": {
+            "type": "number",
+            "nullable": true
+          },
+          "origenIp": {
+            "type": "string",
+            "nullable": true,
+            "description": "Dirección que llamó a la API"
+          },
+          "origenDeclarado": {
+            "type": "string",
+            "nullable": true,
+            "description": "Dirección del navegador según la consola"
+          },
+          "agente": {
+            "type": "string",
+            "nullable": true
+          },
+          "detalle": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "ocurridoEn",
+          "usuarioId",
+          "nombreUsuario",
+          "actorId",
+          "nombreActor",
+          "turnoId",
+          "duracionSegundos",
+          "origenIp",
+          "origenDeclarado",
+          "agente",
+          "detalle"
+        ]
+      },
+      "HechoDeCuentaDto": {
+        "type": "object",
+        "properties": {
+          "hecho": {
+            "type": "string",
+            "enum": [
+              "contrasena_cambiada",
+              "contrasena_restablecida",
+              "sesion_cerrada"
+            ]
+          }
+        },
+        "required": [
+          "hecho"
+        ]
+      },
+      "HechoDePorteriaDto": {
+        "type": "object",
+        "properties": {
+          "hecho": {
+            "type": "string",
+            "enum": [
+              "portero_editado",
+              "turno_retirado"
+            ]
+          }
+        },
+        "required": [
+          "hecho"
         ]
       },
       "HistorialDeOrdenesDto": {
@@ -8740,6 +9955,97 @@
           "cantidad"
         ]
       },
+      "PorteroCreadoDto": {
+        "type": "object",
+        "properties": {
+          "usuarioId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "usuarioId"
+        ]
+      },
+      "PorteroDto": {
+        "type": "object",
+        "properties": {
+          "usuarioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "usuario": {
+            "type": "string",
+            "nullable": true
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "telefono": {
+            "type": "string",
+            "nullable": true
+          },
+          "correoContacto": {
+            "type": "string",
+            "nullable": true
+          },
+          "porteria": {
+            "type": "string",
+            "nullable": true
+          },
+          "sectores": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "debeCambiarContrasena": {
+            "type": "boolean"
+          },
+          "turnoVigente": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TurnoDto"
+              }
+            ]
+          },
+          "sesionAbierta": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SesionAbiertaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "usuarioId",
+          "usuario",
+          "nombre",
+          "telefono",
+          "correoContacto",
+          "porteria",
+          "sectores",
+          "debeCambiarContrasena",
+          "turnoVigente",
+          "sesionAbierta"
+        ]
+      },
+      "PorterosDto": {
+        "type": "object",
+        "properties": {
+          "porteros": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PorteroDto"
+            }
+          }
+        },
+        "required": [
+          "porteros"
+        ]
+      },
       "PuntoDeFrecuenciaDto": {
         "type": "object",
         "properties": {
@@ -8996,6 +10302,24 @@
           "propagacion"
         ]
       },
+      "RestablecimientoDeContrasenaDto": {
+        "type": "object",
+        "properties": {
+          "temporal": {
+            "type": "string",
+            "maxLength": 256,
+            "format": "password",
+            "description": "Contraseña temporal que ESCRIBE quien restablece (S-51). No se devuelve nunca; la cuenta queda obligada a cambiarla en su siguiente ingreso."
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "temporal"
+        ]
+      },
       "RestablecimientoRegistradoDto": {
         "type": "object",
         "properties": {
@@ -9086,6 +10410,23 @@
           "valorAnterior",
           "valorNuevo",
           "detalle"
+        ]
+      },
+      "ResultadoDeDesbloqueoDto": {
+        "type": "object",
+        "properties": {
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "desbloqueada",
+              "incorrecto",
+              "agotado",
+              "no_en_patrullaje"
+            ]
+          }
+        },
+        "required": [
+          "resultado"
         ]
       },
       "ResultadoDeOperacionDto": {
@@ -9225,6 +10566,18 @@
           "detalle"
         ]
       },
+      "RetiroDeTurnoDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
       "RevocacionDto": {
         "type": "object",
         "properties": {
@@ -9341,6 +10694,62 @@
         "required": [
           "estado",
           "momento"
+        ]
+      },
+      "SesionAbiertaDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activa",
+              "patrullaje"
+            ]
+          },
+          "iniciadaEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "patrullajeDesde": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "origen": {
+            "type": "string",
+            "nullable": true,
+            "description": "Origen que declaró la consola"
+          }
+        },
+        "required": [
+          "estado",
+          "iniciadaEn",
+          "patrullajeDesde",
+          "origen"
+        ]
+      },
+      "SesionDeAccesoDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiraEn": {
+            "type": "number",
+            "description": "Segundos Unix"
+          },
+          "debeCambiarContrasena": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "expiraEn",
+          "debeCambiarContrasena"
         ]
       },
       "SesionDto": {
@@ -9485,6 +10894,100 @@
         "required": [
           "activas",
           "inactivas"
+        ]
+      },
+      "TurnoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "porteroId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "porteria": {
+            "type": "string",
+            "nullable": true
+          },
+          "dia": {
+            "type": "string"
+          },
+          "horaInicio": {
+            "type": "string"
+          },
+          "horaFin": {
+            "type": "string"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fin": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cruzaMedianoche": {
+            "type": "boolean"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "programado",
+              "extra"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "porteroId",
+          "porteria",
+          "dia",
+          "horaInicio",
+          "horaFin",
+          "inicio",
+          "fin",
+          "cruzaMedianoche",
+          "tipo",
+          "motivo"
+        ]
+      },
+      "TurnoGuardadoDto": {
+        "type": "object",
+        "properties": {
+          "turno": {
+            "$ref": "#/components/schemas/TurnoDto"
+          },
+          "solapes": {
+            "description": "Solapes con la misma portería: se permiten y se registran",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TurnoDto"
+            }
+          }
+        },
+        "required": [
+          "turno",
+          "solapes"
+        ]
+      },
+      "TurnosDto": {
+        "type": "object",
+        "properties": {
+          "turnos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TurnoDto"
+            }
+          }
+        },
+        "required": [
+          "turnos"
         ]
       },
       "UrlDeEvidenciaDto": {

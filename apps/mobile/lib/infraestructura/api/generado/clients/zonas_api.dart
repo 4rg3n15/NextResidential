@@ -5,6 +5,7 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
+import '../models/apertura_de_zona_dto.dart';
 import '../models/autorizar_zona_dto.dart';
 import '../models/baja_de_zona_aplicada_dto.dart';
 import '../models/baja_de_zona_dto.dart';
@@ -32,6 +33,14 @@ abstract class ZonasApi {
   @GET('/copropiedades/{id}/zonas')
   Future<List<ZonaDto>> zonasControllerListar({
     @Path('id') required String id,
+  });
+
+  /// Abre o cierra la zona a mano, con motivo (portería, C-32)
+  @POST('/copropiedades/{id}/zonas/{zonaId}/apertura')
+  Future<ZonaDto> zonasControllerApertura({
+    @Path('id') required String id,
+    @Path('zonaId') required String zonaId,
+    @Body() required AperturaDeZonaDto body,
   });
 
   /// Da permiso sobre la zona a una autorización (HU-19, HU-20)

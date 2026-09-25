@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/auth/acceso": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Inicio de sesión por correo o por NIT y usuario */
+        post: operations["CuentasController_acceso"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/cierre": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cierra la sesión del token presentado */
+        post: operations["CuentasController_cierre"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/contrasena": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cambia la propia contraseña; cierra el primer ingreso */
+        post: operations["CuentasController_contrasena"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/mfa/codigos": {
         parameters: {
             query?: never;
@@ -1241,6 +1292,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/porteria/bitacora": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bitácora append-only: ingresos con origen, patrullajes, turnos, restablecimientos */
+        get: operations["SupervisionController_bitacora"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/porteros": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Porteros de la copropiedad, quién está de turno y con sesión */
+        get: operations["SupervisionController_listar"];
+        put?: never;
+        /** Alta de portero con usuario y contraseña inicial (cambio obligatorio) */
+        post: operations["SupervisionController_alta"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/porteros/{usuarioId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Datos del portero (nombre, teléfono, correo de contacto, portería, sectores) */
+        put: operations["SupervisionController_editar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/tablero/accesos-por-hora": {
         parameters: {
             query?: never;
@@ -1292,6 +1395,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/turnos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Calendario de turnos en un rango (hasta 62 días) */
+        get: operations["SupervisionController_turnos"];
+        put?: never;
+        /** Asigna un turno (programado o extra con motivo); los solapes se registran */
+        post: operations["SupervisionController_asignar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/turnos/{turnoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edita un turno que no ha terminado */
+        put: operations["SupervisionController_editarTurno"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/turnos/{turnoId}/retiro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retira un turno que no ha terminado, con motivo */
+        post: operations["SupervisionController_retirar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/usuarios/{usuarioId}/restablecimiento": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restablece la contraseña de una cuenta con una temporal y cambio obligatorio */
+        post: operations["CuentasController_restablecimiento"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/zonas": {
         parameters: {
             query?: never;
@@ -1304,6 +1476,23 @@ export interface paths {
         put?: never;
         /** Crea una zona común (HU-18). Horario y normas, después */
         post: operations["ZonasController_crearZona"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/zonas/{zonaId}/apertura": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Abre o cierra la zona a mano, con motivo (portería, C-32) */
+        post: operations["ZonasController_apertura"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1489,6 +1678,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/porteria/perfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El perfil del propio portero, de solo lectura */
+        get: operations["PorteriaController_miPerfil"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/porteria/sesion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de la sesión: activa (con código), patrullaje, cerrada o fuera de turno */
+        get: operations["PorteriaController_sesion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/porteria/sesion/desbloqueo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Termina el patrullaje con el código; el 5.º fallo cierra la sesión */
+        post: operations["PorteriaController_desbloqueo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/porteria/sesion/patrullaje": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pone la sesión en patrullaje: la API rechaza toda acción hasta el código */
+        post: operations["PorteriaController_iniciarPatrullaje"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ready": {
         parameters: {
             query?: never;
@@ -1510,6 +1767,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccesoDto: {
+            /** @description Cuentas por correo */
+            correo?: string;
+            /** @description NIT de la copropiedad */
+            nit?: string;
+            /** @description Nombre de usuario */
+            usuario?: string;
+            /** Format: password */
+            contrasena: string;
+        };
         AccesosPorHoraDto: {
             /** @description Siempre 24 franjas, incluidas las de cero: el eje lo fija el servidor */
             franjas: components["schemas"]["FranjaDeAccesosDto"][];
@@ -1589,9 +1856,26 @@ export interface components {
             /** @default true */
             probarConexion: boolean;
         };
+        AltaDePorteroDto: {
+            nombre: string;
+            telefono?: string | null;
+            correoContacto?: string | null;
+            porteria?: string | null;
+            /** @description Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas. */
+            sectores: string[];
+            /** @description Identificación del portero como usuario */
+            usuario: string;
+            /** Format: password */
+            contrasenaInicial: string;
+        };
         AparatoRegistradoDto: {
             /** Format: uuid */
             id: string;
+        };
+        AperturaDeZonaDto: {
+            /** @description false cierra la zona; true la vuelve a abrir */
+            abierta: boolean;
+            motivo: string;
         };
         AutorizacionDto: {
             /** Format: uuid */
@@ -1638,6 +1922,9 @@ export interface components {
         BajaDto: {
             desactivado: boolean;
         };
+        BitacoraDePorteriaDto: {
+            hechos: components["schemas"]["HechoDeBitacoraDto"][];
+        };
         BloqueoVigenteDto: {
             /** Format: uuid */
             dispositivoId: string;
@@ -1662,6 +1949,12 @@ export interface components {
         BorradoDefinitivoDto: {
             borrada: boolean;
             identificador: string;
+        };
+        CambioDeContrasenaDto: {
+            /** Format: password */
+            actual: string;
+            /** Format: password */
+            nueva: string;
         };
         CambiosDeConfiguracionDto: {
             /** @example Urbanización Mira */
@@ -1931,6 +2224,35 @@ export interface components {
             icono?: string | null;
             normas?: string[];
         };
+        DatosDeTurnoDto: {
+            /** Format: uuid */
+            porteroId: string;
+            porteria?: string | null;
+            /**
+             * @description Día en la zona de la copropiedad
+             * @example 2026-09-25
+             */
+            dia: string;
+            /** @example 22:00 */
+            horaInicio: string;
+            /**
+             * @description Si no es posterior al inicio, cruza la medianoche
+             * @example 06:00
+             */
+            horaFin: string;
+            /** @enum {string} */
+            tipo: "programado" | "extra";
+            /** @description Obligatorio en un turno extra */
+            motivo?: string;
+        };
+        DatosDelPorteroDto: {
+            nombre: string;
+            telefono?: string | null;
+            correoContacto?: string | null;
+            porteria?: string | null;
+            /** @description Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas. */
+            sectores: string[];
+        };
         DecisionDelEdgeDto: {
             /** @description Lo que el Edge resolvió en la portería */
             permitido: boolean;
@@ -1964,6 +2286,13 @@ export interface components {
         DesactivarDto: {
             /** @description Obligatorio (RN-19). Queda en la auditoría junto al actor y no se puede editar. */
             motivo: string;
+        };
+        DesbloqueoDto: {
+            /**
+             * @description El código que la consola mostraba
+             * @example 0427
+             */
+            codigo: string;
         };
         DetalleDeErrorDto: {
             /** @description Un mensaje, o el arreglo que devuelve el ValidationPipe con un renglón por campo rechazado. La consola muestra el arreglo campo a campo; una cadena, tal cual. */
@@ -2161,6 +2490,21 @@ export interface components {
             /** @example 0 */
             caidos: number;
         };
+        EstadoDeSesionDto: {
+            /** @enum {string} */
+            estado: "activa" | "patrullaje" | "cerrada" | "fuera_de_turno" | "sin_registro";
+            /** @description Sólo con la sesión activa */
+            codigo: string | null;
+            /** Format: date-time */
+            turnoInicio: string | null;
+            /** Format: date-time */
+            turnoFin: string | null;
+            porteria: string | null;
+            intentosRestantes: number | null;
+            /** Format: date-time */
+            patrullajeDesde: string | null;
+            motivoCierre: string | null;
+        };
         EventoIngestaDto: {
             copropiedadId: string;
             dispositivoId: string;
@@ -2340,6 +2684,37 @@ export interface components {
              * @enum {string|null}
              */
             correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota" | null;
+        };
+        HechoDeBitacoraDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            tipo: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
+            /** Format: date-time */
+            ocurridoEn: string;
+            /** Format: uuid */
+            usuarioId: string | null;
+            nombreUsuario: string | null;
+            /** Format: uuid */
+            actorId: string | null;
+            nombreActor: string | null;
+            /** Format: uuid */
+            turnoId: string | null;
+            duracionSegundos: number | null;
+            /** @description Dirección que llamó a la API */
+            origenIp: string | null;
+            /** @description Dirección del navegador según la consola */
+            origenDeclarado: string | null;
+            agente: string | null;
+            detalle: string | null;
+        };
+        HechoDeCuentaDto: {
+            /** @enum {string} */
+            hecho: "contrasena_cambiada" | "contrasena_restablecida" | "sesion_cerrada";
+        };
+        HechoDePorteriaDto: {
+            /** @enum {string} */
+            hecho: "portero_editado" | "turno_retirado";
         };
         HistorialDeOrdenesDto: {
             ordenes: components["schemas"]["OrdenEjecutadaDto"][];
@@ -2680,6 +3055,26 @@ export interface components {
             reiniciarNumeracion?: boolean;
             excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
         };
+        PorteroCreadoDto: {
+            /** Format: uuid */
+            usuarioId: string;
+        };
+        PorteroDto: {
+            /** Format: uuid */
+            usuarioId: string;
+            usuario: string | null;
+            nombre: string;
+            telefono: string | null;
+            correoContacto: string | null;
+            porteria: string | null;
+            sectores: string[];
+            debeCambiarContrasena: boolean;
+            turnoVigente: components["schemas"]["TurnoDto"] | null;
+            sesionAbierta: components["schemas"]["SesionAbiertaDto"] | null;
+        };
+        PorterosDto: {
+            porteros: components["schemas"]["PorteroDto"][];
+        };
         PuntoDeFrecuenciaDto: {
             /** @description Lunes de la semana ISO, YYYY-MM-DD */
             semana: string;
@@ -2772,6 +3167,14 @@ export interface components {
             /** @description Si el titular aceptó: el resultado de empujar cada plantilla a todas las terminales. Vacío si rechazó o si no había plantilla pendiente. */
             propagacion: components["schemas"]["SincronizacionTotalDto"][];
         };
+        RestablecimientoDeContrasenaDto: {
+            /**
+             * Format: password
+             * @description Contraseña temporal que ESCRIBE quien restablece (S-51). No se devuelve nunca; la cuenta queda obligada a cambiarla en su siguiente ingreso.
+             */
+            temporal: string;
+            motivo?: string;
+        };
         RestablecimientoRegistradoDto: {
             /**
              * @description Siempre true; la respuesta es 204 sin cuerpo
@@ -2800,6 +3203,10 @@ export interface components {
             valorAnterior: string | null;
             valorNuevo: string | null;
             detalle: string;
+        };
+        ResultadoDeDesbloqueoDto: {
+            /** @enum {string} */
+            resultado: "desbloqueada" | "incorrecto" | "agotado" | "no_en_patrullaje";
         };
         ResultadoDeOperacionDto: {
             encolada: boolean;
@@ -2841,6 +3248,9 @@ export interface components {
             sincronizada: boolean;
             detalle: string;
         };
+        RetiroDeTurnoDto: {
+            motivo: string;
+        };
         RevocacionDto: {
             revocada: boolean;
         };
@@ -2881,6 +3291,23 @@ export interface components {
             estado: string;
             /** Format: date-time */
             momento: string;
+        };
+        SesionAbiertaDto: {
+            /** @enum {string} */
+            estado: "activa" | "patrullaje";
+            /** Format: date-time */
+            iniciadaEn: string;
+            /** Format: date-time */
+            patrullajeDesde: string | null;
+            /** @description Origen que declaró la consola */
+            origen: string | null;
+        };
+        SesionDeAccesoDto: {
+            accessToken: string;
+            refreshToken: string;
+            /** @description Segundos Unix */
+            expiraEn: number;
+            debeCambiarContrasena: boolean;
         };
         SesionDto: {
             /** Format: uuid */
@@ -2926,6 +3353,32 @@ export interface components {
         TotalesDeViviendasDto: {
             activas: number;
             inactivas: number;
+        };
+        TurnoDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            porteroId: string;
+            porteria: string | null;
+            dia: string;
+            horaInicio: string;
+            horaFin: string;
+            /** Format: date-time */
+            inicio: string;
+            /** Format: date-time */
+            fin: string;
+            cruzaMedianoche: boolean;
+            /** @enum {string} */
+            tipo: "programado" | "extra";
+            motivo: string | null;
+        };
+        TurnoGuardadoDto: {
+            turno: components["schemas"]["TurnoDto"];
+            /** @description Solapes con la misma portería: se permiten y se registran */
+            solapes: components["schemas"]["TurnoDto"][];
+        };
+        TurnosDto: {
+            turnos: components["schemas"]["TurnoDto"][];
         };
         UrlDeEvidenciaDto: {
             /** @description URL firmada de vida corta (120 s) al bucket privado. No se cachea ni se persiste: el enlace acaba en el historial del navegador y ahí sigue siendo válido (RN-21). */
@@ -3045,6 +3498,116 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    CuentasController_acceso: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccesoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SesionDeAccesoDto"];
+                };
+            };
+            /** @description Usuario, NIT o contraseña incorrectos */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description Contraseña correcta, pero la sesión no se concede (sin rol, fuera de turno) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description 5/min por cuenta, 10/min por origen declarado, 30/min por dirección (S-50) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    CuentasController_cierre: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HechoDeCuentaDto"];
+                };
+            };
+        };
+    };
+    CuentasController_contrasena: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioDeContrasenaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HechoDeCuentaDto"];
+                };
+            };
+            /** @description Política, igual a la actual o actual incorrecta */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description Rol administrativo sin segundo factor */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
     AutenticacionController_generarCodigos: {
         parameters: {
             query?: never;
@@ -5362,6 +5925,103 @@ export interface operations {
             };
         };
     };
+    SupervisionController_bitacora: {
+        parameters: {
+            query: {
+                desde: string;
+                hasta: string;
+                tipo?: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BitacoraDePorteriaDto"];
+                };
+            };
+        };
+    };
+    SupervisionController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PorterosDto"];
+                };
+            };
+        };
+    };
+    SupervisionController_alta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AltaDePorteroDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PorteroCreadoDto"];
+                };
+            };
+        };
+    };
+    SupervisionController_editar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuarioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosDelPorteroDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HechoDePorteriaDto"];
+                };
+            };
+        };
+    };
     TableroController_leerAccesosPorHora: {
         parameters: {
             query?: never;
@@ -5425,6 +6085,151 @@ export interface operations {
             };
         };
     };
+    SupervisionController_turnos: {
+        parameters: {
+            query: {
+                desde: string;
+                hasta: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurnosDto"];
+                };
+            };
+        };
+    };
+    SupervisionController_asignar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosDeTurnoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurnoGuardadoDto"];
+                };
+            };
+        };
+    };
+    SupervisionController_editarTurno: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                turnoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatosDeTurnoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurnoGuardadoDto"];
+                };
+            };
+        };
+    };
+    SupervisionController_retirar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                turnoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetiroDeTurnoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HechoDePorteriaDto"];
+                };
+            };
+        };
+    };
+    CuentasController_restablecimiento: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuarioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestablecimientoDeContrasenaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HechoDeCuentaDto"];
+                };
+            };
+            /** @description La temporal no cumple la política */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description Su rol no restablece a esa cuenta */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
     ZonasController_listar: {
         parameters: {
             query?: never;
@@ -5458,6 +6263,32 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CrearZonaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZonaDto"];
+                };
+            };
+        };
+    };
+    ZonasController_apertura: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                zonaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AperturaDeZonaDto"];
             };
         };
         responses: {
@@ -5692,6 +6523,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LatenciasDto"];
+                };
+            };
+        };
+    };
+    PorteriaController_miPerfil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PorteroDto"];
+                };
+            };
+        };
+    };
+    PorteriaController_sesion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeSesionDto"];
+                };
+            };
+        };
+    };
+    PorteriaController_desbloqueo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesbloqueoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeDesbloqueoDto"];
+                };
+            };
+        };
+    };
+    PorteriaController_iniciarPatrullaje: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeSesionDto"];
                 };
             };
         };
