@@ -9,6 +9,7 @@ import {
 } from '@ncr/domain-core';
 import type { EstadoDelCanal, Reloj } from '@ncr/domain-core';
 import type { CanalDeIntercom, EstadoDeCanal } from '../aplicacion/puertos';
+import { SinTransporteDeAudio } from '../aplicacion/puertos';
 
 /**
  * Canal de intercom en el proceso, sobre la máquina de estados del dominio.
@@ -65,6 +66,7 @@ export class CanalIntercomEnProceso implements CanalDeIntercom {
       // El canal en proceso reparte TURNOS; el transporte lo pone quien lo
       // decore (`CanalIntercomConTransporte`). Solo, no hay audio y lo dice.
       transporte: 'ninguno',
+      formatoDeAudio: null,
       detalleTransporte: 'canal sin transporte de audio: sólo exclusividad',
     };
   }
@@ -111,5 +113,20 @@ export class CanalIntercomEnProceso implements CanalDeIntercom {
     );
     this.canales.set(this.clave(copropiedadId, dispositivoId), vigente);
     return this.aDto(vigente, operadorId);
+  }
+
+  /** En proceso no hay equipo: el turno existe, el audio no. */
+  recibirAudio(_c: string, dispositivoId: string): AsyncIterable<Uint8Array> {
+    const error = new SinTransporteDeAudio(
+      dispositivoId,
+      'los turnos en proceso no tienen transporte',
+    );
+    return {
+      [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(error) }),
+    };
+  }
+
+  async enviarAudio(_c: string, dispositivoId: string): Promise<void> {
+    throw new SinTransporteDeAudio(dispositivoId, 'los turnos en proceso no tienen transporte');
   }
 }

@@ -499,6 +499,33 @@ describe.each(CASOS)('contrato de proveedor · $nombre', (caso) => {
     });
   });
 
+  describe('escucha de lo que el equipo emite · A4, por capacidad (ETAPA 15-E)', () => {
+    it('el videoportero se escucha, o dice por qué no; y detener es idempotente', async () => {
+      const { proveedor } = caso.montar();
+      const escucha = await proveedor.escuchar(PORTERO);
+      expect(['escucha', 'suscripcion', 'ninguna']).toContain(escucha.transporte);
+      expect(escucha.detalle).not.toBe('');
+      // Pedirla dos veces no abre dos flujos: es la misma.
+      expect((await proveedor.escuchar(PORTERO)).transporte).toBe(escucha.transporte);
+      escucha.detener();
+      escucha.detener();
+    });
+
+    it('un equipo desconocido no se escucha: rechaza', async () => {
+      const { proveedor } = caso.montar();
+      await expect(proveedor.escuchar(DESCONOCIDO)).rejects.toThrow();
+    });
+
+    it('la cámara no se escucha por un segundo camino: `ninguna`, o rechazo por capacidad', async () => {
+      const { proveedor } = caso.montar();
+      const resultado = await proveedor.escuchar(BARRERA).catch((e: unknown) => e);
+      expect(
+        resultado instanceof Error ||
+          (resultado as { transporte: string }).transporte === 'ninguna',
+      ).toBe(true);
+    });
+  });
+
   describe('IntercomProvider · ADR-01', () => {
     it('el primer operador recibe el canal', async () => {
       const { proveedor } = caso.montar();

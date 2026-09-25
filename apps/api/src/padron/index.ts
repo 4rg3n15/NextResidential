@@ -6,3 +6,10 @@
  * la frontera está donde debe.
  */
 export { PadronModule } from './padron.module';
+/**
+ * A4 (15-E) · la única pregunta que otro módulo hace del padrón: dónde está la
+ * vivienda que un videoportero nombra por unidad. Token y forma estrecha; el
+ * repositorio entero sigue sin salir.
+ */
+export { LOCALIZADOR_DE_VIVIENDA } from './aplicacion/puertos';
+export type { LocalizadorDeVivienda } from './aplicacion/puertos';

@@ -16,6 +16,9 @@ export {
   SIN_PROBAR,
   TIPOS_DE_EQUIPO,
 } from './aplicacion/puertos';
+/** A4 (15-E) · los equipos activos que emiten, para que el receptor los escuche. */
+export { EQUIPOS_QUE_EMITEN } from './aplicacion/puertos';
+export type { EquipoQueEmite } from './aplicacion/puertos';
 /** A3 (15-E) · las terminales con biblioteca de rostros, por capacidad. */
 export { TERMINALES_DE_ROSTROS } from './aplicacion/terminales-de-rostros';
 export type { TerminalDeRostros } from './aplicacion/terminales-de-rostros';

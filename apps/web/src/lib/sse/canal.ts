@@ -2,6 +2,8 @@
 
 import type { AlertaExpuesta, EventoRegistrado } from '@ncr/contracts';
 import { ESPERA_MAXIMA_MS, esperaDeReintento, msHastaRenovar } from './reconexion';
+import { esLlamadaEntrante } from './llamadas';
+import type { LlamadaEntrante } from './llamadas';
 import type { EstadoDeSesion } from '@/app/api/sesion/estado/route';
 
 /**
@@ -31,6 +33,8 @@ export type EstadoDelCanal = 'conectando' | 'conectado' | 'reconectando' | 'sin-
 export interface MensajesDelCanal {
   readonly evento: (evento: EventoRegistrado) => void;
   readonly alerta: (alerta: AlertaExpuesta) => void;
+  /** A4 · la llamada de un videoportero. Opcional: no toda vista la atiende. */
+  readonly llamada?: (llamada: LlamadaEntrante) => void;
   readonly estado: (estado: EstadoDelCanal, intento: number) => void;
   /** Eventos recuperados tras un corte, del más antiguo al más reciente. */
   readonly recuperados: (eventos: readonly EventoRegistrado[]) => void;
@@ -167,6 +171,15 @@ export const abrirCanal = ({
     nueva.addEventListener('alertas', (m) => {
       try {
         mensajes.alerta(JSON.parse((m as MessageEvent<string>).data) as AlertaExpuesta);
+      } catch {
+        /* ídem */
+      }
+    });
+
+    nueva.addEventListener('llamadas', (m) => {
+      try {
+        const carga: unknown = JSON.parse((m as MessageEvent<string>).data);
+        if (esLlamadaEntrante(carga)) mensajes.llamada?.(carga);
       } catch {
         /* ídem */
       }

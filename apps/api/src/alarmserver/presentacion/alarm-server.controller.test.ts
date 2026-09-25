@@ -128,6 +128,8 @@ const montar = (opciones: {
     { titularDePlantilla: async () => null },
     { responderVerificacionRemota: async () => ({ aceptado: true, latenciaMs: 5 }) },
     reloj,
+    { porUnidad: async () => null },
+    { llamadaEntrante: async () => undefined },
   );
   const fuente = new FuenteDePlacas();
   fuente.fijarIngestor(ingestor);

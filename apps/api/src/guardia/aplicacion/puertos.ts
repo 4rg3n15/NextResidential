@@ -23,6 +23,23 @@ export interface EstadoDeCanal {
    */
   readonly transporte: 'equipo' | 'ninguno';
   readonly detalleTransporte: string | null;
+  /**
+   * A4 · el códec que el equipo ANUNCIA para su canal (`g711u`, `g711a`…),
+   * leído de sus capacidades; `null` sin transporte. La consola decodifica
+   * lo que el equipo dice, no lo que alguien supuso.
+   */
+  readonly formatoDeAudio: string | null;
+}
+
+/** A4 · se pidió audio a quien no tiene la palabra, o a un turno sin transporte. */
+export class SinTransporteDeAudio extends Error {
+  constructor(
+    readonly dispositivoId: string,
+    readonly motivo: string,
+  ) {
+    super(`No hay audio con el equipo ${dispositivoId}: ${motivo}`);
+    this.name = 'SinTransporteDeAudio';
+  }
 }
 
 /**
@@ -44,6 +61,22 @@ export interface CanalDeIntercom {
   pedir(copropiedadId: string, dispositivoId: string, operadorId: string): Promise<EstadoDeCanal>;
   soltar(copropiedadId: string, dispositivoId: string, operadorId: string): Promise<EstadoDeCanal>;
   estado(copropiedadId: string, dispositivoId: string, operadorId: string): Promise<EstadoDeCanal>;
+  /**
+   * A4 · el audio de la sesión, SÓLO para el titular del turno. Bajada: lo
+   * que el equipo emite, en su formato. Subida: un trozo hacia el equipo.
+   * Sin turno o sin transporte lanzan `SinTransporteDeAudio`.
+   */
+  recibirAudio(
+    copropiedadId: string,
+    dispositivoId: string,
+    operadorId: string,
+  ): AsyncIterable<Uint8Array>;
+  enviarAudio(
+    copropiedadId: string,
+    dispositivoId: string,
+    operadorId: string,
+    fragmento: Uint8Array,
+  ): Promise<void>;
 }
 
 export const CANAL_DE_INTERCOM = Symbol.for('ncr.puerto.CanalDeIntercom');

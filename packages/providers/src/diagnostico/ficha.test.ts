@@ -238,3 +238,42 @@ describe('A2 · la terminal que decide sola ofrece la corrección', () => {
     expect(hallazgo?.correccion).toBeNull();
   });
 });
+
+describe('A4 · el videoportero dice qué NO aplica por capacidad', () => {
+  const videoportero = (parcial: Parameters<typeof capacidadesDeclaradas>[0]) =>
+    fichaDe(
+      con({
+        familia: 'videoportero',
+        capacidadesDelEquipo: capacidadesDeclaradas({
+          aperturaRemota: 'si',
+          audioBidireccional: { estado: 'si', canal: 1, formato: 'g711u' },
+          ...parcial,
+        }),
+      }),
+    );
+
+  it('sin biblioteca de rostros: el reconocimiento facial en este equipo NO APLICA', () => {
+    const ficha = videoportero({
+      bibliotecaDeRostros: { estado: 'no', maximo: null, almacenadas: null },
+    });
+    const h = ficha.hallazgos.find((x) => x.campo === 'reconocimiento facial en este equipo');
+    expect(h?.estado).toBe('aviso');
+    expect(h?.detalle).toMatch(/NO APLICA POR CAPACIDAD/);
+  });
+
+  it('con biblioteca declarada: conforme, y dice cuántos caben', () => {
+    const ficha = videoportero({
+      bibliotecaDeRostros: { estado: 'si', maximo: 500, almacenadas: 3 },
+    });
+    const h = ficha.hallazgos.find((x) => x.campo === 'reconocimiento facial en este equipo');
+    expect(h?.estado).toBe('conforme');
+    expect(h?.valorLeido).toContain('500');
+  });
+
+  it('sin señalización de llamada (el DS-KD9633 real): NO APLICA, y se dice quién atiende', () => {
+    const ficha = videoportero({ senalizacionDeLlamada: 'no' });
+    const h = ficha.hallazgos.find((x) => x.campo === 'señalización de llamada');
+    expect(h?.estado).toBe('aviso');
+    expect(h?.detalle).toMatch(/NO APLICA POR CAPACIDAD/);
+  });
+});

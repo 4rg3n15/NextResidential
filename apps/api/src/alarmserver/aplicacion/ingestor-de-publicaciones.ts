@@ -10,7 +10,12 @@ import type { RegistrarAcceso } from '../../eventos';
 import type { AccionadorDePuerta } from '../../guardia';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import type { EquipoDeclarado } from '../../comun/equipos-de-alarm-server';
-import type { ResolutorDeTitularBiometrico } from './puertos';
+import type {
+  AvisadorDeLlamadas,
+  LlamadaEntrante,
+  ResolutorDeTitularBiometrico,
+  ResolutorDeViviendaDeLlamada,
+} from './puertos';
 
 /**
  * A2 · a quién se le devuelve el veredicto. Declarado aquí, por el consumidor:
@@ -93,6 +98,9 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     /** A2 · a quién se le devuelve el veredicto: el proveedor de equipos. */
     private readonly respondedor: RespondedorDeVerificacionRemota,
     private readonly reloj: Reloj,
+    /** A4 · la llamada del videoportero: quién resuelve la vivienda y quién avisa. */
+    private readonly viviendas: ResolutorDeViviendaDeLlamada,
+    private readonly avisador: AvisadorDeLlamadas,
   ) {}
 
   async ingerir(publicacion: PublicacionDeEquipo): Promise<ResultadoDeIngesta> {
@@ -108,13 +116,7 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     }
     if (evento.clase === 'rostro') return this.ingerirRostro(publicacion, copropiedadId);
     if (evento.clase === 'llamada' || evento.clase === 'timbre') {
-      // A4 · la llamada no es un acceso: se atiende en la ronda del videoportero.
-      this.bitacora.registrar('info', 'llamada del videoportero recibida', {
-        copropiedadId,
-        dispositivoId: evento.dispositivoId,
-        origen: evento.origenDeLlamada,
-      });
-      return { registrado: false, motivo: 'llamada: no es un acceso' };
+      return this.ingerirLlamada(evento, copropiedadId, evento.clase);
     }
 
     if (evento.horaSinDesplazamiento) {
@@ -227,6 +229,64 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
    * equipo aceptó el veredicto. Es la cifra que decide si la terminal espera
    * lo bastante; qué hace el equipo si no llega a tiempo está en S-41.
    */
+  /**
+   * A4 · LA LLAMADA NO ES UN ACCESO, Y POR ESO NO PASA POR EL MOTOR
+   *
+   * Nadie pidió entrar todavía: alguien llamó. Lo que corresponde es que la
+   * portería y la guardia virtual lo VEAN en el acto (RN-18, KPI-25), con la
+   * vivienda a la que llama si el equipo declara la unidad; abrir sigue
+   * siendo una orden aparte, atribuida al operador (RN-08, CA-20). No hay
+   * fila en `eventos`: un timbre no es un hecho de acceso y escribirlo como
+   * tal falsearía el histórico.
+   */
+  private async ingerirLlamada(
+    evento: EventoDeEquipo,
+    copropiedadId: string,
+    clase: 'llamada' | 'timbre',
+  ): Promise<ResultadoDeIngesta> {
+    const vivienda = await this.viviendaDeLaLlamada(copropiedadId, evento);
+    const llamada: LlamadaEntrante = {
+      copropiedadId,
+      dispositivoId: evento.dispositivoId,
+      clase,
+      viviendaId: vivienda?.id ?? null,
+      vivienda: vivienda?.identificador ?? evento.unidadDeLlamada,
+      origen: evento.origenDeLlamada,
+      ocurridoEn: evento.ocurridoEn,
+      referenciaExterna: evento.referenciaDelEquipo,
+    };
+    await this.avisador.llamadaEntrante(llamada);
+    this.bitacora.registrar('info', 'llamada del videoportero recibida', {
+      copropiedadId,
+      dispositivoId: evento.dispositivoId,
+      origen: evento.origenDeLlamada,
+      viviendaResuelta: vivienda !== null,
+    });
+    return { registrado: false, motivo: 'llamada: avisada a las consolas; no es un acceso' };
+  }
+
+  /** La vivienda, si el equipo dice la unidad y el padrón la reconoce. Nunca lanza. */
+  private async viviendaDeLaLlamada(
+    copropiedadId: string,
+    evento: EventoDeEquipo,
+  ): Promise<{ readonly id: string; readonly identificador: string } | null> {
+    if (evento.unidadDeLlamada === null) return null;
+    try {
+      return await this.viviendas.porUnidad(
+        copropiedadId,
+        evento.edificioDeLlamada,
+        evento.unidadDeLlamada,
+      );
+    } catch (error) {
+      this.bitacora.registrar('aviso', 'no se pudo resolver la vivienda de la llamada', {
+        copropiedadId,
+        unidad: evento.unidadDeLlamada,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
   private async ingerirRostro(
     publicacion: PublicacionDeEquipo,
     copropiedadId: string,

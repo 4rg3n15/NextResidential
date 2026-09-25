@@ -553,9 +553,26 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     if (catalogada.proposito === 'enviar audio al equipo') {
       const cuerpo = opciones?.body;
       if (cuerpo instanceof Uint8Array) audioRecibido.push(cuerpo);
+      // A4 · el adaptador sube el audio como UN flujo que dura la sesión: el
+      // equipo lo lee según llega, como el real, y contesta en el acto.
+      if (cuerpo instanceof ReadableStream) {
+        const lector = (cuerpo as ReadableStream<Uint8Array>).getReader();
+        void (async () => {
+          for (;;) {
+            const { done, value } = await lector
+              .read()
+              .catch(() => ({ done: true, value: undefined }));
+            if (done === true) return;
+            if (value !== undefined) audioRecibido.push(value);
+          }
+        })();
+      }
       return respuestaDe(200, '');
     }
     if (catalogada.proposito === 'recibir audio del equipo') {
+      // Lo que el flujo de subida ya entregó se vuelca aquí; un tic deja que
+      // el lector del flujo apunte lo último que llegó.
+      await new Promise((listo) => setTimeout(listo, 0));
       const respuesta = respuestaDe(200, '');
       const trozos = audioRecibido.splice(0, audioRecibido.length);
       Object.defineProperty(respuesta, 'body', { value: cuerpoBinario(trozos) });

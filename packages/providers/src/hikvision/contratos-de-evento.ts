@@ -147,6 +147,14 @@ export interface EventoDeEquipo {
   readonly esResultadoDeVerificacion: boolean;
   /** De dónde llama (`llamada`): edificio/unidad/periodo tal como los declara. */
   readonly origenDeLlamada: string | null;
+  /**
+   * A4 · las dos partes del origen que la plataforma puede cotejar con el
+   * padrón: la UNIDAD (número de la vivienda) y el EDIFICIO (agrupación).
+   * `[SUPUESTO]` S-42: `unitNumber` es la vivienda y `buildingNumber` la
+   * agrupación. `null` en las demás clases o si el equipo no lo declara.
+   */
+  readonly unidadDeLlamada: string | null;
+  readonly edificioDeLlamada: string | null;
 }
 
 /**
@@ -377,6 +385,8 @@ export const desdeAlarmServerXml = (
     serieDelEquipo: null,
     esResultadoDeVerificacion: false,
     origenDeLlamada: null,
+    unidadDeLlamada: null,
+    edificioDeLlamada: null,
   };
 };
 
@@ -489,6 +499,18 @@ const origenDeLlamadaDe = (bloque: BloqueDeAlertStream): string | null => {
   return partes.length === 0 ? null : partes.join(' · ');
 };
 
+/** Una parte del origen, como texto, o `null` si el equipo no la declara. */
+const parteDeLlamada = (
+  bloque: BloqueDeAlertStream,
+  clave: 'unitNumber' | 'buildingNumber',
+): string | null => {
+  const origen = bloque.CallInfo ?? bloque.voiceTalkEvent?.src;
+  const valor = origen?.[clave];
+  if (valor === undefined || valor === null) return null;
+  const texto = String(valor).trim();
+  return texto === '' ? null : texto;
+};
+
 /** La clase de un bloque JSON, por lo que TRAE y no sólo por su tipo. */
 export const claseDeBloque = (bloque: BloqueDeAlertStream): ClaseDeEvento => {
   const tipo = bloque.eventType ?? '';
@@ -571,6 +593,8 @@ export const desdeAlertStreamJson = (
     serieDelEquipo: serie === null || Number.isNaN(serie) ? null : serie,
     esResultadoDeVerificacion: esResultado,
     origenDeLlamada: origenDeLlamadaDe(bloque),
+    unidadDeLlamada: parteDeLlamada(bloque, 'unitNumber'),
+    edificioDeLlamada: parteDeLlamada(bloque, 'buildingNumber'),
   };
 };
 

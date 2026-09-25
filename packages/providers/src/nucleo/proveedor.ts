@@ -7,6 +7,7 @@ import type {
   ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo } from './capacidades';
+import type { EscuchaActiva } from './escucha';
 import type { VeredictoRemoto } from './verificacion-remota';
 
 /**
@@ -52,4 +53,11 @@ export type ProveedorDeEquipos = AccessPointProvider &
       dispositivoId: string,
       veredicto: VeredictoRemoto,
     ): Promise<ResultadoAccionamiento>;
+    /**
+     * A4 · abre y mantiene la escucha de lo que el equipo EMITE —llamadas,
+     * rostros, timbres— y lo publica en la fuente compartida. Devuelve cómo
+     * quedó (transporte elegido por capacidad, o `ninguna` con su motivo) y
+     * cómo detenerla. Un equipo desconocido rechaza.
+     */
+    escuchar(dispositivoId: string): Promise<EscuchaActiva>;
   };

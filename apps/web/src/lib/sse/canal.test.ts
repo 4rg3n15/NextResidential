@@ -206,3 +206,54 @@ describe('abrirCanal', () => {
     baja();
   });
 });
+
+describe('A4 · la llamada del videoportero', () => {
+  it('llega por el tema «llamadas» a quien la atiende, y lo malformado se tira', () => {
+    const llamadas: unknown[] = [];
+    const baja = abrirCanal({
+      copropiedadId: COP,
+      mensajes: { ...espias(), llamada: (l) => llamadas.push(l) },
+      crearFuente: (url) => new FuenteFalsa(url) as unknown as EventSource,
+      ahora: () => 0,
+      aleatorio: () => 0,
+    });
+    const fuente = FuenteFalsa.abiertas.at(-1);
+    fuente?.emitir('listo', { copropiedadId: COP });
+    fuente?.emitir('llamadas', {
+      dispositivoId: 'v-1',
+      clase: 'llamada',
+      viviendaId: null,
+      vivienda: 'Casa 12',
+      origen: 'unidad 12',
+      ocurridoEn: '2026-09-25T10:00:00.000Z',
+      referenciaExterna: null,
+    });
+    fuente?.emitir('llamadas', { esto: 'no es una llamada' });
+    expect(llamadas).toHaveLength(1);
+    expect(llamadas[0]).toMatchObject({ vivienda: 'Casa 12', clase: 'llamada' });
+    baja();
+  });
+
+  it('sin oyente de llamadas, el mensaje no rompe el canal', () => {
+    const baja = abrirCanal({
+      copropiedadId: COP,
+      mensajes: espias(),
+      crearFuente: (url) => new FuenteFalsa(url) as unknown as EventSource,
+      ahora: () => 0,
+      aleatorio: () => 0,
+    });
+    const fuente = FuenteFalsa.abiertas.at(-1);
+    expect(() =>
+      fuente?.emitir('llamadas', {
+        dispositivoId: 'v-1',
+        clase: 'timbre',
+        viviendaId: null,
+        vivienda: null,
+        origen: null,
+        ocurridoEn: '2026-09-25T10:00:00.000Z',
+        referenciaExterna: null,
+      }),
+    ).not.toThrow();
+    baja();
+  });
+});

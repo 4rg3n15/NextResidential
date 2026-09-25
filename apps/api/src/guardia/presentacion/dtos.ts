@@ -159,6 +159,15 @@ export class EstadoDeCanalDto {
     description: 'Por qué no hay transporte, si no lo hay',
   })
   detalleTransporte!: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description:
+      'A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. ' +
+      'La consola decodifica lo que el equipo dice.',
+  })
+  formatoDeAudio!: string | null;
 }
 
 export class AvisoAlResidenteDto {

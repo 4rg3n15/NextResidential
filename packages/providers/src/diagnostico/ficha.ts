@@ -221,15 +221,42 @@ const hallazgosDeVideoportero = (c: CapacidadesDeEquipo): HallazgoDelEquipo[] =>
   desdeCapacidad('señalización de llamada', c.senalizacionDeLlamada, {
     si: {
       valor: 'sí',
-      detalle: 'La central puede contestar o rechazar la llamada desde la consola',
+      detalle:
+        'La central contesta y cuelga desde la consola: al abrir el audio se envía «contestar» ' +
+        'y al cerrarlo «colgar» (A4)',
     },
     no: {
       estado: 'aviso',
       detalle:
-        'El equipo no admite señalizar la llamada: la central no podrá contestarla desde aquí',
+        'NO APLICA POR CAPACIDAD: el equipo no admite señalizar la llamada. La llamada se ' +
+        'atiende en el propio aparato; la consola sólo abre el audio y la puerta',
     },
     desconocida: 'No se pudo leer si el equipo admite señalizar llamadas',
     valorCorrecto: 'sí',
+  }),
+  /**
+   * A4 · el reconocimiento facial en ESTE videoportero es una promesa que
+   * sólo se hace si el equipo declara biblioteca de rostros. Prometerlo por
+   * el tipo del aparato dejaría en sitio un visitante con consentimiento y
+   * sin puerta.
+   */
+  desdeCapacidad('reconocimiento facial en este equipo', c.bibliotecaDeRostros.estado, {
+    si: {
+      valor:
+        c.bibliotecaDeRostros.maximo === null
+          ? 'biblioteca declarada'
+          : `biblioteca de hasta ${String(c.bibliotecaDeRostros.maximo)} rostros`,
+      detalle:
+        'Las plantillas con consentimiento vigente se sincronizan también a este equipo (RN-09)',
+    },
+    no: {
+      estado: 'aviso',
+      detalle:
+        'NO APLICA POR CAPACIDAD: el equipo no declara biblioteca de rostros. Ninguna plantilla ' +
+        'se le envía; el acceso por este equipo es por llamada y apertura remota',
+    },
+    desconocida: 'No se pudo leer si el equipo tiene biblioteca de rostros: sondee de nuevo',
+    valorCorrecto: 'sí, si el modelo la trae',
   }),
   desdeCapacidad('suscripción a eventos', c.suscripcionDeEventos, {
     si: { valor: 'sí', detalle: 'El equipo admite que la plataforma se suscriba a sus eventos' },

@@ -467,3 +467,42 @@ describe('el evento ANPR en JSON · 6.7a · DOCUMENTADO, NO VERIFICADO', () => {
     expect(esJsonDeAlarmServer('<EventNotificationAlert/>')).toBe(false);
   });
 });
+
+describe('A4 · el origen de la llamada, en partes que el padrón puede cotejar', () => {
+  it('CallInfo: unidad y edificio como texto', () => {
+    const e = desdeAlertStreamJson(
+      {
+        eventType: 'videoIntercomEvent',
+        currentEvent: true,
+        CallInfo: { buildingNumber: 1, unitNumber: 12, periodNumber: 1 },
+      },
+      'portero-1',
+      new Date('2026-09-25T10:00:00Z'),
+    );
+    expect(e.clase).toBe('llamada');
+    expect(e.unidadDeLlamada).toBe('12');
+    expect(e.edificioDeLlamada).toBe('1');
+    expect(e.origenDeLlamada).toContain('unidad 12');
+  });
+
+  it('voiceTalkEvent.src también vale; lo que no viene es null, nunca una cadena vacía', () => {
+    const e = desdeAlertStreamJson(
+      {
+        eventType: 'voiceTalkEvent',
+        currentEvent: true,
+        voiceTalkEvent: { src: { unitNumber: ' 7 ' } },
+      },
+      'portero-1',
+      new Date('2026-09-25T10:00:00Z'),
+    );
+    expect(e.unidadDeLlamada).toBe('7');
+    expect(e.edificioDeLlamada).toBeNull();
+    const sin = desdeAlertStreamJson(
+      { eventType: 'AccessControllerEvent', currentEvent: true, AccessControllerEvent: {} },
+      't-1',
+      new Date('2026-09-25T10:00:00Z'),
+    );
+    expect(sin.unidadDeLlamada).toBeNull();
+    expect(sin.edificioDeLlamada).toBeNull();
+  });
+});

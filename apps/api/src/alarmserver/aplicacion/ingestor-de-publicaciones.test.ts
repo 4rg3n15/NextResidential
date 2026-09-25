@@ -45,6 +45,8 @@ const rostro = (extra: Partial<EventoDeEquipo> = {}): PublicacionDeEquipo => ({
     serieDelEquipo: 4711,
     esResultadoDeVerificacion: false,
     origenDeLlamada: null,
+    unidadDeLlamada: null,
+    edificioDeLlamada: null,
     ...extra,
   },
   foto: null,
@@ -94,6 +96,7 @@ const montar = (opciones: {
     guardar: async () => 'evidencia-1',
     urlFirmada: async () => 'https://x.invalid',
   };
+  const llamadas: LlamadaEntrante[] = [];
   const ingestor = new IngestorDeEquipos(
     { ejecutar } as unknown as RegistrarAcceso,
     { accionar },
@@ -106,8 +109,19 @@ const montar = (opciones: {
     },
     respondedor,
     reloj,
+    // A4 · la vivienda de la llamada y el avisador, con dobles observables.
+    {
+      porUnidad: async (_cop: string, agrupacion: string | null, identificador: string) =>
+        identificador === '305'
+          ? {
+              id: 'viv-305',
+              identificador: `Apto 305${agrupacion === null ? '' : ` · ${agrupacion}`}`,
+            }
+          : null,
+    },
+    { llamadaEntrante: async (llamada) => void llamadas.push(llamada) },
   );
-  return { ingestor, ejecutar, accionar, veredictos, lineas, respondedor };
+  return { ingestor, ejecutar, accionar, veredictos, lineas, respondedor, llamadas };
 };
 
 describe('A2 · el rostro que espera veredicto', () => {
@@ -211,5 +225,37 @@ describe('A2 · lo que NO es una petición', () => {
     );
     expect(r.registrado).toBe(false);
     expect(ejecutar).not.toHaveBeenCalled();
+  });
+});
+
+describe('A4 · la llamada del videoportero', () => {
+  it('avisa a las consolas con la vivienda resuelta por unidad y edificio; no registra acceso', async () => {
+    const { ingestor, ejecutar, llamadas } = montar({});
+    const r = await ingestor.ingerir(
+      rostro({
+        clase: 'llamada',
+        origenDeLlamada: 'edificio 2 · unidad 305',
+        unidadDeLlamada: '305',
+        edificioDeLlamada: '2',
+        esperaVeredicto: false,
+      }),
+    );
+    expect(r.registrado).toBe(false);
+    expect(ejecutar).not.toHaveBeenCalled();
+    expect(llamadas).toHaveLength(1);
+    expect(llamadas[0]).toMatchObject({
+      clase: 'llamada',
+      viviendaId: 'viv-305',
+      vivienda: 'Apto 305 · 2',
+      origen: 'edificio 2 · unidad 305',
+    });
+  });
+
+  it('sin unidad reconocida avisa igual, con la vivienda en null: la llamada no se pierde', async () => {
+    const { ingestor, llamadas } = montar({});
+    await ingestor.ingerir(
+      rostro({ clase: 'timbre', unidadDeLlamada: '999', esperaVeredicto: false }),
+    );
+    expect(llamadas[0]).toMatchObject({ clase: 'timbre', viviendaId: null, vivienda: '999' });
   });
 });

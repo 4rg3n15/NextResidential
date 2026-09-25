@@ -791,6 +791,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Audio que el equipo emite, en flujo, para quien tiene la palabra */
+        get: operations["GuardiaController_escucharAudio"];
+        put?: never;
+        /** Un trozo de audio del operador hacia el equipo */
+        post: operations["GuardiaController_hablar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/guardia/ordenes": {
         parameters: {
             query?: never;
@@ -2114,6 +2132,8 @@ export interface components {
             transporte: "equipo" | "ninguno";
             /** @description Por qué no hay transporte, si no lo hay */
             detalleTransporte: string | null;
+            /** @description A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice. */
+            formatoDeAudio: string | null;
         };
         EstadoDeDispositivosDto: {
             dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
@@ -4123,7 +4143,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado y «alertas» por cada escalamiento. La carga de cada mensaje es un EventoRegistradoDto o un AlertaExpuestaDto según el tema. */
+            /** @description Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado, «alertas» por cada escalamiento y «llamadas» por cada llamada de videoportero (A4: dispositivoId, clase, viviendaId, vivienda, origen, ocurridoEn, referenciaExterna). La carga de cada mensaje es un EventoRegistradoDto, un AlertaExpuestaDto o la de la llamada según el tema. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4432,6 +4452,66 @@ export interface operations {
                     "application/json": components["schemas"]["EstadoDeCanalDto"];
                 };
             };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_escucharAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Flujo de audio en el formato que `formatoDeAudio` del canal anuncia */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    GuardiaController_hablar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        /** @description Bytes en el formato anunciado */
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
             /** @description Copropiedad fuera del alcance */
             404: {
                 headers: {

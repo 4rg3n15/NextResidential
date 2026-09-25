@@ -97,3 +97,60 @@ describe('CanalIntercomConTransporte', () => {
     expect(doble.abrirSesion).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('A4 · el audio es de quien tiene la palabra', () => {
+  const montarConAudio = () => {
+    const { doble, proveedor } = proveedorDoble();
+    const enviados: number[][] = [];
+    const conAudio = {
+      ...doble,
+      enviarAudio: vi.fn(async (f: Uint8Array) => void enviados.push([...f])),
+      recibirAudio: vi.fn(async function* () {
+        yield new Uint8Array([1, 2]);
+        yield new Uint8Array([3]);
+      }),
+    };
+    const canal = new CanalIntercomConTransporte(
+      new CanalIntercomEnProceso(reloj),
+      { ...proveedor, ...conAudio } as unknown as ProveedorDeEquipos,
+      silencio,
+    );
+    return { canal, enviados, conAudio };
+  };
+
+  it('el titular oye y habla; el formato anunciado por el equipo viaja en el estado', async () => {
+    const { canal, enviados } = montarConAudio();
+    const estado = await canal.pedir(COP, CON_AUDIO, 'op-1');
+    expect(estado.formatoDeAudio).toBe(CAPACIDADES_COMPLETAS.audioBidireccional.formato);
+    const oido: number[] = [];
+    for await (const trozo of canal.recibirAudio(COP, CON_AUDIO, 'op-1')) oido.push(...trozo);
+    expect(oido).toEqual([1, 2, 3]);
+    await canal.enviarAudio(COP, CON_AUDIO, 'op-1', new Uint8Array([9]));
+    expect(enviados).toEqual([[9]]);
+  });
+
+  it('quien espera en cola NO oye ni habla', async () => {
+    const { canal, conAudio } = montarConAudio();
+    await canal.pedir(COP, CON_AUDIO, 'op-1');
+    await canal.pedir(COP, CON_AUDIO, 'op-2');
+    await expect(
+      (async () => {
+        for await (const t of canal.recibirAudio(COP, CON_AUDIO, 'op-2')) void t;
+      })(),
+    ).rejects.toThrow(/la palabra la tiene otro/);
+    await expect(canal.enviarAudio(COP, CON_AUDIO, 'op-2', new Uint8Array([1]))).rejects.toThrow(
+      /la palabra la tiene otro/,
+    );
+    expect(conAudio.enviarAudio).not.toHaveBeenCalled();
+  });
+
+  it('sin canal abierto no hay audio, y tras soltar el formato desaparece', async () => {
+    const { canal } = montarConAudio();
+    await expect(canal.enviarAudio(COP, CON_AUDIO, 'op-1', new Uint8Array([1]))).rejects.toThrow(
+      /no está abierto/,
+    );
+    await canal.pedir(COP, CON_AUDIO, 'op-1');
+    const cerrado = await canal.soltar(COP, CON_AUDIO, 'op-1');
+    expect(cerrado.formatoDeAudio).toBeNull();
+  });
+});

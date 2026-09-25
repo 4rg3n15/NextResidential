@@ -6,6 +6,7 @@ import type {
   EstadoDeVerificacion,
   RepositorioDeEquipos,
   ResultadoDeSondeo,
+  EquipoQueEmite,
 } from '../aplicacion/puertos';
 
 /**
@@ -56,6 +57,18 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
 
   async listar(_ctx: ContextoTenant, copropiedadId: string): Promise<readonly DatosDeEquipo[]> {
     return [...this.lista(copropiedadId)];
+  }
+
+  async activosQueEmiten(): Promise<readonly EquipoQueEmite[]> {
+    const todos: EquipoQueEmite[] = [];
+    for (const [copropiedadId, equipos] of this.equipos) {
+      for (const e of equipos) {
+        if (e.estado !== 'activo' || (e.tipo !== 'terminal_facial' && e.tipo !== 'intercom'))
+          continue;
+        todos.push({ dispositivoId: e.id, copropiedadId, nombre: e.nombre });
+      }
+    }
+    return todos;
   }
 
   async crear(

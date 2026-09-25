@@ -2,7 +2,7 @@ import type { Bitacora } from '@ncr/domain-core';
 import { soporta } from '@ncr/providers';
 import type { ProveedorDeEquipos } from '@ncr/providers';
 import type { CanalDeIntercom, EstadoDeCanal } from '../aplicacion/puertos';
-import { TransporteDeAudioNoDisponible } from '../aplicacion/puertos';
+import { SinTransporteDeAudio, TransporteDeAudioNoDisponible } from '../aplicacion/puertos';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -34,6 +34,8 @@ import { TransporteDeAudioNoDisponible } from '../aplicacion/puertos';
 export class CanalIntercomConTransporte implements CanalDeIntercom {
   /** Dispositivos cuyo canal el proveedor tiene abierto, y para quién. */
   private readonly abiertos = new Map<string, string>();
+  /** A4 · el códec que el equipo anunció, por clave, mientras el canal esté abierto. */
+  private readonly formatos = new Map<string, string | null>();
 
   constructor(
     private readonly turnos: CanalDeIntercom,
@@ -57,6 +59,7 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
       ...estado,
       transporte: abierto ? 'equipo' : 'ninguno',
       detalleTransporte: abierto ? null : detalleSinTransporte,
+      formatoDeAudio: abierto ? (this.formatos.get(clave) ?? null) : null,
     };
   }
 
@@ -116,6 +119,7 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
         : new TransporteDeAudioNoDisponible(dispositivoId, motivo);
     }
     this.abiertos.set(clave, operadorId);
+    this.formatos.set(clave, capacidades.audioBidireccional.formato);
     this.bitacora.registrar('info', 'canal de audio del equipo abierto por el proveedor', {
       dispositivoId,
       operadorId,
@@ -131,6 +135,7 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
     const clave = this.clave(copropiedadId, dispositivoId);
     if (this.abiertos.get(clave) === operadorId) {
       this.abiertos.delete(clave);
+      this.formatos.delete(clave);
       try {
         await this.proveedor.cerrarSesion('el operador colgó');
       } catch (error) {
@@ -165,5 +170,40 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
       operadorId,
       turno.estado === 'abierta' ? 'turno sin transporte de audio' : null,
     );
+  }
+
+  /**
+   * A4 · el audio es de QUIEN tiene la palabra. Un operador en cola que
+   * pudiera escuchar oiría una conversación ajena; uno que pudiera hablar
+   * pisaría al titular. Ninguna de las dos es una opción, y por eso aquí no
+   * hay «modo escucha».
+   */
+  private exigirTitular(copropiedadId: string, dispositivoId: string, operadorId: string): void {
+    const titular = this.abiertos.get(this.clave(copropiedadId, dispositivoId));
+    if (titular === undefined) {
+      throw new SinTransporteDeAudio(dispositivoId, 'el canal del equipo no está abierto');
+    }
+    if (titular !== operadorId) {
+      throw new SinTransporteDeAudio(dispositivoId, 'la palabra la tiene otro operador');
+    }
+  }
+
+  async *recibirAudio(
+    copropiedadId: string,
+    dispositivoId: string,
+    operadorId: string,
+  ): AsyncIterable<Uint8Array> {
+    this.exigirTitular(copropiedadId, dispositivoId, operadorId);
+    for await (const trozo of this.proveedor.recibirAudio()) yield trozo;
+  }
+
+  async enviarAudio(
+    copropiedadId: string,
+    dispositivoId: string,
+    operadorId: string,
+    fragmento: Uint8Array,
+  ): Promise<void> {
+    this.exigirTitular(copropiedadId, dispositivoId, operadorId);
+    await this.proveedor.enviarAudio(fragmento);
   }
 }

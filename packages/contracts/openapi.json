@@ -2179,7 +2179,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado y «alertas» por cada escalamiento. La carga de cada mensaje es un EventoRegistradoDto o un AlertaExpuestaDto según el tema.",
+            "description": "Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado, «alertas» por cada escalamiento y «llamadas» por cada llamada de videoportero (A4: dispositivoId, clase, viviendaId, vivienda, origen, ocurridoEn, referenciaExterna). La carga de cada mensaje es un EventoRegistradoDto, un AlertaExpuestaDto o la de la llamada según el tema.",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -2694,6 +2694,115 @@
           }
         ],
         "summary": "Estado del canal: quién tiene la palabra y cuántos esperan",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}/audio": {
+      "get": {
+        "operationId": "GuardiaController_escucharAudio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flujo de audio en el formato que `formatoDeAudio` del canal anuncia",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Audio que el equipo emite, en flujo, para quien tiene la palabra",
+        "tags": [
+          "guardia"
+        ]
+      },
+      "post": {
+        "operationId": "GuardiaController_hablar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Bytes en el formato anunciado",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Un trozo de audio del operador hacia el equipo",
         "tags": [
           "guardia"
         ]
@@ -6770,6 +6879,11 @@
             "type": "string",
             "nullable": true,
             "description": "Por qué no hay transporte, si no lo hay"
+          },
+          "formatoDeAudio": {
+            "type": "string",
+            "nullable": true,
+            "description": "A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice."
           }
         },
         "required": [
@@ -6779,7 +6893,8 @@
           "titular",
           "timeoutSegundos",
           "transporte",
-          "detalleTransporte"
+          "detalleTransporte",
+          "formatoDeAudio"
         ]
       },
       "EstadoDeDispositivosDto": {

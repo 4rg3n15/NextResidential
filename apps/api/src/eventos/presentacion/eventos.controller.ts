@@ -151,9 +151,11 @@ export class EventosController {
   @ApiProduces('text/event-stream')
   @ApiOkResponse({
     description:
-      'Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado y ' +
-      '«alertas» por cada escalamiento. La carga de cada mensaje es un EventoRegistradoDto ' +
-      'o un AlertaExpuestaDto según el tema.',
+      'Flujo SSE. Temas: «listo» al abrir, «eventos» por cada acceso registrado, ' +
+      '«alertas» por cada escalamiento y «llamadas» por cada llamada de videoportero ' +
+      '(A4: dispositivoId, clase, viviendaId, vivienda, origen, ocurridoEn, referenciaExterna). ' +
+      'La carga de cada mensaje es un EventoRegistradoDto, un AlertaExpuestaDto o la de la ' +
+      'llamada según el tema.',
     schema: { type: 'string', format: 'binary' },
   })
   @ApiNotFoundResponse({ type: ErrorApiDto })

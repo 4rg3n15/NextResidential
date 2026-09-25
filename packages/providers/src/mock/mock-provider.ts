@@ -12,6 +12,7 @@ import { ordenAceptada } from '@ncr/domain-core';
 import type { PerfilDeSimulacion } from './simulacion';
 import { Azar, FalloDeHardwareSimulado, PERFIL_REALISTA, RelojSimulado } from './simulacion';
 import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
+import type { EscuchaActiva } from '../nucleo/escucha';
 import { CAPACIDADES_COMPLETAS, CAPACIDADES_SIN_CONSULTAR } from '../nucleo/capacidades';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
@@ -82,6 +83,24 @@ export class MockProvider
   /** El simulado finge un equipo completo: todo `si`. Lo desconocido, nada. */
   async capacidadesDe(dispositivoId: string): Promise<CapacidadesDeEquipo> {
     return this.dispositivos.has(dispositivoId) ? CAPACIDADES_COMPLETAS : CAPACIDADES_SIN_CONSULTAR;
+  }
+
+  /**
+   * A4 · el simulado no tiene flujo que escuchar: sus lecturas entran por la
+   * fuente (`entregarLectura`) o por el receptor. Lo dice, y un equipo que no
+   * conoce lo rechaza, como el real.
+   */
+  async escuchar(dispositivoId: string): Promise<EscuchaActiva> {
+    if (!this.dispositivos.has(dispositivoId)) {
+      throw new FalloDeHardwareSimulado(dispositivoId, 'escuchar');
+    }
+    return {
+      dispositivoId,
+      transporte: 'ninguna',
+      detalle:
+        'simulado: no hay flujo que escuchar; los eventos entran por la fuente o el receptor',
+      detener: () => undefined,
+    };
   }
 
   // ── AccessPointProvider ──────────────────────────────────────────────────

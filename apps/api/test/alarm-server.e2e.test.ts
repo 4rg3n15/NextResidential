@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso';
 import type { INestApplication } from '@nestjs/common';
 import { sobreDeLectura } from '@ncr/providers';
 import { COP_A, crearApp, crearFirmante } from './utilidades';
@@ -157,6 +158,41 @@ describe('receptor del servidor de alarma', () => {
     // haya `ignorado: true` es lo que distingue un receptor que lo procesa de
     // uno que lo tira con un 200.
     expect(respuesta.body).toEqual({ aceptado: true });
+  });
+
+  it('A4 · la llamada JSON del videoportero se AVISA por el canal de tiempo real, sin evento', async () => {
+    const canal = app.get(CanalEnProceso, { strict: false });
+    const recibidos: { tema: string; carga: unknown }[] = [];
+    const baja = canal.suscribir(COP_A, {
+      entregar: (tema, carga) => {
+        recibidos.push({ tema, carga });
+        return true;
+      },
+    });
+    const llamada = JSON.stringify({
+      eventType: 'videoIntercomEvent',
+      dateTime: '2026-09-25T07:00:00-05:00',
+      alarmDataType: 0,
+      CallInfo: { buildingNumber: 1, unitNumber: 'no-existe-99' },
+    });
+    const respuesta = await request(app.getHttpServer())
+      .post(`/alarm-server/${SECRETO}`)
+      .set('content-type', 'application/json')
+      .send(llamada)
+      .expect(200);
+    baja();
+    // Aceptada y NO registrada como acceso: el motivo lo dice. Un timbre no es
+    // una fila en `eventos`; es un aviso a quien atiende.
+    expect(respuesta.body.aceptado).toBe(true);
+    expect(respuesta.body.motivo).toMatch(/avisada a las consolas/);
+    const aviso = recibidos.find((r) => r.tema === 'llamadas');
+    expect(aviso?.carga).toMatchObject({
+      dispositivoId: DISPOSITIVO,
+      clase: 'llamada',
+      viviendaId: null,
+      vivienda: 'no-existe-99',
+      origen: expect.stringContaining('unidad no-existe-99'),
+    });
   });
 
   it('un evento que no es una lectura de placa se acepta y se ignora', async () => {

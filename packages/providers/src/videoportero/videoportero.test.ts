@@ -196,6 +196,103 @@ describe('el canal de audio está escrito y NO habilitado', () => {
     expect(llamadas.some((u) => /channels\/1\//.test(u))).toBe(false);
   });
 
+  it('A4 · el audio va por UN flujo que dura la sesión, no un PUT por trozo', async () => {
+    const peticiones: { url: string; metodo: string; cuerpo: unknown }[] = [];
+    const peticion = vi.fn(async (url: string, init: RequestInit) => {
+      peticiones.push({ url, metodo: init.method ?? 'GET', cuerpo: init.body });
+      return respuesta(200);
+    });
+    const { reloj } = relojFijo();
+    const intercom = new IntercomDeEquipo({
+      host: 'portero.invalid',
+      usuario: 'u',
+      clave: 'c',
+      reloj,
+      canalHabilitado: true,
+      canal: 2,
+      peticion: peticion as unknown as typeof fetch,
+    });
+    await intercom.abrirSesion('portero-1', 'op-1');
+    await intercom.enviarAudio(new Uint8Array([1, 2]));
+    await intercom.enviarAudio(new Uint8Array([3, 4]));
+    await intercom.enviarAudio(new Uint8Array([5]));
+
+    const subidas = peticiones.filter((p) => /audioData$/.test(p.url) && p.metodo === 'PUT');
+    expect(subidas).toHaveLength(1);
+    const cuerpo = subidas[0]?.cuerpo;
+    expect(cuerpo).toBeInstanceOf(ReadableStream);
+
+    // Lo que el flujo entrega son los trozos, en orden; y cerrar la sesión lo termina.
+    const lector = (cuerpo as ReadableStream<Uint8Array>).getReader();
+    const leidos: number[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      const { value } = await lector.read();
+      leidos.push(...(value ?? []));
+    }
+    expect(leidos).toEqual([1, 2, 3, 4, 5]);
+    await intercom.cerrarSesion('fin');
+    expect((await lector.read()).done).toBe(true);
+    // Tras cerrar, hablar vuelve a exigir sesión.
+    await expect(intercom.enviarAudio(new Uint8Array([9]))).rejects.toThrow(/sesión/);
+  });
+
+  it('A4 · con señalización DECLARADA, abrir contesta y cerrar cuelga; sin ella, ninguna señal', async () => {
+    const montarCon = (senalizacion: boolean) => {
+      const cuerpos: string[] = [];
+      const peticion = vi.fn(async (url: string, init: RequestInit) => {
+        if (/callSignal/.test(url)) cuerpos.push(String(init.body));
+        return respuesta(200);
+      });
+      const { reloj } = relojFijo();
+      return {
+        cuerpos,
+        intercom: new IntercomDeEquipo({
+          host: 'portero.invalid',
+          usuario: 'u',
+          clave: 'c',
+          reloj,
+          canalHabilitado: true,
+          canal: 1,
+          senalizacion,
+          peticion: peticion as unknown as typeof fetch,
+        }),
+      };
+    };
+    const con = montarCon(true);
+    await con.intercom.abrirSesion('portero-1', 'op-1');
+    await con.intercom.cerrarSesion('fin');
+    expect(con.cuerpos).toEqual([
+      JSON.stringify({ CallSignal: { cmdType: 'answer' } }),
+      JSON.stringify({ CallSignal: { cmdType: 'hangUp' } }),
+    ]);
+
+    const sin = montarCon(false);
+    await sin.intercom.abrirSesion('portero-1', 'op-1');
+    await sin.intercom.cerrarSesion('fin');
+    expect(sin.cuerpos).toEqual([]);
+  });
+
+  it('A4 · si el equipo rechaza el flujo de audio, el siguiente trozo lo dice', async () => {
+    const peticion = vi.fn(async (url: string) =>
+      /audioData$/.test(url) ? respuesta(400) : respuesta(200),
+    );
+    const { reloj } = relojFijo();
+    const intercom = new IntercomDeEquipo({
+      host: 'portero.invalid',
+      usuario: 'u',
+      clave: 'c',
+      reloj,
+      canalHabilitado: true,
+      canal: 1,
+      peticion: peticion as unknown as typeof fetch,
+    });
+    await intercom.abrirSesion('portero-1', 'op-1');
+    await intercom.enviarAudio(new Uint8Array([1]));
+    // La respuesta del equipo llega después del primer trozo.
+    await new Promise((listo) => setTimeout(listo, 0));
+    await expect(intercom.enviarAudio(new Uint8Array([2]))).rejects.toThrow(/HTTP 400/);
+  });
+
   it('sin canal descubierto NO se abre: se dice que falta, no se supone 1 (D4)', async () => {
     const peticion = vi.fn(async () => respuesta(200));
     const { reloj } = relojFijo();

@@ -76,6 +76,8 @@ export type {
 } from './hikvision/contratos-de-evento';
 export { EscuchaDeAlertStream, transporteSegunCapacidades } from './equipo/escucha-alertstream';
 export type { TransporteDeFlujo, OpcionesDeEscucha } from './equipo/escucha-alertstream';
+/** A4 (15-E) · lo que el proveedor devuelve al pedirle que escuche un equipo. */
+export type { EscuchaActiva, TransporteDeEscucha } from './nucleo/escucha';
 export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';
 
 // ── Diagnóstico y corrección de un equipo, para la consola ───────────────────

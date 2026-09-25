@@ -17,6 +17,8 @@ import { ControlDeBarreraVehicular } from '../barrera/control-barrera';
 import { TerminalFacial } from '../terminal/terminal-facial';
 import { Videoportero } from '../videoportero/videoportero';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
+import { EscuchaDeAlertStream, transporteSegunCapacidades } from '../equipo/escucha-alertstream';
+import type { EscuchaActiva } from '../nucleo/escucha';
 import { EquipoDecidePorSuCuenta } from '../camara/modo-de-control';
 import { leerVeredictoDeControl } from '../camara/veredicto-de-control';
 import { leerDisparador } from '../camara/disparadores-vinculados';
@@ -25,7 +27,7 @@ import type { EquipoRegistrado, RegistroDeEquipos } from './registro-de-equipos'
 import { descubrirCapacidades } from './capacidades-hikvision';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
-import { CAPACIDADES_SIN_CONSULTAR, estadoDe } from '../nucleo/capacidades';
+import { CAPACIDADES_SIN_CONSULTAR, estadoDe, soporta } from '../nucleo/capacidades';
 import { CapacidadNoSoportada } from '../nucleo/errores';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
@@ -106,6 +108,8 @@ export class HikvisionProvider
   private readonly puertas = new Map<string, AccessPointProvider>();
   private readonly terminales = new Map<string, TerminalFacial>();
   private readonly intercomos = new Map<string, IntercomDeEquipo>();
+  /** A4 · escuchas abiertas, una por equipo. */
+  private readonly escuchas = new Map<string, EscuchaActiva>();
   private enSesion: string | null = null;
 
   constructor(private readonly opciones: OpcionesDeHikvision) {
@@ -245,6 +249,73 @@ export class HikvisionProvider
    */
   async suscribir(alLeer: (lectura: LecturaDePlaca) => Promise<void>): Promise<void> {
     await this.fuente.suscribir(alLeer);
+  }
+
+  // ── Escucha de lo que el equipo emite (A4) ───────────────────────────────
+
+  /**
+   * Abre el flujo del equipo y bombea lo que emite hacia la fuente compartida,
+   * por el transporte que su CAPACIDAD indique (`transporteSegunCapacidades`).
+   * La cámara no se escucha: publica al servidor de alarma, y abrirle además un
+   * flujo sería el segundo camino silencioso que la 15-E prohíbe. Un equipo
+   * que no está en el registro rechaza.
+   */
+  async escuchar(dispositivoId: string): Promise<EscuchaActiva> {
+    const activa = this.escuchas.get(dispositivoId);
+    if (activa !== undefined) return activa;
+
+    const equipo = await this.resolver(dispositivoId);
+    const familia = FAMILIA_DE[equipo.tipo];
+    if (familia === 'camara') {
+      return {
+        dispositivoId,
+        transporte: 'ninguna',
+        detalle:
+          'la cámara publica al servidor de alarma; escucharla además abriría un segundo camino',
+        detener: () => undefined,
+      };
+    }
+
+    const capacidades = await this.capacidadesDe(dispositivoId);
+    const flujo = transporteSegunCapacidades(capacidades);
+    const transporte = flujo === 'subscribeEvent' ? 'suscripcion' : 'escucha';
+    const escucha = new EscuchaDeAlertStream({
+      ...this.conexionDe(equipo),
+      dispositivoId,
+      familia,
+      transporte: flujo,
+    });
+    const control = new AbortController();
+    void this.bombear(escucha, control.signal, transporte);
+
+    const nueva: EscuchaActiva = {
+      dispositivoId,
+      transporte,
+      detalle:
+        flujo === 'subscribeEvent'
+          ? 'suscripción a los eventos del equipo (capacidad declarada)'
+          : 'flujo de alertas del equipo (sin capacidad de suscripción declarada)',
+      detener: () => {
+        control.abort();
+        this.escuchas.delete(dispositivoId);
+      },
+    };
+    this.escuchas.set(dispositivoId, nueva);
+    return nueva;
+  }
+
+  private async bombear(
+    escucha: EscuchaDeAlertStream,
+    cancelar: AbortSignal,
+    transporte: 'escucha' | 'suscripcion',
+  ): Promise<void> {
+    try {
+      for await (const evento of escucha.escuchar(cancelar)) {
+        await this.fuente.publicar({ evento, foto: null, recorte: null, transporte });
+      }
+    } catch {
+      // La escucha reintenta sola; si salió del bucle es porque se canceló.
+    }
   }
 
   // ── FaceTemplateProvider ─────────────────────────────────────────────────
@@ -502,6 +573,9 @@ export class HikvisionProvider
       reloj: this.opciones.reloj,
       canalHabilitado: equipo.canalDeAudioHabilitado ?? false,
       canal: capacidades.audioBidireccional.canal ?? equipo.canalDeAudio ?? null,
+      // A4 · contestar y colgar por señalización SÓLO si el equipo la declara
+      // (el DS-KD9633 del proyecto declara que no: NO APLICA POR CAPACIDAD).
+      senalizacion: soporta(capacidades, 'senalizacionDeLlamada'),
     });
     this.intercomos.set(dispositivoId, creado);
     return creado;

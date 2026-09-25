@@ -15,6 +15,21 @@ import { GuardiaDeAlarmServer, EQUIPOS_DE_ALARM_SERVER } from './presentacion/gu
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 import type { EquipoDeclarado } from '../comun/equipos-de-alarm-server';
 import { INGESTOR_DE_EQUIPOS, IngestorDeEquipos } from './aplicacion/ingestor-de-publicaciones';
+import { CANAL_TIEMPO_REAL } from '../eventos';
+import type { CanalTiempoReal } from '../eventos';
+import { LOCALIZADOR_DE_VIVIENDA, PadronModule } from '../padron';
+import type { LocalizadorDeVivienda } from '../padron';
+import { EQUIPOS_QUE_EMITEN, EquiposModule } from '../equipos';
+import { CONFIGURACION } from '../configuracion/configuracion.module';
+import type { Configuracion } from '../configuracion/esquema';
+import { AVISADOR_DE_LLAMADAS, RESOLUTOR_DE_VIVIENDA_DE_LLAMADA } from './aplicacion/puertos';
+import type {
+  AvisadorDeLlamadas,
+  EquiposParaEscucha,
+  ResolutorDeViviendaDeLlamada,
+} from './aplicacion/puertos';
+import { AvisadorPorCanal } from './infraestructura/avisador-por-canal';
+import { EscuchasDeEquipos } from './aplicacion/escuchas-de-equipos';
 
 /**
  * El receptor del «servidor de alarma», y la fuente por la que entran las
@@ -61,11 +76,39 @@ export class AlarmServerModule {
     return {
       module: AlarmServerModule,
       // A2 · la identidad biométrica, por el barril (misma instancia: ver `eventos`).
-      imports: [BiometriaModule.registrar()],
+      imports: [BiometriaModule.registrar(), PadronModule.registrar(), EquiposModule.registrar()],
       controllers: [AlarmServerController],
       providers: [
         GuardiaDeAlarmServer,
         { provide: EQUIPOS_DE_ALARM_SERVER, useValue: equipos },
+        {
+          // A4 · el aviso de llamada va por el canal de tiempo real (SSE).
+          provide: AVISADOR_DE_LLAMADAS,
+          inject: [CANAL_TIEMPO_REAL, BITACORA],
+          useFactory: (canal: CanalTiempoReal, bitacora: Bitacora) =>
+            new AvisadorPorCanal(canal, bitacora),
+        },
+        {
+          // A4 · la vivienda de la llamada la localiza el padrón, por forma.
+          provide: RESOLUTOR_DE_VIVIENDA_DE_LLAMADA,
+          inject: [LOCALIZADOR_DE_VIVIENDA],
+          useFactory: (localizador: LocalizadorDeVivienda): ResolutorDeViviendaDeLlamada =>
+            localizador,
+        },
+        {
+          // A4 · las escuchas de terminal y videoportero viven con el proceso.
+          provide: EscuchasDeEquipos,
+          inject: [EQUIPOS_QUE_EMITEN, PROVEEDOR_DE_EQUIPOS, BITACORA, CONFIGURACION],
+          useFactory: (
+            catalogo: EquiposParaEscucha,
+            proveedor: ProveedorDeEquipos,
+            bitacora: Bitacora,
+            c: Configuracion,
+          ) =>
+            new EscuchasDeEquipos(catalogo, proveedor, bitacora, {
+              habilitadas: c.PROVEEDOR_DE_EQUIPOS !== 'simulado',
+            }),
+        },
         {
           /**
            * El ingestor se construye y se FIJA en la fuente compartida en la
@@ -85,6 +128,8 @@ export class AlarmServerModule {
             IDENTIDAD_BIOMETRICA,
             PROVEEDOR_DE_EQUIPOS,
             RELOJ,
+            RESOLUTOR_DE_VIVIENDA_DE_LLAMADA,
+            AVISADOR_DE_LLAMADAS,
           ],
           useFactory: (
             referencia: ModuleRef,
@@ -97,6 +142,8 @@ export class AlarmServerModule {
             identidad: IdentidadBiometricaDesdeRepositorios,
             proveedor: ProveedorDeEquipos,
             reloj: Reloj,
+            viviendas: ResolutorDeViviendaDeLlamada,
+            avisador: AvisadorDeLlamadas,
           ) => {
             const ingestor = new IngestorDeEquipos(
               registrar,
@@ -115,13 +162,16 @@ export class AlarmServerModule {
               // A2 · el veredicto vuelve por el MISMO proveedor que abre puertas.
               proveedor,
               reloj,
+              // A4 · la llamada del videoportero: vivienda por el padrón, aviso por SSE.
+              viviendas,
+              avisador,
             );
             fuente.fijarIngestor(ingestor);
             return ingestor;
           },
         },
       ],
-      exports: [INGESTOR_DE_EQUIPOS],
+      exports: [INGESTOR_DE_EQUIPOS, EscuchasDeEquipos],
     };
   }
 }

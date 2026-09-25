@@ -16,6 +16,7 @@ import type {
 import { ordenAceptada, ordenInalcanzable } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe } from '../nucleo/capacidades';
+import type { EscuchaActiva } from '../nucleo/escucha';
 import {
   BibliotecaLlena,
   CapacidadNoSoportada,
@@ -225,6 +226,36 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
     const equipo = this.exigir(dispositivoId, 'bibliotecaDeRostros');
     this.adversidadDe(equipo);
     this.plantillas.get(dispositivoId)?.delete(plantillaId);
+  }
+
+  /**
+   * A4 · escuchar exige la CAPACIDAD de suscripción, como todo lo demás aquí.
+   * Órbita no emite nada por sí mismo: la escucha existe para que el contrato
+   * pueda pedirla y detenerla, y para que un equipo que no la declara la
+   * niegue con el error neutral que corresponde.
+   */
+  async escuchar(dispositivoId: string): Promise<EscuchaActiva> {
+    const equipo = this.equipos.get(dispositivoId);
+    // Desconocido: rechaza, como los otros dos. Conocido sin la capacidad: no
+    // se escucha y se dice por qué, que es lo que el contrato pide.
+    if (equipo === undefined) this.exigir(dispositivoId, 'suscripcionDeEventos');
+    if (
+      estadoDe(equipo?.capacidades ?? CAPACIDADES_SIN_CONSULTAR, 'suscripcionDeEventos') !== 'si'
+    ) {
+      return {
+        dispositivoId,
+        transporte: 'ninguna',
+        detalle: 'Órbita: el equipo no declara suscripción a eventos; no se le abre flujo',
+        detener: () => undefined,
+      };
+    }
+    if (equipo !== undefined) this.adversidadDe(equipo);
+    return {
+      dispositivoId,
+      transporte: 'suscripcion',
+      detalle: 'Órbita: suscripción declarada; el equipo ficticio no emite eventos',
+      detener: () => undefined,
+    };
   }
 
   // ── IntercomProvider ─────────────────────────────────────────────────────

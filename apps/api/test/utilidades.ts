@@ -13,6 +13,7 @@ import {
   RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
 } from '../src/autorizaciones/presentacion/limites';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../src/comun/sobre-de-equipo';
+import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from '../src/comun/ruta-de-audio';
 import type { INestApplication } from '@nestjs/common';
 import { aplicarSaneamiento, aplicarSeguridad } from '../src/seguridad';
 import { aplicarContextoDePeticion } from '../src/comun/contexto/contexto-de-peticion';
@@ -358,6 +359,11 @@ export const crearApp = async (
    * alarma» que nunca recibe cuerpo, y estaría en verde.
    */
   app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
+  // A4 · el audio del operador, crudo y acotado, sólo bajo su ruta.
+  app.use(
+    RUTA_DE_AUDIO_DE_INTERCOM,
+    express.raw({ type: 'application/octet-stream', limit: LIMITE_DE_TROZO_DE_AUDIO }),
+  );
   app.use(
     RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
     express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),

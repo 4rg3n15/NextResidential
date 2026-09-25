@@ -48,6 +48,7 @@ import {
   guardarCuerpoCrudo,
 } from './autorizaciones';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from './comun/sobre-de-equipo';
+import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from './comun/ruta-de-audio';
 import { AppModule } from './app.module';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
 import { aplicarSaneamiento, aplicarSeguridad } from './seguridad';
@@ -111,6 +112,11 @@ async function arrancar(): Promise<void> {
    * crudo, acotado en tamaño, y `@ncr/providers` lo abre.
    */
   app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
+  // A4 · el audio del operador, crudo y acotado, sólo bajo su ruta.
+  app.use(
+    RUTA_DE_AUDIO_DE_INTERCOM,
+    express.raw({ type: 'application/octet-stream', limit: LIMITE_DE_TROZO_DE_AUDIO }),
+  );
   // O3 · la fotografía del visitante: más que el tope general, SÓLO en su ruta.
   app.use(
     RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
