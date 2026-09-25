@@ -40,15 +40,20 @@ describe('las rutas de MFA propias ya no existen', () => {
     expect(rutas).not.toContain('/auth/mfa/verificacion');
   });
 
-  it('/auth expone exactamente dos rutas, y ninguna es de segundo factor', () => {
+  it('/auth expone exactamente estas rutas, y ninguna es de segundo factor', () => {
     // La lista es exhaustiva a propósito: comprobar solo que «no hay /auth/mfa»
     // dejaría entrar cualquier otra ruta nueva sin que nadie la revisara.
     const auth = enumerarRutas(app)
       .filter((r) => r.ruta.startsWith('/auth'))
       .map((r) => `${r.metodo} ${r.ruta}`)
       .sort();
+    // 15-H (ADR-023) · entrada por usuario, cambio de contraseña y cierre.
+    // Ninguna toca el segundo factor: lo sigue emitiendo Supabase (ADR-008).
     expect(auth).toEqual([
       'GET /auth/sesion',
+      'POST /auth/acceso',
+      'POST /auth/cierre',
+      'POST /auth/contrasena',
       'POST /auth/mfa/codigos',
       'POST /auth/mfa/recuperacion',
       'POST /auth/restablecimiento',

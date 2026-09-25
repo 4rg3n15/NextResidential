@@ -37,7 +37,14 @@ import {
   REPOSITORIO_COPROPIEDADES,
   RepositorioCopropiedadesEnMemoria,
 } from '../src/multiempresa/repositorio-copropiedades';
-import { COP_A, COP_B, configuracionDePrueba, crearFirmante, tokenDe } from './utilidades';
+import {
+  COP_A,
+  COP_B,
+  conSesionDePorteriaDeLaSuite,
+  configuracionDePrueba,
+  crearFirmante,
+  tokenDe,
+} from './utilidades';
 
 let app: INestApplication;
 let portero = '';
@@ -49,9 +56,11 @@ beforeAll(async () => {
   const f = await crearFirmante();
   portero = await tokenDe(f, { rol: 'portero', copropiedadId: COP_A });
   administrador = await tokenDe(f, { rol: 'administrador', copropiedadId: COP_A });
-  const modulo = await Test.createTestingModule({
-    imports: [AppModule.conConfiguracion(configuracionDePrueba)],
-  })
+  const modulo = await conSesionDePorteriaDeLaSuite(
+    Test.createTestingModule({
+      imports: [AppModule.conConfiguracion(configuracionDePrueba)],
+    }),
+  )
     .overrideProvider(REPOSITORIO_COPROPIEDADES)
     .useFactory({
       factory: () => {

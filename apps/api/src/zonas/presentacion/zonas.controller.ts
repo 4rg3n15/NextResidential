@@ -11,8 +11,8 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Aforo, FranjaHoraria, HorarioDeZona } from '@ncr/domain-core';
-import type { ErrorDominio, Resultado, Zona } from '@ncr/domain-core';
+import { Aforo, BITACORA, FranjaHoraria, HorarioDeZona } from '@ncr/domain-core';
+import type { Bitacora, ErrorDominio, Resultado, Zona } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
@@ -27,7 +27,13 @@ import {
   LiberarAforo,
   ValidarAforo,
 } from '../aplicacion/casos-de-uso';
-import { AutorizarZonaDto, BajaDeZonaDto, ConfigurarZonaDto, CrearZonaDto } from './dtos';
+import {
+  AperturaDeZonaDto,
+  AutorizarZonaDto,
+  BajaDeZonaDto,
+  ConfigurarZonaDto,
+  CrearZonaDto,
+} from './dtos';
 import {
   BajaDeZonaAplicadaDto,
   ConteoDto,
@@ -57,6 +63,7 @@ export class ZonasController {
     @Inject(CrearZona) private readonly crear: CrearZona,
     @Inject(DarDeBajaZona) private readonly baja: DarDeBajaZona,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    @Inject(BITACORA) private readonly bitacora: Bitacora,
   ) {}
 
   /**
@@ -168,6 +175,40 @@ export class ZonasController {
     }
     const presentacion = (await this.zonas.presentacionDe(copropiedadId)).get(zonaId);
     return exponer(actualizada, new Date(), presentacion ?? { icono: dto.icono ?? null });
+  }
+
+  /**
+   * ETAPA 15-H (C-32) · el portero bloquea y desbloquea la zona común, por
+   * decisión del cliente. Sólo la apertura: la ruta de configuración sigue
+   * siendo de administración y el portero recibe 403 allí. El motivo queda en
+   * el registro estructurado con el actor, que la fila guarda en
+   * `actualizado_por`.
+   */
+  @Post(':zonaId/apertura')
+  @Roles('portero', 'operador_central', 'administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Abre o cierra la zona a mano, con motivo (portería, C-32)' })
+  @ApiOkResponse({ type: ZonaDto })
+  async apertura(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('zonaId', ParseUUIDPipe) zonaId: string,
+    @Body() dto: AperturaDeZonaDto,
+  ): Promise<ZonaDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'zonas/apertura');
+    const actualizada = desenvolver(
+      await this.configurar.ejecutar(copropiedadId, zonaId, ctx.usuarioId, {
+        abierta: dto.abierta,
+      }),
+    );
+    this.bitacora.registrar('info', dto.abierta ? 'zona abierta a mano' : 'zona cerrada a mano', {
+      copropiedadId,
+      zonaId,
+      actorId: ctx.usuarioId,
+      rol: ctx.rol,
+      motivo: dto.motivo,
+    });
+    const presentacion = (await this.zonas.presentacionDe(copropiedadId)).get(zonaId);
+    return exponer(actualizada, new Date(), presentacion ?? { icono: null });
   }
 
   @Post(':zonaId/ingresos')

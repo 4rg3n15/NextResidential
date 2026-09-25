@@ -82,6 +82,8 @@ export class GuardaDeAutenticacion implements CanActivate {
         copropiedadId: claims.copropiedad_id ?? null,
         copropiedadesAtendidas: claims.copropiedades ?? [],
         mfaVerificado,
+        ...(claims.session_id === undefined ? {} : { sesionId: claims.session_id }),
+        ...(claims.debe_cambiar_contrasena === true ? { debeCambiarContrasena: true } : {}),
       };
       peticion[CLAVE_CONTEXTO] = ctx;
       return true;

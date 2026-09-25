@@ -89,3 +89,30 @@ export const CLAVE_SIN_SEGUNDO_FACTOR = 'ncr:sin_segundo_factor';
  */
 export const SinSegundoFactor = (): MethodDecorator & ClassDecorator =>
   SetMetadata(CLAVE_SIN_SEGUNDO_FACTOR, true);
+
+/**
+ * ETAPA 15-H (ADR-023) · rutas que admiten un token con el cambio de
+ * contraseña PENDIENTE. La lista es de dos —el propio cambio y el cierre de
+ * sesión— y la suite de aislamiento la compara con el código: ampliarla es
+ * dejar entrar a una cuenta que todavía usa la contraseña que otro escribió.
+ */
+export const CLAVE_CON_CAMBIO_PENDIENTE = 'ncr:con_cambio_pendiente';
+export const PermiteCambioPendiente = (): MethodDecorator & ClassDecorator =>
+  SetMetadata(CLAVE_CON_CAMBIO_PENDIENTE, true);
+
+/**
+ * ETAPA 15-H (ADR-024) · rutas que un PORTERO alcanza con la sesión en
+ * patrullaje: consultar su estado, desbloquear con el código y cerrar. Todo lo
+ * demás de esa sesión responde 423 mientras dure el patrullaje.
+ */
+export const CLAVE_DURANTE_EL_PATRULLAJE = 'ncr:durante_el_patrullaje';
+export const PermitidaDuranteElPatrullaje = (): MethodDecorator & ClassDecorator =>
+  SetMetadata(CLAVE_DURANTE_EL_PATRULLAJE, true);
+
+/**
+ * ETAPA 15-H (ADR-024) · rutas que un PORTERO alcanza fuera de su turno:
+ * consultar el estado de su sesión (para que la consola lo diga) y cerrarla.
+ */
+export const CLAVE_FUERA_DE_TURNO = 'ncr:fuera_de_turno';
+export const PermitidaFueraDeTurno = (): MethodDecorator & ClassDecorator =>
+  SetMetadata(CLAVE_FUERA_DE_TURNO, true);

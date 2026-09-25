@@ -99,6 +99,9 @@ const SIN_AMBITO_DE_VIVIENDA = new Set([
   'POST /auth/mfa/codigos',
   'POST /auth/mfa/recuperacion',
   'POST /auth/restablecimiento',
+  // 15-H (ADR-023) · la propia contraseña y la propia sesión: sin vivienda.
+  'POST /auth/contrasena',
+  'POST /auth/cierre',
   'GET /copropiedades',
   'GET /copropiedades/:id',
   'GET /copropiedades/:id/zonas',

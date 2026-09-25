@@ -80,8 +80,8 @@ describe('sin motivo válido NO se bloquea · la prueba mira el accionador', () 
 });
 
 describe('quién puede bloquear', () => {
-  it('administrador y superadministrador, sí', async () => {
-    for (const rol of ['administrador', 'superadministrador'] as const) {
+  it('portero, administrador y superadministrador, sí (C-32)', async () => {
+    for (const rol of ['portero', 'administrador', 'superadministrador'] as const) {
       const { caso, ordenadas } = banco();
       const r = await caso.ejecutar(ctx(rol), orden);
       expect(r.ok, rol).toBe(true);
@@ -89,8 +89,8 @@ describe('quién puede bloquear', () => {
     }
   });
 
-  it('el portero NO: dejar el conjunto sin entrada es de administración (H-3)', async () => {
-    for (const rol of ['portero', 'operador_central', 'residente'] as const) {
+  it('el operador de central y el residente NO (H-3)', async () => {
+    for (const rol of ['operador_central', 'residente'] as const) {
       const { caso, ordenadas } = banco();
       const r = await caso.ejecutar(ctx(rol), orden);
       expect(r.ok, rol).toBe(false);

@@ -45,6 +45,14 @@ afterAll(async () => {
 const EXENTAS = new Set([
   // Identidad del propio llamante: no operan sobre una copropiedad.
   '/auth/restablecimiento',
+  // 15-H (ADR-023/024) · entrar, cambiar la propia contraseña, salir, y la
+  // sesión del propio portero. Ninguna escribe sobre una copropiedad elegida:
+  // la del portero sale de su token y su sesión registrada.
+  '/auth/acceso',
+  '/auth/contrasena',
+  '/auth/cierre',
+  '/porteria/sesion/patrullaje',
+  '/porteria/sesion/desbloqueo',
   '/auth/mfa/codigos',
   '/auth/mfa/recuperacion',
   // Identidad de SERVICIO: la copropiedad llega en el cuerpo firmado, y su

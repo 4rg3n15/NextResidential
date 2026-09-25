@@ -44,6 +44,13 @@ const PUBLICAS = new Set([
   'GET /consentimiento/:token',
   'POST /consentimiento/:token/respuesta',
   'POST /consentimiento/:token/revocacion',
+  /**
+   * 15-H (ADR-023) · el inicio de sesión por correo o por NIT y usuario. Sin
+   * sesión por definición; lo que la protege son sus tres límites (por cuenta,
+   * por origen declarado y por dirección) y el tiempo uniforme de sus fallos.
+   * Su prueba está en `cuentas-y-porteria.e2e.test.ts`.
+   */
+  'POST /auth/acceso',
 ]);
 
 /**
@@ -68,6 +75,16 @@ const SIN_RECURSO_TENANT = new Set([
   // así exige sesión y rol administrativo, porque un mapa de dónde tarda el
   // sistema es información de operación.
   '/observabilidad/latencias',
+  // ETAPA 15-H (ADR-023) · cambio de la propia contraseña y cierre de la propia
+  // sesión: la identidad sale del token, ninguna recibe copropiedad.
+  '/auth/contrasena',
+  '/auth/cierre',
+  // ETAPA 15-H (ADR-024) · la consola del portero sobre SU sesión y SU perfil.
+  // La copropiedad sale del token; el turno y el patrullaje, de su registro.
+  '/porteria/sesion',
+  '/porteria/sesion/patrullaje',
+  '/porteria/sesion/desbloqueo',
+  '/porteria/perfil',
 ]);
 
 /**
@@ -75,7 +92,15 @@ const SIN_RECURSO_TENANT = new Set([
  * administrativo. **La lista es de UNA**, y esta suite existe para que siga
  * siéndolo: ampliarla es relajar RN-20, y tiene que verse en el diff.
  */
-const SIN_SEGUNDO_FACTOR = new Set(['/auth/restablecimiento', '/auth/mfa/recuperacion']);
+const SIN_SEGUNDO_FACTOR = new Set([
+  '/auth/restablecimiento',
+  '/auth/mfa/recuperacion',
+  // 15-H (ADR-023) · una cuenta administrativa recién creada o restablecida
+  // cambia su contraseña ANTES de inscribir el segundo factor; el caso de uso
+  // sólo lo admite con el cambio pendiente. Cerrar sesión no expone nada.
+  '/auth/contrasena',
+  '/auth/cierre',
+]);
 
 /**
  * Rutas marcadas `@AlcanceDelLlamante()`: devuelven el alcance del llamante y
