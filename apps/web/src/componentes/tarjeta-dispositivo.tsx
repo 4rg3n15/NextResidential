@@ -52,15 +52,9 @@ export const FilaDeDispositivo = ({
         <p className="truncate text-cuerpo font-medium text-texto">{dispositivo.nombre}</p>
         <p className="mt-0.5 truncate text-secundario text-texto-apagado">
           {TIPO[dispositivo.tipo] ?? dispositivo.tipo}
-          {/* El direccionamiento solo llega a roles administrativos (C-11); para
-              el resto la API manda `null` y aquí simplemente no se pinta. La
-              credencial NUNCA llega, ni enmascarada (RN-21). */}
-          {dispositivo.host === null ? null : (
-            <>
-              {' · '}
-              <span className="font-mono">{dispositivo.host}</span>
-            </>
-          )}
+          {/* La dirección del equipo NO llega a ningún rol (ETAPA 15-D, §7.1,
+              C-28): con el aparato habla el servidor. La credencial nunca
+              llegó, ni enmascarada (RN-21). */}
         </p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">

@@ -13,7 +13,7 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
-import type { FichaDelEquipo } from '@ncr/providers';
+import type { CapacidadesDeEquipo, FichaDelEquipo } from '@ncr/providers';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import {
   CORRECTOR_DE_EQUIPO,
@@ -32,12 +32,14 @@ import type {
 import {
   AltaDeEquipoDto,
   BajaDeEquipoDto,
+  CapacidadesDeEquipoDto,
   CorreccionDeEquipoDto,
   EquipoDto,
   EquiposDto,
   FichaDelEquipoDto,
   ResultadoDeCorreccionDto,
   ResultadoDeSondeoDto,
+  EdicionDeEquipoDto,
 } from './dtos';
 
 /**
@@ -83,6 +85,20 @@ const aFicha = (ficha: FichaDelEquipo): FichaDelEquipoDto => ({
   })),
 });
 
+/** Campo a campo, por la misma razón que la ficha: lo que sale es una decisión. */
+const aCapacidades = (c: CapacidadesDeEquipo): CapacidadesDeEquipoDto => ({
+  origen: c.origen,
+  aperturaRemota: c.aperturaRemota,
+  verificacionRemota: c.verificacionRemota,
+  bibliotecaDeRostros: { ...c.bibliotecaDeRostros },
+  gestionDePersonas: c.gestionDePersonas,
+  audioBidireccional: { ...c.audioBidireccional },
+  senalizacionDeLlamada: c.senalizacionDeLlamada,
+  suscripcionDeEventos: c.suscripcionDeEventos,
+  reconocimientoDePlacas: c.reconocimientoDePlacas,
+  estadoDeBarrera: c.estadoDeBarrera,
+});
+
 @ApiTags('equipos')
 @ApiBearerAuth()
 @Controller('copropiedades/:id/equipos')
@@ -94,8 +110,66 @@ export class EquiposController {
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
 
+  /**
+   * Campo a campo y NUNCA con `spread` (§7.1): `DatosDeEquipo` lleva host,
+   * puerto, protocolo y usuario porque la sonda y el corrector los necesitan
+   * en el servidor; ninguno cruza al cliente.
+   */
   private aDto(e: DatosDeEquipo): EquipoDto {
-    return { ...e };
+    return {
+      id: e.id,
+      nombre: e.nombre,
+      tipo: e.tipo,
+      modelo: e.modelo,
+      firmware: e.firmware,
+      canalBarrera: e.canalBarrera,
+      numeroDePuerta: e.numeroDePuerta,
+      canalDeAudio: e.canalDeAudio,
+      fabricante: e.fabricante,
+      modoDeTerminal: e.modoDeTerminal,
+      canalDeAudioHabilitado: e.canalDeAudioHabilitado,
+      capacidades: e.capacidades === null ? null : aCapacidades(e.capacidades),
+      verificacion: e.verificacion,
+      verificadoEn: e.verificadoEn,
+      motivoNoVerificado: e.motivoNoVerificado,
+      estado: e.estado,
+    };
+  }
+
+  /**
+   * O5 · la edición llega PARCIAL: lo ausente se conserva de lo guardado
+   * (leer-modificar-escribir, §6.1). El cliente no conoce la dirección ni el
+   * usuario, así que no puede reenviarlos; y «ausente» nunca significa «borra».
+   */
+  private altaDesdeEdicion(dto: EdicionDeEquipoDto, actual: DatosDeEquipo): AltaDeEquipoDto {
+    const fusion = new AltaDeEquipoDto();
+    Object.assign(fusion, {
+      nombre: dto.nombre ?? actual.nombre,
+      tipo: dto.tipo ?? actual.tipo,
+      host: dto.host ?? actual.host,
+      puerto: dto.puerto ?? actual.puerto,
+      protocolo: dto.protocolo ?? actual.protocolo,
+      usuario: dto.usuario ?? actual.usuario ?? '',
+      ...(dto.secreto === undefined ? {} : { secreto: dto.secreto }),
+      ...((dto.canalBarrera ?? actual.canalBarrera ?? undefined) === undefined
+        ? {}
+        : { canalBarrera: dto.canalBarrera ?? actual.canalBarrera }),
+      ...((dto.numeroDePuerta ?? actual.numeroDePuerta ?? undefined) === undefined
+        ? {}
+        : { numeroDePuerta: dto.numeroDePuerta ?? actual.numeroDePuerta }),
+      ...((dto.canalDeAudio ?? actual.canalDeAudio ?? undefined) === undefined
+        ? {}
+        : { canalDeAudio: dto.canalDeAudio ?? actual.canalDeAudio }),
+      ...((dto.fabricante ?? actual.fabricante ?? undefined) === undefined
+        ? {}
+        : { fabricante: dto.fabricante ?? actual.fabricante }),
+      ...((dto.modoDeTerminal ?? actual.modoDeTerminal ?? undefined) === undefined
+        ? {}
+        : { modoDeTerminal: dto.modoDeTerminal ?? actual.modoDeTerminal }),
+      canalDeAudioHabilitado: dto.canalDeAudioHabilitado ?? actual.canalDeAudioHabilitado,
+      ...(dto.probarConexion === undefined ? {} : { probarConexion: dto.probarConexion }),
+    });
+    return fusion;
   }
 
   private altaDesdeDto(dto: AltaDeEquipoDto): AltaDeEquipo {
@@ -110,6 +184,9 @@ export class EquiposController {
       canalBarrera: dto.canalBarrera ?? null,
       numeroDePuerta: dto.numeroDePuerta ?? null,
       canalDeAudio: dto.canalDeAudio ?? null,
+      fabricante: dto.fabricante ?? null,
+      modoDeTerminal: dto.modoDeTerminal ?? null,
+      canalDeAudioHabilitado: dto.canalDeAudioHabilitado ?? false,
     };
   }
 
@@ -119,14 +196,20 @@ export class EquiposController {
    * «rechazada» falso, y un rechazo falso invita a reintentar — que es
    * justamente lo que bloquea la cuenta en el equipo.
    */
-  private async sondear(dto: AltaDeEquipoDto): Promise<ResultadoDeSondeo> {
+  private async sondear(
+    dto: AltaDeEquipoDto,
+    secretoGuardado: string | null = null,
+  ): Promise<ResultadoDeSondeo> {
     if (dto.probarConexion === false) return SIN_PROBAR;
-    if (dto.secreto === undefined) {
+    // O4 · al editar sin reescribir la clave se usa la GUARDADA, que sólo
+    // existe en el servidor: el sondeo sigue sin necesitar que nadie la vea.
+    const secreto = dto.secreto ?? secretoGuardado;
+    if (secreto === null || secreto === undefined) {
       return {
         ...SIN_PROBAR,
         detalle:
-          'Guardado sin comprobar: para probar la conexión hay que volver a escribir la clave ' +
-          'del equipo, porque el sistema no la muestra ni la reenvía.',
+          'Guardado sin comprobar: el equipo no tiene clave guardada y no se escribió una. ' +
+          'Escríbala en la edición para que el sistema pueda sondearlo.',
       };
     }
     return this.sonda.probar({
@@ -134,9 +217,27 @@ export class EquiposController {
       puerto: dto.puerto,
       protocolo: dto.protocolo,
       usuario: dto.usuario,
-      secreto: dto.secreto,
+      secreto,
       tipo: dto.tipo,
+      canalBarrera: dto.canalBarrera ?? null,
+      modoDeTerminal: dto.modoDeTerminal ?? null,
     });
+  }
+
+  /** El veredicto a su DTO: la ficha y las capacidades se omiten cuando no las hay. */
+  private aResultado(veredicto: ResultadoDeSondeo): ResultadoDeSondeoDto {
+    return {
+      clase: veredicto.clase,
+      detalle: veredicto.detalle,
+      modelo: veredicto.modelo,
+      firmware: veredicto.firmware,
+      latenciaMs: veredicto.latenciaMs,
+      verificado: veredicto.verificado,
+      ...(veredicto.ficha === undefined ? {} : { ficha: aFicha(veredicto.ficha) }),
+      ...(veredicto.capacidades === undefined
+        ? {}
+        : { capacidades: aCapacidades(veredicto.capacidades) }),
+    };
   }
 
   @Get()
@@ -166,15 +267,7 @@ export class EquiposController {
     const veredicto = await this.sondear({ ...dto, probarConexion: true });
     // La ficha se omite cuando no la hay, en vez de enviarse vacía: la falta de
     // ficha no es una ficha sin hallazgos (`exactOptionalPropertyTypes`).
-    return {
-      clase: veredicto.clase,
-      detalle: veredicto.detalle,
-      modelo: veredicto.modelo,
-      firmware: veredicto.firmware,
-      latenciaMs: veredicto.latenciaMs,
-      verificado: veredicto.verificado,
-      ...(veredicto.ficha === undefined ? {} : { ficha: aFicha(veredicto.ficha) }),
-    };
+    return this.aResultado(veredicto);
   }
 
   @Post()
@@ -200,19 +293,74 @@ export class EquiposController {
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('equipoId', ParseUUIDPipe) equipoId: string,
-    @Body() dto: AltaDeEquipoDto,
+    @Body() dto: EdicionDeEquipoDto,
   ): Promise<EquipoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/edicion');
-    const veredicto = await this.sondear(dto);
+    const actual = (await this.repo.listar(ctx, copropiedadId)).find((e) => e.id === equipoId);
+    if (actual === undefined) throw new NotFoundException('No se encontró el equipo');
+    const completo = this.altaDesdeEdicion(dto, actual);
+    const veredicto = await this.sondear(
+      completo,
+      dto.secreto === undefined
+        ? await this.repo.credencialPara(ctx, copropiedadId, equipoId)
+        : null,
+    );
     const equipo = await this.repo.editar(
       ctx,
       copropiedadId,
       equipoId,
-      this.altaDesdeDto(dto),
+      this.altaDesdeDto(completo),
       veredicto,
     );
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
     return this.aDto(equipo);
+  }
+
+  /**
+   * O4 · LA FICHA DE UN EQUIPO YA DADO DE ALTA
+   *
+   * Hasta ahora la ficha sólo existía en el alta, con la clave recién tecleada.
+   * Un equipo en servicio no tenía forma de volver a diagnosticarse sin
+   * reescribirla. Aquí se sondea con la credencial GUARDADA —que no sale del
+   * servidor—, se persiste lo que cambió (verificación, modelo, firmware,
+   * capacidades) y se devuelve la ficha por tipo, con sus botones de
+   * corrección. Deja rastro: es una lectura del equipo, no un cambio, pero
+   * «quién lo sondeó y cuándo» es lo que explica un `verificado_en` nuevo.
+   */
+  @Post(':equipoId/diagnostico')
+  @Roles('superadministrador', 'administrador')
+  @ApiOperation({
+    summary: 'Sondea un equipo en servicio con su clave guardada y devuelve su ficha',
+  })
+  @ApiOkResponse({ type: ResultadoDeSondeoDto })
+  async diagnosticar(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('equipoId', ParseUUIDPipe) equipoId: string,
+  ): Promise<ResultadoDeSondeoDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/diagnostico');
+    const equipos = await this.repo.listar(ctx, copropiedadId);
+    const equipo = equipos.find((e) => e.id === equipoId);
+    if (equipo === undefined) throw new NotFoundException('No se encontró el equipo');
+    const secreto = await this.repo.credencialPara(ctx, copropiedadId, equipoId);
+    if (secreto === null) {
+      throw new NotFoundException(
+        'El equipo no tiene credencial guardada: vuelva a escribirla en la edición antes de ' +
+          'sondearlo, porque el sistema no la muestra ni la reenvía',
+      );
+    }
+    const veredicto = await this.sonda.probar({
+      host: equipo.host,
+      puerto: equipo.puerto,
+      protocolo: equipo.protocolo,
+      usuario: equipo.usuario ?? '',
+      secreto,
+      tipo: equipo.tipo,
+      canalBarrera: equipo.canalBarrera,
+      modoDeTerminal: equipo.modoDeTerminal,
+    });
+    await this.repo.registrarSondeo(ctx, copropiedadId, equipoId, veredicto);
+    return this.aResultado(veredicto);
   }
 
   /**

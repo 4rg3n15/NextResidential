@@ -21,6 +21,7 @@ describe('la terminal facial contra un equipo simulado', () => {
       host: 'terminal.invalid',
       ...CREDENCIALES,
       modo: 'reporta_y_espera',
+      numeroDePuerta: 1,
       peticion: equipoSimulado({ familia: 'terminal', ...CREDENCIALES, sinSoporte }),
     });
 
@@ -122,6 +123,7 @@ describe('el videoportero contra un equipo simulado', () => {
     const portero = new Videoportero({
       host: 'portero.invalid',
       ...CREDENCIALES,
+      numeroDePuerta: 1,
       peticion: equipoSimulado({ familia: 'videoportero', ...CREDENCIALES }),
     });
     await expect(portero.abrir('p-1', 'operador-1')).resolves.toMatchObject({ aceptado: true });
@@ -168,7 +170,7 @@ describe('la cámara que publica', () => {
     // construye tiene que ser exactamente lo que el receptor sabe abrir.
     const sobre = sobreDeLectura({ placa: 'ABC123', confianza: 91, referencia: 'ev-9' });
     const abierto = abrirSobreDeAlarmServer(sobre.cuerpo, sobre.tipoDeContenido);
-    const evento = desdeAlarmServerXml(abierto.xml, 'camara-1', new Date());
+    const evento = desdeAlarmServerXml(abierto.documento, 'camara-1', new Date());
 
     expect(evento?.clase).toBe('placa');
     expect(evento?.placa).toBe('ABC123');

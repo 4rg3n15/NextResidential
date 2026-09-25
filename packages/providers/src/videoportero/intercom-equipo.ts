@@ -61,7 +61,23 @@ export interface OpcionesDeIntercom extends OpcionesDeEquipo {
    * emite una sola petición hacia el canal de audio del equipo.
    */
   readonly canalHabilitado: boolean;
+  /**
+   * El canal, **leído de la lista que el equipo declara** (D4). `null` mientras
+   * no se haya descubierto: entonces abrir la sesión falla diciendo que falta
+   * el canal, no con un `notSupport` del aparato a un `channels/1` inventado.
+   */
+  readonly canal: number | null;
   readonly margenSegundos?: number;
+}
+
+export class CanalDeAudioSinDescubrir extends Error {
+  constructor(readonly dispositivoId: string) {
+    super(
+      `El canal de audio del equipo ${dispositivoId} no se ha descubierto. Se lee de la lista ` +
+        'de canales que el aparato declara, nunca se supone 1 (D4)',
+    );
+    this.name = 'CanalDeAudioSinDescubrir';
+  }
 }
 
 export class IntercomDeEquipo implements IntercomProvider {
@@ -102,7 +118,15 @@ export class IntercomDeEquipo implements IntercomProvider {
 
     this.ultimoDispositivo.set(operadorId, dispositivoId);
 
-    const ruta = rutaPara('abrir el canal de audio bidireccional', 'videoportero');
+    if (this.opciones.canal === null) {
+      this.canales.set(dispositivoId, soltarCanal(solicitud.estado, operadorId, ahora).estado);
+      throw new CanalDeAudioSinDescubrir(dispositivoId);
+    }
+    const ruta = rutaPara(
+      'abrir el canal de audio bidireccional',
+      'videoportero',
+      this.opciones.canal,
+    );
     const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta);
     if (!respuesta.ok) {
       // El equipo dijo que no: se suelta el turno en vez de dejar al operador
@@ -116,26 +140,37 @@ export class IntercomDeEquipo implements IntercomProvider {
   }
 
   /**
-   * El audio **no se implementa aquí, y se dice**.
+   * ═══════════════════════════════════════════════════════════════════════════
+   * EL TRANSPORTE DE AUDIO · DOCUMENTADO, NO VERIFICADO · ETAPA 15-D
    *
-   * El transporte del flujo es un socket de audio sostenido con su códec y su
-   * cadencia, y escribirlo contra un canal que nadie ha podido abrir ni una vez
-   * sería escribir contra una suposición: qué códec negocia ESTE firmware, si
-   * es semiduplex, y con qué tamaño de paquete, son medidas que no existen.
-   * Lanzar es honesto; devolver silencio sería simular que funciona.
+   * Hasta la 15-C esto lanzaba, y lo decía: escribir un flujo contra un canal
+   * que nadie ha abierto ni una vez es escribir contra una suposición. Ahora
+   * está escrito **según la documentación del fabricante** —`audioData` por
+   * `PUT` para hablar y por `GET` para escuchar, en el códec que el canal
+   * declara— y se prueba contra el simulado. Lo que sigue sin existir es la
+   * medida: códec real, tamaño de paquete, cadencia, semiduplex y latencia
+   * (KPI-33). **Nada de eso tiene cifra**, y el informe lo dice así.
    */
-  async enviarAudio(_fragmento: Uint8Array): Promise<void> {
-    throw new Error(
-      'El transporte de audio del equipo no está implementado: falta medir códec, cadencia y ' +
-        'duplex contra el aparato (guía §8.3). Hasta entonces, la consola usa el simulado',
-    );
+  async enviarAudio(fragmento: Uint8Array): Promise<void> {
+    const dispositivoId = this.abierto;
+    if (dispositivoId === null) throw new Error('No hay ninguna sesión de audio abierta');
+    if (this.opciones.canal === null) throw new CanalDeAudioSinDescubrir(dispositivoId);
+    const ruta = rutaPara('enviar audio al equipo', 'videoportero', this.opciones.canal);
+    const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
+      tipo: 'application/octet-stream',
+      contenido: fragmento,
+    });
+    if (!respuesta.ok) {
+      throw new Error(`El equipo no aceptó el audio (HTTP ${String(respuesta.estado)})`);
+    }
   }
 
-  recibirAudio(): AsyncIterable<Uint8Array> {
-    throw new Error(
-      'El transporte de audio del equipo no está implementado: falta medir códec, cadencia y ' +
-        'duplex contra el aparato (guía §8.3). Hasta entonces, la consola usa el simulado',
-    );
+  async *recibirAudio(): AsyncIterable<Uint8Array> {
+    const dispositivoId = this.abierto;
+    if (dispositivoId === null) throw new Error('No hay ninguna sesión de audio abierta');
+    if (this.opciones.canal === null) throw new CanalDeAudioSinDescubrir(dispositivoId);
+    const ruta = rutaPara('recibir audio del equipo', 'videoportero', this.opciones.canal);
+    for await (const trozo of this.cliente.flujoBinario(ruta.ruta)) yield trozo;
   }
 
   async cerrarSesion(motivo: string): Promise<void> {
@@ -155,7 +190,12 @@ export class IntercomDeEquipo implements IntercomProvider {
     // El cierre se manda SIEMPRE, aunque el turno ya se hubiera soltado por
     // caducidad: un canal que el equipo cree abierto no admite al siguiente, y
     // ese estado sobrevive a nuestro proceso.
-    const ruta = rutaPara('cerrar el canal de audio bidireccional', 'videoportero');
+    if (this.opciones.canal === null) return;
+    const ruta = rutaPara(
+      'cerrar el canal de audio bidireccional',
+      'videoportero',
+      this.opciones.canal,
+    );
     try {
       await this.cliente.pedir(ruta.metodo, ruta.ruta);
     } catch {

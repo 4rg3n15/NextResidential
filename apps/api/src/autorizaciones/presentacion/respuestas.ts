@@ -23,9 +23,28 @@ export class AutorizacionDto {
   @ApiProperty({ type: String, enum: ['activa', 'revocada'] }) estado!: string;
   @ApiProperty({ type: String, nullable: true }) placa!: string | null;
   @ApiProperty({ type: [String] }) acompanantes!: string[];
-  @ApiProperty({ type: PatronDeAutorizacionDto, nullable: true }) patron!: PatronDeAutorizacionDto | null;
+  @ApiProperty({ type: PatronDeAutorizacionDto, nullable: true })
+  patron!: PatronDeAutorizacionDto | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) revocadaEn!: string | null;
   @ApiProperty({ type: String, nullable: true }) motivoRevocacion!: string | null;
+  @ApiProperty({ type: String, nullable: true }) observaciones!: string | null;
+  @ApiProperty({ type: Boolean }) tieneFotografia!: boolean;
+}
+
+export class ModificacionDto {
+  @ApiProperty({ type: Boolean }) modificada!: boolean;
+}
+
+export class FotografiaAdjuntadaDto {
+  @ApiProperty({ type: Boolean }) adjuntada!: boolean;
+  @ApiProperty({ type: String }) tipoMime!: string;
+  @ApiProperty({ type: Number }) tamanoBytes!: number;
+}
+
+/** URL firmada de vida corta (RN-21). Se genera al pedirla; nunca se guarda. */
+export class UrlDeFotografiaDto {
+  @ApiProperty({ type: String }) url!: string;
+  @ApiProperty({ type: Number }) expiraEnSegundos!: number;
 }
 
 export class IdAutorizacionDto {

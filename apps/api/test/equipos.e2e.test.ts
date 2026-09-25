@@ -6,7 +6,7 @@ import type { Firmante } from './utilidades';
 import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
 import { SondaPorProveedor } from '../src/equipos/infraestructura/sonda-por-proveedor';
-import { equiposSimulados } from '@ncr/providers';
+import { capacidadesDescubiertas, equiposSimulados } from '@ncr/providers';
 
 /**
  * A · APROVISIONAMIENTO DE EQUIPOS DESDE LA CONSOLA
@@ -58,6 +58,49 @@ const ALCANZADO: ResultadoDeSondeo = {
   latenciaMs: 41,
   verificado: true,
 };
+
+describe('O2 · las capacidades DESCUBIERTAS al sondear se persisten y se enseñan', () => {
+  it('lo que la sonda descubre vuelve en el alta y en el listado, con su origen', async () => {
+    const capacidades = capacidadesDescubiertas({
+      aperturaRemota: 'si',
+      senalizacionDeLlamada: 'no',
+      audioBidireccional: { estado: 'si', canal: 1, formato: 'g711u' },
+    });
+    const { app: a, firmante } = await conEquipos({
+      probar: async () => ({ ...ALCANZADO, capacidades }),
+    });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const res = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, tipo: 'intercom', fabricante: 'Una marca', canalDeAudioHabilitado: true });
+
+    expect(res.status).toBe(201);
+    expect(res.body.capacidades.origen).toBe('descubiertas');
+    expect(res.body.capacidades.aperturaRemota).toBe('si');
+    expect(res.body.capacidades.senalizacionDeLlamada).toBe('no');
+    // Lo no descubierto se enseña como DESCONOCIDA, nunca como sí.
+    expect(res.body.capacidades.bibliotecaDeRostros.estado).toBe('desconocida');
+    expect(res.body.fabricante).toBe('Una marca');
+    expect(res.body.canalDeAudioHabilitado).toBe(true);
+
+    const lista = await request(a.getHttpServer())
+      .get(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(lista.body.equipos[0].capacidades.audioBidireccional.canal).toBe(1);
+  });
+
+  it('sin sondeo no hay capacidades: `null`, no un objeto de síes', async () => {
+    const { app: a, firmante } = await conEquipos({ probar: async () => ALCANZADO });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const res = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, probarConexion: false });
+    expect(res.status).toBe(201);
+    expect(res.body.capacidades).toBeNull();
+  });
+});
 
 describe('A.2 · el secreto es de ESCRITURA: entra y no vuelve', () => {
   it('ninguna respuesta del alta lleva el secreto, ni enmascarado', async () => {
@@ -278,14 +321,16 @@ describe('A.3 · «probar conexión» distingue cuatro situaciones, no una', () 
     expect(r.verificado).toBe(false);
   });
 
-  it('inalcanzable: nombra host y puerto, y NUNCA el secreto', async () => {
+  it('inalcanzable: nombra el host ELIDIDO y el puerto, y NUNCA el secreto (§7.1)', async () => {
     const r = await new SondaPorProveedor((() =>
       Promise.reject(new Error('connect ECONNREFUSED'))) as typeof fetch).probar({
       ...ALTA,
       tipo: 'camara_lpr',
     });
     expect(r.clase).toBe('inalcanzable');
-    expect(r.detalle).toContain('203.0.113.10:80');
+    // Lo justo para reconocerla; la dirección completa no forma parte del contrato.
+    expect(r.detalle).toContain('20…10:80');
+    expect(r.detalle).not.toContain('203.0.113.10');
     expect(r.detalle).not.toContain(ALTA.secreto);
     expect(r.verificado).toBe(false);
   });
@@ -330,10 +375,12 @@ describe('A.3 · guardar un equipo que no contesta es legítimo, pero se marca',
       },
     });
     const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    // O4 · SIN clave guardada: el alta no la trae. Con una guardada, editar sí
+    // sondea —con la del servidor—, y eso lo prueba la sección O4 de abajo.
     const creado = await request(a.getHttpServer())
       .post(`/copropiedades/${COP_B}/equipos`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ ...ALTA, probarConexion: false });
+      .send({ ...ALTA, secreto: undefined, probarConexion: false });
     expect(creado.status).toBe(201);
 
     // Se arma sin el campo en vez de desestructurar y descartar: lo que la
@@ -346,6 +393,245 @@ describe('A.3 · guardar un equipo que no contesta es legítimo, pero se marca',
 
     expect(res.status).toBe(200);
     expect(res.body.verificacion).toBe('no_verificado');
-    expect(res.body.motivoNoVerificado).toMatch(/no la muestra ni la reenvía/);
+    expect(res.body.motivoNoVerificado).toMatch(/no tiene clave guardada/);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O4 · TERMINAL Y VIDEOPORTERO AL NIVEL DE LA CÁMARA
+ *
+ * Sonda REAL contra el simulador de `@ncr/providers`: lo que se prueba es que
+ * la ficha de una terminal es la de una terminal, que «decide sola» se juzga
+ * como en la cámara —salvo declaración expresa—, y que un equipo ya dado de
+ * alta se vuelve a sondear con la clave GUARDADA, sin que nadie la reescriba.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('O4 · la ficha es por tipo y el sondeo posterior usa la clave guardada', () => {
+  const TERMINAL = { ...ALTA, nombre: 'Terminal del gimnasio', tipo: 'terminal_facial' as const };
+  const VIDEOPORTERO = { ...ALTA, nombre: 'Portero principal', tipo: 'intercom' as const };
+  const sondaCon = (familia: 'terminal' | 'videoportero', guion: Record<string, unknown>) =>
+    new SondaPorProveedor(
+      equiposSimulados({
+        [ALTA.host]: { familia, usuario: ALTA.usuario, clave: ALTA.secreto, ...guion },
+      }),
+    );
+
+  it('una terminal que espera el veredicto queda VERIFICADA, con su ficha y sin la de cámara', async () => {
+    const { app: a, firmante } = await conEquipos(
+      sondaCon('terminal', { verificacionRemota: true }),
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const prueba = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/prueba-de-conexion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(TERMINAL)
+      .expect(201);
+    const campos = (prueba.body.ficha.hallazgos as { campo: string; estado: string }[]).map(
+      (h) => h.campo,
+    );
+    expect(campos).toContain('quién decide la apertura');
+    expect(campos).toContain('biblioteca de rostros');
+    expect(campos.some((c) => /país|receptor|disparador/.test(c))).toBe(false);
+    expect(prueba.body.verificado).toBe(true);
+    expect(prueba.body.capacidades.verificacionRemota).toBe('si');
+  });
+
+  it('una terminal que decide sola NO se da por buena… salvo que se declare a sabiendas', async () => {
+    const { app: a, firmante } = await conEquipos(
+      sondaCon('terminal', { verificacionRemota: false }),
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const sola = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(TERMINAL)
+      .expect(201);
+    expect(sola.body.verificacion).toBe('rechazado');
+    expect(sola.body.motivoNoVerificado).toMatch(/decide por su cuenta/);
+
+    const declarada = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...TERMINAL, nombre: 'Terminal declarada', modoDeTerminal: 'decide_el_equipo' })
+      .expect(201);
+    expect(declarada.body.verificacion).toBe('verificado');
+    expect(declarada.body.modoDeTerminal).toBe('decide_el_equipo');
+  });
+
+  it('el videoportero trae apertura, audio, llamada y suscripción; sin audio es aviso, no bloqueo', async () => {
+    const { app: a, firmante } = await conEquipos(
+      sondaCon('videoportero', {
+        aperturaRemota: true,
+        canalesDeAudio: [{ id: 1, habilitado: false }],
+      }),
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const prueba = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/prueba-de-conexion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(VIDEOPORTERO)
+      .expect(201);
+    const hallazgos = prueba.body.ficha.hallazgos as { campo: string; estado: string }[];
+    expect(hallazgos.find((h) => /apertura desde la plataforma/.test(h.campo))?.estado).toBe(
+      'conforme',
+    );
+    expect(hallazgos.find((h) => /canal de audio/.test(h.campo))?.estado).toBe('aviso');
+    expect(prueba.body.verificado).toBe(true);
+    expect(prueba.body.capacidades.audioBidireccional.estado).toBe('no');
+  });
+
+  it('POST …/diagnostico sondea con la clave GUARDADA, persiste y deja rastro', async () => {
+    const {
+      app: a,
+      repo,
+      firmante,
+    } = await conEquipos(
+      sondaCon('terminal', {
+        verificacionRemota: true,
+        bibliotecaMaximo: 100,
+        bibliotecaAlmacenadas: 95,
+      }),
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    // Alta SIN sondear: queda no verificada y sin capacidades.
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...TERMINAL, probarConexion: false })
+      .expect(201);
+    expect(creado.body.verificacion).toBe('no_verificado');
+    expect(creado.body.capacidades).toBeNull();
+
+    const diagnostico = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/${creado.body.id}/diagnostico`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201);
+    expect(diagnostico.body.verificado).toBe(true);
+    const biblioteca = (
+      diagnostico.body.ficha.hallazgos as { campo: string; estado: string }[]
+    ).find((h) => h.campo === 'biblioteca de rostros');
+    expect(biblioteca?.estado).toBe('aviso');
+    // Y nada de la respuesta lleva la clave.
+    expect(JSON.stringify(diagnostico.body)).not.toContain(ALTA.secreto);
+
+    const lista = await request(a.getHttpServer())
+      .get(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const guardado = (
+      lista.body.equipos as {
+        id: string;
+        verificacion: string;
+        capacidades: { verificacionRemota: string } | null;
+      }[]
+    ).find((e) => e.id === creado.body.id);
+    expect(guardado?.verificacion).toBe('verificado');
+    expect(guardado?.capacidades?.verificacionRemota).toBe('si');
+    expect(repo.auditoria.map((x) => x.recurso)).toContain('equipos/diagnostico');
+  });
+
+  it('sin clave guardada, el diagnóstico lo dice (404) y no inventa un sondeo', async () => {
+    const { app: a, firmante } = await conEquipos(sondaCon('terminal', {}));
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...TERMINAL, secreto: undefined, probarConexion: false })
+      .expect(201);
+    const r = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/${creado.body.id}/diagnostico`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+    expect(JSON.stringify(r.body)).toMatch(/credencial guardada/);
+  });
+
+  it('editar SIN reescribir la clave vuelve a sondear con la guardada: queda verificado', async () => {
+    const { app: a, firmante } = await conEquipos(
+      sondaCon('terminal', { verificacionRemota: true }),
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...TERMINAL, probarConexion: false })
+      .expect(201);
+    expect(creado.body.verificacion).toBe('no_verificado');
+
+    const editado = await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...TERMINAL, secreto: undefined, nombre: 'Terminal renombrada' })
+      .expect(200);
+    expect(editado.body.nombre).toBe('Terminal renombrada');
+    expect(editado.body.verificacion).toBe('verificado');
+    expect(editado.body.capacidades?.verificacionRemota).toBe('si');
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O5 · §7.1 · EL CLIENTE NUNCA CONOCE LA RED DEL CONJUNTO
+ *
+ * Hasta la 15-C la dirección, el puerto y el usuario del equipo volvían en el
+ * alta y en el listado (C-11 los consideraba inventario). C-28 lo revoca: con
+ * el equipo habla el servidor, y lo que no cruza no se puede filtrar. La
+ * edición pasa a ser PARCIAL: lo que no viene se conserva de lo guardado.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('O5 · ninguna respuesta lleva dirección, puerto, protocolo ni usuario del equipo', () => {
+  it('ni el alta ni el listado ni la ficha: los campos NO EXISTEN en la respuesta', async () => {
+    const { app: a, firmante } = await conEquipos({ probar: async () => ALCANZADO });
+    const token = await tokenDe(firmante, { rol: 'superadministrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(ALTA)
+      .expect(201);
+    for (const campo of ['host', 'puerto', 'protocolo', 'usuario', 'secreto']) {
+      expect(creado.body).not.toHaveProperty(campo);
+    }
+    const lista = await request(a.getHttpServer())
+      .get(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const cuerpo = JSON.stringify(lista.body);
+    expect(cuerpo).not.toContain(ALTA.host);
+    expect(cuerpo).not.toContain(ALTA.usuario);
+    expect(cuerpo).not.toContain(ALTA.secreto);
+  });
+
+  it('editar es PARCIAL: sólo el nombre viaja y la dirección guardada sigue sirviendo para sondear', async () => {
+    const sondeos: { host: string; usuario: string }[] = [];
+    const {
+      app: a,
+      repo,
+      firmante,
+    } = await conEquipos({
+      probar: async (d) => {
+        sondeos.push(d as { host: string; usuario: string });
+        return ALCANZADO;
+      },
+    });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, canalBarrera: 2 })
+      .expect(201);
+    const antes = repo.sobreDe(COP_B, creado.body.id as string);
+
+    const editado = await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Cámara renombrada' })
+      .expect(200);
+    expect(editado.body.nombre).toBe('Cámara renombrada');
+    expect(editado.body.canalBarrera).toBe(2);
+    expect(editado.body.verificacion).toBe('verificado');
+    // El sondeo de la edición usó la dirección y el usuario GUARDADOS, que el
+    // cliente nunca vio, y el sobre del secreto no se tocó.
+    expect(sondeos.at(-1)).toMatchObject({ host: ALTA.host, usuario: ALTA.usuario });
+    expect(repo.sobreDe(COP_B, creado.body.id as string)).toEqual(antes);
   });
 });

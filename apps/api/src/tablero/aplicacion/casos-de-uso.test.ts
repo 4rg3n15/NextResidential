@@ -63,8 +63,6 @@ const equipo = (nombre: string, ultimoLatido: Date | null): DispositivoDelTabler
   nombre,
   tipo: 'camara_lpr',
   zonaId: null,
-  host: 'equipo-de-prueba.invalid',
-  puerto: 80,
   modelo: 'modelo-de-prueba',
   firmware: 'v0.0.0-prueba',
   ultimoLatido,

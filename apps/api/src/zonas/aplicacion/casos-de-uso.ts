@@ -1,13 +1,21 @@
-import { debeReiniciarAforo, errorDominio, esFallo, exito, fallo } from '@ncr/domain-core';
-import type {
+import {
   Aforo,
-  ErrorDominio,
   HorarioDeZona,
+  Zona,
+  debeReiniciarAforo,
+  errorDominio,
+  esFallo,
+  exito,
+  fallo,
+} from '@ncr/domain-core';
+import type {
+  ErrorDominio,
+  GeneradorDeId,
   MotivoAcceso,
   PoliticaReinicio,
   Reloj,
   Resultado,
-  Zona,
+  TipoDeZona,
 } from '@ncr/domain-core';
 import type { RepositorioAutorizacionesZona, RepositorioZonas } from './puertos';
 
@@ -212,5 +220,80 @@ export class AutorizarZonaAVisitante {
       return exito({ zonaId });
     }
     return exito({ zonaId });
+  }
+}
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * HU-18 · CREAR UNA ZONA DESDE LA CONSOLA · ETAPA 15-D (O3, P1)
+ *
+ * Hasta la 15-D las zonas sólo existían si alguien las insertaba con `psql` (la
+ * semilla) y el módulo cableaba el repositorio EN MEMORIA en producción: cada
+ * reinicio las perdía. Ahora se crean por API, nacen sin horario —abierta
+ * según política— y con el aforo que se declare; el horario y las normas se
+ * configuran después con `ConfigurarZona`, que ya existía.
+ *
+ * El icono no entra al agregado: es presentación (ADR-013) y se guarda aparte.
+ */
+export interface EntradaCrearZona {
+  readonly nombre: string;
+  readonly tipo: TipoDeZona;
+  readonly aforoMaximo: number;
+  readonly normas?: readonly string[];
+  readonly icono?: string | null;
+}
+
+export class CrearZona {
+  constructor(
+    private readonly repositorio: RepositorioZonas,
+    private readonly ids: GeneradorDeId,
+  ) {}
+
+  async ejecutar(
+    copropiedadId: string,
+    actorId: string,
+    entrada: EntradaCrearZona,
+  ): Promise<Resultado<Zona, ErrorDominio>> {
+    const aforo = Aforo.crear(entrada.aforoMaximo, 0);
+    if (esFallo(aforo)) return aforo;
+    // Sin franjas = abierta según política. El desplazamiento se resuelve en
+    // la base al leer, a partir de la zona horaria de la copropiedad.
+    const horario = HorarioDeZona.crear([], 0);
+    if (esFallo(horario)) return horario;
+    const zona = Zona.crear({
+      id: this.ids.nuevo(),
+      copropiedadId,
+      nombre: entrada.nombre,
+      tipo: entrada.tipo,
+      horario: horario.valor,
+      aforo: aforo.valor,
+      normas: entrada.normas ?? [],
+    });
+    if (esFallo(zona)) return zona;
+    await this.repositorio.guardar(zona.valor, actorId);
+    if (entrada.icono !== undefined) {
+      await this.repositorio.fijarIcono(copropiedadId, zona.valor.id, entrada.icono, actorId);
+    }
+    return exito(zona.valor);
+  }
+}
+
+/** Baja lógica con motivo (RN-19). Nunca borrado: una zona tiene eventos. */
+export class DarDeBajaZona {
+  constructor(private readonly repositorio: RepositorioZonas) {}
+
+  async ejecutar(
+    copropiedadId: string,
+    zonaId: string,
+    motivo: string,
+    actorId: string,
+  ): Promise<Resultado<void, ErrorDominio>> {
+    if (motivo.trim().length < 3) {
+      return fallo(errorDominio('DATO_INVALIDO', 'La baja exige un motivo', 'RN-19'));
+    }
+    const hecho = await this.repositorio.desactivar(copropiedadId, zonaId, motivo.trim(), actorId);
+    return hecho
+      ? exito(undefined)
+      : fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'La zona no existe o ya estaba de baja'));
   }
 }

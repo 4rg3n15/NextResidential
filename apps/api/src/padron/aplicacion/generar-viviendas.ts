@@ -7,6 +7,7 @@ import type {
   ViviendaProyectada,
 } from '@ncr/domain-core';
 import type { RepositorioPadron } from './puertos';
+import type { ModoDeRegeneracion } from './puertos';
 import type { ContextoTenant } from '../../autenticacion';
 
 /**
@@ -49,6 +50,10 @@ export interface VistaPreviaDeGeneracion {
 
 export interface GeneracionAplicada {
   readonly creadas: number;
+  /** Las que ya existían y se dejaron como estaban (`conservar`/`sobrescribir`). */
+  readonly conservadas: number;
+  /** Las de baja que `sobrescribir` volvió a activar. */
+  readonly reactivadas: number;
 }
 
 const excepcionesDe = (plan: PlanDeGeneracion): readonly string[] =>
@@ -120,6 +125,7 @@ export class GenerarViviendas {
     ctx: ContextoTenant,
     plan: PlanDeGeneracion,
     totalEsperado: number,
+    modo: ModoDeRegeneracion = 'estricto',
   ): Promise<Resultado<GeneracionAplicada, ErrorDominio>> {
     if (!ctx.copropiedadId) {
       return fallo(errorDominio('OPERACION_NO_PERMITIDA', 'La identidad no tiene copropiedad'));
@@ -142,8 +148,19 @@ export class GenerarViviendas {
       copropiedadId: ctx.copropiedadId,
       viviendas: proyectadas.valor,
       actorId: ctx.usuarioId,
-      resumenDelPlan: resumenDelPlan(plan, proyectadas.valor.length),
+      resumenDelPlan: `${resumenDelPlan(plan, proyectadas.valor.length)} · modo ${modo}`,
+      modo,
     });
+
+    if (modo !== 'estricto') {
+      return exito({
+        creadas: resultado.creadas,
+        // Las reactivadas entran al repositorio como colisión (ya existen al
+        // insertar); conservadas son las que estaban activas ANTES.
+        conservadas: resultado.colisiones.length - (resultado.reactivadas ?? 0),
+        reactivadas: resultado.reactivadas ?? 0,
+      });
+    }
 
     if (resultado.colisiones.length > 0) {
       // Ni una sola se creó: el repositorio revierte la transacción entera. Se
@@ -157,6 +174,6 @@ export class GenerarViviendas {
         ),
       );
     }
-    return exito({ creadas: resultado.creadas });
+    return exito({ creadas: resultado.creadas, conservadas: 0, reactivadas: 0 });
   }
 }

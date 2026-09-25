@@ -653,12 +653,29 @@ repetir la visita.
 ```bash
 pnpm --filter @ncr/providers build
 node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs
+node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --sin-accionar
+node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --con-audio
+node scripts/puesta-en-marcha-equipos.mjs --simulado --con-audio   # ensayo, sin aparatos
 ```
 
 Sondea los tres equipos, **confirma o desmiente cada ruta documentada**, acciona
-cada relé midiendo la latencia y escribe un informe. Con `--sin-accionar` no
-mueve ningún relé, que es como conviene ejecutarlo la primera vez si hay alguien
-delante de la barrera.
+lo que abre midiendo la latencia —barrera y puerta de la terminal contra
+**KPI-13**, puerta del videoportero contra **KPI-32**— y escribe un informe. Con
+`--sin-accionar` no mueve nada, que es como conviene ejecutarlo la primera vez
+si hay alguien delante de la barrera.
+
+**Desde la ETAPA 15-D el guion imprime además la FICHA de cada equipo**, con el
+mismo diagnóstico que usa la consola y por familia: la cámara, quién decide por
+las tres vías; la terminal, si espera el veredicto y si su biblioteca cabe; el
+videoportero, si abre desde la central y si tiene canal de audio. Un `✗ BLOQUEO`
+en la ficha es un problema del guion (salida 1), no una nota al pie.
+
+Con `--con-audio` abre y cierra el canal de audio del videoportero y mide cuánto
+tarda en abrirse. **Es un proxy de KPI-33** (< 2 s extremo a extremo): el extremo
+a extremo exige el navegador del operador y NO se mide aquí; el informe lo dice
+con esas palabras. Con `--simulado` no habla con ningún aparato: recorre el
+mismo guion contra los tres equipos simulados, y el informe sale rotulado
+SIMULADO.
 
 | Salida         | Qué significa                                                                          |
 | -------------- | -------------------------------------------------------------------------------------- |
@@ -675,10 +692,13 @@ mano con esta guía delante.
 Las variables van en su `.env` local y **nunca** en el repositorio:
 
 ```
-BARRERA_HOST= BARRERA_PUERTO= BARRERA_USUARIO= BARRERA_CLAVE=
-TERMINAL_HOST= TERMINAL_PUERTO= TERMINAL_USUARIO= TERMINAL_CLAVE=
-VIDEOPORTERO_HOST= VIDEOPORTERO_PUERTO= VIDEOPORTERO_USUARIO= VIDEOPORTERO_CLAVE=
+BARRERA_HOST= BARRERA_PUERTO= BARRERA_USUARIO= BARRERA_CLAVE= BARRERA_CANAL=
+TERMINAL_HOST= TERMINAL_PUERTO= TERMINAL_USUARIO= TERMINAL_CLAVE= TERMINAL_CANAL=
+VIDEOPORTERO_HOST= VIDEOPORTERO_PUERTO= VIDEOPORTERO_USUARIO= VIDEOPORTERO_CLAVE= VIDEOPORTERO_CANAL=
 ```
+
+`*_CANAL` es el carril de la barrera, la puerta de la terminal o el canal de
+audio del videoportero; por omisión, 1.
 
 ### 8.2 · Cámara LPR · **que deje de decidir**
 

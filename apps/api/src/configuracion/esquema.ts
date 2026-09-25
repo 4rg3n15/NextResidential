@@ -213,6 +213,22 @@ export const esquemaConfiguracion = z.object({
    */
   PROVEEDOR_SEMILLA: z.coerce.number().int().default(20260908),
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * QUIÉN CARGA EL CONTEXTO DEL MOTOR · D-25, ETAPA 15-D
+   *
+   *   postgres     (por omisión) — lee autorizaciones, padrón y lista negra
+   *                 de la base. Es el único con el que una placa autorizada
+   *                 desde la consola se PERMITE.
+   *   conservador  — no lee nada y el motor deniega todo por FALLO_TECNICO.
+   *                 Es el comportamiento correcto sin origen de datos y el
+   *                 que usa la suite de la API, que no tiene base.
+   *
+   * Que hoy nadie supiera cuál estaba puesto era la mitad del defecto: el
+   * arranque REGISTRA cuál quedó activo, con su nombre.
+   */
+  CARGADOR_DE_CONTEXTO: z.enum(['postgres', 'conservador']).default('postgres'),
+
   /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 

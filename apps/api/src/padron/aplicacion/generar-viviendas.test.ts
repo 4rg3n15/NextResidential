@@ -17,6 +17,11 @@ const ctx: ContextoTenant = {
 
 const repo = (parcial: Partial<RepositorioPadron> = {}): RepositorioPadron => {
   const base: RepositorioPadron = {
+    resolverPlaca: vi.fn().mockResolvedValue(null),
+    editarVivienda: vi.fn().mockResolvedValue({ tipo: 'editada' }),
+    editarVehiculo: vi.fn().mockResolvedValue({ tipo: 'editado' }),
+    historialDeVehiculo: vi.fn().mockResolvedValue(null),
+    borrarVehiculoDefinitivamente: vi.fn().mockResolvedValue({ borrado: true }),
     registrarVehiculo: vi.fn().mockResolvedValue({ tipo: 'registrado', id: 'v1' }),
     desactivarVehiculo: vi.fn().mockResolvedValue(true),
     registrarResidente: vi.fn().mockResolvedValue({ id: 'r1' }),

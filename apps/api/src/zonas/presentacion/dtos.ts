@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -15,7 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { POLITICAS_REINICIO } from '@ncr/domain-core';
+import { POLITICAS_REINICIO, TIPOS_DE_ZONA } from '@ncr/domain-core';
 
 /**
  * Una franja del horario semanal (CA-15).
@@ -75,6 +76,52 @@ export class ConfigurarZonaDto {
   @IsOptional()
   @IsBoolean()
   abierta?: boolean;
+
+  /** Icono de la tarjeta (ADR-013). `null` lo quita. Presentación, no dominio. */
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'waves' })
+  @IsOptional()
+  @Matches(/^[a-z0-9-]{1,40}$/, { message: 'el icono es un nombre en minúsculas y guiones' })
+  icono?: string | null;
+}
+
+/** O3 · alta de zona desde la consola. Horario y normas se configuran después. */
+export class CrearZonaDto {
+  @ApiProperty({ type: String, minLength: 1, maxLength: 100 })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  nombre!: string;
+
+  @ApiProperty({ type: String, enum: TIPOS_DE_ZONA })
+  @IsIn([...TIPOS_DE_ZONA])
+  tipo!: (typeof TIPOS_DE_ZONA)[number];
+
+  @ApiProperty({ description: 'Aforo máximo simultáneo (RN-14). 0 = sin límite práctico.' })
+  @IsInt()
+  @Min(0)
+  @Max(100000)
+  aforoMaximo!: number;
+
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'dumbbell' })
+  @IsOptional()
+  @Matches(/^[a-z0-9-]{1,40}$/, { message: 'el icono es un nombre en minúsculas y guiones' })
+  icono?: string | null;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  normas?: string[];
+}
+
+export class BajaDeZonaDto {
+  @ApiProperty({ type: String, minLength: 3, maxLength: 300 })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(300)
+  motivo!: string;
 }
 
 export class AutorizarZonaDto {

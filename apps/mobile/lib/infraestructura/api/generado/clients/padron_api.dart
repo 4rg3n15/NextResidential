@@ -6,11 +6,15 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/baja_dto.dart';
+import '../models/borrado_definitivo_de_vehiculo_dto.dart';
 import '../models/borrado_definitivo_dto.dart';
 import '../models/cargar_padron_dto.dart';
 import '../models/cargar_padron_xlsx_dto.dart';
 import '../models/confirmar_generacion_dto.dart';
 import '../models/desactivar_dto.dart';
+import '../models/edicion_aplicada_dto.dart';
+import '../models/editar_vehiculo_dto.dart';
+import '../models/editar_vivienda_dto.dart';
 import '../models/estado.dart';
 import '../models/generacion_aplicada_dto.dart';
 import '../models/id_creado_dto.dart';
@@ -88,6 +92,21 @@ abstract class PadronApi {
     @Path('id') required String id,
   });
 
+  /// Edita un vehículo; la placa única activa la garantiza la base
+  @PUT('/copropiedades/{id}/padron/vehiculos/{vehiculoId}')
+  Future<EdicionAplicadaDto> padronControllerEditarVehiculo({
+    @Path('id') required String id,
+    @Path('vehiculoId') required String vehiculoId,
+    @Body() required EditarVehiculoDto body,
+  });
+
+  /// Borrado DEFINITIVO del vehículo, sólo sin historial (RN-19)
+  @DELETE('/copropiedades/{id}/padron/vehiculos/{vehiculoId}')
+  Future<BorradoDefinitivoDeVehiculoDto> padronControllerBorrarVehiculoDefinitivamente({
+    @Path('id') required String id,
+    @Path('vehiculoId') required String vehiculoId,
+  });
+
   /// Baja lógica del vehículo; el motivo es obligatorio (RN-19)
   @POST('/copropiedades/{id}/padron/vehiculos/{vehiculoId}/desactivacion')
   Future<BajaDto> padronControllerDesactivarVehiculo({
@@ -123,6 +142,14 @@ abstract class PadronApi {
   Future<VistaPreviaDeGeneracionDto> padronControllerPrevisualizarGeneracion({
     @Path('id') required String id,
     @Body() required PlanDeGeneracionDto body,
+  });
+
+  /// Edita identificador, agrupación o dirección de la vivienda (HU-02)
+  @PUT('/copropiedades/{id}/padron/viviendas/{viviendaId}')
+  Future<EdicionAplicadaDto> padronControllerEditarVivienda({
+    @Path('id') required String id,
+    @Path('viviendaId') required String viviendaId,
+    @Body() required EditarViviendaDto body,
   });
 
   /// Borrado DEFINITIVO, sólo si la vivienda no tiene historial (B.2, RN-19)

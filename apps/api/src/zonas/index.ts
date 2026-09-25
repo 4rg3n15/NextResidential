@@ -13,5 +13,11 @@ export type {
   RepositorioZonas,
   ResultadoOcupacion,
 } from './aplicacion/puertos';
-export { LiberarAforo, ReiniciarAforosVencidos, ValidarAforo } from './aplicacion/casos-de-uso';
+export {
+  CrearZona,
+  DarDeBajaZona,
+  LiberarAforo,
+  ReiniciarAforosVencidos,
+  ValidarAforo,
+} from './aplicacion/casos-de-uso';
 export type { ParteDeReinicio } from './aplicacion/casos-de-uso';

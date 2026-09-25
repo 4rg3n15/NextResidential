@@ -8,6 +8,10 @@ import { CLAVE_ROLES } from '../src/comun/decoradores';
 import type { TestingModuleBuilder } from '@nestjs/testing';
 import express from 'express';
 import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
+import {
+  LIMITE_DE_FOTOGRAFIA,
+  RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
+} from '../src/autorizaciones/presentacion/limites';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../src/comun/sobre-de-equipo';
 import type { INestApplication } from '@nestjs/common';
 import { aplicarSaneamiento, aplicarSeguridad } from '../src/seguridad';
@@ -30,6 +34,8 @@ import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { FiltroGlobalDeExcepciones } from '../src/comun/filtros/filtro-global';
 import { REPOSITORIO_DE_EQUIPOS, SIN_PROBAR, SONDA_DE_EQUIPO } from '../src/equipos';
+import { REPOSITORIO_AUTORIZACIONES_ZONA, REPOSITORIO_ZONAS } from '../src/zonas';
+import { RepositorioZonasEnMemoria } from '../src/zonas/infraestructura/repositorio-zonas-memoria';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
 import { COP_A, COP_B } from './constantes';
 import {
@@ -76,6 +82,10 @@ export const configuracionDePrueba: Configuracion = {
    */
   PROVEEDOR_DE_EQUIPOS: 'simulado',
   PROVEEDOR_SEMILLA: 20260908,
+  // Este banco no tiene base: el cargador que lee de ella fallaría en cada
+  // lectura. El conservador deniega, que es lo que las suites de la API
+  // esperan; el cargador PostgreSQL tiene su propia suite contra base real.
+  CARGADOR_DE_CONTEXTO: 'conservador',
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   LOG_LEVEL: 'aviso',
@@ -250,6 +260,21 @@ export const crearApp = async (
      * honesto cuando no hay equipo al otro lado. Las suites que prueban los
      * cuatro resultados la sustituyen por el suyo.
      */
+    /**
+     * ETAPA 15-D (P1) · las zonas ya persisten en PostgreSQL en producción; en
+     * este banco sin base se vuelve al doble en memoria, que es la MISMA
+     * instancia que las suites siembran por `RepositorioZonasEnMemoria`.
+     */
+    .overrideProvider(REPOSITORIO_ZONAS)
+    .useFactory({
+      factory: (enMemoria: RepositorioZonasEnMemoria) => enMemoria,
+      inject: [RepositorioZonasEnMemoria],
+    })
+    .overrideProvider(REPOSITORIO_AUTORIZACIONES_ZONA)
+    .useFactory({
+      factory: (enMemoria: RepositorioZonasEnMemoria) => enMemoria.permisosDeZona,
+      inject: [RepositorioZonasEnMemoria],
+    })
     .overrideProvider(REPOSITORIO_DE_EQUIPOS)
     .useFactory({ factory: () => equiposPorOmision ?? new RepositorioDeEquiposEnMemoria() })
     .overrideProvider(SONDA_DE_EQUIPO)
@@ -330,6 +355,10 @@ export const crearApp = async (
    * alarma» que nunca recibe cuerpo, y estaría en verde.
    */
   app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
+  app.use(
+    RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
+    express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
+  );
   app.use(
     express.json({ limit: configuracionDePrueba.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }),
   );

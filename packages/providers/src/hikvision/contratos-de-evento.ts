@@ -69,9 +69,25 @@ export interface RecuadroDetectado {
   readonly alto: number;
 }
 
+/**
+ * Las clases de evento que el sistema distingue · ampliadas en la 15-D (6.5).
+ *
+ * | Clase          | Quién la emite            | Qué trae                                 |
+ * | -------------- | ------------------------- | ---------------------------------------- |
+ * | `placa`        | Cámara ANPR               | placa, confianza, quién abrió            |
+ * | `timbre`       | Videoportero              | que alguien pulsó                        |
+ * | `llamada`      | Videoportero              | origen de la llamada (edificio/unidad)   |
+ * | `rostro`       | Terminal facial           | persona reconocida y si ESPERA veredicto |
+ * | `desconocido`  | Cualquiera                | nada que el sistema sepa usar            |
+ *
+ * `rostro` con `esperaVeredicto: true` es el corazón de la verificación remota
+ * (O4): la terminal reconoció y NO abrió, y espera que la plataforma decida.
+ */
+export type ClaseDeEvento = 'placa' | 'timbre' | 'llamada' | 'rostro' | 'desconocido';
+
 /** Evento normalizado: lo único que sale de este módulo hacia el resto. */
 export interface EventoDeEquipo {
-  readonly clase: 'placa' | 'timbre' | 'desconocido';
+  readonly clase: ClaseDeEvento;
   readonly placa: string | null;
   readonly confianza: number | null;
   readonly dispositivoId: string;
@@ -105,6 +121,19 @@ export interface EventoDeEquipo {
    * permite verlo en la puesta en marcha en vez de descubrirlo en una auditoría.
    */
   readonly horaSinDesplazamiento: boolean;
+  /**
+   * Identificador de la persona que la terminal reconoció (`rostro`). Es el
+   * `plantillaId` con el que se dio de alta: la identidad vive en
+   * `plantillas_biometricas`, nunca en el aparato. `null` en las demás clases.
+   */
+  readonly personaId: string | null;
+  /**
+   * `true` cuando la terminal reconoció y ESPERA el veredicto de la plataforma
+   * (verificación remota). `false` cuando decidió sola o no aplica.
+   */
+  readonly esperaVeredicto: boolean;
+  /** De dónde llama (`llamada`): edificio/unidad/periodo tal como los declara. */
+  readonly origenDeLlamada: string | null;
 }
 
 /**
@@ -330,6 +359,57 @@ export const desdeAlarmServerXml = (
     horaSinDesplazamiento: cuando !== null && cuando !== '' && !traeDesplazamiento(cuando),
     enVivo: esDatoEnVivo(etiqueta(cuerpo, 'alarmDataType')),
     referenciaDelEquipo: etiqueta(cuerpo, 'eventId') ?? etiqueta(cuerpo, 'serialNumber'),
+    personaId: null,
+    esperaVeredicto: false,
+    origenDeLlamada: null,
+  };
+};
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 6.7a · EL MISMO EVENTO, EN JSON · DOCUMENTADO, NO VERIFICADO
+ *
+ * El receptor del equipo admite `parameterFormatType` XML o JSON (la 15-C
+ * dejó el equipo en XML a propósito). Si un firmware o una configuración
+ * publica en JSON, la parte del evento llega como `application/json` y este
+ * normalizador produce EXACTAMENTE el mismo `EventoDeEquipo` que el XML: el
+ * resto del sistema no sabe en qué idioma habló la cámara.
+ *
+ * La forma JSON del evento ANPR es la del bloque de `alertStream` (mismas
+ * claves), y se normaliza por el mismo sitio. `alarmDataType` se busca en la
+ * raíz y dentro de `ANPR`; si no está, HISTÓRICO, como en XML.
+ */
+export const esJsonDeAlarmServer = (cuerpo: string): boolean =>
+  /^\s*\{/.test(cuerpo) && /"eventType"/.test(cuerpo);
+
+export const desdeAlarmServerJson = (
+  cuerpo: string,
+  dispositivoId: string,
+  ahora: Date,
+): EventoDeEquipo | null => {
+  let objeto: unknown;
+  try {
+    objeto = JSON.parse(cuerpo);
+  } catch {
+    return null;
+  }
+  if (typeof objeto !== 'object' || objeto === null) return null;
+  const raiz = objeto as Record<string, unknown>;
+  const bloque = (raiz['EventNotificationAlert'] ?? raiz) as BloqueDeAlertStream &
+    Record<string, unknown>;
+  const anpr = (bloque.ANPR ?? {}) as Record<string, unknown>;
+  const alarmDataType = bloque['alarmDataType'] ?? anpr['alarmDataType'];
+  const base = desdeAlertStreamJson(bloque, dispositivoId, ahora);
+  return {
+    ...base,
+    // En el sobre del receptor manda `alarmDataType`, no `currentEvent`.
+    enVivo: esDatoEnVivo(alarmDataType === undefined ? null : String(alarmDataType)),
+    referenciaDelEquipo:
+      typeof bloque['eventId'] === 'string'
+        ? bloque['eventId']
+        : typeof bloque['serialNumber'] === 'string'
+          ? bloque['serialNumber']
+          : base.referenciaDelEquipo,
   };
 };
 
@@ -337,7 +417,7 @@ export const desdeAlarmServerXml = (
 // 2 · VIDEOPORTERO · JSON del alertStream que ABRE nuestro sistema
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Forma mínima del bloque JSON del `alertStream`. */
+/** Forma mínima del bloque JSON del `alertStream` · DOCUMENTADA, NO VERIFICADA. */
 export interface BloqueDeAlertStream {
   readonly eventType?: string;
   readonly eventState?: string;
@@ -346,7 +426,65 @@ export interface BloqueDeAlertStream {
   readonly channelID?: number | string;
   readonly eventDescription?: string;
   readonly ANPR?: { readonly licensePlate?: string; readonly confidenceLevel?: number };
+  /**
+   * Evento de control de acceso de la TERMINAL (6.5). `employeeNoString` es el
+   * identificador de persona que se dio de alta (= plantillaId); `remoteCheck`
+   * dice si la terminal ESPERA el veredicto de la plataforma. Claves
+   * [SUPUESTO] S-36 hasta capturarlas del equipo.
+   */
+  readonly AccessControllerEvent?: {
+    readonly employeeNoString?: string;
+    readonly employeeNo?: string | number;
+    readonly remoteCheck?: boolean;
+    readonly majorEventType?: number;
+    readonly subEventType?: number;
+    readonly verifyNo?: number;
+  };
+  /**
+   * Llamada del VIDEOPORTERO (6.5). Origen tal como el equipo lo declara:
+   * periodo/edificio/unidad. Claves [SUPUESTO] S-36.
+   */
+  readonly CallInfo?: {
+    readonly periodNumber?: number | string;
+    readonly buildingNumber?: number | string;
+    readonly unitNumber?: number | string;
+    readonly floorNumber?: number | string;
+    readonly roomNumber?: number | string;
+  };
+  readonly voiceTalkEvent?: { readonly src?: BloqueDeAlertStream['CallInfo'] };
 }
+
+/** «edificio 1 · unidad 2 · periodo 3», con lo que venga. */
+const origenDeLlamadaDe = (bloque: BloqueDeAlertStream): string | null => {
+  const origen = bloque.CallInfo ?? bloque.voiceTalkEvent?.src;
+  if (origen === undefined) return null;
+  const partes = [
+    ['periodo', origen.periodNumber],
+    ['edificio', origen.buildingNumber],
+    ['unidad', origen.unitNumber],
+    ['piso', origen.floorNumber],
+    ['apto', origen.roomNumber],
+  ]
+    .filter(([, v]) => v !== undefined && v !== null && String(v) !== '')
+    .map(([k, v]) => `${String(k)} ${String(v)}`);
+  return partes.length === 0 ? null : partes.join(' · ');
+};
+
+/** La clase de un bloque JSON, por lo que TRAE y no sólo por su tipo. */
+export const claseDeBloque = (bloque: BloqueDeAlertStream): ClaseDeEvento => {
+  const tipo = bloque.eventType ?? '';
+  if ((bloque.ANPR?.licensePlate ?? null) !== null) return 'placa';
+  if (bloque.AccessControllerEvent !== undefined || /AccessController/i.test(tipo)) return 'rostro';
+  if (
+    bloque.CallInfo !== undefined ||
+    bloque.voiceTalkEvent !== undefined ||
+    /videoIntercom|callSignal|voiceTalk/i.test(tipo)
+  ) {
+    return 'llamada';
+  }
+  if (/doorbell/i.test(tipo)) return 'timbre';
+  return 'desconocido';
+};
 
 /**
  * **La línea que impide inundar el sistema al conectar.**
@@ -365,18 +503,17 @@ export const desdeAlertStreamJson = (
   dispositivoId: string,
   ahora: Date,
 ): EventoDeEquipo => {
-  const tipo = bloque.eventType ?? '';
   const placa = bloque.ANPR?.licensePlate ?? null;
   const confianza = bloque.ANPR?.confidenceLevel ?? null;
   const cuando = bloque.dateTime;
 
+  const acceso = bloque.AccessControllerEvent;
+  const personaId =
+    acceso?.employeeNoString ??
+    (acceso?.employeeNo === undefined ? null : String(acceso.employeeNo));
+
   return {
-    clase:
-      placa !== null
-        ? 'placa'
-        : /doorbell|callSignal|videoIntercom/i.test(tipo)
-          ? 'timbre'
-          : 'desconocido',
+    clase: claseDeBloque(bloque),
     placa,
     // Mismo campo documentado y misma escala que en el sobre del Alarm Server:
     // porcentaje entero. Se normaliza por el mismo sitio para que no haya dos
@@ -404,6 +541,9 @@ export const desdeAlertStreamJson = (
     enVivo: esEventoEnVivo(bloque),
     referenciaDelEquipo:
       bloque.channelID === undefined ? null : `${dispositivoId}:${bloque.channelID}`,
+    personaId: personaId === null || personaId === '' ? null : personaId,
+    esperaVeredicto: acceso?.remoteCheck === true,
+    origenDeLlamada: origenDeLlamadaDe(bloque),
   };
 };
 

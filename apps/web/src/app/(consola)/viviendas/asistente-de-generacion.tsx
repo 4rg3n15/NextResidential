@@ -3,7 +3,13 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import type { PlanDeGeneracion, TipoDeCopropiedad, VistaPreviaDeGeneracion } from '@ncr/contracts';
+import type {
+  GeneracionAplicada,
+  ModoDeRegeneracion,
+  PlanDeGeneracion,
+  TipoDeCopropiedad,
+  VistaPreviaDeGeneracion,
+} from '@ncr/contracts';
 import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
@@ -73,8 +79,14 @@ export const AsistenteDeGeneracion = ({
   readonly vocabulario: Vocabulario;
   readonly abierto: boolean;
   readonly alCerrar: () => void;
-  readonly alTerminar: (creadas: number) => void;
+  readonly alTerminar: (resultado: GeneracionAplicada) => void;
 }): JSX.Element => {
+  /**
+   * O3 · qué hacer con las que ya existen. Arranca en `estricto` —todas o
+   * ninguna— y sólo se ofrece elegir cuando la vista previa nombra colisiones:
+   * es entonces cuando la pregunta tiene sentido, y no antes.
+   */
+  const [modo, setModo] = useState<ModoDeRegeneracion>('estricto');
   /**
    * El denominador arranca APAGADO. Es la mitad de la corrección: preguntarlo
    * primero y darlo por supuesto era lo que obligaba a inventarse una torre en
@@ -157,11 +169,12 @@ export const AsistenteDeGeneracion = ({
       const respuesta = desenvolver(
         await cliente.POST('/copropiedades/{id}/padron/viviendas/generacion', {
           params: { path: { id: copropiedadId } },
-          body: { ...plan(), totalEsperado: vista.total },
+          body: { ...plan(), totalEsperado: vista.total, modo },
         }),
       );
       setVista(null);
-      alTerminar(respuesta.creadas);
+      setModo('estricto');
+      alTerminar(respuesta);
     } catch (e) {
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo generar el padrón');
     } finally {
@@ -169,7 +182,9 @@ export const AsistenteDeGeneracion = ({
     }
   };
 
-  const bloqueada = vista !== null && vista.colisiones.length > 0;
+  const hayColisiones = vista !== null && vista.colisiones.length > 0;
+  // En estricto una colisión bloquea; conservar y sobrescribir siguen adelante.
+  const bloqueada = hayColisiones && modo === 'estricto';
 
   return (
     <DialogoDeFormulario
@@ -177,7 +192,11 @@ export const AsistenteDeGeneracion = ({
       titulo={`Generar ${vocabulario.vivienda.toLowerCase()}s`}
       descripcion="Se crean todas o ninguna. Nada se sustituye: si alguna ya existe, la operación se niega entera y las nombra."
       etiquetaEnviar={
-        vista === null ? 'Ver qué se va a crear' : `Crear ${String(vista.total)} viviendas`
+        vista === null
+          ? 'Ver qué se va a crear'
+          : hayColisiones && modo !== 'estricto'
+            ? `Crear las que faltan de ${String(vista.total)}`
+            : `Crear ${String(vista.total)} viviendas`
       }
       enviando={enviando}
       error={error}
@@ -185,10 +204,38 @@ export const AsistenteDeGeneracion = ({
       alEnviar={() => void (vista === null ? previsualizar() : confirmar())}
       alCancelar={() => {
         setVista(null);
+        setModo('estricto');
         setError(undefined);
         alCerrar();
       }}
     >
+      {hayColisiones ? (
+        <fieldset className="space-y-2 rounded-campo border border-aviso bg-aviso-suave p-3">
+          <legend className="px-1 text-secundario font-medium text-aviso-texto">
+            Algunas ya existen. ¿Qué hacer con ellas?
+          </legend>
+          {(
+            [
+              ['estricto', 'No crear ninguna: corrijo el plan'],
+              ['conservar', 'Conservar las que existen y crear sólo las que faltan'],
+              [
+                'sobrescribir',
+                'Además, volver a activar las que estaban dadas de baja (no se borra ni se renombra nada, RN-19)',
+              ],
+            ] as const
+          ).map(([valor, texto]) => (
+            <label key={valor} className="flex items-start gap-2 text-secundario text-texto">
+              <input
+                type="radio"
+                name="modo-de-regeneracion"
+                checked={modo === valor}
+                onChange={() => setModo(valor)}
+              />
+              {texto}
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
       <label className="flex items-start gap-2 text-secundario text-texto">
         <input
           type="checkbox"

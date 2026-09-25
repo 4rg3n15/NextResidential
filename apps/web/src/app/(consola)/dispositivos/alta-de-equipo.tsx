@@ -1,9 +1,9 @@
 'use client';
 
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { ResultadoDeSondeo, TipoDeEquipo } from '@ncr/contracts';
+import type { Equipo, ResultadoDeSondeo, TipoDeEquipo } from '@ncr/contracts';
 import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
@@ -89,16 +89,30 @@ const numero = (texto: string): number | undefined => {
   return texto.trim() === '' || !Number.isFinite(n) ? undefined : n;
 };
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * O4 · EL MISMO DIÁLOGO DA DE ALTA Y EDITA
+ *
+ * Con `equipo` es edición: los campos llegan rellenos, la clave se deja en
+ * blanco para CONSERVAR la guardada —el sistema sondea con ella en el servidor,
+ * sin que nadie la vea— y sólo se reescribe para rotarla. Un segundo formulario
+ * habría duplicado los seis campos y sus avisos, y uno de los dos se quedaría
+ * atrás en la primera corrección.
+ */
 export const AltaDeEquipo = ({
   copropiedadId,
   abierto,
   alCerrar,
+  equipo = null,
 }: {
   readonly copropiedadId: string;
   readonly abierto: boolean;
   readonly alCerrar: () => void;
+  /** Con un equipo, el diálogo EDITA. */
+  readonly equipo?: Equipo | null;
 }): JSX.Element => {
   const clientes = useQueryClient();
+  const editando = equipo !== null;
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState<TipoDeEquipo>('camara_lpr');
   const [host, setHost] = useState('');
@@ -107,21 +121,53 @@ export const AltaDeEquipo = ({
   const [usuario, setUsuario] = useState('');
   const [secreto, setSecreto] = useState('');
   const [especifico, setEspecifico] = useState('1');
+  const [fabricante, setFabricante] = useState('');
+  const [modoDeTerminal, setModoDeTerminal] = useState<'reporta_y_espera' | 'decide_el_equipo'>(
+    'reporta_y_espera',
+  );
+  const [canalDeAudioHabilitado, setCanalDeAudioHabilitado] = useState(false);
   const [sondeo, setSondeo] = useState<ResultadoDeSondeo | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+
+  // Al abrir en edición, los campos se rellenan con lo guardado (nunca la clave).
+  useEffect(() => {
+    if (!abierto) return;
+    setNombre(equipo?.nombre ?? '');
+    setTipo(equipo?.tipo ?? 'camara_lpr');
+    // La dirección, el puerto, el protocolo y el usuario NO llegan al navegador
+    // (§7.1): al editar arrancan en blanco y en blanco significan «conserva lo
+    // guardado». Sólo se escriben para cambiarlos.
+    setHost('');
+    setPuerto(editando ? '' : '80');
+    setProtocolo('http');
+    setUsuario('');
+    setSecreto('');
+    setFabricante(equipo?.fabricante ?? '');
+    setModoDeTerminal(equipo?.modoDeTerminal ?? 'reporta_y_espera');
+    setCanalDeAudioHabilitado(equipo?.canalDeAudioHabilitado ?? false);
+    setEspecifico(
+      String(equipo?.canalBarrera ?? equipo?.numeroDePuerta ?? equipo?.canalDeAudio ?? 1),
+    );
+    setSondeo(null);
+    setError(undefined);
+  }, [abierto, equipo]);
 
   const campoEspecifico = ESPECIFICO[tipo];
 
   const cuerpo = (): Record<string, unknown> => ({
     nombre: nombre.trim(),
     tipo,
-    host: host.trim(),
-    puerto: numero(puerto) ?? 80,
-    protocolo,
-    usuario: usuario.trim(),
+    // Al editar, lo vacío no viaja: el servidor conserva lo guardado (§6.1).
+    ...(editando && host.trim() === '' ? {} : { host: host.trim() }),
+    ...(editando && puerto.trim() === '' ? {} : { puerto: numero(puerto) ?? 80 }),
+    ...(editando && host.trim() === '' ? {} : { protocolo }),
+    ...(editando && usuario.trim() === '' ? {} : { usuario: usuario.trim() }),
     ...(secreto === '' ? {} : { secreto }),
     ...(campoEspecifico === null ? {} : { [campoEspecifico.clave]: numero(especifico) ?? 1 }),
+    ...(fabricante.trim() === '' ? {} : { fabricante: fabricante.trim() }),
+    ...(tipo === 'terminal_facial' ? { modoDeTerminal } : {}),
+    ...(tipo === 'intercom' ? { canalDeAudioHabilitado } : {}),
   });
 
   /**
@@ -136,9 +182,10 @@ export const AltaDeEquipo = ({
 
   const completo =
     nombre.trim() !== '' &&
-    host.trim() !== '' &&
-    usuario.trim() !== '' &&
-    secreto !== '' &&
+    // Al editar, dirección, usuario y clave en blanco CONSERVAN lo guardado.
+    (editando || host.trim() !== '') &&
+    (editando || usuario.trim() !== '') &&
+    (editando || secreto !== '') &&
     rechazoDeNombre === null &&
     rechazoDeUsuario === null &&
     rechazoDeClave === null;
@@ -167,13 +214,19 @@ export const AltaDeEquipo = ({
     setEnviando(true);
     setError(undefined);
     try {
+      // Ya se probó: no se vuelve a sondear al guardar. Un segundo intento
+      // con la credencial equivocada acerca el bloqueo de la cuenta.
+      const body = { ...cuerpo(), probarConexion: sondeo === null } as never;
       desenvolver(
-        await cliente.POST('/copropiedades/{id}/equipos', {
-          params: { path: { id: copropiedadId } },
-          // Ya se probó: no se vuelve a sondear al guardar. Un segundo intento
-          // con la credencial equivocada acerca el bloqueo de la cuenta.
-          body: { ...cuerpo(), probarConexion: sondeo === null } as never,
-        }),
+        equipo === null
+          ? await cliente.POST('/copropiedades/{id}/equipos', {
+              params: { path: { id: copropiedadId } },
+              body,
+            })
+          : await cliente.PUT('/copropiedades/{id}/equipos/{equipoId}', {
+              params: { path: { id: copropiedadId, equipoId: equipo.id } },
+              body,
+            }),
       );
       await clientes.invalidateQueries({ queryKey: ['dispositivos', copropiedadId] });
       setSondeo(null);
@@ -189,9 +242,13 @@ export const AltaDeEquipo = ({
   return (
     <DialogoDeFormulario
       abierto={abierto}
-      titulo="Agregar equipo"
-      descripcion="Los datos de conexión del aparato. La clave se guarda cifrada y el sistema no vuelve a mostrarla."
-      etiquetaEnviar="Guardar equipo"
+      titulo={editando ? `Editar ${equipo.nombre}` : 'Agregar equipo'}
+      descripcion={
+        editando
+          ? 'Deje la clave en blanco para conservar la guardada: al guardar, el servidor vuelve a sondear el equipo con ella. Escríbala sólo para rotarla.'
+          : 'Los datos de conexión del aparato. La clave se guarda cifrada y el sistema no vuelve a mostrarla.'
+      }
+      etiquetaEnviar={editando ? 'Guardar cambios' : 'Guardar equipo'}
       enviando={enviando}
       error={error}
       puedeEnviar={completo}
@@ -233,11 +290,15 @@ export const AltaDeEquipo = ({
 
       <div className="grid grid-cols-[2fr_1fr] gap-2">
         <Campo
-          etiqueta="Dirección del equipo"
+          etiqueta={editando ? 'Nueva dirección del equipo (opcional)' : 'Dirección del equipo'}
           value={host}
           onChange={(e) => setHost(e.target.value)}
-          ayuda="La IP fija del aparato en la red del conjunto."
-          required
+          ayuda={
+            editando
+              ? 'La guardada no se muestra: el navegador nunca conoce la red del conjunto. En blanco se conserva.'
+              : 'La IP fija del aparato en la red del conjunto. No vuelve a mostrarse: con el equipo habla el servidor.'
+          }
+          required={!editando}
         />
         <Campo
           etiqueta="Puerto"
@@ -275,23 +336,79 @@ export const AltaDeEquipo = ({
       </fieldset>
 
       <Campo
-        etiqueta="Usuario del equipo"
+        etiqueta={editando ? 'Nuevo usuario del equipo (opcional)' : 'Usuario del equipo'}
         value={usuario}
         onChange={(e) => setUsuario(e.target.value)}
-        ayuda="Use un usuario de servicio con el mínimo privilegio, no el de fábrica: la guía del fabricante define un perfil de OPERADOR, y es el que hace falta."
-        required
+        ayuda={
+          editando
+            ? 'En blanco se conserva el guardado.'
+            : 'Use un usuario de servicio con el mínimo privilegio, no el de fábrica: la guía del fabricante define un perfil de OPERADOR, y es el que hace falta.'
+        }
+        required={!editando}
         {...(rechazoDeUsuario === null ? {} : { error: rechazoDeUsuario })}
       />
       <Campo
-        etiqueta="Clave del equipo"
+        etiqueta={editando ? 'Nueva clave del equipo (opcional)' : 'Clave del equipo'}
         type="password"
         autoComplete="new-password"
         value={secreto}
         onChange={(e) => setSecreto(e.target.value)}
-        ayuda="Se guarda cifrada y no vuelve a mostrarse. Para volver a probar la conexión más adelante habrá que escribirla otra vez."
-        required
+        ayuda={
+          editando
+            ? 'En blanco conserva la guardada. El sistema nunca la muestra: para sondear usa la que tiene en el servidor.'
+            : 'Se guarda cifrada y no vuelve a mostrarse. Para volver a sondear el equipo más adelante el sistema usa la guardada.'
+        }
+        required={!editando}
         {...(rechazoDeClave === null ? {} : { error: rechazoDeClave })}
       />
+      <Campo
+        etiqueta="Fabricante (informativo)"
+        value={fabricante}
+        onChange={(e) => setFabricante(e.target.value)}
+        ayuda="Sólo se muestra y se audita. Ninguna decisión del sistema mira la marca: mira lo que el equipo declara poder hacer."
+      />
+      {tipo === 'terminal_facial' ? (
+        <fieldset className="space-y-1.5">
+          <legend className="block text-secundario font-medium text-texto">
+            Quién decide en la terminal
+          </legend>
+          {(
+            [
+              ['reporta_y_espera', 'Reporta y espera el veredicto de la plataforma (lo exigido)'],
+              [
+                'decide_el_equipo',
+                'Decide el equipo — declarado a sabiendas; la traza queda incompleta',
+              ],
+            ] as const
+          ).map(([valor, texto]) => (
+            <label key={valor} className="flex items-start gap-2 text-secundario text-texto">
+              <input
+                type="radio"
+                name="modo-de-terminal"
+                checked={modoDeTerminal === valor}
+                onChange={() => setModoDeTerminal(valor)}
+              />
+              {texto}
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
+      {tipo === 'intercom' ? (
+        <label className="flex items-start gap-2 text-secundario text-texto">
+          <input
+            type="checkbox"
+            checked={canalDeAudioHabilitado}
+            onChange={(e) => setCanalDeAudioHabilitado(e.target.checked)}
+            className="mt-1 h-4 w-4 accent-marca"
+          />
+          <span>
+            Una persona habilitó el canal de audio EN EL APARATO (ADR-01)
+            <span className="block text-texto-apagado">
+              El sistema no lo habilita solo; el sondeo comprueba si el equipo lo declara.
+            </span>
+          </span>
+        </label>
+      ) : null}
 
       {campoEspecifico === null ? null : (
         <Campo
@@ -333,13 +450,15 @@ export const AltaDeEquipo = ({
           variante="secundario"
           tamano="sm"
           type="button"
-          disabled={!completo || enviando}
+          disabled={!completo || enviando || editando}
           onClick={() => void probar()}
         >
           Probar conexión
         </Boton>
         <span className="text-secundario text-texto-apagado">
-          La prueba la hace el servidor, no este navegador.
+          {editando
+            ? 'Al guardar, el servidor vuelve a sondear el equipo con lo guardado y lo que cambie aquí.'
+            : 'La prueba la hace el servidor, no este navegador.'}
         </span>
       </div>
 

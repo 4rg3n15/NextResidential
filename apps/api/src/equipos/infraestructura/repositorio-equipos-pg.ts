@@ -6,11 +6,14 @@ import type {
   AltaDeEquipo,
   DatosDeEquipo,
   EstadoDeVerificacion,
+  ModoDeTerminalDeclarado,
   ProtocoloDeEquipo,
   RepositorioDeEquipos,
   ResultadoDeSondeo,
   TipoDeEquipo,
 } from '../aplicacion/puertos';
+import { capacidadesDesdeJson } from '@ncr/providers';
+import { ACTOR_INGESTA as ACTOR_DE_SERVICIO } from '../../comun/actores-de-servicio';
 
 /**
  * Equipos en PostgreSQL — A.1 y A.2.
@@ -46,9 +49,13 @@ interface FilaDeEquipo {
   readonly usuario: string | null;
   readonly modelo: string | null;
   readonly firmware: string | null;
+  readonly fabricante: string | null;
   readonly canal_barrera: number | null;
   readonly numero_de_puerta: number | null;
   readonly canal_de_audio: number | null;
+  readonly modo_de_terminal: ModoDeTerminalDeclarado | null;
+  readonly canal_de_audio_habilitado: boolean;
+  readonly capacidades: unknown;
   readonly verificacion: EstadoDeVerificacion;
   readonly verificado_en: Date | null;
   readonly motivo_no_verificado: string | null;
@@ -57,7 +64,8 @@ interface FilaDeEquipo {
 
 const CAMPOS = `
   id, nombre, tipo::text AS tipo, host, puerto, protocolo::text AS protocolo, usuario,
-  modelo, firmware, canal_barrera, numero_de_puerta, canal_de_audio,
+  modelo, firmware, fabricante, canal_barrera, numero_de_puerta, canal_de_audio,
+  modo_de_terminal, canal_de_audio_habilitado, capacidades,
   verificacion::text AS verificacion, verificado_en, motivo_no_verificado,
   estado::text AS estado`;
 
@@ -71,9 +79,14 @@ const aDatos = (f: FilaDeEquipo): DatosDeEquipo => ({
   usuario: f.usuario,
   modelo: f.modelo,
   firmware: f.firmware,
+  fabricante: f.fabricante,
   canalBarrera: f.canal_barrera,
   numeroDePuerta: f.numero_de_puerta,
   canalDeAudio: f.canal_de_audio,
+  modoDeTerminal: f.modo_de_terminal,
+  canalDeAudioHabilitado: f.canal_de_audio_habilitado,
+  // Se lee sin confiar en la forma: lo corrupto vuelve a DESCONOCIDA.
+  capacidades: f.capacidades === null ? null : capacidadesDesdeJson(f.capacidades),
   verificacion: f.verificacion,
   verificadoEn: f.verificado_en === null ? null : f.verificado_en.toISOString(),
   motivoNoVerificado: f.motivo_no_verificado,
@@ -82,6 +95,46 @@ const aDatos = (f: FilaDeEquipo): DatosDeEquipo => ({
 
 const verificacionDe = (v: ResultadoDeSondeo): EstadoDeVerificacion =>
   v.verificado ? 'verificado' : v.clase === 'decide_solo' ? 'rechazado' : 'no_verificado';
+
+/** Claims de SERVICIO para una copropiedad: lo único que lee el sobre. */
+export const claimsDeServicio = (copropiedadId: string): Record<string, unknown> => ({
+  rol: 'servicio',
+  usuario_id: ACTOR_DE_SERVICIO,
+  copropiedad_id: copropiedadId,
+  copropiedades: [copropiedadId],
+});
+
+/**
+ * El sobre, descifrado, **sólo para hablar con el equipo**. Lo comparten el
+ * repositorio (corrección desde la consola) y el registro que alimenta al
+ * proveedor. Un solo sitio que descifra es lo que lo mantiene auditable.
+ */
+export const leerSobre = async (
+  pool: Pool,
+  llaveMaestra: string,
+  copropiedadId: string,
+  equipoId: string,
+): Promise<string | null> => {
+  const cliente = await pool.connect();
+  try {
+    await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
+      JSON.stringify(claimsDeServicio(copropiedadId)),
+    ]);
+    const { rows } = await cliente.query<{ iv: Buffer; cuerpo: Buffer; etiqueta: Buffer }>(
+      `SELECT iv, cuerpo, etiqueta FROM public.credenciales_de_equipo
+        WHERE dispositivo_id = $1 AND copropiedad_id = $2 AND estado = 'activo'`,
+      [equipoId, copropiedadId],
+    );
+    const fila = rows[0];
+    if (fila === undefined) return null;
+    const llave = derivarLlave(llaveMaestra, copropiedadId, PROPOSITOS.credencialesDeEquipo);
+    return descifrar(llave, { iv: fila.iv, cuerpo: fila.cuerpo, etiqueta: fila.etiqueta }).toString(
+      'utf8',
+    );
+  } finally {
+    cliente.release();
+  }
+};
 
 @Injectable()
 export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
@@ -187,10 +240,12 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
              (copropiedad_id, nombre, tipo, host, puerto, protocolo, usuario,
               credencial_ref, modelo, firmware, canal_barrera, numero_de_puerta,
               canal_de_audio, verificacion, verificado_en, motivo_no_verificado,
-              creado_por, actualizado_por)
+              creado_por, actualizado_por, fabricante, modo_de_terminal,
+              canal_de_audio_habilitado, capacidades, capacidades_descubiertas_en)
            VALUES ($1, $2, $3::tipo_dispositivo, $4, $5, $6::protocolo_equipo, $7,
                    'vault:pendiente', $8, $9, $10, $11, $12,
-                   $13::verificacion_equipo, $14, $15, $16, $16)
+                   $13::verificacion_equipo, $14, $15, $16, $16, $17, $18, $19,
+                   $20::jsonb, CASE WHEN $20::jsonb IS NULL THEN NULL ELSE now() END)
            RETURNING ${CAMPOS}`,
           [
             copropiedadId,
@@ -209,6 +264,10 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
             veredicto.verificado ? new Date() : null,
             veredicto.verificado ? null : veredicto.detalle,
             actorId,
+            alta.fabricante ?? null,
+            alta.modoDeTerminal ?? null,
+            alta.canalDeAudioHabilitado ?? false,
+            veredicto.capacidades === undefined ? null : JSON.stringify(veredicto.capacidades),
           ],
         );
         const fila = rows[0];
@@ -225,6 +284,53 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
           await this.guardarSecreto(c, copropiedadId, actorId, fila.id, alta.secreto);
         }
         await this.auditar(c, copropiedadId, actorId, 'equipos/alta', fila.nombre);
+        await c.query('COMMIT');
+        return aDatos(fila);
+      } catch (error) {
+        await c.query('ROLLBACK');
+        throw error;
+      }
+    });
+  }
+
+  async registrarSondeo(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+    veredicto: ResultadoDeSondeo,
+  ): Promise<DatosDeEquipo | null> {
+    const actorId = ctx.usuarioId;
+    return this.conCliente(ctx, async (c) => {
+      await c.query('BEGIN');
+      try {
+        const { rows } = await c.query<FilaDeEquipo>(
+          `UPDATE public.dispositivos
+              SET modelo = COALESCE($3, modelo), firmware = COALESCE($4, firmware),
+                  verificacion = $5::verificacion_equipo, verificado_en = $6,
+                  motivo_no_verificado = $7, actualizado_por = $8,
+                  capacidades = COALESCE($9::jsonb, capacidades),
+                  capacidades_descubiertas_en = CASE WHEN $9::jsonb IS NULL
+                    THEN capacidades_descubiertas_en ELSE now() END
+            WHERE id = $2 AND copropiedad_id = $1
+        RETURNING ${CAMPOS}`,
+          [
+            copropiedadId,
+            equipoId,
+            veredicto.modelo,
+            veredicto.firmware,
+            verificacionDe(veredicto),
+            veredicto.verificado ? new Date() : null,
+            veredicto.verificado ? null : veredicto.detalle,
+            actorId,
+            veredicto.capacidades === undefined ? null : JSON.stringify(veredicto.capacidades),
+          ],
+        );
+        const fila = rows[0];
+        if (fila === undefined) {
+          await c.query('ROLLBACK');
+          return null;
+        }
+        await this.auditar(c, copropiedadId, actorId, 'equipos/diagnostico', fila.nombre);
         await c.query('COMMIT');
         return aDatos(fila);
       } catch (error) {
@@ -252,7 +358,13 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
                   modelo = COALESCE($9, modelo), firmware = COALESCE($10, firmware),
                   canal_barrera = $11, numero_de_puerta = $12, canal_de_audio = $13,
                   verificacion = $14::verificacion_equipo, verificado_en = $15,
-                  motivo_no_verificado = $16, actualizado_por = $17
+                  motivo_no_verificado = $16, actualizado_por = $17,
+                  fabricante = $18, modo_de_terminal = $19, canal_de_audio_habilitado = $20,
+                  -- Unas capacidades recién descubiertas sustituyen a las viejas;
+                  -- un sondeo que no alcanzó el equipo conserva las que había.
+                  capacidades = COALESCE($21::jsonb, capacidades),
+                  capacidades_descubiertas_en = CASE WHEN $21::jsonb IS NULL
+                    THEN capacidades_descubiertas_en ELSE now() END
             WHERE id = $2 AND copropiedad_id = $1
         RETURNING ${CAMPOS}`,
           [
@@ -273,6 +385,10 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
             veredicto.verificado ? new Date() : null,
             veredicto.verificado ? null : veredicto.detalle,
             actorId,
+            alta.fabricante ?? null,
+            alta.modoDeTerminal ?? null,
+            alta.canalDeAudioHabilitado ?? false,
+            veredicto.capacidades === undefined ? null : JSON.stringify(veredicto.capacidades),
           ],
         );
         const fila = rows[0];
@@ -335,25 +451,25 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     copropiedadId: string,
     equipoId: string,
   ): Promise<string | null> {
-    return this.conCliente(ctx, async (c) => {
-      const { rows } = await c.query<{
-        iv: Buffer;
-        cuerpo: Buffer;
-        etiqueta: Buffer;
-      }>(
-        `SELECT iv, cuerpo, etiqueta FROM public.credenciales_de_equipo
-          WHERE dispositivo_id = $1 AND copropiedad_id = $2 AND activa = true`,
-        [equipoId, copropiedadId],
-      );
-      const fila = rows[0];
-      if (fila === undefined) return null;
-      const llave = derivarLlave(this.llaveMaestra, copropiedadId, PROPOSITOS.credencialesDeEquipo);
-      return descifrar(llave, {
-        iv: fila.iv,
-        cuerpo: fila.cuerpo,
-        etiqueta: fila.etiqueta,
-      }).toString('utf8');
-    });
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * P6 · CORREGIDO EN LA 15-D. Dos defectos en una consulta que nunca corrió
+     *
+     * 1. Filtraba por `activa = true`, y la columna se llama `estado`. Contra
+     *    base real la consulta fallaba con «column does not exist».
+     * 2. Corría con los claims del ADMINISTRADOR, y la política de lectura de
+     *    `credenciales_de_equipo` sólo deja leer a `servicio` (migración 0032:
+     *    «NADIE lee esta tabla con un token de usuario, ni el
+     *    superadministrador»). Con la columna corregida habría devuelto 0 filas.
+     *
+     * Ninguno de los dos se vio porque la suite usa el doble en memoria. Ahora
+     * la lectura del sobre corre con los claims de SERVICIO de esa copropiedad
+     * —que es lo que la política exige— y la comprobación de alcance del
+     * administrador la hizo el controlador antes, por el filtro de aplicación.
+     * Lo prueba `test/registro-de-equipos-pg.test.ts` contra base real.
+     */
+    void ctx;
+    return leerSobre(this.pool, this.llaveMaestra, copropiedadId, equipoId);
   }
 
   /**

@@ -1,6 +1,6 @@
-import { esFallo } from '@ncr/domain-core';
-import type { Zona } from '@ncr/domain-core';
+import { Zona, esFallo } from '@ncr/domain-core';
 import type {
+  PresentacionDeZona,
   RepositorioAutorizacionesZona,
   RepositorioZonas,
   ResultadoOcupacion,
@@ -22,6 +22,7 @@ import type {
 export class RepositorioZonasEnMemoria implements RepositorioZonas {
   private readonly zonas = new Map<string, Zona>();
   private readonly permisos = new Map<string, Set<string>>();
+  private readonly iconos = new Map<string, string | null>();
 
   private clave(copropiedadId: string, zonaId: string): string {
     return `${copropiedadId}|${zonaId}`;
@@ -69,6 +70,50 @@ export class RepositorioZonasEnMemoria implements RepositorioZonas {
     // `conAforoAlDia` sella el instante del reinicio, igual que la columna
     // `reiniciado_en` de la base.
     this.zonas.set(this.clave(copropiedadId, zonaId), zona.conAforoAlDia(ahora));
+  }
+
+  async desactivar(
+    copropiedadId: string,
+    zonaId: string,
+    _motivo: string,
+    _actorId: string,
+  ): Promise<boolean> {
+    const zona = this.zonas.get(this.clave(copropiedadId, zonaId));
+    if (zona === undefined || !zona.activa) return false;
+    const inactiva = Zona.crear({
+      id: zona.id,
+      copropiedadId: zona.copropiedadId,
+      nombre: zona.nombre,
+      tipo: zona.tipo,
+      horario: zona.horario,
+      aforo: zona.aforo,
+      politicaReinicio: zona.politicaReinicio,
+      normas: zona.normas,
+      controladores: zona.controladores,
+      abierta: false,
+      ultimoReinicio: zona.ultimoReinicio,
+      activa: false,
+    });
+    if (esFallo(inactiva)) return false;
+    this.zonas.set(this.clave(copropiedadId, zonaId), inactiva.valor);
+    return true;
+  }
+
+  async presentacionDe(copropiedadId: string): Promise<ReadonlyMap<string, PresentacionDeZona>> {
+    return new Map(
+      [...this.iconos.entries()]
+        .filter(([clave]) => clave.startsWith(`${copropiedadId}|`))
+        .map(([clave, icono]) => [clave.split('|')[1] ?? '', { icono }]),
+    );
+  }
+
+  async fijarIcono(
+    copropiedadId: string,
+    zonaId: string,
+    icono: string | null,
+    _actorId: string,
+  ): Promise<void> {
+    this.iconos.set(this.clave(copropiedadId, zonaId), icono);
   }
 
   /** Alta directa, solo para pruebas y para la semilla del arranque. */

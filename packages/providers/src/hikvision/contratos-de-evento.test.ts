@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   CAMPOS_IGNORADOS_A_PROPOSITO,
+  desdeAlarmServerJson,
   desdeAlarmServerXml,
   desdeAlertStreamJson,
   esEventoEnVivo,
+  esJsonDeAlarmServer,
   esXmlDeAlarmServer,
   soloEnVivo,
 } from './contratos-de-evento';
@@ -307,5 +309,126 @@ describe('normalización · los bordes que distinguen un firmware de otro', () =
     const evento = desdeAlertStreamJson(bloque, DISPOSITIVO, AHORA);
     expect(evento.ocurridoEn).toEqual(AHORA);
     expect(evento.horaSinDesplazamiento).toBe(true);
+  });
+});
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 6.5 y 6.7a · LAS CLASES NUEVAS Y EL EVENTO EN JSON (ETAPA 15-D)
+ *
+ * Las claves de `AccessControllerEvent` y `CallInfo` son [SUPUESTO] S-36 hasta
+ * capturarlas del equipo; lo que se fija aquí es que el sistema las traduce a
+ * su clase neutral y a los dos campos que O4 necesita: quién y si espera.
+ */
+describe('las clases `rostro` y `llamada` · 6.5', () => {
+  const AHORA2 = new Date('2026-09-24T12:00:00.000Z');
+
+  it('un evento de control de acceso con `remoteCheck` es un ROSTRO que ESPERA veredicto', () => {
+    const evento = desdeAlertStreamJson(
+      {
+        eventType: 'AccessControllerEvent',
+        currentEvent: true,
+        dateTime: '2026-09-24T07:00:00-05:00',
+        AccessControllerEvent: { employeeNoString: 'plantilla-77', remoteCheck: true },
+      },
+      'disp-terminal',
+      AHORA2,
+    );
+    expect(evento.clase).toBe('rostro');
+    expect(evento.personaId).toBe('plantilla-77');
+    expect(evento.esperaVeredicto).toBe(true);
+    expect(evento.placa).toBeNull();
+  });
+
+  it('sin `remoteCheck` la terminal decidió sola: rostro que NO espera', () => {
+    const evento = desdeAlertStreamJson(
+      { currentEvent: true, AccessControllerEvent: { employeeNo: 12 } },
+      'disp-terminal',
+      AHORA2,
+    );
+    expect(evento.clase).toBe('rostro');
+    expect(evento.personaId).toBe('12');
+    expect(evento.esperaVeredicto).toBe(false);
+  });
+
+  it('una llamada del videoportero trae su ORIGEN, con lo que el equipo declare', () => {
+    const evento = desdeAlertStreamJson(
+      {
+        eventType: 'videoIntercomEvent',
+        currentEvent: true,
+        CallInfo: { periodNumber: 1, buildingNumber: 2, unitNumber: 3 },
+      },
+      'disp-portero',
+      AHORA2,
+    );
+    expect(evento.clase).toBe('llamada');
+    expect(evento.origenDeLlamada).toBe('periodo 1 · edificio 2 · unidad 3');
+    expect(evento.personaId).toBeNull();
+  });
+
+  it('y por la forma `voiceTalkEvent.src` también', () => {
+    const evento = desdeAlertStreamJson(
+      { currentEvent: true, voiceTalkEvent: { src: { buildingNumber: 5 } } },
+      'disp-portero',
+      AHORA2,
+    );
+    expect(evento.clase).toBe('llamada');
+    expect(evento.origenDeLlamada).toBe('edificio 5');
+  });
+
+  it('un timbre sigue siendo timbre, y una llamada sin origen no inventa uno', () => {
+    expect(
+      desdeAlertStreamJson({ eventType: 'doorbell', currentEvent: true }, 'd', AHORA2).clase,
+    ).toBe('timbre');
+    const sinOrigen = desdeAlertStreamJson(
+      { eventType: 'callSignal', currentEvent: true, CallInfo: {} },
+      'd',
+      AHORA2,
+    );
+    expect(sinOrigen.clase).toBe('llamada');
+    expect(sinOrigen.origenDeLlamada).toBeNull();
+  });
+});
+
+describe('el evento ANPR en JSON · 6.7a · DOCUMENTADO, NO VERIFICADO', () => {
+  const AHORA2 = new Date('2026-09-24T12:00:00.000Z');
+
+  it('produce EXACTAMENTE la misma lectura que el XML', () => {
+    const json = JSON.stringify({
+      eventType: 'ANPR',
+      dateTime: '2026-09-24T07:00:00-05:00',
+      alarmDataType: 0,
+      eventId: 'ev-json-1',
+      ANPR: { licensePlate: 'ABC123', confidenceLevel: 92 },
+    });
+    const evento = desdeAlarmServerJson(json, 'disp-camara', AHORA2);
+    expect(evento?.clase).toBe('placa');
+    expect(evento?.placa).toBe('ABC123');
+    expect(evento?.confianza).toBe(0.92);
+    expect(evento?.enVivo).toBe(true);
+    expect(evento?.referenciaDelEquipo).toBe('ev-json-1');
+    expect(evento?.ocurridoEn.toISOString()).toBe('2026-09-24T12:00:00.000Z');
+  });
+
+  it('acepta `alarmDataType` dentro de `ANPR` y el bloque envuelto', () => {
+    const json = JSON.stringify({
+      EventNotificationAlert: {
+        eventType: 'ANPR',
+        ANPR: { licensePlate: 'XYZ789', confidenceLevel: 80, alarmDataType: 0 },
+      },
+    });
+    expect(desdeAlarmServerJson(json, 'd', AHORA2)?.enVivo).toBe(true);
+  });
+
+  it('sin `alarmDataType` es HISTÓRICO, igual que en XML: la dirección segura', () => {
+    const json = JSON.stringify({ eventType: 'ANPR', ANPR: { licensePlate: 'ABC123' } });
+    expect(desdeAlarmServerJson(json, 'd', AHORA2)?.enVivo).toBe(false);
+  });
+
+  it('lo que no es JSON, o no es un objeto, es `null`', () => {
+    expect(desdeAlarmServerJson('<xml/>', 'd', AHORA2)).toBeNull();
+    expect(desdeAlarmServerJson('42', 'd', AHORA2)).toBeNull();
+    expect(esJsonDeAlarmServer('{"eventType":"ANPR"}')).toBe(true);
+    expect(esJsonDeAlarmServer('<EventNotificationAlert/>')).toBe(false);
   });
 });

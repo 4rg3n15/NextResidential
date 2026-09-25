@@ -4,8 +4,9 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'capacidades_de_equipo_dto.dart';
 import 'equipo_dto_estado.dart';
-import 'equipo_dto_protocolo.dart';
+import 'equipo_dto_modo_de_terminal.dart';
 import 'equipo_dto_tipo.dart';
 import 'equipo_dto_verificacion.dart';
 
@@ -17,15 +18,15 @@ class EquipoDto {
     required this.id,
     required this.nombre,
     required this.tipo,
-    required this.host,
-    required this.puerto,
-    required this.protocolo,
-    required this.usuario,
     required this.modelo,
     required this.firmware,
     required this.canalBarrera,
     required this.numeroDePuerta,
     required this.canalDeAudio,
+    required this.fabricante,
+    required this.modoDeTerminal,
+    required this.canalDeAudioHabilitado,
+    required this.capacidades,
     required this.verificacion,
     required this.verificadoEn,
     required this.motivoNoVerificado,
@@ -37,15 +38,15 @@ class EquipoDto {
   final String id;
   final String nombre;
   final EquipoDtoTipo tipo;
-  final String host;
-  final num puerto;
-  final EquipoDtoProtocolo protocolo;
-  final String? usuario;
   final String? modelo;
   final String? firmware;
   final num? canalBarrera;
   final num? numeroDePuerta;
   final num? canalDeAudio;
+  final String? fabricante;
+  final EquipoDtoModoDeTerminal? modoDeTerminal;
+  final bool canalDeAudioHabilitado;
+  final CapacidadesDeEquipoDto? capacidades;
   final EquipoDtoVerificacion verificacion;
   final String? verificadoEn;
   final String? motivoNoVerificado;

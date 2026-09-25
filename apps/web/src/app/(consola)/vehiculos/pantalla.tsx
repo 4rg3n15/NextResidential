@@ -47,6 +47,10 @@ export const PantallaDeVehiculos = ({
 
   const [alta, setAlta] = useState(false);
   const [baja, setBaja] = useState<Vehiculo | null>(null);
+  /** O3 · edición y borrado DEFINITIVO (sólo sin historial; lo decide la base). */
+  const [editar, setEditar] = useState<Vehiculo | null>(null);
+  const [borrado, setBorrado] = useState<Vehiculo | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -58,6 +62,76 @@ export const PantallaDeVehiculos = ({
   const [tipo, setTipo] = useState<(typeof TIPOS)[number]['valor']>('automovil');
 
   const normalizada = vistaPreviaDePlaca(placa);
+
+  const abrirEdicion = (v: Vehiculo): void => {
+    setEditar(v);
+    setPlaca(v.placa);
+    setMarca(v.marca ?? '');
+    setModelo(v.modelo ?? '');
+    setColor(v.color ?? '');
+    setTipo(
+      TIPOS.some((t) => t.valor === v.tipo) ? (v.tipo as (typeof TIPOS)[number]['valor']) : 'otro',
+    );
+    setError(undefined);
+  };
+
+  const limpiar = (): void => {
+    setPlaca('');
+    setMarca('');
+    setModelo('');
+    setColor('');
+    setTipo('automovil');
+  };
+
+  const guardarEdicion = async (): Promise<void> => {
+    if (editar === null) return;
+    setEnviando(true);
+    setError(undefined);
+    try {
+      desenvolver(
+        await cliente.PUT('/copropiedades/{id}/padron/vehiculos/{vehiculoId}', {
+          params: { path: { id: copropiedadId, vehiculoId: editar.id } },
+          body: {
+            // La placa sólo viaja si cambió: el dominio la normaliza y la base
+            // decide si ya está activa en otra parte (RN-04, ADR-04).
+            ...(placa.trim() === editar.placa ? {} : { placa: placa.trim() }),
+            tipo,
+            marca: marca.trim() === '' ? null : marca.trim(),
+            modelo: modelo.trim() === '' ? null : modelo.trim(),
+            color: color.trim() === '' ? null : color.trim(),
+          },
+        }),
+      );
+      setEditar(null);
+      limpiar();
+      await refrescar();
+    } catch (e) {
+      setError(e instanceof ErrorDeApi ? e.message : 'No se pudo editar el vehículo');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const borrarDefinitivamente = async (): Promise<void> => {
+    if (borrado === null) return;
+    setEnviando(true);
+    setError(undefined);
+    try {
+      const r = desenvolver(
+        await cliente.DELETE('/copropiedades/{id}/padron/vehiculos/{vehiculoId}', {
+          params: { path: { id: copropiedadId, vehiculoId: borrado.id } },
+        }),
+      );
+      setBorrado(null);
+      setAviso(`Se borró definitivamente ${r.placa}. No queda rastro del vehículo.`);
+      await refrescar();
+    } catch (e) {
+      // La API dice cuántos eventos y autorizaciones lo impiden: viaja tal cual.
+      setError(e instanceof ErrorDeApi ? e.message : 'No se pudo borrar');
+    } finally {
+      setEnviando(false);
+    }
+  };
 
   const refrescar = async (): Promise<void> => {
     await clientes.invalidateQueries({ queryKey: ['vehiculos', copropiedadId] });
@@ -85,10 +159,7 @@ export const PantallaDeVehiculos = ({
         }),
       );
       setAlta(false);
-      setPlaca('');
-      setMarca('');
-      setModelo('');
-      setColor('');
+      limpiar();
       await refrescar();
     } catch (e) {
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo registrar el vehículo');
@@ -172,12 +243,23 @@ export const PantallaDeVehiculos = ({
       clave: 'acciones',
       titulo: 'Acciones',
       alineacion: 'derecha',
-      celda: (v) =>
-        v.estado === 'activo' ? (
-          <Boton variante="secundario" tamano="sm" onClick={() => setBaja(v)}>
-            Desactivar
+      celda: (v) => (
+        <span className="flex justify-end gap-2">
+          {v.estado === 'activo' ? (
+            <>
+              <Boton variante="secundario" tamano="sm" onClick={() => abrirEdicion(v)}>
+                Editar
+              </Boton>
+              <Boton variante="secundario" tamano="sm" onClick={() => setBaja(v)}>
+                Desactivar
+              </Boton>
+            </>
+          ) : null}
+          <Boton variante="peligro" tamano="sm" onClick={() => setBorrado(v)}>
+            Borrar
           </Boton>
-        ) : null,
+        </span>
+      ),
     },
   ];
 
@@ -199,6 +281,15 @@ export const PantallaDeVehiculos = ({
         acciones={<Boton onClick={() => setAlta(true)}>Registrar vehículo</Boton>}
       />
 
+      {aviso !== null ? (
+        <p
+          role="status"
+          className="mb-4 rounded-md border border-exito bg-exito-suave px-3 py-2 text-secundario text-exito-texto"
+        >
+          {aviso}
+        </p>
+      ) : null}
+
       <TablaDeDatos
         titulo="Vehículos registrados"
         columnas={columnas}
@@ -212,6 +303,71 @@ export const PantallaDeVehiculos = ({
           accion: <Boton onClick={() => setAlta(true)}>Registrar vehículo</Boton>,
         }}
       />
+
+      <DialogoDeFormulario
+        abierto={editar !== null}
+        titulo={`Editar ${editar?.placa ?? ''}`}
+        descripcion="Placa, tipo, marca, modelo y color. Cambiar la placa la vuelve a normalizar; si ya está activa en otra vivienda, la base lo rechaza (RN-04)."
+        etiquetaEnviar="Guardar cambios"
+        enviando={enviando}
+        error={error}
+        puedeEnviar={placa.trim() !== ''}
+        alEnviar={() => void guardarEdicion()}
+        alCancelar={() => {
+          setEditar(null);
+          limpiar();
+          setError(undefined);
+        }}
+      >
+        <Campo
+          etiqueta="Placa"
+          value={placa}
+          onChange={(e) => setPlaca(e.target.value)}
+          ayuda={
+            placa.trim() === ''
+              ? undefined
+              : `Se guardará como: ${normalizada || '(vacía tras normalizar)'}`
+          }
+          required
+        />
+        <label className="block space-y-1.5">
+          <span className="block text-secundario font-medium">Tipo</span>
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as (typeof TIPOS)[number]['valor'])}
+            className="w-full rounded-campo border border-borde bg-campo px-3 py-2 text-cuerpo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto"
+          >
+            {TIPOS.map((t) => (
+              <option key={t.valor} value={t.valor}>
+                {t.etiqueta}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Campo etiqueta="Marca" value={marca} onChange={(e) => setMarca(e.target.value)} />
+        <Campo etiqueta="Modelo" value={modelo} onChange={(e) => setModelo(e.target.value)} />
+        <Campo etiqueta="Color" value={color} onChange={(e) => setColor(e.target.value)} />
+      </DialogoDeFormulario>
+
+      <DialogoDeConfirmacion
+        abierto={borrado !== null}
+        titulo={`Borrar definitivamente ${borrado?.placa ?? ''}`}
+        descripcion="Esto BORRA el vehículo. Solo se permite si no tiene ningún evento ni autorización con su placa: con historial, el sistema lo rechaza y dice qué lo impide (RN-19)."
+        etiquetaConfirmar="Borrar definitivamente"
+        enviando={enviando}
+        error={error}
+        sinMotivo
+        alConfirmar={() => void borrarDefinitivamente()}
+        alCancelar={() => {
+          setBorrado(null);
+          setError(undefined);
+        }}
+      >
+        <p className="rounded-md border border-peligro bg-peligro-suave px-3 py-2 text-secundario text-peligro-texto">
+          Es para el vehículo <strong>registrado por error</strong>. Si ya pasó por la portería, use
+          «Desactivar»: el historial de accesos no se borra nunca.
+        </p>
+      </DialogoDeConfirmacion>
 
       <DialogoDeFormulario
         abierto={alta}

@@ -8,6 +8,7 @@ import { DirectorioDeViviendas } from './viviendas/directorio';
 import { PantallaDeVehiculos } from './vehiculos/pantalla';
 import { PantallaDeVisitantes } from './visitantes/pantalla';
 import { PantallaDeDispositivos } from './dispositivos/pantalla';
+import { PantallaDeZonas } from './zonas/pantalla';
 
 /**
  * **Barrido de formularios — D-72 y D-73, y no ruta a ruta.**
@@ -147,6 +148,9 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
     if (url.includes('/padron/vehiculos')) return respuesta([]);
     if (url.includes('/dispositivos/pendientes')) return respuesta({ dispositivos: [] });
     if (url.includes('/tablero/dispositivos')) return respuesta({ dispositivos: [] });
+    if (url.includes('/equipos') && !url.includes('/prueba-de-conexion')) {
+      return respuesta({ equipos: [] });
+    }
     if (url.includes('/equipos/prueba-de-conexion')) {
       return respuesta({
         clase: 'alcanzado',
@@ -158,6 +162,7 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
       });
     }
     if (url.includes('/autorizaciones')) return respuesta([]);
+    if (url.includes('/zonas')) return respuesta([]);
     return respuesta({ id: PERSONA.id, nombreCompleto: PERSONA.nombreCompleto, yaExistia: false });
   });
 
@@ -313,6 +318,13 @@ const PANTALLAS = [
     elemento: <PantallaDeDispositivos copropiedadId={COP} />,
     boton: /Agregar equipo/,
   },
+  {
+    // ETAPA 15-D (O3) · el alta de zonas. Pide nombre, tipo, aforo e icono
+    // —lo que el administrador tiene delante— y ningún identificador.
+    nombre: 'zonas',
+    elemento: <PantallaDeZonas copropiedadId={COP} />,
+    boton: /Nueva zona/,
+  },
 ] as const;
 
 beforeEach(() => {
@@ -427,6 +439,13 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
   'guardia/pantalla.tsx':
     'las órdenes actúan sobre el elemento en atención; no se introduce ninguna identidad',
   'dispositivos/pantalla.tsx': 'botones por fila del inventario; no hay campos que rellenar',
+  /**
+   * ETAPA 15-D (O4) · la ficha de un equipo en servicio: el equipo viene de la
+   * fila, el servidor lo sondea con la clave guardada, y lo único que se
+   * teclea es el MOTIVO de una corrección. Ningún identificador.
+   */
+  'dispositivos/ficha-dialogo.tsx':
+    'el equipo viene de la fila; sólo se teclea el motivo de una corrección',
   'viviendas/carga-de-padron.tsx':
     'la entrada es un archivo, y su validación por fila la hace el servidor con reporte por fila',
   'configuracion/formulario.tsx':
@@ -443,6 +462,14 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    */
   'biometria/pantalla.tsx':
     'no es un diálogo; el único identificador lo aporta el buscador compartido, y tiene prueba propia',
+  /**
+   * ETAPA 15-D (O3) · la fotografía del visitante: la entrada es un archivo de
+   * imagen elegido con el selector del navegador, y el identificador de la
+   * autorización viaja en la RUTA desde la tarjeta que lo muestra. No hay un
+   * solo campo de texto.
+   */
+  'componentes/fotografia-visitante.tsx':
+    'la entrada es un archivo; el identificador viaja en la ruta desde la tarjeta, nadie lo teclea',
 };
 
 /**
@@ -478,6 +505,7 @@ describe('cobertura del barrido', () => {
       'vehiculos/pantalla.tsx',
       'visitantes/pantalla.tsx',
       'dispositivos/alta-de-equipo.tsx',
+      'zonas/pantalla.tsx',
     ]);
     const sinClasificar = todasLasEscrituras().filter(
       (f) => !conFormulario.has(f) && SIN_FORMULARIO[f] === undefined,

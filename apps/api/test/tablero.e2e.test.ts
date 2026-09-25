@@ -41,8 +41,6 @@ beforeAll(async () => {
     nombre: 'Cámara de placas · portería principal',
     tipo: 'camara_lpr',
     zonaId: null,
-    host: 'lpr-porteria.invalid',
-    puerto: 80,
     modelo: 'modelo-de-prueba',
     firmware: 'v0.0.0-prueba',
     ultimoLatido: null,
@@ -109,15 +107,14 @@ describe('GET /copropiedades/:id/tablero/dispositivos', () => {
     expect(res.body).toMatchObject({ saludables: 0, caidos: 1 });
   });
 
-  it('el rol administrativo ve el direccionamiento del equipo (C-11)', async () => {
+  it('§7.1 · NI el rol administrativo ve el direccionamiento del equipo (C-28 revoca C-11)', async () => {
     const res = await request(app.getHttpServer())
       .get(`/copropiedades/${COP_A}/tablero/dispositivos`)
       .set('Authorization', `Bearer ${await comoAdmin()}`);
-    expect(res.body.dispositivos[0]).toMatchObject({
-      host: 'lpr-porteria.invalid',
-      puerto: 80,
-      firmware: 'v0.0.0-prueba',
-    });
+    expect(res.body.dispositivos[0]).toMatchObject({ firmware: 'v0.0.0-prueba' });
+    expect(res.body.dispositivos[0]).not.toHaveProperty('host');
+    expect(res.body.dispositivos[0]).not.toHaveProperty('puerto');
+    expect(JSON.stringify(res.body)).not.toContain('.invalid');
   });
 
   it('RN-21 · la credencial del dispositivo NO sale por la API, ni enmascarada', async () => {
@@ -128,8 +125,6 @@ describe('GET /copropiedades/:id/tablero/dispositivos', () => {
       nombre: 'Terminal Facial Peatonal',
       tipo: 'terminal_facial',
       zonaId: null,
-      host: 'facial-peatonal.invalid',
-      puerto: 80,
       modelo: 'modelo-de-prueba-2',
       firmware: 'v0.0.0-prueba-2',
       ultimoLatido: new Date(),

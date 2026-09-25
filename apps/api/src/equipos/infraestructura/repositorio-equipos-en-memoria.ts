@@ -75,9 +75,13 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       usuario: alta.usuario,
       modelo: veredicto.modelo ?? alta.modelo ?? null,
       firmware: veredicto.firmware,
+      fabricante: alta.fabricante ?? null,
       canalBarrera: alta.canalBarrera ?? null,
       numeroDePuerta: alta.numeroDePuerta ?? null,
       canalDeAudio: alta.canalDeAudio ?? null,
+      modoDeTerminal: alta.modoDeTerminal ?? null,
+      canalDeAudioHabilitado: alta.canalDeAudioHabilitado ?? false,
+      capacidades: veredicto.capacidades ?? null,
       verificacion: this.verificacionDe(veredicto),
       verificadoEn: veredicto.verificado ? new Date(0).toISOString() : null,
       motivoNoVerificado: veredicto.verificado ? null : veredicto.detalle,
@@ -120,9 +124,14 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       usuario: alta.usuario,
       modelo: veredicto.modelo ?? alta.modelo ?? actual.modelo,
       firmware: veredicto.firmware ?? actual.firmware,
+      fabricante: alta.fabricante ?? null,
       canalBarrera: alta.canalBarrera ?? null,
       numeroDePuerta: alta.numeroDePuerta ?? null,
       canalDeAudio: alta.canalDeAudio ?? null,
+      modoDeTerminal: alta.modoDeTerminal ?? null,
+      canalDeAudioHabilitado: alta.canalDeAudioHabilitado ?? false,
+      // Recién descubiertas sustituyen; un sondeo fallido conserva las viejas.
+      capacidades: veredicto.capacidades ?? actual.capacidades,
       verificacion: this.verificacionDe(veredicto),
       verificadoEn: veredicto.verificado ? new Date(0).toISOString() : null,
       motivoNoVerificado: veredicto.verificado ? null : veredicto.detalle,
@@ -130,6 +139,30 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
     if (nuevo === null) return null;
     if (alta.secreto !== undefined) this.guardarSecreto(copropiedadId, equipoId, alta.secreto);
     this.auditoria.push({ copropiedadId, actorId: ctx.usuarioId, recurso: 'equipos/edicion' });
+    return nuevo;
+  }
+
+  async registrarSondeo(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+    veredicto: ResultadoDeSondeo,
+  ): Promise<DatosDeEquipo | null> {
+    const nuevo = this.reemplazar(copropiedadId, equipoId, (actual) => ({
+      ...actual,
+      modelo: veredicto.modelo ?? actual.modelo,
+      firmware: veredicto.firmware ?? actual.firmware,
+      capacidades: veredicto.capacidades ?? actual.capacidades,
+      verificacion: this.verificacionDe(veredicto),
+      verificadoEn: veredicto.verificado ? new Date(0).toISOString() : null,
+      motivoNoVerificado: veredicto.verificado ? null : veredicto.detalle,
+    }));
+    if (nuevo !== null)
+      this.auditoria.push({
+        copropiedadId,
+        actorId: ctx.usuarioId,
+        recurso: 'equipos/diagnostico',
+      });
     return nuevo;
   }
 

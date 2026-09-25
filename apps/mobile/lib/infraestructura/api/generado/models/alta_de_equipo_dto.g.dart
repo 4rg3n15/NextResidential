@@ -17,9 +17,16 @@ AltaDeEquipoDto _$AltaDeEquipoDtoFromJson(Map<String, dynamic> json) =>
       canalBarrera: json['canalBarrera'] as num?,
       numeroDePuerta: json['numeroDePuerta'] as num?,
       canalDeAudio: json['canalDeAudio'] as num?,
+      fabricante: json['fabricante'] as String?,
+      modoDeTerminal: json['modoDeTerminal'] == null
+          ? null
+          : AltaDeEquipoDtoModoDeTerminal.fromJson(
+              json['modoDeTerminal'] as String,
+            ),
       protocolo: json['protocolo'] == null
           ? AltaDeEquipoDtoProtocolo.http
           : AltaDeEquipoDtoProtocolo.fromJson(json['protocolo'] as String),
+      canalDeAudioHabilitado: json['canalDeAudioHabilitado'] as bool? ?? false,
       probarConexion: json['probarConexion'] as bool? ?? true,
     );
 
@@ -35,5 +42,8 @@ Map<String, dynamic> _$AltaDeEquipoDtoToJson(AltaDeEquipoDto instance) =>
       'canalBarrera': instance.canalBarrera,
       'numeroDePuerta': instance.numeroDePuerta,
       'canalDeAudio': instance.canalDeAudio,
+      'fabricante': instance.fabricante,
+      'modoDeTerminal': instance.modoDeTerminal,
+      'canalDeAudioHabilitado': instance.canalDeAudioHabilitado,
       'probarConexion': instance.probarConexion,
     };

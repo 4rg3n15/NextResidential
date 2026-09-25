@@ -1,4 +1,5 @@
 import type { AlmacenEvidencia, Bitacora } from '@ncr/domain-core';
+import { tipoRealDe } from '../../comun/archivos/tipo-real';
 
 /**
  * Evidencia en el **bucket privado de Supabase Storage** — RN-21, §2.7.8.
@@ -36,19 +37,12 @@ import type { AlmacenEvidencia, Bitacora } from '@ncr/domain-core';
  *    registrada, y eso deshace por Storage lo que RN-03 garantiza en la base.
  */
 
-/** Firmas de los únicos dos formatos que la evidencia puede tener. */
-const FIRMAS: readonly { readonly mime: string; readonly bytes: readonly number[] }[] = [
-  { mime: 'image/jpeg', bytes: [0xff, 0xd8, 0xff] },
-  { mime: 'image/png', bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
-];
-
 /**
- * Tipo REAL del contenido, o `null` si no es ninguno de los admitidos.
- * Exportada porque es lo que se prueba: la validación por extensión es la que
- * no protege, y hay que poder demostrar que esta no lo hace.
+ * El tipo real se decide en `comun/archivos/tipo-real.ts` desde la 15-D: la
+ * fotografía del visitante usa la MISMA función. Se reexporta para que las
+ * pruebas de este adaptador sigan hablando con él.
  */
-export const tipoRealDe = (contenido: Uint8Array): string | null =>
-  FIRMAS.find((f) => f.bytes.every((b, i) => contenido[i] === b))?.mime ?? null;
+export { tipoRealDe };
 
 export class ErrorDeEvidencia extends Error {
   constructor(mensaje: string) {

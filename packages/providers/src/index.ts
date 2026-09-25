@@ -29,6 +29,17 @@
  * además que salga en forma de **tipo**, que era la vía que quedaba abierta.
  */
 
+// ── El NÚCLEO neutral · ETAPA 15-D (O2) ──────────────────────────────────────
+/**
+ * Lo que cualquier adaptador —de esta marca, de otra, o inventado— cumple, y
+ * lo que el resto del sistema mira para decidir: capacidades y errores. No hay
+ * aquí un solo nombre de fabricante. El adaptador ficticio de `src/ficticio/`
+ * NO sale por este barril: `scripts/lib/frontera-extensibilidad.mjs` lo impide.
+ */
+export * from './nucleo/capacidades';
+export * from './nucleo/errores';
+export type { ProveedorDeEquipos } from './nucleo/proveedor';
+
 // ── Los dos adaptadores y su punto de composición ────────────────────────────
 export * from './mock/mock-provider';
 export * from './mock/intercom-simulado';
@@ -36,6 +47,11 @@ export * from './mock/simulacion';
 export * from './hikvision/hikvision-provider';
 export * from './hikvision/registro-de-equipos';
 export * from './fabrica';
+export {
+  capacidadesDesdeDeviceCap,
+  canalesDeAudioDesde,
+  descubrirCapacidadesDe,
+} from './hikvision/capacidades-hikvision';
 
 /**
  * El control de barrera se compone **dentro** de este paquete y se expone como
@@ -52,10 +68,13 @@ export * from './equipo/fuente-de-placas';
 export * from './hikvision/recepcion';
 export type {
   EventoDeEquipo,
+  ClaseDeEvento,
   QuienAbrio,
   RecuadroDetectado,
   BloqueDeAlertStream,
 } from './hikvision/contratos-de-evento';
+export { EscuchaDeAlertStream, transporteSegunCapacidades } from './equipo/escucha-alertstream';
+export type { TransporteDeFlujo, OpcionesDeEscucha } from './equipo/escucha-alertstream';
 export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';
 
 // ── Diagnóstico y corrección de un equipo, para la consola ───────────────────

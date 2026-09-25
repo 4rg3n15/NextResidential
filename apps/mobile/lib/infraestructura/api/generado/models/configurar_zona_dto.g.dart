@@ -22,6 +22,7 @@ ConfigurarZonaDto _$ConfigurarZonaDtoFromJson(Map<String, dynamic> json) =>
           ?.map((e) => e as String)
           .toList(),
       abierta: json['abierta'] as bool?,
+      icono: json['icono'] as String?,
     );
 
 Map<String, dynamic> _$ConfigurarZonaDtoToJson(ConfigurarZonaDto instance) =>
@@ -32,4 +33,5 @@ Map<String, dynamic> _$ConfigurarZonaDtoToJson(ConfigurarZonaDto instance) =>
       'politicaReinicio': instance.politicaReinicio,
       'normas': instance.normas,
       'abierta': instance.abierta,
+      'icono': instance.icono,
     };

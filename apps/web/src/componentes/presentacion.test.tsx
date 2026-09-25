@@ -14,8 +14,6 @@ const dispositivo = (parcial: Partial<DispositivoDelTablero> = {}): DispositivoD
   nombre: 'Cámara de placas · portería',
   tipo: 'camara_lpr',
   zonaId: null,
-  host: 'lpr-porteria.invalid',
-  puerto: 80,
   modelo: 'modelo-de-prueba',
   firmware: 'v0.0.0-prueba',
   estado: 'saludable',
@@ -86,13 +84,13 @@ describe('FilaDeDispositivo · tres estados, no dos', () => {
     expect(screen.getByText(/nunca ha reportado/)).toBeDefined();
   });
 
-  it('el direccionamiento se oculta cuando la API no lo envía (C-11)', () => {
+  it('ninguna fila pinta direccionamiento: la API ya no lo envía a nadie (§7.1, C-28)', () => {
     render(
       <ul>
-        <FilaDeDispositivo dispositivo={dispositivo({ host: null })} />
+        <FilaDeDispositivo dispositivo={dispositivo({})} />
       </ul>,
     );
-    expect(screen.queryByText(/lpr-porteria\.invalid/)).toBeNull();
+    expect(screen.queryByText(/\.invalid|:80\b/)).toBeNull();
   });
 
   it('nunca pinta nada que se parezca a una credencial', () => {

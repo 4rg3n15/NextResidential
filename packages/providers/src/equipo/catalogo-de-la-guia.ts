@@ -27,8 +27,6 @@ import type { RutaDeEquipo } from './tipos-de-ruta';
  * del aparato el 15/09/2026.
  */
 
-const CANAL = 1;
-
 export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
   // ── ACTIVACIÓN · la primera pregunta, y la única sin credenciales ────────
   {
@@ -53,7 +51,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral, activación. Es el único extremo que responde sin autenticación, ' +
       'y por eso separa «no hay equipo» de «credencial rechazada»',
-    capitulo: '§3.2 Activation',
+    capitulo: 'Guía ISAPI integral del fabricante · §3.2 Activation',
     confirmarEnSitio: 'que responda sin credenciales y qué dice de un equipo ya activado',
   },
 
@@ -61,37 +59,40 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
   {
     proposito: 'leer el país con el que el algoritmo lee las placas',
     metodo: 'GET',
-    ruta: `/ISAPI/Traffic/channels/${String(CANAL)}/basic`,
+    ruta: '/ISAPI/Traffic/channels/{canal}/basic',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente:
       'Guía ISAPI integral, canal de tráfico. El índice de reconocimiento fija la gramática ' +
       'de placa; Colombia es 210, y el genérico lee mal sin dar error',
-    capitulo: '§11.1.1 API Reference · Traffic/channels/<ID>/basic',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11.1.1 API Reference · Traffic/channels/<ID>/basic',
     confirmarEnSitio: 'qué índice trae de fábrica ESTE equipo antes de tocar nada',
   },
   {
     proposito: 'leer qué países admite el algoritmo de este equipo',
     metodo: 'GET',
-    ruta: `/ISAPI/Traffic/channels/${String(CANAL)}/basic/capabilities`,
+    ruta: '/ISAPI/Traffic/channels/{canal}/basic/capabilities',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente:
       'Guía ISAPI integral, capacidades del canal de tráfico. El `opt=` del índice de ' +
       'reconocimiento es lo que ESE equipo admite: fuera de esa lista no se escribe',
-    capitulo: '§11.1.1 API Reference · Traffic/channels/<ID>/basic/capabilities',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11.1.1 API Reference · Traffic/channels/<ID>/basic/capabilities',
     confirmarEnSitio: 'que 210 esté en la lista. Si no está, se dice y no se escribe',
   },
   {
     proposito: 'fijar el país del algoritmo',
     metodo: 'PUT',
-    ruta: `/ISAPI/Traffic/channels/${String(CANAL)}/basic`,
+    ruta: '/ISAPI/Traffic/channels/{canal}/basic',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente:
       'Guía ISAPI integral, canal de tráfico. El cuerpo exige el documento básico COMPLETO: ' +
       'canal, sentido, sitio, identificador, descripción, canal por omisión, región e índice',
-    capitulo: '§11.1.1 API Reference · Traffic/channels/<ID>/basic',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11.1.1 API Reference · Traffic/channels/<ID>/basic',
     confirmarEnSitio:
       'LEER antes y devolver todo lo demás tal cual vino. La región se enumera de dos formas ' +
       'en el mismo capítulo (C-17): no se envía una fija, se devuelve la que vino',
@@ -108,7 +109,8 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral, capacidades de parámetros de entrada. El `opt=` del modo de ' +
       'control enumera 0, 1 y 2: cámara, plataforma y ambos',
-    capitulo: '§11 API Reference · ITC/Entrance/entranceParam/capabilities',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · ITC/Entrance/entranceParam/capabilities',
     confirmarEnSitio: 'que el modo 1 esté admitido antes de proponer corregirlo',
   },
   {
@@ -126,7 +128,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral, parámetros de entrada. El cuerpo exige número de carril, ' +
       'habilitación y modo de disparo relacionado; el modo de control es opcional al escribir',
-    capitulo: '§11 API Reference · ITC/Entrance/entranceParam',
+    capitulo: 'Guía ISAPI integral del fabricante · §11 API Reference · ITC/Entrance/entranceParam',
     confirmarEnSitio:
       'LEER-MODIFICAR-ESCRIBIR: se devuelve el documento entero con un solo campo cambiado',
     dejaRastro: true,
@@ -136,23 +138,25 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
   {
     proposito: 'leer si un disparador vinculado acciona la barrera',
     metodo: 'GET',
-    ruta: `/ISAPI/Event/triggers/vehicledetection-${String(CANAL)}`,
+    ruta: '/ISAPI/Event/triggers/vehicledetection-{canal}',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente:
       'Guía ISAPI integral, disparadores de evento. Una acción vinculada de tipo E/S ' +
       'acciona una salida física del equipo: si es el relé de la barrera, abre sola',
-    capitulo: '§11 API Reference · Event/triggers/vehicledetection-<ID>',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · Event/triggers/vehicledetection-<ID>',
     confirmarEnSitio: 'qué acciones trae vinculadas de fábrica, y a qué puerto de salida apuntan',
   },
   {
     proposito: 'configurar el disparador de detección de vehículo',
     metodo: 'PUT',
-    ruta: `/ISAPI/Event/triggers/vehicledetection-${String(CANAL)}`,
+    ruta: '/ISAPI/Event/triggers/vehicledetection-{canal}',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía ISAPI integral, disparadores de evento',
-    capitulo: '§11 API Reference · Event/triggers/vehicledetection-<ID>',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · Event/triggers/vehicledetection-<ID>',
     confirmarEnSitio: 'que retirar una acción de E/S no desactive además la notificación',
     dejaRastro: true,
   },
@@ -171,7 +175,8 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral, horarios de evento. Fuera del horario armado la detección NO ' +
       'reporta, y eso se diagnostica como avería',
-    capitulo: '§11 API Reference · Event/schedules/vehicledetects',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · Event/schedules/vehicledetects',
     confirmarEnSitio: 'qué horario trae de fábrica: si no es 24×7, faltarán eventos y no errores',
     dejaRastro: true,
   },
@@ -180,42 +185,45 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
   {
     proposito: 'leer los parámetros de detección de vehículo del canal',
     metodo: 'GET',
-    ruta: `/ISAPI/Traffic/channels/${String(CANAL)}/vehicleDetect`,
+    ruta: '/ISAPI/Traffic/channels/{canal}/vehicleDetect',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía ISAPI integral, detección de vehículo del canal de tráfico',
-    capitulo: '§11 API Reference · Traffic/channels/<ID>/vehicleDetect',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · Traffic/channels/<ID>/vehicleDetect',
     confirmarEnSitio: 'qué modo de disparo usa: lazo inductivo, vídeo, multifotograma o radar',
   },
   {
     proposito: 'leer qué admite la detección de vehículo del canal',
     metodo: 'GET',
-    ruta: `/ISAPI/Traffic/channels/${String(CANAL)}/vehicleDetect/capabilities`,
+    ruta: '/ISAPI/Traffic/channels/{canal}/vehicleDetect/capabilities',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía ISAPI integral, capacidades de detección de vehículo',
-    capitulo: '§11 API Reference · Traffic/channels/<ID>/vehicleDetect/capabilities',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · Traffic/channels/<ID>/vehicleDetect/capabilities',
     confirmarEnSitio: 'qué modos de disparo admite este modelo',
   },
   {
     proposito: 'configurar la detección de vehículo del canal',
     metodo: 'PUT',
-    ruta: `/ISAPI/Traffic/channels/${String(CANAL)}/vehicleDetect`,
+    ruta: '/ISAPI/Traffic/channels/{canal}/vehicleDetect',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía ISAPI integral, detección de vehículo del canal de tráfico',
-    capitulo: '§11 API Reference · Traffic/channels/<ID>/vehicleDetect',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · Traffic/channels/<ID>/vehicleDetect',
     confirmarEnSitio: 'LEER-MODIFICAR-ESCRIBIR, como todo lo de este capítulo',
     dejaRastro: true,
   },
   {
     proposito: 'leer los parámetros de reconocimiento de placa',
     metodo: 'GET',
-    ruta: `/ISAPI/ITC/plateRecognitionParam?channelID=${String(CANAL)}`,
+    ruta: '/ISAPI/ITC/plateRecognitionParam?channelID={canal}',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía ISAPI integral, parámetros de reconocimiento de placa',
-    capitulo: '§11 API Reference · ITC/plateRecognitionParam',
+    capitulo: 'Guía ISAPI integral del fabricante · §11 API Reference · ITC/plateRecognitionParam',
     confirmarEnSitio: 'qué umbral de reconocimiento trae y en qué escala lo expresa',
   },
   {
@@ -225,17 +233,18 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía ISAPI integral, capacidades de reconocimiento de placa',
-    capitulo: '§11 API Reference · ITC/plateRecognitionParam/capabilities',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · ITC/plateRecognitionParam/capabilities',
     confirmarEnSitio: 'el rango del umbral: decide si nuestra escala 0-100 coincide',
   },
   {
     proposito: 'configurar el reconocimiento de placa',
     metodo: 'PUT',
-    ruta: `/ISAPI/ITC/plateRecognitionParam?channelID=${String(CANAL)}`,
+    ruta: '/ISAPI/ITC/plateRecognitionParam?channelID={canal}',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía ISAPI integral, parámetros de reconocimiento de placa',
-    capitulo: '§11 API Reference · ITC/plateRecognitionParam',
+    capitulo: 'Guía ISAPI integral del fabricante · §11 API Reference · ITC/plateRecognitionParam',
     confirmarEnSitio: 'LEER-MODIFICAR-ESCRIBIR',
     dejaRastro: true,
   },
@@ -248,7 +257,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral. Es una de las CUATRO consultas que bastan para confirmar que ' +
       'este equipo reconoce matrículas: basta con que se cumpla UNA',
-    capitulo: '§9.1.1 Motor Vehicle Recognition · TriggerMode',
+    capitulo: 'Guía ISAPI integral del fabricante · §9.1.1 Motor Vehicle Recognition · TriggerMode',
     confirmarEnSitio: 'cuál de las cuatro consultas de capacidad contesta en ESTE modelo',
   },
   {
@@ -258,7 +267,8 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente: 'Guía ISAPI integral. Segunda de las cuatro consultas de capacidad del §9.1.1',
-    capitulo: '§9.1.1 Motor Vehicle Recognition · ITC/capabilities',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §9.1.1 Motor Vehicle Recognition · ITC/capabilities',
     confirmarEnSitio: 'si declara detección de vehículo a nivel de módulo',
   },
 
@@ -272,7 +282,8 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral, notificación HTTP. De aquí salen el formato, la acreditación y ' +
       'qué imágenes envía: los tres campos que deciden si el evento llega y qué trae',
-    capitulo: '§11 API Reference · Event/notification/httpHosts',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · Event/notification/httpHosts',
     confirmarEnSitio: 'en qué formato está de fábrica y qué imágenes envía',
   },
   {
@@ -284,7 +295,8 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral, notificación HTTP. La forma con identificador configura UNO sin ' +
       'tocar los demás; la forma sin identificador reemplaza la lista entera',
-    capitulo: '§11 API Reference · Event/notification/httpHosts/<ID>',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §11 API Reference · Event/notification/httpHosts/<ID>',
     confirmarEnSitio: 'si este firmware admite la forma con identificador',
     dejaRastro: true,
   },
@@ -312,7 +324,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral, reabastecimiento. Declara intervalo y tiempo límite de subida y ' +
       'la dirección del servidor de armado: tras un corte, el equipo REENVÍA lo no entregado',
-    capitulo: '§11 API Reference · Traffic/ANR',
+    capitulo: 'Guía ISAPI integral del fabricante · §11 API Reference · Traffic/ANR',
     confirmarEnSitio:
       'cuánto guarda y en qué lotes reenvía: decide la ventana que la clave de idempotencia ' +
       'tiene que cubrir',
@@ -323,13 +335,14 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
   {
     proposito: 'leer si este modelo reporta el estado de la barrera',
     metodo: 'GET',
-    ruta: `/ISAPI/Parking/channels/${String(CANAL)}/barrierGate/capabilities`,
+    ruta: '/ISAPI/Parking/channels/{canal}/barrierGate/capabilities',
     procedencia: 'guia_oficial',
     familia: 'camara',
     fuente:
       'Guía ISAPI integral, control de barrera. Declara si el modelo sabe informar de la ' +
       'posición del brazo; sondearlo sin preguntar da un estado desconocido permanente',
-    capitulo: '§10.2 Entrance and Exit Barrier Control · capabilities',
+    capitulo:
+      'Guía ISAPI integral del fabricante · §10.2 Entrance and Exit Barrier Control · capabilities',
     confirmarEnSitio: 'si lo soporta. Si no, la consola lo dice en vez de sondear a ciegas',
   },
 
@@ -343,7 +356,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral, sincronización horaria. Un reloj desviado no falla: fecha mal los ' +
       'eventos, y eso no se ve hasta que una auditoría compara dos fuentes',
-    capitulo: '§5.4 Device Time Sync',
+    capitulo: 'Guía ISAPI integral del fabricante · §5.4 Device Time Sync',
     confirmarEnSitio: 'cuánto se desvía del servidor y si el equipo declara su zona horaria',
   },
   {
@@ -353,7 +366,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     procedencia: 'guia_oficial',
     familia: 'comun',
     fuente: 'Guía ISAPI integral, sincronización horaria',
-    capitulo: '§5.4 Device Time Sync · capabilities',
+    capitulo: 'Guía ISAPI integral del fabricante · §5.4 Device Time Sync · capabilities',
     confirmarEnSitio: 'si admite servidor de hora o sólo ajuste manual',
   },
   {
@@ -363,7 +376,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     procedencia: 'guia_oficial',
     familia: 'comun',
     fuente: 'Guía ISAPI integral, sincronización horaria',
-    capitulo: '§5.4 Device Time Sync',
+    capitulo: 'Guía ISAPI integral del fabricante · §5.4 Device Time Sync',
     confirmarEnSitio: 'que el cambio no reinicie el equipo ni vacíe su registro',
     dejaRastro: true,
   },
@@ -384,7 +397,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     fuente:
       'Guía ISAPI integral, permisos de usuario. Los tres perfiles son administrador, ' +
       'operador y observador; la integración pide OPERADOR con privilegio mínimo',
-    capitulo: '§5.8 User Management · operatorCap',
+    capitulo: 'Guía ISAPI integral del fabricante · §5.8 User Management · operatorCap',
     confirmarEnSitio: 'que un operador alcance lo que la integración necesita, y nada más',
   },
   {
@@ -394,7 +407,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     procedencia: 'guia_oficial',
     familia: 'comun',
     fuente: 'Guía ISAPI integral, permisos de usuario',
-    capitulo: '§5.8 User Management · viewerCap',
+    capitulo: 'Guía ISAPI integral del fabricante · §5.8 User Management · viewerCap',
     confirmarEnSitio: 'si el perfil observador basta para el diagnóstico de sólo lectura',
   },
 ];

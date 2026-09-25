@@ -184,8 +184,6 @@ export class RepositorioTableroPg implements RepositorioTablero {
       nombre: string;
       tipo: string;
       zona_id: string | null;
-      host: string;
-      puerto: number;
       modelo: string | null;
       firmware: string | null;
       ultimo_latido: Date | null;
@@ -215,7 +213,7 @@ export class RepositorioTableroPg implements RepositorioTablero {
        * fallidas es lo que distingue «falló la última» de «hay catorce sin
        * llegar», que se resuelven distinto.
        */
-      `SELECT d.id, d.nombre, d.tipo::text AS tipo, d.zona_id, d.host, d.puerto,
+      `SELECT d.id, d.nombre, d.tipo::text AS tipo, d.zona_id,
               d.modelo, d.firmware, d.ultimo_latido, d.ultima_sincronizacion,
               u.estado::text AS ultimo_resultado,
               COALESCE(f.fallidas, 0) AS sincronizaciones_fallidas
@@ -242,8 +240,6 @@ export class RepositorioTableroPg implements RepositorioTablero {
       nombre: f.nombre,
       tipo: f.tipo,
       zonaId: f.zona_id,
-      host: f.host,
-      puerto: f.puerto,
       modelo: f.modelo,
       firmware: f.firmware,
       ultimoLatido: f.ultimo_latido,

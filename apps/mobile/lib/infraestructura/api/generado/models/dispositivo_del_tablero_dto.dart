@@ -17,8 +17,6 @@ class DispositivoDelTableroDto {
     required this.nombre,
     required this.tipo,
     required this.zonaId,
-    required this.host,
-    required this.puerto,
     required this.modelo,
     required this.firmware,
     required this.estado,
@@ -35,10 +33,6 @@ class DispositivoDelTableroDto {
   final String nombre;
   final DispositivoDelTableroDtoTipo tipo;
   final String? zonaId;
-
-  /// IP o FQDN del equipo. Solo se rellena para roles administrativos (C-11); para el resto llega null. NUNCA sale la credencial ni su referencia (RN-21).
-  final String? host;
-  final num? puerto;
   final String? modelo;
   final String? firmware;
 

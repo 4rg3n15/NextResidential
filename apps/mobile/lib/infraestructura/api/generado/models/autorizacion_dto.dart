@@ -27,6 +27,8 @@ class AutorizacionDto {
     required this.patron,
     required this.revocadaEn,
     required this.motivoRevocacion,
+    required this.observaciones,
+    required this.tieneFotografia,
   });
   
   factory AutorizacionDto.fromJson(Map<String, Object?> json) => _$AutorizacionDtoFromJson(json);
@@ -45,6 +47,8 @@ class AutorizacionDto {
   final PatronDeAutorizacionDto? patron;
   final DateTime? revocadaEn;
   final String? motivoRevocacion;
+  final String? observaciones;
+  final bool tieneFotografia;
 
   Map<String, Object?> toJson() => _$AutorizacionDtoToJson(this);
 }

@@ -1,5 +1,5 @@
 import { abrirSobreDeAlarmServer } from './publicacion-alarm-server';
-import { desdeAlarmServerXml } from './contratos-de-evento';
+import { desdeAlarmServerJson, desdeAlarmServerXml } from './contratos-de-evento';
 import type { PublicacionDeEquipo } from '../equipo/fuente-de-placas';
 
 /**
@@ -91,7 +91,12 @@ export const recibirPublicacionDeEquipo = (
     return sinPublicacion('ilegible', error instanceof Error ? error.message : 'envío ilegible');
   }
 
-  const evento = desdeAlarmServerXml(sobre.xml, dispositivoId, ahora);
+  // Mismo `EventoDeEquipo` venga en XML o en JSON (6.7a): el resto del sistema
+  // no sabe en qué idioma habló la cámara.
+  const evento =
+    sobre.formato === 'json'
+      ? desdeAlarmServerJson(sobre.documento, dispositivoId, ahora)
+      : desdeAlarmServerXml(sobre.documento, dispositivoId, ahora);
   const comunes = {
     partesBiometricasRechazadas: sobre.partesBiometricasRechazadas,
     partesNoClasificadas: sobre.partesNoClasificadas,

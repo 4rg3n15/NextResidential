@@ -3,7 +3,7 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { DispositivoDelTablero } from '@ncr/contracts';
+import type { DispositivoDelTablero, Equipo } from '@ncr/contracts';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { TablaDeDatos } from '@/componentes/tabla-datos';
 import type { Columna } from '@/componentes/tabla-datos';
@@ -12,8 +12,105 @@ import { Distintivo } from '@/componentes/ui/distintivo';
 import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
 import { estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
-import { useDispositivos, useDispositivosPendientes } from '@/lib/api/consultas';
+import { useDispositivos, useDispositivosPendientes, useEquipos } from '@/lib/api/consultas';
 import { AltaDeEquipo } from './alta-de-equipo';
+import { FichaDialogo } from './ficha-dialogo';
+
+/**
+ * O4 · lo que el equipo DECLARA, en una frase por tipo. Sale de las capacidades
+ * descubiertas al sondear (neutrales: ninguna marca aquí). `desconocida` se
+ * dice, no se pinta en verde.
+ */
+const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto: string }[] => {
+  const c = e.capacidades;
+  if (c === null) return [{ tono: 'neutro', texto: 'Sin sondear' }];
+  const si = (estado: string): TonoDeDistintivo =>
+    estado === 'si' ? 'exito' : estado === 'no' ? 'peligro' : 'neutro';
+  const palabra = (estado: string, siTexto: string, noTexto: string, dudaTexto: string): string =>
+    estado === 'si' ? siTexto : estado === 'no' ? noTexto : dudaTexto;
+  switch (e.tipo) {
+    case 'terminal_facial':
+      return [
+        {
+          tono: si(c.verificacionRemota),
+          texto: palabra(
+            c.verificacionRemota,
+            'Reporta y espera',
+            'Decide sola',
+            'Verificación sin comprobar',
+          ),
+        },
+        {
+          tono: si(c.bibliotecaDeRostros.estado),
+          texto:
+            c.bibliotecaDeRostros.estado === 'si' && c.bibliotecaDeRostros.maximo !== null
+              ? `${String(c.bibliotecaDeRostros.almacenadas ?? 0)}/${String(c.bibliotecaDeRostros.maximo)} plantillas`
+              : palabra(
+                  c.bibliotecaDeRostros.estado,
+                  'Biblioteca',
+                  'Sin biblioteca',
+                  'Biblioteca sin comprobar',
+                ),
+        },
+      ];
+    case 'intercom':
+      return [
+        {
+          tono: si(c.aperturaRemota),
+          texto: palabra(
+            c.aperturaRemota,
+            'Abre desde la central',
+            'No abre desde aquí',
+            'Apertura sin comprobar',
+          ),
+        },
+        {
+          tono:
+            c.audioBidireccional.estado === 'si'
+              ? 'exito'
+              : c.audioBidireccional.estado === 'no'
+                ? 'aviso'
+                : 'neutro',
+          texto:
+            c.audioBidireccional.estado === 'si'
+              ? `Audio canal ${String(c.audioBidireccional.canal ?? '?')}`
+              : palabra(c.audioBidireccional.estado, 'Audio', 'Sin audio', 'Audio sin comprobar'),
+        },
+      ];
+    case 'camara_lpr':
+      return [
+        {
+          tono: si(c.reconocimientoDePlacas),
+          texto: palabra(
+            c.reconocimientoDePlacas,
+            'Lee placas',
+            'No lee placas',
+            'Placas sin comprobar',
+          ),
+        },
+      ];
+    default:
+      return [
+        {
+          tono: si(c.aperturaRemota),
+          texto: palabra(
+            c.aperturaRemota,
+            'Abre desde la plataforma',
+            'No abre desde aquí',
+            'Apertura sin comprobar',
+          ),
+        },
+      ];
+  }
+};
+
+const VERIFICACION: Readonly<
+  Record<Equipo['verificacion'], { tono: TonoDeDistintivo; texto: string }>
+> = {
+  verificado: { tono: 'exito', texto: 'Verificado' },
+  no_verificado: { tono: 'neutro', texto: 'No verificado' },
+  rechazado: { tono: 'peligro', texto: 'Decide solo' },
+};
 
 type Operacion = 'configuracion' | 'sincronizacion' | 'reinicio';
 
@@ -64,6 +161,9 @@ export const PantallaDeDispositivos = ({
   const clientes = useQueryClient();
   const consulta = useDispositivos(copropiedadId);
   const pendientes = useDispositivosPendientes(copropiedadId);
+  const inventario = useEquipos(copropiedadId);
+  const [editando, setEditando] = useState<Equipo | null>(null);
+  const [fichaDe, setFichaDe] = useState<Equipo | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enCurso, setEnCurso] = useState<string | null>(null);
@@ -115,6 +215,8 @@ export const PantallaDeDispositivos = ({
   }
 
   const sincronizando = new Set(pendientes.data?.dispositivos ?? []);
+  // El tablero dice si está en línea; el inventario dice qué es y qué declara.
+  const porId = new Map((inventario.data?.equipos ?? []).map((e) => [e.id, e] as const));
 
   const columnas: readonly Columna<DispositivoDelTablero>[] = [
     {
@@ -129,19 +231,15 @@ export const PantallaDeDispositivos = ({
       ),
     },
     {
-      clave: 'red',
-      titulo: 'Dirección · firmware',
-      texto: (d) => `${d.host ?? ''} ${d.firmware ?? ''}`,
+      // Sin dirección ni puerto (ETAPA 15-D, §7.1): la red del conjunto no llega
+      // a este navegador. Con el equipo habla el servidor.
+      clave: 'modelo',
+      titulo: 'Modelo · firmware',
+      texto: (d) => `${d.modelo ?? ''} ${d.firmware ?? ''}`,
       celda: (d) => (
-        <div>
-          <p className="font-mono text-secundario text-texto">
-            {d.host ?? '—'}
-            {d.puerto === null ? '' : `:${d.puerto}`}
-          </p>
-          <p className="text-secundario text-texto-apagado">
-            {d.modelo ?? 'Modelo sin registrar'} · {d.firmware ?? 'firmware desconocido'}
-          </p>
-        </div>
+        <p className="text-secundario text-texto-apagado">
+          {d.modelo ?? 'Modelo sin registrar'} · {d.firmware ?? 'firmware desconocido'}
+        </p>
       ),
     },
     {
@@ -154,6 +252,34 @@ export const PantallaDeDispositivos = ({
         ) : (
           <Distintivo tono={ESTADO[d.estado].tono}>{ESTADO[d.estado].texto}</Distintivo>
         ),
+    },
+    {
+      clave: 'declara',
+      titulo: 'Lo que declara',
+      texto: (d) => {
+        const e = porId.get(d.id);
+        return e === undefined
+          ? ''
+          : resumenDeCapacidades(e)
+              .map((x) => x.texto)
+              .join(' ');
+      },
+      celda: (d) => {
+        const e = porId.get(d.id);
+        if (e === undefined) return <span className="text-secundario text-texto-apagado">—</span>;
+        return (
+          <div className="flex flex-wrap gap-1">
+            <Distintivo tono={VERIFICACION[e.verificacion].tono}>
+              {VERIFICACION[e.verificacion].texto}
+            </Distintivo>
+            {resumenDeCapacidades(e).map((x) => (
+              <Distintivo key={x.texto} tono={x.tono}>
+                {x.texto}
+              </Distintivo>
+            ))}
+          </div>
+        );
+      },
     },
     {
       clave: 'sincronizacion',
@@ -199,7 +325,27 @@ export const PantallaDeDispositivos = ({
       titulo: 'Acciones',
       alineacion: 'derecha',
       celda: (d) => (
-        <div className="flex justify-end gap-1.5">
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {porId.has(d.id) ? (
+            <>
+              <Boton
+                variante="secundario"
+                tamano="sm"
+                disabled={enCurso !== null}
+                onClick={() => setFichaDe(porId.get(d.id) ?? null)}
+              >
+                Ficha
+              </Boton>
+              <Boton
+                variante="secundario"
+                tamano="sm"
+                disabled={enCurso !== null}
+                onClick={() => setEditando(porId.get(d.id) ?? null)}
+              >
+                Editar
+              </Boton>
+            </>
+          ) : null}
           {(['configuracion', 'sincronizacion', 'reinicio'] as const).map((op) => (
             <Boton
               key={op}
@@ -275,6 +421,17 @@ export const PantallaDeDispositivos = ({
         abierto={dandoDeAlta}
         alCerrar={() => setDandoDeAlta(false)}
       />
+      <AltaDeEquipo
+        copropiedadId={copropiedadId}
+        abierto={editando !== null}
+        equipo={editando}
+        alCerrar={() => setEditando(null)}
+      />
+      <FichaDialogo
+        copropiedadId={copropiedadId}
+        equipo={fichaDe}
+        alCerrar={() => setFichaDe(null)}
+      />
 
       {aviso !== null ? (
         <p
@@ -299,7 +456,7 @@ export const PantallaDeDispositivos = ({
         filas={equipos}
         claveDeFila={(d) => d.id}
         cargando={consulta.isLoading}
-        buscador={{ marcador: 'Buscar por nombre, tipo o dirección' }}
+        buscador={{ marcador: 'Buscar por nombre, tipo o modelo' }}
         vacio={{
           titulo: 'Sin dispositivos',
           descripcion:

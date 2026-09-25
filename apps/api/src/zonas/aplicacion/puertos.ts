@@ -27,10 +27,36 @@ export type ResultadoOcupacion =
   | { readonly tipo: 'aforo_superado'; readonly conteo: number }
   | { readonly tipo: 'zona_no_encontrada' };
 
+/**
+ * Lo que la pantalla pinta de una zona y el dominio NO lee (ADR-013): el icono
+ * de la tarjeta. Vive fuera del agregado a propósito: meter un nombre de icono
+ * en `Zona` sería poner presentación en el dominio (§2.2).
+ */
+export interface PresentacionDeZona {
+  readonly icono: string | null;
+}
+
 export interface RepositorioZonas {
   porId(copropiedadId: string, zonaId: string): Promise<Zona | null>;
+  /** Todas, activas e inactivas: `Zona.activa` lo dice y la pantalla lo pinta. */
   listar(copropiedadId: string): Promise<readonly Zona[]>;
+  /** Crea si no existe, actualiza si existe. El conteo de aforo no se toca aquí. */
   guardar(zona: Zona, actorId: string): Promise<void>;
+  /** Baja lógica con motivo (RN-19). `false` si no había zona activa. */
+  desactivar(
+    copropiedadId: string,
+    zonaId: string,
+    motivo: string,
+    actorId: string,
+  ): Promise<boolean>;
+  /** Presentación por zona (icono). Vacío para las que no tienen. */
+  presentacionDe(copropiedadId: string): Promise<ReadonlyMap<string, PresentacionDeZona>>;
+  fijarIcono(
+    copropiedadId: string,
+    zonaId: string,
+    icono: string | null,
+    actorId: string,
+  ): Promise<void>;
 
   /** Incremento ATÓMICO. Ver `ResultadoOcupacion`. */
   ocupar(copropiedadId: string, zonaId: string): Promise<ResultadoOcupacion>;

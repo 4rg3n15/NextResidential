@@ -1,3 +1,13 @@
+import {
+  BibliotecaLlena,
+  CredencialRechazada,
+  EquipoAveriado,
+  EquipoOcupado,
+  PeticionRechazada,
+  ReinicioNecesario,
+} from '../nucleo/errores';
+import type { ErrorDeEquipo } from '../nucleo/errores';
+
 /**
  * EL MAPA DE ERRORES DEL FABRICANTE HACIA LOS MOTIVOS DEL DOMINIO.
  *
@@ -243,6 +253,41 @@ export const interpretarError = (cuerpo: string): ErrorDelFabricante => {
     reintentable: false,
     ...aparte,
   };
+};
+
+/**
+ * De la reacción al ERROR NEUTRAL que cruza la frontera del paquete.
+ *
+ * Hasta la 15-D los adaptadores lanzaban `Error` con un texto, y quien estaba
+ * fuera no podía distinguir «ocupado, reintenta» de «credencial, NO
+ * reintentes». Aquí la taxonomía se convierte en clases que la suite de
+ * contrato exige a cualquier adaptador, de esta marca o de otra.
+ */
+export const comoErrorNeutral = (
+  dispositivoId: string,
+  cuerpo: string,
+  estadoHttp: number,
+): ErrorDeEquipo => {
+  const error = interpretarError(cuerpo);
+  const detalle = `${error.detalle} (HTTP ${String(estadoHttp)}${error.codigo === null ? '' : `, ${error.codigo}`})`;
+  if (estadoHttp === 401 || estadoHttp === 403 || error.reaccion === 'credencial_rechazada') {
+    return new CredencialRechazada(dispositivoId);
+  }
+  if (/faceLibraryFull|libraryFull|FDLibFull/i.test(cuerpo))
+    return new BibliotecaLlena(dispositivoId, null);
+  switch (error.reaccion) {
+    case 'equipo_ocupado':
+      return new EquipoOcupado(dispositivoId, detalle);
+    case 'equipo_averiado':
+      return new EquipoAveriado(dispositivoId, detalle);
+    case 'reinicio_necesario':
+      return new ReinicioNecesario(dispositivoId, detalle);
+    case 'peticion_mal_formada':
+    case 'placa_no_reconocible':
+      return new PeticionRechazada(dispositivoId, detalle);
+    default:
+      return new EquipoAveriado(dispositivoId, detalle);
+  }
 };
 
 /**

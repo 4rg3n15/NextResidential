@@ -20,6 +20,8 @@ CrearAutorizacionDto _$CrearAutorizacionDtoFromJson(
   patron: json['patron'] == null
       ? null
       : PatronDeEntradaDto.fromJson(json['patron'] as Map<String, dynamic>),
+  placa: json['placa'] as String?,
+  observaciones: json['observaciones'] as String?,
 );
 
 Map<String, dynamic> _$CrearAutorizacionDtoToJson(
@@ -32,4 +34,6 @@ Map<String, dynamic> _$CrearAutorizacionDtoToJson(
   'zonasPermitidas': instance.zonasPermitidas,
   'maximoAcompanantes': instance.maximoAcompanantes,
   'patron': instance.patron,
+  'placa': instance.placa,
+  'observaciones': instance.observaciones,
 };

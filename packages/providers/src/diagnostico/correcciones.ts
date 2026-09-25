@@ -10,6 +10,7 @@ import {
   conPaisCorregido,
 } from '../camara/pais-del-algoritmo';
 import { IMAGENES } from '../camara/receptor-en-el-equipo';
+import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -106,7 +107,7 @@ const leerYModificar = async (
   campo: string,
   valor: string,
 ): Promise<{ anterior: string | null; documento: string } | null> => {
-  const lectura = rutaPara(propositoDeLectura, 'camara');
+  const lectura = rutaPara(propositoDeLectura, 'camara', CARRIL_VERIFICADO_DE_LA_CAMARA);
   const respuesta = await cliente.pedir(lectura.metodo, lectura.ruta);
   if (!respuesta.ok || rechazado(respuesta.cuerpo)) return null;
   const anterior = etiqueta(respuesta.cuerpo, campo);
@@ -119,7 +120,7 @@ const escribir = async (
   propositoDeEscritura: string,
   documento: string,
 ): Promise<{ ok: boolean; detalle: string }> => {
-  const ruta = rutaPara(propositoDeEscritura, 'camara');
+  const ruta = rutaPara(propositoDeEscritura, 'camara', CARRIL_VERIFICADO_DE_LA_CAMARA);
   const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta, {
     tipo: 'application/xml',
     contenido: documento,
@@ -205,7 +206,11 @@ const corregirPais = async (
   cliente: ClienteDeEquipo,
   indice: number,
 ): Promise<ResultadoDeCorreccion> => {
-  const lectura = rutaPara('leer el país con el que el algoritmo lee las placas', 'camara');
+  const lectura = rutaPara(
+    'leer el país con el que el algoritmo lee las placas',
+    'camara',
+    CARRIL_VERIFICADO_DE_LA_CAMARA,
+  );
   const respuesta = await cliente.pedir(lectura.metodo, lectura.ruta);
   if (!respuesta.ok || rechazado(respuesta.cuerpo)) {
     return noAplicada('pais_del_algoritmo', 'El equipo no devolvió los datos básicos del canal');

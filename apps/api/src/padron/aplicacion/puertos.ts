@@ -163,22 +163,87 @@ export type ResultadoAltaPersona = {
  * la unicidad es el índice único parcial (ADR-04) — no un `SELECT` previo, que
  * entre comprobar e insertar deja pasar a otro administrador generando a la vez.
  */
+/**
+ * ETAPA 15-D (O3) · qué hacer con las que YA EXISTEN al regenerar.
+ *
+ * | Modo           | Colisión activa                    | Colisión de baja               |
+ * | -------------- | ---------------------------------- | ------------------------------ |
+ * | `estricto`     | No se crea NINGUNA (lo que había)  | Se crea otra: la baja no choca |
+ * | `conservar`    | Se conserva tal cual, se crean las demás | Se crea otra              |
+ * | `sobrescribir` | Se conserva (misma identidad)      | Se REACTIVA con el plan        |
+ *
+ * «Sobrescribir» no borra ni renombra: una vivienda con historial no se toca
+ * (RN-19). Lo único que un plan puede «escribir encima» de una existente es
+ * su estado de baja, y sólo si su identidad coincide con la del plan.
+ * Todo modo corre en UNA transacción: o entra todo, o nada.
+ */
+export type ModoDeRegeneracion = 'estricto' | 'conservar' | 'sobrescribir';
+
 export interface GeneracionDeViviendas {
   readonly copropiedadId: string;
   readonly viviendas: readonly ViviendaProyectada[];
   readonly actorId: string;
   /** Texto del rastro en `auditoria_seguridad` (valor `generacion_de_padron`). */
   readonly resumenDelPlan: string;
+  readonly modo?: ModoDeRegeneracion;
 }
 
 export interface ResultadoDeGeneracion {
   readonly creadas: number;
   /**
-   * Las que ya existían activas. Si trae alguna, **no se creó ninguna**: la
-   * diferencia entre lo pedido y lo devuelto por el `RETURNING` es la lista
-   * exacta de colisiones, y la transacción se revierte entera.
+   * Las que ya existían activas. En modo `estricto`, si trae alguna **no se
+   * creó ninguna**: la diferencia entre lo pedido y lo devuelto por el
+   * `RETURNING` es la lista exacta de colisiones, y la transacción se revierte
+   * entera. En `conservar` y `sobrescribir` son las que se dejaron como estaban.
    */
   readonly colisiones: readonly ViviendaProyectada[];
+  /** Sólo en `sobrescribir`: las de baja que volvieron a estar activas. */
+  readonly reactivadas?: number;
+}
+
+/** O3 · edición de una vivienda. Lo ausente no se toca. */
+export interface EdicionDeVivienda {
+  readonly copropiedadId: string;
+  readonly viviendaId: string;
+  readonly identificador?: string;
+  readonly agrupacion?: string | null;
+  /** Estado administrativo de la copropiedad hacia la vivienda (0002). */
+  readonly estadoAdministrativo?: EstadoAdministrativo;
+  readonly actorId: string;
+}
+
+/** Catálogo cerrado de `estado_administrativo` (migración 0002). */
+export const ESTADOS_ADMINISTRATIVOS = ['al_dia', 'en_mora', 'suspendida'] as const;
+export type EstadoAdministrativo = (typeof ESTADOS_ADMINISTRATIVOS)[number];
+
+export type ResultadoEdicionVivienda =
+  | { readonly tipo: 'editada' }
+  | { readonly tipo: 'no_encontrada' }
+  | { readonly tipo: 'identificador_duplicado' };
+
+/** O3 · edición de un vehículo. La placa cambia por el VO, como al registrar. */
+export interface EdicionDeVehiculo {
+  readonly copropiedadId: string;
+  readonly vehiculoId: string;
+  readonly placa?: Placa;
+  readonly personaId?: string | null;
+  readonly marca?: string | null;
+  readonly modelo?: string | null;
+  readonly color?: string | null;
+  readonly tipo?: TipoDeVehiculo;
+  readonly actorId: string;
+}
+
+export type ResultadoEdicionVehiculo =
+  | { readonly tipo: 'editado' }
+  | { readonly tipo: 'no_encontrado' }
+  | { readonly tipo: 'placa_activa_duplicada' };
+
+/** Cuánto historial cuelga de un vehículo: eventos con su placa y autorizaciones. */
+export interface HistorialDeVehiculo {
+  readonly placa: string;
+  readonly eventos: number;
+  readonly autorizaciones: number;
 }
 
 /**
@@ -197,7 +262,27 @@ export interface FilaExportada {
   readonly esTitular: boolean | null;
 }
 
+/**
+ * Lo que una PLACA dice del padrón, resuelto en una consulta — ETAPA 15-D, D-25.
+ *
+ * Es lo que el cargador de contexto del motor necesita saber de una lectura, y
+ * nada más: a qué vivienda pertenece el vehículo, si esa vivienda sigue en
+ * servicio y desde cuándo/hasta cuándo rige el derecho del residente (RN-13).
+ * `viviendaDesactivadaEn` es el instante en que ese derecho dejó de estar
+ * vigente: una vivienda dada de baja no genera accesos nuevos.
+ */
+export interface VehiculoResuelto {
+  readonly vehiculoId: string;
+  readonly viviendaId: string;
+  readonly viviendaActiva: boolean;
+  readonly viviendaDesactivadaEn: Date | null;
+  readonly personaId: string | null;
+  readonly registradoEn: Date;
+}
+
 export interface RepositorioPadron {
+  /** `null` si ninguna vivienda de la copropiedad tiene un vehículo ACTIVO con esa placa. */
+  resolverPlaca(copropiedadId: string, placa: Placa): Promise<VehiculoResuelto | null>;
   registrarVehiculo(alta: AltaVehiculo): Promise<ResultadoRegistroVehiculo>;
   registrarVivienda(alta: AltaVivienda): Promise<ResultadoAltaVivienda>;
   buscarPersonas(
@@ -283,6 +368,19 @@ export interface RepositorioPadron {
     actorId: string,
   ): Promise<{ readonly borrada: boolean; readonly motivo?: string }>;
   contarVehiculosActivos(copropiedadId: string, placa: Placa): Promise<number>;
+  /** O3 · edición. La unicidad la decide el índice, no un SELECT previo (ADR-04). */
+  editarVivienda(edicion: EdicionDeVivienda): Promise<ResultadoEdicionVivienda>;
+  editarVehiculo(edicion: EdicionDeVehiculo): Promise<ResultadoEdicionVehiculo>;
+  historialDeVehiculo(
+    copropiedadId: string,
+    vehiculoId: string,
+  ): Promise<HistorialDeVehiculo | null>;
+  /** O3 · borrado DEFINITIVO de vehículo, sólo sin historial (migración 0034). */
+  borrarVehiculoDefinitivamente(
+    copropiedadId: string,
+    vehiculoId: string,
+    actorId: string,
+  ): Promise<{ readonly borrado: boolean; readonly motivo?: string }>;
   /** Ejecuta varias operaciones en una sola transacción (carga de padrón). */
   enTransaccion<T>(operacion: (repo: RepositorioPadron) => Promise<T>): Promise<T>;
 }

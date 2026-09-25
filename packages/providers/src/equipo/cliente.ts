@@ -123,8 +123,12 @@ export class ClienteDeEquipo {
    * sobre todo el flujo lo cortaría a los pocos segundos, que es justo lo
    * contrario de lo que hace falta.
    */
-  async *flujo(ruta: string, cancelar?: AbortSignal): AsyncIterable<string> {
-    const respuesta = await this.abrirFlujo(ruta, cancelar);
+  async *flujo(
+    ruta: string,
+    cancelar?: AbortSignal,
+    peticion?: { readonly metodo: string; readonly cuerpo?: CuerpoDePeticion },
+  ): AsyncIterable<string> {
+    const respuesta = await this.abrirFlujo(ruta, cancelar, peticion);
     const cuerpo = respuesta.body;
     if (cuerpo === null) return;
 
@@ -143,11 +147,38 @@ export class ClienteDeEquipo {
     }
   }
 
-  private async abrirFlujo(ruta: string, cancelar?: AbortSignal): Promise<Response> {
-    const primera = await this.enviar('GET', ruta, undefined, cancelar);
+  /**
+   * Como `flujo`, pero entrega los BYTES tal cual: es lo que necesita el audio,
+   * donde decodificar como texto corrompería el códec.
+   */
+  async *flujoBinario(ruta: string, cancelar?: AbortSignal): AsyncIterable<Uint8Array> {
+    const respuesta = await this.abrirFlujo(ruta, cancelar);
+    const cuerpo = respuesta.body;
+    if (cuerpo === null) return;
+    const lector = cuerpo.getReader();
+    try {
+      for (;;) {
+        const { done, value } = await lector.read();
+        if (done) return;
+        if (value !== undefined) yield value;
+      }
+    } finally {
+      await lector.cancel().catch(() => undefined);
+    }
+  }
+
+  private async abrirFlujo(
+    ruta: string,
+    cancelar?: AbortSignal,
+    peticion?: { readonly metodo: string; readonly cuerpo?: CuerpoDePeticion },
+  ): Promise<Response> {
+    // La suscripción (6.5) abre el flujo con un POST y un cuerpo que dice qué
+    // eventos se quieren; el `alertStream` clásico, con un GET sin cuerpo.
+    const metodo = peticion?.metodo ?? 'GET';
+    const primera = await this.enviar(metodo, ruta, peticion?.cuerpo, cancelar);
     if (primera.status !== 401) return primera;
     if (!this.sesion.aceptarDesafio(primera.headers.get('www-authenticate'))) return primera;
-    return this.enviar('GET', ruta, undefined, cancelar);
+    return this.enviar(metodo, ruta, peticion?.cuerpo, cancelar);
   }
 
   private async enviar(

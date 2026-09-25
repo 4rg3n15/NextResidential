@@ -2626,6 +2626,94 @@ try {
     }
   }
 
+  console.log('\n▸ 32 · un acoplamiento a una marca de hardware se detecta (O2, ETAPA 15-D)');
+  {
+    if (exigeControl('scripts/lib/frontera-extensibilidad.mjs')) {
+      const control = () => enClon('node', ['scripts/lib/frontera-extensibilidad.mjs']);
+      const base = control();
+      base.codigo === 0
+        ? ok('la línea base del banco está limpia')
+        : mal(`el banco NO parte de una línea base limpia: ${base.salida.split('\n')[1] ?? ''}`);
+
+      // (A) el dominio importa el paquete de proveedores, aunque sea un tipo.
+      const sondaDominio = join(clon, 'packages/domain-core/src/sonda-extensibilidad.ts');
+      writeFileSync(sondaDominio, "import type { X } from '@ncr/providers';\nexport type Y = X;\n");
+      const a = control();
+      a.codigo !== 0 && /sonda-extensibilidad/.test(a.salida) && /\(A\)/.test(a.salida)
+        ? ok('(A) el dominio importando @ncr/providers se detecta, aunque sea un tipo')
+        : mal(`(A) NO detectado en el dominio (codigo ${a.codigo})`);
+      rmSync(sondaDominio, { force: true });
+
+      // (A bis) la capa de aplicación lo importa como VALOR; como tipo se admite.
+      const sondaAplicacion = join(clon, 'apps/api/src/eventos/aplicacion/sonda-extensibilidad.ts');
+      writeFileSync(
+        sondaAplicacion,
+        "import { crearProveedorDeEquipos } from '@ncr/providers';\nexport const f = crearProveedorDeEquipos;\n",
+      );
+      const av = control();
+      av.codigo !== 0 && /como VALOR/.test(av.salida)
+        ? ok('(A) la aplicación importando un VALOR de @ncr/providers se detecta')
+        : mal(`(A) el valor en aplicación NO se detecta (codigo ${av.codigo})`);
+      writeFileSync(
+        sondaAplicacion,
+        "import type { FichaDelEquipo } from '@ncr/providers';\nexport type F = FichaDelEquipo;\n",
+      );
+      control().codigo === 0
+        ? ok('(A) y un `import type` en aplicación se admite: no ejecuta nada del paquete')
+        : mal('(A) el control rechaza el `import type` legítimo');
+      rmSync(sondaAplicacion, { force: true });
+
+      // (B) alguien fuera del paquete construye un adaptador de marca.
+      const sondaMarca = join(clon, 'apps/api/src/sonda-extensibilidad.ts');
+      writeFileSync(
+        sondaMarca,
+        "import { HikvisionProvider } from '@ncr/providers';\nexport const p = new HikvisionProvider({} as never);\n", // extensibilidad-exenta: sonda
+      );
+      const b = control();
+      b.codigo !== 0 && /\(B\)/.test(b.salida)
+        ? ok('(B) construir un adaptador de marca fuera del paquete se detecta')
+        : mal(`(B) NO detectado (codigo ${b.codigo})`);
+      rmSync(sondaMarca, { force: true });
+
+      // (C) el ficticio toca la carpeta de otra marca.
+      const sondaFicticio = join(clon, 'packages/providers/src/ficticio/sonda-extensibilidad.ts');
+      writeFileSync(
+        sondaFicticio,
+        "import { ClienteDeEquipo } from '../equipo/cliente';\nexport const c = ClienteDeEquipo;\n",
+      );
+      const c = control();
+      c.codigo !== 0 && /\(C\)/.test(c.salida)
+        ? ok('(C) el ficticio importando el cliente de la marca real se detecta')
+        : mal(`(C) NO detectado (codigo ${c.codigo})`);
+      rmSync(sondaFicticio, { force: true });
+
+      // (D) el barril exporta la marca inventada.
+      const barril = join(clon, 'packages/providers/src/index.ts');
+      const barrilOriginal = readFileSync(barril, 'utf8');
+      writeFileSync(barril, barrilOriginal + "\nexport * from './ficticio/registrar';\n");
+      const d = control();
+      d.codigo !== 0 && /\(D\)/.test(d.salida)
+        ? ok('(D) exportar el ficticio por el barril se detecta')
+        : mal(`(D) NO detectado (codigo ${d.codigo})`);
+      writeFileSync(barril, barrilOriginal);
+
+      // (C bis) sin ficticio no hay prueba de fuego: también se detecta.
+      const ficticio = join(clon, 'packages/providers/src/ficticio');
+      const respaldo = join(banco, 'ficticio-respaldo');
+      cpSync(ficticio, respaldo, { recursive: true });
+      rmSync(ficticio, { recursive: true, force: true });
+      const sin = control();
+      sin.codigo !== 0 && /prueba de fuego/.test(sin.salida)
+        ? ok('(C) que el adaptador ficticio desaparezca se detecta')
+        : mal(`(C) la ausencia del ficticio pasa (codigo ${sin.codigo})`);
+      cpSync(respaldo, ficticio, { recursive: true });
+
+      control().salida === base.salida
+        ? ok('el banco de pruebas vuelve a su línea base')
+        : mal('la sonda dejó rastro en el banco');
+    }
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
@@ -2824,6 +2912,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 27 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 28 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

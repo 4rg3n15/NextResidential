@@ -561,6 +561,60 @@
         ]
       }
     },
+    "/copropiedades/{id}/autorizaciones/{autorizacionId}": {
+      "put": {
+        "operationId": "AutorizacionesController_modificarAutorizacion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModificarAutorizacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModificacionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia fin de vigencia, placa u observaciones de una viva (O3)",
+        "tags": [
+          "autorizaciones"
+        ]
+      }
+    },
     "/copropiedades/{id}/autorizaciones/{autorizacionId}/acompanantes": {
       "post": {
         "operationId": "AutorizacionesController_agregarAcompanante",
@@ -610,6 +664,102 @@
           }
         ],
         "summary": "Añade un acompañante por su propia identidad (HU-08, D-01)",
+        "tags": [
+          "autorizaciones"
+        ]
+      }
+    },
+    "/copropiedades/{id}/autorizaciones/{autorizacionId}/fotografia": {
+      "post": {
+        "operationId": "AutorizacionesController_adjuntarFotografia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FotografiaDeVisitanteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FotografiaAdjuntadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Adjunta la fotografía de identificación del visitante (O3, RN-21)",
+        "tags": [
+          "autorizaciones"
+        ]
+      },
+      "get": {
+        "operationId": "AutorizacionesController_fotografia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UrlDeFotografiaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "URL firmada de vida corta de la fotografía del visitante (RN-21)",
         "tags": [
           "autorizaciones"
         ]
@@ -1335,7 +1485,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AltaDeEquipoDto"
+                "$ref": "#/components/schemas/EdicionDeEquipoDto"
               }
             }
           }
@@ -1466,6 +1616,50 @@
           }
         ],
         "summary": "Corrige un campo del equipo. Exige confirmación y deja constancia",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/equipos/{equipoId}/diagnostico": {
+      "post": {
+        "operationId": "EquiposController_diagnosticar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeSondeoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sondea un equipo en servicio con su clave guardada y devuelve su ficha",
         "tags": [
           "equipos"
         ]
@@ -3352,6 +3546,102 @@
         ]
       }
     },
+    "/copropiedades/{id}/padron/vehiculos/{vehiculoId}": {
+      "put": {
+        "operationId": "PadronController_editarVehiculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vehiculoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditarVehiculoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdicionAplicadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edita un vehículo; la placa única activa la garantiza la base",
+        "tags": [
+          "padron"
+        ]
+      },
+      "delete": {
+        "operationId": "PadronController_borrarVehiculoDefinitivamente",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vehiculoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BorradoDefinitivoDeVehiculoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Borrado DEFINITIVO del vehículo, sólo sin historial (RN-19)",
+        "tags": [
+          "padron"
+        ]
+      }
+    },
     "/copropiedades/{id}/padron/vehiculos/{vehiculoId}/desactivacion": {
       "post": {
         "operationId": "PadronController_desactivarVehiculo",
@@ -3599,6 +3889,58 @@
       }
     },
     "/copropiedades/{id}/padron/viviendas/{viviendaId}": {
+      "put": {
+        "operationId": "PadronController_editarVivienda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditarViviendaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdicionAplicadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edita identificador, agrupación o dirección de la vivienda (HU-02)",
+        "tags": [
+          "padron"
+        ]
+      },
       "delete": {
         "operationId": "PadronController_borrarViviendaDefinitivamente",
         "parameters": [
@@ -3849,6 +4191,50 @@
       }
     },
     "/copropiedades/{id}/zonas": {
+      "post": {
+        "operationId": "ZonasController_crearZona",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearZonaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZonaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crea una zona común (HU-18). Horario y normas, después",
+        "tags": [
+          "zonas"
+        ]
+      },
       "get": {
         "operationId": "ZonasController_listar",
         "parameters": [
@@ -3936,6 +4322,60 @@
           }
         ],
         "summary": "Da permiso sobre la zona a una autorización (HU-19, HU-20)",
+        "tags": [
+          "zonas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/zonas/{zonaId}/baja": {
+      "post": {
+        "operationId": "ZonasController_darDeBaja",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "zonaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaDeZonaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BajaDeZonaAplicadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Baja lógica de la zona con motivo; nunca borrado (RN-19)",
         "tags": [
           "zonas"
         ]
@@ -4490,6 +4930,21 @@
           "canalDeAudio": {
             "type": "number"
           },
+          "fabricante": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "modoDeTerminal": {
+            "type": "string",
+            "enum": [
+              "reporta_y_espera",
+              "decide_el_equipo"
+            ]
+          },
+          "canalDeAudioHabilitado": {
+            "type": "boolean",
+            "default": false
+          },
           "probarConexion": {
             "type": "boolean",
             "default": true
@@ -4584,6 +5039,13 @@
           "motivoRevocacion": {
             "type": "string",
             "nullable": true
+          },
+          "observaciones": {
+            "type": "string",
+            "nullable": true
+          },
+          "tieneFotografia": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -4600,7 +5062,9 @@
           "acompanantes",
           "patron",
           "revocadaEn",
-          "motivoRevocacion"
+          "motivoRevocacion",
+          "observaciones",
+          "tieneFotografia"
         ]
       },
       "AutorizarZonaDto": {
@@ -4637,6 +5101,30 @@
         "properties": {
           "motivo": {
             "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "BajaDeZonaAplicadaDto": {
+        "type": "object",
+        "properties": {
+          "desactivada": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "desactivada"
+        ]
+      },
+      "BajaDeZonaDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
             "maxLength": 300
           }
         },
@@ -4718,6 +5206,21 @@
           "bloqueos"
         ]
       },
+      "BorradoDefinitivoDeVehiculoDto": {
+        "type": "object",
+        "properties": {
+          "borrado": {
+            "type": "boolean"
+          },
+          "placa": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "borrado",
+          "placa"
+        ]
+      },
       "BorradoDefinitivoDto": {
         "type": "object",
         "properties": {
@@ -4773,6 +5276,145 @@
             ]
           }
         }
+      },
+      "CapacidadDeAudioDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          },
+          "canal": {
+            "type": "number",
+            "nullable": true
+          },
+          "formato": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "estado",
+          "canal",
+          "formato"
+        ]
+      },
+      "CapacidadDeBibliotecaDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          },
+          "maximo": {
+            "type": "number",
+            "nullable": true
+          },
+          "almacenadas": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "estado",
+          "maximo",
+          "almacenadas"
+        ]
+      },
+      "CapacidadesDeEquipoDto": {
+        "type": "object",
+        "properties": {
+          "origen": {
+            "type": "string",
+            "enum": [
+              "descubiertas",
+              "declaradas",
+              "sin_consultar"
+            ]
+          },
+          "aperturaRemota": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          },
+          "verificacionRemota": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          },
+          "bibliotecaDeRostros": {
+            "$ref": "#/components/schemas/CapacidadDeBibliotecaDto"
+          },
+          "gestionDePersonas": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          },
+          "audioBidireccional": {
+            "$ref": "#/components/schemas/CapacidadDeAudioDto"
+          },
+          "senalizacionDeLlamada": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          },
+          "suscripcionDeEventos": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          },
+          "reconocimientoDePlacas": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          },
+          "estadoDeBarrera": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          }
+        },
+        "required": [
+          "origen",
+          "aperturaRemota",
+          "verificacionRemota",
+          "bibliotecaDeRostros",
+          "gestionDePersonas",
+          "audioBidireccional",
+          "senalizacionDeLlamada",
+          "suscripcionDeEventos",
+          "reconocimientoDePlacas",
+          "estadoDeBarrera"
+        ]
       },
       "CapturarRostroDto": {
         "type": "object",
@@ -4935,7 +5577,7 @@
           },
           "umbralConfianzaPlaca": {
             "type": "number",
-            "example": 0.85,
+            "example": 0.8,
             "description": "Por debajo de este valor la lectura de placa NO decide sola: escala al portero (CU-01, excepción 3a). Sólo el superadministrador lo cambia."
           },
           "politicaContingenciaEdge": {
@@ -5051,6 +5693,11 @@
           "abierta": {
             "type": "boolean",
             "description": "Cierre manual del operador, sin presencia física (PB-04)"
+          },
+          "icono": {
+            "type": "string",
+            "nullable": true,
+            "example": "waves"
           }
         }
       },
@@ -5081,6 +5728,14 @@
             "items": {
               "$ref": "#/components/schemas/ExcepcionDeAgrupacionDto"
             }
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "estricto",
+              "conservar",
+              "sobrescribir"
+            ]
           },
           "totalEsperado": {
             "type": "number"
@@ -5283,6 +5938,17 @@
                 "$ref": "#/components/schemas/PatronDeEntradaDto"
               }
             ]
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 5,
+            "maxLength": 12
+          },
+          "observaciones": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
           }
         },
         "required": [
@@ -5290,6 +5956,44 @@
           "personaId",
           "desde",
           "hasta"
+        ]
+      },
+      "CrearZonaDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "vehicular",
+              "peatonal",
+              "comun"
+            ]
+          },
+          "aforoMaximo": {
+            "type": "number",
+            "description": "Aforo máximo simultáneo (RN-14). 0 = sin límite práctico."
+          },
+          "icono": {
+            "type": "string",
+            "nullable": true,
+            "example": "dumbbell"
+          },
+          "normas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "nombre",
+          "tipo",
+          "aforoMaximo"
         ]
       },
       "DecisionDelEdgeDto": {
@@ -5445,15 +6149,6 @@
             "format": "uuid",
             "nullable": true
           },
-          "host": {
-            "type": "string",
-            "nullable": true,
-            "description": "IP o FQDN del equipo. Solo se rellena para roles administrativos (C-11); para el resto llega null. NUNCA sale la credencial ni su referencia (RN-21)."
-          },
-          "puerto": {
-            "type": "number",
-            "nullable": true
-          },
           "modelo": {
             "type": "string",
             "nullable": true
@@ -5506,8 +6201,6 @@
           "nombre",
           "tipo",
           "zonaId",
-          "host",
-          "puerto",
           "modelo",
           "firmware",
           "estado",
@@ -5517,6 +6210,148 @@
           "ultimoResultadoDeSincronizacion",
           "sincronizacionesFallidas"
         ]
+      },
+      "EdicionAplicadaDto": {
+        "type": "object",
+        "properties": {
+          "editado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "editado"
+        ]
+      },
+      "EdicionDeEquipoDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "camara_lpr",
+              "terminal_facial",
+              "intercom",
+              "rele",
+              "controlador_io"
+            ]
+          },
+          "host": {
+            "type": "string",
+            "example": "203.0.113.10"
+          },
+          "puerto": {
+            "type": "number",
+            "example": 80
+          },
+          "protocolo": {
+            "type": "string",
+            "enum": [
+              "http",
+              "https"
+            ],
+            "default": "http"
+          },
+          "usuario": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "secreto": {
+            "type": "string",
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "canalBarrera": {
+            "type": "number"
+          },
+          "numeroDePuerta": {
+            "type": "number"
+          },
+          "canalDeAudio": {
+            "type": "number"
+          },
+          "fabricante": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "modoDeTerminal": {
+            "type": "string",
+            "enum": [
+              "reporta_y_espera",
+              "decide_el_equipo"
+            ]
+          },
+          "canalDeAudioHabilitado": {
+            "type": "boolean",
+            "default": false
+          },
+          "probarConexion": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "EditarVehiculoDto": {
+        "type": "object",
+        "properties": {
+          "placa": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 16
+          },
+          "personaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "marca": {
+            "type": "string",
+            "nullable": true
+          },
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "automovil",
+              "motocicleta",
+              "bicicleta",
+              "otro"
+            ]
+          }
+        }
+      },
+      "EditarViviendaDto": {
+        "type": "object",
+        "properties": {
+          "identificador": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "agrupacion": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 24
+          },
+          "estadoAdministrativo": {
+            "type": "string",
+            "enum": [
+              "al_dia",
+              "en_mora",
+              "suspendida"
+            ]
+          }
+        }
       },
       "EmergenciaDto": {
         "type": "object",
@@ -5614,23 +6449,6 @@
               "controlador_io"
             ]
           },
-          "host": {
-            "type": "string"
-          },
-          "puerto": {
-            "type": "number"
-          },
-          "protocolo": {
-            "type": "string",
-            "enum": [
-              "http",
-              "https"
-            ]
-          },
-          "usuario": {
-            "type": "string",
-            "nullable": true
-          },
           "modelo": {
             "type": "string",
             "nullable": true
@@ -5650,6 +6468,29 @@
           "canalDeAudio": {
             "type": "number",
             "nullable": true
+          },
+          "fabricante": {
+            "type": "string",
+            "nullable": true
+          },
+          "modoDeTerminal": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "reporta_y_espera",
+              "decide_el_equipo"
+            ]
+          },
+          "canalDeAudioHabilitado": {
+            "type": "boolean"
+          },
+          "capacidades": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CapacidadesDeEquipoDto"
+              }
+            ]
           },
           "verificacion": {
             "type": "string",
@@ -5679,15 +6520,15 @@
           "id",
           "nombre",
           "tipo",
-          "host",
-          "puerto",
-          "protocolo",
-          "usuario",
           "modelo",
           "firmware",
           "canalBarrera",
           "numeroDePuerta",
           "canalDeAudio",
+          "fabricante",
+          "modoDeTerminal",
+          "canalDeAudioHabilitado",
+          "capacidades",
           "verificacion",
           "verificadoEn",
           "motivoNoVerificado",
@@ -6212,6 +7053,45 @@
           "incumplimientos"
         ]
       },
+      "FotografiaAdjuntadaDto": {
+        "type": "object",
+        "properties": {
+          "adjuntada": {
+            "type": "boolean"
+          },
+          "tipoMime": {
+            "type": "string"
+          },
+          "tamanoBytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "adjuntada",
+          "tipoMime",
+          "tamanoBytes"
+        ]
+      },
+      "FotografiaDeVisitanteDto": {
+        "type": "object",
+        "properties": {
+          "tipoMime": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png"
+            ]
+          },
+          "contenidoBase64": {
+            "type": "string",
+            "description": "Imagen JPEG o PNG en base64, máximo 1,5 MiB."
+          }
+        },
+        "required": [
+          "tipoMime",
+          "contenidoBase64"
+        ]
+      },
       "FranjaDeAccesosDto": {
         "type": "object",
         "properties": {
@@ -6307,10 +7187,20 @@
         "properties": {
           "creadas": {
             "type": "number"
+          },
+          "conservadas": {
+            "type": "number",
+            "description": "Ya existían y se dejaron como estaban."
+          },
+          "reactivadas": {
+            "type": "number",
+            "description": "De baja, reactivadas por «sobrescribir»."
           }
         },
         "required": [
-          "creadas"
+          "creadas",
+          "conservadas",
+          "reactivadas"
         ]
       },
       "GrupoProyectadoDto": {
@@ -7011,6 +7901,37 @@
           "nivelAcceso",
           "activo"
         ]
+      },
+      "ModificacionDto": {
+        "type": "object",
+        "properties": {
+          "modificada": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "modificada"
+        ]
+      },
+      "ModificarAutorizacionDto": {
+        "type": "object",
+        "properties": {
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 5,
+            "maxLength": 12
+          },
+          "observaciones": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          }
+        }
       },
       "NotasDeAlertaDto": {
         "type": "object",
@@ -7890,6 +8811,14 @@
                 "$ref": "#/components/schemas/FichaDelEquipoDto"
               }
             ]
+          },
+          "capacidades": {
+            "description": "Lo que el equipo declaró poder hacer. Ausente cuando no se alcanzó.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CapacidadesDeEquipoDto"
+              }
+            ]
           }
         },
         "required": [
@@ -8135,6 +9064,21 @@
         },
         "required": [
           "url"
+        ]
+      },
+      "UrlDeFotografiaDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "expiraEnSegundos": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "url",
+          "expiraEnSegundos"
         ]
       },
       "VehiculoDto": {
@@ -8404,6 +9348,13 @@
           "tipo": {
             "type": "string"
           },
+          "icono": {
+            "type": "string",
+            "nullable": true
+          },
+          "activa": {
+            "type": "boolean"
+          },
           "abierta": {
             "type": "boolean"
           },
@@ -8453,6 +9404,8 @@
           "id",
           "nombre",
           "tipo",
+          "icono",
+          "activa",
           "abierta",
           "politicaReinicio",
           "normas",

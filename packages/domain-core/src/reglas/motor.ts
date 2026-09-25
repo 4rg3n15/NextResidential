@@ -28,12 +28,31 @@ import {
  * porque con una placa ilegible no sabemos de quién son las vigencias que
  * estaríamos mirando.
  */
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * EL ORDEN, Y POR QUÉ `placaConocida` VA ANTES QUE `vivienda` (ETAPA 15-D)
+ *
+ * La precedencia vinculante es `listaNegra > vigencia > patrón > zona`, y se
+ * conserva. Lo que cambió es el sitio de la placa desconocida: iba DESPUÉS de
+ * `politicaVivienda`, y una placa que nadie registró no tiene vivienda, así que
+ * el motor contestaba `FALLO_TECNICO` —«no sé a qué vivienda va»— cuando lo que
+ * sabía de sobra era que la placa no existe. `PLACA_DESCONOCIDA` era, en la
+ * práctica, inalcanzable: sólo salía en la prueba, donde el contexto traía una
+ * vivienda inventada.
+ *
+ * Nadie lo vio en cinco etapas porque ningún contexto real llegaba al motor
+ * (D-25). El primer cargador con datos lo destapó en su primera tabla de
+ * pruebas: «placa inexistente → PLACA_DESCONOCIDA», y salía `FALLO_TECNICO`.
+ *
+ * `FALLO_TECNICO` queda para lo que es: información insuficiente para emitir
+ * el motivo correcto. Una placa desconocida es información suficiente.
+ */
 export const REGLAS_PREDETERMINADAS: readonly Politica[] = [
   politicaListaNegra,
+  politicaPlacaConocida,
   politicaVivienda,
   politicaConfianza,
   politicaConsentimiento,
-  politicaPlacaConocida,
   politicaVigencia,
   politicaRecurrencia,
   politicaZona,

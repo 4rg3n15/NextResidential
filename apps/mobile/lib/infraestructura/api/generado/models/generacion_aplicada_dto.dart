@@ -10,11 +10,19 @@ part 'generacion_aplicada_dto.g.dart';
 class GeneracionAplicadaDto {
   const GeneracionAplicadaDto({
     required this.creadas,
+    required this.conservadas,
+    required this.reactivadas,
   });
   
   factory GeneracionAplicadaDto.fromJson(Map<String, Object?> json) => _$GeneracionAplicadaDtoFromJson(json);
   
   final num creadas;
+
+  /// Ya existían y se dejaron como estaban.
+  final num conservadas;
+
+  /// De baja, reactivadas por «sobrescribir».
+  final num reactivadas;
 
   Map<String, Object?> toJson() => _$GeneracionAplicadaDtoToJson(this);
 }

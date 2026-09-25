@@ -69,6 +69,19 @@ export class VistaPreviaDeGeneracionDto {
 
 export class GeneracionAplicadaDto {
   @ApiProperty({ type: Number }) creadas!: number;
+  @ApiProperty({ type: Number, description: 'Ya existían y se dejaron como estaban.' })
+  conservadas!: number;
+  @ApiProperty({ type: Number, description: 'De baja, reactivadas por «sobrescribir».' })
+  reactivadas!: number;
+}
+
+export class EdicionAplicadaDto {
+  @ApiProperty({ type: Boolean }) editado!: boolean;
+}
+
+export class BorradoDefinitivoDeVehiculoDto {
+  @ApiProperty({ type: Boolean }) borrado!: boolean;
+  @ApiProperty({ type: String }) placa!: string;
 }
 
 export class TotalesDeViviendasDto {

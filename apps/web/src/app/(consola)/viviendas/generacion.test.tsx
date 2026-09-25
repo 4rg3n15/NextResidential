@@ -76,7 +76,9 @@ const servidorFalso = (
   vi.fn(async (entrada: string | Request) => {
     const url = typeof entrada === 'string' ? entrada : entrada.url;
     if (url.includes('/generacion/previsualizacion')) return respuesta(vistaPrevia);
-    if (url.includes('/viviendas/generacion')) return respuesta({ creadas: 39 });
+    if (url.includes('/viviendas/generacion')) {
+      return respuesta({ creadas: 39, conservadas: 0, reactivadas: 0 });
+    }
     if (url.includes('/configuracion')) return respuesta(configuracion);
     if (url.includes('/padron/viviendas')) {
       return respuesta({ totales: { activas: 0, inactivas: 0 }, viviendas: [] });

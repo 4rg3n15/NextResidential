@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { EscuchaDeAlertStream, extraerObjetos } from './escucha-alertstream';
+import {
+  EscuchaDeAlertStream,
+  extraerObjetos,
+  transporteSegunCapacidades,
+} from './escucha-alertstream';
+import { capacidadesDeclaradas } from '../nucleo/capacidades';
 
 const bloque = (extra: Record<string, unknown>): string =>
   JSON.stringify({ eventType: 'doorbell', dateTime: '2026-09-22T10:00:00Z', ...extra });
@@ -221,5 +226,49 @@ describe('el volcado histórico NO llega al sistema', () => {
     // Dos esperas distintas para la misma base: eso es la dispersión.
     expect(esperas[0]).not.toBe(Math.round(esperas[0]! / 0.75));
     expect(new Set(esperas).size).toBeGreaterThan(1);
+  });
+});
+
+describe('6.5 · el tercer transporte: suscripción, elegido por CAPACIDAD', () => {
+  it('con `suscripcionDeEventos = si` se elige subscribeEvent; si no, alertStream', () => {
+    expect(transporteSegunCapacidades(capacidadesDeclaradas({ suscripcionDeEventos: 'si' }))).toBe(
+      'subscribeEvent',
+    );
+    expect(transporteSegunCapacidades(capacidadesDeclaradas({ suscripcionDeEventos: 'no' }))).toBe(
+      'alertStream',
+    );
+    // DESCONOCIDA no es sí: se queda en el transporte que no exige capacidad.
+    expect(transporteSegunCapacidades(capacidadesDeclaradas({}))).toBe('alertStream');
+  });
+
+  it('la suscripción abre el flujo con POST y un cuerpo, y filtra lo histórico igual', async () => {
+    const llamadas: { url: string; metodo: string; cuerpo: unknown }[] = [];
+    const peticion = vi.fn(async (url: string, opciones: RequestInit) => {
+      llamadas.push({ url, metodo: opciones.method ?? 'GET', cuerpo: opciones.body });
+      return flujoDe([bloque({ currentEvent: false }), bloque({ currentEvent: true })]);
+    });
+    const escucha = new EscuchaDeAlertStream({
+      host: 'equipo.invalid',
+      usuario: 'u',
+      clave: 'c',
+      dispositivoId: 'portero-1',
+      familia: 'videoportero',
+      transporte: 'subscribeEvent',
+      peticion: peticion as unknown as typeof fetch,
+      esperar: async () => undefined,
+      azar: () => 0.5,
+    });
+    const cancelar = new AbortController();
+    const vistos = [];
+    for await (const evento of escucha.escuchar(cancelar.signal)) {
+      vistos.push(evento);
+      cancelar.abort();
+    }
+    expect(escucha.transporte).toBe('subscribeEvent');
+    expect(llamadas[0]?.url).toMatch(/subscribeEvent$/);
+    expect(llamadas[0]?.metodo).toBe('POST');
+    expect(String(llamadas[0]?.cuerpo)).toContain('SubscribeEvent');
+    expect(vistos).toHaveLength(1);
+    expect(escucha.historicosDescartados).toBe(1);
   });
 });

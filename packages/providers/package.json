@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./operacion": {
+      "types": "./dist/operacion.d.ts",
+      "default": "./dist/operacion.js"
     }
   },
   "scripts": {

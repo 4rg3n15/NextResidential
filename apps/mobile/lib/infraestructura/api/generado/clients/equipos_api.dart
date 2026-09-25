@@ -8,6 +8,7 @@ import 'package:retrofit/retrofit.dart';
 import '../models/alta_de_equipo_dto.dart';
 import '../models/baja_de_equipo_dto.dart';
 import '../models/correccion_de_equipo_dto.dart';
+import '../models/edicion_de_equipo_dto.dart';
 import '../models/equipo_dto.dart';
 import '../models/equipos_dto.dart';
 import '../models/resultado_de_correccion_dto.dart';
@@ -44,7 +45,7 @@ abstract class EquiposApi {
   Future<EquipoDto> equiposControllerEditar({
     @Path('id') required String id,
     @Path('equipoId') required String equipoId,
-    @Body() required AltaDeEquipoDto body,
+    @Body() required EdicionDeEquipoDto body,
   });
 
   /// Baja lógica con motivo. Nunca borrado físico (RN-19)
@@ -61,6 +62,13 @@ abstract class EquiposApi {
     @Path('id') required String id,
     @Path('equipoId') required String equipoId,
     @Body() required CorreccionDeEquipoDto body,
+  });
+
+  /// Sondea un equipo en servicio con su clave guardada y devuelve su ficha
+  @POST('/copropiedades/{id}/equipos/{equipoId}/diagnostico')
+  Future<ResultadoDeSondeoDto> equiposControllerDiagnosticar({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
   });
 
   /// Vuelve a poner en servicio un equipo dado de baja

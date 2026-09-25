@@ -9,6 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
@@ -22,18 +23,28 @@ import type { RepositorioDeConsultaDeAutorizaciones } from '../aplicacion/puerto
 import {
   AgregarAcompanante,
   CrearAutorizacion,
+  ModificarAutorizacion,
   RevocarAutorizacion,
 } from '../aplicacion/casos-de-uso';
 import {
+  AdjuntarFotografiaDeVisitante,
+  UrlDeFotografiaDeVisitante,
+} from '../aplicacion/fotografia-de-visitante';
+import {
   AgregarAcompananteDto,
   CrearAutorizacionDto,
+  FotografiaDeVisitanteDto,
+  ModificarAutorizacionDto,
   RevocarAutorizacionDto,
 } from './dtos-autorizacion';
 import {
   AcompananteAgregadoDto,
   AutorizacionDto,
+  FotografiaAdjuntadaDto,
   IdAutorizacionDto,
+  ModificacionDto,
   RevocacionDto,
+  UrlDeFotografiaDto,
 } from './respuestas';
 import { MideKpi } from '../../observabilidad';
 
@@ -58,6 +69,10 @@ export class AutorizacionesController {
     @Inject(CrearAutorizacion) private readonly crear: CrearAutorizacion,
     @Inject(RevocarAutorizacion) private readonly revocarCasoDeUso: RevocarAutorizacion,
     @Inject(AgregarAcompanante) private readonly agregar: AgregarAcompanante,
+    @Inject(ModificarAutorizacion) private readonly modificar: ModificarAutorizacion,
+    @Inject(AdjuntarFotografiaDeVisitante)
+    private readonly adjuntarFoto: AdjuntarFotografiaDeVisitante,
+    @Inject(UrlDeFotografiaDeVisitante) private readonly urlDeFoto: UrlDeFotografiaDeVisitante,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
 
@@ -69,6 +84,8 @@ export class AutorizacionesController {
         throw new ConflictException(r.error.detalle);
       case 'ENTIDAD_NO_ENCONTRADA':
         throw new NotFoundException(r.error.detalle);
+      case 'OPERACION_NO_PERMITIDA':
+        throw new ConflictException(r.error.detalle);
       default:
         throw new BadRequestException(r.error.detalle);
     }
@@ -106,6 +123,55 @@ export class AutorizacionesController {
   ): Promise<IdAutorizacionDto> {
     const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
     return this.desenvolver(await this.crear.ejecutar(destino, dto));
+  }
+
+  @Put(':autorizacionId')
+  @Roles('administrador', 'superadministrador', 'portero')
+  @ApiOperation({ summary: 'Cambia fin de vigencia, placa u observaciones de una viva (O3)' })
+  @ApiOkResponse({ type: ModificacionDto })
+  async modificarAutorizacion(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('autorizacionId', ParseUUIDPipe) autorizacionId: string,
+    @Body() dto: ModificarAutorizacionDto,
+  ): Promise<ModificacionDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
+    this.desenvolver(await this.modificar.ejecutar(destino, autorizacionId, dto));
+    return { modificada: true };
+  }
+
+  /**
+   * La fotografía de IDENTIFICACIÓN del visitante (ADR-021). No es biométrica:
+   * no genera plantilla ni viaja a ninguna terminal. Bucket privado y URL
+   * firmada de vida corta (RN-21); el tipo se comprueba por los bytes, no por
+   * lo que diga el cliente (§2.7.8).
+   */
+  @Post(':autorizacionId/fotografia')
+  @Roles('administrador', 'superadministrador', 'portero')
+  @ApiOperation({ summary: 'Adjunta la fotografía de identificación del visitante (O3, RN-21)' })
+  @ApiOkResponse({ type: FotografiaAdjuntadaDto })
+  async adjuntarFotografia(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('autorizacionId', ParseUUIDPipe) autorizacionId: string,
+    @Body() dto: FotografiaDeVisitanteDto,
+  ): Promise<FotografiaAdjuntadaDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
+    const r = this.desenvolver(await this.adjuntarFoto.ejecutar(destino, autorizacionId, dto));
+    return { adjuntada: true, ...r };
+  }
+
+  @Get(':autorizacionId/fotografia')
+  @Roles('administrador', 'superadministrador', 'portero', 'operador_central')
+  @ApiOperation({ summary: 'URL firmada de vida corta de la fotografía del visitante (RN-21)' })
+  @ApiOkResponse({ type: UrlDeFotografiaDto })
+  async fotografia(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('autorizacionId', ParseUUIDPipe) autorizacionId: string,
+  ): Promise<UrlDeFotografiaDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'autorizaciones');
+    return this.desenvolver(await this.urlDeFoto.ejecutar(destino, autorizacionId));
   }
 
   @Post(':autorizacionId/revocacion')

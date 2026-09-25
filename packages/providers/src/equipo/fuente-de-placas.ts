@@ -13,10 +13,11 @@ import type { EventoDeEquipo } from '../hikvision/contratos-de-evento';
  *
  * Aquí converge, y por **los dos transportes**, que no son intercambiables:
  *
- * | Transporte | Quién inicia        | Cuándo se usa                            |
- * | ---------- | ------------------- | ---------------------------------------- |
- * | ARMADO     | Nuestro sistema     | El equipo admite mantener el flujo abierto |
- * | ESCUCHA    | **El equipo**       | El equipo publica en nuestro receptor     |
+ * | Transporte   | Quién inicia        | Cuándo se usa                                      |
+ * | ------------ | ------------------- | -------------------------------------------------- |
+ * | ARMADO       | Nuestro sistema     | El equipo admite mantener el flujo abierto         |
+ * | ESCUCHA      | **El equipo**       | El equipo publica en nuestro receptor              |
+ * | SUSCRIPCIÓN  | Nuestro sistema     | El equipo declara `suscripcionDeEventos` (15-D, 6.5) |
  *
  * Son dos porque el propio fabricante enumera, entre los fallos previstos de la
  * integración, que **un modelo puede no admitir la escucha de eventos**. Con un
@@ -55,7 +56,7 @@ export interface PublicacionDeEquipo {
   /** Recorte de la placa, si el transporte lo trajo. */
   readonly recorte: Buffer | null;
   /** Por dónde entró. Se registra: distingue un modelo del otro en sitio. */
-  readonly transporte: 'escucha' | 'armado';
+  readonly transporte: 'escucha' | 'armado' | 'suscripcion';
 }
 
 /**

@@ -1,8 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
-import { GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
-import type { GeneradorDeId, Reloj } from '@ncr/domain-core';
+import { ALMACEN_EVIDENCIA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
+import type { AlmacenEvidencia, GeneradorDeId, Reloj } from '@ncr/domain-core';
+import { CONFIGURACION } from '../configuracion/configuracion.module';
+import type { Configuracion } from '../configuracion/esquema';
 import { IngestaController } from './presentacion/ingesta.controller';
 import { GuardiaDeFirmaDeIngesta } from './presentacion/guardia-firma';
 import { AutorizacionesController } from './presentacion/autorizaciones.controller';
@@ -17,8 +19,13 @@ import { RepositorioListaNegraPg } from './infraestructura/repositorio-lista-neg
 import {
   AgregarAcompanante,
   CrearAutorizacion,
+  ModificarAutorizacion,
   RevocarAutorizacion,
 } from './aplicacion/casos-de-uso';
+import {
+  AdjuntarFotografiaDeVisitante,
+  UrlDeFotografiaDeVisitante,
+} from './aplicacion/fotografia-de-visitante';
 
 /**
  * Módulo de autorizaciones. Expone la ingesta firmada, que desde la ETAPA 06
@@ -34,6 +41,14 @@ import {
  * verdad. No se elige memoria aquí: los visitantes de ayer tienen que seguir
  * estando mañana, y un adaptador en memoria los pierde al reiniciar.
  */
+/**
+ * `@Global` desde la 15-D, por la misma razón que zonas y padrón: el módulo de
+ * eventos compone el cargador de contexto del motor y necesita el repositorio
+ * de autorizaciones. Sin el global, el orden de registro decidía si el motor
+ * tenía o no de dónde leer, y eso es exactamente lo que D-25 no puede volver a
+ * depender de nadie.
+ */
+@Global()
 @Module({})
 export class AutorizacionesModule {
   static registrar(): DynamicModule {
@@ -44,8 +59,11 @@ export class AutorizacionesModule {
         GuardiaDeFirmaDeIngesta,
         {
           provide: RepositorioAutorizacionesPg,
-          inject: [Pool],
-          useFactory: (pool: Pool) => new RepositorioAutorizacionesPg(pool),
+          inject: [Pool, CONFIGURACION],
+          // El nombre del bucket va a `evidencias.bucket` (D-19): el real cuando
+          // está declarado, y el del almacén provisional cuando no.
+          useFactory: (pool: Pool, c: Configuracion) =>
+            new RepositorioAutorizacionesPg(pool, {}, c.EVIDENCIA_BUCKET ?? 'en-memoria'),
         },
         { provide: REPOSITORIO_AUTORIZACIONES, useExisting: RepositorioAutorizacionesPg },
         { provide: CONSULTA_AUTORIZACIONES, useExisting: RepositorioAutorizacionesPg },
@@ -79,6 +97,33 @@ export class AutorizacionesModule {
           inject: [REPOSITORIO_AUTORIZACIONES, RELOJ],
           useFactory: (repo: RepositorioAutorizaciones, reloj: Reloj) =>
             new AgregarAcompanante(repo, reloj),
+        },
+        {
+          provide: ModificarAutorizacion,
+          inject: [REPOSITORIO_AUTORIZACIONES, RELOJ],
+          useFactory: (repo: RepositorioAutorizaciones, reloj: Reloj) =>
+            new ModificarAutorizacion(repo, reloj),
+        },
+        /**
+         * ETAPA 15-D (O3) · la fotografía del visitante usa el MISMO almacén de
+         * evidencia que los eventos (RN-21): `EventosModule` es global y lo
+         * exporta, así que aquí no se elige bucket ni adaptador.
+         */
+        {
+          provide: AdjuntarFotografiaDeVisitante,
+          inject: [REPOSITORIO_AUTORIZACIONES, RELOJ, ALMACEN_EVIDENCIA, GENERADOR_DE_ID],
+          useFactory: (
+            repo: RepositorioAutorizaciones,
+            reloj: Reloj,
+            almacen: AlmacenEvidencia,
+            ids: GeneradorDeId,
+          ) => new AdjuntarFotografiaDeVisitante(repo, reloj, almacen, ids),
+        },
+        {
+          provide: UrlDeFotografiaDeVisitante,
+          inject: [REPOSITORIO_AUTORIZACIONES, RELOJ, ALMACEN_EVIDENCIA],
+          useFactory: (repo: RepositorioAutorizaciones, reloj: Reloj, almacen: AlmacenEvidencia) =>
+            new UrlDeFotografiaDeVisitante(repo, reloj, almacen),
         },
       ],
       exports: [REPOSITORIO_AUTORIZACIONES, CONSULTA_AUTORIZACIONES, REPOSITORIO_LISTA_NEGRA],

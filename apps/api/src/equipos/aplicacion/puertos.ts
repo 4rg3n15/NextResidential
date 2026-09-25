@@ -1,4 +1,4 @@
-import type { FichaDelEquipo } from '@ncr/providers';
+import type { CapacidadesDeEquipo, FichaDelEquipo } from '@ncr/providers';
 import type { ContextoTenant } from '../../autenticacion';
 
 /**
@@ -35,6 +35,8 @@ export type TipoDeEquipo = (typeof TIPOS_DE_EQUIPO)[number];
 
 export type ProtocoloDeEquipo = 'http' | 'https';
 export type EstadoDeVerificacion = 'no_verificado' | 'verificado' | 'rechazado';
+/** Lo que la terminal facial DECLARA ser. Se declara, no se deduce (D2). */
+export type ModoDeTerminalDeclarado = 'reporta_y_espera' | 'decide_el_equipo';
 
 /**
  * Lo que la consola ENVÍA al dar de alta o editar. El secreto viaja aquí y no
@@ -50,10 +52,15 @@ export interface AltaDeEquipo {
   /** `undefined` al editar = «no lo cambies». Nunca significa «bórralo». */
   readonly secreto?: string;
   readonly modelo?: string | null;
+  /** INFORMATIVO (O2): se muestra y se audita; ninguna decisión lo mira. */
+  readonly fabricante?: string | null;
   /** Específicos del tipo. Nulos donde no aplican. */
   readonly canalBarrera?: number | null;
   readonly numeroDePuerta?: number | null;
   readonly canalDeAudio?: number | null;
+  readonly modoDeTerminal?: ModoDeTerminalDeclarado | null;
+  /** Si una persona habilitó el canal de audio EN EL APARATO (ADR-01). */
+  readonly canalDeAudioHabilitado?: boolean;
 }
 
 /** Lo que la consola RECIBE. Sin secreto, por construcción. */
@@ -67,9 +74,18 @@ export interface DatosDeEquipo {
   readonly usuario: string | null;
   readonly modelo: string | null;
   readonly firmware: string | null;
+  readonly fabricante: string | null;
   readonly canalBarrera: number | null;
   readonly numeroDePuerta: number | null;
   readonly canalDeAudio: number | null;
+  readonly modoDeTerminal: ModoDeTerminalDeclarado | null;
+  readonly canalDeAudioHabilitado: boolean;
+  /**
+   * Lo que el equipo declara poder hacer, descubierto al sondearlo y
+   * PERSISTIDO: es lo que el proveedor mira antes de pedirle algo (O2). `null`
+   * cuando nunca se sondeó con éxito.
+   */
+  readonly capacidades: CapacidadesDeEquipo | null;
   readonly verificacion: EstadoDeVerificacion;
   readonly verificadoEn: string | null;
   readonly motivoNoVerificado: string | null;
@@ -124,6 +140,17 @@ export interface RepositorioDeEquipos {
   ): Promise<string | null>;
   /** Constancia de una corrección aplicada: qué cambió, de qué valor a cuál. */
   auditarCorreccion(ctx: ContextoTenant, copropiedadId: string, detalle: string): Promise<void>;
+  /**
+   * O4 · un sondeo posterior al alta —desde la ficha, con la credencial
+   * guardada— actualiza verificación, modelo, firmware y capacidades sin tocar
+   * lo que la consola declaró. `null` si el equipo no es de esta copropiedad.
+   */
+  registrarSondeo(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+    veredicto: ResultadoDeSondeo,
+  ): Promise<DatosDeEquipo | null>;
 }
 
 /**
@@ -213,6 +240,11 @@ export interface ResultadoDeSondeo {
    */
   readonly ficha?: FichaDelEquipo;
   /**
+   * Las capacidades DESCUBIERTAS en el aparato durante el sondeo (O2). Se
+   * persisten con el alta. Ausentes cuando no se alcanzó el equipo.
+   */
+  readonly capacidades?: CapacidadesDeEquipo;
+  /**
    * `true` sólo con `alcanzado`. Guardar un equipo que no contesta es legítimo
    * —se instala el lunes— pero queda NO VERIFICADO y se dice por qué.
    */
@@ -226,6 +258,13 @@ export interface DatosDeSondeo {
   readonly usuario: string;
   readonly secreto: string;
   readonly tipo: TipoDeEquipo;
+  /** Carril de la cámara, si se declaró. */
+  readonly canalBarrera?: number | null;
+  /**
+   * O4 · lo que la consola DECLARÓ de una terminal. Una terminal que decide
+   * sola es un bloqueo salvo que alguien lo haya declarado a sabiendas.
+   */
+  readonly modoDeTerminal?: ModoDeTerminalDeclarado | null;
 }
 
 export interface SondaDeEquipo {

@@ -15,6 +15,7 @@
   "scripts/lib/frontera-append-only.mjs": 1,
   "scripts/lib/frontera-construccion.mjs": 6,
   "scripts/lib/frontera-csp.mjs": 0,
+  "scripts/lib/frontera-extensibilidad.mjs": 3,
   "scripts/lib/frontera-hardware.mjs": 3,
   "scripts/lib/frontera-modulos.mjs": 9,
   "scripts/lib/frontera-tema.mjs": 1,

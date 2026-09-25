@@ -95,7 +95,7 @@ export class ConfiguracionDeCopropiedadDto {
   @ApiProperty({ example: 'America/Bogota' }) zonaHoraria!: string;
 
   @ApiProperty({
-    example: 0.85,
+    example: 0.8,
     description:
       'Por debajo de este valor la lectura de placa NO decide sola: escala al portero ' +
       '(CU-01, excepción 3a). Sólo el superadministrador lo cambia.',

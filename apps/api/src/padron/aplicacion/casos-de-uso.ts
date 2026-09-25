@@ -10,6 +10,7 @@ import type {
   TotalesDePadron,
   VehiculoEnLista,
   ViviendaEnLista,
+  EstadoAdministrativo,
 } from './puertos';
 import { totalDeHistorial } from './puertos';
 import type { LectorDeVocabulario } from './vocabulario';
@@ -488,5 +489,161 @@ export class ListarVehiculos {
     copropiedadId: string,
   ): Promise<Resultado<readonly VehiculoEnLista[], ErrorDominio>> {
     return exito(await this.repo.listarVehiculos(copropiedadId));
+  }
+}
+
+// ═══════════════════════════ O3 · EDICIÓN Y BORRADO (ETAPA 15-D) ═══════════
+
+export interface EntradaEditarVivienda {
+  readonly identificador?: string;
+  readonly agrupacion?: string | null;
+  readonly estadoAdministrativo?: EstadoAdministrativo;
+}
+
+/**
+ * HU-02 · edita identificador, agrupación o estado administrativo. Lo ausente
+ * no se toca.
+ * La unicidad la decide el índice (ADR-04); aquí sólo se traduce el veredicto.
+ */
+export class EditarVivienda {
+  constructor(private readonly repo: RepositorioPadron) {}
+
+  async ejecutar(
+    ctx: ContextoTenant,
+    viviendaId: string,
+    entrada: EntradaEditarVivienda,
+  ): Promise<Resultado<void, ErrorDominio>> {
+    if (!ctx.copropiedadId) return fallo(sinCopropiedad());
+    const identificador = entrada.identificador?.trim();
+    if (identificador !== undefined && (identificador.length === 0 || identificador.length > 60)) {
+      return fallo(errorDominio('DATO_INVALIDO', 'El identificador tiene 1..60 caracteres'));
+    }
+    const r = await this.repo.editarVivienda({
+      copropiedadId: ctx.copropiedadId,
+      viviendaId,
+      ...(identificador === undefined ? {} : { identificador }),
+      ...(entrada.agrupacion === undefined ? {} : { agrupacion: entrada.agrupacion }),
+      ...(entrada.estadoAdministrativo === undefined
+        ? {}
+        : { estadoAdministrativo: entrada.estadoAdministrativo }),
+      actorId: ctx.usuarioId,
+    });
+    switch (r.tipo) {
+      case 'editada':
+        return exito(undefined);
+      case 'no_encontrada':
+        return fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'Vivienda no encontrada'));
+      default:
+        return fallo(
+          errorDominio(
+            'CONFLICTO_DE_CONCURRENCIA',
+            'Ya hay una vivienda activa con ese identificador en esa agrupación',
+            'ADR-04',
+          ),
+        );
+    }
+  }
+}
+
+export interface EntradaEditarVehiculo {
+  readonly placa?: string;
+  readonly personaId?: string | null;
+  readonly marca?: string | null;
+  readonly modelo?: string | null;
+  readonly color?: string | null;
+  readonly tipo?: TipoDeVehiculo;
+}
+
+/** HU-04 · edita un vehículo. La placa pasa por el VO, como al registrar. */
+export class EditarVehiculo {
+  constructor(private readonly repo: RepositorioPadron) {}
+
+  async ejecutar(
+    ctx: ContextoTenant,
+    vehiculoId: string,
+    entrada: EntradaEditarVehiculo,
+  ): Promise<Resultado<void, ErrorDominio>> {
+    if (!ctx.copropiedadId) return fallo(sinCopropiedad());
+    let placa: Placa | undefined;
+    if (entrada.placa !== undefined) {
+      const validada = Placa.crear(entrada.placa);
+      if (!validada.ok) return validada;
+      placa = validada.valor;
+    }
+    const r = await this.repo.editarVehiculo({
+      copropiedadId: ctx.copropiedadId,
+      vehiculoId,
+      ...(placa === undefined ? {} : { placa }),
+      ...(entrada.personaId === undefined ? {} : { personaId: entrada.personaId }),
+      ...(entrada.marca === undefined ? {} : { marca: entrada.marca }),
+      ...(entrada.modelo === undefined ? {} : { modelo: entrada.modelo }),
+      ...(entrada.color === undefined ? {} : { color: entrada.color }),
+      ...(entrada.tipo === undefined ? {} : { tipo: entrada.tipo }),
+      actorId: ctx.usuarioId,
+    });
+    switch (r.tipo) {
+      case 'editado':
+        return exito(undefined);
+      case 'no_encontrado':
+        return fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'Vehículo no encontrado'));
+      default:
+        return fallo(
+          errorDominio(
+            'CONFLICTO_DE_CONCURRENCIA',
+            `La placa ${placa?.valor ?? ''} ya está activa en esta copropiedad`,
+            'RN-04',
+          ),
+        );
+    }
+  }
+}
+
+/**
+ * O3 · el caso «lo registré mal hace un minuto». **Sólo sin historial** —ni un
+ * evento con esa placa ni una autorización—, y quien lo garantiza es el
+ * disparador de la base (migración 0034), también frente al dueño de la tabla.
+ */
+export class BorrarVehiculoDefinitivamente {
+  constructor(private readonly repo: RepositorioPadron) {}
+
+  async ejecutar(
+    ctx: ContextoTenant,
+    vehiculoId: string,
+  ): Promise<Resultado<{ placa: string }, ErrorDominio>> {
+    if (!ctx.copropiedadId) return fallo(sinCopropiedad());
+    const historial = await this.repo.historialDeVehiculo(ctx.copropiedadId, vehiculoId);
+    if (historial === null) {
+      return fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'Vehículo no encontrado'));
+    }
+    if (historial.eventos + historial.autorizaciones > 0) {
+      const partes = [
+        historial.eventos > 0 ? `${String(historial.eventos)} evento(s)` : null,
+        historial.autorizaciones > 0
+          ? `${String(historial.autorizaciones)} autorización(es)`
+          : null,
+      ].filter((x): x is string => x !== null);
+      return fallo(
+        errorDominio(
+          'OPERACION_NO_PERMITIDA',
+          `El vehículo ${historial.placa} tiene historial y no puede borrarse: ${partes.join(', ')}. ` +
+            'Dele de baja en vez de borrarlo (RN-19)',
+          'RN-19',
+        ),
+      );
+    }
+    const r = await this.repo.borrarVehiculoDefinitivamente(
+      ctx.copropiedadId,
+      vehiculoId,
+      ctx.usuarioId,
+    );
+    return r.borrado
+      ? exito({ placa: historial.placa })
+      : fallo(
+          errorDominio(
+            'OPERACION_NO_PERMITIDA',
+            r.motivo ?? 'La base no admitió el borrado',
+            'RN-19',
+          ),
+        );
   }
 }

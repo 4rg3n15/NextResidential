@@ -124,7 +124,7 @@ describe('clasificarSobre', () => {
       ),
     );
 
-    expect(resultado.xml).toContain('ABC123');
+    expect(resultado.documento).toContain('ABC123');
     expect(resultado.recorte?.equals(recorte)).toBe(true);
     expect(resultado.foto?.equals(escena)).toBe(true);
   });
@@ -195,7 +195,7 @@ describe('clasificarSobre', () => {
         'B',
       ),
     );
-    expect(resultado.xml).toContain('ABC123');
+    expect(resultado.documento).toContain('ABC123');
     expect(resultado.foto?.equals(JPEG_FALSO)).toBe(true);
   });
 
@@ -336,7 +336,7 @@ describe('abrirSobreDeAlarmServer', () => {
       { nombre: 'licensePlate.jpg', tipo: 'image/jpeg', contenido: JPEG_FALSO },
     ]);
     const abierto = abrirSobreDeAlarmServer(cuerpo, 'multipart/form-data; boundary=----abc');
-    expect(abierto.xml).toContain('<eventType>ANPR</eventType>');
+    expect(abierto.documento).toContain('<eventType>ANPR</eventType>');
   });
 
   it('un cuerpo que no es multipart se rechaza sin intentar adivinar', () => {
@@ -368,7 +368,7 @@ describe('defensas del sobre · lo que el documento advierte', () => {
       Buffer.from('\r\n--B--\r\n'),
     ]);
     const sobre = abrirSobreDeAlarmServer(cuerpo, 'multipart/form-data; boundary=B');
-    expect(sobre.xml).toContain('ANPR');
+    expect(sobre.documento).toContain('ANPR');
   });
 
   it('y CON `Content-Length` declarado tampoco cambia nada', () => {
@@ -380,7 +380,7 @@ describe('defensas del sobre · lo que el documento advierte', () => {
       Buffer.from('\r\n--B--\r\n'),
     ]);
     const sobre = abrirSobreDeAlarmServer(cuerpo, 'multipart/form-data; boundary=B');
-    expect(sobre.xml).toBe(xml);
+    expect(sobre.documento).toBe(xml);
   });
 });
 
@@ -404,7 +404,7 @@ describe('sobres que NO declaran el tipo de cada parte', () => {
         'B',
       ),
     );
-    expect(resultado.xml).toContain('ABC123');
+    expect(resultado.documento).toContain('ABC123');
     expect(resultado.recorte?.equals(recorte)).toBe(true);
     expect(resultado.foto?.equals(escena)).toBe(true);
   });
@@ -419,7 +419,7 @@ describe('sobres que NO declaran el tipo de cada parte', () => {
         'B',
       ),
     );
-    expect(resultado.xml).toContain('ABC123');
+    expect(resultado.documento).toContain('ABC123');
     expect(resultado.foto?.equals(JPEG_FALSO)).toBe(true);
   });
 
@@ -433,7 +433,35 @@ describe('sobres que NO declaran el tipo de cada parte', () => {
         'B',
       ),
     );
-    expect(resultado.xml).toContain('ABC123');
+    expect(resultado.documento).toContain('ABC123');
     expect(resultado.foto).toBeNull();
+  });
+});
+
+describe('6.7a · la parte del evento puede ser JSON', () => {
+  it('se clasifica por tipo de contenido y el sobre dice su formato', () => {
+    const json = '{"eventType":"ANPR","ANPR":{"licensePlate":"ABC123"}}';
+    const resultado = clasificarSobre(
+      partirSobre(
+        sobre('J', [{ nombre: 'anpr.json', tipo: 'application/json', contenido: json }]),
+        'J',
+      ),
+    );
+    expect(resultado.formato).toBe('json');
+    expect(resultado.documento).toBe(json);
+  });
+
+  it('y por el NOMBRE cuando el tipo no lo dice', () => {
+    const resultado = clasificarSobre(
+      partirSobre(sobre('J', [{ nombre: 'evento.json', contenido: '{"eventType":"ANPR"}' }]), 'J'),
+    );
+    expect(resultado.formato).toBe('json');
+  });
+
+  it('el XML sigue diciendo xml', () => {
+    const resultado = clasificarSobre(
+      partirSobre(sobre('X', [{ nombre: 'anpr.xml', tipo: 'text/xml', contenido: XML }]), 'X'),
+    );
+    expect(resultado.formato).toBe('xml');
   });
 });

@@ -1,8 +1,9 @@
-import { Autorizacion, PatronRecurrencia, Vigencia } from '@ncr/domain-core';
+import { Autorizacion, PatronRecurrencia, Placa, Vigencia } from '@ncr/domain-core';
 import type { ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
 import { errorDominio, exito, fallo } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import { alcanzaCopropiedad } from '../../autenticacion';
+import { ViviendaSinTitular } from './puertos';
 import type { RepositorioAutorizaciones } from './puertos';
 
 /**
@@ -15,11 +16,32 @@ import type { RepositorioAutorizaciones } from './puertos';
  * El reloj entra por constructor. Un `new Date()` aquí haría que «la vigencia
  * ya expiró» dependiera del reloj del servidor y no se pudiera probar.
  */
-abstract class CasoDeUsoDeAutorizaciones {
+export abstract class CasoDeUsoDeAutorizaciones {
   constructor(
     protected readonly repo: RepositorioAutorizaciones,
     protected readonly reloj: Reloj,
   ) {}
+
+  /**
+   * Persiste y traduce la única señal tipada que el adaptador puede devolver:
+   * la vivienda destino no tiene titular activo que pueda figurar como quien
+   * autoriza (RN-05, S-38). Cualquier otro fallo de la base es técnico y sube.
+   */
+  protected async persistir(
+    copropiedadId: string,
+    autorizacion: Autorizacion,
+    actorId: string,
+  ): Promise<Resultado<void, ErrorDominio>> {
+    try {
+      await this.repo.guardar(copropiedadId, autorizacion, actorId);
+      return exito(undefined);
+    } catch (error) {
+      if (error instanceof ViviendaSinTitular) {
+        return fallo(errorDominio('INVARIANTE_VIOLADA', error.message, 'RN-05'));
+      }
+      throw error;
+    }
+  }
 
   /**
    * §2.7.6 · El aislamiento se comprueba TAMBIÉN aquí, no solo en la RLS: las
@@ -36,11 +58,23 @@ abstract class CasoDeUsoDeAutorizaciones {
   }
 }
 
+/**
+ * Placa opcional de la entrada: `undefined` y `null` significan «sin vehículo»;
+ * un texto se normaliza en el objeto de valor y, si no es placa, se rechaza.
+ */
+const placaDe = (entrada: string | null | undefined): Resultado<Placa | null, ErrorDominio> => {
+  if (entrada === undefined || entrada === null || entrada.trim() === '') return exito(null);
+  return Placa.crear(entrada);
+};
+
 export interface EntradaCrearAutorizacion {
   readonly viviendaId: string;
   readonly personaId: string;
   readonly desde: string;
   readonly hasta: string;
+  /** ETAPA 15-D (O3) · con qué placa entra el visitante, si viene en vehículo. */
+  readonly placa?: string | null;
+  readonly observaciones?: string | null;
   readonly zonasPermitidas?: readonly string[];
   readonly maximoAcompanantes?: number;
   /** Patrón de recurrencia; su presencia es lo único que distingue `CrearRecurrente`. */
@@ -89,6 +123,8 @@ export class CrearAutorizacion extends CasoDeUsoDeAutorizaciones {
       if (!r.ok) return r;
       patron = r.valor;
     }
+    const placa = placaDe(entrada.placa);
+    if (!placa.ok) return placa;
 
     const creada = Autorizacion.crear({
       id: this.ids.nuevo(),
@@ -98,14 +134,70 @@ export class CrearAutorizacion extends CasoDeUsoDeAutorizaciones {
       vigencia: vigencia.valor,
       zonasPermitidas: entrada.zonasPermitidas ?? [],
       patron,
+      placa: placa.valor,
+      observaciones: entrada.observaciones ?? null,
       ...(entrada.maximoAcompanantes === undefined
         ? {}
         : { maximoAcompanantes: entrada.maximoAcompanantes }),
     });
     if (!creada.ok) return creada;
 
-    await this.repo.guardar(copropiedad.valor, creada.valor, ctx.usuarioId);
+    const guardada = await this.persistir(copropiedad.valor, creada.valor, ctx.usuarioId);
+    if (!guardada.ok) return guardada;
     return exito({ id: creada.valor.id });
+  }
+}
+
+export interface CambiosDeAutorizacion {
+  readonly hasta?: string;
+  /** `null` quita la placa; `undefined` la deja como está. */
+  readonly placa?: string | null;
+  readonly observaciones?: string | null;
+}
+
+/**
+ * ETAPA 15-D (O3) · modifica lo que la consola puede cambiar de una
+ * autorización viva: hasta cuándo vale, la placa y las observaciones. Ni la
+ * vivienda ni el visitante: eso es otra autorización con su propia traza. Las
+ * reglas —revocada no se toca, no se acorta por debajo de «ahora»— las pone el
+ * agregado en `modificar`; aquí sólo se construyen los objetos de valor.
+ */
+export class ModificarAutorizacion extends CasoDeUsoDeAutorizaciones {
+  async ejecutar(
+    ctx: ContextoTenant,
+    autorizacionId: string,
+    cambios: CambiosDeAutorizacion,
+  ): Promise<Resultado<void, ErrorDominio>> {
+    const copropiedad = this.copropiedadDe(ctx);
+    if (!copropiedad.ok) return copropiedad;
+
+    const autorizacion = await this.repo.porId(copropiedad.valor, autorizacionId);
+    if (autorizacion === null) {
+      return fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'La autorización no existe'));
+    }
+
+    let placa: Placa | null | undefined;
+    if (cambios.placa !== undefined) {
+      const r = placaDe(cambios.placa);
+      if (!r.ok) return r;
+      placa = r.valor;
+    }
+    const hasta = cambios.hasta === undefined ? undefined : new Date(cambios.hasta);
+    if (hasta !== undefined && Number.isNaN(hasta.getTime())) {
+      return fallo(errorDominio('DATO_INVALIDO', 'La fecha de fin no es válida', 'RN-01'));
+    }
+
+    const r = autorizacion.modificar(
+      {
+        ...(hasta === undefined ? {} : { hasta }),
+        ...(placa === undefined ? {} : { placa }),
+        ...(cambios.observaciones === undefined ? {} : { observaciones: cambios.observaciones }),
+      },
+      this.reloj.ahora(),
+    );
+    if (!r.ok) return r;
+
+    return this.persistir(copropiedad.valor, autorizacion, ctx.usuarioId);
   }
 }
 

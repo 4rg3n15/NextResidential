@@ -199,3 +199,87 @@ describe('zonas · aislamiento', () => {
     await request(app.getHttpServer()).get(`/copropiedades/${COP_A}/zonas`).expect(401);
   });
 });
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * O3 (ETAPA 15-D) · la consola CREA y DA DE BAJA zonas, y les pone icono
+ *
+ * Hasta la 15-D las zonas sólo existían si alguien las insertaba con `psql`.
+ * Lo que se fija aquí es la forma del recorrido por HTTP; que persistan de
+ * verdad lo prueba `test/zonas-pg.test.ts` contra la base.
+ */
+describe('zonas · alta, baja e icono desde la consola (O3)', () => {
+  it('crea una zona con aforo e icono, que sale en el listado con `activa`', async () => {
+    const creada = await con('post', `/copropiedades/${COP_A}/zonas`)
+      .send({ nombre: 'Gimnasio', tipo: 'comun', aforoMaximo: 12, icono: 'dumbbell' })
+      .expect(201);
+    expect(creada.body).toMatchObject({
+      nombre: 'Gimnasio',
+      tipo: 'comun',
+      aforoMaximo: 12,
+      aforoActual: 0,
+      icono: 'dumbbell',
+      activa: true,
+      // Sin franjas: abierta según política, que es lo que la pantalla dice.
+      dentroDeHorario: true,
+    });
+    const lista = await con('get', `/copropiedades/${COP_A}/zonas`).expect(200);
+    const gimnasio = lista.body.find((z: { id: string }) => z.id === creada.body.id);
+    expect(gimnasio?.icono).toBe('dumbbell');
+  });
+
+  it('el icono se cambia por configuración y `null` lo quita', async () => {
+    const creada = await con('post', `/copropiedades/${COP_A}/zonas`)
+      .send({ nombre: 'Piscina', tipo: 'comun', aforoMaximo: 30 })
+      .expect(201);
+    expect(creada.body.icono).toBeNull();
+    const con_icono = await con(
+      'post',
+      `/copropiedades/${COP_A}/zonas/${creada.body.id}/configuracion`,
+    )
+      .send({ icono: 'waves' })
+      .expect(201);
+    expect(con_icono.body.icono).toBe('waves');
+    const sin_icono = await con(
+      'post',
+      `/copropiedades/${COP_A}/zonas/${creada.body.id}/configuracion`,
+    )
+      .send({ icono: null })
+      .expect(201);
+    expect(sin_icono.body.icono).toBeNull();
+  });
+
+  it('un icono que no es un nombre se rechaza: es un campo de pantalla, no un texto libre', async () => {
+    await con('post', `/copropiedades/${COP_A}/zonas`)
+      .send({ nombre: 'BBQ', tipo: 'comun', aforoMaximo: 8, icono: '<script>' })
+      .expect(400);
+  });
+
+  it('la baja exige motivo, deja la zona INACTIVA y la sigue listando (RN-19)', async () => {
+    const creada = await con('post', `/copropiedades/${COP_A}/zonas`)
+      .send({ nombre: 'Terraza', tipo: 'comun', aforoMaximo: 20 })
+      .expect(201);
+    await con('post', `/copropiedades/${COP_A}/zonas/${creada.body.id}/baja`)
+      .send({ motivo: 'x' })
+      .expect(400);
+    await con('post', `/copropiedades/${COP_A}/zonas/${creada.body.id}/baja`)
+      .send({ motivo: 'Cerrada por reforma' })
+      .expect(201);
+    const lista = await con('get', `/copropiedades/${COP_A}/zonas`).expect(200);
+    const terraza = lista.body.find((z: { id: string }) => z.id === creada.body.id);
+    expect(terraza).toMatchObject({ activa: false, dentroDeHorario: false });
+    // Una segunda baja no encuentra zona activa.
+    await con('post', `/copropiedades/${COP_A}/zonas/${creada.body.id}/baja`)
+      .send({ motivo: 'Otra vez' })
+      .expect(404);
+  });
+
+  it('un portero NO crea zonas', async () => {
+    const portero = await tokenDe(firmante, { rol: 'portero', copropiedadId: COP_A });
+    await request(app.getHttpServer())
+      .post(`/copropiedades/${COP_A}/zonas`)
+      .set('Authorization', `Bearer ${portero}`)
+      .send({ nombre: 'Sauna', tipo: 'comun', aforoMaximo: 4 })
+      .expect(403);
+  });
+});

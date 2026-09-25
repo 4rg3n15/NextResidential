@@ -33,6 +33,13 @@ export interface RutaDeEquipo {
   /** Nombre en lenguaje del dominio: es lo que se lee en un informe. */
   readonly proposito: string;
   readonly metodo: string;
+  /**
+   * La ruta. Puede llevar el marcador `{canal}` donde el equipo exige el
+   * número de canal, puerta o carril: **nunca un número escrito aquí**. Quien
+   * la pide lo aporta —leído del aparato o declarado en el alta— y `rutaPara`
+   * lanza si falta. Es la corrección de D4 (ETAPA 15-D): el canal de audio no
+   * es 1 por omisión, es el que el equipo declara en su lista de canales.
+   */
   readonly ruta: string;
   readonly procedencia: Procedencia;
   /** Familia de equipo a la que aplica. */

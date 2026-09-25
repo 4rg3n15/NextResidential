@@ -127,6 +127,21 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
     }
   }
 
+  /**
+   * Sin claims de usuario: lo pide la ingesta de equipos, que no tiene sesión.
+   * Se ejecuta como el rol de conexión de la API y no expone nada más que un
+   * número; el aislamiento lo garantiza el `WHERE` por copropiedad, que es la
+   * misma frontera que RN-15 pide en la capa de aplicación.
+   */
+  async umbralDeConfianzaPlaca(copropiedadId: string): Promise<number | null> {
+    const { rows } = await this.pool.query<{ umbral: string }>(
+      `SELECT umbral_confianza_placa::text AS umbral FROM public.copropiedades WHERE id = $1`,
+      [copropiedadId],
+    );
+    const fila = rows[0];
+    return fila === undefined ? null : Number(fila.umbral);
+  }
+
   async leerConfiguracion(
     ctx: ContextoTenant,
     id: string,

@@ -1,4 +1,5 @@
 import type { ModoDeTerminal } from '../terminal/terminal-facial';
+import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
 
 /**
  * QUÉ EQUIPOS HAY Y CÓMO SE LLEGA A ELLOS.
@@ -56,6 +57,18 @@ export interface EquipoRegistrado {
    * seguridad tomada por el código.
    */
   readonly canalDeAudioHabilitado?: boolean;
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ETAPA 15-D · LO QUE EL EQUIPO PUEDE HACER, Y DE DÓNDE SE SUPO
+   *
+   * `fabricante` y `modelo` son INFORMATIVOS: se muestran, se auditan, y
+   * **ninguna decisión los mira**. Lo que decide es `capacidades`, que el
+   * proveedor lee de aquí cuando la consola ya las descubrió y persistió, o
+   * descubre del aparato una vez por proceso cuando faltan (`sin_consultar`).
+   */
+  readonly fabricante?: string | null;
+  readonly modelo?: string | null;
+  readonly capacidades?: CapacidadesDeEquipo;
 }
 
 export interface RegistroDeEquipos {

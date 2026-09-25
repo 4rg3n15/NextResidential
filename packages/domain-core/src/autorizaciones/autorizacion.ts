@@ -2,8 +2,9 @@ import type { Resultado } from '../compartido/resultado';
 import { exito, fallo } from '../compartido/resultado';
 import type { ErrorDominio } from '../compartido/errores';
 import { errorDominio } from '../compartido/errores';
-import type { Vigencia } from './vigencia';
+import { Vigencia } from './vigencia';
 import type { PatronRecurrencia } from './patron-recurrencia';
+import type { Placa } from '../padron/placa';
 
 export type EstadoAutorizacion = 'vigente' | 'revocada';
 
@@ -24,13 +25,30 @@ export interface Acompanante {
  * motor de reglas, que compone esas respuestas con las de otras políticas
  * según la precedencia vinculante del diagrama.
  */
+const MAX_OBSERVACIONES = 1000;
+
+const observacionesValidas = (texto: string | null): Resultado<string | null, ErrorDominio> => {
+  if (texto === null) return exito(null);
+  const limpio = texto.trim();
+  if (limpio.length === 0) return exito(null);
+  if (limpio.length > MAX_OBSERVACIONES) {
+    return fallo(
+      errorDominio(
+        'DATO_INVALIDO',
+        `Las observaciones tienen como máximo ${MAX_OBSERVACIONES} caracteres`,
+      ),
+    );
+  }
+  return exito(limpio);
+};
+
 export class Autorizacion {
   private constructor(
     readonly id: string,
     readonly copropiedadId: string,
     readonly viviendaId: string,
     readonly personaId: string,
-    readonly vigencia: Vigencia,
+    private _vigencia: Vigencia,
     private _estado: EstadoAutorizacion,
     private readonly _acompanantes: Acompanante[],
     private readonly _zonasPermitidas: Set<string>,
@@ -38,7 +56,25 @@ export class Autorizacion {
     readonly maximoAcompanantes: number,
     private _revocadaEn: Date | null,
     private _motivoRevocacion: string | null,
+    /**
+     * ETAPA 15-D (O3, [SUPUESTO] S-37) · la placa con la que el visitante entra
+     * en vehículo y las observaciones del residente. La columna existía desde
+     * la 0006 y la app del residente la escribía; el agregado no la conocía y
+     * la consola no podía crear una autorización vehicular.
+     */
+    private _placa: Placa | null,
+    private _observaciones: string | null,
   ) {}
+
+  get vigencia(): Vigencia {
+    return this._vigencia;
+  }
+  get placa(): Placa | null {
+    return this._placa;
+  }
+  get observaciones(): string | null {
+    return this._observaciones;
+  }
 
   static crear(datos: {
     id: string;
@@ -49,11 +85,15 @@ export class Autorizacion {
     zonasPermitidas?: readonly string[];
     patron?: PatronRecurrencia | null;
     maximoAcompanantes?: number;
+    placa?: Placa | null;
+    observaciones?: string | null;
   }): Resultado<Autorizacion, ErrorDominio> {
     const maximo = datos.maximoAcompanantes ?? 5;
     if (!Number.isInteger(maximo) || maximo < 0 || maximo > 50) {
       return fallo(errorDominio('DATO_INVALIDO', 'Máximo de acompañantes fuera de rango', 'RN-05'));
     }
+    const observaciones = observacionesValidas(datos.observaciones ?? null);
+    if (!observaciones.ok) return observaciones;
     return exito(
       new Autorizacion(
         datos.id,
@@ -68,6 +108,8 @@ export class Autorizacion {
         maximo,
         null,
         null,
+        datos.placa ?? null,
+        observaciones.valor,
       ),
     );
   }
@@ -100,6 +142,8 @@ export class Autorizacion {
     maximoAcompanantes: number;
     revocadaEn: Date | null;
     motivoRevocacion: string | null;
+    placa?: Placa | null;
+    observaciones?: string | null;
   }): Autorizacion {
     return new Autorizacion(
       datos.id,
@@ -114,7 +158,51 @@ export class Autorizacion {
       datos.maximoAcompanantes,
       datos.revocadaEn,
       datos.motivoRevocacion,
+      datos.placa ?? null,
+      datos.observaciones ?? null,
     );
+  }
+
+  /**
+   * ETAPA 15-D (O3) · lo que la consola puede CAMBIAR de una autorización viva:
+   * hasta cuándo vale, con qué placa entra y las observaciones. No se cambia ni
+   * la vivienda ni el visitante: eso es otra autorización, con su propia traza.
+   *
+   * Extender la vigencia de una revocada la resucitaría por la puerta de
+   * atrás; y acortarla por debajo de «ahora» sería una revocación sin motivo.
+   */
+  modificar(
+    cambios: {
+      readonly hasta?: Date;
+      readonly placa?: Placa | null;
+      readonly observaciones?: string | null;
+    },
+    ahora: Date,
+  ): Resultado<void, ErrorDominio> {
+    if (this._estado === 'revocada') {
+      return fallo(errorDominio('OPERACION_NO_PERMITIDA', 'La autorización está revocada'));
+    }
+    if (cambios.hasta !== undefined) {
+      const vigencia = Vigencia.crear(this._vigencia.desde, cambios.hasta);
+      if (!vigencia.ok) return vigencia;
+      if (vigencia.valor.expiradaEn(ahora)) {
+        return fallo(
+          errorDominio(
+            'DATO_INVALIDO',
+            'La nueva vigencia ya estaría expirada: revoque con motivo en vez de acortarla',
+            'RN-01',
+          ),
+        );
+      }
+      this._vigencia = vigencia.valor;
+    }
+    if (cambios.observaciones !== undefined) {
+      const observaciones = observacionesValidas(cambios.observaciones);
+      if (!observaciones.ok) return observaciones;
+      this._observaciones = observaciones.valor;
+    }
+    if (cambios.placa !== undefined) this._placa = cambios.placa;
+    return exito(undefined);
   }
 
   get estado(): EstadoAutorizacion {
