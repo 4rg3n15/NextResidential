@@ -86,6 +86,8 @@ export const configuracionDePrueba: Configuracion = {
   // lectura. El conservador deniega, que es lo que las suites de la API
   // esperan; el cargador PostgreSQL tiene su propia suite contra base real.
   CARGADOR_DE_CONTEXTO: 'conservador',
+  // La suite no tiene base: el histórico va en memoria, y lo dice al arrancar.
+  PERSISTENCIA_DE_EVENTOS: 'memoria',
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',
   LOG_LEVEL: 'aviso',

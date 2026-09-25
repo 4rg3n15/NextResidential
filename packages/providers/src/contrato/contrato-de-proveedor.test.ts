@@ -235,7 +235,11 @@ registrarAdaptadorFicticio();
 const equiposFicticios = (mundo: MundoDeContrato): readonly EquipoFicticio[] => [
   {
     dispositivoId: BARRERA,
-    capacidades: capacidadesDeclaradas({ aperturaRemota: 'si', reconocimientoDePlacas: 'si' }),
+    capacidades: capacidadesDeclaradas({
+      aperturaRemota: 'si',
+      reconocimientoDePlacas: 'si',
+      bloqueoDeAcceso: 'si',
+    }),
   },
   {
     dispositivoId: TERMINAL,
@@ -341,6 +345,40 @@ describe.each(CASOS)('contrato de proveedor · $nombre', (caso) => {
       // «degradado» es de configuración. Colapsarlas manda a mirar el sitio malo.
       const { proveedor } = caso.montar();
       expect(await proveedor.estado(DESCONOCIDO)).toBe('fuera_de_linea');
+    });
+  });
+
+  describe('bloqueo de acceso · H-3, por capacidad (ETAPA 15-E)', () => {
+    it('la barrera declara bloqueo y la orden se ACEPTA, con latencia medida', async () => {
+      const { proveedor } = caso.montar();
+      expect(soporta(await proveedor.capacidadesDe(BARRERA), 'bloqueoDeAcceso')).toBe(true);
+      const resultado = await proveedor.fijarBloqueo(BARRERA, true);
+      expect(resultado.estado).toBe('aceptada');
+      expect(resultado.latenciaMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('bloquear y desbloquear son la misma capacidad en los dos sentidos', async () => {
+      const { proveedor } = caso.montar();
+      await proveedor.fijarBloqueo(BARRERA, true);
+      expect((await proveedor.fijarBloqueo(BARRERA, false)).estado).toBe('aceptada');
+    });
+
+    it('quien NO declara bloqueo se niega con CapacidadNoSoportada, nunca «aceptada»', async () => {
+      // La misma frase para los tres: si la capacidad es sí, resuelve; si no,
+      // el error nombra la capacidad. Un simulado completo declara sí en todo
+      // y por eso la aserción se escribe contra lo que el equipo declara.
+      const { proveedor } = caso.montar();
+      const capacidades = await proveedor.capacidadesDe(PORTERO);
+      if (soporta(capacidades, 'bloqueoDeAcceso')) {
+        expect((await proveedor.fijarBloqueo(PORTERO, true)).estado).toBe('aceptada');
+        return;
+      }
+      const error = await proveedor
+        .fijarBloqueo(PORTERO, true)
+        .then(() => null)
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CapacidadNoSoportada);
+      expect((error as CapacidadNoSoportada).capacidad).toBe('bloqueoDeAcceso');
     });
   });
 

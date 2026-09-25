@@ -7,7 +7,9 @@ import type {
   PlateEventSource,
   Reloj,
   ResultadoAccionamiento,
+  ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
+import { ordenInalcanzable } from '@ncr/domain-core';
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { FuenteDePlacas } from '../equipo/fuente-de-placas';
@@ -190,6 +192,32 @@ export class HikvisionProvider
       return { aceptado: resultado.estado === 'aceptada', latenciaMs: resultado.latenciaMs };
     }
     return puerta.abrir(dispositivoId, actorId);
+  }
+
+  /**
+   * Bloqueo persistente (H-3), por dispositivo y por CAPACIDAD. La barrera lo
+   * ejecuta por la misma ruta VERIFICADA con la que abre (`lock`/`unlock`); un
+   * equipo que no declara `bloqueoDeAcceso` se niega con motivo, nunca con una
+   * orden que parece pasar. Un equipo dado de alta antes de la 15-E tiene la
+   * capacidad `desconocida` hasta que la consola lo vuelva a sondear, y eso
+   * también se niega: es la dirección segura de ADR-019.
+   */
+  async fijarBloqueo(dispositivoId: string, bloqueado: boolean): Promise<ResultadoDeAccionamiento> {
+    const equipo = await this.resolver(dispositivoId);
+    try {
+      await this.exigirCapacidad(dispositivoId, 'bloqueoDeAcceso');
+      const puerta = await this.puertaDe(equipo);
+      const barrera = puerta as unknown as Partial<ControlDeBarreraVehicular>;
+      if (typeof barrera.fijarBloqueo !== 'function') {
+        throw new CapacidadNoSoportada(dispositivoId, 'bloqueoDeAcceso', false);
+      }
+      return await barrera.fijarBloqueo(dispositivoId, bloqueado);
+    } catch (error) {
+      if (error instanceof EquipoInalcanzable) {
+        return ordenInalcanzable(error.detalle, error.latenciaMs);
+      }
+      throw error;
+    }
   }
 
   async estado(dispositivoId: string): Promise<'en_linea' | 'fuera_de_linea' | 'degradado'> {

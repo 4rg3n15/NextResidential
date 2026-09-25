@@ -3,7 +3,8 @@ import type { DynamicModule } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID } from '@ncr/domain-core';
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId } from '@ncr/domain-core';
-import { FuenteDePlacas } from '@ncr/providers';
+import type { FuenteDePlacas } from '@ncr/providers';
+import { FUENTE_DE_PLACAS } from '../proveedores';
 import { ACCIONADOR_DE_PUERTA } from '../guardia';
 import type { AccionadorDePuerta } from '../guardia';
 import { RegistrarAcceso } from '../eventos';
@@ -11,8 +12,7 @@ import { AlarmServerController } from './presentacion/alarm-server.controller';
 import { GuardiaDeAlarmServer, EQUIPOS_DE_ALARM_SERVER } from './presentacion/guardia-alarm-server';
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 import type { EquipoDeclarado } from '../comun/equipos-de-alarm-server';
-import { FUENTE_DE_PLACAS } from './presentacion/alarm-server.controller';
-import { IngestorDeEquipos } from './aplicacion/ingestor-de-publicaciones';
+import { INGESTOR_DE_EQUIPOS, IngestorDeEquipos } from './aplicacion/ingestor-de-publicaciones';
 
 /**
  * El receptor del «servidor de alarma», y la fuente por la que entran las
@@ -24,16 +24,16 @@ import { IngestorDeEquipos } from './aplicacion/ingestor-de-publicaciones';
  * del motor de reglas.
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * UNA SOLA FUENTE Y UN SOLO INGESTOR · 15-C
+ * UNA SOLA FUENTE Y UN SOLO INGESTOR · 15-C, corregido en la 15-E (A1)
  *
- * La fuente se registra aquí y **con un solo ingestor**. Dos producirían dos
- * eventos por cada lectura en una tabla que no admite borrado, y el defecto no
- * se vería hasta que alguien contara los accesos del día. La propia fuente se
- * niega a aceptar un segundo.
- *
- * Que se exporte importa: el transporte de ARMADO —el flujo que mantenemos
- * abierto contra el equipo— publica en esta misma instancia, y si cada uno
- * tuviera la suya habría otra vez dos caminos a `RegistrarAcceso`.
+ * La 15-C prometía «una sola fuente» y construía la suya aquí, distinta de la
+ * que el adaptador real creaba por dentro y que `PLATE_EVENT_SOURCE` exponía.
+ * Dos fuentes, un ingestor: lo publicado por el receptor no lo veía ningún
+ * suscriptor del puerto, y lo publicado por el transporte de armado no llegaba
+ * al ingestor. Ahora la fuente la construye `ProveedoresModule` —la misma que
+ * recibe el adaptador— y este módulo sólo le FIJA su único ingestor. Dos
+ * ingestores producirían dos eventos por lectura en una tabla append-only, y
+ * la propia fuente se niega a aceptar un segundo.
  *
  * ═════════════════════════════════════════════════════════════════════════════
  * POR QUÉ EL ACCIONADOR SE RESUELVE POR `ModuleRef` Y NO SE IMPORTA
@@ -63,7 +63,13 @@ export class AlarmServerModule {
         GuardiaDeAlarmServer,
         { provide: EQUIPOS_DE_ALARM_SERVER, useValue: equipos },
         {
-          provide: FUENTE_DE_PLACAS,
+          /**
+           * El ingestor se construye y se FIJA en la fuente compartida en la
+           * misma fábrica: es un efecto deliberado del arranque, y es lo que
+           * garantiza que exista un solo camino de una publicación a
+           * `RegistrarAcceso`. La fuente rechaza un segundo ingestor.
+           */
+          provide: INGESTOR_DE_EQUIPOS,
           inject: [
             ModuleRef,
             RegistrarAcceso,
@@ -71,6 +77,7 @@ export class AlarmServerModule {
             BITACORA,
             GENERADOR_DE_ID,
             EQUIPOS_DE_ALARM_SERVER,
+            FUENTE_DE_PLACAS,
           ],
           useFactory: (
             referencia: ModuleRef,
@@ -79,25 +86,27 @@ export class AlarmServerModule {
             bitacora: Bitacora,
             ids: GeneradorDeId,
             declarados: readonly EquipoDeclarado[],
-          ) =>
-            new FuenteDePlacas(
-              new IngestorDeEquipos(
-                registrar,
-                /**
-                 * Token PROPIO no hace falta aquí: el accionador se resuelve
-                 * por `ModuleRef` con `strict: false`, que busca la instancia
-                 * ÚNICA que `app.module.ts` registró. Ver la nota de arriba.
-                 */
-                referencia.get<AccionadorDePuerta>(ACCIONADOR_DE_PUERTA, { strict: false }),
-                evidencia,
-                bitacora,
-                ids,
-                declarados,
-              ),
-            ),
+            fuente: FuenteDePlacas,
+          ) => {
+            const ingestor = new IngestorDeEquipos(
+              registrar,
+              /**
+               * Token PROPIO no hace falta aquí: el accionador se resuelve
+               * por `ModuleRef` con `strict: false`, que busca la instancia
+               * ÚNICA que `app.module.ts` registró. Ver la nota de arriba.
+               */
+              referencia.get<AccionadorDePuerta>(ACCIONADOR_DE_PUERTA, { strict: false }),
+              evidencia,
+              bitacora,
+              ids,
+              declarados,
+            );
+            fuente.fijarIngestor(ingestor);
+            return ingestor;
+          },
         },
       ],
-      exports: [FUENTE_DE_PLACAS],
+      exports: [INGESTOR_DE_EQUIPOS],
     };
   }
 }

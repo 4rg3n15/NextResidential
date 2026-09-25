@@ -49,6 +49,9 @@ import type { EquipoDeclarado } from '../../comun/equipos-de-alarm-server';
 /** Techo del tramo de evidencia dentro del presupuesto de KPI-13 (3 s). */
 export const PRESUPUESTO_DE_EVIDENCIA_MS = 800;
 
+/** El único ingestor de publicaciones de equipo del proceso (A1). */
+export const INGESTOR_DE_EQUIPOS = Symbol.for('ncr.alarmserver.IngestorDeEquipos');
+
 export class IngestorDeEquipos implements IngestorDePublicaciones {
   constructor(
     private readonly registrar: RegistrarAcceso,
@@ -116,7 +119,10 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     }
 
     if (constancia.valor.permitido && !constancia.valor.duplicado) {
-      const orden = await this.accionador.accionar(evento.dispositivoId, true);
+      // La apertura decidida por el motor se atribuye a la identidad de
+      // servicio de la ingesta: el proveedor exige un actor (RN-08) y el
+      // operador aquí es el sistema, no una persona.
+      const orden = await this.accionador.accionar(evento.dispositivoId, true, ACTOR_INGESTA);
       this.bitacora.registrar(orden.estado === 'aceptada' ? 'info' : 'aviso', 'relé accionado', {
         dispositivoId: evento.dispositivoId,
         eventoId: constancia.valor.eventoId,

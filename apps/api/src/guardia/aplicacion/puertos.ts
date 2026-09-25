@@ -14,6 +14,30 @@ export interface EstadoDeCanal {
   readonly porDelante: number;
   readonly titular: string | null;
   readonly timeoutSegundos: number;
+  /**
+   * ETAPA 15-E · por dónde va el audio de este canal. `equipo` cuando el
+   * proveedor abrió el canal del aparato; `ninguno` cuando el turno existe
+   * pero no hay transporte (el equipo no declara audio, o es el simulado sin
+   * ese dispositivo). La consola tiene que poder decir «tienes la palabra y
+   * no hay audio» en vez de dejar al operador hablando a un micrófono muerto.
+   */
+  readonly transporte: 'equipo' | 'ninguno';
+  readonly detalleTransporte: string | null;
+}
+
+/**
+ * El turno se concedió y el equipo NO pudo abrir el canal. El turno se suelta
+ * antes de lanzar: un operador con la palabra sobre un canal muerto bloquearía
+ * al siguiente hasta la caducidad.
+ */
+export class TransporteDeAudioNoDisponible extends Error {
+  constructor(
+    readonly dispositivoId: string,
+    readonly motivo: string,
+  ) {
+    super(`El equipo ${dispositivoId} no abrió el canal de audio: ${motivo}`);
+    this.name = 'TransporteDeAudioNoDisponible';
+  }
 }
 
 export interface CanalDeIntercom {

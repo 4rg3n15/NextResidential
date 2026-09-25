@@ -13,7 +13,7 @@ import type {
   TipoDeEquipo,
 } from '../aplicacion/puertos';
 import { capacidadesDesdeJson } from '@ncr/providers';
-import { ACTOR_INGESTA as ACTOR_DE_SERVICIO } from '../../comun/actores-de-servicio';
+import { claimsDeServicio } from '../../comun/claims-de-servicio';
 
 /**
  * Equipos en PostgreSQL — A.1 y A.2.
@@ -96,13 +96,8 @@ const aDatos = (f: FilaDeEquipo): DatosDeEquipo => ({
 const verificacionDe = (v: ResultadoDeSondeo): EstadoDeVerificacion =>
   v.verificado ? 'verificado' : v.clase === 'decide_solo' ? 'rechazado' : 'no_verificado';
 
-/** Claims de SERVICIO para una copropiedad: lo único que lee el sobre. */
-export const claimsDeServicio = (copropiedadId: string): Record<string, unknown> => ({
-  rol: 'servicio',
-  usuario_id: ACTOR_DE_SERVICIO,
-  copropiedad_id: copropiedadId,
-  copropiedades: [copropiedadId],
-});
+/** Claims de SERVICIO para una copropiedad: lo único que lee el sobre (viven en `comun`). */
+export { claimsDeServicio };
 
 /**
  * El sobre, descifrado, **sólo para hablar con el equipo**. Lo comparten el

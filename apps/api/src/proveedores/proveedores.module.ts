@@ -10,7 +10,7 @@ import {
 } from '@ncr/domain-core';
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import { Pool } from 'pg';
-import { crearProveedorDeEquipos } from '@ncr/providers';
+import { FuenteDePlacas, crearProveedorDeEquipos } from '@ncr/providers';
 import type { ClaseDeProveedor, ProveedorDeEquipos, RegistroDeEquipos } from '@ncr/providers';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
@@ -40,6 +40,17 @@ import type { Configuracion } from '../configuracion/esquema';
  * plantillas, y una supresión que no suprime la que la terminal tiene.
  *
  * ═════════════════════════════════════════════════════════════════════════════
+ * UNA SOLA FUENTE DE PLACAS · ETAPA 15-E (A1)
+ *
+ * Hasta la 15-E había DOS: la que el adaptador real creaba por dentro —la que
+ * `PLATE_EVENT_SOURCE.suscribir` observaba— y la que el receptor del «servidor
+ * de alarma» creaba para su ingestor. Publicar en una no llegaba a la otra, así
+ * que el puerto del dominio seguía siendo un adorno con otro nombre. La fuente
+ * se construye AQUÍ, se entrega al adaptador por la fábrica y se exporta con
+ * token propio para que el receptor publique en la MISMA. Un solo ingestor, un
+ * solo camino a `RegistrarAcceso`, y los observadores del puerto ven todo.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
  * LA VERIFICACIÓN DE OE-03, EN UNA FRASE
  *
  * Cambiar `PROVEEDOR_DE_EQUIPOS` del adaptador simulado al real no toca una
@@ -47,6 +58,17 @@ import type { Configuracion } from '../configuracion/esquema';
  * un defecto de diseño de las etapas anteriores y habría que pararse y
  * reportarlo.
  */
+
+/**
+ * La instancia ÚNICA del proveedor, con la pregunta que el dominio no hace
+ * (`capacidadesDe`) y el bloqueo (H-3). Quien necesite los cuatro puertos como
+ * uno solo —el accionador, el canal de intercom— la toma por aquí.
+ */
+export const PROVEEDOR_DE_EQUIPOS = Symbol.for('ncr.proveedores.Instancia');
+
+/** La fuente por la que entran las placas: la comparten adaptador y receptor. */
+export const FUENTE_DE_PLACAS = Symbol.for('ncr.proveedores.FuenteDePlacas');
+
 @Global()
 @Module({})
 export class ProveedoresModule {
@@ -67,14 +89,6 @@ export class ProveedoresModule {
     /** Semilla del simulado: la adversidad tiene que ser reproducible. */
     readonly semilla?: number;
   }): DynamicModule {
-    /**
-     * Token intermedio, y no cuatro fábricas: con cuatro habría cuatro
-     * instancias. Es el mismo defecto que ya obligó a que el almacén de
-     * plantillas fuese un proveedor propio en vez de un `new` dentro de otra
-     * fábrica, y la misma solución.
-     */
-    const PROVEEDOR = Symbol.for('ncr.proveedores.Instancia');
-
     const alias = [
       ACCESS_POINT_PROVIDER,
       PLATE_EVENT_SOURCE,
@@ -82,21 +96,29 @@ export class ProveedoresModule {
       INTERCOM_PROVIDER,
     ].map((token) => ({
       provide: token,
-      inject: [PROVEEDOR],
+      inject: [PROVEEDOR_DE_EQUIPOS],
       useFactory: (proveedor: ProveedorDeEquipos) => proveedor,
     }));
 
     return {
       module: ProveedoresModule,
       providers: [
+        { provide: FUENTE_DE_PLACAS, useFactory: () => new FuenteDePlacas() },
         {
-          provide: PROVEEDOR,
-          inject: [RELOJ, BITACORA, Pool, CONFIGURACION],
+          /**
+           * Token intermedio, y no cuatro fábricas: con cuatro habría cuatro
+           * instancias. Es el mismo defecto que ya obligó a que el almacén de
+           * plantillas fuese un proveedor propio en vez de un `new` dentro de
+           * otra fábrica, y la misma solución.
+           */
+          provide: PROVEEDOR_DE_EQUIPOS,
+          inject: [RELOJ, BITACORA, Pool, CONFIGURACION, FUENTE_DE_PLACAS],
           useFactory: (
             reloj: Reloj,
             bitacora: Bitacora,
             pool: Pool,
             configuracion: Configuracion,
+            fuente: FuenteDePlacas,
           ) => {
             const registro =
               opciones.registro ??
@@ -120,6 +142,7 @@ export class ProveedoresModule {
             return crearProveedorDeEquipos({
               clase: opciones.clase,
               reloj,
+              fuente,
               ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
             });
@@ -128,7 +151,8 @@ export class ProveedoresModule {
         ...alias,
       ],
       exports: [
-        PROVEEDOR,
+        PROVEEDOR_DE_EQUIPOS,
+        FUENTE_DE_PLACAS,
         ACCESS_POINT_PROVIDER,
         PLATE_EVENT_SOURCE,
         FACE_TEMPLATE_PROVIDER,

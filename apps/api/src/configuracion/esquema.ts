@@ -229,6 +229,20 @@ export const esquemaConfiguracion = z.object({
    */
   CARGADOR_DE_CONTEXTO: z.enum(['postgres', 'conservador']).default('postgres'),
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * DÓNDE VIVE EL HISTÓRICO DE EVENTOS · ETAPA 15-E
+   *
+   *   postgres  (por omisión) — `eventos` y `recepciones_evento` de la base,
+   *              con los claims de servicio de cada copropiedad por llamada.
+   *              Es el único con el que un acceso sobrevive a un reinicio y
+   *              con el que la hoja de resultados en sitio se puede cotejar.
+   *   memoria   — el doble de la ETAPA 06. Es el de la suite, que no tiene
+   *              base, y sirve para ensayar sin ella. Un despliegue en
+   *              `memoria` NO tiene trazabilidad: el arranque lo avisa.
+   */
+  PERSISTENCIA_DE_EVENTOS: z.enum(['postgres', 'memoria']).default('postgres'),
+
   /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
   BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 

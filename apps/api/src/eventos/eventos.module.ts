@@ -49,6 +49,7 @@ import {
 } from './aplicacion/consultar-eventos';
 import { VigilarLatidos } from './aplicacion/vigilancia-latidos';
 import { CanalEnProceso } from './infraestructura/canal-en-proceso';
+import { RepositorioEventosPgDeServicio } from './infraestructura/repositorio-eventos-pg-de-servicio';
 import { AlmacenEvidenciaSupabase } from './infraestructura/evidencia-supabase';
 import {
   AlmacenEvidenciaFirmado,
@@ -92,7 +93,34 @@ export class EventosModule {
       module: EventosModule,
       controllers: [EventosController, AlertasController, InformesController],
       providers: [
-        { provide: REPOSITORIO_EVENTOS, useFactory: () => new RepositorioEventosEnMemoria() },
+        {
+          /**
+           * ETAPA 15-E · el histórico va a PostgreSQL por omisión. La nota de
+           * arriba («sin contraseña de PostgreSQL») dejó de ser cierta en la
+           * 09-B, cuando el `Pool` único empezó a servir al padrón y a las
+           * autorizaciones; el histórico se quedó en memoria por inercia. Se
+           * elige por configuración y el arranque dice cuál quedó activo,
+           * igual que el proveedor de equipos y el cargador de contexto.
+           */
+          provide: REPOSITORIO_EVENTOS,
+          inject: [CONFIGURACION, Pool, BITACORA],
+          useFactory: (config: Configuracion, pool: Pool, bitacora: Bitacora) => {
+            const enBase = config.PERSISTENCIA_DE_EVENTOS === 'postgres';
+            bitacora.registrar(
+              enBase ? 'info' : 'aviso',
+              `histórico de eventos activo: ${config.PERSISTENCIA_DE_EVENTOS}`,
+              {
+                persistencia: config.PERSISTENCIA_DE_EVENTOS,
+                consecuencia: enBase
+                  ? 'cada acceso queda en la tabla append-only de la base (RN-03, CA-23)'
+                  : 'los eventos viven en este proceso y se PIERDEN al reiniciar: sin trazabilidad',
+              },
+            );
+            return enBase
+              ? new RepositorioEventosPgDeServicio(pool)
+              : new RepositorioEventosEnMemoria();
+          },
+        },
         { provide: REPOSITORIO_ALERTAS, useFactory: () => new RepositorioAlertasEnMemoria() },
         {
           provide: REPOSITORIO_DISPOSITIVOS,

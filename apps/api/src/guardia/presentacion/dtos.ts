@@ -144,6 +144,21 @@ export class EstadoDeCanalDto {
 
   @ApiProperty({ description: 'Segundos tras los que el canal se libera solo por inactividad' })
   timeoutSegundos!: number;
+
+  @ApiProperty({
+    enum: ['equipo', 'ninguno'],
+    description:
+      'Por dónde va el audio: «equipo» si el proveedor abrió el canal del aparato; «ninguno» ' +
+      'si hay turno pero no transporte (el equipo no declara audio o no está en el registro).',
+  })
+  transporte!: string;
+
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: 'Por qué no hay transporte, si no lo hay',
+  })
+  detalleTransporte!: string | null;
 }
 
 export class AvisoAlResidenteDto {

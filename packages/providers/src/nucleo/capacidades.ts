@@ -91,6 +91,13 @@ export interface CapacidadesDeEquipo {
   readonly reconocimientoDePlacas: EstadoDeCapacidad;
   /** ¿Informa de la posición del brazo de la barrera? */
   readonly estadoDeBarrera: EstadoDeCapacidad;
+  /**
+   * ¿Admite dejar el acceso BLOQUEADO como estado persistente (H-3)? Bloquear
+   * no es cerrar: es un estado que manda sobre toda decisión posterior, y sólo
+   * lo declara quien lo ejecuta de verdad —la barrera vehicular, hoy—. Un
+   * equipo que sólo abre por orden declara `no`, y la consola lo ve así.
+   */
+  readonly bloqueoDeAcceso: EstadoDeCapacidad;
 }
 
 /** Nombre de cada capacidad, para nombrarla en un error o en una pantalla. */
@@ -108,6 +115,7 @@ export const CAPACIDADES_SIN_CONSULTAR: CapacidadesDeEquipo = Object.freeze<Capa
   suscripcionDeEventos: 'desconocida',
   reconocimientoDePlacas: 'desconocida',
   estadoDeBarrera: 'desconocida',
+  bloqueoDeAcceso: 'desconocida',
 });
 
 /** El estado de una capacidad, sea simple o compuesta. */
@@ -160,6 +168,7 @@ export const CAPACIDADES_COMPLETAS: CapacidadesDeEquipo = Object.freeze<Capacida
   suscripcionDeEventos: 'si',
   reconocimientoDePlacas: 'si',
   estadoDeBarrera: 'si',
+  bloqueoDeAcceso: 'si',
 });
 
 /**
@@ -203,5 +212,6 @@ export const capacidadesDesdeJson = (crudo: unknown): CapacidadesDeEquipo => {
     suscripcionDeEventos: estado(objeto['suscripcionDeEventos']),
     reconocimientoDePlacas: estado(objeto['reconocimientoDePlacas']),
     estadoDeBarrera: estado(objeto['estadoDeBarrera']),
+    bloqueoDeAcceso: estado(objeto['bloqueoDeAcceso']),
   };
 };

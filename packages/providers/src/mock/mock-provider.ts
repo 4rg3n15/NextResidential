@@ -6,7 +6,9 @@ import type {
   LecturaDePlaca,
   PlateEventSource,
   ResultadoAccionamiento,
+  ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
+import { ordenAceptada } from '@ncr/domain-core';
 import type { PerfilDeSimulacion } from './simulacion';
 import { Azar, FalloDeHardwareSimulado, PERFIL_REALISTA, RelojSimulado } from './simulacion';
 import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
@@ -55,6 +57,8 @@ export class MockProvider
 
   /** Bitácora de lo ocurrido, para que las pruebas afirmen sobre hechos. */
   readonly aperturas: { dispositivoId: string; actorId: string }[] = [];
+  /** Bloqueos vigentes por dispositivo (H-3): estado, no pulso. */
+  readonly bloqueos = new Map<string, boolean>();
   readonly plantillas = new Map<string, Set<string>>();
   private readonly suscriptores: ((l: LecturaDePlaca) => Promise<void>)[] = [];
 
@@ -88,6 +92,17 @@ export class MockProvider
   async estado(dispositivoId: string): Promise<'en_linea' | 'fuera_de_linea' | 'degradado'> {
     if (!this.dispositivos.has(dispositivoId)) return 'fuera_de_linea';
     return this.azar.ocurre(this.perfil.probabilidadDeFallo) ? 'degradado' : 'en_linea';
+  }
+
+  /**
+   * Bloqueo persistente (H-3). El simulado lo GUARDA en vez de olvidarlo: una
+   * prueba puede afirmar que el acceso quedó bloqueado, que es el hecho que
+   * importa, y no sólo que la orden «pasó».
+   */
+  async fijarBloqueo(dispositivoId: string, bloqueado: boolean): Promise<ResultadoDeAccionamiento> {
+    const latencia = await this.conReintentos(dispositivoId, 'fijarBloqueo');
+    this.bloqueos.set(dispositivoId, bloqueado);
+    return ordenAceptada(latencia);
   }
 
   // ── PlateEventSource ─────────────────────────────────────────────────────

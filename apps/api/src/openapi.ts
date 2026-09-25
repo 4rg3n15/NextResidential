@@ -32,6 +32,7 @@ const configuracionParaContrato: Configuracion = {
   // puede depender de que haya cámaras al otro lado.
   PROVEEDOR_DE_EQUIPOS: 'simulado',
   CARGADOR_DE_CONTEXTO: 'conservador',
+  PERSISTENCIA_DE_EVENTOS: 'memoria',
   PROVEEDOR_SEMILLA: 20260908,
   INGESTA_VENTANA_SEGUNDOS: 300,
   LIMITE_PAYLOAD: '256kb',

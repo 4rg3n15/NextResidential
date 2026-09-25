@@ -62,6 +62,10 @@ export class CanalIntercomEnProceso implements CanalDeIntercom {
       porDelante: puesto < 0 ? 0 : puesto + 1,
       titular: vigente.titular?.operadorId ?? null,
       timeoutSegundos: this.margenSegundos,
+      // El canal en proceso reparte TURNOS; el transporte lo pone quien lo
+      // decore (`CanalIntercomConTransporte`). Solo, no hay audio y lo dice.
+      transporte: 'ninguno',
+      detalleTransporte: 'canal sin transporte de audio: sólo exclusividad',
     };
   }
 

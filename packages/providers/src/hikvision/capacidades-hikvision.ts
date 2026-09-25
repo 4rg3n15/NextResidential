@@ -271,8 +271,14 @@ export const descubrirCapacidades = async (
     const barrera = await pedir('leer si este modelo reporta el estado de la barrera');
     parciales.estadoDeBarrera =
       barrera === null ? 'desconocida' : booleano(etiqueta(barrera, 'isSupportBarrierGateStatus'));
-    // La cámara acciona la barrera por la ruta VERIFICADA: es apertura remota.
+    // La cámara acciona la barrera por la ruta VERIFICADA: es apertura remota,
+    // y la misma ruta admite `lock`/`unlock` (H-3): es bloqueo de acceso.
     parciales.aperturaRemota = 'si';
+    parciales.bloqueoDeAcceso = 'si';
+  } else {
+    // Terminal y videoportero abren por orden y no dejan el acceso bloqueado
+    // como estado: lo declaran, para que la consola no ofrezca lo que no hay.
+    parciales.bloqueoDeAcceso = 'no';
   }
 
   return capacidadesDescubiertas(parciales);

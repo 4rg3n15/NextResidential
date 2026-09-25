@@ -97,7 +97,17 @@ export interface OrdenEjecutada {
  * una coincidencia en vez de una comprobación.
  */
 export interface AccionadorDePuerta {
-  accionar(dispositivoId: string, abrir: boolean): Promise<ResultadoDeAccionamiento>;
+  /**
+   * `actorId` entra desde la 15-E: el proveedor de equipos atribuye cada
+   * apertura a quien la pidió (RN-08, CA-20), y un videoportero real se niega
+   * a abrir sin operador identificado. Para una apertura decidida por el motor
+   * el actor es la identidad de servicio de la ingesta, nunca un vacío.
+   */
+  accionar(
+    dispositivoId: string,
+    abrir: boolean,
+    actorId: string,
+  ): Promise<ResultadoDeAccionamiento>;
 }
 export const ACCIONADOR_DE_PUERTA = Symbol.for('ncr.puerto.AccionadorDePuerta');
 
@@ -211,7 +221,7 @@ export class AccionarPuertaAMano {
     await this.bitacora.registrar(ejecutada);
     if (orden.accion !== 'abrir') return exito(ejecutada);
 
-    const resultado = await this.accionador.accionar(orden.dispositivoId, true);
+    const resultado = await this.accionador.accionar(orden.dispositivoId, true, ctx.usuarioId);
     const detalle = resultado.estado === 'aceptada' ? null : resultado.motivo;
     await this.bitacora.anotarResultado(ejecutada.id, resultado.estado, detalle);
 

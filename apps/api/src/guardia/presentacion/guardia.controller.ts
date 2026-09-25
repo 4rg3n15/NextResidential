@@ -8,7 +8,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -33,7 +33,7 @@ import type { BitacoraDeOrdenes } from '../aplicacion/apertura-manual';
 import { FijarBloqueoDeAcceso, REGISTRO_DE_BLOQUEOS } from '../aplicacion/bloqueo-de-acceso';
 import type { BloqueoVigente, RegistroDeBloqueos } from '../aplicacion/bloqueo-de-acceso';
 import { construirCola, resumenDeCola } from '../aplicacion/cola-de-atencion';
-import { CANAL_DE_INTERCOM } from '../aplicacion/puertos';
+import { CANAL_DE_INTERCOM, TransporteDeAudioNoDisponible } from '../aplicacion/puertos';
 import type { CanalDeIntercom } from '../aplicacion/puertos';
 import {
   AceptadoDto,
@@ -297,7 +297,19 @@ export class GuardiaController {
     @Body() dto: SolicitudDeCanalDto,
   ): Promise<EstadoDeCanalDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom');
-    return this.intercom.pedir(copropiedadId, dto.dispositivoId, ctx.usuarioId);
+    try {
+      return await this.intercom.pedir(copropiedadId, dto.dispositivoId, ctx.usuarioId);
+    } catch (error) {
+      /**
+       * 15-E · el turno se concedió y el EQUIPO no abrió su canal: canal
+       * deshabilitado en el aparato, capacidad ausente, equipo mudo. Es un
+       * conflicto con el estado del equipo, no un fallo del servidor, y el
+       * operador necesita el motivo tal cual para resolverlo (guía §8.4).
+       */
+      if (error instanceof TransporteDeAudioNoDisponible)
+        throw new ConflictException(error.message);
+      throw error;
+    }
   }
 
   @Post('intercom/cerrar')

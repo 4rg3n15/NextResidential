@@ -11,7 +11,9 @@ import type {
   LecturaDePlaca,
   Reloj,
   ResultadoAccionamiento,
+  ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
+import { ordenAceptada, ordenInalcanzable } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe } from '../nucleo/capacidades';
 import {
@@ -84,6 +86,7 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
   private readonly equipos = new Map<string, EquipoFicticio>();
   private readonly suscriptores: ((l: LecturaDePlaca) => Promise<void>)[] = [];
   readonly plantillas = new Map<string, Set<string>>();
+  readonly bloqueos = new Map<string, boolean>();
   private readonly canales = new Map<string, EstadoDelCanal>();
   private readonly audio: Uint8Array[] = [];
   private enSesion: string | null = null;
@@ -143,6 +146,17 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
       return { aceptado: false, latenciaMs: this.latencia() };
     this.adversidadDe(equipo);
     return { aceptado: true, latenciaMs: this.latencia() };
+  }
+
+  /** Bloqueo persistente (H-3): sólo si Órbita lo declara para ese equipo. */
+  async fijarBloqueo(dispositivoId: string, bloqueado: boolean): Promise<ResultadoDeAccionamiento> {
+    const equipo = this.exigir(dispositivoId, 'bloqueoDeAcceso');
+    if (equipo.adversidad === 'inalcanzable') {
+      return ordenInalcanzable('el equipo no respondió', this.latencia());
+    }
+    this.adversidadDe(equipo);
+    this.bloqueos.set(dispositivoId, bloqueado);
+    return ordenAceptada(this.latencia());
   }
 
   async estado(dispositivoId: string): Promise<'en_linea' | 'fuera_de_linea' | 'degradado'> {

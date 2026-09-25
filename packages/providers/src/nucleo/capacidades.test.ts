@@ -43,6 +43,10 @@ describe('capacidades neutrales · tres estados, y `desconocida` no es `si`', ()
   it('las completas del simulado dicen `si` a todo, con canal y códec', () => {
     expect(soporta(CAPACIDADES_COMPLETAS, 'audioBidireccional')).toBe(true);
     expect(CAPACIDADES_COMPLETAS.audioBidireccional.canal).toBe(1);
+    // ETAPA 15-E · el bloqueo persistente (H-3) es una capacidad más, y el
+    // simulado completo la declara para que la consola pueda ejercerla.
+    expect(soporta(CAPACIDADES_COMPLETAS, 'bloqueoDeAcceso')).toBe(true);
+    expect(CAPACIDADES_SIN_CONSULTAR.bloqueoDeAcceso).toBe('desconocida');
   });
 
   it('un JSON persistido se lee sin confiar en su forma: lo corrupto vuelve a DESCONOCIDA', () => {
