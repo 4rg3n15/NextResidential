@@ -10,6 +10,7 @@ import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { EstadoCargando, estadoSegunCodigo } from '@/componentes/estados';
+import { AjusteFijo } from './ajuste-fijo';
 
 /**
  * Formulario de configuración.
@@ -34,6 +35,16 @@ import { EstadoCargando, estadoSegunCodigo } from '@/componentes/estados';
  * acaba pedido otra vez en la reunión siguiente. Mostrarlo con la razón a la
  * vista —cota legal, integridad, trazabilidad— cierra la conversación y además
  * documenta el sistema para quien lo audita.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * LO QUE NO ES DE NADIE (ETAPA 15-B, B.5)
+ *
+ * El umbral de confianza de placa y el margen de latido **no están en el
+ * borrador ni viajan en el PATCH**: la API los retiró de su DTO y, con
+ * `forbidNonWhitelisted`, un cuerpo que los traiga responde 400 —mientras la
+ * consola los enviaba, TODO guardado fallaba—. Se pintan con `AjusteFijo`,
+ * lectura y no campo deshabilitado, porque ningún rol puede abrirlos: los fija
+ * la base (migración 0032, P-02 y P-06) y cambiarlos exige una migración.
  */
 
 const ETIQUETA_DE_POLITICA: Readonly<Record<string, string>> = {
@@ -55,9 +66,7 @@ interface Borrador {
   etiquetaVivienda: string;
   etiquetaAgrupacion: string;
   zonaHoraria: string;
-  umbralConfianzaPlaca: string;
   politicaContingenciaEdge: string;
-  umbralLatidoMinutos: string;
 }
 
 const aBorrador = (c: ConfiguracionDeCopropiedad): Borrador => ({
@@ -67,10 +76,18 @@ const aBorrador = (c: ConfiguracionDeCopropiedad): Borrador => ({
   etiquetaVivienda: c.etiquetaVivienda,
   etiquetaAgrupacion: c.etiquetaAgrupacion,
   zonaHoraria: c.zonaHoraria,
-  umbralConfianzaPlaca: c.umbralConfianzaPlaca.toFixed(3),
   politicaContingenciaEdge: c.politicaContingenciaEdge,
-  umbralLatidoMinutos: String(c.umbralLatidoMinutos),
 });
+
+/**
+ * La API devuelve el umbral como fracción (0,800): es como lo guarda la
+ * columna y como lo consume el dominio. La pantalla lo enseña en la escala en
+ * que está DOCUMENTADO —`confidenceLevel` del evento ANPR, entero 0–100—
+ * porque «0,800» no se puede contrastar con la hoja del fabricante y «80» sí.
+ */
+const umbralEnEscalaAnpr = (fraccion: number): number => Math.round(fraccion * 100);
+
+const enMinutos = (n: number): string => (n === 1 ? '1 minuto' : `${String(n)} minutos`);
 
 export const FormularioDeConfiguracion = ({
   copropiedadId,
@@ -113,9 +130,7 @@ export const FormularioDeConfiguracion = ({
           etiquetaVivienda: b.etiquetaVivienda,
           etiquetaAgrupacion: b.etiquetaAgrupacion,
           zonaHoraria: b.zonaHoraria,
-          umbralConfianzaPlaca: Number(b.umbralConfianzaPlaca),
           politicaContingenciaEdge: b.politicaContingenciaEdge as 'denegar' | 'escalar_portero',
-          umbralLatidoMinutos: Number(b.umbralLatidoMinutos),
         },
       });
       return desenvolver(respuesta);
@@ -260,21 +275,17 @@ export const FormularioDeConfiguracion = ({
         ayuda="Decide qué significa «hoy» en el tablero y en los informes. Identificador IANA, por ejemplo America/Bogota."
       />
 
-      <Campo
+      <AjusteFijo
         etiqueta="Umbral de confianza de placa"
-        type="number"
-        step="0.005"
-        min="0.5"
-        max="1"
-        value={borrador.umbralConfianzaPlaca}
-        onChange={(e) => cambiar('umbralConfianzaPlaca', e.target.value)}
-        disabled={!editable('umbralConfianzaPlaca')}
-        error={rechazos['umbralConfianzaPlaca']}
-        ayuda={
-          editable('umbralConfianzaPlaca')
-            ? 'Por debajo de este valor la lectura no abre sola: escala al portero. Bajarlo convierte lecturas dudosas en aperturas automáticas.'
-            : `${bloqueado} Decide cuándo una lectura de placa abre sin intervención humana: es exclusivo del superadministrador.`
+        valor={
+          <>
+            <span className="tabular-nums">{umbralEnEscalaAnpr(datos.umbralConfianzaPlaca)}</span>
+            {' de 100 (escala '}
+            <code className="font-mono">confidenceLevel</code>
+            {' del evento ANPR)'}
+          </>
         }
+        motivo="Por debajo de este valor la lectura de placa no decide sola: escala al portero (CU-01, excepción 3a). No es un ajuste de la copropiedad sino la constante documentada del fabricante, fijada por restricción de base (migración 0032, P-02): cambiarla exige una migración."
       />
 
       <div className="space-y-1.5">
@@ -304,17 +315,10 @@ export const FormularioDeConfiguracion = ({
         </p>
       </div>
 
-      <Campo
-        etiqueta="Margen de latido de dispositivo (minutos)"
-        type="number"
-        min="1"
-        max="60"
-        step="1"
-        value={borrador.umbralLatidoMinutos}
-        onChange={(e) => cambiar('umbralLatidoMinutos', e.target.value)}
-        disabled={!editable('umbralLatidoMinutos')}
-        error={rechazos['umbralLatidoMinutos']}
-        ayuda="Sin latido en este plazo, el dispositivo pasa a «fuera de línea» (RN-12, CA-26)."
+      <AjusteFijo
+        etiqueta="Margen de latido de dispositivo"
+        valor={<span className="tabular-nums">{enMinutos(datos.umbralLatidoMinutos)}</span>}
+        motivo="Sin latido en este plazo el dispositivo pasa a «fuera de línea» (RN-12, CA-26). No es un ajuste de la copropiedad: la base lo ata al periodo de latido y a los latidos tolerados (migración 0020) y lo normaliza a su valor documentado (migración 0032, P-06); cambiarlo exige una migración."
       />
 
       {rechazos['general'] !== undefined ? (

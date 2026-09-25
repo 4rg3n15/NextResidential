@@ -15,17 +15,18 @@ import { FormularioDeConfiguracion } from './formulario';
  * TRES CLASES DE AJUSTE, Y CADA UNA SE VE
  *
  * · **Editable por el administrador**: identidad de la copropiedad y operación
- *   corriente —nombre, zona horaria, margen de latido—.
- * · **Editable sólo por el superadministrador**: lo que decide aperturas. El
- *   umbral de confianza de placa marca por debajo de qué valor una lectura NO
- *   abre sola (CU-01, excepción 3a), y la contingencia del Edge dice qué hace
- *   cuando la regla no está en su caché (RN-16). No son preferencias.
- * · **Solo lectura, con el motivo a la vista**: cota legal, integridad o
- *   trazabilidad. El plazo de consentimiento biométrico lo fija la Ley 1581 de
- *   2012 como MÁXIMO —no como valor por defecto—, el NIT identifica fiscalmente
- *   a la copropiedad y sostiene un índice único, y el margen de caché del Edge
- *   sostiene el marcado de decisiones con caché potencialmente obsoleto
- *   (KPI-31).
+ *   corriente —nombre, dirección, tipo, etiquetas, zona horaria—.
+ * · **Editable sólo por el superadministrador**: la contingencia del Edge, que
+ *   dice qué hace cuando la regla no está en su caché (RN-16). No es una
+ *   preferencia.
+ * · **Solo lectura, con el motivo a la vista**: cota legal, integridad,
+ *   trazabilidad o constante documentada. El plazo de consentimiento
+ *   biométrico lo fija la Ley 1581 de 2012 como MÁXIMO —no como valor por
+ *   defecto—, el NIT identifica fiscalmente a la copropiedad y sostiene un
+ *   índice único, el margen de caché del Edge sostiene el marcado de
+ *   decisiones con caché potencialmente obsoleto (KPI-31), y el umbral de
+ *   confianza de placa y el margen de latido los fija la base (migración 0032,
+ *   B.5): ningún rol los edita, ni el superadministrador.
  *
  * **Solo lectura con el motivo visible no es lo mismo que oculto.** Lo oculto
  * parece que no existe y acaba pedido otra vez; lo visible con su razón cierra

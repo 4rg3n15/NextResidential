@@ -14,13 +14,25 @@ import { rechazosPorCampo } from '@/lib/api/cliente';
  * campo. Lo segundo depende de leer el cuerpo en el sitio correcto, y el sitio
  * correcto no era el evidente: el filtro global de la API envuelve todo error
  * en `{ estado, correlacion, mensaje }`.
+ *
+ * Y una tercera, de la ETAPA 15-E: que los dos umbrales técnicos **no viajan
+ * en el PATCH**. La API los retiró de su DTO (15-B, B.5) y `forbidNonWhitelisted`
+ * rechaza con 400 cualquier cuerpo que los traiga; mientras la consola los
+ * siguió enviando, TODO guardado fallaba y ninguna prueba lo decía, porque el
+ * doble de `fetch` contestaba 200 sin mirar el cuerpo. Aquí se lee el cuerpo.
  */
 const COP = '10000000-0000-4000-8000-000000000001';
 
 const CONFIGURACION = {
   nombre: 'Villas del Bosque',
+  direccion: 'Kilómetro 4 vía La Calera',
+  tipo: 'casas',
+  etiquetaVivienda: 'Casa',
+  etiquetaAgrupacion: 'Manzana',
   zonaHoraria: 'America/Bogota',
-  umbralConfianzaPlaca: 0.85,
+  // Lo que la API devuelve de verdad: la FRACCIÓN que guarda la columna
+  // (`numeric(4,3)`). La pantalla tiene que enseñarla como 80, no como 0,800.
+  umbralConfianzaPlaca: 0.8,
   politicaContingenciaEdge: 'denegar',
   umbralLatidoMinutos: 5,
   nit: '900123456',
@@ -28,7 +40,7 @@ const CONFIGURACION = {
   plazoConsentimientoHoras: 24,
   margenCacheReglasHoras: 24,
   versionReglasActual: 3,
-  editables: ['nombre', 'zonaHoraria', 'umbralLatidoMinutos'],
+  editables: ['nombre', 'zonaHoraria'],
 };
 
 const json = (cuerpo: unknown, estado = 200): Response =>
@@ -67,7 +79,7 @@ describe('la consola OBEDECE la lista de editables de la API', () => {
     await waitFor(() => expect(screen.getByLabelText(/nombre de la copropiedad/i)).toBeDefined());
     expect(screen.getByLabelText(/nombre de la copropiedad/i)).not.toHaveProperty('disabled', true);
     // No está en `editables`: la API dice que este rol no lo toca.
-    expect(screen.getByLabelText(/umbral de confianza de placa/i)).toHaveProperty('disabled', true);
+    expect(screen.getByLabelText(/contingencia del edge/i)).toHaveProperty('disabled', true);
   });
 
   it('cuando lo deshabilita, DICE por qué en vez de esconderlo', async () => {
@@ -75,7 +87,7 @@ describe('la consola OBEDECE la lista de editables de la API', () => {
     // otra vez. La razón visible cierra la conversación.
     montar();
     await waitFor(() =>
-      expect(screen.getByText(/exclusivo del superadministrador/i)).toBeDefined(),
+      expect(screen.getByText(/valor conservador que impone el contrato/i)).toBeDefined(),
     );
   });
 
@@ -90,6 +102,83 @@ describe('la consola OBEDECE la lista de editables de la API', () => {
       'disabled',
       true,
     );
+  });
+});
+
+describe('los dos umbrales técnicos se VEN y no se editan (15-B, B.5)', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => json(CONFIGURACION)),
+    );
+  });
+
+  it('muestra el umbral de confianza en la escala documentada, no como fracción', async () => {
+    montar();
+    const grupo = await screen.findByRole('group', { name: /umbral de confianza de placa/i });
+    // 0,800 en la columna es 80 en `confidenceLevel` del evento ANPR (0–100),
+    // que es la cifra que se puede contrastar con la hoja del fabricante.
+    expect(grupo.textContent).toContain('80 de 100');
+    expect(grupo.textContent).toContain('confidenceLevel');
+    expect(grupo.textContent).not.toContain('0.800');
+  });
+
+  it('muestra el margen de latido con su unidad', async () => {
+    montar();
+    const grupo = await screen.findByRole('group', { name: /margen de latido/i });
+    expect(grupo.textContent).toContain('5 minutos');
+  });
+
+  it('no hay campo numérico que un rol con más permiso pudiera abrir', async () => {
+    // Un `<input disabled>` diría «pide el permiso»; y no existe tal permiso.
+    montar();
+    await screen.findByRole('group', { name: /umbral de confianza de placa/i });
+    expect(screen.queryByRole('spinbutton')).toBeNull();
+  });
+
+  it('explica que es una restricción de base, sin atribuirlo a ningún rol', async () => {
+    montar();
+    const umbral = await screen.findByRole('group', { name: /umbral de confianza de placa/i });
+    const latido = await screen.findByRole('group', { name: /margen de latido/i });
+    for (const grupo of [umbral, latido]) {
+      expect(grupo.textContent).toMatch(/no es un ajuste de la copropiedad/i);
+      expect(grupo.textContent).toMatch(/migración 0032/i);
+      expect(grupo.textContent).toMatch(/exige una migración/i);
+    }
+    // La ayuda anterior lo afirmaba, y era falso: nadie lo edita.
+    expect(screen.queryByText(/exclusivo del superadministrador/i)).toBeNull();
+  });
+
+  it('el PATCH que envía la consola NO lleva los umbrales', async () => {
+    /**
+     * Se captura el `Request` y se LEE su cuerpo. Contestar 200 sin mirarlo es
+     * lo que dejó pasar el defecto: la API real respondía 400 a cada guardado y
+     * el doble seguía diciendo que todo iba bien.
+     */
+    const capturadas: Request[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (peticion: Request) => {
+        if (peticion.method === 'PATCH') capturadas.push(peticion);
+        return json(CONFIGURACION);
+      }),
+    );
+
+    montar();
+    await waitFor(() => expect(screen.getByLabelText(/nombre de la copropiedad/i)).toBeDefined());
+    fireEvent.change(screen.getByLabelText(/nombre de la copropiedad/i), {
+      target: { value: 'Villas del Bosque II' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    await waitFor(() => expect(capturadas.length).toBe(1));
+    const [peticion] = capturadas;
+    if (peticion === undefined) throw new Error('no se capturó el PATCH');
+    const cuerpo: unknown = await peticion.json();
+
+    expect(cuerpo).toMatchObject({ nombre: 'Villas del Bosque II', zonaHoraria: 'America/Bogota' });
+    expect(cuerpo).not.toHaveProperty('umbralConfianzaPlaca');
+    expect(cuerpo).not.toHaveProperty('umbralLatidoMinutos');
   });
 });
 
