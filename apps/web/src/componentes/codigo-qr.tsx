@@ -3,6 +3,7 @@
 import type { JSX } from 'react';
 import { useMemo } from 'react';
 import { create as crearQr } from 'qrcode';
+import { TEMA_CLARO } from '@ncr/config';
 
 /**
  * A3 (15-E) · EL ENLACE DEL TITULAR, TAMBIÉN COMO QR.
@@ -12,7 +13,14 @@ import { create as crearQr } from 'qrcode';
  * teléfono. Se pinta como SVG con `<rect>` por módulo —sin `canvas`, sin HTML
  * inyectado— para que la CSP no tenga nada que objetar y para que la prueba
  * pueda contar módulos sin un navegador de verdad.
+ *
+ * Papel blanco y tinta negra EN LOS DOS TEMAS, y con cuatro módulos de zona de
+ * silencio: es un requisito del formato, no un color de pantalla (los lectores
+ * fallan sobre fondo oscuro). Los dos colores salen de `constante` del preset,
+ * la única pareja declarada que no cambia con el tema; no hay literal suelto.
  */
+const { blanco, negro } = TEMA_CLARO.constante;
+const SILENCIO = 4;
 export const CodigoQr = ({
   texto,
   titulo,
@@ -40,17 +48,18 @@ export const CodigoQr = ({
       }
     }
   }
+  const lado = n + SILENCIO * 2;
   return (
     <svg
       role="img"
       aria-label={titulo}
-      viewBox={`-2 -2 ${String(n + 4)} ${String(n + 4)}`}
+      viewBox={`${String(-SILENCIO)} ${String(-SILENCIO)} ${String(lado)} ${String(lado)}`}
       shapeRendering="crispEdges"
-      className={className ?? 'h-44 w-44 rounded-md bg-white p-1'}
+      className={className ?? 'h-44 w-44 rounded-md'}
       data-modulos={n}
     >
-      <rect x={-2} y={-2} width={n + 4} height={n + 4} fill="#fff" />
-      <g fill="#000">{modulos}</g>
+      <rect x={-SILENCIO} y={-SILENCIO} width={lado} height={lado} fill={blanco} />
+      <g fill={negro}>{modulos}</g>
     </svg>
   );
 };
