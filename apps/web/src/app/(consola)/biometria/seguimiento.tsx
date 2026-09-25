@@ -3,6 +3,7 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { Boton } from '@/componentes/ui/boton';
+import { CodigoQr } from '@/componentes/codigo-qr';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 
@@ -153,6 +154,15 @@ export const SeguimientoDeConsentimiento = ({
               className="mt-1 block w-full rounded-md border bg-muted px-2 py-1 font-mono text-xs"
             />
           </label>
+          {enlace.url !== null && (
+            <div className="flex flex-wrap items-start gap-3">
+              <CodigoQr texto={enlace.url} titulo="Código QR del enlace del titular" />
+              <p className="max-w-xs text-muted-foreground">
+                Muéstrele el QR al titular: lo lee con la cámara de su teléfono y responde ahí. El
+                enlace es de un solo uso y caduca; para revocar después hará falta otro.
+              </p>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <Boton variante="secundario" onClick={() => void copiar()}>
               {copiado ? 'Copiado' : 'Copiar'}

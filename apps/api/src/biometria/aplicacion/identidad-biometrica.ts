@@ -40,14 +40,16 @@ export class IdentidadBiometricaDesdeRepositorios {
     personaId: string,
     ahora: Date,
   ): Promise<boolean> {
-    const plantillas = await this.plantillas.deTitular(copropiedadId, personaId);
-    for (const plantilla of plantillas) {
-      const consentimiento = await this.consentimientos.porId(
-        copropiedadId,
-        plantilla.consentimientoId,
-      );
-      if (puedeReconocer(plantilla, consentimiento, ahora).permitido) return true;
-    }
-    return false;
+    // Dos consultas y nada más, tenga el titular una plantilla o diez: las
+    // suyas y SU consentimiento vigente (RN-09: uno por titular). Preguntar
+    // por el consentimiento de cada plantilla era N+1 en el camino del acceso.
+    const [plantillas, vigente] = await Promise.all([
+      this.plantillas.deTitular(copropiedadId, personaId),
+      this.consentimientos.vigenteDe(copropiedadId, personaId),
+    ]);
+    if (vigente === null) return false;
+    return plantillas.some(
+      (p) => p.consentimientoId === vigente.id && puedeReconocer(p, vigente, ahora).permitido,
+    );
   }
 }

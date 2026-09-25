@@ -1,3 +1,4 @@
+import type { EstadoConsentimiento } from '@ncr/domain-core';
 import type { ConsentimientoBiometrico, PlantillaBiometrica } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 
@@ -120,6 +121,14 @@ export interface DatosDelEnlace {
   readonly titularId: string;
   /** Instante de caducidad. Un enlace sin caducidad es una contraseña. */
   readonly expiraEn: Date;
+  /**
+   * Estado del consentimiento AL EMITIR. Es lo que hace al enlace de UN SOLO
+   * USO: usarlo cambia el estado —aceptado, rechazado, revocado— y con ese
+   * cambio todo enlace emitido para el estado anterior deja de valer. No hace
+   * falta una lista de tokens usados ni depender del reloj: el propio agregado
+   * dice en qué estado está.
+   */
+  readonly estadoAlEmitir: EstadoConsentimiento;
 }
 
 /**

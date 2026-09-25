@@ -132,6 +132,7 @@ export interface BitacoraDeOrdenes {
    * saber el desenlace. Si esta falla, el rastro sigue estando.
    */
   anotarResultado(
+    copropiedadId: string,
     id: string,
     resultado: EstadoDeAccionamiento,
     detalle: string | null,
@@ -223,7 +224,12 @@ export class AccionarPuertaAMano {
 
     const resultado = await this.accionador.accionar(orden.dispositivoId, true, ctx.usuarioId);
     const detalle = resultado.estado === 'aceptada' ? null : resultado.motivo;
-    await this.bitacora.anotarResultado(ejecutada.id, resultado.estado, detalle);
+    await this.bitacora.anotarResultado(
+      ejecutada.copropiedadId,
+      ejecutada.id,
+      resultado.estado,
+      detalle,
+    );
 
     /**
      * Se devuelve el desenlace, **y «aceptada» no dice que la barrera se abrió**

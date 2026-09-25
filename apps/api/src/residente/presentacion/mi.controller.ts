@@ -268,6 +268,9 @@ export class MiController {
           consentimientoId: r.consentimientoId,
           titular: r.titular ?? null,
           calidad: r.calidad,
+          // El enlace del titular: la app lo muestra y el residente lo
+          // entrega. Se quedaba en el caso de uso y no llegaba (15-E).
+          enlaceDeConsentimiento: r.enlaceDeConsentimiento ?? null,
         }
       : {
           aceptada: false,
@@ -276,6 +279,7 @@ export class MiController {
           consentimientoId: null,
           titular: null,
           calidad: null,
+          enlaceDeConsentimiento: null,
         };
   }
 

@@ -1,4 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import type { EstadoConsentimiento } from '@ncr/domain-core';
+
+const ESTADOS = new Set(['pendiente', 'vigente', 'rechazado', 'revocado', 'expirado']);
 import { PROPOSITOS, derivarLlave } from '../../comun/cripto/sobre-aes-gcm';
 import type { DatosDelEnlace, FirmanteDeEnlaces } from '../aplicacion/puertos';
 
@@ -32,6 +35,8 @@ interface Carga {
   readonly k: string;
   readonly t: string;
   readonly e: number;
+  /** Estado del consentimiento al emitir: el enlace vale mientras siga así. */
+  readonly s: string;
 }
 
 const B64URL = /^[A-Za-z0-9_-]+$/;
@@ -66,6 +71,7 @@ export class FirmanteHmacDeEnlaces implements FirmanteDeEnlaces {
       k: datos.consentimientoId,
       t: datos.titularId,
       e: Math.floor(datos.expiraEn.getTime() / 1000),
+      s: datos.estadoAlEmitir,
     };
     const cuerpo = Buffer.from(JSON.stringify(carga), 'utf8').toString('base64url');
     return `${cuerpo}.${this.firmaDe(datos.copropiedadId, cuerpo).toString('base64url')}`;
@@ -92,6 +98,13 @@ export class FirmanteHmacDeEnlaces implements FirmanteDeEnlaces {
     const expiraEn = new Date(carga.e * 1000);
     if (expiraEn.getTime() <= ahora.getTime()) return null;
 
-    return { copropiedadId: carga.c, consentimientoId: carga.k, titularId: carga.t, expiraEn };
+    if (!ESTADOS.has(carga.s)) return null;
+    return {
+      copropiedadId: carga.c,
+      consentimientoId: carga.k,
+      titularId: carga.t,
+      expiraEn,
+      estadoAlEmitir: carga.s as EstadoConsentimiento,
+    };
   }
 }

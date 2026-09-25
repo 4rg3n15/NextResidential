@@ -52,6 +52,7 @@ import {
 import { VigilarLatidos } from './aplicacion/vigilancia-latidos';
 import { CanalEnProceso } from './infraestructura/canal-en-proceso';
 import { RepositorioEventosPgDeServicio } from './infraestructura/repositorio-eventos-pg-de-servicio';
+import { RepositorioAlertasPg } from './infraestructura/repositorio-alertas-pg';
 import { AlmacenEvidenciaSupabase } from './infraestructura/evidencia-supabase';
 import {
   AlmacenEvidenciaFirmado,
@@ -130,7 +131,19 @@ export class EventosModule {
               : new RepositorioEventosEnMemoria();
           },
         },
-        { provide: REPOSITORIO_ALERTAS, useFactory: () => new RepositorioAlertasEnMemoria() },
+        {
+          /**
+           * D-139 (15-E) · las alertas van a la base con el mismo interruptor
+           * que el histórico: una alerta de lista negra o una emergencia que
+           * se pierde al reiniciar no es evidencia de CA-18.
+           */
+          provide: REPOSITORIO_ALERTAS,
+          inject: [CONFIGURACION, Pool, BITACORA],
+          useFactory: (config: Configuracion, pool: Pool, bitacora: Bitacora) =>
+            config.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new RepositorioAlertasPg(pool, bitacora)
+              : new RepositorioAlertasEnMemoria(),
+        },
         {
           provide: REPOSITORIO_DISPOSITIVOS,
           useFactory: () => new RepositorioDispositivosEnMemoria(),

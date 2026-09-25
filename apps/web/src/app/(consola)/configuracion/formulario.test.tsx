@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { JSX, ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -179,6 +181,31 @@ describe('los dos umbrales técnicos se VEN y no se editan (15-B, B.5)', () => {
     expect(cuerpo).toMatchObject({ nombre: 'Villas del Bosque II', zonaHoraria: 'America/Bogota' });
     expect(cuerpo).not.toHaveProperty('umbralConfianzaPlaca');
     expect(cuerpo).not.toHaveProperty('umbralLatidoMinutos');
+
+    /**
+     * 15-E · y la regla general, no sólo los dos nombres que ya fallaron: cada
+     * clave que la consola manda tiene que existir en el esquema del cuerpo
+     * que la API publica (`CambiosDeConfiguracionDto` del contrato versionado).
+     * `forbidNonWhitelisted` convierte cualquier clave de más en un 400, así
+     * que ésta es la prueba que se pone roja ANTES de que un superadministrador
+     * vuelva a no poder guardar nada.
+     */
+    const contrato = JSON.parse(
+      readFileSync(resolve(process.cwd(), '../../packages/contracts/openapi.json'), 'utf8'),
+    ) as {
+      components: { schemas: Record<string, { properties?: Record<string, unknown> }> };
+    };
+    const admitidas = new Set(
+      Object.keys(contrato.components.schemas['CambiosDeConfiguracionDto']?.properties ?? {}),
+    );
+    expect(admitidas.size).toBeGreaterThan(0);
+    const fueraDelContrato = Object.keys(cuerpo as Record<string, unknown>).filter(
+      (clave) => !admitidas.has(clave),
+    );
+    expect(
+      fueraDelContrato,
+      `la consola manda claves que la API rechaza con 400: ${fueraDelContrato.join(', ')}`,
+    ).toEqual([]);
   });
 });
 

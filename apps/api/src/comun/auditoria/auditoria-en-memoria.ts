@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { RegistroDeAuditoria } from './registro';
+import type { RegistroDeAuditoria, RespuestaDeTitularAuditada } from './registro';
 
 /**
  * Adaptador transitorio de `auditoria_seguridad`.
@@ -43,5 +43,12 @@ export class AuditoriaEnMemoria implements RegistroDeAuditoria {
     userAgent: string | null;
   }): Promise<void> {
     this.restablecimientos.push(entrada);
+  }
+
+  /** Respuestas del titular por su enlace (A3), para que la suite las mire. */
+  readonly respuestasDeTitular: RespuestaDeTitularAuditada[] = [];
+
+  async registrarRespuestaDeTitular(entrada: RespuestaDeTitularAuditada): Promise<void> {
+    this.respuestasDeTitular.push(entrada);
   }
 }

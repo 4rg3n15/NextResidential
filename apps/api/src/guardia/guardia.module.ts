@@ -32,6 +32,8 @@ import {
   RegistroDeBloqueosEnMemoria,
 } from './infraestructura/adaptadores-en-memoria';
 import { AccionadorPorProveedor } from './infraestructura/accionador-por-proveedor';
+import { BitacoraDeOrdenesPg } from './infraestructura/bitacora-de-ordenes-pg';
+import { Pool } from 'pg';
 import { CanalIntercomConTransporte } from './infraestructura/canal-intercom-con-transporte';
 import { anunciarAccionador } from './infraestructura/aviso-de-arranque-del-accionador';
 
@@ -104,7 +106,29 @@ export class GuardiaModule {
           inject: [ACCIONADOR_DE_PUERTA],
           useFactory: (accionador: AccionadorDePuerta & BloqueoDeAcceso) => accionador,
         },
-        { provide: BITACORA_DE_ORDENES, useClass: BitacoraDeOrdenesEnMemoria },
+        {
+          /**
+           * D-139 (15-E) · el historial de órdenes manuales (RN-08) va a la
+           * base con el interruptor del histórico; en memoria sólo para la
+           * suite y para ensayar sin base, y el arranque lo dice.
+           */
+          provide: BITACORA_DE_ORDENES,
+          inject: [CONFIGURACION, Pool, BITACORA],
+          useFactory: (configuracion: Configuracion, pool: Pool, bitacora: Bitacora) => {
+            const enBase = configuracion.PERSISTENCIA_DE_EVENTOS === 'postgres';
+            bitacora.registrar(
+              enBase ? 'info' : 'aviso',
+              `bitácora de órdenes manuales activa: ${configuracion.PERSISTENCIA_DE_EVENTOS}`,
+              {
+                persistencia: configuracion.PERSISTENCIA_DE_EVENTOS,
+                consecuencia: enBase
+                  ? 'las órdenes de portería y guardia quedan en ordenes_manuales'
+                  : 'las órdenes viven en este proceso y se PIERDEN al reiniciar',
+              },
+            );
+            return enBase ? new BitacoraDeOrdenesPg(pool) : new BitacoraDeOrdenesEnMemoria();
+          },
+        },
         { provide: REGISTRO_DE_BLOQUEOS, useClass: RegistroDeBloqueosEnMemoria },
         {
           provide: FijarBloqueoDeAcceso,

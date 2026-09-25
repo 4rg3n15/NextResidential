@@ -153,28 +153,47 @@ export const ESCENARIOS = [
   },
 
   /* ── Videoportero · 6 ───────────────────────────────────────────────── */
+  /*
+   * Lo que el videoportero del proyecto DECLARA en su volcado de capacidades
+   * (docs/insumos, líneas citadas) manda sobre cualquier suposición:
+   *   · suscripción de eventos: SÍ (línea 26) → la API se suscribe y recibe la
+   *     llamada (voiceTalkEvent) sin configurar nada en el equipo;
+   *   · señalización de llamada (callSignal): NO (línea 82) → contestar o colgar
+   *     por señal NO APLICA POR CAPACIDAD; la llamada la atiende el aparato;
+   *   · apertura remota de puerta: SÍ (línea 72) → por el proveedor, atribuida;
+   *   · audio bidireccional: sus canales se descubren por su propia ruta (el
+   *     volcado sólo declara 1 entrada y 1 salida de audio, líneas 22-25); se
+   *     VERIFICÓ el 18/09 que existe con G.711 µ-law y estaba deshabilitado;
+   *   · biblioteca de rostros y personas: NO CONSTAN en el volcado → el
+   *     reconocimiento facial en el videoportero NO APLICA POR CAPACIDAD, salvo
+   *     que la ficha del equipo (sondeo de la biblioteca) lo declare en sitio.
+   */
   {
     id: 'V1',
     familia: 'videoportero',
-    titulo: 'Llamada del videoportero a una vivienda',
-    criterios: 'CU-03 · HU-25 · CA-18',
-    pasos: ['Marcar en el videoportero el edificio y la unidad de una vivienda del padrón'],
+    titulo: 'Llamada del videoportero a una vivienda (aviso del timbre)',
+    criterios: 'CU-03 · HU-25 · CA-18 · capacidad: suscripción de eventos = SÍ',
+    pasos: [
+      'Comprobar en la bitácora de la API que la escucha del videoportero está abierta (se rearma cada 30 s)',
+      'Marcar en el videoportero el edificio y la unidad de una vivienda del padrón',
+    ],
     esperado:
-      'Aviso emergente en portería y en guardia virtual con la vivienda resuelta; queda en /eventos como llamada, no como acceso',
+      'Aviso EMERGENTE en portería y en guardia virtual con la vivienda resuelta; queda en /eventos como llamada, no como acceso. No depende de callSignal',
     motivo: '— (llamada avisada a las consolas)',
     umbral: 'aviso en la consola < 10 000 ms',
   },
   {
     id: 'V2',
     familia: 'videoportero',
-    titulo: 'Audio bidireccional con exclusividad',
-    criterios: 'ADR-01 · HU-26 · CA-19 · KPI-33',
+    titulo: 'Audio bidireccional por su propio canal · contestar por señal NO APLICA',
+    criterios: 'ADR-01 · HU-26 · CA-19 · KPI-33 · capacidad: callSignal = NO',
     pasos: [
-      'Atender la llamada desde la guardia virtual (https o localhost: el micrófono lo exige)',
+      'Con el canal de audio HABILITADO en el equipo, pulsar «Atender» en la guardia virtual (https o localhost: el micrófono lo exige)',
       'Hablar y escuchar; abrir un segundo operador y pedir el mismo canal',
+      'Anotar el formato que la consola muestra (cabecera del flujo) y compararlo con el del panel del equipo',
     ],
     esperado:
-      'Se oye y se habla en el formato que el equipo anuncia; el segundo operador queda EN ESPERA con su puesto; al colgar, el canal se cierra en el equipo',
+      'Se oye y se habla en el formato anunciado (G.711 µ-law); el canal se abrió por su ruta propia, sin señal de llamada; el segundo operador queda EN ESPERA; al colgar, el canal se cierra en el equipo. «Contestar/colgar por señalización»: NO APLICA POR CAPACIDAD (se anota, no se prueba)',
     motivo: '— (canal abierto: transporte equipo)',
     umbral: 'audio extremo a extremo < 2 000 ms (KPI-33), cronómetro en mano',
   },
@@ -184,7 +203,7 @@ export const ESCENARIOS = [
     titulo: 'Video en vivo por WHEP a través de la API',
     criterios: 'CA-19 · KPI-33 · RN-12 · RN-21',
     pasos: [
-      'Con GO2RTC_URL en la API, seleccionar el videoportero en la guardia virtual',
+      'Con GO2RTC_URL en la API, seleccionar el videoportero en la guardia virtual (o pulsar el aviso de llamada)',
       'Leer en la consola «negociación N ms · primer cuadro M ms»; en las herramientas del navegador, comprobar que ninguna petición lleva rtsp:// ni la dirección del equipo',
     ],
     esperado:
@@ -196,10 +215,10 @@ export const ESCENARIOS = [
     id: 'V4',
     familia: 'videoportero',
     titulo: 'Apertura remota desde la central con motivo',
-    criterios: 'CA-20 · RN-08 · KPI-32 · HU-27',
+    criterios: 'CA-20 · RN-08 · KPI-32 · HU-27 · capacidad: apertura remota = SÍ',
     pasos: ['Con la llamada atendida, ABRIR desde la consola escribiendo el motivo'],
     esperado:
-      'La puerta del videoportero abre; la orden queda atribuida al operador con su motivo; evento de apertura',
+      'La puerta del videoportero abre por el proveedor; la orden queda atribuida al operador con su motivo en /ordenes (sobrevive a un reinicio de la API); evento de apertura',
     motivo: '— (orden manual: abrir)',
     umbral: 'orden → relé < 3 000 ms (KPI-32)',
   },
@@ -210,21 +229,23 @@ export const ESCENARIOS = [
     criterios: 'CA-17 · RN-08 · HU-28',
     pasos: ['NEGAR desde la consola con motivo; pulsar «Avisar al residente»'],
     esperado:
-      'La puerta NO se mueve; la negación queda registrada con motivo; el aviso al residente queda como alerta informativa',
+      'La puerta NO se mueve; la negación queda registrada con motivo; el aviso al residente queda como alerta informativa persistida',
     motivo: '— (orden manual: negar)',
     umbral: '—',
   },
   {
     id: 'V6',
     familia: 'videoportero',
-    titulo: 'Operador ocupado en otra copropiedad, escalamiento y emergencia',
-    criterios: 'CU-03 flujos alternos · KPI-35 · HU-29 · CA-18 · RN-18',
+    titulo: 'Operador ocupado en otra copropiedad, escalamiento y emergencia · facial NO APLICA',
+    criterios:
+      'CU-03 flujos alternos · KPI-35 · HU-29 · CA-18 · RN-18 · capacidad: biblioteca de rostros = no consta',
     pasos: [
       'Con el operador atendiendo la copropiedad A, provocar una llamada en la B',
       'Conmutar a la B; comprobar que nada de la A se ve; pulsar EMERGENCIA con motivo',
+      'Anotar lo que la FICHA del videoportero declara de biblioteca de rostros: si la declara, repetir T1–T5 sobre él; si no, escribir NO APLICA POR CAPACIDAD',
     ],
     esperado:
-      'La llamada de B espera en cola con su tiempo; al conmutar no aparece ningún dato de A; la emergencia se escala con severidad crítica',
+      'La llamada de B espera en cola con su tiempo; al conmutar no aparece ningún dato de A; la emergencia se escala con severidad crítica y persiste. Reconocimiento facial en el videoportero: NO APLICA POR CAPACIDAD salvo declaración de la ficha',
     motivo: '— (alerta: panico, crítica)',
     umbral: 'escalamiento < 10 000 ms (CA-18)',
   },

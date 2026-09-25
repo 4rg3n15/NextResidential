@@ -10,6 +10,7 @@ const DATOS = {
   consentimientoId: '50000000-0000-4000-8000-000000000001',
   titularId: '40000000-0000-4000-8000-000000000103',
   expiraEn: new Date(AHORA.getTime() + 3_600_000),
+  estadoAlEmitir: 'pendiente' as const,
 };
 
 describe('FirmanteHmacDeEnlaces · el enlace del titular (A3)', () => {
@@ -28,7 +29,7 @@ describe('FirmanteHmacDeEnlaces · el enlace del titular (A3)', () => {
   it('no lleva ningún dato del titular más allá de identificadores', () => {
     const [cuerpo] = firmante.firmar(DATOS).split('.');
     const carga = Buffer.from(cuerpo ?? '', 'base64url').toString('utf8');
-    expect(Object.keys(JSON.parse(carga) as object).sort()).toEqual(['c', 'e', 'k', 't']);
+    expect(Object.keys(JSON.parse(carga) as object).sort()).toEqual(['c', 'e', 'k', 's', 't']);
   });
 
   it('un carácter cambiado en la carga invalida el enlace', () => {

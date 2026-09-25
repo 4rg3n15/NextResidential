@@ -8,14 +8,17 @@ import {
   Param,
   Post,
   Redirect,
+  Req,
   Res,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { BITACORA, esFallo } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { Publico } from '../../comun/decoradores';
+import { REGISTRO_AUDITORIA } from '../../comun/auditoria';
+import type { RegistroDeAuditoria } from '../../comun/auditoria';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import type { ContextoTenant } from '../../autenticacion';
 import { ResponderConsentimiento, RevocarConsentimiento } from '../aplicacion/casos-de-uso';
@@ -65,7 +68,17 @@ export class ConsentimientoPublicoController {
     private readonly revocar: RevocarConsentimiento,
     private readonly propagar: PropagarConsentimientoAceptado,
     @Inject(BITACORA) private readonly bitacora: Bitacora,
+    @Inject(REGISTRO_AUDITORIA) private readonly auditoria: RegistroDeAuditoria,
   ) {}
+
+  /** Desde dónde respondió el titular: la IP y el agente, para la evidencia (Ley 1581). */
+  private static origenDe(peticion: Request): { ip: string | null; userAgent: string | null } {
+    const agente = peticion.headers['user-agent'];
+    return {
+      ip: peticion.ip ?? null,
+      userAgent: typeof agente === 'string' ? agente : null,
+    };
+  }
 
   // `@Publico()` va en CADA ruta y no en la clase: así cada exención se lee
   // una a una en el diff y en la suite de aislamiento.
@@ -85,7 +98,7 @@ export class ConsentimientoPublicoController {
       respuesta.status(404);
       return paginaDeEnlaceInvalido();
     }
-    return paginaDeConsentimiento(enlace.consentimiento, `${RUTA}/${token}`, null);
+    return paginaDeConsentimiento(enlace.consentimiento, `${RUTA}/${token}`, null, enlace.gastado);
   }
 
   @Publico()
@@ -95,10 +108,12 @@ export class ConsentimientoPublicoController {
   async responderComoTitular(
     @Param('token') token: string,
     @Body() cuerpo: RespuestaDelTitularDto,
+    @Req() peticion: Request,
   ): Promise<{ url: string }> {
     const enlace = await this.resolver.ejecutar(token);
-    // Enlace inválido: la página del GET lo dice con 404. No se responde nada.
-    if (enlace === null) return { url: `${RUTA}/${token}` };
+    // Enlace inválido (404 en el GET) o ya USADO (el GET muestra el estado, sin
+    // formularios): no se responde nada, se vuelve a la página.
+    if (enlace === null || enlace.gastado) return { url: `${RUTA}/${token}` };
 
     const ctx = contextoDeServicio(enlace.datos.copropiedadId);
     const r = await this.responder.ejecutar(ctx, {
@@ -121,6 +136,15 @@ export class ConsentimientoPublicoController {
       consentimientoId: enlace.datos.consentimientoId,
       estado: r.valor.estado,
     });
+    // La evidencia: qué respondió, a qué versión de la política, desde dónde
+    // y cuándo, en la tabla append-only. El agregado guarda el instante.
+    await this.auditoria.registrarRespuestaDeTitular({
+      copropiedadId: enlace.datos.copropiedadId,
+      consentimientoId: enlace.datos.consentimientoId,
+      respuesta: r.valor.estado === 'vigente' ? 'aceptado' : 'rechazado',
+      versionPolitica: enlace.consentimiento.versionPolitica,
+      ...ConsentimientoPublicoController.origenDe(peticion),
+    });
     if (r.valor.estado === 'vigente') {
       // Aceptado: hacia todas las terminales. Lo que no llegue queda en
       // bitácora y se relanza desde la consola; al titular no se le hace
@@ -134,9 +158,12 @@ export class ConsentimientoPublicoController {
   @Post(':token/revocacion')
   @HttpCode(303)
   @Redirect(RUTA, 303)
-  async revocarComoTitular(@Param('token') token: string): Promise<{ url: string }> {
+  async revocarComoTitular(
+    @Param('token') token: string,
+    @Req() peticion: Request,
+  ): Promise<{ url: string }> {
     const enlace = await this.resolver.ejecutar(token);
-    if (enlace === null) return { url: `${RUTA}/${token}` };
+    if (enlace === null || enlace.gastado) return { url: `${RUTA}/${token}` };
 
     const r = await this.revocar.ejecutar(contextoDeServicio(enlace.datos.copropiedadId), {
       consentimientoId: enlace.datos.consentimientoId,
@@ -147,6 +174,15 @@ export class ConsentimientoPublicoController {
       consentimientoId: enlace.datos.consentimientoId,
       ...(esFallo(r) ? { motivo: r.error.detalle } : r.valor),
     });
+    if (!esFallo(r)) {
+      await this.auditoria.registrarRespuestaDeTitular({
+        copropiedadId: enlace.datos.copropiedadId,
+        consentimientoId: enlace.datos.consentimientoId,
+        respuesta: 'revocado',
+        versionPolitica: enlace.consentimiento.versionPolitica,
+        ...ConsentimientoPublicoController.origenDe(peticion),
+      });
+    }
     return { url: `${RUTA}/${token}` };
   }
 }

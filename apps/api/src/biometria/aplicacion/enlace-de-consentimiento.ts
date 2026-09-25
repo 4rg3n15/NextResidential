@@ -76,6 +76,7 @@ export class EmitirEnlaceDeConsentimiento {
       consentimientoId: c.id,
       titularId: c.titularId,
       expiraEn,
+      estadoAlEmitir: c.estado,
     });
     const ruta = `${RUTA_PUBLICA}/${token}`;
     const base = this.opciones.urlPublica?.replace(/\/+$/, '') ?? null;
@@ -94,6 +95,12 @@ export class EmitirEnlaceDeConsentimiento {
 export interface EnlaceResuelto {
   readonly datos: DatosDelEnlace;
   readonly consentimiento: ConsentimientoBiometrico;
+  /**
+   * `true` si el enlace es auténtico pero YA SE USÓ: el consentimiento cambió
+   * de estado después de emitirlo. Se puede mostrar el estado; no se puede
+   * actuar con él.
+   */
+  readonly gastado: boolean;
 }
 
 export class ResolverEnlaceDeConsentimiento {
@@ -103,7 +110,14 @@ export class ResolverEnlaceDeConsentimiento {
     private readonly reloj: Reloj,
   ) {}
 
-  /** `null` en todo caso dudoso: firma, caducidad, consentimiento ausente o de otro titular. */
+  /**
+   * `null` en todo caso dudoso: firma, caducidad, consentimiento ausente o de
+   * otro titular. Un enlace auténtico YA USADO —el consentimiento cambió de
+   * estado después de emitirlo— vuelve con `gastado: true`: vale para MOSTRAR
+   * lo que el titular decidió, no para actuar. Un enlace vale para responder
+   * mientras el consentimiento siga pendiente, y para revocar sólo si se emitió
+   * después de otorgarlo.
+   */
   async ejecutar(token: string): Promise<EnlaceResuelto | null> {
     const datos = this.firmante.verificar(token, this.reloj.ahora());
     if (datos === null) return null;
@@ -112,6 +126,13 @@ export class ResolverEnlaceDeConsentimiento {
       datos.consentimientoId,
     );
     if (consentimiento === null || consentimiento.titularId !== datos.titularId) return null;
-    return { datos, consentimiento };
+    return { datos, consentimiento, gastado: !enlaceVigente(datos, consentimiento) };
   }
 }
+
+/** Puro: la regla de un solo uso, para la prueba y para el resolutor. */
+export const enlaceVigente = (
+  datos: Pick<DatosDelEnlace, 'estadoAlEmitir'>,
+  c: Pick<ConsentimientoBiometrico, 'estado'>,
+): boolean =>
+  c.estado === datos.estadoAlEmitir && (c.estado === 'pendiente' || c.estado === 'vigente');

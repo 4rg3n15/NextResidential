@@ -11,6 +11,7 @@ import type { RepositorioDeEquipos } from '../src/equipos';
 import type { ContextoTenant } from '../src/autenticacion';
 import { FirmanteHmacDeEnlaces } from '../src/biometria/infraestructura/firmante-de-enlaces';
 import { configuracionDePrueba } from './utilidades';
+import { AuditoriaEnMemoria } from '../src/comun/auditoria';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -160,10 +161,6 @@ describe('el enlace del titular', () => {
       .expect(303);
     expect(post.headers.location).toBe(ruta);
 
-    const pagina = await request(app.getHttpServer()).get(ruta).expect(200);
-    expect(pagina.text).toContain('Consentimiento otorgado');
-    expect(pagina.text).toContain('Revocar mi consentimiento');
-
     expect(tienePlantilla(terminalId, plantillaId)).toBe(true);
     expect(tienePlantilla(videoporteroId, plantillaId)).toBe(true);
     expect(tienePlantilla(sinBibliotecaId, plantillaId)).toBe(false);
@@ -175,13 +172,31 @@ describe('el enlace del titular', () => {
     ).expect(200);
     expect(estado.body.estado).toBe('vigente');
 
-    // Y revoca: la plantilla sale de los equipos EN EL ACTO (CA-11).
+    // El enlace con el que aceptó está GASTADO: de un solo uso. Muestra lo que
+    // el titular decidió, sin formularios, y no revoca.
+    const gastado = await request(app.getHttpServer()).get(ruta).expect(200);
+    expect(gastado.text).toContain('Consentimiento otorgado');
+    expect(gastado.text).toContain('Este enlace ya se usó');
+    expect(gastado.text).not.toContain('Revocar mi consentimiento');
     await request(app.getHttpServer()).post(`${ruta}/revocacion`).expect(303);
+    expect(tienePlantilla(terminalId, plantillaId)).toBe(true);
+
+    // Para revocar hace falta un enlace NUEVO, emitido después de otorgar.
+    const { ruta: rutaNueva } = await emitirEnlace(consentimientoId);
+    const otorgado = await request(app.getHttpServer()).get(rutaNueva).expect(200);
+    expect(otorgado.text).toContain('Consentimiento otorgado');
+    expect(otorgado.text).toContain('Revocar mi consentimiento');
+
+    // Y revoca: la plantilla sale de los equipos EN EL ACTO (CA-11).
+    await request(app.getHttpServer()).post(`${rutaNueva}/revocacion`).expect(303);
     expect(tienePlantilla(terminalId, plantillaId)).toBe(false);
     expect(tienePlantilla(videoporteroId, plantillaId)).toBe(false);
-    const cerrada = await request(app.getHttpServer()).get(ruta).expect(200);
+    const revocado = await con(tokenAdmin, 'get', `${base}/consentimientos/${consentimientoId}`);
+    expect(revocado.body.estado).toBe('revocado');
+    // Y ese enlace también quedó gastado: muestra «revocado», sin formularios.
+    const cerrada = await request(app.getHttpServer()).get(rutaNueva).expect(200);
     expect(cerrada.text).toContain('revocado');
-    expect(cerrada.text).not.toContain('Acepto');
+    expect(cerrada.text).not.toContain('<form');
   });
 
   it('el titular rechaza: nada viaja y la página lo dice', async () => {
@@ -193,15 +208,20 @@ describe('el enlace del titular', () => {
       .send({ acepta: 'no' })
       .expect(303);
     expect(tienePlantilla(terminalId, plantillaId)).toBe(false);
+    // El enlace se gastó con el rechazo: muestra el estado y ningún formulario.
     const pagina = await request(app.getHttpServer()).get(ruta).expect(200);
     expect(pagina.text).toContain('rechazado');
+    expect(pagina.text).toContain('Este enlace ya se usó');
+    expect(pagina.text).not.toContain('<form');
+    const estado = await con(tokenAdmin, 'get', `${base}/consentimientos/${consentimientoId}`);
+    expect(estado.body.estado).toBe('rechazado');
     // Un consentimiento cerrado ya no admite enlace nuevo.
     await con(tokenPortero, 'post', `${base}/consentimientos/${consentimientoId}/enlace`)
       .send()
       .expect(403);
   });
 
-  it('responder dos veces no cambia nada: la segunda vuelve a la página tal cual', async () => {
+  it('responder dos veces con el mismo enlace: la segunda no cambia nada (un solo uso)', async () => {
     const { consentimientoId } = await capturar();
     const { ruta } = await emitirEnlace(consentimientoId);
     await request(app.getHttpServer())
@@ -215,6 +235,28 @@ describe('el enlace del titular', () => {
       .expect(303);
     const estado = await con(tokenAdmin, 'get', `${base}/consentimientos/${consentimientoId}`);
     expect(estado.body.estado).toBe('rechazado');
+    const pagina = await request(app.getHttpServer()).get(ruta).expect(200);
+    expect(pagina.text).not.toContain('<form');
+  });
+
+  it('la respuesta del titular deja evidencia: versión de la política, respuesta y origen', async () => {
+    const { consentimientoId } = await capturar();
+    const { ruta } = await emitirEnlace(consentimientoId);
+    const auditoria = app.get(AuditoriaEnMemoria);
+    const antes = auditoria.respuestasDeTitular.length;
+    await request(app.getHttpServer())
+      .post(`${ruta}/respuesta`)
+      .type('form')
+      .set('User-Agent', 'telefono-del-visitante/1.0')
+      .send({ acepta: 'si' })
+      .expect(303);
+    const constancia = auditoria.respuestasDeTitular
+      .slice(antes)
+      .find((r) => r.consentimientoId === consentimientoId);
+    expect(constancia?.respuesta).toBe('aceptado');
+    expect(constancia?.versionPolitica).toBe('v1.0');
+    expect(constancia?.userAgent).toBe('telefono-del-visitante/1.0');
+    expect(constancia?.ip).toBeTruthy();
   });
 
   it('una respuesta que no es si/no se rechaza con 400', async () => {
@@ -244,6 +286,7 @@ describe('el enlace del titular', () => {
       consentimientoId,
       titularId: TITULAR,
       expiraEn: new Date(Date.now() + HORA),
+      estadoAlEmitir: 'pendiente' as const,
     });
     await request(app.getHttpServer()).get(`/consentimiento/${ajeno}`).expect(404);
 
@@ -252,6 +295,7 @@ describe('el enlace del titular', () => {
       consentimientoId,
       titularId: TITULAR,
       expiraEn: new Date(Date.now() - 1000),
+      estadoAlEmitir: 'pendiente' as const,
     });
     await request(app.getHttpServer()).get(`/consentimiento/${caducado}`).expect(404);
     await request(app.getHttpServer())

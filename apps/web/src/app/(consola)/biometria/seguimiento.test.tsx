@@ -72,6 +72,26 @@ describe('SeguimientoDeConsentimiento', () => {
     const campo = await screen.findByLabelText('Enlace del titular');
     expect((campo as HTMLInputElement).value).toBe('/consentimiento/abc.def');
     expect(screen.getByText(/API_URL_PUBLICA/)).toBeTruthy();
+    // Sin URL pública no hay QR que valga: un QR de una ruta relativa no abre nada.
+    expect(screen.queryByRole('img', { name: /Código QR/ })).toBeNull();
+  });
+
+  it('con API_URL_PUBLICA muestra el QR del enlace, de un solo uso (BE-01: sin correo)', async () => {
+    respuestas[`/copropiedades/${COP}/biometria/consentimientos/${CONSENTIMIENTO}/enlace`] = () =>
+      json({
+        consentimientoId: CONSENTIMIENTO,
+        estado: 'pendiente',
+        token: 'abc.def',
+        ruta: '/consentimiento/abc.def',
+        url: 'http://consola.invalid:3000/consentimiento/abc.def',
+        expiraEn: new Date(Date.now() + 3_600_000).toISOString(),
+      });
+    montar();
+    fireEvent.click(screen.getByRole('button', { name: /Generar enlace para el titular/ }));
+    const qr = await screen.findByRole('img', { name: /Código QR del enlace del titular/ });
+    expect(Number(qr.getAttribute('data-modulos'))).toBeGreaterThanOrEqual(21);
+    expect(qr.querySelectorAll('rect').length).toBeGreaterThan(50);
+    expect(screen.getByText(/un solo uso/)).toBeTruthy();
   });
 
   it('sin aceptación del titular NO sincroniza: lo comprueba y lo dice', async () => {

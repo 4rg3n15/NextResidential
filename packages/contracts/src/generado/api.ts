@@ -2858,6 +2858,8 @@ export interface components {
              * @description El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10).
              */
             consentimientoId: string | null;
+            /** @description A3 (15-E) · el enlace que el residente ENTREGA al visitante para que responda desde su teléfono, sin cuenta. De un solo uso y con caducidad. URL completa si la API declara API_URL_PUBLICA; si no, la ruta. Nulo cuando la captura no se aceptó. */
+            enlaceDeConsentimiento: string | null;
             /** @description A quién se le pidió: el visitante, no el residente que tomó la foto */
             titular: string | null;
             calidad: number | null;

@@ -55,7 +55,17 @@ export const paginaDeConsentimiento = (
   c: ConsentimientoBiometrico,
   rutaBase: string,
   aviso: string | null,
+  /**
+   * `true` cuando el enlace ya se USÓ: el consentimiento cambió de estado
+   * después de emitirlo. Se muestra el estado —es lo que el propio titular
+   * acaba de decidir— pero sin ningún formulario: un enlace de un solo uso no
+   * acepta, rechaza ni revoca dos veces.
+   */
+  gastado = false,
 ): string => {
+  const avisoDeUso = gastado
+    ? `<p role="status"><strong>Este enlace ya se usó.</strong> Si necesita cambiar su decisión, pida un enlace nuevo a quien gestiona su visita.</p>`
+    : '';
   const ficha = `
 <dl>
 <dt>Finalidad</dt><dd>${escapar(c.finalidad === 'control_acceso' ? 'control de acceso a la copropiedad' : c.finalidad)}</dd>
@@ -65,7 +75,7 @@ export const paginaDeConsentimiento = (
 </dl>`;
   const nota = aviso === null ? '' : `<p role="status"><strong>${escapar(aviso)}</strong></p>`;
 
-  if (c.estado === 'pendiente') {
+  if (c.estado === 'pendiente' && !gastado) {
     return documento(
       'Consentimiento para el uso de su rostro',
       `${nota}
@@ -82,15 +92,18 @@ ${formulario(`${rutaBase}/respuesta`, '<input type="hidden" name="acepta" value=
   }
 
   if (c.estado === 'vigente') {
+    const revocar = gastado
+      ? ''
+      : `<p>Puede <strong>revocar</strong> este consentimiento en cualquier momento. Al hacerlo, su plantilla
+se elimina de inmediato de la base y de los equipos de acceso.</p>
+${formulario(`${rutaBase}/revocacion`, '', 'Revocar mi consentimiento')}`;
     return documento(
       'Consentimiento otorgado',
-      `${nota}
+      `${nota}${avisoDeUso}
 <p>Su rostro puede usarse para reconocerlo en los accesos mientras dure su visita. Otorgado el
 ${escapar(fecha(c.otorgadoEn))}.</p>
 ${ficha}
-<p>Puede <strong>revocar</strong> este consentimiento en cualquier momento. Al hacerlo, su plantilla
-se elimina de inmediato de la base y de los equipos de acceso.</p>
-${formulario(`${rutaBase}/revocacion`, '', 'Revocar mi consentimiento')}`,
+${revocar}`,
     );
   }
 
@@ -101,7 +114,7 @@ ${formulario(`${rutaBase}/revocacion`, '', 'Revocar mi consentimiento')}`,
   };
   return documento(
     titulos[c.estado] ?? 'Consentimiento',
-    `${nota}
+    `${nota}${avisoDeUso}
 <p>Este consentimiento ya está cerrado (${escapar(c.estado)}). Ningún dato biométrico suyo queda
 en uso; si desea registrarse de nuevo, pida una nueva solicitud a quien gestiona su visita.</p>
 ${ficha}`,

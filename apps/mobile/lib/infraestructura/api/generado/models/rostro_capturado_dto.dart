@@ -13,6 +13,7 @@ class RostroCapturadoDto {
     required this.motivos,
     required this.plantillaId,
     required this.consentimientoId,
+    required this.enlaceDeConsentimiento,
     required this.titular,
     required this.calidad,
   });
@@ -27,6 +28,9 @@ class RostroCapturadoDto {
 
   /// El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10).
   final String? consentimientoId;
+
+  /// A3 (15-E) · el enlace que el residente ENTREGA al visitante para que responda desde su teléfono, sin cuenta. De un solo uso y con caducidad. URL completa si la API declara API_URL_PUBLICA; si no, la ruta. Nulo cuando la captura no se aceptó.
+  final String? enlaceDeConsentimiento;
 
   /// A quién se le pidió: el visitante, no el residente que tomó la foto
   final String? titular;

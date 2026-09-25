@@ -183,6 +183,10 @@ idempotencia (RN-17). El equipo también admite JSON por parte
    consentimiento **a nombre del visitante** (RN-10) y devuelve un **enlace
    firmado** (`API_URL_PUBLICA/consentimiento/<token>`) que el residente le
    pasa al visitante. El visitante acepta o rechaza en su teléfono, sin sesión.
+   El enlace es de **un solo uso** (deja de valer en cuanto el consentimiento
+   cambia de estado) y la consola lo muestra también como **QR** (BE-01: el
+   correo está bloqueado). La respuesta queda en `auditoria_seguridad` con la
+   versión de la política, el momento, la IP y el agente del teléfono.
    Sólo tras aceptar se genera la plantilla y se sincroniza a **todas** las
    terminales con biblioteca (`FDLib`): alta de persona
    (`POST /ISAPI/AccessControl/UserInfo/Record`), carga de la plantilla
@@ -232,7 +236,13 @@ idempotencia (RN-17). El equipo también admite JSON por parte
    Ningún equipo va en ese fichero. `PUENTE_VIDEO_URL` de la consola se queda
    vacío. Reproducir video no exige TLS; el micrófono sí.
 
-5. **Apertura de la puerta**: orden aparte por `/guardia/ordenes` con motivo,
+5. **Reconocimiento facial en el videoportero**: el volcado del equipo del
+   proyecto **no declara** biblioteca de rostros ni gestión de personas
+   (`docs/insumos/hikvision/hik-videoportero-capabilities.xml`; sí declara
+   `isSupportFaceContrast`, l. 64, que es detección, no biblioteca). Hasta que
+   la ficha lo sondee en sitio es **NO APLICA POR CAPACIDAD**: T1–T5 se
+   ejecutan en la terminal, no en el videoportero.
+6. **Apertura de la puerta**: orden aparte por `/guardia/ordenes` con motivo,
    atribuida al operador (`PUT /ISAPI/AccessControl/RemoteControl/door/<canal>`,
    **DOCUMENTADO**). Nunca por el canal de audio.
 

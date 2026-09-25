@@ -78,18 +78,17 @@ export class BitacoraDeOrdenesEnMemoria implements BitacoraDeOrdenes {
    * no depende de ésta: si ésta falla, la orden sigue registrada.
    */
   async anotarResultado(
+    copropiedadId: string,
     id: string,
     resultado: EstadoDeAccionamiento,
     detalle: string | null,
   ): Promise<void> {
-    for (const [copropiedad, lista] of this.porCopropiedad) {
-      const indice = lista.findIndex((o) => o.id === id);
-      if (indice === -1) continue;
-      const actualizada = [...lista];
-      actualizada[indice] = { ...lista[indice]!, resultado, detalle };
-      this.porCopropiedad.set(copropiedad, actualizada);
-      return;
-    }
+    const lista = this.porCopropiedad.get(copropiedadId) ?? [];
+    const indice = lista.findIndex((o) => o.id === id);
+    if (indice === -1) return;
+    const actualizada = [...lista];
+    actualizada[indice] = { ...lista[indice]!, resultado, detalle };
+    this.porCopropiedad.set(copropiedadId, actualizada);
   }
 
   async ultimas(copropiedadId: string, cuantas: number): Promise<readonly OrdenEjecutada[]> {
