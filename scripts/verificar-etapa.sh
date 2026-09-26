@@ -244,11 +244,51 @@ echo "$salida" | grep -E "Tests +[0-9]" | sed 's/^/   /'
 # cuando `grep -q` puede terminar antes que `echo`.
 #
 # Por eso aquí se usa `<<<`, que no crea tubería y no puede romperse así.
+# ─────────────────────────────────────────────────────────────────────────────
+# 15-K · LA ROJA SE NOMBRA DESDE EL JSON, NO DESDE UN `grep` SOBRE LA CONSOLA.
+#
+# En la segunda corrida final de la 15-K, `@ncr/api` terminó con «1 failed» y
+# este paso imprimió diez líneas que contenían «error»: pruebas VERDES llamadas
+# `errores-…` y trazas JSON de peticiones fallidas a propósito. El nombre de la
+# roja estaba en el `.informe-paso5.json` que este mismo paso acaba de pedir, y
+# no se leyó. Es la familia de D-100 otra vez: el dato está y nadie lo imprime.
+# ─────────────────────────────────────────────────────────────────────────────
+nombrar_rojas() {
+  node -e '
+    const { existsSync, readFileSync, readdirSync } = require("node:fs");
+    let n = 0;
+    for (const raiz of ["apps", "packages"]) {
+      for (const p of readdirSync(raiz)) {
+        const f = `${raiz}/${p}/.informe-paso5.json`;
+        if (!existsSync(f)) continue;
+        let r;
+        try { r = JSON.parse(readFileSync(f, "utf8")); } catch { console.log(`${f}: ilegible`); continue; }
+        for (const t of r.testResults ?? []) {
+          const fichero = String(t.name).replace(/.*?\/(apps|packages)\//, "$1/");
+          if ((t.assertionResults ?? []).length === 0 && t.status === "failed") {
+            n += 1;
+            console.log(`ROJA ${fichero} (el fichero no llegó a ejecutar pruebas)`);
+            console.log(`  ${String(t.message ?? "").replace(/\s+/g, " ").slice(0, 300)}`);
+          }
+          for (const a of t.assertionResults ?? []) {
+            if (a.status !== "failed") continue;
+            n += 1;
+            console.log(`ROJA ${fichero} › ${a.fullName}`);
+            console.log(`  ${(a.failureMessages ?? []).join(" ").replace(/\s+/g, " ").slice(0, 300)}`);
+          }
+        }
+      }
+    }
+    if (n === 0) console.log("ningún informe JSON nombra una roja: mire la salida de turbo");
+  ' 2>&1 | head -24 | sed 's/^/     /'
+}
 if [[ $codigo_pruebas -ne 0 ]]; then
   mal "la suite no terminó bien (código $codigo_pruebas): puede que ni siquiera llegara a correr"
-  grep -E "error|Error|ERR_|×|→" "$salida_pruebas" | head -10 | sed 's/^/     /'
+  nombrar_rojas
+  grep -E "ERR_|×|→|FAIL " "$salida_pruebas" | head -10 | sed 's/^/     /'
 elif grep -qE "Tests +[0-9]+ failed|FAIL " <<<"$salida"; then
   mal "hay pruebas en rojo"
+  nombrar_rojas
   echo "$salida" | grep -E "×|→" | head -10 | sed 's/^/     /'
 elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida" && [[ "$CON_BASE" == "1" ]]; then
   # ───────────────────────────────────────────────────────────────────────────
