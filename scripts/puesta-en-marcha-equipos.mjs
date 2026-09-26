@@ -121,7 +121,7 @@ const {
   RUTAS,
   ClienteDeEquipo,
   CARRIL_VERIFICADO_DE_LA_CAMARA,
-  TerminalFacial,
+  cargaDePruebaDeRostro,
   diagnosticarEquipo,
   documentoSaneado,
   equiposSimulados,
@@ -685,39 +685,29 @@ for (const entrada of FAMILIAS) {
     (entrada.familia === 'videoportero' && c?.bibliotecaDeRostros.estado === 'si');
   if (capturar && conBiblioteca) {
     anotar('   ── Carga de prueba (--capturar): imagen sintética SIN rostro');
-    const terminal = new TerminalFacial({ ...conexion, modo: 'decide_el_equipo' });
-    const plantillaId = randomUUID();
-    let aceptada = false;
-    try {
-      await terminal.sincronizar('captura-de-sitio', plantillaId, IMAGEN_SINTETICA);
-      aceptada = true;
-      anotar(
-        '   ⚠ el equipo ACEPTÓ una imagen sin rostro: no valida lo que recibe. Anótelo en la hoja.',
-      );
-    } catch (error) {
-      anotar(
-        `   · el equipo la rechazó (lo esperado): ${String(error?.message ?? error).slice(0, 300)}`,
-      );
-    }
-    try {
-      if (aceptada) await terminal.suprimir('captura-de-sitio', plantillaId);
-      const baja = await terminal.darDeBajaPersona(plantillaId);
-      anotar(
-        `   · baja de la persona de prueba pedida: HTTP ${String(baja.estado)} (el equipo la ejecuta en segundo plano)`,
-      );
-      if (!baja.ok) {
-        // Un rechazo de la baja es inocuo si la persona nunca llegó a crearse,
-        // y no lo es si se creó: sólo el equipo lo sabe, así que se dice.
-        anotar(
-          `   ⚠ la baja no se aceptó: compruebe en el equipo que no quedó la persona ${plantillaId.replace(/-/g, '')}`,
-        );
-      }
-    } catch (error) {
+    const prueba = await cargaDePruebaDeRostro(conexion, IMAGEN_SINTETICA, randomUUID());
+    anotar(
+      prueba.aceptada
+        ? '   ⚠ el equipo ACEPTÓ una imagen sin rostro: no valida lo que recibe. Anótelo en la hoja.'
+        : `   · el equipo la rechazó (lo esperado): ${String(prueba.rechazo).slice(0, 300)}`,
+    );
+    if (prueba.baja === null) {
       huboProblema = true;
       anotar(
-        `   ⚠ no se pudo dar de baja la persona de prueba (${String(error?.message ?? error).slice(0, 200)}): ` +
-          'bórrela a mano en el equipo antes de seguir',
+        `   ⚠ no se pudo dar de baja la persona de prueba ${prueba.employeeNo} ` +
+          `(${String(prueba.errorDeBaja).slice(0, 200)}): bórrela a mano en el equipo antes de seguir`,
       );
+    } else {
+      anotar(
+        `   · baja de la persona de prueba pedida: HTTP ${String(prueba.baja.estado)} (el equipo la ejecuta en segundo plano)`,
+      );
+      // Un rechazo de la baja es inocuo si la persona nunca llegó a crearse, y
+      // no lo es si se creó: sólo el equipo lo sabe, así que se dice.
+      if (!prueba.baja.ok) {
+        anotar(
+          `   ⚠ la baja no se aceptó: compruebe en el equipo que no quedó la persona ${prueba.employeeNo}`,
+        );
+      }
     }
   }
   if (capturar) {
