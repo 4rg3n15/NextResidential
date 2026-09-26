@@ -28,6 +28,13 @@ ConfiguracionDeCopropiedadDto _$ConfiguracionDeCopropiedadDtoFromJson(
   plazoConsentimientoHoras: json['plazoConsentimientoHoras'] as num,
   margenCacheReglasHoras: json['margenCacheReglasHoras'] as num,
   versionReglasActual: json['versionReglasActual'] as num,
+  codigoCorto: json['codigoCorto'] as String?,
+  telefonoPorteria: json['telefonoPorteria'] as String?,
+  topeVehiculosPropios: json['topeVehiculosPropios'] as num,
+  aprobacionDeTerceros:
+      ConfiguracionDeCopropiedadDtoAprobacionDeTerceros.fromJson(
+        json['aprobacionDeTerceros'] as String,
+      ),
   editables: (json['editables'] as List<dynamic>)
       .map((e) => e as String)
       .toList(),
@@ -50,5 +57,9 @@ Map<String, dynamic> _$ConfiguracionDeCopropiedadDtoToJson(
   'plazoConsentimientoHoras': instance.plazoConsentimientoHoras,
   'margenCacheReglasHoras': instance.margenCacheReglasHoras,
   'versionReglasActual': instance.versionReglasActual,
+  'codigoCorto': instance.codigoCorto,
+  'telefonoPorteria': instance.telefonoPorteria,
+  'topeVehiculosPropios': instance.topeVehiculosPropios,
+  'aprobacionDeTerceros': instance.aprobacionDeTerceros,
   'editables': instance.editables,
 };

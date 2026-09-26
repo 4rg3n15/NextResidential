@@ -27,7 +27,7 @@
             }
           },
           "401": {
-            "description": "Usuario, NIT o contraseña incorrectos",
+            "description": "Código o NIT, usuario o contraseña incorrectos",
             "content": {
               "application/json": {
                 "schema": {
@@ -57,7 +57,7 @@
             }
           }
         },
-        "summary": "Inicio de sesión por correo o por NIT y usuario",
+        "summary": "Inicio de sesión por correo, o por código (o NIT) y usuario",
         "tags": [
           "cuentas"
         ]
@@ -3231,6 +3231,86 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/alta": {
+      "get": {
+        "operationId": "MiAltaController_estado",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeMiAltaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Qué le falta al residente para operar: vivienda y ocupantes (3.2)",
+        "tags": [
+          "residente"
+        ]
+      },
+      "post": {
+        "operationId": "MiAltaController_alta",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AltaDeMiViviendaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeAltaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Primer ingreso: contacto, documento, vivienda y código (3.2)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/autorizaciones": {
       "get": {
         "operationId": "MiController_autorizaciones",
@@ -3309,6 +3389,58 @@
           }
         ],
         "summary": "Autorizo a un visitante de mi vivienda (HU-07, HU-08, HU-09, M-4)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/consentimientos/{consentimientoId}": {
+      "get": {
+        "operationId": "MiHogarController_estadoDelConsentimiento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "consentimientoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeConsentimientoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "¿Respondió mi visitante? pendiente, aceptado o rechazado (RN-10)",
         "tags": [
           "residente"
         ]
@@ -3518,6 +3650,166 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/ocupantes": {
+      "get": {
+        "operationId": "MiAltaController_ocupantes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MisOcupantesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mis ocupantes y los códigos de las plazas libres (3.3)",
+        "tags": [
+          "residente"
+        ]
+      },
+      "post": {
+        "operationId": "MiAltaController_declararOcupantes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclaracionDeOcupantesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MisOcupantesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Declaro cuántos ocupantes hay: una vez y definitivo (D6)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/perfil": {
+      "get": {
+        "operationId": "MiHogarController_perfil",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilDelResidenteDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mi perfil, mi copropiedad y el teléfono de portería (3.5, D7)",
+        "tags": [
+          "residente"
+        ]
+      },
+      "put": {
+        "operationId": "MiHogarController_editar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerfilDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDePerfilDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edito mis datos personales y de contacto (3.5)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/vehiculos": {
       "get": {
         "operationId": "MiController_vehiculos",
@@ -3552,6 +3844,140 @@
           }
         ],
         "summary": "Los vehículos de mi vivienda (HU-05, HU-06 lectura, M-3)",
+        "tags": [
+          "residente"
+        ]
+      },
+      "post": {
+        "operationId": "MiHogarController_vehiculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehiculoPropioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeVehiculoPropioDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registro un vehículo propio: activo al instante, dentro del tope (D5 a)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/vehiculos/{vehiculoId}/desactivacion": {
+      "post": {
+        "operationId": "MiHogarController_desactivar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vehiculoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehiculoDesactivadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Doy de baja un vehículo propio de mi vivienda; libera el cupo",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/vinculacion": {
+      "post": {
+        "operationId": "MiAltaController_cambioDeVivienda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AltaDeMiViviendaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeAltaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambio de vivienda desde el perfil: siempre con código (3.5)",
         "tags": [
           "residente"
         ]
@@ -4730,6 +5156,128 @@
         ]
       }
     },
+    "/copropiedades/{id}/residentes/cuentas": {
+      "get": {
+        "operationId": "SupervisionDeResidentesController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CuentaDeResidenteDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cuentas de residentes y su vivienda (sin correo)",
+        "tags": [
+          "residentes"
+        ]
+      },
+      "post": {
+        "operationId": "SupervisionDeResidentesController_alta",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AltaDeCuentaDeResidenteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaDeResidenteCreadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alta de un residente con usuario y contraseña inicial (3.1)",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
+    "/copropiedades/{id}/residentes/vehiculos": {
+      "get": {
+        "operationId": "SupervisionDeResidentesController_vehiculos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VehiculoDeResidenteDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vehículos registrados por residentes, con fecha y vivienda (D5 a)",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
     "/copropiedades/{id}/tablero/accesos-por-hora": {
       "get": {
         "operationId": "TableroController_leerAccesosPorHora",
@@ -5115,6 +5663,170 @@
         "summary": "Restablece la contraseña de una cuenta con una temporal y cambio obligatorio",
         "tags": [
           "cuentas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/viviendas/{viviendaId}/ocupantes": {
+      "get": {
+        "operationId": "OcupantesDeViviendaController_ver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlazaDeOcupanteDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plazas de ocupante de una vivienda, con los códigos libres (D6)",
+        "tags": [
+          "residentes"
+        ]
+      },
+      "post": {
+        "operationId": "OcupantesDeViviendaController_anadir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnadirOcupantesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlazaDeOcupanteDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Añade ocupantes a petición del residente, con motivo (D6)",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
+    "/copropiedades/{id}/viviendas/{viviendaId}/ocupantes/{plazaId}/retiro": {
+      "post": {
+        "operationId": "OcupantesDeViviendaController_retirar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "plazaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetiroDeOcupanteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlazaRetiradaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quita un ocupante; si la plaza estaba ocupada, da de baja el vínculo (D6)",
+        "tags": [
+          "residentes"
         ]
       }
     },
@@ -5815,6 +6527,11 @@
             "maxLength": 254,
             "description": "Cuentas por correo"
           },
+          "codigo": {
+            "type": "string",
+            "maxLength": 8,
+            "description": "Código corto de la copropiedad (D1): 3 a 8 letras o números"
+          },
           "nit": {
             "type": "string",
             "maxLength": 20,
@@ -6007,6 +6724,36 @@
           "notas"
         ]
       },
+      "AltaDeCuentaDeResidenteDto": {
+        "type": "object",
+        "properties": {
+          "usuario": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 32,
+            "example": "casa42.ana"
+          },
+          "contrasenaInicial": {
+            "type": "string",
+            "format": "password",
+            "maxLength": 256
+          },
+          "nombre": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "telefono": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 24
+          }
+        },
+        "required": [
+          "usuario",
+          "contrasenaInicial",
+          "nombre"
+        ]
+      },
       "AltaDeEquipoDto": {
         "type": "object",
         "properties": {
@@ -6087,6 +6834,35 @@
           "usuario"
         ]
       },
+      "AltaDeMiViviendaDto": {
+        "type": "object",
+        "properties": {
+          "perfil": {
+            "$ref": "#/components/schemas/PerfilDto"
+          },
+          "identificador": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "El número de la vivienda, que tiene que EXISTIR"
+          },
+          "agrupacion": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60,
+            "description": "La agrupación (torre, manzana…): obligatoria en un conjunto de apartamentos"
+          },
+          "codigo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 12,
+            "description": "Código de ocupante. Nulo = «no lo tengo» (sólo si la vivienda no tiene cuenta)"
+          }
+        },
+        "required": [
+          "perfil",
+          "identificador"
+        ]
+      },
       "AltaDePorteroDto": {
         "type": "object",
         "properties": {
@@ -6133,6 +6909,24 @@
           "sectores",
           "usuario",
           "contrasenaInicial"
+        ]
+      },
+      "AnadirOcupantesDto": {
+        "type": "object",
+        "properties": {
+          "cantidad": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "cantidad",
+          "motivo"
         ]
       },
       "AparatoRegistradoDto": {
@@ -6501,8 +7295,38 @@
               "denegar",
               "escalar_portero"
             ]
+          },
+          "codigoCorto": {
+            "type": "string",
+            "example": "MIRA",
+            "description": "D1 · código corto de acceso: 3 a 8 letras o números (sólo superadministrador)"
+          },
+          "telefonoPorteria": {
+            "type": "string",
+            "example": "+57 601 555 0100",
+            "description": "D7 · teléfono de portería; vacío lo borra (sólo superadministrador)"
+          },
+          "topeVehiculosPropios": {
+            "type": "number",
+            "example": 2,
+            "description": "D5 a · vehículos propios por vivienda (sólo superadministrador)"
           }
         }
+      },
+      "CampoRechazadoDto": {
+        "type": "object",
+        "properties": {
+          "campo": {
+            "type": "string"
+          },
+          "motivo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "campo",
+          "motivo"
+        ]
       },
       "CapacidadDeAudioDto": {
         "type": "object",
@@ -6841,6 +7665,30 @@
             "type": "number",
             "example": 3
           },
+          "codigoCorto": {
+            "type": "string",
+            "nullable": true,
+            "example": "MIRA",
+            "description": "D1 · código corto de acceso; null mientras no se asigne (sólo se entra por NIT)."
+          },
+          "telefonoPorteria": {
+            "type": "string",
+            "nullable": true,
+            "example": "+576015550100",
+            "description": "D7 · teléfono al que llama el botón «Portería» de la app."
+          },
+          "topeVehiculosPropios": {
+            "type": "number",
+            "example": 2,
+            "description": "D5 a · vehículos propios por vivienda."
+          },
+          "aprobacionDeTerceros": {
+            "type": "string",
+            "enum": [
+              "automatica"
+            ],
+            "description": "D5 c · solo lectura: modo de aprobación de terceros (ADR-027)."
+          },
           "editables": {
             "description": "Ajustes que ESTE rol puede cambiar. La consola deshabilita el resto.",
             "type": "array",
@@ -6864,6 +7712,10 @@
           "plazoConsentimientoHoras",
           "margenCacheReglasHoras",
           "versionReglasActual",
+          "codigoCorto",
+          "telefonoPorteria",
+          "topeVehiculosPropios",
+          "aprobacionDeTerceros",
           "editables"
         ]
       },
@@ -7224,6 +8076,56 @@
           "aforoMaximo"
         ]
       },
+      "CuentaDeResidenteCreadaDto": {
+        "type": "object",
+        "properties": {
+          "usuarioId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "usuarioId"
+        ]
+      },
+      "CuentaDeResidenteDto": {
+        "type": "object",
+        "properties": {
+          "usuarioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "usuario": {
+            "type": "string",
+            "nullable": true
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "vivienda": {
+            "type": "string",
+            "nullable": true
+          },
+          "activa": {
+            "type": "boolean"
+          },
+          "debeCambiarContrasena": {
+            "type": "boolean"
+          },
+          "creadaEn": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "usuario",
+          "nombre",
+          "vivienda",
+          "activa",
+          "debeCambiarContrasena",
+          "creadaEn"
+        ]
+      },
       "DatosDeTurnoDto": {
         "type": "object",
         "properties": {
@@ -7347,6 +8249,24 @@
           "permitido",
           "reglaAplicada",
           "versionDeReglas"
+        ]
+      },
+      "DeclaracionDeOcupantesDto": {
+        "type": "object",
+        "properties": {
+          "numero": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "confirmoQueEsDefinitivo": {
+            "type": "boolean",
+            "description": "El residente confirmó que el número es DEFINITIVO"
+          }
+        },
+        "required": [
+          "numero",
+          "confirmoQueEsDefinitivo"
         ]
       },
       "DefinicionKpiDto": {
@@ -8016,6 +8936,24 @@
           "formatoDeAudio"
         ]
       },
+      "EstadoDeConsentimientoDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "aceptado",
+              "rechazado",
+              "revocado",
+              "expirado"
+            ]
+          }
+        },
+        "required": [
+          "estado"
+        ]
+      },
       "EstadoDeDispositivosDto": {
         "type": "object",
         "properties": {
@@ -8043,6 +8981,38 @@
           "saludables",
           "degradados",
           "caidos"
+        ]
+      },
+      "EstadoDeMiAltaDto": {
+        "type": "object",
+        "properties": {
+          "completa": {
+            "type": "boolean"
+          },
+          "viviendaVinculada": {
+            "type": "boolean"
+          },
+          "debeDeclararOcupantes": {
+            "type": "boolean"
+          },
+          "vocabulario": {
+            "$ref": "#/components/schemas/VocabularioDeAltaDto"
+          },
+          "pideAgrupacion": {
+            "type": "boolean"
+          },
+          "avisoOcupantes": {
+            "type": "string",
+            "description": "El texto que la pantalla muestra ANTES de confirmar (D6)"
+          }
+        },
+        "required": [
+          "completa",
+          "viviendaVinculada",
+          "debeDeclararOcupantes",
+          "vocabulario",
+          "pideAgrupacion",
+          "avisoOcupantes"
         ]
       },
       "EstadoDeSesionDto": {
@@ -9467,6 +10437,32 @@
           "activo"
         ]
       },
+      "MisOcupantesDto": {
+        "type": "object",
+        "properties": {
+          "declarados": {
+            "type": "number"
+          },
+          "declarada": {
+            "type": "boolean"
+          },
+          "plazas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlazaDeOcupanteDto"
+            }
+          },
+          "aviso": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "declarados",
+          "declarada",
+          "plazas",
+          "aviso"
+        ]
+      },
       "ModificacionDto": {
         "type": "object",
         "properties": {
@@ -9849,6 +10845,116 @@
           "dispositivos"
         ]
       },
+      "PerfilDelResidenteDto": {
+        "type": "object",
+        "properties": {
+          "nombres": {
+            "type": "string",
+            "nullable": true
+          },
+          "apellidos": {
+            "type": "string",
+            "nullable": true
+          },
+          "nombreCompleto": {
+            "type": "string"
+          },
+          "fechaNacimiento": {
+            "type": "string",
+            "nullable": true
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "nullable": true
+          },
+          "numeroDocumento": {
+            "type": "string",
+            "nullable": true
+          },
+          "correo": {
+            "type": "string",
+            "nullable": true
+          },
+          "telefono": {
+            "type": "string",
+            "nullable": true
+          },
+          "copropiedadNombre": {
+            "type": "string"
+          },
+          "copropiedadDireccion": {
+            "type": "string",
+            "nullable": true
+          },
+          "telefonoPorteria": {
+            "type": "string",
+            "nullable": true,
+            "description": "D7 · null = el superadministrador no lo ha registrado"
+          }
+        },
+        "required": [
+          "nombres",
+          "apellidos",
+          "nombreCompleto",
+          "fechaNacimiento",
+          "tipoDocumento",
+          "numeroDocumento",
+          "correo",
+          "telefono",
+          "copropiedadNombre",
+          "copropiedadDireccion",
+          "telefonoPorteria"
+        ]
+      },
+      "PerfilDto": {
+        "type": "object",
+        "properties": {
+          "nombres": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "apellidos": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "fechaNacimiento": {
+            "type": "string",
+            "nullable": true,
+            "example": "1990-05-17"
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "cedula",
+              "cedula_extranjeria",
+              "pasaporte",
+              "otro"
+            ]
+          },
+          "numeroDocumento": {
+            "type": "string",
+            "maxLength": 24
+          },
+          "correo": {
+            "type": "string",
+            "maxLength": 254,
+            "description": "Canal de CONTACTO, no de acceso"
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 24,
+            "description": "Canal de CONTACTO, no de acceso"
+          }
+        },
+        "required": [
+          "nombres",
+          "apellidos",
+          "tipoDocumento",
+          "numeroDocumento",
+          "correo",
+          "telefono"
+        ]
+      },
       "PermisoDeZonaDto": {
         "type": "object",
         "properties": {
@@ -9953,6 +11059,48 @@
         "required": [
           "agrupaciones",
           "cantidad"
+        ]
+      },
+      "PlazaDeOcupanteDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "numero": {
+            "type": "number"
+          },
+          "libre": {
+            "type": "boolean"
+          },
+          "codigo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sólo en las libres: ABCD-EFGH"
+          },
+          "ocupante": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "numero",
+          "libre",
+          "codigo",
+          "ocupante"
+        ]
+      },
+      "PlazaRetiradaDto": {
+        "type": "object",
+        "properties": {
+          "retirada": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "retirada"
         ]
       },
       "PorteroCreadoDto": {
@@ -10333,6 +11481,48 @@
           "registrado"
         ]
       },
+      "ResultadoDeAltaDto": {
+        "type": "object",
+        "properties": {
+          "vinculada": {
+            "type": "boolean"
+          },
+          "debeDeclararOcupantes": {
+            "type": "boolean"
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "DEMASIADOS_INTENTOS",
+              "VIVIENDA_INEXISTENTE",
+              "AGRUPACION_REQUERIDA",
+              "VIVIENDA_INACTIVA",
+              "CODIGO_REQUERIDO",
+              "CODIGO_INCORRECTO",
+              "DOCUMENTO_EN_USO",
+              "YA_VINCULADA"
+            ]
+          },
+          "explicacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "campos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampoRechazadoDto"
+            }
+          }
+        },
+        "required": [
+          "vinculada",
+          "debeDeclararOcupantes",
+          "motivo",
+          "explicacion",
+          "campos"
+        ]
+      },
       "ResultadoDeCargaDto": {
         "type": "object",
         "properties": {
@@ -10460,6 +11650,41 @@
           "detalle"
         ]
       },
+      "ResultadoDePerfilDto": {
+        "type": "object",
+        "properties": {
+          "guardado": {
+            "type": "boolean"
+          },
+          "perfil": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PerfilDelResidenteDto"
+              }
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "DOCUMENTO_EN_USO",
+              "SIN_VINCULO"
+            ]
+          },
+          "campos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampoRechazadoDto"
+            }
+          }
+        },
+        "required": [
+          "guardado",
+          "motivo",
+          "campos"
+        ]
+      },
       "ResultadoDeReconciliacionDto": {
         "type": "object",
         "properties": {
@@ -10542,6 +11767,41 @@
           "verificado"
         ]
       },
+      "ResultadoDeVehiculoPropioDto": {
+        "type": "object",
+        "properties": {
+          "registrado": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "TOPE_ALCANZADO",
+              "PLACA_DUPLICADA",
+              "VIVIENDA_INACTIVA",
+              "OCUPANTE_AJENO",
+              "SIN_OCUPANTES",
+              "DATOS_INVALIDOS"
+            ]
+          },
+          "explicacion": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "registrado",
+          "id",
+          "motivo",
+          "explicacion"
+        ]
+      },
       "ResultadoPorTerminalDto": {
         "type": "object",
         "properties": {
@@ -10564,6 +11824,18 @@
           "nombre",
           "sincronizada",
           "detalle"
+        ]
+      },
+      "RetiroDeOcupanteDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
         ]
       },
       "RetiroDeTurnoDto": {
@@ -11017,6 +12289,81 @@
           "expiraEnSegundos"
         ]
       },
+      "VehiculoDeResidenteDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vivienda": {
+            "type": "string"
+          },
+          "placa": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "marca": {
+            "type": "string",
+            "nullable": true
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "registradoEn": {
+            "type": "string"
+          },
+          "registradoPor": {
+            "type": "string",
+            "nullable": true
+          },
+          "ocupantes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "activo": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "viviendaId",
+          "vivienda",
+          "placa",
+          "color",
+          "modelo",
+          "marca",
+          "tipo",
+          "registradoEn",
+          "registradoPor",
+          "ocupantes",
+          "activo"
+        ]
+      },
+      "VehiculoDesactivadoDto": {
+        "type": "object",
+        "properties": {
+          "desactivado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "desactivado"
+        ]
+      },
       "VehiculoDto": {
         "type": "object",
         "properties": {
@@ -11084,6 +12431,51 @@
           "viviendaIdentificador",
           "propietarioId",
           "propietarioNombre"
+        ]
+      },
+      "VehiculoPropioDto": {
+        "type": "object",
+        "properties": {
+          "placa": {
+            "type": "string",
+            "maxLength": 12
+          },
+          "color": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "modelo": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "marca": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "automovil",
+              "motocicleta",
+              "bicicleta",
+              "otro"
+            ]
+          },
+          "ocupantes": {
+            "description": "`residenteId` de los ocupantes vinculados",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "placa",
+          "color",
+          "modelo",
+          "tipo",
+          "ocupantes"
         ]
       },
       "VentanaDelDiaDto": {
@@ -11269,6 +12661,30 @@
         "required": [
           "agrupacion",
           "identificador"
+        ]
+      },
+      "VocabularioDeAltaDto": {
+        "type": "object",
+        "properties": {
+          "copropiedadNombre": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "nullable": true
+          },
+          "etiquetaVivienda": {
+            "type": "string"
+          },
+          "etiquetaAgrupacion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "copropiedadNombre",
+          "tipo",
+          "etiquetaVivienda",
+          "etiquetaAgrupacion"
         ]
       },
       "ZonaDto": {

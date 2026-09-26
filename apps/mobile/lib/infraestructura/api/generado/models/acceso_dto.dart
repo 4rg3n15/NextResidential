@@ -11,6 +11,7 @@ class AccesoDto {
   const AccesoDto({
     required this.contrasena,
     this.correo,
+    this.codigo,
     this.nit,
     this.usuario,
   });
@@ -19,6 +20,9 @@ class AccesoDto {
   
   /// Cuentas por correo
   final String? correo;
+
+  /// Código corto de la copropiedad (D1): 3 a 8 letras o números
+  final String? codigo;
 
   /// NIT de la copropiedad
   final String? nit;
