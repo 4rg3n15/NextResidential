@@ -2703,6 +2703,11 @@ export interface components {
             ruta: string;
             /** @description URL completa si API_URL_PUBLICA está declarada; null si no lo está */
             url: string | null;
+            /**
+             * @description H-SITIO-10 · si otro aparato puede abrir `url`. `bucle_local`: 127.0.0.1/localhost, que en un teléfono es el propio teléfono; la consola lo advierte junto al QR.
+             * @enum {string}
+             */
+            alcance: "ausente" | "bucle_local" | "alcanzable";
             /** @description Caducidad del enlace (ISO 8601) */
             expiraEn: string;
         };

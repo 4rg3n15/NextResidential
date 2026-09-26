@@ -16,6 +16,8 @@ export { HORARIOS, trabajoPorCopropiedad } from './aplicacion/trabajos';
 export type { OperacionPorCopropiedad } from './aplicacion/trabajos';
 export { PlanificadorPgBoss } from './infraestructura/planificador-pgboss';
 export { PlanificadorInerte } from './infraestructura/planificador-inerte';
+export { conexionDePgBoss } from './infraestructura/conexion-de-pgboss';
+export type { ConexionDePgBoss, ClaseDeConexion } from './infraestructura/conexion-de-pgboss';
 export {
   CatalogoDeCopropiedadesPg,
   CatalogoDeCopropiedadesEnMemoria,

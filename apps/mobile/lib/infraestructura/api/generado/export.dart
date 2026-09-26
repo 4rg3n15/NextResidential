@@ -279,6 +279,7 @@ export 'models/edicion_de_equipo_dto_modo_de_terminal.dart';
 export 'models/editar_vehiculo_dto_tipo.dart';
 export 'models/editar_vivienda_dto_estado_administrativo.dart';
 export 'models/en_atencion_dto_urgencia.dart';
+export 'models/enlace_de_consentimiento_dto_alcance.dart';
 export 'models/equipo_dto_tipo.dart';
 export 'models/equipo_dto_modo_de_terminal.dart';
 export 'models/equipo_dto_verificacion.dart';

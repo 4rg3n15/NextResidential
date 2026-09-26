@@ -2714,6 +2714,64 @@ try {
     }
   }
 
+  console.log('\n▸ 33 · una clase que Nest construye e inyecta POR TIPO se detecta (H-SITIO-06)');
+  {
+    /**
+     * En sitio, `start:dev` (tsx, sin metadatos de tipos) inyectó `undefined`
+     * en el `ModuleRef` del planificador y la API cayó al arrancar. El control
+     * se ejecuta desde el repositorio real —necesita `typescript`— contra un
+     * árbol de sondas del banco, como el de Mermaid.
+     */
+    if (exigeControl('scripts/lib/inyeccion-explicita.mjs')) {
+      const arbol = join(banco, 'sonda-inyeccion');
+      mkdirSync(arbol, { recursive: true });
+      const sonda = join(arbol, 'sonda.module.ts');
+      const control = () =>
+        correr('node', ['scripts/lib/inyeccion-explicita.mjs', arbol], { cwd: raiz });
+      const modulo = (parametro, extra = '') =>
+        "import { Controller, Inject, Injectable, Module } from '@nestjs/common';\n" +
+        'class CasoDeUso {}\n' +
+        `@Controller('sonda') export class SondaController { constructor(${parametro}) {} }\n` +
+        `${extra}\n` +
+        '@Module({ controllers: [SondaController] }) export class SondaModule {}\n';
+
+      writeFileSync(sonda, modulo('private readonly caso: CasoDeUso'));
+      const a = control();
+      a.codigo !== 0 && /SondaController\(caso: CasoDeUso\)/.test(a.salida)
+        ? ok('un controlador que inyecta por tipo, sin @Inject, se detecta')
+        : mal(`el controlador sin @Inject NO se detecta (codigo ${a.codigo})`);
+
+      writeFileSync(
+        sonda,
+        "import { Inject, Injectable, Module } from '@nestjs/common';\n" +
+          'class Dependencia {}\n' +
+          '@Injectable() export class Servicio { constructor(private readonly d: Dependencia) {} }\n' +
+          '@Module({ providers: [{ provide: Servicio, useClass: Servicio }] }) export class M {}\n',
+      );
+      const b = control();
+      b.codigo !== 0 && /Servicio\(d: Dependencia\)/.test(b.salida)
+        ? ok('y un proveedor de `useClass:` que inyecta por tipo, también')
+        : mal(`el proveedor de useClass sin @Inject NO se detecta (codigo ${b.codigo})`);
+
+      writeFileSync(sonda, modulo('@Inject(CasoDeUso) private readonly caso: CasoDeUso'));
+      control().codigo === 0
+        ? ok('con @Inject explícito el control lo admite')
+        : mal('el control rechaza un @Inject explícito');
+
+      // Lo que se construye en una fábrica lleva sus argumentos escritos: no cuenta.
+      writeFileSync(
+        sonda,
+        "import { Injectable, Module } from '@nestjs/common';\n" +
+          '@Injectable() export class RepoPg { constructor(private readonly pool: object) {} }\n' +
+          '@Module({ providers: [{ provide: RepoPg, useFactory: () => new RepoPg({}) }] }) export class M {}\n',
+      );
+      control().codigo === 0
+        ? ok('una clase construida en `useFactory` no da falso positivo')
+        : mal('el control marca una clase que sólo se construye en una fábrica');
+      rmSync(arbol, { recursive: true, force: true });
+    }
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
@@ -2912,6 +2970,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 28 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 29 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

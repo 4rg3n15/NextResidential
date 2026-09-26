@@ -51,6 +51,7 @@ import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from './comun/sobre-de-equip
 import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from './comun/ruta-de-audio';
 import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from './comun/ruta-de-video';
 import { AppModule } from './app.module';
+import { avisoDeUrlPublica } from './comun/url-publica';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
 import { aplicarSaneamiento, aplicarSeguridad } from './seguridad';
 import { FiltroGlobalDeExcepciones } from './comun/filtros/filtro-global';
@@ -140,6 +141,15 @@ async function arrancar(): Promise<void> {
 
   await app.listen(config.PORT);
   bitacora.registrar('info', 'API arrancada', { puerto: config.PORT, entorno: config.NODE_ENV });
+
+  // H-SITIO-10 · con el proveedor real, una URL pública de bucle local produce
+  // enlaces y QR que ningún teléfono abre. En sitio se descubrió delante del
+  // titular; ahora sale en la terminal al arrancar, como error.
+  const avisoDeUrl = avisoDeUrlPublica(config);
+  if (avisoDeUrl !== null) {
+    bitacora.registrar('error', avisoDeUrl, { API_URL_PUBLICA: config.API_URL_PUBLICA });
+    console.error(`\n✗ ${avisoDeUrl}\n`);
+  }
 
   /**
    * Los recursos externos se comprueban AL ARRANCAR, hablando con el recurso

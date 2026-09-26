@@ -44,7 +44,7 @@ import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
  */
 import { GuardiaModule } from './guardia';
 import { AlarmServerModule } from './alarmserver';
-import { PlanificacionModule } from './planificacion';
+import { PlanificacionModule, conexionDePgBoss } from './planificacion';
 import { EquiposModule, RegistroDeEquiposPg } from './equipos';
 
 /**
@@ -182,7 +182,7 @@ export class AppModule {
          * mismo argumento de orden que el de `MultiempresaModule`, arriba.
          */
         PlanificacionModule.registrar({
-          cadenaDeConexion: config.DATABASE_URL,
+          conexion: conexionDePgBoss(config),
           esquema: config.PGBOSS_SCHEMA,
           // En pruebas NUNCA: una suite que levanta veinte aplicaciones abriría
           // veinte conexiones de pg-boss contra una base que no existe.

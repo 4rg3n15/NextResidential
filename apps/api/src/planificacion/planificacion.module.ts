@@ -1,7 +1,6 @@
 import { Injectable, Module } from '@nestjs/common';
 import type { DynamicModule, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { ModuleRef } from '@nestjs/core';
 import { Pool } from 'pg';
 import { BITACORA } from '@ncr/domain-core';
@@ -19,6 +18,7 @@ import { HORARIOS, trabajoPorCopropiedad } from './aplicacion/trabajos';
 import { PlanificadorPgBoss } from './infraestructura/planificador-pgboss';
 import { PlanificadorInerte } from './infraestructura/planificador-inerte';
 import { CatalogoDeCopropiedadesPg } from './infraestructura/catalogo-copropiedades-pg';
+import type { ConexionDePgBoss } from './infraestructura/conexion-de-pgboss';
 
 /**
  * Identidad del planificador en las columnas de auditoría.
@@ -49,7 +49,12 @@ export class CicloDelPlanificador implements OnApplicationBootstrap, OnApplicati
     @Inject(PLANIFICADOR) private readonly planificador: Planificador,
     @Inject(CATALOGO_DE_COPROPIEDADES) private readonly catalogo: CatalogoDeCopropiedades,
     @Inject(BITACORA) private readonly bitacora: Bitacora,
-    private readonly referencia: ModuleRef,
+    /**
+     * H-SITIO-06 · EXPLÍCITO. En sitio, `start:dev` (tsx, sin metadatos de
+     * tipos) inyectaba aquí `undefined` y la API caía al arrancar con
+     * «Cannot read properties of undefined (reading 'get')».
+     */
+    @Inject(ModuleRef) private readonly referencia: ModuleRef,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -204,8 +209,11 @@ export const trabajosDeMantenimiento = (
 ];
 
 export interface OpcionesPlanificacion {
-  /** Sin cadena, no hay planificador: se registra el motivo y no se ejecuta. */
-  readonly cadenaDeConexion?: string;
+  /**
+   * Sin conexión, no hay planificador: se registra el motivo y no se ejecuta.
+   * H-SITIO-07 · de `PGBOSS_DATABASE_URL` si está, y si no de `DATABASE_URL`.
+   */
+  readonly conexion?: ConexionDePgBoss;
   readonly esquema: string;
   readonly habilitado: boolean;
 }
@@ -235,19 +243,37 @@ export class PlanificacionModule {
         {
           provide: PLANIFICADOR,
           inject: [BITACORA],
-          useFactory: (bitacora: Bitacora): Planificador =>
-            opciones.habilitado && opciones.cadenaDeConexion !== undefined
-              ? new PlanificadorPgBoss({
-                  cadenaDeConexion: opciones.cadenaDeConexion,
-                  esquema: opciones.esquema,
-                  bitacora,
-                })
-              : new PlanificadorInerte(
-                  bitacora,
-                  opciones.habilitado === false
-                    ? 'PLANIFICADOR_HABILITADO=false'
-                    : 'sin DATABASE_URL para pg-boss',
-                ),
+          useFactory: (bitacora: Bitacora): Planificador => {
+            const conexion = opciones.conexion;
+            if (!opciones.habilitado || conexion === undefined) {
+              return new PlanificadorInerte(
+                bitacora,
+                opciones.habilitado === false
+                  ? 'PLANIFICADOR_HABILITADO=false'
+                  : 'sin DATABASE_URL para pg-boss',
+              );
+            }
+            /**
+             * H-SITIO-07 · el arranque dice QUÉ conexión usa pg-boss —de qué
+             * variable, contra qué host y puerto, de qué clase— y avisa como
+             * error si esa clase no va a funcionar. En sitio el único rastro
+             * fue un `ENOTFOUND` sin contexto. Nunca usuario ni contraseña.
+             */
+            bitacora.registrar(
+              conexion.aviso === null ? 'info' : 'error',
+              `pg-boss conecta por ${conexion.variable}`,
+              {
+                destino: conexion.destino,
+                clase: conexion.clase,
+                ...(conexion.aviso === null ? {} : { aviso: conexion.aviso }),
+              },
+            );
+            return new PlanificadorPgBoss({
+              cadenaDeConexion: conexion.cadena,
+              esquema: opciones.esquema,
+              bitacora,
+            });
+          },
         },
         CicloDelPlanificador,
       ],

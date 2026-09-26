@@ -759,6 +759,15 @@ else
   mal "hay campos de texto sin longitud máxima declarada (§2.7.4)"
   echo "$salida_long" | head -10 | sed 's/^/     /'
 fi
+# H-SITIO-06 (15-K) · `start:dev` usa tsx, que no emite metadatos de tipos: una
+# clase que Nest construye e inyecta POR TIPO recibe `undefined`. En sitio la
+# API cayó al arrancar. La mitad estática del control; la que arranca, en 12d.
+if salida_iny=$(con_limite "$LIMITE_CORTO" node scripts/lib/inyeccion-explicita.mjs 2>&1); then
+  ok "${salida_iny#OK }"
+else
+  mal "hay clases que Nest construye e inyecta por tipo: con tsx reciben undefined (H-SITIO-06)"
+  echo "$salida_iny" | head -10 | sed 's/^/     /'
+fi
 # KPI-11 · la sustitución de MockProvider por HikvisionProvider en la ETAPA 15
 # solo es posible si nadie fuera de `packages/providers` conoce el protocolo.
 if salida_kpi11=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-hardware.mjs 2>&1); then
@@ -950,6 +959,20 @@ if con_limite "$LIMITE_LARGO" node e2e/camino-de-acceso.mjs >/tmp/ncr-camino.log
 else
   mal "el camino del navegador está roto o no hay con qué recorrerlo (ver /tmp/ncr-camino.log)"
   grep -E "✗|     " /tmp/ncr-camino.log | head -6 | sed 's/^/     /'
+fi
+
+paso "12d · la API arranca con tsx —el start:dev de sitio— y sus controladores reciben sus dependencias"
+# H-SITIO-06 (15-K) · el 26/09/2026 `start:dev` cayó en sitio con «Cannot read
+# properties of undefined (reading 'get')». Ni la suite (SWC con metadatos) ni
+# el 12c (`node dist/main.js`, compilado con tsc) pasan por tsx: el único
+# arranque que el usuario ejecutó en sitio era el único que nadie probaba. Sin
+# base: usa adaptadores en memoria y un doble de GoTrue, como el 12c.
+if salida_tsx=$(con_limite "$LIMITE_MEDIO" node e2e/arranque-con-tsx.mjs 2>&1); then
+  echo "$salida_tsx" | grep -E "^   ✓" | sed 's/^   //' | sed 's/^/   /'
+  ok "la API arranca con tsx y un controlador inyectado contesta"
+else
+  mal "con tsx (start:dev) la API no arranca o un controlador no recibe sus dependencias"
+  echo "$salida_tsx" | head -16 | sed 's/^/     /'
 fi
 
 if [[ "$CON_BASE" == "1" ]]; then

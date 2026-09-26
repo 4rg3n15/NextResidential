@@ -1,14 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common';
 /**
- * `Reflector` se importa como VALOR, no como tipo, y la regla se apaga aquí a
- * propósito. Es la misma trampa de D-24: `import type` borra la clase al
- * compilar, `design:paramtypes` queda en `Object` y Nest no puede resolver la
- * dependencia. Allí el síntoma fue un `ValidationPipe` inerte; aquí sería un
- * interceptor que no arranca. La regla no distingue un tipo de un token de
- * inyección, así que la excepción va donde se ve.
+ * `Reflector` se importa como VALOR: es el token de `@Inject(Reflector)`. Hasta
+ * la 15-K se inyectaba por `design:paramtypes` y hacía falta apagar la regla de
+ * `import type`; con el `@Inject` explícito (H-SITIO-06) el uso como valor es
+ * visible y la excepción sobra.
  */
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { Reflector } from '@nestjs/core';
 import type { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -35,7 +32,8 @@ import { CLAVE_KPI } from './mide-kpi.decorator';
 @Injectable()
 export class InterceptorDeLatencias implements NestInterceptor {
   constructor(
-    private readonly reflector: Reflector,
+    // H-SITIO-06 · explícito: con `tsx` no hay metadatos de tipos.
+    @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(METRICAS) private readonly metricas: Metricas,
     @Inject(RELOJ) private readonly reloj: Reloj,
   ) {}

@@ -94,6 +94,23 @@ describe('SeguimientoDeConsentimiento', () => {
     expect(screen.getByText(/un solo uso/)).toBeTruthy();
   });
 
+  it('H-SITIO-10 · con una URL de bucle local AVISA que ningún otro aparato la abre', async () => {
+    respuestas[`/copropiedades/${COP}/biometria/consentimientos/${CONSENTIMIENTO}/enlace`] = () =>
+      json({
+        consentimientoId: CONSENTIMIENTO,
+        estado: 'pendiente',
+        token: 'abc.def',
+        ruta: '/consentimiento/abc.def',
+        url: 'http://127.0.0.1:3000/consentimiento/abc.def',
+        alcance: 'bucle_local',
+        expiraEn: new Date(Date.now() + 3_600_000).toISOString(),
+      });
+    montar();
+    fireEvent.click(screen.getByRole('button', { name: /Generar enlace para el titular/ }));
+    const aviso = await screen.findByText(/NO se abre desde otro aparato/);
+    expect(aviso.getAttribute('role')).toBe('alert');
+  });
+
   it('sin aceptación del titular NO sincroniza: lo comprueba y lo dice', async () => {
     let sincronizaciones = 0;
     respuestas[`/copropiedades/${COP}/biometria/consentimientos/${CONSENTIMIENTO}`] = () =>

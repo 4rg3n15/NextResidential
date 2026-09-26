@@ -27,6 +27,8 @@ interface Enlace {
   readonly url: string | null;
   readonly ruta: string;
   readonly expiraEn: string;
+  /** H-SITIO-10 · si otro aparato puede abrir la URL. */
+  readonly alcance?: 'ausente' | 'bucle_local' | 'alcanzable';
 }
 
 interface PorTerminal {
@@ -154,6 +156,17 @@ export const SeguimientoDeConsentimiento = ({
               className="mt-1 block w-full rounded-md border bg-muted px-2 py-1 font-mono text-xs"
             />
           </label>
+          {enlace.alcance === 'bucle_local' && (
+            <p
+              role="alert"
+              className="rounded-md border border-peligro px-2 py-1 text-peligro-texto"
+            >
+              Este enlace NO se abre desde otro aparato: apunta a 127.0.0.1 / localhost, que en el
+              teléfono del visitante es el propio teléfono. Declare en la API{' '}
+              <code>API_URL_PUBLICA=http://&lt;IP-del-Mac&gt;:3000</code> y genere otro enlace, o
+              use el consentimiento presencial en esta pantalla.
+            </p>
+          )}
           {enlace.url !== null && (
             <div className="flex flex-wrap items-start gap-3">
               <CodigoQr texto={enlace.url} titulo="Código QR del enlace del titular" />

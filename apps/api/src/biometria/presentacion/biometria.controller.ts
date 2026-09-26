@@ -84,13 +84,18 @@ const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
 @Controller('copropiedades/:id/biometria')
 export class BiometriaController {
   constructor(
-    private readonly capturar: CapturarRostro,
-    private readonly responder: ResponderConsentimiento,
-    private readonly revocar: RevocarConsentimiento,
-    private readonly sincronizar: SincronizarPlantilla,
-    private readonly barrer: BarrerPlantillasVencidas,
+    // H-SITIO-06 · `@Inject` explícito: con `tsx` (start:dev) no hay metadatos
+    // de tipos y estos ocho llegaban como `undefined` (inyeccion-explicita.mjs).
+    @Inject(CapturarRostro) private readonly capturar: CapturarRostro,
+    @Inject(ResponderConsentimiento) private readonly responder: ResponderConsentimiento,
+    @Inject(RevocarConsentimiento) private readonly revocar: RevocarConsentimiento,
+    @Inject(SincronizarPlantilla) private readonly sincronizar: SincronizarPlantilla,
+    @Inject(BarrerPlantillasVencidas) private readonly barrer: BarrerPlantillasVencidas,
+    @Inject(EmitirEnlaceDeConsentimiento)
     private readonly emitirEnlace: EmitirEnlaceDeConsentimiento,
+    @Inject(SincronizarPlantillaEnTerminales)
     private readonly sincronizarEnTerminales: SincronizarPlantillaEnTerminales,
+    @Inject(PropagarConsentimientoAceptado)
     private readonly propagar: PropagarConsentimientoAceptado,
     @Inject(REPOSITORIO_CONSENTIMIENTOS)
     private readonly consentimientos: RepositorioConsentimientos,
@@ -209,6 +214,7 @@ export class BiometriaController {
       token: e.token,
       ruta: e.ruta,
       url: e.url,
+      alcance: e.alcance,
       expiraEn: e.expiraEn.toISOString(),
     };
   }
