@@ -328,6 +328,36 @@ VERIFICACIÓN DE ETAPA: FALLIDA — NO se cierra la etapa
 - **Todo lo demás, en verde**, incluidos 12d (arranque con tsx), 13b (el
   recorrido de la consola) y 13c (el recorrido negativo).
 
+### La segunda corrida final, FALLIDA por una roja intermitente sin nombre
+
+Sobre `93174b8`: **FALLIDA**. El paso 5 (la suite completa por turbo)
+informó `@ncr/api: Tests 1 failed | 1315 passed | 5 skipped (1321)`; el paso 7
+(la misma suite, por vitest directo) la dio entera en verde y el 7b cazó la
+discrepancia; el paso 14, tres corridas más, en verde. Literal:
+
+```
+▸ 5 · suite completa
+   @ncr/api:test:       Tests  1 failed | 1315 passed | 5 skipped (1321)
+   ✗ la suite no terminó bien (código 1): puede que ni siquiera llegara a correr
+▸ 7b · los dos recuentos de la MISMA suite coinciden (D-112)
+   ✗ los dos caminos de la suite NO dan el mismo resultado: uno de los dos miente
+       ✗ @ncr/api — difieren: verdes, rojas
+```
+
+- **La roja no se pudo nombrar**, y eso es un defecto del verificador, no
+  mala suerte: con código ≠ 0, el paso 5 imprimía las diez primeras líneas que
+  contenían «error» —pruebas **verdes** llamadas `errores-…` y trazas de
+  peticiones fallidas a propósito— y el nombre, que estaba en el
+  `.informe-paso5.json` que el propio paso pide, no se leía. **Corregido**
+  (`7d56f8e`): `nombrar_rojas` lo lee en las dos ramas de fallo.
+- **Perseguida:** cuatro corridas más de la suite completa por turbo, en
+  paralelo como el paso 5: **cuatro verdes**. Con el paso 7 y las tres del
+  paso 14, **ocho verdes contra una roja** sobre el mismo commit.
+- **Se registra como una aparición más de D-101** (la roja intermitente de
+  `@ncr/api`, abierta desde la ETAPA 12: salió bajo la suite completa en
+  paralelo y no a solas), **sin afirmar que sea la misma prueba**: sin nombre,
+  no hay diagnóstico. La próxima aparición llegará nombrada.
+
 ### El veredicto literal de la corrida final, sobre el árbol completo
 
 _Se pega aquí, tal cual, al terminar la corrida final._
@@ -427,6 +457,7 @@ _Se pega aquí, tal cual, al terminar la corrida final._
   sondeo de la consola (ADR-030).
 - **DT-15K-05** · el guion de sitio no se ejecuta en el verificador; `--capturar`
   tiene prueba unitaria de la carga de prueba y un ensayo manual en SIMULADO.
+- **D-101** · reapareció una vez en la segunda corrida final (paso 5), sin nombre; ocho corridas verdes después. Sigue ABIERTA; ahora el paso 5 la nombra.
 - **DT-15K-06** · una corrida de la sonda H-SITIO-08 del recorrido negativo
   falló una vez en el acceso, antes de llegar a la comprobación (la siguiente la
   detectó). Causa no encontrada; el fallo de acceso vuelca ahora el texto de la
@@ -488,7 +519,9 @@ Conventional Commits con el prefijo `etapa-15k/<módulo>`.
 | `637b890`  | `test(etapa-15k/controles)`: la sonda 34 ejerce los .xcconfig y el trinquete mide los dos controles nuevos                               |
 | `65b7c84`  | `chore(etapa-15k)`: cierre de la ronda de hallazgos de sitio (informe, ESTADO y registro)                                                |
 | `70ae74c`  | `test(etapa-15k/equipos)`: las ramas nuevas del proveedor, ejercidas (umbral de ramas de @ncr/providers)                                 |
-| _(cierre)_ | `chore(etapa-15k)`: las dos corridas del verificador y el veredicto literal de la final                                                  |
+| `93174b8`  | `docs(etapa-15k)`: la primera corrida final del verificador, FALLIDA, y lo que destapó                                                   |
+| `7d56f8e`  | `fix(etapa-15k/verificador)`: el paso 5 nombra la roja desde su informe JSON                                                             |
+| _(cierre)_ | `docs(etapa-15k)`: la segunda corrida, y el veredicto literal de la final                                                                |
 
 **PR** contra `develop`, abierto y **sin fusionar**.
 
