@@ -2834,6 +2834,66 @@ try {
       control().codigo !== 0
         ? ok('un plist mal formado es un fallo, no un «no encontrado»')
         : mal('un plist mal formado pasa');
+
+      // Sin el bloque de ATS: la app de depuración no alcanzaría la API por HTTP.
+      writeFileSync(
+        sonda,
+        original.replace(/<key>NSAppTransportSecurity<\/key>\s*<dict>[\s\S]*?<\/dict>/, ''),
+      );
+      const d = control();
+      d.codigo !== 0 && /Debug: falta NSAppTransportSecurity/.test(d.salida)
+        ? ok('Debug sin la excepción de red local se detecta')
+        : mal(`Debug sin ATS local NO se detecta (codigo ${d.codigo})`);
+
+      /**
+       * 15-K · las ramas de los .xcconfig, que el trinquete encontró sin
+       * ejercer: el plist puede estar bien y la compilación, no. Se copian al
+       * banco y se rompen allí.
+       */
+      writeFileSync(sonda, original);
+      const xc = join(banco, 'xcconfig-sonda');
+      mkdirSync(xc, { recursive: true });
+      const debugXc = readFileSync(join(raiz, 'apps/mobile/ios/Flutter/Debug.xcconfig'), 'utf8');
+      const releaseXc = readFileSync(
+        join(raiz, 'apps/mobile/ios/Flutter/Release.xcconfig'),
+        'utf8',
+      );
+      const conXc = () =>
+        correr('node', ['scripts/lib/info-plist-ios.mjs', '--plist', sonda, '--xcconfig', xc]);
+
+      writeFileSync(join(xc, 'Debug.xcconfig'), debugXc);
+      writeFileSync(
+        join(xc, 'Release.xcconfig'),
+        `${releaseXc}\nINFOPLIST_PREPROCESSOR_DEFINITIONS = NCR_DEPURACION=1\n`,
+      );
+      const e = conXc();
+      e.codigo !== 0 && /Release\.xcconfig define NCR_DEPURACION/.test(e.salida)
+        ? ok('Release.xcconfig que define NCR_DEPURACION se detecta: ATS llegaría al binario')
+        : mal(`NCR_DEPURACION en Release NO se detecta (codigo ${e.codigo})`);
+
+      writeFileSync(
+        join(xc, 'Debug.xcconfig'),
+        debugXc.replace(/^INFOPLIST_PREPROCESS.*$/gm, '// quitado por la sonda'),
+      );
+      writeFileSync(
+        join(xc, 'Release.xcconfig'),
+        releaseXc.replace(/^INFOPLIST_PREPROCESS.*$/gm, '// quitado por la sonda'),
+      );
+      const f = conXc();
+      f.codigo !== 0 &&
+      /Debug\.xcconfig no activa/.test(f.salida) &&
+      /Debug\.xcconfig no define NCR_DEPURACION/.test(f.salida) &&
+      /Release\.xcconfig no activa/.test(f.salida)
+        ? ok('los .xcconfig sin preprocesado ni marca de depuración se detectan, los tres')
+        : mal(`los .xcconfig rotos NO se detectan (codigo ${f.codigo})`);
+
+      rmSync(join(xc, 'Debug.xcconfig'), { force: true });
+      const g = conXc();
+      g.codigo !== 0 && /no se pudo leer/.test(g.salida)
+        ? ok('un .xcconfig que falta es un fallo, no un silencio')
+        : mal(`un .xcconfig que falta NO se detecta (codigo ${g.codigo})`);
+
+      rmSync(xc, { recursive: true, force: true });
       rmSync(sonda, { force: true });
     }
   }
