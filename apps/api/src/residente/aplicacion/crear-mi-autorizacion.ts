@@ -113,12 +113,15 @@ export class CrearMiAutorizacion {
     }
     if (entrada.patron !== null) {
       /**
-       * H-15I-06 · FALLA CERRADA a propósito. La recurrente desde la app
-       * respondía 500 (no se escribía su patrón), y escribirlo hoy sería peor:
-       * la persistencia guarda la franja en hora local sin su desplazamiento y
-       * la relee como UTC (H-15I-05), así que en Bogotá dejaría pasar cinco
-       * horas antes de la franja. Hasta corregir H-15I-05 —persistencia, fuera
-       * del alcance de esta etapa—, la app crea una visita por día (D5 b).
+       * H-15I-06 · FALLA CERRADA a propósito. H-15I-05 —la lectura en UTC de
+       * una franja guardada en hora local— quedó corregido en la 15-J, pero
+       * esta guarda NO es lo único que falta: el adaptador del residente
+       * (`residente/infraestructura/autorizaciones-pg.ts`) inserta la
+       * autorización como `recurrente` y no escribe sus filas de
+       * `patrones_recurrencia`, así que el disparador diferido
+       * `tg_recurrente_con_patron` (0013) la rechazaría al confirmar: sin esta
+       * guarda, la app recibiría un 500 en vez de este rechazo. Reportado como
+       * H-15J-01; mientras tanto, la app crea una visita por día (D5 b).
        */
       return fallo(
         errorDominio(

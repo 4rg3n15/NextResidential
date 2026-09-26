@@ -52,9 +52,17 @@ export class PatronDeEntradaDto {
   @Max(1440)
   minutoFin!: number;
 
+  /**
+   * H-15I-05 · el desplazamiento del CLIENTE no decide nada. La franja se guarda
+   * en hora local de la copropiedad y al leerla manda `copropiedades.zona_horaria`
+   * en el instante del reloj de la API. Se sigue aceptando —acotado— para no
+   * romper a los clientes que ya lo envían; no se persiste.
+   */
   @ApiProperty({
     type: Number,
-    description: 'Desfase UTC en minutos de la copropiedad; el patrón es local, no UTC.',
+    description:
+      'Informativo: se valida y se descarta. La franja es hora local de la copropiedad y ' +
+      'se evalúa con SU zona horaria, no con la del navegador.',
     example: -300,
   })
   @IsInt()

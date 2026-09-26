@@ -3324,7 +3324,7 @@ export interface components {
             /** @example 1080 */
             minutoFin: number;
             /**
-             * @description Desfase UTC en minutos de la copropiedad; el patrón es local, no UTC.
+             * @description Informativo: se valida y se descarta. La franja es hora local de la copropiedad y se evalúa con SU zona horaria, no con la del navegador.
              * @example -300
              */
             desplazamientoUtcMinutos: number;
@@ -3334,7 +3334,7 @@ export interface components {
             dias: number[];
             minutoInicio: number;
             minutoFin: number;
-            /** @description Minutos respecto de UTC; Bogotá: -300 */
+            /** @description Informativo: se valida y se descarta. La franja es hora local de la copropiedad y se evalúa con SU zona horaria, no con la del teléfono. */
             desplazamientoUtcMinutos: number;
         };
         PendientesDto: {

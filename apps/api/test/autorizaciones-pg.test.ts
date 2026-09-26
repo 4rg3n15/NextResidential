@@ -77,7 +77,7 @@ describe('O3 · autorizaciones de la consola contra base (D-131, S-38, RN-05)', 
 
   it('un administrador crea: `autorizado_por` es el TITULAR de la vivienda y `creado_por` es él', async () => {
     if (!disponible || pool === undefined) return;
-    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba');
+    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba', reloj);
     const r = await new CrearAutorizacion(repo, reloj, ids).ejecutar(ctx(), {
       viviendaId: VIVIENDA_CON_TITULAR,
       personaId,
@@ -117,7 +117,7 @@ describe('O3 · autorizaciones de la consola contra base (D-131, S-38, RN-05)', 
 
   it('el motor la encuentra por la placa (D-25): `activasParaLectura` la rehidrata entera', async () => {
     if (!disponible || pool === undefined || autorizacionId === '') return;
-    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba');
+    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba', reloj);
     const activas = await repo.activasParaLectura(COP, { placa: `AU${CORRIDA}`, personaId: null });
     const mia = activas.find((a) => a.id === autorizacionId);
     expect(mia?.placa?.valor).toBe(`AU${CORRIDA}`);
@@ -128,7 +128,7 @@ describe('O3 · autorizaciones de la consola contra base (D-131, S-38, RN-05)', 
 
   it('modificar: quita la placa (y el acceso vehicular con ella), cambia observaciones y fin', async () => {
     if (!disponible || pool === undefined || autorizacionId === '') return;
-    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba');
+    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba', reloj);
     const r = await new ModificarAutorizacion(repo, reloj).ejecutar(ctx(), autorizacionId, {
       placa: null,
       observaciones: 'Modificada',
@@ -154,7 +154,7 @@ describe('O3 · autorizaciones de la consola contra base (D-131, S-38, RN-05)', 
 
   it('la fotografía queda como fila de `evidencias` (referencia, nunca URL) y la lista lo dice', async () => {
     if (!disponible || pool === undefined || autorizacionId === '') return;
-    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba');
+    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba', reloj);
     const clave = `visitantes/${COP}/${autorizacionId}/${randomUUID()}.jpg`;
     const hash = 'a'.repeat(64);
     const enlazada = await repo.adjuntarFotografia(
@@ -198,7 +198,7 @@ describe('O3 · autorizaciones de la consola contra base (D-131, S-38, RN-05)', 
       actorId,
     });
     if (vivienda.tipo !== 'registrada') throw new Error('no se pudo crear la vivienda de prueba');
-    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba');
+    const repo = new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba', reloj);
     const r = await new CrearAutorizacion(repo, reloj, ids).ejecutar(ctx(), {
       viviendaId: vivienda.id,
       personaId,

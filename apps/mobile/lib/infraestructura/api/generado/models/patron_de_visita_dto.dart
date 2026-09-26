@@ -22,7 +22,7 @@ class PatronDeVisitaDto {
   final num minutoInicio;
   final num minutoFin;
 
-  /// Minutos respecto de UTC; Bogotá: -300
+  /// Informativo: se valida y se descarta. La franja es hora local de la copropiedad y se evalúa con SU zona horaria, no con la del teléfono.
   final num desplazamientoUtcMinutos;
 
   Map<String, Object?> toJson() => _$PatronDeVisitaDtoToJson(this);

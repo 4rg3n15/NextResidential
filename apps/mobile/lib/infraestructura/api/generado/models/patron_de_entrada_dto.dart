@@ -22,7 +22,7 @@ class PatronDeEntradaDto {
   final num minutoInicio;
   final num minutoFin;
 
-  /// Desfase UTC en minutos de la copropiedad; el patrón es local, no UTC.
+  /// Informativo: se valida y se descarta. La franja es hora local de la copropiedad y se evalúa con SU zona horaria, no con la del navegador.
   final num desplazamientoUtcMinutos;
 
   Map<String, Object?> toJson() => _$PatronDeEntradaDtoToJson(this);

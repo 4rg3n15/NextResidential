@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { Placa, esExito } from '@ncr/domain-core';
-import type { Bitacora, ResultadoAcceso } from '@ncr/domain-core';
+import type { Bitacora, Reloj, ResultadoAcceso } from '@ncr/domain-core';
 import { CargadorDeContextoPg } from '../src/autorizaciones/infraestructura/cargador-pg';
 import { VersionDeReglasFija } from '../src/autorizaciones/infraestructura/cargador-conservador';
 import { RepositorioAutorizacionesPg } from '../src/autorizaciones/infraestructura/repositorio-autorizaciones-pg';
@@ -51,6 +51,8 @@ const claims = (copropiedadId: string) => ({
 });
 
 const bitacora: Bitacora = { registrar: () => undefined };
+/** El mismo reloj para el motor y para el repositorio, como en la API. */
+const relojDelBanco: Reloj = { ahora: () => new Date() };
 
 const decisorDe = (copropiedadId: string): DecidirAcceso => {
   const p = pool as Pool;
@@ -63,13 +65,13 @@ const decisorDe = (copropiedadId: string): DecidirAcceso => {
   };
   const cargador = new CargadorDeContextoPg(
     new VersionDeReglasFija(),
-    new RepositorioAutorizacionesPg(p, claims(copropiedadId)),
+    new RepositorioAutorizacionesPg(p, claims(copropiedadId), 'en-memoria', relojDelBanco),
     placas,
     new RepositorioListaNegraPg(p, claims(copropiedadId)),
     new RepositorioCopropiedadesPg(p),
     bitacora,
   );
-  return new DecidirAcceso(cargador, { ahora: () => new Date() });
+  return new DecidirAcceso(cargador, relojDelBanco);
 };
 
 const decidir = async (
