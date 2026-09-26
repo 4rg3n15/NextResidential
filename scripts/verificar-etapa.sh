@@ -530,6 +530,15 @@ else
   mal "hay una dependencia acotada a ciegas"
   echo "$salida_acot" | sed 's/^/     /'
 fi
+# H-SITIO-11 (15-K) · el Info.plist de iOS YA PREPROCESADO, Debug y Release. En
+# sitio el iPhone no alcanzaba la API por la IP privada: faltaba la clave de
+# privacidad de red local. Mirar el fichero crudo no basta: Xcode lo preprocesa.
+if salida_plist=$(con_limite "$LIMITE_CORTO" node scripts/lib/info-plist-ios.mjs 2>&1); then
+  ok "${salida_plist#OK }"
+else
+  mal "el Info.plist de iOS, preprocesado como en Xcode, no es el esperado (H-SITIO-11)"
+  echo "$salida_plist" | sed 's/^/     /'
+fi
 if ! hay_flutter; then
   mal "no hay SDK de Flutter ($FLUTTER_BIN): no se pudo comprobar si el cliente Dart está al día"
 elif salida_cliente=$(con_limite "$LIMITE_MEDIO" node scripts/lib/cliente-dart-desfasado.mjs 2>&1); then

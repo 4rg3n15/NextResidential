@@ -39,9 +39,17 @@ enum ClaseDeFallo {
 }
 
 class Fallo implements Exception {
-  const Fallo(this.clase, this.detalle);
+  const Fallo(this.clase, this.detalle, {this.detalleTecnico});
   final ClaseDeFallo clase;
   final String detalle;
+
+  /// H-SITIO-11 · el POR QUÉ técnico de un fallo de red: la URL base con la
+  /// que se compiló la app, el tipo de excepción del transporte y su mensaje.
+  /// En sitio, un iPhone decía «No hay conexión con el servidor» mientras
+  /// Safari abría la API, y sin esto no había forma de saber si era la URL,
+  /// el permiso de red local o el servidor. Nunca lleva tokens (lo sanea la
+  /// infraestructura) y la interfaz lo pinta SÓLO en compilación Debug.
+  final String? detalleTecnico;
 
   @override
   String toString() => 'Fallo(${clase.name}: $detalle)';

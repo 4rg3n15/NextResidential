@@ -21,6 +21,7 @@ import '../../dominio/puertos.dart';
 import '../../dominio/sesion.dart';
 import '../api/generado/clients/cuentas_api.dart';
 import '../api/generado/models/acceso_dto.dart';
+import '../api/soporte_de_api.dart' show detalleTecnicoDe;
 import 'claims.dart';
 
 class AutenticadorPorApi implements Autenticador {
@@ -70,7 +71,12 @@ class AutenticadorPorApi implements Autenticador {
         e.type == DioExceptionType.receiveTimeout) {
       // Sin red no se dice «credenciales incorrectas»: mandaría a reescribir
       // una contraseña que estaba bien.
-      return const Fallo(ClaseDeFallo.sinConexion, 'No hay conexión con el servidor');
+      return Fallo(
+        ClaseDeFallo.sinConexion,
+        'No hay conexión con el servidor',
+        // H-SITIO-11 · el porqué, para el panel de Debug.
+        detalleTecnico: detalleTecnicoDe(e),
+      );
     }
     return switch (e.response?.statusCode) {
       400 ||

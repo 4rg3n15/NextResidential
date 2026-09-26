@@ -2772,6 +2772,71 @@ try {
     }
   }
 
+  console.log(
+    '\n▸ 34 · un Info.plist de iOS que pierde la red local o suelta ATS se detecta (H-SITIO-11)',
+  );
+  {
+    /**
+     * En sitio, un iPhone físico no alcanzaba la API por la IP privada:
+     * faltaba `NSLocalNetworkUsageDescription`. El control preprocesa el plist
+     * como Xcode; aquí se le dan variantes rotas en el banco.
+     */
+    if (exigeControl('scripts/lib/info-plist-ios.mjs')) {
+      const original = readFileSync(join(raiz, 'apps/mobile/ios/Runner/Info.plist'), 'utf8');
+      const sonda = join(banco, 'Info-sonda.plist');
+      const control = () =>
+        correr('node', [
+          'scripts/lib/info-plist-ios.mjs',
+          '--plist',
+          sonda,
+          '--xcconfig',
+          join(raiz, 'apps/mobile/ios/Flutter'),
+        ]);
+
+      writeFileSync(sonda, original);
+      control().codigo === 0
+        ? ok('el Info.plist del repositorio pasa: línea base limpia')
+        : mal(`el Info.plist del repositorio NO pasa: ${control().salida.split('\n')[1] ?? ''}`);
+
+      writeFileSync(
+        sonda,
+        original.replace(
+          /<key>NSLocalNetworkUsageDescription<\/key>\s*<string>[^<]*<\/string>/,
+          '',
+        ),
+      );
+      const a = control();
+      a.codigo !== 0 && /NSLocalNetworkUsageDescription/.test(a.salida)
+        ? ok('sin la clave de red local se detecta (el síntoma de sitio)')
+        : mal(`sin la clave de red local NO se detecta (codigo ${a.codigo})`);
+
+      // ATS fuera del bloque de depuración: llegaría al binario de Release.
+      writeFileSync(sonda, original.replace(/#if NCR_DEPURACION/, '#if 1'));
+      const b = control();
+      b.codigo !== 0 && /Release: lleva NSAppTransportSecurity/.test(b.salida)
+        ? ok('la excepción de ATS en Release se detecta')
+        : mal(`ATS en Release NO se detecta (codigo ${b.codigo})`);
+
+      writeFileSync(
+        sonda,
+        original.replace(
+          '<key>NSAllowsLocalNetworking</key>',
+          '<key>NSAllowsArbitraryLoads</key><true/><key>NSAllowsLocalNetworking</key>',
+        ),
+      );
+      const c = control();
+      c.codigo !== 0 && /NSAllowsArbitraryLoads/.test(c.salida)
+        ? ok('NSAllowsArbitraryLoads se detecta, aunque sea sólo en Debug')
+        : mal(`NSAllowsArbitraryLoads NO se detecta (codigo ${c.codigo})`);
+
+      writeFileSync(sonda, original.replace('</dict>\n</plist>', '</plist>'));
+      control().codigo !== 0
+        ? ok('un plist mal formado es un fallo, no un «no encontrado»')
+        : mal('un plist mal formado pasa');
+      rmSync(sonda, { force: true });
+    }
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
@@ -2970,6 +3035,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 29 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 30 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );
