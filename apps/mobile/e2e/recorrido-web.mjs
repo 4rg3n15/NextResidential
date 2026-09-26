@@ -430,32 +430,49 @@ try {
   const USUARIO = 'maria';
   const CLAVE = 'la-que-sea';
 
+  /**
+   * H-15I-14 · el foco NO basta: se comprueba lo leído y se reescribe.
+   *
+   * El verificador vio salir `usuario: "aria"` tras teclear `maria`. Con el
+   * `<input>` ya enfocado, el motor puede aplicarle todavía su estado —vacío— y
+   * borrar la primera pulsación. El campo del DOM es lo que el motor lee en la
+   * pulsación siguiente, así que si lo leído no es lo tecleado se vacía y se
+   * teclea otra vez, hasta tres. Sigue sin haber ningún `waitForTimeout`.
+   */
   const escribirEn = async (etiqueta, texto) => {
     const campo = pagina.getByLabel(etiqueta);
-    await campo.click();
-    try {
-      await pagina.waitForFunction(
-        (et) => {
-          // `startsWith`: el campo del código lleva texto de ayuda, y el motor
-          // puede añadirlo a la etiqueta accesible.
-          const i = [...document.querySelectorAll('input, textarea')].find((e) =>
-            (e.getAttribute('aria-label') ?? '').startsWith(et),
-          );
-          return i !== undefined && i === document.activeElement;
-        },
-        etiqueta,
-        { timeout: 5000 },
+    for (let intento = 1; intento <= 3; intento += 1) {
+      await campo.click();
+      try {
+        await pagina.waitForFunction(
+          (et) => {
+            // `startsWith`: el campo del código lleva texto de ayuda, y el motor
+            // puede añadirlo a la etiqueta accesible.
+            const i = [...document.querySelectorAll('input, textarea')].find((e) =>
+              (e.getAttribute('aria-label') ?? '').startsWith(et),
+            );
+            return i !== undefined && i === document.activeElement;
+          },
+          etiqueta,
+          { timeout: 5000 },
+        );
+      } catch {
+        console.log(`   · «${etiqueta}»: el motor no enfocó su <input> en 5 s`);
+        return false;
+      }
+      if (intento > 1) {
+        await pagina.keyboard.press('ControlOrMeta+A');
+        await pagina.keyboard.press('Backspace');
+      }
+      await pagina.keyboard.type(texto);
+      const leido = await campo.inputValue().catch(() => '<ilegible>');
+      console.log(
+        `   · «${etiqueta}»: enfocado por el motor, tecleado (intento ${intento}), ` +
+          `leído ${JSON.stringify(etiqueta === 'Contraseña' ? '·'.repeat(leido.length) : leido)}`,
       );
-    } catch {
-      console.log(`   · «${etiqueta}»: el motor no enfocó su <input> en 5 s`);
-      return false;
+      if (leido === texto) return true;
     }
-    await pagina.keyboard.type(texto);
-    const leido = await campo.inputValue().catch(() => '<ilegible>');
-    console.log(
-      `   · «${etiqueta}»: enfocado por el motor, tecleado, leído ${JSON.stringify(leido)}`,
-    );
-    return leido === texto;
+    return false;
   };
 
   /**
