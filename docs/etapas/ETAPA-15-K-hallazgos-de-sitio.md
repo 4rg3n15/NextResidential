@@ -353,10 +353,41 @@ discrepancia; el paso 14, tres corridas más, en verde. Literal:
 - **Perseguida:** cuatro corridas más de la suite completa por turbo, en
   paralelo como el paso 5: **cuatro verdes**. Con el paso 7 y las tres del
   paso 14, **ocho verdes contra una roja** sobre el mismo commit.
-- **Se registra como una aparición más de D-101** (la roja intermitente de
-  `@ncr/api`, abierta desde la ETAPA 12: salió bajo la suite completa en
-  paralelo y no a solas), **sin afirmar que sea la misma prueba**: sin nombre,
-  no hay diagnóstico. La próxima aparición llegará nombrada.
+- ~~Se registra como una aparición más de D-101~~. **Rectificado por la
+  tercera corrida**: con el paso 5 ya nombrando, las rojas eran **dos pruebas
+  de esta ronda**, no D-101 (ver abajo). La de esta corrida fue, con toda
+  probabilidad, una de ellas.
+
+### La tercera corrida final, FALLIDA: la roja, por fin con nombre, era mía
+
+Sobre `d7813c4`: **FALLIDA**, y esta vez el paso 5 la nombró. Literal:
+
+```
+▸ 5 · suite completa
+   @ncr/api:test:       Tests  1 failed | 1315 passed | 5 skipped (1321)
+   ✗ la suite no terminó bien (código 1): puede que ni siquiera llegara a correr
+     ROJA apps/api/test/tablero-pg.test.ts › H-SITIO-02 · tablero contra base real los accesos por hora cuentan los eventos del día en la hora LOCAL del conjunto
+       AssertionError: expected 7 to be 2 // Object.is equality at …/apps/api/test/tablero-pg.test.ts:269:69
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     ## @ncr/api: PRUEBAS EN ROJO
+            ✗ registro de equipos contra base real (D5, P6) D-11 · sólo el superadministrador atesta, y la atestación viaja al proveedor
+              error: duplicate key value violates unique constraint "dispositivos_endpoint_uk"
+```
+
+**Dos defectos de aislamiento en pruebas escritas en esta ronda:**
+
+- `tablero-pg.test.ts` contaba **exactamente** los eventos del día de la
+  copropiedad sembrada, en la que otras suites anexan eventos en paralelo:
+  esperaba 2 y vio 7. Ahora exige «al menos» lo que anexó —los eventos sólo se
+  añaden— y sigue cazando la hora UTC: con ese defecto, estos eventos y los
+  ajenos caerían cinco franjas más allá y la franja local no crecería.
+- `registro-de-equipos-pg.test.ts` (y `tablero-pg.test.ts`) daban de alta
+  equipos en `198.51.100.x:80` con sólo 200 hosts posibles, y la base de
+  pruebas conserva los equipos activos de corridas anteriores: el índice
+  `dispositivos_endpoint_uk` acabó chocando. El patrón venía de la 15-D; esta
+  ronda añadió un tercer equipo en el mismo espacio. Ahora el puerto también
+  varía por corrida.
+- Repetidas cinco veces contra la base tras la corrección: 9 de 9 cada vez.
 
 ### El veredicto literal de la corrida final, sobre el árbol completo
 
@@ -457,7 +488,7 @@ _Se pega aquí, tal cual, al terminar la corrida final._
   sondeo de la consola (ADR-030).
 - **DT-15K-05** · el guion de sitio no se ejecuta en el verificador; `--capturar`
   tiene prueba unitaria de la carga de prueba y un ensayo manual en SIMULADO.
-- **D-101** · reapareció una vez en la segunda corrida final (paso 5), sin nombre; ocho corridas verdes después. Sigue ABIERTA; ahora el paso 5 la nombra.
+- **D-101** · sigue ABIERTA y **no** reapareció: la roja sin nombre de la segunda corrida era, con toda probabilidad, una de las dos pruebas de esta ronda que la tercera nombró. Lo que cambia es que el paso 5 ya nombra cualquier roja.
 - **DT-15K-06** · una corrida de la sonda H-SITIO-08 del recorrido negativo
   falló una vez en el acceso, antes de llegar a la comprobación (la siguiente la
   detectó). Causa no encontrada; el fallo de acceso vuelca ahora el texto de la
@@ -521,7 +552,9 @@ Conventional Commits con el prefijo `etapa-15k/<módulo>`.
 | `70ae74c`  | `test(etapa-15k/equipos)`: las ramas nuevas del proveedor, ejercidas (umbral de ramas de @ncr/providers)                                 |
 | `93174b8`  | `docs(etapa-15k)`: la primera corrida final del verificador, FALLIDA, y lo que destapó                                                   |
 | `7d56f8e`  | `fix(etapa-15k/verificador)`: el paso 5 nombra la roja desde su informe JSON                                                             |
-| _(cierre)_ | `docs(etapa-15k)`: la segunda corrida, y el veredicto literal de la final                                                                |
+| `d7813c4`  | `docs(etapa-15k)`: la segunda corrida final, FALLIDA por una roja intermitente sin nombre                                                |
+| `cea9121`  | `fix(etapa-15k/pruebas)`: el tablero y el registro de equipos, aislados de las suites en paralelo y de corridas anteriores               |
+| _(cierre)_ | `docs(etapa-15k)`: la tercera corrida y el veredicto literal de la final                                                                 |
 
 **PR** contra `develop`, abierto y **sin fusionar**.
 
