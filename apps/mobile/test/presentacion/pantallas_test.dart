@@ -2,12 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
 import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
+import 'package:ncr_residente/dominio/hogar.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
-import 'package:ncr_residente/dominio/sesion.dart';
-import 'package:ncr_residente/infraestructura/sesion/almacen_seguro.dart';
 import 'package:ncr_residente/presentacion/controlador.dart';
 import 'package:ncr_residente/presentacion/pantallas/familia.dart';
 import 'package:ncr_residente/presentacion/pantallas/historial.dart';
@@ -16,6 +14,8 @@ import 'package:ncr_residente/presentacion/pantallas/notificaciones.dart';
 import 'package:ncr_residente/presentacion/pantallas/pendiente.dart';
 import 'package:ncr_residente/presentacion/pantallas/perfil.dart';
 import 'package:ncr_residente/presentacion/pantallas/vehiculos.dart';
+
+import '../dobles/hogar_falso.dart';
 
 /// Las cinco pantallas de 11-A, recorridas como las ve el residente.
 ///
@@ -297,25 +297,28 @@ void main() {
     final repo = RepositorioFalso();
     final inicio = controladorDeInicio(repo);
     await inicio.cargarAhora();
-
-    final sesion = SesionEnUso(
-      almacen: AlmacenEnMemoria(),
-      autenticador: _AutenticadorQuieto(),
-      reloj: const RelojDelSistema(),
-    );
-    await sesion.iniciar(correo: 'residente@ejemplo.invalid', clave: 'x');
+    final perfil = ControladorDeVista<PerfilDelResidente>(leer: HogarFalso().miPerfil);
+    await perfil.cargarAhora();
+    final ocupantes = ControladorDeVista<MisOcupantes>(leer: AltaFalsa().misOcupantes);
+    await ocupantes.cargarAhora();
+    final llamador = LlamadorFalso();
 
     await t.pumpWidget(
       envolver(
         Scaffold(
           body: PantallaDePerfil(
-            sesion: sesion,
             controladorDeInicio: inicio,
+            controladorDePerfil: perfil,
+            controladorDeOcupantes: ocupantes,
+            llamador: llamador,
             alCerrarSesion: () {},
-            alPedirAcceso: () {},
             alAbrirFamilia: () {},
             alAbrirHistorial: () {},
+            alAbrirVehiculos: () {},
             alAbrirNotificaciones: () {},
+            alEditarPerfil: (_) {},
+            alCambiarVivienda: (_) {},
+            alCambiarContrasena: () {},
             estadoDeAvisos: EstadoDeAvisos.sinDeterminar,
           ),
         ),
@@ -323,12 +326,20 @@ void main() {
     );
     await t.pumpAndSettle();
 
-    expect(find.text('residente@ejemplo.invalid'), findsOneWidget);
-    expect(find.text('Casa 42 · Manzana B'), findsOneWidget);
+    // 3.5 · el nombre de la PERSONA, no el correo de la sesión (C-36).
+    expect(find.text('Ana Pérez'), findsWidgets);
+    expect(find.text('Casa 42 · Manzana B · Titular'), findsOneWidget);
+    // La copropiedad, de solo lectura, y los códigos de las plazas libres.
+    expect(find.text('Calle inventada 00'), findsOneWidget);
+    await t.scrollUntilVisible(find.text('Código: ABCD-EFGH'), 200,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Código: ABCD-EFGH'), findsOneWidget);
 
     // En 11-A las notificaciones eran dos interruptores apagados. Ahora son una
     // fila con estado, porque «activadas» resumía tres condiciones distintas y
     // dejaba al residente creyendo que le avisarían.
+    await t.scrollUntilVisible(find.text('Notificaciones'), 200,
+        scrollable: find.byType(Scrollable).first);
     expect(find.text('Notificaciones'), findsOneWidget);
     expect(find.text(resumenDeAvisos(EstadoDeAvisos.sinDeterminar)), findsOneWidget);
 
@@ -354,19 +365,4 @@ void main() {
     expect(find.text('Pantalla M-4 · en construcción'), findsOneWidget);
     expect(find.textContaining('modo sin conexión'), findsOneWidget);
   });
-}
-
-class _AutenticadorQuieto implements Autenticador {
-  @override
-  Future<Sesion> iniciarSesion({required String correo, required String clave}) async => Sesion(
-        tokenDeAcceso: 'a',
-        tokenDeRefresco: 'r',
-        expiraEn: DateTime.now().add(const Duration(minutes: 5)),
-        usuarioId: 'u',
-        copropiedadId: 'c',
-        correo: correo,
-      );
-
-  @override
-  Future<Sesion> renovar(Sesion sesion) async => sesion;
 }

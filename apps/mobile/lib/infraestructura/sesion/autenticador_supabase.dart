@@ -21,43 +21,48 @@
 /// copropiedad recibiría 404 en toda ruta: no gana nada.
 library;
 
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 
+import '../../dominio/acceso.dart';
 import '../../dominio/puertos.dart';
 import '../../dominio/sesion.dart';
+import 'claims.dart';
 
 class AutenticadorSupabase implements Autenticador {
-  AutenticadorSupabase({
-    required Dio dio,
-    required String urlBase,
-    required String clavePublicable,
-  })  : _dio = dio,
-        _urlBase = urlBase,
-        _clave = clavePublicable;
+  AutenticadorSupabase({required Dio dio, required String urlBase, required String clavePublicable})
+    : _dio = dio,
+      _urlBase = urlBase,
+      _clave = clavePublicable;
 
   final Dio _dio;
   final String _urlBase;
   final String _clave;
 
+  /// Sólo las cuentas POR CORREO pueden entrar directamente contra Supabase:
+  /// el correo sintético de una cuenta por usuario no sale nunca de la API
+  /// (ADR-023). Por eso la app entra por `AutenticadorPorApi` y este adaptador
+  /// queda para RENOVAR, que es un canje de token y no conoce identificadores.
   @override
-  Future<Sesion> iniciarSesion({required String correo, required String clave}) =>
-      _pedirToken(
-        ruta: 'token?grant_type=password',
-        cuerpo: {'email': correo, 'password': clave},
+  Future<Sesion> iniciarSesion(IdentificadorDeAcceso identificador, {required String clave}) {
+    if (identificador is! PorCorreo) {
+      throw const Fallo(
+        ClaseDeFallo.sesionInvalida,
+        'Con código y usuario se entra por la API, no contra el proveedor',
       );
+    }
+    return _pedirToken(
+      ruta: 'token?grant_type=password',
+      cuerpo: {'email': identificador.correo, 'password': clave},
+    );
+  }
 
   @override
   Future<Sesion> renovar(Sesion sesion) => _pedirToken(
-        ruta: 'token?grant_type=refresh_token',
-        cuerpo: {'refresh_token': sesion.tokenDeRefresco},
-      );
+    ruta: 'token?grant_type=refresh_token',
+    cuerpo: {'refresh_token': sesion.tokenDeRefresco},
+  );
 
-  Future<Sesion> _pedirToken({
-    required String ruta,
-    required Map<String, String> cuerpo,
-  }) async {
+  Future<Sesion> _pedirToken({required String ruta, required Map<String, String> cuerpo}) async {
     try {
       final respuesta = await _dio.post<Map<String, dynamic>>(
         '$_urlBase/auth/v1/$ruta',
@@ -101,37 +106,10 @@ class AutenticadorSupabase implements Autenticador {
     if (acceso == null || refresco == null) {
       throw const Fallo(ClaseDeFallo.servidor, 'La respuesta de identidad no trae tokens');
     }
-    final claims = _claimsDe(acceso);
-    final expiraEnSegundos = (datos['expires_in'] as num?)?.toInt();
-    final exp = claims['exp'];
-
-    // Se prefiere `exp` del token sobre `expires_in`: el primero es un instante
-    // absoluto del emisor y el segundo es relativo a la recepción, que arrastra
-    // el desfase de reloj del dispositivo — el mismo desfase que justifica el
-    // margen de refresco.
-    final expira = exp is num
-        ? DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000, isUtc: true)
-        : DateTime.now().toUtc().add(Duration(seconds: expiraEnSegundos ?? 300));
-
-    return Sesion(
-      tokenDeAcceso: acceso,
-      tokenDeRefresco: refresco,
-      expiraEn: expira,
-      usuarioId: (claims['usuario_id'] ?? claims['sub'] ?? '') as String,
-      copropiedadId: claims['copropiedad_id'] as String?,
-      correo: (claims['email'] ?? '') as String,
+    return sesionDesdeTokens(
+      acceso: acceso,
+      refresco: refresco,
+      expiraEnSegundos: (datos['expires_in'] as num?)?.toInt(),
     );
-  }
-
-  /// Carga útil del JWT. Sin verificar firma, y a propósito: ver la cabecera.
-  Map<String, dynamic> _claimsDe(String jwt) {
-    try {
-      final partes = jwt.split('.');
-      if (partes.length < 2) return const {};
-      final normalizado = base64Url.normalize(partes[1]);
-      return jsonDecode(utf8.decode(base64Url.decode(normalizado))) as Map<String, dynamic>;
-    } catch (_) {
-      return const {};
-    }
   }
 }

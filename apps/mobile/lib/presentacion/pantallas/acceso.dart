@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../aplicacion/sesion_en_uso.dart';
 import '../../configuracion/ambiente.dart';
 import '../../configuracion/tema.dart';
+import '../../dominio/acceso.dart';
 import '../../dominio/puertos.dart';
 
 /// Acceso del residente.
@@ -10,6 +11,11 @@ import '../../dominio/puertos.dart';
 /// No está en el mockup —los ocho dibujos empiezan con la sesión abierta— y sin
 /// ella no hay app: es el hueco número catorce de la auditoría, y se construye
 /// con lo que el resto del sistema ya decidió.
+///
+/// **Código de la copropiedad + usuario + contraseña (D1, 15-I).** El usuario
+/// lo creó el superadministrador; no es un correo, así que ya no se exige la
+/// arroba. Las cuentas anteriores siguen entrando con su correo: si lo escrito
+/// en «Usuario» lleva arroba, el código no se pide (`identificadorDesde`).
 ///
 /// **Sin segundo factor, y eso es una decisión, no un olvido.** RN-20 exige MFA
 /// a los roles administrativos; el residente no es uno. Pedírselo aquí
@@ -33,7 +39,8 @@ class PantallaDeAcceso extends StatefulWidget {
 }
 
 class _PantallaDeAccesoState extends State<PantallaDeAcceso> {
-  final _correo = TextEditingController();
+  final _codigo = TextEditingController();
+  final _usuario = TextEditingController();
   final _clave = TextEditingController();
   final _formulario = GlobalKey<FormState>();
   bool _enviando = false;
@@ -41,7 +48,8 @@ class _PantallaDeAccesoState extends State<PantallaDeAcceso> {
 
   @override
   void dispose() {
-    _correo.dispose();
+    _codigo.dispose();
+    _usuario.dispose();
     _clave.dispose();
     super.dispose();
   }
@@ -53,7 +61,10 @@ class _PantallaDeAccesoState extends State<PantallaDeAcceso> {
       _fallo = null;
     });
     try {
-      await widget.sesion.iniciar(correo: _correo.text.trim(), clave: _clave.text);
+      await widget.sesion.iniciar(
+        identificador: identificadorDesde(codigo: _codigo.text, usuario: _usuario.text),
+        clave: _clave.text,
+      );
       if (!mounted) return;
       widget.alEntrar();
     } on Fallo catch (f) {
@@ -113,21 +124,35 @@ class _PantallaDeAccesoState extends State<PantallaDeAcceso> {
                       const SizedBox(height: 16),
                     ],
                     TextFormField(
-                      controller: _correo,
-                      autofillHints: const [AutofillHints.email],
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(labelText: 'Correo'),
+                      key: const Key('acceso.codigo'),
+                      controller: _codigo,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                        labelText: 'Código de la copropiedad',
+                        helperText: 'Se lo da la administración, p. ej. «MIRA»',
+                      ),
+                      // Sólo hace falta si el usuario no es un correo (D1).
                       validator: (v) =>
-                          (v == null || !v.contains('@')) ? 'Escriba su correo' : null,
+                          pideCodigo(_usuario.text) ? motivoDeCodigoInvalido(v ?? '') : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
+                      key: const Key('acceso.usuario'),
+                      controller: _usuario,
+                      autofillHints: const [AutofillHints.username],
+                      autocorrect: false,
+                      decoration: const InputDecoration(labelText: 'Usuario'),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Escriba su usuario' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      key: const Key('acceso.clave'),
                       controller: _clave,
                       obscureText: true,
                       autofillHints: const [AutofillHints.password],
                       decoration: const InputDecoration(labelText: 'Contraseña'),
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Escriba su contraseña' : null,
+                      validator: (v) => (v == null || v.isEmpty) ? 'Escriba su contraseña' : null,
                       onFieldSubmitted: (_) => _entrar(),
                     ),
                     const SizedBox(height: 20),

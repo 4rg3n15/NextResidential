@@ -6,10 +6,13 @@ import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
 import 'package:ncr_residente/configuracion/ambiente.dart';
 import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
+import 'package:ncr_residente/dominio/acceso.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/dominio/sesion.dart';
 import 'package:ncr_residente/infraestructura/sesion/almacen_seguro.dart';
 import 'package:ncr_residente/presentacion/app.dart';
+
+import '../dobles/hogar_falso.dart';
 
 /// EL ORDEN AL VOLVER A PRIMER PLANO
 ///
@@ -50,7 +53,7 @@ class AutenticadorQueAnota implements Autenticador {
       );
 
   @override
-  Future<Sesion> iniciarSesion({required String correo, required String clave}) async =>
+  Future<Sesion> iniciarSesion(IdentificadorDeAcceso identificador, {required String clave}) async =>
       _emitir();
 
   @override
@@ -171,9 +174,11 @@ void main() {
   late RelojFijo reloj;
   late SesionEnUso sesion;
   late Dependencias dependencias;
+  late AltaFalsa alta;
 
   setUp(() async {
     bitacora.clear();
+    alta = AltaFalsa();
     reloj = RelojFijo(DateTime.utc(2026, 9, 18, 12));
     final almacen = AlmacenEnMemoria();
     sesion = SesionEnUso(
@@ -181,7 +186,7 @@ void main() {
       autenticador: AutenticadorQueAnota(reloj),
       reloj: reloj,
     );
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
     dependencias = Dependencias(
       ambiente: Ambiente(
         apiUrl: 'http://api.invalid',
@@ -193,6 +198,11 @@ void main() {
       reloj: reloj,
       notificaciones: FuenteGobernada(),
       claves: () => 'clave-fija-de-prueba',
+      alta: alta,
+      hogar: HogarFalso(),
+      cuenta: CuentaFalsa(),
+      llamador: LlamadorFalso(),
+      compartidor: CompartidorFalso(),
     );
   });
 
@@ -246,5 +256,26 @@ void main() {
 
     expect(find.text('Acceso del residente'), findsOneWidget);
     expect(bitacora, isEmpty);
+  });
+
+  testWidgets('3.2 · con el alta sin completar, NO se ve ni se carga la app', (t) async {
+    alta.estados
+      ..clear()
+      ..add(estadoDeAlta(vinculada: false));
+    await t.pumpWidget(AppDelResidente(dependencias: dependencias));
+    await t.pumpAndSettle();
+
+    expect(find.text('Complete sus datos'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(bitacora.where((e) => e.startsWith('leer:')), isEmpty,
+        reason: 'ninguna pantalla de la app pide datos antes de completar el alta');
+  });
+
+  testWidgets('S-59 · sesión recuperada sin red: pasa a la app, que pinta su estado', (t) async {
+    alta.falloConsulta = const Fallo(ClaseDeFallo.sinConexion, 'sin red');
+    await t.pumpWidget(AppDelResidente(dependencias: dependencias));
+    await t.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
   });
 }

@@ -7,7 +7,12 @@ import '../controlador.dart';
 import '../widgets/estados.dart';
 import 'comunes.dart';
 
-/// M-3 · Mis Vehículos — HU-05, HU-06 (lectura).
+/// M-3 · Mis Vehículos — HU-05, HU-06, y D5 a de la ETAPA 15-I.
+///
+/// Desde la 15-I el residente REGISTRA sus vehículos propios (activos al
+/// instante, dentro del tope que la base cuenta) y da de baja los que registró
+/// un residente de su vivienda. Los que registró la administración sólo los da
+/// de baja la administración: el servidor contesta «no» y la pantalla lo dice.
 ///
 /// La placa se muestra **tal como la normalizó el objeto de valor `Placa`**, en
 /// mayúsculas y sin separadores. No se re-formatea aquí: la app mostraría una
@@ -19,14 +24,20 @@ class PantallaDeVehiculos extends StatelessWidget {
     super.key,
     required this.controlador,
     required this.alPedirAcceso,
+    this.alRegistrar,
+    this.alDesactivar,
   });
 
   final ControladorDeVista controlador;
   final void Function() alPedirAcceso;
 
+  /// `null` = sin alta desde la app (las pruebas de 11-A la montan así).
+  final void Function()? alRegistrar;
+  final Future<void> Function(Vehiculo vehiculo)? alDesactivar;
+
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
+    final lista = AnimatedBuilder(
       animation: controlador,
       builder: (context, _) => RefreshIndicator(
         onRefresh: controlador.cargarAhora,
@@ -34,9 +45,10 @@ class PantallaDeVehiculos extends StatelessWidget {
           estado: controlador.estado as Estado<List<Vehiculo>>,
           alReintentar: controlador.cargarAhora,
           alPedirAcceso: alPedirAcceso,
-          mensajeVacio:
-              'No hay vehículos registrados en su vivienda. Registrarlos desde la app llega en la '
-              'ETAPA 11-B; hoy los registra la administración.',
+          mensajeVacio: alRegistrar == null
+              ? 'No hay vehículos registrados en su vivienda.'
+              : 'No hay vehículos registrados en su vivienda. Registre los suyos con el botón '
+                    '«Registrar».',
           conDatos: (vehiculos, {required desdeCache}) => ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -48,18 +60,31 @@ class PantallaDeVehiculos extends StatelessWidget {
                 style: const TextStyle(color: Paleta.textoSuave),
               ),
               const SizedBox(height: 16),
-              ...vehiculos.map((v) => _Vehiculo(v)),
+              ...vehiculos.map((v) => _Vehiculo(v, alDesactivar: alDesactivar)),
+              const SizedBox(height: 72),
             ],
           ),
         ),
+      ),
+    );
+    final registrar = alRegistrar;
+    if (registrar == null) return lista;
+    return Scaffold(
+      body: lista,
+      floatingActionButton: FloatingActionButton.extended(
+        key: const Key('vehiculos.registrar'),
+        onPressed: registrar,
+        icon: const Icon(Icons.add),
+        label: const Text('Registrar'),
       ),
     );
   }
 }
 
 class _Vehiculo extends StatelessWidget {
-  const _Vehiculo(this.v);
+  const _Vehiculo(this.v, {this.alDesactivar});
   final Vehiculo v;
+  final Future<void> Function(Vehiculo vehiculo)? alDesactivar;
 
   @override
   Widget build(BuildContext context) {
@@ -92,8 +117,7 @@ class _Vehiculo extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                if (v.esPrincipal)
-                  const Distintivo(texto: 'Principal', pareja: Paleta.exitoSuave),
+                if (v.esPrincipal) const Distintivo(texto: 'Principal', pareja: Paleta.exitoSuave),
                 if (!v.activo) ...[
                   const SizedBox(width: 6),
                   const Distintivo(texto: 'Desactivado', pareja: Paleta.neutroSuave),
@@ -104,6 +128,15 @@ class _Vehiculo extends StatelessWidget {
               const SizedBox(height: 10),
               Text(v.descripcion, style: const TextStyle(color: Paleta.textoSuave)),
             ],
+            if (v.activo && alDesactivar != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  key: Key('vehiculos.baja.${v.placa}'),
+                  onPressed: () => alDesactivar!(v),
+                  child: const Text('Dar de baja'),
+                ),
+              ),
           ],
         ),
       ),

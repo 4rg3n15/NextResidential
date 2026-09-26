@@ -59,11 +59,7 @@ class Vivienda {
 }
 
 class Vinculo {
-  const Vinculo({
-    required this.residenteId,
-    required this.esTitular,
-    required this.nivelAcceso,
-  });
+  const Vinculo({required this.residenteId, required this.esTitular, required this.nivelAcceso});
 
   final String residenteId;
   final bool esTitular;
@@ -71,11 +67,7 @@ class Vinculo {
 }
 
 class MiHogar {
-  const MiHogar({
-    required this.vivienda,
-    required this.vinculo,
-    required this.puedeAutorizar,
-  });
+  const MiHogar({required this.vivienda, required this.vinculo, required this.puedeAutorizar});
 
   final Vivienda vivienda;
   final Vinculo vinculo;
@@ -204,15 +196,8 @@ enum DiaDeSemana { domingo, lunes, martes, miercoles, jueves, viernes, sabado }
 
 extension NombreDelDia on DiaDeSemana {
   String get corto => const ['D', 'L', 'M', 'X', 'J', 'V', 'S'][index];
-  String get largo => const [
-        'domingo',
-        'lunes',
-        'martes',
-        'miércoles',
-        'jueves',
-        'viernes',
-        'sábado',
-      ][index];
+  String get largo =>
+      const ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][index];
 }
 
 /// HU-09 · RN-22 · El patrón: qué días y entre qué horas.
@@ -319,15 +304,14 @@ enum SalidaDelRechazo {
 
 extension QueHacerConElRechazo on MotivoDeRechazo {
   SalidaDelRechazo get salida => switch (this) {
-        MotivoDeRechazo.listaNegra => SalidaDelRechazo.hableConLaAdministracion,
-        MotivoDeRechazo.viviendaInactiva => SalidaDelRechazo.hableConLaAdministracion,
-        MotivoDeRechazo.sinNivelDeAcceso => SalidaDelRechazo.hableConLaAdministracion,
-        MotivoDeRechazo.placaDuplicada => SalidaDelRechazo.corrijaElFormulario,
-      };
+    MotivoDeRechazo.listaNegra => SalidaDelRechazo.hableConLaAdministracion,
+    MotivoDeRechazo.viviendaInactiva => SalidaDelRechazo.hableConLaAdministracion,
+    MotivoDeRechazo.sinNivelDeAcceso => SalidaDelRechazo.hableConLaAdministracion,
+    MotivoDeRechazo.placaDuplicada => SalidaDelRechazo.corrijaElFormulario,
+  };
 
   /// Qué campo señalar cuando el residente sí puede arreglarlo.
-  String? get campoAResaltar =>
-      this == MotivoDeRechazo.placaDuplicada ? 'placa' : null;
+  String? get campoAResaltar => this == MotivoDeRechazo.placaDuplicada ? 'placa' : null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -417,9 +401,15 @@ class CapturaAceptada extends ResultadoDeCaptura {
     required this.consentimientoId,
     required this.titular,
     required this.calidad,
+    this.enlaceDeConsentimiento,
   });
 
   final String consentimientoId;
+
+  /// Punto 5 (15-I) · el enlace de UN solo uso con el que el VISITANTE responde
+  /// desde su teléfono (RN-10). El residente lo entrega —QR o compartir—; no lo
+  /// responde él. `null` si la API no lo emitió.
+  final String? enlaceDeConsentimiento;
 
   /// A QUIÉN se le pidió. Se enseña por su nombre para que el residente
   /// entienda que la respuesta no le toca a él.

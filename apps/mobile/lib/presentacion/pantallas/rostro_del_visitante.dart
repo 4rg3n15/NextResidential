@@ -36,7 +36,9 @@ import 'package:flutter/material.dart';
 import '../../configuracion/tema.dart';
 import '../../dominio/calidad_de_captura.dart';
 import '../../dominio/entidades.dart';
+import '../../dominio/hogar.dart';
 import '../../dominio/puertos.dart';
+import 'entrega_del_consentimiento.dart';
 
 /// De dónde sale la foto y sus medidas. Es un puerto por lo de siempre: sin él
 /// esta pantalla no se podría probar sin una cámara, y con él se prueban las
@@ -65,6 +67,9 @@ class PantallaDeRostroDelVisitante extends StatefulWidget {
     required this.tomarFoto,
     required this.enviar,
     required this.versionPolitica,
+    this.compartidor,
+    this.consultarConsentimiento,
+    this.urlDeLaApi = '',
   });
 
   /// Se enseña en todas partes: es de ESTA persona de quien se habla.
@@ -75,6 +80,14 @@ class PantallaDeRostroDelVisitante extends StatefulWidget {
   /// La versión de la política de tratamiento que se le mostró al titular.
   /// Queda escrita en el consentimiento para la auditoría de la Ley 1581.
   final String versionPolitica;
+
+  /// Punto 5 (15-I) · para ENTREGAR el enlace al visitante y ver su respuesta.
+  /// `null` = la pantalla de 11-B, sin entrega (así la montan sus pruebas).
+  final Compartidor? compartidor;
+  final Future<EstadoDeConsentimiento> Function(String consentimientoId)? consultarConsentimiento;
+
+  /// Para completar el enlace si la API sólo devolvió la ruta.
+  final String urlDeLaApi;
 
   @override
   State<PantallaDeRostroDelVisitante> createState() => _PantallaDeRostroDelVisitanteState();
@@ -156,7 +169,8 @@ class _PantallaDeRostroDelVisitanteState extends State<PantallaDeRostroDelVisita
               icono: Icons.check_circle_outline,
               pareja: Paleta.exitoSuave,
               titulo: 'La foto sirve',
-              cuerpo: 'Ahora falta lo importante: pedirle el permiso a '
+              cuerpo:
+                  'Ahora falta lo importante: pedirle el permiso a '
                   '${widget.nombreDelVisitante}.',
             ),
             const SizedBox(height: 12),
@@ -173,7 +187,10 @@ class _PantallaDeRostroDelVisitanteState extends State<PantallaDeRostroDelVisita
             onPressed: puedeEnviar ? _enviar : null,
             icon: _enviando
                 ? const SizedBox(
-                    height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.send_outlined),
             label: Text(_enviando ? 'Enviando…' : 'Pedirle el permiso'),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
@@ -193,22 +210,38 @@ class _PantallaDeRostroDelVisitanteState extends State<PantallaDeRostroDelVisita
             const SizedBox(height: 16),
             switch (desenlace) {
               CapturaAceptada(titular: final titular) => _Aviso(
-                  icono: Icons.hourglass_top_outlined,
-                  pareja: Paleta.avisoSuave,
-                  // NO dice «listo». Decirlo haría que el residente mandara a su
-                  // visitante a una terminal que todavía no lo conoce.
-                  titulo: 'Pendiente de que $titular acepte',
-                  cuerpo: 'La solicitud le llegará a $titular, que es quien decide. '
-                      'Usted no puede aceptar por él. Hasta que acepte, la foto NO se '
-                      'envía a ninguna terminal del conjunto.',
-                ),
+                icono: Icons.hourglass_top_outlined,
+                pareja: Paleta.avisoSuave,
+                // NO dice «listo». Decirlo haría que el residente mandara a su
+                // visitante a una terminal que todavía no lo conoce.
+                titulo: 'Pendiente de que $titular acepte',
+                cuerpo:
+                    'La solicitud le llegará a $titular, que es quien decide. '
+                    'Usted no puede aceptar por él. Hasta que acepte, la foto NO se '
+                    'envía a ninguna terminal del conjunto.',
+              ),
               CapturaRechazada(motivos: final motivos) => _Aviso(
-                  icono: Icons.no_photography_outlined,
-                  pareja: Paleta.peligroSuave,
-                  titulo: 'El conjunto no aceptó la foto',
-                  cuerpo: 'Repítala. Motivos: ${motivos.join(', ')}.',
-                ),
+                icono: Icons.no_photography_outlined,
+                pareja: Paleta.peligroSuave,
+                titulo: 'El conjunto no aceptó la foto',
+                cuerpo: 'Repítala. Motivos: ${motivos.join(', ')}.',
+              ),
             },
+            if (desenlace
+                case CapturaAceptada(
+                  enlaceDeConsentimiento: final String enlace,
+                  consentimientoId: final id,
+                  titular: final titular,
+                )
+                when widget.compartidor != null && widget.consultarConsentimiento != null) ...[
+              const SizedBox(height: 12),
+              EntregaDelConsentimiento(
+                titular: titular,
+                enlace: enlaceParaCompartir(enlace, widget.urlDeLaApi),
+                compartidor: widget.compartidor!,
+                consultar: () => widget.consultarConsentimiento!(id),
+              ),
+            ],
           ],
         ],
       ),
@@ -294,10 +327,7 @@ class _Aviso extends StatelessWidget {
       liveRegion: true,
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: pareja.fondo,
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration: BoxDecoration(color: pareja.fondo, borderRadius: BorderRadius.circular(10)),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

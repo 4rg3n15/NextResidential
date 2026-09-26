@@ -1,138 +1,170 @@
 import 'package:flutter/material.dart';
 
 import 'notificaciones.dart';
+import 'ocupantes.dart';
 
 import '../../aplicacion/estado.dart';
-import '../../aplicacion/sesion_en_uso.dart';
 import '../../configuracion/tema.dart';
 import '../../dominio/entidades.dart';
+import '../../dominio/hogar.dart';
 import '../controlador.dart';
 
-/// M-8 · Mi Perfil — HU-37 (parcial).
+/// M-8 · Mi Perfil — HU-37, y 3.5 de la ETAPA 15-I.
 ///
 /// ─────────────────────────────────────────────────────────────────────────────
-/// LOS TRES INTERRUPTORES DEL MOCKUP ESTÁN, DESHABILITADOS, CON SU MOTIVO
+/// QUÉ SE EDITA, QUÉ SE VE Y QUÉ NO SE TOCA
 ///
-/// El dibujo pone «Notificaciones push», «Alertas de seguridad» y «Resumen
-/// semanal». Pintarlos como si funcionaran sería la peor de las opciones: el
-/// residente los apagaría y seguiría recibiendo avisos, o los encendería y no
-/// recibiría nada. No hay dónde guardar esa preferencia —no existe la columna—
-/// ni quién la respete, porque el envío por FCM es de 11-B.
+///  · Se EDITAN nombre, apellidos, fecha de nacimiento, documento, correo y
+///    teléfono (con su propio formulario), y los vehículos (su pestaña).
+///  · Se VE la vivienda, y cambiarla exige el código de quien ya vive allí.
+///  · La copropiedad —nombre y dirección— es de SOLO LECTURA.
+///  · Los códigos de las plazas libres se ven aquí para dárselos a quien vive
+///    con el residente (3.3).
+///  · «Llamar a portería» marca el teléfono que registró el superadministrador
+///    (D7) y, si no hay ninguno, lo dice en vez de quedarse mudo.
 ///
-/// Se muestran deshabilitados y diciendo cuándo llegan. Es la misma decisión
-/// que el vídeo de la guardia virtual en la ETAPA 10.
+/// El nombre que se muestra es el de la PERSONA, no el correo de la sesión:
+/// una cuenta por usuario no tiene correo que enseñar (C-36).
 ///
-/// Lo que sí hay: la vivienda, el correo de la sesión y **cerrar sesión**, que
-/// borra el llavero. Y lo que falta y queda dicho: cambio de contraseña,
-/// segundo factor voluntario, revocación del propio consentimiento biométrico
-/// (HU-15) y la política de privacidad con su versión aceptada — los cuatro en
-/// 11-B, porque los cuatro escriben.
+/// El interruptor «Resumen semanal» sigue deshabilitado con su motivo: no hay
+/// dónde guardar esa preferencia, y uno que se mueve sin guardar nada es una
+/// mentira con animación.
 class PantallaDePerfil extends StatelessWidget {
   const PantallaDePerfil({
     super.key,
-    required this.sesion,
     required this.controladorDeInicio,
+    required this.controladorDePerfil,
+    required this.controladorDeOcupantes,
+    required this.llamador,
     required this.alCerrarSesion,
-    required this.alPedirAcceso,
     required this.alAbrirFamilia,
     required this.alAbrirHistorial,
+    required this.alAbrirVehiculos,
     required this.alAbrirNotificaciones,
+    required this.alEditarPerfil,
+    required this.alCambiarVivienda,
+    required this.alCambiarContrasena,
     required this.estadoDeAvisos,
   });
 
-  final SesionEnUso sesion;
   final ControladorDeVista controladorDeInicio;
+  final ControladorDeVista<PerfilDelResidente> controladorDePerfil;
+  final ControladorDeVista<MisOcupantes> controladorDeOcupantes;
+  final LlamadorDeTelefono llamador;
   final void Function() alCerrarSesion;
-  final void Function() alPedirAcceso;
   final void Function() alAbrirFamilia;
   final void Function() alAbrirHistorial;
+  final void Function() alAbrirVehiculos;
   final void Function() alAbrirNotificaciones;
+  final void Function(PerfilDelResidente perfil) alEditarPerfil;
+  final void Function(PerfilDelResidente? perfil) alCambiarVivienda;
+  final void Function() alCambiarContrasena;
 
   /// En qué punto está el registro del aparato. Se recibe como VALOR: el perfil
-  /// no tiene por qué saber que hay un controlador detrás, y así el resumen que
-  /// enseña aquí y el detalle de M-7 no pueden contradecirse.
+  /// no tiene por qué saber que hay un controlador detrás.
   final EstadoDeAvisos estadoDeAvisos;
+
+  static T? _datos<T>(Estado<T> e) => switch (e) {
+    ConDatos<T>(datos: final d) => d,
+    Cargando<T>(previo: final p) => p,
+    Fallido<T>(previo: final p) => p,
+    _ => null,
+  };
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controladorDeInicio,
+      animation: Listenable.merge([
+        controladorDeInicio,
+        controladorDePerfil,
+        controladorDeOcupantes,
+      ]),
       builder: (context, _) {
-        final estado = controladorDeInicio.estado;
-        final hogar = estado is ConDatos<MiHogar> ? estado.datos : null;
+        final hogar = _datos(controladorDeInicio.estado as Estado<MiHogar>);
+        final perfil = _datos(controladorDePerfil.estado);
+        final ocupantes = _datos(controladorDeOcupantes.estado);
+        final nombre = perfil?.nombreCompleto ?? '';
+        final t = Theme.of(context).textTheme;
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('Mi perfil', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Mi perfil', style: t.headlineSmall),
             const SizedBox(height: 16),
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Paleta.peligroSuave.fondo,
+                  child: Text(
+                    nombre.isEmpty ? '?' : nombre.characters.first.toUpperCase(),
+                    style: TextStyle(color: Paleta.peligroSuave.texto, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                title: Text(
+                  nombre.isEmpty ? 'Mi cuenta' : nombre,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: hogar == null
+                    ? null
+                    : Text(
+                        '${hogar.vivienda.titulo} · '
+                        '${hogar.vinculo.esTitular ? 'Titular' : 'Residente'}',
+                      ),
+              ),
+            ),
+            if (perfil != null) ...[
+              const SizedBox(height: 12),
+              _Datos(perfil: perfil, alEditar: () => alEditarPerfil(perfil)),
+              const SizedBox(height: 12),
+              Card(
+                child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 26,
-                      backgroundColor: Paleta.peligroSuave.fondo,
-                      child: Text(
-                        (sesion.sesion?.correo ?? '?').characters.first.toUpperCase(),
-                        style: TextStyle(
-                          color: Paleta.peligroSuave.texto,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 20,
-                        ),
-                      ),
+                    ListTile(
+                      leading: const Icon(Icons.apartment_outlined),
+                      title: Text(perfil.copropiedadNombre),
+                      subtitle: Text(perfil.copropiedadDireccion ?? 'Sin dirección registrada'),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sesion.sesion?.correo ?? 'Sin sesión',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          if (hogar != null) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              hogar.vivienda.titulo,
-                              style: const TextStyle(color: Paleta.textoSuave),
-                            ),
-                            Text(
-                              hogar.vinculo.esTitular ? 'Titular de la vivienda' : 'Residente',
-                              style: const TextStyle(color: Paleta.textoSuave, fontSize: 13),
-                            ),
-                          ],
-                        ],
+                    const Divider(height: 1),
+                    ListTile(
+                      key: const Key('perfil.cambiarVivienda'),
+                      leading: const Icon(Icons.home_outlined),
+                      title: Text(hogar?.vivienda.titulo ?? 'Mi vivienda'),
+                      subtitle: const Text('Cambiar de vivienda exige un código'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => alCambiarVivienda(perfil),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      key: const Key('perfil.porteria'),
+                      leading: const Icon(Icons.phone_outlined),
+                      title: const Text('Llamar a portería'),
+                      subtitle: Text(
+                        perfil.telefonoPorteria ?? 'La administración no registró el teléfono',
                       ),
+                      onTap: () => llamarAPorteria(context, llamador, perfil.telefonoPorteria),
                     ),
                   ],
                 ),
               ),
-            ),
+            ],
+            if (ocupantes != null && ocupantes.declarada) ...[
+              const SizedBox(height: 12),
+              TarjetaDeOcupantes(ocupantes: ocupantes),
+            ],
             const SizedBox(height: 20),
-            Text('Atajos', style: Theme.of(context).textTheme.titleMedium),
+            Text('Atajos', style: t.titleMedium),
             const SizedBox(height: 8),
             Card(
               child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.people_outline),
-                    title: const Text('Mi familia'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: alAbrirFamilia,
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.history),
-                    title: const Text('Historial de accesos'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: alAbrirHistorial,
-                  ),
+                  _Atajo(Icons.people_outline, 'Mi familia', alAbrirFamilia),
+                  _Atajo(Icons.directions_car_outlined, 'Mis vehículos', alAbrirVehiculos),
+                  _Atajo(Icons.history, 'Historial de accesos', alAbrirHistorial),
+                  _Atajo(Icons.password_outlined, 'Cambiar contraseña', alCambiarContrasena),
                 ],
               ),
             ),
             const SizedBox(height: 20),
-            Text('Preferencias', style: Theme.of(context).textTheme.titleMedium),
+            Text('Preferencias', style: t.titleMedium),
             const SizedBox(height: 8),
             Card(
               child: Column(
@@ -140,9 +172,7 @@ class PantallaDePerfil extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.notifications_outlined),
                     title: const Text('Notificaciones'),
-                    // El resumen dice el estado REAL, no «activadas». Que la
-                    // app tenga permiso no significa que los avisos lleguen:
-                    // hace falta además que el conjunto tenga el token.
+                    // El resumen dice el estado REAL, no «activadas».
                     subtitle: Text(
                       resumenDeAvisos(estadoDeAvisos),
                       style: const TextStyle(fontSize: 12),
@@ -151,25 +181,17 @@ class PantallaDePerfil extends StatelessWidget {
                     onTap: alAbrirNotificaciones,
                   ),
                   const Divider(height: 1),
-                  _InterruptorPendiente(
-                    titulo: 'Resumen semanal',
-                    detalle: 'Sin dónde guardar la preferencia todavía (11-B).',
+                  const SwitchListTile(
+                    value: false,
+                    // `null` deshabilita de verdad.
+                    onChanged: null,
+                    title: Text('Resumen semanal'),
+                    subtitle: Text(
+                      'Sin dónde guardar la preferencia todavía.',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Paleta.neutroSuave.fondo,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                'Pendiente en 11-B: cambio de contraseña, segundo factor voluntario, revocar mi '
-                'consentimiento biométrico (HU-15, RN-11 — el residente también es titular de sus '
-                'datos) y la política de privacidad con la versión aceptada (Ley 1581).',
-                style: TextStyle(color: Paleta.neutroSuave.texto, fontSize: 13),
               ),
             ),
             const SizedBox(height: 20),
@@ -195,20 +217,83 @@ class PantallaDePerfil extends StatelessWidget {
   }
 }
 
-class _InterruptorPendiente extends StatelessWidget {
-  const _InterruptorPendiente({required this.titulo, required this.detalle});
-  final String titulo;
-  final String detalle;
+class _Datos extends StatelessWidget {
+  const _Datos({required this.perfil, required this.alEditar});
+  final PerfilDelResidente perfil;
+  final void Function() alEditar;
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile(
-      value: false,
-      // `null` deshabilita de verdad: un interruptor que se mueve y no guarda
-      // nada es una mentira con animación.
-      onChanged: null,
-      title: Text(titulo),
-      subtitle: Text(detalle, style: const TextStyle(fontSize: 12)),
+    final documento = perfil.numeroDocumento == null
+        ? 'Sin documento'
+        : '${tiposDeDocumento[perfil.tipoDocumento] ?? 'Documento'} ${perfil.numeroDocumento}';
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            title: const Text('Mis datos'),
+            trailing: TextButton(
+              key: const Key('perfil.editar'),
+              onPressed: alEditar,
+              child: const Text('Editar'),
+            ),
+          ),
+          _Fila(Icons.mail_outline, perfil.correo ?? 'Sin correo de contacto'),
+          _Fila(Icons.phone_iphone, perfil.telefono ?? 'Sin teléfono'),
+          _Fila(Icons.badge_outlined, documento),
+          if (perfil.fechaNacimiento != null) _Fila(Icons.cake_outlined, perfil.fechaNacimiento!),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _Fila extends StatelessWidget {
+  const _Fila(this.icono, this.texto);
+  final IconData icono;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) =>
+      ListTile(dense: true, leading: Icon(icono, size: 20), title: Text(texto));
+}
+
+class _Atajo extends StatelessWidget {
+  const _Atajo(this.icono, this.titulo, this.alPulsar);
+  final IconData icono;
+  final String titulo;
+  final void Function() alPulsar;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    leading: Icon(icono),
+    title: Text(titulo),
+    trailing: const Icon(Icons.chevron_right),
+    onTap: alPulsar,
+  );
+}
+
+/// D7 · marca el teléfono de portería, o dice por qué no puede.
+Future<void> llamarAPorteria(
+  BuildContext context,
+  LlamadorDeTelefono llamador,
+  String? telefono,
+) async {
+  final mensajero = ScaffoldMessenger.of(context);
+  if (telefono == null || telefono.isEmpty) {
+    mensajero.showSnackBar(
+      const SnackBar(
+        content: Text('La administración todavía no registró el teléfono de portería.'),
+      ),
+    );
+    return;
+  }
+  final pudo = await llamador.llamar(telefono);
+  if (!pudo) {
+    mensajero.showSnackBar(
+      SnackBar(content: Text('Este aparato no puede llamar. El número es $telefono.')),
     );
   }
 }

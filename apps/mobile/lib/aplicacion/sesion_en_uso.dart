@@ -19,6 +19,7 @@ library;
 
 import 'dart:async';
 
+import '../dominio/acceso.dart';
 import '../dominio/puertos.dart';
 import '../dominio/sesion.dart';
 
@@ -48,11 +49,18 @@ class SesionEnUso {
     _ultimoUso = await _almacen.ultimoUso();
   }
 
-  Future<Sesion> iniciar({required String correo, required String clave}) async {
-    final s = await _autenticador.iniciarSesion(correo: correo, clave: clave);
+  Future<Sesion> iniciar({
+    required IdentificadorDeAcceso identificador,
+    required String clave,
+  }) async {
+    final s = await _autenticador.iniciarSesion(identificador, clave: clave);
     await _fijar(s);
     return s;
   }
+
+  /// ADR-023 · tras cambiar la contraseña, el token vigente sigue llevando el
+  /// indicador: se renueva para que el gancho de la base emita uno sin él.
+  Future<Sesion?> renovarTrasCambio() => _renovarUnaVez();
 
   Future<void> cerrar() async {
     _sesion = null;

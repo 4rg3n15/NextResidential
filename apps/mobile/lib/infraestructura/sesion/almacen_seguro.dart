@@ -26,11 +26,12 @@ import '../../dominio/sesion.dart';
 
 class AlmacenSeguroDeSesion implements AlmacenDeSesion {
   AlmacenSeguroDeSesion({FlutterSecureStorage? almacen})
-      : _almacen = almacen ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-            );
+    : _almacen =
+          almacen ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+          );
 
   final FlutterSecureStorage _almacen;
 
@@ -50,6 +51,8 @@ class AlmacenSeguroDeSesion implements AlmacenDeSesion {
         usuarioId: j['usuario'] as String,
         copropiedadId: j['copropiedad'] as String?,
         correo: j['correo'] as String,
+        // 15-I · ausente en los registros anteriores: no hay cambio pendiente.
+        debeCambiarContrasena: j['cambio'] == true,
       );
     } catch (_) {
       // Un registro corrupto se descarta en silencio y se pide acceso. Dejarlo
@@ -71,6 +74,7 @@ class AlmacenSeguroDeSesion implements AlmacenDeSesion {
         'usuario': sesion.usuarioId,
         'copropiedad': sesion.copropiedadId,
         'correo': sesion.correo,
+        'cambio': sesion.debeCambiarContrasena,
       }),
     );
     await _almacen.write(key: _claveUltimoUso, value: ultimoUso.toIso8601String());

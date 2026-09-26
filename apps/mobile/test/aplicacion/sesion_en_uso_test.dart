@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
+import 'package:ncr_residente/dominio/acceso.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/dominio/sesion.dart';
 import 'package:ncr_residente/infraestructura/sesion/almacen_seguro.dart';
@@ -38,7 +39,7 @@ class AutenticadorDePrueba implements Autenticador {
       );
 
   @override
-  Future<Sesion> iniciarSesion({required String correo, required String clave}) async {
+  Future<Sesion> iniciarSesion(IdentificadorDeAcceso identificador, {required String clave}) async {
     inicios += 1;
     return _nueva();
   }
@@ -72,19 +73,19 @@ void main() {
   });
 
   test('iniciar sesión la guarda en el almacén', () async {
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
     expect(sesion.haySesion, isTrue);
     expect(await almacen.leer(), isNotNull);
   });
 
   test('con la sesión fresca, asegurar() NO renueva', () async {
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
     await sesion.asegurar();
     expect(autenticador.renovaciones, 0);
   });
 
   test('tras una suspensión larga, asegurar() renueva ANTES de devolverla', () async {
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
     reloj.avanzar(const Duration(hours: 3));
 
     final s = await sesion.asegurar();
@@ -100,7 +101,7 @@ void main() {
     /// El modo de fallo que convierte «refresqué al volver» en «me echó al
     /// volver»: Supabase ROTA el token de refresco en cada uso, así que cuatro
     /// renovaciones en paralelo invalidan tres.
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
     reloj.avanzar(const Duration(hours: 3));
     autenticador.bloqueo = Completer<void>();
 
@@ -122,7 +123,7 @@ void main() {
   });
 
   test('alVolverAPrimerPlano renueva solo cuando hace falta, y lo dice', () async {
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
 
     expect(await sesion.alVolverAPrimerPlano(), isFalse);
     expect(autenticador.renovaciones, 0);
@@ -134,7 +135,7 @@ void main() {
 
   test('si el refresco es rechazado, la sesión se cierra y se borra el llavero', () async {
     sesion = construir(fallaRenovacion: true);
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
     reloj.avanzar(const Duration(hours: 3));
 
     final s = await sesion.asegurar();
@@ -150,14 +151,14 @@ void main() {
   });
 
   test('cerrar sesión borra la sesión guardada', () async {
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
     await sesion.cerrar();
     expect(sesion.haySesion, isFalse);
     expect(await almacen.leer(), isNull);
   });
 
   test('recuperar() trae la sesión del almacén al arrancar', () async {
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
     final otra = SesionEnUso(almacen: almacen, autenticador: autenticador, reloj: reloj);
     expect(otra.haySesion, isFalse);
     await otra.recuperar();

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ncr_residente/dominio/acceso.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/infraestructura/sesion/autenticador_supabase.dart';
 
@@ -78,7 +79,7 @@ void main() {
   test('iniciar sesión lee identidad y copropiedad de los claims', () async {
     final servidor = ServidorFalso((_) => ok());
     final sesion = await construir(servidor).iniciarSesion(
-      correo: 'residente@ejemplo.invalid',
+      const PorCorreo('residente@ejemplo.invalid'),
       clave: 'x',
     );
 
@@ -92,7 +93,7 @@ void main() {
 
   test('la petición lleva la llave PUBLICABLE en la cabecera apikey', () async {
     final servidor = ServidorFalso((_) => ok());
-    await construir(servidor).iniciarSesion(correo: 'a@b.invalid', clave: 'x');
+    await construir(servidor).iniciarSesion(PorCorreo('a@b.invalid'), clave: 'x');
 
     expect(servidor.peticiones.single.headers['apikey'], llavePublicable);
     expect(servidor.peticiones.single.path, contains('grant_type=password'));
@@ -101,7 +102,7 @@ void main() {
   test('renovar usa el token de refresco, no la contraseña', () async {
     final servidor = ServidorFalso((_) => ok());
     final autenticador = construir(servidor);
-    final sesion = await autenticador.iniciarSesion(correo: 'a@b.invalid', clave: 'x');
+    final sesion = await autenticador.iniciarSesion(PorCorreo('a@b.invalid'), clave: 'x');
     await autenticador.renovar(sesion);
 
     expect(servidor.peticiones.last.path, contains('grant_type=refresh_token'));
@@ -123,7 +124,7 @@ void main() {
     );
 
     await expectLater(
-      construir(servidor).iniciarSesion(correo: 'a@b.invalid', clave: 'mala'),
+      construir(servidor).iniciarSesion(PorCorreo('a@b.invalid'), clave: 'mala'),
       throwsA(
         isA<Fallo>()
             .having((f) => f.clase, 'clase', ClaseDeFallo.sesionInvalida)
@@ -144,7 +145,7 @@ void main() {
     );
 
     await expectLater(
-      construir(servidor).iniciarSesion(correo: 'a@b.invalid', clave: 'x'),
+      construir(servidor).iniciarSesion(PorCorreo('a@b.invalid'), clave: 'x'),
       throwsA(isA<Fallo>().having((f) => f.clase, 'clase', ClaseDeFallo.sinConexion)),
     );
   });
@@ -161,7 +162,7 @@ void main() {
     );
 
     await expectLater(
-      construir(servidor).iniciarSesion(correo: 'a@b.invalid', clave: 'x'),
+      construir(servidor).iniciarSesion(PorCorreo('a@b.invalid'), clave: 'x'),
       throwsA(isA<Fallo>().having((f) => f.clase, 'clase', ClaseDeFallo.servidor)),
     );
   });
@@ -177,7 +178,7 @@ void main() {
       ),
     );
 
-    final sesion = await construir(servidor).iniciarSesion(correo: 'a@b.invalid', clave: 'x');
+    final sesion = await construir(servidor).iniciarSesion(PorCorreo('a@b.invalid'), clave: 'x');
     expect(sesion.copropiedadId, isNull);
     // Y la caducidad cae al `expires_in`, que es lo único que queda.
     expect(sesion.expiraEn.isAfter(DateTime.now().toUtc()), isTrue);

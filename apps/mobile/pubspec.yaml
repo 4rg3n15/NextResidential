@@ -41,6 +41,14 @@ dependencies:
   json_annotation: ^4.9.0
   connectivity_plus: ^6.1.0
   retrofit: ^4.4.1
+  # ETAPA 15-I (punto 5) · el QR del enlace de consentimiento del VISITANTE.
+  # Dart puro: pinta en el lienzo, sin plataforma ni permisos.
+  qr_flutter: ^4.1.0
+  # ETAPA 15-I (punto 5) · el panel NATIVO de compartir (WhatsApp, SMS…): no hay
+  # SMTP (D9) y el enlace lo entrega el residente desde su teléfono.
+  share_plus: ^10.1.4
+  # ETAPA 15-I (D7) · el botón «Portería» abre el marcador con `tel:`.
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

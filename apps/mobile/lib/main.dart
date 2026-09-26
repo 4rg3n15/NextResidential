@@ -20,10 +20,14 @@ import 'package:flutter/material.dart';
 import 'aplicacion/sesion_en_uso.dart';
 import 'configuracion/ambiente.dart';
 import 'dominio/puertos.dart';
+import 'infraestructura/api/generado/clients/cuentas_api.dart';
 import 'infraestructura/api/generado/clients/residente_api.dart';
+import 'infraestructura/api/hogar_api.dart';
 import 'infraestructura/api/repositorio_api.dart';
 import 'infraestructura/notificaciones/fuente.dart';
+import 'infraestructura/plataforma/telefono_y_compartir.dart';
 import 'infraestructura/sesion/almacen_seguro.dart';
+import 'infraestructura/sesion/autenticador_por_api.dart';
 import 'infraestructura/sesion/autenticador_supabase.dart';
 import 'presentacion/app.dart';
 
@@ -44,22 +48,26 @@ Future<void> main() async {
   // sobrevive a la recarga y eso se declara— en vez de fingir un llavero.
   final almacen = kIsWeb ? AlmacenEnMemoria() : AlmacenSeguroDeSesion();
 
+  // D1 · se ENTRA por la API (código + usuario, o correo) y se RENUEVA contra
+  // el proveedor. El `Dio` del acceso no lleva el interceptor de sesión: es la
+  // petición que la crea, no una que la use.
   final sesion = SesionEnUso(
     almacen: almacen,
-    autenticador: AutenticadorSupabase(
-      dio: Dio(),
-      urlBase: ambiente.supabaseUrl,
-      clavePublicable: ambiente.supabaseClavePublicable,
+    autenticador: AutenticadorPorApi(
+      api: CuentasApi(Dio(BaseOptions(baseUrl: ambiente.apiUrl))),
+      renovacion: AutenticadorSupabase(
+        dio: Dio(),
+        urlBase: ambiente.supabaseUrl,
+        clavePublicable: ambiente.supabaseClavePublicable,
+      ),
     ),
     reloj: reloj,
   );
   await sesion.recuperar();
 
   final dio = crearDioDeApi(urlBase: ambiente.apiUrl, sesion: sesion);
-  final repositorio = RepositorioApiDelResidente(
-    api: ResidenteApi(dio),
-    sesion: sesion,
-  );
+  final api = ResidenteApi(dio);
+  final repositorio = RepositorioApiDelResidente(api: api, sesion: sesion);
 
   runApp(
     AppDelResidente(
@@ -70,6 +78,12 @@ Future<void> main() async {
         reloj: reloj,
         notificaciones: SinServicioDeMensajeria(identidad: IdentidadDelAparato()),
         claves: claveDeIdempotencia,
+        alta: AltaPorApi(api: api, sesion: sesion),
+        hogar: HogarPorApi(api: api, sesion: sesion),
+        // El cambio de contraseña va CON la sesión: su `Dio` es el de la API.
+        cuenta: CuentaPorApi(api: CuentasApi(dio)),
+        llamador: const LlamadorDelSistema(),
+        compartidor: const CompartidorDelSistema(),
       ),
     ),
   );
