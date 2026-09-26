@@ -1,15 +1,21 @@
 # Despliegue de Next Control Residencial
 
-> **Lea esto antes que nada.** La plataforma de despliegue de la API **no está
-> decidida**: es `PENDIENTE DE DEFINICIÓN` **P-08**, registrada desde la ETAPA
-> 00 y con dueño Grupo Control. El documento de requisitos §13.2 sugería
-> _«Railway o Fly.io»_ y `CLAUDE.md` §2.6 fija el stack completo **sin**
-> mencionar plataforma, así que aquí no se elige una.
+> **Lea esto antes que nada · D8 (ADR-028, 2026-09-26).** **Netlify aloja SÓLO
+> la consola web.** La **API** va en un **servidor con procesos permanentes**:
+> las escuchas de equipos (rearmadas cada 30 s), el canal de tiempo real, las
+> colas de pg-boss y el puente de video go2rtc tienen que seguir en pie entre
+> peticiones, y ninguno cabe en funciones efímeras. Eso resuelve P-08 **en
+> parte**: el proveedor concreto del servidor de la API sigue sin elegir, y las
+> cuatro secciones que faltan están enumeradas en §13.
 >
-> Lo que esta guía hace es separar lo que **no depende** de esa decisión —que es
-> casi todo— de lo que sí, y decir exactamente qué párrafos habrá que escribir
-> cuando se decida. Inventar una plataforma habría producido una guía que parece
-> completa y no se puede seguir.
+> **Riesgo declarado y sin resolver (C-37 · P-20).** El proxy de la consola
+> (`/api/ncr/…`) hace pasar por el servidor de la consola el canal SSE y el
+> audio del intercomunicador. En Netlify ese servidor son funciones con tiempo
+> máximo de ejecución: esos flujos largos se cortarían. No afecta a la prueba
+> en sitio, porque allí la consola corre en el portátil. Ver §6.
+>
+> **En la ETAPA 15-I no se hizo trabajo de despliegue.** Esta guía separa lo
+> que no depende del proveedor —casi todo— de lo que sí.
 
 ---
 
@@ -27,7 +33,7 @@
 10. [Observabilidad: qué mirar y dónde](#10--observabilidad-qué-mirar-y-dónde)
 11. [Verificación posterior al despliegue](#11--verificación-posterior-al-despliegue)
 12. [Reversión](#12--reversión)
-13. [Lo que falta cuando P-08 se decida](#13--lo-que-falta-cuando-p-08-se-decida)
+13. [Lo que falta cuando se elija el servidor de la API](#13--lo-que-falta-cuando-se-elija-el-servidor-de-la-api)
 
 ---
 
@@ -37,14 +43,14 @@ Del repositorio salen **seis entregables**. El trabajo `entregables` del flujo
 de CI los produce todos en cada corrida; si uno no compila, el flujo se pone en
 rojo antes de que nadie despliegue nada.
 
-| Entregable            | Artefacto                                | Dónde vive                                    |
-| --------------------- | ---------------------------------------- | --------------------------------------------- |
-| API (NestJS)          | `apps/api/dist/main.js` + `node_modules` | Servidor o contenedor · **P-08**              |
-| Consola web (Next.js) | `apps/web/.next`                         | Servidor Node o plataforma de Next · **P-08** |
-| PWA instalable        | La misma consola, con manifiesto y SW    | No se despliega aparte: **es** la consola     |
-| Escritorio (Tauri)    | `.deb`, `.msi`, `.dmg`                   | Se distribuye a los puestos, no se despliega  |
-| App del residente     | Flutter (iOS/Android)                    | Tiendas · **fuera del alcance** del reto      |
-| Edge Gateway          | `apps/edge/dist`                         | Equipo en la copropiedad · guía propia        |
+| Entregable            | Artefacto                                | Dónde vive                                                                      |
+| --------------------- | ---------------------------------------- | ------------------------------------------------------------------------------- |
+| API (NestJS)          | `apps/api/dist/main.js` + `node_modules` | **Servidor con procesos permanentes** (D8) + go2rtc; proveedor por elegir (§13) |
+| Consola web (Next.js) | `apps/web/.next`                         | **Netlify** (D8, ADR-028)                                                       |
+| PWA instalable        | La misma consola, con manifiesto y SW    | No se despliega aparte: **es** la consola                                       |
+| Escritorio (Tauri)    | `.deb`, `.msi`, `.dmg`                   | Se distribuye a los puestos, no se despliega                                    |
+| App del residente     | Flutter (iOS/Android)                    | Tiendas · **fuera del alcance** del reto                                        |
+| Edge Gateway          | `apps/edge/dist`                         | Equipo en la copropiedad · guía propia                                          |
 
 **Lo que NO se despliega desde aquí:** el esquema de Supabase (§3 tiene su
 procedimiento y su guía propia), los dispositivos Hikvision (ETAPA 15) y la
@@ -218,6 +224,19 @@ pnpm --filter @ncr/web start      # servidor Node en el puerto 3100
 La consola es **renderizada en servidor** (`force-dynamic` en las páginas que
 leen sesión): no hay exportación estática y no se puede servir desde un bucket.
 
+### En Netlify (D8)
+
+- El renderizado en servidor, el proxy `/api/ncr/…` y el `middleware` de la CSP
+  con nonce corren como funciones de Netlify. `API_URL` apunta al dominio
+  público de la API y **nunca** es un `NEXT_PUBLIC_*`.
+- `CORS_ALLOWED_ORIGINS` de la API incluye el dominio de la consola.
+- **C-37 · P-20 (sin resolver):** el canal SSE (`…/eventos/flujo`) y el audio de
+  la guardia virtual pasan por el proxy como flujo. Con el límite de ejecución
+  de una función, el SSE reconecta con huecos y el audio se corta. Hasta que se
+  decida P-20, las consolas **operativas** (portería y guardia virtual) deben
+  correr donde el proxy no tenga ese límite: el servidor Node de la consola
+  (`pnpm --filter @ncr/web start`) o la app de escritorio. Así se hace en sitio.
+
 ### La PWA no se despliega aparte
 
 El manifiesto, los iconos y el service worker son ficheros estáticos de
@@ -296,7 +315,7 @@ desplegar el resto:
   compilado en Flutter es extraíble: la llave secreta **jamás**. El arranque de
   la app rechaza una llave con forma de secreta, y una prueba lo verifica.
 - Cambiar el dominio de la API obliga a **volver a publicar** la app. Tenga eso
-  en cuenta antes de elegir el dominio en P-08.
+  en cuenta antes de elegir el dominio del servidor de la API (§13).
 - `API_URL` **no tiene valor por omisión**. Sin ella la app arranca en una
   pantalla que lo dice y que enseña la línea que faltó, en vez de fallar con
   «sin conexión»: en un teléfono físico `localhost` es el propio teléfono.
@@ -459,10 +478,11 @@ cualquier fuga. Si esa suite está verde en la SHA desplegada, está comprobado.
 
 ---
 
-## 13 · Lo que falta cuando P-08 se decida
+## 13 · Lo que falta cuando se elija el servidor de la API
 
-Cuando Grupo Control elija plataforma, esta guía necesita **exactamente** estas
-cuatro secciones, y ni una más. Se dejan enumeradas para que la decisión llegue
+D8 fijó el reparto (consola en Netlify, API en un servidor con procesos
+permanentes). Cuando Grupo Control elija el **proveedor del servidor de la
+API**, esta guía necesita **exactamente** estas cuatro secciones, y ni una más. Se dejan enumeradas para que la decisión llegue
 con su lista de deberes:
 
 | §        | Sección que habrá que escribir | Qué tiene que contener                                                                                           |
@@ -474,8 +494,7 @@ con su lista de deberes:
 
 **Lo que la decisión NO cambia:** nada de las secciones 3 a 12. El sistema es un
 proceso Node con variables de entorno y una base PostgreSQL gestionada; eso es
-cierto en un contenedor, en una máquina y en cualquiera de las dos plataformas
-que el documento de requisitos sugería.
+cierto en un contenedor y en una máquina, siempre que el proceso sea permanente.
 
 **Dos requisitos que valen sea cual sea la elección**, y conviene comprobarlos
 al decidir:
