@@ -39,8 +39,23 @@ vi.mock('next/headers', () => ({
 /** Contraseña correcta, token `aal1`, y un factor TOTP ya verificado. */
 const identidadConFactor = { aal: 'aal1', factorVerificado: true };
 
+const tokenCon = (claims: Record<string, unknown>): string =>
+  `cabecera.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.firma`;
+
 const proveedor = (opciones: { apiAcepta: boolean }): ReturnType<typeof vi.fn> =>
   vi.fn(async (url: string) => {
+    // 15-H (ADR-023) · la consola entra por la API, que habla con Supabase.
+    if (url.endsWith('/auth/acceso')) {
+      return new Response(
+        JSON.stringify({
+          accessToken: tokenCon({ aal: identidadConFactor.aal, rol: 'administrador' }),
+          refreshToken: 'refresco',
+          expiraEn: 4_102_444_800,
+          debeCambiarContrasena: false,
+        }),
+        { status: 200 },
+      );
+    }
     if (url.includes('/auth/v1/token')) {
       return new Response(
         JSON.stringify({
@@ -141,11 +156,96 @@ describe('el entorno no puede relajar la regla', () => {
   it('unas credenciales equivocadas siguen sin entrar', async () => {
     await preparar({ MFA_OBLIGATORIO: 'false' }, true);
     fetchFalso.mockImplementation(async (url: string) =>
-      url.includes('/auth/v1/token')
-        ? new Response(JSON.stringify({ error_code: 'invalid_credentials' }), { status: 400 })
+      url.endsWith('/auth/acceso')
+        ? new Response(
+            JSON.stringify({ estado: 401, mensaje: 'Usuario, NIT o contraseña incorrectos' }),
+            { status: 401 },
+          )
         : new Response('{}', { status: 200 }),
     );
     const res = await entrar();
     expect(res.status).toBe(401);
+  });
+});
+
+describe('15-H · entrada por NIT y usuario, a través de la API (ADR-023)', () => {
+  it('reenvía NIT y usuario —nunca un correo— y declara el origen del navegador', async () => {
+    await preparar({}, true);
+    fetchFalso.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/auth/acceso')) {
+        const cuerpo = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        expect(cuerpo).toEqual({
+          nit: '900123456-7',
+          usuario: 'porteria.norte',
+          contrasena: CONTRASENA_EFIMERA,
+        });
+        expect((init?.headers as Record<string, string>)['x-ncr-origen']).toBe('198.51.100.20');
+        return new Response(
+          JSON.stringify({
+            accessToken: tokenCon({ aal: 'aal1', rol: 'portero', debe_cambiar_contrasena: true }),
+            refreshToken: 'refresco',
+            expiraEn: 4_102_444_800,
+            debeCambiarContrasena: true,
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+    const res = await ruta.POST(
+      new Request('http://consola.invalid/api/sesion', {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '198.51.100.20' },
+        body: JSON.stringify({
+          nit: '900123456-7',
+          usuario: 'porteria.norte',
+          contrasena: CONTRASENA_EFIMERA,
+        }),
+      }) as never,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ siguiente: 'cambio-de-contrasena' });
+    // Con el cambio pendiente no se consulta ningún factor a Supabase.
+    expect((fetchFalso.mock.calls as [string][]).some(([u]) => u.endsWith('/auth/v1/user'))).toBe(
+      false,
+    );
+  });
+
+  it('un portero fuera de turno recibe el motivo de la API, con 403', async () => {
+    await preparar({}, true);
+    fetchFalso.mockImplementation(async (url: string) =>
+      url.endsWith('/auth/acceso')
+        ? new Response(
+            JSON.stringify({
+              estado: 403,
+              mensaje: { message: 'Fuera de su turno: no tiene un turno vigente en este momento' },
+            }),
+            { status: 403 },
+          )
+        : new Response('{}', { status: 200 }),
+    );
+    const res = await ruta.POST(
+      new Request('http://consola.invalid/api/sesion', {
+        method: 'POST',
+        body: JSON.stringify({
+          nit: '900123456',
+          usuario: 'noche',
+          contrasena: CONTRASENA_EFIMERA,
+        }),
+      }) as never,
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { mensaje: string }).mensaje).toMatch(/Fuera de su turno/);
+  });
+
+  it('sin correo válido ni NIT y usuario, 400 con el mismo texto que unas credenciales malas', async () => {
+    await preparar({}, true);
+    const res = await ruta.POST(
+      new Request('http://consola.invalid/api/sesion', {
+        method: 'POST',
+        body: JSON.stringify({ usuario: 'sin-nit', contrasena: CONTRASENA_EFIMERA }),
+      }) as never,
+    );
+    expect(res.status).toBe(400);
   });
 });

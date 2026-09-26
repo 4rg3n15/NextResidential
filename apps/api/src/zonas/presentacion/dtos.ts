@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Length,
   Matches,
   Max,
   MaxLength,
@@ -82,6 +83,22 @@ export class ConfigurarZonaDto {
   @IsOptional()
   @Matches(/^[a-z0-9-]{1,40}$/, { message: 'el icono es un nombre en minúsculas y guiones' })
   icono?: string | null;
+}
+
+/**
+ * ETAPA 15-H (C-32) · abrir o cerrar la zona a mano, con motivo. Es lo único
+ * de la configuración que alcanza el portero: horario, aforo y normas siguen
+ * siendo de administración.
+ */
+export class AperturaDeZonaDto {
+  @ApiProperty({ type: Boolean, description: 'false cierra la zona; true la vuelve a abrir' })
+  @IsBoolean()
+  abierta!: boolean;
+
+  @ApiProperty({ type: String, minLength: 5, maxLength: 300 })
+  @IsString()
+  @Length(5, 300)
+  motivo!: string;
 }
 
 /** O3 · alta de zona desde la consola. Horario y normas se configuran después. */

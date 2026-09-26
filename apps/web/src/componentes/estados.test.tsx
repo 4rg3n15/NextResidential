@@ -82,7 +82,16 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
     // añade Rostro del visitante, que tampoco estaba: la captura vivía sólo en
     // la app del residente (ADR-016) y el escritorio no tenía por dónde.
     expect(navegacionDe('administrador')).toHaveLength(13);
-    expect(NAVEGACION).toHaveLength(13);
+    // La 15-H añade DOS entradas que el administrador NO ve: «Porteros», del
+    // superadministrador (B4), y «Mi perfil», del portero (E-02).
+    expect(NAVEGACION).toHaveLength(15);
+  });
+
+  it('15-H · sólo el superadministrador supervisa porteros; sólo el portero ve su perfil', () => {
+    expect(navegacionDe('superadministrador').map((e) => e.clave)).toContain('porteros');
+    expect(navegacionDe('administrador').map((e) => e.clave)).not.toContain('porteros');
+    expect(navegacionDe('portero').map((e) => e.clave)).toContain('mi-perfil');
+    expect(navegacionDe('portero').map((e) => e.clave)).not.toContain('porteros');
   });
 
   it('el portero NO ve las latencias: no es información de su puesto', () => {

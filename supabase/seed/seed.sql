@@ -538,4 +538,15 @@ ON CONFLICT DO NOTHING;
 SET LOCAL request.jwt.claims =
   '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002"}';
 
+-- ETAPA 15-H (ADR-024) · el portero de demostración tiene perfil de portería.
+-- NO se le siembra turno: los turnos llevan fecha, y uno sembrado caducaría o
+-- dejaría al portero dentro para siempre. Para entrar como él, el
+-- superadministrador le asigna un turno desde «Porteros».
+INSERT INTO public.perfiles_de_portero (usuario_id, copropiedad_id, porteria, sectores,
+                                        creado_por, actualizado_por)
+VALUES ('00000000-0000-4000-8000-000000000011','10000000-0000-4000-8000-000000000001',
+        'Principal', '{Torre 1,Torre 2}',
+        '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
+ON CONFLICT DO NOTHING;
+
 COMMIT;

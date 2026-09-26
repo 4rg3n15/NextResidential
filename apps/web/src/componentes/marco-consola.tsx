@@ -10,6 +10,7 @@ import { ConfiguracionInicial } from './configuracion-inicial';
 import { ContextoDelCanal } from '@/lib/sse/contexto';
 import type { EstadoDelCanal } from '@/lib/sse/canal';
 import type { AlcanceActivo } from '@/app/(consola)/copropiedad';
+import type { EstadoDeSesionDePorteria } from '@ncr/contracts';
 
 /**
  * Estructura visual de la consola y **dueño del estado del canal en vivo**.
@@ -23,11 +24,14 @@ export const MarcoDeConsola = ({
   sesion,
   rol,
   alcance,
+  porteria = null,
   children,
 }: {
   readonly sesion: Sesion;
   readonly rol: Rol;
   readonly alcance: AlcanceActivo;
+  /** 15-H (ADR-024) · la sesión activa del portero, con su código de patrullaje. */
+  readonly porteria?: EstadoDeSesionDePorteria | null;
   readonly children: ReactNode;
 }): JSX.Element => {
   const [estado, setEstado] = useState<EstadoDelCanal>('conectando');
@@ -37,7 +41,7 @@ export const MarcoDeConsola = ({
       <div className="flex min-h-dvh">
         <BarraLateral rol={rol} className="hidden md:flex" />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Cabecera sesion={sesion} estadoDelCanal={estado} alcance={alcance} />
+          <Cabecera sesion={sesion} estadoDelCanal={estado} alcance={alcance} porteria={porteria} />
           <main id="contenido" className="flex-1 px-6 py-6">
             {children}
           </main>

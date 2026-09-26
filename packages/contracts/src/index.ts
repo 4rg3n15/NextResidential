@@ -130,3 +130,13 @@ export type EstadoDeDispositivo = DispositivoDelTablero['estado'];
 
 /** Roles del sistema, tal como los declara el contrato. */
 export type Rol = Sesion['rol'];
+
+/** ETAPA 15-H (ADR-023/024) · portería: sesión, patrullaje, porteros, turnos y bitácora. */
+export type EstadoDeSesionDePorteria = Esquemas['EstadoDeSesionDto'];
+export type ResultadoDeDesbloqueo = Esquemas['ResultadoDeDesbloqueoDto'];
+export type Portero = Esquemas['PorteroDto'];
+export type Porteros = Esquemas['PorterosDto'];
+export type TurnoDePorteria = Esquemas['TurnoDto'];
+export type TurnoGuardado = Esquemas['TurnoGuardadoDto'];
+export type HechoDeBitacora = Esquemas['HechoDeBitacoraDto'];
+export type TipoDeHechoDeBitacora = HechoDeBitacora['tipo'];

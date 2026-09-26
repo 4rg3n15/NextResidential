@@ -4,6 +4,7 @@
 
 import 'package:dio/dio.dart';
 
+import 'clients/cuentas_api.dart';
 import 'clients/autenticacion_api.dart';
 import 'clients/multiempresa_api.dart';
 import 'clients/alertas_api.dart';
@@ -16,6 +17,7 @@ import 'clients/guardia_api.dart';
 import 'clients/informes_api.dart';
 import 'clients/residente_api.dart';
 import 'clients/padron_api.dart';
+import 'clients/porteria_api.dart';
 import 'clients/tablero_api.dart';
 import 'clients/zonas_api.dart';
 import 'clients/salud_api.dart';
@@ -37,6 +39,7 @@ class RestClient {
 
   static String get version => '0.1.0';
 
+  CuentasApi? _cuentas;
   AutenticacionApi? _autenticacion;
   MultiempresaApi? _multiempresa;
   AlertasApi? _alertas;
@@ -49,11 +52,14 @@ class RestClient {
   InformesApi? _informes;
   ResidenteApi? _residente;
   PadronApi? _padron;
+  PorteriaApi? _porteria;
   TableroApi? _tablero;
   ZonasApi? _zonas;
   SaludApi? _salud;
   IngestaApi? _ingesta;
   ObservabilidadApi? _observabilidad;
+
+  CuentasApi get cuentas => _cuentas ??= CuentasApi(_dio, baseUrl: _baseUrl);
 
   AutenticacionApi get autenticacion => _autenticacion ??= AutenticacionApi(_dio, baseUrl: _baseUrl);
 
@@ -78,6 +84,8 @@ class RestClient {
   ResidenteApi get residente => _residente ??= ResidenteApi(_dio, baseUrl: _baseUrl);
 
   PadronApi get padron => _padron ??= PadronApi(_dio, baseUrl: _baseUrl);
+
+  PorteriaApi get porteria => _porteria ??= PorteriaApi(_dio, baseUrl: _baseUrl);
 
   TableroApi get tablero => _tablero ??= TableroApi(_dio, baseUrl: _baseUrl);
 

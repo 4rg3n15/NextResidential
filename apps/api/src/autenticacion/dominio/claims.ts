@@ -26,6 +26,14 @@ export const esquemaClaims = z
     copropiedades: z.array(z.string().uuid()).max(64).optional(),
     /** Nivel de garantía de autenticación de Supabase: aal1 sin MFA, aal2 con MFA. */
     aal: z.enum(['aal1', 'aal2']).optional(),
+    /**
+     * ETAPA 15-H (ADR-024) · la sesión de Supabase a la que pertenece el token.
+     * Es estable entre refrescos, y por eso la API la usa para registrar la
+     * sesión del portero y su estado de patrullaje.
+     */
+    session_id: z.string().uuid().optional(),
+    /** ETAPA 15-H (ADR-023) · primer ingreso o restablecimiento pendiente. */
+    debe_cambiar_contrasena: z.boolean().optional(),
     exp: z.number().int(),
     iss: z.string(),
     aud: z.union([z.string(), z.array(z.string())]),
@@ -45,6 +53,10 @@ export interface ContextoTenant {
   readonly copropiedadId: string | null;
   readonly copropiedadesAtendidas: readonly string[];
   readonly mfaVerificado: boolean;
+  /** ETAPA 15-H · `session_id` del token, si lo trae (ADR-024). */
+  readonly sesionId?: string;
+  /** ETAPA 15-H · cambio de contraseña obligatorio pendiente (ADR-023). */
+  readonly debeCambiarContrasena?: boolean;
 }
 
 /** Roles que RN-20 obliga a proteger con segundo factor. */

@@ -18,11 +18,18 @@ import { motivoValido } from './apertura-manual';
  * efecto. Es el hallazgo H-3 de la validación en sitio, y es la diferencia
  * entre una decisión operativa y una decisión de servicio.
  *
- * De ahí lo demás: **no lo ejerce el portero**. Un portero abre para quien está
- * esperando; dejar el conjunto sin entrada vehicular es de administración.
+ * Hasta la 15-E lo ejercían sólo administración. **Desde la 15-H también el
+ * portero, por decisión expresa del cliente (C-32, E-02)**: es quien está en
+ * la garita cuando hay que cerrar una entrada. Lo que no cambia es el peso: el
+ * motivo es obligatorio, el rastro se escribe antes de accionar y el operador
+ * de central y el residente siguen sin poder hacerlo.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export const ROLES_QUE_BLOQUEAN: readonly Rol[] = ['administrador', 'superadministrador'];
+export const ROLES_QUE_BLOQUEAN: readonly Rol[] = [
+  'portero',
+  'administrador',
+  'superadministrador',
+];
 
 export interface OrdenDeBloqueo {
   readonly copropiedadId: string;

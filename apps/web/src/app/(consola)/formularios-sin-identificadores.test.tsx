@@ -430,6 +430,21 @@ describe('las restricciones del dominio se señalan antes de enviarlas (D-73)', 
  * clasificado — con formulario que este barrido recorre, o exento con motivo.
  */
 const SIN_FORMULARIO: Readonly<Record<string, string>> = {
+  /**
+   * ETAPA 15-H (ADR-023/024) · supervisión de portería y consola del portero.
+   * Ninguna pide un identificador tecleado: el portero de un turno sale de un
+   * desplegable con los porteros que devuelve la API, y el resto de
+   * identificadores viaja en la RUTA desde la fila o la sesión.
+   */
+  'porteros/dialogo-portero.tsx':
+    'alta y datos del portero: usuario (nombre legible, no UUID), nombre y contacto; el usuarioId de la edición viene de la fila',
+  'porteros/dialogo-turno.tsx':
+    'el porteroId sale de un desplegable con los porteros que devuelve la API; día y horas son campos date/time del navegador',
+  'porteros/calendario-de-turnos.tsx':
+    'retirar un turno: el turnoId viene de la tarjeta; sólo se teclea el motivo',
+  'componentes/cabecera.tsx': 'el botón «Patrullaje» no lleva cuerpo: la sesión sale del token',
+  'componentes/bloqueo-de-patrullaje.tsx':
+    'sólo se teclea el código de 4 dígitos que la consola mostraba',
   'componentes/buscador-personas.tsx':
     'es el buscador que RESUELVE la identidad por nombre o documento; su propio barrido está en buscador-personas.test.tsx',
   'componentes/configuracion-inicial.tsx':

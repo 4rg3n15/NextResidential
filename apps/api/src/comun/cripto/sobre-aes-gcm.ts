@@ -47,6 +47,8 @@ export const PROPOSITOS = {
   credencialesDeEquipo: 'ncr:credenciales-de-equipo:v1',
   /** A3 (15-E) · firma HMAC del enlace con el que el TITULAR responde. */
   enlaceDeConsentimiento: 'ncr:enlace-de-consentimiento:v1',
+  /** 15-H (ADR-024, S-48) · el código de patrullaje del portero, por turno. */
+  codigoDePatrullaje: 'ncr:codigo-de-patrullaje:v1',
 } as const;
 
 export type Proposito = (typeof PROPOSITOS)[keyof typeof PROPOSITOS];

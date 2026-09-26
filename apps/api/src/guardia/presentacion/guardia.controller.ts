@@ -171,10 +171,11 @@ export class GuardiaController {
    * No es la apertura manual con otro nombre: aquella es un pulso para un
    * vehículo, ésta deja un estado que manda sobre toda decisión posterior.
    * Mientras el acceso esté bloqueado, una placa autorizada **no** abre. Por
-   * eso no la ejerce el portero y por eso el motivo pesa igual que allí.
+   * eso el motivo pesa igual que allí. El portero la ejerce desde la 15-H por
+   * decisión del cliente (C-32).
    */
   @Post('bloqueo')
-  @Roles('administrador', 'superadministrador')
+  @Roles('portero', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Bloquea o desbloquea el acceso, con motivo obligatorio (RN-08)' })
   @ApiCreatedResponse({ type: BloqueoVigenteDto })
   @ApiForbiddenResponse({ type: ErrorApiDto, description: 'Rol que no bloquea accesos' })

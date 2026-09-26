@@ -6,6 +6,10 @@ import { ConfiguracionModule } from './configuracion/configuracion.module';
 import { AutenticacionModule } from './autenticacion';
 import { GuardaDeAutenticacion } from './comun/guardas/autenticacion.guard';
 import { GuardaDeRoles } from './comun/guardas/roles.guard';
+import { GuardaDeCambioDeContrasena } from './comun/guardas/cambio-de-contrasena.guard';
+import { BitacoraDeIdentidadModule } from './comun/bitacora-de-identidad';
+import { CuentasModule, limitadoresDeAcceso } from './cuentas';
+import { GuardaDeTurnoDePorteria, PorteriaModule } from './porteria';
 import { MultiempresaModule } from './multiempresa/multiempresa.module';
 import { PoolModule } from './persistencia/pool.module';
 import { PadronModule } from './padron';
@@ -100,6 +104,12 @@ export class AppModule {
          */
         PoolModule.registrar(),
         /**
+         * ETAPA 15-H · el rastro de identidad y portería (ADR-024). Global y
+         * antes de sus dos escritores —cuentas y portería—, que se registran
+         * después: el mismo argumento de orden que el del `Pool`.
+         */
+        BitacoraDeIdentidadModule.registrar(),
+        /**
          * ETAPA 15-C · el ÚNICO punto de composición de los proveedores de
          * hardware, y antes que cualquiera de sus consumidores.
          *
@@ -124,6 +134,19 @@ export class AppModule {
         }),
         MultiempresaModule,
         AutenticacionModule.registrar(),
+        /**
+         * ETAPA 15-H (ADR-023) · cuentas por usuario y primer ingreso. Después
+         * de autenticación, de la que lee el verificador de tokens, y antes de
+         * portería, que crea cuentas e inscribe su gancho de sesión.
+         */
+        CuentasModule.registrar(),
+        /**
+         * ETAPA 15-H (ADR-024) · portería: porteros, turnos, sesiones y
+         * patrullaje. Después de cuentas —crea sus cuentas y se inscribe en su
+         * registro de ganchos— y de multiempresa, de cuyo catálogo lee la zona
+         * horaria de cada copropiedad.
+         */
+        PorteriaModule.registrar(),
         PadronModule.registrar(),
         ZonasModule.registrar(),
         BiometriaModule.registrar(),
@@ -176,6 +199,9 @@ export class AppModule {
             limit: config.THROTTLE_LIMITE,
           },
           limitadorPorDispositivo(config.THROTTLE_DISPOSITIVO_LIMITE),
+          // ETAPA 15-H (S-50) · el inicio de sesión cuenta también por cuenta y
+          // por el origen que declara la consola. Sólo en su ruta (`skipIf`).
+          ...limitadoresDeAcceso(),
         ]),
       ],
       controllers: [SaludController],
@@ -193,6 +219,12 @@ export class AppModule {
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: GuardaDeAutenticacion },
         { provide: APP_GUARD, useClass: GuardaDeRoles },
+        // ETAPA 15-H (ADR-023) · después de roles: una ruta que el rol no
+        // alcanza responde por su rol; una que sí, por el cambio pendiente.
+        { provide: APP_GUARD, useClass: GuardaDeCambioDeContrasena },
+        // ETAPA 15-H (ADR-024) · la última: turno vigente y patrullaje del
+        // portero, consultados en CADA petición con el reloj inyectado.
+        { provide: APP_GUARD, useClass: GuardaDeTurnoDePorteria },
         InterceptorDeCorrelacion,
       ],
     };

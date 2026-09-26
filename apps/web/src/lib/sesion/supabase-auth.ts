@@ -73,7 +73,13 @@ export type MotivoDeFalloDeAcceso =
    * podido contactar con un servicio que había respondido — la misma clase de
    * mentira que el diagnóstico inventado sobre el segundo factor.
    */
-  | 'SERVICIO_RESPONDIO_ERROR';
+  | 'SERVICIO_RESPONDIO_ERROR'
+  /**
+   * ETAPA 15-H · la contraseña era buena y la API niega la sesión: un portero
+   * fuera de su turno, o una cuenta sin rol vigente. El texto lo da la API y
+   * se transmite tal cual: es lo que el usuario necesita saber.
+   */
+  | 'ACCESO_DENEGADO';
 
 /**
  * Rastro del fallo para el diagnóstico, **sin cuerpo de respuesta**.
@@ -87,6 +93,8 @@ export type MotivoDeFalloDeAcceso =
 export interface DetalleDeFallo {
   readonly estado?: number | undefined;
   readonly codigo?: string | undefined;
+  /** 15-H · el motivo que da la API al negar la sesión (`ACCESO_DENEGADO`). */
+  readonly mensaje?: string | undefined;
 }
 
 export class FalloDeAcceso extends Error {
@@ -287,7 +295,7 @@ export const factoresDelTitular = async (accessToken: string): Promise<readonly 
 };
 
 /** Factor TOTP ya verificado, que es el que habilita el paso de verificación. */
-const factorTotp = async (accessToken: string): Promise<string | null> => {
+export const factorTotp = async (accessToken: string): Promise<string | null> => {
   const verificado = (await factoresDelTitular(accessToken)).find((f) => f.status === 'verified');
   return verificado?.id ?? null;
 };

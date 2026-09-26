@@ -41,6 +41,24 @@ import { RepositorioZonasEnMemoria } from '../src/zonas/infraestructura/reposito
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
 import { COP_A, COP_B } from './constantes';
 import {
+  CODIGO_DE_PATRULLAJE,
+  ControlDeSesiones,
+  REPOSITORIO_DE_PERFILES,
+  REPOSITORIO_DE_SESIONES,
+  REPOSITORIO_DE_TURNOS,
+} from '../src/porteria';
+import type {
+  CodigoDePatrullaje,
+  RepositorioDePerfiles,
+  RepositorioDeSesiones,
+  RepositorioDeTurnos,
+} from '../src/porteria';
+import { BITACORA_DE_IDENTIDAD } from '../src/comun/bitacora-de-identidad';
+import type { BitacoraDeIdentidad } from '../src/comun/bitacora-de-identidad';
+import { RELOJ } from '@ncr/domain-core';
+import type { Reloj } from '@ncr/domain-core';
+import { ControlConLaSesionDeLaSuite, SESION_DE_LA_SUITE } from './dobles/sesion-de-la-suite';
+import {
   AUTORIZACIONES_DEL_RESIDENTE,
   DIRECTORIO_DEL_RESIDENTE,
   NOTIFICACIONES_DEL_RESIDENTE,
@@ -153,6 +171,10 @@ export interface Identidad {
   copropiedades?: string[];
   aal?: 'aal1' | 'aal2';
   usuarioId?: string;
+  /** 15-H · `session_id`. Al portero se le pone el de la suite si no se da otro. */
+  sesionId?: string;
+  /** 15-H · primer ingreso pendiente (ADR-023). */
+  debeCambiarContrasena?: boolean;
 }
 
 export const tokenDe = async (f: Firmante, id: Identidad): Promise<string> =>
@@ -163,6 +185,38 @@ export const tokenDe = async (f: Firmante, id: Identidad): Promise<string> =>
     copropiedad_id: id.copropiedadId === undefined ? COP_A : id.copropiedadId,
     ...(id.copropiedades ? { copropiedades: id.copropiedades } : {}),
     aal: id.aal ?? 'aal2',
+    ...(id.sesionId !== undefined
+      ? { session_id: id.sesionId }
+      : id.rol === 'portero'
+        ? { session_id: SESION_DE_LA_SUITE }
+        : {}),
+    ...(id.debeCambiarContrasena === true ? { debe_cambiar_contrasena: true } : {}),
+  });
+
+/**
+ * ETAPA 15-H · la sesión de portería de la suite (ver `dobles/sesion-de-la-suite`).
+ * Las suites anteriores emiten tokens de portero sin iniciar sesión, y el
+ * turno les es ortogonal. Cualquier otro `session_id` recorre el camino real
+ * de la guarda. Se exporta para las suites que montan su propio banco.
+ */
+export const conSesionDePorteriaDeLaSuite = (b: TestingModuleBuilder): TestingModuleBuilder =>
+  b.overrideProvider(ControlDeSesiones).useFactory({
+    factory: (
+      p: RepositorioDePerfiles,
+      t: RepositorioDeTurnos,
+      se: RepositorioDeSesiones,
+      c: CodigoDePatrullaje,
+      bi: BitacoraDeIdentidad,
+      r: Reloj,
+    ) => new ControlConLaSesionDeLaSuite(p, t, se, c, bi, r),
+    inject: [
+      REPOSITORIO_DE_PERFILES,
+      REPOSITORIO_DE_TURNOS,
+      REPOSITORIO_DE_SESIONES,
+      CODIGO_DE_PATRULLAJE,
+      BITACORA_DE_IDENTIDAD,
+      RELOJ,
+    ],
   });
 
 /**
@@ -210,7 +264,10 @@ export const crearApp = async (
       ),
     ],
   });
-  const modulo = await (sustituir === undefined ? base : sustituir(base))
+  // La sesión de la suite va ANTES de `sustituir`, para que una suite que
+  // quiera el control real de portería pueda reemplazarlo y gane.
+  const conSuite = conSesionDePorteriaDeLaSuite(base);
+  const modulo = await (sustituir === undefined ? conSuite : sustituir(conSuite))
     /**
      * El catálogo de copropiedades se sustituye por el doble en memoria.
      *

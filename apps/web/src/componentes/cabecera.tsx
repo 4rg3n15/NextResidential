@@ -3,7 +3,7 @@
 import type { JSX } from 'react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import type { Sesion } from '@ncr/contracts';
+import type { EstadoDeSesionDePorteria, Sesion } from '@ncr/contracts';
 import type { Rol } from '@ncr/contracts';
 import { Boton } from './ui/boton';
 import { Distintivo } from './ui/distintivo';
@@ -13,6 +13,7 @@ import type { AlcanceActivo } from '@/app/(consola)/copropiedad';
 import { SelectorDeCopropiedad } from './selector-copropiedad';
 import { BuscadorGlobal } from './buscador-global';
 import { ConmutadorDeTema } from './conmutador-tema';
+import { cliente, desenvolver } from '@/lib/api/cliente';
 
 /**
  * Cabecera: buscador global, estado del canal en vivo y menú de usuario.
@@ -31,13 +32,29 @@ export const Cabecera = ({
   sesion,
   estadoDelCanal,
   alcance,
+  porteria = null,
 }: {
   readonly sesion: Sesion;
   readonly estadoDelCanal: EstadoDelCanal;
   readonly alcance: AlcanceActivo;
+  readonly porteria?: EstadoDeSesionDePorteria | null;
 }): JSX.Element => {
   const router = useRouter();
   const [cerrando, setCerrando] = useState(false);
+  const [saliendoARonda, setSaliendoARonda] = useState(false);
+
+  /**
+   * 15-H (ADR-024) · el patrullaje lo pone la API en el servidor; al refrescar,
+   * el marco pregunta de nuevo y pinta la pantalla de bloqueo.
+   */
+  const iniciarPatrullaje = async (): Promise<void> => {
+    setSaliendoARonda(true);
+    try {
+      desenvolver(await cliente.POST('/porteria/sesion/patrullaje'));
+    } finally {
+      router.refresh();
+    }
+  };
 
   const cerrarSesion = async (): Promise<void> => {
     setCerrando(true);
@@ -70,6 +87,26 @@ export const Cabecera = ({
       <IndicadorDeCanal estado={estadoDelCanal} />
 
       <ConmutadorDeTema />
+
+      {porteria?.estado === 'activa' && porteria.codigo !== null ? (
+        <div className="flex items-center gap-2">
+          <span
+            className="rounded-distintivo bg-marca-suave px-2 py-1 font-mono text-distintivo tracking-widest text-marca-texto"
+            aria-label={`Código de patrullaje ${porteria.codigo.split('').join(' ')}`}
+            title="Código de patrullaje: lo pedirá la consola al volver de la ronda"
+          >
+            {porteria.codigo}
+          </span>
+          <Boton
+            variante="secundario"
+            tamano="sm"
+            cargando={saliendoARonda}
+            onClick={() => void iniciarPatrullaje()}
+          >
+            Patrullaje
+          </Boton>
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-3">
         <div className="hidden text-right sm:block">

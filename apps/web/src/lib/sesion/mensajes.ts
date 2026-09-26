@@ -29,7 +29,7 @@ import type { DetalleDeFallo, MotivoDeFalloDeAcceso } from './supabase-auth';
  * el servidor respondió lo que respondió.
  */
 const TEXTOS: Readonly<Record<MotivoDeFalloDeAcceso, string>> = {
-  CREDENCIALES_INVALIDAS: 'Correo o contraseña incorrectos.',
+  CREDENCIALES_INVALIDAS: 'Los datos de acceso no son correctos.',
   DEMASIADOS_INTENTOS: 'Demasiados intentos. Espera un momento antes de volver a probar.',
   FACTOR_INVALIDO: 'El código no es válido o ya caducó. Genera uno nuevo e inténtalo otra vez.',
   SESION_EXPIRADA: 'La sesión expiró. Vuelve a iniciar sesión.',
@@ -57,6 +57,7 @@ const TEXTOS: Readonly<Record<MotivoDeFalloDeAcceso, string>> = {
   // Sin el estado no dice nada útil; el estado lo añade la función de abajo.
   SERVICIO_RESPONDIO_ERROR:
     'El servicio de identidad respondió con un error. No es un problema de tus credenciales.',
+  ACCESO_DENEGADO: 'La contraseña es correcta, pero el acceso no está disponible en este momento.',
 };
 
 /**
@@ -70,6 +71,13 @@ export const textoDeFalloDeAcceso = (
   detalle?: DetalleDeFallo,
 ): string => {
   const base = TEXTOS[motivo];
+  if (
+    motivo === 'ACCESO_DENEGADO' &&
+    typeof detalle?.mensaje === 'string' &&
+    detalle.mensaje !== ''
+  ) {
+    return detalle.mensaje;
+  }
   if (motivo === 'SERVICIO_RESPONDIO_ERROR' && typeof detalle?.estado === 'number') {
     return `${base} (HTTP ${detalle.estado}). Inténtalo en unos minutos.`;
   }
@@ -94,6 +102,7 @@ export const estadoDeFalloDeAcceso = (
   estadoSiEsCulpaDelCliente: 400 | 401,
 ): number => {
   if (motivo === 'DEMASIADOS_INTENTOS') return 429;
+  if (motivo === 'ACCESO_DENEGADO') return 403;
   if (motivo === 'SERVICIO_NO_DISPONIBLE' || motivo === 'SERVICIO_RESPONDIO_ERROR') return 503;
   return estadoSiEsCulpaDelCliente;
 };
