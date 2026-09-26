@@ -35,6 +35,12 @@ const COP_A = '10000000-0000-4000-8000-000000000001';
 const COP_B = '10000000-0000-4000-8000-000000000002';
 const LLAVE = 'llave-de-equipos-solo-para-pruebas-32+';
 const CORRIDA = randomBytes(3).toString('hex');
+/**
+ * El puerto varía por corrida: `dispositivos_endpoint_uk` es único por
+ * (copropiedad, host, puerto) entre los activos y la base de pruebas conserva
+ * los equipos de corridas anteriores (la de registro-de-equipos-pg chocó así).
+ */
+const PUERTO = 1024 + (parseInt(CORRIDA, 16) % 60_000);
 
 /**
  * El rol con el que se conecta la API en Supabase: dueño de las tablas y NO
@@ -83,7 +89,7 @@ const alta = (nombre: string, tipo: 'intercom' | 'camara_lpr', octeto: number) =
   nombre,
   tipo,
   host: `198.51.100.${String(octeto)}`,
-  puerto: 80,
+  puerto: PUERTO,
   protocolo: 'http' as const,
   usuario: 'servicio',
   secreto: `clave-${CORRIDA}`,
@@ -264,10 +270,19 @@ describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real'
     const despues = await consulta.ejecutar(COP_A);
 
     expect(despues.franjas).toHaveLength(24);
+    /**
+     * «Al menos», no «exactamente»: COP_A es la copropiedad sembrada y otras
+     * suites anexan eventos en ella EN PARALELO (la corrida final de la 15-K lo
+     * enseñó: esperaba 2 y vio 7). Los eventos sólo se añaden, así que el
+     * delta nunca baja de lo que esta prueba anexó. La propiedad que importa
+     * —la hora LOCAL— se sigue cazando: si la franja se calculara en UTC, estos
+     * eventos y los de las demás suites caerían cinco franjas más allá y la
+     * franja local no crecería.
+     */
     const suma = (x: typeof antes, k: 'permitidos' | 'negados'): number =>
       x.franjas.reduce((t, f) => t + f[k], 0);
-    expect(suma(despues, 'permitidos') - suma(antes, 'permitidos')).toBe(2);
-    expect(suma(despues, 'negados') - suma(antes, 'negados')).toBe(1);
+    expect(suma(despues, 'permitidos') - suma(antes, 'permitidos')).toBeGreaterThanOrEqual(2);
+    expect(suma(despues, 'negados') - suma(antes, 'negados')).toBeGreaterThanOrEqual(1);
 
     const horaLocal = Number(
       new Intl.DateTimeFormat('en-GB', {
@@ -278,6 +293,6 @@ describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real'
     );
     const franja = despues.franjas[horaLocal];
     const previa = antes.franjas[horaLocal];
-    expect((franja?.permitidos ?? 0) - (previa?.permitidos ?? 0)).toBe(2);
+    expect((franja?.permitidos ?? 0) - (previa?.permitidos ?? 0)).toBeGreaterThanOrEqual(2);
   });
 });

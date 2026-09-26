@@ -28,6 +28,13 @@ const COP_A = '10000000-0000-4000-8000-000000000001';
 const COP_B = '10000000-0000-4000-8000-000000000002';
 const LLAVE = 'llave-de-equipos-solo-para-pruebas-32+';
 const CORRIDA = randomBytes(3).toString('hex');
+/**
+ * 15-K · el puerto también varía por corrida. `dispositivos_endpoint_uk` es
+ * único por (copropiedad, host, puerto) entre los ACTIVOS, y la base de pruebas
+ * conserva los equipos de corridas anteriores: con 200 hosts posibles y el
+ * puerto fijo en 80, la corrida final de la 15-K chocó con uno de ellos.
+ */
+const PUERTO = 1024 + (parseInt(CORRIDA, 16) % 60_000);
 
 let pool: Pool | undefined;
 let disponible = false;
@@ -89,7 +96,7 @@ describe.skipIf(URL_BASE === undefined)('registro de equipos contra base real (D
         nombre: `Portero de prueba ${CORRIDA}`,
         tipo: 'intercom',
         host: `198.51.100.${String(1 + (parseInt(CORRIDA, 16) % 200))}`,
-        puerto: 80,
+        puerto: PUERTO,
         protocolo: 'http',
         usuario: 'servicio',
         secreto,
@@ -135,7 +142,7 @@ describe.skipIf(URL_BASE === undefined)('registro de equipos contra base real (D
         nombre: `Cámara B ${CORRIDA}`,
         tipo: 'camara_lpr',
         host: `198.51.100.${String(1 + ((parseInt(CORRIDA, 16) + 7) % 200))}`,
-        puerto: 80,
+        puerto: PUERTO,
         protocolo: 'http',
         usuario: 'servicio',
         secreto: `otra-${CORRIDA}`,
@@ -156,7 +163,7 @@ describe.skipIf(URL_BASE === undefined)('registro de equipos contra base real (D
         nombre: `Cámara atestada ${CORRIDA}`,
         tipo: 'camara_lpr',
         host: `198.51.100.${String(1 + ((parseInt(CORRIDA, 16) + 13) % 200))}`,
-        puerto: 80,
+        puerto: PUERTO,
         protocolo: 'http',
         usuario: 'servicio',
         secreto: `camara-${CORRIDA}`,
