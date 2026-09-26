@@ -10,7 +10,9 @@
 | `5289efe`  | `feat(etapa-15h/api)`: módulos `cuentas` y `porteria`, guardas globales de cambio pendiente y de turno, bitácora compartida, pruebas |
 | `2832cf4`  | `chore(etapa-15h/contratos)`: OpenAPI, cliente TypeScript y cliente Dart regenerados (nada escrito a mano)                           |
 | `78f6a1b`  | `feat(etapa-15h/consola)`: acceso por usuario y NIT, cambio obligatorio, patrullaje, «Porteros» y «Mi perfil»                        |
-| _(cierre)_ | `docs(etapa-15h)`: este informe, ESTADO, ADR alineados con lo construido; después, el veredicto literal del verificador              |
+| `d06415c`  | `docs(etapa-15h)`: este informe, ESTADO, README y ADR-023/024 alineados con lo construido                                            |
+| `e7bff8f`  | `fix(etapa-15h/verificador)`: hallazgos de la primera corrida con base (SQL 80, `creado_por` NOT NULL, `expires_in`)                 |
+| _(cierre)_ | `chore(etapa-15h)`: el veredicto literal del verificador                                                                             |
 
 Esta ronda **no se fusiona**: abre PR contra `develop` y se detiene. **No
 empieza la sesión 2 del Bloque B** (residentes). **La ETAPA 15 sigue BLOQUEADA
@@ -214,7 +216,79 @@ apps/web/src/app/(consola)/porteros/ · mi-perfil/                             p
 
 ### El veredicto literal de `./scripts/verificar-etapa.sh --con-base`
 
-_(se pega tras la única corrida del cierre)_
+Dos corridas; la segunda vale. La primera destapó tres defectos que las
+comprobaciones dirigidas no veían, porque las tres dependen de cómo se monta el
+entorno completo:
+
+| Corrida | Sobre     | Resultado                                                                                                                                                                                                                                                                                                                   |
+| ------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1       | `d06415c` | **FALLIDA** · paso 12: la prueba SQL 80 escribía sus datos sin claims, y en `--modo-supabase` la conexión es el dueño NO superusuario con la RLS forzada · paso 12b: `bitacora_de_porteria.creado_por` admitía nulos · paso 12c: el adaptador exigía `expires_at` y el proveedor puede mandar sólo `expires_in` (`e7bff8f`) |
+| 2       | `e7bff8f` | **correcta** · 26 de 26 pasos, sin una sola ✗                                                                                                                                                                                                                                                                               |
+
+Veredicto literal de la segunda corrida (`./scripts/verificar-etapa.sh --con-base`, base efímera migrada hasta la 0037 con semillas, Flutter en el PATH, Chromium del entorno; se omiten los pasos 0 a 4, 5b, 5d, 5e, 8, 10, 10b y 11, todos en ✓, y el detalle de las cinco saltadas declaradas):
+
+```
+▸ 5 · suite completa
+   @ncr/config:test:       Tests  144 passed (144)
+   @ncr/edge:test:       Tests  101 passed (101)
+   @ncr/domain-core:test:       Tests  402 passed (402)
+   @ncr/providers:test:       Tests  629 passed (629)
+   @ncr/web:test:       Tests  474 passed (474)
+   @ncr/api:test:       Tests  1215 passed | 5 skipped (1220)
+   ⚠ suite sin rojas · las saltadas están DECLARADAS y se ejercen en otro paso
+       las 5 están DECLARADAS y se ejercen en otro paso (arranque-en-frio.e2e, paso 12b)
+▸ 5c · app móvil: suite de Dart y cobertura POR CAPA
+   00:14 +163: All tests passed!
+   ✓ dominio           95.87 % (umbral 90 %, 116/121 líneas)
+   ✓ aplicacion        95.03 % (umbral 90 %, 153/161 líneas)
+   ✓ configuracion    100.00 % (umbral 70 %, 33/33 líneas)
+   ✓ infraestructura   84.47 % (umbral 60 %, 261/309 líneas)
+   ✓ presentacion      83.46 % (umbral 50 %, 1075/1288 líneas)
+   ✓ resto             31.43 % (umbral 0 %, 11/35 líneas)
+   ✓ global            84.69 % (umbral 70 %, sin contar lo generado)
+   – 416 líneas generadas, excluidas del cómputo a propósito
+   ✓ cobertura de la app dentro de los umbrales por capa
+   ✓ la suite de Dart da lo mismo en otro huso (Pacific/Auckland): ninguna prueba depende del reloj del sistema
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 230 de 230 ficheros de prueba ejecutados
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     OK   dominio (packages/domain-core/src): lineas 95.67 % · ramas 96.70 % · funciones 95.92 % (umbral 90 %, 34 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 95.55 % · ramas 87.67 % · funciones 98.38 % (umbral 90 %, 67 archivos)
+     OK   global: lineas 81.29 % · ramas 84.38 % · funciones 82.07 % (umbral 70 %, 502 archivos)
+   ✓ las tres capas cumplen su umbral
+▸ 7b · los dos recuentos de la MISMA suite coinciden (D-112)
+   ✓ recuentos: 6 paquete(s) con el mismo resultado por los dos caminos (turbo y vitest directo) · 2970 pruebas
+▸ 9 · pruebas negativas de los propios controles
+   ✓ entorno declarado: 53 variables de 2 esquemas, todas en su .env.example · 21 leídas fuera de Zod, con motivo
+   ✓ declaraciones: 1 paso(s) declarado(s) no ejercido(s), 0 de ellos en linux, con motivo y etapa de revisión vigente
+   ✓ controles: 35 de 37 con prueba negativa · 2 en deuda declarada (no puede crecer)
+   ✓ PRUEBAS NEGATIVAS: los 28 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ ramas: 36 controles medidos · 234 bloques sin ejercer (no puede subir)
+▸ 12 · esquema y aislamiento en --modo-supabase (requiere --con-base)
+   ✓ migraciones, semillas y suite SQL
+▸ 12b · arranque en frío: base vacía → migraciones → superadministrador (requiere --con-base)
+   ✓ una base recién migrada llega a un superadministrador con claims válidos
+   ✓ y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1
+▸ 12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero
+   ✓ el camino completo se recorre en el navegador
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+   ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
+   ✓ una hoja sin un solo UUID crea viviendas, personas y sus vínculos (D-72, RN-06)
+   ✓ el superadministrador escribe el padrón en la copropiedad del selector (D-71)
+   ✓ las 12 en una sentencia, el mismo número en tres agrupaciones, y una colisión revierte las 12
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 26 de 26 pasos ejecutados
+
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+Las 5 pruebas saltadas de `@ncr/api` en el paso 5 son las del arranque en frío,
+que necesitan los claims que escribe el paso 12b; ese paso las ejecuta y exige
+que no se salten. En el paso 14, sin caché, las 1220 corren y pasan.
 
 ---
 
