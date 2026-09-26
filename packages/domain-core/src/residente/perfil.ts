@@ -54,12 +54,20 @@ export interface CampoRechazado {
   readonly motivo: string;
 }
 
-// eslint-disable-next-line no-control-regex -- es justo lo que hay que quitar
-const sanear = (v: string): string =>
-  v
-    .normalize('NFC')
-    .replace(/[\u0000-\u001F\u007F]/g, '')
-    .trim();
+/**
+ * Quita los caracteres de control (U+0000–U+001F y U+007F) filtrando por punto
+ * de código, como `padron/persona.ts`: una regex con controles literales
+ * dispara `no-control-regex`.
+ */
+const sinControles = (valor: string): string =>
+  [...valor]
+    .filter((caracter) => {
+      const codigo = caracter.codePointAt(0) ?? 0;
+      return codigo >= 0x20 && codigo !== 0x7f;
+    })
+    .join('');
+
+const sanear = (v: string): string => sinControles(v.normalize('NFC')).trim();
 const CORREO = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,63}$/;
 const TELEFONO = /^\+?[0-9]{7,15}$/;
 const DOCUMENTO = /^[A-Z0-9]{4,20}$/;

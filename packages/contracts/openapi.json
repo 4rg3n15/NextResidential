@@ -11059,6 +11059,7 @@
           "fechaNacimiento": {
             "type": "string",
             "nullable": true,
+            "maxLength": 10,
             "example": "1990-05-17"
           },
           "tipoDocumento": {

@@ -41,9 +41,10 @@ export class PerfilDto {
   @ApiProperty({ maxLength: 100 }) @IsString() @MinLength(1) @MaxLength(100) nombres!: string;
   @ApiProperty({ maxLength: 100 }) @IsString() @MinLength(1) @MaxLength(100) apellidos!: string;
 
-  @ApiPropertyOptional({ type: String, nullable: true, example: '1990-05-17' })
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 10, example: '1990-05-17' })
   @IsOptional()
   @IsString()
+  @MaxLength(10)
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   fechaNacimiento?: string | null;
 

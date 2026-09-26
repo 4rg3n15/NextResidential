@@ -53,12 +53,21 @@ export interface RechazoDeVehiculo {
   readonly detalle: string;
 }
 
+/**
+ * Quita los caracteres de control (U+0000–U+001F y U+007F) filtrando por punto
+ * de código, como `padron/persona.ts`: una regex con controles literales
+ * dispara `no-control-regex`.
+ */
+const sinControles = (valor: string): string =>
+  [...valor]
+    .filter((caracter) => {
+      const codigo = caracter.codePointAt(0) ?? 0;
+      return codigo >= 0x20 && codigo !== 0x7f;
+    })
+    .join('');
+
 const texto = (valor: string, maximo: number): string | null => {
-  // eslint-disable-next-line no-control-regex -- es justo lo que hay que quitar
-  const limpio = valor
-    .normalize('NFC')
-    .replace(/[\u0000-\u001F\u007F]/g, '')
-    .trim();
+  const limpio = sinControles(valor.normalize('NFC')).trim();
   return limpio.length >= 1 && limpio.length <= maximo ? limpio : null;
 };
 
