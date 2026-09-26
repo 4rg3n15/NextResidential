@@ -33,6 +33,7 @@ import {
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
+import { arbolDeSonda } from '../../e2e/arbol-de-sonda.mjs';
 
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
@@ -2837,6 +2838,72 @@ try {
     }
   }
 
+  console.log(
+    '\n▸ 35 · con tsx, un controlador inyectado POR TIPO contesta 500 y el paso 12d lo ve (H-SITIO-06)',
+  );
+  {
+    /**
+     * El 12d se añadió en la 15-K y nadie lo había visto fallar: lo destapó el
+     * propio control de cobertura negativa. Se reintroduce el defecto de sitio
+     * —un `@Inject` quitado— en un ÁRBOL DE SONDA (sólo `apps/api` copiada,
+     * el resto enlazado) y se exige que el paso lo nombre.
+     */
+    const arbol = arbolDeSonda({ copiar: ['apps/api'] });
+    try {
+      arbol.mutar(
+        'apps/api/src/biometria/presentacion/consentimiento-publico.controller.ts',
+        /@Inject\(ResolverEnlaceDeConsentimiento\)\s*\n/,
+        '',
+      );
+      const r = correr('node', ['e2e/arranque-con-tsx.mjs'], {
+        timeout: 240_000,
+        env: { ...process.env, NCR_RAIZ: arbol.raiz },
+      });
+      r.codigo !== 0 && /le falta una dependencia/.test(r.salida)
+        ? ok('sin el @Inject explícito, el arranque con tsx falla y dice por qué')
+        : mal(`sin el @Inject explícito el paso 12d NO falla (codigo ${r.codigo})`);
+    } finally {
+      arbol.limpiar();
+    }
+  }
+
+  console.log(
+    '\n▸ 36 · el recorrido de la consola sin base o sin navegador NO pasa por verde (§4)',
+  );
+  {
+    /**
+     * La prueba negativa FUERTE del recorrido es el paso 13c: reintroduce
+     * H-SITIO-02, 03 y 08 y exige que lo nombre. Aquí, sin base de datos, se
+     * comprueba lo que puede comprobarse siempre: que la falta de lo que
+     * necesita es un fallo explícito, nunca un salto en silencio.
+     */
+    const sinBase = correr('node', ['e2e/recorrido-de-consola.mjs'], {
+      timeout: 60_000,
+      env: { ...process.env, DATABASE_URL_PRUEBAS: '' },
+    });
+    sinBase.codigo !== 0 && /sin DATABASE_URL_PRUEBAS/.test(sinBase.salida)
+      ? ok('sin base el recorrido falla y dice que NO se ha verificado')
+      : mal(`sin base el recorrido no falla como debe (codigo ${sinBase.codigo})`);
+    const sinNavegador = correr('node', ['e2e/recorrido-de-consola.mjs'], {
+      timeout: 60_000,
+      env: { ...process.env, NCR_CHROMIUM: join(banco, 'chromium-que-no-existe') },
+    });
+    sinNavegador.codigo !== 0 && /no hay Chromium/.test(sinNavegador.salida)
+      ? ok('sin Chromium el recorrido falla y lo dice')
+      : mal(`sin Chromium el recorrido no falla como debe (codigo ${sinNavegador.codigo})`);
+  }
+
+  console.log('\n▸ 37 · la sonda negativa del recorrido sin ninguna sonda NO es un verde (§4)');
+  {
+    const r = correr('node', ['e2e/recorrido-negativo.mjs'], {
+      timeout: 60_000,
+      env: { ...process.env, NCR_SONDAS: 'H-SITIO-INEXISTENTE' },
+    });
+    r.codigo !== 0 && /no se ejecutó ninguna sonda/.test(r.salida)
+      ? ok('un filtro que no casa con ninguna sonda es un fallo, no un «todo detectado»')
+      : mal(`sin sondas el recorrido negativo pasa (codigo ${r.codigo})`);
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
@@ -3035,6 +3102,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 30 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 33 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

@@ -61,6 +61,8 @@ export interface ConfiguracionDeProveedor {
   /** Semilla del simulado: la adversidad tiene que ser reproducible. */
   readonly semilla?: number;
   readonly dispositivosSimulados?: readonly string[];
+  /** 15-K (§4) · el simulado reconoce también lo que el registro conoce. */
+  readonly equipoConocido?: (dispositivoId: string) => Promise<boolean>;
   /**
    * Perfil del simulado. La suite de contrato pide el IDEAL porque compara los
    * proveedores: con latencia y fallos aleatorios en uno y no en otro, la
@@ -145,6 +147,9 @@ registrarAdaptador({
       ...(configuracion.dispositivosSimulados === undefined
         ? {}
         : { dispositivos: configuracion.dispositivosSimulados }),
+      ...(configuracion.equipoConocido === undefined
+        ? {}
+        : { conocido: configuracion.equipoConocido }),
     }),
 });
 

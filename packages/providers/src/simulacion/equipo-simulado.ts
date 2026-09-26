@@ -427,6 +427,8 @@ export const veredictosRecibidosPor = new Map<string, string[]>();
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   /** Estado mutable del equipo: la corrección lo cambia y la lectura lo ve. */
   let verificacionRemota = guion.verificacionRemota !== false;
+  /** 15-K (§4) · el modo de control también: la corrección lo escribe y se lee. */
+  let modoDeControl = guion.ctrlMod ?? '1';
   const veredictosRecibidos: string[] = [];
   if (guion.destino !== undefined) veredictosRecibidosPor.set(guion.destino, veredictosRecibidos);
   const sinSoporte = new Set(guion.sinSoporte ?? []);
@@ -635,7 +637,15 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     }
 
     if (catalogada.proposito === 'leer quién controla la barrera: la cámara o la plataforma') {
-      return respuestaDe(200, entranceParam(guion));
+      return respuestaDe(200, entranceParam({ ...guion, ctrlMod: modoDeControl }));
+    }
+    if (catalogada.proposito === 'corregir quién controla la barrera') {
+      // Leer-modificar-escribir de verdad, como la verificación remota: lo que
+      // se escribe es lo que la siguiente lectura devuelve.
+      const pedido = /<ctrlMode?>\s*([012])\s*</.exec(String(opciones?.body ?? ''))?.[1];
+      if (pedido === undefined) return respuestaDe(400, PARAMETRO_MALO);
+      modoDeControl = pedido as '0' | '1' | '2';
+      return respuestaDe(200, OK);
     }
 
     if (catalogada.proposito === 'leer si un disparador vinculado acciona la barrera') {

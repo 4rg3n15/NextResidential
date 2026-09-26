@@ -107,6 +107,19 @@ export class RegistroDeEquiposPg implements RegistroDeEquipos {
     };
   }
 
+  /**
+   * 15-K (§4) · ¿existe y está activo? Sin credencial ni sobre: es lo único
+   * que el proveedor SIMULADO necesita para reconocer un equipo de la base.
+   */
+  async activo(dispositivoId: string): Promise<boolean> {
+    // Un identificador que no es UUID no está en la tabla: se dice que no, en
+    // vez de dejar que PostgreSQL lance por el tipo de la columna.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dispositivoId)) {
+      return false;
+    }
+    return (await this.fila(dispositivoId)) !== null;
+  }
+
   private async fila(dispositivoId: string): Promise<FilaDeRegistro | null> {
     const cliente = await this.pool.connect();
     try {

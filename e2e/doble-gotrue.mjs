@@ -28,7 +28,7 @@
  * Así el camino es real de punta a punta sin tocar la red.
  */
 import { createServer } from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import { authenticator } from 'otplib';
 
@@ -62,26 +62,43 @@ const svgDeQr = (semilla) => {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" width="210" height="210"><rect width="21" height="21" fill="#fff"/>${celdas.join('')}</svg>`;
 };
 
-export const arrancarDobleGotrue = async () => {
+/**
+ * 15-K (§4) · VARIOS USUARIOS Y, CON BASE REAL, LOS CLAIMS DEL GANCHO REAL.
+ *
+ * `usuarios` admite más de uno —el recorrido de la consola entra como
+ * superadministrador Y como portero— y cada uno tiene sus propios factores.
+ * `claimsDe(authUserId, base)` sustituye los claims fijos: el recorrido lo
+ * conecta a `public.custom_access_token_hook` de la base, que es lo que
+ * Supabase ejecuta de verdad. Así el portero lleva su `session_id` y el rol
+ * que dice la base, no el que el doble se inventa.
+ *
+ * Sin opciones, el comportamiento es el de siempre: un superadministrador con
+ * claims fijos (12c y 12d no cambian).
+ */
+export const arrancarDobleGotrue = async ({ usuarios = [USUARIO], claimsDe } = {}) => {
   const { publicKey, privateKey } = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(publicKey)), kid: 'doble', alg: 'RS256', use: 'sig' };
 
-  /** @type {{id:string,status:string,factor_type:string,friendly_name:string,secret:string}[]} */
-  let factores = [];
+  /** @type {Map<string, {id:string,status:string,factor_type:string,friendly_name:string,secret:string}[]>} */
+  const factoresPorUsuario = new Map(usuarios.map((u) => [u.id, []]));
+  const factoresDe = (id) => factoresPorUsuario.get(id) ?? [];
   const sesiones = new Map();
   const desafios = new Map();
   let emisor = '';
 
-  const emitirToken = async (aal) => {
-    const token = await new SignJWT({
+  const emitirToken = async (aal, usuario, sesionId) => {
+    const base = {
       aal,
-      rol: USUARIO.rol,
-      usuario_id: USUARIO.id,
-      copropiedad_id: USUARIO.copropiedadId,
+      session_id: sesionId,
+      rol: usuario.rol,
+      usuario_id: usuario.id,
+      copropiedad_id: usuario.copropiedadId,
       copropiedades: [],
-    })
+    };
+    const claims = claimsDe === undefined ? base : await claimsDe(usuario.id, base);
+    const token = await new SignJWT(claims)
       .setProtectedHeader({ alg: 'RS256', kid: 'doble' })
-      .setSubject(USUARIO.id)
+      .setSubject(usuario.id)
       // El emisor que la API espera es `<SUPABASE_URL>/auth/v1`, derivado de la
       // URL del proyecto. Firmar con la URL a secas producía `EMISOR_INVALIDO`
       // y un 401 en `/auth/mfa/codigos`: el mismo síntoma que el cliente vio
@@ -91,9 +108,17 @@ export const arrancarDobleGotrue = async () => {
       .setIssuedAt()
       .setExpirationTime('10m')
       .sign(privateKey);
-    sesiones.set(token, { aal });
+    sesiones.set(token, { aal, usuario, sesionId });
     return token;
   };
+
+  /** El refresco lleva a quién y qué sesión: el de GoTrue también las identifica. */
+  const refresco = (usuario, sesionId) => `refresco.${usuario.id}.${sesionId}`;
+  const conToken = async (aal, usuario, sesionId) => ({
+    access_token: await emitirToken(aal, usuario, sesionId),
+    refresh_token: refresco(usuario, sesionId),
+    expires_in: 600,
+  });
 
   const sesionDe = (peticion) => {
     const cabecera = peticion.headers.authorization ?? '';
@@ -137,29 +162,25 @@ export const arrancarDobleGotrue = async () => {
 
     if (ruta === '/auth/v1/token' && peticion.method === 'POST') {
       if (url.searchParams.get('grant_type') === 'refresh_token') {
-        return responder(200, {
-          access_token: await emitirToken('aal1'),
-          refresh_token: 'refresco',
-          expires_in: 600,
-        });
+        const [, id, sesionId] = String(cuerpo.refresh_token ?? '').split('.');
+        const usuario = usuarios.find((u) => u.id === id) ?? usuarios[0];
+        return responder(200, await conToken('aal1', usuario, sesionId ?? randomUUID()));
       }
-      if (cuerpo.email !== USUARIO.correo || cuerpo.password !== USUARIO.contrasena) {
-        return responder(400, { error_code: 'invalid_credentials' });
-      }
+      const usuario = usuarios.find(
+        (u) => u.correo === cuerpo.email && u.contrasena === cuerpo.password,
+      );
+      if (usuario === undefined) return responder(400, { error_code: 'invalid_credentials' });
       // Contraseña correcta: SIEMPRE aal1. El `aal2` solo llega verificando.
-      return responder(200, {
-        access_token: await emitirToken('aal1'),
-        refresh_token: 'refresco',
-        expires_in: 600,
-      });
+      // Cada inicio abre una sesión NUEVA, con su `session_id`, como GoTrue.
+      return responder(200, await conToken('aal1', usuario, randomUUID()));
     }
 
     if (ruta === '/auth/v1/user' && peticion.method === 'GET') {
       if (sesion === null) return responder(401, { error_code: 'no_authorization' });
       return responder(200, {
-        id: USUARIO.id,
-        email: USUARIO.correo,
-        factors: factores.map(({ secret, ...resto }) => resto),
+        id: sesion.usuario.id,
+        email: sesion.usuario.correo,
+        factors: factoresDe(sesion.usuario.id).map(({ secret, ...resto }) => resto),
       });
     }
 
@@ -170,6 +191,7 @@ export const arrancarDobleGotrue = async () => {
 
     if (ruta === '/auth/v1/factors' && peticion.method === 'POST') {
       if (sesion === null) return responder(401, { error_code: 'no_authorization' });
+      const factores = factoresDe(sesion.usuario.id);
       if (sesion.aal !== 'aal2' && factores.some((f) => f.status === 'verified')) {
         return responder(403, { error_code: 'insufficient_aal' });
       }
@@ -192,7 +214,7 @@ export const arrancarDobleGotrue = async () => {
           // EN CRUDO, como el proveedor real.
           qr_code: svgDeQr(secret),
           secret,
-          uri: `otpauth://totp/ncr:${USUARIO.correo}?secret=${secret}`,
+          uri: `otpauth://totp/ncr:${sesion.usuario.correo}?secret=${secret}`,
         },
       });
     }
@@ -208,22 +230,22 @@ export const arrancarDobleGotrue = async () => {
     const verificar = /^\/auth\/v1\/factors\/([^/]+)\/verify$/.exec(ruta);
     if (verificar !== null && peticion.method === 'POST') {
       if (sesion === null) return responder(401, { error_code: 'no_authorization' });
-      const factor = factores.find((f) => f.id === verificar[1]);
+      const factor = factoresDe(sesion.usuario.id).find((f) => f.id === verificar[1]);
       if (factor === undefined) return responder(404, { error_code: 'mfa_factor_not_found' });
       if (!authenticator.check(String(cuerpo.code ?? ''), factor.secret)) {
         return responder(400, { error_code: 'mfa_verification_failed' });
       }
       factor.status = 'verified';
-      return responder(200, {
-        access_token: await emitirToken('aal2'),
-        refresh_token: 'refresco',
-        expires_in: 600,
-      });
+      return responder(200, await conToken('aal2', sesion.usuario, sesion.sesionId));
     }
 
     const borrar = /^\/auth\/v1\/factors\/([^/]+)$/.exec(ruta);
     if (borrar !== null && peticion.method === 'DELETE') {
-      factores = factores.filter((f) => f.id !== borrar[1]);
+      if (sesion === null) return responder(401, { error_code: 'no_authorization' });
+      factoresPorUsuario.set(
+        sesion.usuario.id,
+        factoresDe(sesion.usuario.id).filter((f) => f.id !== borrar[1]),
+      );
       return responder(200, {});
     }
 
@@ -238,7 +260,7 @@ export const arrancarDobleGotrue = async () => {
   return {
     url: emisor,
     jwksUrl: `${emisor}/auth/v1/.well-known/jwks.json`,
-    factores: () => factores.map((f) => ({ ...f })),
+    factores: (usuarioId = usuarios[0].id) => factoresDe(usuarioId).map((f) => ({ ...f })),
     cerrar: () => new Promise((listo) => servidor.close(listo)),
   };
 };

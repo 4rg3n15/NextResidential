@@ -24,6 +24,14 @@ export interface OpcionesMock {
   readonly reloj?: RelojSimulado;
   /** Dispositivos que el simulador reconoce. Cualquier otro está fuera de línea. */
   readonly dispositivos?: readonly string[];
+  /**
+   * 15-K (§4) · además de la lista fija, un equipo que el REGISTRO conoce. Con
+   * PostgreSQL y el simulado —la configuración por omisión— el simulado sólo
+   * conocía `disp-porteria` y `disp-talanquera`, así que toda orden a un
+   * equipo dado de alta en la consola fallaba. ADR-03 exige que el sistema
+   * funcione completo contra el simulado, también con base real.
+   */
+  readonly conocido?: (dispositivoId: string) => Promise<boolean>;
 }
 
 /**
@@ -77,13 +85,22 @@ export class MockProvider
     this.azar = new Azar(opciones.semilla);
     this.reloj = opciones.reloj ?? new RelojSimulado();
     this.dispositivos = new Set(opciones.dispositivos ?? ['disp-porteria', 'disp-talanquera']);
+    this.conocido = opciones.conocido;
+  }
+
+  private readonly conocido: ((dispositivoId: string) => Promise<boolean>) | undefined;
+
+  /** La lista fija, o lo que el registro conozca. Lo desconocido, nada. */
+  private async conoce(dispositivoId: string): Promise<boolean> {
+    if (this.dispositivos.has(dispositivoId)) return true;
+    return this.conocido === undefined ? false : this.conocido(dispositivoId);
   }
 
   // ── Capacidades ──────────────────────────────────────────────────────────
 
   /** El simulado finge un equipo completo: todo `si`. Lo desconocido, nada. */
   async capacidadesDe(dispositivoId: string): Promise<CapacidadesDeEquipo> {
-    return this.dispositivos.has(dispositivoId) ? CAPACIDADES_COMPLETAS : CAPACIDADES_SIN_CONSULTAR;
+    return (await this.conoce(dispositivoId)) ? CAPACIDADES_COMPLETAS : CAPACIDADES_SIN_CONSULTAR;
   }
 
   /**
@@ -92,7 +109,7 @@ export class MockProvider
    * conoce lo rechaza, como el real.
    */
   async escuchar(dispositivoId: string): Promise<EscuchaActiva> {
-    if (!this.dispositivos.has(dispositivoId)) {
+    if (!(await this.conoce(dispositivoId))) {
       throw new FalloDeHardwareSimulado(dispositivoId, 'escuchar');
     }
     return {
@@ -106,7 +123,7 @@ export class MockProvider
 
   /** A5 · el simulado no tiene cámara que mostrar; un equipo que no conoce, rechaza. */
   async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
-    if (!this.dispositivos.has(dispositivoId)) {
+    if (!(await this.conoce(dispositivoId))) {
       throw new FalloDeHardwareSimulado(dispositivoId, 'origenDeVideo');
     }
     return null;
@@ -121,7 +138,7 @@ export class MockProvider
   }
 
   async estado(dispositivoId: string): Promise<'en_linea' | 'fuera_de_linea' | 'degradado'> {
-    if (!this.dispositivos.has(dispositivoId)) return 'fuera_de_linea';
+    if (!(await this.conoce(dispositivoId))) return 'fuera_de_linea';
     return this.azar.ocurre(this.perfil.probabilidadDeFallo) ? 'degradado' : 'en_linea';
   }
 
@@ -342,7 +359,7 @@ export class MockProvider
    * cifra que importa para KPI-13 y KPI-32, no la del intento afortunado.
    */
   private async conReintentos(dispositivoId: string, operacion: string): Promise<number> {
-    if (!this.dispositivos.has(dispositivoId)) {
+    if (!(await this.conoce(dispositivoId))) {
       throw new FalloDeHardwareSimulado(dispositivoId, operacion);
     }
     let acumulada = 0;

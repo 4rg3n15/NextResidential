@@ -204,6 +204,13 @@ describe.skipIf(URL_BASE === undefined)('registro de equipos contra base real (D
     // Y el registro del proveedor la entrega con el equipo.
     const registrado = await new RegistroDeEquiposPg(p, LLAVE).buscar(camara.id);
     expect(registrado?.atestacion).toEqual({ firmware: 'V0' });
+
+    // 15-K (§4) · el simulado reconoce el equipo activo de la base; lo que no
+    // existe o no es un UUID, no.
+    const registro = new RegistroDeEquiposPg(p, LLAVE);
+    await expect(registro.activo(camara.id)).resolves.toBe(true);
+    await expect(registro.activo('00000000-0000-4000-8000-0000000000ff')).resolves.toBe(false);
+    await expect(registro.activo('disp-porteria')).resolves.toBe(false);
     await comoLaApi.end();
   });
 

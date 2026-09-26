@@ -31,7 +31,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { arrancarDobleGotrue } from './doble-gotrue.mjs';
 
-const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// 15-K · `NCR_RAIZ` apunta a un árbol de sonda (`arbol-de-sonda.mjs`) con un
+// defecto reintroducido: es como la prueba negativa ve fallar este paso.
+const raiz = process.env.NCR_RAIZ ?? resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PLAZO_DE_ARRANQUE_MS = Number(process.env.NCR_PLAZO_TSX_MS ?? 90_000);
 
 const puertoLibre = () =>

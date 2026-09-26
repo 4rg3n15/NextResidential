@@ -269,3 +269,20 @@ describe('los DOS contratos reales, ejercidos por el simulado', () => {
     expect(recibidas).toEqual(['XYZ789']);
   });
 });
+
+describe('15-K (§4) · el simulado reconoce lo que el registro conoce', () => {
+  it('un equipo de la base se acciona; uno que el registro no conoce, no', async () => {
+    const conocidos = new Set(['11111111-1111-4111-8111-111111111111']);
+    const mock = new MockProvider({
+      perfil: PERFIL_IDEAL,
+      conocido: async (id) => conocidos.has(id),
+    });
+    await expect(mock.abrir('11111111-1111-4111-8111-111111111111', 'op')).resolves.toMatchObject({
+      aceptado: true,
+    });
+    await expect(mock.estado('11111111-1111-4111-8111-111111111111')).resolves.toBe('en_linea');
+    await expect(mock.abrir('22222222-2222-4222-8222-222222222222', 'op')).rejects.toThrow();
+    // La lista fija sigue valiendo sin preguntar al registro.
+    await expect(mock.abrir('disp-porteria', 'op')).resolves.toMatchObject({ aceptado: true });
+  });
+});

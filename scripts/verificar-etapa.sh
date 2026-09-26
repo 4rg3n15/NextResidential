@@ -1061,6 +1061,32 @@ if [[ "$CON_BASE" == "1" ]]; then
   fi
 fi
 
+if [[ "$CON_BASE" == "1" ]]; then
+  paso "13b · el recorrido de la CONSOLA contra la API real, PostgreSQL y el simulado (requiere --con-base)"
+  # 15-K (§4) · los tres defectos que en sitio se vieron en el primer minuto
+  # (H-SITIO-02, 03 y 08) vivían en la costura consola ↔ proxy ↔ API ↔ base, y
+  # cada pieza tenía sus pruebas en verde con dobles de las otras. Esto la
+  # recorre en Chromium como el superadministrador y como el portero, con una
+  # base propia, el gancho de claims real y equipos simulados por HTTP.
+  if con_limite "$LIMITE_LARGO" node e2e/recorrido-de-consola.mjs >/tmp/ncr-recorrido.log 2>&1; then
+    ok "el superadministrador y el portero recorren la consola de punta a punta"
+  else
+    mal "el recorrido de la consola falla (ver /tmp/ncr-recorrido.log)"
+    grep -E "✗" /tmp/ncr-recorrido.log | head -8 | sed 's/^/     /'
+  fi
+  paso "13c · el recorrido FALLA con H-SITIO-02, 03 y 08 reintroducidos (requiere --con-base)"
+  # Un recorrido en verde sólo demuestra algo si se le ha visto rojo con el
+  # defecto que dice cazar. Cada uno se reintroduce en su árbol de sonda y se
+  # exige que el recorrido lo NOMBRE; un fallo por otra causa no cuenta.
+  if NCR_REUTILIZAR_CONSOLA=1 con_limite "$LIMITE_LARGO" node e2e/recorrido-negativo.mjs \
+       >/tmp/ncr-recorrido-negativo.log 2>&1; then
+    ok "los tres defectos de sitio, reintroducidos, se detectan cada uno por su nombre"
+  else
+    mal "el recorrido no detecta algún defecto de sitio (ver /tmp/ncr-recorrido-negativo.log)"
+    grep -E "✗|✓" /tmp/ncr-recorrido-negativo.log | head -8 | sed 's/^/     /'
+  fi
+fi
+
 paso "14 · estabilidad: la suite da lo mismo tres veces seguidas"
 # AÑADIDO EN LA ETAPA 07, a petición del usuario. La primera ejecución de la
 # etapa falló con `socket hang up` en una prueba HTTP y la segunda pasó sin

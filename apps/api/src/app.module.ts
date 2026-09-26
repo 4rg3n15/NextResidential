@@ -131,6 +131,11 @@ export class AppModule {
           // arrancaba en modo hardware.
           registroDesde: ({ pool, configuracion }) =>
             new RegistroDeEquiposPg(pool, configuracion.EQUIPOS_LLAVE),
+          // 15-K (§4) · y el simulado reconoce los equipos activos de la base.
+          conocidoDesde: ({ pool, configuracion }) => {
+            const registro = new RegistroDeEquiposPg(pool, configuracion.EQUIPOS_LLAVE);
+            return (dispositivoId) => registro.activo(dispositivoId);
+          },
         }),
         MultiempresaModule,
         AutenticacionModule.registrar(),

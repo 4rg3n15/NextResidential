@@ -627,3 +627,38 @@ describe('H-SITIO-01 · la ficha de la cámara trae lo que el equipo CONTESTÓ',
     expect(fichaDe(d).crudos).toBeUndefined();
   });
 });
+
+describe('15-K (§4) · el simulado recuerda la corrección del modo de control', () => {
+  it('corregido, el siguiente diagnóstico ya no bloquea por el modo', async () => {
+    const peticion = camara({ ctrlMod: '0' });
+    const opciones = {
+      host: HOST,
+      puerto: 80,
+      protocolo: 'http' as const,
+      ...CREDENCIAL,
+      peticion,
+    };
+    const antes = fichaDe(
+      await diagnosticarEquipo({
+        ...opciones,
+        familia: 'camara',
+        ahoraDelServidor: () => new Date(0),
+      }),
+    );
+    expect(antes.hallazgos.some((h) => h.correccion === 'modo_de_control')).toBe(true);
+    const r = await aplicarCorreccion({
+      ...opciones,
+      clase: 'modo_de_control',
+      confirmadaPor: 'instalador-1',
+    });
+    expect(r.aplicada).toBe(true);
+    const despues = fichaDe(
+      await diagnosticarEquipo({
+        ...opciones,
+        familia: 'camara',
+        ahoraDelServidor: () => new Date(0),
+      }),
+    );
+    expect(despues.hallazgos.some((h) => h.correccion === 'modo_de_control')).toBe(false);
+  });
+});
