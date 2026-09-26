@@ -311,6 +311,69 @@ describe('D-11 · la atestación del instalador, contra el firmware EN VIVO', ()
     expect(String((error as Error).message)).toMatch(/atestación del instalador sin efecto/);
   });
 
+  /** El simulado, salvo en las rutas que se rompen: ésas contestan 500 o no contestan. */
+  const conRutasRotas =
+    (base: typeof fetch, rotas: Record<string, 'error' | 'inalcanzable'>): typeof fetch =>
+    async (url, opciones) => {
+      const ruta = new URL(String(url)).pathname;
+      const clave = Object.keys(rotas).find((r) => ruta.includes(r));
+      if (clave === undefined) return base(url, opciones);
+      if (rotas[clave] === 'inalcanzable') throw new TypeError('fetch failed');
+      return {
+        status: 500,
+        ok: false,
+        headers: new Headers(),
+        text: async () => '<ResponseStatus><statusCode>3</statusCode></ResponseStatus>',
+        body: null,
+      } as unknown as Response;
+    };
+
+  it.each([
+    ['contesta con error', 'error'],
+    ['no contesta', 'inalcanzable'],
+  ] as const)(
+    'si el firmware no se puede leer (%s), no se da por el mismo: NO se opera',
+    async (_caso, rotura) => {
+      const proveedor = conAtestacion(
+        conRutasRotas(camaraConforme({ ctrlMod: '0', firmware: 'V5.3.0 build 220101' }), {
+          '/System/deviceInfo': rotura,
+        }),
+        'V5.3.0 build 220101',
+      );
+      const error = await proveedor.abrir(CAMARA, 'operador-1').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(EquipoDecidePorSuCuenta);
+      expect(String((error as Error).message)).toMatch(/atestación del instalador sin efecto/);
+    },
+  );
+
+  it.each([
+    ['contesta con error', 'error'],
+    ['no contesta', 'inalcanzable'],
+  ] as const)(
+    'un disparador que no se puede leer (%s) cuenta como «abre»: la atestación es la única salida',
+    async (_caso, rotura) => {
+      const t = traza();
+      const proveedor = conAtestacion(
+        conRutasRotas(camaraConforme({ firmware: 'V5.3.0 build 220101' }), {
+          '/Event/triggers/': rotura,
+        }),
+        'V5.3.0 build 220101',
+        t,
+      );
+      await expect(proveedor.abrir(CAMARA, 'operador-1')).resolves.toBeDefined();
+      expect(t.lineas.some((l) => /ATESTACIÓN del instalador/.test(l))).toBe(true);
+    },
+  );
+
+  it('sin atestación, un modo de control ilegible bloquea: no leerlo no es «conforme»', async () => {
+    const proveedor = proveedorCon(
+      conRutasRotas(camaraConforme(), { '/ITC/Entrance/entranceParam': 'error' }),
+    );
+    await expect(proveedor.abrir(CAMARA, 'operador-1')).rejects.toBeInstanceOf(
+      EquipoDecidePorSuCuenta,
+    );
+  });
+
   it('sin atestación todo sigue como antes: bloquea', async () => {
     const proveedor = proveedorCon(camaraConforme({ ctrlMod: '0' }));
     await expect(proveedor.abrir(CAMARA, 'operador-1')).rejects.toBeInstanceOf(
