@@ -49,6 +49,15 @@ dependencies:
   share_plus: ^10.1.4
   # ETAPA 15-I (D7) · el botón «Portería» abre el marcador con `tel:`.
   url_launcher: ^6.3.1
+  # ETAPA 15-I (hito 3) · la CÁMARA REAL del teléfono: la terminal facial
+  # construye la plantilla a partir de un JPEG, y la foto se reduce en el propio
+  # aparato (lado 640) antes de salir. Abre la cámara del sistema: sin binarios
+  # propios de detección.
+  image_picker: ^1.2.3
+  # ETAPA 15-I (hito 3) · Dart puro: descodifica el JPEG para medir iluminación
+  # y nitidez con las MISMAS fórmulas que la consola, y lo recomprime si pasa
+  # del techo de 180 KB.
+  image: ^4.10.1
 
 dev_dependencies:
   flutter_test:

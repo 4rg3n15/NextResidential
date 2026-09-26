@@ -37,6 +37,7 @@ import '../../configuracion/tema.dart';
 import '../../dominio/calidad_de_captura.dart';
 import '../../dominio/entidades.dart';
 import '../../dominio/hogar.dart';
+import '../../dominio/medidas_de_imagen.dart';
 import '../../dominio/puertos.dart';
 import 'entrega_del_consentimiento.dart';
 
@@ -46,7 +47,12 @@ import 'entrega_del_consentimiento.dart';
 typedef TomarFoto = Future<FotoTomada?> Function();
 
 class FotoTomada {
-  const FotoTomada({required this.vector, required this.medidas, this.vistaPrevia});
+  const FotoTomada({
+    required this.vector,
+    required this.medidas,
+    this.vistaPrevia,
+    this.sinDetector = false,
+  });
 
   /// La plantilla derivada. **Nunca la foto original**: lo que viaja y lo que
   /// se guarda es el vector, y ni siquiera eso se queda en el teléfono.
@@ -56,6 +62,11 @@ class FotoTomada {
   /// Miniatura para que el residente vea qué salió. Vive en memoria y muere
   /// con la pantalla.
   final Uint8List? vistaPrevia;
+
+  /// 15-I · la cámara real no trae detector de rostros: el conteo y la
+  /// proporción los sustituye la confirmación del encuadre por quien captura,
+  /// igual que en la consola. Nunca se inventan.
+  final bool sinDetector;
 }
 
 typedef EnviarRostro = Future<ResultadoDeCaptura> Function(FotoTomada foto);
@@ -95,7 +106,34 @@ class PantallaDeRostroDelVisitante extends StatefulWidget {
 
 class _PantallaDeRostroDelVisitanteState extends State<PantallaDeRostroDelVisitante> {
   FotoTomada? _foto;
+  bool _encuadreConfirmado = false;
   List<FalloDeCalidad> _fallos = const [];
+
+  /// Lo que se juzga es lo que se envía: con la confirmación del encuadre, las
+  /// medidas llevan un rostro y la proporción declarada; sin ella, cero.
+  MedidasDeCaptura? get _medidasEfectivas {
+    final f = _foto;
+    if (f == null) return null;
+    return f.sinDetector && _encuadreConfirmado ? conEncuadreConfirmado(f.medidas) : f.medidas;
+  }
+
+  /// Mientras falta confirmar el encuadre, «no se ve ningún rostro» no es un
+  /// consejo: es que nadie lo ha medido todavía. Se enseña el resto (luz,
+  /// nitidez), que sí sale de la foto.
+  List<FalloDeCalidad> get _consejosVisibles => (_foto?.sinDetector ?? false) &&
+          !_encuadreConfirmado
+      ? _fallos
+          .where((f) => f != FalloDeCalidad.sinRostro && f != FalloDeCalidad.demasiadoLejos)
+          .toList()
+      : _fallos;
+
+  void _confirmarEncuadre() {
+    final m = conEncuadreConfirmado(_foto!.medidas);
+    setState(() {
+      _encuadreConfirmado = true;
+      _fallos = evaluarCaptura(m);
+    });
+  }
   bool _enviando = false;
   ResultadoDeCaptura? _desenlace;
   String? _error;
@@ -109,6 +147,7 @@ class _PantallaDeRostroDelVisitanteState extends State<PantallaDeRostroDelVisita
     if (!mounted || foto == null) return;
     setState(() {
       _foto = foto;
+      _encuadreConfirmado = false;
       // El juicio del dominio, no un `if` aquí: los umbrales viven en un sitio.
       _fallos = evaluarCaptura(foto.medidas);
     });
@@ -116,16 +155,19 @@ class _PantallaDeRostroDelVisitanteState extends State<PantallaDeRostroDelVisita
 
   Future<void> _enviar() async {
     final foto = _foto;
+    final medidas = _medidasEfectivas;
     // La guarda no es cosmética: el botón se deshabilita, pero una pantalla que
     // permita enviar una foto que ella misma rechazó deja la validación en
     // manos de un estado de interfaz.
-    if (foto == null || _fallos.isNotEmpty) return;
+    if (foto == null || medidas == null || _fallos.isNotEmpty) return;
     setState(() {
       _enviando = true;
       _error = null;
     });
     try {
-      final r = await widget.enviar(foto);
+      final r = await widget.enviar(
+        FotoTomada(vector: foto.vector, medidas: medidas, vistaPrevia: foto.vistaPrevia),
+      );
       if (!mounted) return;
       setState(() => _desenlace = r);
     } catch (e) {
@@ -160,8 +202,21 @@ class _PantallaDeRostroDelVisitanteState extends State<PantallaDeRostroDelVisita
             const SizedBox(height: 12),
           ],
 
-          if (_foto != null && _fallos.isNotEmpty) ...[
-            _Consejos(fallos: _fallos),
+          if (_foto != null && _foto!.sinDetector && !_encuadreConfirmado) ...[
+            // Sin detector, el encuadre lo confirma quien captura. Es un BOTÓN
+            // sobre la foto, no una casilla de «acepto»: no dice nada del
+            // permiso, que sigue siendo del visitante (RN-10).
+            OutlinedButton.icon(
+              key: const Key('rostro.confirmarEncuadre'),
+              onPressed: _confirmarEncuadre,
+              icon: const Icon(Icons.center_focus_strong_outlined),
+              label: const Text('Encuadre correcto: sale UNA persona, de frente, cerca'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_foto != null && _consejosVisibles.isNotEmpty) ...[
+            _Consejos(fallos: _consejosVisibles),
             const SizedBox(height: 12),
           ],
           if (_foto != null && _fallos.isEmpty && desenlace == null) ...[

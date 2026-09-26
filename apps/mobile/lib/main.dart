@@ -24,6 +24,7 @@ import 'infraestructura/api/generado/clients/cuentas_api.dart';
 import 'infraestructura/api/generado/clients/residente_api.dart';
 import 'infraestructura/api/hogar_api.dart';
 import 'infraestructura/api/repositorio_api.dart';
+import 'infraestructura/camara/camara_del_telefono.dart';
 import 'infraestructura/notificaciones/fuente.dart';
 import 'infraestructura/plataforma/telefono_y_compartir.dart';
 import 'infraestructura/sesion/almacen_seguro.dart';
@@ -84,6 +85,9 @@ Future<void> main() async {
         cuenta: CuentaPorApi(api: CuentasApi(dio)),
         llamador: const LlamadorDelSistema(),
         compartidor: const CompartidorDelSistema(),
+        // Hito 3 · la foto real del visitante, reducida en el aparato. En web
+        // (el recorrido del verificador) no hay cámara que abrir: la simulada.
+        tomarFoto: kIsWeb ? null : CamaraDelTelefono().tomar,
       ),
     ),
   );

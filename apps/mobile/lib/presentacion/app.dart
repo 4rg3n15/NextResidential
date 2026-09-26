@@ -74,6 +74,7 @@ class Dependencias {
     required this.cuenta,
     required this.llamador,
     required this.compartidor,
+    this.tomarFoto,
     this.versionPoliticaBiometrica = 'v1.0',
   });
 
@@ -90,6 +91,10 @@ class Dependencias {
   final ServicioDeCuenta cuenta;
   final LlamadorDeTelefono llamador;
   final Compartidor compartidor;
+
+  /// 15-I (hito 3) · la cámara REAL del teléfono. `null` = la simulada (web,
+  /// recorrido y pruebas), declarada como tal en `fuente_de_fotos.dart`.
+  final TomarFoto? tomarFoto;
 
   /// De dónde sale la clave de idempotencia de cada visita. Se inyecta porque
   /// una clave que la pantalla fabricara al construirse cambiaría con cada
@@ -345,11 +350,10 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
   /// CU-02 · la foto cuelga de la AUTORIZACIÓN, no del residente: es de ahí de
   /// donde el servidor deriva quién es el titular del dato (RN-10).
   void _capturarRostro(String autorizacionId, String nombreDelVisitante) {
-    final camara = CamaraSimulada();
     _abrir(
       PantallaDeRostroDelVisitante(
         nombreDelVisitante: nombreDelVisitante,
-        tomarFoto: camara.tomar,
+        tomarFoto: widget.dependencias.tomarFoto ?? CamaraSimulada().tomar,
         versionPolitica: widget.dependencias.versionPoliticaBiometrica,
         enviar: (foto) => _repo.capturarRostro(
           autorizacionId: autorizacionId,
