@@ -132,7 +132,14 @@ export class BiometriaController {
   }
 
   @Get('consentimientos/:consentimientoId')
-  @Roles('administrador', 'portero', 'operador_central', 'residente')
+  /**
+   * H-SITIO-03 · `superadministrador` faltaba aquí y la pantalla «Rostro del
+   * visitante», que él SÍ ve, llama a esta ruta tras cada captura: en sitio
+   * contestó 403 y el seguimiento del consentimiento no se pudo comprobar.
+   * `roles-de-biometria.e2e.test.ts` cruza ahora cada ruta que la pantalla
+   * llama con cada rol que la ve.
+   */
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central', 'residente')
   @ApiOperation({ summary: 'Estado de un consentimiento, sin dato biométrico alguno' })
   async verConsentimiento(
     @Param('id', ParseUUIDPipe) copropiedadId: string,
@@ -284,7 +291,14 @@ export class BiometriaController {
    * duplica.
    */
   @Post('plantillas/:plantillaId/sincronizacion-total')
-  @Roles('superadministrador', 'administrador')
+  /**
+   * H-SITIO-03 · la pantalla que captura el rostro la llaman también portero y
+   * operador de central —son quienes atienden al visitante— y aquí sólo
+   * entraban los dos roles administrativos: el «Comprobar y sincronizar» del
+   * seguimiento les devolvía 403. No relaja RN-09: el caso de uso sigue
+   * negándose sin consentimiento vigente, sea quien sea quien lo pida.
+   */
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central')
   @ApiOperation({
     summary: 'Empuja la plantilla a todos los equipos con biblioteca de rostros (RN-09)',
   })
