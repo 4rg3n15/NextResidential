@@ -257,7 +257,7 @@ describe('O3 · regeneración con modos, edición y borrado definitivo contra ba
     const reloj: Reloj = { ahora: () => new Date() };
     const ids: GeneradorDeId = { nuevo: () => randomUUID() };
     const autorizacion = await new CrearAutorizacion(
-      new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba'),
+      new RepositorioAutorizacionesPg(pool, {}, 'bucket-de-prueba', reloj),
       reloj,
       ids,
     ).ejecutar(ctx(), {

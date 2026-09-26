@@ -70,7 +70,12 @@ export class PatronDeVisitaDto {
   @ApiProperty({ minimum: 0, maximum: 1440 }) @IsInt() @Min(0) @Max(1440) minutoInicio!: number;
   @ApiProperty({ minimum: 0, maximum: 1440 }) @IsInt() @Min(0) @Max(1440) minutoFin!: number;
 
-  @ApiProperty({ description: 'Minutos respecto de UTC; Bogotá: -300' })
+  /** H-15I-05 · como en la consola: el desplazamiento del teléfono no decide nada. */
+  @ApiProperty({
+    description:
+      'Informativo: se valida y se descarta. La franja es hora local de la copropiedad y ' +
+      'se evalúa con SU zona horaria, no con la del teléfono.',
+  })
   @IsInt()
   @Min(-840)
   @Max(840)

@@ -63,11 +63,13 @@ export class AutorizacionesModule {
         GuardiaDeFirmaDeIngesta,
         {
           provide: RepositorioAutorizacionesPg,
-          inject: [Pool, CONFIGURACION],
+          inject: [Pool, CONFIGURACION, RELOJ],
           // El nombre del bucket va a `evidencias.bucket` (D-19): el real cuando
-          // está declarado, y el del almacén provisional cuando no.
-          useFactory: (pool: Pool, c: Configuracion) =>
-            new RepositorioAutorizacionesPg(pool, {}, c.EVIDENCIA_BUCKET ?? 'en-memoria'),
+          // está declarado, y el del almacén provisional cuando no. El reloj es
+          // el MISMO que usa el motor: con él se resuelve la zona horaria del
+          // patrón (H-15I-05).
+          useFactory: (pool: Pool, c: Configuracion, reloj: Reloj) =>
+            new RepositorioAutorizacionesPg(pool, {}, c.EVIDENCIA_BUCKET ?? 'en-memoria', reloj),
         },
         { provide: REPOSITORIO_AUTORIZACIONES, useExisting: RepositorioAutorizacionesPg },
         { provide: CONSULTA_AUTORIZACIONES, useExisting: RepositorioAutorizacionesPg },

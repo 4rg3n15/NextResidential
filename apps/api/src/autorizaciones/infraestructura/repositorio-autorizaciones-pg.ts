@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { Autorizacion, PatronRecurrencia, Placa, Vigencia, esExito } from '@ncr/domain-core';
-import type { Acompanante } from '@ncr/domain-core';
+import type { Acompanante, Reloj } from '@ncr/domain-core';
 import { ViviendaSinTitular } from '../aplicacion/puertos';
+import { desplazamientoDeZona } from './desplazamiento-de-zona';
 import type {
   AutorizacionEnLista,
   CriterioDeLectura,
@@ -39,6 +40,12 @@ import type {
  *    disparador lo rechazaba y ninguna autorización creada desde administración
  *    o portería llegaba a existir contra base real (D-131). El administrador
  *    autoriza EN NOMBRE de la vivienda; `creado_por` conserva quién fue.
+ * 5. **La franja del patrón es hora LOCAL de la copropiedad** —COMMENT de la
+ *    0006— y así se escribe. Al leerla, el desplazamiento sale de
+ *    `copropiedades.zona_horaria` en el instante del `Reloj` inyectado, en la
+ *    MISMA consulta. Hasta la 15-J se reconstruía con desplazamiento 0: en
+ *    Bogotá, 14:00–18:00 abría de 09:00 a 13:00 (H-15I-05). El desplazamiento
+ *    que manda el navegador al crear no se guarda ni decide nada.
  */
 @Injectable()
 export class RepositorioAutorizacionesPg
@@ -49,6 +56,8 @@ export class RepositorioAutorizacionesPg
     private readonly claims: Record<string, unknown> = {},
     /** Nombre del bucket que figura en `evidencias.bucket` (D-19). */
     private readonly bucket: string = 'en-memoria',
+    /** El instante con el que se resuelve la zona horaria del patrón (decisión 5). */
+    private readonly reloj: Reloj,
   ) {}
 
   private async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
@@ -241,14 +250,16 @@ export class RepositorioAutorizacionesPg
       motivo_revocacion: string | null;
       placa: string | null;
       observaciones: string | null;
+      zona_horaria: string;
     }>(
       `SELECT a.id, a.vivienda_id, v.persona_id,
               lower(a.vigencia) AS desde, upper(a.vigencia) AS hasta,
               a.estado::text AS estado, a.revocada_en, a.motivo_revocacion,
-              a.placa, a.observaciones
+              a.placa, a.observaciones, co.zona_horaria
          FROM public.autorizaciones a
          JOIN public.visitantes v
            ON v.copropiedad_id = a.copropiedad_id AND v.id = a.visitante_id
+         JOIN public.copropiedades co ON co.id = a.copropiedad_id
         WHERE a.copropiedad_id=$1 AND a.id=$2`,
       [copropiedadId, autorizacionId],
     );
@@ -283,17 +294,8 @@ export class RepositorioAutorizacionesPg
       [copropiedadId, autorizacionId],
     );
 
-    let patron: PatronRecurrencia | null = null;
-    if (patronFilas.rows[0] !== undefined) {
-      const primera = patronFilas.rows[0];
-      const reconstruido = PatronRecurrencia.crear({
-        dias: patronFilas.rows.map((f) => (f.dia_semana === 7 ? 0 : f.dia_semana)),
-        minutoInicio: horaAMinutos(primera.hora_inicio),
-        minutoFin: horaAMinutos(primera.hora_fin),
-        desplazamientoUtcMinutos: 0,
-      });
-      if (esExito(reconstruido)) patron = reconstruido.valor;
-    }
+    const patron = patronDesde(patronFilas.rows, fila.zona_horaria, this.reloj.ahora());
+    if (patron === ILEGIBLE) return null;
 
     const lista: Acompanante[] = acompanantes.rows.map((f) => ({
       personaId: f.persona_id,
@@ -384,7 +386,8 @@ export class RepositorioAutorizacionesPg
         observaciones: string | null;
         zonas: string[] | null;
         acompanantes: { persona_id: string; nombre_completo: string }[] | null;
-        patron: { dia_semana: number; hora_inicio: string; hora_fin: string }[] | null;
+        patron: FilaDePatron[] | null;
+        zona_horaria: string;
       }>(
         `SELECT a.id, a.vivienda_id, v.persona_id,
                 lower(a.vigencia) AS desde, upper(a.vigencia) AS hasta,
@@ -405,10 +408,12 @@ export class RepositorioAutorizacionesPg
                                  ORDER BY pr.dia_semana)
                    FROM public.patrones_recurrencia pr
                   WHERE pr.copropiedad_id = a.copropiedad_id
-                    AND pr.autorizacion_id = a.id) AS patron
+                    AND pr.autorizacion_id = a.id) AS patron,
+                co.zona_horaria
            FROM public.autorizaciones a
            JOIN public.visitantes v
              ON v.copropiedad_id = a.copropiedad_id AND v.id = a.visitante_id
+           JOIN public.copropiedades co ON co.id = a.copropiedad_id
           WHERE a.copropiedad_id = $1
             AND a.estado = 'activa'
             AND (($2::text IS NOT NULL AND a.placa = $2)
@@ -418,21 +423,13 @@ export class RepositorioAutorizacionesPg
         [copropiedadId, criterio.placa, criterio.personaId],
       );
 
+      const ahora = this.reloj.ahora();
       const salida: Autorizacion[] = [];
       for (const f of rows) {
         const vigencia = Vigencia.crear(f.desde, f.hasta);
         if (!esExito(vigencia)) continue;
-        let patron: PatronRecurrencia | null = null;
-        const primera = f.patron?.[0];
-        if (primera !== undefined && f.patron !== null) {
-          const reconstruido = PatronRecurrencia.crear({
-            dias: f.patron.map((x) => (x.dia_semana === 7 ? 0 : x.dia_semana)),
-            minutoInicio: horaAMinutos(primera.hora_inicio),
-            minutoFin: horaAMinutos(primera.hora_fin),
-            desplazamientoUtcMinutos: 0,
-          });
-          if (esExito(reconstruido)) patron = reconstruido.valor;
-        }
+        const patron = patronDesde(f.patron ?? [], f.zona_horaria, ahora);
+        if (patron === ILEGIBLE) continue;
         const acompanantes: Acompanante[] = (f.acompanantes ?? []).map((x) => ({
           personaId: x.persona_id,
           nombre: x.nombre_completo,
@@ -623,6 +620,42 @@ const placaDesde = (texto: string | null): Placa | null => {
   if (texto === null) return null;
   const placa = Placa.crear(texto);
   return esExito(placa) ? placa.valor : null;
+};
+
+interface FilaDePatron {
+  readonly dia_semana: number;
+  readonly hora_inicio: string;
+  readonly hora_fin: string;
+}
+
+/** Un patrón que existe y no se puede reconstruir: la autorización no se entrega. */
+const ILEGIBLE = Symbol('patrón ilegible');
+
+/**
+ * Decisión 5 · las filas guardan hora LOCAL; el desplazamiento es el de la zona
+ * de la copropiedad en `instante`. Sin filas no hay patrón (`null`). Con filas
+ * que no se pueden reconstruir —zona irresoluble, franja inválida— se devuelve
+ * ILEGIBLE y quien llama no entrega la autorización: el motor la trata como
+ * inexistente y niega. Antes, ese caso dejaba el patrón en `null`, que es una
+ * autorización SIN restricción horaria (§2.1.4: se deniega por defecto).
+ */
+const patronDesde = (
+  filas: readonly FilaDePatron[],
+  zona: string,
+  instante: Date,
+): PatronRecurrencia | null | typeof ILEGIBLE => {
+  const primera = filas[0];
+  if (primera === undefined) return null;
+  const desplazamiento = desplazamientoDeZona(zona, instante);
+  if (desplazamiento === null) return ILEGIBLE;
+  const reconstruido = PatronRecurrencia.crear({
+    // El dominio usa 0..6 con domingo=0; la base, ISO 1..7 con domingo=7.
+    dias: filas.map((f) => (f.dia_semana === 7 ? 0 : f.dia_semana)),
+    minutoInicio: horaAMinutos(primera.hora_inicio),
+    minutoFin: horaAMinutos(primera.hora_fin),
+    desplazamientoUtcMinutos: desplazamiento,
+  });
+  return esExito(reconstruido) ? reconstruido.valor : ILEGIBLE;
 };
 
 const minutosAHora = (minutos: number): string => {
