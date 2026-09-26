@@ -27,7 +27,13 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('inscripción del segundo factor', () => {
   it('ofrece el secreto en texto para quien no puede escanear el QR', async () => {
-    render(<InscripcionDeFactor alVerificar={() => undefined} alCancelar={() => undefined} alYaInscrito={() => undefined} />);
+    render(
+      <InscripcionDeFactor
+        alVerificar={() => undefined}
+        alCancelar={() => undefined}
+        alYaInscrito={() => undefined}
+      />,
+    );
 
     // El secreto no se muestra de entrada: en una portería la pantalla la ve
     // todo el que pasa. Se enseña cuando el titular lo pide.
@@ -39,16 +45,32 @@ describe('inscripción del segundo factor', () => {
   });
 
   it('no envía ningún identificador de usuario: la identidad la pone el servidor', async () => {
-    render(<InscripcionDeFactor alVerificar={() => undefined} alCancelar={() => undefined} alYaInscrito={() => undefined} />);
+    render(
+      <InscripcionDeFactor
+        alVerificar={() => undefined}
+        alCancelar={() => undefined}
+        alYaInscrito={() => undefined}
+      />,
+    );
     await waitFor(() => expect(fetchFalso).toHaveBeenCalled());
     const [, opciones] = fetchFalso.mock.calls[0] as [string, RequestInit | undefined];
     expect(opciones?.body ?? '').toBe('');
   });
 
   it('un fallo del servidor se cuenta, no se traga', async () => {
-    fetchFalso.mockResolvedValue(new Response(JSON.stringify({ mensaje: 'Vuelve a intentarlo.' }), { status: 503 }));
-    render(<InscripcionDeFactor alVerificar={() => undefined} alCancelar={() => undefined} alYaInscrito={() => undefined} />);
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Vuelve a intentarlo.'));
+    fetchFalso.mockResolvedValue(
+      new Response(JSON.stringify({ mensaje: 'Vuelve a intentarlo.' }), { status: 503 }),
+    );
+    render(
+      <InscripcionDeFactor
+        alVerificar={() => undefined}
+        alCancelar={() => undefined}
+        alYaInscrito={() => undefined}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toContain('Vuelve a intentarlo.'),
+    );
   });
 });
 
@@ -122,7 +144,13 @@ const conFallo = (): Response =>
 describe('un fallo transitorio no deja la pantalla inservible', () => {
   it('sin QR no se muestra el campo de código: se muestra cómo reintentar', async () => {
     fetchFalso.mockResolvedValue(conFallo());
-    render(<InscripcionDeFactor alVerificar={() => undefined} alCancelar={() => undefined} alYaInscrito={() => undefined} />);
+    render(
+      <InscripcionDeFactor
+        alVerificar={() => undefined}
+        alCancelar={() => undefined}
+        alYaInscrito={() => undefined}
+      />,
+    );
 
     await screen.findByRole('alert');
     // Un campo donde teclear un código que no se puede obtener es la pantalla
@@ -133,7 +161,13 @@ describe('un fallo transitorio no deja la pantalla inservible', () => {
 
   it('el reintento con éxito BORRA el error y pinta el QR', async () => {
     fetchFalso.mockResolvedValueOnce(conFallo()).mockResolvedValue(conQr());
-    render(<InscripcionDeFactor alVerificar={() => undefined} alCancelar={() => undefined} alYaInscrito={() => undefined} />);
+    render(
+      <InscripcionDeFactor
+        alVerificar={() => undefined}
+        alCancelar={() => undefined}
+        alYaInscrito={() => undefined}
+      />,
+    );
 
     fireEvent.click(await screen.findByRole('button', { name: /volver a intentarlo/i }));
 
@@ -148,9 +182,16 @@ describe('un fallo transitorio no deja la pantalla inservible', () => {
     // mensaje rojo encima de un QR perfectamente válido.
     const tardia = diferida<Response>();
     fetchFalso.mockReturnValueOnce(tardia.promesa).mockResolvedValue(conQr());
-    render(<InscripcionDeFactor alVerificar={() => undefined} alCancelar={() => undefined} alYaInscrito={() => undefined} />, {
-      wrapper: StrictMode,
-    });
+    render(
+      <InscripcionDeFactor
+        alVerificar={() => undefined}
+        alCancelar={() => undefined}
+        alYaInscrito={() => undefined}
+      />,
+      {
+        wrapper: StrictMode,
+      },
+    );
 
     await waitFor(() => expect(screen.getByRole('img', { hidden: true })).toBeTruthy());
     expect(fetchFalso).toHaveBeenCalledTimes(2);

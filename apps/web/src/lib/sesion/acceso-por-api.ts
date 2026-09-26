@@ -27,7 +27,9 @@ import type { SesionSupabase } from './supabase-auth';
  */
 export type IdentificadorDeAcceso =
   | { readonly correo: string }
-  | { readonly nit: string; readonly usuario: string };
+  | { readonly nit: string; readonly usuario: string }
+  /** D1 (15-I) · el código corto de la copropiedad, la forma que también usa la app. */
+  | { readonly codigo: string; readonly usuario: string };
 
 export interface OrigenDelNavegador {
   readonly ip: string | null;

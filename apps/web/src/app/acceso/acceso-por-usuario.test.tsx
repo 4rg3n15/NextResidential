@@ -28,24 +28,43 @@ const escribir = (etiqueta: RegExp, valor: string): void => {
   fireEvent.change(screen.getByLabelText(etiqueta), { target: { value: valor } });
 };
 
-describe('acceso por usuario y NIT (ADR-023, C-34)', () => {
-  it('sin arroba es un USUARIO: pide el NIT y lo recuerda en este equipo', async () => {
+describe('acceso por usuario con código o NIT (ADR-023, C-34, D1)', () => {
+  it('sin arroba es un USUARIO: con un NIT lo envía como NIT y lo recuerda', async () => {
     render(<FormularioDeAcceso />);
-    expect(screen.queryByLabelText(/NIT de la copropiedad/)).toBeNull();
+    expect(screen.queryByLabelText(/Código o NIT de la copropiedad/)).toBeNull();
     escribir(/Correo o usuario/, 'porteria.norte');
-    escribir(/NIT de la copropiedad/, '900123456-7');
+    escribir(/Código o NIT de la copropiedad/, '900123456-7');
     escribir(/^Contraseña$/, 'Clave#2026x');
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
     await waitFor(() => expect(fetchFalso).toHaveBeenCalled());
     expect(cuerpoDe(0)).toMatchObject({ nit: '900123456-7', usuario: 'porteria.norte' });
     expect(cuerpoDe(0)).not.toHaveProperty('correo');
-    expect(window.localStorage.getItem('ncr:nit-de-acceso')).toBe('900123456-7');
+    expect(cuerpoDe(0)).not.toHaveProperty('codigo');
+    expect(window.localStorage.getItem('ncr:copropiedad-de-acceso')).toBe('900123456-7');
+  });
+
+  it('D1 · con un CÓDIGO corto lo envía como código, no como NIT', async () => {
+    render(<FormularioDeAcceso />);
+    escribir(/Correo o usuario/, 'casa42.ana');
+    escribir(/Código o NIT de la copropiedad/, 'mira');
+    escribir(/^Contraseña$/, 'Clave#2026x');
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+    await waitFor(() => expect(fetchFalso).toHaveBeenCalled());
+    expect(cuerpoDe(0)).toMatchObject({ codigo: 'mira', usuario: 'casa42.ana' });
+    expect(cuerpoDe(0)).not.toHaveProperty('nit');
+  });
+
+  it('recuerda la copropiedad del ingreso anterior, también la guardada como NIT', () => {
+    window.localStorage.setItem('ncr:nit-de-acceso', '900123456');
+    render(<FormularioDeAcceso />);
+    escribir(/Correo o usuario/, 'porteria.norte');
+    expect((screen.getByLabelText(/Código o NIT/) as HTMLInputElement).value).toBe('900123456');
   });
 
   it('con arroba es un CORREO, como hasta ahora, y no pide NIT', async () => {
     render(<FormularioDeAcceso />);
     escribir(/Correo o usuario/, 'admin@copropiedad.co');
-    expect(screen.queryByLabelText(/NIT de la copropiedad/)).toBeNull();
+    expect(screen.queryByLabelText(/Código o NIT de la copropiedad/)).toBeNull();
     escribir(/^Contraseña$/, 'Clave#2026x');
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
     await waitFor(() => expect(fetchFalso).toHaveBeenCalled());
@@ -59,7 +78,7 @@ describe('acceso por usuario y NIT (ADR-023, C-34)', () => {
     );
     render(<FormularioDeAcceso />);
     escribir(/Correo o usuario/, 'porteria.norte');
-    escribir(/NIT de la copropiedad/, '900123456');
+    escribir(/Código o NIT de la copropiedad/, '900123456');
     escribir(/^Contraseña$/, 'Inicial#2026');
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
     await waitFor(() =>

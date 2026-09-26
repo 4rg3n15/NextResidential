@@ -52,6 +52,8 @@ export const ICONOS_DE_NAVEGACION = [
   // ETAPA 15-H · supervisión de portería y perfil del portero.
   'UsersRound',
   'IdCard',
+  // ETAPA 15-I · supervisión de residentes: cuentas, ocupantes y vehículos propios.
+  'UserCog',
 ] as const;
 export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 
@@ -152,6 +154,19 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     roles: ['superadministrador'],
     pendienteDeEtapa: null,
     icono: 'UsersRound',
+  },
+  /**
+   * ETAPA 15-I (3.1, D5 a, D6) · supervisión de residentes: alta de cuentas por
+   * usuario, plazas de ocupante y la vista de vehículos registrados por
+   * residentes. Sólo el superadministrador, como los porteros.
+   */
+  {
+    clave: 'residentes',
+    etiqueta: 'Residentes',
+    ruta: '/residentes',
+    roles: ['superadministrador'],
+    pendienteDeEtapa: null,
+    icono: 'UserCog',
   },
   {
     clave: 'guardia',

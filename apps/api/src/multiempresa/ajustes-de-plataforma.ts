@@ -33,10 +33,20 @@ export const normalizarTelefono = (valor: string): string => valor.replace(/[\s(
 
 const FORMATO_TELEFONO = /^\+?[0-9]{7,15}$/;
 
+/**
+ * `[SUPUESTO]` S-58 · la consola acepta «código o NIT» en UN campo (D1). Un
+ * código de 5 a 8 cifras sin letras sería indistinguible de un NIT y la consola
+ * lo mandaría como NIT: se rechaza al asignarlo, con el remedio en el mensaje.
+ */
+export const pareceUnNit = (codigo: string): boolean => /^[0-9]{5,8}$/.test(codigo);
+
 export const validarCodigoCorto = (valor: string | number): string | null => {
   if (typeof valor !== 'string') return 'se esperaba texto';
   const c = codigoCorto(valor);
-  return c.ok ? null : c.error;
+  if (!c.ok) return c.error;
+  return pareceUnNit(c.valor)
+    ? 'un código de 5 o más cifras sin letras se confunde con un NIT: añada al menos una letra'
+    : null;
 };
 
 /** Vacío = borrar el teléfono (la app dirá que no está registrado, en vez de fallar). */

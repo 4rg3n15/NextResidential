@@ -11,6 +11,12 @@ import { Campo } from '@/componentes/ui/campo';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { EstadoCargando, estadoSegunCodigo } from '@/componentes/estados';
 import { AjusteFijo } from './ajuste-fijo';
+import {
+  AjustesDePlataforma,
+  ajustesDePlataformaDe,
+  cuerpoDePlataforma,
+} from './ajustes-de-plataforma';
+import type { BorradorDePlataforma } from './ajustes-de-plataforma';
 
 /**
  * Formulario de configuración.
@@ -59,7 +65,7 @@ const ETIQUETA_DE_TIPO: Readonly<Record<string, string>> = {
   otro: 'Otro (sin generación automática)',
 };
 
-interface Borrador {
+interface Borrador extends BorradorDePlataforma {
   nombre: string;
   direccion: string;
   tipo: string;
@@ -77,6 +83,7 @@ const aBorrador = (c: ConfiguracionDeCopropiedad): Borrador => ({
   etiquetaAgrupacion: c.etiquetaAgrupacion,
   zonaHoraria: c.zonaHoraria,
   politicaContingenciaEdge: c.politicaContingenciaEdge,
+  ...ajustesDePlataformaDe(c),
 });
 
 /**
@@ -115,6 +122,7 @@ export const FormularioDeConfiguracion = ({
     if (consulta.data !== undefined) setBorrador(aBorrador(consulta.data));
   }, [consulta.data]);
 
+  const editables = consulta.data?.editables ?? [];
   const guardar = useMutation({
     mutationFn: async (b: Borrador) => {
       const respuesta = await cliente.PATCH('/copropiedades/{id}/configuracion', {
@@ -131,6 +139,7 @@ export const FormularioDeConfiguracion = ({
           etiquetaAgrupacion: b.etiquetaAgrupacion,
           zonaHoraria: b.zonaHoraria,
           politicaContingenciaEdge: b.politicaContingenciaEdge as 'denegar' | 'escalar_portero',
+          ...cuerpoDePlataforma(b, (clave) => editables.includes(clave)),
         },
       });
       return desenvolver(respuesta);
@@ -314,6 +323,13 @@ export const FormularioDeConfiguracion = ({
             : `${bloqueado} «Denegar» es el valor conservador que impone el contrato.`}
         </p>
       </div>
+
+      <AjustesDePlataforma
+        borrador={borrador}
+        cambiar={cambiar}
+        editable={editable}
+        rechazos={rechazos}
+      />
 
       <AjusteFijo
         etiqueta="Margen de latido de dispositivo"
