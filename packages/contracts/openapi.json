@@ -1070,6 +1070,60 @@
         ]
       }
     },
+    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial": {
+      "post": {
+        "operationId": "BiometriaController_aceptarPresencialmente",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "consentimientoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AceptacionPresencialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespuestaDeConsentimientoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10)",
+        "tags": [
+          "biometria"
+        ]
+      }
+    },
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace": {
       "post": {
         "operationId": "BiometriaController_emitirEnlaceDeConsentimiento",
@@ -6707,6 +6761,36 @@
           "zonaHoraria",
           "desde",
           "hasta"
+        ]
+      },
+      "AceptacionPresencialDto": {
+        "type": "object",
+        "properties": {
+          "nombreCompleto": {
+            "type": "string",
+            "description": "Nombre completo, escrito por el propio titular",
+            "maxLength": 200
+          },
+          "numeroDocumento": {
+            "type": "string",
+            "description": "Número de documento, escrito por el propio titular",
+            "maxLength": 30
+          },
+          "versionPolitica": {
+            "type": "string",
+            "description": "Versión de la política que se le mostró y aceptó",
+            "maxLength": 50
+          },
+          "aceptaPolitica": {
+            "type": "boolean",
+            "description": "Declaración expresa del titular: leyó y acepta. Sólo `true`; lo demás es 400."
+          }
+        },
+        "required": [
+          "nombreCompleto",
+          "numeroDocumento",
+          "versionPolitica",
+          "aceptaPolitica"
         ]
       },
       "AceptadoDto": {

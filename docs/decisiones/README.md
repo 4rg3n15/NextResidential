@@ -29,6 +29,7 @@ Registro de las decisiones de arquitectura del proyecto. Una decisión **aceptad
 | [ADR-026](ADR-026-tope-de-vehiculos-propios-en-la-base.md)              | El tope de vehículos propios lo impone la **base**, con un bloqueo por vivienda (ADR-04)                          | Aceptada | ETAPA 15-I     |
 | [ADR-027](ADR-027-punto-de-extension-de-aprobacion.md)                  | La aprobación es una **política** del dominio; hoy sólo «automática», y el ADR dice cómo activar la del portero   | Aceptada | ETAPA 15-I     |
 | [ADR-028](ADR-028-la-consola-en-netlify-y-la-api-en-un-servidor.md)     | Netlify aloja **sólo** la consola; la API va en un servidor con procesos permanentes (D8)                         | Aceptada | ETAPA 15-I     |
+| [ADR-029](ADR-029-consentimiento-presencial-del-titular.md)             | Consentimiento **presencial**: el titular escribe su identidad en la portería (D-10; validez jurídica pendiente)  | Aceptada | ETAPA 15-K     |
 
 **Los números 009, 010 y 011 no existen** y no es un error de numeración que
 haya que corregir: se reservaron para decisiones de la 09-A que acabaron siendo

@@ -159,3 +159,47 @@ export class NombreDePersona {
     return this.valor;
   }
 }
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * D-10 · ¿LO QUE ESCRIBIÓ EL TITULAR ES SU IDENTIDAD REGISTRADA?
+ *
+ * En el consentimiento PRESENCIAL el titular escribe él mismo su nombre y su
+ * documento en la pantalla de la portería. Esto decide si coinciden con la
+ * persona del padrón a la que pertenece el consentimiento.
+ *
+ * Pura y sin E/S: no sabe de dónde vino ninguna de las dos identidades.
+ *
+ *  · Documento: la MISMA normalización que la escritura (`12.345.678` es
+ *    `12345678`). Debe ser igual, sin tolerancias: el documento ES la
+ *    identidad (D-01).
+ *  · Nombre: aquí sí se pliega lo que una persona escribe distinto de un
+ *    registro —mayúsculas, tildes, espacios dobles—, porque quien lo teclea en
+ *    una pantalla ajena no tiene por qué reproducir la ortografía con la que
+ *    otro lo dio de alta. Lo que no se pliega es el CONTENIDO: otro nombre no
+ *    coincide.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+export interface IdentidadEscrita {
+  readonly nombreCompleto: string;
+  readonly numeroDocumento: string;
+}
+
+const nombreComparable = (nombre: string): string =>
+  sinControl(nombre.normalize('NFD'))
+    .replace(/\p{M}/gu, '')
+    .toLocaleLowerCase('es')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+export const identidadCoincide = (
+  escrita: IdentidadEscrita,
+  registrada: IdentidadEscrita,
+): boolean => {
+  const documentoEscrito = Documento.normalizarNumero(escrita.numeroDocumento);
+  const documentoRegistrado = Documento.normalizarNumero(registrada.numeroDocumento);
+  if (documentoEscrito === null || documentoRegistrado === null) return false;
+  if (documentoEscrito !== documentoRegistrado) return false;
+  const nombre = nombreComparable(escrita.nombreCompleto);
+  return nombre !== '' && nombre === nombreComparable(registrada.nombreCompleto);
+};

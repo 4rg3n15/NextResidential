@@ -363,6 +363,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10) */
+        post: operations["BiometriaController_aceptarPresencialmente"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace": {
         parameters: {
             query?: never;
@@ -1999,6 +2016,16 @@ export interface components {
             desde: string;
             /** Format: date-time */
             hasta: string;
+        };
+        AceptacionPresencialDto: {
+            /** @description Nombre completo, escrito por el propio titular */
+            nombreCompleto: string;
+            /** @description Número de documento, escrito por el propio titular */
+            numeroDocumento: string;
+            /** @description Versión de la política que se le mostró y aceptó */
+            versionPolitica: string;
+            /** @description Declaración expresa del titular: leyó y acepta. Sólo `true`; lo demás es 400. */
+            aceptaPolitica: boolean;
         };
         AceptadoDto: {
             /** @example true */
@@ -4600,6 +4627,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    BiometriaController_aceptarPresencialmente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                consentimientoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AceptacionPresencialDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespuestaDeConsentimientoDto"];
+                };
             };
         };
     };

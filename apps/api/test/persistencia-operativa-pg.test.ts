@@ -241,7 +241,8 @@ describe('auditoría de seguridad · la respuesta del titular deja constancia', 
   it('escribe versión de la política, respuesta y origen en auditoria_seguridad', async () => {
     if (omitida()) return;
     const consentimientoId = randomUUID();
-    await new RegistroDeAuditoriaPg(escribe as Pool, bitacora).registrarRespuestaDeTitular({
+    const registro = new RegistroDeAuditoriaPg(escribe as Pool, bitacora);
+    await registro.registrarRespuestaDeTitular({
       copropiedadId: COP,
       consentimientoId,
       respuesta: 'aceptado',
@@ -268,9 +269,28 @@ describe('auditoría de seguridad · la respuesta del titular deja constancia', 
         [consentimientoId],
       );
       expect(rows[0]?.tipo).toBe('respuesta_de_titular');
-      expect(rows[0]?.recurso).toBe('consentimiento/aceptado/politica:v1.0');
+      expect(rows[0]?.recurso).toBe('consentimiento/aceptado/politica:v1.0/canal:enlace');
       expect(rows[0]?.ip).toBe('203.0.113.7');
       expect(rows[0]?.user_agent).toBe('telefono-de-prueba');
+
+      // D-10 · la presencial deja el canal y al operador que atendía la pantalla.
+      const presencial = randomUUID();
+      await registro.registrarRespuestaDeTitular({
+        copropiedadId: COP,
+        consentimientoId: presencial,
+        respuesta: 'aceptado',
+        versionPolitica: 'v1.0',
+        ip: null,
+        userAgent: null,
+        canal: 'presencial',
+        operadorId: ACTOR_INGESTA,
+      });
+      const { rows: p } = await c.query<{ recurso: string; usuario_id: string }>(
+        'SELECT recurso, usuario_id FROM public.auditoria_seguridad WHERE identificador_solicitado = $1',
+        [presencial],
+      );
+      expect(p[0]?.recurso).toBe('consentimiento/aceptado/politica:v1.0/canal:presencial');
+      expect(p[0]?.usuario_id).toBe(ACTOR_INGESTA);
     } finally {
       c.release();
     }

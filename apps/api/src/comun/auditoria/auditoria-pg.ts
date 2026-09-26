@@ -120,10 +120,14 @@ export class RegistroDeAuditoriaPg implements RegistroDeAuditoria {
         tipo: 'respuesta_de_titular',
         // El recurso lleva la respuesta y la versión de la política: es lo que
         // la Ley 1581 pide poder demostrar después.
-        recurso: `consentimiento/${entrada.respuesta}/politica:${entrada.versionPolitica}`,
+        // D-10 · y el canal: «presencial» con el operador que atendía la
+        // pantalla como `usuario_id`; por enlace no hay usuario.
+        recurso:
+          `consentimiento/${entrada.respuesta}/politica:${entrada.versionPolitica}` +
+          `/canal:${entrada.canal ?? 'enlace'}`,
         resultado: 'permitido',
         copropiedadObjetivo: entrada.copropiedadId,
-        usuarioId: null,
+        usuarioId: entrada.operadorId ?? null,
         identificador: entrada.consentimientoId,
         ip: entrada.ip,
         userAgent: entrada.userAgent,

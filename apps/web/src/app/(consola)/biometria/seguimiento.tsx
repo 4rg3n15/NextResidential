@@ -20,8 +20,14 @@ import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
  *     biblioteca de rostros. Si el titular todavía no aceptó, lo dice y no
  *     empuja nada (RN-09).
  *
- * Sigue sin haber un botón de «aceptar»: el consentimiento no es un trámite
- * del operador (RN-10).
+ * Sigue sin haber un botón de «aceptar» del operador: el consentimiento no es
+ * un trámite suyo (RN-10).
+ *
+ * D-10 · **el canal presencial**, para cuando el enlace no se puede abrir (en
+ * sitio, H-SITIO-10). La pantalla se entrega al TITULAR: él escribe su nombre
+ * y su documento —la consola no los conoce ni los precarga— y declara que
+ * leyó la política. El servidor los compara con el padrón; la auditoría deja
+ * el canal, el operador que atendía, la hora y la versión.
  */
 interface Enlace {
   readonly url: string | null;
@@ -48,14 +54,98 @@ interface Total {
 const mensajeDe = (fallo: unknown, porOmision: string): string =>
   fallo instanceof ErrorDeApi ? fallo.message : porOmision;
 
+const TEXTO_DE_LA_POLITICA =
+  'Se le pide autorización para registrar su rostro y usarlo únicamente para reconocerlo en ' +
+  'los puntos de acceso de la copropiedad mientras dure su visita. La imagen se guarda ' +
+  'cifrada, se envía sólo a los equipos de acceso y se elimina automáticamente al vencer su ' +
+  'autorización, o antes si usted lo pide. Puede revocarlo en cualquier momento.';
+
+/**
+ * D-10 · el formulario que llena el TITULAR. Estado propio y efímero: al
+ * enviarlo se vacía, para que el documento no quede en la pantalla del
+ * siguiente que se acerque.
+ */
+const FormularioPresencial = ({
+  versionPolitica,
+  ocupado,
+  alEnviar,
+}: {
+  readonly versionPolitica: string;
+  readonly ocupado: boolean;
+  readonly alEnviar: (datos: {
+    nombreCompleto: string;
+    numeroDocumento: string;
+  }) => Promise<boolean>;
+}): JSX.Element => {
+  const [nombreCompleto, setNombre] = useState('');
+  const [numeroDocumento, setDocumento] = useState('');
+  const [declara, setDeclara] = useState(false);
+  const listo = nombreCompleto.trim().length >= 2 && numeroDocumento.trim().length >= 4 && declara;
+  return (
+    <form
+      aria-label="Consentimiento presencial del titular"
+      className="space-y-2 rounded-md border border-aviso p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void alEnviar({ nombreCompleto, numeroDocumento }).then((enviado) => {
+          if (!enviado) return;
+          setNombre('');
+          setDocumento('');
+          setDeclara(false);
+        });
+      }}
+    >
+      <p className="font-medium">Para el titular: llénelo usted mismo.</p>
+      <p className="text-muted-foreground">{TEXTO_DE_LA_POLITICA}</p>
+      <p className="text-muted-foreground">
+        Política de tratamiento de datos biométricos, versión <strong>{versionPolitica}</strong>{' '}
+        (Ley 1581 de 2012).
+      </p>
+      <label className="block">
+        <span>Su nombre completo</span>
+        <input
+          value={nombreCompleto}
+          onChange={(e) => setNombre(e.target.value)}
+          autoComplete="off"
+          maxLength={200}
+          className="mt-1 block w-full rounded-md border px-2 py-1"
+        />
+      </label>
+      <label className="block">
+        <span>Su número de documento</span>
+        <input
+          value={numeroDocumento}
+          onChange={(e) => setDocumento(e.target.value)}
+          autoComplete="off"
+          maxLength={30}
+          className="mt-1 block w-full rounded-md border px-2 py-1"
+        />
+      </label>
+      <label className="flex items-start gap-2">
+        <input type="checkbox" checked={declara} onChange={(e) => setDeclara(e.target.checked)} />
+        <span>
+          Soy el titular de este rostro, leí la política {versionPolitica} y autorizo su uso para el
+          control de acceso.
+        </span>
+      </label>
+      <Boton type="submit" disabled={!listo || ocupado}>
+        Registrar mi consentimiento
+      </Boton>
+    </form>
+  );
+};
+
 export const SeguimientoDeConsentimiento = ({
   copropiedadId,
   consentimientoId,
   plantillaId,
+  versionPolitica,
 }: {
   readonly copropiedadId: string;
   readonly consentimientoId: string;
   readonly plantillaId: string;
+  /** D-10 · la versión con la que se solicitó: la que el titular acepta. */
+  readonly versionPolitica: string;
 }): JSX.Element => {
   const [enlace, setEnlace] = useState<Enlace | null>(null);
   const [estado, setEstado] = useState<string>('pendiente');
@@ -63,6 +153,35 @@ export const SeguimientoDeConsentimiento = ({
   const [ocupado, setOcupado] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [presencial, setPresencial] = useState(false);
+
+  const aceptarPresencialmente = async (datos: {
+    nombreCompleto: string;
+    numeroDocumento: string;
+  }): Promise<boolean> => {
+    setOcupado(true);
+    setError(undefined);
+    try {
+      const r = desenvolver(
+        await cliente.POST(
+          '/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial',
+          {
+            params: { path: { id: copropiedadId, consentimientoId } },
+            body: { ...datos, versionPolitica, aceptaPolitica: true },
+          },
+        ),
+      ) as { estado: string; propagacion: readonly Total[] };
+      setEstado(r.estado);
+      setTotal(r.propagacion[0] ?? null);
+      setPresencial(false);
+      return true;
+    } catch (fallo) {
+      setError(mensajeDe(fallo, 'No se pudo registrar el consentimiento. Inténtelo de nuevo.'));
+      return false;
+    } finally {
+      setOcupado(false);
+    }
+  };
 
   const emitirEnlace = async (): Promise<void> => {
     setOcupado(true);
@@ -143,7 +262,26 @@ export const SeguimientoDeConsentimiento = ({
         >
           Comprobar respuesta y sincronizar a todas las terminales
         </Boton>
+        {estado === 'pendiente' && (
+          <Boton
+            variante="secundario"
+            onClick={() => setPresencial((abierto) => !abierto)}
+            disabled={ocupado}
+          >
+            {presencial
+              ? 'Cerrar el consentimiento presencial'
+              : 'El titular está aquí: consentimiento presencial'}
+          </Boton>
+        )}
       </div>
+
+      {presencial && estado === 'pendiente' && (
+        <FormularioPresencial
+          versionPolitica={versionPolitica}
+          ocupado={ocupado}
+          alEnviar={aceptarPresencialmente}
+        />
+      )}
 
       {enlace !== null && (
         <div className="space-y-2">

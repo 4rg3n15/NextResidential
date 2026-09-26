@@ -12,6 +12,7 @@ import type { ContextoTenant } from '../src/autenticacion';
 import { FirmanteHmacDeEnlaces } from '../src/biometria/infraestructura/firmante-de-enlaces';
 import { configuracionDePrueba } from './utilidades';
 import { AuditoriaEnMemoria } from '../src/comun/auditoria';
+import { IdentidadDePersonaEnMemoria } from '../src/padron';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -347,14 +348,98 @@ describe('el enlace del titular', () => {
     expect(tienePlantilla(terminalId, plantillaId)).toBe(false);
   });
 
-  it('el portero no lanza la sincronización total ni el residente emite enlaces', async () => {
+  it('sin consentimiento el portero no sincroniza (RN-09, no su rol) y el residente no emite enlaces', async () => {
     const { consentimientoId, plantillaId } = await capturar();
-    await con(tokenPortero, 'post', `${base}/plantillas/${plantillaId}/sincronizacion-total`)
+    // H-SITIO-03 · el portero SÍ alcanza la ruta; lo que lo detiene es RN-09.
+    const sinConsentimiento = await con(
+      tokenPortero,
+      'post',
+      `${base}/plantillas/${plantillaId}/sincronizacion-total`,
+    )
       .send()
       .expect(403);
+    expect(JSON.stringify(sinConsentimiento.body)).not.toMatch(/Rol no autorizado/);
     const tokenResidente = await tokenDe(firmante, { rol: 'residente', copropiedadId: COP_A });
     await con(tokenResidente, 'post', `${base}/consentimientos/${consentimientoId}/enlace`)
       .send()
       .expect(403);
+  });
+});
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * D-10 · EL TITULAR ACEPTA EN LA PORTERÍA
+ *
+ * Sin enlace (en sitio no se abría desde el teléfono, H-SITIO-10): el titular
+ * escribe su nombre y documento en la pantalla y acepta la política vigente.
+ * El residente no entra; el operador no puede aceptar sin la identidad del
+ * titular; aceptado, la plantilla viaja a todos los equipos con biblioteca.
+ * Cuatro llamadas en total: la ruta tiene límite estricto por identidad.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+describe('D-10 · consentimiento presencial', () => {
+  const IDENTIDAD = { nombreCompleto: 'Visitante de Prueba Uno', numeroDocumento: '10203040' };
+  const presencial = (token: string, consentimientoId: string) =>
+    con(token, 'post', `${base}/consentimientos/${consentimientoId}/aceptacion-presencial`);
+
+  beforeAll(() => {
+    app.get(IdentidadDePersonaEnMemoria).declarar(COP_A, TITULAR, IDENTIDAD);
+  });
+
+  it('el residente NUNCA acepta por su visitante: 403 por rol', async () => {
+    const { consentimientoId } = await capturar();
+    const tokenResidente = await tokenDe(firmante, { rol: 'residente', copropiedadId: COP_A });
+    const r = await presencial(tokenResidente, consentimientoId)
+      .send({ ...IDENTIDAD, versionPolitica: 'v1.0', aceptaPolitica: true })
+      .expect(403);
+    expect(JSON.stringify(r.body)).toMatch(/Rol no autorizado/);
+  });
+
+  it('sin la declaración expresa no hay aceptación: aceptaPolitica ≠ true es 400', async () => {
+    const { consentimientoId } = await capturar();
+    await presencial(tokenPortero, consentimientoId)
+      .send({ ...IDENTIDAD, versionPolitica: 'v1.0', aceptaPolitica: false })
+      .expect(400);
+  });
+
+  it('el operador no marca por el titular: otra identidad es 403 y sigue pendiente', async () => {
+    const { consentimientoId } = await capturar();
+    await presencial(tokenPortero, consentimientoId)
+      .send({
+        ...IDENTIDAD,
+        numeroDocumento: '99999999',
+        versionPolitica: 'v1.0',
+        aceptaPolitica: true,
+      })
+      .expect(403);
+    const estado = await con(tokenAdmin, 'get', `${base}/consentimientos/${consentimientoId}`);
+    expect(estado.body.estado).toBe('pendiente');
+  });
+
+  it('con SU identidad: vigente, canal presencial y operador en la auditoría, y a TODOS los equipos con biblioteca', async () => {
+    const { consentimientoId, plantillaId } = await capturar();
+    const auditoria = app.get(AuditoriaEnMemoria);
+    const antes = auditoria.respuestasDeTitular.length;
+    const r = await presencial(tokenPortero, consentimientoId)
+      .send({
+        nombreCompleto: 'VISITANTE DE PRUEBA UNO',
+        numeroDocumento: '10.203.040',
+        versionPolitica: 'v1.0',
+        aceptaPolitica: true,
+      })
+      .expect(201);
+    expect(r.body.estado).toBe('vigente');
+    expect(tienePlantilla(terminalId, plantillaId)).toBe(true);
+    expect(tienePlantilla(videoporteroId, plantillaId)).toBe(true);
+    expect(tienePlantilla(sinBibliotecaId, plantillaId)).toBe(false);
+    const constancia = auditoria.respuestasDeTitular
+      .slice(antes)
+      .find((x) => x.consentimientoId === consentimientoId);
+    expect(constancia).toMatchObject({
+      respuesta: 'aceptado',
+      versionPolitica: 'v1.0',
+      canal: 'presencial',
+      operadorId: '00000000-0000-4000-8000-000000000010',
+    });
   });
 });

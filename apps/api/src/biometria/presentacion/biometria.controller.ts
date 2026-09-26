@@ -8,8 +8,11 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { esFallo } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
@@ -32,7 +35,9 @@ import {
   SincronizarPlantillaEnTerminales,
 } from '../aplicacion/sincronizacion-total';
 import type { ResultadoDeSincronizacionTotal } from '../aplicacion/sincronizacion-total';
+import { AceptarConsentimientoPresencial } from '../aplicacion/consentimiento-presencial';
 import {
+  AceptacionPresencialDto,
   CapturarRostroDto,
   EnlaceDeConsentimientoDto,
   RespuestaDeConsentimientoDto,
@@ -100,6 +105,8 @@ export class BiometriaController {
     @Inject(REPOSITORIO_CONSENTIMIENTOS)
     private readonly consentimientos: RepositorioConsentimientos,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    @Inject(AceptarConsentimientoPresencial)
+    private readonly presencial: AceptarConsentimientoPresencial,
   ) {}
 
   @Post('capturas')
@@ -247,6 +254,45 @@ export class BiometriaController {
     // A3 · aceptado = hacia todas las terminales, ya. Lo que no llegue se dice.
     const propagacion =
       r.estado === 'vigente' ? await this.propagar.ejecutar(destino, { consentimientoId }) : [];
+    return { estado: r.estado, propagacion: propagacion.map(aSincronizacionDto) };
+  }
+
+  /**
+   * D-10 · el titular en la portería: escribe su nombre y documento y acepta la
+   * política que se le muestra. El residente queda fuera a propósito: nunca
+   * acepta por su visitante (RN-10). Límite estricto por identidad: comparar
+   * contra el padrón no puede convertirse en un oráculo de documentos.
+   */
+  @Post('consentimientos/:consentimientoId/aceptacion-presencial')
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10)',
+  })
+  @ApiOkResponse({ type: RespuestaDeConsentimientoDto })
+  async aceptarPresencialmente(
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
+    @Contexto() ctx: ContextoTenant,
+    @Body() dto: AceptacionPresencialDto,
+    @Req() peticion: Request,
+  ): Promise<RespuestaDeConsentimientoDto> {
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'biometria/consentimientos/presencial',
+    );
+    const agente = peticion.headers['user-agent'];
+    const r = desenvolver(
+      await this.presencial.ejecutar(destino, {
+        consentimientoId,
+        identidad: { nombreCompleto: dto.nombreCompleto, numeroDocumento: dto.numeroDocumento },
+        versionPoliticaAceptada: dto.versionPolitica,
+        origen: { ip: peticion.ip ?? null, userAgent: typeof agente === 'string' ? agente : null },
+      }),
+    );
+    // Aceptado = hacia todos los equipos con biblioteca de rostros, ya.
+    const propagacion = await this.propagar.ejecutar(destino, { consentimientoId });
     return { estado: r.estado, propagacion: propagacion.map(aSincronizacionDto) };
   }
 

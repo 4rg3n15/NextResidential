@@ -27,6 +27,7 @@ export 'clients/observabilidad_api.dart';
 // Data classes
 export 'models/acceso_dto.dart';
 export 'models/accesos_por_hora_dto.dart';
+export 'models/aceptacion_presencial_dto.dart';
 export 'models/aceptado_dto.dart';
 export 'models/acompanante_agregado_dto.dart';
 export 'models/agregar_acompanante_dto.dart';
