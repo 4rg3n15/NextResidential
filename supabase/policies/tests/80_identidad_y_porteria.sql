@@ -16,7 +16,12 @@ BEGIN;
 
 -- ---------------------------------------------------------------------------
 -- 0 · Datos: un portero por copropiedad, con perfil, turno, sesión y rastro.
+--     Con CLAIMS: en `--modo-supabase` la conexión es el dueño NO superusuario,
+--     y la RLS forzada le alcanza. Cada fila entra con la identidad que la API
+--     usaría: plataforma para cuentas, perfiles y turnos; servicio de SU
+--     copropiedad para las sesiones.
 -- ---------------------------------------------------------------------------
+SET LOCAL request.jwt.claims = '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000001","copropiedad_id":null}';
 INSERT INTO public.usuarios (id, copropiedad_id, auth_user_id, correo, nombre_usuario, nombre,
                              debe_cambiar_contrasena, creado_por, actualizado_por)
 VALUES ('80000000-0000-4000-8000-0000000000a1', '10000000-0000-4000-8000-000000000001',
@@ -43,21 +48,28 @@ VALUES ('80000000-0000-4000-8000-0000000000a2', '10000000-0000-4000-8000-0000000
        ('80000000-0000-4000-8000-0000000000b2', '10000000-0000-4000-8000-000000000002',
         '80000000-0000-4000-8000-0000000000b1', 'Sur', '2026-09-25', '06:00', '14:00', 'empty',
         '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001');
+SET LOCAL request.jwt.claims = '{"rol":"servicio","usuario_id":"00000000-0000-4000-8000-000000000003","copropiedad_id":"10000000-0000-4000-8000-000000000001","copropiedades":["10000000-0000-4000-8000-000000000001"]}';
 INSERT INTO public.sesiones_de_porteria (sesion_id, copropiedad_id, portero_id, turno_id, codigo_hash,
                                          iniciada_en, creado_por, actualizado_por)
 VALUES ('80000000-0000-4000-8000-0000000000a3', '10000000-0000-4000-8000-000000000001',
         '80000000-0000-4000-8000-0000000000a1', '80000000-0000-4000-8000-0000000000a2',
         'scrypt$c2FsLWRlLXBydWViYQ==$aGFzaC1kZS1wcnVlYmE=', now(),
-        '80000000-0000-4000-8000-0000000000a1', '80000000-0000-4000-8000-0000000000a1'),
-       ('80000000-0000-4000-8000-0000000000b3', '10000000-0000-4000-8000-000000000002',
+        '80000000-0000-4000-8000-0000000000a1', '80000000-0000-4000-8000-0000000000a1');
+SET LOCAL request.jwt.claims = '{"rol":"servicio","usuario_id":"00000000-0000-4000-8000-000000000003","copropiedad_id":"10000000-0000-4000-8000-000000000002","copropiedades":["10000000-0000-4000-8000-000000000002"]}';
+INSERT INTO public.sesiones_de_porteria (sesion_id, copropiedad_id, portero_id, turno_id, codigo_hash,
+                                         iniciada_en, creado_por, actualizado_por)
+VALUES ('80000000-0000-4000-8000-0000000000b3', '10000000-0000-4000-8000-000000000002',
         '80000000-0000-4000-8000-0000000000b1', '80000000-0000-4000-8000-0000000000b2',
         'scrypt$c2FsLWRlLXBydWViYQ==$aGFzaC1kZS1wcnVlYmE=', now(),
         '80000000-0000-4000-8000-0000000000b1', '80000000-0000-4000-8000-0000000000b1');
-INSERT INTO public.bitacora_de_porteria (id, copropiedad_id, ocurrido_en, tipo, usuario_id, actor_id)
+SET LOCAL request.jwt.claims = '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000001","copropiedad_id":null}';
+INSERT INTO public.bitacora_de_porteria (id, copropiedad_id, ocurrido_en, tipo, usuario_id, actor_id, creado_por)
 VALUES ('80000000-0000-4000-8000-0000000000a4', '10000000-0000-4000-8000-000000000001', now(),
-        'inicio_de_sesion', '80000000-0000-4000-8000-0000000000a1', '80000000-0000-4000-8000-0000000000a1'),
+        'inicio_de_sesion', '80000000-0000-4000-8000-0000000000a1', '80000000-0000-4000-8000-0000000000a1',
+        '80000000-0000-4000-8000-0000000000a1'),
        ('80000000-0000-4000-8000-0000000000b4', '10000000-0000-4000-8000-000000000002', now(),
-        'inicio_de_sesion', '80000000-0000-4000-8000-0000000000b1', '80000000-0000-4000-8000-0000000000b1');
+        'inicio_de_sesion', '80000000-0000-4000-8000-0000000000b1', '80000000-0000-4000-8000-0000000000b1',
+        '80000000-0000-4000-8000-0000000000b1');
 
 -- ---------------------------------------------------------------------------
 -- 1 · La base calcula la franja, y el turno de 22:00 a 06:00 cruza la medianoche.
@@ -149,8 +161,8 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   BEGIN
-    INSERT INTO public.bitacora_de_porteria (copropiedad_id, ocurrido_en, tipo) VALUES
-      ('10000000-0000-4000-8000-000000000001', now(), 'fin_de_patrullaje');
+    INSERT INTO public.bitacora_de_porteria (copropiedad_id, ocurrido_en, tipo, creado_por) VALUES
+      ('10000000-0000-4000-8000-000000000001', now(), 'fin_de_patrullaje', '80000000-0000-4000-8000-0000000000a1');
     RAISE EXCEPTION 'bitacora_porteria_insercion: el portero escribió en la bitácora';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
@@ -217,8 +229,8 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   BEGIN
-    INSERT INTO public.bitacora_de_porteria (copropiedad_id, ocurrido_en, tipo)
-    VALUES ('10000000-0000-4000-8000-000000000001', now(), 'turno_extra');
+    INSERT INTO public.bitacora_de_porteria (copropiedad_id, ocurrido_en, tipo, creado_por)
+    VALUES ('10000000-0000-4000-8000-000000000001', now(), 'turno_extra', '00000000-0000-4000-8000-000000000010');
     RAISE EXCEPTION 'bitacora_porteria_insercion: el administrador escribió en la bitácora';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
@@ -250,8 +262,8 @@ BEGIN
   SELECT count(*) INTO n FROM public.turnos_de_porteria WHERE copropiedad_id = '10000000-0000-4000-8000-000000000001';
   ASSERT n = 0, 'servicio: lee turnos de otra copropiedad';
   BEGIN
-    INSERT INTO public.bitacora_de_porteria (copropiedad_id, ocurrido_en, tipo)
-    VALUES ('10000000-0000-4000-8000-000000000001', now(), 'inicio_de_sesion');
+    INSERT INTO public.bitacora_de_porteria (copropiedad_id, ocurrido_en, tipo, creado_por)
+    VALUES ('10000000-0000-4000-8000-000000000001', now(), 'inicio_de_sesion', '00000000-0000-4000-8000-000000000003');
     RAISE EXCEPTION 'bitacora_porteria_insercion: el servicio de ROBLE escribió en MIRA';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
@@ -275,26 +287,35 @@ RESET request.jwt.claims;
 -- 5 · Bitácora append-only frente al DUEÑO (ADR-005): ACL y disparador.
 -- ---------------------------------------------------------------------------
 DO $$
-DECLARE n int; dueno text;
+DECLARE n int; dueno text; m text;
 BEGIN
   SELECT pg_get_userbyid(relowner) INTO dueno FROM pg_class WHERE relname = 'bitacora_de_porteria';
   SELECT count(*) INTO n FROM information_schema.role_table_grants
    WHERE table_schema = 'public' AND table_name = 'bitacora_de_porteria'
      AND privilege_type IN ('UPDATE', 'DELETE', 'TRUNCATE');
   ASSERT n = 0, format('la bitácora conserva %s privilegios de edición (dueño %s)', n, dueno);
+  -- Como el DUEÑO. Si no es superusuario (Supabase) lo frena el REVOKE (42501);
+  -- si lo es (el clúster local sin `--modo-supabase`), el disparador. Otra
+  -- causa, o ninguna, es un fallo.
   BEGIN
     EXECUTE format('SET LOCAL ROLE %I', dueno);
     UPDATE public.bitacora_de_porteria SET detalle = 'reescrito' WHERE id = '80000000-0000-4000-8000-0000000000a4';
-    RAISE EXCEPTION 'el DUEÑO editó la bitácora';
-  EXCEPTION WHEN insufficient_privilege THEN NULL;
+    m := 'el DUEÑO editó la bitácora';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLSTATE = '42501' OR SQLERRM LIKE '%append-only%',
+      format('UPDATE del dueño rechazado por otra causa: %s', SQLERRM);
   END;
+  ASSERT m IS NULL, m;
   RESET ROLE;
   BEGIN
     EXECUTE format('SET LOCAL ROLE %I', dueno);
     DELETE FROM public.bitacora_de_porteria WHERE id = '80000000-0000-4000-8000-0000000000a4';
-    RAISE EXCEPTION 'el DUEÑO borró de la bitácora';
-  EXCEPTION WHEN insufficient_privilege THEN NULL;
+    m := 'el DUEÑO borró de la bitácora';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLSTATE = '42501' OR SQLERRM ILIKE '%prohibid%',
+      format('DELETE del dueño rechazado por otra causa: %s', SQLERRM);
   END;
+  ASSERT m IS NULL, m;
   RESET ROLE;
   RAISE NOTICE '80 · bitácora frente al dueño (%): sin UPDATE, DELETE ni TRUNCATE: ok', dueno;
 END $$;
@@ -307,27 +328,35 @@ BEGIN
     UPDATE public.bitacora_de_porteria SET detalle = 'reescrito' WHERE id = '80000000-0000-4000-8000-0000000000a4';
     m := 'editó';
   EXCEPTION WHEN OTHERS THEN
-    ASSERT SQLERRM LIKE '%append-only%', format('UPDATE rechazado por otra causa: %s', SQLERRM);
+    -- Dueño NO superusuario (Supabase): lo frena el REVOKE. Superusuario local:
+    -- lo frena el disparador. Las dos son la inmutabilidad; otra causa no.
+    ASSERT SQLERRM LIKE '%append-only%' OR SQLSTATE = '42501',
+      format('UPDATE rechazado por otra causa: %s', SQLERRM);
   END;
   ASSERT m IS NULL, 'la conexión sin cambio de rol editó la bitácora';
   BEGIN
     DELETE FROM public.bitacora_de_porteria WHERE id = '80000000-0000-4000-8000-0000000000a4';
     m := 'borró';
   EXCEPTION WHEN OTHERS THEN
-    ASSERT SQLERRM ILIKE '%prohibid%', format('DELETE rechazado por otra causa: %s', SQLERRM);
+    ASSERT SQLERRM ILIKE '%prohibid%' OR SQLSTATE = '42501',
+      format('DELETE rechazado por otra causa: %s', SQLERRM);
   END;
   ASSERT m IS NULL, 'la conexión sin cambio de rol borró de la bitácora';
-  RAISE NOTICE '80 · bitácora: el disparador bloquea UPDATE y DELETE a la conexión: ok';
+  RAISE NOTICE '80 · bitácora: la conexión tal como llega no edita ni borra (REVOKE o disparador): ok';
 END $$;
 
 -- ---------------------------------------------------------------------------
--- 6 · Una sesión cerrada no se reabre.
+-- 6 · Una sesión cerrada no se reabre. Con los claims de SERVICIO de MIRA, que
+--     es el único que edita sesiones: sin ellos la RLS filtraría las dos
+--     actualizaciones y la prueba pasaría por la razón equivocada.
 -- ---------------------------------------------------------------------------
+SET LOCAL request.jwt.claims = '{"rol":"servicio","usuario_id":"00000000-0000-4000-8000-000000000003","copropiedad_id":"10000000-0000-4000-8000-000000000001","copropiedades":["10000000-0000-4000-8000-000000000001"]}';
 DO $$
 DECLARE reabierta boolean := false;
 BEGIN
   UPDATE public.sesiones_de_porteria SET estado = 'cerrada', cerrada_en = now(), motivo_cierre = 'manual'
    WHERE sesion_id = '80000000-0000-4000-8000-0000000000a3';
+  ASSERT FOUND, 'el servicio no pudo cerrar la sesión: la prueba no demostraría nada';
   BEGIN
     UPDATE public.sesiones_de_porteria SET estado = 'activa', cerrada_en = NULL, motivo_cierre = NULL
      WHERE sesion_id = '80000000-0000-4000-8000-0000000000a3';

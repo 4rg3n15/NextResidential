@@ -351,7 +351,9 @@ CREATE TABLE IF NOT EXISTS public.bitacora_de_porteria (
   agente             text NULL,
   detalle            text NULL,
   creado_en          timestamptz NOT NULL DEFAULT now(),
-  creado_por         uuid NULL REFERENCES public.usuarios(id),
+  -- NOT NULL como toda columna de auditoría (el arranque en frío lo exige):
+  -- sin actor humano, firma el actor de ingesta (0035).
+  creado_por         uuid NOT NULL REFERENCES public.usuarios(id),
 
   CONSTRAINT bitacora_porteria_tipo CHECK (tipo IN (
     'inicio_de_sesion', 'acceso_rechazado', 'cierre_de_sesion',
@@ -365,6 +367,9 @@ CREATE TABLE IF NOT EXISTS public.bitacora_de_porteria (
   CONSTRAINT bitacora_porteria_agente_len CHECK (agente IS NULL OR length(agente) <= 300),
   CONSTRAINT bitacora_porteria_detalle_len CHECK (detalle IS NULL OR length(detalle) <= 500)
 );
+-- Idempotente también sobre una base donde la tabla ya existía sin la
+-- restricción: no hay filas sin autor, así que el cambio no puede fallar.
+ALTER TABLE public.bitacora_de_porteria ALTER COLUMN creado_por SET NOT NULL;
 CREATE INDEX IF NOT EXISTS bitacora_porteria_copropiedad_idx
   ON public.bitacora_de_porteria (copropiedad_id, ocurrido_en DESC);
 CREATE INDEX IF NOT EXISTS bitacora_porteria_usuario_idx

@@ -12,7 +12,19 @@ interface RespuestaDeToken {
   access_token?: unknown;
   refresh_token?: unknown;
   expires_at?: unknown;
+  expires_in?: unknown;
 }
+
+/**
+ * Instante de caducidad en segundos Unix. GoTrue manda `expires_at` y
+ * `expires_in`; si sólo llega el segundo —versiones y dobles que lo omiten—, se
+ * calcula. Sin ninguno de los dos, la respuesta no tiene forma.
+ */
+const caducidadDe = (cuerpo: RespuestaDeToken, ahoraMs: number): number | null => {
+  if (typeof cuerpo.expires_at === 'number') return cuerpo.expires_at;
+  if (typeof cuerpo.expires_in === 'number') return Math.floor(ahoraMs / 1000) + cuerpo.expires_in;
+  return null;
+};
 
 /**
  * Supabase Auth detrás de los dos puertos de cuentas (ADR-023).
@@ -45,15 +57,16 @@ export class CuentasSupabase implements ProveedorDeIdentidad, AdministradorDeCue
     if (r.status === 400 || r.status === 401 || r.status === 422) return null;
     if (!r.ok) throw this.fallo('inicio de sesión', r.status);
     const cuerpo = (await r.json()) as RespuestaDeToken;
-    const { access_token, refresh_token, expires_at } = cuerpo;
+    const { access_token, refresh_token } = cuerpo;
+    const expiraEn = caducidadDe(cuerpo, Date.now());
     if (
       typeof access_token !== 'string' ||
       typeof refresh_token !== 'string' ||
-      typeof expires_at !== 'number'
+      expiraEn === null
     ) {
       throw this.fallo('inicio de sesión: respuesta sin forma', r.status);
     }
-    return { accessToken: access_token, refreshToken: refresh_token, expiraEn: expires_at };
+    return { accessToken: access_token, refreshToken: refresh_token, expiraEn };
   }
 
   async cerrarSesion(accessToken: string): Promise<void> {

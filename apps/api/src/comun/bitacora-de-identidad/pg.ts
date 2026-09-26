@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 import type { Pool } from 'pg';
 import { claimsDeServicio } from '../claims-de-servicio';
+import { ACTOR_INGESTA } from '../actores-de-servicio';
 import type {
   BitacoraDeIdentidad,
   ConsultaDeHechos,
@@ -49,7 +50,7 @@ export class BitacoraDeIdentidadPg implements BitacoraDeIdentidad {
         `INSERT INTO public.bitacora_de_porteria
            (copropiedad_id, ocurrido_en, tipo, usuario_id, actor_id, sesion_id, turno_id,
             duracion_segundos, origen_ip, origen_declarado, agente, detalle, creado_por)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $5)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [
           h.copropiedadId,
           h.ocurridoEn,
@@ -63,6 +64,8 @@ export class BitacoraDeIdentidadPg implements BitacoraDeIdentidad {
           recortar(h.origen?.declarado, 100),
           recortar(h.origen?.agente, 300),
           recortar(h.detalle, 500),
+          // Sin actor humano firma el actor de ingesta: la columna es NOT NULL.
+          h.actorId ?? ACTOR_INGESTA,
         ],
       );
       await cliente.query('COMMIT');
