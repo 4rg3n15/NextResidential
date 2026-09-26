@@ -35,7 +35,6 @@
  */
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  PatronRecurrencia,
   Vigencia,
   aprobacionAutomatica,
   errorDominio,
@@ -113,13 +112,21 @@ export class CrearMiAutorizacion {
       );
     }
     if (entrada.patron !== null) {
-      const patron = PatronRecurrencia.crear({
-        dias: [...entrada.patron.dias],
-        minutoInicio: entrada.patron.minutoInicio,
-        minutoFin: entrada.patron.minutoFin,
-        desplazamientoUtcMinutos: entrada.patron.desplazamientoUtcMinutos,
-      });
-      if (!patron.ok) return patron;
+      /**
+       * H-15I-06 · FALLA CERRADA a propósito. La recurrente desde la app
+       * respondía 500 (no se escribía su patrón), y escribirlo hoy sería peor:
+       * la persistencia guarda la franja en hora local sin su desplazamiento y
+       * la relee como UTC (H-15I-05), así que en Bogotá dejaría pasar cinco
+       * horas antes de la franja. Hasta corregir H-15I-05 —persistencia, fuera
+       * del alcance de esta etapa—, la app crea una visita por día (D5 b).
+       */
+      return fallo(
+        errorDominio(
+          'OPERACION_NO_PERMITIDA',
+          'Las visitas recurrentes están deshabilitadas en la app: cree una visita por día con su franja',
+          'RN-22',
+        ),
+      );
     }
 
     // ── 3 · Reglas de negocio, con su precedencia en el dominio ─────────────

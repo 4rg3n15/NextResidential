@@ -54,6 +54,8 @@ export const ICONOS_DE_NAVEGACION = [
   'IdCard',
   // ETAPA 15-I · supervisión de residentes: cuentas, ocupantes y vehículos propios.
   'UserCog',
+  // ETAPA 15-I · HU-35 · la lista negra desde la consola.
+  'ShieldBan',
 ] as const;
 export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 
@@ -97,6 +99,19 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     roles: OPERACION,
     pendienteDeEtapa: null,
     icono: 'UserRoundCheck',
+  },
+  /**
+   * ETAPA 15-I · HU-35 · RN-07 · la lista negra. Junto a Visitantes porque es su
+   * contrapeso: un veto niega aunque la autorización esté vigente (RN-06).
+   * Vetan los cuatro roles de operación; levantar es de administración.
+   */
+  {
+    clave: 'listas-negras',
+    etiqueta: 'Listas negras',
+    ruta: '/listas-negras',
+    roles: OPERACION,
+    pendienteDeEtapa: null,
+    icono: 'ShieldBan',
   },
   /**
    * ETAPA 15 · anticipo autorizado del punto 4 de la ETAPA 16.

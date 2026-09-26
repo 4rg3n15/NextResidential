@@ -152,6 +152,26 @@ export interface RepositorioListaNegra {
   activasDe(copropiedadId: string): Promise<readonly EntradaListaNegra[]>;
 }
 
+/** 15-I · lo que la consola lista de la lista negra: con nombre y documento. */
+export interface VetoListado {
+  readonly id: string;
+  readonly placa: string | null;
+  readonly personaId: string | null;
+  readonly persona: string | null;
+  readonly documento: string | null;
+  readonly motivo: string;
+  readonly creadoEn: string;
+}
+
+export const CONSULTA_LISTA_NEGRA = Symbol('CONSULTA_LISTA_NEGRA');
+
+/** Lectura para la consola y resolución del documento de quien se veta (HU-35). */
+export interface ConsultaDeListaNegra {
+  activas(copropiedadId: string): Promise<readonly VetoListado[]>;
+  /** La persona de ESA copropiedad con ese documento, ya normalizado por la base. */
+  personaPorDocumento(copropiedadId: string, documento: string): Promise<string | null>;
+}
+
 export interface RepositorioVersionDeReglas {
   vigenteDe(copropiedadId: string): Promise<VersionDeReglas>;
 }

@@ -75,17 +75,18 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
     expect(claves).not.toContain('viviendas');
   });
 
-  it('el administrador ve las trece entradas, y cada añadido tiene su etapa', () => {
+  it('el administrador ve las catorce entradas, y cada añadido tiene su etapa', () => {
     // Nueve hasta la ETAPA 09; la 10 añade Portería y Guardia virtual, que son
     // DOS superficies y no una (C-12); la 14 añade Latencias, que no está en
     // el mockup porque el mockup no tenía tablero de observabilidad; y la 15
     // añade Rostro del visitante, que tampoco estaba: la captura vivía sólo en
     // la app del residente (ADR-016) y el escritorio no tenía por dónde.
-    expect(navegacionDe('administrador')).toHaveLength(13);
+    expect(navegacionDe('administrador')).toHaveLength(14);
     // La 15-H añade DOS entradas que el administrador NO ve: «Porteros», del
     // superadministrador (B4), y «Mi perfil», del portero (E-02). La 15-I añade
-    // «Residentes», también sólo del superadministrador (3.1, D5 a, D6).
-    expect(NAVEGACION).toHaveLength(16);
+    // «Residentes», también sólo del superadministrador (3.1, D5 a, D6), y
+    // «Listas negras» (HU-35), que sí ve el administrador.
+    expect(NAVEGACION).toHaveLength(17);
   });
 
   it('15-I · sólo el superadministrador supervisa residentes', () => {

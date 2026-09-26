@@ -173,3 +173,32 @@ export class AgregarAcompananteDto {
   @Length(1, 200)
   nombre!: string;
 }
+
+/**
+ * 15-I · HU-35 · un veto: una placa, o el documento de la persona, y siempre
+ * el motivo (RN-07). El caso de uso exige al menos una de las dos.
+ */
+export class VetoDto {
+  @ApiPropertyOptional({ type: String, nullable: true, minLength: 5, maxLength: 12 })
+  @IsOptional()
+  @IsString()
+  @Length(5, 12)
+  placa?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    minLength: 4,
+    maxLength: 32,
+    description: 'Documento de la persona a vetar; se resuelve en ESTA copropiedad',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(4, 32)
+  documento?: string | null;
+
+  @ApiProperty({ type: String, minLength: 3, maxLength: 300 })
+  @IsString()
+  @Length(3, 300)
+  motivo!: string;
+}

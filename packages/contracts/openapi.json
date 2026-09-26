@@ -3231,6 +3231,133 @@
         ]
       }
     },
+    "/copropiedades/{id}/listas-negras": {
+      "get": {
+        "operationId": "ListasNegrasController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VetoListadoDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vetos activos de la copropiedad (HU-35)",
+        "tags": [
+          "listas-negras"
+        ]
+      },
+      "post": {
+        "operationId": "ListasNegrasController_crear",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VetoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdVetoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Veta una placa o una persona por su documento, con motivo (RN-06, RN-07)",
+        "tags": [
+          "listas-negras"
+        ]
+      }
+    },
+    "/copropiedades/{id}/listas-negras/{vetoId}/levantamiento": {
+      "post": {
+        "operationId": "ListasNegrasController_levantarVeto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vetoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VetoLevantadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Levanta un veto: sólo la administración, con autor y momento (RN-07)",
+        "tags": [
+          "listas-negras"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/alta": {
       "get": {
         "operationId": "MiAltaController_estado",
@@ -9857,6 +9984,18 @@
           "id"
         ]
       },
+      "IdVetoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
       "IndicadoresDto": {
         "type": "object",
         "properties": {
@@ -12522,6 +12661,85 @@
           "admitido",
           "conteo",
           "motivo"
+        ]
+      },
+      "VetoDto": {
+        "type": "object",
+        "properties": {
+          "placa": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 5,
+            "maxLength": 12
+          },
+          "documento": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "Documento de la persona a vetar; se resuelve en ESTA copropiedad"
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "VetoLevantadoDto": {
+        "type": "object",
+        "properties": {
+          "levantado": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "levantado"
+        ]
+      },
+      "VetoListadoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true
+          },
+          "personaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "persona": {
+            "type": "string",
+            "nullable": true
+          },
+          "documento": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "creadoEn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "placa",
+          "personaId",
+          "persona",
+          "documento",
+          "motivo",
+          "creadoEn"
         ]
       },
       "VisitaCreadaDto": {

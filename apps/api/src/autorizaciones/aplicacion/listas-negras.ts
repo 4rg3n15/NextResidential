@@ -1,5 +1,5 @@
 import type { ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
-import { errorDominio, exito, fallo } from '@ncr/domain-core';
+import { Placa, errorDominio, exito, fallo } from '@ncr/domain-core';
 import type { ContextoTenant, Rol } from '../../autenticacion';
 import { alcanzaCopropiedad } from '../../autenticacion';
 import type { RepositorioListaNegra } from './puertos';
@@ -56,7 +56,15 @@ export class VetarEnListaNegra {
     if (!copropiedad.ok) return copropiedad;
 
     const personaId = entrada.personaId ?? null;
-    const placa = entrada.placa ?? null;
+    // 15-I · la placa se veta NORMALIZADA, como la compara el motor: «abc-123»
+    // y «ABC123» son la misma placa y el veto tiene que alcanzar a las dos.
+    const bruta = entrada.placa ?? null;
+    let placa: string | null = null;
+    if (bruta !== null && bruta.trim() !== '') {
+      const normalizada = Placa.crear(bruta);
+      if (!normalizada.ok) return normalizada;
+      placa = normalizada.valor.valor;
+    }
     if (personaId === null && placa === null) {
       return fallo(
         errorDominio('DATO_INVALIDO', 'El veto necesita una persona o una placa', 'RN-06'),
@@ -64,6 +72,19 @@ export class VetarEnListaNegra {
     }
     if (entrada.motivo.trim().length === 0) {
       return fallo(errorDominio('DATO_INVALIDO', 'El veto exige un motivo', 'RN-07'));
+    }
+
+    // Un veto activo por persona y por placa: la base lo garantiza con índices
+    // únicos parciales (ADR-04); esto sólo da un motivo legible al repetido.
+    const activas = await this.repo.activasDe(copropiedad.valor);
+    const repetida = activas.some(
+      (a) =>
+        (placa !== null && a.placa === placa) || (personaId !== null && a.personaId === personaId),
+    );
+    if (repetida) {
+      return fallo(
+        errorDominio('CONFLICTO_DE_CONCURRENCIA', 'Ya hay un veto activo para eso', 'RN-06'),
+      );
     }
 
     const id = this.ids.nuevo();

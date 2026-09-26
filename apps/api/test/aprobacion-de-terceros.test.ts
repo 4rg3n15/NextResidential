@@ -68,4 +68,15 @@ describe('ADR-027 · la aprobación de la app pasa por la política', () => {
     if (!r.ok) expect(r.error.codigo).toBe('OPERACION_NO_PERMITIDA');
     expect(escrituras.creadas.size).toBe(0);
   });
+
+  it('H-15I-06 · una recurrente desde la app falla cerrada y no escribe (H-15I-05 abierto)', async () => {
+    const { caso, escrituras } = montar(false);
+    const r = await caso.ejecutar(ctx, COP_A, {
+      ...visita(20),
+      patron: { dias: [2], minutoInicio: 840, minutoFin: 1080, desplazamientoUtcMinutos: -300 },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.regla).toBe('RN-22');
+    expect(escrituras.creadas.size).toBe(0);
+  });
 });

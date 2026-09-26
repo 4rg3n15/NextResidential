@@ -15,6 +15,7 @@ import 'clients/equipos_api.dart';
 import 'clients/eventos_api.dart';
 import 'clients/guardia_api.dart';
 import 'clients/informes_api.dart';
+import 'clients/listas_negras_api.dart';
 import 'clients/residente_api.dart';
 import 'clients/padron_api.dart';
 import 'clients/porteria_api.dart';
@@ -51,6 +52,7 @@ class RestClient {
   EventosApi? _eventos;
   GuardiaApi? _guardia;
   InformesApi? _informes;
+  ListasNegrasApi? _listasNegras;
   ResidenteApi? _residente;
   PadronApi? _padron;
   PorteriaApi? _porteria;
@@ -82,6 +84,8 @@ class RestClient {
   GuardiaApi get guardia => _guardia ??= GuardiaApi(_dio, baseUrl: _baseUrl);
 
   InformesApi get informes => _informes ??= InformesApi(_dio, baseUrl: _baseUrl);
+
+  ListasNegrasApi get listasNegras => _listasNegras ??= ListasNegrasApi(_dio, baseUrl: _baseUrl);
 
   ResidenteApi get residente => _residente ??= ResidenteApi(_dio, baseUrl: _baseUrl);
 

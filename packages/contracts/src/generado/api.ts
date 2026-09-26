@@ -912,6 +912,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/listas-negras": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vetos activos de la copropiedad (HU-35) */
+        get: operations["ListasNegrasController_listar"];
+        put?: never;
+        /** Veta una placa o una persona por su documento, con motivo (RN-06, RN-07) */
+        post: operations["ListasNegrasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/listas-negras/{vetoId}/levantamiento": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Levanta un veto: sólo la administración, con autor y momento (RN-07) */
+        post: operations["ListasNegrasController_levantarVeto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/alta": {
         parameters: {
             query?: never;
@@ -2997,6 +3032,10 @@ export interface components {
             /** Format: uuid */
             id: string;
         };
+        IdVetoDto: {
+            /** Format: uuid */
+            id: string;
+        };
         IndicadoresDto: {
             padron: components["schemas"]["ConteosDelPadronDto"];
             visitantes: components["schemas"]["ConteosDeVisitantesDto"];
@@ -3797,6 +3836,27 @@ export interface components {
             admitido: boolean;
             conteo: number | null;
             motivo: string | null;
+        };
+        VetoDto: {
+            placa?: string | null;
+            /** @description Documento de la persona a vetar; se resuelve en ESTA copropiedad */
+            documento?: string | null;
+            motivo: string;
+        };
+        VetoLevantadoDto: {
+            levantado: boolean;
+        };
+        VetoListadoDto: {
+            /** Format: uuid */
+            id: string;
+            placa: string | null;
+            /** Format: uuid */
+            personaId: string | null;
+            persona: string | null;
+            documento: string | null;
+            motivo: string;
+            /** Format: date-time */
+            creadoEn: string;
         };
         VisitaCreadaDto: {
             /** @description false = una regla de negocio lo impidió */
@@ -5632,6 +5692,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InformeDto"];
+                };
+            };
+        };
+    };
+    ListasNegrasController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VetoListadoDto"][];
+                };
+            };
+        };
+    };
+    ListasNegrasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VetoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdVetoDto"];
+                };
+            };
+        };
+    };
+    ListasNegrasController_levantarVeto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                vetoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VetoLevantadoDto"];
                 };
             };
         };
