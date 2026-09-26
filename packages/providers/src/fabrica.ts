@@ -1,4 +1,4 @@
-import type { Reloj } from '@ncr/domain-core';
+import type { Bitacora, Reloj } from '@ncr/domain-core';
 import { MockProvider } from './mock/mock-provider';
 import type { PerfilDeSimulacion } from './mock/simulacion';
 import { HikvisionProvider } from './hikvision/hikvision-provider';
@@ -69,6 +69,11 @@ export interface ConfiguracionDeProveedor {
   readonly perfil?: PerfilDeSimulacion;
   /** `false` sólo en pruebas que no van contra una cámara. Nunca en producción. */
   readonly exigirVeredictoDeControl?: boolean;
+  /**
+   * H-SITIO-12/13/14 · la bitácora del proceso, para que el adaptador de
+   * hardware cuente lo que pasa con los equipos. El simulado no la usa.
+   */
+  readonly traza?: Bitacora;
 }
 
 export class ConfiguracionDeProveedorIncompleta extends Error {
@@ -155,6 +160,7 @@ registrarAdaptador({
       ...(configuracion.exigirVeredictoDeControl === undefined
         ? {}
         : { exigirVeredictoDeControl: configuracion.exigirVeredictoDeControl }),
+      ...(configuracion.traza === undefined ? {} : { traza: configuracion.traza }),
     }),
 });
 

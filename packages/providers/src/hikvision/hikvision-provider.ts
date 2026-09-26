@@ -1,5 +1,6 @@
 import type {
   AccessPointProvider,
+  Bitacora,
   EstadoSesionIntercom,
   FaceTemplateProvider,
   IntercomProvider,
@@ -86,6 +87,12 @@ export interface OpcionesDeHikvision {
    * producción: es la guarda del principio rector.
    */
   readonly exigirVeredictoDeControl?: boolean;
+  /**
+   * H-SITIO-12/13/14 · la bitácora del proceso. Por aquí salen la
+   * renegociación del Digest, el intercambio de cada orden de puerta y todo lo
+   * que pasa en una escucha. Sin ella, el adaptador calla.
+   */
+  readonly traza?: Bitacora;
 }
 
 const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
@@ -328,8 +335,15 @@ export class HikvisionProvider
       for await (const evento of escucha.escuchar(cancelar)) {
         await this.fuente.publicar({ evento, foto: null, recorte: null, transporte });
       }
-    } catch {
-      // La escucha reintenta sola; si salió del bucle es porque se canceló.
+    } catch (error) {
+      // La escucha reintenta sola; si salió del bucle es porque se canceló o
+      // porque publicar falló. Lo segundo se DICE (H-SITIO-14).
+      if (!cancelar.aborted) {
+        this.opciones.traza?.registrar('error', 'escucha: el bombeo hacia la fuente se detuvo', {
+          dispositivoId: escucha.dispositivoId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 
@@ -431,6 +445,8 @@ export class HikvisionProvider
     usuario: string;
     clave: string;
     peticion?: typeof fetch;
+    traza?: Bitacora;
+    dispositivoId: string;
   } {
     return {
       host: equipo.host,
@@ -438,7 +454,9 @@ export class HikvisionProvider
       protocolo: equipo.protocolo,
       usuario: equipo.usuario,
       clave: equipo.clave,
+      dispositivoId: equipo.dispositivoId,
       ...(this.opciones.peticion === undefined ? {} : { peticion: this.opciones.peticion }),
+      ...(this.opciones.traza === undefined ? {} : { traza: this.opciones.traza }),
     };
   }
 

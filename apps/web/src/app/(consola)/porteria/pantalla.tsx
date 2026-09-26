@@ -11,6 +11,8 @@ import { useColaDeAtencion, useOrdenesManuales } from '@/lib/api/consultas';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
+import { resultadoDeOrden } from '@/componentes/resultado-de-orden';
+import type { OrdenConResultado } from '@/componentes/resultado-de-orden';
 import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
 import { DialogoDeMotivo } from '@/componentes/dialogo-motivo';
 import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
@@ -73,6 +75,8 @@ export const PantallaDePorteria = ({
     eventoId?: string;
   } | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
+  // H-SITIO-13 · lo que el equipo contestó a la última orden, dicho sin adorno.
+  const [ultimaOrden, setUltimaOrden] = useState<OrdenConResultado | null>(null);
   const [llamada, setLlamada] = useState<LlamadaEntrante | null>(null);
 
   const ordenar = useMutation({
@@ -93,9 +97,10 @@ export const PantallaDePorteria = ({
           },
         }),
       ),
-    onSuccess: () => {
+    onSuccess: (orden) => {
       setPidiendo(null);
       setError(undefined);
+      setUltimaOrden(orden);
       void clienteDeConsulta.invalidateQueries({ queryKey: ['guardia', copropiedadId] });
     },
     onError: (e) => {
@@ -297,6 +302,11 @@ export const PantallaDePorteria = ({
               descripcion="Lo accionado a mano en esta portería (HU-23)."
             />
             <CuerpoDeTarjeta>
+              {ultimaOrden !== null ? (
+                <p role="status" className="mb-2 text-secundario text-texto-apagado">
+                  Última orden: {resultadoDeOrden(ultimaOrden).texto}
+                </p>
+              ) : null}
               {ordenes.data === undefined || ordenes.data.ordenes.length === 0 ? (
                 <p className="text-secundario text-texto-apagado">
                   Todavía no se ha accionado nada a mano.
@@ -306,14 +316,18 @@ export const PantallaDePorteria = ({
                   {ordenes.data.ordenes.slice(0, 6).map((o) => (
                     <li key={o.id} className="border-b border-borde pb-2 last:border-b-0 last:pb-0">
                       <div className="flex items-center gap-2">
-                        <Distintivo tono={o.accion === 'abrir' ? 'exito' : 'peligro'}>
-                          {o.accion === 'abrir' ? 'Abierta' : 'Negada'}
+                        {/* H-SITIO-13 · lo que CONTESTÓ el equipo; nunca «Abierta». */}
+                        <Distintivo tono={resultadoDeOrden(o).tono}>
+                          {resultadoDeOrden(o).texto}
                         </Distintivo>
                         <span className="text-distintivo text-texto-apagado">
                           {CUANDO(o.momento)}
                         </span>
                       </div>
                       <p className="mt-1 text-secundario text-texto-apagado">{o.motivo}</p>
+                      {o.accion === 'abrir' && o.resultado !== 'aceptada' && o.detalle !== null ? (
+                        <p className="mt-1 text-secundario text-peligro-texto">{o.detalle}</p>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

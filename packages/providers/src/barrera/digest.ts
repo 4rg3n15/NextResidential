@@ -26,6 +26,12 @@ export interface DesafioDigest {
   readonly qop: string | null;
   readonly opaque: string | null;
   readonly algorithm: string;
+  /**
+   * H-SITIO-12 · `stale="TRUE"`: el equipo aceptó el resumen pero el nonce
+   * ya había vencido. NO es una clave errónea, y confundirlas fue lo que en
+   * sitio convirtió la segunda orden de cada equipo en «usuario o clave».
+   */
+  readonly stale: boolean;
 }
 
 const md5 = (texto: string): string => createHash('md5').update(texto, 'utf8').digest('hex');
@@ -38,15 +44,24 @@ const md5 = (texto: string): string => createHash('md5').update(texto, 'utf8').d
  */
 export const interpretarDesafio = (cabecera: string | null): DesafioDigest | null => {
   if (cabecera === null) return null;
-  const sinEsquema = /^\s*digest\s+(.*)$/is.exec(cabecera);
-  if (sinEsquema === null) return null;
+  /**
+   * H-SITIO-12 · `fetch` UNE las cabeceras repetidas con «, »: un equipo que
+   * ofrece `Basic` y `Digest` llega como `Basic realm="x", Digest realm="y"…`.
+   * Se busca el esquema Digest donde esté y se corta en el siguiente esquema,
+   * para que un `realm` ajeno no pise el del desafío.
+   */
+  const inicio = /(?:^|,)\s*digest\s+/i.exec(cabecera);
+  if (inicio === null) return null;
+  const resto = cabecera.slice(inicio.index + inicio[0].length);
+  const otroEsquema = /,\s*(?:basic|bearer|negotiate|ntlm)\b/i.exec(resto);
+  const propios = otroEsquema === null ? resto : resto.slice(0, otroEsquema.index);
 
   const parametros = new Map<string, string>();
   const expresion = /([a-z0-9_-]+)\s*=\s*(?:"([^"]*)"|([^,\s]+))/gi;
-  let encontrado = expresion.exec(sinEsquema[1]!);
+  let encontrado = expresion.exec(propios);
   while (encontrado !== null) {
     parametros.set(encontrado[1]!.toLowerCase(), encontrado[2] ?? encontrado[3] ?? '');
-    encontrado = expresion.exec(sinEsquema[1]!);
+    encontrado = expresion.exec(propios);
   }
 
   const realm = parametros.get('realm');
@@ -70,6 +85,7 @@ export const interpretarDesafio = (cabecera: string | null): DesafioDigest | nul
     qop,
     opaque: parametros.get('opaque') ?? null,
     algorithm: (parametros.get('algorithm') ?? 'MD5').toUpperCase(),
+    stale: (parametros.get('stale') ?? '').toLowerCase() === 'true',
   };
 };
 
@@ -118,12 +134,34 @@ export const construirAutorizacion = (
 export const cnonceAleatorio = (): string => randomBytes(8).toString('hex');
 
 /**
+ * Qué pasó al recibir un desafío nuevo. Lo necesita quien decide si reintentar
+ * y cómo contarlo en la bitácora.
+ */
+export interface Renegociacion {
+  /** `true` si el equipo marcó el nonce anterior como vencido (`stale`). */
+  readonly vencido: boolean;
+  /** `true` si el nonce cambió; `false` si el equipo repitió el mismo. */
+  readonly nonceNuevo: boolean;
+  /** `true` si todavía no había ningún desafío: el primer contacto. */
+  readonly primerContacto: boolean;
+}
+
+/**
  * Cliente con estado: recuerda el desafío entre órdenes y lleva el contador.
  *
  * **No reintenta más de una vez.** Ante un `401` renegocia y repite; si el
  * segundo también es `401`, se rinde. Un bucle de reintentos contra un equipo
  * que bloquea cuentas por intentos fallidos es la forma más rápida de quedarse
  * fuera del aparato, y ya está anotado como riesgo en la guía de validación.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * H-SITIO-12 · EL CONTADOR NO SE REINICIA SI EL NONCE ES EL MISMO
+ *
+ * `nc` es por nonce y el equipo rechaza uno repetido. Antes, cualquier `401`
+ * ponía el contador a cero aunque el equipo devolviera el MISMO nonce: el
+ * reintento viajaba con `nc=00000001` ya usado y el equipo lo rechazaba otra
+ * vez. Dos `401` seguidos se leían como credencial, y la segunda orden de cada
+ * equipo acababa en «usuario o clave» (sitio, 26/09/2026).
  */
 export class SesionDigest {
   private desafio: DesafioDigest | null = null;
@@ -148,17 +186,72 @@ export class SesionDigest {
     );
   }
 
-  /** Guarda el desafío recibido en un `401` y reinicia el contador. */
-  aceptarDesafio(cabecera: string | null): boolean {
+  /**
+   * Guarda el desafío recibido en un `401`. Reinicia el contador SÓLO si el
+   * nonce cambió. `null` si la cabecera no trae un desafío Digest legible.
+   */
+  renegociar(cabecera: string | null): Renegociacion | null {
     const nuevo = interpretarDesafio(cabecera);
-    if (nuevo === null) return false;
+    if (nuevo === null) return null;
+    const primerContacto = this.desafio === null;
+    const nonceNuevo = this.desafio?.nonce !== nuevo.nonce;
     this.desafio = nuevo;
-    this.contador = 0;
-    return true;
+    if (nonceNuevo) this.contador = 0;
+    return { vencido: nuevo.stale, nonceNuevo, primerContacto };
+  }
+
+  /** Compatibilidad: `true` si la cabecera traía un desafío legible. */
+  aceptarDesafio(cabecera: string | null): boolean {
+    return this.renegociar(cabecera) !== null;
+  }
+
+  /** ¿Se está usando ya un desafío? Un `401` con él puede ser un nonce vencido. */
+  get tieneDesafio(): boolean {
+    return this.desafio !== null;
   }
 
   /** Para las pruebas y el diagnóstico: cuántas órdenes lleva este desafío. */
   get ordenesConEsteDesafio(): number {
     return this.contador;
   }
+
+  /** Para las pruebas: las credenciales con las que se creó (nunca se registra). */
+  mismasCredenciales(credenciales: CredencialesDigest): boolean {
+    return (
+      credenciales.usuario === this.credenciales.usuario &&
+      credenciales.clave === this.credenciales.clave
+    );
+  }
 }
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * H-SITIO-12 · UNA SESIÓN DIGEST POR EQUIPO, COMPARTIDA
+ *
+ * El proveedor creaba un cliente nuevo para cada sondeo, cada lectura de
+ * capacidades y cada escucha; cada uno negociaba su propio nonce con el MISMO
+ * equipo. Un equipo que emite un nonce nuevo invalida el anterior, así que el
+ * cliente de las órdenes se quedaba con uno muerto sin saberlo. Compartida,
+ * quien renegocia lo hace por todos, y el contador `nc` es uno solo.
+ *
+ * Se indexa además por la función de transporte: cada prueba inyecta su
+ * propio `fetch` y así no hereda el desafío de la anterior.
+ */
+const sesionesPorTransporte = new WeakMap<object, Map<string, SesionDigest>>();
+
+export const sesionDigestCompartida = (
+  transporte: object,
+  destino: string,
+  credenciales: CredencialesDigest,
+  generarCnonce: () => string = cnonceAleatorio,
+): SesionDigest => {
+  const porDestino = sesionesPorTransporte.get(transporte) ?? new Map<string, SesionDigest>();
+  sesionesPorTransporte.set(transporte, porDestino);
+  const clave = `${destino}|${credenciales.usuario}`;
+  const existente = porDestino.get(clave);
+  // Si la clave cambió (edición del equipo), la sesión vieja no sirve.
+  if (existente !== undefined && existente.mismasCredenciales(credenciales)) return existente;
+  const nueva = new SesionDigest(credenciales, generarCnonce);
+  porDestino.set(clave, nueva);
+  return nueva;
+};

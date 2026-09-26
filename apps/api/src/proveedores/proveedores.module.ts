@@ -143,6 +143,8 @@ export class ProveedoresModule {
               clase: opciones.clase,
               reloj,
               fuente,
+              // H-SITIO-12/13/14 · lo que pasa con los equipos, a la bitácora.
+              traza: bitacora,
               ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
             });

@@ -100,6 +100,24 @@ export class CredencialRechazada extends ErrorDeEquipo {
   }
 }
 
+/**
+ * H-SITIO-12 · el equipo aceptó el resumen Digest pero venció el nonce dos veces
+ * seguidas (`stale=true`). **No es la clave**: reintentar la orden es seguro,
+ * porque el resumen era correcto y el equipo no lo cuenta como intento fallido.
+ * En sitio, confundirlo con `CredencialRechazada` hizo que la segunda orden de
+ * cada equipo se anunciara como «usuario o clave».
+ */
+export class DesafioVencido extends ErrorDeEquipo {
+  readonly reintentable = true;
+  constructor(dispositivoId: string) {
+    super(
+      dispositivoId,
+      `El equipo ${dispositivoId} venció el desafío de acceso dos veces seguidas: no es la clave. ` +
+        'Reintente la orden',
+    );
+  }
+}
+
 /** La biblioteca de rostros está llena: una plantilla más no cabe. */
 export class BibliotecaLlena extends ErrorDeEquipo {
   constructor(

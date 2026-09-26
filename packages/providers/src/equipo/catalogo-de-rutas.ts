@@ -33,6 +33,16 @@
 import type { Procedencia, RutaDeEquipo } from './tipos-de-ruta';
 import { RUTAS_DE_LA_GUIA } from './catalogo-de-la-guia';
 
+/**
+ * H-SITIO-13 · el cuerpo de «Remote Door Control» tal como lo da la guía de
+ * control de acceso: declaración, espacio de nombres y `version="2.0"`, que la
+ * guía marca como atributo requerido. Se enviaba sin ninguno de los tres.
+ */
+export const CUERPO_DE_APERTURA_REMOTA =
+  '<?xml version="1.0" encoding="UTF-8"?>' +
+  '<RemoteControlDoor xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0">' +
+  '<cmd>open</cmd></RemoteControlDoor>';
+
 export type { Procedencia, RutaDeEquipo } from './tipos-de-ruta';
 
 /**
@@ -283,7 +293,7 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     acciona: true,
     cuerpo: {
       tipo: 'application/xml',
-      contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
+      contenido: CUERPO_DE_APERTURA_REMOTA,
     },
   },
 
@@ -567,7 +577,7 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     acciona: true,
     cuerpo: {
       tipo: 'application/xml',
-      contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
+      contenido: CUERPO_DE_APERTURA_REMOTA,
     },
   },
   {

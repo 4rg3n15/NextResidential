@@ -7,6 +7,7 @@ import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { comoErrorNeutral } from '../equipo/errores-del-fabricante';
+import { AperturaNoSoportada, abrirPuertaRemota } from '../equipo/puerta-remota';
 import { BibliotecaLlena } from '../nucleo/errores';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
@@ -345,16 +346,11 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       this.opciones.numeroDePuerta ?? undefined,
     );
     try {
-      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
-        tipo: 'application/xml',
-        contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
-      });
-      if (NO_SOPORTADO.test(respuesta.cuerpo)) throw new RutaNoSoportada(ruta.proposito, ruta.ruta);
-      if (!respuesta.ok) throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
-      return { aceptado: true, latenciaMs: respuesta.latenciaMs };
+      // H-SITIO-13 · cuerpo de la guía, código ISAPI e intercambio completo.
+      return await abrirPuertaRemota(this.cliente, ruta, dispositivoId);
     } catch (error) {
-      if (error instanceof EquipoInalcanzable) {
-        return { aceptado: false, latenciaMs: error.latenciaMs };
+      if (error instanceof AperturaNoSoportada) {
+        throw new RutaNoSoportada(ruta.proposito, ruta.ruta);
       }
       throw error;
     }

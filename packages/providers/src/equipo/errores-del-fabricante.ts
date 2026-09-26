@@ -1,6 +1,7 @@
 import {
   BibliotecaLlena,
   CredencialRechazada,
+  DesafioVencido,
   EquipoAveriado,
   EquipoOcupado,
   PeticionRechazada,
@@ -267,10 +268,27 @@ export const comoErrorNeutral = (
   dispositivoId: string,
   cuerpo: string,
   estadoHttp: number,
+  extra?: { readonly desafioVencido?: boolean | undefined },
 ): ErrorDeEquipo => {
   const error = interpretarError(cuerpo);
   const detalle = `${error.detalle} (HTTP ${String(estadoHttp)}${error.codigo === null ? '' : `, ${error.codigo}`})`;
-  if (estadoHttp === 401 || estadoHttp === 403 || error.reaccion === 'credencial_rechazada') {
+  // H-SITIO-12 · un 401 con el nonce vencido otra vez no es la clave.
+  if (estadoHttp === 401 && extra?.desafioVencido === true) {
+    return new DesafioVencido(dispositivoId);
+  }
+  /**
+   * H-SITIO-12 · el `403` YA NO se lee siempre como credencial. La guía de la
+   * terminal lo usa para «Invalid Operation / notSupport» con su código ISAPI
+   * en el cuerpo (capítulo «Error Processing»): tratarlo como «usuario o
+   * clave» mandaba a revisar una contraseña que estaba bien. Un 403 es
+   * credencial sólo si el cuerpo lo dice.
+   */
+  const sinCodigoIsapi = error.codigo === null && !/statusCode|subStatusCode/i.test(cuerpo);
+  if (
+    estadoHttp === 401 ||
+    error.reaccion === 'credencial_rechazada' ||
+    (estadoHttp === 403 && sinCodigoIsapi)
+  ) {
     return new CredencialRechazada(dispositivoId);
   }
   if (/faceLibraryFull|libraryFull|FDLibFull/i.test(cuerpo))
