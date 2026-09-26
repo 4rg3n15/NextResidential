@@ -113,7 +113,7 @@ export class AutorizacionesDelResidentePg
              (copropiedad_id, vivienda_id, visitante_id, autorizado_por, tipo, placa,
               vigencia, permite_acceso_vehicular, observaciones, clave_idempotencia,
               creado_por, actualizado_por)
-           VALUES ($1, $2, $3, $4, $5, app.normalizar_placa($6),
+           VALUES ($1, $2, $3, $4, $5, NULLIF(app.normalizar_placa($6), ''),
                    tstzrange($7::timestamptz, $8::timestamptz, '[)'), $9, $10, $11, $12, $12)
            RETURNING id`,
           [

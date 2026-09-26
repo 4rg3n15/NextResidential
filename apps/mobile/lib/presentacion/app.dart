@@ -349,7 +349,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
 
   /// CU-02 · la foto cuelga de la AUTORIZACIÓN, no del residente: es de ahí de
   /// donde el servidor deriva quién es el titular del dato (RN-10).
-  void _capturarRostro(String autorizacionId, String nombreDelVisitante) {
+  void _capturarRostro(String autorizacionId, String nombreDelVisitante, DateTime hasta) {
     _abrir(
       PantallaDeRostroDelVisitante(
         nombreDelVisitante: nombreDelVisitante,
@@ -360,9 +360,10 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
           medidas: foto.medidas,
           vector: foto.vector,
           versionPolitica: widget.dependencias.versionPoliticaBiometrica,
-          // RN-11 · la plantilla no vive más que la visita. Sin este tope, un
-          // dato biométrico se quedaría en la terminal indefinidamente.
-          suprimirEn: widget.dependencias.reloj.ahora().add(const Duration(days: 1)),
+          // RN-11 · la plantilla no vive más que la VISITA: se suprime cuando
+          // termina. Antes era «captura + 24 h», que para una visita de mañana
+          // la borraba antes de que llegara el visitante (H-15I-10).
+          suprimirEn: hasta,
         ),
         // Punto 5 (15-I) · el enlace se ENTREGA al visitante y su respuesta se
         // consulta; el residente no responde por él (RN-10).

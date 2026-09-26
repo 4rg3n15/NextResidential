@@ -15,8 +15,8 @@ import { GuardiaDeAlarmServer, EQUIPOS_DE_ALARM_SERVER } from './presentacion/gu
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 import type { EquipoDeclarado } from '../comun/equipos-de-alarm-server';
 import { INGESTOR_DE_EQUIPOS, IngestorDeEquipos } from './aplicacion/ingestor-de-publicaciones';
-import { CANAL_TIEMPO_REAL } from '../eventos';
-import type { CanalTiempoReal } from '../eventos';
+import { CANAL_TIEMPO_REAL, REGISTRO_DE_EVIDENCIA } from '../eventos';
+import type { CanalTiempoReal, RegistroDeEvidencia } from '../eventos';
 import { LOCALIZADOR_DE_VIVIENDA, PadronModule } from '../padron';
 import type { LocalizadorDeVivienda } from '../padron';
 import { EQUIPOS_QUE_EMITEN, EquiposModule } from '../equipos';
@@ -130,6 +130,7 @@ export class AlarmServerModule {
             RELOJ,
             RESOLUTOR_DE_VIVIENDA_DE_LLAMADA,
             AVISADOR_DE_LLAMADAS,
+            REGISTRO_DE_EVIDENCIA,
           ],
           useFactory: (
             referencia: ModuleRef,
@@ -144,6 +145,7 @@ export class AlarmServerModule {
             reloj: Reloj,
             viviendas: ResolutorDeViviendaDeLlamada,
             avisador: AvisadorDeLlamadas,
+            registroDeEvidencia: RegistroDeEvidencia,
           ) => {
             const ingestor = new IngestorDeEquipos(
               registrar,
@@ -165,6 +167,8 @@ export class AlarmServerModule {
               // A4 · la llamada del videoportero: vivienda por el padrón, aviso por SSE.
               viviendas,
               avisador,
+              // H-15I-07 · la foto queda en `evidencias` y el evento la referencia.
+              registroDeEvidencia,
             );
             fuente.fijarIngestor(ingestor);
             return ingestor;

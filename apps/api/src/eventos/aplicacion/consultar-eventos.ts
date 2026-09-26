@@ -6,6 +6,8 @@ import type {
   Resultado,
 } from '@ncr/domain-core';
 import type { EventoRegistrado, PaginaDeEventos, RepositorioEventos } from './puertos';
+import { registroSinBase } from './registro-de-evidencia';
+import type { RegistroDeEvidencia } from './registro-de-evidencia';
 
 /**
  * Caso de uso `ConsultarEventos` — HU-32.
@@ -96,11 +98,14 @@ export class ObtenerEvidencia {
   constructor(
     private readonly repositorio: RepositorioEventos,
     private readonly almacen: AlmacenEvidencia,
+    /** H-15I-07 · con base, el evento lleva el id de `evidencias`, no la ruta. */
+    private readonly registro: RegistroDeEvidencia = registroSinBase,
   ) {}
 
   async ejecutar(copropiedadId: string, eventoId: string): Promise<string | null> {
     const evento = await this.repositorio.porId(copropiedadId, eventoId);
     if (evento === null || evento.evidenciaId === null) return null;
-    return this.almacen.urlFirmada(evento.evidenciaId, SEGUNDOS_URL_EVIDENCIA);
+    const ruta = await this.registro.rutaDe(copropiedadId, evento.evidenciaId);
+    return ruta === null ? null : this.almacen.urlFirmada(ruta, SEGUNDOS_URL_EVIDENCIA);
   }
 }
