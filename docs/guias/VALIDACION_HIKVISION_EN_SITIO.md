@@ -77,7 +77,7 @@ analogías.
 
 1. **Red.** Portátil, iPhone y equipos en la misma LAN. Anote la IP del portátil: es la de `API_URL_PUBLICA`, `API_URL` y el Alarm Server.
 2. **Arranque.** Primero go2rtc; después la API (`pnpm --filter @ncr/api start:dev`). Lea la bitácora de arranque: tiene que decir persistencia `postgres`, proveedor `hikvision` y el puente go2rtc.
-3. **Consola en el PORTÁTIL** (`pnpm --filter @ncr/web start`), no en Netlify: el SSE y el audio pasan por su servidor (C-37, P-20).
+3. **Consola en el PORTÁTIL** (`pnpm --filter @ncr/web build && pnpm --filter @ncr/web start`, en el puerto 3100), no en Netlify: el SSE y el audio pasan por su servidor (C-37, P-20).
 4. **Acceso** a la consola como superadministrador: código o NIT de la copropiedad, usuario, contraseña y MFA.
 5. **Registrar los tres equipos**: Dispositivos → + Agregar equipo (§9), con el usuario de servicio de cada uno. «Probar conexión» descubre modelo, firmware y capacidades (ADR-019). **Las fichas tienen que quedar en verde**:
 
