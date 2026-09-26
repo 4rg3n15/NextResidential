@@ -10978,10 +10978,20 @@
             "items": {
               "type": "string"
             }
+          },
+          "ejecutaContraElEquipo": {
+            "type": "boolean",
+            "description": "H-SITIO-02 · `false` si configurar, sincronizar y reiniciar sólo registran la orden sin llegar al equipo. La consola lo escribe en el botón."
+          },
+          "detalleDeEjecucion": {
+            "type": "string",
+            "description": "Qué hacen de verdad esas tres órdenes."
           }
         },
         "required": [
-          "dispositivos"
+          "dispositivos",
+          "ejecutaContraElEquipo",
+          "detalleDeEjecucion"
         ]
       },
       "PerfilDelResidenteDto": {

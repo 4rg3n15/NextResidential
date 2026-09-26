@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { Pool } from 'pg';
+import type { Pool, QueryResultRow } from 'pg';
+import { claimsDeServicio } from '../../comun/claims-de-servicio';
 import { UMBRAL_DE_LATIDO_POR_DEFECTO } from '@ncr/domain-core';
 import type { VentanaDelDia } from '@ncr/domain-core';
 import type {
@@ -34,13 +35,47 @@ import type {
 export class RepositorioTableroPg implements RepositorioTablero {
   constructor(private readonly pool: Pool) {}
 
+  /**
+   * H-SITIO-02 · CADA LECTURA CON LOS CLAIMS DE SERVICIO DE SU COPROPIEDAD.
+   *
+   * Este adaptador existía desde la ETAPA 06 y nunca se cableó: consultaba el
+   * `Pool` a secas. Con la RLS forzada (§2.7.6) eso no es un error, es peor —
+   * cero filas— y la pantalla de Dispositivos habría salido vacía igual que con
+   * el doble en memoria. Los claims se fijan con `set_config(…, true)` DENTRO
+   * de una transacción: mueren con ella y no viajan a la siguiente petición que
+   * reciba esta conexión del pool. Quién puede pedir qué copropiedad ya lo
+   * decidió la aplicación (`exigirAlcance`); la base es la segunda barrera.
+   */
+  private async consultar<F extends QueryResultRow>(
+    copropiedadId: string,
+    sql: string,
+    parametros: readonly unknown[],
+  ): Promise<{ rows: F[] }> {
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN READ ONLY');
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
+        JSON.stringify(claimsDeServicio(copropiedadId)),
+      ]);
+      const resultado = await cliente.query<F>(sql, [...parametros]);
+      await cliente.query('COMMIT');
+      return { rows: resultado.rows };
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
   async configuracion(copropiedadId: string): Promise<ConfiguracionDeTablero | null> {
-    const { rows } = await this.pool.query<{
+    const { rows } = await this.consultar<{
       zona_horaria: string;
       periodo_latido_segundos: string;
       latidos_tolerados: number;
       umbral_latido_segundos: string;
     }>(
+      copropiedadId,
       `SELECT zona_horaria,
               extract(epoch FROM periodo_latido)              AS periodo_latido_segundos,
               latidos_tolerados,
@@ -63,12 +98,13 @@ export class RepositorioTableroPg implements RepositorioTablero {
   }
 
   async conteosDelPadron(copropiedadId: string, ventana: VentanaDelDia): Promise<ConteosDelPadron> {
-    const { rows } = await this.pool.query<{
+    const { rows } = await this.consultar<{
       residentes_activos: string;
       residentes_alta: string;
       vehiculos_activos: string;
       vehiculos_alta: string;
     }>(
+      copropiedadId,
       `SELECT
          (SELECT count(*) FROM public.residentes
            WHERE copropiedad_id = $1 AND estado = 'activo')                     AS residentes_activos,
@@ -76,9 +112,9 @@ export class RepositorioTableroPg implements RepositorioTablero {
            WHERE copropiedad_id = $1 AND estado = 'activo'
              AND creado_en >= $2 AND creado_en < $3)                            AS residentes_alta,
          (SELECT count(*) FROM public.vehiculos
-           WHERE copropiedad_id = $1 AND activo)                                AS vehiculos_activos,
+           WHERE copropiedad_id = $1 AND estado = 'activo')                                AS vehiculos_activos,
          (SELECT count(*) FROM public.vehiculos
-           WHERE copropiedad_id = $1 AND activo
+           WHERE copropiedad_id = $1 AND estado = 'activo'
              AND creado_en >= $2 AND creado_en < $3)                            AS vehiculos_alta`,
       [copropiedadId, ventana.desde, ventana.hasta],
     );
@@ -107,7 +143,8 @@ export class RepositorioTableroPg implements RepositorioTablero {
     copropiedadId: string,
     ventana: VentanaDelDia,
   ): Promise<ConteosDeVisitantes> {
-    const { rows } = await this.pool.query<{ del_dia: string; dentro: string }>(
+    const { rows } = await this.consultar<{ del_dia: string; dentro: string }>(
+      copropiedadId,
       `SELECT
          (SELECT count(*) FROM public.autorizaciones
            WHERE copropiedad_id = $1
@@ -130,7 +167,8 @@ export class RepositorioTableroPg implements RepositorioTablero {
   }
 
   async conteosDeAlertas(copropiedadId: string): Promise<ConteosDeAlertas> {
-    const { rows } = await this.pool.query<{ pendientes: string; severidad: string | null }>(
+    const { rows } = await this.consultar<{ pendientes: string; severidad: string | null }>(
+      copropiedadId,
       // El orden por severidad se declara aquí y no se deduce del enumerado:
       // `max(severidad)` sobre un enum ordena por el orden de declaración, que
       // es un detalle del `CREATE TYPE` y no una decisión de producto.
@@ -153,11 +191,12 @@ export class RepositorioTableroPg implements RepositorioTablero {
     copropiedadId: string,
     ventana: VentanaDelDia,
   ): Promise<readonly FranjaDeAccesos[]> {
-    const { rows } = await this.pool.query<{
+    const { rows } = await this.consultar<{
       hora: string;
       permitidos: string;
       negados: string;
     }>(
+      copropiedadId,
       // La hora se extrae del instante YA convertido a la zona de la
       // copropiedad. Sin el `AT TIME ZONE`, el histograma sería el del huso del
       // servidor y las barras aparecerían corridas cinco horas en Colombia.
@@ -179,7 +218,7 @@ export class RepositorioTableroPg implements RepositorioTablero {
   }
 
   async dispositivos(copropiedadId: string): Promise<readonly DispositivoDelTablero[]> {
-    const { rows } = await this.pool.query<{
+    const { rows } = await this.consultar<{
       id: string;
       nombre: string;
       tipo: string;
@@ -191,6 +230,7 @@ export class RepositorioTableroPg implements RepositorioTablero {
       ultimo_resultado: string | null;
       sincronizaciones_fallidas: string;
     }>(
+      copropiedadId,
       /**
        * Columnas enumeradas una a una, jamás `*`: es lo que mantiene
        * `credencial_ref` fuera del proceso (RN-21).

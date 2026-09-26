@@ -215,6 +215,13 @@ export const PantallaDeDispositivos = ({
   }
 
   const sincronizando = new Set(pendientes.data?.dispositivos ?? []);
+  /**
+   * H-SITIO-02 · si la orden NO llega al equipo, el botón lo dice. En sitio,
+   * con el proveedor real, «Reiniciar» sólo anotaba la intención y se leía
+   * como si reiniciara. Mientras la API no conteste, se asume lo prudente.
+   */
+  const soloRegistra = pendientes.data?.ejecutaContraElEquipo !== true;
+  const detalleDeEjecucion = pendientes.data?.detalleDeEjecucion;
   // El tablero dice si está en línea; el inventario dice qué es y qué declara.
   const porId = new Map((inventario.data?.equipos ?? []).map((e) => [e.id, e] as const));
 
@@ -354,12 +361,14 @@ export const PantallaDeDispositivos = ({
               cargando={enCurso === `${d.id}:${op}`}
               disabled={enCurso !== null}
               onClick={() => void ordenar(d.id, op)}
+              title={detalleDeEjecucion}
             >
               {op === 'configuracion'
                 ? 'Configurar'
                 : op === 'sincronizacion'
                   ? 'Sincronizar'
                   : 'Reiniciar'}
+              {soloRegistra ? ' · sólo registra' : ''}
             </Boton>
           ))}
         </div>
@@ -406,8 +415,9 @@ export const PantallaDeDispositivos = ({
               tamano="sm"
               disabled={enCurso !== null || equipos.length === 0}
               onClick={() => void sincronizarTodo()}
+              title={detalleDeEjecucion}
             >
-              Sincronizar todo
+              Sincronizar todo{soloRegistra ? ' · sólo registra' : ''}
             </Boton>
             <Boton tamano="sm" onClick={() => setDandoDeAlta(true)}>
               + Agregar equipo
@@ -433,6 +443,11 @@ export const PantallaDeDispositivos = ({
         alCerrar={() => setFichaDe(null)}
       />
 
+      {soloRegistra && detalleDeEjecucion !== undefined ? (
+        <p className="mb-3 rounded-md border border-aviso bg-aviso-suave px-3 py-2 text-secundario text-aviso-texto">
+          {detalleDeEjecucion}
+        </p>
+      ) : null}
       {aviso !== null ? (
         <p
           role="status"

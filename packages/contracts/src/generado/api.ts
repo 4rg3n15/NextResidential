@@ -3340,6 +3340,10 @@ export interface components {
         PendientesDto: {
             /** @description Identificadores de equipos con una orden sin ejecutar: se muestran «sincronizando». */
             dispositivos: string[];
+            /** @description H-SITIO-02 · `false` si configurar, sincronizar y reiniciar sólo registran la orden sin llegar al equipo. La consola lo escribe en el botón. */
+            ejecutaContraElEquipo: boolean;
+            /** @description Qué hacen de verdad esas tres órdenes. */
+            detalleDeEjecucion: string;
         };
         PerfilDelResidenteDto: {
             nombres: string | null;
