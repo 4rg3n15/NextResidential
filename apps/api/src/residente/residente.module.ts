@@ -32,6 +32,13 @@ import {
 } from './aplicacion/casos-de-uso';
 import { BiometriaModule, CapturarRostro, EmitirEnlaceDeConsentimiento } from '../biometria';
 import { MiController } from './presentacion/mi.controller';
+import { MiAltaController } from './presentacion/mi-alta.controller';
+import { MiHogarController } from './presentacion/mi-hogar.controller';
+import {
+  OcupantesDeViviendaController,
+  SupervisionDeResidentesController,
+} from './presentacion/supervision-de-residentes.controller';
+import { PROVEEDORES_DEL_HOGAR } from './hogar.providers';
 
 /**
  * Módulo de la superficie del residente.
@@ -54,8 +61,17 @@ export class ResidenteModule {
        * terminales — y no podría, porque no los inyecta.
        */
       imports: [BiometriaModule.registrar()],
-      controllers: [MiController],
+      controllers: [
+        MiController,
+        // ETAPA 15-I · primer ingreso, ocupantes, perfil, vehículos propios y
+        // su supervisión por el superadministrador.
+        MiAltaController,
+        MiHogarController,
+        SupervisionDeResidentesController,
+        OcupantesDeViviendaController,
+      ],
       providers: [
+        ...PROVEEDORES_DEL_HOGAR,
         {
           provide: DIRECTORIO_DEL_RESIDENTE,
           inject: [Pool],

@@ -107,7 +107,7 @@ export class AutorizacionesDelResidentePg
 
     try {
       const id = await this.enTransaccion(async (c) => {
-        const visitanteId = await this.visitante(c, ambito, nueva);
+        const visitanteId = await this.visitante(c, ambito, nueva, creadaPor.usuarioId);
         const { rows } = await c.query<{ id: string }>(
           `INSERT INTO public.autorizaciones
              (copropiedad_id, vivienda_id, visitante_id, autorizado_por, tipo, placa,
@@ -197,26 +197,40 @@ export class AutorizacionesDelResidentePg
     c: PoolClient,
     ambito: AmbitoDelResidente,
     nueva: NuevaAutorizacion,
+    usuarioId: string,
   ): Promise<string> {
-    const personaId = await this.persona(c, ambito, nueva.visitante, nueva.documento);
+    const personaId = await this.persona(c, ambito, nueva.visitante, nueva.documento, usuarioId);
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO public.visitantes (copropiedad_id, persona_id, creado_por, actualizado_por)
        VALUES ($1, $2, $3, $3)
        ON CONFLICT (copropiedad_id, persona_id) WHERE estado = 'activo'
          DO UPDATE SET actualizado_en = now()
        RETURNING id`,
-      [ambito.copropiedadId, personaId, this.claims['usuario_id'] ?? null],
+      [ambito.copropiedadId, personaId, usuarioId],
     );
     const id = rows[0]?.id;
     if (id === undefined) throw new Error('no se pudo registrar al visitante');
     return id;
   }
 
+  /**
+   * H-15I-03 · hasta la 15-I este INSERT no llevaba `tipo_documento` (NOT NULL),
+   * dejaba `numero_documento` en NULL (NOT NULL) y firmaba con el `usuario_id`
+   * de unos claims VACÍOS (NOT NULL). Contra la base real ninguna visita de un
+   * visitante nuevo se creaba desde la app: 500. El doble de la suite no tiene
+   * esas restricciones, y el ensayo de la 15-I lo destapó.
+   *
+   * `[SUPUESTO]` S-56 · el tipo del documento no llega de la app: se guarda como
+   * `otro` (la lista negra cruza por NÚMERO, no por tipo). `[SUPUESTO]` S-57 · sin
+   * documento, un número técnico `SD…` único que nunca cruza la lista negra por
+   * documento; por placa sí.
+   */
   private async persona(
     c: PoolClient,
     ambito: AmbitoDelResidente,
     nombre: string,
     documento: string | null,
+    usuarioId: string,
   ): Promise<string> {
     if (documento !== null) {
       const { rows } = await c.query<{ id: string }>(
@@ -231,11 +245,14 @@ export class AutorizacionesDelResidentePg
     }
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO public.personas
-         (copropiedad_id, nombre_completo, numero_documento, creado_por, actualizado_por)
-       VALUES ($1, $2, CASE WHEN $3::text IS NULL THEN NULL ELSE app.normalizar_documento($3) END,
+         (copropiedad_id, tipo_documento, nombre_completo, numero_documento, creado_por,
+          actualizado_por)
+       VALUES ($1, 'otro', $2,
+               coalesce(nullif(app.normalizar_documento($3), ''),
+                        'SD' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12))),
                $4, $4)
        RETURNING id`,
-      [ambito.copropiedadId, nombre, documento, this.claims['usuario_id'] ?? null],
+      [ambito.copropiedadId, nombre, documento, usuarioId],
     );
     const id = rows[0]?.id;
     if (id === undefined) throw new Error('no se pudo registrar a la persona');
@@ -251,7 +268,7 @@ export class AutorizacionesDelResidentePg
     nombres: readonly string[],
   ): Promise<void> {
     for (const nombre of nombres) {
-      const personaId = await this.persona(c, ambito, nombre, null);
+      const personaId = await this.persona(c, ambito, nombre, null, usuarioId);
       await c.query(
         `INSERT INTO public.autorizacion_acompanantes
            (copropiedad_id, autorizacion_id, persona_id, creado_por, actualizado_por)

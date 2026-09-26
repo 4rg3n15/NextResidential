@@ -72,6 +72,9 @@ const RECORRIDAS: Record<string, { readonly esperaLista: boolean }> = {
   'GET /copropiedades/:id/mi/vehiculos': { esperaLista: true },
   'GET /copropiedades/:id/mi/autorizaciones': { esperaLista: true },
   'GET /copropiedades/:id/mi/historial': { esperaLista: true },
+  // 15-I · ocupantes (con los códigos libres) y perfil: de SU vivienda y de SU persona.
+  'GET /copropiedades/:id/mi/ocupantes': { esperaLista: false },
+  'GET /copropiedades/:id/mi/perfil': { esperaLista: false },
 };
 
 /**
@@ -109,6 +112,24 @@ const SIN_AMBITO_DE_VIVIENDA = new Set([
   'GET /copropiedades/:id/biometria/consentimientos/:consentimientoId',
   'POST /copropiedades/:id/biometria/consentimientos/:consentimientoId/respuesta',
   'POST /copropiedades/:id/biometria/consentimientos/:consentimientoId/revocacion',
+  // 15-I (3.2) · el ALTA es lo que crea el ámbito: antes de ella la cuenta no
+  // tiene vivienda que acotar. La vivienda se busca por su número y el vínculo
+  // exige código si ya hay alguien dentro; lo prueba `residentes-y-vehiculos-pg`.
+  'GET /copropiedades/:id/mi/alta',
+  'POST /copropiedades/:id/mi/alta',
+  'POST /copropiedades/:id/mi/vinculacion',
+]);
+
+/**
+ * 15-I · rutas del residente con su propia prueba de ámbito más abajo, porque
+ * no son una lectura que filtrar ni una escritura por POST sin recurso: o
+ * nombran un recurso (vehículo, autorización y consentimiento) o no son POST.
+ */
+const CUBIERTAS_APARTE = new Set([
+  'POST /copropiedades/:id/mi/ocupantes',
+  'PUT /copropiedades/:id/mi/perfil',
+  'POST /copropiedades/:id/mi/vehiculos/:vehiculoId/desactivacion',
+  'GET /copropiedades/:id/mi/autorizaciones/:autorizacionId/consentimientos/:consentimientoId',
 ]);
 
 /**
@@ -150,6 +171,16 @@ const ESCRITURAS_DEL_AMBITO: Record<string, { readonly cuerpo: Record<string, un
       instalacionId: 'instalacion-de-r1',
       token: 'token-de-prueba-0001',
       plataforma: 'android',
+    },
+  },
+  // 15-I (D5 a) · el vehículo propio cae en SU vivienda, con ocupantes de ella.
+  'POST /copropiedades/:id/mi/vehiculos': {
+    cuerpo: {
+      placa: 'RUNO11',
+      color: 'Gris',
+      modelo: 'Mazda 3',
+      tipo: 'automovil',
+      ocupantes: ['40000000-0000-4000-8000-000000000001'],
     },
   },
 };
@@ -214,6 +245,7 @@ describe('cobertura · la lista de rutas sale del CÓDIGO, no de esta prueba', (
         (clave) =>
           RECORRIDAS[clave] === undefined &&
           ESCRITURAS_DEL_AMBITO[clave] === undefined &&
+          !CUBIERTAS_APARTE.has(clave) &&
           clave !== RUTA_DE_ROSTRO &&
           !SIN_AMBITO_DE_VIVIENDA.has(clave),
       );
@@ -629,5 +661,75 @@ describe('M-4 · los rechazos llegan con su motivo TIPADO, no como un error', ()
     });
     expect(res.body.creada).toBe(false);
     expect(res.body.motivo).toBe('SIN_NIVEL_DE_ACCESO');
+  });
+});
+
+describe('15-I · el hogar del residente también es SU vivienda (D5 a, D6, 3.5)', () => {
+  const pedirConMetodo = (metodo: 'put' | 'post', ruta: string, token: string, cuerpo: object) =>
+    request(app.getHttpServer())[metodo](ruta).set('Authorization', `Bearer ${token}`).send(cuerpo);
+
+  it('D6 · un residente que intenta cambiar el número de ocupantes por la API recibe 403', async () => {
+    for (const usuario of [USUARIO_R1, USUARIO_R2]) {
+      const token = await tokenResidente(usuario, COP_A);
+      const res = await pedirConMetodo('post', `/copropiedades/${COP_A}/mi/ocupantes`, token, {
+        numero: 9,
+        confirmoQueEsDefinitivo: true,
+      });
+      expect(res.status, JSON.stringify(res.body)).toBe(403);
+    }
+  });
+
+  it('3.5 · R1 edita SU perfil y el de R2 no cambia', async () => {
+    const tokenR1 = await tokenResidente(USUARIO_R1, COP_A);
+    const res = await pedirConMetodo('put', `/copropiedades/${COP_A}/mi/perfil`, tokenR1, {
+      nombres: 'Titular',
+      apellidos: 'Editado',
+      fechaNacimiento: null,
+      tipoDocumento: 'cedula',
+      numeroDocumento: '52123456',
+      correo: 'titular@correo.invalid',
+      telefono: '+573000000001',
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.perfil.nombreCompleto).toBe('Titular Editado');
+    const r2 = await pedir(
+      '/copropiedades/:id/mi/perfil',
+      COP_A,
+      await tokenResidente(USUARIO_R2, COP_A),
+    );
+    expect(r2.body.nombreCompleto).toBe('Ruiz Vecino');
+  });
+
+  it('D5 a · R1 no da de baja el vehículo propio de R2 (404) y R2 sí', async () => {
+    const tokenR2 = await tokenResidente(USUARIO_R2, COP_A);
+    const alta = await pedirConMetodo('post', `/copropiedades/${COP_A}/mi/vehiculos`, tokenR2, {
+      placa: 'RDOS22',
+      color: 'Azul',
+      modelo: 'Kia Picanto',
+      tipo: 'automovil',
+      ocupantes: ['40000000-0000-4000-8000-0000000000a1'],
+    });
+    expect(alta.body.registrado, JSON.stringify(alta.body)).toBe(true);
+    const ruta = `/copropiedades/${COP_A}/mi/vehiculos/${String(alta.body.id)}/desactivacion`;
+    const deR1 = await pedirConMetodo('post', ruta, await tokenResidente(USUARIO_R1, COP_A), {});
+    expect(deR1.status).toBe(404);
+    const deR2 = await pedirConMetodo('post', ruta, tokenR2, {});
+    expect(deR2.status).toBe(200);
+  });
+
+  it('RN-10 · R1 no ve el consentimiento de la visita del vecino (404)', async () => {
+    const tokenR2 = await tokenResidente(USUARIO_R2, COP_A);
+    const visita = await enviar('/copropiedades/:id/mi/autorizaciones', COP_A, tokenR2, {
+      ...ESCRITURAS_DEL_AMBITO['POST /copropiedades/:id/mi/autorizaciones']?.cuerpo,
+      claveDeIdempotencia: 'visita-del-vecino-15i',
+    });
+    expect(visita.body.creada).toBe(true);
+    const tokenR1 = await tokenResidente(USUARIO_R1, COP_A);
+    const res = await pedir(
+      `/copropiedades/:id/mi/autorizaciones/${String(visita.body.id)}/consentimientos/${OTRO_ID}`,
+      COP_A,
+      tokenR1,
+    );
+    expect(res.status).toBe(404);
   });
 });

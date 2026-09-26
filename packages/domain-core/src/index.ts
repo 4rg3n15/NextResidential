@@ -45,3 +45,8 @@ export * from './tiempo/ventana-del-dia';
 export * from './intercom/canal-exclusivo';
 export * from './residente/ambito-del-residente';
 export * from './residente/puede-autorizar';
+export * from './residente/vinculacion';
+export * from './residente/ocupantes';
+export * from './residente/vehiculo-propio';
+export * from './residente/perfil';
+export * from './autorizaciones/politica-de-aprobacion';
