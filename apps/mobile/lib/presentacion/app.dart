@@ -43,7 +43,9 @@ import '../infraestructura/camara/fuente_de_fotos.dart';
 import '../configuracion/tema.dart';
 import '../aplicacion/estado.dart';
 import '../dominio/entidades.dart';
+import '../dominio/hogar.dart';
 import '../dominio/puertos.dart';
+import 'acciones_del_hogar.dart';
 import 'controlador.dart';
 import 'pantallas/acceso.dart';
 import 'pantallas/familia.dart';
@@ -52,6 +54,7 @@ import 'pantallas/inicio.dart';
 import 'pantallas/notificaciones.dart';
 import 'pantallas/nuevo_visitante.dart';
 import 'pantallas/perfil.dart';
+import 'pantallas/primer_ingreso.dart';
 import 'pantallas/rostro_del_visitante.dart';
 import 'pantallas/vehiculos.dart';
 import 'pantallas/visitantes.dart';
@@ -66,6 +69,12 @@ class Dependencias {
     required this.reloj,
     required this.notificaciones,
     required this.claves,
+    required this.alta,
+    required this.hogar,
+    required this.cuenta,
+    required this.llamador,
+    required this.compartidor,
+    this.tomarFoto,
     this.versionPoliticaBiometrica = 'v1.0',
   });
 
@@ -74,6 +83,18 @@ class Dependencias {
   final RepositorioDelResidente repositorio;
   final Reloj reloj;
   final FuenteDeNotificaciones notificaciones;
+
+  /// ETAPA 15-I · el primer ingreso, el hogar, la contraseña y los dos puertos
+  /// que tocan el sistema operativo (marcador y panel de compartir).
+  final RepositorioDeAlta alta;
+  final RepositorioDelHogar hogar;
+  final ServicioDeCuenta cuenta;
+  final LlamadorDeTelefono llamador;
+  final Compartidor compartidor;
+
+  /// 15-I (hito 3) · la cámara REAL del teléfono. `null` = la simulada (web,
+  /// recorrido y pruebas), declarada como tal en `fuente_de_fotos.dart`.
+  final TomarFoto? tomarFoto;
 
   /// De dónde sale la clave de idempotencia de cada visita. Se inyecta porque
   /// una clave que la pantalla fabricara al construirse cambiaría con cada
@@ -113,10 +134,26 @@ class Armazon extends StatefulWidget {
 
 class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
   late final ControladorDeVista _inicio = controladorDeInicio(_repo);
-  late final ControladorDeVista _familia = controladorDeFamilia(_repo);
-  late final ControladorDeVista _vehiculos = controladorDeVehiculos(_repo);
-  late final ControladorDeVista<List<Autorizacion>> _autorizaciones =
-      controladorDeAutorizaciones(_repo);
+  late final ControladorDeVista<List<MiembroDeFamilia>> _familia = controladorDeFamilia(_repo);
+  late final ControladorDeVista<List<Vehiculo>> _vehiculos = controladorDeVehiculos(_repo);
+  late final ControladorDeVista<PerfilDelResidente> _perfil =
+      ControladorDeVista<PerfilDelResidente>(leer: widget.dependencias.hogar.miPerfil);
+  late final ControladorDeVista<MisOcupantes> _ocupantes = ControladorDeVista<MisOcupantes>(
+    leer: widget.dependencias.alta.misOcupantes,
+  );
+  late final AccionesDelHogar _acciones = AccionesDelHogar(
+    sesion: _sesion,
+    alta: widget.dependencias.alta,
+    hogar: widget.dependencias.hogar,
+    cuenta: widget.dependencias.cuenta,
+    familia: _familia,
+    vehiculos: _vehiculos,
+    perfil: _perfil,
+    alCambiarDeVivienda: _cargarTodo,
+  );
+  late final ControladorDeVista<List<Autorizacion>> _autorizaciones = controladorDeAutorizaciones(
+    _repo,
+  );
   late final ControladorDeHistorial _historial = ControladorDeHistorial(_repo);
   late final ControladorDeVista<List<ZonaComun>> _zonas = controladorDeZonas(_repo);
   late final ControladorDeAvisos _avisos = ControladorDeAvisos(
@@ -134,6 +171,13 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
 
   int _pestana = 0;
   bool _autenticado = false;
+
+  /// 3.2 · hasta que la puerta del primer ingreso diga «listo», no se ve ni se
+  /// carga ninguna otra pantalla.
+  bool _primerIngresoHecho = false;
+
+  /// La sesión vino del llavero al arrancar (S-59), no de un acceso de ahora.
+  bool _recuperada = false;
   DateTime? _ultimaCarga;
 
   @override
@@ -145,7 +189,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     // que existe un controlador detrás.
     _avisos.addListener(_alCambiarAvisos);
     _autenticado = _sesion.haySesion;
-    if (_autenticado) _cargarTodo();
+    _recuperada = _autenticado;
   }
 
   @override
@@ -161,7 +205,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState estado) {
-    if (estado != AppLifecycleState.resumed || !_autenticado) return;
+    if (estado != AppLifecycleState.resumed || !_autenticado || !_primerIngresoHecho) return;
     alVolverAPrimerPlano();
   }
 
@@ -177,7 +221,8 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
       setState(() => _autenticado = false);
       return;
     }
-    final viejo = _ultimaCarga == null ||
+    final viejo =
+        _ultimaCarga == null ||
         widget.dependencias.reloj.ahora().difference(_ultimaCarga!) > const Duration(minutes: 2);
     if (renovo || viejo) _cargarTodo();
   }
@@ -190,6 +235,8 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     _autorizaciones.cargarAhora();
     _historial.cargarAhora();
     _zonas.cargarAhora();
+    _perfil.cargarAhora();
+    _ocupantes.cargarAhora();
     // El token de FCM rota solo. Si el registro solo ocurriera al entrar en la
     // pantalla de notificaciones, dejaría de funcionar en silencio el día que
     // rote y nadie se enteraría hasta que un visitante esperara en la portería.
@@ -227,7 +274,16 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     // Olvidar ANTES de cerrar: si se cerrara primero y la app se redibujara con
     // los controladores llenos, los datos del residente anterior seguirían en
     // pantalla un instante. En un teléfono compartido eso es una fuga.
-    for (final c in [_inicio, _familia, _vehiculos, _autorizaciones, _historial, _zonas]) {
+    for (final c in <ControladorDeVista<Object?>>[
+      _inicio,
+      _familia,
+      _vehiculos,
+      _autorizaciones,
+      _historial,
+      _zonas,
+      _perfil,
+      _ocupantes,
+    ]) {
       c.olvidar();
     }
     // El token pertenece al aparato; el REGISTRO pertenece a la cuenta. Sin
@@ -237,6 +293,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     _sesion.cerrar();
     setState(() {
       _autenticado = false;
+      _primerIngresoHecho = false;
       _pestana = 0;
     });
   }
@@ -292,22 +349,31 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
 
   /// CU-02 · la foto cuelga de la AUTORIZACIÓN, no del residente: es de ahí de
   /// donde el servidor deriva quién es el titular del dato (RN-10).
-  void _capturarRostro(String autorizacionId, String nombreDelVisitante) {
-    final camara = CamaraSimulada();
+  void _capturarRostro(String autorizacionId, String nombreDelVisitante, DateTime hasta) {
     _abrir(
       PantallaDeRostroDelVisitante(
         nombreDelVisitante: nombreDelVisitante,
-        tomarFoto: camara.tomar,
+        tomarFoto: widget.dependencias.tomarFoto ?? CamaraSimulada().tomar,
         versionPolitica: widget.dependencias.versionPoliticaBiometrica,
         enviar: (foto) => _repo.capturarRostro(
           autorizacionId: autorizacionId,
           medidas: foto.medidas,
           vector: foto.vector,
           versionPolitica: widget.dependencias.versionPoliticaBiometrica,
-          // RN-11 · la plantilla no vive más que la visita. Sin este tope, un
-          // dato biométrico se quedaría en la terminal indefinidamente.
-          suprimirEn: widget.dependencias.reloj.ahora().add(const Duration(days: 1)),
+          // RN-11 · la plantilla no vive más que la VISITA: se suprime cuando
+          // termina. Antes era «captura + 24 h», que para una visita de mañana
+          // la borraba antes de que llegara el visitante (H-15I-10).
+          suprimirEn: hasta,
         ),
+        // Punto 5 (15-I) · el enlace se ENTREGA al visitante y su respuesta se
+        // consulta; el residente no responde por él (RN-10).
+        compartidor: widget.dependencias.compartidor,
+        urlDeLaApi: widget.dependencias.ambiente.apiUrl,
+        consultarConsentimiento: (consentimientoId) =>
+            widget.dependencias.hogar.estadoDelConsentimiento(
+              autorizacionId: autorizacionId,
+              consentimientoId: consentimientoId,
+            ),
       ),
     );
   }
@@ -337,8 +403,23 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
       return PantallaDeAcceso(
         ambiente: widget.dependencias.ambiente,
         sesion: _sesion,
-        alEntrar: () {
-          setState(() => _autenticado = true);
+        alEntrar: () => setState(() {
+          _autenticado = true;
+          _recuperada = false;
+          _primerIngresoHecho = false;
+        }),
+      );
+    }
+
+    if (!_primerIngresoHecho) {
+      return PuertaDePrimerIngreso(
+        sesion: _sesion,
+        alta: widget.dependencias.alta,
+        cuenta: widget.dependencias.cuenta,
+        recuperada: _recuperada,
+        alSalir: _cerrarSesion,
+        alTerminar: () {
+          setState(() => _primerIngresoHecho = true);
           _cargarTodo();
         },
       );
@@ -349,12 +430,10 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
         controlador: _inicio,
         autorizaciones: _autorizaciones,
         alPedirAcceso: _pedirAcceso,
-        alAbrirFamilia: () => _abrir(
-          PantallaDeFamilia(controlador: _familia, alPedirAcceso: _pedirAcceso),
-        ),
-        alAbrirHistorial: () => _abrir(
-          PantallaDeHistorial(controlador: _historial, alPedirAcceso: _pedirAcceso),
-        ),
+        alAbrirFamilia: () =>
+            _abrir(PantallaDeFamilia(controlador: _familia, alPedirAcceso: _pedirAcceso)),
+        alAbrirHistorial: () =>
+            _abrir(PantallaDeHistorial(controlador: _historial, alPedirAcceso: _pedirAcceso)),
         alAbrirVehiculos: () => setState(() => _pestana = 2),
       ),
       PantallaDeVisitantes(
@@ -365,20 +444,28 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
         alReintentarPendientes: _vaciarBandeja,
         ahora: widget.dependencias.reloj.ahora(),
       ),
-      PantallaDeVehiculos(controlador: _vehiculos, alPedirAcceso: _pedirAcceso),
+      PantallaDeVehiculos(
+        controlador: _vehiculos,
+        alPedirAcceso: _pedirAcceso,
+        alRegistrar: () => _acciones.registrarVehiculo(context),
+        alDesactivar: (v) => _acciones.desactivarVehiculo(context, v),
+      ),
       PantallaDeZonas(controlador: _zonas, alPedirAcceso: _pedirAcceso),
       PantallaDePerfil(
-        sesion: _sesion,
         controladorDeInicio: _inicio,
+        controladorDePerfil: _perfil,
+        controladorDeOcupantes: _ocupantes,
+        llamador: widget.dependencias.llamador,
         alCerrarSesion: _cerrarSesion,
-        alPedirAcceso: _pedirAcceso,
-        alAbrirFamilia: () => _abrir(
-          PantallaDeFamilia(controlador: _familia, alPedirAcceso: _pedirAcceso),
-        ),
-        alAbrirHistorial: () => _abrir(
-          PantallaDeHistorial(controlador: _historial, alPedirAcceso: _pedirAcceso),
-        ),
+        alAbrirFamilia: () =>
+            _abrir(PantallaDeFamilia(controlador: _familia, alPedirAcceso: _pedirAcceso)),
+        alAbrirHistorial: () =>
+            _abrir(PantallaDeHistorial(controlador: _historial, alPedirAcceso: _pedirAcceso)),
+        alAbrirVehiculos: () => setState(() => _pestana = 2),
         alAbrirNotificaciones: _abrirNotificaciones,
+        alEditarPerfil: (p) => _acciones.editarPerfil(context, p),
+        alCambiarVivienda: (p) => _acciones.cambiarVivienda(context, p),
+        alCambiarContrasena: () => _acciones.cambiarContrasena(context),
         estadoDeAvisos: _avisos.estado,
       ),
     ];

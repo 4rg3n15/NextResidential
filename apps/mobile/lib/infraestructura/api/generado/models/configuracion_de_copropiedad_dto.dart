@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'configuracion_de_copropiedad_dto_aprobacion_de_terceros.dart';
 import 'configuracion_de_copropiedad_dto_politica_contingencia_edge.dart';
 import 'configuracion_de_copropiedad_dto_tipo.dart';
 
@@ -26,6 +27,10 @@ class ConfiguracionDeCopropiedadDto {
     required this.plazoConsentimientoHoras,
     required this.margenCacheReglasHoras,
     required this.versionReglasActual,
+    required this.codigoCorto,
+    required this.telefonoPorteria,
+    required this.topeVehiculosPropios,
+    required this.aprobacionDeTerceros,
     required this.editables,
   });
   
@@ -65,6 +70,18 @@ class ConfiguracionDeCopropiedadDto {
   /// Solo lectura: sostiene el marcado de decisión con caché obsoleto (KPI-31).
   final num margenCacheReglasHoras;
   final num versionReglasActual;
+
+  /// D1 · código corto de acceso; null mientras no se asigne (sólo se entra por NIT).
+  final String? codigoCorto;
+
+  /// D7 · teléfono al que llama el botón «Portería» de la app.
+  final String? telefonoPorteria;
+
+  /// D5 a · vehículos propios por vivienda.
+  final num topeVehiculosPropios;
+
+  /// D5 c · solo lectura: modo de aprobación de terceros (ADR-027).
+  final ConfiguracionDeCopropiedadDtoAprobacionDeTerceros aprobacionDeTerceros;
 
   /// Ajustes que ESTE rol puede cambiar. La consola deshabilita el resto.
   final List<String> editables;

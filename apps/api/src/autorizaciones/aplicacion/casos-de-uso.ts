@@ -1,6 +1,18 @@
 import { Autorizacion, PatronRecurrencia, Placa, Vigencia } from '@ncr/domain-core';
-import type { ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
-import { errorDominio, exito, fallo } from '@ncr/domain-core';
+import type {
+  ErrorDominio,
+  GeneradorDeId,
+  PoliticaDeAprobacion,
+  Reloj,
+  Resultado,
+} from '@ncr/domain-core';
+import {
+  aprobacionAutomatica,
+  errorDominio,
+  estadoPersistible,
+  exito,
+  fallo,
+} from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import { alcanzaCopropiedad } from '../../autenticacion';
 import { ViviendaSinTitular } from './puertos';
@@ -97,6 +109,8 @@ export class CrearAutorizacion extends CasoDeUsoDeAutorizaciones {
     repo: RepositorioAutorizaciones,
     reloj: Reloj,
     private readonly ids: GeneradorDeId,
+    /** D5 c · ADR-027: con qué estado nace. Hoy, siempre la automática. */
+    private readonly aprobacion: PoliticaDeAprobacion = aprobacionAutomatica,
   ) {
     super(repo, reloj);
   }
@@ -125,6 +139,21 @@ export class CrearAutorizacion extends CasoDeUsoDeAutorizaciones {
     }
     const placa = placaDe(entrada.placa);
     if (!placa.ok) return placa;
+
+    // D5 c · ADR-027 · la aprobación pasa por la política, no por un `if` aquí.
+    const inicial = this.aprobacion({
+      traeVehiculo: placa.valor !== null,
+      recurrente: patron !== null,
+    });
+    if (!estadoPersistible(inicial)) {
+      return fallo(
+        errorDominio(
+          'OPERACION_NO_PERMITIDA',
+          'La aprobación del portero no está construida (ADR-027)',
+          'D5 c',
+        ),
+      );
+    }
 
     const creada = Autorizacion.crear({
       id: this.ids.nuevo(),

@@ -33,6 +33,16 @@ export interface VinculoDeResidente {
   readonly esTitular: boolean;
   /** `[SUPUESTO]` P-11: por defecto el más restrictivo (`SoloIngreso`). */
   readonly nivelAcceso: string | null;
+  /**
+   * P-11 · lo que el CATÁLOGO dice de ese nivel (`niveles_acceso.permite_autorizar`).
+   *
+   * H-15I-01: se decidía comparando el nombre con `'acceso_completo'`, y el
+   * catálogo lo llama `completo`. Contra la base real ningún residente podía
+   * autorizar desde la app —siempre `SIN_NIVEL_DE_ACCESO`— mientras el doble de
+   * la suite, que usaba el nombre equivocado, pasaba en verde. Ahora manda la
+   * columna, no la palabra.
+   */
+  readonly permiteAutorizar: boolean;
 }
 
 export interface ViviendaDelResidente {

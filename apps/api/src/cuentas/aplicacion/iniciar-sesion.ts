@@ -2,6 +2,7 @@ import { exito, fallo } from '@ncr/domain-core';
 import type { Resultado } from '@ncr/domain-core';
 import { nit, nombreDeUsuario } from '../dominio/nombre-de-usuario';
 import { correoSintetico } from '../dominio/correo-sintetico';
+import { codigoCorto } from '../../multiempresa/codigo-corto';
 import { ROLES_CON_GANCHO_OBLIGATORIO } from './puertos';
 import type {
   GanchosDeSesion,
@@ -13,10 +14,15 @@ import type {
   SesionEmitida,
 } from './puertos';
 
-/** Cómo se identifica quien entra. */
+/**
+ * Cómo se identifica quien entra: por su correo (cuentas anteriores a la 15-H)
+ * o por su usuario DENTRO de una copropiedad, que se nombra por su código corto
+ * (D1, la app y la consola) o por su NIT (sólo la consola, C-34).
+ */
 export type IdentificadorDeAcceso =
   | { readonly tipo: 'correo'; readonly correo: string }
-  | { readonly tipo: 'usuario'; readonly nit: string; readonly usuario: string };
+  | { readonly tipo: 'usuario'; readonly nit: string; readonly usuario: string }
+  | { readonly tipo: 'codigo'; readonly codigo: string; readonly usuario: string };
 
 export interface SesionConcedida extends SesionEmitida {
   readonly debeCambiarContrasena: boolean;
@@ -104,10 +110,25 @@ export class IniciarSesion {
 
   private async correoDe(id: IdentificadorDeAcceso): Promise<string | null> {
     if (id.tipo === 'correo') return id.correo.trim().toLowerCase();
-    const n = nit(id.nit);
     const u = nombreDeUsuario(id.usuario);
-    if (!n.ok || !u.ok) return null;
-    const copropiedadId = await this.cuentas.copropiedadPorNit(n.valor);
+    if (!u.ok) return null;
+    const copropiedadId = await this.copropiedadDe(id);
     return copropiedadId === null ? null : correoSintetico(u.valor, copropiedadId);
+  }
+
+  /**
+   * El código o el NIT sólo dicen EN QUÉ conjunto buscar. Uno inexistente
+   * responde igual que una contraseña equivocada —y tarda lo mismo—: el
+   * mensaje no dice cuál de las tres piezas falló.
+   */
+  private async copropiedadDe(
+    id: Exclude<IdentificadorDeAcceso, { readonly tipo: 'correo' }>,
+  ): Promise<string | null> {
+    if (id.tipo === 'codigo') {
+      const c = codigoCorto(id.codigo);
+      return c.ok ? this.cuentas.copropiedadPorCodigo(c.valor) : null;
+    }
+    const n = nit(id.nit);
+    return n.ok ? this.cuentas.copropiedadPorNit(n.valor) : null;
   }
 }

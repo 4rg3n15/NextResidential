@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- ETAPA 15-I (hito 3): la foto del visitante para la terminal facial. -->
+	<key>NSCameraUsageDescription</key>
+	<string>La cámara toma la foto del rostro de su visitante para la terminal facial del conjunto. El visitante decide si acepta.</string>
+	<!-- image_picker exige declararla aunque la app sólo abre la cámara. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>La app no lee su fototeca: sólo usa la foto que toma con la cámara.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

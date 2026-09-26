@@ -14,6 +14,7 @@ library;
 
 import 'dart:typed_data';
 
+import 'acceso.dart';
 import 'calidad_de_captura.dart';
 import 'entidades.dart';
 import 'sesion.dart';
@@ -107,7 +108,8 @@ abstract interface class AlmacenDeSesion {
 
 /// Quién emite y renueva la sesión.
 abstract interface class Autenticador {
-  Future<Sesion> iniciarSesion({required String correo, required String clave});
+  /// D1 · por código y usuario, o por correo (cuentas anteriores a la 15-H).
+  Future<Sesion> iniciarSesion(IdentificadorDeAcceso identificador, {required String clave});
 
   /// Renueva con el token de refresco. Un fallo aquí es `sesionInvalida`: el
   /// residente tiene que volver a entrar, y la app lo dice sin rodeos.

@@ -3,8 +3,12 @@ import type { DynamicModule } from '@nestjs/common';
 import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
+import { ACTOR_INGESTA } from '../comun/actores-de-servicio';
 import type { Configuracion } from '../configuracion/esquema';
 import { Pool } from 'pg';
+import { REGISTRO_DE_EVIDENCIA, registroSinBase } from './aplicacion/registro-de-evidencia';
+import type { RegistroDeEvidencia } from './aplicacion/registro-de-evidencia';
+import { RegistroDeEvidenciaPg } from './infraestructura/registro-de-evidencia-pg';
 import {
   CargadorDeContextoConservador,
   CargadorDeContextoPg,
@@ -346,11 +350,31 @@ export class EventosModule {
           inject: [REPOSITORIO_EVENTOS],
           useFactory: (repo: RepositorioEventos) => new ExportarEventos(repo),
         },
+        /**
+         * H-15I-07 · con base, la foto de cada evento se REGISTRA en
+         * `evidencias` (hash y tamaño) y el evento lleva ese id; sin base, la
+         * ruta, como siempre. Lo eligen la misma variable que el histórico.
+         */
+        {
+          provide: REGISTRO_DE_EVIDENCIA,
+          inject: [CONFIGURACION, Pool],
+          useFactory: (config: Configuracion, pool: Pool): RegistroDeEvidencia =>
+            config.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new RegistroDeEvidenciaPg(
+                  pool,
+                  config.EVIDENCIA_BUCKET ?? 'en-memoria',
+                  ACTOR_INGESTA,
+                )
+              : registroSinBase,
+        },
         {
           provide: ObtenerEvidencia,
-          inject: [REPOSITORIO_EVENTOS, ALMACEN_EVIDENCIA],
-          useFactory: (repo: RepositorioEventos, almacen: AlmacenEvidencia) =>
-            new ObtenerEvidencia(repo, almacen),
+          inject: [REPOSITORIO_EVENTOS, ALMACEN_EVIDENCIA, REGISTRO_DE_EVIDENCIA],
+          useFactory: (
+            repo: RepositorioEventos,
+            almacen: AlmacenEvidencia,
+            registro: RegistroDeEvidencia,
+          ) => new ObtenerEvidencia(repo, almacen, registro),
         },
         {
           provide: VigilarLatidos,
@@ -383,6 +407,8 @@ export class EventosModule {
          * política de firma (RN-21).
          */
         ALMACEN_EVIDENCIA,
+        // H-15I-07 · y el registro que la referencia en `evidencias`.
+        REGISTRO_DE_EVIDENCIA,
         REPOSITORIO_ALERTAS,
         REPOSITORIO_DISPOSITIVOS,
         CANAL_TIEMPO_REAL,

@@ -63,12 +63,14 @@ const leerCredenciales = async (peticion: NextRequest): Promise<Credenciales | n
     return null;
   }
   if (typeof cuerpo !== 'object' || cuerpo === null) return null;
-  const { correo, nit, usuario, contrasena, recordar } = cuerpo as Record<string, unknown>;
+  const { correo, nit, codigo, usuario, contrasena, recordar } = cuerpo as Record<string, unknown>;
   const identificador: IdentificadorDeAcceso | null = esCorreo(correo)
     ? { correo }
-    : esTexto(nit, 5, 20) && esTexto(usuario, 3, 32)
-      ? { nit: nit.trim(), usuario: usuario.trim() }
-      : null;
+    : esTexto(codigo, 3, 8) && esTexto(usuario, 3, 32)
+      ? { codigo: codigo.trim(), usuario: usuario.trim() }
+      : esTexto(nit, 5, 20) && esTexto(usuario, 3, 32)
+        ? { nit: nit.trim(), usuario: usuario.trim() }
+        : null;
   if (identificador === null) return null;
   if (typeof contrasena !== 'string' || contrasena.length === 0 || contrasena.length > 256) {
     return null;

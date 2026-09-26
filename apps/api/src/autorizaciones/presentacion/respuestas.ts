@@ -58,3 +58,22 @@ export class RevocacionDto {
 export class AcompananteAgregadoDto {
   @ApiProperty({ type: Boolean }) agregado!: boolean;
 }
+
+/** 15-I · HU-35 · un veto activo, como lo lista la consola. */
+export class VetoListadoDto {
+  @ApiProperty({ type: String, format: 'uuid' }) id!: string;
+  @ApiProperty({ type: String, nullable: true }) placa!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) personaId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) persona!: string | null;
+  @ApiProperty({ type: String, nullable: true }) documento!: string | null;
+  @ApiProperty({ type: String }) motivo!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) creadoEn!: string;
+}
+
+export class IdVetoDto {
+  @ApiProperty({ type: String, format: 'uuid' }) id!: string;
+}
+
+export class VetoLevantadoDto {
+  @ApiProperty({ type: Boolean }) levantado!: boolean;
+}

@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Autorizacion, ContextoDeAcceso, GeneradorDeId, Reloj } from '@ncr/domain-core';
-import { VersionDeReglas, esExito, esFallo } from '@ncr/domain-core';
+import {
+  VersionDeReglas,
+  aprobacionDelPortero,
+  esExito,
+  esFallo,
+  esVehiculoDeTercero,
+} from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import {
   AgregarAcompanante,
@@ -78,6 +84,23 @@ describe('CrearAutorizacion (HU-07, HU-09)', () => {
   beforeEach(() => {
     repo = new RepoAutorizacionesFalso();
     caso = new CrearAutorizacion(repo, reloj, ids);
+  });
+
+  it('D5 c · ADR-027 · con la política del portero, un vehículo de tercero NO nace activo', async () => {
+    // La política alternativa existe en el dominio; el estado pendiente aún no
+    // en la base. La creación falla CERRADA y no persiste nada (§2.1.4).
+    const conPortero = new CrearAutorizacion(
+      repo,
+      reloj,
+      ids,
+      aprobacionDelPortero(esVehiculoDeTercero),
+    );
+    const r = await conPortero.ejecutar(ctx(), { ...entradaBase, placa: 'TER123' });
+    expect(esFallo(r)).toBe(true);
+    if (esFallo(r)) expect(r.error.codigo).toBe('OPERACION_NO_PERMITIDA');
+    expect(repo.guardadas.size).toBe(0);
+    // Un visitante a pie sigue naciendo activo con esa misma política.
+    expect(esExito(await conPortero.ejecutar(ctx(), entradaBase))).toBe(true);
   });
 
   it('crea y persiste una autorización simple', async () => {

@@ -59,11 +59,49 @@ const tokenCon = (segundos) =>
     sub: 'auth-1',
     usuario_id: 'usr-1',
     copropiedad_id: COP,
-    email: 'maria@ejemplo.invalid',
+    // 15-I · una cuenta POR USUARIO: el proveedor pone el correo sintético en
+    // el claim `email` (C-36). El recorrido comprueba que la app no lo enseña.
+    email: `maria@${COP}.usuarios.ncr.invalid`,
     exp: Math.floor(Date.now() / 1000) + segundos,
   })}.sin-firma-porque-el-servidor-real-la-verifica`;
 
 const DATOS = {
+  // 15-I · el primer ingreso ya completo: la puerta deja pasar a la app.
+  alta: {
+    completa: true,
+    viviendaVinculada: true,
+    debeDeclararOcupantes: false,
+    vocabulario: {
+      copropiedadNombre: 'Urbanización de prueba',
+      tipo: 'casas',
+      etiquetaVivienda: 'Casa',
+      etiquetaAgrupacion: 'Manzana',
+    },
+    pideAgrupacion: false,
+    avisoOcupantes: 'El número de ocupantes es DEFINITIVO.',
+  },
+  perfil: {
+    nombres: 'Maria',
+    apellidos: 'Titular',
+    nombreCompleto: 'Maria Titular',
+    fechaNacimiento: null,
+    tipoDocumento: 'cedula',
+    numeroDocumento: '1000000001',
+    correo: 'contacto@ejemplo.invalid',
+    telefono: '+573000000001',
+    copropiedadNombre: 'Urbanización de prueba',
+    copropiedadDireccion: 'Calle inventada 00',
+    telefonoPorteria: '+576015550100',
+  },
+  ocupantes: {
+    declarados: 2,
+    declarada: true,
+    aviso: 'El número de ocupantes es DEFINITIVO.',
+    plazas: [
+      { id: 'p1', numero: 1, libre: false, codigo: null, ocupante: 'Maria Titular' },
+      { id: 'p2', numero: 2, libre: true, codigo: 'ABCD-EFGH', ocupante: null },
+    ],
+  },
   vivienda: {
     vivienda: {
       id: 'viv-1',
@@ -151,6 +189,8 @@ const TIPOS = {
 
 /** Peticiones que el guardarropa vio: la prueba mira las cabeceras. */
 const vistas = [];
+/** Cuerpos de `POST /auth/acceso`: la prueba mira que lleven código y usuario. */
+const accesos = [];
 
 const servidor = createServer(async (peticion, respuesta) => {
   const url = new URL(peticion.url, `http://127.0.0.1:${PUERTO}`);
@@ -161,12 +201,27 @@ const servidor = createServer(async (peticion, respuesta) => {
       'Content-Type': 'application/json; charset=utf-8',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': '*',
-      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
     });
     respuesta.end(JSON.stringify(cuerpo));
   };
 
   if (peticion.method === 'OPTIONS') return responder(204, {});
+
+  // D1 (15-I) · la app ENTRA por la API con código + usuario; renueva contra
+  // el proveedor (la ruta de abajo).
+  if (url.pathname === '/auth/acceso' && peticion.method === 'POST') {
+    let cuerpo = '';
+    for await (const trozo of peticion) cuerpo += trozo;
+    const datos = JSON.parse(cuerpo || '{}');
+    accesos.push(datos);
+    return responder(200, {
+      accessToken: tokenCon(40),
+      refreshToken: 'refresco-de-recorrido',
+      expiraEn: 40,
+      debeCambiarContrasena: false,
+    });
+  }
 
   if (url.pathname === '/supabase/auth/v1/token') {
     // 40 s de vida: suficiente para el recorrido y corto para que el margen de
@@ -264,7 +319,20 @@ const irAPestana = async (etiqueta) => {
   }
   throw new Error(`no se encontró la pestaña «${etiqueta}» en la barra inferior`);
 };
-const texto = () => pagina.locator('body').innerText();
+/**
+ * Lo que un lector de pantalla leería: el texto visible Y las etiquetas
+ * accesibles. Flutter fusiona en UNA etiqueta (`aria-label`) los textos de una
+ * tarjeta que contiene un botón —la tarjeta de un vehículo con «Dar de baja»,
+ * 15-I—, y esa etiqueta no aparece en `innerText` aunque TalkBack la lea
+ * entera. Mirar sólo `innerText` daría por ausente una placa que se oye.
+ */
+const texto = async () => {
+  const visible = await pagina.locator('body').innerText();
+  const etiquetas = await pagina.evaluate(() =>
+    [...document.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label')),
+  );
+  return `${visible}\n${etiquetas.join('\n')}`;
+};
 
 /**
  * Espera a que una frase aparezca, con tope. **Sustituye a los
@@ -358,33 +426,53 @@ try {
    *       «Entrar» no sale la petición, se mira qué campo reclama la app y se
    *       rellena ESE. El recorrido deja de adivinar.
    */
-  const CORREO = 'maria@ejemplo.invalid';
+  const CODIGO = 'MIRA';
+  const USUARIO = 'maria';
   const CLAVE = 'la-que-sea';
 
+  /**
+   * H-15I-14 · el foco NO basta: se comprueba lo leído y se reescribe.
+   *
+   * El verificador vio salir `usuario: "aria"` tras teclear `maria`. Con el
+   * `<input>` ya enfocado, el motor puede aplicarle todavía su estado —vacío— y
+   * borrar la primera pulsación. El campo del DOM es lo que el motor lee en la
+   * pulsación siguiente, así que si lo leído no es lo tecleado se vacía y se
+   * teclea otra vez, hasta tres. Sigue sin haber ningún `waitForTimeout`.
+   */
   const escribirEn = async (etiqueta, texto) => {
     const campo = pagina.getByLabel(etiqueta);
-    await campo.click();
-    try {
-      await pagina.waitForFunction(
-        (et) => {
-          const i = [...document.querySelectorAll('input, textarea')].find(
-            (e) => e.getAttribute('aria-label') === et,
-          );
-          return i !== undefined && i === document.activeElement;
-        },
-        etiqueta,
-        { timeout: 5000 },
+    for (let intento = 1; intento <= 3; intento += 1) {
+      await campo.click();
+      try {
+        await pagina.waitForFunction(
+          (et) => {
+            // `startsWith`: el campo del código lleva texto de ayuda, y el motor
+            // puede añadirlo a la etiqueta accesible.
+            const i = [...document.querySelectorAll('input, textarea')].find((e) =>
+              (e.getAttribute('aria-label') ?? '').startsWith(et),
+            );
+            return i !== undefined && i === document.activeElement;
+          },
+          etiqueta,
+          { timeout: 5000 },
+        );
+      } catch {
+        console.log(`   · «${etiqueta}»: el motor no enfocó su <input> en 5 s`);
+        return false;
+      }
+      if (intento > 1) {
+        await pagina.keyboard.press('ControlOrMeta+A');
+        await pagina.keyboard.press('Backspace');
+      }
+      await pagina.keyboard.type(texto);
+      const leido = await campo.inputValue().catch(() => '<ilegible>');
+      console.log(
+        `   · «${etiqueta}»: enfocado por el motor, tecleado (intento ${intento}), ` +
+          `leído ${JSON.stringify(etiqueta === 'Contraseña' ? '·'.repeat(leido.length) : leido)}`,
       );
-    } catch {
-      console.log(`   · «${etiqueta}»: el motor no enfocó su <input> en 5 s`);
-      return false;
+      if (leido === texto) return true;
     }
-    await pagina.keyboard.type(texto);
-    const leido = await campo.inputValue().catch(() => '<ilegible>');
-    console.log(
-      `   · «${etiqueta}»: enfocado por el motor, tecleado, leído ${JSON.stringify(leido)}`,
-    );
-    return leido === texto;
+    return false;
   };
 
   /**
@@ -395,20 +483,23 @@ try {
   const entrar = async () => {
     for (let vuelta = 1; vuelta <= 3; vuelta += 1) {
       const espera = pagina
-        .waitForResponse((r) => r.url().includes('/auth/v1/token'), { timeout: 6000 })
+        .waitForResponse((r) => r.url().includes('/auth/acceso'), { timeout: 6000 })
         .catch(() => null);
       await pagina.getByRole('button', { name: 'Entrar' }).click();
       const respuesta = await espera;
       if (respuesta !== null) return respuesta;
 
-      const faltaCorreo = await esperarTexto('Escriba su correo', 500);
+      const faltaCodigo = await esperarTexto('Escriba el código de su copropiedad', 500);
+      const faltaUsuario = await esperarTexto('Escriba su usuario', 500);
       const faltaClave = await esperarTexto('Escriba su contraseña', 500);
       console.log(
         `   · vuelta ${vuelta}: no hubo petición; la app reclama` +
-          `${faltaCorreo ? ' el correo' : ''}${faltaClave ? ' la contraseña' : ''}` +
-          `${!faltaCorreo && !faltaClave ? ' nada (ningún validador protesta)' : ''}`,
+          `${faltaCodigo ? ' el código' : ''}${faltaUsuario ? ' el usuario' : ''}` +
+          `${faltaClave ? ' la contraseña' : ''}` +
+          `${!faltaCodigo && !faltaUsuario && !faltaClave ? ' nada (ningún validador protesta)' : ''}`,
       );
-      if (faltaCorreo) await escribirEn('Correo', CORREO);
+      if (faltaCodigo) await escribirEn('Código de la copropiedad', CODIGO);
+      if (faltaUsuario) await escribirEn('Usuario', USUARIO);
       if (faltaClave) await escribirEn('Contraseña', CLAVE);
     }
     throw new Error(
@@ -435,13 +526,18 @@ try {
    * el `waitForTimeout`. Teclear es lo que hace el residente, y esperar la
    * PETICIÓN —no un reloj— es lo que hace la comprobación determinista.
    */
-  await escribirEn('Correo', CORREO);
+  await escribirEn('Código de la copropiedad', CODIGO);
+  await escribirEn('Usuario', USUARIO);
   await escribirEn('Contraseña', CLAVE);
 
   const respuestaDelToken = await entrar();
   respuestaDelToken.status() === 200
-    ? ok('el acceso pide el token al emisor de identidad')
-    : mal(`el emisor contestó ${respuestaDelToken.status()}`);
+    ? ok('el acceso entra por la API con código y usuario (D1)')
+    : mal(`la API de acceso contestó ${respuestaDelToken.status()}`);
+  const pedido = accesos.at(-1) ?? {};
+  pedido.codigo === CODIGO && pedido.usuario === USUARIO && !pedido.correo
+    ? ok('el acceso lleva código y usuario, sin correo')
+    : mal(`el acceso llevó ${JSON.stringify({ ...pedido, contrasena: undefined })}`);
 
   // ── 2 · inicio ────────────────────────────────────────────────────────────
   (await hay('Casa 42 · Manzana B'))
@@ -511,9 +607,15 @@ try {
 
   // ── 6 · perfil e historial ────────────────────────────────────────────────
   await irAPestana('Perfil');
-  (await hay('maria@ejemplo.invalid'))
-    ? ok('el perfil trae el correo de la sesión')
-    : mal('sin correo');
+  (await hay('Maria Titular'))
+    ? ok('el perfil trae el nombre de la persona (3.5)')
+    : mal('el perfil no muestra el nombre');
+  (await hay('Llamar a portería'))
+    ? ok('y el botón de portería (D7)')
+    : mal('no se ve el botón de portería');
+  (await pagina.content()).includes('usuarios.ncr.invalid')
+    ? mal('el correo sintético aparece en la página (C-36)')
+    : ok('el correo sintético del token no aparece en ninguna parte (C-36)');
   await captura('6-perfil');
 
   await pagina.getByText('Historial de accesos').first().click();

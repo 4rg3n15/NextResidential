@@ -5,18 +5,30 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
+import '../models/alta_de_mi_vivienda_dto.dart';
 import '../models/aparato_registrado_dto.dart';
+import '../models/declaracion_de_ocupantes_dto.dart';
+import '../models/estado_de_consentimiento_dto.dart';
+import '../models/estado_de_mi_alta_dto.dart';
 import '../models/mi_autorizacion_dto.dart';
 import '../models/mi_evento_dto.dart';
 import '../models/mi_inicio_dto.dart';
 import '../models/mi_vehiculo_dto.dart';
 import '../models/mi_zona_dto.dart';
 import '../models/miembro_de_familia_dto.dart';
+import '../models/mis_ocupantes_dto.dart';
 import '../models/nueva_visita_dto.dart';
+import '../models/perfil_del_residente_dto.dart';
+import '../models/perfil_dto.dart';
 import '../models/periodo.dart';
+import '../models/resultado_de_alta_dto.dart';
+import '../models/resultado_de_perfil_dto.dart';
+import '../models/resultado_de_vehiculo_propio_dto.dart';
 import '../models/rostro_capturado_dto.dart';
 import '../models/rostro_de_mi_visitante_dto.dart';
 import '../models/token_de_notificacion_dto.dart';
+import '../models/vehiculo_desactivado_dto.dart';
+import '../models/vehiculo_propio_dto.dart';
 import '../models/visita_creada_dto.dart';
 
 part 'residente_api.g.dart';
@@ -24,6 +36,19 @@ part 'residente_api.g.dart';
 @RestApi()
 abstract class ResidenteApi {
   factory ResidenteApi(Dio dio, {String? baseUrl}) = _ResidenteApi;
+
+  /// Qué le falta al residente para operar: vivienda y ocupantes (3.2)
+  @GET('/copropiedades/{id}/mi/alta')
+  Future<EstadoDeMiAltaDto> miAltaControllerEstado({
+    @Path('id') required String id,
+  });
+
+  /// Primer ingreso: contacto, documento, vivienda y código (3.2)
+  @POST('/copropiedades/{id}/mi/alta')
+  Future<ResultadoDeAltaDto> miAltaControllerAlta({
+    @Path('id') required String id,
+    @Body() required AltaDeMiViviendaDto body,
+  });
 
   /// Las autorizaciones de mi vivienda (HU-07 lectura, M-1)
   @GET('/copropiedades/{id}/mi/autorizaciones')
@@ -36,6 +61,14 @@ abstract class ResidenteApi {
   Future<VisitaCreadaDto> miControllerCrearAutorizacion({
     @Path('id') required String id,
     @Body() required NuevaVisitaDto body,
+  });
+
+  /// ¿Respondió mi visitante? pendiente, aceptado o rechazado (RN-10)
+  @GET('/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/consentimientos/{consentimientoId}')
+  Future<EstadoDeConsentimientoDto> miHogarControllerEstadoDelConsentimiento({
+    @Path('id') required String id,
+    @Path('autorizacionId') required String autorizacionId,
+    @Path('consentimientoId') required String consentimientoId,
   });
 
   /// Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10)
@@ -67,10 +100,57 @@ abstract class ResidenteApi {
     @Body() required TokenDeNotificacionDto body,
   });
 
+  /// Mis ocupantes y los códigos de las plazas libres (3.3)
+  @GET('/copropiedades/{id}/mi/ocupantes')
+  Future<MisOcupantesDto> miAltaControllerOcupantes({
+    @Path('id') required String id,
+  });
+
+  /// Declaro cuántos ocupantes hay: una vez y definitivo (D6)
+  @POST('/copropiedades/{id}/mi/ocupantes')
+  Future<MisOcupantesDto> miAltaControllerDeclararOcupantes({
+    @Path('id') required String id,
+    @Body() required DeclaracionDeOcupantesDto body,
+  });
+
+  /// Mi perfil, mi copropiedad y el teléfono de portería (3.5, D7)
+  @GET('/copropiedades/{id}/mi/perfil')
+  Future<PerfilDelResidenteDto> miHogarControllerPerfil({
+    @Path('id') required String id,
+  });
+
+  /// Edito mis datos personales y de contacto (3.5)
+  @PUT('/copropiedades/{id}/mi/perfil')
+  Future<ResultadoDePerfilDto> miHogarControllerEditar({
+    @Path('id') required String id,
+    @Body() required PerfilDto body,
+  });
+
   /// Los vehículos de mi vivienda (HU-05, HU-06 lectura, M-3)
   @GET('/copropiedades/{id}/mi/vehiculos')
   Future<List<MiVehiculoDto>> miControllerVehiculos({
     @Path('id') required String id,
+  });
+
+  /// Registro un vehículo propio: activo al instante, dentro del tope (D5 a)
+  @POST('/copropiedades/{id}/mi/vehiculos')
+  Future<ResultadoDeVehiculoPropioDto> miHogarControllerVehiculo({
+    @Path('id') required String id,
+    @Body() required VehiculoPropioDto body,
+  });
+
+  /// Doy de baja un vehículo propio de mi vivienda; libera el cupo
+  @POST('/copropiedades/{id}/mi/vehiculos/{vehiculoId}/desactivacion')
+  Future<VehiculoDesactivadoDto> miHogarControllerDesactivar({
+    @Path('id') required String id,
+    @Path('vehiculoId') required String vehiculoId,
+  });
+
+  /// Cambio de vivienda desde el perfil: siempre con código (3.5)
+  @POST('/copropiedades/{id}/mi/vinculacion')
+  Future<ResultadoDeAltaDto> miAltaControllerCambioDeVivienda({
+    @Path('id') required String id,
+    @Body() required AltaDeMiViviendaDto body,
   });
 
   /// Mi vivienda, mi vínculo y si puedo autorizar (HU-33, M-1)

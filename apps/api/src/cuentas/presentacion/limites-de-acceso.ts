@@ -9,7 +9,7 @@ import type { ThrottlerOptions } from '@nestjs/throttler';
  * Tres contadores sobre la misma ruta, cada uno por lo suyo:
  *
  *  · `default`, por la dirección que llama a la API (30/min en la ruta).
- *  · `acceso-cuenta`, por la CUENTA que se intenta: NIT + usuario, o correo.
+ *  · `acceso-cuenta`, por la CUENTA que se intenta: código o NIT + usuario, o correo.
  *    Es el que no se esquiva rotando direcciones, y el que corta la fuerza
  *    bruta contra un portero concreto (5/min).
  *  · `acceso-origen`, por la dirección del NAVEGADOR que declara la consola.
@@ -44,8 +44,14 @@ export const cuentaIntentada = (cuerpo: unknown): string => {
   const c = cuerpo as Record<string, unknown>;
   const correo = cadena(c['correo'], 254);
   if (correo !== null) return `correo:${correo}`;
-  const nit = cadena(c['nit'], 20)?.replace(/[\s.,]/g, '') ?? '';
   const usuario = cadena(c['usuario'], 32) ?? '';
+  // D1 · el código se cuenta aparte del NIT: son dos nombres de la misma
+  // copropiedad, y quien alterne los dos duplica su cuota (10/min en vez de 5).
+  // Queda declarado como riesgo residual en el informe de la 15-I; el límite
+  // por dirección (30/min) sigue acotando el total.
+  const codigo = cadena(c['codigo'], 8);
+  if (codigo !== null) return `codigo:${codigo.replace(/\s/g, '')}|${usuario}`;
+  const nit = cadena(c['nit'], 20)?.replace(/[\s.,]/g, '') ?? '';
   return `usuario:${nit}|${usuario}`;
 };
 

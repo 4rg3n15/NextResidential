@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
 import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
+import 'package:ncr_residente/dominio/acceso.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/dominio/sesion.dart';
 import 'package:ncr_residente/infraestructura/api/generado/clients/residente_api.dart';
@@ -66,7 +67,7 @@ class AutenticadorDePrueba implements Autenticador {
       );
 
   @override
-  Future<Sesion> iniciarSesion({required String correo, required String clave}) async =>
+  Future<Sesion> iniciarSesion(IdentificadorDeAcceso identificador, {required String clave}) async =>
       _sesion('token-1');
 
   @override
@@ -89,7 +90,7 @@ void main() {
       autenticador: autenticador,
       reloj: const RelojFijo(),
     );
-    await sesion.iniciar(correo: 'x@y.invalid', clave: 'z');
+    await sesion.iniciar(identificador: PorCorreo('x@y.invalid'), clave: 'z');
     final servidor = ServidorFalso(responder);
     final dio = crearDioDeApi(urlBase: 'http://api.invalid', sesion: sesion);
     dio.httpClientAdapter = servidor;

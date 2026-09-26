@@ -22,7 +22,17 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { Aislamiento } from './aislamiento';
 import { AlcanceDelLlamante, PermiteServicio, Roles } from '../comun/decoradores';
 import { Contexto } from '../comun/decoradores/contexto.decorator';
@@ -36,7 +46,7 @@ import {
 } from './respuestas';
 import { CLAVES_EDITABLES, puedeEditar, validarCambios } from './configuracion';
 import type { CambiosDeConfiguracion, ConfiguracionDeCopropiedad } from './configuracion';
-import { REPOSITORIO_COPROPIEDADES } from './repositorio-copropiedades';
+import { CodigoCortoEnUso, REPOSITORIO_COPROPIEDADES } from './repositorio-copropiedades';
 import type { RepositorioCopropiedades } from './repositorio-copropiedades';
 import { ErrorApiDto } from '../comun/respuestas';
 
@@ -97,6 +107,37 @@ export class CambiosDeConfiguracionDto {
   @IsOptional()
   @IsEnum(['denegar', 'escalar_portero'])
   politicaContingenciaEdge?: 'denegar' | 'escalar_portero';
+
+  @ApiProperty({
+    required: false,
+    example: 'MIRA',
+    description: 'D1 · código corto de acceso: 3 a 8 letras o números (sólo superadministrador)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  codigoCorto?: string;
+
+  @ApiProperty({
+    required: false,
+    example: '+57 601 555 0100',
+    description: 'D7 · teléfono de portería; vacío lo borra (sólo superadministrador)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(24)
+  telefonoPorteria?: string;
+
+  @ApiProperty({
+    required: false,
+    example: 2,
+    description: 'D5 a · vehículos propios por vivienda (sólo superadministrador)',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  topeVehiculosPropios?: number;
 
   /**
    * B.5 · el umbral de confianza y el margen de latido YA NO SON CAMPOS. No se
@@ -213,11 +254,18 @@ export class CopropiedadesController {
     if (rechazos.length > 0) {
       throw new UnprocessableEntityException({ codigo: 422, rechazos: [...rechazos] });
     }
-    const guardada = await this.catalogo.guardarConfiguracion(
-      ctx,
-      id,
-      dto as CambiosDeConfiguracion,
-    );
+    let guardada: ConfiguracionDeCopropiedad | null;
+    try {
+      guardada = await this.catalogo.guardarConfiguracion(ctx, id, dto as CambiosDeConfiguracion);
+    } catch (error) {
+      if (error instanceof CodigoCortoEnUso) {
+        throw new UnprocessableEntityException({
+          codigo: 422,
+          rechazos: [{ clave: 'codigoCorto', motivo: error.message }],
+        });
+      }
+      throw error;
+    }
     if (guardada === null) throw new NotFoundException('copropiedad no encontrada');
     return this.aDto(ctx, guardada);
   }

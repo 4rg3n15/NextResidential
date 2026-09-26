@@ -39,6 +39,7 @@ import { ROLES_ADMINISTRATIVOS } from '../../autenticacion';
 import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { IniciarSesion } from '../aplicacion/iniciar-sesion';
+import type { IdentificadorDeAcceso } from '../aplicacion/iniciar-sesion';
 import { CambiarContrasena } from '../aplicacion/cambiar-contrasena';
 import { RestablecerContrasena } from '../aplicacion/restablecer-contrasena';
 import { CerrarSesion } from '../aplicacion/cerrar-sesion';
@@ -58,7 +59,17 @@ import {
 } from './limites-de-acceso';
 
 /** Texto ÚNICO de un fallo de credenciales: no dice qué parte falló. */
-export const MENSAJE_CREDENCIALES = 'Usuario, NIT o contraseña incorrectos';
+export const MENSAJE_CREDENCIALES = 'Código o NIT, usuario o contraseña incorrectos';
+
+const identificadorDe = (dto: AccesoDto): IdentificadorDeAcceso => {
+  // Nulo = ausente: el cliente Dart generado envía los opcionales como `null`.
+  if (dto.correo !== undefined && dto.correo !== null)
+    return { tipo: 'correo', correo: dto.correo };
+  if (dto.codigo !== undefined && dto.codigo !== null) {
+    return { tipo: 'codigo', codigo: dto.codigo, usuario: dto.usuario ?? '' };
+  }
+  return { tipo: 'usuario', nit: dto.nit ?? '', usuario: dto.usuario ?? '' };
+};
 
 const origenDe = (peticion: Request): OrigenDeAcceso => {
   const cabeceras = peticion.headers as Record<string, unknown>;
@@ -97,7 +108,7 @@ export class CuentasController {
   @Publico()
   @LimitadaComoAcceso()
   @Throttle({ default: { limit: LIMITE_POR_DIRECCION, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Inicio de sesión por correo o por NIT y usuario' })
+  @ApiOperation({ summary: 'Inicio de sesión por correo, o por código (o NIT) y usuario' })
   @ApiOkResponse({ type: SesionDeAccesoDto })
   @ApiUnauthorizedResponse({ type: ErrorApiDto, description: MENSAJE_CREDENCIALES })
   @ApiForbiddenResponse({
@@ -109,13 +120,7 @@ export class CuentasController {
     description: '5/min por cuenta, 10/min por origen declarado, 30/min por dirección (S-50)',
   })
   async acceso(@Body() dto: AccesoDto, @Req() peticion: Request): Promise<SesionDeAccesoDto> {
-    const r = await this.iniciar.ejecutar(
-      dto.correo !== undefined
-        ? { tipo: 'correo', correo: dto.correo }
-        : { tipo: 'usuario', nit: dto.nit ?? '', usuario: dto.usuario ?? '' },
-      dto.contrasena,
-      origenDe(peticion),
-    );
+    const r = await this.iniciar.ejecutar(identificadorDe(dto), dto.contrasena, origenDe(peticion));
     if (!r.ok) {
       if (r.error.motivo === 'CREDENCIALES') throw new UnauthorizedException(MENSAJE_CREDENCIALES);
       if (r.error.motivo === 'SIN_ACCESO') {

@@ -73,13 +73,16 @@ export const CodigosDeRecuperacion = ({
         <div>
           <h2 className="text-seccion">Guarda tus códigos de recuperación</h2>
           <p className="mt-1 text-secundario text-texto-apagado">
-            Se muestran <strong>una sola vez</strong>. Si pierdes el teléfono, son la única forma
-            de recuperar el acceso sin ayuda de nadie.
+            Se muestran <strong>una sola vez</strong>. Si pierdes el teléfono, son la única forma de
+            recuperar el acceso sin ayuda de nadie.
           </p>
         </div>
 
         {error !== undefined ? (
-          <p role="alert" className="rounded-tarjeta border border-aviso/30 bg-aviso-suave px-4 py-3 text-cuerpo text-aviso-texto">
+          <p
+            role="alert"
+            className="rounded-tarjeta border border-aviso/30 bg-aviso-suave px-4 py-3 text-cuerpo text-aviso-texto"
+          >
             {error}
           </p>
         ) : codigos === null ? (
@@ -107,8 +110,8 @@ export const CodigosDeRecuperacion = ({
               {copiado ? 'Copiados al portapapeles' : 'Copiar los códigos'}
             </Boton>
             <p className="text-secundario text-texto-apagado">
-              Un código <strong>no da acceso</strong>: sirve para retirar el factor perdido y
-              poder configurar otro. Cada uno funciona una sola vez.
+              Un código <strong>no da acceso</strong>: sirve para retirar el factor perdido y poder
+              configurar otro. Cada uno funciona una sola vez.
             </p>
             <label className="flex items-start gap-2 text-secundario text-texto">
               <input

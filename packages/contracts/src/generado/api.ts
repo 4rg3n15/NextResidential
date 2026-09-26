@@ -13,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Inicio de sesión por correo o por NIT y usuario */
+        /** Inicio de sesión por correo, o por código (o NIT) y usuario */
         post: operations["CuentasController_acceso"];
         delete?: never;
         options?: never;
@@ -912,6 +912,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/listas-negras": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vetos activos de la copropiedad (HU-35) */
+        get: operations["ListasNegrasController_listar"];
+        put?: never;
+        /** Veta una placa o una persona por su documento, con motivo (RN-06, RN-07) */
+        post: operations["ListasNegrasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/listas-negras/{vetoId}/levantamiento": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Levanta un veto: sólo la administración, con autor y momento (RN-07) */
+        post: operations["ListasNegrasController_levantarVeto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/alta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Qué le falta al residente para operar: vivienda y ocupantes (3.2) */
+        get: operations["MiAltaController_estado"];
+        put?: never;
+        /** Primer ingreso: contacto, documento, vivienda y código (3.2) */
+        post: operations["MiAltaController_alta"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/autorizaciones": {
         parameters: {
             query?: never;
@@ -924,6 +977,23 @@ export interface paths {
         put?: never;
         /** Autorizo a un visitante de mi vivienda (HU-07, HU-08, HU-09, M-4) */
         post: operations["MiController_crearAutorizacion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/consentimientos/{consentimientoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ¿Respondió mi visitante? pendiente, aceptado o rechazado (RN-10) */
+        get: operations["MiHogarController_estadoDelConsentimiento"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -998,6 +1068,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/mi/ocupantes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mis ocupantes y los códigos de las plazas libres (3.3) */
+        get: operations["MiAltaController_ocupantes"];
+        put?: never;
+        /** Declaro cuántos ocupantes hay: una vez y definitivo (D6) */
+        post: operations["MiAltaController_declararOcupantes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/perfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mi perfil, mi copropiedad y el teléfono de portería (3.5, D7) */
+        get: operations["MiHogarController_perfil"];
+        /** Edito mis datos personales y de contacto (3.5) */
+        put: operations["MiHogarController_editar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/vehiculos": {
         parameters: {
             query?: never;
@@ -1008,7 +1114,42 @@ export interface paths {
         /** Los vehículos de mi vivienda (HU-05, HU-06 lectura, M-3) */
         get: operations["MiController_vehiculos"];
         put?: never;
-        post?: never;
+        /** Registro un vehículo propio: activo al instante, dentro del tope (D5 a) */
+        post: operations["MiHogarController_vehiculo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/vehiculos/{vehiculoId}/desactivacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Doy de baja un vehículo propio de mi vivienda; libera el cupo */
+        post: operations["MiHogarController_desactivar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/vinculacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cambio de vivienda desde el perfil: siempre con código (3.5) */
+        post: operations["MiAltaController_cambioDeVivienda"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1344,6 +1485,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/residentes/cuentas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cuentas de residentes y su vivienda (sin correo) */
+        get: operations["SupervisionDeResidentesController_listar"];
+        put?: never;
+        /** Alta de un residente con usuario y contraseña inicial (3.1) */
+        post: operations["SupervisionDeResidentesController_alta"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/residentes/vehiculos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vehículos registrados por residentes, con fecha y vivienda (D5 a) */
+        get: operations["SupervisionDeResidentesController_vehiculos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/tablero/accesos-por-hora": {
         parameters: {
             query?: never;
@@ -1458,6 +1634,41 @@ export interface paths {
         put?: never;
         /** Restablece la contraseña de una cuenta con una temporal y cambio obligatorio */
         post: operations["CuentasController_restablecimiento"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/viviendas/{viviendaId}/ocupantes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plazas de ocupante de una vivienda, con los códigos libres (D6) */
+        get: operations["OcupantesDeViviendaController_ver"];
+        put?: never;
+        /** Añade ocupantes a petición del residente, con motivo (D6) */
+        post: operations["OcupantesDeViviendaController_anadir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/viviendas/{viviendaId}/ocupantes/{plazaId}/retiro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quita un ocupante; si la plaza estaba ocupada, da de baja el vínculo (D6) */
+        post: operations["OcupantesDeViviendaController_retirar"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1770,6 +1981,8 @@ export interface components {
         AccesoDto: {
             /** @description Cuentas por correo */
             correo?: string;
+            /** @description Código corto de la copropiedad (D1): 3 a 8 letras o números */
+            codigo?: string;
             /** @description NIT de la copropiedad */
             nit?: string;
             /** @description Nombre de usuario */
@@ -1830,6 +2043,14 @@ export interface components {
             escaladaDentroDelPlazo: boolean | null;
             notas: string | null;
         };
+        AltaDeCuentaDeResidenteDto: {
+            /** @example casa42.ana */
+            usuario: string;
+            /** Format: password */
+            contrasenaInicial: string;
+            nombre: string;
+            telefono?: string | null;
+        };
         AltaDeEquipoDto: {
             nombre: string;
             /** @enum {string} */
@@ -1856,6 +2077,15 @@ export interface components {
             /** @default true */
             probarConexion: boolean;
         };
+        AltaDeMiViviendaDto: {
+            perfil: components["schemas"]["PerfilDto"];
+            /** @description El número de la vivienda, que tiene que EXISTIR */
+            identificador: string;
+            /** @description La agrupación (torre, manzana…): obligatoria en un conjunto de apartamentos */
+            agrupacion?: string | null;
+            /** @description Código de ocupante. Nulo = «no lo tengo» (sólo si la vivienda no tiene cuenta) */
+            codigo?: string | null;
+        };
         AltaDePorteroDto: {
             nombre: string;
             telefono?: string | null;
@@ -1867,6 +2097,10 @@ export interface components {
             usuario: string;
             /** Format: password */
             contrasenaInicial: string;
+        };
+        AnadirOcupantesDto: {
+            cantidad: number;
+            motivo: string;
         };
         AparatoRegistradoDto: {
             /** Format: uuid */
@@ -1971,6 +2205,25 @@ export interface components {
             zonaHoraria?: string;
             /** @enum {string} */
             politicaContingenciaEdge?: "denegar" | "escalar_portero";
+            /**
+             * @description D1 · código corto de acceso: 3 a 8 letras o números (sólo superadministrador)
+             * @example MIRA
+             */
+            codigoCorto?: string;
+            /**
+             * @description D7 · teléfono de portería; vacío lo borra (sólo superadministrador)
+             * @example +57 601 555 0100
+             */
+            telefonoPorteria?: string;
+            /**
+             * @description D5 a · vehículos propios por vivienda (sólo superadministrador)
+             * @example 2
+             */
+            topeVehiculosPropios?: number;
+        };
+        CampoRechazadoDto: {
+            campo: string;
+            motivo: string;
         };
         CapacidadDeAudioDto: {
             /** @enum {string} */
@@ -2101,6 +2354,26 @@ export interface components {
             margenCacheReglasHoras: number;
             /** @example 3 */
             versionReglasActual: number;
+            /**
+             * @description D1 · código corto de acceso; null mientras no se asigne (sólo se entra por NIT).
+             * @example MIRA
+             */
+            codigoCorto: string | null;
+            /**
+             * @description D7 · teléfono al que llama el botón «Portería» de la app.
+             * @example +576015550100
+             */
+            telefonoPorteria: string | null;
+            /**
+             * @description D5 a · vehículos propios por vivienda.
+             * @example 2
+             */
+            topeVehiculosPropios: number;
+            /**
+             * @description D5 c · solo lectura: modo de aprobación de terceros (ADR-027).
+             * @enum {string}
+             */
+            aprobacionDeTerceros: "automatica";
             /** @description Ajustes que ESTE rol puede cambiar. La consola deshabilita el resto. */
             editables: string[];
         };
@@ -2224,6 +2497,20 @@ export interface components {
             icono?: string | null;
             normas?: string[];
         };
+        CuentaDeResidenteCreadaDto: {
+            /** Format: uuid */
+            usuarioId: string;
+        };
+        CuentaDeResidenteDto: {
+            /** Format: uuid */
+            usuarioId: string;
+            usuario: string | null;
+            nombre: string;
+            vivienda: string | null;
+            activa: boolean;
+            debeCambiarContrasena: boolean;
+            creadaEn: string;
+        };
         DatosDeTurnoDto: {
             /** Format: uuid */
             porteroId: string;
@@ -2267,6 +2554,11 @@ export interface components {
             versionDeReglas: number;
             /** @description Lectura de baja confianza (CU-01 3a) */
             requiereConfirmacionHumana?: boolean;
+        };
+        DeclaracionDeOcupantesDto: {
+            numero: number;
+            /** @description El residente confirmó que el número es DEFINITIVO */
+            confirmoQueEsDefinitivo: boolean;
         };
         DefinicionKpiDto: {
             /** @example KPI-32 */
@@ -2481,6 +2773,10 @@ export interface components {
             /** @description A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice. */
             formatoDeAudio: string | null;
         };
+        EstadoDeConsentimientoDto: {
+            /** @enum {string} */
+            estado: "pendiente" | "aceptado" | "rechazado" | "revocado" | "expirado";
+        };
         EstadoDeDispositivosDto: {
             dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
             /** @example 3 */
@@ -2489,6 +2785,15 @@ export interface components {
             degradados: number;
             /** @example 0 */
             caidos: number;
+        };
+        EstadoDeMiAltaDto: {
+            completa: boolean;
+            viviendaVinculada: boolean;
+            debeDeclararOcupantes: boolean;
+            vocabulario: components["schemas"]["VocabularioDeAltaDto"];
+            pideAgrupacion: boolean;
+            /** @description El texto que la pantalla muestra ANTES de confirmar (D6) */
+            avisoOcupantes: string;
         };
         EstadoDeSesionDto: {
             /** @enum {string} */
@@ -2727,6 +3032,10 @@ export interface components {
             /** Format: uuid */
             id: string;
         };
+        IdVetoDto: {
+            /** Format: uuid */
+            id: string;
+        };
         IndicadoresDto: {
             padron: components["schemas"]["ConteosDelPadronDto"];
             visitantes: components["schemas"]["ConteosDeVisitantesDto"];
@@ -2895,6 +3204,12 @@ export interface components {
             /** @description RN-19: el desactivado conserva historial. */
             activo: boolean;
         };
+        MisOcupantesDto: {
+            declarados: number;
+            declarada: boolean;
+            plazas: components["schemas"]["PlazaDeOcupanteDto"][];
+            aviso: string;
+        };
         ModificacionDto: {
             modificada: boolean;
         };
@@ -3026,6 +3341,33 @@ export interface components {
             /** @description Identificadores de equipos con una orden sin ejecutar: se muestran «sincronizando». */
             dispositivos: string[];
         };
+        PerfilDelResidenteDto: {
+            nombres: string | null;
+            apellidos: string | null;
+            nombreCompleto: string;
+            fechaNacimiento: string | null;
+            tipoDocumento: string | null;
+            numeroDocumento: string | null;
+            correo: string | null;
+            telefono: string | null;
+            copropiedadNombre: string;
+            copropiedadDireccion: string | null;
+            /** @description D7 · null = el superadministrador no lo ha registrado */
+            telefonoPorteria: string | null;
+        };
+        PerfilDto: {
+            nombres: string;
+            apellidos: string;
+            /** @example 1990-05-17 */
+            fechaNacimiento?: string | null;
+            /** @enum {string} */
+            tipoDocumento: "cedula" | "cedula_extranjeria" | "pasaporte" | "otro";
+            numeroDocumento: string;
+            /** @description Canal de CONTACTO, no de acceso */
+            correo: string;
+            /** @description Canal de CONTACTO, no de acceso */
+            telefono: string;
+        };
         PermisoDeZonaDto: {
             /** Format: uuid */
             zonaId: string;
@@ -3054,6 +3396,18 @@ export interface components {
             porPiso?: number;
             reiniciarNumeracion?: boolean;
             excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
+        };
+        PlazaDeOcupanteDto: {
+            /** Format: uuid */
+            id: string;
+            numero: number;
+            libre: boolean;
+            /** @description Sólo en las libres: ABCD-EFGH */
+            codigo: string | null;
+            ocupante: string | null;
+        };
+        PlazaRetiradaDto: {
+            retirada: boolean;
         };
         PorteroCreadoDto: {
             /** Format: uuid */
@@ -3182,6 +3536,14 @@ export interface components {
              */
             registrado: boolean;
         };
+        ResultadoDeAltaDto: {
+            vinculada: boolean;
+            debeDeclararOcupantes: boolean;
+            /** @enum {string|null} */
+            motivo: "DEMASIADOS_INTENTOS" | "VIVIENDA_INEXISTENTE" | "AGRUPACION_REQUERIDA" | "VIVIENDA_INACTIVA" | "CODIGO_REQUERIDO" | "CODIGO_INCORRECTO" | "DOCUMENTO_EN_USO" | "YA_VINCULADA" | null;
+            explicacion: string | null;
+            campos: components["schemas"]["CampoRechazadoDto"][];
+        };
         ResultadoDeCargaDto: {
             aceptadas: number;
             /** @description Errores fila a fila. Si hay uno solo, `aplicada` es falso: la carga es atómica. */
@@ -3216,6 +3578,13 @@ export interface components {
             estado: "sincronizando";
             detalle: string;
         };
+        ResultadoDePerfilDto: {
+            guardado: boolean;
+            perfil?: components["schemas"]["PerfilDelResidenteDto"] | null;
+            /** @enum {string|null} */
+            motivo: "DOCUMENTO_EN_USO" | "SIN_VINCULO" | null;
+            campos: components["schemas"]["CampoRechazadoDto"][];
+        };
         ResultadoDeReconciliacionDto: {
             /** @description La clave con la que el Edge lo reconocerá en su bandeja */
             claveIdempotencia: string;
@@ -3241,12 +3610,23 @@ export interface components {
             /** @description Lo que el equipo declaró poder hacer. Ausente cuando no se alcanzó. */
             capacidades?: components["schemas"]["CapacidadesDeEquipoDto"];
         };
+        ResultadoDeVehiculoPropioDto: {
+            registrado: boolean;
+            /** Format: uuid */
+            id: string | null;
+            /** @enum {string|null} */
+            motivo: "TOPE_ALCANZADO" | "PLACA_DUPLICADA" | "VIVIENDA_INACTIVA" | "OCUPANTE_AJENO" | "SIN_OCUPANTES" | "DATOS_INVALIDOS" | null;
+            explicacion: string | null;
+        };
         ResultadoPorTerminalDto: {
             /** Format: uuid */
             dispositivoId: string;
             nombre: string;
             sincronizada: boolean;
             detalle: string;
+        };
+        RetiroDeOcupanteDto: {
+            motivo: string;
         };
         RetiroDeTurnoDto: {
             motivo: string;
@@ -3388,6 +3768,25 @@ export interface components {
             url: string;
             expiraEnSegundos: number;
         };
+        VehiculoDeResidenteDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            viviendaId: string;
+            vivienda: string;
+            placa: string;
+            color: string | null;
+            modelo: string | null;
+            marca: string | null;
+            tipo: string;
+            registradoEn: string;
+            registradoPor: string | null;
+            ocupantes: string[];
+            activo: boolean;
+        };
+        VehiculoDesactivadoDto: {
+            desactivado: boolean;
+        };
         VehiculoDto: {
             /** Format: uuid */
             id: string;
@@ -3405,6 +3804,16 @@ export interface components {
             /** Format: uuid */
             propietarioId: string | null;
             propietarioNombre: string | null;
+        };
+        VehiculoPropioDto: {
+            placa: string;
+            color: string;
+            modelo: string;
+            marca?: string | null;
+            /** @enum {string} */
+            tipo: "automovil" | "motocicleta" | "bicicleta" | "otro";
+            /** @description `residenteId` de los ocupantes vinculados */
+            ocupantes: string[];
         };
         VentanaDelDiaDto: {
             /**
@@ -3427,6 +3836,27 @@ export interface components {
             admitido: boolean;
             conteo: number | null;
             motivo: string | null;
+        };
+        VetoDto: {
+            placa?: string | null;
+            /** @description Documento de la persona a vetar; se resuelve en ESTA copropiedad */
+            documento?: string | null;
+            motivo: string;
+        };
+        VetoLevantadoDto: {
+            levantado: boolean;
+        };
+        VetoListadoDto: {
+            /** Format: uuid */
+            id: string;
+            placa: string | null;
+            /** Format: uuid */
+            personaId: string | null;
+            persona: string | null;
+            documento: string | null;
+            motivo: string;
+            /** Format: date-time */
+            creadoEn: string;
         };
         VisitaCreadaDto: {
             /** @description false = una regla de negocio lo impidió */
@@ -3467,6 +3897,12 @@ export interface components {
         ViviendaProyectadaDto: {
             agrupacion: string | null;
             identificador: string;
+        };
+        VocabularioDeAltaDto: {
+            copropiedadNombre: string;
+            tipo: string | null;
+            etiquetaVivienda: string;
+            etiquetaAgrupacion: string;
         };
         ZonaDto: {
             /** Format: uuid */
@@ -3519,7 +3955,7 @@ export interface operations {
                     "application/json": components["schemas"]["SesionDeAccesoDto"];
                 };
             };
-            /** @description Usuario, NIT o contraseña incorrectos */
+            /** @description Código o NIT, usuario o contraseña incorrectos */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -5260,6 +5696,120 @@ export interface operations {
             };
         };
     };
+    ListasNegrasController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VetoListadoDto"][];
+                };
+            };
+        };
+    };
+    ListasNegrasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VetoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdVetoDto"];
+                };
+            };
+        };
+    };
+    ListasNegrasController_levantarVeto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                vetoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VetoLevantadoDto"];
+                };
+            };
+        };
+    };
+    MiAltaController_estado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeMiAltaDto"];
+                };
+            };
+        };
+    };
+    MiAltaController_alta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AltaDeMiViviendaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeAltaDto"];
+                };
+            };
+        };
+    };
     MiController_autorizaciones: {
         parameters: {
             query?: never;
@@ -5302,6 +5852,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VisitaCreadaDto"];
+                };
+            };
+        };
+    };
+    MiHogarController_estadoDelConsentimiento: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+                consentimientoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeConsentimientoDto"];
                 };
             };
         };
@@ -5402,6 +5975,98 @@ export interface operations {
             };
         };
     };
+    MiAltaController_ocupantes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MisOcupantesDto"];
+                };
+            };
+        };
+    };
+    MiAltaController_declararOcupantes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclaracionDeOcupantesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MisOcupantesDto"];
+                };
+            };
+        };
+    };
+    MiHogarController_perfil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerfilDelResidenteDto"];
+                };
+            };
+        };
+    };
+    MiHogarController_editar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerfilDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDePerfilDto"];
+                };
+            };
+        };
+    };
     MiController_vehiculos: {
         parameters: {
             query?: never;
@@ -5419,6 +6084,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MiVehiculoDto"][];
+                };
+            };
+        };
+    };
+    MiHogarController_vehiculo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehiculoPropioDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeVehiculoPropioDto"];
+                };
+            };
+        };
+    };
+    MiHogarController_desactivar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                vehiculoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehiculoDesactivadoDto"];
+                };
+            };
+        };
+    };
+    MiAltaController_cambioDeVivienda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AltaDeMiViviendaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeAltaDto"];
                 };
             };
         };
@@ -6022,6 +6759,73 @@ export interface operations {
             };
         };
     };
+    SupervisionDeResidentesController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuentaDeResidenteDto"][];
+                };
+            };
+        };
+    };
+    SupervisionDeResidentesController_alta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AltaDeCuentaDeResidenteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuentaDeResidenteCreadaDto"];
+                };
+            };
+        };
+    };
+    SupervisionDeResidentesController_vehiculos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehiculoDeResidenteDto"][];
+                };
+            };
+        };
+    };
     TableroController_leerAccesosPorHora: {
         parameters: {
             query?: never;
@@ -6226,6 +7030,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    OcupantesDeViviendaController_ver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                viviendaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlazaDeOcupanteDto"][];
+                };
+            };
+        };
+    };
+    OcupantesDeViviendaController_anadir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                viviendaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnadirOcupantesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlazaDeOcupanteDto"][];
+                };
+            };
+        };
+    };
+    OcupantesDeViviendaController_retirar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                viviendaId: string;
+                plazaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetiroDeOcupanteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlazaRetiradaDto"];
                 };
             };
         };

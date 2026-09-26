@@ -41,6 +41,23 @@ dependencies:
   json_annotation: ^4.9.0
   connectivity_plus: ^6.1.0
   retrofit: ^4.4.1
+  # ETAPA 15-I (punto 5) · el QR del enlace de consentimiento del VISITANTE.
+  # Dart puro: pinta en el lienzo, sin plataforma ni permisos.
+  qr_flutter: ^4.1.0
+  # ETAPA 15-I (punto 5) · el panel NATIVO de compartir (WhatsApp, SMS…): no hay
+  # SMTP (D9) y el enlace lo entrega el residente desde su teléfono.
+  share_plus: ^10.1.4
+  # ETAPA 15-I (D7) · el botón «Portería» abre el marcador con `tel:`.
+  url_launcher: ^6.3.1
+  # ETAPA 15-I (hito 3) · la CÁMARA REAL del teléfono: la terminal facial
+  # construye la plantilla a partir de un JPEG, y la foto se reduce en el propio
+  # aparato (lado 640) antes de salir. Abre la cámara del sistema: sin binarios
+  # propios de detección.
+  image_picker: ^1.2.3
+  # ETAPA 15-I (hito 3) · Dart puro: descodifica el JPEG para medir iluminación
+  # y nitidez con las MISMAS fórmulas que la consola, y lo recomprime si pasa
+  # del techo de 180 KB.
+  image: ^4.10.1
 
 dev_dependencies:
   flutter_test:

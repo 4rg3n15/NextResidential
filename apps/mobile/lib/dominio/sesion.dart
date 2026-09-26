@@ -44,6 +44,7 @@ class Sesion {
     required this.usuarioId,
     required this.copropiedadId,
     required this.correo,
+    this.debeCambiarContrasena = false,
   });
 
   final String tokenDeAcceso;
@@ -57,19 +58,25 @@ class Sesion {
   final String? copropiedadId;
   final String correo;
 
+  /// ADR-023 · el claim `debe_cambiar_contrasena` del token: una cuenta nueva o
+  /// restablecida no puede hacer nada hasta cambiarla (lo impone el SERVIDOR;
+  /// la app sólo lleva a la pantalla que toca en vez de mostrar 403).
+  final bool debeCambiarContrasena;
+
   Sesion conTokens({
     required String tokenDeAcceso,
     required String tokenDeRefresco,
     required DateTime expiraEn,
-  }) =>
-      Sesion(
-        tokenDeAcceso: tokenDeAcceso,
-        tokenDeRefresco: tokenDeRefresco,
-        expiraEn: expiraEn,
-        usuarioId: usuarioId,
-        copropiedadId: copropiedadId,
-        correo: correo,
-      );
+    bool? debeCambiarContrasena,
+  }) => Sesion(
+    tokenDeAcceso: tokenDeAcceso,
+    tokenDeRefresco: tokenDeRefresco,
+    expiraEn: expiraEn,
+    usuarioId: usuarioId,
+    copropiedadId: copropiedadId,
+    correo: correo,
+    debeCambiarContrasena: debeCambiarContrasena ?? this.debeCambiarContrasena,
+  );
 }
 
 /// Qué hacer con una sesión en un instante dado.

@@ -70,6 +70,15 @@ import {
   NotificacionesDelResidenteEnMemoria,
   ZonasDelResidenteEnMemoria,
 } from './dobles/directorio-del-residente';
+import { HogarEnMemoria } from './dobles/hogar-en-memoria';
+import {
+  ALTA_DEL_RESIDENTE,
+  BITACORA_DE_RESIDENTES,
+  CUENTAS_DE_RESIDENTES,
+  OCUPANTES_DE_LA_VIVIENDA,
+  PERFIL_DEL_RESIDENTE,
+  VEHICULOS_PROPIOS,
+} from '../src/residente/aplicacion/puertos-hogar';
 
 export { COP_A, COP_B } from './constantes';
 
@@ -226,6 +235,41 @@ export const conSesionDePorteriaDeLaSuite = (b: TestingModuleBuilder): TestingMo
  * `AdministradorDeFactores`, no el controlador, así que lo que se ejercita
  * sigue siendo el camino real.
  */
+/**
+ * El directorio del residente, con su doble en memoria y DOS VIVIENDAS
+ * pobladas en la misma copropiedad, y los puertos de 11-B y de la 15-I.
+ *
+ * Se sustituye aquí —y no en cada suite— porque el eje de aislamiento que la
+ * ETAPA 11 añade es residente contra residente DENTRO del mismo conjunto, y sin
+ * dos viviendas con datos distinguibles ese recorrido pasaría en verde con una
+ * implementación que solo filtrara por copropiedad. Los adaptadores PostgreSQL
+ * se ejercen contra base real.
+ */
+const conDoblesDelResidente = (b: TestingModuleBuilder): TestingModuleBuilder => {
+  const hogar = new HogarEnMemoria();
+  return b
+    .overrideProvider(DIRECTORIO_DEL_RESIDENTE)
+    .useFactory({ factory: () => new DirectorioDelResidenteEnMemoria() })
+    .overrideProvider(AUTORIZACIONES_DEL_RESIDENTE)
+    .useFactory({ factory: () => new AutorizacionesDelResidenteEnMemoria() })
+    .overrideProvider(ZONAS_DEL_RESIDENTE)
+    .useFactory({ factory: () => new ZonasDelResidenteEnMemoria() })
+    .overrideProvider(NOTIFICACIONES_DEL_RESIDENTE)
+    .useFactory({ factory: () => new NotificacionesDelResidenteEnMemoria() })
+    .overrideProvider(ALTA_DEL_RESIDENTE)
+    .useValue(hogar)
+    .overrideProvider(OCUPANTES_DE_LA_VIVIENDA)
+    .useValue(hogar)
+    .overrideProvider(VEHICULOS_PROPIOS)
+    .useValue(hogar)
+    .overrideProvider(PERFIL_DEL_RESIDENTE)
+    .useValue(hogar)
+    .overrideProvider(BITACORA_DE_RESIDENTES)
+    .useValue(hogar)
+    .overrideProvider(CUENTAS_DE_RESIDENTES)
+    .useValue(hogar);
+};
+
 export const crearApp = async (
   firmante: Firmante,
   sustituir?: (constructor: TestingModuleBuilder) => TestingModuleBuilder,
@@ -267,48 +311,38 @@ export const crearApp = async (
   // La sesión de la suite va ANTES de `sustituir`, para que una suite que
   // quiera el control real de portería pueda reemplazarlo y gane.
   const conSuite = conSesionDePorteriaDeLaSuite(base);
-  const modulo = await (sustituir === undefined ? conSuite : sustituir(conSuite))
-    /**
-     * El catálogo de copropiedades se sustituye por el doble en memoria.
-     *
-     * En producción lo sirve PostgreSQL bajo la RLS; aquí no hay contraseña
-     * (D-17) y una consulta real dejaría la suite dependiendo de una base. Lo
-     * que estas pruebas ejercitan es el **filtro de aplicación**, que es la
-     * barrera que sigue en pie cuando la llave secreta omite la RLS. El camino
-     * de la RLS se prueba aparte y contra base real.
-     */
-    .overrideProvider(REPOSITORIO_COPROPIEDADES)
-    .useFactory({
-      factory: () => {
-        const catalogo = new RepositorioCopropiedadesEnMemoria();
-        catalogo.declarar([
-          { id: COP_A, nombre: 'Copropiedad A', zonaHoraria: 'America/Bogota' },
-          { id: COP_B, nombre: 'Copropiedad B', zonaHoraria: 'America/Bogota' },
-        ]);
-        return catalogo;
-      },
-    })
-    /**
-     * El directorio del residente, con su doble en memoria y DOS VIVIENDAS
-     * pobladas en la misma copropiedad.
-     *
-     * Se sustituye aquí —y no en cada suite— porque el eje de aislamiento que
-     * la ETAPA 11 añade es residente contra residente DENTRO del mismo
-     * conjunto, y sin dos viviendas con datos distinguibles ese recorrido
-     * pasaría en verde con una implementación que solo filtrara por
-     * copropiedad. El adaptador PostgreSQL se ejerce aparte, contra base real.
-     */
-    .overrideProvider(DIRECTORIO_DEL_RESIDENTE)
-    .useFactory({ factory: () => new DirectorioDelResidenteEnMemoria() })
-    // Los tres puertos que 11-B añadió. El de escritura guarda por ámbito, que
-    // es lo que hace que la prueba del segundo eje diga algo sobre las
-    // escrituras y no solo sobre las lecturas.
-    .overrideProvider(AUTORIZACIONES_DEL_RESIDENTE)
-    .useFactory({ factory: () => new AutorizacionesDelResidenteEnMemoria() })
-    .overrideProvider(ZONAS_DEL_RESIDENTE)
-    .useFactory({ factory: () => new ZonasDelResidenteEnMemoria() })
-    .overrideProvider(NOTIFICACIONES_DEL_RESIDENTE)
-    .useFactory({ factory: () => new NotificacionesDelResidenteEnMemoria() })
+  const sustituido = sustituir === undefined ? conSuite : sustituir(conSuite);
+  const baseReal = configuracion?.PERSISTENCIA_DE_EVENTOS === 'postgres';
+  const conCatalogo = baseReal
+    ? sustituido
+    : sustituido
+        /**
+         * El catálogo de copropiedades se sustituye por el doble en memoria.
+         *
+         * En producción lo sirve PostgreSQL bajo la RLS; aquí no hay contraseña
+         * (D-17) y una consulta real dejaría la suite dependiendo de una base. Lo
+         * que estas pruebas ejercitan es el **filtro de aplicación**, que es la
+         * barrera que sigue en pie cuando la llave secreta omite la RLS. El camino
+         * de la RLS se prueba aparte y contra base real.
+         */
+        .overrideProvider(REPOSITORIO_COPROPIEDADES)
+        .useFactory({
+          factory: () => {
+            const catalogo = new RepositorioCopropiedadesEnMemoria();
+            catalogo.declarar([
+              { id: COP_A, nombre: 'Copropiedad A', zonaHoraria: 'America/Bogota' },
+              { id: COP_B, nombre: 'Copropiedad B', zonaHoraria: 'America/Bogota' },
+            ]);
+            return catalogo;
+          },
+        });
+  /**
+   * ETAPA 15-I · con base real (`PERSISTENCIA_DE_EVENTOS=postgres`) el catálogo
+   * de copropiedades, el residente y su hogar usan sus adaptadores PostgreSQL:
+   * la suite contra base recorre la cadena ENTERA —configuración → identidad →
+   * vivienda → plazas → vehículos— y no un doble. Sin base, los de siempre.
+   */
+  const modulo = await (baseReal ? conCatalogo : conDoblesDelResidente(conCatalogo))
     /**
      * ETAPA 15-B · los equipos, con su doble en memoria y su sonda muda.
      *

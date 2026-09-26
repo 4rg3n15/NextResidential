@@ -19,6 +19,9 @@ class CambiosDeConfiguracionDto {
     this.etiquetaAgrupacion,
     this.zonaHoraria,
     this.politicaContingenciaEdge,
+    this.codigoCorto,
+    this.telefonoPorteria,
+    this.topeVehiculosPropios,
   });
   
   factory CambiosDeConfiguracionDto.fromJson(Map<String, Object?> json) => _$CambiosDeConfiguracionDtoFromJson(json);
@@ -30,6 +33,15 @@ class CambiosDeConfiguracionDto {
   final String? etiquetaAgrupacion;
   final String? zonaHoraria;
   final CambiosDeConfiguracionDtoPoliticaContingenciaEdge? politicaContingenciaEdge;
+
+  /// D1 · código corto de acceso: 3 a 8 letras o números (sólo superadministrador)
+  final String? codigoCorto;
+
+  /// D7 · teléfono de portería; vacío lo borra (sólo superadministrador)
+  final String? telefonoPorteria;
+
+  /// D5 a · vehículos propios por vivienda (sólo superadministrador)
+  final num? topeVehiculosPropios;
 
   Map<String, Object?> toJson() => _$CambiosDeConfiguracionDtoToJson(this);
 }

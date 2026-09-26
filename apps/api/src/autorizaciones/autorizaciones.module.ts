@@ -8,12 +8,16 @@ import type { Configuracion } from '../configuracion/esquema';
 import { IngestaController } from './presentacion/ingesta.controller';
 import { GuardiaDeFirmaDeIngesta } from './presentacion/guardia-firma';
 import { AutorizacionesController } from './presentacion/autorizaciones.controller';
+import { ListasNegrasController } from './presentacion/listas-negras.controller';
 import {
   CONSULTA_AUTORIZACIONES,
+  CONSULTA_LISTA_NEGRA,
   REPOSITORIO_AUTORIZACIONES,
   REPOSITORIO_LISTA_NEGRA,
 } from './aplicacion/puertos';
-import type { RepositorioAutorizaciones } from './aplicacion/puertos';
+import type { RepositorioAutorizaciones, RepositorioListaNegra } from './aplicacion/puertos';
+import { LevantarListaNegra, VetarEnListaNegra } from './aplicacion/listas-negras';
+import { ConsultaDeListaNegraPg } from './infraestructura/consulta-lista-negra-pg';
 import { RepositorioAutorizacionesPg } from './infraestructura/repositorio-autorizaciones-pg';
 import { RepositorioListaNegraPg } from './infraestructura/repositorio-lista-negra-pg';
 import {
@@ -54,7 +58,7 @@ export class AutorizacionesModule {
   static registrar(): DynamicModule {
     return {
       module: AutorizacionesModule,
-      controllers: [IngestaController, AutorizacionesController],
+      controllers: [IngestaController, AutorizacionesController, ListasNegrasController],
       providers: [
         GuardiaDeFirmaDeIngesta,
         {
@@ -79,6 +83,24 @@ export class AutorizacionesModule {
           provide: REPOSITORIO_LISTA_NEGRA,
           inject: [Pool],
           useFactory: (pool: Pool) => new RepositorioListaNegraPg(pool),
+        },
+        /** 15-I · HU-35 · la lista negra desde la consola: vetar y levantar. */
+        {
+          provide: CONSULTA_LISTA_NEGRA,
+          inject: [Pool],
+          useFactory: (pool: Pool) => new ConsultaDeListaNegraPg(pool),
+        },
+        {
+          provide: VetarEnListaNegra,
+          inject: [REPOSITORIO_LISTA_NEGRA, GENERADOR_DE_ID],
+          useFactory: (repo: RepositorioListaNegra, ids: GeneradorDeId) =>
+            new VetarEnListaNegra(repo, ids),
+        },
+        {
+          provide: LevantarListaNegra,
+          inject: [REPOSITORIO_LISTA_NEGRA, RELOJ],
+          useFactory: (repo: RepositorioListaNegra, reloj: Reloj) =>
+            new LevantarListaNegra(repo, reloj),
         },
         {
           provide: CrearAutorizacion,

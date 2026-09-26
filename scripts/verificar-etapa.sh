@@ -621,7 +621,10 @@ else
   else
     mal "alguna capa por debajo del umbral de §2.4"
   fi
-  echo "$salida_cob" | grep -E "^  (OK|BAJO)|QUEDARON FUERA|NADIE ejecutó|NO terminaron|^     - |SIN RESUMEN|SIN INFORME" | sed 's/^/     /'
+  # H-15I-11 · «NO terminó» y «CORRIDA INTERRUMPIDA» nombran la CAUSA (ENOBUFS,
+  # señal, memoria). Sin ellas, un paquete que murió a medias sólo se veía como
+  # la lista de sus ficheros «que nadie ejecutó».
+  echo "$salida_cob" | grep -E "^  (OK|BAJO)|QUEDARON FUERA|NADIE ejecutó|NO terminaron|NO terminó|CORRIDA INTERRUMPIDA|^     - |SIN RESUMEN|SIN INFORME" | sed 's/^/     /'
   # ───────────────────────────────────────────────────────────────────────────
   # D-105 · EL CONTROL IMPRIMÍA EL NOMBRE Y EL CONSUMIDOR LO TIRABA.
   #

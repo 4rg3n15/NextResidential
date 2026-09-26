@@ -140,3 +140,8 @@ export type TurnoDePorteria = Esquemas['TurnoDto'];
 export type TurnoGuardado = Esquemas['TurnoGuardadoDto'];
 export type HechoDeBitacora = Esquemas['HechoDeBitacoraDto'];
 export type TipoDeHechoDeBitacora = HechoDeBitacora['tipo'];
+
+/** ETAPA 15-I · residentes: cuentas, plazas de ocupante y vehículos registrados por ellos. */
+export type CuentaDeResidente = Esquemas['CuentaDeResidenteDto'];
+export type PlazaDeOcupante = Esquemas['PlazaDeOcupanteDto'];
+export type VehiculoDeResidente = Esquemas['VehiculoDeResidenteDto'];

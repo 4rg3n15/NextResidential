@@ -43,6 +43,7 @@ import 'generado/models/token_de_notificacion_dto.dart';
 import 'generado/models/token_de_notificacion_dto_plataforma.dart';
 import 'generado/models/visita_creada_dto.dart';
 import 'generado/models/visita_creada_dto_motivo.dart';
+import 'soporte_de_api.dart';
 
 /// Construye el `Dio` de la API con el interceptor de sesión.
 ///
@@ -107,47 +108,9 @@ class RepositorioApiDelResidente implements RepositorioDelResidente {
   final ResidenteApi _api;
   final SesionEnUso _sesion;
 
-  /// La copropiedad de la ruta sale de los claims de la sesión.
-  ///
-  /// No es un dato que el residente elija: si su token no la trae, ninguna ruta
-  /// de la API es alcanzable y decirlo así —«su cuenta no está asociada a un
-  /// conjunto»— es más útil que un 404 sin contexto. Es el mismo hueco que dejó
-  /// al superadministrador sin escribir (D-71), visto desde el otro lado.
-  String get _copropiedad {
-    final id = _sesion.sesion?.copropiedadId;
-    if (id == null || id.isEmpty) {
-      throw const Fallo(
-        ClaseDeFallo.sinPermiso,
-        'Su cuenta no está asociada a ninguna copropiedad. El administrador del '
-            'conjunto tiene que vincularla a su vivienda.',
-      );
-    }
-    return id;
-  }
+  String get _copropiedad => copropiedadDeLaSesion(_sesion);
 
-  Future<T> _pedir<T>(Future<T> Function() llamada) async {
-    try {
-      return await llamada();
-    } on DioException catch (e) {
-      throw _traducir(e);
-    }
-  }
-
-  Fallo _traducir(DioException e) {
-    if (e.type == DioExceptionType.connectionError ||
-        e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.receiveTimeout) {
-      return Fallo(ClaseDeFallo.sinConexion, e.message ?? 'Sin conexión');
-    }
-    final codigo = e.response?.statusCode;
-    final detalle = _detalleDe(e.response?.data) ?? e.message ?? 'Error de servidor';
-    return switch (codigo) {
-      401 => Fallo(ClaseDeFallo.sesionInvalida, detalle),
-      403 => Fallo(ClaseDeFallo.sinPermiso, detalle),
-      404 => Fallo(ClaseDeFallo.sinVivienda, detalle),
-      _ => Fallo(ClaseDeFallo.servidor, detalle),
-    };
-  }
+  Future<T> _pedir<T>(Future<T> Function() llamada) => pedirALaApi(llamada);
 
   @override
   Future<List<ZonaComun>> misZonas() => _pedir(() async {
@@ -243,26 +206,9 @@ class RepositorioApiDelResidente implements RepositorioDelResidente {
           consentimientoId: consentimiento,
           titular: dto.titular ?? 'su visitante',
           calidad: (dto.calidad ?? 0).toDouble(),
+          enlaceDeConsentimiento: dto.enlaceDeConsentimiento,
         );
       });
-
-  /// El cuerpo de error de la API tiene forma `{estado, correlacion, mensaje}`
-  /// —el filtro global de `main.ts`—, y `mensaje` puede ser a su vez el objeto
-  /// de Nest. Se extrae el texto útil sin suponer una sola forma, porque
-  /// suponerla fue justo lo que rompió la suite de la API cuando el filtro
-  /// global no estaba en el banco de pruebas.
-  String? _detalleDe(dynamic datos) {
-    if (datos is Map) {
-      final mensaje = datos['mensaje'] ?? datos['message'];
-      if (mensaje is String) return mensaje;
-      if (mensaje is Map) {
-        final interno = mensaje['message'];
-        if (interno is String) return interno;
-        if (interno is List && interno.isNotEmpty) return interno.join(', ');
-      }
-    }
-    return null;
-  }
 
   @override
   Future<MiHogar> miHogar() => _pedir(() async {

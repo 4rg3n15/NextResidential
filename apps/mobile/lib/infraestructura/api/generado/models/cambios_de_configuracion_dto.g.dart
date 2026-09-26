@@ -22,6 +22,9 @@ CambiosDeConfiguracionDto _$CambiosDeConfiguracionDtoFromJson(
       : CambiosDeConfiguracionDtoPoliticaContingenciaEdge.fromJson(
           json['politicaContingenciaEdge'] as String,
         ),
+  codigoCorto: json['codigoCorto'] as String?,
+  telefonoPorteria: json['telefonoPorteria'] as String?,
+  topeVehiculosPropios: json['topeVehiculosPropios'] as num?,
 );
 
 Map<String, dynamic> _$CambiosDeConfiguracionDtoToJson(
@@ -34,4 +37,7 @@ Map<String, dynamic> _$CambiosDeConfiguracionDtoToJson(
   'etiquetaAgrupacion': instance.etiquetaAgrupacion,
   'zonaHoraria': instance.zonaHoraria,
   'politicaContingenciaEdge': instance.politicaContingenciaEdge,
+  'codigoCorto': instance.codigoCorto,
+  'telefonoPorteria': instance.telefonoPorteria,
+  'topeVehiculosPropios': instance.topeVehiculosPropios,
 };

@@ -81,6 +81,12 @@ export interface ConstanciaDeAcceso {
   readonly claveIdempotencia: string;
   readonly duplicado: boolean;
   readonly permitido: boolean;
+  /**
+   * CU-01, excepción 3a · el motor PERMITIÓ con una lectura dudosa (entre la
+   * mitad del umbral y el umbral): la identificación sirve, pero la apertura la
+   * confirma una persona. Quien acciona tiene que respetarlo (H-15I-09).
+   */
+  readonly requiereConfirmacionHumana: boolean;
   readonly alertaId: string | null;
 }
 
@@ -98,6 +104,10 @@ export interface ConstanciaDeAcceso {
  * la única fuente que la auditoría acepta. Publicar de más es un aviso perdido;
  * publicar de menos, un evento inventado.
  */
+/** La marca del motor sobre una concesión; una negación nunca la lleva. */
+const dudosa = (d: ResultadoAcceso): boolean =>
+  d.permitido && d.requiereConfirmacionHumana === true;
+
 export class RegistrarAcceso {
   constructor(
     private readonly motor: MotorDeDecision,
@@ -177,6 +187,7 @@ export class RegistrarAcceso {
         claveIdempotencia: clave.valor,
         duplicado: true,
         permitido: acceso.permitido,
+        requiereConfirmacionHumana: dudosa(decision),
         alertaId: null,
       });
     }
@@ -190,6 +201,7 @@ export class RegistrarAcceso {
       claveIdempotencia: clave.valor,
       duplicado: false,
       permitido: acceso.permitido,
+      requiereConfirmacionHumana: dudosa(decision),
       alertaId,
     });
   }

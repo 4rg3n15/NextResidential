@@ -1,6 +1,8 @@
 import { puedeReconocer } from '@ncr/domain-core';
 import type { RepositorioConsentimientos, RepositorioPlantillas } from './puertos';
 
+const ES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * QUIÉN ES EL DUEÑO DE UNA PLANTILLA, Y SI SE LE PUEDE RECONOCER AHORA · A2
@@ -26,6 +28,11 @@ export class IdentidadBiometricaDesdeRepositorios {
 
   /** La persona dueña de la plantilla, o `null` si Next Control no la gestiona. */
   async titularDePlantilla(copropiedadId: string, plantillaId: string): Promise<string | null> {
+    // H-15I-08 · la terminal puede tener personas dadas de alta a mano con un
+    // número de empleado propio («1», «0042»). No es una plantilla nuestra: es
+    // un desconocido, se niega y se registra. Consultarlo tal cual reventaba la
+    // consulta (UUID inválido) y el equipo se quedaba sin veredicto.
+    if (!ES_UUID.test(plantillaId)) return null;
     const plantilla = await this.plantillas.porId(copropiedadId, plantillaId);
     return plantilla?.titularId ?? null;
   }

@@ -47,7 +47,7 @@ const montar = (opciones: { otorgado: boolean; activa: boolean }) => {
 
   let plantilla = desenvolver(
     PlantillaBiometrica.crear({
-      id: 'p-1',
+      id: '70000000-0000-4000-8000-000000000001',
       copropiedadId: COP,
       titularId: TITULAR,
       consentimientoId: 'c-1',
@@ -67,18 +67,25 @@ const montar = (opciones: { otorgado: boolean; activa: boolean }) => {
 describe('IdentidadBiometricaDesdeRepositorios', () => {
   it('traduce la plantilla que la terminal reconoció a su TITULAR', async () => {
     const identidad = montar({ otorgado: true, activa: true });
-    expect(await identidad.titularDePlantilla(COP, 'p-1')).toBe(TITULAR);
+    expect(await identidad.titularDePlantilla(COP, '70000000-0000-4000-8000-000000000001')).toBe(
+      TITULAR,
+    );
   });
 
   it('una plantilla que Next Control no gestiona no tiene titular', async () => {
     const identidad = montar({ otorgado: true, activa: true });
-    expect(await identidad.titularDePlantilla(COP, 'p-que-no-existe')).toBeNull();
+    expect(
+      await identidad.titularDePlantilla(COP, '70000000-0000-4000-8000-00000000ffff'),
+    ).toBeNull();
   });
 
   it('y de OTRA copropiedad tampoco: el aislamiento no se salta por una plantilla', async () => {
     const identidad = montar({ otorgado: true, activa: true });
     expect(
-      await identidad.titularDePlantilla('10000000-0000-4000-8000-000000000002', 'p-1'),
+      await identidad.titularDePlantilla(
+        '10000000-0000-4000-8000-000000000002',
+        '70000000-0000-4000-8000-000000000001',
+      ),
     ).toBeNull();
   });
 
@@ -96,5 +103,10 @@ describe('IdentidadBiometricaDesdeRepositorios', () => {
     // Sincronizar y reconocer son momentos distintos: sólo la activa cuenta.
     const identidad = montar({ otorgado: true, activa: false });
     expect(await identidad.consentimientoVigente(COP, TITULAR, AHORA)).toBe(false);
+  });
+
+  it('H-15I-08 · un número de empleado que no es nuestro (no UUID) es un desconocido, sin consultar', async () => {
+    const identidad = montar({ otorgado: true, activa: true });
+    expect(await identidad.titularDePlantilla(COP, '0042')).toBeNull();
   });
 });

@@ -318,28 +318,42 @@ lleva **esperado · obtenido · motivo en consola · latencia · evento en
 `/eventos` · evidencia · veredicto**; los pasos y criterios de cada escenario
 van debajo de su tabla. Resumen:
 
-| #   | Escenario                                                    | Criterio principal             | Umbral                  |
-| --- | ------------------------------------------------------------ | ------------------------------ | ----------------------- |
-| L1  | Placa con autorización vigente → abre                        | CA-04, CA-05, KPI-13, hito 2   | < 3 s lectura → relé    |
-| L2  | Placa sin autorización → `PLACA_DESCONOCIDA`, no abre        | CA-05, RN-01                   | < 3 s                   |
-| L3  | Placa vencida → `VIGENCIA_EXPIRADA`, no abre                 | CA-05, CA-12                   | < 3 s                   |
-| L4  | Lista negra con autorización vigente → `LISTA_NEGRA`, alerta | CA-13, RN-06, CA-18            | alerta < 10 s           |
-| L5  | Baja confianza → cola; apertura manual con motivo            | CU-01 3a, CA-16, CA-17, KPI-32 | orden → relé < 3 s      |
-| T1  | Enrolamiento con consentimiento del visitante                | CU-02, RN-10, CA-09, KPI-17    | sincronización < 60 s   |
-| T2  | Reconocimiento con verificación remota → abre                | CA-07, CA-26, KPI-13, hito 3   | < 3 s                   |
-| T3  | Rostro con autorización vencida → no abre                    | CA-12, CA-26                   | < 3 s                   |
-| T4  | Revocación → supresión inmediata verificada                  | RN-11, CA-11, KPI-20           | retirada < 60 s         |
-| T5  | Rostro no enrolado → no abre, sin dato biométrico en la API  | CA-07, RN-02                   | —                       |
-| V1  | Llamada → aviso emergente con la vivienda                    | CU-03, HU-25                   | aviso < 10 s            |
-| V2  | Audio bidireccional exclusivo                                | ADR-01, CA-19, KPI-33          | < 2 s extremo a extremo |
-| V3  | Video por WHEP a través de la API                            | KPI-33, RN-12, RN-21           | primer cuadro < 2 s     |
-| V4  | Apertura remota con motivo                                   | CA-20, RN-08, KPI-32           | orden → relé < 3 s      |
-| V5  | Negación con motivo y aviso al residente                     | CA-17, HU-28                   | —                       |
-| V6  | Operador en otra copropiedad, escalamiento y emergencia      | KPI-35, HU-29, CA-18           | escalamiento < 10 s     |
+> **Redefinidos en la ETAPA 15-I (26/09/2026, C-35).** L1–L5 y T1–T5 son ahora
+> los que fijó el usuario —tercero en su día y su franja, fuera de franja, otro
+> día, lista negra con autorización vigente— y **se ejecutan por dos canales**:
+> la visita creada desde la app y desde la consola. Por eso la hoja tiene
+> **26 filas escenario × canal para 16 escenarios**, más tres adicionales fuera
+> de la cuenta (L6, L7, T6). La definición que manda es la de
+> `scripts/lib/hoja-de-resultados.mjs`; el ensayo previo en SIMULADO, fila por
+> fila, está en [`ENSAYO_PREVIO_EN_SITIO.md`](ENSAYO_PREVIO_EN_SITIO.md), y el
+> orden de la visita, en
+> [`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md) §V.
 
-**Sin identificador de evento no hay PASA** (RN-02). La ETAPA 15 se cierra con
-los 16 en PASA, o con cada FALLA convertida en un defecto con dueño y una nueva
-hoja. La hoja rellenada se adjunta al informe de cierre **con host y usuario
+| #   | Escenario                                                   | Canales       | Criterio principal                        | Umbral                                      |
+| --- | ----------------------------------------------------------- | ------------- | ----------------------------------------- | ------------------------------------------- |
+| L1  | Tercero dentro de su día y su franja → abre                 | app · consola | CA-04, CA-05, KPI-13, D5 b, hito 2        | < 3 s lectura → relé                        |
+| L2  | Placa desconocida → `PLACA_DESCONOCIDA`, no abre            | app · consola | CA-05, RN-01                              | < 3 s                                       |
+| L3  | Día correcto, hora fuera de la franja → no abre             | app · consola | CA-05, CA-12, D5 b                        | < 3 s                                       |
+| L4  | Hora correcta, día distinto → no abre                       | app · consola | CA-05, CA-12, D5 b                        | < 3 s                                       |
+| L5  | Lista negra con autorización vigente → `LISTA_NEGRA`        | app · consola | CA-13, RN-06, RN-07, CA-18, HU-35         | alerta < 10 s                               |
+| T1  | Rostro enrolado dentro de su día y su franja → abre         | app · consola | CU-02, RN-09, RN-10, CA-09, CA-26, hito 3 | sincronización < 60 s; reconocimiento < 3 s |
+| T2  | Rostro no enrolado → no abre, sin dato biométrico           | app · consola | CA-07, RN-02                              | —                                           |
+| T3  | Día correcto, hora fuera de la franja → no abre             | app · consola | CA-12, CA-26, RN-01                       | < 3 s                                       |
+| T4  | Hora correcta, día distinto → no abre                       | app · consola | CA-12, RN-01, RN-11                       | < 3 s                                       |
+| T5  | Lista negra con autorización vigente → `LISTA_NEGRA`        | app · consola | CA-13, RN-06, RN-07, HU-35                | < 3 s                                       |
+| V1  | Llamada → aviso emergente con la vivienda                   | consola       | CU-03, HU-25                              | aviso < 10 s                                |
+| V2  | Audio bidireccional exclusivo                               | consola       | ADR-01, CA-19, KPI-33                     | < 2 s extremo a extremo                     |
+| V3  | Video por WHEP a través de la API                           | consola       | KPI-33, RN-12, RN-21                      | primer cuadro < 2 s                         |
+| V4  | Apertura remota con motivo                                  | consola       | CA-20, RN-08, KPI-32                      | orden → relé < 3 s                          |
+| V5  | Negación con motivo y aviso al residente                    | consola       | CA-17, HU-28                              | —                                           |
+| V6  | Operador en otra copropiedad, escalamiento y emergencia     | consola       | KPI-35, HU-29, CA-18                      | escalamiento < 10 s                         |
+| L6  | _Adicional_ · vehículo propio de residente a cualquier hora | app           | D5 a, RN-04, ADR-026                      | < 3 s                                       |
+| L7  | _Adicional_ · baja confianza → apertura manual con motivo   | consola       | CU-01 3a, CA-16, CA-17, KPI-32            | orden → relé < 3 s                          |
+| T6  | _Adicional_ · revocación → supresión inmediata              | app · consola | RN-11, CA-10, CA-11, KPI-20               | retirada < 60 s                             |
+
+**Sin identificador de evento no hay PASA** (RN-02), salvo V1: un timbre no
+deja evento de acceso. La ETAPA 15 se cierra con las 26 filas en PASA, o con
+cada FALLA convertida en un defecto con dueño y una nueva hoja. La hoja rellenada se adjunta al informe de cierre **con host y usuario
 elididos**.
 
 ## 10 · Diagnóstico de fallos frecuentes
@@ -375,9 +389,10 @@ autorizaciones, eventos— no se tocan.
 
 1. **Sin accionar**: guion `--sin-accionar`, fichas sin bloqueos, cámara
    publicando y eventos en `/eventos` con motivo. Nadie abre nada.
-2. **Barrera**: L1–L5 con vehículos de prueba y alguien delante de la
-   talanquera.
-3. **Terminal**: T1–T5 con un visitante de prueba que acepta y luego revoca.
+2. **Barrera**: L1–L5 por los dos canales, y L6 y L7, con vehículos de prueba
+   y alguien delante de la talanquera.
+3. **Terminal**: T1–T5 por los dos canales con un visitante de prueba que
+   acepta, y T6 cuando revoca.
 4. **Videoportero**: V1–V6 con dos operadores.
 5. **Operación**: `ALARM_SERVER_EQUIPOS` con la cámara definitiva, VLAN de
    equipos (H-15-1), TLS para la consola (micrófono), hoja de resultados

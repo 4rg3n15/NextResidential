@@ -49,6 +49,8 @@ export const PROPOSITOS = {
   enlaceDeConsentimiento: 'ncr:enlace-de-consentimiento:v1',
   /** 15-H (ADR-024, S-48) · el código de patrullaje del portero, por turno. */
   codigoDePatrullaje: 'ncr:codigo-de-patrullaje:v1',
+  /** 15-I (ADR-025) · el código de vinculación de cada plaza de ocupante. */
+  codigoDeOcupante: 'ncr:codigo-de-ocupante:v1',
 } as const;
 
 export type Proposito = (typeof PROPOSITOS)[keyof typeof PROPOSITOS];

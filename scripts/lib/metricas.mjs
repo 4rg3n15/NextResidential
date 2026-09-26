@@ -109,7 +109,14 @@ const correr = (paquete, dir) => {
         '--coverage.reporter=json-summary',
         '--coverage.reporter=text',
       ],
-      { cwd: raiz, stdio: 'pipe', encoding: 'utf8' },
+      /**
+       * H-15I-11 · el búfer por omisión de `execFileSync` es de 1 MiB. La suite
+       * de `@ncr/api` escribe sus bitácoras de nivel aviso por la salida y, en
+       * verde, pasó de 1 148 522 bytes: el proceso se mataba con ENOBUFS, no
+       * quedaba informe y el paso culpaba a «ficheros que nadie ejecutó».
+       * Mismo límite que `estabilidad.mjs`.
+       */
+      { cwd: raiz, stdio: 'pipe', encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
     );
     codigoSalida = 0;
   } catch (e) {

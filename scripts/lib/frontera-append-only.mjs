@@ -39,6 +39,8 @@ const APPEND_ONLY = [
   'recepciones_evento',
   // ETAPA 15-H (ADR-024) · el rastro del panel de supervisión del superadministrador.
   'bitacora_de_porteria',
+  // ETAPA 15-I · vinculaciones, ocupantes y vehículos propios de los residentes.
+  'bitacora_de_residentes',
 ];
 
 /**

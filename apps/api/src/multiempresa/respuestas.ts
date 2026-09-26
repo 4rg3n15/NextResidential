@@ -133,6 +133,31 @@ export class ConfiguracionDeCopropiedadDto {
   @ApiProperty({ example: 3 }) versionReglasActual!: number;
 
   @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'MIRA',
+    description: 'D1 · código corto de acceso; null mientras no se asigne (sólo se entra por NIT).',
+  })
+  codigoCorto!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '+576015550100',
+    description: 'D7 · teléfono al que llama el botón «Portería» de la app.',
+  })
+  telefonoPorteria!: string | null;
+
+  @ApiProperty({ example: 2, description: 'D5 a · vehículos propios por vivienda.' })
+  topeVehiculosPropios!: number;
+
+  @ApiProperty({
+    enum: ['automatica'],
+    description: 'D5 c · solo lectura: modo de aprobación de terceros (ADR-027).',
+  })
+  aprobacionDeTerceros!: 'automatica';
+
+  @ApiProperty({
     type: [String],
     description: 'Ajustes que ESTE rol puede cambiar. La consola deshabilita el resto.',
   })

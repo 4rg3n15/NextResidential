@@ -52,6 +52,10 @@ export const ICONOS_DE_NAVEGACION = [
   // ETAPA 15-H · supervisión de portería y perfil del portero.
   'UsersRound',
   'IdCard',
+  // ETAPA 15-I · supervisión de residentes: cuentas, ocupantes y vehículos propios.
+  'UserCog',
+  // ETAPA 15-I · HU-35 · la lista negra desde la consola.
+  'ShieldBan',
 ] as const;
 export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 
@@ -95,6 +99,19 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     roles: OPERACION,
     pendienteDeEtapa: null,
     icono: 'UserRoundCheck',
+  },
+  /**
+   * ETAPA 15-I · HU-35 · RN-07 · la lista negra. Junto a Visitantes porque es su
+   * contrapeso: un veto niega aunque la autorización esté vigente (RN-06).
+   * Vetan los cuatro roles de operación; levantar es de administración.
+   */
+  {
+    clave: 'listas-negras',
+    etiqueta: 'Listas negras',
+    ruta: '/listas-negras',
+    roles: OPERACION,
+    pendienteDeEtapa: null,
+    icono: 'ShieldBan',
   },
   /**
    * ETAPA 15 · anticipo autorizado del punto 4 de la ETAPA 16.
@@ -152,6 +169,19 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     roles: ['superadministrador'],
     pendienteDeEtapa: null,
     icono: 'UsersRound',
+  },
+  /**
+   * ETAPA 15-I (3.1, D5 a, D6) · supervisión de residentes: alta de cuentas por
+   * usuario, plazas de ocupante y la vista de vehículos registrados por
+   * residentes. Sólo el superadministrador, como los porteros.
+   */
+  {
+    clave: 'residentes',
+    etiqueta: 'Residentes',
+    ruta: '/residentes',
+    roles: ['superadministrador'],
+    pendienteDeEtapa: null,
+    icono: 'UserCog',
   },
   {
     clave: 'guardia',

@@ -97,7 +97,9 @@ class PantallaDeNuevoVisitante extends StatefulWidget {
   /// CU-02 · se ofrece SOLO cuando la visita quedó creada de verdad. Una foto
   /// de una visita encolada no tendría a qué colgarse, y una de una rechazada
   /// sería un dato biométrico recogido para nada.
-  final void Function(String autorizacionId, String nombreDelVisitante)? alCapturarRostro;
+  /// 15-I · con el FIN de la visita: la plantilla no vive más que ella (RN-11).
+  final void Function(String autorizacionId, String nombreDelVisitante, DateTime hasta)?
+      alCapturarRostro;
 
   @override
   State<PantallaDeNuevoVisitante> createState() => _PantallaDeNuevoVisitanteState();
@@ -210,6 +212,7 @@ class _PantallaDeNuevoVisitanteState extends State<PantallaDeNuevoVisitante> {
                   onPressed: () => widget.alCapturarRostro!(
                     (_desenlace! as EnvioAceptado).id!,
                     _visitante.text.trim(),
+                    _hasta,
                   ),
                   icon: const Icon(Icons.photo_camera_outlined),
                   // No dice «registrar rostro»: dice de quién es el permiso,

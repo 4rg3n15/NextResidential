@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Pool } from 'pg';
 import type { ContextoTenant } from '../autenticacion';
 import type { CopropiedadResumen, RepositorioCopropiedades } from './repositorio-copropiedades';
-import { filtrarPorAlcance } from './repositorio-copropiedades';
+import { CodigoCortoEnUso, filtrarPorAlcance } from './repositorio-copropiedades';
 import type {
   CambiosDeConfiguracion,
   ConfiguracionDeCopropiedad,
@@ -27,6 +27,9 @@ interface FilaDeConfiguracion {
   readonly consentimiento_horas: string;
   readonly cache_horas: string;
   readonly version_reglas_actual: string;
+  readonly codigo_corto: string | null;
+  readonly telefono_porteria: string | null;
+  readonly tope_vehiculos_propios: number;
 }
 
 const aConfiguracion = (f: FilaDeConfiguracion): ConfiguracionDeCopropiedad => ({
@@ -44,6 +47,10 @@ const aConfiguracion = (f: FilaDeConfiguracion): ConfiguracionDeCopropiedad => (
   plazoConsentimientoHoras: Number(f.consentimiento_horas),
   margenCacheReglasHoras: Number(f.cache_horas),
   versionReglasActual: Number(f.version_reglas_actual),
+  codigoCorto: f.codigo_corto,
+  telefonoPorteria: f.telefono_porteria,
+  topeVehiculosPropios: Number(f.tope_vehiculos_propios),
+  aprobacionDeTerceros: 'automatica',
 });
 
 /**
@@ -66,7 +73,10 @@ const CAMPOS_DE_CONFIGURACION = `
        estado::text AS estado,
        EXTRACT(EPOCH FROM plazo_consentimiento) / 3600 AS consentimiento_horas,
        EXTRACT(EPOCH FROM margen_cache_reglas)   / 3600 AS cache_horas,
-       version_reglas_actual`;
+       version_reglas_actual,
+       codigo_corto,
+       telefono_porteria,
+       tope_vehiculos_propios`;
 
 /**
  * Catálogo de copropiedades contra PostgreSQL, **por los dos caminos de
@@ -197,6 +207,9 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
       etiquetaAgrupacion: 'etiqueta_agrupacion = $#',
       zonaHoraria: 'zona_horaria = $#',
       politicaContingenciaEdge: 'politica_contingencia_edge = $#::politica_contingencia',
+      codigoCorto: 'codigo_corto = $#',
+      telefonoPorteria: 'telefono_porteria = $#',
+      topeVehiculosPropios: 'tope_vehiculos_propios = $#',
       /**
        * B.5 · `umbral_confianza_placa` y `umbral_latido_dispositivo` YA NO se
        * escriben desde aquí. No es que el mapa los ignore: es que no hay
@@ -208,10 +221,11 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
     };
 
     const asignaciones: string[] = [];
-    const valores: (string | number)[] = [];
+    const valores: (string | number | null)[] = [];
     for (const [clave, valor] of Object.entries(efectivos)) {
       const plantilla = COLUMNA[clave];
       if (plantilla === undefined || valor === undefined) continue;
+      // `null` sólo lo admite el teléfono (borrarlo); el resto nunca llega nulo.
       valores.push(valor);
       asignaciones.push(plantilla.replace('$#', `$${String(valores.length)}`));
     }
@@ -262,6 +276,10 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
         return aConfiguracion(fila);
       } catch (error) {
         await cliente.query('ROLLBACK');
+        const e = error as { code?: string; constraint?: string };
+        if (e.code === '23505' && e.constraint === 'copropiedades_codigo_corto_uk') {
+          throw new CodigoCortoEnUso();
+        }
         throw error;
       }
     } finally {

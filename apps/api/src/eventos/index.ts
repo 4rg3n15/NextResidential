@@ -22,6 +22,8 @@ export type {
   RepositorioDispositivos,
   RepositorioEventos,
 } from './aplicacion/puertos';
+export { REGISTRO_DE_EVIDENCIA, registroSinBase } from './aplicacion/registro-de-evidencia';
+export type { RegistroDeEvidencia, TipoDeEvidencia } from './aplicacion/registro-de-evidencia';
 export {
   LIMITADOR_DISPOSITIVO,
   limitadorPorDispositivo,

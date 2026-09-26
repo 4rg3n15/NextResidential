@@ -17,6 +17,106 @@ analogías.
 
 ---
 
+## V · Procedimiento de la visita · ETAPA 15-I · **empiece aquí**
+
+> **Añadido el 26/09/2026 (ETAPA 15-I).** Es el procedimiento ÚNICO y ordenado
+> para ir a sitio. Todo lo que sigue a este apartado (§0 a §9) es el detalle de
+> cada paso, y se cita desde aquí. Tras fusionar la 15-I, **lo único pendiente de
+> la ETAPA 15 es esto: registrar los tres equipos y ejecutar los 16 escenarios,
+> desde la consola web y desde la app móvil (BE-02).** El ensayo previo, en
+> SIMULADO y contra base real, está en
+> [`ENSAYO_PREVIO_EN_SITIO.md`](ENSAYO_PREVIO_EN_SITIO.md): 24 de las 26 filas
+> escenario × canal en verde, y los defectos que destapó ya corregidos.
+
+### V.1 · Antes de salir de casa
+
+- [ ] **Código.** `develop` con el PR de la 15-I fusionado; `pnpm install --frozen-lockfile`.
+- [ ] **Verificador en verde en el portátil:** `./scripts/verificar-etapa.sh --con-base`.
+- [ ] **Base del proyecto con TODAS las migraciones, hasta la `0038`**
+      (`20260926120000_0038_residentes_y_acceso_por_codigo.sql`): `supabase db push`.
+      Comprobar que la RLS quedó activa y forzada (`docs/guias/CONEXION_SUPABASE.md`).
+- [ ] **`apps/api/.env`**, con estos NOMBRES (los valores sólo en su `.env` local, nunca en el repositorio, RN-21):
+
+  | Variable                                                                               | Para qué                                                                                                |
+  | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+  | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL` | Proyecto de Supabase: la secreta, SÓLO en la API                                                        |
+  | `DATABASE_URL`, `DATABASE_POOLER_URL`                                                  | Conexión de la API a PostgreSQL                                                                         |
+  | `CORS_ALLOWED_ORIGINS`                                                                 | El origen de la consola (la del portátil en sitio)                                                      |
+  | `PROVEEDOR_DE_EQUIPOS=hikvision`                                                       | Equipos reales (con `simulado`, ninguno)                                                                |
+  | `CARGADOR_DE_CONTEXTO=postgres`                                                        | El motor lee autorizaciones, padrón y lista negra de la base                                            |
+  | `PERSISTENCIA_DE_EVENTOS=postgres`, `PERSISTENCIA_DE_BIOMETRIA=postgres`               | Histórico, evidencias y biometría en la base (con `memoria` no hay trazabilidad)                        |
+  | `API_URL_PUBLICA`                                                                      | `http://<IP-del-portátil>:3000`: el teléfono del VISITANTE abre el enlace de consentimiento contra ella |
+  | `GO2RTC_URL`                                                                           | `http://127.0.0.1:1984`: el puente de vídeo, visto desde la API                                         |
+  | `ALARM_SERVER_EQUIPOS`                                                                 | `copropiedad\|equipo\|secreto\|ip` de la cámara (se completa en sitio, paso V.2.6)                      |
+  | `INGESTA_FIRMA_SECRETO`                                                                | Firma de la ingesta del Edge                                                                            |
+  | `BIOMETRIA_LLAVE`, `BIOMETRIA_LLAVE_REF`                                               | Bóveda biométrica, enlace del titular, códigos de patrullaje y de ocupante (ADR-025)                    |
+  | `EQUIPOS_LLAVE`, `EQUIPOS_LLAVE_REF`                                                   | Cifrado de las claves de servicio de los equipos en la base                                             |
+  | `EVIDENCIA_BUCKET`                                                                     | Bucket privado de evidencias (si falta, la API avisa y usa memoria)                                     |
+
+- [ ] **`apps/web/.env`**: `API_URL=http://<IP-del-portátil>:3000`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`; `PUENTE_VIDEO_URL` vacío (ADR-022).
+- [ ] **go2rtc** descargado para el portátil, con un `go2rtc.yaml` mínimo: `api.listen: "127.0.0.1:1984"` y `webrtc.listen: ":8555"` (`candidates` con la IP del portátil). **Sin equipos en el fichero**: la API registra cada flujo al pedirlo (§3.3).
+- [ ] **App en el iPhone físico** (Xcode con la cuenta de desarrollo, iPhone de confianza), compilada en **Debug**, que es la única configuración que permite HTTP a una IP privada ([`DESPLIEGUE.md`](DESPLIEGUE.md) §8.1):
+
+  ```
+  cd apps/mobile
+  flutter run -d <id-del-iPhone> \
+    --dart-define=API_URL=http://<IP-del-portátil>:3000 \
+    --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
+    --dart-define=SUPABASE_PUBLISHABLE_KEY=<la PUBLICABLE, nunca la secreta>
+  ```
+
+  Al primer uso, acepte los permisos de **cámara** (foto del visitante, hito 3) y de **red local**.
+
+- [ ] **Superadministrador** con MFA inscrito (arranque en frío: `scripts/registrar-copropiedad.mjs` y `scripts/aprovisionar-rol.mjs`).
+- [ ] **La copropiedad de prueba**, desde Configuración → Ajustes de plataforma (superadministrador): **código corto** (p. ej. `MIRA`; es el que teclean app y consola, D1), tipo y etiquetas de vivienda, **teléfono de portería** (D7) y tope de vehículos propios (2).
+- [ ] **Un residente de prueba** (Residentes → Nuevo residente: usuario y contraseña inicial) y **un portero de prueba** (Porteros) con turno de hoy.
+- [ ] **Credenciales de servicio de los tres equipos**, en mano, y sus IP fijas. Nunca en el repositorio ni en la hoja.
+- [ ] **La hoja de resultados** (16 escenarios en 26 filas escenario × canal, más L6, L7 y T6): `node scripts/puesta-en-marcha-equipos.mjs --simulado --hoja=./hoja.md`.
+
+### V.2 · En sitio
+
+1. **Red.** Portátil, iPhone y equipos en la misma LAN. Anote la IP del portátil: es la de `API_URL_PUBLICA`, `API_URL` y el Alarm Server.
+2. **Arranque.** Primero go2rtc; después la API (`pnpm --filter @ncr/api start:dev`). Lea la bitácora de arranque: tiene que decir persistencia `postgres`, proveedor `hikvision` y el puente go2rtc.
+3. **Consola en el PORTÁTIL** (`pnpm --filter @ncr/web build && pnpm --filter @ncr/web start`, en el puerto 3100), no en Netlify: el SSE y el audio pasan por su servidor (C-37, P-20).
+4. **Acceso** a la consola como superadministrador: código o NIT de la copropiedad, usuario, contraseña y MFA.
+5. **Registrar los tres equipos**: Dispositivos → + Agregar equipo (§9), con el usuario de servicio de cada uno. «Probar conexión» descubre modelo, firmware y capacidades (ADR-019). **Las fichas tienen que quedar en verde**:
+
+   - la cámara, `ctrlMode=1`, `CRIndex=210`, `detectionUpLoadPicturesType` distinto de «all» y formato XML;
+   - la terminal, `remoteCheck`/`AcsCfg` y la biblioteca FDLib;
+   - el videoportero, TwoWayAudio.
+
+   Lo que la ficha marque se corrige antes de seguir (§8.2 a §8.4).
+
+6. **La cámara hacia la API.** Alarm Server apuntado a `http://<IP>:3000/alarm-server/<secreto>` (§4.2) y la cámara declarada en `ALARM_SERVER_EQUIPOS` con el id que le dio la consola. Reinicie la API. La terminal y el videoportero no se configuran hacia la API: es la API la que se suscribe a ellos.
+7. **Guion de sitio**, primero sin mover nada y después completo (§8.1):
+   `node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --sin-accionar`, y luego sin `--sin-accionar`. Ningún `✗ BLOQUEO`.
+8. **La app, primer ingreso del residente de prueba:**
+
+   1. código de la copropiedad, usuario y contraseña inicial;
+   2. cambio de contraseña;
+   3. alta con su vivienda, marcando «no lo tengo» si es la primera cuenta de esa vivienda;
+   4. ocupantes: el aviso de que el número es DEFINITIVO, y confirmar.
+
+   En Perfil, «Llamar a portería» tiene que marcar el número registrado.
+
+9. **El portero de prueba** entra en la consola con el código o el NIT, su usuario y su turno.
+10. **Los 16 escenarios por canal**, con la hoja delante. Orden sugerido:
+
+    1. L1–L5 con la visita creada en la app, y otra vez creada en la consola;
+    2. T1–T5 con la foto tomada en la app, y otra vez en la consola;
+    3. V1–V6;
+    4. después, L6, L7 y T6.
+
+    Cada fila lleva su evento de `/eventos` y su evidencia; sin identificador de evento no hay PASA (RN-02). La única excepción es V1, porque un timbre no deja evento. La lista negra de L5 y T5 se crea en Listas negras → Vetar.
+
+11. **Al terminar:**
+    1. levante los vetos de prueba;
+    2. revoque los consentimientos de prueba y compruebe con el `Count` de la biblioteca que la plantilla salió de la terminal;
+    3. revierta la configuración de los equipos si procede (§8.6);
+    4. guarde la hoja y el informe del guion, que eliden host y usuario.
+
+---
+
 ## 0 · Procedencia de lo que hay aquí abajo · **léalo primero**
 
 **No pude verificar los endpoints contra la documentación oficial.** El entorno

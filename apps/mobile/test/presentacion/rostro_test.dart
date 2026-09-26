@@ -172,4 +172,50 @@ void main() {
     final f = await CamaraSimulada(siempreBuena: true).tomar();
     expect(evaluarCaptura(f!.medidas), isEmpty);
   });
+
+  testWidgets('15-I · cámara real sin detector: el encuadre se CONFIRMA, no se inventa', (t) async {
+    t.view.physicalSize = const Size(1000, 2400);
+    t.view.devicePixelRatio = 1.0;
+    addTearDown(t.view.reset);
+    final enviadas = <FotoTomada>[];
+    await t.pumpWidget(
+      MaterialApp(
+        home: PantallaDeRostroDelVisitante(
+          nombreDelVisitante: 'Plomero Pérez',
+          versionPolitica: 'v1.0',
+          tomarFoto: () async => FotoTomada(
+            vector: Uint8List.fromList(List<int>.filled(64, 3)),
+            medidas: const MedidasDeCaptura(
+              nitidez: 0.8,
+              iluminacion: 0.5,
+              rostrosDetectados: 0,
+              proporcionRostro: 0,
+            ),
+            sinDetector: true,
+          ),
+          enviar: (f) async {
+            enviadas.add(f);
+            return const CapturaRechazada(['prueba']);
+          },
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('Tomar la foto'));
+    await t.pumpAndSettle();
+
+    // Antes de confirmar: no se puede enviar, y «no se ve ningún rostro» no
+    // aparece como consejo porque nadie lo ha medido.
+    final enviar = find.widgetWithText(FilledButton, 'Pedirle el permiso');
+    expect(t.widget<FilledButton>(enviar).onPressed, isNull);
+    expect(find.byKey(const Key('rostro.confirmarEncuadre')), findsOneWidget);
+    expect(find.byType(Checkbox), findsNothing, reason: 'un botón de encuadre, no una casilla');
+
+    await t.tap(find.byKey(const Key('rostro.confirmarEncuadre')));
+    await t.pumpAndSettle();
+    expect(t.widget<FilledButton>(enviar).onPressed, isNotNull);
+    await t.tap(enviar);
+    await t.pumpAndSettle();
+    expect(enviadas.single.medidas.rostrosDetectados, 1);
+  });
 }

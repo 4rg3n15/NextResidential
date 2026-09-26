@@ -443,6 +443,24 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
   'porteros/calendario-de-turnos.tsx':
     'retirar un turno: el turnoId viene de la tarjeta; sólo se teclea el motivo',
   'componentes/cabecera.tsx': 'el botón «Patrullaje» no lleva cuerpo: la sesión sale del token',
+  /**
+   * ETAPA 15-I · supervisión de residentes. Ningún identificador se teclea: la
+   * vivienda sale de un desplegable con las que devuelve la API, y la plaza, el
+   * vehículo y la cuenta viajan en la RUTA desde su fila.
+   */
+  'residentes/dialogos.tsx':
+    'alta del residente: usuario (nombre legible, no UUID), contraseña inicial, nombre y teléfono; el restablecimiento toma el usuarioId de la fila',
+  'residentes/ocupantes.tsx':
+    'la vivienda sale de un desplegable con las viviendas de la API; la plaza que se quita viene de su fila; sólo se teclean cantidad y motivo',
+  'residentes/vehiculos-de-residentes.tsx':
+    'desactivar: el vehiculoId viene de la fila; sólo se teclea el motivo',
+  /**
+   * ETAPA 15-I · HU-35 · la lista negra. Se teclean una PLACA o un DOCUMENTO,
+   * que son identificadores legibles, nunca un UUID: el servidor resuelve el
+   * documento a su persona en ESA copropiedad. Levantar toma el vetoId de la fila.
+   */
+  'listas-negras/pantalla.tsx':
+    'vetar: placa o documento legibles (la persona la resuelve el servidor) y motivo; levantar toma el vetoId de la fila',
   'componentes/bloqueo-de-patrullaje.tsx':
     'sólo se teclea el código de 4 dígitos que la consola mostraba',
   'componentes/buscador-personas.tsx':

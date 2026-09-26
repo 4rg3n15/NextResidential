@@ -17,7 +17,7 @@ part 'cuentas_api.g.dart';
 abstract class CuentasApi {
   factory CuentasApi(Dio dio, {String? baseUrl}) = _CuentasApi;
 
-  /// Inicio de sesión por correo o por NIT y usuario
+  /// Inicio de sesión por correo, o por código (o NIT) y usuario
   @POST('/auth/acceso')
   Future<SesionDeAccesoDto> cuentasControllerAcceso({
     @Body() required AccesoDto body,

@@ -7,6 +7,8 @@ import type {
   VeredictoRemoto,
 } from '@ncr/providers';
 import type { RegistrarAcceso } from '../../eventos';
+import { registroSinBase } from '../../eventos';
+import type { RegistroDeEvidencia, TipoDeEvidencia } from '../../eventos';
 import type { AccionadorDePuerta } from '../../guardia';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import type { EquipoDeclarado } from '../../comun/equipos-de-alarm-server';
@@ -101,6 +103,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     /** A4 · la llamada del videoportero: quién resuelve la vivienda y quién avisa. */
     private readonly viviendas: ResolutorDeViviendaDeLlamada,
     private readonly avisador: AvisadorDeLlamadas,
+    /** H-15I-07 · la fila de `evidencias` que el evento referencia (con base). */
+    private readonly registroDeEvidencia: RegistroDeEvidencia = registroSinBase,
   ) {}
 
   async ingerir(publicacion: PublicacionDeEquipo): Promise<ResultadoDeIngesta> {
@@ -136,6 +140,10 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     const evidenciaId = await this.guardarEvidencia(
       publicacion.foto ?? publicacion.recorte,
       evento.dispositivoId,
+      copropiedadId,
+      publicacion.foto === null || publicacion.foto === undefined
+        ? 'recorte_placa'
+        : 'foto_completa',
     );
 
     const constancia = await this.registrar.ejecutar(
@@ -163,7 +171,17 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
       return { registrado: false, motivo: 'el hecho no se pudo registrar' };
     }
 
-    if (constancia.valor.permitido && !constancia.valor.duplicado) {
+    if (constancia.valor.requiereConfirmacionHumana && !constancia.valor.duplicado) {
+      // H-15I-09 · CU-01, excepción 3a: lectura DUDOSA. El motor identificó la
+      // placa pero no con la confianza para decidir solo: la barrera NO se
+      // acciona aquí. El evento ya está en portería con su evidencia y la
+      // apertura, si procede, la hace una persona con motivo (RN-08, CA-16).
+      this.bitacora.registrar('aviso', 'lectura dudosa: la apertura la confirma la portería', {
+        dispositivoId: evento.dispositivoId,
+        eventoId: constancia.valor.eventoId,
+        confianza: evento.confianza ?? 0,
+      });
+    } else if (constancia.valor.permitido && !constancia.valor.duplicado) {
       // La apertura decidida por el motor se atribuye a la identidad de
       // servicio de la ingesta: el proveedor exige un actor (RN-08) y el
       // operador aquí es el sistema, no una persona.
@@ -323,7 +341,12 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
       );
     }
 
-    const evidenciaId = await this.guardarEvidencia(publicacion.foto, evento.dispositivoId);
+    const evidenciaId = await this.guardarEvidencia(
+      publicacion.foto,
+      evento.dispositivoId,
+      copropiedadId,
+      'captura_rostro',
+    );
     const constancia = await this.registrar.ejecutar(
       {
         copropiedadId,
@@ -352,7 +375,10 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
       return { registrado: false, motivo: 'el hecho no se pudo registrar' };
     }
 
-    const permitido = constancia.valor.permitido && !constancia.valor.duplicado;
+    const permitido =
+      constancia.valor.permitido &&
+      !constancia.valor.duplicado &&
+      !constancia.valor.requiereConfirmacionHumana;
     if (evento.esperaVeredicto) {
       await this.responder(
         evento,
@@ -432,14 +458,24 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
    * Nunca lanza: el evento pesa más que su fotografía.
    */
   private async guardarEvidencia(
-    imagen: Buffer | null,
+    imagen: Buffer | null | undefined,
     dispositivoId: string,
+    copropiedadId: string,
+    tipo: TipoDeEvidencia,
   ): Promise<string | null> {
-    if (imagen === null || imagen.length === 0) return null;
+    if (imagen === null || imagen === undefined || imagen.length === 0) return null;
     const clave = `lpr/${dispositivoId}/${this.ids.nuevo()}.jpg`;
     try {
       const guardada = await Promise.race([
-        this.evidencia.guardar(clave, imagen, 'image/jpeg'),
+        this.evidencia.guardar(clave, imagen, 'image/jpeg').then((ruta) =>
+          this.registroDeEvidencia.registrar({
+            copropiedadId,
+            clave: ruta,
+            tipo,
+            contenido: imagen,
+            tipoMime: 'image/jpeg',
+          }),
+        ),
         new Promise<null>((resolver) =>
           setTimeout(() => resolver(null), PRESUPUESTO_DE_EVIDENCIA_MS),
         ),
