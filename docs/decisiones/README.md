@@ -25,6 +25,10 @@ Registro de las decisiones de arquitectura del proyecto. Una decisión **aceptad
 | [ADR-022](ADR-022-el-navegador-negocia-el-video-con-la-api.md)          | La vista en vivo se negocia con la **API** (WHEP); el navegador nunca ve RTSP ni el puente                        | Aceptada | ETAPA 15-E     |
 | [ADR-023](ADR-023-cuentas-por-nombre-de-usuario.md)                     | Cuentas por **nombre de usuario** con correo sintético `.invalid`; primer ingreso impuesto en el servidor         | Aceptada | ETAPA 15-H     |
 | [ADR-024](ADR-024-turnos-y-patrullaje-del-portero.md)                   | Turnos del portero en **cada petición**; el patrullaje es un **bloqueo de pantalla** en el servidor, no un factor | Aceptada | ETAPA 15-H     |
+| [ADR-025](ADR-025-codigos-de-ocupante-derivados.md)                     | Los códigos de ocupante se **derivan** (HMAC con propósito propio) bajo demanda; no se guardan                    | Aceptada | ETAPA 15-I     |
+| [ADR-026](ADR-026-tope-de-vehiculos-propios-en-la-base.md)              | El tope de vehículos propios lo impone la **base**, con un bloqueo por vivienda (ADR-04)                          | Aceptada | ETAPA 15-I     |
+| [ADR-027](ADR-027-punto-de-extension-de-aprobacion.md)                  | La aprobación es una **política** del dominio; hoy sólo «automática», y el ADR dice cómo activar la del portero   | Aceptada | ETAPA 15-I     |
+| [ADR-028](ADR-028-la-consola-en-netlify-y-la-api-en-un-servidor.md)     | Netlify aloja **sólo** la consola; la API va en un servidor con procesos permanentes (D8)                         | Aceptada | ETAPA 15-I     |
 
 **Los números 009, 010 y 011 no existen** y no es un error de numeración que
 haya que corregir: se reservaron para decisiones de la 09-A que acabaron siendo

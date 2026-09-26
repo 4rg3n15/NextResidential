@@ -62,3 +62,13 @@ export const aprobacionDelPortero =
 /** La configuración de la copropiedad elige la política; el caso de uso sólo la aplica. */
 export const politicaDeAprobacionPara = (modo: ModoDeAprobacion): PoliticaDeAprobacion =>
   modo === 'portero' ? aprobacionDelPortero(esVehiculoDeTercero) : aprobacionAutomatica;
+
+/**
+ * Lo único que HOY se puede persistir es `activa`: el estado
+ * `pendiente_de_aprobacion` no existe todavía en la base (ADR-027, paso 1).
+ * Si una política distinta de la automática llegara a pedirlo antes de que
+ * exista, la creación FALLA CERRADA (§2.1.4) en vez de guardar como activa
+ * algo que debía esperar al portero.
+ */
+export const estadoPersistible = (estado: EstadoInicialDeAutorizacion): estado is 'activa' =>
+  estado === 'activa';

@@ -37,12 +37,20 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   PatronRecurrencia,
   Vigencia,
+  aprobacionAutomatica,
   errorDominio,
+  estadoPersistible,
   exito,
   fallo,
   puedeAutorizar,
 } from '@ncr/domain-core';
-import type { ErrorDominio, MotivoDeNoAutorizar, Reloj, Resultado } from '@ncr/domain-core';
+import type {
+  ErrorDominio,
+  MotivoDeNoAutorizar,
+  PoliticaDeAprobacion,
+  Reloj,
+  Resultado,
+} from '@ncr/domain-core';
 import { RELOJ } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type { ResolverMiAmbito } from './casos-de-uso';
@@ -83,6 +91,8 @@ export class CrearMiAutorizacion {
     @Inject(AUTORIZACIONES_DEL_RESIDENTE)
     private readonly autorizaciones: AutorizacionesDelResidente,
     @Inject(RELOJ) private readonly reloj: Reloj,
+    /** D5 c · ADR-027: con qué estado nace. Hoy, siempre la automática. */
+    private readonly aprobacion: PoliticaDeAprobacion = aprobacionAutomatica,
   ) {}
 
   async ejecutar(
@@ -128,6 +138,22 @@ export class CrearMiAutorizacion {
       vinculoPuedeAutorizar: vinculo.permiteAutorizar,
     });
     if (!veredicto.puede) return exito({ creada: false, motivo: veredicto.motivo });
+
+    // ── 3 bis · Aprobación (D5 b/c, ADR-027): aprobada al instante, SIN límite
+    // de autorizaciones de terceros; la política decide, no un `if` aquí.
+    const inicial = this.aprobacion({
+      traeVehiculo: entrada.placa !== null,
+      recurrente: entrada.patron !== null,
+    });
+    if (!estadoPersistible(inicial)) {
+      return fallo(
+        errorDominio(
+          'OPERACION_NO_PERMITIDA',
+          'La aprobación del portero no está construida (ADR-027)',
+          'D5 c',
+        ),
+      );
+    }
 
     // ── 4 · Escritura ──────────────────────────────────────────────────────
     const escrita = await this.autorizaciones.crearAutorizacion(
