@@ -702,7 +702,9 @@ for (const entrada of FAMILIAS) {
     try {
       if (aceptada) await terminal.suprimir('captura-de-sitio', plantillaId);
       const baja = await terminal.darDeBajaPersona(plantillaId);
-      anotar(`   · baja de la persona de prueba: HTTP ${String(baja.estado)}`);
+      anotar(
+        `   · baja de la persona de prueba pedida: HTTP ${String(baja.estado)} (el equipo la ejecuta en segundo plano)`,
+      );
       if (!baja.ok) {
         // Un rechazo de la baja es inocuo si la persona nunca llegó a crearse,
         // y no lo es si se creó: sólo el equipo lo sabe, así que se dice.

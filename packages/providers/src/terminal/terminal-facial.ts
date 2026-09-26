@@ -284,16 +284,19 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
   /**
    * 15-K (§5) · la baja de la PERSONA, que es la que lleva el rostro colgado.
    * La usa la captura de sitio para no dejar en el equipo la persona de la
-   * carga de prueba. Ruta DOCUMENTADA en la guía de las series IP/Ultra
-   * (`UserInfoDelCond`); la de la serie Value documenta otra, asíncrona, y es
-   * una hipótesis abierta para la visita.
+   * carga de prueba. Como «Person Deleting» de la guía: `mode: byEmployeeNo`,
+   * sin error si la persona no existe, y ASÍNCRONA —un 200 dice que empezó,
+   * no que terminó—. Por eso quien la llama no la da por hecha.
    */
   async darDeBajaPersona(plantillaId: string): Promise<RespuestaDeEquipo> {
     const ruta = rutaPara('dar de baja a la persona y con ella su plantilla', 'terminal');
     return this.cliente.pedir(ruta.metodo, ruta.ruta, {
       tipo: 'application/json',
       contenido: JSON.stringify({
-        UserInfoDelCond: { EmployeeNoList: [{ employeeNo: identificadorEnElEquipo(plantillaId) }] },
+        UserInfoDetail: {
+          mode: 'byEmployeeNo',
+          EmployeeNoList: [{ employeeNo: identificadorEnElEquipo(plantillaId) }],
+        },
       }),
     });
   }

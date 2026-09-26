@@ -424,4 +424,30 @@ describe('15-K (§5) · la baja de la persona de la carga de prueba', () => {
     expect(r.ok).toBe(true);
     expect((await terminal.suprimirYVerificar('t-1', plantillaId)).ausente).toBe(true);
   });
+
+  it('usa la ruta y el cuerpo de «Person Deleting» de la guía de la serie de la terminal', async () => {
+    const vistas: { url: string; cuerpo: string }[] = [];
+    const simulado = equipoSimulado({ familia: 'terminal', usuario: 'servicio', clave: 'k' });
+    const terminal = new TerminalFacial({
+      host: 'terminal.invalid',
+      usuario: 'servicio',
+      clave: 'k',
+      peticion: async (url, opciones) => {
+        vistas.push({ url: String(url), cuerpo: String(opciones?.body ?? '') });
+        return simulado(url, opciones);
+      },
+      modo: 'decide_el_equipo',
+    });
+    // Borrar a quien no está no es error (la guía lo dice): la baja es idempotente.
+    const r = await terminal.darDeBajaPersona('5e2b7c1a-0000-4000-8000-000000000002');
+    expect(r.ok).toBe(true);
+    const baja = vistas.find((v) => v.url.includes('/ISAPI/AccessControl/UserInfoDetail/Delete'));
+    expect(baja).toBeDefined();
+    expect(JSON.parse(baja?.cuerpo ?? '{}')).toEqual({
+      UserInfoDetail: {
+        mode: 'byEmployeeNo',
+        EmployeeNoList: [{ employeeNo: '5e2b7c1a000040008000000000000002' }],
+      },
+    });
+  });
 });

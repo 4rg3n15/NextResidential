@@ -558,8 +558,12 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     }
     if (catalogada.proposito === 'dar de baja a la persona y con ella su plantilla') {
       // 15-K (§5) · la persona se lleva su rostro: la plantilla deja de estar.
-      const empleado = /"employeeNo"\s*:\s*"([^"]*)"/.exec(String(opciones?.body ?? ''))?.[1];
-      if (empleado === undefined) return respuestaDe(400, PARAMETRO_MALO);
+      // Como la guía: `mode` es requerido, y borrar a quien no está no es error.
+      const cuerpo = String(opciones?.body ?? '');
+      const empleado = /"employeeNo"\s*:\s*"([^"]*)"/.exec(cuerpo)?.[1];
+      if (empleado === undefined || !/"mode"\s*:\s*"byEmployeeNo"/.test(cuerpo)) {
+        return respuestaDe(400, PARAMETRO_MALO);
+      }
       plantillas.delete(empleado);
       return respuestaDe(200, OK);
     }

@@ -239,13 +239,23 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     dejaRastro: true,
   },
   {
+    /**
+     * 15-K (§5) · la guía de la serie de la terminal (la K1T344 figura en su
+     * lista de modelos) documenta SÓLO `UserInfoDetail/Delete`, y el
+     * procedimiento «Person Deleting» de las dos series lo prescribe: borra la
+     * persona con sus tarjetas, huellas y rostros, por `employeeNo`, y es
+     * ASÍNCRONO (el progreso, en `UserInfoDetail/DeleteProcess`). Se usaba
+     * `UserInfo/Delete`, que sólo aparece en la guía del videoportero.
+     */
     proposito: 'dar de baja a la persona y con ella su plantilla',
     metodo: 'PUT',
-    ruta: '/ISAPI/AccessControl/UserInfo/Delete?format=json',
+    ruta: '/ISAPI/AccessControl/UserInfoDetail/Delete?format=json',
     procedencia: 'documentada',
     familia: 'terminal',
-    fuente: 'Documentación ISAPI del fabricante, gestión de usuarios de control de acceso',
-    confirmarEnSitio: 'que borrar la persona borre TAMBIÉN su rostro, o hacen falta las dos',
+    fuente:
+      'Documentación ISAPI del fabricante, «Person Deleting» (series Value e IP/Ultra de control de acceso)',
+    confirmarEnSitio:
+      'que el borrado asíncrono termine (UserInfoDetail/DeleteProcess) y se lleve también el rostro',
     dejaRastro: true,
   },
   {

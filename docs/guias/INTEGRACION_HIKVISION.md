@@ -284,7 +284,7 @@ la 15-E:
 | Escuchar eventos (terminal, videoportero)     | `GET /ISAPI/Event/notification/alertStream` o `POST …/subscribeEvent` según capacidad                         | comunes                        | documentada    |
 | ¿Espera el veredicto? / fijarlo               | `GET`/`PUT /ISAPI/AccessControl/AcsCfg?format=json`                                                           | terminal                       | documentada    |
 | Responder la verificación remota              | `PUT /ISAPI/AccessControl/remoteCheck?format=json`                                                            | terminal                       | documentada    |
-| Persona, plantilla, conteo, supresión         | `UserInfo/Record` · `FDLib/FDSetUp` · `FDLib/Count` · `FDLib/FDSearch/Delete` · `UserInfo/Delete`             | terminal                       | documentada    |
+| Persona, plantilla, conteo, supresión         | `UserInfo/Record` · `FDLib/FDSetUp` · `FDLib/Count` · `FDLib/FDSearch/Delete` · `UserInfoDetail/Delete`       | terminal                       | documentada    |
 | Abrir la puerta                               | `PUT /ISAPI/AccessControl/RemoteControl/door/{canal}`                                                         | terminal, videoportero         | documentada    |
 | Canal de audio: canales, abrir, audio, cerrar | `GET …/TwoWayAudio/channels` · `PUT …/{canal}/open` · `PUT`/`GET …/{canal}/audioData` · `PUT …/{canal}/close` | videoportero                   | documentada    |
 | Contestar o colgar (sólo si lo declara)       | `PUT /ISAPI/VideoIntercom/callSignal?format=json`                                                             | videoportero                   | documentada    |
