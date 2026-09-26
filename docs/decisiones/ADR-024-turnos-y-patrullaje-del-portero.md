@@ -32,18 +32,34 @@ token; no puede cerrar una sesión a la hora exacta.
 - `sesiones_de_porteria`: una fila por **sesión de Supabase** (`session_id` del
   token), creada al iniciar sesión por la API con su turno, su origen y el hash
   del código de patrullaje.
-- **Guard global** (`GuardaDeTurnoDePorteria`, después del de roles): para el
-  rol `portero`, en cada petición, busca la sesión registrada y comprueba con
-  el **reloj inyectado** que su turno sigue vigente. Sin sesión registrada,
-  403 —eso cierra el atajo de pedir un token a Supabase por otro camino—; fuera
-  de turno, 403 y la sesión queda cerrada con motivo `fin_de_turno`.
+- **Guard global** (`GuardaDeTurnoDePorteria`, el último: después del de roles
+  y del de cambio de contraseña): para el rol `portero`, en cada petición,
+  busca la sesión registrada y comprueba con el **reloj inyectado** que su
+  turno sigue vigente. Sin sesión registrada o con la sesión cerrada, **401**
+  —eso cierra el atajo de pedir un token a Supabase por otro camino—; fuera de
+  turno, **403** y la sesión queda cerrada con motivo `fin_de_turno`; en
+  patrullaje, **423**. `GET /porteria/sesion` y `POST /auth/cierre` son las
+  únicas rutas que se admiten fuera de turno, para que la consola pueda decir
+  por qué y cerrar.
+- **La sesión se registra desde cuentas**: el inicio de sesión invoca el
+  **gancho de sesión** del rol, que portería inscribe al arrancar en un
+  registro que publica cuentas (portería depende de cuentas para crear las de
+  sus porteros, así que no puede ser a la vez dependencia suya). Si el gancho
+  del portero no estuviera inscrito, cuentas **niega** el inicio de sesión:
+  falla cerrado.
 - **Inicio de sesión**: fuera de turno, `POST /auth/acceso` rechaza **después**
   de comprobar la contraseña y revoca la sesión que Supabase acaba de abrir.
 - **Relevo**: nadie libera a nadie. Cada portero entra cuando empieza SU turno.
+  Si al terminar la franja **el mismo portero** tiene otro turno vigente —uno
+  extra a continuación—, la sesión pasa a ese turno con su código nuevo en vez
+  de cerrarse.
 - **Turnos extra**: sólo el superadministrador, con motivo obligatorio; quedan
   en la bitácora.
 - **Solapes**: dos porteros en la misma portería a la vez se admiten; al
-  asignar el turno y al iniciar sesión se registra el solape.
+  asignar o editar el turno se registra el solape en la bitácora y la respuesta
+  lo devuelve para que el panel lo enseñe.
+- **Un turno terminado no se edita ni se retira** (409): es historia, y las
+  sesiones de la bitácora lo citan.
 
 ### Patrullaje · es un BLOQUEO DE PANTALLA, no un factor de autenticación
 
@@ -82,7 +98,24 @@ quien se siente en la silla mientras el portero patrulla use su sesión.
 - Sectores asignados: **informativos** mientras P-17 no se decida. Ocultarle
   alarmas a un portero de guardia es un riesgo de seguridad física.
 
+### Rutas
+
+| Quién                    | Ruta                                                                                               | Qué                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Portero                  | `GET /porteria/sesion`                                                                             | Estado: activa (con el código), patrullaje, cerrada o fuera de turno |
+| Portero                  | `POST /porteria/sesion/patrullaje` · `POST /porteria/sesion/desbloqueo`                            | Patrullaje y desbloqueo                                              |
+| Portero                  | `GET /porteria/perfil`                                                                             | Su perfil, de solo lectura                                           |
+| Portero y administración | `POST /copropiedades/:id/zonas/:zonaId/apertura`                                                   | Abrir o cerrar la zona con motivo (C-32)                             |
+| Superadministrador       | `GET`/`POST /copropiedades/:id/porteros` · `PUT …/porteros/:usuarioId`                             | Porteros: lista con turno y sesión, alta, datos                      |
+| Superadministrador       | `GET`/`POST /copropiedades/:id/turnos` · `PUT …/turnos/:turnoId` · `POST …/turnos/:turnoId/retiro` | Calendario                                                           |
+| Superadministrador       | `GET /copropiedades/:id/porteria/bitacora`                                                         | Bitácora                                                             |
+
 ### La bitácora
+
+La escriben DOS módulos —cuentas (cambios y restablecimientos de contraseña) y
+portería (sesiones, patrullajes, turnos, altas)— y la lee el panel, así que es
+fontanería compartida (`comun/bitacora-de-identidad`) con una sola instancia en
+memoria para la suite y una sola tabla en la base.
 
 `bitacora_de_porteria` es de **solo inserción** con las mismas tres capas que
 `eventos` (ADR-005): `REVOKE UPDATE, DELETE, TRUNCATE` también al dueño,

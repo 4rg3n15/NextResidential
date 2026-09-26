@@ -37,10 +37,12 @@ ENRUTABLE bajo `.invalid` (RFC 2606):**
   tokens son los de Supabase: el JWKS, los claims del gancho, el `aal` y la RLS
   no cambian en nada. La consola guarda la sesión en las mismas cookies
   `httpOnly` de siempre.
-- **Las cuentas por correo siguen entrando como hasta ahora**: la consola
-  distingue por la presencia de `@` y, con correo, habla con Supabase como en
-  la ETAPA 03. `usuarios.correo` sólo admite nulo si la cuenta tiene nombre de
-  usuario (restricción en la base).
+- **Las cuentas por correo siguen funcionando, y entran por el MISMO camino**:
+  la consola distingue por la presencia de `@` y manda `correo` o `nit` y
+  `usuario` a `POST /auth/acceso`. Una sola puerta: si el correo siguiera
+  hablando con Supabase directamente, un portero con correo se saltaría su
+  turno y el límite por cuenta. `usuarios.correo` sólo admite nulo si la cuenta
+  tiene nombre de usuario (restricción en la base).
 
 ### El nombre de usuario
 
@@ -72,8 +74,10 @@ tres límites a la vez: **5/min por cuenta** (NIT + usuario), **10/min por
 origen declarado por la consola** y **30/min por dirección que llama a la API**
 (la consola misma). El primero es el que no se puede esquivar: rotar el origen
 declarado no cambia la cuenta que se ataca. Además, todo fallo responde tras un
-**tiempo mínimo uniforme**, para que «el usuario no existe» y «la contraseña no
-es esa» no se distingan por el reloj.
+**tiempo mínimo uniforme** (400 ms, `TIEMPO_MINIMO_DE_FALLO_MS`), para que «el
+usuario no existe» y «la contraseña no es esa» no se distingan por el reloj.
+Los tres límites son limitadores con nombre (`acceso-cuenta`, `acceso-origen`,
+`default`) acotados a esa ruta con `skipIf`, el mismo mecanismo que D-28.
 
 ### Primer ingreso · impuesto en el servidor
 
@@ -84,14 +88,25 @@ es esa» no se distingan por el reloj.
 - El cambio verifica **la contraseña actual contra Supabase**, rechaza una
   nueva **igual a la actual** (que mientras dure el indicador ES la inicial) y
   las que no cumplen la política vigente (8 caracteres, mayúscula, minúscula,
-  dígito), la fija con la API de administración y **baja el indicador**. La
-  consola refresca el token y el claim desaparece.
+  dígito y carácter especial, la misma de la consola), la fija con la API de
+  administración y **baja el indicador**. La consola refresca el token y el
+  claim desaparece.
+- `POST /auth/contrasena` admite `aal1` (`@SinSegundoFactor`) porque una cuenta
+  administrativa recién creada o restablecida cambia la contraseña antes de
+  inscribir el factor; el caso de uso sólo lo permite **con el indicador
+  encendido**. Sin él, un `aal1` administrativo recibe 403: quien tuviera sólo
+  la contraseña no podría cambiarla sin el segundo factor.
 
 ### Recuperación sin SMTP · pendiente de BE-01
 
-- **Portero**: la restablece el **superadministrador**.
-- **Residente** (y cualquier otra cuenta de su copropiedad salvo roles
-  administrativos): la restablece el **administrador**.
+- Ruta: `POST /copropiedades/:id/usuarios/:usuarioId/restablecimiento`, con la
+  copropiedad en la ruta y `exigirAlcance` (una cuenta de otra copropiedad
+  responde 404, CA-24).
+- **Portero** (y administrador u operador de central): la restablece el
+  **superadministrador**.
+- **Residente**: la restablece el **administrador** de su copropiedad (o el
+  superadministrador). El administrador no restablece a un portero ni a otro
+  administrador.
 - Quien restablece **escribe** una contraseña temporal que cumple la política;
   el servidor no la genera ni la devuelve. La cuenta queda con
   `debe_cambiar_contrasena`, y el restablecimiento queda en la bitácora de solo

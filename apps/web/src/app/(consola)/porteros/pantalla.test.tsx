@@ -66,7 +66,7 @@ const HECHOS: HechoDeBitacora[] = [
     nombreActor: 'Ana Garita',
     turnoId: TURNO.id,
     duracionSegundos: 900,
-    origenIp: '10.0.0.5',
+    origenIp: '192.0.2.5',
     origenDeclarado: '203.0.113.7',
     agente: 'navegador',
     detalle: null,
