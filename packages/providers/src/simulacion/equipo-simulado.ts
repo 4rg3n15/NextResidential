@@ -556,6 +556,13 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         }),
       );
     }
+    if (catalogada.proposito === 'dar de baja a la persona y con ella su plantilla') {
+      // 15-K (§5) · la persona se lleva su rostro: la plantilla deja de estar.
+      const empleado = /"employeeNo"\s*:\s*"([^"]*)"/.exec(String(opciones?.body ?? ''))?.[1];
+      if (empleado === undefined) return respuestaDe(400, PARAMETRO_MALO);
+      plantillas.delete(empleado);
+      return respuestaDe(200, OK);
+    }
     if (catalogada.proposito === 'dar de alta la persona a la que pertenece la plantilla') {
       // H-SITIO-04 · como la guía: el `employeeNo` admite hasta 32 bytes.
       const empleado = /"employeeNo"\s*:\s*"([^"]*)"/.exec(String(opciones?.body ?? ''))?.[1];

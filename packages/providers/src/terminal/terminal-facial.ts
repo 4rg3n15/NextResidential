@@ -4,7 +4,7 @@ import type {
   ResultadoAccionamiento,
 } from '@ncr/domain-core';
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
-import type { OpcionesDeEquipo } from '../equipo/cliente';
+import type { OpcionesDeEquipo, RespuestaDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { comoErrorNeutral, resumenIsapi } from '../equipo/errores-del-fabricante';
 import { identificadorEnElEquipo } from './identificador-en-el-equipo';
@@ -281,6 +281,23 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
   }
 
   /** Cuántas plantillas hay en la biblioteca. `null` si el equipo no contesta. */
+  /**
+   * 15-K (§5) · la baja de la PERSONA, que es la que lleva el rostro colgado.
+   * La usa la captura de sitio para no dejar en el equipo la persona de la
+   * carga de prueba. Ruta DOCUMENTADA en la guía de las series IP/Ultra
+   * (`UserInfoDelCond`); la de la serie Value documenta otra, asíncrona, y es
+   * una hipótesis abierta para la visita.
+   */
+  async darDeBajaPersona(plantillaId: string): Promise<RespuestaDeEquipo> {
+    const ruta = rutaPara('dar de baja a la persona y con ella su plantilla', 'terminal');
+    return this.cliente.pedir(ruta.metodo, ruta.ruta, {
+      tipo: 'application/json',
+      contenido: JSON.stringify({
+        UserInfoDelCond: { EmployeeNoList: [{ employeeNo: identificadorEnElEquipo(plantillaId) }] },
+      }),
+    });
+  }
+
   async contar(): Promise<number | null> {
     const ruta = rutaPara('contar las plantillas de la biblioteca de rostros', 'terminal');
     try {

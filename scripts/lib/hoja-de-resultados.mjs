@@ -365,7 +365,7 @@ const ROTULO = {
 const celda = (texto) => String(texto).replace(/\|/g, '\\|');
 
 /**
- * @param {{ fecha?: string, modo?: 'simulado'|'real', declaradas?: Record<string, boolean>, referencias?: string[] }} opciones
+ * @param {{ fecha?: string, modo?: 'simulado'|'real', declaradas?: Record<string, boolean>, referencias?: string[], capturas?: string | null }} opciones
  * @returns {string} Markdown de la hoja
  */
 export const hojaDeResultados = ({
@@ -373,6 +373,7 @@ export const hojaDeResultados = ({
   modo = 'real',
   declaradas = {},
   referencias = [],
+  capturas = null,
 } = {}) => {
   const lineas = [];
   const simulado = modo === 'simulado';
@@ -387,6 +388,9 @@ export const hojaDeResultados = ({
   lineas.push('| Copropiedad de prueba | _(nombre, sin dirección ni credenciales)_ |');
   lineas.push('| Quién ejecuta | _(nombre y rol)_ |');
   lineas.push('| Versión desplegada | _(commit de `develop` o de la rama)_ |');
+  lineas.push(
+    `| Capturas crudas (--capturar) | ${capturas === null ? '_(no se capturó: repita con `--capturar`)_' : celda(capturas)} |`,
+  );
   lineas.push(
     `| Equipos declarados al guion | ${['camara', 'terminal', 'videoportero']
       .map((f) => `${ROTULO[f]}: ${declaradas[f] === true ? 'sí' : 'NO'}`)
@@ -408,6 +412,9 @@ export const hojaDeResultados = ({
     '- **Evidencia**: nombre del archivo o de la URL firmada que se descargó, sin la URL entera.',
   );
   lineas.push(
+    '- **Evidencia cruda** (15-K): lo que el EQUIPO contestó en ese escenario, saneado y fuera del repositorio: las líneas de la bitácora de la API (`api.log`, guía de sitio V.2.3) o el fichero de `--capturar` que lo muestre. En sitio, el 26/09/2026, cuatro fallos se quedaron sin diagnóstico por no tenerla: **un FALLA sin evidencia cruda no se puede corregir**.',
+  );
+  lineas.push(
     '- **Veredicto**: `PASA` sólo si obtenido = esperado Y la latencia está dentro del umbral. Todo lo demás es `FALLA`, con el motivo en «Obtenido».',
   );
   lineas.push(
@@ -420,13 +427,13 @@ export const hojaDeResultados = ({
   lineas.push('');
   const tabla = (lista) => {
     lineas.push(
-      '| # | Canal | Escenario | Esperado | Obtenido | Motivo en consola | Latencia (ms) | Evento en /eventos | Evidencia | Veredicto |',
+      '| # | Canal | Escenario | Esperado | Obtenido | Motivo en consola | Latencia (ms) | Evento en /eventos | Evidencia | Evidencia cruda | Veredicto |',
     );
-    lineas.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
+    lineas.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
     for (const e of lista) {
       for (const canal of e.canales) {
         lineas.push(
-          `| ${e.id} | ${canal} | ${celda(e.titulo)} | ${celda(e.esperado)} · umbral: ${celda(e.umbral)} | | esperado: ${celda(e.motivo)} | | | | |`,
+          `| ${e.id} | ${canal} | ${celda(e.titulo)} | ${celda(e.esperado)} · umbral: ${celda(e.umbral)} | | esperado: ${celda(e.motivo)} | | | | | |`,
         );
       }
     }

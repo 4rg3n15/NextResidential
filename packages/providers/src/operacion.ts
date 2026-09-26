@@ -25,6 +25,9 @@ export { ClienteDeEquipo, EquipoInalcanzable } from './equipo/cliente';
 export { interpretarError } from './equipo/errores-del-fabricante';
 export { juzgarModo, leerCtrlMod } from './camara/modo-de-control';
 export { CARRIL_VERIFICADO_DE_LA_CAMARA } from './camara/carril';
-export { diagnosticarEquipo } from './diagnostico/diagnostico-de-equipo';
+export { diagnosticarEquipo, documentoSaneado } from './diagnostico/diagnostico-de-equipo';
+// 15-K (§5) · lo que necesita `--capturar`: la carga de prueba y el saneado.
+export { TerminalFacial } from './terminal/terminal-facial';
+export { equipoSimulado } from './simulacion/equipo-simulado';
 export { fichaDe } from './diagnostico/ficha';
 export { equiposSimulados } from './simulacion/equipo-simulado';

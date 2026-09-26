@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RutaNoSoportada, TerminalFacial } from './terminal-facial';
 import type { ModoDeTerminal } from './terminal-facial';
+import { equipoSimulado } from '../simulacion/equipo-simulado';
 
 /** Respuesta de equipo, sin red. ADR-03: la suite corre sin un solo aparato. */
 const respuesta = (estado: number, cuerpo = '', cabeceras: Record<string, string> = {}): Response =>
@@ -404,5 +405,23 @@ describe('A2 · responder la verificación remota', () => {
       motivo: 'x',
     });
     expect(r.aceptado).toBe(false);
+  });
+});
+
+describe('15-K (§5) · la baja de la persona de la carga de prueba', () => {
+  it('se lleva la plantilla: la búsqueda posterior ya no la encuentra', async () => {
+    const peticion = equipoSimulado({ familia: 'terminal', usuario: 'servicio', clave: 'k' });
+    const terminal = new TerminalFacial({
+      host: 'terminal.invalid',
+      usuario: 'servicio',
+      clave: 'k',
+      peticion,
+      modo: 'decide_el_equipo',
+    });
+    const plantillaId = '5e2b7c1a-0000-4000-8000-000000000001';
+    await terminal.sincronizar('t-1', plantillaId, new Uint8Array([0xff, 0xd8, 0xff, 0xd9]));
+    const r = await terminal.darDeBajaPersona(plantillaId);
+    expect(r.ok).toBe(true);
+    expect((await terminal.suprimirYVerificar('t-1', plantillaId)).ausente).toBe(true);
   });
 });

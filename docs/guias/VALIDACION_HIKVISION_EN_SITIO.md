@@ -17,7 +17,7 @@ analogías.
 
 ---
 
-## V · Procedimiento de la visita · ETAPA 15-I · **empiece aquí**
+## V · Procedimiento de la visita · ETAPA 15-I, corregido en la 15-K · **empiece aquí**
 
 > **Añadido el 26/09/2026 (ETAPA 15-I).** Es el procedimiento ÚNICO y ordenado
 > para ir a sitio. Todo lo que sigue a este apartado (§0 a §9) es el detalle de
@@ -27,70 +27,101 @@ analogías.
 > SIMULADO y contra base real, está en
 > [`ENSAYO_PREVIO_EN_SITIO.md`](ENSAYO_PREVIO_EN_SITIO.md): 24 de las 26 filas
 > escenario × canal en verde, y los defectos que destapó ya corregidos.
+>
+> **Corregido tras la primera visita (ETAPA 15-K, H-SITIO-01 a 14).** Cambia
+> cómo se arranca la API (`start`, no `start:dev`), qué `API_URL` lleva la
+> consola (`127.0.0.1`, no la IP), por dónde se abre la consola (por IP), y
+> añade dos cosas que faltaron aquel día: la **captura cruda** de lo que
+> contesta cada equipo (`--capturar`), ANTES de tocar nada y después, y la
+> **reversión equipo por equipo** contra esa captura. Cuatro fallos de la
+> visita (H-SITIO-01, 04, 05 y 09) se quedaron sin diagnóstico por no tenerla.
 
 ### V.1 · Antes de salir de casa
 
-- [ ] **Código.** `develop` con el PR de la 15-I fusionado; `pnpm install --frozen-lockfile`.
-- [ ] **Verificador en verde en el portátil:** `./scripts/verificar-etapa.sh --con-base`.
-- [ ] **Base del proyecto con TODAS las migraciones, hasta la `0038`**
-      (`20260926120000_0038_residentes_y_acceso_por_codigo.sql`): `supabase db push`.
+- [ ] **Código.** `develop` con el PR de la 15-K fusionado; `pnpm install --frozen-lockfile`.
+- [ ] **Verificador en verde en el Mac:** `./scripts/verificar-etapa.sh --con-base`.
+- [ ] **Base del proyecto con TODAS las migraciones, hasta la `0039`**
+      (`20260926130000_0039_atestacion_del_instalador.sql`): `supabase db push`.
       Comprobar que la RLS quedó activa y forzada (`docs/guias/CONEXION_SUPABASE.md`).
 - [ ] **`apps/api/.env`**, con estos NOMBRES (los valores sólo en su `.env` local, nunca en el repositorio, RN-21):
 
-  | Variable                                                                               | Para qué                                                                                                |
-  | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-  | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL` | Proyecto de Supabase: la secreta, SÓLO en la API                                                        |
-  | `DATABASE_URL`, `DATABASE_POOLER_URL`                                                  | Conexión de la API a PostgreSQL                                                                         |
-  | `CORS_ALLOWED_ORIGINS`                                                                 | El origen de la consola (la del portátil en sitio)                                                      |
-  | `PROVEEDOR_DE_EQUIPOS=hikvision`                                                       | Equipos reales (con `simulado`, ninguno)                                                                |
-  | `CARGADOR_DE_CONTEXTO=postgres`                                                        | El motor lee autorizaciones, padrón y lista negra de la base                                            |
-  | `PERSISTENCIA_DE_EVENTOS=postgres`, `PERSISTENCIA_DE_BIOMETRIA=postgres`               | Histórico, evidencias y biometría en la base (con `memoria` no hay trazabilidad)                        |
-  | `API_URL_PUBLICA`                                                                      | `http://<IP-del-portátil>:3000`: el teléfono del VISITANTE abre el enlace de consentimiento contra ella |
-  | `GO2RTC_URL`                                                                           | `http://127.0.0.1:1984`: el puente de vídeo, visto desde la API                                         |
-  | `ALARM_SERVER_EQUIPOS`                                                                 | `copropiedad\|equipo\|secreto\|ip` de la cámara (se completa en sitio, paso V.2.6)                      |
-  | `INGESTA_FIRMA_SECRETO`                                                                | Firma de la ingesta del Edge                                                                            |
-  | `BIOMETRIA_LLAVE`, `BIOMETRIA_LLAVE_REF`                                               | Bóveda biométrica, enlace del titular, códigos de patrullaje y de ocupante (ADR-025)                    |
-  | `EQUIPOS_LLAVE`, `EQUIPOS_LLAVE_REF`                                                   | Cifrado de las claves de servicio de los equipos en la base                                             |
-  | `EVIDENCIA_BUCKET`                                                                     | Bucket privado de evidencias (si falta, la API avisa y usa memoria)                                     |
+  | Variable                                                                               | Para qué                                                                                                                                                                              |
+  | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL` | Proyecto de Supabase: la secreta, SÓLO en la API                                                                                                                                      |
+  | `DATABASE_URL`, `DATABASE_POOLER_URL`                                                  | Conexión de la API a PostgreSQL                                                                                                                                                       |
+  | `PGBOSS_DATABASE_URL`                                                                  | **Si la red del sitio es sólo IPv4** (H-SITIO-07): el pooler en modo **sesión**, puerto **5432**. La directa `db.<ref>.supabase.co` sólo resuelve por IPv6. Vacía: usa `DATABASE_URL` |
+  | `CORS_ALLOWED_ORIGINS`                                                                 | `http://<IP-del-Mac>:3100,http://127.0.0.1:3100`: los dos orígenes por los que se abre la consola (V.2.4)                                                                             |
+  | `PROVEEDOR_DE_EQUIPOS=hikvision`                                                       | Equipos reales (con `simulado`, ninguno)                                                                                                                                              |
+  | `CARGADOR_DE_CONTEXTO=postgres`                                                        | El motor lee autorizaciones, padrón y lista negra de la base                                                                                                                          |
+  | `PERSISTENCIA_DE_EVENTOS=postgres`, `PERSISTENCIA_DE_BIOMETRIA=postgres`               | Histórico, evidencias, biometría y la lista de Dispositivos en la base (con `memoria` no hay trazabilidad, y el equipo dado de alta no aparece: H-SITIO-02)                           |
+  | `API_URL_PUBLICA`                                                                      | `http://<IP-del-Mac>:3000`. **Nunca `127.0.0.1` ni `localhost`**: el teléfono del VISITANTE abre contra ella el enlace y el QR del consentimiento (H-SITIO-10)                        |
+  | `GO2RTC_URL`                                                                           | `http://127.0.0.1:1984`: el puente de vídeo, visto desde la API                                                                                                                       |
+  | `ALARM_SERVER_EQUIPOS`                                                                 | `copropiedad\|equipo\|secreto\|ip` de la cámara (se completa en sitio, paso V.2.7)                                                                                                    |
+  | `INGESTA_FIRMA_SECRETO`                                                                | Firma de la ingesta del Edge                                                                                                                                                          |
+  | `BIOMETRIA_LLAVE`, `BIOMETRIA_LLAVE_REF`                                               | Bóveda biométrica, enlace del titular, códigos de patrullaje y de ocupante (ADR-025)                                                                                                  |
+  | `EQUIPOS_LLAVE`, `EQUIPOS_LLAVE_REF`                                                   | Cifrado de las claves de servicio de los equipos en la base                                                                                                                           |
+  | `EVIDENCIA_BUCKET`                                                                     | Bucket privado de evidencias (si falta, la API avisa y usa memoria)                                                                                                                   |
+  | `BARRERA_*`, `TERMINAL_*`, `VIDEOPORTERO_*`                                            | `HOST`, `PUERTO`, `USUARIO`, `CLAVE`, `CANAL` de cada equipo, para el guion de sitio (§8.1). Sólo en el `.env` local                                                                  |
 
-- [ ] **`apps/web/.env`**: `API_URL=http://<IP-del-portátil>:3000`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`; `PUENTE_VIDEO_URL` vacío (ADR-022).
-- [ ] **go2rtc** descargado para el portátil, con un `go2rtc.yaml` mínimo: `api.listen: "127.0.0.1:1984"` y `webrtc.listen: ":8555"` (`candidates` con la IP del portátil). **Sin equipos en el fichero**: la API registra cada flujo al pedirlo (§3.3).
+- [ ] **`apps/web/.env`**: **`API_URL=http://127.0.0.1:3000`**, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`; `PUENTE_VIDEO_URL` vacío (ADR-022).
+      `API_URL` la resuelve el **servidor** de la consola, que corre en el mismo Mac que la API; el navegador nunca habla con ella (todo pasa por `/api/ncr`, [`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](CONSOLA_EN_RED_Y_DESPLIEGUE.md) §4). Con la IP del Mac en vez del bucle local, `next start` —que es producción— **no arranca**: exige `https` a toda API que no sea de bucle local (§2.7.8).
+- [ ] **go2rtc** descargado para el Mac, con un `go2rtc.yaml` mínimo: `api.listen: "127.0.0.1:1984"` y `webrtc.listen: ":8555"` (`candidates` con la IP del Mac). **Sin equipos en el fichero**: la API registra cada flujo al pedirlo (§3.3).
 - [ ] **App en el iPhone físico** (Xcode con la cuenta de desarrollo, iPhone de confianza), compilada en **Debug**, que es la única configuración que permite HTTP a una IP privada ([`DESPLIEGUE.md`](DESPLIEGUE.md) §8.1):
 
   ```
   cd apps/mobile
   flutter run -d <id-del-iPhone> \
-    --dart-define=API_URL=http://<IP-del-portátil>:3000 \
+    --dart-define=API_URL=http://<IP-del-Mac>:3000 \
     --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
     --dart-define=SUPABASE_PUBLISHABLE_KEY=<la PUBLICABLE, nunca la secreta>
   ```
 
-  Al primer uso, acepte los permisos de **cámara** (foto del visitante, hito 3) y de **red local**.
+  Al primer uso, acepte los permisos de **cámara** (foto del visitante, hito 3) y de **red local** (H-SITIO-11: sin él, «No hay conexión con el servidor» aunque Safari abra la API). En Debug, un fallo de red muestra el panel de detalle con la URL compilada y el tipo de error: anótelo si aparece.
 
 - [ ] **Superadministrador** con MFA inscrito (arranque en frío: `scripts/registrar-copropiedad.mjs` y `scripts/aprovisionar-rol.mjs`).
 - [ ] **La copropiedad de prueba**, desde Configuración → Ajustes de plataforma (superadministrador): **código corto** (p. ej. `MIRA`; es el que teclean app y consola, D1), tipo y etiquetas de vivienda, **teléfono de portería** (D7) y tope de vehículos propios (2).
 - [ ] **Un residente de prueba** (Residentes → Nuevo residente: usuario y contraseña inicial) y **un portero de prueba** (Porteros) con turno de hoy.
 - [ ] **Credenciales de servicio de los tres equipos**, en mano, y sus IP fijas. Nunca en el repositorio ni en la hoja.
-- [ ] **La hoja de resultados** (16 escenarios en 26 filas escenario × canal, más L6, L7 y T6): `node scripts/puesta-en-marcha-equipos.mjs --simulado --hoja=./hoja.md`.
+- [ ] **Una carpeta de sitio FUERA del repositorio**, p. ej. `$HOME/ncr-sitio`. Ahí van las capturas, la bitácora de la API, la hoja y el informe. `--capturar` se niega a escribir dentro del repositorio (sale con 2).
+- [ ] **La hoja de resultados** (16 escenarios en 26 filas escenario × canal, más L6, L7 y T6, con la columna **«Evidencia cruda»**): `node scripts/puesta-en-marcha-equipos.mjs --simulado --hoja=$HOME/ncr-sitio/hoja.md`.
 
 ### V.2 · En sitio
 
-1. **Red.** Portátil, iPhone y equipos en la misma LAN. Anote la IP del portátil: es la de `API_URL_PUBLICA`, `API_URL` y el Alarm Server.
-2. **Arranque.** Primero go2rtc; después la API (`pnpm --filter @ncr/api start:dev`). Lea la bitácora de arranque: tiene que decir persistencia `postgres`, proveedor `hikvision` y el puente go2rtc.
-3. **Consola en el PORTÁTIL** (`pnpm --filter @ncr/web build && pnpm --filter @ncr/web start`, en el puerto 3100), no en Netlify: el SSE y el audio pasan por su servidor (C-37, P-20).
-4. **Acceso** a la consola como superadministrador: código o NIT de la copropiedad, usuario, contraseña y MFA.
-5. **Registrar los tres equipos**: Dispositivos → + Agregar equipo (§9), con el usuario de servicio de cada uno. «Probar conexión» descubre modelo, firmware y capacidades (ADR-019). **Las fichas tienen que quedar en verde**:
+1. **Red.** Mac, iPhone y equipos en la misma LAN. Anote la IP del Mac: es la de `API_URL_PUBLICA`, la de la consola por IP, la de la app y la del Alarm Server. **No** es la de `API_URL` de la consola, que sigue en `127.0.0.1`.
+2. **Estado previo de los equipos, capturado ANTES de tocar nada** —ni la consola, ni el panel web de ningún equipo—:
 
-   - la cámara, `ctrlMode=1`, `CRIndex=210`, `detectionUpLoadPicturesType` distinto de «all» y formato XML;
-   - la terminal, `remoteCheck`/`AcsCfg` y la biblioteca FDLib;
-   - el videoportero, TwoWayAudio.
+   ```
+   pnpm --filter @ncr/providers build
+   node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs \
+     --sin-accionar --capturar=$HOME/ncr-sitio/antes --informe=$HOME/ncr-sitio/informe-antes.md
+   ```
 
-   Lo que la ficha marque se corrige antes de seguir (§8.2 a §8.4).
+   Deja una carpeta por equipo (`camara/`, `terminal/`, `videoportero/`) con cada petición y cada respuesta **crudas y saneadas** (sin claves ni tokens, IPs tachadas): capacidades, `EntranceParam`, disparadores, servidor de alarma, `AcsCfg`/`remoteCheckDoorEnabled`, FDLib, TwoWayAudio. En la terminal hace además la **carga de prueba** con una imagen sintética que no es un rostro y **da de baja** la persona de prueba al terminar, la acepte o no (H-SITIO-04). Si el guion dice que la baja no se aceptó, compruebe en el equipo que no quedó esa persona antes de seguir. **Ésta es la referencia de la reversión (paso 13): sin ella no hay vuelta atrás exacta.**
 
-6. **La cámara hacia la API.** Alarm Server apuntado a `http://<IP>:3000/alarm-server/<secreto>` (§4.2) y la cámara declarada en `ALARM_SERVER_EQUIPOS` con el id que le dio la consola. Reinicie la API. La terminal y el videoportero no se configuran hacia la API: es la API la que se suscribe a ellos.
-7. **Guion de sitio**, primero sin mover nada y después completo (§8.1):
-   `node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --sin-accionar`, y luego sin `--sin-accionar`. Ningún `✗ BLOQUEO`.
-8. **La app, primer ingreso del residente de prueba:**
+3. **Arranque.** Primero go2rtc. Después compile y arranque la API **con `start`**, guardando su bitácora en la carpeta de sitio:
+
+   ```
+   pnpm turbo run build --filter=@ncr/api --filter=@ncr/web
+   pnpm --filter @ncr/api start 2>&1 | tee $HOME/ncr-sitio/api.log
+   ```
+
+   `start` es `node dist/main.js`, que es lo que ejecuta el recorrido de la consola en el verificador (paso 13b). **No use `start:dev`**: ya arranca (H-SITIO-06), pero recompila en caliente con `tsx` y no es lo que está verificado. Lea la bitácora de arranque: tiene que decir persistencia `postgres`, proveedor `hikvision`, el puente go2rtc y **qué conexión usa pg-boss** (H-SITIO-07); y **ningún error** de `API_URL_PUBLICA` de bucle local (H-SITIO-10).
+
+4. **Consola en el Mac, abierta POR IP**: `pnpm --filter @ncr/web start` (puerto 3100) y, en el navegador, `http://<IP-del-Mac>:3100`. No en Netlify: el SSE y el audio pasan por su servidor (C-37, P-20). Por IP es como la abrirá cualquier otro aparato, y es la única forma de ver lo que verán ellos (D-67 y D-68 sólo aparecían por IP).
+   **Una excepción, y es del navegador, no de la consola:** el **audio de la guardia (V2)** necesita el micrófono, y el navegador sólo lo concede en contexto seguro. `http://<IP>` sin TLS no lo es; `http://127.0.0.1:3100` sí. V2 se hace en el propio Mac por `127.0.0.1` ([`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](CONSOLA_EN_RED_Y_DESPLIEGUE.md) §3).
+5. **Acceso** a la consola como superadministrador: código o NIT de la copropiedad, usuario, contraseña y MFA.
+6. **Registrar los tres equipos**: Dispositivos → + Agregar equipo (§9), con el usuario de servicio de cada uno. «Probar conexión» descubre modelo, firmware y capacidades (ADR-019). **El equipo aparece en la tabla aunque la ficha lo rechace** (H-SITIO-01, 02): se corrige desde su ficha. Cada ficha muestra, en «Respuesta del equipo», lo que el equipo contestó, saneado.
+
+   - **La cámara**: en verde con `ctrlMode=1`, `CRIndex=210`, `detectionUpLoadPicturesType` distinto de «all» y formato XML. Si bloquea por operaciones de barrera no catalogadas (`barrierGateOper=0` NO se da por «no abre»: en la visita abría con 0) o por un disparador ilegible, **pruébelo físicamente** —una placa de la lista blanca del equipo y una desconocida; **ninguna** abre— y regístrelo con «Atestar» como superadministrador (D-11, [ADR-030](../decisiones/ADR-030-atestacion-del-instalador.md)). Queda en **ámbar**, nunca en verde, y sólo para ese firmware. Si alguna abre, es hallazgo de bloqueo (§4.1): pare.
+   - **La terminal**: `AcsCfg.remoteCheckDoorEnabled` (verificación remota, H-SITIO-05) y la biblioteca FDLib.
+   - **El videoportero**: TwoWayAudio, y «Rostros: recibe plantillas» o «no aplica» (H-SITIO-09).
+
+   Lo que la ficha marque se corrige antes de seguir (§8.2 a §8.4). **Cada casilla que cambie en un equipo se anota en su tabla con el fichero de `antes/` que tiene su valor previo.**
+
+7. **La cámara hacia la API.** Alarm Server apuntado a `http://<IP-del-Mac>:3000/alarm-server/<secreto>` (§4.2) y la cámara declarada en `ALARM_SERVER_EQUIPOS` con el id que le dio la consola. Reinicie la API (con `tee -a` al mismo `api.log`). La terminal y el videoportero no se configuran hacia la API: es la API la que se suscribe a ellos.
+8. **Guion de sitio completo**, ya con los equipos configurados:
+   `node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --capturar=$HOME/ncr-sitio/durante --informe=$HOME/ncr-sitio/informe.md` (sin `--sin-accionar`: acciona barrera y puertas). Ningún `✗ BLOQUEO`.
+9. **La app, primer ingreso del residente de prueba:**
 
    1. código de la copropiedad, usuario y contraseña inicial;
    2. cambio de contraseña;
@@ -99,21 +130,29 @@ analogías.
 
    En Perfil, «Llamar a portería» tiene que marcar el número registrado.
 
-9. **El portero de prueba** entra en la consola con el código o el NIT, su usuario y su turno.
-10. **Los 16 escenarios por canal**, con la hoja delante. Orden sugerido:
+10. **El portero de prueba** entra en la consola (por IP) con el código o el NIT, su usuario y su turno.
+11. **Los 16 escenarios por canal**, con la hoja delante. Orden sugerido:
 
     1. L1–L5 con la visita creada en la app, y otra vez creada en la consola;
     2. T1–T5 con la foto tomada en la app, y otra vez en la consola;
-    3. V1–V6;
+    3. V1–V6 (V2 por `127.0.0.1`, paso 4);
     4. después, L6, L7 y T6.
 
     Cada fila lleva su evento de `/eventos` y su evidencia; sin identificador de evento no hay PASA (RN-02). La única excepción es V1, porque un timbre no deja evento. La lista negra de L5 y T5 se crea en Listas negras → Vetar.
+    **Evidencia cruda, en cada fila:** las líneas de `api.log` de ese escenario —cada evento que llega de un equipo deja una línea `info` con tipo, equipo y resultado, y cada orden su petición y su respuesta saneadas (H-SITIO-13, 14)— o el fichero de `--capturar` que lo muestre. **Un FALLA sin evidencia cruda no se puede corregir desde aquí.**
+    **Consentimiento:** si el teléfono del visitante no abre el enlace, el titular puede aceptar en persona en la misma pantalla de la foto —«El titular está aquí: consentimiento presencial»—, escribiendo **él** su nombre y su documento (D-10, [ADR-029](../decisiones/ADR-029-consentimiento-presencial-del-titular.md); su validez jurídica está PENDIENTE DE DEFINICIÓN del área legal). El operador no rellena nada por él.
 
-11. **Al terminar:**
+12. **Limpieza de datos de prueba:**
     1. levante los vetos de prueba;
-    2. revoque los consentimientos de prueba y compruebe con el `Count` de la biblioteca que la plantilla salió de la terminal;
-    3. revierta la configuración de los equipos si procede (§8.6);
-    4. guarde la hoja y el informe del guion, que eliden host y usuario.
+    2. revoque los consentimientos de prueba y compruebe con el `Count` de la biblioteca que la plantilla salió de la terminal y, si recibe plantillas, del videoportero.
+13. **Reversión, equipo por equipo, contra la captura de `antes/`:**
+
+    1. para cada equipo, recorra su tabla de cambios (§8.2 cámara, §8.3 terminal, §8.4 videoportero) y devuelva cada casilla al valor que muestra su fichero de `antes/<equipo>/` —`…entranceParam…`, `…triggers-vehicledetection…` y `…httpHosts…` en la cámara; `…AcsCfg…` en la terminal; `…TwoWayAudio…` en el videoportero—;
+    2. capture el resultado: `node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --sin-accionar --capturar=$HOME/ncr-sitio/despues`;
+    3. compare, equipo por equipo: `diff -r $HOME/ncr-sitio/antes/camara $HOME/ncr-sitio/despues/camara` (y `terminal`, `videoportero`). Sólo pueden cambiar la hora del equipo y los ficheros de la carga de prueba (llevan un identificador nuevo en cada corrida). **Cualquier otra diferencia es una casilla sin revertir**: vuelva al punto 1 con ese equipo. Si los números de los ficheros no casan (el guion preguntó otra cosa porque el equipo contestó distinto), compare por el nombre de la ruta, que va en el nombre del fichero;
+    4. si una casilla no puede volver a su valor previo (p. ej. la cámara debe quedarse sin decidir por su cuenta), anótelo en la hoja como decisión, no como olvido.
+
+14. **Guarde, fuera del repositorio,** la hoja, los dos informes, `api.log` y las tres carpetas de captura. Eliden host y usuario, pero son respuestas de equipos reales: **no se versionan**.
 
 ---
 
