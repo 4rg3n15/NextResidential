@@ -549,4 +549,11 @@ VALUES ('00000000-0000-4000-8000-000000000011','10000000-0000-4000-8000-00000000
         '00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000002')
 ON CONFLICT DO NOTHING;
 
+-- ETAPA 15-I (D1, D7) · código corto de acceso y teléfono de portería de las dos
+-- copropiedades de demostración. El teléfono es ficticio (serie 555).
+UPDATE public.copropiedades SET codigo_corto = 'MIRA', telefono_porteria = '+576015550100'
+ WHERE id = '10000000-0000-4000-8000-000000000001' AND codigo_corto IS NULL;
+UPDATE public.copropiedades SET codigo_corto = 'ROBLE'
+ WHERE id = '10000000-0000-4000-8000-000000000002' AND codigo_corto IS NULL;
+
 COMMIT;
