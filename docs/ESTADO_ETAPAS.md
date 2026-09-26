@@ -908,6 +908,9 @@ sustitución por la referencia exacta queda como deuda mecánica.
 **Prueba:** `apps/api/test/patron-en-hora-local-pg.test.ts` contra PostgreSQL
 real: **5 de 9 en rojo sin la corrección, 9 de 9 en verde con ella**.
 
+**Verificador:** una sola corrida, **correcta: 26 de 26 pasos sin una sola ✗**
+(veredicto literal en el informe, §6).
+
 ---
 
 ## Ronda `etapa-15i-residentes-y-app` — Bloque B, sesión 2: residentes y app, hasta la puerta del sitio · **CERRADA** · 2026-09-26
