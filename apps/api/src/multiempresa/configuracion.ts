@@ -1,4 +1,11 @@
 import type { Rol } from '../autenticacion';
+import {
+  codigoCortoEfectivo,
+  telefonoEfectivo,
+  validarCodigoCorto,
+  validarTelefonoPorteria,
+  validarTopeVehiculos,
+} from './ajustes-de-plataforma';
 
 /**
  * Qué se puede configurar de una copropiedad, quién puede tocarlo y qué se
@@ -41,7 +48,10 @@ export type ClaveEditable =
   | 'etiquetaVivienda'
   | 'etiquetaAgrupacion'
   | 'zonaHoraria'
-  | 'politicaContingenciaEdge';
+  | 'politicaContingenciaEdge'
+  | 'codigoCorto'
+  | 'telefonoPorteria'
+  | 'topeVehiculosPropios';
 
 export type PoliticaContingencia = 'denegar' | 'escalar_portero';
 
@@ -175,7 +185,15 @@ export interface ConfiguracionDeCopropiedad {
   readonly etiquetaAgrupacion: string;
   readonly zonaHoraria: string;
   readonly politicaContingenciaEdge: PoliticaContingencia;
+  /** D1 · `null` mientras el superadministrador no lo asigne: sin él sólo se entra por NIT. */
+  readonly codigoCorto: string | null;
+  /** D7 · `null` = la app dice «portería no ha registrado su teléfono». */
+  readonly telefonoPorteria: string | null;
+  /** D5 a · vehículos propios activos que los ocupantes registran por vivienda. */
+  readonly topeVehiculosPropios: number;
   /* ── Solo lectura ── */
+  /** D5 c · ADR-027 · hoy sólo «automatica»; el modo del portero no está construido. */
+  readonly aprobacionDeTerceros: 'automatica';
   /**
    * Se siguen exponiendo para que la pantalla los MUESTRE con su motivo; ya no
    * se editan (ETAPA 15-B, B.5). Lo que la consola recibe es el valor efectivo,
@@ -204,9 +222,13 @@ export interface CambiosDeConfiguracion {
   readonly etiquetaAgrupacion?: string;
   readonly zonaHoraria?: string;
   readonly politicaContingenciaEdge?: PoliticaContingencia;
+  readonly codigoCorto?: string;
+  /** Vacío borra el teléfono; por eso el efectivo admite `null`. */
+  readonly telefonoPorteria?: string | null;
+  readonly topeVehiculosPropios?: number;
 }
 
-interface Ajuste {
+export interface Ajuste {
   readonly clave: ClaveEditable;
   readonly etiqueta: string;
   /** Roles que pueden cambiarlo. El resto lo ve, no lo toca. */
@@ -312,6 +334,25 @@ const AJUSTES: readonly Ajuste[] = [
         ? null
         : 'debe ser «denegar» o «escalar_portero»',
   },
+  // ETAPA 15-I · los tres de plataforma: su verdad vive en `ajustes-de-plataforma.ts`.
+  {
+    clave: 'codigoCorto',
+    etiqueta: 'Código de acceso de la copropiedad',
+    editablePor: ['superadministrador'],
+    validar: validarCodigoCorto,
+  },
+  {
+    clave: 'telefonoPorteria',
+    etiqueta: 'Teléfono de portería',
+    editablePor: ['superadministrador'],
+    validar: validarTelefonoPorteria,
+  },
+  {
+    clave: 'topeVehiculosPropios',
+    etiqueta: 'Vehículos propios por vivienda',
+    editablePor: ['superadministrador'],
+    validar: validarTopeVehiculos,
+  },
 ];
 
 export const AJUSTE_POR_CLAVE: ReadonlyMap<ClaveEditable, Ajuste> = new Map(
@@ -378,6 +419,11 @@ export const cambiosEfectivos = (
   const direccion = p.direccion === undefined ? undefined : sanearTexto(p.direccion);
   const etiquetaVivienda = p.etiquetaVivienda?.trim();
   const etiquetaAgrupacion = p.etiquetaAgrupacion?.trim();
+  const codigo = p.codigoCorto === undefined ? undefined : codigoCortoEfectivo(p.codigoCorto);
+  const telefono =
+    p.telefonoPorteria === undefined || p.telefonoPorteria === null
+      ? p.telefonoPorteria
+      : telefonoEfectivo(p.telefonoPorteria);
   return {
     ...(nombre !== undefined && nombre !== actual.nombre ? { nombre } : {}),
     ...(zonaHoraria !== undefined && zonaHoraria !== actual.zonaHoraria ? { zonaHoraria } : {}),
@@ -392,6 +438,14 @@ export const cambiosEfectivos = (
     ...(p.politicaContingenciaEdge !== undefined &&
     p.politicaContingenciaEdge !== actual.politicaContingenciaEdge
       ? { politicaContingenciaEdge: p.politicaContingenciaEdge }
+      : {}),
+    ...(codigo !== undefined && codigo !== actual.codigoCorto ? { codigoCorto: codigo } : {}),
+    ...(telefono !== undefined && telefono !== actual.telefonoPorteria
+      ? { telefonoPorteria: telefono }
+      : {}),
+    ...(p.topeVehiculosPropios !== undefined &&
+    p.topeVehiculosPropios !== actual.topeVehiculosPropios
+      ? { topeVehiculosPropios: p.topeVehiculosPropios }
       : {}),
   };
 };

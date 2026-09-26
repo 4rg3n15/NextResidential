@@ -94,7 +94,7 @@ const DATOS: ReadonlyMap<string, Datos> = new Map([
           nombre: 'Maria Titular',
           parentesco: 'Propietario',
           esTitular: true,
-          nivelAcceso: 'acceso_completo',
+          nivelAcceso: 'completo',
           activo: true,
         },
         {
@@ -156,7 +156,7 @@ const DATOS: ReadonlyMap<string, Datos> = new Map([
           nombre: 'Ruiz Vecino',
           parentesco: 'Propietario',
           esTitular: true,
-          nivelAcceso: 'acceso_completo',
+          nivelAcceso: 'completo',
           activo: true,
         },
       ],
@@ -221,7 +221,8 @@ const VINCULOS: ReadonlyMap<string, VinculoDeResidente> = new Map([
       residenteId: '40000000-0000-4000-8000-000000000001',
       personaId: '80000000-0000-4000-8000-000000000001',
       esTitular: true,
-      nivelAcceso: 'acceso_completo',
+      nivelAcceso: 'completo',
+      permiteAutorizar: true,
     },
   ],
   [
@@ -232,7 +233,8 @@ const VINCULOS: ReadonlyMap<string, VinculoDeResidente> = new Map([
       residenteId: '40000000-0000-4000-8000-0000000000a1',
       personaId: '80000000-0000-4000-8000-0000000000a1',
       esTitular: true,
-      nivelAcceso: 'acceso_completo',
+      nivelAcceso: 'completo',
+      permiteAutorizar: true,
     },
   ],
   [
@@ -244,6 +246,7 @@ const VINCULOS: ReadonlyMap<string, VinculoDeResidente> = new Map([
       personaId: '80000000-0000-4000-8000-0000000000b1',
       esTitular: true,
       nivelAcceso: 'solo_ingreso',
+      permiteAutorizar: false,
     },
   ],
 ]);

@@ -118,15 +118,14 @@ export class CrearMiAutorizacion {
       placa: entrada.placa,
     });
     /**
-     * El cuarto hecho lo pone el VÍNCULO, no la base. `[SUPUESTO]` P-11 sigue
-     * abierto —el documento no define los niveles de acceso—, así que el
-     * criterio es el conservador de §2.1.4: solo `acceso_completo` autoriza, y
-     * un nivel desconocido o ausente NO. Denegar de más se corrige con una
-     * llamada a la administración; permitir de más abre una puerta.
+     * El cuarto hecho lo pone el VÍNCULO, no la base: lo que el catálogo de
+     * niveles (P-11) dice del nivel de este residente. Un nivel ausente NO
+     * autoriza —§2.1.4, denegar por defecto—. H-15I-01: antes se comparaba el
+     * NOMBRE del nivel con uno que el catálogo no usa.
      */
     const veredicto = puedeAutorizar({
       ...deLaBase,
-      vinculoPuedeAutorizar: vinculo.nivelAcceso === 'acceso_completo',
+      vinculoPuedeAutorizar: vinculo.permiteAutorizar,
     });
     if (!veredicto.puede) return exito({ creada: false, motivo: veredicto.motivo });
 

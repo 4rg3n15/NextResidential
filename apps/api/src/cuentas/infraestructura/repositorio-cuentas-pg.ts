@@ -54,6 +54,16 @@ export class RepositorioDeCuentasPg implements RepositorioDeCuentas {
     });
   }
 
+  async copropiedadPorCodigo(codigo: string): Promise<string | null> {
+    return this.con(lectura(), async (c) => {
+      const { rows } = await c.query<{ id: string }>(
+        `SELECT id FROM public.copropiedades WHERE codigo_corto = $1 AND estado = 'activa'`,
+        [codigo],
+      );
+      return rows[0]?.id ?? null;
+    });
+  }
+
   async identidadDe(usuarioId: string): Promise<IdentidadDeCuenta | null> {
     return this.con(lectura(), async (c) => {
       const { rows } = await c.query<FilaDeIdentidad>(

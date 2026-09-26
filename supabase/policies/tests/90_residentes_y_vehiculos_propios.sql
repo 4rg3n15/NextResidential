@@ -318,6 +318,27 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
+-- 3.2 · H-15I-02 · una copropiedad NUEVA nace con sus dos niveles de acceso
+--       (P-11) y admite residentes; antes el disparador de la 0013 los rechazaba.
+-- ---------------------------------------------------------------------------
+RESET ROLE;
+SET LOCAL request.jwt.claims = '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002","copropiedad_id":null}';
+DO $$
+DECLARE n int;
+BEGIN
+  INSERT INTO public.copropiedades (id, nombre, nit, creado_por, actualizado_por)
+  VALUES ('90000000-0000-4000-8000-0000000000c1', 'Conjunto Nuevo', '900555001',
+          '00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000002');
+  SELECT count(*) INTO n FROM public.niveles_acceso
+   WHERE copropiedad_id = '90000000-0000-4000-8000-0000000000c1' AND estado = 'activo';
+  ASSERT n = 2, format('tg_copropiedad_niveles_de_acceso: la copropiedad nueva nació con %s niveles', n);
+  SELECT count(*) INTO n FROM public.niveles_acceso
+   WHERE copropiedad_id = '90000000-0000-4000-8000-0000000000c1' AND clave = 'completo' AND permite_autorizar;
+  ASSERT n = 1, 'el nivel «completo» no permite autorizar';
+  RAISE NOTICE '90 · P-11 · una copropiedad nueva nace con solo_ingreso y completo: ok';
+END $$;
+
+-- ---------------------------------------------------------------------------
 -- 4 · La bitácora de residentes, frente al DUEÑO (ADR-005).
 -- ---------------------------------------------------------------------------
 RESET ROLE;

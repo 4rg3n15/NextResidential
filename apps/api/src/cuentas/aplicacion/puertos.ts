@@ -80,6 +80,8 @@ export interface AltaDeCuenta {
 
 export interface RepositorioDeCuentas {
   copropiedadPorNit(nit: string): Promise<string | null>;
+  /** D1 · el código ya normalizado (`codigoCorto`); sólo copropiedades activas. */
+  copropiedadPorCodigo(codigo: string): Promise<string | null>;
   identidadDe(usuarioId: string): Promise<IdentidadDeCuenta | null>;
   existeNombre(copropiedadId: string, usuario: NombreDeUsuario): Promise<boolean>;
   /**

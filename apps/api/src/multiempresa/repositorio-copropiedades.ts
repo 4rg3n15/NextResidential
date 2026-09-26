@@ -1,6 +1,14 @@
 import type { ContextoTenant } from '../autenticacion';
 import type { CambiosDeConfiguracion, ConfiguracionDeCopropiedad } from './configuracion';
 import { UMBRAL_CONFIANZA_PLACA_FRACCION, cambiosEfectivos } from './configuracion';
+import { APROBACION_DE_TERCEROS, TOPE_VEHICULOS_POR_OMISION } from './ajustes-de-plataforma';
+
+/** D1 · el código ya lo usa otra copropiedad: lo decide el índice único, no un SELECT previo. */
+export class CodigoCortoEnUso extends Error {
+  constructor() {
+    super('ese código ya lo usa otra copropiedad');
+  }
+}
 
 /**
  * Puerto de lectura del catálogo de copropiedades.
@@ -118,6 +126,10 @@ export class RepositorioCopropiedadesEnMemoria implements RepositorioCopropiedad
           plazoConsentimientoHoras: 24,
           margenCacheReglasHoras: 24,
           versionReglasActual: 0,
+          codigoCorto: null,
+          telefonoPorteria: null,
+          topeVehiculosPropios: TOPE_VEHICULOS_POR_OMISION,
+          aprobacionDeTerceros: APROBACION_DE_TERCEROS,
         });
       }
     }
@@ -152,6 +164,14 @@ export class RepositorioCopropiedadesEnMemoria implements RepositorioCopropiedad
     const actual = this.configuraciones.get(id);
     if (actual === undefined) return null;
     const efectivos = cambiosEfectivos(actual, cambios);
+    if (
+      efectivos.codigoCorto !== undefined &&
+      [...this.configuraciones.entries()].some(
+        ([otra, c]) => otra !== id && c.codigoCorto === efectivos.codigoCorto,
+      )
+    ) {
+      throw new CodigoCortoEnUso();
+    }
     const guardada: ConfiguracionDeCopropiedad = { ...actual, ...efectivos };
     this.configuraciones.set(id, guardada);
     this.filas = this.filas.map((f) =>

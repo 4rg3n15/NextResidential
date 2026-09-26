@@ -16,6 +16,12 @@ BEGIN
 END
 $$;
 
+DROP TRIGGER IF EXISTS tg_copropiedad_niveles_de_acceso ON public.copropiedades;
+DROP FUNCTION IF EXISTS app.tg_copropiedad_niveles_de_acceso();
+DROP FUNCTION IF EXISTS app.sembrar_niveles_de_acceso(uuid);
+DROP POLICY IF EXISTS niveles_acceso_insercion_plataforma ON public.niveles_acceso;
+-- Los niveles ya sembrados se QUEDAN: los residentes los referencian.
+
 DROP TABLE IF EXISTS public.bitacora_de_residentes;
 DROP TABLE IF EXISTS public.plazas_de_ocupante;
 DROP TABLE IF EXISTS public.vehiculos_ocupantes;

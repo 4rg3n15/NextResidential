@@ -2,7 +2,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, Length, MaxLength, ValidateIf } from 'class-validator';
 
 /**
- * Entrada de la consola: por correo O por NIT y usuario (ADR-023, C-34).
+ * Entrada de la consola y de la app: por correo, por CÓDIGO corto y usuario
+ * (D1) o por NIT y usuario (ADR-023, C-34; sólo lo ofrece la consola).
  *
  * El DTO valida FORMA: longitudes y presencia. La verdad —si el usuario tiene
  * el formato del objeto de valor, si el NIT existe— la decide el caso de uso,
@@ -10,13 +11,25 @@ import { IsEmail, IsOptional, IsString, Length, MaxLength, ValidateIf } from 'cl
  */
 export class AccesoDto {
   @ApiPropertyOptional({ type: String, maxLength: 254, description: 'Cuentas por correo' })
-  @ValidateIf((o: AccesoDto) => o.usuario === undefined && o.nit === undefined)
+  @ValidateIf(
+    (o: AccesoDto) => o.usuario === undefined && o.nit === undefined && o.codigo === undefined,
+  )
   @IsEmail()
   @MaxLength(254)
   correo?: string;
 
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 8,
+    description: 'Código corto de la copropiedad (D1): 3 a 8 letras o números',
+  })
+  @ValidateIf((o: AccesoDto) => o.correo === undefined && o.nit === undefined)
+  @IsString()
+  @Length(3, 8)
+  codigo?: string;
+
   @ApiPropertyOptional({ type: String, maxLength: 20, description: 'NIT de la copropiedad' })
-  @ValidateIf((o: AccesoDto) => o.correo === undefined)
+  @ValidateIf((o: AccesoDto) => o.correo === undefined && o.codigo === undefined)
   @IsString()
   @Length(5, 20)
   nit?: string;

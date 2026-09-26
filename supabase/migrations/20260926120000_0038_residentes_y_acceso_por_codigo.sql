@@ -23,6 +23,10 @@
 --   7 · bitacora_de_residentes: rastro de SOLO INSERCIÓN (vinculaciones, códigos
 --       equivocados, ocupantes, vehículos propios, perfil), con las tres capas de
 --       ADR-005.
+--   8 · P-11 · todo conjunto nace con sus dos niveles de acceso. Hallazgo
+--       H-15I-02: ninguna migración los creaba —sólo la semilla—, así que en una
+--       copropiedad real el disparador de la 0013 rechazaba TODO residente
+--       («no tiene niveles de acceso configurados»).
 --
 -- Reversión: supabase/reversion/0038_revert.sql.
 -- =============================================================================
@@ -497,7 +501,56 @@ CREATE POLICY bitacora_residentes_lectura ON public.bitacora_de_residentes FOR S
 CREATE POLICY bitacora_residentes_insercion ON public.bitacora_de_residentes FOR INSERT
   WITH CHECK (app.es_superadmin() OR app.es_servicio(copropiedad_id));
 
--- 11 · aserciones de despliegue -------------------------------------------------
+-- 11 · P-11 · los dos niveles de acceso de todo conjunto (H-15I-02) ------------
+-- La 0013 asigna al residente el nivel más restrictivo y, si la copropiedad no
+-- tiene catálogo, RECHAZA el alta. Sólo la semilla sembraba el catálogo: una
+-- copropiedad creada con `registrar-copropiedad.mjs` no podía tener residentes.
+-- Los dos valores son los que P-11 resolvió (2026-09-06); más niveles se añaden
+-- sin migración, como entonces.
+DROP POLICY IF EXISTS niveles_acceso_insercion_plataforma ON public.niveles_acceso;
+CREATE POLICY niveles_acceso_insercion_plataforma ON public.niveles_acceso FOR INSERT
+  WITH CHECK (app.es_superadmin());
+
+CREATE OR REPLACE FUNCTION app.sembrar_niveles_de_acceso(p_copropiedad_id uuid)
+RETURNS void LANGUAGE sql AS $$
+  INSERT INTO public.niveles_acceso (copropiedad_id, clave, nombre, descripcion, orden,
+                                     permite_autorizar, creado_por, actualizado_por)
+  SELECT p_copropiedad_id, v.clave, v.nombre, v.descripcion, v.orden, v.permite_autorizar,
+         app.actor_de_sistema(), app.actor_de_sistema()
+    FROM (VALUES
+      ('solo_ingreso', 'Solo ingreso', 'Entra y sale; no crea autorizaciones de visitante.',
+       1::smallint, false),
+      ('completo', 'Acceso completo', 'Gestiona vehiculos y autoriza visitantes de su vivienda.',
+       2::smallint, true)
+    ) AS v(clave, nombre, descripcion, orden, permite_autorizar)
+   WHERE NOT EXISTS (SELECT 1 FROM public.niveles_acceso n
+                      WHERE n.copropiedad_id = p_copropiedad_id AND n.estado = 'activo')
+  ON CONFLICT DO NOTHING;
+$$;
+
+CREATE OR REPLACE FUNCTION app.tg_copropiedad_niveles_de_acceso()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM app.sembrar_niveles_de_acceso(NEW.id);
+  RETURN NEW;
+END
+$$;
+DROP TRIGGER IF EXISTS tg_copropiedad_niveles_de_acceso ON public.copropiedades;
+CREATE TRIGGER tg_copropiedad_niveles_de_acceso AFTER INSERT ON public.copropiedades
+  FOR EACH ROW EXECUTE FUNCTION app.tg_copropiedad_niveles_de_acceso();
+
+-- Las copropiedades que ya existen sin catálogo lo reciben ahora. Con la
+-- identidad de plataforma: la RLS forzada alcanza también al dueño.
+DO $$
+BEGIN
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('rol', 'superadministrador', 'usuario_id', app.actor_de_sistema(),
+                      'copropiedad_id', NULL)::text, true);
+  PERFORM app.sembrar_niveles_de_acceso(c.id) FROM public.copropiedades c;
+END
+$$;
+
+-- 12 · aserciones de despliegue -------------------------------------------------
 DO $$
 DECLARE n int;
 BEGIN
@@ -530,5 +583,9 @@ BEGIN
   SELECT count(*) INTO n FROM pg_indexes
    WHERE schemaname = 'public' AND indexname IN ('copropiedades_codigo_corto_uk', 'plazas_numero_uk');
   ASSERT n = 2, '0038: faltan los índices únicos del código corto o de las plazas';
+
+  SELECT count(*) INTO n FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+   WHERE c.relname = 'copropiedades' AND t.tgname = 'tg_copropiedad_niveles_de_acceso';
+  ASSERT n = 1, '0038: una copropiedad nueva nacería sin niveles de acceso (H-15I-02)';
 END
 $$;

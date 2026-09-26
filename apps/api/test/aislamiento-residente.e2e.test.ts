@@ -621,7 +621,7 @@ describe('M-4 · los rechazos llegan con su motivo TIPADO, no como un error', ()
 
   it('P-11 · un residente de nivel `solo_ingreso` no autoriza', async () => {
     // RB es el que tiene `solo_ingreso` en el doble, y vive en COP_B. El
-    // criterio es el conservador de §2.1.4: solo `acceso_completo` autoriza.
+    // criterio es el conservador de §2.1.4: sólo un nivel que PERMITE autorizar (P-11).
     const token = await tokenResidente(USUARIO_RB, COP_B);
     const res = await enviar('/copropiedades/:id/mi/autorizaciones', COP_B, token, {
       ...ESCRITURAS_DEL_AMBITO['POST /copropiedades/:id/mi/autorizaciones']?.cuerpo,

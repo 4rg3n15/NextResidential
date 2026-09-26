@@ -23,10 +23,12 @@ interface CuentaGuardada extends IdentidadDeCuenta {
 export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, DirectorioDeCuentas {
   private readonly cuentas = new Map<string, CuentaGuardada>();
   private readonly nits = new Map<string, string>();
+  private readonly codigos = new Map<string, string>();
 
-  /** Para sembrar desde la suite: una copropiedad con su NIT. */
-  declararCopropiedad(nit: string, copropiedadId: string): void {
+  /** Para sembrar desde la suite: una copropiedad con su NIT y, si lo tiene, su código (D1). */
+  declararCopropiedad(nit: string, copropiedadId: string, codigo?: string): void {
     this.nits.set(nit, copropiedadId);
+    if (codigo !== undefined) this.codigos.set(codigo, copropiedadId);
   }
 
   /** Para sembrar desde la suite: una cuenta por correo, como las anteriores a 15-H. */
@@ -67,6 +69,10 @@ export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, Dire
 
   async copropiedadPorNit(nit: string): Promise<string | null> {
     return this.nits.get(nit) ?? null;
+  }
+
+  async copropiedadPorCodigo(codigo: string): Promise<string | null> {
+    return this.codigos.get(codigo) ?? null;
   }
 
   async identidadDe(usuarioId: string): Promise<IdentidadDeCuenta | null> {

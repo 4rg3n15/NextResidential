@@ -76,13 +76,15 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
         persona_id: string;
         es_titular: boolean;
         nivel: string | null;
+        permite_autorizar: boolean;
       }>(
         `SELECT r.copropiedad_id,
                 r.vivienda_id,
                 r.id          AS residente_id,
                 r.persona_id,
                 r.es_titular,
-                n.clave       AS nivel
+                n.clave       AS nivel,
+                COALESCE(n.permite_autorizar, false) AS permite_autorizar
            FROM public.usuarios   u
            JOIN public.residentes r ON r.persona_id = u.persona_id
                                    AND r.estado = 'activo'
@@ -104,6 +106,7 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
         personaId: f.persona_id,
         esTitular: f.es_titular,
         nivelAcceso: f.nivel,
+        permiteAutorizar: f.permite_autorizar,
       };
     });
   }
