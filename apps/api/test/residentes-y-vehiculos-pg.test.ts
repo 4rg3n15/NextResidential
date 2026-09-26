@@ -130,7 +130,10 @@ const residenteNuevo = async (n: number): Promise<string> => {
   const primero = await http()
     .post('/auth/acceso')
     .set('x-ncr-origen', origen)
-    .send({ codigo: CODIGO.toLowerCase(), usuario, contrasena: INICIAL });
+    // La forma EXACTA del cliente Dart generado: los opcionales viajan como
+    // `null`. Con `!== undefined` en el servidor, esto era un acceso por
+    // «correo: null» y respondía 401 (hallazgo H-15I-04).
+    .send({ correo: null, codigo: CODIGO.toLowerCase(), nit: null, usuario, contrasena: INICIAL });
   expect(primero.status, JSON.stringify(primero.body)).toBe(200);
   expect(primero.body.debeCambiarContrasena).toBe(true);
   // Con el cambio pendiente, ni siquiera el alta: 403 (ADR-023).

@@ -9,36 +9,41 @@ import { IsEmail, IsOptional, IsString, Length, MaxLength, ValidateIf } from 'cl
  * el formato del objeto de valor, si el NIT existe— la decide el caso de uso,
  * y un fallo ahí responde lo mismo que una contraseña equivocada.
  */
+/**
+ * Nulo cuenta como AUSENTE. El cliente Dart generado (app, 15-I) serializa los
+ * opcionales como `null`; si aquí se comparara con `undefined`, un acceso por
+ * código llegaría como «correo: null» y se trataría como acceso por correo.
+ */
+const ausente = (v: unknown): boolean => v === undefined || v === null;
+
 export class AccesoDto {
   @ApiPropertyOptional({ type: String, maxLength: 254, description: 'Cuentas por correo' })
-  @ValidateIf(
-    (o: AccesoDto) => o.usuario === undefined && o.nit === undefined && o.codigo === undefined,
-  )
+  @ValidateIf((o: AccesoDto) => ausente(o.usuario) && ausente(o.nit) && ausente(o.codigo))
   @IsEmail()
   @MaxLength(254)
-  correo?: string;
+  correo?: string | null;
 
   @ApiPropertyOptional({
     type: String,
     maxLength: 8,
     description: 'Código corto de la copropiedad (D1): 3 a 8 letras o números',
   })
-  @ValidateIf((o: AccesoDto) => o.correo === undefined && o.nit === undefined)
+  @ValidateIf((o: AccesoDto) => ausente(o.correo) && ausente(o.nit))
   @IsString()
   @Length(3, 8)
-  codigo?: string;
+  codigo?: string | null;
 
   @ApiPropertyOptional({ type: String, maxLength: 20, description: 'NIT de la copropiedad' })
-  @ValidateIf((o: AccesoDto) => o.correo === undefined && o.codigo === undefined)
+  @ValidateIf((o: AccesoDto) => ausente(o.correo) && ausente(o.codigo))
   @IsString()
   @Length(5, 20)
-  nit?: string;
+  nit?: string | null;
 
   @ApiPropertyOptional({ type: String, maxLength: 32, description: 'Nombre de usuario' })
-  @ValidateIf((o: AccesoDto) => o.correo === undefined)
+  @ValidateIf((o: AccesoDto) => ausente(o.correo))
   @IsString()
   @Length(1, 32)
-  usuario?: string;
+  usuario?: string | null;
 
   @ApiProperty({ type: String, maxLength: 256, format: 'password' })
   @IsString()

@@ -62,8 +62,10 @@ import {
 export const MENSAJE_CREDENCIALES = 'Código o NIT, usuario o contraseña incorrectos';
 
 const identificadorDe = (dto: AccesoDto): IdentificadorDeAcceso => {
-  if (dto.correo !== undefined) return { tipo: 'correo', correo: dto.correo };
-  if (dto.codigo !== undefined) {
+  // Nulo = ausente: el cliente Dart generado envía los opcionales como `null`.
+  if (dto.correo !== undefined && dto.correo !== null)
+    return { tipo: 'correo', correo: dto.correo };
+  if (dto.codigo !== undefined && dto.codigo !== null) {
     return { tipo: 'codigo', codigo: dto.codigo, usuario: dto.usuario ?? '' };
   }
   return { tipo: 'usuario', nit: dto.nit ?? '', usuario: dto.usuario ?? '' };
