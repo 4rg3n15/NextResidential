@@ -3,14 +3,37 @@
 import type { JSX } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
 import { CodigosDeRecuperacion } from './codigos-recuperacion';
 import { InscripcionDeFactor } from './inscripcion-factor';
+import { CambioObligatorio } from './cambio-obligatorio';
 import type { ResultadoDeAcceso } from '@/app/api/sesion/route';
 
-type Paso = 'credenciales' | 'inscripcion' | 'segundo-factor' | 'codigos';
+type Paso = 'credenciales' | 'inscripcion' | 'segundo-factor' | 'codigos' | 'cambio';
+
+/**
+ * ETAPA 15-H (ADR-023) · el NIT se recuerda en ESTE equipo: un portero entra
+ * cada turno desde la misma garita, y escribir el NIT cada vez es donde se
+ * equivoca. Es un dato público del conjunto, no una credencial; aun así va a
+ * `localStorage` sólo como comodidad y la página funciona igual sin él.
+ */
+const CLAVE_NIT = 'ncr:nit-de-acceso';
+const leerNit = (): string => {
+  try {
+    return window.localStorage.getItem(CLAVE_NIT) ?? '';
+  } catch {
+    return '';
+  }
+};
+const guardarNit = (nit: string): void => {
+  try {
+    window.localStorage.setItem(CLAVE_NIT, nit);
+  } catch {
+    // Sin almacenamiento (modo privado, bloqueado): se escribe cada vez.
+  }
+};
 
 /**
  * Formulario de acceso en dos pasos.
@@ -25,10 +48,22 @@ type Paso = 'credenciales' | 'inscripcion' | 'segundo-factor' | 'codigos';
  * bloqueo por límite de peticiones con su espera, servicio de identidad caído,
  * botón en curso y el paso de segundo factor completo.
  */
-export const FormularioDeAcceso = ({ className }: { readonly className?: string }): JSX.Element => {
+export const FormularioDeAcceso = ({
+  className,
+  pasoInicial = 'credenciales',
+}: {
+  readonly className?: string;
+  /** 15-H · la consola manda aquí a quien tiene el cambio de contraseña pendiente. */
+  readonly pasoInicial?: 'credenciales' | 'cambio';
+}): JSX.Element => {
   const router = useRouter();
-  const [paso, setPaso] = useState<Paso>('credenciales');
+  const [paso, setPaso] = useState<Paso>(pasoInicial);
   const [correo, setCorreo] = useState('');
+  const [nit, setNit] = useState('');
+  const [aviso, setAviso] = useState<string | undefined>(undefined);
+  useEffect(() => setNit(leerNit()), []);
+  /** Sin arroba es un NOMBRE DE USUARIO, y entonces hace falta el NIT (C-34). */
+  const porUsuario = correo.trim() !== '' && !correo.includes('@');
   const [contrasena, setContrasena] = useState('');
   const [codigo, setCodigo] = useState('');
   const [verContrasena, setVerContrasena] = useState(false);
@@ -72,6 +107,35 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
       setEnviando(false);
     }
   };
+
+  if (paso === 'cambio') {
+    return (
+      <CambioObligatorio
+        className={className}
+        alTerminar={(r) => {
+          if (r.siguiente === 'segundo-factor' || r.siguiente === 'inscripcion') {
+            setPaso(r.siguiente);
+            return;
+          }
+          if (r.siguiente === 'acceso') {
+            setPaso('credenciales');
+            setAviso('Contraseña cambiada. Vuelve a entrar con la nueva.');
+            return;
+          }
+          router.replace('/');
+          router.refresh();
+        }}
+        alCancelar={() => {
+          void fetch('/api/sesion', { method: 'DELETE', credentials: 'same-origin' }).finally(
+            () => {
+              setPaso('credenciales');
+              router.replace('/acceso');
+            },
+          );
+        }}
+      />
+    );
+  }
 
   if (paso === 'inscripcion') {
     return (
@@ -156,7 +220,16 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
       className={className}
       onSubmit={(e) => {
         e.preventDefault();
-        void enviar('/api/sesion', { correo, contrasena, recordar }, (r) => {
+        const identificador = porUsuario
+          ? { nit: nit.trim(), usuario: correo.trim() }
+          : { correo: correo.trim() };
+        if (porUsuario) guardarNit(nit.trim());
+        void enviar('/api/sesion', { ...identificador, contrasena, recordar }, (r) => {
+          if (r.siguiente === 'cambio-de-contrasena') {
+            setPaso('cambio');
+            setContrasena('');
+            return;
+          }
           if (r.siguiente === 'segundo-factor' || r.siguiente === 'inscripcion') {
             setPaso(r.siguiente);
             setContrasena('');
@@ -168,16 +241,37 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
       }}
     >
       <div className="space-y-4">
+        {aviso === undefined ? null : (
+          <p role="status" className="text-secundario text-exito-texto">
+            {aviso}
+          </p>
+        )}
         <Campo
-          etiqueta="Correo electrónico"
+          etiqueta="Correo o usuario"
           name="correo"
-          type="email"
+          type="text"
           autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
           required
           value={correo}
           onChange={(e) => setCorreo(e.target.value)}
-          placeholder="nombre@copropiedad.com"
+          placeholder="nombre@copropiedad.com o tu usuario"
+          ayuda="El personal de portería entra con su usuario y el NIT de la copropiedad."
         />
+        {porUsuario ? (
+          <Campo
+            etiqueta="NIT de la copropiedad"
+            name="nit"
+            inputMode="numeric"
+            autoComplete="organization"
+            required
+            value={nit}
+            onChange={(e) => setNit(e.target.value)}
+            placeholder="900123456-7"
+            ayuda="Se recuerda en este equipo para el próximo ingreso."
+          />
+        ) : null}
         <Campo
           etiqueta="Contraseña"
           name="contrasena"
@@ -238,7 +332,7 @@ export const FormularioDeAcceso = ({ className }: { readonly className?: string 
           type="submit"
           anchoCompleto
           cargando={enviando}
-          disabled={correo === '' || contrasena === ''}
+          disabled={correo === '' || contrasena === '' || (porUsuario && nit.trim() === '')}
         >
           Iniciar sesión
         </Boton>

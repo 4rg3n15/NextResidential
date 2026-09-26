@@ -49,6 +49,9 @@ export const ICONOS_DE_NAVEGACION = [
   'Gauge',
   // ETAPA 15 · la captura biométrica desde la consola.
   'ScanFace',
+  // ETAPA 15-H · supervisión de portería y perfil del portero.
+  'UsersRound',
+  'IdCard',
 ] as const;
 export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 
@@ -138,6 +141,18 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     pendienteDeEtapa: null,
     icono: 'DoorOpen',
   },
+  /**
+   * ETAPA 15-H (B4, ADR-024) · supervisión de portería: porteros, turnos y
+   * bitácora. Sólo el superadministrador; el administrador no asigna turnos.
+   */
+  {
+    clave: 'porteros',
+    etiqueta: 'Porteros',
+    ruta: '/porteros',
+    roles: ['superadministrador'],
+    pendienteDeEtapa: null,
+    icono: 'UsersRound',
+  },
   {
     clave: 'guardia',
     etiqueta: 'Guardia virtual',
@@ -184,6 +199,15 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     roles: ADMINISTRACION,
     pendienteDeEtapa: null,
     icono: 'Settings',
+  },
+  /** ETAPA 15-H (E-02) · el portero ve su perfil y no lo edita. */
+  {
+    clave: 'mi-perfil',
+    etiqueta: 'Mi perfil',
+    ruta: '/mi-perfil',
+    roles: ['portero'],
+    pendienteDeEtapa: null,
+    icono: 'IdCard',
   },
 ];
 

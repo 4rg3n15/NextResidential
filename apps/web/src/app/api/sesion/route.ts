@@ -6,13 +6,11 @@ import {
   leerSesion,
   marcarFactorPendiente,
 } from '@/lib/sesion/cookies';
-import {
-  FalloDeAcceso,
-  cerrarSesionRemota,
-  exigeSegundoFactor,
-  iniciarSesion,
-} from '@/lib/sesion/supabase-auth';
+import { FalloDeAcceso, cerrarSesionRemota, exigeSegundoFactor } from '@/lib/sesion/supabase-auth';
+import { accederPorApi, cerrarEnLaApi } from '@/lib/sesion/acceso-por-api';
+import type { IdentificadorDeAcceso } from '@/lib/sesion/acceso-por-api';
 import { estadoDeFalloDeAcceso, textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
+import { ipDe } from '@/lib/limitador';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,8 +18,9 @@ export const runtime = 'nodejs';
 /**
  * Alta y baja de sesión.
  *
- * El navegador manda correo y contraseña a **su propio origen**; nunca a
- * Supabase. La respuesta no lleva token: lleva qué hacer a continuación —entrar
+ * El navegador manda correo —o NIT y usuario— y contraseña a **su propio
+ * origen**; nunca a Supabase. Desde la 15-H la consola los pasa a la API
+ * (ADR-023), que es donde viven el correo sintético, el turno y los límites. La respuesta no lleva token: lleva qué hacer a continuación —entrar
  * o pedir el segundo factor—, y el token se queda en la cookie `httpOnly`.
  *
  * El cuerpo se valida aquí aunque el servidor de identidad vuelva a validarlo:
@@ -30,7 +29,7 @@ export const runtime = 'nodejs';
  */
 
 interface Credenciales {
-  correo: string;
+  identificador: IdentificadorDeAcceso;
   contrasena: string;
   /** «Recordar sesión en este equipo». Decide la permanencia de la cookie. */
   recordar: boolean;
@@ -45,10 +44,16 @@ export type ResultadoDeAcceso =
    * cada llamada y la consola no tenía nada que ofrecerle. Era el bloqueo que
    * dejaba el sistema inaccesible.
    */
-  | { readonly siguiente: 'inscripcion' };
+  | { readonly siguiente: 'inscripcion' }
+  /** 15-H (ADR-023) · primer ingreso o restablecimiento: la API no deja hacer nada más. */
+  | { readonly siguiente: 'cambio-de-contrasena' };
 
 const esCorreo = (v: unknown): v is string =>
   typeof v === 'string' && v.length >= 5 && v.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+
+/** Forma, no verdad: el formato exacto lo decide la API y responde lo mismo. */
+const esTexto = (v: unknown, minimo: number, maximo: number): v is string =>
+  typeof v === 'string' && v.trim().length >= minimo && v.length <= maximo;
 
 const leerCredenciales = async (peticion: NextRequest): Promise<Credenciales | null> => {
   let cuerpo: unknown;
@@ -58,14 +63,19 @@ const leerCredenciales = async (peticion: NextRequest): Promise<Credenciales | n
     return null;
   }
   if (typeof cuerpo !== 'object' || cuerpo === null) return null;
-  const { correo, contrasena, recordar } = cuerpo as Record<string, unknown>;
-  if (!esCorreo(correo)) return null;
+  const { correo, nit, usuario, contrasena, recordar } = cuerpo as Record<string, unknown>;
+  const identificador: IdentificadorDeAcceso | null = esCorreo(correo)
+    ? { correo }
+    : esTexto(nit, 5, 20) && esTexto(usuario, 3, 32)
+      ? { nit: nit.trim(), usuario: usuario.trim() }
+      : null;
+  if (identificador === null) return null;
   if (typeof contrasena !== 'string' || contrasena.length === 0 || contrasena.length > 256) {
     return null;
   }
   // Ausente o con cualquier otro valor se lee como `false`: la permanencia es
   // lo que hay que pedir explícitamente, no lo que se concede por omisión.
-  return { correo, contrasena, recordar: recordar === true };
+  return { identificador, contrasena, recordar: recordar === true };
 };
 
 export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
@@ -80,7 +90,10 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
   }
 
   try {
-    const sesion = await iniciarSesion(credenciales.correo, credenciales.contrasena);
+    const sesion = await accederPorApi(credenciales.identificador, credenciales.contrasena, {
+      ip: ipDe(peticion.headers),
+      agente: peticion.headers.get('user-agent'),
+    });
     await guardarSesion(
       {
         accessToken: sesion.accessToken,
@@ -89,6 +102,11 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
       },
       credenciales.recordar,
     );
+
+    if (sesion.debeCambiarContrasena) {
+      await marcarFactorPendiente(null);
+      return NextResponse.json<ResultadoDeAcceso>({ siguiente: 'cambio-de-contrasena' });
+    }
 
     if (sesion.nivel === 'aal2') {
       await marcarFactorPendiente(null);
@@ -132,7 +150,10 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
 
 export const DELETE = async (): Promise<NextResponse> => {
   const sesion = await leerSesion();
-  if (sesion !== null && sesion.accessToken !== '') await cerrarSesionRemota(sesion.accessToken);
+  if (sesion !== null && sesion.accessToken !== '') {
+    await cerrarEnLaApi(sesion.accessToken);
+    await cerrarSesionRemota(sesion.accessToken);
+  }
   await borrarSesion();
   return NextResponse.json({ cerrada: true });
 };
