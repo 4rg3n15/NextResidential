@@ -930,10 +930,18 @@ sustitución por la referencia exacta queda como deuda mecánica.
 | **H-15I-08**        | Un número de empleado no UUID reventaba la consulta de identidad de la terminal                                                    | Corregido · desconocido                        |
 | **H-15I-09**        | Una lectura dudosa abría la barrera sola (CU-01 3a)                                                                                | Corregido · la abre la portería con motivo     |
 | **H-15I-10**        | La app suprimía la plantilla a las 24 h de la captura, no al final de la visita                                                    | Corregido · RN-11                              |
+| **H-15I-11**        | El paso 7 del verificador corría cada suite con un búfer de 1 MiB; la de la API, en verde, escribe 1,1 MB y moría sin informe      | Corregido · 64 MiB y la causa visible          |
+| **H-15I-12**        | Dos saneadores del dominio con regex de controles literales: `pnpm lint` en rojo                                                   | Corregido · filtro por punto de código         |
+| **H-15I-13**        | `fechaNacimiento` del perfil sin longitud máxima (§2.7.4)                                                                          | Corregido · `@MaxLength(10)`                   |
+| **H-15I-14**        | El recorrido de la app no comprobaba lo tecleado y el motor de Flutter web podía comerse la primera pulsación                      | Corregido · se lee y se reescribe              |
 | **C-37** · **P-20** | Netlify (D8) frente al SSE y el audio de portería y guardia                                                                        | **Reportado** · no bloquea: en sitio, portátil |
 
 **Abierto y no bloqueante para BE-02:** S-38 (por ratificar), AR-01 a AR-04 y el
 riesgo residual de H-15B-1 (aceptaciones sin firmar), P-19, P-20 y H-15I-05.
+
+**Verificador:** tres corridas; la tercera, sobre `f01e274`, **correcta, 26 de 26
+pasos sin una sola ✗**. Las dos primeras destaparon H-15I-11 a H-15I-14
+(detalle en el informe, §6).
 
 ---
 
