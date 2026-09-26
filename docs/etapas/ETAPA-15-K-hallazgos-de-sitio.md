@@ -391,7 +391,126 @@ Sobre `d7813c4`: **FALLIDA**, y esta vez el paso 5 la nombró. Literal:
 
 ### El veredicto literal de la corrida final, sobre el árbol completo
 
-_Se pega aquí, tal cual, al terminar la corrida final._
+Cuarta corrida, sobre `967fb4e`, con el árbol quieto de principio a fin: **correcta, 29 de 29 pasos, ni una ✗**. El único ⚠ son las cinco pruebas del arranque en frío, declaradas y ejercidas en el paso 12b, como en las rondas anteriores. Líneas de estado de cada paso, tal cual:
+
+```
+▸ 0 · borrando artefactos de compilación (así corre un checkout nuevo)
+   ✓ dist, .turbo, coverage, registros de compilación y claims de arranque eliminados
+▸ 1 · entorno dentro de lo declarado
+   ✓ entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2 · Flutter 3.47.4 (Dart 3.13.3) dentro de lo declarado · recorrido listo (Chromium + puerto 4599)
+▸ 1c · el árbol es escribible por las herramientas que van a usarlo
+   ✓ escritura: 9 rutas ejercidas de verdad (crear, escribir, leer, borrar)
+   ✓ base de pruebas: 127.0.0.1:55432/ncr como postgres · PostgreSQL 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu · conectado como postgres · esquema presente · 2 copropiedad(es) sembrada(s)
+▸ 1b · docs/ESTADO_ETAPAS.md no se contradice a sí mismo
+   ✓ coherente: 17 etapas en el mapa, 15 cerradas con ficha e informe, cabecera al día · 0 de 0 rama(s) «en curso» comprobadas contra git
+▸ 2 · instalación coherente con el lockfile
+   ✓ pnpm install --frozen-lockfile
+▸ 3 · compilación desde cero
+   ✓ @ncr/api construye SOLO, sin que nadie le prepare las dependencias
+   ✓ @ncr/edge construye SOLO, sin que nadie le prepare las dependencias
+   ✓ pnpm build
+   ✓ ninguna aplicación compila contra un dist/ desfasado (7 paquetes del espacio de trabajo, D-65)
+▸ 4 · lint y typecheck
+   ✓ pnpm lint
+   ✓ pnpm typecheck
+▸ 5 · suite completa
+   ⚠ suite sin rojas · las saltadas están DECLARADAS y se ejercen en otro paso
+▸ 5b · app móvil: análisis estático de Dart
+   ✓ flutter analyze sin hallazgos
+▸ 5c · app móvil: suite de Dart y cobertura POR CAPA
+   ✓ dominio           96.02 % (umbral 90 %, 193/201 líneas)
+   ✓ aplicacion        95.06 % (umbral 90 %, 154/162 líneas)
+   ✓ configuracion    100.00 % (umbral 70 %, 33/33 líneas)
+   ✓ infraestructura   85.47 % (umbral 60 %, 447/523 líneas)
+   ✓ presentacion      81.03 % (umbral 50 %, 1636/2019 líneas)
+   ✓ resto             26.83 % (umbral 0 %, 11/41 líneas)
+   ✓ global            83.05 % (umbral 70 %, sin contar lo generado)
+   ✓ cobertura de la app dentro de los umbrales por capa
+   ✓ la suite de Dart da lo mismo en otro huso (Pacific/Auckland): ninguna prueba depende del reloj del sistema
+▸ 5d · app móvil: cliente al día, sin secretos y sin dependencias a ciegas
+   ✓ sin secretos: la app no nombra ni incrusta ninguna llave que omita la RLS
+   ✓ dependencias: 1 acotación(es) con motivo escrito · objective_c fuera del grafo (lo arrastraba el plugin de Windows)
+   ✓ Info.plist preprocesado: Debug y Release piden red local; ATS local sólo en Debug; nunca NSAllowsArbitraryLoads
+   ✓ cliente Dart al día: 329 ficheros generados desde packages/contracts/openapi.json, sin diferencias
+▸ 5e · app móvil: el RECORRIDO en un navegador de verdad
+   ✓ el distintivo administrativo se pinta
+   ✓ las 9 lecturas salieron con el token en la cabecera
+   ✓ el residente desactivado sigue apareciendo (RN-19)
+   ✓ y está marcado
+   ✓ la placa se muestra como la normalizó el dominio
+   ✓ la pestaña de visitantes muestra lo que el conjunto tiene a su nombre
+   ✓ y ofrece autorizar una visita, que es para lo que se abre (HU-07)
+   ✓ el perfil trae el nombre de la persona (3.5)
+   ✓ y el botón de portería (D7)
+   ✓ el correo sintético del token no aparece en ninguna parte (C-36)
+   ✓ el motivo de la negación se explica en lenguaje llano
+   ✓ lo decidido por el Edge se marca (KPI-31)
+   ✓ ni un error de JavaScript en el recorrido completo
+   ✓ la app se recorre entera en el navegador, sin un error de JavaScript
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 260 de 260 ficheros de prueba ejecutados
+▸ 7 · umbrales de cobertura por capa (§2.4)
+   ✓ las tres capas cumplen su umbral
+▸ 7b · los dos recuentos de la MISMA suite coinciden (D-112)
+   ✓ recuentos: 6 paquete(s) con el mismo resultado por los dos caminos (turbo y vitest directo) · 3231 pruebas
+▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
+   ✓ portabilidad: 17 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
+▸ 9 · pruebas negativas de los propios controles
+   ✓ entorno declarado: 54 variables de 2 esquemas, todas en su .env.example · 21 leídas fuera de Zod, con motivo
+   ✓ declaraciones: 1 paso(s) declarado(s) no ejercido(s), 0 de ellos en linux, con motivo y etapa de revisión vigente
+   ✓ controles: 40 de 42 con prueba negativa · 2 en deuda declarada (no puede crecer)
+   ✓ PRUEBAS NEGATIVAS: los 33 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ ramas: 38 controles medidos · 250 bloques sin ejercer (no puede subir)
+▸ 10 · fronteras de arquitectura y secretos
+   ✓ fronteras (DoD ETAPA 02)
+   ✓ frontera-modulos: 15 módulos (alarmserver, autenticacion, autorizaciones, biometria, cuentas, equipos, eventos, guardia, observabilidad, padron, planificacion, porteria, residente, tablero, zonas), ninguna importación ent
+   ✓ sin secretos
+   ✓ escaneo de secretos: limpio (3936 blobs del historial alcanzable · 2 de línea base declarados)
+   ✓ longitud por campo: 117 campo(s) @IsString(), todos con cota declarada
+   ✓ 54 clases que Nest construye inyectan con @Inject() explícito en todos sus parámetros
+   ✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers/ (los rangos de documentación de RFC 5737 no cuentan: no son de nadie)
+   ✓ frontera-extensibilidad: 195 fichero(s) de dominio/aplicación sin @ncr/providers, ningún adaptador nombrado fuera del paquete, y el ficticio sólo toca el núcleo
+   ✓ ningún atributo `style` en la consola (204 ficheros, §2.7.7)
+   ✓ 204 ficheros de la consola: todo color sale de un token con pareja medida en los dos temas
+   ✓ frontera-vocabulario: 83 ficheros del dominio, sin tipo de copropiedad ni etiquetas (el tipo se puede cambiar sin consecuencias)
+   ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 7 tablas vigiladas)
+   ✓ pwa: manifiesto completo, iconos reales de 192/512 y uno enmascarable distinto, service worker registrado con `/api/` fuera de la caché y página de sin conexión
+   ✓ paleta: paleta.g.dart al día con el preset (40 tokens por tema)
+   ✓ mermaid: 9 diagrama(s) en 2 fichero(s) analizan con Mermaid 11.17.2
+▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
+   ✓ esquemas: 212 DTO con nombre único en apps/api/src
+   ✓ 131 de 139 operaciones con respuesta tipada; 8 exentas con etapa declarada
+   ✓ contrato y cliente generado al día respecto de los controladores
+▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
+   ✓ KPI-25 con margen sobre el umbral
+▸ 12 · esquema y aislamiento en --modo-supabase (requiere --con-base)
+   ✓ migraciones, semillas y suite SQL
+▸ 12b · arranque en frío: base vacía → migraciones → superadministrador (requiere --con-base)
+   ✓ una base recién migrada llega a un superadministrador con claims válidos
+   ✓ y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1
+▸ 12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero
+   ✓ el camino completo se recorre en el navegador
+▸ 12d · la API arranca con tsx —el start:dev de sitio— y sus controladores reciben sus dependencias
+   ✓ con tsx la API llega a «API arrancada»
+   ✓ con tsx un controlador inyectado contesta con su lógica (404, no 500)
+   ✓ la API arranca con tsx y un controlador inyectado contesta
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+   ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
+   ✓ una hoja sin un solo UUID crea viviendas, personas y sus vínculos (D-72, RN-06)
+   ✓ el superadministrador escribe el padrón en la copropiedad del selector (D-71)
+   ✓ las 12 en una sentencia, el mismo número en tres agrupaciones, y una colisión revierte las 12
+▸ 13b · el recorrido de la CONSOLA contra la API real, PostgreSQL y el simulado (requiere --con-base)
+   ✓ el superadministrador y el portero recorren la consola de punta a punta
+▸ 13c · el recorrido FALLA con H-SITIO-02, 03 y 08 reintroducidos (requiere --con-base)
+   ✓ los tres defectos de sitio, reintroducidos, se detectan cada uno por su nombre
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 29 de 29 pasos ejecutados
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
 
 ---
 
@@ -554,7 +673,8 @@ Conventional Commits con el prefijo `etapa-15k/<módulo>`.
 | `7d56f8e`  | `fix(etapa-15k/verificador)`: el paso 5 nombra la roja desde su informe JSON                                                             |
 | `d7813c4`  | `docs(etapa-15k)`: la segunda corrida final, FALLIDA por una roja intermitente sin nombre                                                |
 | `cea9121`  | `fix(etapa-15k/pruebas)`: el tablero y el registro de equipos, aislados de las suites en paralelo y de corridas anteriores               |
-| _(cierre)_ | `docs(etapa-15k)`: la tercera corrida y el veredicto literal de la final                                                                 |
+| `967fb4e`  | `docs(etapa-15k)`: la tercera corrida final nombra la roja, y era de esta ronda                                                          |
+| _(cierre)_ | `docs(etapa-15k)`: el veredicto literal de la cuarta corrida, correcta                                                                   |
 
 **PR** contra `develop`, abierto y **sin fusionar**.
 

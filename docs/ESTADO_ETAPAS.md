@@ -927,7 +927,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 real, PostgreSQL y el simulado por HTTP, y su prueba negativa (13c), que
 reintroduce H-SITIO-02, 03 y 08 y exige que el recorrido los nombre.
 
-**Verificador:** _se completa con la corrida final._
+**Verificador:** cuatro corridas finales. Las tres primeras, **FALLIDAS**, destaparon el umbral de ramas propio de `@ncr/providers` (88,95 %, subido al 90,12 % con pruebas), un paso 5 que no nombraba la roja (corregido) y dos pruebas de la ronda sin aislamiento (corregidas). La cuarta, sobre `967fb4e`: **correcta, 29 de 29 pasos sin una sola ✗** (veredicto literal en el informe, §6).
 
 ---
 
