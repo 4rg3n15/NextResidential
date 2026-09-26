@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { AtestacionDeEquipoDto } from './dtos-atestacion';
 import {
   IsBoolean,
   IsIn,
@@ -199,6 +200,14 @@ export class EquipoDto {
   @ApiProperty({ type: String, nullable: true }) verificadoEn!: string | null;
   @ApiProperty({ type: String, nullable: true }) motivoNoVerificado!: string | null;
   @ApiProperty({ type: String, enum: ['activo', 'inactivo'] }) estado!: string;
+  @ApiProperty({
+    type: AtestacionDeEquipoDto,
+    nullable: true,
+    description:
+      'D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si ' +
+      'nunca se atestó.',
+  })
+  atestacion!: AtestacionDeEquipoDto | null;
 }
 
 /**

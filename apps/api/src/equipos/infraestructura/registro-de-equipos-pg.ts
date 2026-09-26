@@ -60,6 +60,8 @@ interface FilaDeRegistro {
   readonly modo_de_terminal: 'reporta_y_espera' | 'decide_el_equipo' | null;
   readonly canal_de_audio_habilitado: boolean;
   readonly capacidades: unknown;
+  /** D-11 · el firmware de la atestación más reciente, si la hay. */
+  readonly firmware_atestado: string | null;
 }
 
 const CLAIMS_DE_LECTURA = JSON.stringify({
@@ -101,6 +103,7 @@ export class RegistroDeEquiposPg implements RegistroDeEquipos {
       fabricante: fila.fabricante,
       modelo: fila.modelo,
       ...(fila.capacidades === null ? {} : { capacidades: capacidadesDesdeJson(fila.capacidades) }),
+      atestacion: fila.firmware_atestado === null ? null : { firmware: fila.firmware_atestado },
     };
   }
 
@@ -111,12 +114,17 @@ export class RegistroDeEquiposPg implements RegistroDeEquipos {
         CLAIMS_DE_LECTURA,
       ]);
       const { rows } = await cliente.query<FilaDeRegistro>(
-        `SELECT id, copropiedad_id, tipo::text AS tipo, host, puerto,
-                protocolo::text AS protocolo, usuario, modelo, fabricante, canal_barrera,
-                numero_de_puerta, canal_de_audio, modo_de_terminal,
-                canal_de_audio_habilitado, capacidades
-           FROM public.dispositivos
-          WHERE id = $1 AND estado = 'activo'`,
+        // D-11 · la atestación más reciente viaja con el equipo: el proveedor
+        // la compara con el firmware leído EN VIVO antes de operar la cámara.
+        `SELECT d.id, d.copropiedad_id, d.tipo::text AS tipo, d.host, d.puerto,
+                d.protocolo::text AS protocolo, d.usuario, d.modelo, d.fabricante,
+                d.canal_barrera, d.numero_de_puerta, d.canal_de_audio, d.modo_de_terminal,
+                d.canal_de_audio_habilitado, d.capacidades,
+                (SELECT a.firmware FROM public.atestaciones_de_equipo a
+                  WHERE a.copropiedad_id = d.copropiedad_id AND a.dispositivo_id = d.id
+                  ORDER BY a.registrada_en DESC LIMIT 1) AS firmware_atestado
+           FROM public.dispositivos d
+          WHERE d.id = $1 AND d.estado = 'activo'`,
         [dispositivoId],
       );
       return rows[0] ?? null;

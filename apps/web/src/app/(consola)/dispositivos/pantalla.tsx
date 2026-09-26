@@ -15,6 +15,7 @@ import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useDispositivos, useDispositivosPendientes, useEquipos } from '@/lib/api/consultas';
 import { AltaDeEquipo } from './alta-de-equipo';
 import { FichaDialogo } from './ficha-dialogo';
+import { DialogoDeAtestacion, distintivoDeAtestacion } from './atestacion-dialogo';
 
 /**
  * O4 · lo que el equipo DECLARA, en una frase por tipo. Sale de las capacidades
@@ -166,10 +167,14 @@ const RESULTADO: Readonly<
  */
 export const PantallaDeDispositivos = ({
   copropiedadId,
+  puedeAtestar = false,
 }: {
   readonly copropiedadId: string;
+  /** D-11 · sólo el superadministrador atesta; la API lo impone igual. */
+  readonly puedeAtestar?: boolean;
 }): JSX.Element => {
   const clientes = useQueryClient();
+  const [atestando, setAtestando] = useState<Equipo | null>(null);
   const consulta = useDispositivos(copropiedadId);
   const pendientes = useDispositivosPendientes(copropiedadId);
   const inventario = useEquipos(copropiedadId);
@@ -290,6 +295,13 @@ export const PantallaDeDispositivos = ({
             <Distintivo tono={VERIFICACION[e.verificacion].tono}>
               {VERIFICACION[e.verificacion].texto}
             </Distintivo>
+            {(() => {
+              // D-11 · ámbar si se opera por atestación; rojo si quedó sin efecto.
+              const atestacion = distintivoDeAtestacion(e);
+              return atestacion === null ? null : (
+                <Distintivo tono={atestacion.tono}>{atestacion.texto}</Distintivo>
+              );
+            })()}
             {resumenDeCapacidades(e).map((x) => (
               <Distintivo key={x.texto} tono={x.tono}>
                 {x.texto}
@@ -362,6 +374,16 @@ export const PantallaDeDispositivos = ({
               >
                 Editar
               </Boton>
+              {puedeAtestar && porId.get(d.id)?.tipo === 'camara_lpr' ? (
+                <Boton
+                  variante="secundario"
+                  tamano="sm"
+                  disabled={enCurso !== null}
+                  onClick={() => setAtestando(porId.get(d.id) ?? null)}
+                >
+                  Atestar
+                </Boton>
+              ) : null}
             </>
           ) : null}
           {(['configuracion', 'sincronizacion', 'reinicio'] as const).map((op) => (
@@ -453,6 +475,14 @@ export const PantallaDeDispositivos = ({
         equipo={fichaDe}
         alCerrar={() => setFichaDe(null)}
       />
+      {puedeAtestar ? (
+        <DialogoDeAtestacion
+          copropiedadId={copropiedadId}
+          equipo={atestando}
+          alCerrar={() => setAtestando(null)}
+          alAtestar={setAviso}
+        />
+      ) : null}
 
       {soloRegistra && detalleDeEjecucion !== undefined ? (
         <p className="mb-3 rounded-md border border-aviso bg-aviso-suave px-3 py-2 text-secundario text-aviso-texto">

@@ -18,7 +18,12 @@ const Dispositivos = async (): Promise<JSX.Element> => {
   if (copropiedadId === null) {
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
-  return <PantallaDeDispositivos copropiedadId={copropiedadId} />;
+  return (
+    <PantallaDeDispositivos
+      copropiedadId={copropiedadId}
+      puedeAtestar={sesion.rol === 'superadministrador'}
+    />
+  );
 };
 
 export default Dispositivos;

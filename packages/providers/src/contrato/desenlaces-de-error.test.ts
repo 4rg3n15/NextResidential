@@ -276,3 +276,45 @@ describe('H-SITIO-09 · la plantilla va a TODOS los equipos con biblioteca de ro
     ).rejects.toThrow(/bibliotecaDeRostros/);
   });
 });
+
+describe('D-11 · la atestación del instalador, contra el firmware EN VIVO', () => {
+  const traza = (): { lineas: string[]; registrar: (n: string, m: string) => void } => {
+    const lineas: string[] = [];
+    return { lineas, registrar: (n, m) => lineas.push(`${n}: ${m}`) };
+  };
+  const conAtestacion = (peticion: typeof fetch, firmware: string, t = traza()) =>
+    new HikvisionProvider({
+      registro: new RegistroEnMemoria([equipo({ atestacion: { firmware } })]),
+      reloj: RELOJ,
+      peticion,
+      traza: t,
+    });
+
+  it('mismo firmware: la cámara que la API no confirma SE OPERA, y la bitácora lo dice', async () => {
+    const t = traza();
+    const proveedor = conAtestacion(
+      camaraConforme({ ctrlMod: '0', firmware: 'V5.3.0 build 220101' }),
+      'V5.3.0 build 220101',
+      t,
+    );
+    await expect(proveedor.abrir(CAMARA, 'operador-1')).resolves.toBeDefined();
+    expect(t.lineas.some((l) => /aviso: .*ATESTACIÓN del instalador/.test(l))).toBe(true);
+  });
+
+  it('el aparato cambió de firmware: la atestación NO vale, y el motivo lo dice', async () => {
+    const proveedor = conAtestacion(
+      camaraConforme({ ctrlMod: '0', firmware: 'V5.3.2 build 230601' }),
+      'V5.3.0 build 220101',
+    );
+    const error = await proveedor.abrir(CAMARA, 'operador-1').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(EquipoDecidePorSuCuenta);
+    expect(String((error as Error).message)).toMatch(/atestación del instalador sin efecto/);
+  });
+
+  it('sin atestación todo sigue como antes: bloquea', async () => {
+    const proveedor = proveedorCon(camaraConforme({ ctrlMod: '0' }));
+    await expect(proveedor.abrir(CAMARA, 'operador-1')).rejects.toBeInstanceOf(
+      EquipoDecidePorSuCuenta,
+    );
+  });
+});

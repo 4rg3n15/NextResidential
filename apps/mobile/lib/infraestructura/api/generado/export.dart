@@ -40,6 +40,8 @@ export 'models/alta_de_portero_dto.dart';
 export 'models/anadir_ocupantes_dto.dart';
 export 'models/aparato_registrado_dto.dart';
 export 'models/apertura_de_zona_dto.dart';
+export 'models/atestacion_de_equipo_dto.dart';
+export 'models/atestacion_de_equipo_entrada_dto.dart';
 export 'models/autorizacion_dto.dart';
 export 'models/autorizar_zona_dto.dart';
 export 'models/aviso_al_residente_dto.dart';

@@ -603,6 +603,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/equipos/{equipoId}/atestacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D-11 · registra la verificación FÍSICA de una cámara: una placa de su lista blanca y una desconocida, ninguna abrió. Vale para el firmware actual del equipo */
+        post: operations["AtestacionesController_atestar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/equipos/{equipoId}/baja": {
         parameters: {
             query?: never;
@@ -2138,6 +2155,28 @@ export interface components {
             abierta: boolean;
             motivo: string;
         };
+        AtestacionDeEquipoDto: {
+            id: string;
+            firmware: string;
+            placaEnListaBlanca: string;
+            placaDesconocida: string;
+            evidencia: string;
+            registradaEn: string;
+            registradaPor: string;
+            vigente: boolean;
+            /** @description Por qué no vale (p. ej. el firmware cambió). `null` si está vigente. */
+            motivoSinEfecto: string | null;
+        };
+        AtestacionDeEquipoEntradaDto: {
+            /** @description Una placa que ESTÁ en la lista blanca del equipo */
+            placaEnListaBlanca: string;
+            /** @description Una placa que NO está en ninguna lista del equipo */
+            placaDesconocida: string;
+            /** @description Lo que se atesta: ninguna de las dos abrió. Sólo `true`; lo demás es 400. */
+            ningunaAbrio: boolean;
+            /** @description Lo que vio el instalador: hora, carril, qué pasó con cada placa */
+            evidencia: string;
+        };
         AutorizacionDto: {
             /** Format: uuid */
             id: string;
@@ -2763,6 +2802,8 @@ export interface components {
             motivoNoVerificado: string | null;
             /** @enum {string} */
             estado: "activo" | "inactivo";
+            /** @description D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó. */
+            atestacion: components["schemas"]["AtestacionDeEquipoDto"] | null;
         };
         EquiposDto: {
             equipos: components["schemas"]["EquipoDto"][];
@@ -5023,6 +5064,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EquipoDto"];
+                };
+            };
+        };
+    };
+    AtestacionesController_atestar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtestacionDeEquipoEntradaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtestacionDeEquipoDto"];
                 };
             };
         };

@@ -69,6 +69,12 @@ export interface EquipoRegistrado {
   readonly fabricante?: string | null;
   readonly modelo?: string | null;
   readonly capacidades?: CapacidadesDeEquipo;
+  /**
+   * D-11 · la atestación del instalador MÁS RECIENTE de este equipo, si la
+   * hay: la prueba física de que, con este firmware, la cámara no abre sola.
+   * El proveedor la compara con el firmware leído EN VIVO antes de operar.
+   */
+  readonly atestacion?: { readonly firmware: string } | null;
 }
 
 export interface RegistroDeEquipos {

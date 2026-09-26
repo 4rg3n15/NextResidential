@@ -29,6 +29,7 @@ const TERMINAL: Equipo = {
   verificadoEn: null,
   motivoNoVerificado: null,
   estado: 'activo',
+  atestacion: null,
 };
 
 const SONDEO = {

@@ -6,6 +6,7 @@ import type { ContextoTenant } from '../src/autenticacion';
 import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositorio-equipos-pg';
 import { RegistroDeEquiposPg } from '../src/equipos/infraestructura/registro-de-equipos-pg';
 import type { ResultadoDeSondeo } from '../src/equipos';
+import { RepositorioDeAtestacionesPg } from '../src/equipos/infraestructura/atestaciones';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -143,6 +144,67 @@ describe.skipIf(URL_BASE === undefined)('registro de equipos contra base real (D
     );
     // Pedir el sobre del equipo de B con la copropiedad A en los claims: nada.
     await expect(repo.credencialPara(ctxAdmin(COP_A), COP_A, creado.id)).resolves.toBeNull();
+  });
+
+  it('D-11 · sólo el superadministrador atesta, y la atestación viaja al proveedor', async () => {
+    const p = pool as Pool;
+    const repo = new RepositorioDeEquiposPg(p, LLAVE, 'env:EQUIPOS_LLAVE');
+    const camara = await repo.crear(
+      ctxAdmin(COP_A),
+      COP_A,
+      {
+        nombre: `Cámara atestada ${CORRIDA}`,
+        tipo: 'camara_lpr',
+        host: `198.51.100.${String(1 + ((parseInt(CORRIDA, 16) + 13) % 200))}`,
+        puerto: 80,
+        protocolo: 'http',
+        usuario: 'servicio',
+        secreto: `camara-${CORRIDA}`,
+      },
+      VEREDICTO,
+    );
+    // Con el rol de la API (dueño, no superusuario) y no con el de la cadena de
+    // pruebas: un superusuario omite la RLS y la prueba negativa no probaría nada.
+    const comoLaApi = new Pool({
+      connectionString: URL_BASE,
+      max: 2,
+      options: '-c role=sb_postgres_sim',
+    });
+    const atestaciones = new RepositorioDeAtestacionesPg(comoLaApi);
+    const nueva = {
+      dispositivoId: camara.id,
+      firmware: 'V0',
+      placaEnListaBlanca: 'ABC123',
+      placaDesconocida: 'XYZ987',
+      evidencia: 'Carril 1: dos pasadas, el brazo no subió en ninguna.',
+    };
+    // El administrador del conjunto NO atesta: la RLS de la 0039 lo rechaza.
+    await expect(
+      atestaciones.registrar(ctxAdmin(COP_A), COP_A, { ...nueva, registradaPor: actorId }),
+    ).rejects.toThrow();
+    const superadmin: ContextoTenant = {
+      usuarioId: '00000000-0000-4000-8000-000000000002',
+      rol: 'superadministrador',
+      copropiedadId: null,
+      copropiedadesAtendidas: [],
+      mfaVerificado: true,
+    };
+    const hecha = await atestaciones.registrar(superadmin, COP_A, {
+      ...nueva,
+      registradaPor: superadmin.usuarioId,
+    });
+    expect(hecha.firmware).toBe('V0');
+
+    // La administración la LEE; la otra copropiedad, no.
+    const propias = await atestaciones.ultimasPorEquipo(ctxAdmin(COP_A), COP_A);
+    expect(propias.get(camara.id)?.placaDesconocida).toBe('XYZ987');
+    const ajenas = await atestaciones.ultimasPorEquipo(ctxAdmin(COP_B), COP_A);
+    expect(ajenas.size).toBe(0);
+
+    // Y el registro del proveedor la entrega con el equipo.
+    const registrado = await new RegistroDeEquiposPg(p, LLAVE).buscar(camara.id);
+    expect(registrado?.atestacion).toEqual({ firmware: 'V0' });
+    await comoLaApi.end();
   });
 
   it('un equipo que no existe o está dado de baja no se resuelve', async () => {

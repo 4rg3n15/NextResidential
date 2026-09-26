@@ -41,6 +41,8 @@ const APPEND_ONLY = [
   'bitacora_de_porteria',
   // ETAPA 15-I · vinculaciones, ocupantes y vehículos propios de los residentes.
   'bitacora_de_residentes',
+  // ETAPA 15-K (D-11) · la atestación física del instalador sobre una cámara.
+  'atestaciones_de_equipo',
 ];
 
 /**

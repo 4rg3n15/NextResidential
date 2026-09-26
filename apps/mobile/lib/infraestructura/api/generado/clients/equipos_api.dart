@@ -6,6 +6,8 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/alta_de_equipo_dto.dart';
+import '../models/atestacion_de_equipo_dto.dart';
+import '../models/atestacion_de_equipo_entrada_dto.dart';
 import '../models/baja_de_equipo_dto.dart';
 import '../models/correccion_de_equipo_dto.dart';
 import '../models/edicion_de_equipo_dto.dart';
@@ -46,6 +48,14 @@ abstract class EquiposApi {
     @Path('id') required String id,
     @Path('equipoId') required String equipoId,
     @Body() required EdicionDeEquipoDto body,
+  });
+
+  /// D-11 · registra la verificación FÍSICA de una cámara: una placa de su lista blanca y una desconocida, ninguna abrió. Vale para el firmware actual del equipo
+  @POST('/copropiedades/{id}/equipos/{equipoId}/atestacion')
+  Future<AtestacionDeEquipoDto> atestacionesControllerAtestar({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+    @Body() required AtestacionDeEquipoEntradaDto body,
   });
 
   /// Baja lógica con motivo. Nunca borrado físico (RN-19)

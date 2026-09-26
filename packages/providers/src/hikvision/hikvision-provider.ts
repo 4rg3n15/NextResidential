@@ -10,7 +10,8 @@ import type {
   ResultadoAccionamiento,
   ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
-import { ordenInalcanzable } from '@ncr/domain-core';
+import { ordenInalcanzable, vigenciaDeAtestacion } from '@ncr/domain-core';
+import { etiqueta } from '../equipo/xml';
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { FuenteDePlacas } from '../equipo/fuente-de-placas';
@@ -510,12 +511,54 @@ export class HikvisionProvider
     }
 
     if (!veredicto.admisible || abrePorDisparador) {
-      throw new EquipoDecidePorSuCuenta(veredicto.modo, [
+      const motivos = [
         ...veredicto.bloqueos.map((b) => `${b.campo}: ${b.detalle}`),
         ...(abrePorDisparador ? [detalleDelDisparador] : []),
-      ]);
+      ];
+      if (await this.atestadaParaEsteFirmware(equipo, cliente, motivos)) {
+        this.aprobados.add(equipo.dispositivoId);
+        return;
+      }
+      throw new EquipoDecidePorSuCuenta(veredicto.modo, motivos);
     }
     this.aprobados.add(equipo.dispositivoId);
+  }
+
+  /**
+   * D-11 · la API no confirma que la cámara no decida, pero un instalador lo
+   * VERIFICÓ físicamente con este mismo firmware. Se opera, y se deja escrito
+   * en la bitácora cada vez que se aprueba así: no es un verde, es una firma.
+   *
+   * El firmware se lee EN VIVO: una actualización del aparato deja la
+   * atestación sin efecto aunque la base no se haya enterado todavía. Si no se
+   * puede leer, no se da por el mismo. Añade a `motivos` por qué no vale.
+   */
+  private async atestadaParaEsteFirmware(
+    equipo: EquipoRegistrado,
+    cliente: ClienteDeEquipo,
+    motivos: string[],
+  ): Promise<boolean> {
+    const atestacion = equipo.atestacion ?? null;
+    if (atestacion === null) return false;
+    const identidad = rutaPara('leer la identidad del equipo (modelo, firmware, serie)', 'comun');
+    let firmware: string | null = null;
+    try {
+      const r = await cliente.pedir(identidad.metodo, identidad.ruta);
+      firmware = r.ok ? etiqueta(r.cuerpo, 'firmwareVersion') : null;
+    } catch (error) {
+      if (!(error instanceof EquipoInalcanzable)) throw error;
+    }
+    const vigencia = vigenciaDeAtestacion(atestacion, firmware);
+    if (!vigencia.vigente) {
+      motivos.push(`atestación del instalador sin efecto: ${vigencia.motivo}`);
+      return false;
+    }
+    this.opciones.traza?.registrar(
+      'aviso',
+      'cámara operada por ATESTACIÓN del instalador: la API no confirma que no decida sola',
+      { dispositivoId: equipo.dispositivoId, firmware: vigencia.firmware, bloqueos: motivos },
+    );
+    return true;
   }
 
   /**

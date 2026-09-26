@@ -1808,6 +1808,60 @@
         ]
       }
     },
+    "/copropiedades/{id}/equipos/{equipoId}/atestacion": {
+      "post": {
+        "operationId": "AtestacionesController_atestar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtestacionDeEquipoEntradaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtestacionDeEquipoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "D-11 · registra la verificación FÍSICA de una cámara: una placa de su lista blanca y una desconocida, ninguna abrió. Vale para el firmware actual del equipo",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
     "/copropiedades/{id}/equipos/{equipoId}/baja": {
       "post": {
         "operationId": "EquiposController_desactivar",
@@ -7170,6 +7224,82 @@
           "motivo"
         ]
       },
+      "AtestacionDeEquipoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "firmware": {
+            "type": "string"
+          },
+          "placaEnListaBlanca": {
+            "type": "string"
+          },
+          "placaDesconocida": {
+            "type": "string"
+          },
+          "evidencia": {
+            "type": "string"
+          },
+          "registradaEn": {
+            "type": "string"
+          },
+          "registradaPor": {
+            "type": "string"
+          },
+          "vigente": {
+            "type": "boolean"
+          },
+          "motivoSinEfecto": {
+            "type": "string",
+            "nullable": true,
+            "description": "Por qué no vale (p. ej. el firmware cambió). `null` si está vigente."
+          }
+        },
+        "required": [
+          "id",
+          "firmware",
+          "placaEnListaBlanca",
+          "placaDesconocida",
+          "evidencia",
+          "registradaEn",
+          "registradaPor",
+          "vigente",
+          "motivoSinEfecto"
+        ]
+      },
+      "AtestacionDeEquipoEntradaDto": {
+        "type": "object",
+        "properties": {
+          "placaEnListaBlanca": {
+            "type": "string",
+            "description": "Una placa que ESTÁ en la lista blanca del equipo",
+            "maxLength": 12
+          },
+          "placaDesconocida": {
+            "type": "string",
+            "description": "Una placa que NO está en ninguna lista del equipo",
+            "maxLength": 12
+          },
+          "ningunaAbrio": {
+            "type": "boolean",
+            "description": "Lo que se atesta: ninguna de las dos abrió. Sólo `true`; lo demás es 400."
+          },
+          "evidencia": {
+            "type": "string",
+            "description": "Lo que vio el instalador: hora, carril, qué pasó con cada placa",
+            "minLength": 20,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "placaEnListaBlanca",
+          "placaDesconocida",
+          "ningunaAbrio",
+          "evidencia"
+        ]
+      },
       "AutorizacionDto": {
         "type": "object",
         "properties": {
@@ -9032,6 +9162,15 @@
               "activo",
               "inactivo"
             ]
+          },
+          "atestacion": {
+            "nullable": true,
+            "description": "D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AtestacionDeEquipoDto"
+              }
+            ]
           }
         },
         "required": [
@@ -9050,7 +9189,8 @@
           "verificacion",
           "verificadoEn",
           "motivoNoVerificado",
-          "estado"
+          "estado",
+          "atestacion"
         ]
       },
       "EquiposDto": {
