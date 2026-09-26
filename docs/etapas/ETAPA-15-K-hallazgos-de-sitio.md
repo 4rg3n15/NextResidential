@@ -295,7 +295,40 @@ verificador, cazó que `--capturar` construía la terminal con
 `new TerminalFacial(` desde el guion: la frontera de extensibilidad (O2)
 prohíbe construir un adaptador de marca fuera de `packages/providers`. Se movió a `diagnostico/carga-de-prueba.ts` con sus pruebas (`6d47fe9`). Y el trinquete de ramas de los controles encontró que `info-plist-ios` tenía **18 bloques** que ninguna sonda ejercía, entre ellos las comprobaciones de los `.xcconfig` —la que impide que la excepción de ATS llegue a Release—: la sonda 34 gana cuatro casos (Debug sin ATS, `NCR_DEPURACION` en Release, `.xcconfig` sin preprocesado, `.xcconfig` ausente) y quedan **11**, todos variantes de plist mal formado y la falta de preprocesador de C. `inyeccion-explicita` entra con 5. Los dos se registran en `ramas-de-los-controles.json`.
 
-### El veredicto literal de `./scripts/verificar-etapa.sh --con-base`
+### La primera corrida final, FALLIDA, y lo que destapó
+
+Sobre `65b7c84`: **FALLIDA, con dos ✗**. Literal:
+
+```
+▸ 7 · umbrales de cobertura por capa (§2.4)
+   ✗ alguna capa por debajo del umbral de §2.4
+     ## @ncr/providers: la corrida NO terminó
+            CORRIDA INTERRUMPIDA · código 1 · Command failed: pnpm --filter @ncr/providers exec vitest run … --coverage …
+…
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+      ✗ la corrida 2 NO coincide con la primera. Diferencias:
+        solo en la 1: @ncr/providers:test: Tests 704 passed (704)
+        solo en la 2: @ncr/providers:test: Tests 711 passed (711)
+   ✗ la suite no es reproducible entre corridas
+…
+VERIFICACIÓN DE ETAPA: FALLIDA — NO se cierra la etapa
+```
+
+- **Paso 7, real.** `@ncr/providers` tiene su propio umbral de ramas del 90 %
+  (`vitest.config`), y el código de esta ronda —Digest, flujo multipart,
+  puerta remota, atestación— lo dejó en **88,95 %**: vitest salía con 1 y el
+  paso lo vio como corrida interrumpida. Las capas de §2.4 estaban en verde
+  (dominio 96,85 % de ramas, aplicación 87,08 % de ramas con 95,75 % de líneas
+  y el umbral en líneas, global 83,77 %). Corregido con pruebas de lo que un
+  equipo raro hace y el de la visita no hizo (`70ae74c`): **90,12 %**. No se
+  bajó el umbral.
+- **Paso 14, provocado por mí.** Añadí esas pruebas con el verificador en
+  marcha: la corrida 1 de estabilidad contó 704 pruebas y las dos siguientes, 711. No es un defecto de la suite; es la razón de que el árbol no se toque
+  durante una corrida.
+- **Todo lo demás, en verde**, incluidos 12d (arranque con tsx), 13b (el
+  recorrido de la consola) y 13c (el recorrido negativo).
+
+### El veredicto literal de la corrida final, sobre el árbol completo
 
 _Se pega aquí, tal cual, al terminar la corrida final._
 
@@ -437,23 +470,25 @@ H-15K-01 y DT-15K-01 a 06.
 **Rama:** `etapa-15k-hallazgos-de-sitio`, sacada de `develop` (`5cceb89`).
 Conventional Commits con el prefijo `etapa-15k/<módulo>`.
 
-| Commit        | Qué trae                                                                                                                                 |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `120fd98`     | `fix(etapa-15k/consola)`: el proxy reenvía PUT y una prueba deriva los verbos del contrato (H-SITIO-08)                                  |
-| `40dfbc8`     | `fix(etapa-15k/tablero)`: Dispositivos e indicadores leen de PostgreSQL con claims de servicio (H-SITIO-02)                              |
-| `2831d76`     | `fix(etapa-15k/biometria)`: las rutas de «Rostro del visitante» admiten a cada rol que ve la pantalla (H-SITIO-03)                       |
-| `f15f905`     | `fix(etapa-15k/arranque)`: start:dev con tsx, conexión de pg-boss y URL pública de bucle local (H-SITIO-06, 07, 10)                      |
-| `2e229d6`     | `fix(etapa-15k/movil)`: clave de red local de iOS y detalle técnico del fallo en Debug (H-SITIO-11)                                      |
-| `de75aa3`     | `fix(etapa-15k/equipos)`: Digest con nonce vencido, apertura sin «abierta» y escucha que se ve (H-SITIO-12, 13, 14)                      |
-| `bd5d0dc`     | `fix(etapa-15k/equipos)`: carga de plantillas, verificación remota, rostros del videoportero y cámara rechazada (H-SITIO-04, 05, 09, 01) |
-| `7d303e1`     | `feat(etapa-15k/biometria)`: consentimiento presencial escrito por el titular (D-10)                                                     |
-| `a697a97`     | `feat(etapa-15k/equipos)`: atestación física del instalador por firmware (D-11)                                                          |
-| `2c2dce4`     | `test(etapa-15k/e2e)`: recorrido de la consola contra API real, PostgreSQL y simulado (§4)                                               |
-| `ca011c7`     | `feat(etapa-15k/sitio)`: captura cruda por equipo y guía de sitio corregida (§5)                                                         |
-| `2b593c0`     | `fix(etapa-15k/equipos)`: baja de la persona por UserInfoDetail/Delete, como la guía de la serie de la terminal (H-15K-02)               |
-| `6d47fe9`     | `fix(etapa-15k/sitio)`: la carga de prueba de --capturar se construye dentro de @ncr/providers (O2)                                      |
-| _(siguiente)_ | `test(etapa-15k/controles)`: la sonda 34 ejerce los .xcconfig y el trinquete mide los dos controles nuevos                               |
-| _(cierre)_    | `chore(etapa-15k)`: este informe, ESTADO y el registro con C-38, S-62, P-21 y E-04; el veredicto literal                                 |
+| Commit     | Qué trae                                                                                                                                 |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `120fd98`  | `fix(etapa-15k/consola)`: el proxy reenvía PUT y una prueba deriva los verbos del contrato (H-SITIO-08)                                  |
+| `40dfbc8`  | `fix(etapa-15k/tablero)`: Dispositivos e indicadores leen de PostgreSQL con claims de servicio (H-SITIO-02)                              |
+| `2831d76`  | `fix(etapa-15k/biometria)`: las rutas de «Rostro del visitante» admiten a cada rol que ve la pantalla (H-SITIO-03)                       |
+| `f15f905`  | `fix(etapa-15k/arranque)`: start:dev con tsx, conexión de pg-boss y URL pública de bucle local (H-SITIO-06, 07, 10)                      |
+| `2e229d6`  | `fix(etapa-15k/movil)`: clave de red local de iOS y detalle técnico del fallo en Debug (H-SITIO-11)                                      |
+| `de75aa3`  | `fix(etapa-15k/equipos)`: Digest con nonce vencido, apertura sin «abierta» y escucha que se ve (H-SITIO-12, 13, 14)                      |
+| `bd5d0dc`  | `fix(etapa-15k/equipos)`: carga de plantillas, verificación remota, rostros del videoportero y cámara rechazada (H-SITIO-04, 05, 09, 01) |
+| `7d303e1`  | `feat(etapa-15k/biometria)`: consentimiento presencial escrito por el titular (D-10)                                                     |
+| `a697a97`  | `feat(etapa-15k/equipos)`: atestación física del instalador por firmware (D-11)                                                          |
+| `2c2dce4`  | `test(etapa-15k/e2e)`: recorrido de la consola contra API real, PostgreSQL y simulado (§4)                                               |
+| `ca011c7`  | `feat(etapa-15k/sitio)`: captura cruda por equipo y guía de sitio corregida (§5)                                                         |
+| `2b593c0`  | `fix(etapa-15k/equipos)`: baja de la persona por UserInfoDetail/Delete, como la guía de la serie de la terminal (H-15K-02)               |
+| `6d47fe9`  | `fix(etapa-15k/sitio)`: la carga de prueba de --capturar se construye dentro de @ncr/providers (O2)                                      |
+| `637b890`  | `test(etapa-15k/controles)`: la sonda 34 ejerce los .xcconfig y el trinquete mide los dos controles nuevos                               |
+| `65b7c84`  | `chore(etapa-15k)`: cierre de la ronda de hallazgos de sitio (informe, ESTADO y registro)                                                |
+| `70ae74c`  | `test(etapa-15k/equipos)`: las ramas nuevas del proveedor, ejercidas (umbral de ramas de @ncr/providers)                                 |
+| _(cierre)_ | `chore(etapa-15k)`: las dos corridas del verificador y el veredicto literal de la final                                                  |
 
 **PR** contra `develop`, abierto y **sin fusionar**.
 
