@@ -240,6 +240,28 @@ const camara = (guion: Record<string, unknown> = {}): typeof fetch =>
 describe('A.3 · «probar conexión» distingue cuatro situaciones, no una', () => {
   const sondaCon = (peticion: typeof fetch): SondaPorProveedor => new SondaPorProveedor(peticion);
 
+  it('H-SITIO-01 · la cámara que decide sola queda RECHAZADA, con su EntranceParam a la vista', async () => {
+    const { app: a, firmante } = await conEquipos(sondaCon(camara({ ctrlMod: '0' })));
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const prueba = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/prueba-de-conexion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(ALTA)
+      .expect(201);
+    const crudos = prueba.body.ficha.crudos as { titulo: string; contenido: string }[];
+    expect(crudos.map((c) => c.titulo)).toContain('Parámetros de entrada (EntranceParam)');
+    // Saneado: ni la clave ni la dirección del equipo salen hacia el navegador.
+    expect(JSON.stringify(crudos)).not.toContain(ALTA.secreto);
+    expect(JSON.stringify(crudos)).not.toContain(ALTA.host);
+
+    const alta = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(ALTA)
+      .expect(201);
+    expect(alta.body.verificacion).toBe('rechazado');
+  });
+
   it('alcanzado: guarda modelo y firmware del propio equipo', async () => {
     const r = await sondaCon(camara({ modelo: 'MODELO-DE-PRUEBA', firmware: 'V9.9.9' })).probar({
       ...ALTA,

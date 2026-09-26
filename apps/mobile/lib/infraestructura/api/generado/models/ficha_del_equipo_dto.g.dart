@@ -19,6 +19,12 @@ FichaDelEquipoDto _$FichaDelEquipoDtoFromJson(Map<String, dynamic> json) =>
       sinComprobar: (json['sinComprobar'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
+      crudos: (json['crudos'] as List<dynamic>?)
+          ?.map(
+            (e) =>
+                DocumentoCrudoDelEquipoDto.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
     );
 
 Map<String, dynamic> _$FichaDelEquipoDtoToJson(FichaDelEquipoDto instance) =>
@@ -30,4 +36,5 @@ Map<String, dynamic> _$FichaDelEquipoDtoToJson(FichaDelEquipoDto instance) =>
       'desvioDeRelojSegundos': instance.desvioDeRelojSegundos,
       'hallazgos': instance.hallazgos,
       'sinComprobar': instance.sinComprobar,
+      'crudos': instance.crudos,
     };

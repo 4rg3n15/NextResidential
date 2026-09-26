@@ -2623,6 +2623,10 @@ export interface components {
             /** @description Cuántas plantillas siguen sin llegar a este equipo. Distingue «falló la última» de «hay catorce sin llegar». */
             sincronizacionesFallidas: number;
         };
+        DocumentoCrudoDelEquipoDto: {
+            titulo: string;
+            contenido: string;
+        };
         EdicionAplicadaDto: {
             editado: boolean;
         };
@@ -2899,6 +2903,8 @@ export interface components {
             desvioDeRelojSegundos: number | null;
             hallazgos: components["schemas"]["HallazgoDelEquipoDto"][];
             sinComprobar: string[];
+            /** @description H-SITIO-01 · lo que el equipo CONTESTÓ, saneado (sin claves, IPs enmascaradas), para leer el veredicto contra el documento y no contra una interpretación. Ausente cuando la familia no lo aporta. */
+            crudos?: components["schemas"]["DocumentoCrudoDelEquipoDto"][];
         };
         FilaDeInformeDto: {
             /** Format: date-time */

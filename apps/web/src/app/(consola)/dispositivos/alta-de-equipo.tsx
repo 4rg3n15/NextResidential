@@ -214,9 +214,15 @@ export const AltaDeEquipo = ({
     setEnviando(true);
     setError(undefined);
     try {
-      // Ya se probó: no se vuelve a sondear al guardar. Un segundo intento
-      // con la credencial equivocada acerca el bloqueo de la cuenta.
-      const body = { ...cuerpo(), probarConexion: sondeo === null } as never;
+      // H-SITIO-01 · el estado de verificación lo fija el SERVIDOR al guardar;
+      // no se acepta del navegador. Antes, tras «Probar conexión» se guardaba
+      // sin sondear y una cámara que decide sola quedaba «no verificada» en vez
+      // de «rechazada». Sólo se omite el sondeo tras un rechazo de credencial:
+      // un segundo intento con la clave equivocada acerca el bloqueo de la cuenta.
+      const body = {
+        ...cuerpo(),
+        probarConexion: sondeo === null || sondeo.clase !== 'credencial',
+      } as never;
       desenvolver(
         equipo === null
           ? await cliente.POST('/copropiedades/{id}/equipos', {

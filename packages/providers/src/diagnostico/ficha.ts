@@ -45,6 +45,8 @@ export interface FichaDelEquipo {
   readonly hallazgos: readonly HallazgoDelEquipo[];
   /** Consultas que no contestaron, con el motivo. Se enseñan. */
   readonly sinComprobar: readonly string[];
+  /** H-SITIO-01 · lo que el equipo contestó, saneado. Sólo cámaras. */
+  readonly crudos?: readonly { readonly titulo: string; readonly contenido: string }[];
 }
 
 const noComprobado = (campo: string, detalle: string): HallazgoDelEquipo => ({
@@ -481,6 +483,8 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
     desvioDeRelojSegundos: diagnostico.hora?.desvioSegundos ?? null,
     hallazgos,
     sinComprobar: diagnostico.sinRespuesta.map((s) => `${s.que}: ${s.motivo}`),
+    // H-SITIO-01: lo que el equipo contestó, saneado, para leerlo junto al veredicto.
+    ...(diagnostico.crudos === undefined ? {} : { crudos: diagnostico.crudos }),
   };
 };
 

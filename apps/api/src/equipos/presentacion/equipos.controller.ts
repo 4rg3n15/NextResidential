@@ -83,6 +83,9 @@ const aFicha = (ficha: FichaDelEquipo): FichaDelEquipoDto => ({
     detalle: h.detalle,
     correccion: h.correccion,
   })),
+  ...(ficha.crudos === undefined
+    ? {}
+    : { crudos: ficha.crudos.map((c) => ({ titulo: c.titulo, contenido: c.contenido })) }),
 });
 
 /** Campo a campo, por la misma razón que la ficha: lo que sale es una decisión. */

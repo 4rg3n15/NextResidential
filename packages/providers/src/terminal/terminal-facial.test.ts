@@ -125,7 +125,53 @@ describe('alta de plantilla', () => {
     await terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1]));
     const alta = llamadas.find((l) => l.url.includes('UserInfo/Record'));
     expect(String(alta?.cuerpo)).not.toMatch(/nombre|apellido/i);
-    expect(String(alta?.cuerpo)).toContain('plantilla-7');
+    // H-SITIO-04 · sólo letras y dígitos: el identificador que el equipo admite.
+    expect(String(alta?.cuerpo)).toContain('"employeeNo":"plantilla7"');
+  });
+
+  it('H-SITIO-04 · un UUID viaja como 32 letras y dígitos, en la persona y en el rostro', async () => {
+    const uuid = '1b4e28ba-2fa1-11d2-883f-0016d3cca427';
+    const compacto = '1b4e28ba2fa111d2883f0016d3cca427';
+    const { terminal, llamadas } = montar([
+      respuesta(200, OK_XML),
+      respuesta(200, OK_XML),
+      respuesta(200, OK_XML),
+    ]);
+    await terminal.sincronizar('terminal-1', uuid, new Uint8Array([1, 2, 3]));
+    const alta = String(llamadas.find((l) => l.url.includes('UserInfo/Record'))?.cuerpo);
+    expect(alta).toContain(`"employeeNo":"${compacto}"`);
+    expect(alta).not.toContain(uuid);
+
+    // El formulario de la guía: registro PLANO en `FaceDataRecord` e imagen en `img`.
+    const carga = llamadas.find((l) => l.url.includes('FDSetUp'));
+    const cuerpo = Buffer.from(carga?.cuerpo as Uint8Array).toString('latin1');
+    expect(cuerpo).toContain('name="FaceDataRecord"');
+    expect(cuerpo).toContain(`"FPID":"${compacto}"`);
+    expect(cuerpo).toContain('"faceLibType":"blackFD"');
+    expect(cuerpo).not.toContain('{"FaceDataRecord"');
+    expect(cuerpo).toContain('name="img"; filename="facePic.jpg"');
+    expect(cuerpo).toMatch(/Content-Length: 3\r\n/);
+  });
+
+  it('H-SITIO-04 · el rechazo de la carga dice statusCode, subStatusCode, errorCode y errorMsg', async () => {
+    const { terminal } = montar([
+      respuesta(200, OK_XML),
+      respuesta(200, OK_XML),
+      respuesta(
+        400,
+        '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"badParameters",' +
+          '"errorCode":1610612737,"errorMsg":"FPID"}',
+      ),
+    ]);
+    const fallo = await terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+    expect(fallo?.message).toMatch(/statusCode 6/);
+    expect(fallo?.message).toMatch(/subStatusCode badParameters/);
+    expect(fallo?.message).toMatch(/errorCode 0x60000001/);
+    expect(fallo?.message).toMatch(/errorMsg FPID/);
+    expect(fallo?.message).not.toMatch(/sin decir por qué/);
   });
 
   it('un alta repetida NO es un fallo: la sincronización tiene que poder reintentarse', async () => {

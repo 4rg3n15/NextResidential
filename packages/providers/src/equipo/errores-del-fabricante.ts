@@ -194,12 +194,103 @@ const POR_CODIGO: Readonly<
   },
 };
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * H-SITIO-04 · LOS CUATRO CAMPOS DEL CUERPO ISAPI, EN XML **Y EN JSON**
+ *
+ * En sitio la terminal rechazó la carga de la plantilla con HTTP 400 y la
+ * bitácora dijo «El equipo rechazó la operación sin decir por qué». Sí lo
+ * decía: las rutas `?format=json` contestan en JSON —`statusCode`,
+ * `subStatusCode`, `errorCode` DECIMAL y `errorMsg` (guía, «Error
+ * Processing»)— y este intérprete sólo leía XML y códigos `0x…`.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+export interface ResumenIsapi {
+  readonly statusCode: number | null;
+  readonly statusString: string | null;
+  readonly subStatusCode: string | null;
+  /** Como lo documenta la guía: `0x` y ocho cifras hexadecimales. */
+  readonly errorCode: string | null;
+  readonly errorMsg: string | null;
+}
+
+const campoJson = (objeto: unknown, nombre: string): unknown => {
+  if (typeof objeto !== 'object' || objeto === null) return undefined;
+  const registro = objeto as Record<string, unknown>;
+  if (nombre in registro) return registro[nombre];
+  // Algunos firmware envuelven la respuesta: {"ResponseStatus": {...}}.
+  for (const v of Object.values(registro)) {
+    if (typeof v === 'object' && v !== null && nombre in (v as Record<string, unknown>)) {
+      return (v as Record<string, unknown>)[nombre];
+    }
+  }
+  return undefined;
+};
+
+const aHexadecimal = (crudo: unknown): string | null => {
+  if (crudo === undefined || crudo === null || crudo === '') return null;
+  const texto = String(crudo).trim();
+  if (/^0x[0-9a-f]+$/i.test(texto)) return `0x${texto.slice(2).padStart(8, '0').toLowerCase()}`;
+  const n = Number(texto);
+  return Number.isInteger(n) && n >= 0 ? `0x${n.toString(16).padStart(8, '0')}` : texto;
+};
+
+const textoCorto = (crudo: unknown): string | null => {
+  if (crudo === undefined || crudo === null) return null;
+  const t = String(crudo).trim();
+  return t === '' ? null : t.slice(0, 128);
+};
+
+export const resumenIsapi = (cuerpo: string): ResumenIsapi => {
+  let json: unknown = undefined;
+  if (/^\s*\{/.test(cuerpo)) {
+    try {
+      json = JSON.parse(cuerpo);
+    } catch {
+      json = undefined;
+    }
+  }
+  const xml = (nombre: string): string | null =>
+    new RegExp(`<${nombre}>\\s*([^<]*?)\\s*</${nombre}>`, 'i').exec(cuerpo)?.[1] ?? null;
+  const de = (nombre: string): unknown =>
+    json === undefined ? xml(nombre) : campoJson(json, nombre);
+  const estado = de('statusCode');
+  const n = estado === null || estado === undefined ? NaN : Number(estado);
+  return {
+    statusCode: Number.isInteger(n) ? n : null,
+    statusString: textoCorto(de('statusString')),
+    subStatusCode: textoCorto(de('subStatusCode')),
+    errorCode: aHexadecimal(de('errorCode') ?? (json === undefined ? xml('MErrCode') : undefined)),
+    errorMsg: textoCorto(de('errorMsg') ?? (json === undefined ? xml('description') : undefined)),
+  };
+};
+
+/** Los cuatro campos, en una línea para el operador y la bitácora. */
+export const resumenIsapiEnTexto = (r: ResumenIsapi): string =>
+  [
+    r.statusCode === null ? null : `statusCode ${String(r.statusCode)}`,
+    r.subStatusCode === null ? null : `subStatusCode ${r.subStatusCode}`,
+    r.errorCode === null ? null : `errorCode ${r.errorCode}`,
+    r.errorMsg === null ? null : `errorMsg ${r.errorMsg}`,
+  ]
+    .filter((p) => p !== null)
+    .join(' · ');
+
 /** Saca el código del cuerpo de respuesta, venga como `0x…` o como nombre. */
 const codigoEn = (cuerpo: string): string | null => {
   const hexadecimal = /0x[0-9a-f]{8}/i.exec(cuerpo)?.[0];
   if (hexadecimal !== undefined) return hexadecimal.toLowerCase();
+  // H-SITIO-04 · el `errorCode` DECIMAL de las respuestas JSON.
+  const resumen = resumenIsapi(cuerpo);
+  if (resumen.errorCode !== null && /^0x[0-9a-f]{8}$/.test(resumen.errorCode)) {
+    return resumen.errorCode;
+  }
   // Algunos firmware devuelven sólo el nombre en `subStatusCode`.
-  const nombre = /<subStatusCode>\s*([A-Za-z]+)\s*<\/subStatusCode>/i.exec(cuerpo)?.[1];
+  const nombre =
+    /<subStatusCode>\s*([A-Za-z]+)\s*<\/subStatusCode>/i.exec(cuerpo)?.[1] ??
+    (resumen.subStatusCode !== null && /^[A-Za-z]+$/.test(resumen.subStatusCode)
+      ? resumen.subStatusCode
+      : undefined);
   if (nombre === undefined) return null;
   const encontrado = Object.entries(CODIGOS_DEL_FABRICANTE).find(
     ([clave]) => clave.toLowerCase() === nombre.toLowerCase(),
@@ -217,7 +308,9 @@ const enteroDe = (crudo: string | undefined): number | null => {
 const extras = (
   cuerpo: string,
 ): { estado: number | null; codigoDeModulo: string | null; codigoDeEquipo: string | null } => ({
-  estado: enteroDe(/<statusCode>\s*(-?\d+)\s*<\/statusCode>/i.exec(cuerpo)?.[1]),
+  estado:
+    enteroDe(/<statusCode>\s*(-?\d+)\s*<\/statusCode>/i.exec(cuerpo)?.[1]) ??
+    resumenIsapi(cuerpo).statusCode,
   codigoDeModulo:
     /<MErrCode>\s*([^<]+)\s*<\/MErrCode>/i.exec(cuerpo)?.[1]?.trim() ??
     /"errorCode"\s*:\s*"?([^",}]+)"?/i.exec(cuerpo)?.[1]?.trim() ??
@@ -271,7 +364,12 @@ export const comoErrorNeutral = (
   extra?: { readonly desafioVencido?: boolean | undefined },
 ): ErrorDeEquipo => {
   const error = interpretarError(cuerpo);
-  const detalle = `${error.detalle} (HTTP ${String(estadoHttp)}${error.codigo === null ? '' : `, ${error.codigo}`})`;
+  // H-SITIO-04 · el detalle lleva los cuatro campos del cuerpo ISAPI: es lo que
+  // hay que comparar con la guía, y en sitio se perdía.
+  const campos = resumenIsapiEnTexto(resumenIsapi(cuerpo));
+  const detalle =
+    `${error.detalle} (HTTP ${String(estadoHttp)}${error.codigo === null ? '' : `, ${error.codigo}`}` +
+    `${campos === '' ? '' : ` · ${campos}`})`;
   // H-SITIO-12 · un 401 con el nonce vencido otra vez no es la clave.
   if (estadoHttp === 401 && extra?.desafioVencido === true) {
     return new DesafioVencido(dispositivoId);

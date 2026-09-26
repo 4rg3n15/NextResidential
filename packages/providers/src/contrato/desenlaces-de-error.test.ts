@@ -170,11 +170,13 @@ describe('los demás desenlaces, cada uno con su reacción', () => {
     );
   });
 
-  it('sincronizar contra un equipo que NO es terminal se niega, y dice por qué', async () => {
-    // Dejaría el dato biométrico en un aparato donde nadie lo busca.
+  it('sincronizar contra un equipo SIN biblioteca de rostros se niega, y dice por qué', async () => {
+    // Dejaría el dato biométrico en un aparato donde nadie lo busca. Desde
+    // H-SITIO-09 la terminal no es el único que la tiene: el videoportero que
+    // la declare también la recibe; una cámara, nunca.
     const proveedor = proveedorCon(camaraConforme());
     await expect(proveedor.sincronizar(CAMARA, 'plantilla-1', new Uint8Array([1]))).rejects.toThrow(
-      /no es una terminal facial/i,
+      /no tiene biblioteca de rostros/i,
     );
   });
 });
@@ -237,5 +239,40 @@ describe('un relé suelto, sin cámara delante', () => {
     );
     const resultado = await proveedor.abrir(CAMARA, 'operador-1');
     expect(typeof resultado.aceptado).toBe('boolean');
+  });
+});
+
+describe('H-SITIO-09 · la plantilla va a TODOS los equipos con biblioteca de rostros', () => {
+  const PORTERO = 'disp-portero-con-rostros';
+  const portero = (bibliotecaEnVideoportero: boolean) =>
+    proveedorCon(
+      equiposSimulados({
+        [HOST]: {
+          familia: 'videoportero',
+          usuario: 'servicio',
+          clave: 'clave-de-prueba',
+          bibliotecaEnVideoportero,
+        },
+      }),
+      equipo({ dispositivoId: PORTERO, tipo: 'intercom' }),
+    );
+
+  it('un videoportero que la declara RECIBE la plantilla, con el formulario de la guía', async () => {
+    const proveedor = portero(true);
+    expect((await proveedor.capacidadesDe(PORTERO)).bibliotecaDeRostros.estado).toBe('si');
+    await expect(
+      proveedor.sincronizar(
+        PORTERO,
+        '1b4e28ba-2fa1-11d2-883f-0016d3cca427',
+        new Uint8Array([1, 2]),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('un videoportero sin biblioteca se niega por CAPACIDAD, no por tipo', async () => {
+    const proveedor = portero(false);
+    await expect(
+      proveedor.sincronizar(PORTERO, 'plantilla-1', new Uint8Array([1])),
+    ).rejects.toThrow(/bibliotecaDeRostros/);
   });
 });

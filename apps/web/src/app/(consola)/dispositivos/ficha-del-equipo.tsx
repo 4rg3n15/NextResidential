@@ -126,5 +126,21 @@ export const FichaDeEquipo = ({
         </ul>
       </details>
     )}
+
+    {/* H-SITIO-01 · el documento tal como lo contestó el equipo, saneado. El
+        veredicto de arriba es una LECTURA de esto; aquí se puede contrastar. */}
+    {(ficha.crudos ?? []).map((crudo) => (
+      <details
+        key={crudo.titulo}
+        className="rounded-md border border-borde bg-lienzo px-3 py-2 text-secundario text-texto-apagado"
+      >
+        <summary className="cursor-pointer font-medium text-texto">
+          Respuesta del equipo · {crudo.titulo}
+        </summary>
+        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all font-mono text-xs">
+          {crudo.contenido}
+        </pre>
+      </details>
+    ))}
   </section>
 );

@@ -6,6 +6,8 @@ import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import type { RutaDeEquipo } from '../equipo/catalogo-de-rutas';
 import { bloques, etiqueta } from '../equipo/xml';
+import { recortado, sinSecretos } from '../equipo/intercambio';
+import type { Bitacora } from '@ncr/domain-core';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 
 /**
@@ -124,22 +126,46 @@ export const canalDeAudioUtilizable = (
 /**
  * Verificación remota de la terminal: ¿espera al veredicto de la plataforma?
  *
- * **DOCUMENTADA, NO VERIFICADA.** El campo y su forma (`AcsCfg.remoteCheck`)
- * salen de la documentación de control de acceso del fabricante, no de una
- * captura de esta terminal. Es un `[SUPUESTO]` S-35 que el guion de puesta en
- * marcha confirma; si la clave real es otra, se cambia aquí.
+ * ═════════════════════════════════════════════════════════════════════════════
+ * H-SITIO-05 · EL INTERRUPTOR SE LLAMA `remoteCheckDoorEnabled`
+ *
+ * La guía de la terminal, «Remote Verification in Arming Method»: el
+ * interruptor principal de `AcsCfg` es **`remoteCheckDoorEnabled`** («The main
+ * switch for remote verification»). Aquí se leía `AcsCfg.remoteCheck` —el
+ * [SUPUESTO] S-35—, que es el nombre del campo del EVENTO, no de la
+ * configuración: en sitio el documento no lo traía y la capacidad quedaba
+ * «desconocida», y con `reporta_y_espera` eso bloqueaba toda apertura. Se lee
+ * el de la guía primero y el supuesto después, por si algún firmware lo usa.
  */
+export const CAMPOS_DE_VERIFICACION_REMOTA = ['remoteCheckDoorEnabled', 'remoteCheck'] as const;
+
 export const verificacionRemotaDesde = (json: string): EstadoDeCapacidad => {
   try {
     const objeto: unknown = JSON.parse(json);
     if (typeof objeto !== 'object' || objeto === null) return 'desconocida';
     const raiz = objeto as Record<string, unknown>;
     const acs = (raiz['AcsCfg'] ?? raiz) as Record<string, unknown>;
-    const valor = acs['remoteCheck'];
-    return valor === true ? 'si' : valor === false ? 'no' : 'desconocida';
+    for (const campo of CAMPOS_DE_VERIFICACION_REMOTA) {
+      const valor = acs[campo];
+      if (valor === true) return 'si';
+      if (valor === false) return 'no';
+    }
+    return 'desconocida';
   } catch {
     return 'desconocida';
   }
+};
+
+/**
+ * H-SITIO-05 · la SEGUNDA lectura, de la guía: `isSupportRemoteCheck` en las
+ * capacidades de control de acceso. Dice si el equipo PUEDE, no si está
+ * activado: `false` es un «no» firme; `true` no basta para «sí» —hay que
+ * activarlo en `AcsCfg`— y queda «desconocida», con el motivo en la bitácora.
+ */
+export const verificacionRemotaSoportada = (documento: string | null): boolean | null => {
+  if (documento === null) return null;
+  const m = /isSupportRemoteCheck["'\s]*[:>]\s*"?(true|false)/i.exec(documento);
+  return m?.[1] === undefined ? null : m[1].toLowerCase() === 'true';
 };
 
 export interface EstadoDeBiblioteca {
@@ -188,6 +214,8 @@ export const bibliotecaDesde = (
 
 export interface OpcionesDeDescubrimiento {
   readonly cliente: ClienteDeEquipo;
+  /** H-SITIO-05 · qué ruta se consultó y qué respondió, a la bitácora. */
+  readonly traza?: Bitacora;
   readonly familia: RutaDeEquipo['familia'];
   /** Para nombrar al equipo en el error de credencial. */
   readonly dispositivoId?: string;
@@ -208,22 +236,48 @@ export const descubrirCapacidades = async (
   opciones: OpcionesDeDescubrimiento,
 ): Promise<CapacidadesDeEquipo> => {
   const { cliente, familia } = opciones;
-  const pedir = async (proposito: string, fam = familia): Promise<string | null> => {
+  /**
+   * H-SITIO-09 · además del cuerpo, si el equipo dijo «no admito esto». Es lo
+   * que separa `no` (NO APLICA) de `desconocida` (no se pudo leer): un
+   * videoportero sin biblioteca de rostros no es un videoportero sin sondear.
+   */
+  const consultar = async (
+    proposito: string,
+    fam = familia,
+  ): Promise<{ readonly cuerpo: string | null; readonly noAdmite: boolean }> => {
     let ruta: RutaDeEquipo;
     try {
       ruta = rutaPara(proposito, fam, opciones.canal ?? CARRIL_VERIFICADO_DE_LA_CAMARA);
     } catch {
-      return null;
+      return { cuerpo: null, noAdmite: false };
     }
     const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta);
+    // H-SITIO-05 · qué se preguntó y qué contestó, para comparar con la guía.
+    opciones.traza?.registrar('info', 'capacidad consultada al equipo', {
+      ...(opciones.dispositivoId === undefined ? {} : { dispositivoId: opciones.dispositivoId }),
+      proposito,
+      metodo: ruta.metodo,
+      ruta: ruta.ruta,
+      estadoHttp: respuesta.estado,
+      respuesta: recortado(sinSecretos(respuesta.cuerpo), 1024),
+    });
     // Una credencial rechazada NO es «no declara»: es un error propio, se
-    // lanza y NO se reintenta (bloquea la cuenta del equipo).
-    if (respuesta.estado === 401 || respuesta.estado === 403) {
+    // lanza y NO se reintenta (bloquea la cuenta del equipo). H-SITIO-12 · un
+    // 403 con código ISAPI en el cuerpo es «no admite», no la clave.
+    if (
+      respuesta.estado === 401 ||
+      (respuesta.estado === 403 && !/statusCode|subStatusCode/i.test(respuesta.cuerpo))
+    ) {
       throw new CredencialRechazada(opciones.dispositivoId ?? cliente.destino);
     }
-    if (!respuesta.ok || rechazado(respuesta.cuerpo)) return null;
-    return respuesta.cuerpo;
+    if (respuesta.estado === 404 || rechazado(respuesta.cuerpo)) {
+      return { cuerpo: null, noAdmite: true };
+    }
+    if (!respuesta.ok) return { cuerpo: null, noAdmite: false };
+    return { cuerpo: respuesta.cuerpo, noAdmite: false };
   };
+  const pedir = async (proposito: string, fam = familia): Promise<string | null> =>
+    (await consultar(proposito, fam)).cuerpo;
 
   const sistema = await pedir('leer las capacidades del equipo', 'comun');
   const base = sistema === null ? {} : capacidadesDesdeDeviceCap(sistema);
@@ -255,16 +309,52 @@ export const descubrirCapacidades = async (
 
   if (familia === 'terminal') {
     const acs = await pedir('leer si la terminal espera el veredicto de la plataforma');
-    parciales.verificacionRemota = acs === null ? 'desconocida' : verificacionRemotaDesde(acs);
+    const personas = await pedir('capacidades de control de acceso de la terminal');
+    const leida = acs === null ? 'desconocida' : verificacionRemotaDesde(acs);
+    // H-SITIO-05 · segunda lectura, la de la guía: si el equipo ni la admite,
+    // es un «no» firme; si la admite, sigue sin saberse si está activada.
+    const soportada = verificacionRemotaSoportada(personas);
+    parciales.verificacionRemota = leida === 'desconocida' && soportada === false ? 'no' : leida;
+    if (leida === 'desconocida') {
+      opciones.traza?.registrar('aviso', 'verificación remota sin leer en AcsCfg', {
+        ...(opciones.dispositivoId === undefined ? {} : { dispositivoId: opciones.dispositivoId }),
+        camposBuscados: [...CAMPOS_DE_VERIFICACION_REMOTA],
+        isSupportRemoteCheck: soportada,
+        consecuencia:
+          soportada === false
+            ? 'el equipo no la admite: en reporta_y_espera no se opera'
+            : 'no se sabe si está activada: en reporta_y_espera no se opera hasta saberlo',
+      });
+    }
     const cap = await pedir('leer qué admite la biblioteca de rostros');
     const cuenta = await pedir('contar las plantillas de la biblioteca de rostros');
     const biblioteca = bibliotecaDesde(cap, cuenta);
     parciales.bibliotecaDeRostros = biblioteca;
-    const personas = await pedir('capacidades de control de acceso de la terminal');
     parciales.gestionDePersonas = personas === null ? 'desconocida' : 'si';
     // La terminal también abre una puerta: la capacidad es la misma pregunta.
     const puerta = await pedir('leer qué órdenes admite la puerta desde la plataforma');
     if (puerta !== null) parciales.aperturaRemota = /open/i.test(puerta) ? 'si' : 'no';
+  }
+
+  if (familia === 'videoportero') {
+    /**
+     * H-SITIO-09 · ¿tiene el videoportero biblioteca de rostros? En sitio
+     * quedaba «desconocida» porque ni se preguntaba, y la sincronización total
+     * lo saltaba sin decirlo. Se pregunta por las MISMAS rutas de la guía de
+     * control de acceso que la terminal: si contesta, recibe las plantillas;
+     * si dice «no admito», la ficha dice NO APLICA; si no se pudo leer, sigue
+     * desconocida y no se le envía nada.
+     */
+    const cap = await consultar('leer qué admite la biblioteca de rostros', 'terminal');
+    const cuenta = await consultar('contar las plantillas de la biblioteca de rostros', 'terminal');
+    if (cap.cuerpo !== null || cuenta.cuerpo !== null) {
+      parciales.bibliotecaDeRostros = bibliotecaDesde(cap.cuerpo, cuenta.cuerpo);
+    } else if (cap.noAdmite && cuenta.noAdmite) {
+      parciales.bibliotecaDeRostros = { estado: 'no', maximo: null, almacenadas: null };
+    }
+    const personas = await consultar('capacidades de control de acceso de la terminal', 'terminal');
+    parciales.gestionDePersonas =
+      personas.cuerpo !== null ? 'si' : personas.noAdmite ? 'no' : 'desconocida';
   }
 
   if (familia === 'camara') {

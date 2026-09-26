@@ -199,3 +199,23 @@ describe('una política que el documento trae A MEDIAS', () => {
     expect(veredicto.reglasInternas[0]?.clase).toBe('desconocida');
   });
 });
+
+describe('H-SITIO-01 · `barrierGateOper` como lo declara la guía: un entero', () => {
+  it('`1` («open barrier gate» en la guía) es una política que ABRE sola', () => {
+    const veredicto = leerVeredictoDeControl(entranceParam({ operacionDeListaBlanca: '1' }));
+    expect(veredicto.admisible).toBe(false);
+    expect(veredicto.reglasInternas[2]?.abreSola).toBe(true);
+    expect(veredicto.bloqueos.some((b) => /abre la barrera por su cuenta/.test(b.detalle))).toBe(
+      true,
+    );
+  });
+
+  it('`0` NO se cataloga «no abre»: en sitio abría con 0, y se dice así', () => {
+    const cuatroEnCero = entranceParam({}).replace(/<barrierGateOper>off</g, '<barrierGateOper>0<');
+    const veredicto = leerVeredictoDeControl(cuatroEnCero);
+    expect(veredicto.admisible).toBe(false);
+    const bloqueo = veredicto.bloqueos.find((b) => b.valorLeido === '0');
+    expect(bloqueo?.detalle).toMatch(/verificación física del instalador/);
+    expect(bloqueo?.valorCorrecto).toBeNull();
+  });
+});

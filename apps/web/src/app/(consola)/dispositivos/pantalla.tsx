@@ -21,7 +21,7 @@ import { FichaDialogo } from './ficha-dialogo';
  * descubiertas al sondear (neutrales: ninguna marca aquí). `desconocida` se
  * dice, no se pinta en verde.
  */
-const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto: string }[] => {
+export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto: string }[] => {
   const c = e.capacidades;
   if (c === null) return [{ tono: 'neutro', texto: 'Sin sondear' }];
   const si = (estado: string): TonoDeDistintivo =>
@@ -75,6 +75,17 @@ const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto: strin
             c.audioBidireccional.estado === 'si'
               ? `Audio canal ${String(c.audioBidireccional.canal ?? '?')}`
               : palabra(c.audioBidireccional.estado, 'Audio', 'Sin audio', 'Audio sin comprobar'),
+        },
+        {
+          // H-SITIO-09 · si recibe plantillas, y si no, que NO APLICA: no es
+          // lo mismo que «sin comprobar», que se resuelve sondeando.
+          tono: c.bibliotecaDeRostros.estado === 'si' ? 'exito' : 'neutro',
+          texto: palabra(
+            c.bibliotecaDeRostros.estado,
+            'Rostros: recibe plantillas',
+            'Rostros: no aplica',
+            'Rostros sin comprobar',
+          ),
         },
       ];
     case 'camara_lpr':

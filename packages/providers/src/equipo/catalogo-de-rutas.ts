@@ -311,11 +311,11 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     procedencia: 'documentada',
     familia: 'terminal',
     fuente:
-      'Documentación ISAPI del fabricante, configuración de control de acceso (AcsCfg). ' +
-      'El campo remoteCheck es un [SUPUESTO] S-35 hasta capturarlo del equipo',
+      'Documentación ISAPI del fabricante, «Remote Verification in Arming Method»: el ' +
+      'interruptor es AcsCfg.remoteCheckDoorEnabled (H-SITIO-05; el S-35 suponía remoteCheck)',
     confirmarEnSitio:
-      'que exista remoteCheck y que con true la terminal NO abra sola. Es la pregunta que ' +
-      'decide si el modo reporta_y_espera es posible en este firmware',
+      'que exista remoteCheckDoorEnabled y que con true la terminal NO abra sola. Es la ' +
+      'pregunta que decide si el modo reporta_y_espera es posible en este firmware',
   },
   {
     /**

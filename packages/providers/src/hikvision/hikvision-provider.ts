@@ -156,6 +156,7 @@ export class HikvisionProvider
       cliente: this.cliente(equipo),
       familia: FAMILIA_DE[equipo.tipo],
       dispositivoId,
+      ...(this.opciones.traza === undefined ? {} : { traza: this.opciones.traza }),
       ...(equipo.canalBarrera === null || equipo.canalBarrera === undefined
         ? {}
         : { canal: equipo.canalBarrera }),
@@ -349,22 +350,27 @@ export class HikvisionProvider
 
   // ── FaceTemplateProvider ─────────────────────────────────────────────────
 
+  /**
+   * H-SITIO-09 · a CUALQUIER equipo que declare biblioteca de rostros: la
+   * terminal y, si la trae, el videoportero. La guarda es la CAPACIDAD
+   * (ADR-019); el tipo sólo excluye lo que no puede tenerla —cámara, relé—.
+   */
   async sincronizar(
     dispositivoId: string,
     plantillaId: string,
     plantilla: Uint8Array,
   ): Promise<void> {
-    await this.exigirQueSeaTerminal(dispositivoId);
+    await this.exigirQuePuedaTenerRostros(dispositivoId);
     await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
-    const terminal = await this.terminalDe(dispositivoId);
-    await terminal.sincronizar(dispositivoId, plantillaId, plantilla);
+    const biblioteca = await this.bibliotecaDe(dispositivoId);
+    await biblioteca.sincronizar(dispositivoId, plantillaId, plantilla);
   }
 
   async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
-    await this.exigirQueSeaTerminal(dispositivoId);
+    await this.exigirQuePuedaTenerRostros(dispositivoId);
     await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
-    const terminal = await this.terminalDe(dispositivoId);
-    await terminal.suprimir(dispositivoId, plantillaId);
+    const biblioteca = await this.bibliotecaDe(dispositivoId);
+    await biblioteca.suprimir(dispositivoId, plantillaId);
   }
 
   /**
@@ -566,6 +572,38 @@ export class HikvisionProvider
       bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
     });
     this.terminales.set(equipo.dispositivoId, creada);
+    return creada;
+  }
+
+  private async exigirQuePuedaTenerRostros(dispositivoId: string): Promise<void> {
+    const equipo = await this.resolver(dispositivoId);
+    if (equipo.tipo !== 'terminal_facial' && equipo.tipo !== 'intercom') {
+      throw new Error(
+        `El equipo ${dispositivoId} no tiene biblioteca de rostros (${equipo.tipo}): ` +
+          'sincronizar una plantilla contra otro aparato dejaría el dato biométrico donde nadie lo busca',
+      );
+    }
+  }
+
+  /**
+   * La biblioteca de rostros del equipo: la terminal, o el videoportero que la
+   * declara. Las rutas son las mismas de la guía de control de acceso; el
+   * videoportero no decide el acceso por rostro en este sistema, así que su
+   * modo es el conservador y su puerta sigue abriéndose por orden.
+   */
+  private async bibliotecaDe(dispositivoId: string): Promise<TerminalFacial> {
+    const equipo = await this.resolver(dispositivoId);
+    if (equipo.tipo === 'terminal_facial') return this.terminalDe(dispositivoId);
+    const guardada = this.terminales.get(dispositivoId);
+    if (guardada !== undefined) return guardada;
+    const capacidades = await this.capacidadesDe(dispositivoId);
+    const creada = new TerminalFacial({
+      ...this.conexionDe(equipo),
+      modo: 'decide_el_equipo',
+      numeroDePuerta: equipo.numeroDePuerta ?? null,
+      bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
+    });
+    this.terminales.set(dispositivoId, creada);
     return creada;
   }
 

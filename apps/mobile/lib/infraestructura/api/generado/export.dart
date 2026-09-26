@@ -86,6 +86,7 @@ export 'models/desactivar_dto.dart';
 export 'models/desbloqueo_dto.dart';
 export 'models/detalle_de_error_dto.dart';
 export 'models/dispositivo_del_tablero_dto.dart';
+export 'models/documento_crudo_del_equipo_dto.dart';
 export 'models/edicion_aplicada_dto.dart';
 export 'models/edicion_de_equipo_dto.dart';
 export 'models/editar_vehiculo_dto.dart';

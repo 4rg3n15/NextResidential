@@ -105,10 +105,16 @@ export interface GuionDeEquipo {
     readonly habilitado: boolean;
     readonly codec?: string;
   }[];
-  /** `false` → `AcsCfg.remoteCheck=false`: la terminal decide sola. */
+  /** `false` → `AcsCfg.remoteCheckDoorEnabled=false`: la terminal decide sola. */
   readonly verificacionRemota?: boolean;
   /** Rótulo para consultar después qué veredictos recibió (A2). Opcional. */
   readonly destino?: string;
+  /**
+   * H-SITIO-09 · un VIDEOPORTERO con biblioteca de rostros: contesta también
+   * las rutas de biblioteca y de personas de la guía de control de acceso.
+   * Sin esto, el videoportero simulado dice «no admito» —NO APLICA—.
+   */
+  readonly bibliotecaEnVideoportero?: boolean;
   /** Capacidad y ocupación de la biblioteca de rostros. */
   readonly bibliotecaMaximo?: number;
   readonly bibliotecaAlmacenadas?: number;
@@ -313,6 +319,10 @@ const ERROR_AVERIADO =
 const ERROR_REINICIO =
   '<ResponseStatus><statusCode>7</statusCode><statusString>Reboot Required</statusString></ResponseStatus>';
 const LLENA = '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"faceLibraryFull"}';
+/** H-SITIO-04 · lo que contesta el equipo a un formulario que no es el de la guía. */
+const PARAMETRO_MALO =
+  '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"badParameters",' +
+  '"errorCode":1610612737,"errorMsg":"badParameters"}';
 
 const md5 = (t: string): string => createHash('md5').update(t, 'utf8').digest('hex');
 
@@ -458,7 +468,13 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
      */
     const delMismoCamino = RUTAS.filter(
       (r) =>
-        caminoCasa(r.ruta, url.pathname) && (r.familia === guion.familia || r.familia === 'comun'),
+        caminoCasa(r.ruta, url.pathname) &&
+        (r.familia === guion.familia ||
+          r.familia === 'comun' ||
+          (guion.familia === 'videoportero' &&
+            guion.bibliotecaEnVideoportero === true &&
+            r.familia === 'terminal' &&
+            /biblioteca|plantilla|persona|control de acceso de la terminal/.test(r.proposito))),
     );
     const catalogada = delMismoCamino.find((r) => r.metodo === metodo) ?? delMismoCamino[0];
 
@@ -492,14 +508,20 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       return respuestaDe(200, ordenesDePuerta(guion));
     }
     if (catalogada.proposito === 'leer si la terminal espera el veredicto de la plataforma') {
-      return respuestaDe(200, JSON.stringify({ AcsCfg: { remoteCheck: verificacionRemota } }));
+      // H-SITIO-05 · el interruptor con el nombre de la guía.
+      return respuestaDe(
+        200,
+        JSON.stringify({
+          AcsCfg: { remoteCheckDoorEnabled: verificacionRemota, checkChannelType: 'ISAPI' },
+        }),
+      );
     }
     if (catalogada.proposito === 'fijar que la terminal espere el veredicto de la plataforma') {
       // Leer-modificar-escribir de verdad: lo que se escribe es lo que la
       // siguiente lectura devuelve. Sin esto, la corrección parecería aplicada
       // y la ficha seguiría en bloqueo.
       const cuerpo = String(opciones?.body ?? '');
-      const pedido = /"remoteCheck"\s*:\s*(true|false)/.exec(cuerpo)?.[1];
+      const pedido = /"remoteCheckDoorEnabled"\s*:\s*(true|false)/.exec(cuerpo)?.[1];
       if (pedido === undefined) return respuestaDe(400, ERROR_AVERIADO);
       verificacionRemota = pedido === 'true';
       return respuestaDe(200, OK);
@@ -532,14 +554,33 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         }),
       );
     }
+    if (catalogada.proposito === 'dar de alta la persona a la que pertenece la plantilla') {
+      // H-SITIO-04 · como la guía: el `employeeNo` admite hasta 32 bytes.
+      const empleado = /"employeeNo"\s*:\s*"([^"]*)"/.exec(String(opciones?.body ?? ''))?.[1];
+      if (empleado === undefined || empleado.length > 32) return respuestaDe(400, PARAMETRO_MALO);
+      return respuestaDe(200, OK);
+    }
     if (catalogada.proposito === 'cargar la plantilla facial') {
       const maximo = guion.bibliotecaMaximo ?? 5000;
       if (enBiblioteca() >= maximo) return respuestaDe(400, LLENA);
       const cuerpo = Buffer.isBuffer(opciones?.body)
         ? opciones.body.toString('latin1')
         : String(opciones?.body ?? '');
+      /**
+       * H-SITIO-04 · el formulario de la guía: registro PLANO con `faceLibType`
+       * y `FDID`, `FPID` de letras y dígitos, y la imagen en la parte `img`.
+       * Lo demás, `400` con los cuatro campos, como el equipo de sitio.
+       */
       const fpid = /"FPID"\s*:\s*"([^"]+)"/.exec(cuerpo)?.[1];
-      if (fpid !== undefined) plantillas.add(fpid);
+      const conforme =
+        /"faceLibType"\s*:/.test(cuerpo) &&
+        /"FDID"\s*:/.test(cuerpo) &&
+        !/\{\s*"FaceDataRecord"\s*:/.test(cuerpo) &&
+        /name="img"/.test(cuerpo) &&
+        fpid !== undefined &&
+        /^[A-Za-z0-9]{1,63}$/.test(fpid);
+      if (!conforme) return respuestaDe(400, PARAMETRO_MALO);
+      plantillas.add(fpid);
       return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'suprimir la plantilla facial') {

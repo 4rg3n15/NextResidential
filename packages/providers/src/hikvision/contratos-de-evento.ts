@@ -1,3 +1,5 @@
+import { plantillaDesdeElEquipo } from '../terminal/identificador-en-el-equipo';
+
 /**
  * Los DOS contratos de evento de Hikvision, y por qué son dos.
  *
@@ -646,7 +648,9 @@ export const desdeAlertStreamJson = (
     enVivo: esEventoEnVivo(bloque),
     referenciaDelEquipo:
       bloque.channelID === undefined ? null : `${dispositivoId}:${bloque.channelID}`,
-    personaId: personaId === null || personaId === '' ? null : personaId,
+    // H-SITIO-04 · la terminal devuelve el identificador compacto (sin guiones)
+    // con que se dio de alta; se vuelve al de la plantilla.
+    personaId: personaId === null || personaId === '' ? null : plantillaDesdeElEquipo(personaId),
     esperaVeredicto: acceso?.remoteCheck === true && !esResultado,
     serieDelEquipo: serie === null || Number.isNaN(serie) ? null : serie,
     esResultadoDeVerificacion: esResultado,

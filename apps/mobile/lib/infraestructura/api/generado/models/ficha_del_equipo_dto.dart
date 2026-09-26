@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'documento_crudo_del_equipo_dto.dart';
 import 'hallazgo_del_equipo_dto.dart';
 
 part 'ficha_del_equipo_dto.g.dart';
@@ -18,6 +19,7 @@ class FichaDelEquipoDto {
     required this.desvioDeRelojSegundos,
     required this.hallazgos,
     required this.sinComprobar,
+    this.crudos,
   });
   
   factory FichaDelEquipoDto.fromJson(Map<String, Object?> json) => _$FichaDelEquipoDtoFromJson(json);
@@ -29,6 +31,9 @@ class FichaDelEquipoDto {
   final num? desvioDeRelojSegundos;
   final List<HallazgoDelEquipoDto> hallazgos;
   final List<String> sinComprobar;
+
+  /// H-SITIO-01 · lo que el equipo CONTESTÓ, saneado (sin claves, IPs enmascaradas), para leer el veredicto contra el documento y no contra una interpretación. Ausente cuando la familia no lo aporta.
+  final List<DocumentoCrudoDelEquipoDto>? crudos;
 
   Map<String, Object?> toJson() => _$FichaDelEquipoDtoToJson(this);
 }

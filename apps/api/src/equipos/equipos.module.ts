@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
+import { BITACORA } from '@ncr/domain-core';
+import type { Bitacora } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import {
@@ -35,7 +37,11 @@ export class EquiposModule {
       module: EquiposModule,
       controllers: [EquiposController],
       providers: [
-        { provide: SONDA_DE_EQUIPO, useFactory: () => new SondaPorProveedor() },
+        {
+          provide: SONDA_DE_EQUIPO,
+          inject: [BITACORA],
+          useFactory: (bitacora: Bitacora) => new SondaPorProveedor(undefined, bitacora),
+        },
         { provide: CORRECTOR_DE_EQUIPO, useFactory: () => new CorrectorPorProveedor() },
         {
           provide: REPOSITORIO_DE_EQUIPOS,

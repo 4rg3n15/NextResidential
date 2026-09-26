@@ -9,6 +9,7 @@ import {
   descubrirCapacidades,
   descubrirSinLanzar,
   verificacionRemotaDesde,
+  verificacionRemotaSoportada,
 } from './capacidades-hikvision';
 import { ClienteDeEquipo } from '../equipo/cliente';
 import { equipoSimulado } from '../simulacion/equipo-simulado';
@@ -256,5 +257,78 @@ describe('descubrir contra el equipo simulado, familia por familia', () => {
         familia: 'terminal',
       }),
     ).rejects.toBeInstanceOf(CredencialRechazada);
+  });
+});
+
+describe('H-SITIO-05 · la verificación remota se lee con el nombre de la guía', () => {
+  it('`AcsCfg.remoteCheckDoorEnabled` —el interruptor de la guía— decide', () => {
+    expect(verificacionRemotaDesde('{"AcsCfg":{"remoteCheckDoorEnabled":true}}')).toBe('si');
+    expect(verificacionRemotaDesde('{"AcsCfg":{"remoteCheckDoorEnabled":false}}')).toBe('no');
+    // El supuesto S-35 sigue valiendo si algún firmware lo usa.
+    expect(verificacionRemotaDesde('{"AcsCfg":{"remoteCheck":true}}')).toBe('si');
+    // Lo que se vio en sitio: un AcsCfg sin ninguno de los dos.
+    expect(verificacionRemotaDesde('{"AcsCfg":{"checkChannelType":"ISAPI"}}')).toBe('desconocida');
+  });
+
+  it('`isSupportRemoteCheck` es la segunda lectura, en XML y en JSON', () => {
+    expect(verificacionRemotaSoportada('<isSupportRemoteCheck>false</isSupportRemoteCheck>')).toBe(
+      false,
+    );
+    expect(verificacionRemotaSoportada('{"AcsCap":{"isSupportRemoteCheck": true}}')).toBe(true);
+    expect(verificacionRemotaSoportada('{"AcsCap":{}}')).toBeNull();
+    expect(verificacionRemotaSoportada(null)).toBeNull();
+  });
+
+  it('cada ruta de capacidad consultada queda en la bitácora con su respuesta', async () => {
+    const lineas: { mensaje: string; c: Record<string, unknown> }[] = [];
+    const credenciales = { usuario: 'servicio', clave: 'clave-de-prueba' };
+    const c = await descubrirCapacidades({
+      cliente: new ClienteDeEquipo({
+        host: 'x.invalid',
+        ...credenciales,
+        peticion: equipoSimulado({ familia: 'terminal', ...credenciales }),
+      }),
+      familia: 'terminal',
+      dispositivoId: 'terminal-1',
+      traza: { registrar: (_n, mensaje, contexto) => lineas.push({ mensaje, c: { ...contexto } }) },
+    });
+    expect(c.verificacionRemota).toBe('si');
+    const acs = lineas.find(
+      (l) =>
+        l.mensaje === 'capacidad consultada al equipo' &&
+        l.c['proposito'] === 'leer si la terminal espera el veredicto de la plataforma',
+    );
+    expect(acs?.c['ruta']).toBe('/ISAPI/AccessControl/AcsCfg?format=json');
+    expect(String(acs?.c['respuesta'])).toContain('remoteCheckDoorEnabled');
+  });
+});
+
+describe('H-SITIO-09 · la biblioteca de rostros del VIDEOPORTERO se pregunta', () => {
+  const credenciales = { usuario: 'servicio', clave: 'clave-de-prueba' };
+  const descubrir = (bibliotecaEnVideoportero: boolean) =>
+    descubrirCapacidades({
+      cliente: new ClienteDeEquipo({
+        host: 'x.invalid',
+        ...credenciales,
+        peticion: equipoSimulado({
+          familia: 'videoportero',
+          ...credenciales,
+          bibliotecaEnVideoportero,
+        }),
+      }),
+      familia: 'videoportero',
+    });
+
+  it('si la tiene, la declara con su máximo: la sincronización total lo incluye', async () => {
+    const c = await descubrir(true);
+    expect(c.bibliotecaDeRostros.estado).toBe('si');
+    expect(c.bibliotecaDeRostros.maximo).toBe(5000);
+    expect(c.gestionDePersonas).toBe('si');
+  });
+
+  it('si dice «no admito», es NO —NO APLICA en la ficha—, no «desconocida»', async () => {
+    const c = await descubrir(false);
+    expect(c.bibliotecaDeRostros.estado).toBe('no');
+    expect(c.gestionDePersonas).toBe('no');
   });
 });

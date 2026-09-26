@@ -2,6 +2,7 @@ import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { interpretarError } from '../equipo/errores-del-fabricante';
+import { CAMPOS_DE_VERIFICACION_REMOTA } from '../hikvision/capacidades-hikvision';
 import { etiqueta, reemplazarEtiqueta } from '../equipo/xml';
 import { ETIQUETA_DE_MODO, MODO_EXIGIDO } from '../camara/modo-de-control';
 import {
@@ -211,17 +212,30 @@ const corregirVerificacionRemota = async (
     return noAplicada('verificacion_remota', 'La configuración del equipo no es JSON legible');
   }
   const acs = documento['AcsCfg'];
-  if (typeof acs !== 'object' || acs === null || !('remoteCheck' in acs)) {
+  // H-SITIO-05 · el interruptor de la guía es `remoteCheckDoorEnabled`; el
+  // supuesto S-35 (`remoteCheck`) sólo si el documento trae ése.
+  const campo =
+    typeof acs === 'object' && acs !== null
+      ? CAMPOS_DE_VERIFICACION_REMOTA.find((c) => c in acs)
+      : undefined;
+  if (typeof acs !== 'object' || acs === null || campo === undefined) {
     return noAplicada(
       'verificacion_remota',
       'La configuración del equipo no trae el campo de verificación remota: este modelo ' +
         'no la admite. Es un hallazgo de BLOQUEO: no se opera contra una terminal que decide sola',
     );
   }
-  const anterior = String((acs as Record<string, unknown>)['remoteCheck']);
+  const actual = acs as Record<string, unknown>;
+  const anterior = String(actual[campo]);
   const corregido = {
     ...documento,
-    AcsCfg: { ...(acs as Record<string, unknown>), remoteCheck: true },
+    AcsCfg: {
+      ...actual,
+      [campo]: true,
+      // «Verification parameters in arming method» (guía): canal `ISAPI`. Sólo
+      // se toca si el documento lo trae; no se añaden campos a ciegas.
+      ...('checkChannelType' in actual ? { checkChannelType: 'ISAPI' } : {}),
+    },
   };
   const escritura = rutaPara(
     'fijar que la terminal espere el veredicto de la plataforma',
@@ -238,7 +252,7 @@ const corregirVerificacionRemota = async (
     valorAnterior: anterior,
     valorNuevo: ok ? 'true' : null,
     detalle: ok
-      ? 'La terminal pasa a reportar y esperar el veredicto de la plataforma (remoteCheck)'
+      ? `La terminal pasa a reportar y esperar el veredicto de la plataforma (${campo})`
       : interpretarError(escrito.cuerpo).detalle,
   };
 };

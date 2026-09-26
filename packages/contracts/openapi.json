@@ -8582,6 +8582,21 @@
           "sincronizacionesFallidas"
         ]
       },
+      "DocumentoCrudoDelEquipoDto": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string"
+          },
+          "contenido": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "titulo",
+          "contenido"
+        ]
+      },
       "EdicionAplicadaDto": {
         "type": "object",
         "properties": {
@@ -9499,6 +9514,13 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "crudos": {
+            "description": "H-SITIO-01 · lo que el equipo CONTESTÓ, saneado (sin claves, IPs enmascaradas), para leer el veredicto contra el documento y no contra una interpretación. Ausente cuando la familia no lo aporta.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentoCrudoDelEquipoDto"
             }
           }
         },
