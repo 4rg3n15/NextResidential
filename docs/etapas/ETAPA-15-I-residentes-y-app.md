@@ -127,7 +127,9 @@ El encargo prohíbe tocar `packages/providers`, el motor de reglas,
 pedido. Lo que el ensayo destapó **dentro** de esas fronteras se reporta, no se
 corrige: **H-15I-05** (la persistencia relee como UTC la franja de un patrón que
 guardó en hora local) va con su parche en §8, y mientras tanto la recurrente
-desde la app **falla cerrada** (H-15I-06). T2 registra `FALLO_TECNICO` para un
+desde la app **falla cerrada** (H-15I-06). _Actualización 15-J: H-15I-05
+**CERRADO** en [`ETAPA-15-J`](ETAPA-15-J-patron-en-hora-local.md), con otra
+corrección que la de §8; H-15I-06 sigue cerrada por otro motivo (H-15J-01)._ T2 registra `FALLO_TECNICO` para un
 rostro desconocido: el motivo lo pone el motor, que no se toca.
 
 ---
@@ -189,19 +191,19 @@ scripts/lib/hoja-de-resultados.mjs                                      columna 
 
 ## 5 · Trazabilidad
 
-| Requisito                           | Cubierto                                                                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **OE-01** (padrón)                  | Alta del residente, ocupantes, vehículos propios con tope                                              |
-| **OE-02** (autorización por la app) | Visitas de terceros con día y franja desde la app, por la política de aprobación                       |
-| **OE-04** (biometría)               | Consentimiento del visitante por QR y compartir; foto real; supresión al terminar la visita (H-15I-10) |
-| **RN-04**, **ADR-04**               | Tope de vehículos por vivienda en la base, con prueba concurrente                                      |
-| **RN-06**, **RN-07**, **HU-35**     | Listas negras desde la consola, con rol administrativo                                                 |
-| **RN-10**, **RN-11**                | El titular es el visitante; se suprime al terminar la visita                                           |
-| **RN-22**                           | La recurrente desde la app falla cerrada mientras H-15I-05 siga abierto (**parcial**, con motivo)      |
-| **CU-01 exc. 3a**                   | La lectura dudosa ya no abre sola (H-15I-09); L7 lo ensaya                                             |
-| **KPI-36/37**                       | Camino de servicio: la copropiedad ajena no ve ni toca las plazas de ésta                              |
-| **Hitos 2 y 3 del reto**            | Ensayados en SIMULADO por los dos canales; **pendientes en sitio (BE-02)**                             |
-| **KPI-13, 17, 25, 32, 33**          | **No medidos**: son latencias de extremo a extremo con el aparato delante (BE-02)                      |
+| Requisito                           | Cubierto                                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **OE-01** (padrón)                  | Alta del residente, ocupantes, vehículos propios con tope                                                                |
+| **OE-02** (autorización por la app) | Visitas de terceros con día y franja desde la app, por la política de aprobación                                         |
+| **OE-04** (biometría)               | Consentimiento del visitante por QR y compartir; foto real; supresión al terminar la visita (H-15I-10)                   |
+| **RN-04**, **ADR-04**               | Tope de vehículos por vivienda en la base, con prueba concurrente                                                        |
+| **RN-06**, **RN-07**, **HU-35**     | Listas negras desde la consola, con rol administrativo                                                                   |
+| **RN-10**, **RN-11**                | El titular es el visitante; se suprime al terminar la visita                                                             |
+| **RN-22**                           | La recurrente desde la app falla cerrada (**parcial**, con motivo). _15-J: H-15I-05 cerrado; sigue cerrada por H-15J-01_ |
+| **CU-01 exc. 3a**                   | La lectura dudosa ya no abre sola (H-15I-09); L7 lo ensaya                                                               |
+| **KPI-36/37**                       | Camino de servicio: la copropiedad ajena no ve ni toca las plazas de ésta                                                |
+| **Hitos 2 y 3 del reto**            | Ensayados en SIMULADO por los dos canales; **pendientes en sitio (BE-02)**                                               |
+| **KPI-13, 17, 25, 32, 33**          | **No medidos**: son latencias de extremo a extremo con el aparato delante (BE-02)                                        |
 
 ---
 
@@ -362,11 +364,11 @@ ingreso deja pasar) · S-60 (contador por identificador) · S-61 (Netlify cortar
 los flujos, no verificado).
 
 **Hallazgos de la ronda:** H-15I-01 a H-15I-14. Todos corregidos salvo
-H-15I-05, que se reporta con su parche.
+H-15I-05, que se reporta con su parche. _Actualización 15-J: H-15I-05 **CERRADO**._
 
 **Defectos reportados sin corregir:**
 
-- **H-15I-05** · el patrón semanal se evalúa en UTC. Parche propuesto, fuera de lo que este encargo permite tocar (la persistencia):
+- ~~**H-15I-05**~~ **CERRADO en la [15-J](ETAPA-15-J-patron-en-hora-local.md)** —sin migración: el desplazamiento se calcula al leer con `copropiedades.zona_horaria`; el parche de abajo se descartó porque exigía columna nueva y dejaba mal las filas existentes—. Texto original: el patrón semanal se evalúa en UTC. Parche propuesto, fuera de lo que este encargo permite tocar (la persistencia):
   1. migración que añade `patrones_recurrencia.desplazamiento_utc_minutos smallint NOT NULL DEFAULT 0`;
   2. en `repositorio-autorizaciones-pg.ts`, escribir `a.patron.desplazamientoUtcMinutos` en el `INSERT` y leerlo en las dos reconstrucciones, que hoy fijan `desplazamientoUtcMinutos: 0`;
   3. una prueba contra la base con una franja de 14:00 a 18:00 en `America/Bogota` que abra a las 15:00 locales y no a las 10:00.
@@ -380,7 +382,8 @@ H-15I-05, que se reporta con su parche.
 - **DT-15I-03** · el comentario de cabecera de la migración `0038` remite a «§3 ter» de `contradicciones-y-supuestos.md`; la sección es **§3 bis (E-03)**. No se reescribe una migración ya verificada por un comentario; queda anotado aquí.
 
 **Abierto y no bloqueante para BE-02:** S-38 (por ratificar), AR-01 a AR-04 y el
-riesgo residual de H-15B-1 (aceptaciones sin firmar), P-19, P-20 y H-15I-05.
+riesgo residual de H-15B-1 (aceptaciones sin firmar), P-19, P-20 y H-15I-05
+(_cerrado en la 15-J_).
 
 ---
 
@@ -437,5 +440,5 @@ Lo demás que queda, con su motivo y su tamaño, **no bloquea la visita**:
 
 | Qué                                      | Motivo                                                                  | Tamaño                                    |
 | ---------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------- |
-| **H-15I-05** · patrón semanal en UTC     | Está en la persistencia, que este encargo no deja tocar                 | Pequeño · parche en §8                    |
+| ~~**H-15I-05** · patrón semanal en UTC~~ | **CERRADO en la 15-J**                                                  | —                                         |
 | **P-20** / **C-37** · consola en Netlify | Decisión del cliente sobre el despliegue; en sitio no aplica (portátil) | Medio · depende de la opción que se elija |

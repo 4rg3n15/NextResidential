@@ -141,7 +141,14 @@ Cada uno de estos defectos habría hecho fallar un escenario **en sitio**:
 
 ## Lo que queda reportado sin corregir
 
-- **H-15I-05 · el patrón de recurrencia se evalúa en UTC.** La persistencia de
+- ~~**H-15I-05 · el patrón de recurrencia se evalúa en UTC.**~~ **CERRADO en la
+  ETAPA 15-J** ([informe](../etapas/ETAPA-15-J-patron-en-hora-local.md)): las
+  dos lecturas del repositorio toman el desplazamiento de
+  `copropiedades.zona_horaria` en el instante del reloj, sin migración; lo
+  prueba `apps/api/test/patron-en-hora-local-pg.test.ts` contra PostgreSQL
+  real. La recurrente desde la app **sigue fallando cerrada** (H-15I-06), ahora
+  por otro motivo: su adaptador no escribe las filas del patrón (H-15J-01).
+  Texto original: La persistencia de
   autorizaciones guarda la franja de un patrón semanal en hora local, sin su
   desplazamiento, y la relee como UTC. En Bogotá, una franja de 14:00 a 18:00
   se evaluaría de 09:00 a 13:00. **No afecta a ninguno de los 16 escenarios**,
