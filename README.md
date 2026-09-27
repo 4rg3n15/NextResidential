@@ -346,6 +346,11 @@ supabase db push
 pnpm --filter @ncr/api start:dev
 ```
 
+`start:dev` compila con `tsc` y arranca `dist/main.js` con `node --watch`; para
+recompilar en caliente, `pnpm --filter @ncr/api start:compilar` en otra
+terminal. **No con `tsx`**: no emite metadatos de tipos, el `ValidationPipe` no
+validaría ningún DTO y la API se niega a arrancar (H-SITIO-06, anexo 15-K).
+
 Endpoints de salud: `/health` (proceso vivo) y `/ready` (dependencias alcanzables, incluida una sonda real contra JWKS).
 
 ### Las tres aplicaciones contra una base, y los tres equipos (ETAPAS 15-E a 15-I)
@@ -394,7 +399,9 @@ casa» y «en sitio», es
    se configuran hacia la API: es la API la que se suscribe a sus eventos.
 7. **Guion de sitio** (`scripts/puesta-en-marcha-equipos.mjs --sin-accionar
 --capturar=<carpeta fuera del repositorio>` primero, ANTES de tocar ningún
-   equipo: es la referencia de la reversión) y la **hoja de resultados** que escribe: los 16 escenarios en 26
+   equipo: es la referencia de la reversión), después `--abrir` —la apertura
+   demostrada en sitio, que pregunta si la puerta se movió (anexo 15-K)— y la
+   **hoja de resultados** que escribe: los 16 escenarios en 26
    filas escenario × canal de
    [`INTEGRACION_HIKVISION.md`](docs/guias/INTEGRACION_HIKVISION.md) §9, ya
    ensayados en SIMULADO en

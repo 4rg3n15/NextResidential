@@ -35,6 +35,15 @@ analogías.
 > contesta cada equipo (`--capturar`), ANTES de tocar nada y después, y la
 > **reversión equipo por equipo** contra esa captura. Cuatro fallos de la
 > visita (H-SITIO-01, 04, 05 y 09) se quedaron sin diagnóstico por no tenerla.
+>
+> **Anexo de sitio (27/09/2026).** La terminal y el videoportero **abrieron**
+> con `PUT door/1`, Content-Type `application/x-www-form-urlencoded;
+charset=UTF-8`, el cuerpo con espacio de nombres y `version="2.0"` y el
+> Digest con el cuerpo ya en la primera petición; con el cuerpo mínimo dijeron
+> «OK» y no abrieron (H-SITIO-13), y `curl --digest`, que sondea con el cuerpo
+> vacío, recibe de la terminal `400 badXmlContent` (H-SITIO-15). El sistema
+> abre ya así, y el guion gana **`--abrir`** para comprobarlo delante de la
+> puerta (paso 2 bis). **No abra puertas con `curl`** (§5.1).
 
 ### V.1 · Antes de salir de casa
 
@@ -98,6 +107,15 @@ analogías.
 
    Deja una carpeta por equipo (`camara/`, `terminal/`, `videoportero/`) con cada petición y cada respuesta **crudas y saneadas** (sin claves ni tokens, IPs tachadas): capacidades, `EntranceParam`, disparadores, servidor de alarma, `AcsCfg`/`remoteCheckDoorEnabled`, FDLib, TwoWayAudio. En la terminal hace además la **carga de prueba** con una imagen sintética que no es un rostro y **da de baja** la persona de prueba al terminar, la acepte o no (H-SITIO-04). Si el guion dice que la baja no se aceptó, compruebe en el equipo que no quedó esa persona antes de seguir. **Ésta es la referencia de la reversión (paso 13): sin ella no hay vuelta atrás exacta.**
 
+2 bis. **La apertura demostrada, lo primero que se verifica** (anexo, H-SITIO-13). No cambia ninguna configuración: sólo abre, una vez, la puerta de la terminal y la del videoportero, con una persona delante de cada una:
+
+```
+node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs \
+  --abrir --capturar=$HOME/ncr-sitio/abrir --informe=$HOME/ncr-sitio/informe-abrir.md
+```
+
+Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con el cuerpo y el Content-Type de formulario), la respuesta (`statusCode 1`, `subStatusCode ok`) y **pregunta si la puerta se movió**: mírela y conteste `s` o `n`. Sale en 0 sólo si las dos se movieron. Si una **no** se movió con la orden aceptada, H-SITIO-13 sigue abierto en ese equipo: no haga sus escenarios de puerta y devuelva la carpeta `abrir/`. Si la terminal contesta `400 badXmlContent`, algo entre el Mac y el equipo le quita el cuerpo (H-SITIO-15).
+
 3. **Arranque.** Primero go2rtc. Después compile y arranque la API **con `start`**, guardando su bitácora en la carpeta de sitio:
 
    ```
@@ -105,7 +123,7 @@ analogías.
    pnpm --filter @ncr/api start 2>&1 | tee $HOME/ncr-sitio/api.log
    ```
 
-   `start` es `node dist/main.js`, que es lo que ejecuta el recorrido de la consola en el verificador (paso 13b). **No use `start:dev`**: ya arranca (H-SITIO-06), pero recompila en caliente con `tsx` y no es lo que está verificado. Lea la bitácora de arranque: tiene que decir persistencia `postgres`, proveedor `hikvision`, el puente go2rtc y **qué conexión usa pg-boss** (H-SITIO-07); y **ningún error** de `API_URL_PUBLICA` de bucle local (H-SITIO-10).
+   `start` es `node dist/main.js`, que es lo que ejecuta el recorrido de la consola en el verificador (paso 13b). `start:dev` ya no usa `tsx` (con él el `ValidationPipe` no validaba nada, H-SITIO-06): compila con `tsc` y arranca lo mismo, y con `tsx` la API se niega a arrancar. Aun así, para la visita, `start`: es lo que está verificado. Lea la bitácora de arranque: tiene que decir persistencia `postgres`, proveedor `hikvision`, el puente go2rtc y **qué conexión usa pg-boss** (H-SITIO-07); y **ningún error** de `API_URL_PUBLICA` de bucle local (H-SITIO-10).
 
 4. **Consola en el Mac, abierta POR IP**: `pnpm --filter @ncr/web start` (puerto 3100) y, en el navegador, `http://<IP-del-Mac>:3100`. No en Netlify: el SSE y el audio pasan por su servidor (C-37, P-20). Por IP es como la abrirá cualquier otro aparato, y es la única forma de ver lo que verán ellos (D-67 y D-68 sólo aparecían por IP).
    **Una excepción, y es del navegador, no de la consola:** el **audio de la guardia (V2)** necesita el micrófono, y el navegador sólo lo concede en contexto seguro. `http://<IP>` sin TLS no lo es; `http://127.0.0.1:3100` sí. V2 se hace en el propio Mac por `127.0.0.1` ([`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](CONSOLA_EN_RED_Y_DESPLIEGUE.md) §3).
@@ -679,31 +697,38 @@ un bloque `ANPR` con la matrícula. **(W · página `XML_EventNotificationAlert_
 
 ### 5.1 · Terminal facial y videoportero · **W**
 
-`PUT /ISAPI/AccessControl/RemoteControl/door/1` con la envoltura
-`RemoteControlDoor` y `cmd` igual a `open`. Es momentáneo. **Nunca
-`alwaysOpen`.**
+> **Corregido por el anexo de sitio (27/09/2026). No use `curl` para esto.**
+> La receta que había aquí reproducía los dos defectos de la visita: el cuerpo
+> mínimo `<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>` recibe «OK»
+> y la puerta **no se mueve** (H-SITIO-13), y `curl --digest` sondea el
+> desafío con el cuerpo **vacío**, que la terminal rechaza con
+> `400 badXmlContent` antes de autenticar (H-SITIO-15).
+
+Use el guion, que abre como abrió en sitio y mide la latencia:
 
 ```
-printf '%s' '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>' > abrir.xml
-curl -sS --digest -u "$USUARIO:$CLAVE" -X PUT \
-  -H 'Content-Type: application/xml' --data-binary @abrir.xml \
-  -w '\nhttp=%{http_code} tiempo_total=%{time_total}s\n' \
-  "http://$FACIAL/ISAPI/AccessControl/RemoteControl/door/1"
+node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --abrir
 ```
 
-**Salida esperada:**
+Lo que envía, para leerlo en su salida: `PUT /ISAPI/AccessControl/RemoteControl/door/1`,
+Content-Type `application/x-www-form-urlencoded; charset=UTF-8` y el cuerpo
+`<RemoteControlDoor xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0"><cmd>open</cmd></RemoteControlDoor>`
+(el videoportero, con `<?xml version='1.0' encoding='utf-8'?>` delante, como
+su interfaz), en la petición del `401` y en la autenticada. Es momentáneo.
+**Nunca `alwaysOpen`.**
+
+**Salida esperada** (por equipo; host elidido):
 
 ```
-<ResponseStatus version="2.0" xmlns="http://www.hikvision.com/ver20/XMLSchema">
-  <requestURL>/ISAPI/AccessControl/RemoteControl/door/1</requestURL>
-  <statusCode>1</statusCode>
-  <statusString>OK</statusString>
-  <subStatusCode>ok</subStatusCode>
-</ResponseStatus>
-http=200 tiempo_total=0.08s
+── Terminal facial · te…ne:80 · puerta 1 (--abrir)
+   PUT /ISAPI/AccessControl/RemoteControl/door/1 · application/x-www-form-urlencoded; charset=UTF-8 · sin credencial · cuerpo de 113 caracteres → HTTP 401
+   PUT /ISAPI/AccessControl/RemoteControl/door/1 · application/x-www-form-urlencoded; charset=UTF-8 · con Digest · cuerpo de 113 caracteres → HTTP 200
+   ✓ orden ACEPTADA: statusCode 1 · subStatusCode ok · 80 ms
+   ¿Se movió la puerta de «Terminal facial»? Mírela y conteste s/n: s
+   ✓ la puerta SE MOVIÓ: H-SITIO-13 verificado en este equipo
 ```
 
-Repita contra `$PORTERO`. Si allí responde `404`, esa familia usa otra ruta:
+El guion hace la terminal y el videoportero. Si alguno responde `404`, esa familia usa otra ruta:
 anótelo y búsquela en la sección de videoporteros de su portal — **es
 exactamente el tipo de diferencia entre familias que esta jornada existe para
 descubrir.**

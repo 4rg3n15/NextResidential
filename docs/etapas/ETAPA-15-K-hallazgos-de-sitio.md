@@ -14,9 +14,21 @@ volver a tener el equipo delante.
 **Equipos de la visita:** cámara LPR `DS-TCG405-E` (firmware V5.4.0), terminal
 facial `DS-K1T344MBFWX-E` (V4.47.0) y videoportero `DS-KD9633-WBE6` (V2.3.9).
 
+**Anexo de sitio (27/09/2026), con prioridad sobre el encargo para H-SITIO-12
+y 13.** Evidencia demostrada delante de los equipos: la terminal y el
+videoportero **abrieron** con `PUT door/1`, Content-Type
+`application/x-www-form-urlencoded; charset=UTF-8`, el cuerpo con espacio de
+nombres y `version="2.0"` y el Digest con el cuerpo ya en la primera petición
+(401 y después 200 con `statusCode 1`); con el cuerpo mínimo contestaron «OK»
+y **no** abrieron; y un cliente que sondea el Digest con el cuerpo vacío
+—`curl --digest` lo hace— recibe de la terminal `400 badXmlContent` antes de
+autenticar (**H-SITIO-15**, nuevo). Lo que cambió por el anexo: §0 (filas 04,
+06, 12, 13, 14 y 15), §2.9, §3, §6 («Lo que destapó el anexo» y la quinta
+corrida final), §8 y §10.
+
 ---
 
-## 0 · Los catorce hallazgos de sitio, uno por uno
+## 0 · Los quince hallazgos de sitio, uno por uno
 
 **Vocabulario.** **CORREGIDO**: el defecto está demostrado, corregido y con
 prueba que falla sin la corrección. **INSTRUMENTADO**: lo demostrable está
@@ -25,22 +37,23 @@ próxima visita la captura (`--capturar`, la ficha y la bitácora) y el informe
 deja las hipótesis numeradas. **PENDIENTE**: sin corregir ni instrumentar.
 **Ninguno queda PENDIENTE.**
 
-| Id             | Qué pasó en sitio                                                                                                             | Estado            | Por qué este estado                                                                                                                                                                                                                                                                                                                                                                                                              | Prueba                                                                                                                                                   |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **H-SITIO-01** | Cámara: `barrierGateOper = 0` en las cuatro políticas, disparador ilegible, «decide sola» y el alta **no quedaba registrada** | **INSTRUMENTADO** | Corregido lo del software: el alta persiste como `rechazado`, aparece en la lista y la ficha trae el `EntranceParam` y el disparador **crudos y saneados**. Lo del equipo **no**: con 0 la cámara abría, y la guía dice «0 = sin operación» (C-38). Salida para operar: la atestación D-11. Qué campo refleja «Paso automático», en la próxima captura                                                                           | `veredicto-de-control.test.ts` · `diagnostico.test.ts` · `alta-de-equipo.test.tsx` · `ficha-del-equipo.test.tsx` · `equipos.e2e.test.ts` · recorrido 13b |
-| **H-SITIO-02** | Dispositivos y el tablero leían SIEMPRE la memoria: el equipo dado de alta no aparecía                                        | **CORREGIDO**     | `RepositorioTableroPg` cableado con `PERSISTENCIA_DE_EVENTOS=postgres`. Ejecutarlo destapó dos defectos más (consultaba sin claims —con la RLS forzada, cero filas sin error— y filtraba por una columna inexistente). Las operaciones aún simuladas lo dicen en el botón                                                                                                                                                        | `tablero-pg.test.ts` (base real, rol sin superusuario) · recorrido 13b · **13c lo reintroduce y el recorrido lo nombra**                                 |
-| **H-SITIO-03** | `GET consentimientos/:id` negaba al superadministrador (403 tras la captura)                                                  | **CORREGIDO**     | Las rutas de «Rostro del visitante» admiten a cada rol que ve la pantalla; RN-09 no se relaja (el dominio sigue negando sin consentimiento vigente)                                                                                                                                                                                                                                                                              | `roles-de-biometria.e2e.test.ts` (3 rojas sin la corrección) · **13c lo reintroduce**                                                                    |
-| **H-SITIO-04** | La terminal rechazó la carga de la plantilla con 400, «sin decir por qué»                                                     | **INSTRUMENTADO** | Corregido lo que la guía de su serie demuestra: `employeeNo` de 36 bytes (máximo 32) → identificador compacto de 32 hexadecimales; registro `FaceDataRecord` plano, no envuelto; imagen en la parte `img`. `statusCode`, `subStatusCode`, `errorCode` y `errorMsg` van a la bitácora y al mensaje. La causa exacta del 400 no se puede afirmar sin el equipo: hipótesis H4-1 a H4-4 (§8)                                         | `terminal-facial.test.ts` · `identificador-en-el-equipo` · el simulado exige lo mismo que la guía · `carga-de-prueba.test.ts`                            |
-| **H-SITIO-05** | En la terminal, `verificacionRemota` «desconocida»: con `reporta_y_espera` toda apertura se rechazaba                         | **CORREGIDO**     | El interruptor es `AcsCfg.remoteCheckDoorEnabled` en la guía de la serie de la terminal (el S-35 suponía `remoteCheck`). Cada ruta de capacidad consultada deja su línea con lo que contestó. Se confirma con la captura `terminal/…AcsCfg…`                                                                                                                                                                                     | `capacidades-hikvision.test.ts`                                                                                                                          |
-| **H-SITIO-06** | `start:dev` (tsx) cayó al arrancar: «Cannot read properties of undefined (reading 'get')»                                     | **CORREGIDO**     | tsx no emite metadatos de tipos: **14** parámetros inyectados por tipo llegaban `undefined`. `@Inject` explícito en todos, control estático y un paso que ARRANCA la API con tsx                                                                                                                                                                                                                                                 | `inyeccion-explicita.mjs` (paso 10, sonda 33) · `e2e/arranque-con-tsx.mjs` (paso 12d, **sonda 35: reproduce el error literal de sitio**)                 |
-| **H-SITIO-07** | pg-boss usaba la conexión directa `db.<ref>.supabase.co`, sólo IPv6: `ENOTFOUND` en la red del sitio                          | **CORREGIDO**     | `PGBOSS_DATABASE_URL` opcional (si falta, `DATABASE_URL`); el arranque dice por qué variable, contra qué host y de qué clase conecta, y avisa como error si es la directa o el pooler en modo transacción. **No probado contra una red sólo IPv4**: se confirma en la visita                                                                                                                                                     | `conexion-de-pgboss.test.ts`                                                                                                                             |
-| **H-SITIO-08** | El proxy de la consola no exportaba `PUT`: toda edición respondía 405                                                         | **CORREGIDO**     | `PUT` añadido; una prueba deriva del contrato generado y de la consola TODOS los verbos en uso y exige que el proxy los reenvíe                                                                                                                                                                                                                                                                                                  | `proxy-verbos.test.ts` (2 rojas sin PUT) · recorrido 13b · **13c lo reintroduce**                                                                        |
-| **H-SITIO-09** | Videoportero: biblioteca de rostros y gestión de personas «desconocidas»                                                      | **CORREGIDO**     | Con biblioteca de rostros, el videoportero entra en la sincronización total (terminales y videoporteros); sin ella, la fila dice «Rostros: no aplica». Si el KD9633 la tiene lo dirá su captura (`videoportero/…FDLib…`)                                                                                                                                                                                                         | `capacidades.test.tsx` · `capacidades-hikvision.test.ts` · `consentimiento-publico.e2e.test.ts` (sincroniza terminal y videoportero)                     |
-| **H-SITIO-10** | Con el proveedor real y `API_URL_PUBLICA` de bucle local, el enlace y el QR no los abría ningún teléfono                      | **CORREGIDO**     | El arranque lo escribe como error; el enlace declara su alcance y la consola avisa junto al QR. Y D-10 da una salida que no depende del teléfono                                                                                                                                                                                                                                                                                 | `url-publica.test.ts` · `seguimiento.test.tsx`                                                                                                           |
-| **H-SITIO-11** | La app en un iPhone físico: «No hay conexión con el servidor» mientras Safari abría la API                                    | **CORREGIDO**     | Faltaba `NSLocalNetworkUsageDescription` (la privacidad de red local alcanza a `dart:io`; ATS no, porque `dart:io` no usa `URLSession`). En Debug, panel con URL compilada, tipo y mensaje del fallo, sin tokens. **No verificable aquí sin un iPhone**: se confirma en la visita                                                                                                                                                | `info-plist-ios.mjs` (paso 5d, sonda 34, sobre el Info.plist preprocesado como Xcode) · `detalle_tecnico_test.dart`                                      |
-| **H-SITIO-12** | La primera orden a cada equipo se aceptaba; la siguiente, 9–35 s después, se rechazaba como «usuario o clave»                 | **CORREGIDO**     | Una sesión Digest por equipo compartida por todo el proceso; `nc` que no se reinicia con el mismo nonce; `stale=true` distinguido de la clave; un 403 con código ISAPI ya no es «credencial»; **un solo reintento**, nunca más (bloqueo de cuenta). Que el equipo real vencía el nonce es inferencia del patrón                                                                                                                  | `digest-vencido.test.ts` contra `servidor-digest.ts` (vence por tiempo y por usos): órdenes, sondeos y suscripciones. Con el cliente anterior, falla     |
-| **H-SITIO-13** | Terminal y videoportero contestaron «OK» a `RemoteControl/door/1` y la puerta **no se movió**                                 | **INSTRUMENTADO** | Cuerpo alineado con la guía (declaración, espacio de nombres y `version="2.0"`, requerido); el código ISAPI del cuerpo decide también en la terminal; petición y respuesta completas y saneadas a la bitácora; la consola dice «Aceptada por el equipo · sin confirmación de apertura», **nunca «Abierta»**. La causa: hipótesis H13-1 a H13-4 (§8)                                                                              | `resultado-de-orden.test.ts` · `desenlaces-de-error.test.ts` · recorrido 13b («Historial inmediato» sin «abierta»)                                       |
-| **H-SITIO-14** | Una persona registrada pasó por la terminal con la escucha activa y no hubo ni una línea                                      | **CORREGIDO**     | Dos defectos de lectura demostrados: el flujo se cortaba contando llaves y la foto lo rompía (ahora se corta como multipart en bytes), y `currentEvent` se buscaba fuera de `AccessControllerEvent`, donde la guía lo pone: todo evento se descartaba como histórico **sin una línea**. La escucha registra ahora conexión, re-autenticación, cada bloque y cada descarte con su motivo; la ingesta, una línea `info` por evento | `escucha-multipart.test.ts` · `ingestor-de-publicaciones.test.ts`                                                                                        |
+| Id             | Qué pasó en sitio                                                                                                                                                                    | Estado                                          | Por qué este estado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Prueba                                                                                                                                                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **H-SITIO-01** | Cámara: `barrierGateOper = 0` en las cuatro políticas, disparador ilegible, «decide sola» y el alta **no quedaba registrada**                                                        | **INSTRUMENTADO**                               | Corregido lo del software: el alta persiste como `rechazado`, aparece en la lista y la ficha trae el `EntranceParam` y el disparador **crudos y saneados**. Lo del equipo **no**: con 0 la cámara abría, y la guía dice «0 = sin operación» (C-38). Salida para operar: la atestación D-11. Qué campo refleja «Paso automático», en la próxima captura                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `veredicto-de-control.test.ts` · `diagnostico.test.ts` · `alta-de-equipo.test.tsx` · `ficha-del-equipo.test.tsx` · `equipos.e2e.test.ts` · recorrido 13b                                                                                                 |
+| **H-SITIO-02** | Dispositivos y el tablero leían SIEMPRE la memoria: el equipo dado de alta no aparecía                                                                                               | **CORREGIDO**                                   | `RepositorioTableroPg` cableado con `PERSISTENCIA_DE_EVENTOS=postgres`. Ejecutarlo destapó dos defectos más (consultaba sin claims —con la RLS forzada, cero filas sin error— y filtraba por una columna inexistente). Las operaciones aún simuladas lo dicen en el botón                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `tablero-pg.test.ts` (base real, rol sin superusuario) · recorrido 13b · **13c lo reintroduce y el recorrido lo nombra**                                                                                                                                 |
+| **H-SITIO-03** | `GET consentimientos/:id` negaba al superadministrador (403 tras la captura)                                                                                                         | **CORREGIDO**                                   | Las rutas de «Rostro del visitante» admiten a cada rol que ve la pantalla; RN-09 no se relaja (el dominio sigue negando sin consentimiento vigente)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `roles-de-biometria.e2e.test.ts` (3 rojas sin la corrección) · **13c lo reintroduce**                                                                                                                                                                    |
+| **H-SITIO-04** | La terminal rechazó la carga de la plantilla con 400, «sin decir por qué»                                                                                                            | **INSTRUMENTADO**                               | Corregido lo que la guía de su serie demuestra: `employeeNo` de 36 bytes (máximo 32) → identificador compacto de 32 hexadecimales; registro `FaceDataRecord` plano, no envuelto; imagen en la parte `img`. `statusCode`, `subStatusCode`, `errorCode` y `errorMsg` van a la bitácora y al mensaje. La causa exacta del 400 no se puede afirmar sin el equipo: hipótesis H4-1 a H4-4 (§8). **Anexo:** «aceptada» sólo con `statusCode 1` también en `UserInfo` y `FaceDataRecord`. La hipótesis del anexo (H4-5) se descarta para la API —enviaba ya el cuerpo desde la primera petición y esos cuerpos son JSON, sin espacio de nombres que poner—, pero el mecanismo de H-SITIO-15 explica **dónde** falló: un cuerpo que la terminal no acepta recibe 400 **antes** del desafío, y eso es lo que H4-1 y H4-2 producían | `terminal-facial.test.ts` · `identificador-en-el-equipo` · el simulado exige lo mismo que la guía · `carga-de-prueba.test.ts` · `anexo-de-sitio.test.ts`                                                                                                 |
+| **H-SITIO-05** | En la terminal, `verificacionRemota` «desconocida»: con `reporta_y_espera` toda apertura se rechazaba                                                                                | **CORREGIDO**                                   | El interruptor es `AcsCfg.remoteCheckDoorEnabled` en la guía de la serie de la terminal (el S-35 suponía `remoteCheck`). Cada ruta de capacidad consultada deja su línea con lo que contestó. Se confirma con la captura `terminal/…AcsCfg…`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `capacidades-hikvision.test.ts`                                                                                                                                                                                                                          |
+| **H-SITIO-06** | `start:dev` (tsx) cayó al arrancar: «Cannot read properties of undefined (reading 'get')»                                                                                            | **CORREGIDO** · reabierto y cerrado en el anexo | tsx no emite metadatos de tipos: **14** parámetros inyectados por tipo llegaban `undefined` → `@Inject` explícito. **La mitad silenciosa la destapó el anexo:** sin esos metadatos el `ValidationPipe` global no conoce el DTO de ningún `@Body` ni `@Query` y **no valida nada** (§2.7.3); con la API bajo tsx el historial de eventos daba 400. `start:dev` compila ahora con `tsc` y la API se niega a arrancar sin metadatos (salida 78)                                                                                                                                                                                                                                                                                                                                                                             | `inyeccion-explicita.mjs` (paso 10, sonda 33) · `metadatos-de-tipos.test.ts` · `e2e/arranque-de-desarrollo.mjs` (paso 12d: arranca, inyecta, **valida**, y con tsx no arranca; **sondas 35a y 35b**)                                                     |
+| **H-SITIO-07** | pg-boss usaba la conexión directa `db.<ref>.supabase.co`, sólo IPv6: `ENOTFOUND` en la red del sitio                                                                                 | **CORREGIDO**                                   | `PGBOSS_DATABASE_URL` opcional (si falta, `DATABASE_URL`); el arranque dice por qué variable, contra qué host y de qué clase conecta, y avisa como error si es la directa o el pooler en modo transacción. **No probado contra una red sólo IPv4**: se confirma en la visita                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `conexion-de-pgboss.test.ts`                                                                                                                                                                                                                             |
+| **H-SITIO-08** | El proxy de la consola no exportaba `PUT`: toda edición respondía 405                                                                                                                | **CORREGIDO**                                   | `PUT` añadido; una prueba deriva del contrato generado y de la consola TODOS los verbos en uso y exige que el proxy los reenvíe                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `proxy-verbos.test.ts` (2 rojas sin PUT) · recorrido 13b · **13c lo reintroduce**                                                                                                                                                                        |
+| **H-SITIO-09** | Videoportero: biblioteca de rostros y gestión de personas «desconocidas»                                                                                                             | **CORREGIDO**                                   | Con biblioteca de rostros, el videoportero entra en la sincronización total (terminales y videoporteros); sin ella, la fila dice «Rostros: no aplica». Si el KD9633 la tiene lo dirá su captura (`videoportero/…FDLib…`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `capacidades.test.tsx` · `capacidades-hikvision.test.ts` · `consentimiento-publico.e2e.test.ts` (sincroniza terminal y videoportero)                                                                                                                     |
+| **H-SITIO-10** | Con el proveedor real y `API_URL_PUBLICA` de bucle local, el enlace y el QR no los abría ningún teléfono                                                                             | **CORREGIDO**                                   | El arranque lo escribe como error; el enlace declara su alcance y la consola avisa junto al QR. Y D-10 da una salida que no depende del teléfono                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `url-publica.test.ts` · `seguimiento.test.tsx`                                                                                                                                                                                                           |
+| **H-SITIO-11** | La app en un iPhone físico: «No hay conexión con el servidor» mientras Safari abría la API                                                                                           | **CORREGIDO**                                   | Faltaba `NSLocalNetworkUsageDescription` (la privacidad de red local alcanza a `dart:io`; ATS no, porque `dart:io` no usa `URLSession`). En Debug, panel con URL compilada, tipo y mensaje del fallo, sin tokens. **No verificable aquí sin un iPhone**: se confirma en la visita                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `info-plist-ios.mjs` (paso 5d, sonda 34, sobre el Info.plist preprocesado como Xcode) · `detalle_tecnico_test.dart`                                                                                                                                      |
+| **H-SITIO-12** | La primera orden a cada equipo se aceptaba; la siguiente, 9–35 s después, se rechazaba como «usuario o clave»                                                                        | **CORREGIDO**                                   | Una sesión Digest por equipo compartida por todo el proceso; `nc` que no se reinicia con el mismo nonce; `stale=true` distinguido de la clave; un 403 con código ISAPI ya no es «credencial»; **un solo reintento**, nunca más (bloqueo de cuenta). Que el equipo real vencía el nonce es inferencia del patrón. **Anexo (d):** el cuerpo viaja desde la primera petición, `nc` incremental, un reintento ante `stale` o nonce vencido, y **con la credencial ya enviada un 401 sin `stale` es la clave: no se repite**. El simulado vence el nonce a los 20 s por omisión (S-64)                                                                                                                                                                                                                                        | `digest-vencido.test.ts` contra `servidor-digest.ts` (vence por tiempo y por usos): órdenes, sondeos y suscripciones. Con el cliente anterior, falla · `anexo-de-sitio.test.ts` (d)                                                                      |
+| **H-SITIO-13** | Terminal y videoportero contestaron «OK» a `RemoteControl/door/1` y la puerta **no se movió**                                                                                        | **CORREGIDO** · causa demostrada en el anexo    | Sin espacio de nombres ni `version="2.0"` el equipo contesta «OK» y **no acciona**. (a) cuerpo declarado por familia —el del videoportero con la declaración XML de su interfaz—; (b) Content-Type de formulario, el que mostró la evidencia; (c) «aceptada» sólo con `statusCode 1` y `subStatusCode`, en **toda** escritura. La consola sigue diciendo «Aceptada», nunca «Abierta»: sin señal de posición nadie lo sabe, y por eso `--abrir` lo **pregunta** delante de la puerta                                                                                                                                                                                                                                                                                                                                      | `anexo-de-sitio.test.ts` (el simulado contesta «OK» sin accionar al cuerpo mínimo) · recorrido 13b (el veredicto lo da el **equipo**, no la consola) · **13c lo reintroduce** · `apertura-de-verificacion.test.ts` · `--abrir` (paso 12e, **sonda 38a**) |
+| **H-SITIO-14** | Una persona registrada pasó por la terminal con la escucha activa y no hubo ni una línea                                                                                             | **CORREGIDO**                                   | Dos defectos de lectura demostrados: el flujo se cortaba contando llaves y la foto lo rompía (ahora se corta como multipart en bytes), y `currentEvent` se buscaba fuera de `AccessControllerEvent`, donde la guía lo pone: todo evento se descartaba como histórico **sin una línea**. La escucha registra ahora conexión, re-autenticación, cada bloque y cada descarte con su motivo; la ingesta, una línea `info` por evento. **Anexo (4), el JPEG:** un JPEG real lleva una comilla suelta, y basta para que el lector de antes pierda **todo lo que sigue a la foto**. **Solo, no explica H-SITIO-14:** el primer evento de cada conexión llega antes de la foto, y a ése lo perdía `currentEvent`. Juntos, sí: el primero por `currentEvent`, los siguientes por la foto                                          | `escucha-multipart.test.ts` · `ingestor-de-publicaciones.test.ts` · el mismo fichero, con un JPEG real: el lector de antes lee `p1` y pierde `p2` y `p3`; el multipart, los tres                                                                         |
+| **H-SITIO-15** | Un cliente Digest que sondea con el cuerpo **vacío** (`curl --digest`) recibe de la terminal `400 badXmlContent` (errorCode 1610612739): valida el contenido **antes** de autenticar | **CORREGIDO**                                   | El cliente **se niega** a enviar una escritura sin cuerpo salvo que el catálogo la declare (`sinCuerpo`: sólo el canal de audio, S-65) y el cuerpo va en la primera petición. El simulado reproduce el 400 antes del desafío, y con él aparecieron **dos casos nuestros**: el diagnóstico sondeaba `FDLib/Count` y `FDSearch` con un `POST` vacío (la guía documenta `Count` como `GET`); la terminal real habría contestado 400                                                                                                                                                                                                                                                                                                                                                                                         | `anexo-de-sitio.test.ts` (400 sin desafío; ni un POST vacío al descubrir y diagnosticar) · recorrido 13b (el **equipo** cuenta las escrituras vacías, incluida la sincronización) · **13c lo reintroduce** · **sonda 38b**                               |
 
 ---
 
@@ -74,6 +87,17 @@ permite operar una cámara cuya configuración la API no puede confirmar, en
 arranque compilado, `API_URL` de la consola en bucle local, consola por IP,
 captura **antes** de tocar nada y **reversión equipo por equipo** contra esa
 captura.
+
+**El anexo de sitio** (27/09) convirtió H-SITIO-13 en causa demostrada y
+añadió H-SITIO-15. Se corrigieron los dos —cuerpo, Content-Type y confirmación
+por familia en el catálogo; ninguna escritura vacía en el cliente—, el
+simulado de las pruebas pasó a comportarse como el equipo (400 con el cuerpo
+vacío, «OK» sin accionar, nonce que vence), el recorrido de la consola corre
+ahora con el adaptador real contra él y **pregunta al equipo** si la puerta se
+movió, y el guion de sitio gana `--abrir`: la verificación de la próxima
+visita, que repite la apertura demostrada y pregunta a la persona si la puerta
+se movió. Por el camino apareció que **H-SITIO-06 no estaba cerrado**: con
+`tsx` el `ValidationPipe` no validaba nada.
 
 ---
 
@@ -157,7 +181,10 @@ falla.
 Sin una señal de posición cableada, nadie en este sistema sabe si la puerta se
 movió. H-SITIO-13 lo demostró: el equipo dijo «OK» y la puerta no se movió. La
 consola ya no dice «Abierta» en ningún caso; dice «Aceptada por el equipo ·
-sin confirmación de apertura».
+sin confirmación de apertura». El anexo lo confirma por el otro lado: con el
+cuerpo mínimo el equipo contestaba `statusCode 1 OK` y no abría. Una respuesta
+correcta del equipo no demuestra el movimiento; sólo lo demuestra quien mira la
+puerta, y eso es lo que `--abrir` le pregunta.
 
 ### 2.7 · El rol con el que la API se conecta (S-62)
 
@@ -168,6 +195,36 @@ fija `claims = {}`. Con el dueño simulado sin `BYPASSRLS`, el buscador quedó
 vacío. **Ocho repositorios** se construyen con claims `{}` y dependen de ello;
 un rol `app_api` sin `BYPASSRLS` los dejaría sin filas (DT-15K-02). No se
 arregla aquí: es la persistencia de cuatro módulos y no la pedía el encargo.
+
+### 2.9 · El anexo: corregir con la causa, y un simulado tan exigente como el equipo
+
+El anexo convirtió H-SITIO-13 de hipótesis en causa, y la regla del §2.2 dice
+qué hacer con una causa demostrada: corregirla. Se corrigió en el **catálogo**,
+que es donde vive el vocabulario del fabricante (KPI-11): cuerpo, Content-Type
+y procedencia `verificada` por familia; y en el **cliente**, que es por donde
+pasan todas las escrituras: cuerpo desde la primera petición, ninguna escritura
+vacía sin declarar, «aceptada» sólo con `statusCode 1`.
+
+**Los tres comportamientos de sitio son del simulado por omisión, no un modo
+especial** (`simulacion/comportamientos-de-sitio.ts`): 400 antes de autenticar
+con el cuerpo vacío, «OK» sin accionar sin espacio de nombres, nonce que vence.
+Un simulado más amable que el equipo deja pasar exactamente los defectos que la
+visita encontró. Y el simulado **anota** lo que accionó y lo que rechazó: es el
+oráculo del recorrido, porque la consola dice «Aceptada» en los dos casos de
+H-SITIO-13 y sólo el equipo sabe si el relé se movió.
+
+Para que el recorrido lo vea, la API del recorrido corre ahora con el
+**adaptador real** (`PROVEEDOR_DE_EQUIPOS=hikvision`) contra los equipos
+simulados por HTTP: con el simulado de dominio, las órdenes nunca llegaban al
+servidor HTTP y H-SITIO-13 y 15 eran invisibles. La prueba negativa (13c) los
+reintroduce **en el paquete de proveedores**: el árbol de sonda copia ahora
+también paquetes internos, rehace los enlaces de pnpm de la API para que cargue
+la copia y la compila con `tsc`.
+
+**Lo que el anexo no cambió, a propósito:** la barrera de la cámara. Su cuerpo
+(`BarrierGate`, sin espacio de nombres) se capturó de la interfaz del propio
+equipo y abrió el 15/09 (§0.ter de la guía). Sin evidencia en contra, extender
+(a) a la cámara sería cambiar lo que funciona por analogía con otra familia.
 
 ### 2.8 · Lo que no se tocó
 
@@ -198,6 +255,7 @@ apps/web/src/
   app/(consola)/dispositivos/atestacion-dialogo.tsx      D-11 · distintivo ámbar/rojo y diálogo
   app/(consola)/biometria/seguimiento.tsx                D-10 · formulario presencial que rellena el titular
   componentes/resultado-de-orden.ts                      H-SITIO-13 · «Aceptada por el equipo», nunca «Abierta»
+  arranque/metadatos-de-tipos.ts                         H-SITIO-06 (anexo) · sin metadatos de tipos, la API no arranca
 apps/mobile/
   ios/Runner/Info.plist                                  H-SITIO-11 · NSLocalNetworkUsageDescription
   lib/presentacion/widgets/detalle_de_fallo.dart         H-SITIO-11 · detalle técnico en Debug, sin tokens
@@ -216,18 +274,27 @@ packages/providers/src/
   hikvision/hikvision-provider.ts                        D-11 · opera la cámara atestada para su firmware
   diagnostico/carga-de-prueba.ts                         §5 · carga de prueba de --capturar, dentro del paquete (O2)
   mock/mock-provider.ts                                  §4 · el simulado conoce los equipos activos de la base
+  equipo/catalogo-de-rutas.ts                            anexo (a)(b) · cuerpo y Content-Type por familia; sinCuerpo
+  equipo/confirmacion-isapi.ts                           anexo (c) · «aceptada» sólo con statusCode 1 y subStatusCode
+  equipo/cliente.ts                                      anexo (d), H-SITIO-15 · EscrituraSinCuerpo; 401 sin stale = clave
+  simulacion/comportamientos-de-sitio.ts                 anexo · 400 sin cuerpo, «OK» sin accionar, nonce que vence
+  terminal/recuento-de-biblioteca.ts                     H-SITIO-15 · FDLib/Count por GET, como la guía
+  diagnostico/apertura-de-verificacion.ts                anexo (3) · la apertura de --abrir, dentro del paquete (O2)
+  equipo/anexo-de-sitio.test.ts                          anexo · cada corrección, vista fallar sin ella
 supabase/
   migrations/…_0039_atestacion_del_instalador.sql        D-11 · tabla de sólo inserción, RLS forzada
   reversion/0039_revert.sql                              D-11 · reversión con confirmación explícita
   policies/tests/95_atestacion_del_instalador.sql        D-11 · políticas, CHECK y sólo-inserción frente al dueño
 e2e/
   recorrido-de-consola.mjs · recorrido-negativo.mjs      §4 · el recorrido y su prueba negativa
-  arbol-de-sonda.mjs · arranque-con-tsx.mjs              §4 · árbol de sonda; H-SITIO-06
+  arbol-de-sonda.mjs                                     §4 · árbol de sonda; copia también paquetes internos (anexo)
+  arranque-de-desarrollo.mjs                             H-SITIO-06 · start:dev inyecta y valida; tsx no arranca
 scripts/
-  puesta-en-marcha-equipos.mjs                           §5 · --capturar
+  puesta-en-marcha-equipos.mjs                           §5 · --capturar; anexo · --abrir
+  lib/apertura-en-sitio.mjs                              anexo · qué se escribe y qué se pregunta en --abrir
   lib/hoja-de-resultados.mjs                             §5 · columna «Evidencia cruda»
   lib/inyeccion-explicita.mjs · lib/info-plist-ios.mjs   H-SITIO-06, 11 · controles nuevos
-  verificar-etapa.sh · lib/pruebas-negativas.mjs         pasos 5d, 12d, 13b, 13c; sondas 33 a 37
+  verificar-etapa.sh · lib/pruebas-negativas.mjs         pasos 5d, 12d, 12e, 13b, 13c; sondas 33 a 38
 docs/
   decisiones/ADR-029 · ADR-030                           D-10, D-11
   guias/VALIDACION_HIKVISION_EN_SITIO.md §V              §5 · procedimiento de la visita corregido
@@ -271,12 +338,23 @@ docs/
 - **Por hallazgo**, la tabla del §0: cada CORREGIDO tiene una prueba que falla
   sin la corrección (las cifras «N rojas sin la corrección» se midieron al
   escribirlas).
-- **La costura entera**, el recorrido 13b; **su prueba negativa**, 13c, con
-  H-SITIO-02, 03 y 08 reintroducidos, cada uno nombrado.
+- **La costura entera**, el recorrido 13b, con el adaptador real contra los
+  equipos simulados; **su prueba negativa**, 13c, con H-SITIO-02, 03, 08, 13
+  y 15 reintroducidos, cada uno nombrado (13 y 15, en una copia compilada de
+  `packages/providers`).
+- **El anexo, corrección por corrección** (`anexo-de-sitio.test.ts`, 12
+  pruebas): cada una se hizo fallar deshaciendo su corrección antes de darla
+  por buena. `apertura-de-verificacion.test.ts` (8) prueba `--abrir` contra el
+  simulado, contra un equipo por HTTP de verdad en el bucle local y contra los
+  casos que no son una apertura; `escucha-multipart.test.ts` gana el JPEG real.
 - **Los controles nuevos, vistos fallar**: sondas 33 (`inyeccion-explicita`),
-  34 (`info-plist-ios`), 35 (el 12d con un `@Inject` quitado reproduce el error
-  de sitio), 36 (el recorrido sin base o sin Chromium no es un verde) y 37 (el
-  recorrido negativo sin sondas no es un verde).
+  34 (`info-plist-ios`), 35 (35a: con el `start:dev` de sitio el 12d dice que
+  el `ValidationPipe` no valida; 35b: sin la negativa del arranque dice que
+  tsx arranca), 36 (el recorrido sin base o sin Chromium no es un verde), 37
+  (el recorrido negativo sin sondas no es un verde) y 38 (el guion de sitio del
+  12e: 38a, con el cuerpo mínimo `--abrir` dice que la puerta NO se movió; 38b,
+  sin `sinCuerpo` `--con-audio` no abre el canal; 38c, contra un equipo que no
+  contesta `--abrir` sale en 1).
 - **D-10 y D-11**, de dominio a base: `identidad.test.ts`,
   `atestacion.test.ts`, los casos de uso, las e2e de la API (residente 403,
   aceptación falsa 400, otra identidad 403, sincronización; administrador 403
@@ -285,8 +363,9 @@ docs/
 - **`--capturar`**: `carga-de-prueba.test.ts` (aceptada, rechazada, baja
   imposible) y un ensayo manual en SIMULADO del guion completo: 41, 34 y 20
   intercambios capturados, ninguna clave en los ficheros, la imagen elidida, y
-  salida 2 si la carpeta está dentro del repositorio. **El guion no está en el
-  verificador** (DT-15K-05).
+  salida 2 si la carpeta está dentro del repositorio. **Desde el anexo, el
+  guion está en el verificador** (paso 12e, `--simulado --con-audio` y
+  `--simulado --abrir`): DT-15K-05 queda cerrada.
 
 ### Lo que destapó el cierre
 
@@ -294,6 +373,30 @@ La corrida de las pruebas negativas con cobertura, previa a la del
 verificador, cazó que `--capturar` construía la terminal con
 `new TerminalFacial(` desde el guion: la frontera de extensibilidad (O2)
 prohíbe construir un adaptador de marca fuera de `packages/providers`. Se movió a `diagnostico/carga-de-prueba.ts` con sus pruebas (`6d47fe9`). Y el trinquete de ramas de los controles encontró que `info-plist-ios` tenía **18 bloques** que ninguna sonda ejercía, entre ellos las comprobaciones de los `.xcconfig` —la que impide que la excepción de ATS llegue a Release—: la sonda 34 gana cuatro casos (Debug sin ATS, `NCR_DEPURACION` en Release, `.xcconfig` sin preprocesado, `.xcconfig` ausente) y quedan **11**, todos variantes de plist mal formado y la falta de preprocesador de C. `inyeccion-explicita` entra con 5. Los dos se registran en `ramas-de-los-controles.json`.
+
+### Lo que destapó el anexo
+
+1. **Nuestro propio H-SITIO-15.** En cuanto el simulado contestó 400 a una
+   escritura vacía, el descubrimiento y el diagnóstico de la terminal
+   fallaron: sondeaban `FDLib/Count` y `FDSearch` con un `POST` **sin
+   cuerpo**. La guía de la serie documenta `Count` como `GET` con `FDID` y
+   `faceLibType`; `FDSearch` lleva ahora su cuerpo JSON.
+2. **H-SITIO-06 a medias.** Al validar las sondas del recorrido —que
+   arrancaban la API con `tsx`— salió una falta ajena en todas: el historial
+   de eventos contestaba 400. `tsx` no emite metadatos de tipos y el
+   `ValidationPipe` global, sin ellos, **no valida ningún DTO**: ni
+   `whitelist`, ni `forbidNonWhitelisted`, ni la conversión de
+   `tamanoPagina`. Era el `start:dev` de sitio. Corregido de raíz (compila con
+   `tsc`) y con una negativa al arrancar; las sondas imprimen ahora las demás
+   faltas, que es como se vio.
+3. **El guion de sitio, roto sin un rojo.** La negativa del cliente a escribir
+   sin cuerpo rompió `--con-audio` (abrir y cerrar el canal van sin cuerpo en
+   la guía). Nada ejecutaba el guion: se vio al ensayarlo a mano. El catálogo
+   declara ahora qué escrituras van sin cuerpo (`sinCuerpo`) y el guion entra
+   en el verificador (12e) con sus sondas (38).
+4. **La prueba de H-SITIO-14 no demostraba lo que decía.** Su «foto» llevaba
+   las comillas a pares y el lector de antes se recuperaba; con un JPEG real,
+   una sola comilla suelta le hace perder todo lo que sigue.
 
 ### La primera corrida final, FALLIDA, y lo que destapó
 
@@ -516,16 +619,16 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
 
 ## 7 · Verificación de seguridad (§2.7)
 
-| Medida                       | En esta ronda                                                                                                                                                                                                                                                                                                              |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 · Secretos                 | Ninguno en código, pruebas, semillas ni documentos. Las respuestas del equipo se sanean con `documentoSaneado` (claves, tokens, IPv4) antes de la ficha, la bitácora y `--capturar`; `--capturar` **se niega** a escribir dentro del repositorio. El escaneo del pre-commit, limpio en cada commit                         |
-| 2 · CORS                     | Sin cambios en el código. La guía de sitio fija la lista blanca a los dos orígenes de la consola (IP y bucle local)                                                                                                                                                                                                        |
-| 3 · Validación en el backend | DTO nuevos con `whitelist` y `forbidNonWhitelisted`: la aceptación presencial exige `aceptaPolitica = true` (`@Equals`), longitudes acotadas; la atestación, placas por el objeto de valor `Placa`, distintas, y evidencia de 20 a 2000 caracteres (también `CHECK` en la base)                                            |
-| 4 · Inyección SQL            | Sólo consultas parametrizadas en los repositorios nuevos                                                                                                                                                                                                                                                                   |
-| 5 · Rate limiting            | Aceptación presencial: 10 por minuto por ruta, además del global                                                                                                                                                                                                                                                           |
-| 6 · RLS                      | `atestaciones_de_equipo` con RLS forzada y prueba negativa (95); el tablero lee ahora con claims de servicio por copropiedad. **Riesgo declarado S-62**: la API se conecta con un rol que omite la RLS y ocho repositorios dependen de ello (DT-15K-02); la validación en aplicación sigue siendo la barrera en esas rutas |
-| 7 · CSP                      | Sin cambios; las pantallas nuevas no introducen `unsafe-inline`                                                                                                                                                                                                                                                            |
-| 8 · Transversales            | Auditoría append-only del consentimiento presencial (canal y operador, nunca lo escrito); atestación de sólo inserción; RBAC por guard en las rutas nuevas (atestación sólo superadministrador; presencial sin residente); la bitácora de órdenes lleva petición y respuesta **saneadas**                                  |
+| Medida                       | En esta ronda                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 · Secretos                 | Ninguno en código, pruebas, semillas ni documentos. Las respuestas del equipo se sanean con `documentoSaneado` (claves, tokens, IPv4) antes de la ficha, la bitácora y `--capturar`; `--capturar` **se niega** a escribir dentro del repositorio; `--abrir` elide host y usuario en el informe y sus capturas van a la misma carpeta de fuera. Ninguna IP ni credencial en ningún fichero del anexo (las del simulado son rótulos `.invalid` y el bucle local). El escaneo del pre-commit, limpio en cada commit                             |
+| 2 · CORS                     | Sin cambios en el código. La guía de sitio fija la lista blanca a los dos orígenes de la consola (IP y bucle local)                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 3 · Validación en el backend | **Anexo · H-SITIO-06:** con `tsx` (el `start:dev` de sitio) el `ValidationPipe` global no validaba ningún DTO; `start:dev` compila con `tsc` y la API **no arranca** sin metadatos de tipos, y el paso 12d comprueba que un cuerpo fuera del DTO recibe 400. DTO nuevos con `whitelist` y `forbidNonWhitelisted`: la aceptación presencial exige `aceptaPolitica = true` (`@Equals`), longitudes acotadas; la atestación, placas por el objeto de valor `Placa`, distintas, y evidencia de 20 a 2000 caracteres (también `CHECK` en la base) |
+| 4 · Inyección SQL            | Sólo consultas parametrizadas en los repositorios nuevos                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 5 · Rate limiting            | Aceptación presencial: 10 por minuto por ruta, además del global                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 6 · RLS                      | `atestaciones_de_equipo` con RLS forzada y prueba negativa (95); el tablero lee ahora con claims de servicio por copropiedad. **Riesgo declarado S-62**: la API se conecta con un rol que omite la RLS y ocho repositorios dependen de ello (DT-15K-02); la validación en aplicación sigue siendo la barrera en esas rutas                                                                                                                                                                                                                   |
+| 7 · CSP                      | Sin cambios; las pantallas nuevas no introducen `unsafe-inline`                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 8 · Transversales            | Auditoría append-only del consentimiento presencial (canal y operador, nunca lo escrito); atestación de sólo inserción; RBAC por guard en las rutas nuevas (atestación sólo superadministrador; presencial sin residente); la bitácora de órdenes lleva petición y respuesta **saneadas**                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -560,11 +663,22 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
 - **H4-4** · la imagen de la app o de la consola excede el tamaño o la
   resolución que la biblioteca admite. Se decide con el mismo fichero de
   capacidades y con la carga de prueba, cuyo rechazo trae `subStatusCode`.
+- **H4-5** _(anexo; descartada para la API)_ · el mismo mecanismo de
+  H-SITIO-13 y 15 en `UserInfo` y `FaceDataRecord`. El cliente de la API ya
+  enviaba el cuerpo desde la primera petición antes del anexo (comprobado en
+  `develop`, `5cceb89`: `pedir` → `enviar(metodo, ruta, cuerpo)` en los dos
+  intentos) y esos cuerpos son JSON y formulario: no hay espacio de nombres XML
+  que poner. **Si el 400 se vio con `curl`, H-SITIO-15 lo explica entero.** Lo
+  que sí aporta el anexo es el **dónde**: la terminal valida el cuerpo antes
+  de autenticar, así que un cuerpo que no acepta —H4-1 y H4-2 lo eran— recibe
+  400 sin llegar al desafío.
 
-**H-SITIO-13 · «OK» sin que la puerta se mueva**
+**H-SITIO-13 · «OK» sin que la puerta se mueva** — **cerrada por el anexo**
 
-- **H13-1** · el cuerpo sin declaración, espacio de nombres ni `version`
-  _(alineado con la guía; puede bastar o no)_.
+- **H13-1** _(DEMOSTRADA en sitio, corregida)_ · el cuerpo sin espacio de
+  nombres ni `version="2.0"`: el equipo contesta «OK» y no acciona. Con ellos,
+  y con el Content-Type de formulario, abrieron los dos. H13-2 a H13-4 quedan
+  **descartadas para `door/1`** de estos dos equipos, que abrió.
 - **H13-2** · la puerta `1` no es el relé cableado a la cerradura. Se decide
   con `…RemoteControl-door-capabilities…` y probando la otra puerta que el
   equipo declare.
@@ -605,8 +719,10 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
 - **DT-15K-04** · el proveedor aprueba un equipo una vez por proceso: un cambio
   de firmware con la API en marcha se detecta al reiniciarla o en el siguiente
   sondeo de la consola (ADR-030).
-- **DT-15K-05** · el guion de sitio no se ejecuta en el verificador; `--capturar`
-  tiene prueba unitaria de la carga de prueba y un ensayo manual en SIMULADO.
+- **DT-15K-05** · **CERRADA en el anexo**: el guion de sitio entra en el
+  verificador (12e) con sus sondas (38a a 38c).
+- **DT-15K-07** · el recorrido de la consola no ejercita el videoportero (su
+  puerta la prueban `anexo-de-sitio.test.ts` y `--abrir`, no la consola).
 - **D-101** · sigue ABIERTA y **no** reapareció: la roja sin nombre de la segunda corrida era, con toda probabilidad, una de las dos pruebas de esta ronda que la tercera nombró. Lo que cambia es que el paso 5 ya nombra cualquier roja.
 - **DT-15K-06** · una corrida de la sonda H-SITIO-08 del recorrido negativo
   falló una vez en el acceso, antes de llegar a la comprobación (la siguiente la
@@ -622,10 +738,20 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
 - **P-21** · validez jurídica del consentimiento presencial (D-10). Conservador:
   el enlace y el QR siguen siendo el canal principal; el operador no puede
   rellenar nada por el titular.
+- **S-63** _(anexo)_ · el `statusCode` que acompaña a `badXmlContent`: el
+  anexo no lo recoge y el simulado usa **6** («Invalid Content»). Conservador:
+  nada decide por ese número; el cliente sólo acepta `statusCode 1`.
+- **S-64** _(anexo)_ · la vida del nonce del equipo: el simulado lo vence a los
+  **20 s**, del orden de lo visto (la segunda orden, entre 9 y 35 s después, se
+  rechazó). Conservador: el cliente renegocia una vez ante cualquier `stale`.
+- **S-65** _(anexo)_ · que el videoportero acepte **sin cuerpo** abrir y cerrar
+  el canal de audio, como dice su guía. La terminal valida el cuerpo antes de
+  autenticar; si el videoportero lo hace también con el audio, contestará 400
+  y el guion `--con-audio` lo dirá: falla a la vista, no en silencio.
 
 **Abierto y no bloqueante para BE-02:** S-38 (por ratificar), AR-01 a AR-04 y el
 riesgo residual de H-15B-1 (aceptaciones sin firmar), P-19, P-20, P-21, H-15J-01,
-H-15K-01 y DT-15K-01 a 06.
+H-15K-01, DT-15K-01 a 04, 06 y 07, y S-63 a S-65.
 
 ---
 
@@ -640,7 +766,10 @@ H-15K-01 y DT-15K-01 a 06.
    `API_URL=http://127.0.0.1:3000` en la consola, `API_URL_PUBLICA` con la IP
    del Mac y una carpeta de sitio fuera del repositorio.
 5. En sitio, §V.2 **en su orden**: la captura `antes/` va antes de tocar
-   ningún equipo, y la reversión del final se hace contra ella.
+   ningún equipo, y la reversión del final se hace contra ella. **Justo
+   después, `--abrir`** (§V.2, paso 2 bis): mire cada puerta y conteste. Si
+   alguna NO se mueve con la orden aceptada, H-SITIO-13 sigue abierto en ese
+   equipo: pare los escenarios de puerta y devuelva la carpeta `abrir/`.
 6. Devolver las carpetas de captura y `api.log` —ya saneadas— para cerrar las
    hipótesis del §8.
 
@@ -683,23 +812,31 @@ Conventional Commits con el prefijo `etapa-15k/<módulo>`.
 ## LO QUE FALTA
 
 **La prueba en sitio de los tres equipos y los 16 escenarios** (BE-02), ahora
-con la consola probada contra la API real, y la **captura cruda** que cierra
-H-SITIO-01, 04 y 13. Los extractos ISAPI que faltan para cerrarlos sin
-adivinar, en el mensaje de cierre de la ronda y aquí:
+con la consola probada contra la API real y con la apertura demostrada en el
+código. Lo primero de la visita, tras la captura `antes/`: **`--abrir`** delante
+de la terminal y del videoportero. Después, la **captura cruda** que cierra
+H-SITIO-01 y 04.
 
-1. **El «Error Code Dictionary»** de las tres guías (series Value, IP/Ultra y
-   cámaras ANPR): las tres lo citan y ninguno de los extractos lo trae. Sin él,
-   el `subStatusCode` del 400 de la terminal y el error del disparador de la
-   cámara se leen como texto, no como causa.
-2. **Cámara ANPR** · la lectura (`GET`) de la vinculación del evento de
+Los extractos ISAPI que faltan para cerrarlos sin adivinar (solo como
+referencia en el chat; no entran al repositorio):
+
+1. **El «Error Code Dictionary»** de las series Value (terminal), IP/Ultra
+   (videoportero) y cámaras ANPR, y en concreto: la entrada de
+   `badXmlContent` / errorCode **1610612739 (0x60000003)** con su
+   `statusCode` (S-63), y los `subStatusCode` con que la terminal rechaza
+   `UserInfo/Record` y `FDLib/FaceDataRecord` (H-SITIO-04).
+2. **Terminal (serie Value)** · la definición de `FDLib/capabilities`
+   (`supportFunction`) y los campos **requeridos** de `FaceDataRecord` en la
+   K1T344, para leer la captura de H4-3 sin interpretar.
+3. **Videoportero (serie IP/Ultra)** · `PUT /ISAPI/System/TwoWayAudio/channels/<id>/open`
+   y `…/close`: si llevan cuerpo y qué devuelven (S-65).
+4. **Cámara ANPR** · la lectura (`GET`) de la vinculación del evento de
    detección de vehículo, o el listado `GET /ISAPI/Event/triggers`: el extracto
-   sólo documenta el `PUT` de `vehicledetection-<canal>`.
-3. **Cámara ANPR** · el recurso que escribe la página «Control del paso» con
+   sólo documenta el `PUT` de `vehicledetection-<canal>` (H1-2).
+5. **Cámara ANPR** · el recurso que escribe la página «Control del paso» con
    «Paso automático» por tipo de lista, si la guía lo documenta en otra
-   sección; si no, la captura del navegador del paso 5 lo sustituye.
-4. **Terminal (serie Value)** · los parámetros de puerta
-   (`AccessControl/Door/param/<puerta>`) con el significado de su estado
-   «permanecer cerrada», y cuántas puertas y relés declara la K1T344.
-5. **Videoportero (serie IP/Ultra)** · qué número de puerta corresponde a la
-   cerradura del KD9633-WBE6 y si su apertura remota exige el contexto de una
-   llamada (`controlType`).
+   sección; si no, la captura del navegador del paso 5 lo sustituye (H1-1).
+
+Ya **no** hacen falta, porque `door/1` abrió: los parámetros de puerta de la
+terminal (`alwaysClose`, H13-3) ni el número de puerta y el `controlType` del
+videoportero (H13-2, H13-4).
