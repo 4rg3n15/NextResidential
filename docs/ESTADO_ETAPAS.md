@@ -930,7 +930,7 @@ como los equipos de sitio—, y su prueba negativa (13c), que reintroduce
 H-SITIO-02, 03, 08, 13 y 15 y exige que el recorrido los nombre. El guion de
 sitio, con `--abrir`, en el paso 12e.
 
-**Verificador:** cuatro corridas finales. Las tres primeras, **FALLIDAS**, destaparon el umbral de ramas propio de `@ncr/providers` (88,95 %, subido al 90,12 % con pruebas), un paso 5 que no nombraba la roja (corregido) y dos pruebas de la ronda sin aislamiento (corregidas). La cuarta, sobre `967fb4e`: **correcta, 29 de 29 pasos sin una sola ✗** (veredicto literal en el informe, §6).
+**Verificador:** seis corridas finales. Antes del anexo, las tres primeras **FALLIDAS** destaparon el umbral de ramas propio de `@ncr/providers` (88,95 % → 90,12 % con pruebas), un paso 5 que no nombraba la roja y dos pruebas de la ronda sin aislamiento; la cuarta, sobre `967fb4e`, correcta. Tras el anexo, la quinta, sobre `c4e0efa`, **FALLIDA** en el paso 9: el control de la suite no decía por qué un fichero de prueba no cargaba (corregido; la causa de aquella vez no se reprodujo, DT-15K-08); y el CI de macOS destapó un doble de GoTrue más estricto que GoTrue con el TOTP (corregido). La sexta, sobre `47373df`: **correcta, 30 de 30 pasos sin una sola ✗** (veredicto literal en el informe, §6).
 
 ---
 

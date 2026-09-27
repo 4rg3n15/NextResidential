@@ -492,7 +492,7 @@ Sobre `d7813c4`: **FALLIDA**, y esta vez el paso 5 la nombró. Literal:
   varía por corrida.
 - Repetidas cinco veces contra la base tras la corrección: 9 de 9 cada vez.
 
-### El veredicto literal de la corrida final, sobre el árbol completo
+### El veredicto literal de la cuarta corrida final, antes del anexo
 
 Cuarta corrida, sobre `967fb4e`, con el árbol quieto de principio a fin: **correcta, 29 de 29 pasos, ni una ✗**. El único ⚠ son las cinco pruebas del arranque en frío, declaradas y ejercidas en el paso 12b, como en las rondas anteriores. Líneas de estado de cada paso, tal cual:
 
@@ -615,6 +615,183 @@ Cuarta corrida, sobre `967fb4e`, con el árbol quieto de principio a fin: **corr
 VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
 ```
 
+### La quinta corrida final, tras el anexo, FALLIDA
+
+Sobre `c4e0efa`, con el árbol quieto: **FALLIDA en el paso 9**, y en ningún
+otro. La sonda 22 —anterior a esta ronda— plantó su prueba roja en
+`@ncr/config` y `metricas.mjs` la informó como «corrida interrumpida», sin el
+nombre ni la saltada. Literal:
+
+```
+▸ 9 · pruebas negativas de los propios controles
+   ✓ entorno declarado: 54 variables de 2 esquemas, todas en su .env.example · 21 leídas fuera de Zod, con motivo
+   ✓ declaraciones: 1 paso(s) declarado(s) no ejercido(s), 0 de ellos en linux, con motivo y etapa de revisión vigente
+   ✓ controles: 40 de 42 con prueba negativa · 2 en deuda declarada (no puede crecer)
+   ✗ algún control NO detecta su violación
+        ✗ la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas
+        ✗ una suite en rojo se informa como corrida interrumpida: remedio equivocado
+        ✗ una saltada no aparece en el recuento legible por máquina
+   ✓ ramas: 40 controles medidos · 261 bloques sin ejercer (no puede subir)
+VERIFICACIÓN DE ETAPA: FALLIDA — NO se cierra la etapa
+```
+
+Reproducido a mano: es exactamente lo que el control imprime cuando un fichero
+de prueba **no carga** (el fichero sale en la lista de cobertura; el motivo, en
+ninguna parte). Por qué no cargó aquella vez **no se ha podido reproducir**:
+ocho repeticiones con el mismo entorno (`NODE_V8_COVERAGE`) y dos corridas
+completas de las negativas dieron la sonda en verde. Lo que sí era un defecto
+es que el control no dijera el motivo —el mismo «buscar a ciegas» que D-100
+cerró para las rojas—, y se corrigió (`47373df`): sin pruebas rojas, una suite
+`failed` es **SUITE EN ROJO** con su fichero y su motivo, la sonda 22 lo
+ejerce, y su línea ✗ lleva ahora lo que dijo el control. **DT-15K-08**: si
+reaparece, esta vez dirá por qué.
+
+En paralelo, el CI de macOS sobre el mismo `c4e0efa` falló en el **12c** («el
+segundo factor NO entra por IP de red»), un paso que la ronda no toca y que
+había pasado en `f365683`. Mecanismo encontrado: el doble de GoTrue validaba
+el TOTP **sin tolerancia** (`authenticator.check`, ventana 0) y GoTrue tolera
+±1 paso de 30 s; un código que cruza el cambio de ventana en su viaje consola →
+API → doble se rechazaba donde el servicio lo acepta. Un doble más estricto que
+el servicio da rojos que no son: tolera ahora ±1 paso (`47373df`), y el 12c
+dice el error de la consola en vez de la entradilla del formulario. El CI de
+`47373df`, 8 de 8 en verde, incluidos los dos `verificar-etapa.sh --con-base`
+de macOS.
+
+### El veredicto literal de la sexta corrida final, sobre el árbol completo
+
+Sexta corrida, sobre `47373df`, con el árbol quieto de principio a fin:
+**correcta, 30 de 30 pasos, ni una ✗**. El único ⚠ son las cinco pruebas del
+arranque en frío, declaradas y ejercidas en el paso 12b, como en las rondas
+anteriores. Líneas de estado de cada paso, tal cual:
+
+```
+▸ 0 · borrando artefactos de compilación (así corre un checkout nuevo)
+   ✓ dist, .turbo, coverage, registros de compilación y claims de arranque eliminados
+▸ 1 · entorno dentro de lo declarado
+   ✓ entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2 · Flutter 3.47.4 (Dart 3.13.3) dentro de lo declarado · recorrido listo (Chromium + puerto 4599)
+▸ 1c · el árbol es escribible por las herramientas que van a usarlo
+   ✓ escritura: 9 rutas ejercidas de verdad (crear, escribir, leer, borrar)
+   ✓ base de pruebas: 127.0.0.1:55432/ncr como postgres · PostgreSQL 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu · conectado como postgres · esquema presente · 2 copropiedad(es) sembrada(s)
+▸ 1b · docs/ESTADO_ETAPAS.md no se contradice a sí mismo
+   ✓ coherente: 17 etapas en el mapa, 15 cerradas con ficha e informe, cabecera al día · 0 de 0 rama(s) «en curso» comprobadas contra git
+▸ 2 · instalación coherente con el lockfile
+   ✓ pnpm install --frozen-lockfile
+▸ 3 · compilación desde cero
+   ✓ @ncr/api construye SOLO, sin que nadie le prepare las dependencias
+   ✓ @ncr/edge construye SOLO, sin que nadie le prepare las dependencias
+   ✓ pnpm build
+   ✓ ninguna aplicación compila contra un dist/ desfasado (7 paquetes del espacio de trabajo, D-65)
+▸ 4 · lint y typecheck
+   ✓ pnpm lint
+   ✓ pnpm typecheck
+▸ 5 · suite completa
+   ⚠ suite sin rojas · las saltadas están DECLARADAS y se ejercen en otro paso
+▸ 5b · app móvil: análisis estático de Dart
+   ✓ flutter analyze sin hallazgos
+▸ 5c · app móvil: suite de Dart y cobertura POR CAPA
+   ✓ dominio           96.02 % (umbral 90 %, 193/201 líneas)
+   ✓ aplicacion        95.06 % (umbral 90 %, 154/162 líneas)
+   ✓ configuracion    100.00 % (umbral 70 %, 33/33 líneas)
+   ✓ infraestructura   85.47 % (umbral 60 %, 447/523 líneas)
+   ✓ presentacion      81.03 % (umbral 50 %, 1636/2019 líneas)
+   ✓ resto             26.83 % (umbral 0 %, 11/41 líneas)
+   ✓ global            83.05 % (umbral 70 %, sin contar lo generado)
+   ✓ cobertura de la app dentro de los umbrales por capa
+   ✓ la suite de Dart da lo mismo en otro huso (Pacific/Auckland): ninguna prueba depende del reloj del sistema
+▸ 5d · app móvil: cliente al día, sin secretos y sin dependencias a ciegas
+   ✓ sin secretos: la app no nombra ni incrusta ninguna llave que omita la RLS
+   ✓ dependencias: 1 acotación(es) con motivo escrito · objective_c fuera del grafo (lo arrastraba el plugin de Windows)
+   ✓ Info.plist preprocesado: Debug y Release piden red local; ATS local sólo en Debug; nunca NSAllowsArbitraryLoads
+   ✓ cliente Dart al día: 329 ficheros generados desde packages/contracts/openapi.json, sin diferencias
+▸ 5e · app móvil: el RECORRIDO en un navegador de verdad
+   ✓ el distintivo administrativo se pinta
+   ✓ las 9 lecturas salieron con el token en la cabecera
+   ✓ el residente desactivado sigue apareciendo (RN-19)
+   ✓ y está marcado
+   ✓ la placa se muestra como la normalizó el dominio
+   ✓ la pestaña de visitantes muestra lo que el conjunto tiene a su nombre
+   ✓ y ofrece autorizar una visita, que es para lo que se abre (HU-07)
+   ✓ el perfil trae el nombre de la persona (3.5)
+   ✓ y el botón de portería (D7)
+   ✓ el correo sintético del token no aparece en ninguna parte (C-36)
+   ✓ el motivo de la negación se explica en lenguaje llano
+   ✓ lo decidido por el Edge se marca (KPI-31)
+   ✓ ni un error de JavaScript en el recorrido completo
+   ✓ la app se recorre entera en el navegador, sin un error de JavaScript
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 263 de 263 ficheros de prueba ejecutados
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     OK   dominio (packages/domain-core/src): lineas 96.11 % · ramas 96.85 % · funciones 96.00 % (umbral 90 %, 40 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 95.75 % · ramas 87.07 % · funciones 98.36 % (umbral 90 %, 77 archivos)
+     OK   global: lineas 83.18 % · ramas 84.14 % · funciones 83.19 % (umbral 70 %, 566 archivos)
+   ✓ las tres capas cumplen su umbral
+▸ 7b · los dos recuentos de la MISMA suite coinciden (D-112)
+   ✓ recuentos: 6 paquete(s) con el mismo resultado por los dos caminos (turbo y vitest directo) · 3257 pruebas
+▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
+   ✓ portabilidad: 17 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
+▸ 9 · pruebas negativas de los propios controles
+   ✓ entorno declarado: 54 variables de 2 esquemas, todas en su .env.example · 21 leídas fuera de Zod, con motivo
+   ✓ declaraciones: 1 paso(s) declarado(s) no ejercido(s), 0 de ellos en linux, con motivo y etapa de revisión vigente
+   ✓ controles: 40 de 42 con prueba negativa · 2 en deuda declarada (no puede crecer)
+   ✓ PRUEBAS NEGATIVAS: los 33 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ ramas: 40 controles medidos · 261 bloques sin ejercer (no puede subir)
+▸ 10 · fronteras de arquitectura y secretos
+   ✓ fronteras (DoD ETAPA 02)
+   ✓ frontera-modulos: 15 módulos (alarmserver, autenticacion, autorizaciones, biometria, cuentas, equipos, eventos, guardia, observabilidad, padron, planificacion, porteria, residente, tablero, zonas), ninguna importación entra por dentro y un solo Pool de PostgreSQL (D-66)
+   ✓ sin secretos
+   ✓ escaneo de secretos: limpio (4003 blobs del historial alcanzable · 2 de línea base declarados)
+   ✓ longitud por campo: 117 campo(s) @IsString(), todos con cota declarada
+   ✓ 54 clases que Nest construye inyectan con @Inject() explícito en todos sus parámetros
+   ✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers/ (los rangos de documentación de RFC 5737 no cuentan: no son de nadie)
+   ✓ frontera-extensibilidad: 195 fichero(s) de dominio/aplicación sin @ncr/providers, ningún adaptador nombrado fuera del paquete, y el ficticio sólo toca el núcleo
+   ✓ ningún atributo `style` en la consola (204 ficheros, §2.7.7)
+   ✓ 204 ficheros de la consola: todo color sale de un token con pareja medida en los dos temas
+   ✓ frontera-vocabulario: 83 ficheros del dominio, sin tipo de copropiedad ni etiquetas (el tipo se puede cambiar sin consecuencias)
+   ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 7 tablas vigiladas)
+   ✓ pwa: manifiesto completo, iconos reales de 192/512 y uno enmascarable distinto, service worker registrado con `/api/` fuera de la caché y página de sin conexión
+   ✓ paleta: paleta.g.dart al día con el preset (40 tokens por tema)
+   ✓ mermaid: 9 diagrama(s) en 2 fichero(s) analizan con Mermaid 11.17.2
+▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
+   ✓ esquemas: 212 DTO con nombre único en apps/api/src
+   ✓ 131 de 139 operaciones con respuesta tipada; 8 exentas con etapa declarada
+   ✓ contrato y cliente generado al día respecto de los controladores
+▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
+   ✓ KPI-25 con margen sobre el umbral
+▸ 12 · esquema y aislamiento en --modo-supabase (requiere --con-base)
+   ✓ migraciones, semillas y suite SQL
+▸ 12b · arranque en frío: base vacía → migraciones → superadministrador (requiere --con-base)
+   ✓ una base recién migrada llega a un superadministrador con claims válidos
+   ✓ y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1
+▸ 12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero
+   ✓ el camino completo se recorre en el navegador
+▸ 12d · start:dev —el arranque de sitio— inyecta y VALIDA; con tsx la API se niega a arrancar
+   ✓ con start:dev la API llega a «API arrancada»
+   ✓ un controlador inyectado contesta con su lógica (404, no 500)
+   ✓ el ValidationPipe valida: un cuerpo fuera del DTO recibe 400
+   ✓ con tsx la API se niega a arrancar y dice por qué: sin metadatos no valida
+   ✓ start:dev arranca, inyecta y valida; tsx no arranca sin metadatos
+▸ 12e · el guion de sitio, ensayado contra los equipos simulados: --con-audio y --abrir
+   ✓ la puerta SE MOVIÓ: H-SITIO-13 verificado en este equipo
+   ✓ la puerta SE MOVIÓ: H-SITIO-13 verificado en este equipo
+   ✓ el guion recorre los tres equipos simulados y --abrir abre como en sitio
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+   ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
+   ✓ una hoja sin un solo UUID crea viviendas, personas y sus vínculos (D-72, RN-06)
+   ✓ el superadministrador escribe el padrón en la copropiedad del selector (D-71)
+   ✓ las 12 en una sentencia, el mismo número en tres agrupaciones, y una colisión revierte las 12
+▸ 13b · el recorrido de la CONSOLA contra la API real, PostgreSQL y el simulado (requiere --con-base)
+   ✓ el superadministrador y el portero recorren la consola de punta a punta
+▸ 13c · el recorrido FALLA con H-SITIO-02, 03, 08, 13 y 15 reintroducidos (requiere --con-base)
+   ✓ los cinco defectos de sitio, reintroducidos, se detectan cada uno por su nombre
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 30 de 30 pasos ejecutados
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
 ---
 
 ## 7 · Verificación de seguridad (§2.7)
@@ -723,6 +900,10 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
   verificador (12e) con sus sondas (38a a 38c).
 - **DT-15K-07** · el recorrido de la consola no ejercita el videoportero (su
   puerta la prueban `anexo-de-sitio.test.ts` y `--abrir`, no la consola).
+- **DT-15K-08** · la sonda 22 falló una vez (quinta corrida final) porque su
+  fichero plantado no cargó; la causa no se reprodujo en ocho repeticiones ni
+  en dos corridas completas. El control dice ya el motivo de un fichero que no
+  carga: si reaparece, quedará escrito.
 - **D-101** · sigue ABIERTA y **no** reapareció: la roja sin nombre de la segunda corrida era, con toda probabilidad, una de las dos pruebas de esta ronda que la tercera nombró. Lo que cambia es que el paso 5 ya nombra cualquier roja.
 - **DT-15K-06** · una corrida de la sonda H-SITIO-08 del recorrido negativo
   falló una vez en el acceso, antes de llegar a la comprobación (la siguiente la
@@ -751,7 +932,7 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
 
 **Abierto y no bloqueante para BE-02:** S-38 (por ratificar), AR-01 a AR-04 y el
 riesgo residual de H-15B-1 (aceptaciones sin firmar), P-19, P-20, P-21, H-15J-01,
-H-15K-01, DT-15K-01 a 04, 06 y 07, y S-63 a S-65.
+H-15K-01, DT-15K-01 a 04, 06 a 08, y S-63 a S-65.
 
 ---
 
@@ -780,30 +961,39 @@ H-15K-01, DT-15K-01 a 04, 06 y 07, y S-63 a S-65.
 **Rama:** `etapa-15k-hallazgos-de-sitio`, sacada de `develop` (`5cceb89`).
 Conventional Commits con el prefijo `etapa-15k/<módulo>`.
 
-| Commit     | Qué trae                                                                                                                                 |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `120fd98`  | `fix(etapa-15k/consola)`: el proxy reenvía PUT y una prueba deriva los verbos del contrato (H-SITIO-08)                                  |
-| `40dfbc8`  | `fix(etapa-15k/tablero)`: Dispositivos e indicadores leen de PostgreSQL con claims de servicio (H-SITIO-02)                              |
-| `2831d76`  | `fix(etapa-15k/biometria)`: las rutas de «Rostro del visitante» admiten a cada rol que ve la pantalla (H-SITIO-03)                       |
-| `f15f905`  | `fix(etapa-15k/arranque)`: start:dev con tsx, conexión de pg-boss y URL pública de bucle local (H-SITIO-06, 07, 10)                      |
-| `2e229d6`  | `fix(etapa-15k/movil)`: clave de red local de iOS y detalle técnico del fallo en Debug (H-SITIO-11)                                      |
-| `de75aa3`  | `fix(etapa-15k/equipos)`: Digest con nonce vencido, apertura sin «abierta» y escucha que se ve (H-SITIO-12, 13, 14)                      |
-| `bd5d0dc`  | `fix(etapa-15k/equipos)`: carga de plantillas, verificación remota, rostros del videoportero y cámara rechazada (H-SITIO-04, 05, 09, 01) |
-| `7d303e1`  | `feat(etapa-15k/biometria)`: consentimiento presencial escrito por el titular (D-10)                                                     |
-| `a697a97`  | `feat(etapa-15k/equipos)`: atestación física del instalador por firmware (D-11)                                                          |
-| `2c2dce4`  | `test(etapa-15k/e2e)`: recorrido de la consola contra API real, PostgreSQL y simulado (§4)                                               |
-| `ca011c7`  | `feat(etapa-15k/sitio)`: captura cruda por equipo y guía de sitio corregida (§5)                                                         |
-| `2b593c0`  | `fix(etapa-15k/equipos)`: baja de la persona por UserInfoDetail/Delete, como la guía de la serie de la terminal (H-15K-02)               |
-| `6d47fe9`  | `fix(etapa-15k/sitio)`: la carga de prueba de --capturar se construye dentro de @ncr/providers (O2)                                      |
-| `637b890`  | `test(etapa-15k/controles)`: la sonda 34 ejerce los .xcconfig y el trinquete mide los dos controles nuevos                               |
-| `65b7c84`  | `chore(etapa-15k)`: cierre de la ronda de hallazgos de sitio (informe, ESTADO y registro)                                                |
-| `70ae74c`  | `test(etapa-15k/equipos)`: las ramas nuevas del proveedor, ejercidas (umbral de ramas de @ncr/providers)                                 |
-| `93174b8`  | `docs(etapa-15k)`: la primera corrida final del verificador, FALLIDA, y lo que destapó                                                   |
-| `7d56f8e`  | `fix(etapa-15k/verificador)`: el paso 5 nombra la roja desde su informe JSON                                                             |
-| `d7813c4`  | `docs(etapa-15k)`: la segunda corrida final, FALLIDA por una roja intermitente sin nombre                                                |
-| `cea9121`  | `fix(etapa-15k/pruebas)`: el tablero y el registro de equipos, aislados de las suites en paralelo y de corridas anteriores               |
-| `967fb4e`  | `docs(etapa-15k)`: la tercera corrida final nombra la roja, y era de esta ronda                                                          |
-| _(cierre)_ | `docs(etapa-15k)`: el veredicto literal de la cuarta corrida, correcta                                                                   |
+| Commit     | Qué trae                                                                                                                                      |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `120fd98`  | `fix(etapa-15k/consola)`: el proxy reenvía PUT y una prueba deriva los verbos del contrato (H-SITIO-08)                                       |
+| `40dfbc8`  | `fix(etapa-15k/tablero)`: Dispositivos e indicadores leen de PostgreSQL con claims de servicio (H-SITIO-02)                                   |
+| `2831d76`  | `fix(etapa-15k/biometria)`: las rutas de «Rostro del visitante» admiten a cada rol que ve la pantalla (H-SITIO-03)                            |
+| `f15f905`  | `fix(etapa-15k/arranque)`: start:dev con tsx, conexión de pg-boss y URL pública de bucle local (H-SITIO-06, 07, 10)                           |
+| `2e229d6`  | `fix(etapa-15k/movil)`: clave de red local de iOS y detalle técnico del fallo en Debug (H-SITIO-11)                                           |
+| `de75aa3`  | `fix(etapa-15k/equipos)`: Digest con nonce vencido, apertura sin «abierta» y escucha que se ve (H-SITIO-12, 13, 14)                           |
+| `bd5d0dc`  | `fix(etapa-15k/equipos)`: carga de plantillas, verificación remota, rostros del videoportero y cámara rechazada (H-SITIO-04, 05, 09, 01)      |
+| `7d303e1`  | `feat(etapa-15k/biometria)`: consentimiento presencial escrito por el titular (D-10)                                                          |
+| `a697a97`  | `feat(etapa-15k/equipos)`: atestación física del instalador por firmware (D-11)                                                               |
+| `2c2dce4`  | `test(etapa-15k/e2e)`: recorrido de la consola contra API real, PostgreSQL y simulado (§4)                                                    |
+| `ca011c7`  | `feat(etapa-15k/sitio)`: captura cruda por equipo y guía de sitio corregida (§5)                                                              |
+| `2b593c0`  | `fix(etapa-15k/equipos)`: baja de la persona por UserInfoDetail/Delete, como la guía de la serie de la terminal (H-15K-02)                    |
+| `6d47fe9`  | `fix(etapa-15k/sitio)`: la carga de prueba de --capturar se construye dentro de @ncr/providers (O2)                                           |
+| `637b890`  | `test(etapa-15k/controles)`: la sonda 34 ejerce los .xcconfig y el trinquete mide los dos controles nuevos                                    |
+| `65b7c84`  | `chore(etapa-15k)`: cierre de la ronda de hallazgos de sitio (informe, ESTADO y registro)                                                     |
+| `70ae74c`  | `test(etapa-15k/equipos)`: las ramas nuevas del proveedor, ejercidas (umbral de ramas de @ncr/providers)                                      |
+| `93174b8`  | `docs(etapa-15k)`: la primera corrida final del verificador, FALLIDA, y lo que destapó                                                        |
+| `7d56f8e`  | `fix(etapa-15k/verificador)`: el paso 5 nombra la roja desde su informe JSON                                                                  |
+| `d7813c4`  | `docs(etapa-15k)`: la segunda corrida final, FALLIDA por una roja intermitente sin nombre                                                     |
+| `cea9121`  | `fix(etapa-15k/pruebas)`: el tablero y el registro de equipos, aislados de las suites en paralelo y de corridas anteriores                    |
+| `967fb4e`  | `docs(etapa-15k)`: la tercera corrida final nombra la roja, y era de esta ronda                                                               |
+| `d8ffa7a`  | `docs(etapa-15k)`: el veredicto literal de la cuarta corrida, correcta                                                                        |
+| `30899e0`  | `fix(etapa-15k/e2e)`: el recorrido dice todas sus faltas y no cuenta el 503 del vídeo sin puente (CI)                                         |
+| `5c3d9ed`  | `fix(etapa-15k/equipos)`: **anexo** · la apertura como abrió en sitio, confirmación `statusCode 1` y ninguna escritura vacía (H-SITIO-13, 15) |
+| `794d89d`  | `test(etapa-15k/e2e)`: el recorrido corre con el adaptador real y pregunta al equipo si la puerta se movió                                    |
+| `cefd6ec`  | `feat(etapa-15k/equipos)`: `--abrir`; `sinCuerpo` en el catálogo; el JPEG real de H-SITIO-14                                                  |
+| `f365683`  | `fix(etapa-15k/arranque)`: `start:dev` con `tsc` y la API no arranca sin metadatos (H-SITIO-06); 12d, 12e, 13c con 13 y 15; sondas 35 y 38    |
+| `2745be2`  | `test(etapa-15k/controles)`: H-SITIO-15 contado al final del recorrido, sonda 38c y trinquete                                                 |
+| `c4e0efa`  | `docs(etapa-15k)`: el anexo en el informe (H-SITIO-01 a 15), la guía, el registro y ESTADO                                                    |
+| `47373df`  | `fix(etapa-15k/controles)`: un fichero de prueba que no carga se nombra con su motivo; el doble de GoTrue tolera ±1 paso de TOTP              |
+| _(cierre)_ | `docs(etapa-15k)`: el veredicto literal de la sexta corrida, correcta                                                                         |
 
 **PR** contra `develop`, abierto y **sin fusionar**.
 
