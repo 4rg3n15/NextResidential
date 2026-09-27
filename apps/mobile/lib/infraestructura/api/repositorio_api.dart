@@ -18,31 +18,29 @@
 /// la interfaz sabe pintar como lo que es: un estado previsto.
 library;
 
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:dio/dio.dart';
 
 import '../../aplicacion/sesion_en_uso.dart';
-import '../../dominio/calidad_de_captura.dart';
 import '../../dominio/entidades.dart';
 import '../../dominio/puertos.dart';
 import 'generado/clients/residente_api.dart';
+import 'generado/models/foto_de_visita_dto.dart';
+import 'generado/models/foto_de_visita_dto_tipo_mime.dart';
+import 'generado/models/medidas_de_foto_dto.dart';
 import 'generado/models/mi_autorizacion_dto.dart';
 import 'generado/models/mi_evento_dto.dart';
 import 'generado/models/mi_inicio_dto.dart';
 import 'generado/models/mi_vehiculo_dto.dart';
+import 'generado/models/mi_visita_dto.dart';
+import 'generado/models/mi_visita_generada_dto.dart';
+import 'generado/models/mi_visita_generada_dto_motivo.dart';
 import 'generado/models/miembro_de_familia_dto.dart';
 import 'generado/models/mi_zona_dto.dart';
-import 'generado/models/nueva_visita_dto.dart';
-import 'generado/models/patron_de_visita_dto.dart';
-import 'generado/models/medidas_de_captura_dto.dart';
 import 'generado/models/periodo.dart';
-import 'generado/models/rostro_de_mi_visitante_dto.dart';
+import 'generado/models/repetir_visita_dto.dart';
 import 'generado/models/token_de_notificacion_dto.dart';
 import 'generado/models/token_de_notificacion_dto_plataforma.dart';
-import 'generado/models/visita_creada_dto.dart';
-import 'generado/models/visita_creada_dto_motivo.dart';
+import 'generado/models/visitante_reciente_dto.dart';
 import 'soporte_de_api.dart';
 
 /// Construye el `Dio` de la API con el interceptor de sesión.
@@ -120,30 +118,55 @@ class RepositorioApiDelResidente implements RepositorioDelResidente {
 
   @override
   Future<ResultadoDeVisita> crearVisita(NuevaVisita visita) => _pedir(() async {
-        final dto = await _api.miControllerCrearAutorizacion(
+        final dto = await _api.misVisitasControllerCrear(
           id: _copropiedad,
-          body: NuevaVisitaDto(
-            visitante: visita.visitante,
+          // Ni rastro de la vivienda: el servidor la saca del vínculo del
+          // residente, y un cuerpo que la llevara sería el segundo eje del
+          // aislamiento abierto desde el teléfono.
+          body: MiVisitaDto(
+            nombre: visita.visitante,
             documento: visita.documento,
             // La API espera ISO-8601 CON zona. `toUtc()` la garantiza: enviar
             // una hora local sin huso deja que el servidor la interprete en el
-            // suyo, y una visita «de 14:00 a 18:00» se convierte en otra cosa.
-            desde: visita.desde.toUtc().toIso8601String(),
-            hasta: visita.hasta.toUtc().toIso8601String(),
+            // suyo, y una visita «de 14:00» se convierte en otra cosa.
+            inicio: visita.inicio.toUtc(),
+            duracionMinutos: visita.duracionMinutos,
             placa: visita.placa,
-            permiteAccesoVehicular: visita.permiteAccesoVehicular,
-            acompanantes: visita.acompanantes.isEmpty ? null : visita.acompanantes,
-            zonasPermitidas: visita.zonasPermitidas.isEmpty ? null : visita.zonasPermitidas,
             observaciones: visita.observaciones,
-            patron: visita.patron == null
-                ? null
-                : PatronDeVisitaDto(
-                    dias: visita.patron!.dias.map((d) => d.index).toList()..sort(),
-                    minutoInicio: visita.patron!.minutoInicio,
-                    minutoFin: visita.patron!.minutoFin,
-                    desplazamientoUtcMinutos: visita.patron!.desplazamientoUtcMinutos,
-                  ),
+            foto: _fotoDto(visita.foto),
+            casillaMarcada: visita.casillaMarcada,
             claveDeIdempotencia: visita.claveDeIdempotencia,
+          ),
+        );
+        return _resultadoDe(dto);
+      });
+
+  @override
+  Future<List<VisitanteReciente>> ultimosVisitantes() => _pedir(() async {
+        final dtos = await _api.misVisitasControllerUltimas(id: _copropiedad);
+        return dtos.map(_recienteDe).toList(growable: false);
+      });
+
+  @override
+  Future<ResultadoDeVisita> volverAAutorizar({
+    required String autorizacionId,
+    required DateTime inicio,
+    required int duracionMinutos,
+    required bool casillaMarcada,
+    required String claveDeIdempotencia,
+  }) =>
+      _pedir(() async {
+        final dto = await _api.misVisitasControllerRepetir(
+          id: _copropiedad,
+          // La visita anterior va en la RUTA y de ella copia el servidor el
+          // nombre, el documento, la placa y la foto. Si no es de la vivienda
+          // del residente, contesta 404 y no se crea nada.
+          autorizacionId: autorizacionId,
+          body: RepetirVisitaDto(
+            inicio: inicio.toUtc(),
+            duracionMinutos: duracionMinutos,
+            casillaMarcada: casillaMarcada,
+            claveDeIdempotencia: claveDeIdempotencia,
           ),
         );
         return _resultadoDe(dto);
@@ -162,51 +185,6 @@ class RepositorioApiDelResidente implements RepositorioDelResidente {
               PlataformaDelAparato.web => TokenDeNotificacionDtoPlataforma.web,
             },
           ),
-        );
-      });
-
-  @override
-  Future<ResultadoDeCaptura> capturarRostro({
-    required String autorizacionId,
-    required MedidasDeCaptura medidas,
-    required Uint8List vector,
-    required String versionPolitica,
-    required DateTime suprimirEn,
-  }) =>
-      _pedir(() async {
-        final dto = await _api.miControllerCapturarRostro(
-          id: _copropiedad,
-          autorizacionId: autorizacionId,
-          body: RostroDeMiVisitanteDto(
-            // El vector va en base64 y entra cifrado a la bóveda del servidor.
-            // Nada de esto se guarda en el teléfono: la plantilla vive en la
-            // terminal y cifrada en base, nunca en el cliente.
-            vector: base64Encode(vector),
-            medidas: MedidasDeCapturaDto(
-              nitidez: medidas.nitidez,
-              iluminacion: medidas.iluminacion,
-              rostrosDetectados: medidas.rostrosDetectados,
-              proporcionRostro: medidas.proporcionRostro,
-            ),
-            versionPolitica: versionPolitica,
-            suprimirEn: suprimirEn.toUtc(),
-          ),
-        );
-        if (!dto.aceptada) return CapturaRechazada(List<String>.from(dto.motivos));
-        final consentimiento = dto.consentimientoId;
-        if (consentimiento == null) {
-          // Aceptada sin consentimiento sería un contrato roto, y tratarlo como
-          // éxito dejaría al residente creyendo que el trámite acabó.
-          throw const Fallo(
-            ClaseDeFallo.servidor,
-            'La captura se aceptó sin solicitud de consentimiento',
-          );
-        }
-        return CapturaAceptada(
-          consentimientoId: consentimiento,
-          titular: dto.titular ?? 'su visitante',
-          calidad: (dto.calidad ?? 0).toDouble(),
-          enlaceDeConsentimiento: dto.enlaceDeConsentimiento,
         );
       });
 
@@ -315,21 +293,51 @@ EventoDeAcceso _eventoDe(MiEventoDto d) => EventoDeAcceso(
       decididoPorEdge: d.decididoPorEdge,
     );
 
-/// El resultado de crear, traducido.
+/// La foto, como la espera el contrato. Siempre JPEG: es lo que produce la
+/// cámara del teléfono (`CamaraDelTelefono` recomprime lo que no lo sea), y el
+/// servidor comprueba que el contenido sea de verdad lo que dice el tipo.
+FotoDeVisitaDto _fotoDto(FotoDeVisita f) => FotoDeVisitaDto(
+      contenidoBase64: f.jpegBase64,
+      // Por su valor y no por `undefined0`, que es como el generador tuvo que
+      // llamar a `image/jpeg` porque la barra no cabe en un identificador.
+      tipoMime: FotoDeVisitaDtoTipoMime.fromJson('image/jpeg'),
+      medidas: MedidasDeFotoDto(
+        rostrosDetectados: f.medidas.rostrosDetectados,
+        nitidez: f.medidas.nitidez,
+        iluminacion: f.medidas.iluminacion,
+        proporcionRostro: f.medidas.proporcionRostro,
+      ),
+    );
+
+/// El resultado de crear o de volver a autorizar, traducido.
 ///
 /// Un motivo que el servidor añada mañana y esta app no conozca llega como
 /// `$unknown` del generador. NO se convierte en «creada»: se trata como
 /// rechazo con la explicación que venga del servidor, que es la dirección
 /// segura — decir «creada» sobre algo que no se creó sería lo peor posible.
-ResultadoDeVisita _resultadoDe(VisitaCreadaDto d) {
-  if (d.creada && d.id != null) {
-    return VisitaCreada(id: d.id!, repetida: d.repetida);
+ResultadoDeVisita _resultadoDe(MiVisitaGeneradaDto d) {
+  final id = d.id;
+  if (d.creada && id != null) {
+    return VisitaCreada(
+      id: id,
+      repetida: d.repetida,
+      equipos: d.equipos.toInt(),
+      sincronizadas: d.sincronizadas.toInt(),
+      fallidas: d.fallidas.toInt(),
+      avisoDeSincronizacion: d.avisoDeSincronizacion,
+    );
+  }
+  // La foto no sirvió: el servidor ni siquiera llegó a mirar las reglas de la
+  // visita. Se dice eso y no un rechazo de negocio, porque el arreglo es otro:
+  // repetir la foto, no llamar a la administración.
+  if (!d.creada && d.motivosDeFoto.isNotEmpty) {
+    return FotoRechazada(List<String>.unmodifiable(d.motivosDeFoto));
   }
   final motivo = switch (d.motivo) {
-    VisitaCreadaDtoMotivo.listaNegra => MotivoDeRechazo.listaNegra,
-    VisitaCreadaDtoMotivo.viviendaInactiva => MotivoDeRechazo.viviendaInactiva,
-    VisitaCreadaDtoMotivo.sinNivelDeAcceso => MotivoDeRechazo.sinNivelDeAcceso,
-    VisitaCreadaDtoMotivo.placaDuplicada => MotivoDeRechazo.placaDuplicada,
+    MiVisitaGeneradaDtoMotivo.listaNegra => MotivoDeRechazo.listaNegra,
+    MiVisitaGeneradaDtoMotivo.viviendaInactiva => MotivoDeRechazo.viviendaInactiva,
+    MiVisitaGeneradaDtoMotivo.sinNivelDeAcceso => MotivoDeRechazo.sinNivelDeAcceso,
+    MiVisitaGeneradaDtoMotivo.placaDuplicada => MotivoDeRechazo.placaDuplicada,
     _ => null,
   };
   return VisitaRechazada(
@@ -340,6 +348,15 @@ ResultadoDeVisita _resultadoDe(VisitaCreadaDto d) {
         'El conjunto no permitió registrar esta visita. Consulte con la administración.',
   );
 }
+
+VisitanteReciente _recienteDe(VisitanteRecienteDto d) => VisitanteReciente(
+      autorizacionId: d.autorizacionId,
+      visitante: d.visitante,
+      documento: d.documento,
+      ultimaVisita: d.ultimaVisita,
+      placa: d.placa,
+      tieneFoto: d.tieneFoto,
+    );
 
 ZonaComun _zonaDe(MiZonaDto d) => ZonaComun(
       id: d.id,

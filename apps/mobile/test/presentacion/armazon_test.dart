@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
 import 'package:ncr_residente/configuracion/ambiente.dart';
-import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/acceso.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/dominio/sesion.dart';
 import 'package:ncr_residente/infraestructura/sesion/almacen_seguro.dart';
 import 'package:ncr_residente/presentacion/app.dart';
+import 'package:ncr_residente/presentacion/widgets/foto_del_visitante.dart';
 
 import '../dobles/hogar_falso.dart';
+import '../dobles/visitas.dart';
 
 /// EL ORDEN AL VOLVER A PRIMER PLANO
 ///
@@ -125,21 +125,24 @@ class RepositorioQueAnota implements RepositorioDelResidente {
     bitacora.add('escribir:aparato:${aparato.token}');
   }
 
-  final List<String> capturas = [];
-@override
-  Future<ResultadoDeCaptura> capturarRostro({
+  @override
+  Future<List<VisitanteReciente>> ultimosVisitantes() async {
+    bitacora.add('leer:ultimos');
+    return [recienteDePrueba()];
+  }
+
+  @override
+  Future<ResultadoDeVisita> volverAAutorizar({
     required String autorizacionId,
-    required MedidasDeCaptura medidas,
-    required Uint8List vector,
-    required String versionPolitica,
-    required DateTime suprimirEn,
+    required DateTime inicio,
+    required int duracionMinutos,
+    required bool casillaMarcada,
+    required String claveDeIdempotencia,
   }) async {
-    capturas.add(autorizacionId);
-    return const CapturaAceptada(
-      consentimientoId: 'c-1',
-      titular: 'Visitante de prueba',
-      calidad: 0.8,
+    bitacora.add(
+      'escribir:repeticion:$autorizacionId:$duracionMinutos:$casillaMarcada:$claveDeIdempotencia',
     );
+    return const VisitaCreada(id: 'a-2', repetida: false, equipos: 2, sincronizadas: 2);
   }
 }
 
@@ -202,7 +205,6 @@ void main() {
       hogar: HogarFalso(),
       cuenta: CuentaFalsa(),
       llamador: LlamadorFalso(),
-      compartidor: CompartidorFalso(),
     );
   });
 
@@ -277,5 +279,57 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.byType(NavigationBar), findsOneWidget);
+  });
+
+  testWidgets('M-1 · «Registrar visita» abre el formulario de la foto y la casilla', (t) async {
+    // El formulario es largo: en 600 px la foto no llega a construirse.
+    t.view.physicalSize = const Size(1000, 3000);
+    t.view.devicePixelRatio = 1.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(AppDelResidente(dependencias: dependencias));
+    await t.pumpAndSettle();
+
+    await t.tap(find.text('Registrar visita'));
+    await t.pumpAndSettle();
+
+    // Ya no es un aviso de «llega más adelante»: es el formulario de verdad.
+    expect(find.text('Nuevo visitante'), findsOneWidget);
+    expect(find.byType(FotoDelVisitante), findsOneWidget);
+  });
+
+  testWidgets('F6 · «Volver a autorizar» desde la pestaña: la visita anterior y la clave al abrir',
+      (t) async {
+    t.view.physicalSize = const Size(1000, 2400);
+    t.view.devicePixelRatio = 1.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(AppDelResidente(dependencias: dependencias));
+    await t.pumpAndSettle();
+
+    await t.tap(find.text('Visitantes'));
+    await t.pumpAndSettle();
+    expect(find.text('Últimos visitantes'), findsOneWidget);
+    expect(find.text('Plomero Pérez'), findsOneWidget);
+
+    await t.tap(find.text('Volver a autorizar'));
+    await t.pumpAndSettle();
+
+    // Sólo cuándo, cuánto y la casilla: nada que escribir y ninguna foto.
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.byType(FotoDelVisitante), findsNothing);
+    expect(find.byType(DropdownButtonFormField<int>), findsOneWidget);
+    expect(find.byType(Checkbox), findsOneWidget);
+
+    await t.tap(find.text(textoDeLaCasilla));
+    await t.pump();
+    await t.tap(find.text('Autorizar de nuevo'));
+    await t.pumpAndSettle();
+
+    expect(
+      bitacora,
+      contains('escribir:repeticion:aut-7:120:true:clave-fija-de-prueba'),
+      reason: 'la autorización de la visita ANTERIOR, la duración elegida y la clave de la app',
+    );
+    expect(find.text('Visita autorizada'), findsOneWidget);
+    expect(find.textContaining('La foto quedó en 2 de 2 equipos'), findsOneWidget);
   });
 }

@@ -1,16 +1,13 @@
 /// ETAPA 15-I en la app, pantalla por pantalla: el acceso por código, la
 /// puerta del primer ingreso, los ocupantes DEFINITIVOS, el vehículo propio
-/// con tope, la portería y la entrega del consentimiento al visitante.
+/// con tope y la portería.
 library;
-
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
 import 'package:ncr_residente/configuracion/ambiente.dart';
 import 'package:ncr_residente/dominio/acceso.dart';
-import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/hogar.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
@@ -20,7 +17,6 @@ import 'package:ncr_residente/presentacion/pantallas/acceso.dart';
 import 'package:ncr_residente/presentacion/pantallas/nuevo_vehiculo.dart';
 import 'package:ncr_residente/presentacion/pantallas/perfil.dart';
 import 'package:ncr_residente/presentacion/pantallas/primer_ingreso.dart';
-import 'package:ncr_residente/presentacion/pantallas/rostro_del_visitante.dart';
 
 import '../dobles/hogar_falso.dart';
 
@@ -277,62 +273,5 @@ void main() {
     await t.pump();
     expect(find.text('La administración todavía no registró el teléfono de portería.'), findsOneWidget);
     expect(llamador.llamadas, hasLength(1));
-  });
-
-  testWidgets('punto 5 · enlace, QR, compartir y estado que se consulta (RN-10)', (t) async {
-    lienzoGrande(t);
-    final compartidor = CompartidorFalso();
-    final hogar = HogarFalso();
-    await t.pumpWidget(MaterialApp(
-      home: PantallaDeRostroDelVisitante(
-        nombreDelVisitante: 'Carlos',
-        versionPolitica: 'v1.0',
-        tomarFoto: () async => FotoTomada(
-          vector: Uint8List.fromList(List<int>.filled(64, 3)),
-          medidas: const MedidasDeCaptura(
-            nitidez: 0.8,
-            iluminacion: 0.5,
-            rostrosDetectados: 1,
-            proporcionRostro: 0.4,
-          ),
-        ),
-        enviar: (_) async => const CapturaAceptada(
-          consentimientoId: 'c-1',
-          titular: 'Carlos',
-          calidad: 0.9,
-          enlaceDeConsentimiento: '/consentimiento/tok',
-        ),
-        compartidor: compartidor,
-        urlDeLaApi: 'http://api.invalid:3000',
-        consultarConsentimiento: (id) => hogar.estadoDelConsentimiento(
-          autorizacionId: 'a-1',
-          consentimientoId: id,
-        ),
-      ),
-    ));
-    await t.tap(find.text('Tomar la foto'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('Pedirle el permiso'));
-    await t.pumpAndSettle();
-
-    expect(find.byKey(const Key('consentimiento.qr')), findsOneWidget);
-    expect(find.text('http://api.invalid:3000/consentimiento/tok'), findsOneWidget);
-    expect(find.text('Pendiente: Carlos aún no responde'), findsOneWidget);
-    // No hay casilla de aceptar: el residente entrega, no consiente.
-    expect(find.byType(Checkbox), findsNothing);
-
-    await t.tap(find.byKey(const Key('consentimiento.compartir')));
-    await t.pump();
-    expect(compartidor.compartidos.single, contains('http://api.invalid:3000/consentimiento/tok'));
-
-    hogar.consentimiento = EstadoDeConsentimiento.aceptado;
-    await t.tap(find.byKey(const Key('consentimiento.actualizar')));
-    await t.pumpAndSettle();
-    expect(find.text('Aceptado por Carlos'), findsOneWidget);
-
-    hogar.consentimiento = EstadoDeConsentimiento.rechazado;
-    await t.tap(find.byKey(const Key('consentimiento.actualizar')));
-    await t.pumpAndSettle();
-    expect(find.text('Rechazado por Carlos'), findsOneWidget);
   });
 }

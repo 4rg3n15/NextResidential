@@ -26,7 +26,7 @@ import 'infraestructura/api/hogar_api.dart';
 import 'infraestructura/api/repositorio_api.dart';
 import 'infraestructura/camara/camara_del_telefono.dart';
 import 'infraestructura/notificaciones/fuente.dart';
-import 'infraestructura/plataforma/telefono_y_compartir.dart';
+import 'infraestructura/plataforma/telefono.dart';
 import 'infraestructura/sesion/almacen_seguro.dart';
 import 'infraestructura/sesion/autenticador_por_api.dart';
 import 'infraestructura/red/tipo_de_red.dart';
@@ -89,7 +89,6 @@ Future<void> main() async {
         // El cambio de contraseña va CON la sesión: su `Dio` es el de la API.
         cuenta: CuentaPorApi(api: CuentasApi(dio)),
         llamador: const LlamadorDelSistema(),
-        compartidor: const CompartidorDelSistema(),
         // Hito 3 · la foto real del visitante, reducida en el aparato. En web
         // (el recorrido del verificador) no hay cámara que abrir: la simulada.
         tomarFoto: kIsWeb ? null : CamaraDelTelefono().tomar,

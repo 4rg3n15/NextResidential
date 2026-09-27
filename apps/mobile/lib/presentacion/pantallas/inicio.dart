@@ -26,6 +26,7 @@ class PantallaDeInicio extends StatelessWidget {
     required this.controlador,
     required this.autorizaciones,
     required this.alPedirAcceso,
+    required this.alRegistrarVisita,
     required this.alAbrirFamilia,
     required this.alAbrirHistorial,
     required this.alAbrirVehiculos,
@@ -34,6 +35,9 @@ class PantallaDeInicio extends StatelessWidget {
   final ControladorDeVista controlador;
   final ControladorDeVista autorizaciones;
   final void Function() alPedirAcceso;
+
+  /// Abre el formulario de «Nuevo visitante», el mismo de la pestaña.
+  final void Function() alRegistrarVisita;
   final void Function() alAbrirFamilia;
   final void Function() alAbrirHistorial;
   final void Function() alAbrirVehiculos;
@@ -52,6 +56,7 @@ class PantallaDeInicio extends StatelessWidget {
             hogar: hogar,
             autorizaciones: autorizaciones,
             desdeCache: desdeCache,
+            alRegistrarVisita: alRegistrarVisita,
             alAbrirFamilia: alAbrirFamilia,
             alAbrirHistorial: alAbrirHistorial,
             alAbrirVehiculos: alAbrirVehiculos,
@@ -68,6 +73,7 @@ class _Contenido extends StatelessWidget {
     required this.hogar,
     required this.autorizaciones,
     required this.desdeCache,
+    required this.alRegistrarVisita,
     required this.alAbrirFamilia,
     required this.alAbrirHistorial,
     required this.alAbrirVehiculos,
@@ -77,6 +83,7 @@ class _Contenido extends StatelessWidget {
   final MiHogar hogar;
   final ControladorDeVista autorizaciones;
   final bool desdeCache;
+  final void Function() alRegistrarVisita;
   final void Function() alAbrirFamilia;
   final void Function() alAbrirHistorial;
   final void Function() alAbrirVehiculos;
@@ -133,7 +140,7 @@ class _Contenido extends StatelessWidget {
                     ),
                     child: Text(
                       'Su vivienda está inactiva: las autorizaciones vigentes siguen valiendo y no '
-                      'se pueden crear nuevas (RN-13). Consulte con la administración.',
+                      'se pueden crear nuevas. Consulte con la administración.',
                       style: TextStyle(color: Paleta.avisoSuave.texto),
                     ),
                   ),
@@ -158,7 +165,7 @@ class _Contenido extends StatelessWidget {
               etiqueta: 'Registrar visita',
               // El servidor decide. `null` deshabilita, y el motivo se lee
               // arriba: ni un `if` de negocio en esta capa.
-              alPulsar: hogar.puedeAutorizar ? () => _avisoDe11B(context) : null,
+              alPulsar: hogar.puedeAutorizar ? alRegistrarVisita : null,
             ),
             AccesoRapido(
               icono: Icons.directions_car_outlined,
@@ -204,14 +211,6 @@ class _Contenido extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  void _avisoDe11B(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Registrar visita llega en la ETAPA 11-B (pantalla M-4).'),
-      ),
     );
   }
 

@@ -159,6 +159,17 @@ const DATOS = {
       acompanantes: 1,
     },
   ],
+  // 15-L (F6) · un visitante que ya vino, para «Volver a autorizar».
+  ultimas: [
+    {
+      autorizacionId: 'aut-0',
+      visitante: 'Plomero de la semana',
+      documento: '79000111',
+      ultimaVisita: new Date(Date.now() - 7 * 86400_000).toISOString(),
+      placa: null,
+      tieneFoto: true,
+    },
+  ],
   historial: [
     {
       id: 'evt-1',
@@ -233,12 +244,13 @@ const servidor = createServer(async (peticion, respuesta) => {
     });
   }
 
-  const mi = new RegExp(`^/copropiedades/${COP}/mi/(\\w+)$`).exec(url.pathname);
+  // 15-L (F6) · la única ruta del residente con dos tramos: `visitas/ultimas`.
+  const mi = new RegExp(`^/copropiedades/${COP}/mi/(\\w+(?:/ultimas)?)$`).exec(url.pathname);
   if (mi !== null) {
     if (!peticion.headers.authorization?.startsWith('Bearer ')) {
       return responder(401, { mensaje: 'sin token' });
     }
-    const clave = mi[1] === 'vivienda' ? 'vivienda' : mi[1];
+    const clave = mi[1] === 'visitas/ultimas' ? 'ultimas' : mi[1];
     const datos = DATOS[clave];
     if (datos === undefined) return responder(404, { mensaje: 'ruta desconocida' });
     return responder(200, datos);
@@ -603,7 +615,11 @@ try {
   (await hay('Nuevo visitante'))
     ? ok('y ofrece autorizar una visita, que es para lo que se abre (HU-07)')
     : mal('no se ve la acción de autorizar');
-  await captura('5-pendiente');
+  // 15-L (F6) · quien ya vino se vuelve a autorizar sin dictar sus datos.
+  (await hay('Plomero de la semana')) && (await hay('Volver a autorizar'))
+    ? ok('los últimos visitantes se ofrecen para volver a autorizarlos (F6)')
+    : mal('no se ven los últimos visitantes con «Volver a autorizar»');
+  await captura('5-visitantes');
 
   // ── 6 · perfil e historial ────────────────────────────────────────────────
   await irAPestana('Perfil');

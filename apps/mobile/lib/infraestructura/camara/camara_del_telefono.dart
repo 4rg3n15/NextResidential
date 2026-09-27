@@ -2,14 +2,16 @@
 /// sincronizar la terminal → reconocer»).
 ///
 /// ─────────────────────────────────────────────────────────────────────────────
-/// LO QUE VIAJA ES UN JPEG, Y SE DICE
+/// LO QUE VIAJA ES UN JPEG, Y SOLO UN JPEG
 ///
-/// El campo del contrato se llama `vector`, pero la terminal facial de este
-/// proyecto construye su plantilla a partir de una IMAGEN y no acepta un vector
-/// ajeno: es lo mismo que ya hace la consola (`apps/web/src/lib/biometria/
-/// imagen.ts`). Lo que el sistema guarda sigue sin ser legible —entra cifrado a
-/// la bóveda y ninguna ruta lo devuelve— y en el teléfono no queda nada: la
-/// foto vive en memoria mientras la pantalla está abierta.
+/// La terminal facial construye su plantilla a partir de una IMAGEN, igual que
+/// en la consola (`apps/web/src/lib/biometria/imagen.ts`), y el contrato de la
+/// visita declara `image/jpeg`. El servidor comprueba que el contenido sea de
+/// verdad lo que dice el tipo, así que aquí se garantiza: lo que no llegue
+/// como JPEG —un PNG, un HEIC que el sistema no convirtió— se recomprime.
+/// Lo que el sistema guarda no es legible —entra cifrado y ninguna ruta lo
+/// devuelve— y en el teléfono no queda nada: la foto vive en memoria mientras
+/// el formulario está abierto.
 ///
 /// Minimización (Ley 1581, art. 4): la cámara del sistema entrega la foto ya
 /// reducida a 640 px de lado; si aun así pasa de 180 KB, se recomprime aquí.
@@ -23,7 +25,7 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import '../../dominio/medidas_de_imagen.dart';
-import '../../presentacion/pantallas/rostro_del_visitante.dart';
+import '../../dominio/puertos.dart';
 
 /// Lado mayor de lo que se envía, y techo del JPEG. Los de la consola.
 const ladoMaximo = 640;
@@ -49,6 +51,9 @@ class CamaraDelTelefono {
 /// Descodifica, reduce si hace falta, recomprime hasta el techo y mide. Es la
 /// parte comprobable sin cámara: la prueba le pasa un JPEG fabricado.
 ///
+/// Sólo viaja tal cual lo que YA es un JPEG pequeño; cualquier otra cosa se
+/// recomprime, aunque quepa, porque el contrato promete `image/jpeg`.
+///
 /// `null` si los bytes no son una imagen o si ni reducida cabe en el techo:
 /// para la pantalla es «no hay foto», y el residente repite.
 FotoTomada? fotoDesdeJpeg(Uint8List bytes) {
@@ -60,7 +65,7 @@ FotoTomada? fotoDesdeJpeg(Uint8List bytes) {
   }
   if (original == null) return null;
   final mayor = original.width > original.height ? original.width : original.height;
-  if (mayor <= ladoMaximo && bytes.length <= bytesMaximos) {
+  if (esJpeg(bytes) && mayor <= ladoMaximo && bytes.length <= bytesMaximos) {
     return _medida(bytes, original);
   }
   // Primero el lado, después la calidad; si aun así no cabe, un lado menor.
@@ -74,6 +79,11 @@ FotoTomada? fotoDesdeJpeg(Uint8List bytes) {
   return null;
 }
 
+/// Los tres primeros bytes de todo JPEG (SOI + el primer marcador). Es la misma
+/// comprobación de «tipo real» que hace el servidor, hecha antes de enviar.
+bool esJpeg(Uint8List bytes) =>
+    bytes.length > 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
+
 img.Image _reducir(img.Image i, int lado) => i.width >= i.height
     ? img.copyResize(i, width: lado)
     : img.copyResize(i, height: lado);
@@ -81,7 +91,7 @@ img.Image _reducir(img.Image i, int lado) => i.width >= i.height
 FotoTomada _medida(Uint8List jpeg, img.Image imagen) {
   final rgba = imagen.convert(numChannels: 4).getBytes(order: img.ChannelOrder.rgba);
   return FotoTomada(
-    vector: jpeg,
+    jpeg: jpeg,
     medidas: medidasSinDetector(rgba, imagen.width, imagen.height),
     vistaPrevia: jpeg,
     sinDetector: true,

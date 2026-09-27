@@ -41,7 +41,6 @@ import '../aplicacion/sesion_en_uso.dart';
 import '../configuracion/ambiente.dart';
 import '../infraestructura/camara/fuente_de_fotos.dart';
 import '../configuracion/tema.dart';
-import '../aplicacion/estado.dart';
 import '../dominio/entidades.dart';
 import '../dominio/hogar.dart';
 import '../dominio/puertos.dart';
@@ -55,9 +54,9 @@ import 'pantallas/notificaciones.dart';
 import 'pantallas/nuevo_visitante.dart';
 import 'pantallas/perfil.dart';
 import 'pantallas/primer_ingreso.dart';
-import 'pantallas/rostro_del_visitante.dart';
 import 'pantallas/vehiculos.dart';
 import 'pantallas/visitantes.dart';
+import 'pantallas/volver_a_autorizar.dart';
 import 'pantallas/zonas.dart';
 
 /// Todo lo que la app necesita, construido una vez en `main`.
@@ -73,9 +72,7 @@ class Dependencias {
     required this.hogar,
     required this.cuenta,
     required this.llamador,
-    required this.compartidor,
     this.tomarFoto,
-    this.versionPoliticaBiometrica = 'v1.0',
   });
 
   final Ambiente ambiente;
@@ -84,13 +81,12 @@ class Dependencias {
   final Reloj reloj;
   final FuenteDeNotificaciones notificaciones;
 
-  /// ETAPA 15-I · el primer ingreso, el hogar, la contraseña y los dos puertos
-  /// que tocan el sistema operativo (marcador y panel de compartir).
+  /// ETAPA 15-I · el primer ingreso, el hogar, la contraseña y el puerto que
+  /// toca el marcador del sistema operativo.
   final RepositorioDeAlta alta;
   final RepositorioDelHogar hogar;
   final ServicioDeCuenta cuenta;
   final LlamadorDeTelefono llamador;
-  final Compartidor compartidor;
 
   /// 15-I (hito 3) · la cámara REAL del teléfono. `null` = la simulada (web,
   /// recorrido y pruebas), declarada como tal en `fuente_de_fotos.dart`.
@@ -101,11 +97,6 @@ class Dependencias {
   /// `setState`, y entonces dejaría de ser una clave de idempotencia. Y porque
   /// una prueba necesita poder fijarla.
   final String Function() claves;
-
-  /// Qué versión de la política de tratamiento se le muestra al titular. Queda
-  /// escrita en el consentimiento: sin ella no se puede demostrar QUÉ aceptó
-  /// quien aceptó, que es la mitad de lo que exige la Ley 1581.
-  final String versionPoliticaBiometrica;
 }
 
 class AppDelResidente extends StatelessWidget {
@@ -154,6 +145,8 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
   late final ControladorDeVista<List<Autorizacion>> _autorizaciones = controladorDeAutorizaciones(
     _repo,
   );
+  late final ControladorDeVista<List<VisitanteReciente>> _ultimos =
+      controladorDeUltimosVisitantes(_repo);
   late final ControladorDeHistorial _historial = ControladorDeHistorial(_repo);
   late final ControladorDeVista<List<ZonaComun>> _zonas = controladorDeZonas(_repo);
   late final ControladorDeAvisos _avisos = ControladorDeAvisos(
@@ -233,6 +226,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     _familia.cargarAhora();
     _vehiculos.cargarAhora();
     _autorizaciones.cargarAhora();
+    _ultimos.cargarAhora();
     _historial.cargarAhora();
     _zonas.cargarAhora();
     _perfil.cargarAhora();
@@ -261,7 +255,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
             ),
           ),
         );
-        _autorizaciones.cargarAhora();
+        _recargarVisitas();
       }
     } on Fallo {
       // La sesión murió a mitad del vaciado. Lo resuelve el refresco de primer
@@ -279,6 +273,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
       _familia,
       _vehiculos,
       _autorizaciones,
+      _ultimos,
       _historial,
       _zonas,
       _perfil,
@@ -300,44 +295,88 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
 
   void _pedirAcceso() => setState(() => _autenticado = false);
 
+  /// Lo que cambia al crear o repetir una visita: la lista de lo autorizado y
+  /// la de los últimos visitantes.
+  void _recargarVisitas() {
+    _autorizaciones.cargarAhora();
+    _ultimos.cargarAhora();
+  }
+
+  /// La cámara real si la hay; si no, la simulada y declarada como tal.
+  TomarFoto get _tomarFoto => widget.dependencias.tomarFoto ?? CamaraSimulada().tomar;
+
   /// Abre M-4. **La clave se genera aquí, al abrir el formulario**, y no dentro
   /// de la pantalla: si la fabricara el widget, cada reconstrucción la
   /// cambiaría y un reintento crearía una visita distinta en vez de recuperar
   /// la anterior (RN-17).
   Future<void> _crearVisitante() async {
     final clave = widget.dependencias.claves();
-    final zonas = switch (_zonas.estado) {
-      ConDatos<List<ZonaComun>>(datos: final d) => d,
-      Cargando<List<ZonaComun>>(previo: final p) => p ?? const <ZonaComun>[],
-      Fallido<List<ZonaComun>>(previo: final p) => p ?? const <ZonaComun>[],
-      _ => const <ZonaComun>[],
-    };
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PantallaDeNuevoVisitante(
           enviar: _enviarVisita,
-          zonas: zonas,
+          tomarFoto: _tomarFoto,
           claveDeIdempotencia: clave,
-          alCapturarRostro: _capturarRostro,
+          ahora: widget.dependencias.reloj.ahora(),
         ),
       ),
     );
     if (!mounted) return;
     // Al volver se recarga aunque se haya encolado: la bandeja también cambió.
     setState(() {});
-    _autorizaciones.cargarAhora();
+    _recargarVisitas();
+  }
+
+  /// F6 · abre «Volver a autorizar» con su PROPIA clave, generada al abrir por
+  /// la misma razón que la del formulario nuevo.
+  Future<void> _volverAAutorizar(VisitanteReciente visitante) async {
+    final clave = widget.dependencias.claves();
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PantallaDeVolverAAutorizar(
+          visitante: visitante,
+          claveDeIdempotencia: clave,
+          ahora: widget.dependencias.reloj.ahora(),
+          volverAAutorizar: ({
+            required autorizacionId,
+            required inicio,
+            required duracionMinutos,
+            required casillaMarcada,
+            required claveDeIdempotencia,
+          }) =>
+              _conSesion(
+                () => _repo.volverAAutorizar(
+                  autorizacionId: autorizacionId,
+                  inicio: inicio,
+                  duracionMinutos: duracionMinutos,
+                  casillaMarcada: casillaMarcada,
+                  claveDeIdempotencia: claveDeIdempotencia,
+                ),
+              ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _recargarVisitas();
   }
 
   /// El puente entre la pantalla y la bandeja. Traduce el desenlace del envío al
   /// vocabulario de la pantalla, que no conoce la bandeja ni el repositorio.
-  Future<ResultadoDeEnvio> _enviarVisita(NuevaVisita visita) async {
+  Future<ResultadoDeEnvio> _enviarVisita(NuevaVisita visita) => _conSesion(() async {
+        final desenlace = await _envio.enviar(visita);
+        return switch (desenlace) {
+          Aceptado(resultado: final r) => EnvioResuelto(r),
+          Rechazado(resultado: final r) => EnvioResuelto(r),
+          Pendiente() => const EnvioEncolado(),
+        };
+      });
+
+  /// Una escritura que se encuentra la sesión muerta lleva a la pantalla de
+  /// acceso en vez de dejar al residente frente a un formulario que ya no
+  /// puede enviar. El fallo se relanza igual: la pantalla decide qué decir.
+  Future<T> _conSesion<T>(Future<T> Function() operacion) async {
     try {
-      final desenlace = await _envio.enviar(visita);
-      return switch (desenlace) {
-        Aceptado(resultado: final r) => EnvioAceptado(repetida: r.repetida, id: r.id),
-        Rechazado(resultado: final r) => EnvioRechazado(r),
-        Pendiente() => const EnvioEncolado(),
-      };
+      return await operacion();
     } on Fallo catch (f) {
       if (f.clase == ClaseDeFallo.sesionInvalida && mounted) {
         _pedirAcceso();
@@ -345,37 +384,6 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
       }
       rethrow;
     }
-  }
-
-  /// CU-02 · la foto cuelga de la AUTORIZACIÓN, no del residente: es de ahí de
-  /// donde el servidor deriva quién es el titular del dato (RN-10).
-  void _capturarRostro(String autorizacionId, String nombreDelVisitante, DateTime hasta) {
-    _abrir(
-      PantallaDeRostroDelVisitante(
-        nombreDelVisitante: nombreDelVisitante,
-        tomarFoto: widget.dependencias.tomarFoto ?? CamaraSimulada().tomar,
-        versionPolitica: widget.dependencias.versionPoliticaBiometrica,
-        enviar: (foto) => _repo.capturarRostro(
-          autorizacionId: autorizacionId,
-          medidas: foto.medidas,
-          vector: foto.vector,
-          versionPolitica: widget.dependencias.versionPoliticaBiometrica,
-          // RN-11 · la plantilla no vive más que la VISITA: se suprime cuando
-          // termina. Antes era «captura + 24 h», que para una visita de mañana
-          // la borraba antes de que llegara el visitante (H-15I-10).
-          suprimirEn: hasta,
-        ),
-        // Punto 5 (15-I) · el enlace se ENTREGA al visitante y su respuesta se
-        // consulta; el residente no responde por él (RN-10).
-        compartidor: widget.dependencias.compartidor,
-        urlDeLaApi: widget.dependencias.ambiente.apiUrl,
-        consultarConsentimiento: (consentimientoId) =>
-            widget.dependencias.hogar.estadoDelConsentimiento(
-              autorizacionId: autorizacionId,
-              consentimientoId: consentimientoId,
-            ),
-      ),
-    );
   }
 
   void _abrirNotificaciones() {
@@ -430,6 +438,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
         controlador: _inicio,
         autorizaciones: _autorizaciones,
         alPedirAcceso: _pedirAcceso,
+        alRegistrarVisita: _crearVisitante,
         alAbrirFamilia: () =>
             _abrir(PantallaDeFamilia(controlador: _familia, alPedirAcceso: _pedirAcceso)),
         alAbrirHistorial: () =>
@@ -438,8 +447,10 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
       ),
       PantallaDeVisitantes(
         controlador: _autorizaciones,
+        ultimos: _ultimos,
         alPedirAcceso: _pedirAcceso,
         alCrear: _crearVisitante,
+        alVolverAAutorizar: _volverAAutorizar,
         pendientes: _envio.bandeja.pendientes,
         alReintentarPendientes: _vaciarBandeja,
         ahora: widget.dependencias.reloj.ahora(),

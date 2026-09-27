@@ -1,39 +1,21 @@
-/// Las tres pantallas de 11-B, cada una por lo que puede salir mal.
+/// Las pantallas de 11-B, cada una por lo que puede salir mal. El formulario
+/// de «Nuevo visitante» (15-L, F1) tiene su propio fichero: `visitas_test.dart`.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/dominio/bandeja_de_salida.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
+import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/presentacion/controlador.dart';
 import 'package:ncr_residente/presentacion/pantallas/notificaciones.dart';
-import 'package:ncr_residente/presentacion/pantallas/nuevo_visitante.dart';
 import 'package:ncr_residente/presentacion/pantallas/visitantes.dart';
 import 'package:ncr_residente/presentacion/pantallas/zonas.dart';
 
+import '../dobles/visitas.dart';
 import 'pantallas_test.dart' show RepositorioFalso;
 
 Widget envolver(Widget hijo) => MaterialApp(home: hijo);
-
-/// El formulario de M-4 es largo y el lienzo de prueba mide 800×600: ni el
-/// botón ni el recuadro del desenlace —que va ARRIBA del todo— caben a la vez.
-/// Un `ListView` no construye lo que no se ve, así que desplazarse hasta el
-/// botón deja el desenlace sin construir y la aserción buscaría algo que no
-/// existe todavía.
-///
-/// Se agranda el lienzo en vez de desplazarse. Lo que estas pruebas juzgan es
-/// QUÉ DICE cada desenlace, no que quepa en una pantalla de 600 px: eso es
-/// asunto del recorrido web, que corre contra un navegador de verdad.
-void lienzoAlto(WidgetTester t) {
-  t.view.physicalSize = const Size(1000, 3000);
-  t.view.devicePixelRatio = 1.0;
-  addTearDown(t.view.reset);
-}
-
-Future<void> pulsarRegistrar(WidgetTester t) async {
-  await t.tap(find.text('Registrar visita'));
-  await t.pumpAndSettle();
-}
 
 final ahora = DateTime.utc(2026, 9, 20, 12);
 
@@ -55,193 +37,6 @@ ZonaComun zona({
     );
 
 void main() {
-  // ═══════════════════════════════════════════════════════════════════════════
-  // M-4 · NUEVO VISITANTE
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  group('M-4 · los cuatro rechazos llegan como respuesta, no como error', () {
-    Future<void> montarYEnviar(WidgetTester t, ResultadoDeEnvio resultado) async {
-      lienzoAlto(t);
-      await t.pumpWidget(
-        envolver(
-          PantallaDeNuevoVisitante(
-            enviar: (_) async => resultado,
-            zonas: const [],
-            claveDeIdempotencia: 'k1',
-          ),
-        ),
-      );
-      await t.enterText(find.byType(TextFormField).first, 'Visitante de prueba');
-      await pulsarRegistrar(t);
-    }
-
-    testWidgets('LISTA NEGRA · dice que no se pudo, sin pedirle que corrija nada', (t) async {
-      await montarYEnviar(
-        t,
-        const EnvioRechazado(
-          VisitaRechazada(
-            motivo: MotivoDeRechazo.listaNegra,
-            explicacion: 'Esta persona no puede ingresar al conjunto. Consulte con la administración.',
-          ),
-        ),
-      );
-      expect(find.text('No se pudo registrar'), findsOneWidget);
-      expect(
-        find.text('Esta persona no puede ingresar al conjunto. Consulte con la administración.'),
-        findsOneWidget,
-      );
-      // Y NO le dice que corrija: no hay nada que corregir (RN-07).
-      expect(find.text('Corrija un dato y vuelva a intentar'), findsNothing);
-    });
-
-    testWidgets('PLACA DUPLICADA · esa SÍ la resuelve él, y el título lo dice', (t) async {
-      // Es la distinción que el usuario pidió por escrito: el residente debe
-      // poder separar «llame a la administración» de «esto lo arreglo yo».
-      await montarYEnviar(
-        t,
-        const EnvioRechazado(
-          VisitaRechazada(
-            motivo: MotivoDeRechazo.placaDuplicada,
-            explicacion: 'Esa placa ya está autorizada y activa en el conjunto.',
-          ),
-        ),
-      );
-      expect(find.text('Corrija un dato y vuelva a intentar'), findsOneWidget);
-      expect(find.text('No se pudo registrar'), findsNothing);
-    });
-
-    testWidgets('VIVIENDA INACTIVA · es de administración, no del formulario', (t) async {
-      await montarYEnviar(
-        t,
-        const EnvioRechazado(
-          VisitaRechazada(
-            motivo: MotivoDeRechazo.viviendaInactiva,
-            explicacion: 'Su vivienda está inactiva. Las visitas vigentes se conservan.',
-          ),
-        ),
-      );
-      expect(find.text('No se pudo registrar'), findsOneWidget);
-    });
-
-    testWidgets('SIN NIVEL DE ACCESO · tampoco es culpa del formulario', (t) async {
-      await montarYEnviar(
-        t,
-        const EnvioRechazado(
-          VisitaRechazada(
-            motivo: MotivoDeRechazo.sinNivelDeAcceso,
-            explicacion: 'Su registro no permite autorizar visitantes.',
-          ),
-        ),
-      );
-      expect(find.text('No se pudo registrar'), findsOneWidget);
-    });
-  });
-
-  testWidgets('M-4 · SIN RED no dice «creada», porque no lo está', (t) async {
-    lienzoAlto(t);
-    // Prometerlo haría que el residente mandara a su visitante a una puerta
-    // que no se va a abrir.
-    await t.pumpWidget(
-      envolver(
-        PantallaDeNuevoVisitante(
-          enviar: (_) async => const EnvioEncolado(),
-          zonas: const [],
-          claveDeIdempotencia: 'k1',
-        ),
-      ),
-    );
-    await t.enterText(find.byType(TextFormField).first, 'Visitante de prueba');
-    await pulsarRegistrar(t);
-
-    expect(find.text('Quedó pendiente de enviarse'), findsOneWidget);
-    expect(find.textContaining('registrada', findRichText: true), findsNothing);
-  });
-
-  testWidgets('M-4 · una visita repetida lo dice: el conjunto no creó otra (RN-17)', (t) async {
-    lienzoAlto(t);
-    await t.pumpWidget(
-      envolver(
-        PantallaDeNuevoVisitante(
-          enviar: (_) async => const EnvioAceptado(repetida: true),
-          zonas: const [],
-          claveDeIdempotencia: 'k1',
-        ),
-      ),
-    );
-    await t.enterText(find.byType(TextFormField).first, 'Visitante de prueba');
-    await pulsarRegistrar(t);
-
-    expect(find.text('Esta visita ya estaba registrada'), findsOneWidget);
-  });
-
-  testWidgets('M-4 · LA CLAVE NO CAMBIA entre reconstrucciones', (t) async {
-    lienzoAlto(t);
-    // Si la pantalla la fabricara, cada `setState` la cambiaría y el reintento
-    // crearía una visita distinta en vez de recuperar la anterior.
-    final claves = <String>[];
-    await t.pumpWidget(
-      envolver(
-        PantallaDeNuevoVisitante(
-          enviar: (v) async {
-            claves.add(v.claveDeIdempotencia);
-            return const EnvioEncolado();
-          },
-          zonas: const [],
-          claveDeIdempotencia: 'k-estable',
-        ),
-      ),
-    );
-    await t.enterText(find.byType(TextFormField).first, 'Visitante de prueba');
-    for (var i = 0; i < 3; i++) {
-      await pulsarRegistrar(t);
-    }
-    expect(claves, ['k-estable', 'k-estable', 'k-estable']);
-  });
-
-  testWidgets('M-4 · el nombre es obligatorio y el envío no sale sin él', (t) async {
-    lienzoAlto(t);
-    var intentos = 0;
-    await t.pumpWidget(
-      envolver(
-        PantallaDeNuevoVisitante(
-          enviar: (_) async {
-            intentos += 1;
-            return const EnvioAceptado(repetida: false);
-          },
-          zonas: const [],
-          claveDeIdempotencia: 'k1',
-        ),
-      ),
-    );
-    await pulsarRegistrar(t);
-
-    expect(intentos, 0);
-    expect(find.text('Escriba el nombre del visitante'), findsOneWidget);
-  });
-
-  testWidgets('M-4 · recurrente sin días elegidos no se envía a medias', (t) async {
-    lienzoAlto(t);
-    var intentos = 0;
-    await t.pumpWidget(
-      envolver(
-        PantallaDeNuevoVisitante(
-          enviar: (_) async {
-            intentos += 1;
-            return const EnvioAceptado(repetida: false);
-          },
-          zonas: const [],
-          claveDeIdempotencia: 'k1',
-        ),
-      ),
-    );
-    await t.enterText(find.byType(TextFormField).first, 'Visitante de prueba');
-    await t.tap(find.text('Se repite'));
-    await t.pumpAndSettle();
-    await pulsarRegistrar(t);
-
-    expect(intentos, 0, reason: 'un patrón sin días no es un patrón');
-  });
-
   // ═══════════════════════════════════════════════════════════════════════════
   // M-5 · ZONAS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -374,35 +169,52 @@ void main() {
   // LA PESTAÑA DE VISITANTES Y LA BANDEJA
   // ═══════════════════════════════════════════════════════════════════════════
 
-  testWidgets('LO PENDIENTE SE VE, y separado de lo confirmado', (t) async {
-    // Si no se viera, el residente tendría una lista donde su visitante NO
-    // aparece: creería que se perdió y lo volvería a crear, con clave nueva.
-    final repo = RepositorioFalso();
-    final c = controladorDeAutorizaciones(repo);
+  /// La pestaña montada con sus dos lecturas ya hechas.
+  Future<List<VisitanteReciente>> montarPestana(
+    WidgetTester t, {
+    RepositorioFalso? repo,
+    List<EnvioPendiente> pendientes = const [],
+  }) async {
+    final r = repo ?? RepositorioFalso();
+    final c = controladorDeAutorizaciones(r);
+    final u = controladorDeUltimosVisitantes(r);
     await c.cargarAhora();
-
+    await u.cargarAhora();
+    final pulsados = <VisitanteReciente>[];
     await t.pumpWidget(
       envolver(
         PantallaDeVisitantes(
           controlador: c,
+          ultimos: u,
           alPedirAcceso: () {},
           alCrear: () {},
+          alVolverAAutorizar: pulsados.add,
           ahora: ahora,
           alReintentarPendientes: () async {},
-          pendientes: [
-            EnvioPendiente(
-              claveDeIdempotencia: 'k1',
-              recurso: 'mi/autorizaciones',
-              cuerpo: const {'visitante': 'Plomero'},
-              encoladoEn: ahora.subtract(const Duration(minutes: 3)),
-              intentos: 2,
-              ultimoError: 'sin red',
-            ),
-          ],
+          pendientes: pendientes,
         ),
       ),
     );
     await t.pumpAndSettle();
+    return pulsados;
+  }
+
+  testWidgets('LO PENDIENTE SE VE, y separado de lo confirmado', (t) async {
+    // Si no se viera, el residente tendría una lista donde su visitante NO
+    // aparece: creería que se perdió y lo volvería a crear, con clave nueva.
+    await montarPestana(
+      t,
+      pendientes: [
+        EnvioPendiente(
+          claveDeIdempotencia: 'k1',
+          recurso: 'mi/visitas',
+          cuerpo: const {'visitante': 'Plomero'},
+          encoladoEn: ahora.subtract(const Duration(minutes: 3)),
+          intentos: 2,
+          ultimoError: 'sin red',
+        ),
+      ],
+    );
 
     expect(find.textContaining('1 sin enviar'), findsOneWidget);
     expect(find.textContaining('NO están autorizadas'), findsOneWidget);
@@ -412,23 +224,78 @@ void main() {
   });
 
   testWidgets('sin nada pendiente, la bandeja no ocupa sitio', (t) async {
-    final repo = RepositorioFalso();
-    final c = controladorDeAutorizaciones(repo);
-    await c.cargarAhora();
-
-    await t.pumpWidget(
-      envolver(
-        PantallaDeVisitantes(
-          controlador: c,
-          alPedirAcceso: () {},
-          alCrear: () {},
-          ahora: ahora,
-          alReintentarPendientes: () async {},
-          pendientes: const [],
-        ),
-      ),
-    );
-    await t.pumpAndSettle();
+    await montarPestana(t);
     expect(find.textContaining('sin enviar'), findsNothing);
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // F6 · ÚLTIMOS VISITANTES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  testWidgets('F6 · cada visitante reciente lleva «Volver a autorizar» con SU visita', (t) async {
+    t.view.physicalSize = const Size(1000, 2000);
+    t.view.devicePixelRatio = 1.0;
+    addTearDown(t.view.reset);
+    final pulsados = await montarPestana(
+      t,
+      repo: RepositorioFalso(
+        recientes: [
+          recienteDePrueba(),
+          recienteDePrueba(autorizacionId: 'aut-8', visitante: 'Sin Foto', tieneFoto: false),
+        ],
+      ),
+    );
+
+    expect(find.text('Últimos visitantes'), findsOneWidget);
+    expect(find.text('Plomero Pérez'), findsOneWidget);
+    // Sin foto guardada no hay nada que copiar: se dice ANTES de pulsar y el
+    // botón no responde.
+    expect(find.textContaining('No hay una foto guardada'), findsOneWidget);
+    final botones = t.widgetList<TextButton>(
+      find.ancestor(of: find.text('Volver a autorizar'), matching: find.byType(TextButton)),
+    );
+    expect(botones.map((b) => b.onPressed != null), [true, false]);
+
+    await t.tap(find.text('Volver a autorizar').first);
+    expect(pulsados.single.autorizacionId, 'aut-7');
+  });
+
+  testWidgets('F6 · sin autorizaciones todavía, los últimos visitantes siguen a la vista', (t) async {
+    // Es justo cuando más se vuelve a autorizar: la visita de la semana pasada
+    // ya terminó y hoy no hay nada vigente.
+    await montarPestana(
+      t,
+      repo: RepositorioSinAutorizaciones(recientes: [recienteDePrueba()]),
+    );
+    expect(find.text('Todavía no ha autorizado a ningún visitante.'), findsOneWidget);
+    expect(find.text('Volver a autorizar'), findsOneWidget);
+  });
+
+  testWidgets('F6 · sin visitantes recientes, la sección no ocupa sitio', (t) async {
+    await montarPestana(t);
+    expect(find.text('Últimos visitantes'), findsNothing);
+  });
+
+  testWidgets('F6 · si los últimos visitantes no cargan, se dice sin tapar lo autorizado',
+      (t) async {
+    await montarPestana(
+      t,
+      repo: RepositorioSinRecientes(const Fallo(ClaseDeFallo.sinConexion, 'sin red')),
+    );
+    expect(find.text('No se pudieron cargar sus últimos visitantes.'), findsOneWidget);
+    expect(find.text('Visitante propio'), findsOneWidget, reason: 'lo autorizado sigue ahí');
+  });
+}
+
+class RepositorioSinAutorizaciones extends RepositorioFalso {
+  RepositorioSinAutorizaciones({super.recientes});
+  @override
+  Future<List<Autorizacion>> misAutorizaciones() async => const [];
+}
+
+class RepositorioSinRecientes extends RepositorioFalso {
+  RepositorioSinRecientes(this.fallo);
+  final Fallo fallo;
+  @override
+  Future<List<VisitanteReciente>> ultimosVisitantes() async => throw fallo;
 }

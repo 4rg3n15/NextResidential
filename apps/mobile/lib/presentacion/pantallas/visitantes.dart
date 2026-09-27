@@ -18,10 +18,19 @@
 /// Tras ocho intentos la bandeja deja de reintentar sola. No se borra: se enseña
 /// con su último error y un botón. El reintento a mano repite la MISMA clave, así
 /// que sigue sin poder duplicar (RN-17).
+///
+/// ═════════════════════════════════════════════════════════════════════════════
+/// F6 · LOS ÚLTIMOS VISITANTES, CON «VOLVER A AUTORIZAR»
+///
+/// Uno por persona y el más reciente primero. Quien viene cada semana se
+/// autoriza con dos toques: cuándo, cuánto y la casilla. Es una lectura aparte
+/// de la de las autorizaciones y se pinta aparte: si fallara, la lista de lo
+/// autorizado sigue a la vista, que es lo que importa en la puerta.
 library;
 
 import 'package:flutter/material.dart';
 
+import '../../aplicacion/estado.dart';
 import '../../dominio/bandeja_de_salida.dart';
 import '../../dominio/entidades.dart';
 import '../../configuracion/tema.dart';
@@ -33,16 +42,22 @@ class PantallaDeVisitantes extends StatelessWidget {
   const PantallaDeVisitantes({
     super.key,
     required this.controlador,
+    required this.ultimos,
     required this.alPedirAcceso,
     required this.alCrear,
+    required this.alVolverAAutorizar,
     required this.pendientes,
     required this.alReintentarPendientes,
     required this.ahora,
   });
 
   final ControladorDeVista<List<Autorizacion>> controlador;
+
+  /// F6 · los últimos visitantes, uno por persona.
+  final ControladorDeVista<List<VisitanteReciente>> ultimos;
   final VoidCallback alPedirAcceso;
   final VoidCallback alCrear;
+  final void Function(VisitanteReciente visitante) alVolverAAutorizar;
 
   /// Lo que espera en la bandeja. Se recibe ya resuelto: esta pantalla no sabe
   /// reintentar, solo lo enseña.
@@ -55,21 +70,21 @@ class PantallaDeVisitantes extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: AnimatedBuilder(
-          animation: controlador,
+          animation: Listenable.merge([controlador, ultimos]),
           builder: (context, _) => VistaConEstado<List<Autorizacion>>(
-            estado: controlador.estado,
+            // «Vacía» no es un estado aparte en esta pestaña: la bandeja y los
+            // últimos visitantes tienen que verse aunque hoy no haya nada
+            // autorizado, que es justo cuando más se vuelve a autorizar.
+            estado: switch (controlador.estado) {
+              Vacio<List<Autorizacion>>() => const ConDatos<List<Autorizacion>>([]),
+              final e => e,
+            },
             alReintentar: controlador.cargarAhora,
             alPedirAcceso: alPedirAcceso,
-            mensajeVacio: 'Todavía no ha autorizado a ningún visitante.',
             conDatos: (lista, {required bool desdeCache}) => ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
               children: [
                 Text('Mis visitantes', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 4),
-                const Text(
-                  'Lo que el conjunto ya tiene registrado a su nombre.',
-                  style: TextStyle(color: Paleta.textoSuave, fontSize: 13),
-                ),
                 if (desdeCache) ...[const SizedBox(height: 8), const MarcaDeCache()],
                 if (pendientes.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -79,7 +94,24 @@ class PantallaDeVisitantes extends StatelessWidget {
                     alReintentar: alReintentarPendientes,
                   ),
                 ],
+                _UltimosVisitantes(
+                  estado: ultimos.estado,
+                  alReintentar: ultimos.cargarAhora,
+                  alVolverAAutorizar: alVolverAAutorizar,
+                ),
                 const SizedBox(height: 16),
+                Text('Autorizaciones', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                const Text(
+                  'Lo que el conjunto ya tiene registrado a su nombre.',
+                  style: TextStyle(color: Paleta.textoSuave, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                if (lista.isEmpty)
+                  const Text(
+                    'Todavía no ha autorizado a ningún visitante.',
+                    style: TextStyle(color: Paleta.textoSuave),
+                  ),
                 ...lista.map((a) => _Fila(a, ahora: ahora)),
               ],
             ),
@@ -157,8 +189,7 @@ class _Bandeja extends StatelessWidget {
             label: const Text('Intentar ahora'),
           ),
           Text(
-            'Reintentar no duplica: se reenvía con la misma clave y el conjunto devuelve la '
-            'visita que ya creó (RN-17).',
+            'Reintentar no duplica: si la visita ya se había creado, se conserva la misma.',
             style: TextStyle(color: Paleta.avisoSuave.texto, fontSize: 11),
           ),
         ],
@@ -193,6 +224,106 @@ class _Fila extends StatelessWidget {
         trailing: Distintivo(
           texto: vigente ? 'vigente' : a.estado,
           pareja: vigente ? Paleta.exitoSuave : Paleta.neutroSuave,
+        ),
+      ),
+    );
+  }
+}
+
+/// F6 · la sección de los últimos visitantes. Pinta su propio estado sin
+/// tapar el resto: vacía no ocupa sitio, y si falla lo dice en una línea.
+class _UltimosVisitantes extends StatelessWidget {
+  const _UltimosVisitantes({
+    required this.estado,
+    required this.alReintentar,
+    required this.alVolverAAutorizar,
+  });
+
+  final Estado<List<VisitanteReciente>> estado;
+  final Future<void> Function() alReintentar;
+  final void Function(VisitanteReciente visitante) alVolverAAutorizar;
+
+  @override
+  Widget build(BuildContext context) {
+    final (lista, fallo) = switch (estado) {
+      ConDatos(datos: final d) => (d, null),
+      Cargando(previo: final p) => (p, null),
+      Fallido(fallo: final f, previo: final p) => (p, f),
+      _ => (null, null),
+    };
+    if ((lista == null || lista.isEmpty) && fallo == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Text('Últimos visitantes', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        const Text(
+          'Para quien vuelve: se usan de nuevo sus datos y su foto.',
+          style: TextStyle(color: Paleta.textoSuave, fontSize: 13),
+        ),
+        if (fallo != null)
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'No se pudieron cargar sus últimos visitantes.',
+                  style: TextStyle(color: Paleta.peligroSuave.texto, fontSize: 13),
+                ),
+              ),
+              TextButton(onPressed: alReintentar, child: const Text('Reintentar')),
+            ],
+          ),
+        const SizedBox(height: 8),
+        ...?lista?.map((v) => _Reciente(v, alVolverAAutorizar: () => alVolverAAutorizar(v))),
+      ],
+    );
+  }
+}
+
+class _Reciente extends StatelessWidget {
+  const _Reciente(this.v, {required this.alVolverAAutorizar});
+  final VisitanteReciente v;
+  final VoidCallback alVolverAAutorizar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(v.visitante, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 2),
+            Text(
+              [
+                'Documento ${v.documento}',
+                if (v.placa != null) v.placa!,
+                'última visita ${momentoLegible(v.ultimaVisita)}',
+              ].join(' · '),
+              style: const TextStyle(color: Paleta.textoSuave, fontSize: 13),
+            ),
+            if (!v.tieneFoto)
+              // Se dice ANTES de pulsar: sin foto guardada no hay nada que
+              // copiar, y el servidor contestaría lo mismo tras el viaje.
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text(
+                  'No hay una foto guardada: regístrelo como visitante nuevo.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: v.tieneFoto ? alVolverAAutorizar : null,
+                icon: const Icon(Icons.replay, size: 18),
+                label: const Text('Volver a autorizar'),
+              ),
+            ),
+          ],
         ),
       ),
     );

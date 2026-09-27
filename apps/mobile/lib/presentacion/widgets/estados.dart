@@ -14,6 +14,7 @@
 /// | sin permiso      | El motivo. Ni reintento ni botón que no lleva a nada       |
 /// | sin vivienda     | La explicación de M-1: a quién pedirle el vínculo          |
 /// | servidor         | La causa y reintentar                                      |
+/// | datos no válidos | El motivo. Reintentar lo mismo daría lo mismo              |
 /// | vacío            | Que está vacío, no que falló                               |
 library;
 
@@ -106,6 +107,14 @@ class VistaConEstado<T> extends StatelessWidget {
           Paleta.peligroSuave,
           Icons.error_outline,
           _Accion('Reintentar', alReintentar),
+        ),
+      // Una lectura no debería recibirlo nunca. Si llega, se dice el motivo y
+      // no se ofrece reintentar: la misma petición daría la misma respuesta.
+      ClaseDeFallo.datosNoValidos => (
+          'No se pudo cargar',
+          Paleta.peligroSuave,
+          Icons.error_outline,
+          null,
         ),
     };
 

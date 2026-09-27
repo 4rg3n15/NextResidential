@@ -60,6 +60,11 @@ Fallo falloDeDio(DioException e) {
   final codigo = e.response?.statusCode;
   final detalle = detalleDeError(e.response?.data) ?? e.message ?? 'Error de servidor';
   return switch (codigo) {
+    // 400 y 422 son la FORMA de lo enviado. No se mezclan con `servidor`
+    // porque la bandeja de salida reintenta `servidor`, y reintentar ocho
+    // veces un formulario al que le falta la casilla sólo retrasa decirlo.
+    // [SUPUESTO] S-87: todo 400/422 es de la forma, nunca transitorio.
+    400 || 422 => Fallo(ClaseDeFallo.datosNoValidos, detalle),
     401 => Fallo(ClaseDeFallo.sesionInvalida, detalle),
     403 => Fallo(ClaseDeFallo.sinPermiso, detalle),
     404 => Fallo(ClaseDeFallo.sinVivienda, detalle),

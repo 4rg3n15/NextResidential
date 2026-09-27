@@ -1,5 +1,5 @@
 /// Los adaptadores del hogar del residente (ETAPA 15-I): alta, ocupantes,
-/// perfil, vehículos propios, consentimiento del visitante y la contraseña.
+/// perfil, vehículos propios y la contraseña.
 ///
 /// Misma regla que `repositorio_api.dart`: el cliente GENERADO adentro, las
 /// entidades del dominio afuera. Ningún DTO ni `DioException` cruza esta
@@ -16,7 +16,6 @@ import 'generado/models/alta_de_mi_vivienda_dto.dart';
 import 'generado/models/cambio_de_contrasena_dto.dart';
 import 'generado/models/campo_rechazado_dto.dart';
 import 'generado/models/declaracion_de_ocupantes_dto.dart';
-import 'generado/models/estado_de_consentimiento_dto_estado.dart';
 import 'generado/models/mis_ocupantes_dto.dart';
 import 'generado/models/perfil_del_residente_dto.dart';
 import 'generado/models/perfil_dto.dart';
@@ -142,27 +141,6 @@ class HogarPorApi implements RepositorioDelHogar {
   Future<bool> desactivarVehiculo(String vehiculoId) => pedirALaApi(() async {
     final d = await _api.miHogarControllerDesactivar(id: _copropiedad, vehiculoId: vehiculoId);
     return d.desactivado;
-  });
-
-  @override
-  Future<EstadoDeConsentimiento> estadoDelConsentimiento({
-    required String autorizacionId,
-    required String consentimientoId,
-  }) => pedirALaApi(() async {
-    final d = await _api.miHogarControllerEstadoDelConsentimiento(
-      id: _copropiedad,
-      autorizacionId: autorizacionId,
-      consentimientoId: consentimientoId,
-    );
-    return switch (d.estado) {
-      EstadoDeConsentimientoDtoEstado.aceptado => EstadoDeConsentimiento.aceptado,
-      EstadoDeConsentimientoDtoEstado.rechazado => EstadoDeConsentimiento.rechazado,
-      EstadoDeConsentimientoDtoEstado.revocado => EstadoDeConsentimiento.revocado,
-      EstadoDeConsentimientoDtoEstado.expirado => EstadoDeConsentimiento.expirado,
-      // Un estado que el servidor añada mañana NO se pinta como aceptado:
-      // «pendiente» es la lectura que no promete nada que no ocurrió.
-      _ => EstadoDeConsentimiento.pendiente,
-    };
   });
 }
 

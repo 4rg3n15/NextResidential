@@ -123,8 +123,7 @@ class _AvisoDeNivelDeAcceso extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        'El «nivel de acceso» viene del mockup y no de un requisito (P-11, sin definir). Hoy solo '
-        'el titular de la vivienda puede autorizar visitantes, como exige RN-05.',
+        'Hoy sólo el titular de la vivienda puede autorizar visitantes.',
         style: TextStyle(color: Paleta.neutroSuave.texto, fontSize: 13),
       ),
     );

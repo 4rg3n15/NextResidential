@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
+
+import '../dobles/visitas.dart';
 
 Vivienda vivienda({String? agrupacion, bool activa = true}) => Vivienda(
       id: 'v',
@@ -162,6 +166,39 @@ void main() {
     test('justo en el límite ya está lleno, no «queda una»', () {
       expect(z(10, 10).lleno, isTrue);
       expect(z(10, 9).lleno, isFalse);
+    });
+  });
+
+  group('15-L · la visita con foto y casilla', () {
+    test('el fin es el inicio más la duración, sin rehacer la suma en la pantalla', () {
+      final v = visitaDePrueba('k1');
+      expect(v.hasta, DateTime.utc(2026, 9, 20, 18));
+    });
+
+    test('la foto viaja en base64 y conserva las medidas con que se juzgó', () {
+      final f = FotoDeVisita.deJpeg(bytesDeJpeg, medidasBuenas);
+      expect(base64Decode(f.jpegBase64), bytesDeJpeg);
+      expect(f.medidas, same(medidasBuenas));
+    });
+
+    test('FotoRechazada dice razones en palabras, sin repetir y sin códigos', () {
+      const r = FotoRechazada(['NITIDEZ', 'NITIDEZ', 'ILUMINACION', 'ENCUADRE', 'SIN_ROSTRO']);
+      expect(r.razones, [
+        'la foto está borrosa',
+        'la luz no es suficiente o sobra',
+        'el rostro no está bien encuadrado',
+        'no se ve ningún rostro',
+      ]);
+      expect(r, isA<VisitaNoCreada>(), reason: 'la bandeja no la reintenta');
+    });
+
+    test('un código que la app no conoce no se enseña crudo', () {
+      expect(razonDeLaFoto('ENCUADRE_OBLICUO'), isNot(contains('ENCUADRE')));
+      expect(razonDeLaFoto('ENCUADRE_OBLICUO'), contains('calidad'));
+    });
+
+    test('el texto de la casilla es el que guarda el servidor, palabra por palabra', () {
+      expect(textoDeLaCasilla, 'El visitante autorizó el uso de su foto para el ingreso');
     });
   });
 }

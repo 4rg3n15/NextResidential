@@ -87,6 +87,16 @@ ControladorDeVista<List<Autorizacion>> controladorDeAutorizaciones(
       estaVacio: (l) => l.isEmpty,
     );
 
+/// F6 · los últimos visitantes de la vivienda, uno por persona. Vacía no es un
+/// fallo: quien nunca ha autorizado a nadie no tiene a quién volver a autorizar.
+ControladorDeVista<List<VisitanteReciente>> controladorDeUltimosVisitantes(
+  RepositorioDelResidente repo,
+) =>
+    ControladorDeVista<List<VisitanteReciente>>(
+      leer: repo.ultimosVisitantes,
+      estaVacio: (l) => l.isEmpty,
+    );
+
 /// El historial lleva su propio filtro, así que el controlador tiene estado
 /// además del `Estado`: el periodo elegido. Cambiar de periodo es cambiar la
 /// lectura y recargar — la misma máquina de estados, no otra.

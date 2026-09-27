@@ -21,6 +21,7 @@ import 'clients/padron_api.dart';
 import 'clients/porteria_api.dart';
 import 'clients/residentes_api.dart';
 import 'clients/tablero_api.dart';
+import 'clients/visitas_api.dart';
 import 'clients/zonas_api.dart';
 import 'clients/salud_api.dart';
 import 'clients/ingesta_api.dart';
@@ -59,6 +60,7 @@ class RestClient {
   PorteriaApi? _porteria;
   ResidentesApi? _residentes;
   TableroApi? _tablero;
+  VisitasApi? _visitas;
   ZonasApi? _zonas;
   SaludApi? _salud;
   IngestaApi? _ingesta;
@@ -98,6 +100,8 @@ class RestClient {
   ResidentesApi get residentes => _residentes ??= ResidentesApi(_dio, baseUrl: _baseUrl);
 
   TableroApi get tablero => _tablero ??= TableroApi(_dio, baseUrl: _baseUrl);
+
+  VisitasApi get visitas => _visitas ??= VisitasApi(_dio, baseUrl: _baseUrl);
 
   ZonasApi get zonas => _zonas ??= ZonasApi(_dio, baseUrl: _baseUrl);
 

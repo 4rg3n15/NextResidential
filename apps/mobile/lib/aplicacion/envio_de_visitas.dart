@@ -11,10 +11,12 @@
 /// ═════════════════════════════════════════════════════════════════════════════
 /// LAS TRES REGLAS QUE GOBIERNAN EL ENVÍO
 ///
-/// 1. **Un rechazo de negocio NO se reintenta.** Si el conjunto dice «esta
-///    persona está en lista negra», insistir ocho veces no la va a sacar de la
-///    lista: se saca de la bandeja y se le enseña al residente. Reintentar solo
-///    tiene sentido ante un fallo de transporte.
+/// 1. **Un rechazo de negocio NO se reintenta**, y una foto que el servidor no
+///    aceptó tampoco. Si el conjunto dice «esta persona está en lista negra»,
+///    insistir ocho veces no la va a sacar de la lista; si dice que la foto
+///    está borrosa, la misma foto seguirá borrosa. Las dos salen de la bandeja
+///    y se le enseñan al residente. Reintentar sólo tiene sentido ante un
+///    fallo de transporte.
 /// 2. **La clave viaja intacta.** El reintento repite la del primer intento, y
 ///    por eso el servidor devuelve la visita anterior en vez de crear otra
 ///    (RN-17). Una clave nueva por intento convertiría la bandeja en una
@@ -26,6 +28,7 @@ library;
 import 'dart:async';
 
 import '../dominio/bandeja_de_salida.dart';
+import '../dominio/calidad_de_captura.dart';
 import '../dominio/entidades.dart';
 import '../dominio/puertos.dart';
 
@@ -39,9 +42,12 @@ class Aceptado extends DesenlaceDeEnvio {
   final VisitaCreada resultado;
 }
 
+/// El conjunto contestó y no la creó: un rechazo de negocio o una foto que no
+/// le sirvió. Las dos cosas son una respuesta, no un fallo, y ninguna se
+/// reintenta.
 class Rechazado extends DesenlaceDeEnvio {
   const Rechazado(this.resultado);
-  final VisitaRechazada resultado;
+  final VisitaNoCreada resultado;
 }
 
 class Pendiente extends DesenlaceDeEnvio {
@@ -54,24 +60,27 @@ class Pendiente extends DesenlaceDeEnvio {
 /// Serializa una visita para guardarla mientras espera. El cuerpo es un mapa
 /// plano a propósito: lo que se guarda tiene que sobrevivir a un cierre de la
 /// app, y un objeto del dominio con `DateTime` dentro no se guarda solo.
+///
+/// La foto va entera —el JPEG en base64 y sus medidas— y la casilla también:
+/// el reintento tiene que enviar EXACTAMENTE lo que el residente compuso, y
+/// una visita encolada sin su foto sería otra visita.
 Map<String, Object?> cuerpoDe(NuevaVisita v) => {
       'visitante': v.visitante,
       'documento': v.documento,
-      'desde': v.desde.toIso8601String(),
-      'hasta': v.hasta.toIso8601String(),
+      'inicio': v.inicio.toUtc().toIso8601String(),
+      'duracionMinutos': v.duracionMinutos,
       'placa': v.placa,
-      'permiteAccesoVehicular': v.permiteAccesoVehicular,
-      'acompanantes': v.acompanantes,
-      'zonasPermitidas': v.zonasPermitidas,
       'observaciones': v.observaciones,
-      'patron': v.patron == null
-          ? null
-          : {
-              'dias': v.patron!.dias.map((d) => d.index).toList()..sort(),
-              'minutoInicio': v.patron!.minutoInicio,
-              'minutoFin': v.patron!.minutoFin,
-              'desplazamientoUtcMinutos': v.patron!.desplazamientoUtcMinutos,
-            },
+      'foto': {
+        'jpegBase64': v.foto.jpegBase64,
+        'medidas': {
+          'nitidez': v.foto.medidas.nitidez,
+          'iluminacion': v.foto.medidas.iluminacion,
+          'rostrosDetectados': v.foto.medidas.rostrosDetectados,
+          'proporcionRostro': v.foto.medidas.proporcionRostro,
+        },
+      },
+      'casillaMarcada': v.casillaMarcada,
       'claveDeIdempotencia': v.claveDeIdempotencia,
     };
 
@@ -79,37 +88,64 @@ Map<String, Object?> cuerpoDe(NuevaVisita v) => {
 /// forma esperada —una versión anterior de la app, un guardado a medias—: un
 /// envío ilegible se descarta en vez de reventar el vaciado de la bandeja
 /// entera, que es lo que dejaría al residente sin enviar nada nunca más.
+///
+/// Se comprueba CADA campo, no sólo los primeros: una visita que se leyera sin
+/// su foto o sin la casilla saldría hacia el servidor como algo que el
+/// residente no compuso.
 NuevaVisita? visitaDe(Map<String, Object?> c) {
   final visitante = c['visitante'];
-  final desde = c['desde'];
-  final hasta = c['hasta'];
+  final documento = c['documento'];
+  final inicio = c['inicio'] is String ? DateTime.tryParse(c['inicio']! as String) : null;
+  final duracion = c['duracionMinutos'];
+  final placa = c['placa'];
+  final observaciones = c['observaciones'];
+  final casilla = c['casillaMarcada'];
   final clave = c['claveDeIdempotencia'];
-  if (visitante is! String || desde is! String || hasta is! String || clave is! String) {
+  final foto = _fotoDe(c['foto']);
+  if (visitante is! String ||
+      documento is! String ||
+      inicio == null ||
+      duracion is! int ||
+      (placa != null && placa is! String) ||
+      (observaciones != null && observaciones is! String) ||
+      casilla is! bool ||
+      clave is! String ||
+      foto == null) {
     return null;
   }
-  final patron = c['patron'];
   return NuevaVisita(
     visitante: visitante,
-    documento: c['documento'] as String?,
-    desde: DateTime.parse(desde),
-    hasta: DateTime.parse(hasta),
-    placa: c['placa'] as String?,
-    permiteAccesoVehicular: c['permiteAccesoVehicular'] == true,
-    acompanantes: List<String>.from((c['acompanantes'] as List?) ?? const []),
-    zonasPermitidas: List<String>.from((c['zonasPermitidas'] as List?) ?? const []),
-    observaciones: c['observaciones'] as String?,
-    patron: patron is! Map
-        ? null
-        : PatronDeVisita(
-            dias: {
-              for (final d in (patron['dias'] as List? ?? const []))
-                DiaDeSemana.values[(d as num).toInt()],
-            },
-            minutoInicio: (patron['minutoInicio'] as num).toInt(),
-            minutoFin: (patron['minutoFin'] as num).toInt(),
-            desplazamientoUtcMinutos: (patron['desplazamientoUtcMinutos'] as num).toInt(),
-          ),
+    documento: documento,
+    inicio: inicio,
+    duracionMinutos: duracion,
+    placa: placa as String?,
+    observaciones: observaciones as String?,
+    foto: foto,
+    casillaMarcada: casilla,
     claveDeIdempotencia: clave,
+  );
+}
+
+FotoDeVisita? _fotoDe(Object? f) {
+  if (f is! Map) return null;
+  final jpeg = f['jpegBase64'];
+  final m = f['medidas'];
+  if (jpeg is! String || m is! Map) return null;
+  final nitidez = m['nitidez'];
+  final iluminacion = m['iluminacion'];
+  final rostros = m['rostrosDetectados'];
+  final proporcion = m['proporcionRostro'];
+  if (nitidez is! num || iluminacion is! num || rostros is! int || proporcion is! num) {
+    return null;
+  }
+  return FotoDeVisita(
+    jpegBase64: jpeg,
+    medidas: MedidasDeCaptura(
+      nitidez: nitidez.toDouble(),
+      iluminacion: iluminacion.toDouble(),
+      rostrosDetectados: rostros,
+      proporcionRostro: proporcion.toDouble(),
+    ),
   );
 }
 
@@ -129,8 +165,9 @@ class EnvioDeVisitas {
   BandejaDeSalida _bandeja = const BandejaDeSalida([]);
   BandejaDeSalida get bandeja => _bandeja;
 
-  /// Los rechazos que el residente todavía no ha visto, por clave.
-  final Map<String, VisitaRechazada> rechazos = {};
+  /// Los rechazos que el residente todavía no ha visto, por clave: de negocio
+  /// o de la foto.
+  final Map<String, VisitaNoCreada> rechazos = {};
 
   /// Intenta enviar AHORA. Si no hay red, encola y lo dice.
   ///
@@ -142,7 +179,7 @@ class EnvioDeVisitas {
     _bandeja = _bandeja.encolar(
       EnvioPendiente(
         claveDeIdempotencia: visita.claveDeIdempotencia,
-        recurso: 'mi/autorizaciones',
+        recurso: 'mi/visitas',
         cuerpo: cuerpoDe(visita),
         encoladoEn: _reloj.ahora(),
       ),
@@ -156,10 +193,13 @@ class EnvioDeVisitas {
       // Aceptada o rechazada, sale de la bandeja: en los dos casos el conjunto
       // ya dio su respuesta y reintentar no cambiaría nada.
       _bandeja = _bandeja.quitar(visita.claveDeIdempotencia);
-      if (r is VisitaCreada) return Aceptado(r);
-      final rechazo = r as VisitaRechazada;
-      rechazos[visita.claveDeIdempotencia] = rechazo;
-      return Rechazado(rechazo);
+      switch (r) {
+        case VisitaCreada():
+          return Aceptado(r);
+        case VisitaNoCreada():
+          rechazos[visita.claveDeIdempotencia] = r;
+          return Rechazado(r);
+      }
     } on Fallo catch (f) {
       if (f.clase == ClaseDeFallo.sinConexion || f.clase == ClaseDeFallo.servidor) {
         _bandeja = _bandeja.fallo(
@@ -170,8 +210,9 @@ class EnvioDeVisitas {
         );
         return Pendiente(f.detalle);
       }
-      // 401 y 403 no son problemas de transporte: reintentarlos ocho veces con
-      // retroceso exponencial solo retrasa el momento de decírselo.
+      // 401, 403 y un formulario que el servidor no admite (400 · 422) no son
+      // problemas de transporte: reintentarlos ocho veces con retroceso
+      // exponencial solo retrasa el momento de decírselo.
       _bandeja = _bandeja.quitar(visita.claveDeIdempotencia);
       rethrow;
     }
