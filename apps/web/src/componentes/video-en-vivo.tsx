@@ -29,11 +29,19 @@ type Fase =
       readonly negociacionMs: number;
       readonly primerCuadroMs: number | null;
     }
-  | { readonly tipo: 'error'; readonly codigo: string; readonly mensaje: string };
+  | { readonly tipo: 'error'; readonly codigo: string; readonly mensaje: string }
+  /** D3 (15-L) · negoció, pero el equipo no manda imagen. */
+  | { readonly tipo: 'sin_senal' };
+
+/** D3 (15-L) · sin primer cuadro en este tiempo, «sin señal» y no un negro. */
+export const PLAZO_PRIMER_CUADRO_MS = 8000;
 
 const TITULO_POR_CODIGO: Record<string, string> = {
   sin_puente: 'Vista en vivo no desplegada',
-  sin_video: 'Este equipo no ofrece video',
+  // 409 · no ofrece video, o lo entrega en un códec que el navegador no
+  // reproduce (H.265): el mensaje de la API dice cuál de las dos.
+  sin_video: 'Sin video de este equipo',
+  cortado: 'Se cortó el video',
   puente: 'El puente de video no responde',
   sin_permiso: 'Sin permiso para ver este equipo',
   navegador: 'Este navegador no reproduce WebRTC',
@@ -44,11 +52,13 @@ export const VideoEnVivo = ({
   copropiedadId,
   dispositivoId,
   negociar = negociarVistaEnVivo,
+  plazoPrimerCuadroMs = PLAZO_PRIMER_CUADRO_MS,
 }: {
   readonly copropiedadId: string;
   readonly dispositivoId: string;
   /** Inyectable para las pruebas; por omisión, la negociación real. */
   readonly negociar?: (url: string, opciones: OpcionesDeNegociacion) => Promise<ConexionEnVivo>;
+  readonly plazoPrimerCuadroMs?: number;
 }): JSX.Element => {
   const [fase, setFase] = useState<Fase>({ tipo: 'conectando' });
   const [intento, setIntento] = useState(0);
@@ -63,6 +73,14 @@ export const VideoEnVivo = ({
     negociar(rutaWhep(copropiedadId, dispositivoId), {
       alFlujo: (flujo) => {
         if (video.current !== null) video.current.srcObject = flujo;
+      },
+      alCortarse: () => {
+        if (!vigente) return;
+        setFase({
+          tipo: 'error',
+          codigo: 'cortado',
+          mensaje: 'La conexión con el puente de video se interrumpió: reintente',
+        });
       },
     })
       .then((c) => {
@@ -89,6 +107,14 @@ export const VideoEnVivo = ({
       if (video.current !== null) video.current.srcObject = null;
     };
   }, [copropiedadId, dispositivoId, intento, negociar]);
+
+  // D3 (15-L) · negoció y no llega imagen: se dice «sin señal», no un negro.
+  const esperandoCuadro = fase.tipo === 'reproduciendo' && fase.primerCuadroMs === null;
+  useEffect(() => {
+    if (!esperandoCuadro) return;
+    const temporizador = setTimeout(() => setFase({ tipo: 'sin_senal' }), plazoPrimerCuadroMs);
+    return () => clearTimeout(temporizador);
+  }, [esperandoCuadro, plazoPrimerCuadroMs]);
 
   const alReproducir = (): void => {
     const primerCuadroMs = Math.round(performance.now() - inicio.current);
@@ -129,10 +155,18 @@ export const VideoEnVivo = ({
               <p className="mt-2 text-secundario text-texto-invertido">
                 {fase.tipo === 'conectando'
                   ? 'Negociando el video con la API…'
-                  : (TITULO_POR_CODIGO[fase.codigo] ?? TITULO_POR_CODIGO['red'])}
+                  : fase.tipo === 'sin_senal'
+                    ? 'Sin señal'
+                    : (TITULO_POR_CODIGO[fase.codigo] ?? TITULO_POR_CODIGO['red'])}
               </p>
               {fase.tipo === 'error' && (
                 <p className="mt-1 text-distintivo text-texto-invertidoApagado">{fase.mensaje}</p>
+              )}
+              {fase.tipo === 'sin_senal' && (
+                <p className="mt-1 text-distintivo text-texto-invertidoApagado">
+                  El video se negoció pero el equipo no envía imagen. Si su ficha dice H.265,
+                  cámbielo a H.264; si no, pruebe la conexión del equipo.
+                </p>
               )}
             </div>
           </div>
@@ -158,7 +192,7 @@ export const VideoEnVivo = ({
             </span>
           </>
         )}
-        {fase.tipo === 'error' && (
+        {(fase.tipo === 'error' || fase.tipo === 'sin_senal') && (
           <Boton
             type="button"
             variante="secundario"

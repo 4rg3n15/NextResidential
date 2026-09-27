@@ -15,6 +15,8 @@ import {
   SONDA_DE_EQUIPO,
 } from './aplicacion/puertos';
 import type { OlvidoDeEquipo } from './aplicacion/puertos';
+import { LECTOR_DE_SENALES } from './aplicacion/senal-de-eventos';
+import type { LectorDeSenales } from './aplicacion/senal-de-eventos';
 import { PROVEEDOR_DE_EQUIPOS } from '../proveedores';
 import type { ProveedorDeEquipos } from '@ncr/providers';
 import type { RepositorioDeAtestaciones, RepositorioDeEquipos } from './aplicacion/puertos';
@@ -62,9 +64,19 @@ export class EquiposModule {
           }),
         },
         {
+          // C3 (15-L) · la señal real de la escucha de cada equipo, para su ficha.
+          provide: LECTOR_DE_SENALES,
+          inject: [PROVEEDOR_DE_EQUIPOS],
+          useFactory: (proveedor: ProveedorDeEquipos): LectorDeSenales => ({
+            senal: (dispositivoId) => proveedor.senalDeEventos?.(dispositivoId) ?? null,
+          }),
+        },
+        {
           provide: SONDA_DE_EQUIPO,
-          inject: [BITACORA],
-          useFactory: (bitacora: Bitacora) => new SondaPorProveedor(undefined, bitacora),
+          inject: [BITACORA, CONFIGURACION],
+          useFactory: (bitacora: Bitacora, c: Configuracion) =>
+            // D2 · C3 (15-L) · «Probar conexión» pregunta también el video (RTSP).
+            new SondaPorProveedor(undefined, bitacora, c.VIDEO_PUERTO_RTSP),
         },
         {
           // 15-L · la apertura sin plataforma y el plazo, del `.env`: nunca del código.

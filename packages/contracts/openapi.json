@@ -7822,6 +7822,34 @@
           "almacenadas"
         ]
       },
+      "CapacidadDeVideoDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "si",
+              "no",
+              "desconocida"
+            ]
+          },
+          "codec": {
+            "type": "string",
+            "nullable": true,
+            "description": "«H.264», «H.265»…"
+          },
+          "canal": {
+            "type": "string",
+            "nullable": true,
+            "description": "Canal preguntado (canal×100+flujo)"
+          }
+        },
+        "required": [
+          "estado",
+          "codec",
+          "canal"
+        ]
+      },
       "CapacidadesDeEquipoDto": {
         "type": "object",
         "properties": {
@@ -7894,6 +7922,9 @@
               "no",
               "desconocida"
             ]
+          },
+          "video": {
+            "$ref": "#/components/schemas/CapacidadDeVideoDto"
           }
         },
         "required": [
@@ -7906,7 +7937,8 @@
           "senalizacionDeLlamada",
           "suscripcionDeEventos",
           "reconocimientoDePlacas",
-          "estadoDeBarrera"
+          "estadoDeBarrera",
+          "video"
         ]
       },
       "CapturarRostroDto": {

@@ -24,9 +24,9 @@ import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
 import { Videoportero } from '../videoportero/videoportero';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
 import { EscuchaDeAlertStream, transporteSegunCapacidades } from '../equipo/escucha-alertstream';
-import type { EscuchaActiva } from '../nucleo/escucha';
+import type { EscuchaActiva, TransporteDeEscucha } from '../nucleo/escucha';
 import type { OrigenDeVideo } from '../nucleo/video';
-import { origenRtspDe } from './video-rtsp';
+import { canalDeVideoDe, origenRtspDe } from './video-rtsp';
 import { EquipoDecidePorSuCuenta } from '../camara/modo-de-control';
 import { leerVeredictoDeControl } from '../camara/veredicto-de-control';
 import { leerDisparador } from '../camara/disparadores-vinculados';
@@ -36,7 +36,7 @@ import { descubrirCapacidades } from './capacidades-hikvision';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe, soporta } from '../nucleo/capacidades';
-import { CapacidadNoSoportada, CredencialRechazada } from '../nucleo/errores';
+import { CapacidadNoSoportada, CredencialRechazada, VideoNoReproducible } from '../nucleo/errores';
 import { POLITICA_DE_ORDENES, conReintentos } from '../nucleo/reintentos';
 import type { MedioDeEspera } from '../nucleo/reintentos';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
@@ -345,7 +345,29 @@ export class HikvisionProvider
    */
   async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
     const equipo = await this.resolver(dispositivoId);
+    // D2 (15-L) · si la última respuesta RTSP del equipo, en ESTE canal, fue un
+    // códec que el navegador no reproduce, se dice ahora y no con un negro.
+    const video = equipo.capacidades?.video;
+    const canal = canalDeVideoDe(equipo);
+    if (
+      video !== undefined &&
+      video.codec !== null &&
+      video.codec !== 'H.264' &&
+      video.canal === canal
+    ) {
+      throw new VideoNoReproducible(dispositivoId, video.codec, canal);
+    }
     return origenRtspDe(equipo, this.opciones.puertoRtsp);
+  }
+
+  /** C3 (15-L) · la señal de la escucha de este equipo, si hay escucha. */
+  senalDeEventos(
+    dispositivoId: string,
+  ): { readonly transporte: TransporteDeEscucha; readonly ultimaSenal: Date | null } | null {
+    const escucha = this.escuchas.get(dispositivoId);
+    return escucha === undefined
+      ? null
+      : { transporte: escucha.transporte, ultimaSenal: escucha.ultimaSenal?.() ?? null };
   }
 
   // ── Escucha de lo que el equipo emite (A4) ───────────────────────────────

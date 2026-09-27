@@ -29,9 +29,22 @@ export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto
     estado === 'si' ? 'exito' : estado === 'no' ? 'peligro' : 'neutro';
   const palabra = (estado: string, siTexto: string, noTexto: string, dudaTexto: string): string =>
     estado === 'si' ? siTexto : estado === 'no' ? noTexto : dudaTexto;
+  // D2 (15-L) · el video, como lo describió el equipo por RTSP al probarlo.
+  const video = (): { tono: TonoDeDistintivo; texto: string } => {
+    const v = c.video;
+    const canal = v.canal === null ? '' : ` (${v.canal})`;
+    if (v.codec === 'H.264') return { tono: 'exito', texto: `Video H.264${canal}` };
+    if (v.codec !== null) {
+      return { tono: 'peligro', texto: `Video ${v.codec}${canal}: no se ve en el navegador` };
+    }
+    return v.estado === 'no'
+      ? { tono: 'aviso', texto: `Sin video en el canal${canal}` }
+      : { tono: 'neutro', texto: 'Video sin comprobar' };
+  };
+  const conVideo = (lista: { tono: TonoDeDistintivo; texto: string }[]) => [...lista, video()];
   switch (e.tipo) {
     case 'terminal_facial':
-      return [
+      return conVideo([
         {
           tono: si(c.verificacionRemota),
           texto: palabra(
@@ -53,9 +66,9 @@ export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto
                   'Biblioteca sin comprobar',
                 ),
         },
-      ];
+      ]);
     case 'intercom':
-      return [
+      return conVideo([
         {
           tono: si(c.aperturaRemota),
           texto: palabra(
@@ -90,9 +103,9 @@ export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto
             'Rostros sin comprobar',
           ),
         },
-      ];
+      ]);
     case 'camara_lpr':
-      return [
+      return conVideo([
         {
           tono: si(c.reconocimientoDePlacas),
           texto: palabra(
@@ -102,7 +115,7 @@ export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto
             'Placas sin comprobar',
           ),
         },
-      ];
+      ]);
     default:
       return [
         {
@@ -368,7 +381,8 @@ export const PantallaDeDispositivos = ({
                 disabled={enCurso !== null}
                 onClick={() => setFichaDe(porId.get(d.id) ?? null)}
               >
-                Ficha
+                {/* C3 (15-L) · la ficha SONDEA el equipo: capacidad por capacidad. */}
+                Probar conexión
               </Boton>
               <Boton
                 variante="secundario"

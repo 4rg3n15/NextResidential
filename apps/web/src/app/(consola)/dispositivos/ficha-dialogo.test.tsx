@@ -154,3 +154,36 @@ describe('la ficha de un equipo en servicio (O4)', () => {
     expect(peticiones.filter((p) => p.ruta.endsWith('/diagnostico'))).toHaveLength(2);
   });
 });
+
+describe('D3 (15-L) · el video en vivo desde la ficha', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', servidorFalso());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const abrir = (equipo: Equipo) =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <FichaDialogo copropiedadId={COP} equipo={equipo} alCerrar={() => undefined} />
+      </QueryClientProvider>,
+    );
+
+  it('un equipo con video lo ofrece a pedido, sin negociar al abrir', async () => {
+    abrir(TERMINAL);
+    const boton = await screen.findByRole('button', { name: 'Ver video en vivo' });
+    expect(screen.queryByText(/Negociando el video/)).toBeNull();
+    fireEvent.click(boton);
+    // En el banco no hay WebRTC: el recuadro lo DICE, no se queda en negro.
+    await waitFor(() =>
+      expect(screen.getByText('Este navegador no reproduce WebRTC')).toBeTruthy(),
+    );
+  });
+
+  it('un relé no tiene video: no se ofrece', async () => {
+    abrir({ ...TERMINAL, tipo: 'rele' });
+    await screen.findByRole('dialog');
+    expect(screen.queryByRole('button', { name: 'Ver video en vivo' })).toBeNull();
+  });
+});

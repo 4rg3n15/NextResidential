@@ -16,7 +16,10 @@ import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import type { CapacidadesDeEquipo, FichaDelEquipo } from '@ncr/providers';
 import { Aislamiento } from '../../multiempresa/aislamiento';
-import { vigenciaDeAtestacion } from '@ncr/domain-core';
+import { RELOJ, vigenciaDeAtestacion } from '@ncr/domain-core';
+import type { Reloj } from '@ncr/domain-core';
+import { LECTOR_DE_SENALES, hallazgoDeEventos } from '../aplicacion/senal-de-eventos';
+import type { LectorDeSenales } from '../aplicacion/senal-de-eventos';
 import {
   CORRECTOR_DE_EQUIPO,
   OLVIDO_DE_EQUIPO,
@@ -130,6 +133,7 @@ const aCapacidades = (c: CapacidadesDeEquipo): CapacidadesDeEquipoDto => ({
   suscripcionDeEventos: c.suscripcionDeEventos,
   reconocimientoDePlacas: c.reconocimientoDePlacas,
   estadoDeBarrera: c.estadoDeBarrera,
+  video: { ...c.video },
 });
 
 /**
@@ -155,6 +159,8 @@ export class EquiposController {
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
     @Inject(REPOSITORIO_DE_ATESTACIONES) private readonly atestaciones: RepositorioDeAtestaciones,
     @Inject(OLVIDO_DE_EQUIPO) private readonly olvido: OlvidoDeEquipo,
+    @Inject(LECTOR_DE_SENALES) private readonly senales: LectorDeSenales,
+    @Inject(RELOJ) private readonly reloj: Reloj,
   ) {}
 
   /** D-11 · los equipos con su atestación más reciente, en una sola consulta. */
@@ -298,6 +304,7 @@ export class EquiposController {
       tipo: dto.tipo,
       canalBarrera: dto.canalBarrera ?? null,
       modoDeTerminal: dto.modoDeTerminal ?? null,
+      canalDeVideo: dto.canalDeVideo ?? null,
     });
   }
 
@@ -436,11 +443,27 @@ export class EquiposController {
       tipo: equipo.tipo,
       canalBarrera: equipo.canalBarrera,
       modoDeTerminal: equipo.modoDeTerminal,
+      canalDeVideo: equipo.canalDeVideo,
     });
     await this.repo.registrarSondeo(ctx, copropiedadId, equipoId, veredicto);
     // C1 (15-L) · capacidades nuevas en la base: el proceso deja las viejas.
     this.olvido.olvidar(equipoId);
-    return this.aResultado(veredicto);
+    // C3 (15-L) · eventos: la señal real de la escucha, no una segunda conexión.
+    const emite = equipo.tipo === 'terminal_facial' || equipo.tipo === 'intercom';
+    return this.aResultado(
+      emite && veredicto.ficha !== undefined
+        ? {
+            ...veredicto,
+            ficha: {
+              ...veredicto.ficha,
+              hallazgos: [
+                ...veredicto.ficha.hallazgos,
+                hallazgoDeEventos(this.senales.senal(equipoId), this.reloj.ahora()),
+              ],
+            },
+          }
+        : veredicto,
+    );
   }
 
   /**

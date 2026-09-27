@@ -120,4 +120,6 @@ export * from './simulacion/equipo-simulado';
 export * from './simulacion/camara-que-publica';
 export { jpegConMedidas } from './simulacion/imagenes-de-prueba';
 export { negacionesLocalesPor, personasPor } from './simulacion/personas-simuladas';
+export { servidorRtspSimulado } from './simulacion/servidor-rtsp';
+export type { ServidorRtspSimulado, GuionRtsp } from './simulacion/servidor-rtsp';
 export type { PersonaSimulada } from './simulacion/personas-simuladas';

@@ -7,7 +7,14 @@ import { resumenDeCapacidades } from './pantalla';
  * decir si recibe plantillas o si NO APLICA —que no es «sin comprobar»: eso se
  * resuelve sondeando; lo otro, no—.
  */
-const videoportero = (biblioteca: 'si' | 'no' | 'desconocida'): Equipo =>
+const videoportero = (
+  biblioteca: 'si' | 'no' | 'desconocida',
+  video: { estado: string; codec: string | null; canal: string | null } = {
+    estado: 'desconocida',
+    codec: null,
+    canal: null,
+  },
+): Equipo =>
   ({
     tipo: 'intercom',
     capacidades: {
@@ -21,6 +28,7 @@ const videoportero = (biblioteca: 'si' | 'no' | 'desconocida'): Equipo =>
       suscripcionDeEventos: 'si',
       reconocimientoDePlacas: 'no',
       estadoDeBarrera: 'no',
+      video,
     },
   }) as unknown as Equipo;
 
@@ -31,5 +39,16 @@ describe('H-SITIO-09 · el videoportero dice si recibe rostros', () => {
     ['desconocida', 'Rostros sin comprobar'],
   ] as const)('%s → «%s»', (estado, texto) => {
     expect(resumenDeCapacidades(videoportero(estado)).map((x) => x.texto)).toContain(texto);
+  });
+});
+
+describe('D2 (15-L) · la fila dice el video que describió el equipo', () => {
+  it.each([
+    [{ estado: 'si', codec: 'H.264', canal: '102' }, 'Video H.264 (102)'],
+    [{ estado: 'si', codec: 'H.265', canal: '101' }, 'Video H.265 (101): no se ve en el navegador'],
+    [{ estado: 'no', codec: null, canal: '202' }, 'Sin video en el canal (202)'],
+    [{ estado: 'desconocida', codec: null, canal: null }, 'Video sin comprobar'],
+  ])('%o → «%s»', (video, texto) => {
+    expect(resumenDeCapacidades(videoportero('si', video)).map((x) => x.texto)).toContain(texto);
   });
 });

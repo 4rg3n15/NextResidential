@@ -75,7 +75,9 @@ type Llamada = [string, { method?: string; headers: Record<string, string>; body
 const llamadas = (): Llamada[] => fetchFalso.mock.calls as unknown as Llamada[];
 
 const llamadaDeAlta = (): Llamada => {
-  const alta = llamadas().find(([url, o]) => url.endsWith('/auth/v1/factors') && o.method === 'POST');
+  const alta = llamadas().find(
+    ([url, o]) => url.endsWith('/auth/v1/factors') && o.method === 'POST',
+  );
   expect(alta).toBeDefined();
   return alta as Llamada;
 };

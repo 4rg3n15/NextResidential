@@ -16,6 +16,7 @@ import type { OrdenConResultado } from '@/componentes/resultado-de-orden';
 import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
 import { DialogoDeMotivo } from '@/componentes/dialogo-motivo';
 import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
+import { VideoEnVivo } from '@/componentes/video-en-vivo';
 
 /**
  * Consola de PORTERÍA — HU-21 a HU-24.
@@ -225,6 +226,9 @@ export const PantallaDePorteria = ({
                   sin que nadie las mire (RN-21).
                 */}
                 <Evidencia copropiedadId={copropiedadId} eventoId={actual.eventoId} />
+
+                {/* D3 (15-L) · el video del equipo del evento, con sus estados. */}
+                <VideoEnVivo copropiedadId={copropiedadId} dispositivoId={actual.dispositivoId} />
 
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Boton

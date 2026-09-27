@@ -303,6 +303,8 @@ export interface DatosDeSondeo {
    * sola es un bloqueo salvo que alguien lo haya declarado a sabiendas.
    */
   readonly modoDeTerminal?: ModoDeTerminalDeclarado | null;
+  /** D2 · C3 (15-L) · el canal de video de la ficha, para preguntarlo por RTSP. */
+  readonly canalDeVideo?: string | null;
 }
 
 export interface SondaDeEquipo {

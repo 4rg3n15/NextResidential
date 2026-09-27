@@ -37,6 +37,7 @@ CapacidadesDeEquipoDto _$CapacidadesDeEquipoDtoFromJson(
   estadoDeBarrera: CapacidadesDeEquipoDtoEstadoDeBarrera.fromJson(
     json['estadoDeBarrera'] as String,
   ),
+  video: CapacidadDeVideoDto.fromJson(json['video'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$CapacidadesDeEquipoDtoToJson(
@@ -52,4 +53,5 @@ Map<String, dynamic> _$CapacidadesDeEquipoDtoToJson(
   'suscripcionDeEventos': instance.suscripcionDeEventos,
   'reconocimientoDePlacas': instance.reconocimientoDePlacas,
   'estadoDeBarrera': instance.estadoDeBarrera,
+  'video': instance.video,
 };

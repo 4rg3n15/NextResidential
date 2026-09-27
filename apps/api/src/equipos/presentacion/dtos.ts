@@ -178,6 +178,15 @@ export class CapacidadDeAudioDto {
   @ApiProperty({ type: String, nullable: true }) formato!: string | null;
 }
 
+/** D2 (15-L) · el video que el equipo describe por RTSP. */
+export class CapacidadDeVideoDto {
+  @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) estado!: string;
+  @ApiProperty({ type: String, nullable: true, description: '«H.264», «H.265»…' })
+  codec!: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Canal preguntado (canal×100+flujo)' })
+  canal!: string | null;
+}
+
 export class CapacidadesDeEquipoDto {
   @ApiProperty({ type: String, enum: ['descubiertas', 'declaradas', 'sin_consultar'] })
   origen!: string;
@@ -190,6 +199,7 @@ export class CapacidadesDeEquipoDto {
   @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) suscripcionDeEventos!: string;
   @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) reconocimientoDePlacas!: string;
   @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) estadoDeBarrera!: string;
+  @ApiProperty({ type: CapacidadDeVideoDto }) video!: CapacidadDeVideoDto;
 }
 
 /**

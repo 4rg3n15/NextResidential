@@ -2324,6 +2324,14 @@ export interface components {
             maximo: number | null;
             almacenadas: number | null;
         };
+        CapacidadDeVideoDto: {
+            /** @enum {string} */
+            estado: "si" | "no" | "desconocida";
+            /** @description «H.264», «H.265»… */
+            codec: string | null;
+            /** @description Canal preguntado (canal×100+flujo) */
+            canal: string | null;
+        };
         CapacidadesDeEquipoDto: {
             /** @enum {string} */
             origen: "descubiertas" | "declaradas" | "sin_consultar";
@@ -2343,6 +2351,7 @@ export interface components {
             reconocimientoDePlacas: "si" | "no" | "desconocida";
             /** @enum {string} */
             estadoDeBarrera: "si" | "no" | "desconocida";
+            video: components["schemas"]["CapacidadDeVideoDto"];
         };
         CapturarRostroDto: {
             /** @description El TITULAR del dato: el visitante (RN-10) */

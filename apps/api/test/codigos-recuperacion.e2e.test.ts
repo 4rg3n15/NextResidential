@@ -22,14 +22,12 @@ beforeAll(async () => {
   firmante = await crearFirmante();
   retiradas = [];
   app = await crearApp(firmante, (constructor) =>
-    constructor
-      .overrideProvider(ADMINISTRADOR_DE_FACTORES)
-      .useValue({
-        retirarFactoresVerificados: async (id: string) => {
-          retiradas.push(id);
-          return 1;
-        },
-      }),
+    constructor.overrideProvider(ADMINISTRADOR_DE_FACTORES).useValue({
+      retirarFactoresVerificados: async (id: string) => {
+        retiradas.push(id);
+        return 1;
+      },
+    }),
   );
 });
 afterAll(async () => {

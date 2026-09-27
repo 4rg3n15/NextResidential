@@ -7,6 +7,7 @@ import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
 import { SondaPorProveedor } from '../src/equipos/infraestructura/sonda-por-proveedor';
 import { OLVIDO_DE_EQUIPO } from '../src/equipos/aplicacion/puertos';
+import { LECTOR_DE_SENALES } from '../src/equipos/aplicacion/senal-de-eventos';
 import { capacidadesDescubiertas, equiposSimulados } from '@ncr/providers';
 
 /**
@@ -813,5 +814,47 @@ describe('C1 (15-L) · editar, dar de baja y reactivar hacen OLVIDAR al proceso 
       .set('Authorization', `Bearer ${token}`)
       .expect(201);
     expect(olvidados).toEqual([id, id, id]);
+  });
+});
+
+describe('C3 (15-L) · «Probar conexión» de un videoportero dice cómo van sus eventos', () => {
+  it('la ficha trae «eventos del equipo» con la señal real de su escucha', async () => {
+    const firmante = await crearFirmante();
+    const repo = new RepositorioDeEquiposEnMemoria();
+    const CON_FICHA: ResultadoDeSondeo = {
+      ...ALCANZADO,
+      ficha: {
+        modelo: 'VIDEOPORTERO-SIM',
+        firmware: 'V1',
+        serie: null,
+        horaDelEquipo: null,
+        desvioDeRelojSegundos: null,
+        hallazgos: [],
+        sinComprobar: [],
+      },
+    };
+    app = await crearApp(
+      firmante,
+      (m) =>
+        m.overrideProvider(LECTOR_DE_SENALES).useValue({
+          senal: () => ({ transporte: 'escucha', ultimaSenal: new Date(Date.now() - 4000) }),
+        }),
+      undefined,
+      { repositorio: repo, sonda: { probar: async () => CON_FICHA } },
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(app.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, tipo: 'intercom', nombre: 'Videoportero de la entrada' });
+    const r = await request(app.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/${creado.body.id as string}/diagnostico`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(r.status).toBe(201);
+    const eventos = (
+      r.body.ficha.hallazgos as { campo: string; estado: string; valorLeido: string }[]
+    ).find((h) => h.campo === 'eventos del equipo');
+    expect(eventos).toMatchObject({ estado: 'conforme' });
+    expect(eventos?.valorLeido).toMatch(/flujo de alertas · última señal hace \d+ s/);
   });
 });

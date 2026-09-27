@@ -58,7 +58,12 @@ export class AutenticacionModule {
             }),
         },
       ],
-      exports: [ProveedorDeJwks, VerificadorDeJwt, REPOSITORIO_CODIGOS_MFA, RepositorioCodigosMfaEnMemoria],
+      exports: [
+        ProveedorDeJwks,
+        VerificadorDeJwt,
+        REPOSITORIO_CODIGOS_MFA,
+        RepositorioCodigosMfaEnMemoria,
+      ],
     };
   }
 }

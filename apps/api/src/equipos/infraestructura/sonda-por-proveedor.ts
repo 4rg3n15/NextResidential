@@ -50,11 +50,23 @@ export const AVISO_DE_CREDENCIAL =
   'estos aparatos bloquean la cuenta tras unos pocos intentos fallidos. ' +
   'Confirme la credencial en el equipo antes de reintentar.';
 
+/** Los tipos que entregan video por RTSP. */
+const CON_VIDEO: ReadonlySet<DatosDeSondeo['tipo']> = new Set([
+  'camara_lpr',
+  'terminal_facial',
+  'intercom',
+]);
+
 export class SondaPorProveedor implements SondaDeEquipo {
   constructor(
     private readonly peticion?: typeof fetch,
     /** H-SITIO-05 · qué ruta de capacidad se consultó y qué respondió. */
     private readonly traza?: Bitacora,
+    /**
+     * D2 · C3 (15-L) · con el puerto RTSP (del `.env`), la sonda le pregunta
+     * al equipo qué video entrega en el canal de su ficha. Sin él, no.
+     */
+    private readonly puertoRtsp?: number,
   ) {}
 
   async probar(datos: DatosDeSondeo): Promise<ResultadoDeSondeo> {
@@ -76,6 +88,9 @@ export class SondaPorProveedor implements SondaDeEquipo {
       ...(datos.canalBarrera === undefined || datos.canalBarrera === null
         ? {}
         : { canal: datos.canalBarrera }),
+      ...(this.puertoRtsp === undefined || !CON_VIDEO.has(datos.tipo)
+        ? {}
+        : { video: { puerto: this.puertoRtsp, canal: datos.canalDeVideo ?? '102' } }),
     });
 
     const ficha = fichaDe(diagnostico);

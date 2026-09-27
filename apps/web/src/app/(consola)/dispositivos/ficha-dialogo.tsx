@@ -9,6 +9,11 @@ import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { EstadoCargando } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { FichaDeEquipo } from './ficha-del-equipo';
+import { Boton } from '@/componentes/ui/boton';
+import { VideoEnVivo } from '@/componentes/video-en-vivo';
+
+/** D3 (15-L) · los equipos que entregan video por RTSP. */
+const CON_VIDEO = new Set<Equipo['tipo']>(['camara_lpr', 'terminal_facial', 'intercom']);
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -50,6 +55,10 @@ export const FichaDialogo = ({
   const [motivo, setMotivo] = useState('');
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
+  // D3 (15-L) · el video se pide al pulsar, no al abrir: negociar por cada
+  // ficha que alguien mira ocuparía el puente y el equipo sin motivo.
+  const [conVideo, setConVideo] = useState(false);
+  useEffect(() => setConVideo(false), [equipo]);
 
   const sondear = async (id: string): Promise<void> => {
     setSondeando(true);
@@ -145,6 +154,16 @@ export const FichaDialogo = ({
         >
           {aviso}
         </p>
+      ) : null}
+
+      {equipo !== null && CON_VIDEO.has(equipo.tipo) ? (
+        conVideo ? (
+          <VideoEnVivo copropiedadId={copropiedadId} dispositivoId={equipo.id} />
+        ) : (
+          <Boton type="button" variante="secundario" tamano="sm" onClick={() => setConVideo(true)}>
+            Ver video en vivo
+          </Boton>
+        )
       ) : null}
 
       {sondeo?.ficha === undefined ? null : (

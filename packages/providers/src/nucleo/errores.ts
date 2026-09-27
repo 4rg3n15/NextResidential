@@ -59,6 +59,26 @@ export class CapacidadNoSoportada extends ErrorDeEquipo {
   }
 }
 
+/**
+ * D2 (15-L) · el equipo entrega un video que el navegador no reproduce (H.265
+ * en el canal de la ficha, según su propia respuesta RTSP). Se niega ANTES de
+ * negociar: un reproductor negro con «primer cuadro pendiente» no explica nada.
+ */
+export class VideoNoReproducible extends ErrorDeEquipo {
+  constructor(
+    dispositivoId: string,
+    readonly codec: string,
+    readonly canal: string,
+  ) {
+    // Sin el identificador: esta frase la lee el operador en la consola de video.
+    super(
+      dispositivoId,
+      `Este equipo entrega ${codec} en el canal ${canal} y el navegador no lo reproduce: ` +
+        'cámbielo a H.264 en el equipo o elija otro canal en su ficha',
+    );
+  }
+}
+
 /** Ocupado ahora. Reintentable con espera. Es FALLO_TECNICO, no denegación. */
 export class EquipoOcupado extends ErrorDeEquipo {
   readonly reintentable = true;

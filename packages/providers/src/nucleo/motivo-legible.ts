@@ -1,5 +1,6 @@
 import {
   BibliotecaLlena,
+  VideoNoReproducible,
   CapacidadNoSoportada,
   CredencialRechazada,
   DesafioVencido,
@@ -41,6 +42,12 @@ export const motivoLegible = (error: unknown): string => {
     return 'el equipo necesita reiniciarse para aplicar el cambio';
   if (error instanceof BibliotecaLlena) return 'la biblioteca de rostros del equipo está llena';
   if (error instanceof FotoNoAdmitida) return `la foto no sirve: ${error.legible}`;
+  if (error instanceof VideoNoReproducible) {
+    return (
+      `el equipo entrega ${error.codec} en el canal ${error.canal} y el navegador no lo ` +
+      'reproduce: cámbielo a H.264 en el equipo o elija otro canal en su ficha'
+    );
+  }
   if (error instanceof OrdenSinConfirmar) {
     return 'el equipo contestó sin confirmar la orden: puede que la puerta no se haya movido';
   }

@@ -7,7 +7,7 @@ import type {
   ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo } from './capacidades';
-import type { EscuchaActiva } from './escucha';
+import type { EscuchaActiva, TransporteDeEscucha } from './escucha';
 import type { OrigenDeVideo } from './video';
 import type { VeredictoRemoto } from './verificacion-remota';
 
@@ -83,4 +83,13 @@ export type ProveedorDeEquipos = AccessPointProvider &
      * orden y la siguiente escucha usan lo guardado, sin reiniciar la API.
      */
     olvidar?(dispositivoId: string): void;
+    /**
+     * C3 (15-L) · la escucha del equipo, si la hay: por qué transporte y cuándo
+     * mandó algo por última vez. Es la respuesta REAL del equipo en cuanto a
+     * eventos, sin abrir una segunda conexión que podría quitarle los suyos a
+     * la escucha de la plataforma.
+     */
+    senalDeEventos?(
+      dispositivoId: string,
+    ): { readonly transporte: TransporteDeEscucha; readonly ultimaSenal: Date | null } | null;
   };
