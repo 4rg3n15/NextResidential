@@ -5703,6 +5703,102 @@
         ]
       }
     },
+    "/copropiedades/{id}/residentes/cuentas/{usuarioId}/perfil": {
+      "get": {
+        "operationId": "PerfilDeResidentesController_ver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilDelResidenteDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Perfil de un residente (datos personales y de contacto)",
+        "tags": [
+          "residentes"
+        ]
+      },
+      "put": {
+        "operationId": "PerfilDeResidentesController_editar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerfilDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDePerfilDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edita el perfil de un residente; queda en su bitácora con el autor",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
     "/copropiedades/{id}/residentes/vehiculos": {
       "get": {
         "operationId": "SupervisionDeResidentesController_vehiculos",

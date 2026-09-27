@@ -12,6 +12,7 @@ import { EstadoError } from '@/componentes/estados';
 import { useCuentasDeResidentes } from './consultas';
 import { DialogoDeResidente, DialogoDeRestablecimientoDeResidente } from './dialogos';
 import { OcupantesPorVivienda } from './ocupantes';
+import { DialogoDePerfilDeResidente } from './perfil-de-residente';
 import { VehiculosDeResidentes } from './vehiculos-de-residentes';
 
 /**
@@ -30,6 +31,7 @@ export const PantallaDeResidentes = ({
   const cuentas = useCuentasDeResidentes(copropiedadId);
   const [alta, setAlta] = useState(false);
   const [restablecer, setRestablecer] = useState<CuentaDeResidente | null>(null);
+  const [perfil, setPerfil] = useState<CuentaDeResidente | null>(null);
   const lista = cuentas.data ?? [];
   const sinVivienda = lista.filter((c) => c.vivienda === null).length;
 
@@ -69,9 +71,20 @@ export const PantallaDeResidentes = ({
       titulo: 'Acciones',
       alineacion: 'derecha',
       celda: (c) => (
-        <Boton variante="fantasma" tamano="sm" onClick={() => setRestablecer(c)}>
-          Restablecer contraseña
-        </Boton>
+        <div className="flex flex-wrap justify-end gap-1">
+          <Boton
+            variante="fantasma"
+            tamano="sm"
+            onClick={() => setPerfil(c)}
+            disabled={c.vivienda === null}
+            title={c.vivienda === null ? 'Tendrá perfil cuando complete su alta' : undefined}
+          >
+            Editar perfil
+          </Boton>
+          <Boton variante="fantasma" tamano="sm" onClick={() => setRestablecer(c)}>
+            Restablecer contraseña
+          </Boton>
+        </div>
       ),
     },
   ];
@@ -111,6 +124,11 @@ export const PantallaDeResidentes = ({
         copropiedadId={copropiedadId}
         abierto={alta}
         alCerrar={() => setAlta(false)}
+      />
+      <DialogoDePerfilDeResidente
+        copropiedadId={copropiedadId}
+        cuenta={perfil}
+        alCerrar={() => setPerfil(null)}
       />
       <DialogoDeRestablecimientoDeResidente
         copropiedadId={copropiedadId}

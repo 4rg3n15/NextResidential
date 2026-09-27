@@ -31,7 +31,7 @@ import { ResolverMiAmbito } from './aplicacion/casos-de-uso';
 import { VerMiAlta, VincularMiVivienda } from './aplicacion/alta';
 import { DeclararMisOcupantes, VerMisOcupantes } from './aplicacion/ocupantes';
 import { DesactivarMiVehiculo, RegistrarMiVehiculo } from './aplicacion/vehiculos-propios';
-import { EditarMiPerfil, VerMiPerfil } from './aplicacion/perfil';
+import { EditarMiPerfil, PerfilDeResidentePorSuperadmin, VerMiPerfil } from './aplicacion/perfil';
 import { EstadoDelConsentimientoDeMiVisitante } from './aplicacion/consentimiento-de-mi-visitante';
 import {
   CuentasDeResidentesDelSuperadmin,
@@ -149,6 +149,12 @@ export const PROVEEDORES_DEL_HOGAR: Provider[] = [
     inject: [PERFIL_DEL_RESIDENTE, BITACORA_DE_RESIDENTES, RELOJ],
     useFactory: (p: PerfilDelResidente, b: BitacoraDeResidentes, r: Reloj) =>
       new EditarMiPerfil(p, b, r),
+  },
+  {
+    provide: PerfilDeResidentePorSuperadmin,
+    inject: [PERFIL_DEL_RESIDENTE, BITACORA_DE_RESIDENTES, RELOJ],
+    useFactory: (p: PerfilDelResidente, b: BitacoraDeResidentes, r: Reloj) =>
+      new PerfilDeResidentePorSuperadmin(p, b, r),
   },
   {
     provide: EstadoDelConsentimientoDeMiVisitante,

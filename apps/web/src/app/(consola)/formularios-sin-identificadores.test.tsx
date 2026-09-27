@@ -538,6 +538,12 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    * 15-L (H1, H2) · el cupo es un número de 0 a 999 y la baja lleva un motivo
    * en texto; el portero viaja en la RUTA desde la fila que lo muestra.
    */
+  /**
+   * 15-L (G) · el perfil de un residente: nombres, documento y contacto en
+   * texto; el residente viaja en la RUTA desde su fila.
+   */
+  'residentes/perfil-de-residente.tsx':
+    'datos personales en texto; el residente viaja en la ruta desde su fila, nadie lo teclea',
   'porteros/pool-y-baja.tsx':
     'cupo numérico y motivo en texto; el portero viaja en la ruta desde su fila, nadie lo teclea',
 };

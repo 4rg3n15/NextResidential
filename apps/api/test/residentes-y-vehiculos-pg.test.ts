@@ -513,6 +513,61 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
     expect(filtrado?.n).toBe('0');
   });
 
+  it('G (15-L) · el superadministrador edita el perfil del residente: mismas reglas, y el rastro dice quién y qué campos', async () => {
+    if (omitida()) return;
+    const usuarioId = (
+      JSON.parse(Buffer.from(primero.split('.')[1] ?? '', 'base64url').toString('utf8')) as {
+        usuario_id: string;
+      }
+    ).usuario_id;
+    const ruta = `/copropiedades/${COP_A}/residentes/cuentas/${usuarioId}/perfil`;
+    const visto = await comoSuper('get', ruta);
+    expect(visto.status, JSON.stringify(visto.body)).toBe(200);
+    const cambio = await http()
+      .put(ruta)
+      .set('Authorization', `Bearer ${superadmin}`)
+      .send({
+        ...perfil(1),
+        nombres: 'Ana Lucía',
+        numeroDocumento: `8${SUFIJO}1`,
+        telefono: '+573009990011',
+      });
+    expect(cambio.status, JSON.stringify(cambio.body)).toBe(200);
+    expect(cambio.body.perfil).toMatchObject({
+      nombreCompleto: `Ana Lucía Prueba ${SUFIJO}`,
+      telefono: '+573009990011',
+    });
+    // El residente ve lo que cambió el superadministrador.
+    expect((await con(primero).get(`/copropiedades/${COP_A}/mi/perfil`)).body.nombres).toBe(
+      'Ana Lucía',
+    );
+    const hecho = await uno<{ actor: string; detalle: string }>(
+      `SELECT actor_id::text AS actor, detalle FROM public.bitacora_de_residentes
+        WHERE usuario_id = $1 AND tipo = 'perfil_editado' ORDER BY ocurrido_en DESC LIMIT 1`,
+      [usuarioId],
+    );
+    expect(hecho?.actor).toBe(SUPER);
+    expect(hecho?.detalle).toMatch(/^editado por el superadministrador: .*nombres/);
+    expect(hecho?.detalle).toMatch(/telefono/);
+    expect(hecho?.detalle).not.toContain(SUFIJO);
+    // Las mismas reglas: un documento de otra persona, no; una fecha imposible, 400.
+    const usado = await http()
+      .put(ruta)
+      .set('Authorization', `Bearer ${superadmin}`)
+      .send(perfil(3));
+    expect(usado.body.motivo).toBe('DOCUMENTO_EN_USO');
+    const mala = await http()
+      .put(ruta)
+      .set('Authorization', `Bearer ${superadmin}`)
+      .send({ ...perfil(1), numeroDocumento: `8${SUFIJO}1`, fechaNacimiento: '2999-01-01' });
+    expect(mala.status).toBe(400);
+    // Desde otra copropiedad, el mismo residente no existe.
+    expect(
+      (await comoSuper('get', `/copropiedades/${COP_B}/residentes/cuentas/${usuarioId}/perfil`))
+        .status,
+    ).toBe(404);
+  });
+
   it('KPI-36/37 · camino de servicio: la copropiedad ajena no ve ni toca las plazas de ésta', async () => {
     if (omitida()) return;
     const desdeRoble = await comoSuper(

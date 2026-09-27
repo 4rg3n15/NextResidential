@@ -56,3 +56,65 @@ export class EditarMiPerfil {
       : { guardado: true, perfil };
   }
 }
+
+const CAMPOS_DEL_PERFIL = [
+  'nombres',
+  'apellidos',
+  'fechaNacimiento',
+  'tipoDocumento',
+  'numeroDocumento',
+  'correo',
+  'telefono',
+] as const;
+
+/**
+ * G (15-L) · EL SUPERADMINISTRADOR EDITA EL PERFIL DE UN RESIDENTE. Las mismas
+ * validaciones del dominio que usa el propio residente (`validarPerfil`) y la
+ * misma unicidad del documento en la base. El rastro dice QUIÉN editó a QUIÉN
+ * y QUÉ CAMPOS cambiaron —sus nombres, nunca los valores: el documento no va a
+ * la bitácora (§2.7.8)—.
+ */
+@Injectable()
+export class PerfilDeResidentePorSuperadmin {
+  constructor(
+    @Inject(PERFIL_DEL_RESIDENTE) private readonly perfiles: PerfilDelResidente,
+    @Inject(BITACORA_DE_RESIDENTES) private readonly bitacora: BitacoraDeResidentes,
+    @Inject(RELOJ) private readonly reloj: Reloj,
+  ) {}
+
+  ver(copropiedadId: string, usuarioId: string): Promise<PerfilGuardado | null> {
+    return this.perfiles.perfil(copropiedadId, usuarioId);
+  }
+
+  async editar(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    usuarioId: string,
+    datos: DatosDelPerfil,
+  ): Promise<ResultadoDePerfil> {
+    const antes = await this.perfiles.perfil(copropiedadId, usuarioId);
+    if (antes === null) return { guardado: false, motivo: 'SIN_VINCULO' };
+    const valido = validarPerfil(datos, this.reloj.ahora());
+    if (!valido.ok) return { guardado: false, campos: valido.error };
+    const cambiados = CAMPOS_DEL_PERFIL.filter(
+      (campo) => (antes[campo] ?? null) !== (valido.valor[campo] ?? null),
+    );
+    const r = await this.perfiles.guardar(copropiedadId, usuarioId, valido.valor, ctx.usuarioId);
+    if (r !== 'guardado') return { guardado: false, motivo: r };
+    await this.bitacora.anotar({
+      copropiedadId,
+      tipo: 'perfil_editado',
+      ocurridoEn: this.reloj.ahora(),
+      usuarioId,
+      actorId: ctx.usuarioId,
+      detalle:
+        cambiados.length === 0
+          ? 'editado por el superadministrador, sin cambios'
+          : `editado por el superadministrador: ${cambiados.join(', ')}`,
+    });
+    const perfil = await this.perfiles.perfil(copropiedadId, usuarioId);
+    return perfil === null
+      ? { guardado: false, motivo: 'SIN_VINCULO' }
+      : { guardado: true, perfil };
+  }
+}

@@ -1,3 +1,4 @@
+import { PerfilDeResidentesController } from './presentacion/perfil-de-residentes.controller';
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
@@ -69,6 +70,8 @@ export class ResidenteModule {
         MiHogarController,
         SupervisionDeResidentesController,
         OcupantesDeViviendaController,
+        // 15-L (G) · el superadministrador edita el perfil de un residente.
+        PerfilDeResidentesController,
       ],
       providers: [
         ...PROVEEDORES_DEL_HOGAR,

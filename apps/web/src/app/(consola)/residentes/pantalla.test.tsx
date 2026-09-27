@@ -48,6 +48,20 @@ const respuestas: Record<string, unknown> = {
     totales: { activas: 1, inactivas: 0 },
     viviendas: [{ id: VIVIENDA, identificador: '42', agrupacion: 'B', estado: 'activo' }],
   },
+  [`/api/ncr/copropiedades/${COP}/residentes/cuentas/00000000-0000-4000-8000-0000000000a1/perfil`]:
+    {
+      nombres: 'Ana',
+      apellidos: 'Pérez',
+      nombreCompleto: 'Ana Pérez',
+      fechaNacimiento: '1990-05-17',
+      tipoDocumento: 'cedula',
+      numeroDocumento: '10203040',
+      correo: 'ana@correo.invalid',
+      telefono: '+573001112233',
+      copropiedadNombre: 'Mira',
+      copropiedadDireccion: null,
+      telefonoPorteria: null,
+    },
   [`/api/ncr/copropiedades/${COP}/viviendas/${VIVIENDA}/ocupantes`]: [
     { id: 'p1', numero: 1, libre: false, codigo: null, ocupante: 'Ana Pérez' },
     { id: 'p2', numero: 2, libre: true, codigo: 'ABCD-EFGH', ocupante: null },
@@ -110,7 +124,7 @@ describe('panel de residentes (15-I)', () => {
     fireEvent.change(screen.getByLabelText(/Contraseña inicial/), {
       target: { value: 'Inicial#2026' },
     });
-    fireEvent.change(screen.getByLabelText(/^Nombre/), { target: { value: 'Eva Ruiz' } });
+    fireEvent.change(screen.getByLabelText(/^Nombre(?!s)/), { target: { value: 'Eva Ruiz' } });
     fireEvent.click(screen.getByRole('button', { name: 'Dar de alta' }));
     const esAlta = (p: Request): boolean =>
       p.url.endsWith('/residentes/cuentas') && p.method === 'POST';
@@ -123,6 +137,55 @@ describe('panel de residentes (15-I)', () => {
       usuario: 'casa9.eva',
       contrasenaInicial: 'Inicial#2026',
       nombre: 'Eva Ruiz',
+    });
+  });
+
+  it('G · el superadministrador edita el perfil: carga lo guardado y envía los campos del residente', async () => {
+    fetchFalso.mockImplementation(async (peticion: Request) => {
+      const ruta = new URL(peticion.url).pathname;
+      if (peticion.method === 'PUT') {
+        return new Response(
+          JSON.stringify({ guardado: true, perfil: {}, motivo: null, campos: [] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      const cuerpo = respuestas[ruta];
+      return new Response(JSON.stringify(cuerpo ?? {}), {
+        status: cuerpo === undefined ? 404 : 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    render(envolver(<PantallaDeResidentes copropiedadId={COP} />));
+    const tabla = await screen.findByRole('table', { name: /Cuentas de residentes/ });
+    const [ana, luis] = within(tabla).getAllByRole('button', { name: 'Editar perfil' });
+    // Sin vivienda no hay perfil que editar todavía.
+    expect((luis as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(ana as HTMLElement);
+    const dialogo = await screen.findByRole('dialog', { name: /Perfil de Ana Pérez/ });
+    await waitFor(() =>
+      expect((within(dialogo).getByLabelText('Nombres') as HTMLInputElement).value).toBe('Ana'),
+    );
+    fireEvent.change(within(dialogo).getByLabelText('Teléfono'), {
+      target: { value: '+573009990011' },
+    });
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() =>
+      expect(fetchFalso.mock.calls.some(([p]) => (p as Request).method === 'PUT')).toBe(true),
+    );
+    const put = fetchFalso.mock.calls
+      .map(([p]) => p as Request)
+      .find((p) => p.method === 'PUT') as Request;
+    expect(new URL(put.url).pathname).toBe(
+      `/api/ncr/copropiedades/${COP}/residentes/cuentas/00000000-0000-4000-8000-0000000000a1/perfil`,
+    );
+    expect(await put.json()).toEqual({
+      nombres: 'Ana',
+      apellidos: 'Pérez',
+      fechaNacimiento: '1990-05-17',
+      tipoDocumento: 'cedula',
+      numeroDocumento: '10203040',
+      correo: 'ana@correo.invalid',
+      telefono: '+573009990011',
     });
   });
 });
