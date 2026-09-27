@@ -7,6 +7,7 @@ import type {
   DatosParaRepetir,
   EstadoDeVisita,
   FotoEnEquipo,
+  HistorialDeVisitantes,
   VisitaListada,
   VisitanteReciente,
   ViviendaDeVisita,
@@ -122,7 +123,7 @@ export class ViviendasParaVisitas {
  * módulo del residente, desde su vínculo—; aquí no se decide cuál.
  */
 export class UltimosVisitantes {
-  constructor(private readonly consulta: ConsultaDeVisitas) {}
+  constructor(private readonly consulta: HistorialDeVisitantes) {}
 
   ejecutar(
     copropiedadId: string,
@@ -144,7 +145,7 @@ export interface Repeticion extends DatosParaRepetir {
  */
 export class DatosParaVolverAAutorizar {
   constructor(
-    private readonly consulta: ConsultaDeVisitas,
+    private readonly consulta: HistorialDeVisitantes,
     private readonly fotos: AlmacenDeFotos,
   ) {}
 

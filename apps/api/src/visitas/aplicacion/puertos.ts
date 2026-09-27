@@ -19,6 +19,7 @@
 export const PERSONAS_DE_VISITA = Symbol.for('ncr.puerto.PersonasDeVisita');
 export const CONSTANCIA_DE_CASILLA = Symbol.for('ncr.puerto.ConstanciaDeCasilla');
 export const CONSULTA_DE_VISITAS = Symbol.for('ncr.puerto.ConsultaDeVisitas');
+export const HISTORIAL_DE_VISITANTES = Symbol.for('ncr.puerto.HistorialDeVisitantes');
 export const LECTOR_DE_FOTOS_DE_VISITA = Symbol.for('ncr.puerto.LectorDeFotosDeVisita');
 
 /** El tema del canal en vivo por el que viajan las visitas nuevas y anuladas. */
@@ -139,7 +140,15 @@ export interface ConsultaDeVisitas {
   ): Promise<{ readonly desde: Date; readonly hasta: Date }>;
   fotoEnEquipos(copropiedadId: string, autorizacionId: string): Promise<readonly FotoEnEquipo[]>;
   viviendas(copropiedadId: string): Promise<readonly ViviendaDeVisita[]>;
-  /** Una por persona, la más reciente primero. SOLO de esa vivienda. */
+}
+
+/**
+ * F6 · lo que el residente consulta de SUS visitantes. Aparte de la consulta de
+ * la consola (§2.3, ISP): el residente no lista ni ve equipos, y la consola no
+ * repite visitas.
+ */
+export interface HistorialDeVisitantes {
+  /** Una por persona, la registrada por último primero. SOLO de esa vivienda. */
   ultimosDeVivienda(
     copropiedadId: string,
     viviendaId: string,

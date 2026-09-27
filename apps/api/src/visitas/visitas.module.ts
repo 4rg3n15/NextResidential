@@ -31,22 +31,22 @@ import { AlmacenDeFotos } from './aplicacion/lector-de-fotos';
 import {
   CONSTANCIA_DE_CASILLA,
   CONSULTA_DE_VISITAS,
+  HISTORIAL_DE_VISITANTES,
   LECTOR_DE_FOTOS_DE_VISITA,
   PERSONAS_DE_VISITA,
 } from './aplicacion/puertos';
 import type {
   ConsultaDeVisitas,
   ConstanciaDeCasilla,
+  HistorialDeVisitantes,
   LectorDeFotosDeVisita,
   PersonasDeVisita,
 } from './aplicacion/puertos';
 import { RechazarVisita } from './aplicacion/rechazar-visita';
 import { RegistrarRostroDeVisita } from './aplicacion/rostro-de-visita';
-import {
-  ConstanciaDeCasillaPg,
-  ConsultaDeVisitasPg,
-  PersonasDeVisitaPg,
-} from './infraestructura/visitas-pg';
+import { ConstanciaDeCasillaPg, PersonasDeVisitaPg } from './infraestructura/visitas-pg';
+import { ConsultaDeVisitasPg } from './infraestructura/consulta-de-visitas-pg';
+import { HistorialDeVisitantesPg } from './infraestructura/historial-de-visitantes-pg';
 import { lectorDeFotosDesde } from './infraestructura/lector-de-fotos';
 import { VisitasController } from './presentacion/visitas.controller';
 
@@ -79,6 +79,11 @@ export class VisitasModule {
           provide: CONSULTA_DE_VISITAS,
           inject: [Pool],
           useFactory: (pool: Pool) => new ConsultaDeVisitasPg(pool),
+        },
+        {
+          provide: HISTORIAL_DE_VISITANTES,
+          inject: [Pool],
+          useFactory: (pool: Pool) => new HistorialDeVisitantesPg(pool),
         },
         {
           provide: LECTOR_DE_FOTOS_DE_VISITA,
@@ -157,17 +162,17 @@ export class VisitasModule {
         },
         {
           provide: UltimosVisitantes,
-          inject: [CONSULTA_DE_VISITAS],
-          useFactory: (c: ConsultaDeVisitas) => new UltimosVisitantes(c),
+          inject: [HISTORIAL_DE_VISITANTES],
+          useFactory: (h: HistorialDeVisitantes) => new UltimosVisitantes(h),
         },
         {
           provide: DatosParaVolverAAutorizar,
-          inject: [CONSULTA_DE_VISITAS, REPOSITORIO_AUTORIZACIONES, LECTOR_DE_FOTOS_DE_VISITA],
+          inject: [HISTORIAL_DE_VISITANTES, REPOSITORIO_AUTORIZACIONES, LECTOR_DE_FOTOS_DE_VISITA],
           useFactory: (
-            c: ConsultaDeVisitas,
+            h: HistorialDeVisitantes,
             autorizaciones: RepositorioAutorizaciones,
             lector: LectorDeFotosDeVisita,
-          ) => new DatosParaVolverAAutorizar(c, new AlmacenDeFotos(autorizaciones, lector)),
+          ) => new DatosParaVolverAAutorizar(h, new AlmacenDeFotos(autorizaciones, lector)),
         },
       ],
       exports: [
