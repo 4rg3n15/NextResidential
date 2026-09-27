@@ -13,6 +13,13 @@
 > local, el servidor configurable desde la app y la sincronización con la
 > consola (ADR-033), con su propio cierre según §2.8 al final:
 > [Corrección de la 15-L](#corrección-de-la-15-l-antes-de-la-fusión--según-28).
+>
+> **Corrección 2 antes de la fusión (2026-09-27):** foto desde la galería, la
+> casilla con el nombre del visitante como única constancia (ADR-032,
+> enmienda), «Enviar eventos a este Mac», verificación remota con el mínimo
+> riesgo, equipos simulados, pg-boss e IPv6, rostros en el videoportero,
+> HikCentral, el bucle local del portero y «omitir por falta de base es
+> fallar»: [Corrección 2](#corrección-2-de-la-15-l-antes-de-la-fusión--según-28).
 
 ---
 
@@ -1265,3 +1272,639 @@ Rama `etapa-15l-entrega-final`, en el mismo PR [4rg3n15/NextResidential#34](http
 - `e34e0d0` feat(etapa-15l/ios): la app en Release por la red local; ATS local en las tres configuraciones
 - `edc3f1e` feat(etapa-15l/sincronizacion): la app lee el estado real de sus visitas y sus notificaciones; el portero ve el nombre de cada equipo
 - el commit de cierre de la corrección, con este informe
+
+---
+
+# Corrección 2 de la 15-L, antes de la fusión · según §2.8
+
+**Encargo (`CORRIGE ETAPA 15-L`, 2026-09-27).** Decisiones del cliente y
+mitigaciones previas a la visita final, en once puntos: foto desde la galería
+(1); la casilla con el nombre del visitante como **única** constancia del
+consentimiento (2); «Enviar eventos a este Mac» (3, C2); verificación remota
+con el mínimo riesgo —pool precalentado, caché del registro, duración de cada
+decisión, p50/p95 en el ensayo, plazo de 8 s e interruptor en la ficha— (4,
+F2); aviso de equipos simulados (5, F3); pg-boss y el host sólo IPv6 (6, C1);
+rostros en el videoportero serie Ultra (7, F4); HikCentral (8, C7); el bucle
+local en la regla del portero (9, K2); omitir por falta de base es fallar con
+`--con-base` (10); verificador, commit y push (11). Decisión del punto 2:
+[enmienda de ADR-032](../decisiones/ADR-032-consentimiento-declarado-por-quien-registra.md).
+
+**Lo incómodo primero.**
+
+- **La casilla no es el consentimiento del titular; es la declaración de quien
+  registra.** Con la confirmación presencial retirada, ya no queda en la
+  interfaz ningún camino por el que el visitante consienta por sí mismo. El
+  cliente lo decidió así —la foto la envía el propio visitante para su
+  ingreso— y asume el riesgo frente a la Ley 1581 (ADR-032, enmienda). P-21
+  queda sin objeto porque la opción que evaluaba ya no existe, no porque se
+  haya resuelto.
+- **Dos métodos del dominio quedan sin llamador en producción:**
+  `ConsentimientoBiometrico.confirmarPorElTitular` e `identidadCoincide`
+  (`packages/domain-core`). No los borré: el encargo dice «el origen del
+  consentimiento en el dominio se mantiene», y tocar el dominio exige tu
+  autorización. Las pruebas del dominio los siguen ejerciendo. Decisión tuya:
+  retirarlos o dejarlos para un canal futuro (DT-15L-09).
+- **El plan B «Verificación remota: desactivar» suspende el principio
+  rector.** Mientras esté desactivada, **la terminal decide sola** y Next
+  Control sólo registra. Es lo que el cliente pidió como salida sin código;
+  queda auditado, escrito en la guía con «anótelo» y reversible desde el mismo
+  interruptor.
+- **La latencia real de la verificación remota sigue sin medir.** El p50/p95
+  del ensayo sólo se ha visto contra el simulado (0 y 1 ms). El
+  precalentamiento y la caché quitan trabajo del camino, pero no garantizan
+  el plazo contra Supabase desde la red del conjunto. El número de verdad lo
+  da el paso 9 del ensayo en sitio.
+- **Los códigos de rechazo por HikCentral y las rutas del videoportero Ultra
+  son supuestos** (S-101 a S-103): la guía del fabricante no los trae. El
+  ensayo anota lo que conteste el equipo, y si es otra cosa, se añade al
+  clasificador.
+- **Me aparté del encargo en dos cosas del ensayo.** «Avisa si el rostro
+  desapareció» es un **FALLO**, no un aviso, porque un aviso dentro de un OK no
+  cambia el veredicto y el rostro que desaparece es un acceso facial que no
+  funcionará. Y el paso 9 también falla si llegan menos de 5 veredictos o si
+  alguno trae `aceptadoPorElEquipo=false`. Si prefieres aviso, es una línea en
+  `paso-de-rostro.ts`.
+- **El control del ítem 10 destapó en el acto un segundo falso verde,
+  H-15L-C02.** La prueba de aislamiento de equipos contra PostgreSQL tomaba un
+  equipo de B creado por otra suite y, si no lo había, salía sin probar nada.
+  Tuvo que fallar dos verificaciones para verse, porque el verificador sólo
+  guardaba el nombre de la roja. Corregido, y el paso 14 imprime ahora el
+  mensaje de cada roja.
+- **KPI-11 estuvo en rojo en el árbol de trabajo.** Yo mismo escribí
+  `hikvision` a mano en la API, y las pruebas nuevas traían direcciones del
+  bucle local. Lo corregí antes de confirmar: el texto sale de
+  `CLASES_DE_PROVEEDOR`, y cada línea exenta lleva su motivo. No llegó a
+  ningún commit.
+
+## K1 · Qué se construyó
+
+**La foto del visitante** se toma con la cámara o se **elige de la galería**,
+y las dos pasan por el mismo camino: lado 640, techo de 180 KB, la misma
+medida de nitidez e iluminación y el mismo juicio de calidad. El EXIF se
+descarta tras aplicar la orientación. En iOS la galería es PHPicker: no pide
+permiso de fototeca, tampoco con el acceso limitado de iOS 14+. Cancelar no es
+un fallo, y un archivo ilegible o un permiso negado se dicen en palabras sin
+borrar la foto que ya servía.
+
+**El consentimiento** es una sola casilla, en la app y en la consola:
+«Declaro que _<nombre del visitante>_ me autorizó a usar su foto para su
+ingreso al conjunto». El nombre sale del formulario y el texto se guarda con
+su versión nueva, `casilla-v2-2026-09-27`. La plantilla la publica la API y
+la consola la sustituye. La confirmación presencial opcional desapareció de la
+interfaz y de la API, sin dejar rutas, casos de uso ni DTO huérfanos; el
+dominio conserva el origen del consentimiento.
+
+**En la ficha de cada equipo** hay tres cosas nuevas:
+
+- **«Enviar eventos a este Mac»** (cámara). La API toma la IP del Mac en la
+  subred de la cámara, o `ALARM_SERVER_IP_ANUNCIADA` si está definida, y
+  escribe el servidor de alarmas: IP, puerto y ruta con el secreto. Después
+  **lo lee de vuelta**, y sólo dice «aplicada» si la cámara quedó apuntando
+  ahí. Queda en la auditoría con la dirección anterior y la nueva, nunca el
+  secreto.
+- **«Verificación remota: activar/desactivar»** (terminal). Escribe `AcsCfg`,
+  lo relee y deja constancia.
+- **«Rostros: admite / no admite / no se pudo leer (motivo)»**, igual en la
+  terminal y en el videoportero. Y si otra plataforma tiene la conexión de
+  eventos del equipo, «eventos del equipo» pasa a **BLOQUEO** con la frase de
+  HikCentral y su remedio.
+
+**La verificación remota** pierde trabajo en el camino caliente:
+
+- la API abre 4 conexiones del pool al arrancar;
+- el registro del equipo y su copropiedad se recuerdan 30 s, sólo cuando se
+  encontraron, y se olvidan en el acto al editar;
+- cada veredicto deja su `duracionMs` en la bitácora de eventos;
+- el plazo de la terminal es 8 s por omisión.
+
+**Con `PROVEEDOR_DE_EQUIPOS=simulado` y equipos dados de alta**, la API lo
+avisa al arrancar y la consola muestra una franja fija: «Equipos simulados:
+las órdenes no llegan a ningún equipo real».
+
+**El ensayo** (`pnpm sitio:ensayo`) empieza por «Comprobaciones de la
+plataforma», que dan FALLO con el remedio en dos casos: la API en simulado con
+equipos reales, o pg-boss hacia `db.<ref>.supabase.co`, que sólo tiene IPv6.
+Después vienen nueve pasos por equipo:
+
+- **4:** compara la dirección que la cámara tiene escrita con la IP actual
+  del Mac.
+- **6:** da de alta, busca y da de baja un rostro también en el videoportero,
+  y lo busca otra vez a los 60 s.
+- **9 (nuevo):** repite 5 veces la verificación contra la terminal y da
+  p50/p95 frente al plazo.
+
+**La regla de IP del portero** trata `::1`, `127.0.0.1` y `::ffff:127.0.0.1`
+como la misma dirección, en los dos lados de la comparación. Una prueba por
+HTTP confirma que el superadministrador nunca pasa por esa guarda, con el
+modo pruebas activo y apagado.
+
+**Con `--con-base`, una prueba omitida por falta de base es un FALLO con su
+nombre.** Es el mecanismo que habría cazado H-15L-C01.
+
+## K2 · Cómo se organizó y por qué
+
+- **Un solo camino para la foto; el origen es un argumento, no un puerto.**
+  Dos puertos invitarían a una segunda copia de la reducción, y el servidor
+  —que vuelve a juzgar con las medidas que la app envía— recibiría medidas
+  calculadas de dos formas.
+- **La frase de la casilla vive en un sitio y se sustituye en otro.** La API
+  publica la plantilla, el marcador y la versión
+  (`visitas/aplicacion/rostro-de-visita.ts`); la consola sustituye el nombre.
+  La app la lleva escrita (S-99) y su prueba de dominio la exige palabra por
+  palabra. Si el nombre está vacío, dice «el visitante». La versión cambió
+  porque cambió el texto que se firma.
+- **Retirar sin dejar huérfanos, salvo en el dominio.** Se fueron la ruta, los
+  dos casos de uso, `IDENTIDAD_DE_PERSONA`, dos DTO y los dos modelos Dart
+  generados. Las pruebas que necesitaban «el titular responde» usan el doble
+  `test/dobles/respuesta-del-titular.ts`, con la misma API que el caso de uso
+  retirado. El dominio no se tocó: está fuera del encargo y de mi autorización.
+- **Toda corrección en sitio se escribe y se relee.** «Enviar eventos a este
+  Mac» y el interruptor de verificación remota viven en
+  `diagnostico/correcciones-de-sitio.ts`, con el mismo patrón que las demás:
+  leer, modificar el primer receptor —o construir uno si no hay—, escribir,
+  releer y comparar. `valorAnterior` y `valorNuevo` son `ip:puerto`: la ruta
+  lleva el secreto y nunca sale del proveedor.
+- **La IP del Mac se deduce, no se teclea.** `ipHaciaElEquipo` elige la
+  interfaz en la misma subred que el equipo. Si no hay ninguna, lo dice con
+  el remedio (conectar el Mac a esa red) en vez de adivinar. El mismo código
+  sirve a la API y al ensayo, así que la ficha y el ensayo no pueden discrepar
+  sobre qué IP es «la de ahora».
+- **La caché sólo recuerda lo encontrado y se olvida al editar.** Un «no es de
+  nadie» recordado dejaría fuera medio minuto a un equipo recién dado de alta.
+  `OLVIDO_DE_EQUIPO` pasó a ser compuesto: suelta el proveedor y las dos
+  cachés.
+- **El precalentamiento nunca bloquea el arranque.** Si no puede abrir las
+  conexiones, lo anota y la API arranca igual. Con la persistencia en memoria
+  no hace nada.
+- **La duración se calcula una vez, en `responder()`**, tanto en el éxito como
+  en el error. Así la fila del evento y la línea de la bitácora dicen lo
+  mismo.
+- **El aviso de equipos simulados es una sola frase en tres sitios**
+  (`AVISO_DE_EQUIPOS_SIMULADOS`), y la ruta está acotada a la copropiedad de la
+  ruta (RN-15): cuántos equipos tiene otra no es asunto de nadie.
+- **«Rostros» es un solo hallazgo para dos familias**
+  (`diagnostico/hallazgo-de-rostros.ts`). Lo único que cambia por familia es
+  la consecuencia de un «no»: bloqueo en la terminal, NO APLICA en el
+  videoportero. `no se pudo leer` sigue siendo `no_comprobado`, nunca
+  conforme, pero ya no en blanco: lleva el motivo que dejó el descubrimiento.
+- **HikCentral en la ficha, sin abrir otra conexión.** La escucha que la API
+  ya mantiene recuerda el último rechazo clasificado y lo olvida al abrirse
+  una conexión. La ficha lo lee por la misma `senalDeEventos` de C3. Probarlo
+  abriendo una segunda conexión le quitaría los eventos a la escucha de
+  verdad. La frase sale de `clasificarConexionDeEventosRechazada`, la misma
+  que usan el ensayo y la bitácora.
+- **Una sola normalización de IP para toda la API** (`comun/direccion-ip.ts`).
+  Había cuatro copias de la misma expresión regular. La comparación del
+  portero junta el bucle local y lo que se guarda no (S-105). Al hacerlo
+  apareció un defecto latente: `::ffff:127.0.0.1/128` acababa en
+  `BlockList.addSubnet(…, 128, 'ipv4')` y lanzaba `ERR_OUT_OF_RANGE` en cada
+  petición de portero de esa copropiedad. Ahora se traduce a `/32`.
+- **Omitir por falta de base: dos barreras.** Con `NCR_BASE_EXIGIDA=1`, que el
+  verificador exporta con `--con-base` y turbo deja pasar,
+  `apps/api/test/base-exigida.ts` hace fallar cada prueba sin base con
+  «fichero › bloque › prueba». Y aunque la variable no llegara, el paso 5 lee
+  los informes JSON y nombra cada omisión (`omisiones-sin-base.mjs`). Las 25
+  suites de PostgreSQL toman la base de ese único ayudante.
+
+## K3 · Árbol de archivos (selección)
+
+```
+apps/mobile/lib/dominio/origen_de_la_foto.dart               origen y motivo tipado de «sin foto»
+apps/mobile/lib/dominio/casilla_de_la_foto.dart              la frase con el nombre (S-99)
+apps/mobile/lib/infraestructura/camara/camara_del_telefono.dart  cámara y galería por la misma reducción; sin EXIF (S-97)
+apps/mobile/lib/presentacion/widgets/avisos_de_la_foto.dart  qué decir cuando no llega la foto
+apps/api/src/visitas/aplicacion/rostro-de-visita.ts          plantilla, marcador y versión de la casilla
+apps/api/src/equipos/aplicacion/configuracion-en-sitio.ts    «Enviar eventos a este Mac» y el interruptor de verificación remota
+apps/api/src/equipos/infraestructura/ip-del-mac.ts           la IP del Mac hacia el equipo y el secreto de su ruta
+apps/api/src/equipos/infraestructura/copropiedad-de-equipo-en-cache.ts  30 s, sólo lo encontrado (S-96)
+apps/api/src/equipos/aplicacion/equipos-simulados.ts         la frase de F3, una sola
+apps/api/src/equipos/presentacion/equipos-simulados.controller.ts  franja de la consola y aviso al arrancar
+apps/api/src/equipos/aplicacion/senal-de-eventos.ts          «eventos del equipo», con el rechazo de HikCentral
+apps/api/src/persistencia/precalentamiento.ts                4 conexiones al arrancar, sin bloquear
+apps/api/src/alarmserver/aplicacion/constancias-de-equipo.ts `duracionMs` en cada veredicto
+apps/api/src/comun/direccion-ip.ts                           una sola normalización; el bucle local en una grafía
+apps/api/test/base-exigida.ts                                la base de las suites de PostgreSQL, y su guardián
+apps/web/src/app/(consola)/dispositivos/acciones-de-sitio.tsx  los dos botones de la ficha
+apps/web/src/componentes/franja-equipos-simulados.tsx        la franja fija
+packages/providers/src/red/ip-hacia-el-equipo.ts             la interfaz del Mac en la subred del equipo
+packages/providers/src/diagnostico/correcciones-de-sitio.ts  escribir y releer el receptor y AcsCfg
+packages/providers/src/diagnostico/hallazgo-de-rostros.ts    «Rostros: admite / no admite / no se pudo leer (motivo)»
+packages/providers/src/hikvision/registro-en-cache.ts        el registro del proveedor, 30 s y `olvidar`
+packages/providers/src/hikvision/rostros-y-personas.ts       orden de respaldo y motivo (S-101)
+packages/providers/src/equipo/conexion-de-eventos-rechazada.ts  el clasificador de HikCentral (S-102)
+packages/providers/src/ensayo/{receptor-del-mac,paso-de-verificacion,paso-de-rostro,comprobaciones-de-plataforma}.ts  C2, F2, F4/C7, F3/C1
+packages/providers/src/simulacion/{situaciones-de-sitio,verificaciones-simuladas,ensayo-simulado}.ts  el simulador de las situaciones de sitio
+scripts/lib/omisiones-sin-base.mjs                           el control del ítem 10
+scripts/lib/{comprobaciones-del-mac,respaldo-en-sitio}.mjs   sacados del guion del ensayo
+docs/decisiones/ADR-032-…md                                  enmienda: la casilla con nombre, única constancia
+docs/guias/ENTREGA_EN_SITIO.md                               IPv6 en casa, HikCentral, §2 bis, nueve pasos, plan B
+```
+
+Retirados: `biometria/aplicacion/consentimiento-presencial.ts` (y su prueba),
+`padron/infraestructura/identidad-de-persona.ts`,
+`visitantes/confirmacion-presencial.tsx` y los modelos Dart
+`aceptacion_presencial_dto` y `respuesta_de_consentimiento_dto`.
+
+## K4 · Tabla SOLID
+
+| Principio | Cumplimiento                                                                                                                                                                                                                                                                                            |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SRP**   | `EnviarEventosAEsteMac` y `CambiarVerificacionRemota` son un caso de uso cada uno; `ipHaciaElEquipo`, `leidoDeRostros`, `clasificarConexionDeEventosRechazada`, `percentil` y `estadoDeEquiposSimulados` son funciones puras; el precalentamiento sólo abre conexiones; la caché sólo recuerda y olvida |
+| **OCP**   | Una corrección de sitio nueva es una `ClaseDeCorreccion` y su función, sin tocar el despacho; un código de rechazo nuevo es una expresión en el clasificador; una situación de sitio nueva es un campo de `SituacionesDeSitio`                                                                          |
+| **LSP**   | `RegistroEnCache` cumple `RegistroDeEquipos` y `CopropiedadDeEquipoEnCache` cumple `COPROPIEDAD_DE_EQUIPO`: quien los consume no sabe que hay caché. La cámara y la galería entregan por el mismo puerto                                                                                                |
+| **ISP**   | `ResolutorDeIpDelMac` y `SecretosDelAlarmServer` tienen un método cada uno; `senalDeEventos` añade un campo, no un puerto; `rechazoPorOtraPlataforma` es opcional en `EscuchaActiva`                                                                                                                    |
+| **DIP**   | Los casos de uso de sitio dependen de puertos con `@Inject` explícito (corrector, resolutor, secretos, olvido); `networkInterfaces` se inyecta en `IpDelMacPorInterfaces`; el reloj de la caché, también                                                                                                |
+
+## K5 · Trazabilidad
+
+- **OE-04 y RN-09/RN-10:** la casilla sigue siendo obligatoria para
+  sincronizar, y ahora nombra al titular. Lo que cambia es quién la marca
+  (ADR-032).
+- **HU-13, CA-08, KPI-16:** la calidad se juzga igual para la galería que para
+  la cámara.
+- **OE-03 y el principio rector:** el ensayo prueba que la terminal espera el
+  veredicto dentro del plazo (paso 9) y la ficha dice si la escucha está en
+  manos de otra plataforma.
+- **RN-12, RN-21:**
+  - el navegador nunca habla con el equipo: los dos botones van a la API;
+  - la ruta con el secreto no sale del proveedor ni llega a la auditoría.
+- **RN-15:** la franja cuenta sólo los equipos de la copropiedad de la ruta.
+  La suite de aislamiento recorre las dos rutas nuevas con `:id`.
+- **KPI-09, KPI-13:** hay duración por decisión, en la bitácora y en la fila
+  del evento. Es la base para medir en sitio; **no** es la medición.
+- **KPI-11:** limpio.
+- **Parcial:**
+  - la latencia real (KPI-09) y los supuestos S-101 a S-103 esperan el
+    ensayo en sitio;
+  - KPI-33 no cambia.
+
+## K6 · Pruebas
+
+### Qué se probó y cómo
+
+- **Galería (1):** pruebas de dominio del origen y del motivo, de widget de la
+  foto (cámara, galería, cancelar, ilegible, permiso negado sin borrar la
+  anterior) y de la galería contra un doble de `image_picker`. En el recorrido
+  web, el paso 5b.
+- **Casilla (2):**
+  - en la API, la plantilla y el nombre vacío;
+  - en la consola, la casilla deshabilitada hasta tener la plantilla y el
+    texto con el nombre;
+  - en la app, la frase palabra por palabra;
+  - `roles-de-visitantes` exige que la ruta presencial ya no exista.
+- **C2 y el interruptor (3, 4e):**
+  - `correcciones-de-sitio.test.ts` (11): escribir y releer, receptor ausente,
+    lectura que no coincide y secreto fuera de los valores;
+  - `configuracion-en-sitio.test.ts` (5): tipo de equipo, sin credencial, sin
+    secreto declarado, sin IP en la subred, y la auditoría sin secreto;
+  - la ficha, en `acciones-de-sitio.test.tsx` (6).
+- **F2 (4a-d):**
+  - el precalentamiento (abre, falla sin bloquear, se salta en memoria);
+  - las dos cachés (recuerda 30 s, sólo lo encontrado, `olvidar`);
+  - la duración en el veredicto;
+  - el paso 9 y `percentil`.
+- **F3 (5):** la frase y cuándo sale; la comprobación del ensayo.
+- **C1 (6):** `comprobaciones-de-plataforma.test.ts` cubre el host directo,
+  el pooler de sesión, el de transacción y una `PGBOSS_DATABASE_URL` vacía que
+  cuenta como ausente.
+- **F4 (7):**
+  - `rostros-y-personas.test.ts`, con el orden de respaldo y el motivo;
+  - la ficha, con «admite», «no admite», «no se pudo leer (motivo)» y sin
+    paréntesis vacíos;
+  - el ensayo en el videoportero.
+- **C7 (8):**
+  - el clasificador;
+  - el ensayo, que corta en el acto y detecta el rostro desaparecido;
+  - la escucha, que recuerda el rechazo y lo **olvida** al volver a conectar
+    (`rechazo-en-la-escucha.test.ts`);
+  - la ficha en BLOQUEO con la frase (`senal-de-eventos.test.ts`).
+- **K2 (9):**
+  - las nueve combinaciones de grafía y las redes;
+  - otras direcciones del bucle local siguen fuera;
+  - por HTTP, el superadministrador desde una IP fuera de toda lista entra
+    con el modo pruebas activo y apagado, y un espía confirma que la guarda no
+    se consulta.
+- **Ítem 10:**
+  - sección 39 de `pruebas-negativas.mjs`, con 14 comprobaciones que siembran
+    la omisión de verdad y la hacen fallar;
+  - a mano, `visitas-pg` contra el puerto 1: con la variable fallan las 20
+    pruebas, cada una con su nombre; sin ella se marcan; sin URL el fichero no
+    carga.
+- **El ensayo completo en simulado:** `pnpm sitio:ensayo -- --simulado` da
+  «VEREDICTO: SIN FALLOS · 24 OK · 0 FALLO · 0 omitidos · 5 no aplica».
+
+### Resultado
+
+**La primera verificación de esta corrección dio FALLIDA**, por dos causas:
+
+- **Frontera de extensibilidad (O2), culpa mía.** Para quitar el `hikvision`
+  escrito a mano de la prueba de equipos simulados importé
+  `CLASES_DE_PROVEEDOR` como valor en la capa de aplicación, y esa capa no
+  puede importar `@ncr/providers`. Arreglar un control rompió otro, y yo no
+  había corrido ese control antes de lanzar el verificador. La prueba usa ahora
+  una clase cualquiera distinta de «simulado».
+- **Estabilidad (paso 14): una roja distinta en dos de las tres corridas.**
+  - `generacion-padron › una sola colisión revierte las 12`: la causa es
+    cierta. Contaba las viviendas activas de **toda** la copropiedad antes y
+    después, y otras suites crean viviendas en ella en paralelo (KPI-03 inserta
+    100 a la vez). Ahora cuenta sólo las agrupaciones del plan, las únicas que
+    la generación puede tocar, y exige que sean 12 antes de comparar.
+  - `equipos-entre-copropiedades › … equipo REAL de B, desde A: 404`: la
+    primera vez no tenía causa. No se reprodujo en 7 corridas —4 del paso 14 tal
+    cual y 3 de la API sola—. Descarté con datos un plazo (la prueba tarda
+    entre 23 y 43 ms), un error de la consulta y el límite de peticiones. Hice
+    entonces que `estabilidad.mjs` imprimiera, además del nombre, la primera
+    línea de cada roja, y **la segunda verificación trajo la causa**: «OMISIÓN
+    POR FALTA DE BASE … sin equipos de B en la base». La suite no creaba su
+    equipo: tomaba «cualquier equipo activo de B» de la base compartida, y el
+    único lo crea `registro-de-equipos-pg` en la misma corrida. Cuando esta
+    llegaba antes no había ninguno. **Hasta el ítem 10 eso era un verde que no
+    probaba nada**: el mismo falso verde que H-15L-C01, y el guardián nuevo lo
+    destapó. Ahora la suite crea su propio equipo de B y lo da de baja al
+    terminar. Con cero equipos de B en la base pasa 3 de 3 veces, con la base
+    exigida.
+
+Las pruebas negativas (34 controles) pasan y el trinquete de ramas sigue en 259.
+
+**La tercera verificación es correcta.** Resultados:
+
+- **Suites:** API 1551 (5 saltadas declaradas, del paso 12b), consola 552,
+  equipos 994, dominio 438, Edge 101, configuración 144 y app 361.
+- **Omisiones por falta de base:** ninguna; las 25 suites que usan la base
+  tienen su guardián.
+- **Cobertura:**
+  - dominio 96,20 %;
+  - aplicación 96,61 % de líneas;
+  - global 85,07 %;
+  - en la app, dominio 98,05 % y aplicación 96,89 %.
+- **Estabilidad:** tres corridas idénticas.
+- **Ensayo en simulado:** SIN FALLOS.
+
+### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
+
+Tercera ejecución, con las tres correcciones de arriba, en Linux, con la base de
+pruebas en PostgreSQL 16 y Flutter en el PATH:
+
+```text
+
+▸ 0 · borrando artefactos de compilación (así corre un checkout nuevo)
+   ✓ dist, .turbo, coverage, registros de compilación y claims de arranque eliminados
+
+▸ 1 · entorno dentro de lo declarado
+   ✓ entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2 · Flutter 3.47.4 (Dart 3.13.3) dentro de lo declarado · recorrido listo (Chromium + puerto 4599)
+
+▸ 1c · el árbol es escribible por las herramientas que van a usarlo
+   ✓ escritura: 9 rutas ejercidas de verdad (crear, escribir, leer, borrar)
+   ✓ base de pruebas: 127.0.0.1:55432/ncr como postgres · PostgreSQL 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu · conectado como postgres · esquema presente · 11 copropiedad(es) sembrada(s)
+
+▸ 1b · docs/ESTADO_ETAPAS.md no se contradice a sí mismo
+   ✓ coherente: 17 etapas en el mapa, 15 cerradas con ficha e informe, cabecera al día · 0 de 0 rama(s) «en curso» comprobadas contra git
+
+▸ 2 · instalación coherente con el lockfile
+   ✓ pnpm install --frozen-lockfile
+
+▸ 3 · compilación desde cero
+   ✓ @ncr/api construye SOLO, sin que nadie le prepare las dependencias
+   ✓ @ncr/edge construye SOLO, sin que nadie le prepare las dependencias
+   ✓ pnpm build
+   ✓ ninguna aplicación compila contra un dist/ desfasado (7 paquetes del espacio de trabajo, D-65)
+
+▸ 4 · lint y typecheck
+   ✓ pnpm lint
+   ✓ pnpm typecheck
+
+▸ 5 · suite completa
+   @ncr/config:test:       Tests  144 passed (144)
+   @ncr/edge:test:       Tests  101 passed (101)
+   @ncr/domain-core:test:       Tests  438 passed (438)
+   @ncr/providers:test:       Tests  994 passed (994)
+   @ncr/web:test:       Tests  552 passed (552)
+   @ncr/api:test:       Tests  1546 passed | 5 skipped (1551)
+   ⚠ suite sin rojas · las saltadas están DECLARADAS y se ejercen en otro paso
+       @ncr/api: 5 saltada(s)
+         ⚠ el superadministrador recién aprovisionado PUEDE entrar los claims del fichero son los que la base produjo, no unos inventados
+            en /home/user/NextResidential/apps/api/test/arranque-en-frio.e2e.test.ts
+            DECLARADA: necesita los claims que escribe el paso 12b, que es quien las ejecuta y exige que no se salten
+         ⚠ el superadministrador recién aprovisionado PUEDE entrar con el segundo factor verificado, la API le abre
+            en /home/user/NextResidential/apps/api/test/arranque-en-frio.e2e.test.ts
+            DECLARADA: necesita los claims que escribe el paso 12b, que es quien las ejecuta y exige que no se salten
+         ⚠ el superadministrador recién aprovisionado PUEDE entrar sin segundo factor NO entra: el arranque no relajó RN-20
+            en /home/user/NextResidential/apps/api/test/arranque-en-frio.e2e.test.ts
+            DECLARADA: necesita los claims que escribe el paso 12b, que es quien las ejecuta y exige que no se salten
+         ⚠ el superadministrador recién aprovisionado PUEDE entrar pero SÍ alcanza la recuperación del factor, que es lo que le desbloquea
+            en /home/user/NextResidential/apps/api/test/arranque-en-frio.e2e.test.ts
+            DECLARADA: necesita los claims que escribe el paso 12b, que es quien las ejecuta y exige que no se salten
+         ⚠ el superadministrador recién aprovisionado PUEDE entrar el superadministrador alcanza una copropiedad cualquiera (alcance global)
+            en /home/user/NextResidential/apps/api/test/arranque-en-frio.e2e.test.ts
+            DECLARADA: necesita los claims que escribe el paso 12b, que es quien las ejecuta y exige que no se salten
+       las 5 están DECLARADAS y se ejercen en otro paso
+   ✓ omisiones por falta de base: ninguna · 25 fichero(s) de prueba usan la base por apps/api/test/base-exigida.ts, todos con su guardián · 6 informe(s) leído(s)
+
+▸ 5b · app móvil: análisis estático de Dart
+   ✓ flutter analyze sin hallazgos
+
+▸ 5c · app móvil: suite de Dart y cobertura POR CAPA
+   00:52 +361: All tests passed!
+   ✓ dominio           98.05 % (umbral 90 %, 302/308 líneas)
+   ✓ aplicacion        96.89 % (umbral 90 %, 280/289 líneas)
+   ✓ configuracion    100.00 % (umbral 70 %, 33/33 líneas)
+   ✓ infraestructura   89.61 % (umbral 60 %, 638/712 líneas)
+   ✓ presentacion      88.71 % (umbral 50 %, 2043/2303 líneas)
+   ✓ resto             21.57 % (umbral 0 %, 11/51 líneas)
+   ✓ global            89.48 % (umbral 70 %, sin contar lo generado)
+   – 979 líneas generadas, excluidas del cómputo a propósito
+   ✓ cobertura de la app dentro de los umbrales por capa
+   ✓ la suite de Dart da lo mismo en otro huso (Pacific/Auckland): ninguna prueba depende del reloj del sistema
+
+▸ 5d · app móvil: cliente al día, sin secretos y sin dependencias a ciegas
+   ✓ sin secretos: la app no nombra ni incrusta ninguna llave que omita la RLS
+   ✓ dependencias: 1 acotación(es) con motivo escrito · objective_c fuera del grafo (lo arrastraba el plugin de Windows)
+   ✓ Info.plist en Profile, Debug, Release: red local pedida y ATS relajado sólo para lo local en todas; nunca NSAllowsArbitraryLoads
+   ✓ cliente Dart al día: 360 ficheros generados desde packages/contracts/openapi.json, sin diferencias
+
+▸ 5e · app móvil: el RECORRIDO en un navegador de verdad
+   ✓ la placa se muestra como la normalizó el dominio
+   ✓ la pestaña de visitantes muestra lo que el conjunto tiene a su nombre
+   ✓ y ofrece autorizar una visita, que es para lo que se abre (HU-07)
+   ✓ los últimos visitantes se ofrecen para volver a autorizarlos (F6)
+   ✓ cada visita dice su situación real, y la rechazada su motivo
+   ✓ la foto se toma o se elige de la galería: los dos botones están a la vista
+   ✓ la casilla dice el nombre del visitante que se escribe, en vivo
+   ✓ el perfil trae el nombre de la persona (3.5)
+   ✓ y el botón de portería (D7)
+   ✓ el correo sintético del token no aparece en ninguna parte (C-36)
+   ✓ el motivo de la negación se explica en lenguaje llano
+   ✓ lo decidido por el Edge se marca (KPI-31)
+   ✓ ni un error de JavaScript en el recorrido completo
+   ✓ la app se recorre entera en el navegador, sin un error de JavaScript
+
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 322 de 322 ficheros de prueba ejecutados
+
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     OK   dominio (packages/domain-core/src): lineas 96.20 % · ramas 96.91 % · funciones 96.04 % (umbral 90 %, 40 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 96.61 % · ramas 89.26 % · funciones 97.65 % (umbral 90 %, 99 archivos)
+     OK   global: lineas 85.07 % · ramas 86.04 % · funciones 84.12 % (umbral 70 %, 678 archivos)
+   ✓ las tres capas cumplen su umbral
+
+▸ 7b · los dos recuentos de la MISMA suite coinciden (D-112)
+   ✓ recuentos: 6 paquete(s) con el mismo resultado por los dos caminos (turbo y vitest directo) · 3780 pruebas
+
+▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
+   ✓ portabilidad: 17 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
+
+▸ 9 · pruebas negativas de los propios controles
+   ✓ entorno declarado: 64 variables de 2 esquemas, todas en su .env.example · 27 leídas fuera de Zod, con motivo
+   ✓ declaraciones: 1 paso(s) declarado(s) no ejercido(s), 0 de ellos en linux, con motivo y etapa de revisión vigente
+   ✓ controles: 41 de 43 con prueba negativa · 2 en deuda declarada (no puede crecer)
+   ✓ PRUEBAS NEGATIVAS: los 34 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ ramas: 41 controles medidos · 259 bloques sin ejercer (no puede subir)
+
+▸ 10 · fronteras de arquitectura y secretos
+   ✓ fronteras (DoD ETAPA 02)
+   ✓ frontera-modulos: 17 módulos (alarmserver, autenticacion, autorizaciones, biometria, cuentas, equipos, eventos, guardia, observabilidad, padron, planificacion, plataforma, porteria, residente, tablero, visitas, zonas), ninguna importación entra por dentro y un solo Pool de PostgreSQL (D-66)
+   ✓ sin secretos
+   ✓ escaneo de secretos: limpio (4896 blobs del historial alcanzable · 2 de línea base declarados)
+   ✓ longitud por campo: 124 campo(s) @IsString(), todos con cota declarada
+   ✓ 70 clases que Nest construye inyectan con @Inject() explícito en todos sus parámetros
+   ✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers/ (los rangos de documentación de RFC 5737 no cuentan: no son de nadie)
+   ✓ frontera-extensibilidad: 232 fichero(s) de dominio/aplicación sin @ncr/providers, ningún adaptador nombrado fuera del paquete, y el ficticio sólo toca el núcleo
+   ✓ ningún atributo `style` en la consola (225 ficheros, §2.7.7)
+   ✓ 225 ficheros de la consola: todo color sale de un token con pareja medida en los dos temas
+   ✓ frontera-vocabulario: 83 ficheros del dominio, sin tipo de copropiedad ni etiquetas (el tipo se puede cambiar sin consecuencias)
+   ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 8 tablas vigiladas)
+   ✓ pwa: manifiesto completo, iconos reales de 192/512 y uno enmascarable distinto, service worker registrado con `/api/` fuera de la caché y página de sin conexión
+   ✓ paleta: paleta.g.dart al día con el preset (40 tokens por tema)
+   ✓ mermaid: 9 diagrama(s) en 2 fichero(s) analizan con Mermaid 11.17.2
+
+▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
+   ✓ esquemas: 234 DTO con nombre único en apps/api/src
+   ✓ 148 de 154 operaciones con respuesta tipada; 6 exentas con etapa declarada
+   ✓ contrato y cliente generado al día respecto de los controladores
+
+▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
+   alertas entregadas: 200 de 200
+   p50 / p95 / p99   : 8 / 48 / 56 ms
+   maximo            : 61 ms
+   umbral KPI-25     : 10000 ms
+   ✓ KPI-25 con margen sobre el umbral
+
+▸ 12 · esquema y aislamiento en --modo-supabase (requiere --con-base)
+   ✓ migraciones, semillas y suite SQL
+
+▸ 12b · arranque en frío: base vacía → migraciones → superadministrador (requiere --con-base)
+   ✓ una base recién migrada llega a un superadministrador con claims válidos
+   ✓ y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1
+
+▸ 12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero
+   ✓ el camino completo se recorre en el navegador
+
+▸ 12d · start:dev —el arranque de sitio— inyecta y VALIDA; con tsx la API se niega a arrancar
+   ✓ con start:dev la API llega a «API arrancada»
+   ✓ un controlador inyectado contesta con su lógica (503, no 500)
+   ✓ el ValidationPipe valida: un cuerpo fuera del DTO recibe 400
+   ✓ con tsx la API se niega a arrancar y dice por qué: sin metadatos no valida
+   ✓ start:dev arranca, inyecta y valida; tsx no arranca sin metadatos
+
+▸ 12e · el guion de sitio, ensayado contra los equipos simulados: --con-audio y --abrir
+   ✓ la puerta SE MOVIÓ: H-SITIO-13 verificado en este equipo
+   ✓ la puerta SE MOVIÓ: H-SITIO-13 verificado en este equipo
+   ✓ el guion recorre los tres equipos simulados y --abrir abre como en sitio
+
+▸ 12f · pnpm sitio:ensayo contra los equipos simulados: nueve pasos por equipo, respaldo y reversión
+   VEREDICTO: SIN FALLOS · 24 OK · 0 FALLO · 0 omitidos · 5 no aplica
+   ✓ el ensayo recorre los tres equipos simulados, respalda y revierte su configuración
+
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+   ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
+   ✓ una hoja sin un solo UUID crea viviendas, personas y sus vínculos (D-72, RN-06)
+   ✓ el superadministrador escribe el padrón en la copropiedad del selector (D-71)
+   ✓ las 12 en una sentencia, el mismo número en tres agrupaciones, y una colisión revierte las 12
+
+▸ 13b · el recorrido de la CONSOLA contra la API real, PostgreSQL y el simulado (requiere --con-base)
+   ✓ el superadministrador y el portero recorren la consola de punta a punta
+
+▸ 13c · el recorrido FALLA con H-SITIO-02, 03, 08, 13 y 15 reintroducidos (requiere --con-base)
+   ✓ los cinco defectos de sitio, reintroducidos, se detectan cada uno por su nombre
+
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 1551 passed (1551) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 438 passed (438) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 994 passed (994) · @ncr/web:test: Tests 552 passed (552)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 1551 passed (1551) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 438 passed (438) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 994 passed (994) · @ncr/web:test: Tests 552 passed (552)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 1551 passed (1551) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 438 passed (438) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 994 passed (994) · @ncr/web:test: Tests 552 passed (552)
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 31 de 31 pasos ejecutados
+
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+## K7 · Verificación de seguridad (§2.7)
+
+| Medida                | Verificación en esta corrección                                                                                                                                                                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 · Secretos          | El secreto del Alarm Server viaja del `.env` al equipo sin pasar por la consola, la auditoría ni la bitácora (`valorAnterior`/`valorNuevo` = `ip:puerto`); el ensayo lo imprime `/alarm-server/••••` y lo añade a los secretos que tacha. Escaneo limpio; KPI-11 limpio |
+| 2 · CORS              | Sin cambios                                                                                                                                                                                                                                                             |
+| 3 · Validación        | Los DTO nuevos (`MotivoDeConfiguracionDto`, `VerificacionRemotaDto`) validan forma; el caso de uso valida tipo de equipo, credencial, secreto declarado e IP. `ALARM_SERVER_IP_ANUNCIADA` se valida como IPv4 al arrancar                                               |
+| 4 · SQL               | Sin SQL nuevo salvo el del ensayo (parametrizado, transacción de sólo lectura); la consulta de visitas perdió un `JOIN`                                                                                                                                                 |
+| 5 · Límites           | Las dos rutas de sitio: 10 por minuto cada una, además del límite global                                                                                                                                                                                                |
+| 6 · RLS y aislamiento | Las rutas nuevas llevan `:id` y entran solas en la suite de aislamiento; la franja cuenta sólo la copropiedad de la ruta; la caché se indexa por equipo y resuelve la copropiedad desde el registro, como antes                                                         |
+| 7 · CSP               | Sin cambios                                                                                                                                                                                                                                                             |
+| 8 · Transversales     | RBAC declarativo: los botones de sitio, sólo superadministración y administración, con motivo obligatorio y auditoría. El EXIF (ubicación incluida) ya no sale del teléfono (S-97)                                                                                      |
+
+## K8 · Deuda técnica, supuestos y pendientes
+
+- **DT-15L-09 · métodos del dominio sin llamador:**
+  `ConsentimientoBiometrico.confirmarPorElTitular` e `identidadCoincide`.
+  Retirarlos exige tu autorización porque es dominio.
+- **DT-15L-10 · `diagnostico/ficha.ts` sigue en 554 líneas**, y
+  `equipo/escucha-alertstream.ts` en 337. Los dos pasaban de 300 antes de esta
+  corrección; «Rostros» salió a su propio fichero para no engordar el primero.
+- **H-15L-C02 CORREGIDO · falso verde en `equipos-entre-copropiedades`** (bloque
+  PostgreSQL): la suite dependía de un equipo de B que creaba otra suite y, si
+  no lo había, salía sin probar nada. Lo destapó el guardián del ítem 10; ahora
+  crea y retira el suyo.
+- **DT-15L-03 sigue** (`entidades.dart`, `repositorio_api.dart`, `app.dart`).
+- **Supuestos:** S-96 a S-106, registrados en
+  `docs/auditoria/contradicciones-y-supuestos.md`.
+- **P-21:** sin objeto.
+- **Propuesta para `CLAUDE.md` §2.8.0 (no la aplico: el contrato es tuyo).**
+  Una viñeta más: «**Omitir por falta de base es fallar con `--con-base`**
+  (H-15L-C01). Toda suite de PostgreSQL toma la base de
+  `apps/api/test/base-exigida.ts` y registra `exigirBase`; el verificador
+  exporta `NCR_BASE_EXIGIDA=1` y cada prueba sin base falla con su nombre; el
+  paso 5 las nombra desde el informe JSON (`omisiones-sin-base.mjs`). Ningún
+  fichero de prueba lee `DATABASE_URL_PRUEBAS` por su cuenta.»
+
+## K9 · Qué debe hacer el usuario manualmente
+
+1. **Fusionar el PR** cuando lo revise. No se fusiona desde aquí.
+2. **En casa, con IPv6 desactivado**, seguir `ENTREGA_EN_SITIO.md` §0.7:
+   `networksetup -setv6off Wi-Fi`, arrancar la API, correr
+   `pnpm sitio:ensayo -- --solo-lectura` y al terminar
+   `networksetup -setv6automatic Wi-Fi`.
+3. **Pedir a quien administra HikCentral** que deshabilite los tres equipos
+   durante la prueba (§0.9).
+4. **Al llegar**, en la ficha de la cámara: **«Enviar eventos a este Mac»**
+   (§2 bis).
+5. **Con el ensayo**, anotar en la hoja:
+
+   - el p50/p95 del paso 9;
+   - lo que la ficha del videoportero diga en «Rostros»;
+   - el cuerpo de cualquier rechazo de eventos.
+
+   Esos datos confirman o corrigen S-101 a S-103.
+
+6. **Decidir DT-15L-09** (los dos métodos del dominio) y **si aceptas la
+   viñeta propuesta para §2.8.0**.
+
+## K10 · Rama y commits
+
+Rama `etapa-15l-entrega-final`, en el mismo PR
+[4rg3n15/NextResidential#34](https://github.com/4rg3n15/NextResidential/pull/34),
+sin fusionar: la fusión es del usuario.
+
+- `5e0f3ad` feat(etapa-15l/sitio): corrección 2 — galería, casilla con nombre, IP del Mac, verificación remota, HikCentral y omisiones sin base
+- el commit de cierre de la corrección 2, con este informe
