@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reenvioDeIp } from '@/lib/ip-de-la-peticion';
 import type { NextRequest } from 'next/server';
 import { configuracion } from '@/lib/configuracion';
 import {
@@ -82,6 +83,7 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
         Authorization: `Bearer ${token.accessToken}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...reenvioDeIp(peticion.headers),
       },
       body: JSON.stringify({ actual, nueva }),
       cache: 'no-store',

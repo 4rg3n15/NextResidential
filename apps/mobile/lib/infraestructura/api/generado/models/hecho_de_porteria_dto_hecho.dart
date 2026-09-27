@@ -10,6 +10,10 @@ enum HechoDePorteriaDtoHecho {
   porteroEditado('portero_editado'),
   @JsonValue('turno_retirado')
   turnoRetirado('turno_retirado'),
+  @JsonValue('cupo_actualizado')
+  cupoActualizado('cupo_actualizado'),
+  @JsonValue('portero_dado_de_baja')
+  porteroDadoDeBaja('portero_dado_de_baja'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

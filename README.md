@@ -385,8 +385,9 @@ casa» y «en sitio», es
    se abre **por IP** (`http://<IP>:3100`). Por IP sin TLS se ve el video; el
    micrófono exige `https` o el bucle local
    ([`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](docs/guias/CONSOLA_EN_RED_Y_DESPLIEGUE.md)).
-   Se entra con el **código corto o el NIT** de la copropiedad, el usuario y la
-   contraseña (D1).
+   Se entra con el **correo** (administración), el **número de portero** (porteros,
+   ADR-031) o el **código corto** de la copropiedad y el usuario (residentes, D1),
+   y la contraseña.
 5. **App del residente**: `flutter run --dart-define=API_URL=http://<IP>:3000`
    desde `apps/mobile` (en el iPhone, en Debug). Se entra con el código de la
    copropiedad, el usuario y la contraseña; el primer ingreso pide cambiarla,

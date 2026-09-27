@@ -14,6 +14,7 @@ class DatosDelPorteroDto {
     this.telefono,
     this.correoContacto,
     this.porteria,
+    this.documento,
   });
   
   factory DatosDelPorteroDto.fromJson(Map<String, Object?> json) => _$DatosDelPorteroDtoFromJson(json);
@@ -25,6 +26,9 @@ class DatosDelPorteroDto {
 
   /// Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas.
   final List<String> sectores;
+
+  /// Documento de identidad (H2). En la edición, ausente = no se cambia
+  final String? documento;
 
   Map<String, Object?> toJson() => _$DatosDelPorteroDtoToJson(this);
 }

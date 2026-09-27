@@ -167,8 +167,11 @@ describe('alertas · persisten, incluidas las que nacen en la consola', () => {
     const escalada = alerta.valor.escalar(new Date());
     await new RepositorioAlertasPg(escribe as Pool, bitacora).guardar(escalada, ACTOR_INGESTA);
 
-    const abiertas = await new RepositorioAlertasPg(lee as Pool, bitacora).abiertasDe(COP);
-    const mia = abiertas.find((x) => x.id === escalada.id);
+    // Por su id, y no entre «las 200 abiertas más recientes»: la base de
+    // pruebas acumula alertas de otras suites con el reloj fijado en el
+    // futuro, y ésta, fechada ahora, podía quedar fuera de la ventana.
+    const mia = await new RepositorioAlertasPg(lee as Pool, bitacora).porId(COP, escalada.id);
+    expect(mia?.estado).toBe('abierta');
     expect(mia?.dispositivoId).toBe('consola-guardia');
     expect(mia?.escaladaEn).not.toBeNull();
     expect(mia?.severidad).toBe('critica');
@@ -208,7 +211,11 @@ describe('órdenes manuales · el rastro de RN-08 sobrevive a un reinicio', () =
       operadorId,
       rol: 'portero',
       dispositivoId,
-      momento: new Date(),
+      // Dentro de DOS días: `verificacion-remota-armada-pg` deja cada corrida
+      // una orden fechada MAÑANA en esta copropiedad, y con veinte corridas en
+      // un día la de ahora ya no entraba en «las últimas 20». Así, la de esta
+      // corrida es siempre la más reciente.
+      momento: new Date(Date.now() + 2 * 86_400_000),
       eventoId: null,
     };
     const a = new BitacoraDeOrdenesPg(escribe as Pool);

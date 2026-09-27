@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reenvioDeIp } from '@/lib/ip-de-la-peticion';
 import type { NextRequest } from 'next/server';
 import { configuracion } from '@/lib/configuracion';
 import { borrarSesion, guardarSesion, marcarFactorPendiente } from '@/lib/sesion/cookies';
@@ -117,7 +118,7 @@ const registrarEnAuditoria = async (accessToken: string, peticion: NextRequest):
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'User-Agent': peticion.headers.get('user-agent') ?? 'consola',
-        'X-Forwarded-For': ipDe(peticion.headers),
+        ...reenvioDeIp(peticion.headers),
       },
       cache: 'no-store',
     });

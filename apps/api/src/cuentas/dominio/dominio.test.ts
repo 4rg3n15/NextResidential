@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nit, nombreDeUsuario } from './nombre-de-usuario';
+import { nombreDeUsuario } from './nombre-de-usuario';
 import type { NombreDeUsuario } from './nombre-de-usuario';
 import { contieneCorreoSintetico, correoSintetico } from './correo-sintetico';
 import { motivoDeRechazoDeContrasena } from './politica-de-contrasena';
@@ -26,17 +26,6 @@ describe('nombre de usuario (ADR-023)', () => {
 
   it('acepta los tres signos permitidos', () => {
     expect(nombreDeUsuario('p_1.norte-2').ok).toBe(true);
-  });
-});
-
-describe('NIT del identificador de acceso (C-34)', () => {
-  it('normaliza como la base: sin puntos, comas ni espacios, con dígito de verificación', () => {
-    expect(nit('900.123.456-7')).toEqual({ ok: true, valor: '900123456-7' });
-    expect(nit('900 123 456')).toEqual({ ok: true, valor: '900123456' });
-  });
-  it('rechaza lo que no es un NIT', () => {
-    expect(nit('abc').ok).toBe(false);
-    expect(nit('1234').ok).toBe(false);
   });
 });
 

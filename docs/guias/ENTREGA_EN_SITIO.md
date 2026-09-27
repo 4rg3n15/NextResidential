@@ -17,6 +17,7 @@
 - [1 · Arranque de API, consola y go2rtc](#1--arranque-de-api-consola-y-go2rtc)
 - [2 · Comprobaciones](#2--comprobaciones)
 - [3 · `supabase db push` pendiente](#3--supabase-db-push-pendiente)
+- [3 bis · Porteros: número, IP y modo pruebas](#3-bis--porteros-número-ip-y-modo-pruebas)
 - [4 · Ensayo](#4--ensayo)
 - [5 · Demostración de los tres hitos del reto](#5--demostración-de-los-tres-hitos-del-reto)
 - [6 · Reversión](#6--reversión)
@@ -55,6 +56,12 @@ pnpm sitio:video                                        # go2rtc, primer plano
 pnpm --filter @ncr/api start 2>&1 | tee -a $HOME/ncr-sitio/api.log
 pnpm --filter @ncr/web start                            # consola en el 3100
 ```
+
+`pnpm --filter @ncr/web start` es `node servidor.mjs`, no `next start`: fija
+en `X-Forwarded-For` la IP del navegador que se conecta, y la API la cree porque
+le llega del propio Mac (`API_PROXIES_DE_CONFIANZA=loopback`, el valor por
+omisión). Con `next start` a secas, un navegador podría declararse desde
+cualquier IP y la lista blanca de porteros no serviría (ADR-031).
 
 Si la IP del Mac cambió respecto de la oficina, `pnpm sitio:video` la toma sola
 (`en0`); si no es esa interfaz, `VIDEO_IP_ANUNCIADA` en el `.env`. La consola se
@@ -112,6 +119,42 @@ supabase db push
 
 y vuelva a arrancar la API (paso 1). Repita `pnpm sitio:ensayo -- --solo-lectura`
 hasta que diga «la base tiene todas las migraciones del repositorio».
+
+## 3 bis · Porteros: número, IP y modo pruebas
+
+Desde la 15-L (ADR-031) **el portero entra con su número y su contraseña**, nada
+más: ni código ni NIT. El número se lo da el sistema al darlo de alta
+(Porteros → Nuevo portero: nombre, documento y contraseña temporal) y se enseña
+en pantalla al terminar: **anótelo y dígaselo**. El portero sembrado que ya
+existía entra con el número que la migración 0042 le asignó (columna «Portero»
+en Porteros).
+
+**El MODO PRUEBAS está ACTIVO al llegar** (franja amarilla arriba de la
+consola: «Modo pruebas activo: restricciones de porteros desactivadas»). Con él,
+un portero entra desde cualquier IP y cada vez que la regla lo habría frenado
+queda anotado «habría sido rechazado» en la auditoría. Así se hacen todas las
+pruebas desde el mismo Mac sin quedarse fuera.
+
+Para demostrar la lista blanca, en este orden:
+
+1. Configuración → «IPs permitidas para conexión remota de porteros»: la IP del
+   Mac (o su red, p. ej. `192.168.1.0/24`). «IP del computador de portería», si
+   hay uno. Guardar: queda en la auditoría.
+2. Configuración → Seguridad → «Desactivar modo pruebas» (sólo el
+   superadministrador). La franja desaparece al recargar, sin reiniciar nada.
+3. El portero, desde el Mac: entra y opera la guardia virtual.
+4. Desde otro aparato cuya IP no esté en la lista: «No autorizado para guardia
+   remota», y la fila con esa IP en `auditoria_seguridad`.
+5. **Con la lista remota vacía**, el portero sólo entra desde la IP de un
+   superadministrador con sesión abierta —el mismo Mac, si el superadministrador
+   tiene la consola abierta—. En cuanto la lista tiene una entrada, esa regla
+   deja de valer.
+6. Si algo se atasca en plena demostración: «Activar modo pruebas» y todo vuelve
+   a entrar, anotado.
+
+Con el modo pruebas apagado, 5 intentos fallidos del mismo número **desde la
+misma IP** bloquean 5 minutos (desde otra IP, no). La consola dice cuánto
+esperar.
 
 ## 4 · Ensayo
 

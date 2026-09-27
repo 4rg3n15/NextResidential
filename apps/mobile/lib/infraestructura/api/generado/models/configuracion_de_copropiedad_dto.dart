@@ -30,6 +30,8 @@ class ConfiguracionDeCopropiedadDto {
     required this.codigoCorto,
     required this.telefonoPorteria,
     required this.topeVehiculosPropios,
+    required this.ipsPorteria,
+    required this.ipsGuardiaRemota,
     required this.aprobacionDeTerceros,
     required this.editables,
   });
@@ -71,7 +73,7 @@ class ConfiguracionDeCopropiedadDto {
   final num margenCacheReglasHoras;
   final num versionReglasActual;
 
-  /// D1 · código corto de acceso; null mientras no se asigne (sólo se entra por NIT).
+  /// D1 · código corto con el que entran los residentes; null mientras no se asigne.
   final String? codigoCorto;
 
   /// D7 · teléfono al que llama el botón «Portería» de la app.
@@ -79,6 +81,12 @@ class ConfiguracionDeCopropiedadDto {
 
   /// D5 a · vehículos propios por vivienda.
   final num topeVehiculosPropios;
+
+  /// H4 · IP (o redes CIDR) del computador de portería
+  final List<String> ipsPorteria;
+
+  /// H4 · IP (o redes CIDR) desde las que un portero puede hacer guardia remota. Vacía: sólo desde la IP de una sesión activa de superadministrador
+  final List<String> ipsGuardiaRemota;
 
   /// D5 c · solo lectura: modo de aprobación de terceros (ADR-027).
   final ConfiguracionDeCopropiedadDtoAprobacionDeTerceros aprobacionDeTerceros;

@@ -21,9 +21,11 @@ export const dynamic = 'force-dynamic';
 const GuardiaVirtual = async (): Promise<JSX.Element> => {
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
-  if (sesion.rol === 'residente' || sesion.rol === 'servicio' || sesion.rol === 'portero') {
+  // 15-L (H4) · el portero también hace guardia remota, pero SÓLO desde las IP
+  // que el superadministrador permite: eso lo decide la API en cada petición.
+  if (sesion.rol === 'residente' || sesion.rol === 'servicio') {
     return (
-      <EstadoSinPermiso descripcion="La guardia virtual es del operador de central y de la administración. El portero atiende su propia puerta desde Portería." />
+      <EstadoSinPermiso descripcion="La guardia virtual es del operador de central, de los porteros y de la administración." />
     );
   }
   const alcance = await alcanceActivo();

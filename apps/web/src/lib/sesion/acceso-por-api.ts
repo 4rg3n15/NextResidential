@@ -10,8 +10,9 @@ import type { SesionSupabase } from './supabase-auth';
  * Hasta la 15-E la consola pedía el token a Supabase directamente. Desde la
  * 15-H lo pide a la API, por dos motivos que la consola sola no podía cumplir:
  *
- *  · El usuario por NOMBRE (NIT + usuario) necesita el correo sintético, y ese
- *    correo sólo existe en la API: aquí no se construye ni se ve nunca.
+ *  · El usuario por NOMBRE (código + usuario, o el número del portero)
+ *    necesita el correo sintético, y ese correo sólo existe en la API: aquí
+ *    no se construye ni se ve nunca.
  *  · El turno del portero y los límites por cuenta se imponen en el servidor.
  *    Un camino de entrada que no pase por la API se los saltaría.
  *
@@ -27,9 +28,10 @@ import type { SesionSupabase } from './supabase-auth';
  */
 export type IdentificadorDeAcceso =
   | { readonly correo: string }
-  | { readonly nit: string; readonly usuario: string }
   /** D1 (15-I) · el código corto de la copropiedad, la forma que también usa la app. */
-  | { readonly codigo: string; readonly usuario: string };
+  | { readonly codigo: string; readonly usuario: string }
+  /** H3 (15-L, ADR-031) · el portero: su número, sin nada más. */
+  | { readonly usuario: string };
 
 export interface OrigenDelNavegador {
   readonly ip: string | null;
@@ -78,7 +80,13 @@ export const accederPorApi = async (
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        ...(origen.ip === null ? {} : { 'x-ncr-origen': origen.ip.slice(0, 100) }),
+        // H6 (15-L) · la IP del navegador, que la API CREE porque le llega del
+        // proxy propio (`API_PROXIES_DE_CONFIANZA`): con ella aplica la regla de
+        // IP del portero y cuenta los intentos por (IP, cuenta). La declarada
+        // sigue yendo aparte, para la bitácora de portería.
+        ...(origen.ip === null
+          ? {}
+          : { 'x-forwarded-for': origen.ip.slice(0, 64), 'x-ncr-origen': origen.ip.slice(0, 100) }),
         ...(origen.agente === null ? {} : { 'x-ncr-agente': origen.agente.slice(0, 300) }),
       },
       body: JSON.stringify({ ...identificador, contrasena }),
@@ -138,11 +146,18 @@ export const accederPorApi = async (
  * sesión del portero y deja constancia. Si fallara, el cierre en el proveedor
  * sigue; la API rechazaría el token igual al caducar la sesión registrada.
  */
-export const cerrarEnLaApi = async (accessToken: string): Promise<void> => {
+export const cerrarEnLaApi = async (
+  accessToken: string,
+  ipDelNavegador: Record<string, string> = {},
+): Promise<void> => {
   const { apiUrl } = configuracion();
   await fetch(`${apiUrl}/auth/cierre`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+      ...ipDelNavegador,
+    },
     cache: 'no-store',
   }).catch(() => undefined);
 };

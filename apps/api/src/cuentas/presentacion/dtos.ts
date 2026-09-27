@@ -3,10 +3,11 @@ import { IsEmail, IsOptional, IsString, Length, MaxLength, ValidateIf } from 'cl
 
 /**
  * Entrada de la consola y de la app: por correo, por CÓDIGO corto y usuario
- * (D1) o por NIT y usuario (ADR-023, C-34; sólo lo ofrece la consola).
+ * (D1, el residente) o por el NÚMERO del portero sin nada más (H3, ADR-031).
+ * El NIT ya no entra.
  *
  * El DTO valida FORMA: longitudes y presencia. La verdad —si el usuario tiene
- * el formato del objeto de valor, si el NIT existe— la decide el caso de uso,
+ * el formato del objeto de valor, si el código existe— la decide el caso de uso,
  * y un fallo ahí responde lo mismo que una contraseña equivocada.
  */
 /**
@@ -18,7 +19,7 @@ const ausente = (v: unknown): boolean => v === undefined || v === null;
 
 export class AccesoDto {
   @ApiPropertyOptional({ type: String, maxLength: 254, description: 'Cuentas por correo' })
-  @ValidateIf((o: AccesoDto) => ausente(o.usuario) && ausente(o.nit) && ausente(o.codigo))
+  @ValidateIf((o: AccesoDto) => ausente(o.usuario) && ausente(o.codigo))
   @IsEmail()
   @MaxLength(254)
   correo?: string | null;
@@ -26,20 +27,20 @@ export class AccesoDto {
   @ApiPropertyOptional({
     type: String,
     maxLength: 8,
-    description: 'Código corto de la copropiedad (D1): 3 a 8 letras o números',
+    description:
+      'Código corto de la copropiedad (D1): 3 a 8 letras o números. Con él, el usuario es el ' +
+      'del residente; sin él, el usuario es el NÚMERO del portero (ADR-031)',
   })
-  @ValidateIf((o: AccesoDto) => ausente(o.correo) && ausente(o.nit))
+  @ValidateIf((o: AccesoDto) => !ausente(o.codigo))
   @IsString()
   @Length(3, 8)
   codigo?: string | null;
 
-  @ApiPropertyOptional({ type: String, maxLength: 20, description: 'NIT de la copropiedad' })
-  @ValidateIf((o: AccesoDto) => ausente(o.correo) && ausente(o.codigo))
-  @IsString()
-  @Length(5, 20)
-  nit?: string | null;
-
-  @ApiPropertyOptional({ type: String, maxLength: 32, description: 'Nombre de usuario' })
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 32,
+    description: 'Usuario del residente (con código) o número del portero (sin código)',
+  })
   @ValidateIf((o: AccesoDto) => ausente(o.correo))
   @IsString()
   @Length(1, 32)

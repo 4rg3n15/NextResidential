@@ -19,7 +19,7 @@ import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { GestionDePorteros } from '../aplicacion/porteros';
-import type { DatosDelPortero, RechazoDePortero } from '../aplicacion/porteros';
+import type { DatosDelPortero } from '../aplicacion/porteros';
 import { CalendarioDeTurnos } from '../aplicacion/turnos';
 import type { RechazoDeTurno, TurnoConSolapes } from '../aplicacion/turnos';
 import type { DatosDeTurno } from '../aplicacion/puertos';
@@ -39,6 +39,7 @@ import {
   TurnosDto,
 } from './dtos';
 import { aHechoDto, aPorteroDto, aTurnoDto } from './mapeadores';
+import { rechazoDePortero } from './rechazo-de-portero';
 
 const datosDelPortero = (d: DatosDelPorteroDto): DatosDelPortero => ({
   nombre: d.nombre,
@@ -46,6 +47,7 @@ const datosDelPortero = (d: DatosDelPorteroDto): DatosDelPortero => ({
   correoContacto: d.correoContacto ?? null,
   porteria: d.porteria ?? null,
   sectores: d.sectores,
+  ...(d.documento === undefined ? {} : { documento: d.documento }),
 });
 
 const datosDeTurno = (d: DatosDeTurnoDto): DatosDeTurno => ({
@@ -57,15 +59,6 @@ const datosDeTurno = (d: DatosDeTurnoDto): DatosDeTurno => ({
   tipo: d.tipo,
   motivo: d.motivo ?? null,
 });
-
-const rechazoDePortero = (e: RechazoDePortero): Error =>
-  e.motivo === 'FORMATO'
-    ? new BadRequestException(e.detalle)
-    : e.motivo === 'DUPLICADO'
-      ? new ConflictException('Ese usuario ya existe en esta copropiedad')
-      : e.motivo === 'NO_ENCONTRADO'
-        ? new NotFoundException('Portero no encontrado')
-        : new BadRequestException('El proveedor de identidad rechazó el alta');
 
 const rechazoDeTurno = (e: RechazoDeTurno): Error =>
   e.motivo === 'FORMATO'
@@ -118,7 +111,9 @@ export class SupervisionController {
 
   @Post('porteros')
   @ApiOperation({
-    summary: 'Alta de portero con usuario y contraseña inicial (cambio obligatorio)',
+    summary:
+      'Alta de portero con nombre, documento y contraseña temporal; recibe el siguiente ' +
+      'número del pool (cambio de contraseña obligatorio)',
   })
   @ApiOkResponse({ type: PorteroCreadoDto })
   async alta(
@@ -129,11 +124,11 @@ export class SupervisionController {
     await this.aislamiento.exigirAlcance(ctx, id, 'porteria/alta');
     const r = await this.porteros.alta(ctx, id, {
       ...datosDelPortero(dto),
-      usuario: dto.usuario,
+      documento: dto.documento,
       contrasenaInicial: dto.contrasenaInicial,
     });
     if (!r.ok) throw rechazoDePortero(r.error);
-    return { usuarioId: r.valor.usuarioId };
+    return { usuarioId: r.valor.usuarioId, numero: r.valor.numero };
   }
 
   @Put('porteros/:usuarioId')

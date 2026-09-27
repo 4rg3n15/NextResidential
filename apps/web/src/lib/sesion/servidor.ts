@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import type { AlcanceDeCopropiedades, Sesion } from '@ncr/contracts';
 import { configuracion } from '../configuracion';
+import { reenvioDeIpActual } from './ip-del-navegador';
 import { registrar } from '../registro';
 import { tokenVigente } from './token';
 
@@ -41,7 +42,11 @@ export const sesionActual = cache(async (): Promise<Sesion | null> => {
   const { apiUrl } = configuracion();
   try {
     const respuesta = await fetch(`${apiUrl}/auth/sesion`, {
-      headers: { Authorization: `Bearer ${token.accessToken}`, Accept: 'application/json' },
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        Accept: 'application/json',
+        ...(await reenvioDeIpActual()),
+      },
       cache: 'no-store',
     });
     if (!respuesta.ok) {
@@ -91,7 +96,11 @@ export const alcanceDeCopropiedades = cache(async (): Promise<AlcanceDeCopropied
   const { apiUrl } = configuracion();
   try {
     const respuesta = await fetch(`${apiUrl}/copropiedades`, {
-      headers: { Authorization: `Bearer ${token.accessToken}`, Accept: 'application/json' },
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        Accept: 'application/json',
+        ...(await reenvioDeIpActual()),
+      },
       cache: 'no-store',
     });
     if (!respuesta.ok) {
@@ -107,5 +116,30 @@ export const alcanceDeCopropiedades = cache(async (): Promise<AlcanceDeCopropied
     return (await respuesta.json()) as AlcanceDeCopropiedades;
   } catch {
     return null;
+  }
+});
+
+/**
+ * H5 (15-L) · si el MODO PRUEBAS está activo: la consola pinta la franja fija
+ * para todo el que tiene sesión. Se pregunta en cada página —el interruptor
+ * surte efecto sin reiniciar— y, si la API no contesta, no se pinta: la
+ * franja informa, no decide nada.
+ */
+export const modoPruebasActivo = cache(async (): Promise<boolean> => {
+  const token = await tokenVigente();
+  if (token === null) return false;
+  const { apiUrl } = configuracion();
+  try {
+    const r = await fetch(`${apiUrl}/plataforma/modo-pruebas`, {
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        Accept: 'application/json',
+        ...(await reenvioDeIpActual()),
+      },
+      cache: 'no-store',
+    });
+    return r.ok && ((await r.json()) as { activo?: unknown }).activo === true;
+  } catch {
+    return false;
   }
 });

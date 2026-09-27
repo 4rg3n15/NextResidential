@@ -2,7 +2,13 @@ import type { Pool, PoolClient } from 'pg';
 import type { Rol } from '../../autenticacion';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import type { NombreDeUsuario } from '../dominio/nombre-de-usuario';
-import type { AltaDeCuenta, IdentidadDeCuenta, RepositorioDeCuentas } from '../aplicacion/puertos';
+import type {
+  AccesoDeCuenta,
+  AltaDeCuenta,
+  AltaEnBase,
+  IdentidadDeCuenta,
+  RepositorioDeCuentas,
+} from '../aplicacion/puertos';
 
 /**
  * `usuarios` y `roles_usuario` para el módulo de cuentas (ADR-023).
@@ -43,16 +49,6 @@ interface FilaDeIdentidad {
 
 export class RepositorioDeCuentasPg implements RepositorioDeCuentas {
   constructor(private readonly pool: Pool) {}
-
-  async copropiedadPorNit(nit: string): Promise<string | null> {
-    return this.con(lectura(), async (c) => {
-      const { rows } = await c.query<{ id: string }>(
-        `SELECT id FROM public.copropiedades WHERE nit = $1 AND estado = 'activa'`,
-        [nit],
-      );
-      return rows[0]?.id ?? null;
-    });
-  }
 
   async copropiedadPorCodigo(codigo: string): Promise<string | null> {
     return this.con(lectura(), async (c) => {
@@ -105,17 +101,36 @@ export class RepositorioDeCuentasPg implements RepositorioDeCuentas {
     });
   }
 
-  async crearPorNombre(alta: AltaDeCuenta, actorId: string): Promise<string | null> {
+  async crearPorNombre(alta: AltaDeCuenta, actorId: string): Promise<AltaEnBase> {
     return this.con(administracion(actorId), async (c) => {
       await c.query('BEGIN');
       try {
+        // H2 (ADR-031) · el número del portero sale del pool BLOQUEADO hasta
+        // el COMMIT de esta misma transacción: dos altas simultáneas esperan
+        // una a la otra, y el cupo se cuenta con el pool bloqueado.
+        const numero =
+          alta.rol === 'portero'
+            ? ((
+                await c.query<{ n: number }>('SELECT app.asignar_numero_de_portero($1) AS n', [
+                  alta.copropiedadId,
+                ])
+              ).rows[0]?.n ?? null)
+            : null;
         const { rows } = await c.query<{ id: string }>(
           `INSERT INTO public.usuarios
              (copropiedad_id, auth_user_id, correo, nombre_usuario, nombre, telefono,
-              debe_cambiar_contrasena, creado_por, actualizado_por)
-           VALUES ($1, $2, NULL, $3, $4, $5, true, $6, $6)
+              numero_de_portero, debe_cambiar_contrasena, creado_por, actualizado_por)
+           VALUES ($1, $2, NULL, $3, $4, $5, $6, true, $7, $7)
            RETURNING id`,
-          [alta.copropiedadId, alta.authUserId, alta.usuario, alta.nombre, alta.telefono, actorId],
+          [
+            alta.copropiedadId,
+            alta.authUserId,
+            alta.usuario,
+            alta.nombre,
+            alta.telefono,
+            numero,
+            actorId,
+          ],
         );
         const usuarioId = rows[0]?.id;
         if (usuarioId === undefined)
@@ -126,13 +141,50 @@ export class RepositorioDeCuentasPg implements RepositorioDeCuentas {
           [alta.copropiedadId, usuarioId, alta.rol, actorId],
         );
         await c.query('COMMIT');
-        return usuarioId;
+        return { ok: true, usuarioId, numeroDePortero: numero };
       } catch (error) {
         await c.query('ROLLBACK');
         const e = error as { code?: string; constraint?: string };
-        if (e.code === '23505' && e.constraint === 'usuarios_nombre_usuario_uk') return null;
+        if (e.code === '23505' && e.constraint === 'usuarios_nombre_usuario_uk') {
+          return { ok: false, motivo: 'DUPLICADO' };
+        }
+        if (e.code === 'NCP01') return { ok: false, motivo: 'CUPO' };
+        if (e.code === 'NCP02') return { ok: false, motivo: 'POOL_AGOTADO' };
         throw error;
       }
+    });
+  }
+
+  async cuentaDePortero(
+    numero: number,
+  ): Promise<{ readonly copropiedadId: string; readonly acceso: AccesoDeCuenta } | null> {
+    return this.con(lectura(), async (c) => {
+      // La copropiedad, por la tabla de pools; después, la cuenta en ella. Un
+      // portero anterior a la 15-H entra por CORREO en el proveedor: su número
+      // (0042) resuelve a ese correo, no a uno sintético.
+      const { rows } = await c.query<{
+        copropiedad_id: string;
+        nombre_usuario: string | null;
+        correo: string | null;
+      }>(
+        `SELECT p.copropiedad_id, u.nombre_usuario::text AS nombre_usuario, u.correo::text AS correo
+           FROM public.pools_de_porteros p
+           JOIN public.usuarios u
+             ON u.copropiedad_id = p.copropiedad_id AND u.numero_de_portero = $1
+          WHERE int4range(p.inicio, p.fin, '[]') @> $1::integer`,
+        [numero],
+      );
+      const f = rows[0];
+      if (f === undefined) return null;
+      if (f.nombre_usuario !== null) {
+        return {
+          copropiedadId: f.copropiedad_id,
+          acceso: { tipo: 'usuario', usuario: f.nombre_usuario as NombreDeUsuario },
+        };
+      }
+      return f.correo === null
+        ? null
+        : { copropiedadId: f.copropiedad_id, acceso: { tipo: 'correo', correo: f.correo } };
     });
   }
 

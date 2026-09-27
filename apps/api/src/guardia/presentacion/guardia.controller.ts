@@ -32,6 +32,7 @@ import {
   esFallo,
 } from '@ncr/domain-core';
 import type { Bitacora, ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
+import { SoloGuardiaRemota } from '../../plataforma';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { ALCANCE_DE_EQUIPOS } from '../../equipos';
 import type { AlcanceDeEquipos } from '../../equipos';
@@ -258,6 +259,8 @@ export class GuardiaController {
    * La espera se calcula aquí, en cada consulta. Guardarla la haría envejecer:
    * la consola pintaría un número que dejó de ser cierto en cuanto se guardó.
    */
+  // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
+  @SoloGuardiaRemota()
   @Get('cola')
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Cola de atención con tiempo de espera (CU-03, HU-25)' })
@@ -307,6 +310,8 @@ export class GuardiaController {
    * operador necesita saber cuándo le toca, no reintentar a ciegas contra un
    * canal que no sabe cuándo se libera.
    */
+  // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
+  @SoloGuardiaRemota()
   @Post('intercom/abrir')
   // RNF-01.4 · establecimiento de audio y vídeo, < 2 s (CA-19). Hoy mide el
   // canal SIMULADO: el adaptador real llega en la ETAPA 15 y el tablero lo dice.
@@ -338,6 +343,8 @@ export class GuardiaController {
     }
   }
 
+  // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
+  @SoloGuardiaRemota()
   @Post('intercom/cerrar')
   @HttpCode(200)
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
@@ -354,6 +361,8 @@ export class GuardiaController {
     return this.intercom.soltar(copropiedadId, dto.dispositivoId, ctx.usuarioId);
   }
 
+  // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
+  @SoloGuardiaRemota()
   @Get('intercom/:dispositivoId')
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Estado del canal: quién tiene la palabra y cuántos esperan' })
@@ -380,6 +389,8 @@ export class GuardiaController {
    * espera en cola no oye ni habla. La apertura de la puerta sigue siendo una
    * orden aparte (`/ordenes`), atribuida al operador (RN-08, CA-20).
    */
+  // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
+  @SoloGuardiaRemota()
   @Get('intercom/:dispositivoId/audio')
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Audio que el equipo emite, en flujo, para quien tiene la palabra' })
@@ -440,6 +451,8 @@ export class GuardiaController {
     }
   }
 
+  // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
+  @SoloGuardiaRemota()
   @Post('intercom/:dispositivoId/audio')
   @HttpCode(204)
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
@@ -478,6 +491,8 @@ export class GuardiaController {
    * la dueña del registro de tokens del dispositivo. Lo que **sí** existe ya es
    * la constancia: que se intentó avisar, a qué vivienda y cuándo.
    */
+  // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
+  @SoloGuardiaRemota()
   @Post('avisar-residente')
   @HttpCode(202)
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
@@ -515,6 +530,8 @@ export class GuardiaController {
    * confirmación cuesta segundos que RN-18 no concede. La fricción está en el
    * motivo, que se escribe una vez y queda.
    */
+  // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
+  @SoloGuardiaRemota()
   @Post('emergencia')
   @HttpCode(202)
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')

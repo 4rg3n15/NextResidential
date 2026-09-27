@@ -9,12 +9,27 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
-UPDATE public.dispositivos SET canal_de_video = '102'
- WHERE id = '90000000-0000-4000-8000-000000000001';
-UPDATE public.dispositivos SET canal_de_video = '1601'
- WHERE id = '90000000-0000-4000-8000-000000000001';
-UPDATE public.dispositivos SET canal_de_video = NULL
- WHERE id = '90000000-0000-4000-8000-000000000001';
+-- Con identidad: con la RLS forzada y sin claims, un UPDATE no alcanza ninguna
+-- fila y NINGÚN valor fallaría —ni el bueno ni el malo—. Así pasaba hasta la
+-- 15-L (H): la prueba daba verde sin haber escrito nada.
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims = '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002"}';
+
+DO $$
+DECLARE
+  bueno text;
+  n     integer;
+BEGIN
+  FOREACH bueno IN ARRAY ARRAY['102', '1601', NULL] LOOP
+    UPDATE public.dispositivos SET canal_de_video = bueno
+     WHERE id = '90000000-0000-4000-8000-000000000001';
+    GET DIAGNOSTICS n = ROW_COUNT;
+    IF n <> 1 THEN
+      RAISE EXCEPTION 'FALLO: el canal de video % no se escribió (% filas)', coalesce(bueno, 'NULL'), n;
+    END IF;
+  END LOOP;
+END
+$$;
 
 DO $$
 DECLARE

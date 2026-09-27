@@ -18,7 +18,13 @@ import { resultadoDeOrden } from '@/componentes/resultado-de-orden';
 import type { OrdenConResultado } from '@/componentes/resultado-de-orden';
 import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
 import { DialogoDeMotivo } from '@/componentes/dialogo-motivo';
-import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
+import {
+  EstadoCargando,
+  EstadoSinPermiso,
+  EstadoVacio,
+  estadoSegunCodigo,
+} from '@/componentes/estados';
+import { AYUDA_GUARDIA_REMOTA, MENSAJE_GUARDIA_REMOTA } from '@/lib/guardia-remota';
 
 /**
  * Consola de GUARDIA VIRTUAL — CU-03, HU-25 a HU-29.
@@ -204,6 +210,12 @@ export const PantallaDeGuardiaVirtual = ({
   if (cola.isPending) return <EstadoCargando etiqueta="Cargando la guardia virtual" />;
   if (cola.isError) {
     const estado = cola.error instanceof ErrorDeApi ? cola.error.estado : 0;
+    // H4 (15-L) · al portero fuera de las IP permitidas, el texto EXACTO de la API.
+    if (estado === 403 && cola.error.message === MENSAJE_GUARDIA_REMOTA) {
+      return (
+        <EstadoSinPermiso titulo={MENSAJE_GUARDIA_REMOTA} descripcion={AYUDA_GUARDIA_REMOTA} />
+      );
+    }
     return estadoSegunCodigo(estado, 'No se pudo cargar la guardia virtual.', () => {
       void cola.refetch();
     });

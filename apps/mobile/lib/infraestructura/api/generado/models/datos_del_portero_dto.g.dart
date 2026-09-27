@@ -15,6 +15,7 @@ DatosDelPorteroDto _$DatosDelPorteroDtoFromJson(Map<String, dynamic> json) =>
       telefono: json['telefono'] as String?,
       correoContacto: json['correoContacto'] as String?,
       porteria: json['porteria'] as String?,
+      documento: json['documento'] as String?,
     );
 
 Map<String, dynamic> _$DatosDelPorteroDtoToJson(DatosDelPorteroDto instance) =>
@@ -24,4 +25,5 @@ Map<String, dynamic> _$DatosDelPorteroDtoToJson(DatosDelPorteroDto instance) =>
       'correoContacto': instance.correoContacto,
       'porteria': instance.porteria,
       'sectores': instance.sectores,
+      'documento': instance.documento,
     };

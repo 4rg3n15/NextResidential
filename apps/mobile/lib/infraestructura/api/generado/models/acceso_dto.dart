@@ -12,7 +12,6 @@ class AccesoDto {
     required this.contrasena,
     this.correo,
     this.codigo,
-    this.nit,
     this.usuario,
   });
   
@@ -21,13 +20,10 @@ class AccesoDto {
   /// Cuentas por correo
   final String? correo;
 
-  /// Código corto de la copropiedad (D1): 3 a 8 letras o números
+  /// Código corto de la copropiedad (D1): 3 a 8 letras o números. Con él, el usuario es el del residente; sin él, el usuario es el NÚMERO del portero (ADR-031)
   final String? codigo;
 
-  /// NIT de la copropiedad
-  final String? nit;
-
-  /// Nombre de usuario
+  /// Usuario del residente (con código) o número del portero (sin código)
   final String? usuario;
   final String contrasena;
 

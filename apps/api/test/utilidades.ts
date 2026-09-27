@@ -24,6 +24,7 @@ import type { ReporteDeErrores } from '../src/observabilidad';
 import { GENERADOR_DE_ID } from '@ncr/domain-core';
 import type { GeneradorDeId } from '@ncr/domain-core';
 import { AppModule } from '../src/app.module';
+import { ControlDeIpDePorteros, ModoPruebas } from '../src/plataforma';
 import { SONDA_POSTGRES } from '../src/arranque/sonda-postgres';
 import { ProveedorDeJwks } from '../src/autenticacion/infraestructura/jwks';
 import {
@@ -86,6 +87,9 @@ export const configuracionDePrueba: Configuracion = {
   NODE_ENV: 'test',
   PG_POOL_MAX: 20,
   PORT: 0,
+  // H6 (15-L) · supertest llega por el bucle local: como el proxy de la consola.
+  API_PROXIES_DE_CONFIANZA: 'loopback',
+  MODO_PRUEBAS_FACTOR_DE_LIMITE: 10,
   SUPABASE_URL: 'https://proyecto-de-prueba.invalid',
   SUPABASE_PUBLISHABLE_KEY: 'marcador',
   SUPABASE_SECRET_KEY: 'marcador',
@@ -226,7 +230,8 @@ export const conSesionDePorteriaDeLaSuite = (b: TestingModuleBuilder): TestingMo
       c: CodigoDePatrullaje,
       bi: BitacoraDeIdentidad,
       r: Reloj,
-    ) => new ControlConLaSesionDeLaSuite(p, t, se, c, bi, r),
+      origen: ControlDeIpDePorteros,
+    ) => new ControlConLaSesionDeLaSuite(p, t, se, c, bi, r, origen),
     inject: [
       REPOSITORIO_DE_PERFILES,
       REPOSITORIO_DE_TURNOS,
@@ -234,6 +239,9 @@ export const conSesionDePorteriaDeLaSuite = (b: TestingModuleBuilder): TestingMo
       CODIGO_DE_PATRULLAJE,
       BITACORA_DE_IDENTIDAD,
       RELOJ,
+      // H4 (15-L) · la regla de IP REAL también en el doble: el inicio de
+      // sesión del portero la evalúa como en producción.
+      ControlDeIpDePorteros,
     ],
   });
 
@@ -286,6 +294,15 @@ export const registroDelBanco = (): RepositorioDeEquiposEnMemoria => {
   return registro;
 };
 
+/**
+ * H5 (15-L) · el modo pruebas arranca ACTIVO, como en la base. La suite que
+ * prueba una restricción de porteros —límites, bloqueo, reglas de IP— lo apaga
+ * por el camino de producción (el mismo que usa la consola).
+ */
+export const sinModoPruebas = async (app: INestApplication): Promise<void> => {
+  await app.get(ModoPruebas).cambiar(false, '00000000-0000-4000-8000-0000000000aa', null);
+};
+
 export const crearApp = async (
   firmante: Firmante,
   sustituir?: (constructor: TestingModuleBuilder) => TestingModuleBuilder,
@@ -311,17 +328,21 @@ export const crearApp = async (
 ): Promise<INestApplication> => {
   const equiposPorOmision = equipos?.repositorio;
   const sondaPorOmision = equipos?.sonda;
+  // La MISMA configuración para el módulo y para lo que se monta fuera de él
+  // (seguridad, límites del cuerpo). Hasta la 15-L, `aplicarSeguridad` recibía
+  // siempre la de prueba: una suite que variaba `API_PROXIES_DE_CONFIANZA`
+  // probaba el `trust proxy` por omisión sin saberlo.
+  const efectiva: Configuracion =
+    configuracion === undefined
+      ? configuracionDePrueba
+      : { ...configuracionDePrueba, ...configuracion };
   const base = Test.createTestingModule({
     imports: [
       // `DiscoveryModule` para poder LEER los decoradores del código en la
       // suite de aislamiento, en vez de mantener una lista paralela en la
       // prueba que diga verificarlos y no los verifique.
       DiscoveryModule,
-      AppModule.conConfiguracion(
-        configuracion === undefined
-          ? configuracionDePrueba
-          : { ...configuracionDePrueba, ...configuracion },
-      ),
+      AppModule.conConfiguracion(efectiva),
     ],
   });
   // La sesión de la suite va ANTES de `sustituir`, para que una suite que
@@ -459,7 +480,7 @@ export const crearApp = async (
    */
   aplicarContextoDePeticion(app, () => app.get<GeneradorDeId>(GENERADOR_DE_ID).nuevo());
 
-  aplicarSeguridad(app, configuracionDePrueba);
+  aplicarSeguridad(app, efectiva);
   /**
    * ETAPA 15 · el acumulador del sobre crudo, ANTES de `express.json` y sólo
    * bajo su ruta — igual que en `main.ts`, y por la misma lección de H-13-11.
@@ -478,10 +499,8 @@ export const crearApp = async (
     RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
     express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
   );
-  app.use(
-    express.json({ limit: configuracionDePrueba.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }),
-  );
-  app.use(express.urlencoded({ limit: configuracionDePrueba.LIMITE_PAYLOAD, extended: false }));
+  app.use(express.json({ limit: efectiva.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
+  app.use(express.urlencoded({ limit: efectiva.LIMITE_PAYLOAD, extended: false }));
   aplicarSaneamiento(app);
   /**
    * EL MISMO FILTRO GLOBAL QUE PRODUCCIÓN.

@@ -1,4 +1,5 @@
 import type { Reloj } from '@ncr/domain-core';
+import type { PeticionDePortero, VeredictoDeOrigen } from '../../plataforma';
 import type { BitacoraDeIdentidad } from '../../comun/bitacora-de-identidad';
 import type { GanchoDeSesion, OrigenDeAcceso, VeredictoDeSesion } from '../../cuentas';
 import { contiene, duracionSegundos } from '../dominio/turno';
@@ -51,6 +52,15 @@ export class ControlDeSesiones implements GanchoDeSesion {
     private readonly codigo: CodigoDePatrullaje,
     private readonly bitacora: BitacoraDeIdentidad,
     private readonly reloj: Reloj,
+    /**
+     * H4 (15-L) · la regla de IP del portero, también al INICIAR sesión (y en
+     * cada petición, en la guarda de origen). Obligatoria: un «todo origen
+     * vale» por omisión se colaba en el doble de las suites sin que nadie lo
+     * viera (denegar por defecto, §2.1.4).
+     */
+    private readonly origen: {
+      evaluar(p: PeticionDePortero): Promise<VeredictoDeOrigen>;
+    },
   ) {}
 
   async alIniciar(e: {
@@ -60,6 +70,26 @@ export class ControlDeSesiones implements GanchoDeSesion {
     readonly origen: OrigenDeAcceso;
   }): Promise<VeredictoDeSesion> {
     const ahora = this.reloj.ahora();
+    const deDonde = await this.origen.evaluar({
+      copropiedadId: e.copropiedadId,
+      usuarioId: e.usuarioId,
+      ip: e.origen.ip,
+      agente: e.origen.agente,
+      soloRemota: false,
+      recurso: 'auth/acceso',
+    });
+    if (!deDonde.permitido) {
+      await this.bitacora.anotar({
+        tipo: 'acceso_rechazado',
+        copropiedadId: e.copropiedadId,
+        ocurridoEn: ahora,
+        usuarioId: e.usuarioId,
+        actorId: e.usuarioId,
+        origen: e.origen,
+        detalle: 'IP no autorizada para porteros',
+      });
+      return { permitido: false, motivo: deDonde.mensaje };
+    }
     const perfil = await this.perfiles.perfilDe(e.copropiedadId, e.usuarioId);
     const turno =
       perfil === null ? null : await this.turnos.vigenteDe(e.copropiedadId, e.usuarioId, ahora);

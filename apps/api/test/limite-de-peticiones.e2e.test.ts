@@ -16,7 +16,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
-import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
+import { COP_A, crearApp, crearFirmante, sinModoPruebas, tokenDe } from './utilidades';
 import { esperaDelIntento } from '../../edge/src/aplicacion/reconciliacion';
 
 const LIMITE = 12;
@@ -29,6 +29,7 @@ beforeAll(async () => {
   const f = await crearFirmante();
   administrador = await tokenDe(f, { rol: 'administrador', copropiedadId: COP_A });
   app = await crearApp(f, undefined, { THROTTLE_LIMITE: LIMITE, THROTTLE_TTL_SEGUNDOS: 60 });
+  await sinModoPruebas(app);
 });
 afterAll(async () => {
   await app.close();
@@ -65,6 +66,32 @@ describe('§2.7.5 · el límite general se aplica y se anuncia', () => {
       .set('authorization', `Bearer ${administrador}`);
     expect(r.status).toBe(429);
     expect(JSON.stringify(r.body)).not.toMatch(/throttle|storage|ttl|tracker/i);
+  });
+});
+
+describe('H5 (15-L) · con el modo pruebas el límite SUBE, no se apaga', () => {
+  it(`permite ${LIMITE} × el factor, y la siguiente es 429`, async () => {
+    const f = await crearFirmante();
+    const token = await tokenDe(f, { rol: 'administrador', copropiedadId: COP_A });
+    const FACTOR = 3;
+    const conModo = await crearApp(f, undefined, {
+      THROTTLE_LIMITE: LIMITE,
+      THROTTLE_TTL_SEGUNDOS: 60,
+      MODO_PRUEBAS_FACTOR_DE_LIMITE: FACTOR,
+    });
+    try {
+      const estados: number[] = [];
+      for (let i = 0; i < LIMITE * FACTOR + 2; i += 1) {
+        const r = await request(conModo.getHttpServer())
+          .get(`/copropiedades/${COP_A}/padron/viviendas`)
+          .set('authorization', `Bearer ${token}`);
+        estados.push(r.status);
+      }
+      expect(estados.filter((e) => e !== 429)).toHaveLength(LIMITE * FACTOR);
+      expect(estados.slice(-2)).toEqual([429, 429]);
+    } finally {
+      await conModo.close();
+    }
   });
 });
 

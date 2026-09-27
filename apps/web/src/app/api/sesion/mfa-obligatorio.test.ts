@@ -158,7 +158,7 @@ describe('el entorno no puede relajar la regla', () => {
     fetchFalso.mockImplementation(async (url: string) =>
       url.endsWith('/auth/acceso')
         ? new Response(
-            JSON.stringify({ estado: 401, mensaje: 'Usuario, NIT o contraseña incorrectos' }),
+            JSON.stringify({ estado: 401, mensaje: 'Usuario, código o contraseña incorrectos' }),
             { status: 401 },
           )
         : new Response('{}', { status: 200 }),
@@ -168,18 +168,16 @@ describe('el entorno no puede relajar la regla', () => {
   });
 });
 
-describe('15-H · entrada por NIT y usuario, a través de la API (ADR-023)', () => {
-  it('reenvía NIT y usuario —nunca un correo— y declara el origen del navegador', async () => {
+describe('15-L · entrada por NÚMERO de portero, a través de la API (ADR-031)', () => {
+  it('reenvía sólo el número —ni NIT ni correo— y la IP del navegador, que la API cree (H6)', async () => {
     await preparar({}, true);
     fetchFalso.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url.endsWith('/auth/acceso')) {
         const cuerpo = JSON.parse(String(init?.body)) as Record<string, unknown>;
-        expect(cuerpo).toEqual({
-          nit: '900123456-7',
-          usuario: 'porteria.norte',
-          contrasena: CONTRASENA_EFIMERA,
-        });
-        expect((init?.headers as Record<string, string>)['x-ncr-origen']).toBe('198.51.100.20');
+        expect(cuerpo).toEqual({ usuario: '1001', contrasena: CONTRASENA_EFIMERA });
+        const cabeceras = init?.headers as Record<string, string>;
+        expect(cabeceras['x-forwarded-for']).toBe('198.51.100.20');
+        expect(cabeceras['x-ncr-origen']).toBe('198.51.100.20');
         return new Response(
           JSON.stringify({
             accessToken: tokenCon({ aal: 'aal1', rol: 'portero', debe_cambiar_contrasena: true }),
@@ -196,11 +194,7 @@ describe('15-H · entrada por NIT y usuario, a través de la API (ADR-023)', () 
       new Request('http://consola.invalid/api/sesion', {
         method: 'POST',
         headers: { 'x-forwarded-for': '198.51.100.20' },
-        body: JSON.stringify({
-          nit: '900123456-7',
-          usuario: 'porteria.norte',
-          contrasena: CONTRASENA_EFIMERA,
-        }),
+        body: JSON.stringify({ usuario: '1001', contrasena: CONTRASENA_EFIMERA }),
       }) as never,
     );
     expect(res.status).toBe(200);
@@ -227,25 +221,27 @@ describe('15-H · entrada por NIT y usuario, a través de la API (ADR-023)', () 
     const res = await ruta.POST(
       new Request('http://consola.invalid/api/sesion', {
         method: 'POST',
-        body: JSON.stringify({
-          nit: '900123456',
-          usuario: 'noche',
-          contrasena: CONTRASENA_EFIMERA,
-        }),
+        body: JSON.stringify({ usuario: '1002', contrasena: CONTRASENA_EFIMERA }),
       }) as never,
     );
     expect(res.status).toBe(403);
     expect(((await res.json()) as { mensaje: string }).mensaje).toMatch(/Fuera de su turno/);
   });
 
-  it('sin correo válido ni NIT y usuario, 400 con el mismo texto que unas credenciales malas', async () => {
+  it('sin correo, ni número de portero, ni código y usuario: 400 con el mismo texto que unas credenciales malas', async () => {
     await preparar({}, true);
-    const res = await ruta.POST(
-      new Request('http://consola.invalid/api/sesion', {
-        method: 'POST',
-        body: JSON.stringify({ usuario: 'sin-nit', contrasena: CONTRASENA_EFIMERA }),
-      }) as never,
-    );
-    expect(res.status).toBe(400);
+    for (const cuerpo of [
+      { usuario: 'sin-codigo', contrasena: CONTRASENA_EFIMERA },
+      // H3 · el NIT ya no es una forma de entrar: con él, como si no hubiera nada.
+      { nit: '900123456-7', usuario: 'porteria.norte', contrasena: CONTRASENA_EFIMERA },
+    ]) {
+      const res = await ruta.POST(
+        new Request('http://consola.invalid/api/sesion', {
+          method: 'POST',
+          body: JSON.stringify(cuerpo),
+        }) as never,
+      );
+      expect(res.status).toBe(400);
+    }
   });
 });

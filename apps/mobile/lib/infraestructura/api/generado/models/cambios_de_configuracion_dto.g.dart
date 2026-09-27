@@ -25,6 +25,12 @@ CambiosDeConfiguracionDto _$CambiosDeConfiguracionDtoFromJson(
   codigoCorto: json['codigoCorto'] as String?,
   telefonoPorteria: json['telefonoPorteria'] as String?,
   topeVehiculosPropios: json['topeVehiculosPropios'] as num?,
+  ipsPorteria: (json['ipsPorteria'] as List<dynamic>?)
+      ?.map((e) => e as String)
+      .toList(),
+  ipsGuardiaRemota: (json['ipsGuardiaRemota'] as List<dynamic>?)
+      ?.map((e) => e as String)
+      .toList(),
 );
 
 Map<String, dynamic> _$CambiosDeConfiguracionDtoToJson(
@@ -40,4 +46,6 @@ Map<String, dynamic> _$CambiosDeConfiguracionDtoToJson(
   'codigoCorto': instance.codigoCorto,
   'telefonoPorteria': instance.telefonoPorteria,
   'topeVehiculosPropios': instance.topeVehiculosPropios,
+  'ipsPorteria': instance.ipsPorteria,
+  'ipsGuardiaRemota': instance.ipsGuardiaRemota,
 };

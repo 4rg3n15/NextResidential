@@ -23,11 +23,14 @@ import {
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Length,
   Max,
   MaxLength,
   Min,
@@ -138,6 +141,33 @@ export class CambiosDeConfiguracionDto {
   @Min(0)
   @Max(20)
   topeVehiculosPropios?: number;
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    example: ['192.0.2.10'],
+    description: 'H4 · IP o redes CIDR del computador de portería (sólo superadministrador)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @Length(2, 50, { each: true })
+  ipsPorteria?: string[];
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    example: ['198.51.100.0/24'],
+    description:
+      'H4 · IP o redes CIDR permitidas para la guardia remota de porteros (sólo superadministrador)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  @Length(2, 50, { each: true })
+  ipsGuardiaRemota?: string[];
 
   /**
    * B.5 · el umbral de confianza y el margen de latido YA NO SON CAMPOS. No se
@@ -276,6 +306,8 @@ export class CopropiedadesController {
   ): ConfiguracionDeCopropiedadDto {
     return {
       ...configuracion,
+      ipsPorteria: [...configuracion.ipsPorteria],
+      ipsGuardiaRemota: [...configuracion.ipsGuardiaRemota],
       editables: CLAVES_EDITABLES.filter((c) => puedeEditar(ctx.rol, c)),
     };
   }

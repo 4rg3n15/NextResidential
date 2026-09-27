@@ -7,7 +7,13 @@ part of 'portero_creado_dto.dart';
 // **************************************************************************
 
 PorteroCreadoDto _$PorteroCreadoDtoFromJson(Map<String, dynamic> json) =>
-    PorteroCreadoDto(usuarioId: json['usuarioId'] as String);
+    PorteroCreadoDto(
+      usuarioId: json['usuarioId'] as String,
+      numero: json['numero'] as num,
+    );
 
 Map<String, dynamic> _$PorteroCreadoDtoToJson(PorteroCreadoDto instance) =>
-    <String, dynamic>{'usuarioId': instance.usuarioId};
+    <String, dynamic>{
+      'usuarioId': instance.usuarioId,
+      'numero': instance.numero,
+    };

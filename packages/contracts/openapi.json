@@ -27,7 +27,7 @@
             }
           },
           "401": {
-            "description": "Código o NIT, usuario o contraseña incorrectos",
+            "description": "Usuario, código o contraseña incorrectos",
             "content": {
               "application/json": {
                 "schema": {
@@ -47,7 +47,7 @@
             }
           },
           "429": {
-            "description": "5/min por cuenta, 10/min por origen declarado, 30/min por dirección (S-50)",
+            "description": "5/min por (IP, cuenta), 10/min y 30/min por dirección (S-50); y, fuera del modo pruebas, 5 fallos del mismo identificador desde la misma IP bloquean 5 minutos (H5)",
             "content": {
               "application/json": {
                 "schema": {
@@ -57,7 +57,7 @@
             }
           }
         },
-        "summary": "Inicio de sesión por correo, o por código (o NIT) y usuario",
+        "summary": "Inicio de sesión por correo, por código y usuario, o por número de portero",
         "tags": [
           "cuentas"
         ]
@@ -5319,6 +5319,7 @@
                 "solape_de_turno",
                 "alta_de_portero",
                 "edicion_de_portero",
+                "baja_de_portero",
                 "restablecimiento_de_contrasena",
                 "cambio_de_contrasena"
               ],
@@ -5423,7 +5424,89 @@
             "bearer": []
           }
         ],
-        "summary": "Alta de portero con usuario y contraseña inicial (cambio obligatorio)",
+        "summary": "Alta de portero con nombre, documento y contraseña temporal; recibe el siguiente número del pool (cambio de contraseña obligatorio)",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/porteros/cupo": {
+      "put": {
+        "operationId": "PoolDePorterosController_fijarCupo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CupoDePorterosDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HechoDePorteriaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cupo de porteros activos de la copropiedad (0 a 999), auditado",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/porteros/pool": {
+      "get": {
+        "operationId": "PoolDePorterosController_pool",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolDePorterosDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pool de números de portero de la copropiedad, el siguiente a asignar y el cupo",
         "tags": [
           "porteria"
         ]
@@ -5478,6 +5561,60 @@
           }
         ],
         "summary": "Datos del portero (nombre, teléfono, correo de contacto, portería, sectores)",
+        "tags": [
+          "porteria"
+        ]
+      }
+    },
+    "/copropiedades/{id}/porteros/{usuarioId}/baja": {
+      "post": {
+        "operationId": "PoolDePorterosController_baja",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaDePorteroDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HechoDePorteriaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Da de baja a un portero: cierra sus sesiones y su número no se reutiliza",
         "tags": [
           "porteria"
         ]
@@ -6678,6 +6815,58 @@
         ]
       }
     },
+    "/plataforma/modo-pruebas": {
+      "get": {
+        "operationId": "PlataformaController_leer",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModoPruebasDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Si el modo pruebas está activo",
+        "tags": [
+          "plataforma"
+        ]
+      },
+      "put": {
+        "operationId": "PlataformaController_cambiar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModoPruebasDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModoPruebasDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Activa o desactiva el modo pruebas (sólo superadministrador)",
+        "tags": [
+          "plataforma"
+        ]
+      }
+    },
     "/porteria/perfil": {
       "get": {
         "operationId": "PorteriaController_miPerfil",
@@ -6857,17 +7046,12 @@
           "codigo": {
             "type": "string",
             "maxLength": 8,
-            "description": "Código corto de la copropiedad (D1): 3 a 8 letras o números"
-          },
-          "nit": {
-            "type": "string",
-            "maxLength": 20,
-            "description": "NIT de la copropiedad"
+            "description": "Código corto de la copropiedad (D1): 3 a 8 letras o números. Con él, el usuario es el del residente; sin él, el usuario es el NÚMERO del portero (ADR-031)"
           },
           "usuario": {
             "type": "string",
             "maxLength": 32,
-            "description": "Nombre de usuario"
+            "description": "Usuario del residente (con código) o número del portero (sin código)"
           },
           "contrasena": {
             "type": "string",
@@ -7259,10 +7443,10 @@
               "type": "string"
             }
           },
-          "usuario": {
+          "documento": {
             "type": "string",
-            "maxLength": 32,
-            "description": "Identificación del portero como usuario"
+            "maxLength": 30,
+            "description": "Documento de identidad"
           },
           "contrasenaInicial": {
             "type": "string",
@@ -7273,7 +7457,6 @@
         "required": [
           "nombre",
           "sectores",
-          "usuario",
           "contrasenaInicial"
         ]
       },
@@ -7538,6 +7721,19 @@
           "motivo"
         ]
       },
+      "BajaDePorteroDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
       "BajaDeZonaAplicadaDto": {
         "type": "object",
         "properties": {
@@ -7752,6 +7948,26 @@
             "type": "number",
             "example": 2,
             "description": "D5 a · vehículos propios por vivienda (sólo superadministrador)"
+          },
+          "ipsPorteria": {
+            "example": [
+              "192.0.2.10"
+            ],
+            "description": "H4 · IP o redes CIDR del computador de portería (sólo superadministrador)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ipsGuardiaRemota": {
+            "example": [
+              "198.51.100.0/24"
+            ],
+            "description": "H4 · IP o redes CIDR permitidas para la guardia remota de porteros (sólo superadministrador)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -8158,7 +8374,7 @@
             "type": "string",
             "nullable": true,
             "example": "MIRA",
-            "description": "D1 · código corto de acceso; null mientras no se asigne (sólo se entra por NIT)."
+            "description": "D1 · código corto con el que entran los residentes; null mientras no se asigne."
           },
           "telefonoPorteria": {
             "type": "string",
@@ -8170,6 +8386,26 @@
             "type": "number",
             "example": 2,
             "description": "D5 a · vehículos propios por vivienda."
+          },
+          "ipsPorteria": {
+            "example": [
+              "192.0.2.10"
+            ],
+            "description": "H4 · IP (o redes CIDR) del computador de portería",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ipsGuardiaRemota": {
+            "example": [
+              "198.51.100.0/24"
+            ],
+            "description": "H4 · IP (o redes CIDR) desde las que un portero puede hacer guardia remota. Vacía: sólo desde la IP de una sesión activa de superadministrador",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "aprobacionDeTerceros": {
             "type": "string",
@@ -8204,6 +8440,8 @@
           "codigoCorto",
           "telefonoPorteria",
           "topeVehiculosPropios",
+          "ipsPorteria",
+          "ipsGuardiaRemota",
           "aprobacionDeTerceros",
           "editables"
         ]
@@ -8615,6 +8853,19 @@
           "creadaEn"
         ]
       },
+      "CupoDePorterosDto": {
+        "type": "object",
+        "properties": {
+          "cupo": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 999
+          }
+        },
+        "required": [
+          "cupo"
+        ]
+      },
       "DatosDeTurnoDto": {
         "type": "object",
         "properties": {
@@ -8691,6 +8942,11 @@
             "items": {
               "type": "string"
             }
+          },
+          "documento": {
+            "type": "string",
+            "maxLength": 30,
+            "description": "Documento de identidad (H2). En la edición, ausente = no se cambia"
           }
         },
         "required": [
@@ -10359,6 +10615,7 @@
               "solape_de_turno",
               "alta_de_portero",
               "edicion_de_portero",
+              "baja_de_portero",
               "restablecimiento_de_contrasena",
               "cambio_de_contrasena"
             ]
@@ -10452,7 +10709,9 @@
             "type": "string",
             "enum": [
               "portero_editado",
-              "turno_retirado"
+              "turno_retirado",
+              "cupo_actualizado",
+              "portero_dado_de_baja"
             ]
           }
         },
@@ -11161,6 +11420,18 @@
           }
         }
       },
+      "ModoPruebasDto": {
+        "type": "object",
+        "properties": {
+          "activo": {
+            "type": "boolean",
+            "description": "Con el modo pruebas activo, las restricciones de porteros se evalúan y se registran sin bloquear, no hay bloqueo por intentos fallidos y el límite de peticiones es más alto"
+          }
+        },
+        "required": [
+          "activo"
+        ]
+      },
       "NotasDeAlertaDto": {
         "type": "object",
         "properties": {
@@ -11781,16 +12052,51 @@
           "retirada"
         ]
       },
+      "PoolDePorterosDto": {
+        "type": "object",
+        "properties": {
+          "inicio": {
+            "type": "number"
+          },
+          "fin": {
+            "type": "number"
+          },
+          "siguiente": {
+            "type": "number",
+            "description": "El próximo número que se asignará"
+          },
+          "cupo": {
+            "type": "number",
+            "description": "Porteros activos que admite (máximo 999)"
+          },
+          "activos": {
+            "type": "number",
+            "description": "Porteros activos ahora"
+          }
+        },
+        "required": [
+          "inicio",
+          "fin",
+          "siguiente",
+          "cupo",
+          "activos"
+        ]
+      },
       "PorteroCreadoDto": {
         "type": "object",
         "properties": {
           "usuarioId": {
             "type": "string",
             "format": "uuid"
+          },
+          "numero": {
+            "type": "number",
+            "description": "El número con el que entrará el portero (H2, ADR-031)"
           }
         },
         "required": [
-          "usuarioId"
+          "usuarioId",
+          "numero"
         ]
       },
       "PorteroDto": {
@@ -11800,7 +12106,12 @@
             "type": "string",
             "format": "uuid"
           },
-          "usuario": {
+          "numero": {
+            "type": "number",
+            "nullable": true,
+            "description": "H2 (ADR-031) · el número con el que entra el portero"
+          },
+          "documento": {
             "type": "string",
             "nullable": true
           },
@@ -11847,7 +12158,8 @@
         },
         "required": [
           "usuarioId",
-          "usuario",
+          "numero",
+          "documento",
           "nombre",
           "telefono",
           "correoContacto",

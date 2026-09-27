@@ -9,7 +9,8 @@ import type { ThrottlerOptions } from '@nestjs/throttler';
  * Tres contadores sobre la misma ruta, cada uno por lo suyo:
  *
  *  · `default`, por la dirección que llama a la API (30/min en la ruta).
- *  · `acceso-cuenta`, por la CUENTA que se intenta: código o NIT + usuario, o correo.
+ *  · `acceso-cuenta`, por la CUENTA que se intenta: número de portero, código +
+ *    usuario, o correo.
  *    Es el que no se esquiva rotando direcciones, y el que corta la fuerza
  *    bruta contra un portero concreto (5/min).
  *  · `acceso-origen`, por la dirección del NAVEGADOR que declara la consola.
@@ -45,35 +46,42 @@ export const cuentaIntentada = (cuerpo: unknown): string => {
   const correo = cadena(c['correo'], 254);
   if (correo !== null) return `correo:${correo}`;
   const usuario = cadena(c['usuario'], 32) ?? '';
-  // D1 · el código se cuenta aparte del NIT: son dos nombres de la misma
-  // copropiedad, y quien alterne los dos duplica su cuota (10/min en vez de 5).
-  // Queda declarado como riesgo residual en el informe de la 15-I; el límite
-  // por dirección (30/min) sigue acotando el total.
+  // H3 (15-L) · sin NIT: la cuenta es el número de portero, o código + usuario.
   const codigo = cadena(c['codigo'], 8);
   if (codigo !== null) return `codigo:${codigo.replace(/\s/g, '')}|${usuario}`;
-  const nit = cadena(c['nit'], 20)?.replace(/[\s.,]/g, '') ?? '';
-  return `usuario:${nit}|${usuario}`;
+  return `portero:${usuario}`;
 };
 
 export const origenDeclarado = (cabeceras: Record<string, unknown>): string | null =>
   cadena(cabeceras[CABECERA_ORIGEN], 100);
 
-export const limitadoresDeAcceso = (): ThrottlerOptions[] => [
+/**
+ * H5 · H6 (15-L) · la cuota por cuenta se cuenta por (IP, cuenta), NUNCA por
+ * cuenta a secas: si no, cualquiera bloquearía a un portero tecleando mal su
+ * número desde otro equipo. Y la IP es `req.ip`, que el `trust proxy` acotado
+ * ya resolvió a la del navegador: la cabecera declarada por la consola deja de
+ * hacer falta (y de poder falsificarse).
+ *
+ * `factor` multiplica los topes: en modo pruebas suben, no se apagan (§2.7.5).
+ */
+export const limitadoresDeAcceso = (
+  factor: () => Promise<number> = async () => 1,
+): ThrottlerOptions[] => [
   {
     name: LIMITADOR_ACCESO_CUENTA,
     ttl: 60_000,
-    limit: LIMITE_POR_CUENTA,
+    limit: async () => LIMITE_POR_CUENTA * (await factor()),
     skipIf: (contexto) => !esRutaDeAcceso(contexto),
-    getTracker: (peticion) => cuentaIntentada((peticion as { body?: unknown }).body),
+    getTracker: (peticion) => {
+      const p = peticion as { body?: unknown; ip?: string };
+      return `${p.ip ?? 'desconocido'}|${cuentaIntentada(p.body)}`;
+    },
   },
   {
     name: LIMITADOR_ACCESO_ORIGEN,
     ttl: 60_000,
-    limit: LIMITE_POR_ORIGEN,
+    limit: async () => LIMITE_POR_ORIGEN * (await factor()),
     skipIf: (contexto) => !esRutaDeAcceso(contexto),
-    getTracker: (peticion) => {
-      const p = peticion as { headers?: Record<string, unknown>; ip?: string };
-      return `origen:${origenDeclarado(p.headers ?? {}) ?? p.ip ?? 'desconocido'}`;
-    },
+    getTracker: (peticion) => `origen:${(peticion as { ip?: string }).ip ?? 'desconocido'}`,
   },
 ];

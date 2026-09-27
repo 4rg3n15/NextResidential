@@ -3,7 +3,7 @@ import type { Reloj, Resultado } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type { BitacoraDeIdentidad } from '../../comun/bitacora-de-identidad';
 import type { CrearCuentaPorUsuario, DirectorioDeCuentas, ResumenDeCuenta } from '../../cuentas';
-import type { SesionDePorteria } from '../dominio/sesion-de-porteria';
+import type { MotivoDeCierre, SesionDePorteria } from '../dominio/sesion-de-porteria';
 import type {
   PerfilDePortero,
   RepositorioDePerfiles,
@@ -18,12 +18,24 @@ export interface DatosDelPortero {
   readonly correoContacto: string | null;
   readonly porteria: string | null;
   readonly sectores: readonly string[];
+  /** H2 (15-L) · documento de identidad. `undefined` en la edición: no se toca. */
+  readonly documento?: string;
 }
 
+/**
+ * H2 (15-L, ADR-031) · nombre, documento y contraseña temporal. El USUARIO ya
+ * no lo elige nadie: el portero entra con el número que le asigna el pool.
+ */
 export interface AltaDelPortero extends DatosDelPortero {
-  readonly usuario: string;
+  readonly documento: string;
   readonly contrasenaInicial: string;
 }
+
+/** Documento: mayúsculas, sin espacios ni puntos; 3 a 20 letras, dígitos o guiones. */
+export const documentoDePortero = (texto: string): string | null => {
+  const d = texto.normalize('NFKC').toUpperCase().replace(/[\s.]/g, '');
+  return /^[0-9A-Z-]{3,20}$/.test(d) ? d : null;
+};
 
 export interface FichaDelPortero {
   readonly cuenta: ResumenDeCuenta;
@@ -36,12 +48,20 @@ export type RechazoDePortero =
   | { readonly motivo: 'FORMATO'; readonly detalle: string }
   | { readonly motivo: 'DUPLICADO' }
   | { readonly motivo: 'PROVEEDOR' }
-  | { readonly motivo: 'NO_ENCONTRADO' };
+  | { readonly motivo: 'NO_ENCONTRADO' }
+  | { readonly motivo: 'CUPO' }
+  | { readonly motivo: 'POOL_AGOTADO' };
+
+/** Lo único que la baja necesita del control de sesiones: cerrar una, con su motivo. */
+export interface CierreDeSesion {
+  cerrar(s: SesionDePorteria, motivo: MotivoDeCierre, actorId: string): Promise<void>;
+}
 
 /**
- * PORTEROS · alta y datos por el superadministrador, perfil de solo lectura
- * para el propio portero (E-02). El usuario lo elige quien da de alta; la
- * contraseña inicial también, y la cuenta nace obligada a cambiarla.
+ * PORTEROS · alta, datos y baja por el superadministrador; perfil de solo
+ * lectura para el propio portero (E-02). El número lo asigna el pool (ADR-031);
+ * la contraseña inicial la escribe quien da de alta, y la cuenta nace obligada
+ * a cambiarla.
  */
 export class GestionDePorteros {
   constructor(
@@ -52,17 +72,24 @@ export class GestionDePorteros {
     private readonly sesiones: RepositorioDeSesiones,
     private readonly bitacora: BitacoraDeIdentidad,
     private readonly reloj: Reloj,
+    private readonly cierre: CierreDeSesion,
   ) {}
 
   async alta(
     ctx: ContextoTenant,
     copropiedadId: string,
     a: AltaDelPortero,
-  ): Promise<Resultado<{ readonly usuarioId: string }, RechazoDePortero>> {
+  ): Promise<Resultado<{ readonly usuarioId: string; readonly numero: number }, RechazoDePortero>> {
+    const documento = documentoDePortero(a.documento);
+    if (documento === null) {
+      return fallo({
+        motivo: 'FORMATO',
+        detalle: 'El documento admite de 3 a 20 letras, números o guiones',
+      });
+    }
     const creada = await this.crearCuenta.ejecutar(
       {
         copropiedadId,
-        usuario: a.usuario,
         nombre: a.nombre,
         telefono: a.telefono,
         rol: 'portero',
@@ -71,7 +98,8 @@ export class GestionDePorteros {
       ctx.usuarioId,
     );
     if (!creada.ok) return creada;
-    const usuarioId = creada.valor.usuarioId;
+    const { usuarioId, numeroDePortero } = creada.valor;
+    if (numeroDePortero === null) throw new Error('el alta del portero no recibió número');
     await this.perfiles.guardar(
       {
         usuarioId,
@@ -79,11 +107,12 @@ export class GestionDePorteros {
         porteria: a.porteria,
         sectores: a.sectores,
         correoContacto: a.correoContacto,
+        documento,
       },
       ctx.usuarioId,
     );
     await this.anotar('alta_de_portero', ctx, copropiedadId, usuarioId);
-    return exito({ usuarioId });
+    return exito({ usuarioId, numero: numeroDePortero });
   }
 
   async editar(
@@ -94,6 +123,13 @@ export class GestionDePorteros {
   ): Promise<Resultado<void, RechazoDePortero>> {
     if ((await this.perfiles.perfilDe(copropiedadId, usuarioId)) === null) {
       return fallo({ motivo: 'NO_ENCONTRADO' });
+    }
+    const documento = d.documento === undefined ? undefined : documentoDePortero(d.documento);
+    if (documento === null) {
+      return fallo({
+        motivo: 'FORMATO',
+        detalle: 'El documento admite de 3 a 20 letras, números o guiones',
+      });
     }
     await this.cuentas.actualizarDatos(
       copropiedadId,
@@ -108,10 +144,56 @@ export class GestionDePorteros {
         porteria: d.porteria,
         sectores: d.sectores,
         correoContacto: d.correoContacto,
+        ...(documento === undefined ? {} : { documento }),
       },
       ctx.usuarioId,
     );
     await this.anotar('edicion_de_portero', ctx, copropiedadId, usuarioId);
+    return exito(undefined);
+  }
+
+  /**
+   * H2 (15-L) · la baja: la cuenta y su rol quedan inactivos —sin borrar la
+   * fila (RN-19)—, sus sesiones abiertas se cierran con motivo `baja` y su
+   * número NO vuelve al pool: los eventos que se le atribuyen siguen señalando
+   * a la misma persona. Libera una plaza del cupo.
+   */
+  async desactivar(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    usuarioId: string,
+    motivo: string,
+  ): Promise<Resultado<void, RechazoDePortero>> {
+    const limpio = motivo.normalize('NFC').trim();
+    if (limpio.length < 3 || limpio.length > 300) {
+      return fallo({
+        motivo: 'FORMATO',
+        detalle: 'El motivo de la baja lleva de 3 a 300 caracteres',
+      });
+    }
+    const ahora = this.reloj.ahora();
+    if (
+      (await this.perfiles.perfilDe(copropiedadId, usuarioId)) === null ||
+      !(await this.cuentas.darDeBaja(
+        copropiedadId,
+        usuarioId,
+        { motivo: limpio, en: ahora },
+        ctx.usuarioId,
+      ))
+    ) {
+      return fallo({ motivo: 'NO_ENCONTRADO' });
+    }
+    for (const s of await this.sesiones.abiertas(copropiedadId, usuarioId)) {
+      await this.cierre.cerrar(s, 'baja', ctx.usuarioId);
+    }
+    await this.bitacora.anotar({
+      tipo: 'baja_de_portero',
+      copropiedadId,
+      ocurridoEn: ahora,
+      usuarioId,
+      actorId: ctx.usuarioId,
+      detalle: limpio,
+    });
     return exito(undefined);
   }
 

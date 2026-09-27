@@ -1,7 +1,8 @@
 import type { JSX } from 'react';
 import { redirect } from 'next/navigation';
 import type { Rol } from '@ncr/contracts';
-import { sesionActual } from '@/lib/sesion/servidor';
+import { modoPruebasActivo, sesionActual } from '@/lib/sesion/servidor';
+import { FranjaDeModoPruebas } from '@/componentes/franja-modo-pruebas';
 import { claimsVisibles, estadoDePorteria } from '@/lib/sesion/porteria';
 import { BloqueoDePatrullaje } from '@/componentes/bloqueo-de-patrullaje';
 import { MarcoDeConsola } from '@/componentes/marco-consola';
@@ -47,9 +48,11 @@ const LayoutDeConsola = async ({
   // pantallas de la misma página discreparan sobre cuál es la copropiedad
   // activa.
   const alcance = await alcanceActivo();
+  const enPruebas = await modoPruebasActivo();
 
   return (
     <ProveedorDeConsultas>
+      {enPruebas ? <FranjaDeModoPruebas /> : null}
       <MarcoDeConsola sesion={sesion} rol={sesion.rol as Rol} alcance={alcance} porteria={porteria}>
         {children}
       </MarcoDeConsola>

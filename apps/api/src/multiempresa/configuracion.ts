@@ -6,6 +6,7 @@ import {
   validarTelefonoPorteria,
   validarTopeVehiculos,
 } from './ajustes-de-plataforma';
+import { redValida } from '../plataforma';
 
 /**
  * Qué se puede configurar de una copropiedad, quién puede tocarlo y qué se
@@ -51,7 +52,9 @@ export type ClaveEditable =
   | 'politicaContingenciaEdge'
   | 'codigoCorto'
   | 'telefonoPorteria'
-  | 'topeVehiculosPropios';
+  | 'topeVehiculosPropios'
+  | 'ipsPorteria'
+  | 'ipsGuardiaRemota';
 
 export type PoliticaContingencia = 'denegar' | 'escalar_portero';
 
@@ -185,12 +188,16 @@ export interface ConfiguracionDeCopropiedad {
   readonly etiquetaAgrupacion: string;
   readonly zonaHoraria: string;
   readonly politicaContingenciaEdge: PoliticaContingencia;
-  /** D1 · `null` mientras el superadministrador no lo asigne: sin él sólo se entra por NIT. */
+  /** D1 · `null` mientras el superadministrador no lo asigne: sin él, un residente no entra. */
   readonly codigoCorto: string | null;
   /** D7 · `null` = la app dice «portería no ha registrado su teléfono». */
   readonly telefonoPorteria: string | null;
   /** D5 a · vehículos propios activos que los ocupantes registran por vivienda. */
   readonly topeVehiculosPropios: number;
+  /** H4 (15-L) · IP (o redes) del computador de portería. */
+  readonly ipsPorteria: readonly string[];
+  /** H4 (15-L) · IP (o redes) desde las que un portero hace guardia remota. */
+  readonly ipsGuardiaRemota: readonly string[];
   /* ── Solo lectura ── */
   /** D5 c · ADR-027 · hoy sólo «automatica»; el modo del portero no está construido. */
   readonly aprobacionDeTerceros: 'automatica';
@@ -226,6 +233,8 @@ export interface CambiosDeConfiguracion {
   /** Vacío borra el teléfono; por eso el efectivo admite `null`. */
   readonly telefonoPorteria?: string | null;
   readonly topeVehiculosPropios?: number;
+  readonly ipsPorteria?: readonly string[];
+  readonly ipsGuardiaRemota?: readonly string[];
 }
 
 export interface Ajuste {
@@ -234,10 +243,10 @@ export interface Ajuste {
   /** Roles que pueden cambiarlo. El resto lo ve, no lo toca. */
   readonly editablePor: readonly Rol[];
   /**
-   * Verdad de negocio, no forma: el DTO ya comprobó que es un número o una
-   * cadena. Devuelve el motivo del rechazo, o `null` si el valor vale.
+   * Verdad de negocio, no forma: el DTO ya comprobó que es un número, una
+   * cadena o (las IP, H4) una lista. Devuelve el motivo del rechazo, o `null`.
    */
-  readonly validar: (valor: string | number) => string | null;
+  validar(valor: string | number | readonly string[]): string | null;
 }
 
 const textoAcotado =
@@ -260,6 +269,22 @@ const textoAcotado =
 const ZONAS_CONOCIDAS: ReadonlySet<string> = new Set(
   typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [],
 );
+
+const esListaDeTexto = (v: unknown): v is readonly string[] =>
+  Array.isArray(v) && v.every((x) => typeof x === 'string');
+
+/** H4 · IP o redes CIDR bien escritas, sin repetir, como mucho `maximo`. */
+const validarListaDeIps =
+  (maximo: number) =>
+  (valor: string | number | readonly string[]): string | null => {
+    if (!esListaDeTexto(valor)) return 'se esperaba una lista de IP';
+    if (valor.length > maximo) return `como mucho ${String(maximo)} IP o redes`;
+    const malas = valor.filter((x) => redValida(x) === null);
+    if (malas.length > 0) {
+      return `no son IP ni redes CIDR (IPv4 o IPv6): ${malas.slice(0, 3).join(', ')}`;
+    }
+    return null;
+  };
 
 const AJUSTES: readonly Ajuste[] = [
   {
@@ -353,6 +378,19 @@ const AJUSTES: readonly Ajuste[] = [
     editablePor: ['superadministrador'],
     validar: validarTopeVehiculos,
   },
+  // H4 (15-L) · dónde puede entrar un portero. Sólo el superadministrador.
+  {
+    clave: 'ipsPorteria',
+    etiqueta: 'IP del computador de portería',
+    editablePor: ['superadministrador'],
+    validar: validarListaDeIps(20),
+  },
+  {
+    clave: 'ipsGuardiaRemota',
+    etiqueta: 'IPs permitidas para conexión remota de porteros',
+    editablePor: ['superadministrador'],
+    validar: validarListaDeIps(50),
+  },
 ];
 
 export const AJUSTE_POR_CLAVE: ReadonlyMap<ClaveEditable, Ajuste> = new Map(
@@ -392,8 +430,8 @@ export const validarCambios = (
       rechazos.push({ clave, motivo: `tu rol no puede cambiar «${ajuste.etiqueta}»` });
       continue;
     }
-    if (typeof valor !== 'string' && typeof valor !== 'number') {
-      rechazos.push({ clave, motivo: 'se esperaba texto o número' });
+    if (typeof valor !== 'string' && typeof valor !== 'number' && !esListaDeTexto(valor)) {
+      rechazos.push({ clave, motivo: 'se esperaba texto, número o una lista' });
       continue;
     }
     const motivo = ajuste.validar(valor);
@@ -447,7 +485,22 @@ export const cambiosEfectivos = (
     p.topeVehiculosPropios !== actual.topeVehiculosPropios
       ? { topeVehiculosPropios: p.topeVehiculosPropios }
       : {}),
+    ...listaCambiada('ipsPorteria', p.ipsPorteria, actual.ipsPorteria),
+    ...listaCambiada('ipsGuardiaRemota', p.ipsGuardiaRemota, actual.ipsGuardiaRemota),
   };
+};
+
+/** La lista normalizada y sin repetidos; sólo si cambió respecto de la guardada. */
+const listaCambiada = <K extends 'ipsPorteria' | 'ipsGuardiaRemota'>(
+  clave: K,
+  pedida: readonly string[] | undefined,
+  actual: readonly string[],
+): Partial<Record<K, readonly string[]>> => {
+  if (pedida === undefined) return {};
+  const limpia = [...new Set(pedida.map((x) => redValida(x)).filter((x) => x !== null))];
+  return limpia.join(',') === actual.join(',')
+    ? {}
+    : ({ [clave]: limpia } as unknown as Partial<Record<K, readonly string[]>>);
 };
 
 /** Texto del registro de auditoría: qué ajuste, de qué valor a cuál. */

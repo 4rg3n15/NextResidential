@@ -36,19 +36,3 @@ export const nombreDeUsuario = (bruto: string): Resultado<NombreDeUsuario, strin
   }
   return exito(limpio as NombreDeUsuario);
 };
-
-/**
- * NIT tal como lo guarda la base (`app.normalizar_nit`, 0026): sin espacios,
- * puntos ni comas, y con el guion del dígito de verificación. Es la otra mitad
- * del identificador de acceso (C-34): el usuario es único DENTRO de una
- * copropiedad, así que sin el NIT el nombre solo sería ambiguo.
- */
-export type Nit = string & { readonly __marca: 'Nit' };
-const FORMATO_NIT = /^[0-9]{5,15}(-[0-9])?$/;
-
-export const nit = (bruto: string): Resultado<Nit, string> => {
-  const limpio = bruto.replace(/[\s.,]/g, '');
-  return FORMATO_NIT.test(limpio)
-    ? exito(limpio as Nit)
-    : fallo('El NIT son de 5 a 15 dígitos, con el dígito de verificación opcional tras un guion');
-};

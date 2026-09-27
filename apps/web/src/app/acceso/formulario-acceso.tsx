@@ -14,21 +14,16 @@ import type { ResultadoDeAcceso } from '@/app/api/sesion/route';
 type Paso = 'credenciales' | 'inscripcion' | 'segundo-factor' | 'codigos' | 'cambio';
 
 /**
- * ETAPA 15-H (ADR-023) y 15-I (D1) · la copropiedad —su CÓDIGO corto o su NIT—
- * se recuerda en ESTE equipo: un portero entra cada turno desde la misma
- * garita, y escribirla cada vez es donde se equivoca. Es un dato público del
- * conjunto, no una credencial; aun así va a `localStorage` sólo como comodidad
- * y la página funciona igual sin él. La clave antigua (sólo NIT) se sigue leyendo.
+ * 15-I (D1) · el CÓDIGO corto de la copropiedad se recuerda en ESTE equipo: es
+ * un dato público del conjunto, no una credencial; aun así va a
+ * `localStorage` sólo como comodidad y la página funciona igual sin él. Desde
+ * la 15-L el NIT ya no identifica a nadie (ADR-031): lo guardado con la clave
+ * antigua no se lee.
  */
 const CLAVE_COPROPIEDAD = 'ncr:copropiedad-de-acceso';
-const CLAVE_NIT_ANTERIOR = 'ncr:nit-de-acceso';
 const leerCopropiedad = (): string => {
   try {
-    return (
-      window.localStorage.getItem(CLAVE_COPROPIEDAD) ??
-      window.localStorage.getItem(CLAVE_NIT_ANTERIOR) ??
-      ''
-    );
+    return window.localStorage.getItem(CLAVE_COPROPIEDAD) ?? '';
   } catch {
     return '';
   }
@@ -42,17 +37,17 @@ const guardarCopropiedad = (valor: string): void => {
 };
 
 /**
- * D1 · «código o NIT» en un solo campo. Un NIT son cifras (con puntos y el
- * dígito de verificación tras un guion); un código lleva al menos una letra o
- * tiene menos de cinco caracteres —la API no deja asignar uno que parezca un
- * NIT (S-58)—. Así la consola nunca tiene que adivinar.
+ * H3 (15-L, ADR-031) · QUÉ ESCRIBIÓ en el campo «Usuario», sin adivinar:
+ *  · con arroba, un CORREO (administración);
+ *  · sólo cifras, el NÚMERO de un portero: entra con él y la contraseña, nada más;
+ *  · lo demás, el usuario de un residente, que necesita el código de la copropiedad.
  */
-export const identificadorDeCopropiedad = (
-  valor: string,
-): { readonly codigo: string } | { readonly nit: string } => {
-  const limpio = valor.trim();
-  const sinSeparadores = limpio.replace(/[\s.,]/g, '');
-  return /^[0-9]{5,15}(-[0-9])?$/.test(sinSeparadores) ? { nit: limpio } : { codigo: limpio };
+export type FormaDeAcceso = 'correo' | 'portero' | 'usuario';
+export const formaDeAcceso = (valor: string): FormaDeAcceso | null => {
+  const v = valor.trim();
+  if (v === '') return null;
+  if (v.includes('@')) return 'correo';
+  return /^[0-9]+$/.test(v) ? 'portero' : 'usuario';
 };
 
 /**
@@ -82,8 +77,9 @@ export const FormularioDeAcceso = ({
   const [copropiedad, setCopropiedad] = useState('');
   const [aviso, setAviso] = useState<string | undefined>(undefined);
   useEffect(() => setCopropiedad(leerCopropiedad()), []);
-  /** Sin arroba es un NOMBRE DE USUARIO, y entonces hace falta el código o el NIT (D1, C-34). */
-  const porUsuario = correo.trim() !== '' && !correo.includes('@');
+  const forma = formaDeAcceso(correo);
+  /** Sólo el usuario de un residente necesita el código de la copropiedad (D1). */
+  const porUsuario = forma === 'usuario';
   const [contrasena, setContrasena] = useState('');
   const [codigo, setCodigo] = useState('');
   const [verContrasena, setVerContrasena] = useState(false);
@@ -240,9 +236,12 @@ export const FormularioDeAcceso = ({
       className={className}
       onSubmit={(e) => {
         e.preventDefault();
-        const identificador = porUsuario
-          ? { ...identificadorDeCopropiedad(copropiedad), usuario: correo.trim() }
-          : { correo: correo.trim() };
+        const identificador =
+          forma === 'correo'
+            ? { correo: correo.trim() }
+            : forma === 'portero'
+              ? { usuario: correo.trim() }
+              : { codigo: copropiedad.trim(), usuario: correo.trim() };
         if (porUsuario) guardarCopropiedad(copropiedad.trim());
         void enviar('/api/sesion', { ...identificador, contrasena, recordar }, (r) => {
           if (r.siguiente === 'cambio-de-contrasena') {
@@ -267,7 +266,7 @@ export const FormularioDeAcceso = ({
           </p>
         )}
         <Campo
-          etiqueta="Correo o usuario"
+          etiqueta="Usuario"
           name="correo"
           type="text"
           autoComplete="username"
@@ -276,12 +275,16 @@ export const FormularioDeAcceso = ({
           required
           value={correo}
           onChange={(e) => setCorreo(e.target.value)}
-          placeholder="nombre@copropiedad.com o tu usuario"
-          ayuda="Porteros y residentes entran con su usuario y el código (o el NIT) de la copropiedad."
+          placeholder="Correo, número de portero o usuario"
+          ayuda={
+            forma === 'portero'
+              ? 'Número de portero: entra sólo con él y tu contraseña.'
+              : 'Los porteros entran con su número; los residentes, con su usuario y el código de la copropiedad.'
+          }
         />
         {porUsuario ? (
           <Campo
-            etiqueta="Código o NIT de la copropiedad"
+            etiqueta="Código de la copropiedad"
             name="copropiedad"
             autoComplete="organization"
             autoCapitalize="characters"
@@ -289,7 +292,7 @@ export const FormularioDeAcceso = ({
             required
             value={copropiedad}
             onChange={(e) => setCopropiedad(e.target.value)}
-            placeholder="MIRA o 900123456-7"
+            placeholder="MIRA"
             ayuda="Se recuerda en este equipo para el próximo ingreso."
           />
         ) : null}

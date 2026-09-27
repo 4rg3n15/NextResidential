@@ -307,7 +307,8 @@ const principal = async () => {
    * red**, no sólo por el bucle local. Sin eso, el paso 3.bis no puede existir,
    * y ese paso es el que encontró D-67.
    */
-  lanzar('node', [binDeNext, 'start', '-H', '0.0.0.0', '-p', String(puertoWeb)], {
+  // 15-L (H6) · el servidor de producción de la consola (`pnpm start`), no `next start`.
+  lanzar('node', ['servidor.mjs', '-H', '0.0.0.0', '-p', String(puertoWeb)], {
     cwd: resolve(raiz, 'apps/web'),
     env: entornoWeb,
     detached: true,
@@ -785,7 +786,7 @@ const principal = async () => {
   });
   if (!(await esperar(`http://127.0.0.1:${puertoApiConVariable}/health`, 'la API'))) return;
 
-  lanzar('node', [binDeNext, 'start', '-p', String(puertoWebConVariable)], {
+  lanzar('node', ['servidor.mjs', '-p', String(puertoWebConVariable)], {
     cwd: resolve(raiz, 'apps/web'),
     env: {
       ...entornoWeb,

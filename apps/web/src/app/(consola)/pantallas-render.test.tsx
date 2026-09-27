@@ -47,6 +47,8 @@ const CONFIGURACION = {
   politicaContingenciaEdge: 'denegar',
   umbralLatidoMinutos: 5,
   nit: '900123456',
+  ipsPorteria: [],
+  ipsGuardiaRemota: [],
   estado: 'activa',
   plazoConsentimientoHoras: 24,
   margenCacheReglasHoras: 24,

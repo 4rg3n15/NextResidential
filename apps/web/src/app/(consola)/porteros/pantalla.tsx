@@ -12,6 +12,7 @@ import { EstadoError } from '@/componentes/estados';
 import { usePorteros } from './consultas';
 import { DialogoDePortero, DialogoDeRestablecimiento } from './dialogo-portero';
 import { CalendarioDeTurnos } from './calendario-de-turnos';
+import { DialogoDeBaja, ResumenDelPool } from './pool-y-baja';
 import { BitacoraDePorteria } from './bitacora';
 
 const hora = (iso: string): string =>
@@ -33,6 +34,8 @@ export const PantallaDePorteros = ({
   const porteros = usePorteros(copropiedadId);
   const [editar, setEditar] = useState<Portero | null | 'nuevo'>(null);
   const [restablecer, setRestablecer] = useState<Portero | null>(null);
+  const [baja, setBaja] = useState<Portero | null>(null);
+  const [creado, setCreado] = useState<{ numero: number; nombre: string } | null>(null);
   const lista = porteros.data ?? [];
   const deTurno = lista.filter((p) => p.turnoVigente !== null).length;
 
@@ -44,6 +47,9 @@ export const PantallaDePorteros = ({
       <Boton variante="fantasma" tamano="sm" onClick={() => setRestablecer(p)}>
         Restablecer contraseña
       </Boton>
+      <Boton variante="fantasma" tamano="sm" onClick={() => setBaja(p)}>
+        Dar de baja
+      </Boton>
     </div>
   );
 
@@ -54,10 +60,13 @@ export const PantallaDePorteros = ({
       celda: (p) => (
         <div>
           <p className="font-medium text-texto">{p.nombre}</p>
-          <p className="text-secundario text-texto-apagado">{p.usuario ?? 'cuenta por correo'}</p>
+          <p className="text-secundario text-texto-apagado">
+            {p.numero === null ? 'Sin número' : `N.º ${String(p.numero)}`}
+            {p.documento === null ? '' : ` · Doc. ${p.documento}`}
+          </p>
         </div>
       ),
-      texto: (p) => `${p.nombre} ${p.usuario ?? ''}`,
+      texto: (p) => `${p.nombre} ${String(p.numero ?? '')} ${p.documento ?? ''}`,
     },
     {
       clave: 'porteria',
@@ -110,10 +119,25 @@ export const PantallaDePorteros = ({
     <div className="space-y-6">
       <EncabezadoDePantalla
         titulo="Porteros"
-        descripcion="Personal de portería, sus turnos y lo que hicieron. Sólo el superadministrador da de alta, asigna turnos y restablece contraseñas."
+        descripcion="Personal de portería, sus turnos y lo que hicieron. Cada portero entra con su número y su contraseña. Sólo el superadministrador da de alta, da de baja, asigna turnos y restablece contraseñas."
         resumen={porteros.isSuccess ? `${deTurno} de ${lista.length} de turno ahora` : undefined}
         acciones={<Boton onClick={() => setEditar('nuevo')}>Nuevo portero</Boton>}
       />
+      {creado === null ? null : (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-tarjeta border border-exito bg-exito-suave px-4 py-3"
+        >
+          <p className="text-cuerpo text-exito-texto">
+            {creado.nombre} quedó dado de alta. Entra con el número{' '}
+            <strong className="font-semibold">{creado.numero}</strong> y la contraseña inicial.
+          </p>
+          <Boton variante="fantasma" tamano="sm" onClick={() => setCreado(null)}>
+            Entendido
+          </Boton>
+        </div>
+      )}
+      <ResumenDelPool copropiedadId={copropiedadId} />
       {porteros.isError ? (
         <EstadoError
           descripcion={porteros.error.message}
@@ -130,7 +154,7 @@ export const PantallaDePorteros = ({
             titulo: 'Sin porteros',
             descripcion: 'Da de alta el primero con «Nuevo portero».',
           }}
-          buscador={{ marcador: 'Buscar por nombre, usuario o portería' }}
+          buscador={{ marcador: 'Buscar por nombre, número, documento o portería' }}
         />
       )}
       <CalendarioDeTurnos copropiedadId={copropiedadId} porteros={lista} />
@@ -140,7 +164,9 @@ export const PantallaDePorteros = ({
         abierto={editar !== null}
         portero={editar === 'nuevo' ? null : editar}
         alCerrar={() => setEditar(null)}
+        alCrear={(numero, nombre) => setCreado({ numero, nombre })}
       />
+      <DialogoDeBaja copropiedadId={copropiedadId} portero={baja} alCerrar={() => setBaja(null)} />
       <DialogoDeRestablecimiento
         copropiedadId={copropiedadId}
         portero={restablecer}

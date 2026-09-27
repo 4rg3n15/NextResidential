@@ -114,6 +114,8 @@ const CONFIGURACION = {
   politicaContingenciaEdge: 'denegar',
   umbralLatidoMinutos: 5,
   nit: '900123456',
+  ipsPorteria: [],
+  ipsGuardiaRemota: [],
   estado: 'activa',
   plazoConsentimientoHoras: 24,
   margenCacheReglasHoras: 24,
@@ -437,7 +439,7 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    * identificadores viaja en la RUTA desde la fila o la sesión.
    */
   'porteros/dialogo-portero.tsx':
-    'alta y datos del portero: usuario (nombre legible, no UUID), nombre y contacto; el usuarioId de la edición viene de la fila',
+    'alta y datos del portero: documento, nombre y contacto (el número lo asigna la API); el usuarioId de la edición viene de la fila',
   'porteros/dialogo-turno.tsx':
     'el porteroId sale de un desplegable con los porteros que devuelve la API; día y horas son campos date/time del navegador',
   'porteros/calendario-de-turnos.tsx':
@@ -527,6 +529,17 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    */
   'componentes/fotografia-visitante.tsx':
     'la entrada es un archivo; el identificador viaja en la ruta desde la tarjeta, nadie lo teclea',
+  /**
+   * 15-L (H5) · el interruptor del modo pruebas: dos botones, un booleano. No
+   * hay campo de texto.
+   */
+  'configuracion/modo-pruebas.tsx': 'un interruptor: envía un booleano, nadie teclea nada',
+  /**
+   * 15-L (H1, H2) · el cupo es un número de 0 a 999 y la baja lleva un motivo
+   * en texto; el portero viaja en la RUTA desde la fila que lo muestra.
+   */
+  'porteros/pool-y-baja.tsx':
+    'cupo numérico y motivo en texto; el portero viaja en la ruta desde su fila, nadie lo teclea',
 };
 
 /**

@@ -1,10 +1,10 @@
 # ADR-023 · Cuentas por nombre de usuario sobre Supabase Auth, con correo sintético no enrutable
 
-|                 |                                                                                                                                            |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Estado**      | Aceptada · ETAPA 15-H (2026-09-25) · extensión al contrato **E-02**                                                                        |
-| **Sustituye a** | Nada. Convive con el acceso por correo de la ETAPA 03, que no cambia                                                                       |
-| **Afecta a**    | migración `0037`, gancho de claims, `apps/api/src/cuentas`, guard global de cambio de contraseña, `apps/web` (acceso y cambio obligatorio) |
+|                 |                                                                                                                                                                                                                                                                                                                                                           |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Estado**      | Aceptada · ETAPA 15-H (2026-09-25) · extensión al contrato **E-02** · **derogada en parte por [ADR-031](ADR-031-porteros-por-numero-lista-blanca-y-modo-pruebas.md) (15-L)**: el portero ya no entra con un usuario escogido ni con el NIT, sino con el número de su pool. Siguen vigentes el correo sintético, el primer ingreso y el cambio obligatorio |
+| **Sustituye a** | Nada. Convive con el acceso por correo de la ETAPA 03, que no cambia                                                                                                                                                                                                                                                                                      |
+| **Afecta a**    | migración `0037`, gancho de claims, `apps/api/src/cuentas`, guard global de cambio de contraseña, `apps/web` (acceso y cambio obligatorio)                                                                                                                                                                                                                |
 
 ---
 

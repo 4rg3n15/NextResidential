@@ -11,11 +11,11 @@ class AltaDePorteroDto {
   const AltaDePorteroDto({
     required this.nombre,
     required this.sectores,
-    required this.usuario,
     required this.contrasenaInicial,
     this.telefono,
     this.correoContacto,
     this.porteria,
+    this.documento,
   });
   
   factory AltaDePorteroDto.fromJson(Map<String, Object?> json) => _$AltaDePorteroDtoFromJson(json);
@@ -28,8 +28,8 @@ class AltaDePorteroDto {
   /// Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas.
   final List<String> sectores;
 
-  /// Identificación del portero como usuario
-  final String usuario;
+  /// Documento de identidad
+  final String? documento;
   final String contrasenaInicial;
 
   Map<String, Object?> toJson() => _$AltaDePorteroDtoToJson(this);

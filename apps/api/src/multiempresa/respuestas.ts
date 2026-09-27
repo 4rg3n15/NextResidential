@@ -136,7 +136,7 @@ export class ConfiguracionDeCopropiedadDto {
     type: String,
     nullable: true,
     example: 'MIRA',
-    description: 'D1 · código corto de acceso; null mientras no se asigne (sólo se entra por NIT).',
+    description: 'D1 · código corto con el que entran los residentes; null mientras no se asigne.',
   })
   codigoCorto!: string | null;
 
@@ -150,6 +150,22 @@ export class ConfiguracionDeCopropiedadDto {
 
   @ApiProperty({ example: 2, description: 'D5 a · vehículos propios por vivienda.' })
   topeVehiculosPropios!: number;
+
+  @ApiProperty({
+    type: [String],
+    example: ['192.0.2.10'],
+    description: 'H4 · IP (o redes CIDR) del computador de portería',
+  })
+  ipsPorteria!: string[];
+
+  @ApiProperty({
+    type: [String],
+    example: ['198.51.100.0/24'],
+    description:
+      'H4 · IP (o redes CIDR) desde las que un portero puede hacer guardia remota. Vacía: ' +
+      'sólo desde la IP de una sesión activa de superadministrador',
+  })
+  ipsGuardiaRemota!: string[];
 
   @ApiProperty({
     enum: ['automatica'],

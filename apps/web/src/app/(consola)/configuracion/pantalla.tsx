@@ -7,6 +7,7 @@ import { NOMBRE_DE_ROL } from '@/lib/navegacion';
 import type { Rol } from '@ncr/contracts';
 import type { AlcanceActivo } from '../copropiedad';
 import { FormularioDeConfiguracion } from './formulario';
+import { InterruptorDeModoPruebas } from './modo-pruebas';
 
 /**
  * Configuración, ahora editable (bloque 7 de la ETAPA 09-B).
@@ -22,8 +23,7 @@ import { FormularioDeConfiguracion } from './formulario';
  * · **Solo lectura, con el motivo a la vista**: cota legal, integridad,
  *   trazabilidad o constante documentada. El plazo de consentimiento
  *   biométrico lo fija la Ley 1581 de 2012 como MÁXIMO —no como valor por
- *   defecto—, el NIT identifica fiscalmente a la copropiedad y sostiene un
- *   índice único, el margen de caché del Edge sostiene el marcado de
+ *   defecto—, el margen de caché del Edge sostiene el marcado de
  *   decisiones con caché potencialmente obsoleto (KPI-31), y el umbral de
  *   confianza de placa y el margen de latido los fija la base (migración 0032,
  *   B.5): ningún rol los edita, ni el superadministrador.
@@ -198,12 +198,6 @@ export const PantallaDeConfiguracion = ({
           >
             24 horas
           </Dato>
-          <Dato
-            etiqueta="NIT de la copropiedad"
-            bloqueado="Identidad fiscal con índice único. Cambiarlo no es configurar: es sustituir el tenant, y va por procedimiento con constancia."
-          >
-            Se consulta en el padrón de la copropiedad
-          </Dato>
         </Bloque>
 
         <Bloque
@@ -223,6 +217,14 @@ export const PantallaDeConfiguracion = ({
           >
             Activo y forzado
           </Dato>
+          {sesion.rol === 'superadministrador' ? (
+            <Dato
+              etiqueta="Modo pruebas (toda la plataforma)"
+              ayuda="Activo, las restricciones de porteros —IP permitidas y bloqueo por intentos— se registran como «habría sido rechazado» sin bloquear, y el límite de peticiones sube. Toda la consola lo muestra en una franja. Cada cambio queda en la auditoría de seguridad."
+            >
+              <InterruptorDeModoPruebas />
+            </Dato>
+          ) : null}
           <Dato
             etiqueta="Gestión de usuarios y restablecimientos"
             ayuda="Se diseña en el bloque 4 de esta etapa. Hoy se aprovisiona con los guiones de docs/guias/RECUPERACION_Y_USUARIOS.md."

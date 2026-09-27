@@ -32,6 +32,8 @@ enum Tipo3 {
   altaDePortero('alta_de_portero'),
   @JsonValue('edicion_de_portero')
   edicionDePortero('edicion_de_portero'),
+  @JsonValue('baja_de_portero')
+  bajaDePortero('baja_de_portero'),
   @JsonValue('restablecimiento_de_contrasena')
   restablecimientoDeContrasena('restablecimiento_de_contrasena'),
   @JsonValue('cambio_de_contrasena')

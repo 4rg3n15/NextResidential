@@ -9,7 +9,10 @@ import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { contrasenaValida, motivoDeRechazo } from '@/lib/politica-contrasena';
 
-const FORMATO_USUARIO = /^[a-z0-9][a-z0-9._-]{2,31}$/;
+/** El documento como lo normaliza la API: mayúsculas, sin espacios ni puntos. */
+const documentoNormalizado = (texto: string): string =>
+  texto.normalize('NFKC').toUpperCase().replace(/[\s.]/g, '');
+const FORMATO_DOCUMENTO = /^[0-9A-Z-]{3,20}$/;
 const sectoresDe = (texto: string): string[] =>
   texto
     .split(',')
@@ -19,24 +22,28 @@ const sectoresDe = (texto: string): string[] =>
 const opcional = (v: string): string | undefined => (v.trim() === '' ? undefined : v.trim());
 
 /**
- * ALTA Y DATOS DEL PORTERO (E-02). Con `portero` es edición: el usuario y la
- * contraseña no se tocan aquí —el usuario es la identidad; la contraseña se
- * RESTABLECE, con su propio rastro—. Los sectores se registran y son
- * INFORMATIVOS (P-17): no filtran alarmas, y el texto de ayuda lo dice.
+ * ALTA Y DATOS DEL PORTERO. El alta lleva nombre, documento y contraseña
+ * temporal; el NÚMERO con el que entrará lo asigna el sistema y se enseña al
+ * terminar (`alCrear`), porque es lo que hay que decirle al portero. Con
+ * `portero` es edición: el número no cambia nunca y la contraseña se
+ * RESTABLECE, con su propio rastro. Los sectores son informativos: no filtran
+ * alarmas, y el texto de ayuda lo dice.
  */
 export const DialogoDePortero = ({
   copropiedadId,
   abierto,
   portero,
   alCerrar,
+  alCrear,
 }: {
   readonly copropiedadId: string;
   readonly abierto: boolean;
   readonly portero: Portero | null;
   readonly alCerrar: () => void;
+  readonly alCrear?: (numero: number, nombre: string) => void;
 }): JSX.Element => {
   const consultas = useQueryClient();
-  const [usuario, setUsuario] = useState('');
+  const [documento, setDocumento] = useState('');
   const [inicial, setInicial] = useState('');
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -48,7 +55,7 @@ export const DialogoDePortero = ({
 
   useEffect(() => {
     if (!abierto) return;
-    setUsuario(portero?.usuario ?? '');
+    setDocumento(portero?.documento ?? '');
     setInicial('');
     setNombre(portero?.nombre ?? '');
     setTelefono(portero?.telefono ?? '');
@@ -59,7 +66,8 @@ export const DialogoDePortero = ({
   }, [abierto, portero]);
 
   const esAlta = portero === null;
-  const usuarioValido = !esAlta || FORMATO_USUARIO.test(usuario.trim().toLowerCase());
+  const documentoValido =
+    (!esAlta && documento.trim() === '') || FORMATO_DOCUMENTO.test(documentoNormalizado(documento));
   const inicialValida = !esAlta || contrasenaValida(inicial);
   const datos = {
     nombre: nombre.trim(),
@@ -67,6 +75,7 @@ export const DialogoDePortero = ({
     ...(opcional(telefono) === undefined ? {} : { telefono: telefono.trim() }),
     ...(opcional(correo) === undefined ? {} : { correoContacto: correo.trim() }),
     ...(opcional(porteria) === undefined ? {} : { porteria: porteria.trim() }),
+    ...(opcional(documento) === undefined ? {} : { documento: documentoNormalizado(documento) }),
   };
 
   const enviar = async (): Promise<void> => {
@@ -74,12 +83,17 @@ export const DialogoDePortero = ({
     setError(undefined);
     try {
       if (esAlta) {
-        desenvolver(
+        const creado = desenvolver(
           await cliente.POST('/copropiedades/{id}/porteros', {
             params: { path: { id: copropiedadId } },
-            body: { ...datos, usuario: usuario.trim().toLowerCase(), contrasenaInicial: inicial },
+            body: {
+              ...datos,
+              documento: documentoNormalizado(documento),
+              contrasenaInicial: inicial,
+            },
           }),
         );
+        alCrear?.(creado.numero, datos.nombre);
       } else {
         desenvolver(
           await cliente.PUT('/copropiedades/{id}/porteros/{usuarioId}', {
@@ -103,30 +117,30 @@ export const DialogoDePortero = ({
       titulo={esAlta ? 'Nuevo portero' : `Datos de ${portero.nombre}`}
       descripcion={
         esAlta
-          ? 'El portero entra con este usuario y el NIT de la copropiedad. La contraseña inicial la escribes tú y tendrá que cambiarla en su primer ingreso.'
-          : 'El usuario no cambia. Para una contraseña nueva, usa «Restablecer contraseña».'
+          ? 'El sistema le asigna un número, que verás al terminar: con él y la contraseña entra. La contraseña inicial la escribes tú y tendrá que cambiarla en su primer ingreso.'
+          : `Entra con el número ${String(portero.numero ?? '—')}, que no cambia. Para una contraseña nueva, usa «Restablecer contraseña».`
       }
       etiquetaEnviar={esAlta ? 'Dar de alta' : 'Guardar'}
       enviando={enviando}
       error={error}
-      puedeEnviar={nombre.trim() !== '' && usuarioValido && inicialValida}
+      puedeEnviar={nombre.trim() !== '' && documentoValido && inicialValida}
       alEnviar={() => void enviar()}
       alCancelar={alCerrar}
     >
       <div className="space-y-3">
+        <Campo
+          etiqueta="Documento de identidad"
+          name="documento"
+          autoCapitalize="characters"
+          spellCheck={false}
+          required={esAlta}
+          value={documento}
+          onChange={(e) => setDocumento(e.target.value)}
+          ayuda="De 3 a 20 letras, números o guiones; los puntos y espacios se quitan."
+          error={documento !== '' && !documentoValido ? 'Formato no admitido.' : undefined}
+        />
         {esAlta ? (
           <>
-            <Campo
-              etiqueta="Usuario (identificación del portero)"
-              name="usuario"
-              autoCapitalize="none"
-              spellCheck={false}
-              required
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
-              ayuda="De 3 a 32: letras sin tilde, números, punto, guion o guion bajo."
-              error={usuario !== '' && !usuarioValido ? 'Formato no admitido.' : undefined}
-            />
             <Campo
               etiqueta="Contraseña inicial"
               name="contrasenaInicial"
@@ -173,7 +187,7 @@ export const DialogoDePortero = ({
           name="sectores"
           value={sectores}
           onChange={(e) => setSectores(e.target.value)}
-          ayuda="Separados por comas. Son informativos: el portero sigue viendo todas las alarmas (P-17)."
+          ayuda="Separados por comas. Son informativos: el portero sigue viendo todas las alarmas."
         />
       </div>
     </DialogoDeFormulario>

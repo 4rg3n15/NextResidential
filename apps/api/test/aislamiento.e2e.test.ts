@@ -85,6 +85,10 @@ const SIN_RECURSO_TENANT = new Set([
   '/porteria/sesion/patrullaje',
   '/porteria/sesion/desbloqueo',
   '/porteria/perfil',
+  // ETAPA 15-L (H5, ADR-031) · el interruptor GLOBAL del modo pruebas: es de la
+  // plataforma, no de una copropiedad. Lo lee todo el que tiene sesión (la
+  // franja de la consola) y lo cambia sólo el superadministrador.
+  '/plataforma/modo-pruebas',
 ]);
 
 /**

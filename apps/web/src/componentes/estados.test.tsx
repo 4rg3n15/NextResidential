@@ -107,12 +107,13 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
     expect(navegacionDe('operador_central').map((e) => e.clave)).toContain('observabilidad');
   });
 
-  it('el portero ve Portería y NO la guardia virtual', () => {
-    // No es un permiso que falte: es otra consola. El portero atiende su
-    // puerta; el operador de central atiende varias copropiedades que no ve.
+  it('el portero ve Portería y, desde la 15-L, también la guardia virtual (H4)', () => {
+    // Eran dos consolas (C-12). El cliente pidió porteros de guardia REMOTA
+    // (H4): la ve, y es la API la que decide en cada petición si su IP está
+    // entre las permitidas. La interfaz oculta; no protege.
     const claves = navegacionDe('portero').map((e) => e.clave);
     expect(claves).toContain('porteria');
-    expect(claves).not.toContain('guardia');
+    expect(claves).toContain('guardia');
   });
 
   it('el operador de central ve las dos', () => {

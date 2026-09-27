@@ -13,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Inicio de sesión por correo, o por código (o NIT) y usuario */
+        /** Inicio de sesión por correo, por código y usuario, o por número de portero */
         post: operations["CuentasController_acceso"];
         delete?: never;
         options?: never;
@@ -1511,8 +1511,42 @@ export interface paths {
         /** Porteros de la copropiedad, quién está de turno y con sesión */
         get: operations["SupervisionController_listar"];
         put?: never;
-        /** Alta de portero con usuario y contraseña inicial (cambio obligatorio) */
+        /** Alta de portero con nombre, documento y contraseña temporal; recibe el siguiente número del pool (cambio de contraseña obligatorio) */
         post: operations["SupervisionController_alta"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/porteros/cupo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cupo de porteros activos de la copropiedad (0 a 999), auditado */
+        put: operations["PoolDePorterosController_fijarCupo"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/porteros/pool": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pool de números de portero de la copropiedad, el siguiente a asignar y el cupo */
+        get: operations["PoolDePorterosController_pool"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1530,6 +1564,23 @@ export interface paths {
         /** Datos del portero (nombre, teléfono, correo de contacto, portería, sectores) */
         put: operations["SupervisionController_editar"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/porteros/{usuarioId}/baja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Da de baja a un portero: cierra sus sesiones y su número no se reutiliza */
+        post: operations["PoolDePorterosController_baja"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1940,6 +1991,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plataforma/modo-pruebas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Si el modo pruebas está activo */
+        get: operations["PlataformaController_leer"];
+        /** Activa o desactiva el modo pruebas (sólo superadministrador) */
+        put: operations["PlataformaController_cambiar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/porteria/perfil": {
         parameters: {
             query?: never;
@@ -2032,11 +2101,9 @@ export interface components {
         AccesoDto: {
             /** @description Cuentas por correo */
             correo?: string;
-            /** @description Código corto de la copropiedad (D1): 3 a 8 letras o números */
+            /** @description Código corto de la copropiedad (D1): 3 a 8 letras o números. Con él, el usuario es el del residente; sin él, el usuario es el NÚMERO del portero (ADR-031) */
             codigo?: string;
-            /** @description NIT de la copropiedad */
-            nit?: string;
-            /** @description Nombre de usuario */
+            /** @description Usuario del residente (con código) o número del portero (sin código) */
             usuario?: string;
             /** Format: password */
             contrasena: string;
@@ -2158,8 +2225,8 @@ export interface components {
             porteria?: string | null;
             /** @description Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas. */
             sectores: string[];
-            /** @description Identificación del portero como usuario */
-            usuario: string;
+            /** @description Documento de identidad */
+            documento?: string;
             /** Format: password */
             contrasenaInicial: string;
         };
@@ -2232,6 +2299,9 @@ export interface components {
             texto: string;
         };
         BajaDeEquipoDto: {
+            motivo: string;
+        };
+        BajaDePorteroDto: {
             motivo: string;
         };
         BajaDeZonaAplicadaDto: {
@@ -2307,6 +2377,20 @@ export interface components {
              * @example 2
              */
             topeVehiculosPropios?: number;
+            /**
+             * @description H4 · IP o redes CIDR del computador de portería (sólo superadministrador)
+             * @example [
+             *       "192.0.2.10"
+             *     ]
+             */
+            ipsPorteria?: string[];
+            /**
+             * @description H4 · IP o redes CIDR permitidas para la guardia remota de porteros (sólo superadministrador)
+             * @example [
+             *       "198.51.100.0/24"
+             *     ]
+             */
+            ipsGuardiaRemota?: string[];
         };
         CampoRechazadoDto: {
             campo: string;
@@ -2455,7 +2539,7 @@ export interface components {
             /** @example 3 */
             versionReglasActual: number;
             /**
-             * @description D1 · código corto de acceso; null mientras no se asigne (sólo se entra por NIT).
+             * @description D1 · código corto con el que entran los residentes; null mientras no se asigne.
              * @example MIRA
              */
             codigoCorto: string | null;
@@ -2469,6 +2553,20 @@ export interface components {
              * @example 2
              */
             topeVehiculosPropios: number;
+            /**
+             * @description H4 · IP (o redes CIDR) del computador de portería
+             * @example [
+             *       "192.0.2.10"
+             *     ]
+             */
+            ipsPorteria: string[];
+            /**
+             * @description H4 · IP (o redes CIDR) desde las que un portero puede hacer guardia remota. Vacía: sólo desde la IP de una sesión activa de superadministrador
+             * @example [
+             *       "198.51.100.0/24"
+             *     ]
+             */
+            ipsGuardiaRemota: string[];
             /**
              * @description D5 c · solo lectura: modo de aprobación de terceros (ADR-027).
              * @enum {string}
@@ -2611,6 +2709,9 @@ export interface components {
             debeCambiarContrasena: boolean;
             creadaEn: string;
         };
+        CupoDePorterosDto: {
+            cupo: number;
+        };
         DatosDeTurnoDto: {
             /** Format: uuid */
             porteroId: string;
@@ -2639,6 +2740,8 @@ export interface components {
             porteria?: string | null;
             /** @description Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas. */
             sectores: string[];
+            /** @description Documento de identidad (H2). En la edición, ausente = no se cambia */
+            documento?: string;
         };
         DecisionDelEdgeDto: {
             /** @description Lo que el Edge resolvió en la portería */
@@ -3141,7 +3244,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            tipo: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
+            tipo: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "baja_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
             /** Format: date-time */
             ocurridoEn: string;
             /** Format: uuid */
@@ -3166,7 +3269,7 @@ export interface components {
         };
         HechoDePorteriaDto: {
             /** @enum {string} */
-            hecho: "portero_editado" | "turno_retirado";
+            hecho: "portero_editado" | "turno_retirado" | "cupo_actualizado" | "portero_dado_de_baja";
         };
         HistorialDeOrdenesDto: {
             ordenes: components["schemas"]["OrdenEjecutadaDto"][];
@@ -3369,6 +3472,10 @@ export interface components {
             placa?: string | null;
             observaciones?: string | null;
         };
+        ModoPruebasDto: {
+            /** @description Con el modo pruebas activo, las restricciones de porteros se evalúan y se registran sin bloquear, no hay bloqueo por intentos fallidos y el límite de peticiones es más alto */
+            activo: boolean;
+        };
         NotasDeAlertaDto: {
             notas: string;
         };
@@ -3563,14 +3670,28 @@ export interface components {
         PlazaRetiradaDto: {
             retirada: boolean;
         };
+        PoolDePorterosDto: {
+            inicio: number;
+            fin: number;
+            /** @description El próximo número que se asignará */
+            siguiente: number;
+            /** @description Porteros activos que admite (máximo 999) */
+            cupo: number;
+            /** @description Porteros activos ahora */
+            activos: number;
+        };
         PorteroCreadoDto: {
             /** Format: uuid */
             usuarioId: string;
+            /** @description El número con el que entrará el portero (H2, ADR-031) */
+            numero: number;
         };
         PorteroDto: {
             /** Format: uuid */
             usuarioId: string;
-            usuario: string | null;
+            /** @description H2 (ADR-031) · el número con el que entra el portero */
+            numero: number | null;
+            documento: string | null;
             nombre: string;
             telefono: string | null;
             correoContacto: string | null;
@@ -4111,7 +4232,7 @@ export interface operations {
                     "application/json": components["schemas"]["SesionDeAccesoDto"];
                 };
             };
-            /** @description Código o NIT, usuario o contraseña incorrectos */
+            /** @description Usuario, código o contraseña incorrectos */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4129,7 +4250,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorApiDto"];
                 };
             };
-            /** @description 5/min por cuenta, 10/min por origen declarado, 30/min por dirección (S-50) */
+            /** @description 5/min por (IP, cuenta), 10/min y 30/min por dirección (S-50); y, fuera del modo pruebas, 5 fallos del mismo identificador desde la misma IP bloquean 5 minutos (H5) */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -6914,7 +7035,7 @@ export interface operations {
             query: {
                 desde: string;
                 hasta: string;
-                tipo?: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
+                tipo?: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "baja_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
             };
             header?: never;
             path: {
@@ -6980,6 +7101,52 @@ export interface operations {
             };
         };
     };
+    PoolDePorterosController_fijarCupo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CupoDePorterosDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HechoDePorteriaDto"];
+                };
+            };
+        };
+    };
+    PoolDePorterosController_pool: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolDePorterosDto"];
+                };
+            };
+        };
+    };
     SupervisionController_editar: {
         parameters: {
             query?: never;
@@ -6993,6 +7160,32 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DatosDelPorteroDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HechoDePorteriaDto"];
+                };
+            };
+        };
+    };
+    PoolDePorterosController_baja: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuarioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BajaDePorteroDto"];
             };
         };
         responses: {
@@ -7649,6 +7842,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LatenciasDto"];
+                };
+            };
+        };
+    };
+    PlataformaController_leer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModoPruebasDto"];
+                };
+            };
+        };
+    };
+    PlataformaController_cambiar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModoPruebasDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModoPruebasDto"];
                 };
             };
         };

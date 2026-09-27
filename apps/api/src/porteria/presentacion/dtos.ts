@@ -52,17 +52,27 @@ export class DatosDelPorteroDto {
   @IsString({ each: true })
   @Length(1, 60, { each: true })
   sectores!: string[];
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 30,
+    description: 'Documento de identidad (H2). En la edición, ausente = no se cambia',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 30)
+  documento?: string;
 }
 
+/**
+ * H2 (15-L, ADR-031) · nombre, documento y contraseña temporal. El número con
+ * el que entrará lo asigna el pool de la copropiedad y vuelve en la respuesta.
+ */
 export class AltaDePorteroDto extends DatosDelPorteroDto {
-  @ApiProperty({
-    type: String,
-    maxLength: 32,
-    description: 'Identificación del portero como usuario',
-  })
+  @ApiProperty({ type: String, maxLength: 30, description: 'Documento de identidad' })
   @IsString()
-  @Length(3, 32)
-  usuario!: string;
+  @Length(3, 30)
+  declare documento: string;
 
   @ApiProperty({ type: String, maxLength: 256, format: 'password' })
   @IsString()
@@ -194,7 +204,13 @@ export class SesionAbiertaDto {
 
 export class PorteroDto {
   @ApiProperty({ type: String, format: 'uuid' }) usuarioId!: string;
-  @ApiProperty({ type: String, nullable: true }) usuario!: string | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'H2 (ADR-031) · el número con el que entra el portero',
+  })
+  numero!: number | null;
+  @ApiProperty({ type: String, nullable: true }) documento!: string | null;
   @ApiProperty({ type: String }) nombre!: string;
   @ApiProperty({ type: String, nullable: true }) telefono!: string | null;
   @ApiProperty({ type: String, nullable: true }) correoContacto!: string | null;
@@ -211,6 +227,8 @@ export class PorterosDto {
 
 export class PorteroCreadoDto {
   @ApiProperty({ type: String, format: 'uuid' }) usuarioId!: string;
+  @ApiProperty({ description: 'El número con el que entrará el portero (H2, ADR-031)' })
+  numero!: number;
 }
 
 export class HechoDeBitacoraDto {
@@ -266,6 +284,9 @@ export class ResultadoDeDesbloqueoDto {
 }
 
 export class HechoDePorteriaDto {
-  @ApiProperty({ type: String, enum: ['portero_editado', 'turno_retirado'] })
-  hecho!: 'portero_editado' | 'turno_retirado';
+  @ApiProperty({
+    type: String,
+    enum: ['portero_editado', 'turno_retirado', 'cupo_actualizado', 'portero_dado_de_baja'],
+  })
+  hecho!: 'portero_editado' | 'turno_retirado' | 'cupo_actualizado' | 'portero_dado_de_baja';
 }

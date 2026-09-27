@@ -189,7 +189,8 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     // C-12 · son DOS superficies, no una: el portero atiende su puerta y el
     // operador de central atiende varias copropiedades que no ve.
     ruta: '/guardia',
-    roles: ['superadministrador', 'administrador', 'operador_central'],
+    // 15-L (H4) · y el portero: la guardia remota, desde las IP permitidas.
+    roles: ['superadministrador', 'administrador', 'operador_central', 'portero'],
     pendienteDeEtapa: null,
     icono: 'RadioTower',
   },

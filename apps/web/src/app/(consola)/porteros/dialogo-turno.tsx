@@ -128,7 +128,7 @@ export const DialogoDeTurno = ({
             {porteros.map((p) => (
               <option key={p.usuarioId} value={p.usuarioId}>
                 {p.nombre}
-                {p.usuario === null ? '' : ` · ${p.usuario}`}
+                {p.numero === null ? '' : ` · N.º ${String(p.numero)}`}
               </option>
             ))}
           </select>

@@ -105,6 +105,34 @@ describe('403 · sin permiso', () => {
   }
 });
 
+describe('403 de la guardia REMOTA · el motivo exacto, no «sin permiso» (15-L, H4)', () => {
+  it('guardia virtual: al portero fuera de las IP permitidas le dice «No autorizado para guardia remota»', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              estado: 403,
+              mensaje: { message: 'No autorizado para guardia remota', statusCode: 403 },
+            }),
+            { status: 403, headers: { 'content-type': 'application/json' } },
+          ),
+      ),
+    );
+    render(
+      <Envoltura>
+        <PantallaDeGuardiaVirtual copropiedadId={COP} nombreDeCopropiedad="Prueba" />
+      </Envoltura>,
+    );
+    await waitFor(() =>
+      expect(screen.getByText('No autorizado para guardia remota')).toBeDefined(),
+    );
+    expect(screen.queryByText('Sin permiso')).toBeNull();
+    expect(screen.getByText(/Pídele al superadministrador que la añada/)).toBeDefined();
+  });
+});
+
 describe('404 · no encontrado, que es como llega un recurso de otra copropiedad', () => {
   for (const pantalla of PANTALLAS) {
     it(`${pantalla.nombre} NO lo traduce a «sin permiso»`, async () => {

@@ -10,6 +10,8 @@ const configuracionParaContrato: Configuracion = {
   NODE_ENV: 'development',
   PORT: 3000,
   PG_POOL_MAX: 20,
+  API_PROXIES_DE_CONFIANZA: 'loopback',
+  MODO_PRUEBAS_FACTOR_DE_LIMITE: 10,
   SUPABASE_URL: 'https://generacion-de-contrato.invalid',
   SUPABASE_PUBLISHABLE_KEY: 'no-aplica',
   SUPABASE_SECRET_KEY: 'no-aplica',

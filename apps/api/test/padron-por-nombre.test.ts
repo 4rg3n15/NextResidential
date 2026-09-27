@@ -44,6 +44,22 @@ const contexto = (): ContextoTenant => ({
 
 /** Sufijo propio de la corrida: la prueba no puede chocar consigo misma. */
 const marca = String(Date.now()).slice(-8);
+/**
+ * Placa de la corrida. Era `DTS` + tres dígitos: mil placas posibles en una
+ * base que conserva las de todas las corridas (sin borrado, RN-19), así que
+ * tarde o temprano una corrida chocaba con otra («placa ya activa»).
+ */
+const letras = (n: number): string =>
+  Array.from({ length: n }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join(
+    '',
+  );
+const PLACA = `${letras(3)}${marca.slice(-3)}`;
+/**
+ * Y el nombre, por lo mismo: el buscador devuelve un número acotado de
+ * coincidencias, y con «Ana Pérez» de cada corrida anterior la de ésta podía
+ * quedar fuera.
+ */
+const NOMBRE = `Ana Pérez ${letras(1)}${letras(5).toLowerCase()}`;
 
 beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
@@ -80,11 +96,11 @@ describe('carga de padrón por nombre y documento, contra base', () => {
     const filas = analizarCsv(
       [
         'identificador,agrupacion,documento,nombre,placa,es_titular',
-        `${casa},B,${documento},Ana Pérez,,true`,
+        `${casa},B,${documento},${NOMBRE},,true`,
         // La misma persona con el documento escrito con puntos, y un vehículo:
         // debe resolver a la MISMA fila de `personas` (RN-06). Y la misma
         // vivienda, aunque aquí lleve la palabra delante.
-        `Casa ${casa},B,10.${marca.slice(0, 3)}.${marca.slice(3)},Ana Pérez,DTS${marca.slice(-3)},`,
+        `Casa ${casa},B,10.${marca.slice(0, 3)}.${marca.slice(3)},${NOMBRE},${PLACA},`,
       ].join('\n'),
     );
 
@@ -114,7 +130,7 @@ describe('carga de padrón por nombre y documento, contra base', () => {
 
     // Y el buscador de la consola la encuentra por el nombre, que es por donde
     // la va a buscar quien autoriza.
-    const encontradas = await new BuscarPersonas(repo).ejecutar(COP, 'Ana Pérez');
+    const encontradas = await new BuscarPersonas(repo).ejecutar(COP, NOMBRE);
     expect(encontradas.ok && encontradas.valor.some((p) => p.numeroDocumento === documento)).toBe(
       true,
     );

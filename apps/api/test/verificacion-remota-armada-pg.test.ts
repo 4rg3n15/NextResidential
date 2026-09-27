@@ -55,9 +55,14 @@ const LLAVE = 'llave-de-equipos-solo-para-pruebas-32+';
 const HOST = `terminal-armada-${CORRIDA.toLowerCase()}.invalid`;
 const CLAVE = 'clave-de-la-terminal-simulada';
 
-/** Mañana a las 15:00 Z, dentro de la franja de la visita (14–18 Z). */
+/**
+ * AYER, con la franja de la visita (14–18 Z). Era «mañana», y cada corrida
+ * dejaba en COP_A una orden de apertura fechada en el futuro: con veinte
+ * corridas en un día, «las últimas órdenes» de otras suites ya no incluían la
+ * suya (15-L, H). Todo lo que decide aquí usa el reloj inyectado, no `now()`.
+ */
 const DIA = new Date(
-  Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1),
+  Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() - 1),
 );
 const hora = (h: number, minutos = 0): Date =>
   new Date(DIA.getTime() + h * 3_600_000 + minutos * 60_000 + (parseInt(CORRIDA, 16) % 50_000));
@@ -191,7 +196,7 @@ const MEDIDAS = { nitidez: 0.9, iluminacion: 0.5, rostrosDetectados: 1, proporci
 // «foto» cuyas medidas no se pueden leer.
 const JPEG = Buffer.from(jpegConMedidas(320, 240, 64));
 
-/** Visita de consola en la franja 14–18 Z de mañana, con rostro aceptado por el titular. */
+/** Visita de consola en la franja 14–18 Z de ayer, con rostro aceptado por el titular. */
 const visitaConRostro = async (): Promise<string> => {
   const documento = `VA${CORRIDA}`;
   const { rows } = await (pool as Pool).query<{ id: string }>(

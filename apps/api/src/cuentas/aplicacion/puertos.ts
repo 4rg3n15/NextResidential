@@ -79,19 +79,42 @@ export interface AltaDeCuenta {
 }
 
 export interface RepositorioDeCuentas {
-  copropiedadPorNit(nit: string): Promise<string | null>;
   /** D1 · el código ya normalizado (`codigoCorto`); sólo copropiedades activas. */
   copropiedadPorCodigo(codigo: string): Promise<string | null>;
   identidadDe(usuarioId: string): Promise<IdentidadDeCuenta | null>;
   existeNombre(copropiedadId: string, usuario: NombreDeUsuario): Promise<boolean>;
   /**
    * `usuarios` + `roles_usuario` en una transacción, con el cambio obligatorio
-   * activo. `null` si el índice único rechazó el nombre (alta simultánea).
+   * activo. Un PORTERO recibe en esa misma transacción el siguiente número de
+   * su pool, con el pool bloqueado (H2, ADR-031): sin carreras y con el cupo
+   * comprobado bajo el mismo bloqueo.
    */
-  crearPorNombre(alta: AltaDeCuenta, actorId: string): Promise<string | null>;
+  crearPorNombre(alta: AltaDeCuenta, actorId: string): Promise<AltaEnBase>;
+  /**
+   * H3 · a quién pertenece un identificador de portero: la copropiedad se
+   * resuelve por la TABLA de pools, nunca con aritmética; después, su cuenta.
+   */
+  cuentaDePortero(
+    numero: number,
+  ): Promise<{ readonly copropiedadId: string; readonly acceso: AccesoDeCuenta } | null>;
   fijarCambioObligatorio(usuarioId: string, pendiente: boolean, actorId: string): Promise<void>;
 }
 export const REPOSITORIO_DE_CUENTAS = Symbol.for('ncr.puerto.RepositorioDeCuentas');
+
+export type AltaEnBase =
+  | { readonly ok: true; readonly usuarioId: string; readonly numeroDePortero: number | null }
+  /** DUPLICADO: el índice único ganó a un alta simultánea. CUPO y POOL_AGOTADO: H2. */
+  | { readonly ok: false; readonly motivo: 'DUPLICADO' | 'CUPO' | 'POOL_AGOTADO' };
+
+/**
+ * H5 (15-L) · el bloqueo temporal por (IP, identificador). Lo implementa el
+ * módulo de plataforma (con el modo pruebas dentro).
+ */
+export interface ControlDeIntentos {
+  bloqueado(ip: string | null, identificador: string): Promise<boolean>;
+  anotarFallo(ip: string | null, identificador: string, agente: string | null): Promise<void>;
+}
+export const CONTROL_DE_INTENTOS = Symbol.for('ncr.puerto.ControlDeIntentos');
 
 /** Desde dónde se pidió: dirección que llama, la que declara la consola y agente. */
 export interface OrigenDeAcceso {
@@ -155,6 +178,8 @@ export const IGUALADOR_DE_TIEMPO = Symbol.for('ncr.puerto.IgualadorDeTiempo');
 export interface ResumenDeCuenta {
   readonly usuarioId: string;
   readonly usuario: string | null;
+  /** H2 (15-L) · el número del portero; `null` en las demás cuentas. */
+  readonly numeroDePortero: number | null;
   readonly nombre: string;
   readonly telefono: string | null;
   readonly activa: boolean;
@@ -170,6 +195,17 @@ export interface DirectorioDeCuentas {
     copropiedadId: string,
     usuarioId: string,
     datos: { readonly nombre: string; readonly telefono: string | null },
+    actorId: string,
+  ): Promise<boolean>;
+  /**
+   * H2 (15-L) · baja de la cuenta y de sus roles en la copropiedad, SIN borrar
+   * la fila (RN-19): su número de portero queda ocupado para siempre. `false`
+   * si no había cuenta activa que dar de baja.
+   */
+  darDeBaja(
+    copropiedadId: string,
+    usuarioId: string,
+    baja: { readonly motivo: string; readonly en: Date },
     actorId: string,
   ): Promise<boolean>;
 }

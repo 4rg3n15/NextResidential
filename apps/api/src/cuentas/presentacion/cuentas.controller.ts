@@ -1,4 +1,7 @@
 import {
+  HttpException,
+  HttpStatus,
+  Res,
   BadRequestException,
   Body,
   Controller,
@@ -13,7 +16,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -38,6 +41,7 @@ import { ErrorApiDto } from '../../comun/respuestas';
 import { ROLES_ADMINISTRATIVOS } from '../../autenticacion';
 import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
+import { VENTANA_DE_BLOQUEO_MS } from '../../plataforma';
 import { IniciarSesion } from '../aplicacion/iniciar-sesion';
 import type { IdentificadorDeAcceso } from '../aplicacion/iniciar-sesion';
 import { CambiarContrasena } from '../aplicacion/cambiar-contrasena';
@@ -59,7 +63,10 @@ import {
 } from './limites-de-acceso';
 
 /** Texto ÚNICO de un fallo de credenciales: no dice qué parte falló. */
-export const MENSAJE_CREDENCIALES = 'Código o NIT, usuario o contraseña incorrectos';
+export const MENSAJE_CREDENCIALES = 'Usuario, código o contraseña incorrectos';
+/** H5 (15-L) · el bloqueo temporal por (IP, identificador). */
+export const MENSAJE_BLOQUEADO =
+  'Demasiados intentos fallidos desde este equipo. Espere 5 minutos e intente de nuevo';
 
 const identificadorDe = (dto: AccesoDto): IdentificadorDeAcceso => {
   // Nulo = ausente: el cliente Dart generado envía los opcionales como `null`.
@@ -68,7 +75,8 @@ const identificadorDe = (dto: AccesoDto): IdentificadorDeAcceso => {
   if (dto.codigo !== undefined && dto.codigo !== null) {
     return { tipo: 'codigo', codigo: dto.codigo, usuario: dto.usuario ?? '' };
   }
-  return { tipo: 'usuario', nit: dto.nit ?? '', usuario: dto.usuario ?? '' };
+  // H3 (ADR-031) · sin código, el usuario es el número del portero.
+  return { tipo: 'portero', numero: dto.usuario ?? '' };
 };
 
 const origenDe = (peticion: Request): OrigenDeAcceso => {
@@ -108,7 +116,9 @@ export class CuentasController {
   @Publico()
   @LimitadaComoAcceso()
   @Throttle({ default: { limit: LIMITE_POR_DIRECCION, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Inicio de sesión por correo, o por código (o NIT) y usuario' })
+  @ApiOperation({
+    summary: 'Inicio de sesión por correo, por código y usuario, o por número de portero',
+  })
   @ApiOkResponse({ type: SesionDeAccesoDto })
   @ApiUnauthorizedResponse({ type: ErrorApiDto, description: MENSAJE_CREDENCIALES })
   @ApiForbiddenResponse({
@@ -117,12 +127,22 @@ export class CuentasController {
   })
   @ApiTooManyRequestsResponse({
     type: ErrorApiDto,
-    description: '5/min por cuenta, 10/min por origen declarado, 30/min por dirección (S-50)',
+    description:
+      '5/min por (IP, cuenta), 10/min y 30/min por dirección (S-50); y, fuera del modo ' +
+      'pruebas, 5 fallos del mismo identificador desde la misma IP bloquean 5 minutos (H5)',
   })
-  async acceso(@Body() dto: AccesoDto, @Req() peticion: Request): Promise<SesionDeAccesoDto> {
+  async acceso(
+    @Body() dto: AccesoDto,
+    @Req() peticion: Request,
+    @Res({ passthrough: true }) respuesta: Response,
+  ): Promise<SesionDeAccesoDto> {
     const r = await this.iniciar.ejecutar(identificadorDe(dto), dto.contrasena, origenDe(peticion));
     if (!r.ok) {
       if (r.error.motivo === 'CREDENCIALES') throw new UnauthorizedException(MENSAJE_CREDENCIALES);
+      if (r.error.motivo === 'BLOQUEADO') {
+        respuesta.setHeader('Retry-After', String(VENTANA_DE_BLOQUEO_MS / 1000));
+        throw new HttpException(MENSAJE_BLOQUEADO, HttpStatus.TOO_MANY_REQUESTS);
+      }
       if (r.error.motivo === 'SIN_ACCESO') {
         throw new ForbiddenException('La cuenta no tiene un acceso habilitado');
       }

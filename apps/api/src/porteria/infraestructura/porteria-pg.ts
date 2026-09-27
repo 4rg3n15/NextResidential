@@ -1,9 +1,12 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
+import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import type { Franja } from '../dominio/turno';
 import type {
   DatosDeTurno,
   PerfilDePortero,
+  PoolDePorteros,
   RepositorioDePerfiles,
+  RepositorioDePools,
   RepositorioDeTurnos,
   TipoDeTurno,
   TurnoRegistrado,
@@ -16,6 +19,7 @@ interface FilaPerfil {
   porteria: string | null;
   sectores: string[];
   correo_contacto: string | null;
+  documento: string | null;
 }
 const aPerfil = (f: FilaPerfil): PerfilDePortero => ({
   usuarioId: f.usuario_id,
@@ -23,6 +27,7 @@ const aPerfil = (f: FilaPerfil): PerfilDePortero => ({
   porteria: f.porteria,
   sectores: f.sectores,
   correoContacto: f.correo_contacto,
+  documento: f.documento,
 });
 
 /** `perfiles_de_portero`. */
@@ -32,7 +37,8 @@ export class PerfilesPg implements RepositorioDePerfiles {
   async perfilDe(copropiedadId: string, usuarioId: string): Promise<PerfilDePortero | null> {
     return conServicio(this.pool, copropiedadId, null, async (c) => {
       const { rows } = await c.query<FilaPerfil>(
-        `SELECT usuario_id, copropiedad_id, porteria, sectores, correo_contacto::text AS correo_contacto
+        `SELECT usuario_id, copropiedad_id, porteria, sectores, correo_contacto::text AS correo_contacto,
+                documento
            FROM public.perfiles_de_portero WHERE copropiedad_id = $1 AND usuario_id = $2`,
         [copropiedadId, usuarioId],
       );
@@ -43,7 +49,8 @@ export class PerfilesPg implements RepositorioDePerfiles {
   async perfiles(copropiedadId: string): Promise<readonly PerfilDePortero[]> {
     return conServicio(this.pool, copropiedadId, null, async (c) => {
       const { rows } = await c.query<FilaPerfil>(
-        `SELECT usuario_id, copropiedad_id, porteria, sectores, correo_contacto::text AS correo_contacto
+        `SELECT usuario_id, copropiedad_id, porteria, sectores, correo_contacto::text AS correo_contacto,
+                documento
            FROM public.perfiles_de_portero WHERE copropiedad_id = $1 ORDER BY creado_en`,
         [copropiedadId],
       );
@@ -55,13 +62,23 @@ export class PerfilesPg implements RepositorioDePerfiles {
     await conServicio(this.pool, p.copropiedadId, actorId, async (c) => {
       await c.query(
         `INSERT INTO public.perfiles_de_portero
-           (usuario_id, copropiedad_id, porteria, sectores, correo_contacto, creado_por, actualizado_por)
-         VALUES ($1, $2, $3, $4, $5, $6, $6)
+           (usuario_id, copropiedad_id, porteria, sectores, correo_contacto, documento,
+            creado_por, actualizado_por)
+         VALUES ($1, $2, $3, $4, $5, $7, $6, $6)
          ON CONFLICT (usuario_id) DO UPDATE
            SET porteria = EXCLUDED.porteria, sectores = EXCLUDED.sectores,
-               correo_contacto = EXCLUDED.correo_contacto
+               correo_contacto = EXCLUDED.correo_contacto,
+               documento = COALESCE(EXCLUDED.documento, perfiles_de_portero.documento)
          WHERE perfiles_de_portero.copropiedad_id = EXCLUDED.copropiedad_id`,
-        [p.usuarioId, p.copropiedadId, p.porteria, [...p.sectores], p.correoContacto, actorId],
+        [
+          p.usuarioId,
+          p.copropiedadId,
+          p.porteria,
+          [...p.sectores],
+          p.correoContacto,
+          actorId,
+          p.documento ?? null,
+        ],
       );
     });
   }
@@ -204,3 +221,56 @@ export class TurnosPg implements RepositorioDeTurnos {
     });
   }
 }
+
+/**
+ * H1 · H2 (15-L) · el pool de identificadores y su cupo (0042). Es de
+ * plataforma: se lee y se cambia con los claims del superadministrador, y el
+ * cupo sólo lo cambia él (la política de la tabla lo exige).
+ */
+export class PoolsPg implements RepositorioDePools {
+  constructor(private readonly pool: Pool) {}
+
+  async de(copropiedadId: string): Promise<PoolDePorteros | null> {
+    return comoPlataforma(this.pool, ACTOR_INGESTA, async (c) => {
+      const { rows } = await c.query<{
+        inicio: number;
+        fin: number;
+        siguiente: number;
+        cupo: number;
+      }>(
+        `SELECT inicio, fin, siguiente, cupo FROM public.pools_de_porteros WHERE copropiedad_id = $1`,
+        [copropiedadId],
+      );
+      return rows[0] ?? null;
+    });
+  }
+
+  async fijarCupo(copropiedadId: string, cupo: number, actorId: string): Promise<boolean> {
+    return comoPlataforma(this.pool, actorId, async (c) => {
+      const { rowCount } = await c.query(
+        `UPDATE public.pools_de_porteros
+            SET cupo = $2, actualizado_en = now(), actualizado_por = $3
+          WHERE copropiedad_id = $1`,
+        [copropiedadId, cupo, actorId],
+      );
+      return (rowCount ?? 0) > 0;
+    });
+  }
+}
+
+const comoPlataforma = async <T>(
+  pool: Pool,
+  actorId: string,
+  fn: (c: PoolClient) => Promise<T>,
+): Promise<T> => {
+  const c = await pool.connect();
+  try {
+    await c.query("SELECT set_config('request.jwt.claims', $1, false)", [
+      JSON.stringify({ rol: 'superadministrador', usuario_id: actorId, copropiedad_id: null }),
+    ]);
+    return await fn(c);
+  } finally {
+    await c.query("SELECT set_config('request.jwt.claims', '', false)").catch(() => undefined);
+    c.release();
+  }
+};

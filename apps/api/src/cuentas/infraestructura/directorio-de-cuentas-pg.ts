@@ -4,6 +4,7 @@ import type { DirectorioDeCuentas, ResumenDeCuenta } from '../aplicacion/puertos
 interface Fila {
   id: string;
   nombre_usuario: string | null;
+  numero_de_portero: number | null;
   nombre: string;
   telefono: string | null;
   estado: string;
@@ -26,7 +27,7 @@ export class DirectorioDeCuentasPg implements DirectorioDeCuentas {
     if (usuarioIds.length === 0) return [];
     const { rows } = await this.consultar<Fila>(
       null,
-      `SELECT id, nombre_usuario::text AS nombre_usuario, nombre, telefono, estado::text AS estado,
+      `SELECT id, nombre_usuario::text AS nombre_usuario, numero_de_portero, nombre, telefono, estado::text AS estado,
               debe_cambiar_contrasena
          FROM public.usuarios
         WHERE copropiedad_id = $1 AND id = ANY($2::uuid[])`,
@@ -35,6 +36,7 @@ export class DirectorioDeCuentasPg implements DirectorioDeCuentas {
     return rows.map((f) => ({
       usuarioId: f.id,
       usuario: f.nombre_usuario,
+      numeroDePortero: f.numero_de_portero,
       nombre: f.nombre,
       telefono: f.telefono,
       activa: f.estado === 'activo',
@@ -53,6 +55,31 @@ export class DirectorioDeCuentasPg implements DirectorioDeCuentas {
       `UPDATE public.usuarios SET nombre = $3, telefono = $4
         WHERE copropiedad_id = $1 AND id = $2`,
       [copropiedadId, usuarioId, datos.nombre, datos.telefono],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
+  async darDeBaja(
+    copropiedadId: string,
+    usuarioId: string,
+    baja: { readonly motivo: string; readonly en: Date },
+    actorId: string,
+  ): Promise<boolean> {
+    // Una sentencia: la cuenta y sus roles caen juntos o no cae ninguno. Con
+    // el rol inactivo, el gancho de claims ya no emite rol y no vuelve a entrar.
+    const { rowCount } = await this.consultar(
+      actorId,
+      `WITH roles AS (
+         UPDATE public.roles_usuario
+            SET estado = 'inactivo', desactivado_en = $3, desactivado_por = $4,
+                motivo_desactivacion = $5
+          WHERE copropiedad_id = $1 AND usuario_id = $2 AND estado = 'activo'
+       )
+       UPDATE public.usuarios
+          SET estado = 'inactivo', desactivado_en = $3, desactivado_por = $4,
+              motivo_desactivacion = $5
+        WHERE copropiedad_id = $1 AND id = $2 AND estado = 'activo'`,
+      [copropiedadId, usuarioId, baja.en, actorId, baja.motivo],
     );
     return (rowCount ?? 0) > 0;
   }

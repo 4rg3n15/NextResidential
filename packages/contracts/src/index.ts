@@ -143,6 +143,9 @@ export type TurnoDePorteria = Esquemas['TurnoDto'];
 export type TurnoGuardado = Esquemas['TurnoGuardadoDto'];
 export type HechoDeBitacora = Esquemas['HechoDeBitacoraDto'];
 export type TipoDeHechoDeBitacora = HechoDeBitacora['tipo'];
+/** ETAPA 15-L (H, ADR-031) · el pool de números de portero y el modo pruebas. */
+export type PoolDePorteros = Esquemas['PoolDePorterosDto'];
+export type ModoPruebas = Esquemas['ModoPruebasDto'];
 
 /** ETAPA 15-I · residentes: cuentas, plazas de ocupante y vehículos registrados por ellos. */
 export type CuentaDeResidente = Esquemas['CuentaDeResidenteDto'];

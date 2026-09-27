@@ -118,6 +118,9 @@ const SIN_AMBITO_DE_VIVIENDA = new Set([
   'GET /copropiedades/:id/mi/alta',
   'POST /copropiedades/:id/mi/alta',
   'POST /copropiedades/:id/mi/vinculacion',
+  // 15-L (H5) · un interruptor global de la plataforma, de sólo lectura para
+  // el residente: no es de ninguna copropiedad ni de ninguna vivienda.
+  'GET /plataforma/modo-pruebas',
 ]);
 
 /**

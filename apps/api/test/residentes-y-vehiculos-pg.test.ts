@@ -132,8 +132,9 @@ const residenteNuevo = async (n: number): Promise<string> => {
     .set('x-ncr-origen', origen)
     // La forma EXACTA del cliente Dart generado: los opcionales viajan como
     // `null`. Con `!== undefined` en el servidor, esto era un acceso por
-    // «correo: null» y respondía 401 (hallazgo H-15I-04).
-    .send({ correo: null, codigo: CODIGO.toLowerCase(), nit: null, usuario, contrasena: INICIAL });
+    // «correo: null» y respondía 401 (hallazgo H-15I-04). Sin `nit` desde la
+    // 15-L (ADR-031): el cliente regenerado ya no lo lleva.
+    .send({ correo: null, codigo: CODIGO.toLowerCase(), usuario, contrasena: INICIAL });
   expect(primero.status, JSON.stringify(primero.body)).toBe(200);
   expect(primero.body.debeCambiarContrasena).toBe(true);
   // Con el cambio pendiente, ni siquiera el alta: 403 (ADR-023).
@@ -213,11 +214,11 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
     expect(JSON.stringify(inexistente.body)).toContain(MENSAJE_CREDENCIALES);
     expect(sinCorrelacion(deOtra.body)).toEqual(sinCorrelacion(inexistente.body));
     expect(bienEnSuCasa.status).toBe(200);
-    // La consola sigue aceptando el NIT como alternativa (D1).
+    // H3 (15-L, ADR-031) · el NIT ya no es una forma de entrar: ni se admite el campo.
     const porNit = await http()
       .post('/auth/acceso')
       .send({ nit: '900987654', usuario, contrasena: INICIAL });
-    expect(porNit.status).toBe(200);
+    expect(porNit.status).toBe(400);
   });
 
   it('3.2 · primer ingreso: la vivienda sin cuenta se vincula con «no lo tengo»', async () => {

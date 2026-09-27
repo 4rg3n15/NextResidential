@@ -85,6 +85,10 @@ const EXENTAS = new Set([
    */
   '/consentimiento/:token/respuesta',
   '/consentimiento/:token/revocacion',
+  // ETAPA 15-L (H5, ADR-031) · el modo pruebas es un ajuste de TODA la
+  // plataforma: no hay copropiedad que elegir, y sólo lo escribe el
+  // superadministrador (política de la tabla y `@Roles`).
+  '/plataforma/modo-pruebas',
 ]);
 
 const escrituras = (): RutaExpuesta[] =>

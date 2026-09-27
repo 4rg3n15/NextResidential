@@ -127,7 +127,7 @@ Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con 
 
 4. **Consola en el Mac, abierta POR IP**: `pnpm --filter @ncr/web start` (puerto 3100) y, en el navegador, `http://<IP-del-Mac>:3100`. No en Netlify: el SSE y el audio pasan por su servidor (C-37, P-20). Por IP es como la abrirá cualquier otro aparato, y es la única forma de ver lo que verán ellos (D-67 y D-68 sólo aparecían por IP).
    **Una excepción, y es del navegador, no de la consola:** el **audio de la guardia (V2)** necesita el micrófono, y el navegador sólo lo concede en contexto seguro. `http://<IP>` sin TLS no lo es; `http://127.0.0.1:3100` sí. V2 se hace en el propio Mac por `127.0.0.1` ([`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](CONSOLA_EN_RED_Y_DESPLIEGUE.md) §3).
-5. **Acceso** a la consola como superadministrador: código o NIT de la copropiedad, usuario, contraseña y MFA.
+5. **Acceso** a la consola como superadministrador: su correo, su contraseña y MFA.
 6. **Registrar los tres equipos**: Dispositivos → + Agregar equipo (§9), con el usuario de servicio de cada uno. «Probar conexión» descubre modelo, firmware y capacidades (ADR-019). **El equipo aparece en la tabla aunque la ficha lo rechace** (H-SITIO-01, 02): se corrige desde su ficha. Cada ficha muestra, en «Respuesta del equipo», lo que el equipo contestó, saneado.
 
    - **La cámara**: en verde con `ctrlMode=1`, `CRIndex=210`, `detectionUpLoadPicturesType` distinto de «all» y formato XML. Si bloquea por operaciones de barrera no catalogadas (`barrierGateOper=0` NO se da por «no abre»: en la visita abría con 0) o por un disparador ilegible, **pruébelo físicamente** —una placa de la lista blanca del equipo y una desconocida; **ninguna** abre— y regístrelo con «Atestar» como superadministrador (D-11, [ADR-030](../decisiones/ADR-030-atestacion-del-instalador.md)). Queda en **ámbar**, nunca en verde, y sólo para ese firmware. Si alguna abre, es hallazgo de bloqueo (§4.1): pare.
@@ -148,7 +148,7 @@ Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con 
 
    En Perfil, «Llamar a portería» tiene que marcar el número registrado.
 
-10. **El portero de prueba** entra en la consola (por IP) con el código o el NIT, su usuario y su turno.
+10. **El portero de prueba** entra en la consola (por IP) con **su número y su contraseña**, dentro de su turno (ADR-031). Con el modo pruebas activo entra desde cualquier IP; para demostrar la lista blanca, [`ENTREGA_EN_SITIO.md`](ENTREGA_EN_SITIO.md) §3 bis.
 11. **Los 16 escenarios por canal**, con la hoja delante. Orden sugerido:
 
     1. L1–L5 con la visita creada en la app, y otra vez creada en la consola;

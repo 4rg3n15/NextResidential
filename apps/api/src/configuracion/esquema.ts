@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { z } from 'zod';
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 
@@ -96,6 +97,38 @@ export const esquemaConfiguracion = z.object({
 
   /** Lista blanca explícita (§2.7.2). Nunca `*`, nunca `origin: true`. */
   CORS_ALLOWED_ORIGINS: noVacio('CORS_ALLOWED_ORIGINS'),
+
+  /**
+   * H6 (15-L) · de quién se cree la `X-Forwarded-For`. `loopback` por omisión:
+   * la consola corre en la misma máquina y su proxy `/api/ncr` llega por el
+   * bucle local con la IP del navegador. Un balanceador delante de la API se
+   * añade aquí (coma; IP o CIDR). Nunca «todos»: creer a cualquiera deja que
+   * el cliente escriba su propia IP y se salte la lista blanca de porteros.
+   */
+  /**
+   * H5 (15-L) · cuánto SUBEN los límites de peticiones con el modo pruebas
+   * activo. Nunca se apagan (§2.7.5): el superadministrador, el portero y la
+   * consola comparten la IP del Mac en la entrega.
+   */
+  MODO_PRUEBAS_FACTOR_DE_LIMITE: z.coerce.number().int().min(2).max(100).default(10),
+
+  API_PROXIES_DE_CONFIANZA: z
+    .string()
+    .trim()
+    .default('loopback')
+    .refine(
+      (v) =>
+        v
+          .split(',')
+          .map((x) => x.trim())
+          .every((x) => {
+            if (x === 'loopback' || x === 'linklocal' || x === 'uniquelocal') return true;
+            const [ip, prefijo] = x.split('/');
+            if (isIP(ip ?? '') === 0) return false;
+            return prefijo === undefined || /^\d{1,3}$/.test(prefijo);
+          }),
+      'API_PROXIES_DE_CONFIANZA: «loopback» o direcciones/CIDR separados por coma',
+    ),
 
   /**
    * RNF-03.11 · Secreto de firma del Alarm Server. La ingesta de eventos de

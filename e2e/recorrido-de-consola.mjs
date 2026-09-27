@@ -39,8 +39,8 @@
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { createHmac, randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createServer as servidorHttp } from 'node:http';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
@@ -306,6 +306,31 @@ const entornoDePsql = () => ({
   PGUSER: process.env.PGUSER ?? 'postgres',
 });
 
+/** Huella de lo que construye la plantilla: migraciones y semillas, por contenido. */
+const huellaDelEsquema = () => {
+  const h = createHash('sha256');
+  for (const dir of ['supabase/migrations', 'supabase/seed']) {
+    for (const f of readdirSync(resolve(raiz, dir)).sort()) {
+      if (!f.endsWith('.sql')) continue;
+      h.update(f).update(readFileSync(resolve(raiz, dir, f)));
+    }
+  }
+  return `ncr-esquema-${h.digest('hex').slice(0, 32)}`;
+};
+
+/** El número de portero de una cuenta, leído de la copia del recorrido. */
+const numeroDelPortero = (correo) =>
+  spawnSync(
+    'psql',
+    [
+      '-d',
+      BASE,
+      '-Atqc',
+      `SELECT numero_de_portero FROM public.usuarios WHERE lower(correo::text) = lower('${correo.replace(/'/g, "''")}')`,
+    ],
+    { encoding: 'utf8', env: entornoDePsql() },
+  ).stdout.trim();
+
 const prepararBase = () => {
   // La plantilla se migra y siembra UNA vez; cada recorrido parte de una copia
   // recién hecha, así que ni hereda lo que dejó el anterior ni ensucia la base
@@ -315,11 +340,20 @@ const prepararBase = () => {
       encoding: 'utf8',
       env: entornoDePsql(),
     });
-  const existe = psql(`SELECT 1 FROM pg_database WHERE datname = '${BASE_PLANTILLA}'`);
+  /**
+   * 15-L · la plantilla lleva la HUELLA de las migraciones y semillas con que
+   * se hizo, y se rehace si cambian. Antes bastaba con que existiera: con una
+   * migración nueva (la 0042), el recorrido corría contra un esquema viejo y
+   * fallaba por algo que no era la consola.
+   */
+  const huella = huellaDelEsquema();
+  const existe = psql(
+    `SELECT coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database WHERE datname = '${BASE_PLANTILLA}'`,
+  );
   if (existe.status !== 0) {
     throw new Error(`psql no alcanza la base de pruebas: ${existe.stderr.trim()}`);
   }
-  if (existe.stdout.trim() !== '1' || process.env.NCR_RECREAR_PLANTILLA === '1') {
+  if (existe.stdout.trim() !== huella || process.env.NCR_RECREAR_PLANTILLA === '1') {
     const r = spawnSync('bash', ['supabase/verificar.sh', '--con-semillas', '--modo-supabase'], {
       cwd: raiz,
       encoding: 'utf8',
@@ -328,6 +362,9 @@ const prepararBase = () => {
     writeFileSync('/tmp/ncr-recorrido-base.log', `${r.stdout}${r.stderr}`);
     if (r.status !== 0)
       throw new Error('no se pudo migrar la base (ver /tmp/ncr-recorrido-base.log)');
+    const marca = psql(`COMMENT ON DATABASE ${BASE_PLANTILLA} IS '${huella}'`);
+    if (marca.status !== 0)
+      throw new Error(`no se pudo marcar la plantilla: ${marca.stderr.trim()}`);
   }
   // Dos órdenes separadas: `psql -c` con varias sentencias las mete en UNA
   // transacción, y ni DROP ni CREATE DATABASE se admiten dentro de una.
@@ -408,7 +445,9 @@ const arrancarConsola = (doble, puertoApi, puertoWeb) => {
       throw new Error('no compila la consola (ver /tmp/ncr-recorrido-build-web.log)');
     }
   }
-  return lanzar('node', [binDeNext, 'start', '-H', '127.0.0.1', '-p', String(puertoWeb)], {
+  // 15-L (H6) · el servidor de PRODUCCIÓN de la consola, que fija la IP del
+  // navegador en `X-Forwarded-For`; `next start` a secas se la dejaría poner a él.
+  return lanzar('node', ['servidor.mjs', '-H', '127.0.0.1', '-p', String(puertoWeb)], {
     cwd,
     env: entorno,
     detached: true,
@@ -642,7 +681,9 @@ const arrarcarDoble = (lectura) =>
 
 /** Ficha: diagnóstico, corrección del modo de control y nuevo diagnóstico. */
 const diagnosticarYCorregir = async (pagina, camara) => {
-  await filaDe(pagina, camara).getByRole('button', { name: 'Ficha' }).click();
+  // C3 (15-L) · el botón que abre la ficha se llama «Probar conexión»: la ficha
+  // SONDEA el equipo. El recorrido buscaba «Ficha» y se quedó esperando.
+  await filaDe(pagina, camara).getByRole('button', { name: 'Probar conexión' }).click();
   const dialogo = pagina.getByRole('dialog', { name: new RegExp(`Ficha de ${camara}`) });
   const hallazgo = dialogo.locator('li', { hasText: 'quién decide · modo de control' }).first();
   await hallazgo.waitFor({ timeout: 30_000 });
@@ -912,7 +953,15 @@ const recorridoDelPortero = async (navegador, base) => {
   paso('12 · portero: entra en su turno y abre con motivo');
   await bloque('acceso del portero', async () => {
     await pagina.goto(`${base}/acceso`, { waitUntil: 'networkidle' });
-    await pagina.fill('input[name="correo"]', PORTERO.correo);
+    // H3 (15-L, ADR-031) · el portero entra con su NÚMERO: la 0042 se lo dio al
+    // sembrado, que era una cuenta por correo. Sin código ni NIT.
+    const numero = numeroDelPortero(PORTERO.correo);
+    afirmar(/^\d{4,}$/.test(numero), `el portero sembrado tiene número (${numero || 'ninguno'})`);
+    await pagina.fill('input[name="correo"]', numero);
+    afirmar(
+      (await pagina.locator('input[name="copropiedad"]').count()) === 0,
+      'con un número, la consola no pide el código de la copropiedad',
+    );
     await pagina.fill('input[name="contrasena"]', PORTERO.contrasena);
     await pagina.click('button[type="submit"]');
     await pagina.waitForURL((u) => !u.pathname.startsWith('/acceso'), { timeout: 30_000 });

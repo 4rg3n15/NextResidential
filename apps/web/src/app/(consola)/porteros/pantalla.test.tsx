@@ -26,7 +26,8 @@ const TURNO: TurnoDePorteria = {
 const PORTEROS: Portero[] = [
   {
     usuarioId: TURNO.porteroId,
-    usuario: 'porteria.norte',
+    numero: 1001,
+    documento: 'CC-1001',
     nombre: 'Ana Garita',
     telefono: null,
     correoContacto: null,
@@ -43,7 +44,8 @@ const PORTEROS: Portero[] = [
   },
   {
     usuarioId: '60000000-0000-4000-8000-000000000002',
-    usuario: 'relevo',
+    numero: 1002,
+    documento: null,
     nombre: 'Luis Relevo',
     telefono: null,
     correoContacto: null,
@@ -84,6 +86,9 @@ beforeEach(() => {
     'fetch',
     vi.fn(async (peticion: Request) => {
       const url = peticion.url;
+      if (url.includes('/porteros/pool')) {
+        return json({ inicio: 1001, fin: 1999, siguiente: 1003, cupo: 999, activos: 2 });
+      }
       if (url.includes('/porteros')) return json({ porteros: PORTEROS });
       if (url.includes('/turnos')) return json({ turnos: [TURNO] });
       if (url.includes('/porteria/bitacora')) return json({ hechos: HECHOS });
@@ -109,6 +114,18 @@ describe('panel de supervisión de portería (B4)', () => {
     expect(within(tabla).getByText(/De turno hasta/)).toBeTruthy();
     expect(within(tabla).getByText(/Patrullando desde/)).toBeTruthy();
     expect(within(tabla).getByText('Cambio de contraseña pendiente')).toBeTruthy();
+  });
+
+  it('H2 · cada portero con su NÚMERO y su documento; y el pool con el siguiente y el cupo', async () => {
+    render(<PantallaDePorteros copropiedadId={COP} />, { wrapper: Envoltura });
+    const tabla = await screen.findByRole('table', { name: /Porteros de la copropiedad/ });
+    await waitFor(() => expect(within(tabla).getByText('N.º 1001 · Doc. CC-1001')).toBeTruthy());
+    expect(within(tabla).getByText('N.º 1002')).toBeTruthy();
+    expect(
+      await screen.findByText(/Del 1001 al 1999\. El próximo portero recibirá el 1003\./),
+    ).toBeTruthy();
+    expect(screen.getByText(/2 activos de un cupo de 999/)).toBeTruthy();
+    expect(within(tabla).getAllByRole('button', { name: 'Dar de baja' })).toHaveLength(2);
   });
 
   it('el calendario pinta el turno extra que cruza la medianoche', async () => {

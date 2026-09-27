@@ -13,7 +13,8 @@ part 'portero_dto.g.dart';
 class PorteroDto {
   const PorteroDto({
     required this.usuarioId,
-    required this.usuario,
+    required this.numero,
+    required this.documento,
     required this.nombre,
     required this.telefono,
     required this.correoContacto,
@@ -27,7 +28,10 @@ class PorteroDto {
   factory PorteroDto.fromJson(Map<String, Object?> json) => _$PorteroDtoFromJson(json);
   
   final String usuarioId;
-  final String? usuario;
+
+  /// H2 (ADR-031) · el número con el que entra el portero
+  final num? numero;
+  final String? documento;
   final String nombre;
   final String? telefono;
   final String? correoContacto;
