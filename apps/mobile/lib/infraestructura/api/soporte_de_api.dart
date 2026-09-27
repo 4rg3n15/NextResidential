@@ -80,15 +80,27 @@ Fallo falloDeDio(DioException e) {
 String? detalleDeError(dynamic datos) {
   if (datos is Map) {
     final mensaje = datos['mensaje'] ?? datos['message'];
-    if (mensaje is String) return mensaje;
+    if (mensaje is String) return sinCodigosDelProyecto(mensaje);
     if (mensaje is Map) {
       final interno = mensaje['message'];
-      if (interno is String) return interno;
-      if (interno is List && interno.isNotEmpty) return interno.join(', ');
+      if (interno is String) return sinCodigosDelProyecto(interno);
+      if (interno is List && interno.isNotEmpty) {
+        return interno.map((m) => sinCodigosDelProyecto('$m')).join(', ');
+      }
     }
   }
   return null;
 }
+
+const _codigo = r'(?:RN|KPI|KP1|CA|HU|CU|OE|D|P|S|C|E|H-SITIO|BE)-?\d{1,3}[a-z]?';
+final _codigosEntreParentesis = RegExp(r'\s*\((?:\s*' + _codigo + r'\s*,?)+\)');
+final _codigoDeEntrada = RegExp(r'^\s*' + _codigo + r'\s*·\s*');
+
+/// Bloque I (15-L) · la API explica sus rechazos citando la regla que los
+/// produce —«Dele de baja en vez de borrarla (RN-19)», «D-11 · …»—: útil en su
+/// registro, ajeno a quien usa la app. Se quita la cita; el mensaje queda.
+String sinCodigosDelProyecto(String texto) =>
+    texto.replaceAll(_codigosEntreParentesis, '').replaceFirst(_codigoDeEntrada, '').trim();
 
 /// La copropiedad de la ruta sale de los claims de la sesión.
 ///
