@@ -7177,6 +7177,15 @@
             "type": "boolean",
             "default": false
           },
+          "canalDeVideo": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{2,3}$",
+            "example": "102"
+          },
+          "zonaId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "probarConexion": {
             "type": "boolean",
             "default": true
@@ -8995,6 +9004,15 @@
             "type": "boolean",
             "default": false
           },
+          "canalDeVideo": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{2,3}$",
+            "example": "102"
+          },
+          "zonaId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "probarConexion": {
             "type": "boolean",
             "default": true
@@ -9307,6 +9325,16 @@
           "canalDeAudioHabilitado": {
             "type": "boolean"
           },
+          "canalDeVideo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Flujo de video; `null` = 102"
+          },
+          "zonaId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
           "capacidades": {
             "nullable": true,
             "allOf": [
@@ -9360,6 +9388,8 @@
           "fabricante",
           "modoDeTerminal",
           "canalDeAudioHabilitado",
+          "canalDeVideo",
+          "zonaId",
           "capacidades",
           "verificacion",
           "verificadoEn",

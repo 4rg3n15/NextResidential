@@ -267,6 +267,11 @@ export const esquemaConfiguracion = z.object({
    * prudente de la práctica, y se cambian aquí si el equipo declara otros.
    */
   EQUIPOS_FOTO_KB_MAXIMOS: z.coerce.number().int().min(16).max(2048).default(200),
+  /**
+   * D2 (15-L) · puerto RTSP de los equipos. 554 es el de fábrica; si en sitio
+   * lo cambiaron, se dice aquí y no en el código.
+   */
+  VIDEO_PUERTO_RTSP: z.coerce.number().int().min(1).max(65535).default(554),
   EQUIPOS_FOTO_LADO_MAXIMO: z.coerce.number().int().min(160).max(4096).default(1024),
 
   /**

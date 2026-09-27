@@ -64,6 +64,8 @@ export const FichaDialogo = ({
       );
       // La verificación y las capacidades acaban de cambiar en el inventario.
       await clientes.invalidateQueries({ queryKey: ['dispositivos', copropiedadId] });
+      // C1 (15-L) · la tabla de Dispositivos sale del tablero: también se refresca.
+      await clientes.invalidateQueries({ queryKey: ['tablero', copropiedadId, 'dispositivos'] });
     } catch (e) {
       setSondeo(null);
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo sondear el equipo');

@@ -82,6 +82,8 @@ export const DialogoDeAtestacion = ({
         }),
       );
       await clientes.invalidateQueries({ queryKey: ['dispositivos', copropiedadId] });
+      // C1 (15-L) · la tabla de Dispositivos sale del tablero: también se refresca.
+      await clientes.invalidateQueries({ queryKey: ['tablero', copropiedadId, 'dispositivos'] });
       alAtestar(
         `${equipo.nombre}: atestación registrada para el firmware ${r.firmware}. Se operará en ` +
           'ámbar: la API sigue sin confirmar que no decida sola.',

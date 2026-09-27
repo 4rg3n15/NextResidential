@@ -76,4 +76,11 @@ export type ProveedorDeEquipos = AccessPointProvider &
      * simulado no lo implementa.
      */
     decideSolo?(dispositivoId: string): Promise<boolean | null>;
+    /**
+     * C1 (15-L) · olvida todo lo que el proceso recuerda de un equipo
+     * —clientes con su dirección y credencial, capacidades, puerta, veredicto
+     * de control— y cierra su escucha. Tras editar un equipo, la siguiente
+     * orden y la siguiente escucha usan lo guardado, sin reiniciar la API.
+     */
+    olvidar?(dispositivoId: string): void;
   };

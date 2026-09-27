@@ -66,6 +66,8 @@ export interface ConfiguracionDeProveedor {
   readonly persona?: AjustesDePersona;
   /** A2 (15-L) · peso y lado máximos de la foto que se sube (del `.env`). */
   readonly limitesDeFoto?: LimitesDeFoto;
+  /** D2 (15-L) · puerto RTSP de los equipos (del `.env`). */
+  readonly puertoRtsp?: number;
   /** Semilla del simulado: la adversidad tiene que ser reproducible. */
   readonly semilla?: number;
   readonly dispositivosSimulados?: readonly string[];
@@ -181,6 +183,7 @@ registrarAdaptador({
       ...(configuracion.limitesDeFoto === undefined
         ? {}
         : { limitesDeFoto: configuracion.limitesDeFoto }),
+      ...(configuracion.puertoRtsp === undefined ? {} : { puertoRtsp: configuracion.puertoRtsp }),
     }),
 });
 

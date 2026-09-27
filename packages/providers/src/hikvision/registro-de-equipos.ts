@@ -46,6 +46,11 @@ export interface EquipoRegistrado {
   readonly numeroDePuerta?: number | null;
   readonly canalDeAudio?: number | null;
   /**
+   * C2/D2 (15-L) · el flujo de video, canal×100+flujo de la guía (101 el
+   * principal del canal 1, 102 su subflujo). Ausente o `null` = 102.
+   */
+  readonly canalDeVideo?: string | null;
+  /**
    * Se **declara**, no se deduce: es la decisión arquitectónica más importante
    * del recorrido facial y esconderla dentro de una rama la haría invisible.
    */

@@ -6,6 +6,7 @@ import type { Firmante } from './utilidades';
 import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
 import { SondaPorProveedor } from '../src/equipos/infraestructura/sonda-por-proveedor';
+import { OLVIDO_DE_EQUIPO } from '../src/equipos/aplicacion/puertos';
 import { capacidadesDescubiertas, equiposSimulados } from '@ncr/providers';
 
 /**
@@ -771,5 +772,46 @@ describe('D-11 · atestación del instalador sobre una cámara', () => {
       .send({ ...ALTA, nombre: 'Terminal', tipo: 'terminal_facial' })
       .expect(201);
     await atestar(a, superadmin, terminal.body.id as string).expect(400);
+  });
+});
+
+describe('C1 (15-L) · editar, dar de baja y reactivar hacen OLVIDAR al proceso lo que recordaba', () => {
+  it('cada cambio pide olvidar ESE equipo; el alta no (no había nada que olvidar)', async () => {
+    const olvidados: string[] = [];
+    const firmante = await crearFirmante();
+    const repo = new RepositorioDeEquiposEnMemoria();
+    app = await crearApp(
+      firmante,
+      (m) =>
+        m
+          .overrideProvider(OLVIDO_DE_EQUIPO)
+          .useValue({ olvidar: (id: string) => void olvidados.push(id) }),
+      undefined,
+      { repositorio: repo, sonda: { probar: async () => ALCANZADO } },
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const http = () => request(app.getHttpServer());
+    const creado = await http()
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(ALTA);
+    const id = creado.body.id as string;
+    expect(olvidados).toEqual([]);
+
+    await http()
+      .put(`/copropiedades/${COP_B}/equipos/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ host: '203.0.113.11' })
+      .expect(200);
+    await http()
+      .post(`/copropiedades/${COP_B}/equipos/${id}/baja`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ motivo: 'se retiró para mantenimiento' })
+      .expect(201);
+    await http()
+      .post(`/copropiedades/${COP_B}/equipos/${id}/reactivacion`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201);
+    expect(olvidados).toEqual([id, id, id]);
   });
 });

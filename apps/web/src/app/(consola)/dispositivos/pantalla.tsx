@@ -216,6 +216,8 @@ export const PantallaDeDispositivos = ({
       );
       setAviso(r.detalle);
       await clientes.invalidateQueries({ queryKey: ['dispositivos', copropiedadId] });
+      // C1 (15-L) · la tabla de Dispositivos sale del tablero: también se refresca.
+      await clientes.invalidateQueries({ queryKey: ['tablero', copropiedadId, 'dispositivos'] });
     } catch (e) {
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo enviar la orden');
     } finally {

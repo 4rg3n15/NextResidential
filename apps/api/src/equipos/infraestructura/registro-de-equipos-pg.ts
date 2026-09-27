@@ -59,6 +59,7 @@ interface FilaDeRegistro {
   readonly canal_de_audio: number | null;
   readonly modo_de_terminal: 'reporta_y_espera' | 'decide_el_equipo' | null;
   readonly canal_de_audio_habilitado: boolean;
+  readonly canal_de_video: string | null;
   readonly capacidades: unknown;
   /** D-11 · el firmware de la atestación más reciente, si la hay. */
   readonly firmware_atestado: string | null;
@@ -100,6 +101,7 @@ export class RegistroDeEquiposPg implements RegistroDeEquipos {
       canalDeAudio: fila.canal_de_audio,
       ...(fila.modo_de_terminal === null ? {} : { modoDeTerminal: fila.modo_de_terminal }),
       canalDeAudioHabilitado: fila.canal_de_audio_habilitado,
+      canalDeVideo: fila.canal_de_video,
       fabricante: fila.fabricante,
       modelo: fila.modelo,
       ...(fila.capacidades === null ? {} : { capacidades: capacidadesDesdeJson(fila.capacidades) }),
@@ -132,7 +134,7 @@ export class RegistroDeEquiposPg implements RegistroDeEquipos {
         `SELECT d.id, d.copropiedad_id, d.tipo::text AS tipo, d.host, d.puerto,
                 d.protocolo::text AS protocolo, d.usuario, d.modelo, d.fabricante,
                 d.canal_barrera, d.numero_de_puerta, d.canal_de_audio, d.modo_de_terminal,
-                d.canal_de_audio_habilitado, d.capacidades,
+                d.canal_de_audio_habilitado, d.canal_de_video, d.capacidades,
                 (SELECT a.firmware FROM public.atestaciones_de_equipo a
                   WHERE a.copropiedad_id = d.copropiedad_id AND a.dispositivo_id = d.id
                   ORDER BY a.registrada_en DESC LIMIT 1) AS firmware_atestado

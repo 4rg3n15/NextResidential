@@ -27,6 +27,8 @@ class EquipoDto {
     required this.fabricante,
     required this.modoDeTerminal,
     required this.canalDeAudioHabilitado,
+    required this.canalDeVideo,
+    required this.zonaId,
     required this.capacidades,
     required this.verificacion,
     required this.verificadoEn,
@@ -48,6 +50,10 @@ class EquipoDto {
   final String? fabricante;
   final EquipoDtoModoDeTerminal? modoDeTerminal;
   final bool canalDeAudioHabilitado;
+
+  /// Flujo de video; `null` = 102
+  final String? canalDeVideo;
+  final String? zonaId;
   final CapacidadesDeEquipoDto? capacidades;
   final EquipoDtoVerificacion verificacion;
   final String? verificadoEn;

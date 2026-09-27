@@ -24,6 +24,8 @@ class AltaDeEquipoDto {
     this.canalDeAudio,
     this.fabricante,
     this.modoDeTerminal,
+    this.canalDeVideo,
+    this.zonaId,
     this.protocolo = AltaDeEquipoDtoProtocolo.http,
     this.canalDeAudioHabilitado = false,
     this.probarConexion = true,
@@ -44,6 +46,8 @@ class AltaDeEquipoDto {
   final String? fabricante;
   final AltaDeEquipoDtoModoDeTerminal? modoDeTerminal;
   final bool canalDeAudioHabilitado;
+  final String? canalDeVideo;
+  final String? zonaId;
   final bool probarConexion;
 
   Map<String, Object?> toJson() => _$AltaDeEquipoDtoToJson(this);

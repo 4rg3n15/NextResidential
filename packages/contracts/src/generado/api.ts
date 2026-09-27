@@ -2135,6 +2135,10 @@ export interface components {
             modoDeTerminal?: "reporta_y_espera" | "decide_el_equipo";
             /** @default false */
             canalDeAudioHabilitado: boolean;
+            /** @example 102 */
+            canalDeVideo?: string;
+            /** Format: uuid */
+            zonaId?: string;
             /** @default true */
             probarConexion: boolean;
         };
@@ -2740,6 +2744,10 @@ export interface components {
             modoDeTerminal?: "reporta_y_espera" | "decide_el_equipo";
             /** @default false */
             canalDeAudioHabilitado: boolean;
+            /** @example 102 */
+            canalDeVideo?: string;
+            /** Format: uuid */
+            zonaId?: string;
             /** @default true */
             probarConexion: boolean;
         };
@@ -2835,6 +2843,10 @@ export interface components {
             /** @enum {string|null} */
             modoDeTerminal: "reporta_y_espera" | "decide_el_equipo" | null;
             canalDeAudioHabilitado: boolean;
+            /** @description Flujo de video; `null` = 102 */
+            canalDeVideo: string | null;
+            /** Format: uuid */
+            zonaId: string | null;
             capacidades: components["schemas"]["CapacidadesDeEquipoDto"] | null;
             /** @enum {string} */
             verificacion: "no_verificado" | "verificado" | "rechazado";

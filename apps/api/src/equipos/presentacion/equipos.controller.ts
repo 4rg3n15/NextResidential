@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Inject,
@@ -18,6 +19,7 @@ import { Aislamiento } from '../../multiempresa/aislamiento';
 import { vigenciaDeAtestacion } from '@ncr/domain-core';
 import {
   CORRECTOR_DE_EQUIPO,
+  OLVIDO_DE_EQUIPO,
   REPOSITORIO_DE_ATESTACIONES,
   REPOSITORIO_DE_EQUIPOS,
   SIN_PROBAR,
@@ -28,6 +30,7 @@ import type {
   AtestacionDelInstalador,
   CorrectorDeEquipo,
   DatosDeEquipo,
+  OlvidoDeEquipo,
   RepositorioDeAtestaciones,
   RepositorioDeEquipos,
   ResultadoDeSondeo,
@@ -129,6 +132,18 @@ const aCapacidades = (c: CapacidadesDeEquipo): CapacidadesDeEquipoDto => ({
   estadoDeBarrera: c.estadoDeBarrera,
 });
 
+/**
+ * C2 (15-L) · la zona es de la copropiedad por clave ajena compuesta: una de
+ * otra copropiedad, o que no existe, la rechaza la base (23503). Se dice así, y
+ * con 400, en vez de un 500 que no explica nada.
+ */
+const zonaAjena = (error: unknown): never => {
+  if ((error as { code?: unknown } | null)?.code === '23503') {
+    throw new BadRequestException('La zona no existe en esta copropiedad');
+  }
+  throw error;
+};
+
 @ApiTags('equipos')
 @ApiBearerAuth()
 @Controller('copropiedades/:id/equipos')
@@ -139,6 +154,7 @@ export class EquiposController {
     @Inject(CORRECTOR_DE_EQUIPO) private readonly corrector: CorrectorDeEquipo,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
     @Inject(REPOSITORIO_DE_ATESTACIONES) private readonly atestaciones: RepositorioDeAtestaciones,
+    @Inject(OLVIDO_DE_EQUIPO) private readonly olvido: OlvidoDeEquipo,
   ) {}
 
   /** D-11 · los equipos con su atestación más reciente, en una sola consulta. */
@@ -178,6 +194,8 @@ export class EquiposController {
       fabricante: e.fabricante,
       modoDeTerminal: e.modoDeTerminal,
       canalDeAudioHabilitado: e.canalDeAudioHabilitado,
+      canalDeVideo: e.canalDeVideo,
+      zonaId: e.zonaId,
       capacidades: e.capacidades === null ? null : aCapacidades(e.capacidades),
       verificacion: e.verificacion,
       verificadoEn: e.verificadoEn,
@@ -218,6 +236,12 @@ export class EquiposController {
         ? {}
         : { modoDeTerminal: dto.modoDeTerminal ?? actual.modoDeTerminal }),
       canalDeAudioHabilitado: dto.canalDeAudioHabilitado ?? actual.canalDeAudioHabilitado,
+      ...((dto.canalDeVideo ?? actual.canalDeVideo ?? undefined) === undefined
+        ? {}
+        : { canalDeVideo: dto.canalDeVideo ?? actual.canalDeVideo }),
+      ...((dto.zonaId ?? actual.zonaId ?? undefined) === undefined
+        ? {}
+        : { zonaId: dto.zonaId ?? actual.zonaId }),
       ...(dto.probarConexion === undefined ? {} : { probarConexion: dto.probarConexion }),
     });
     return fusion;
@@ -238,6 +262,8 @@ export class EquiposController {
       fabricante: dto.fabricante ?? null,
       modoDeTerminal: dto.modoDeTerminal ?? null,
       canalDeAudioHabilitado: dto.canalDeAudioHabilitado ?? false,
+      canalDeVideo: dto.canalDeVideo ?? null,
+      zonaId: dto.zonaId ?? null,
     };
   }
 
@@ -334,7 +360,9 @@ export class EquiposController {
   ): Promise<EquipoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/alta');
     const veredicto = await this.sondear(dto);
-    const equipo = await this.repo.crear(ctx, copropiedadId, this.altaDesdeDto(dto), veredicto);
+    const equipo = await this.repo
+      .crear(ctx, copropiedadId, this.altaDesdeDto(dto), veredicto)
+      .catch(zonaAjena);
     return this.aDtoCompleto(ctx, copropiedadId, equipo);
   }
 
@@ -358,14 +386,11 @@ export class EquiposController {
         ? await this.repo.credencialPara(ctx, copropiedadId, equipoId)
         : null,
     );
-    const equipo = await this.repo.editar(
-      ctx,
-      copropiedadId,
-      equipoId,
-      this.altaDesdeDto(completo),
-      veredicto,
-    );
+    const equipo = await this.repo
+      .editar(ctx, copropiedadId, equipoId, this.altaDesdeDto(completo), veredicto)
+      .catch(zonaAjena);
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
+    this.olvido.olvidar(equipoId);
     return this.aDtoCompleto(ctx, copropiedadId, equipo);
   }
 
@@ -413,6 +438,8 @@ export class EquiposController {
       modoDeTerminal: equipo.modoDeTerminal,
     });
     await this.repo.registrarSondeo(ctx, copropiedadId, equipoId, veredicto);
+    // C1 (15-L) · capacidades nuevas en la base: el proceso deja las viejas.
+    this.olvido.olvidar(equipoId);
     return this.aResultado(veredicto);
   }
 
@@ -475,6 +502,8 @@ export class EquiposController {
       `${equipo.nombre} · ${dto.correccion}: ${resultado.valorAnterior ?? '(sin valor)'} → ` +
         `${resultado.valorNuevo ?? '(sin cambio)'} · ${dto.motivo}`,
     );
+    // C1 (15-L) · el equipo cambió de configuración: lo recordado ya no vale.
+    this.olvido.olvidar(equipoId);
 
     return { ...resultado };
   }
@@ -492,6 +521,7 @@ export class EquiposController {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/baja');
     const equipo = await this.repo.desactivar(ctx, copropiedadId, equipoId, dto.motivo);
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
+    this.olvido.olvidar(equipoId);
     return this.aDtoCompleto(ctx, copropiedadId, equipo);
   }
 
@@ -507,6 +537,7 @@ export class EquiposController {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/reactivacion');
     const equipo = await this.repo.reactivar(ctx, copropiedadId, equipoId);
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
+    this.olvido.olvidar(equipoId);
     return this.aDtoCompleto(ctx, copropiedadId, equipo);
   }
 }

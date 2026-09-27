@@ -172,6 +172,8 @@ export class ProveedoresModule {
                 bytesMaximos: configuracion.EQUIPOS_FOTO_KB_MAXIMOS * 1024,
                 ladoMaximo: configuracion.EQUIPOS_FOTO_LADO_MAXIMO,
               },
+              // D2 (15-L) · el puerto RTSP, del `.env`.
+              puertoRtsp: configuracion.VIDEO_PUERTO_RTSP,
               ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
             });

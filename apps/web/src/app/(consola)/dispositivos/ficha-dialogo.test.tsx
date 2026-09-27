@@ -29,6 +29,8 @@ const TERMINAL: Equipo = {
   verificadoEn: null,
   motivoNoVerificado: null,
   estado: 'activo',
+  canalDeVideo: null,
+  zonaId: null,
   atestacion: null,
 };
 

@@ -10,8 +10,12 @@ import {
   CORRECTOR_DE_EQUIPO,
   EQUIPOS_QUE_EMITEN,
   REPOSITORIO_DE_EQUIPOS,
+  OLVIDO_DE_EQUIPO,
   SONDA_DE_EQUIPO,
 } from './aplicacion/puertos';
+import type { OlvidoDeEquipo } from './aplicacion/puertos';
+import { PROVEEDOR_DE_EQUIPOS } from '../proveedores';
+import type { ProveedorDeEquipos } from '@ncr/providers';
 import type { RepositorioDeAtestaciones, RepositorioDeEquipos } from './aplicacion/puertos';
 import { REPOSITORIO_DE_ATESTACIONES } from './aplicacion/puertos';
 import { RegistrarAtestacionDelInstalador } from './aplicacion/atestacion-del-instalador';
@@ -48,6 +52,14 @@ export class EquiposModule {
       module: EquiposModule,
       controllers: [EquiposController, AtestacionesController],
       providers: [
+        {
+          // C1 (15-L) · el proveedor olvida lo que recordaba de un equipo editado.
+          provide: OLVIDO_DE_EQUIPO,
+          inject: [PROVEEDOR_DE_EQUIPOS],
+          useFactory: (proveedor: ProveedorDeEquipos): OlvidoDeEquipo => ({
+            olvidar: (dispositivoId) => proveedor.olvidar?.(dispositivoId),
+          }),
+        },
         {
           provide: SONDA_DE_EQUIPO,
           inject: [BITACORA],

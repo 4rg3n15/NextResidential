@@ -65,6 +65,10 @@ export interface AltaDeEquipo {
   readonly modoDeTerminal?: ModoDeTerminalDeclarado | null;
   /** Si una persona habilitó el canal de audio EN EL APARATO (ADR-01). */
   readonly canalDeAudioHabilitado?: boolean;
+  /** C2/D2 (15-L) · el flujo de video, canal×100+flujo. `null` = 102. */
+  readonly canalDeVideo?: string | null;
+  /** C2 (15-L) · la zona de la copropiedad donde está el equipo. */
+  readonly zonaId?: string | null;
 }
 
 /** Lo que la consola RECIBE. Sin secreto, por construcción. */
@@ -84,6 +88,8 @@ export interface DatosDeEquipo {
   readonly canalDeAudio: number | null;
   readonly modoDeTerminal: ModoDeTerminalDeclarado | null;
   readonly canalDeAudioHabilitado: boolean;
+  readonly canalDeVideo: string | null;
+  readonly zonaId: string | null;
   /**
    * Lo que el equipo declara poder hacer, descubierto al sondearlo y
    * PERSISTIDO: es lo que el proveedor mira antes de pedirle algo (O2). `null`
@@ -343,3 +349,14 @@ export interface RepositorioDeAtestaciones {
     copropiedadId: string,
   ): Promise<ReadonlyMap<string, AtestacionDelInstalador>>;
 }
+
+/**
+ * C1 (15-L) · tras editar, dar de baja, reactivar, corregir o volver a sondear
+ * un equipo, el proceso OLVIDA lo que recordaba de él (clientes con su
+ * dirección y credencial, capacidades, escucha). Sin esto, una edición en la
+ * consola no llegaba al equipo hasta reiniciar la API.
+ */
+export interface OlvidoDeEquipo {
+  olvidar(dispositivoId: string): void;
+}
+export const OLVIDO_DE_EQUIPO = Symbol.for('ncr.equipos.OlvidoDeEquipo');

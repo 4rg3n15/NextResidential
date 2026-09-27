@@ -113,6 +113,8 @@ export interface OpcionesDeHikvision {
    */
   readonly persona?: AjustesDePersona;
   readonly limitesDeFoto?: LimitesDeFoto;
+  /** D2 (15-L) · puerto RTSP de los equipos (`VIDEO_PUERTO_RTSP`). 554 por omisión. */
+  readonly puertoRtsp?: number;
 }
 
 const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
@@ -153,6 +155,27 @@ export class HikvisionProvider
   /** La fuente de placas, para que el receptor publique en ella. */
   get fuenteDePlacas(): FuenteDePlacas {
     return this.fuente;
+  }
+
+  /**
+   * C1 (15-L) · lo recordado de un equipo, fuera. Los clientes guardan la
+   * dirección, la credencial y la puerta con que se crearon: sin esto, una
+   * edición en la consola no llegaba al equipo hasta reiniciar la API. La
+   * escucha se cierra y quien la vigila (la API, cada 30 s) la reabre ya con
+   * lo nuevo.
+   */
+  olvidar(dispositivoId: string): void {
+    this.aprobados.delete(dispositivoId);
+    this.veredictosDeControl.delete(dispositivoId);
+    this.capacidades.delete(dispositivoId);
+    this.puertas.delete(dispositivoId);
+    this.terminales.delete(dispositivoId);
+    this.intercomos.delete(dispositivoId);
+    this.escuchas.get(dispositivoId)?.detener();
+    this.escuchas.delete(dispositivoId);
+    this.opciones.traza?.registrar('info', 'equipo olvidado tras un cambio en su ficha', {
+      dispositivoId,
+    });
   }
 
   // ── Capacidades ──────────────────────────────────────────────────────────
@@ -322,7 +345,7 @@ export class HikvisionProvider
    */
   async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
     const equipo = await this.resolver(dispositivoId);
-    return origenRtspDe(equipo);
+    return origenRtspDe(equipo, this.opciones.puertoRtsp);
   }
 
   // ── Escucha de lo que el equipo emite (A4) ───────────────────────────────

@@ -6,6 +6,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Matches,
   Max,
@@ -112,6 +113,23 @@ export class AltaDeEquipoDto {
   canalDeAudioHabilitado?: boolean;
 
   /**
+   * C2/D2 (15-L) · el flujo de video: canal×100+flujo de la guía del
+   * fabricante (101 el principal del canal 1, 102 su subflujo). Sin él, 102.
+   */
+  @ApiPropertyOptional({ type: String, pattern: '^[1-9][0-9]{2,3}$', example: '102' })
+  @IsOptional()
+  @IsString()
+  @Length(3, 4)
+  @Matches(/^[1-9][0-9]{2,3}$/, { message: 'canalDeVideo es canal×100+flujo, p. ej. 102' })
+  canalDeVideo?: string;
+
+  /** C2 (15-L) · la zona de la copropiedad donde está el equipo. */
+  @ApiPropertyOptional({ type: String, format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  zonaId?: string;
+
+  /**
    * Guardar un equipo que todavía no está instalado es legítimo: se monta el
    * lunes. Lo que no es legítimo es que la pantalla diga que está verificado.
    */
@@ -193,6 +211,9 @@ export class EquipoDto {
   @ApiProperty({ type: String, nullable: true, enum: ['reporta_y_espera', 'decide_el_equipo'] })
   modoDeTerminal!: string | null;
   @ApiProperty({ type: Boolean }) canalDeAudioHabilitado!: boolean;
+  @ApiProperty({ type: String, nullable: true, description: 'Flujo de video; `null` = 102' })
+  canalDeVideo!: string | null;
+  @ApiProperty({ type: String, nullable: true, format: 'uuid' }) zonaId!: string | null;
   @ApiProperty({ type: CapacidadesDeEquipoDto, nullable: true })
   capacidades!: CapacidadesDeEquipoDto | null;
   @ApiProperty({ type: String, enum: ['no_verificado', 'verificado', 'rechazado'] })
