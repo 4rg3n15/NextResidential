@@ -1,0 +1,117 @@
+import type { OpcionesDeEquipo } from '../equipo/cliente';
+import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * J1 (ETAPA 15-L) · EL ENSAYO EN SITIO, EN SU VOCABULARIO
+ *
+ * Ocho pasos por equipo, siempre en este orden y siempre los ocho: el que no
+ * aplica a una familia se dice («no aplica»), no se salta en silencio. Cada
+ * resultado lleva la CAUSA en palabras de quien está delante del equipo y la
+ * ACCIÓN que la corrige; nunca un código del fabricante a secas.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+export type FamiliaDeEnsayo = 'camara' | 'terminal' | 'videoportero';
+
+export type EstadoDePaso = 'ok' | 'fallo' | 'omitido' | 'no_aplica';
+
+export const PASOS_DEL_ENSAYO = [
+  { paso: 'conexion', titulo: 'Conexión y Digest' },
+  { paso: 'hora', titulo: 'Hora del equipo frente a la del Mac' },
+  { paso: 'configuracion', titulo: 'Lectura de configuración' },
+  { paso: 'eventos', titulo: 'Suscripción de eventos' },
+  { paso: 'apertura', titulo: 'Apertura con confirmación humana' },
+  { paso: 'rostro', titulo: 'Alta y baja de un rostro de prueba' },
+  { paso: 'video', titulo: 'Video' },
+  { paso: 'audio', titulo: 'Audio' },
+] as const;
+
+export type NombreDePaso = (typeof PASOS_DEL_ENSAYO)[number]['paso'];
+
+export interface ResultadoDePaso {
+  readonly paso: NombreDePaso;
+  /** 1 a 8, el orden del guion. */
+  readonly numero: number;
+  readonly titulo: string;
+  readonly estado: EstadoDePaso;
+  /** Qué pasó, en español llano. */
+  readonly causa: string;
+  /** Qué hacer. `null` cuando no hay nada que hacer. */
+  readonly accion: string | null;
+  /** Lo que contestó el equipo, ya saneado, para quien quiera mirar más. */
+  readonly detalle: readonly string[];
+}
+
+/**
+ * La persona delante del equipo. En sitio, el terminal; en las pruebas y en
+ * `--simulado`, un doble que contesta lo que el simulador sabe.
+ */
+export interface Interlocutor {
+  /** Una instrucción («pulse el timbre»). Vuelve cuando se ha dado. */
+  indicar(instruccion: string): Promise<void>;
+  /** Una pregunta de sí o no. `null`: nadie contestó. */
+  confirmar(pregunta: string): Promise<boolean | null>;
+}
+
+export interface EventoVisto {
+  readonly titulo: string;
+  readonly ocurridoEn: Date;
+}
+
+/**
+ * Lo que la PLATAFORMA registró. Con la API en marcha, el ensayo no abre una
+ * segunda suscripción al equipo —en uno de un solo flujo le quitaría los
+ * eventos a la escucha de verdad—: pregunta a la base qué llegó.
+ */
+export interface EventosDeLaPlataforma {
+  primeroDesde(host: string, desde: Date, plazoMs: number): Promise<EventoVisto | null>;
+}
+
+export interface EquipoDeEnsayo extends OpcionesDeEquipo {
+  readonly familia: FamiliaDeEnsayo;
+  /** Carril de la cámara o puerta de la terminal y del videoportero. */
+  readonly puerta: number;
+  /** `102` por omisión: el subflujo (D2). */
+  readonly canalDeVideo: string;
+  readonly puertoRtsp: number;
+}
+
+export interface OpcionesDeEnsayo {
+  readonly equipo: EquipoDeEnsayo;
+  readonly interlocutor: Interlocutor;
+  /** Sin apertura, sin rostro, sin audio: nada que mueva o escriba. */
+  readonly soloLectura: boolean;
+  readonly plataforma?: EventosDeLaPlataforma;
+  readonly esperaDeEventoMs: number;
+  /** JPEG de una cara real para el alta. Sin ella, la imagen sintética. */
+  readonly foto?: Uint8Array;
+  readonly limitesDeFoto: LimitesDeFoto;
+  /** La zona del conjunto: America/Bogota. */
+  readonly zona: string;
+  readonly ahora: () => Date;
+}
+
+export const resultado = (
+  paso: NombreDePaso,
+  estado: EstadoDePaso,
+  causa: string,
+  accion: string | null = null,
+  detalle: readonly string[] = [],
+): ResultadoDePaso => {
+  const i = PASOS_DEL_ENSAYO.findIndex((p) => p.paso === paso);
+  return {
+    paso,
+    numero: i + 1,
+    titulo: PASOS_DEL_ENSAYO[i]?.titulo ?? paso,
+    estado,
+    causa,
+    accion,
+    detalle,
+  };
+};
+
+export const ROTULO: Readonly<Record<FamiliaDeEnsayo, string>> = {
+  camara: 'Cámara LPR',
+  terminal: 'Terminal facial',
+  videoportero: 'Videoportero',
+};

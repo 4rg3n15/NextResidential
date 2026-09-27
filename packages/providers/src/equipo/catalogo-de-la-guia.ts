@@ -381,6 +381,42 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     dejaRastro: true,
   },
 
+  // ── J (15-L) · LO QUE EL ENSAYO EN SITIO LEE Y RESPALDA ────────────────────
+  {
+    /**
+     * Decisión 8 (15-L) · el tamaño y el formato de la foto son del `.env`
+     * porque la guía NO fija un límite en KB ni en píxeles; lo que sí dice es
+     * que el equipo declara aquí qué admite y cuántas personas caben. El ensayo
+     * lo lee del aparato de verdad y lo compara con lo configurado.
+     */
+    proposito: 'leer qué admite la gestión de personas',
+    metodo: 'GET',
+    ruta: '/ISAPI/AccessControl/UserInfo/capabilities?format=json',
+    procedencia: 'documentada',
+    familia: 'terminal',
+    fuente:
+      'Documento de terminales faciales Value Series, «Person and Credential Management › ' +
+      'Person Management»: supportFunction (get, post, put, setUp) y maxRecordNum',
+    confirmarEnSitio: 'que conteste y declare «post» en supportFunction y su maxRecordNum',
+  },
+  {
+    /**
+     * J2 (15-L) · la REVERSIÓN del canal de audio. La guía lo llama «Set the
+     * audio parameters of one two-way audio channel», paso opcional del flujo;
+     * aquí sólo se usa para devolver el canal a como estaba antes de la visita.
+     */
+    proposito: 'configurar un canal de audio bidireccional',
+    metodo: 'PUT',
+    ruta: '/ISAPI/System/TwoWayAudio/channels/{canal}',
+    procedencia: 'documentada',
+    familia: 'videoportero',
+    fuente:
+      'Documento ISAPI de las series IP, «Two-Way Audio › API Calling Flow», paso 3: ' +
+      'PUT /…/TwoWayAudio/channels/<audioID> fija los parámetros de un canal',
+    confirmarEnSitio: 'que el videoportero lo acepte y que la lectura posterior lo refleje',
+    dejaRastro: true,
+  },
+
   // ── EL USUARIO DE SERVICIO · privilegio mínimo, comprobable ──────────────
   {
     /**

@@ -34,9 +34,10 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { arch, networkInterfaces, platform } from 'node:os';
+import { arch, platform } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ipDelMac } from './lib/red-del-mac.mjs';
 
 const RAIZ = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);
@@ -65,19 +66,6 @@ const leerEnv = (ruta) => {
     valores.set(m[1], m[2].replace(/^(['"])(.*)\1$/, '$2'));
   }
   return valores;
-};
-
-/** La primera IPv4 de la red local; `en0` (la Wi-Fi del Mac) si la hay. */
-const ipDelMac = () => {
-  const interfaces = networkInterfaces();
-  const candidatas = Object.entries(interfaces)
-    .flatMap(([nombre, direcciones]) =>
-      (direcciones ?? [])
-        .filter((d) => d.family === 'IPv4' && !d.internal)
-        .map((d) => ({ nombre, direccion: d.address })),
-    )
-    .sort((a, b) => (a.nombre === 'en0' ? -1 : b.nombre === 'en0' ? 1 : 0));
-  return candidatas[0]?.direccion ?? null;
 };
 
 const env = leerEnv(rutaEnv);

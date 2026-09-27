@@ -16,6 +16,7 @@ import type {
 import { ClienteDeEquipo } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { opcionesDeEscritura, rutaPara } from '../equipo/catalogo-de-rutas';
+import { resumenIsapi } from '../equipo/errores-del-fabricante';
 
 /**
  * AUDIO BIDIRECCIONAL CONTRA EL EQUIPO · ADR-01.
@@ -209,12 +210,27 @@ export class IntercomDeEquipo implements IntercomProvider {
       undefined,
       opcionesDeEscritura(ruta),
     );
-    if (!respuesta.ok) {
+    /**
+     * J (15-L) · un 2xx NO basta: así rechazan estos equipos, con `200` y el
+     * motivo dentro (`notSupport`, o un `statusCode` distinto de 1) — la
+     * tercera respuesta engañosa de sitio. La respuesta buena del `open` puede
+     * ser una sesión (`TwoWayAudioSession`) o un `ResponseStatus` con 1: por
+     * eso se rechaza lo que dice que no, en vez de exigir un `statusCode`.
+     */
+    const resumen = resumenIsapi(respuesta.cuerpo);
+    const rechazo =
+      !respuesta.ok ||
+      /notSupport|invalidOperation/i.test(respuesta.cuerpo) ||
+      (resumen.statusCode !== null && resumen.statusCode !== 1);
+    if (rechazo) {
       // El equipo dijo que no: se suelta el turno en vez de dejar al operador
       // con un canal que cree tener. Un turno retenido sobre un canal muerto
       // bloquea al siguiente hasta que caduque.
       this.canales.set(dispositivoId, soltarCanal(solicitud.estado, operadorId, ahora).estado);
-      throw new Error(`El equipo no abrió el canal de audio (HTTP ${String(respuesta.estado)})`);
+      throw new Error(
+        `El equipo no abrió el canal de audio (HTTP ${String(respuesta.estado)}` +
+          `${resumen.subStatusCode === null ? '' : ` · ${resumen.subStatusCode}`})`,
+      );
     }
     this.abierto = dispositivoId;
     // A4 · con señalización declarada, abrir el audio ES contestar la llamada.

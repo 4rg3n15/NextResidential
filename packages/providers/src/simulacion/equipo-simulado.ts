@@ -178,6 +178,15 @@ export interface GuionDeEquipo {
   readonly puerta?: number;
   /** A2 (15-L) · la zona del reloj del equipo. America/Bogota por omisión. */
   readonly zonaHoraria?: string;
+  /**
+   * J (15-L) · tercera respuesta engañosa de sitio: la apertura contesta 2xx
+   * SIN `statusCode 1` y el relé no se mueve. No es un éxito.
+   */
+  readonly aperturaSinConfirmar?: boolean;
+  /** J (15-L) · lo que declara la gestión de personas (`supportFunction`). */
+  readonly funcionesDePersonas?: string;
+  /** J2 (15-L) · la serie que declara: un respaldo de otro equipo no se aplica. */
+  readonly serie?: string;
 }
 
 /**
@@ -340,11 +349,13 @@ const capacidadesDelSistema = (guion: GuionDeEquipo): string => {
 /** Un canal habilitado con G.711 µ-law: lo que el equipo real declara, salvo que viene deshabilitado. */
 const CANALES_POR_OMISION = [{ id: 1, habilitado: true, codec: 'G.711ulaw' }] as const;
 
-const canalesDeAudio = (guion: GuionDeEquipo): string =>
+type CanalDeAudioSimulado = NonNullable<GuionDeEquipo['canalesDeAudio']>[number];
+
+const canalesDeAudio = (canales: readonly CanalDeAudioSimulado[]): string =>
   [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<TwoWayAudioChannelList version="2.0" xmlns="${ESPACIO}">`,
-    ...(guion.canalesDeAudio ?? CANALES_POR_OMISION).map(
+    ...canales.map(
       (c) =>
         `<TwoWayAudioChannel><id>${String(c.id)}</id><enabled>${c.habilitado ? 'true' : 'false'}</enabled>` +
         `<audioCompressionType>${c.codec ?? 'G.711ulaw'}</audioCompressionType>` +
@@ -528,6 +539,8 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   const enBiblioteca = (): number => almacenadasSinNombre + plantillas.size;
   /** Audio recibido, para devolverlo como eco por el flujo de salida. */
   const audioRecibido: Uint8Array[] = [];
+  /** J2 (15-L) · los canales de audio, que la reversión escribe y se leen. */
+  const canales: CanalDeAudioSimulado[] = [...(guion.canalesDeAudio ?? CANALES_POR_OMISION)];
   /** Anexo 15-K · el Digest del equipo, con el nonce que vence. */
   const digest = new DigestDelEquipo(guion.usuario, guion.clave, REINO, guion.nonce);
 
@@ -613,7 +626,32 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     if (escribe && guion.reinicioNecesario === true) return respuestaDe(200, ERROR_REINICIO);
 
     if (catalogada.proposito === 'leer los canales de audio bidireccional del equipo') {
-      return respuestaDe(200, canalesDeAudio(guion));
+      return respuestaDe(200, canalesDeAudio(canales));
+    }
+    if (catalogada.proposito === 'configurar un canal de audio bidireccional') {
+      // Engañosa 1 también aquí: sin espacio de nombres, «OK» y nada cambia.
+      const cuerpo = String(opciones?.body ?? '');
+      const id = Number(/channels\/(\d+)$/.exec(url.pathname)?.[1]);
+      const i = canales.findIndex((c) => c.id === id);
+      const activo = /<enabled>\s*(true|false)\s*</.exec(cuerpo)?.[1];
+      if (i < 0 || activo === undefined) return respuestaDe(400, PARAMETRO_MALO);
+      const actual = canales[i];
+      if (actual !== undefined && cuerpo.includes(`xmlns="${ESPACIO}"`)) {
+        canales[i] = { ...actual, habilitado: activo === 'true' };
+      }
+      return respuestaDe(200, OK);
+    }
+    if (catalogada.proposito === 'leer qué admite la gestión de personas') {
+      return respuestaDe(
+        200,
+        JSON.stringify({
+          UserInfo: {
+            supportFunction: { '@opt': guion.funcionesDePersonas ?? 'post,delete,put,get,setUp' },
+            maxRecordNum: 3000,
+            userType: { '@opt': 'normal,visitor,blackList' },
+          },
+        }),
+      );
     }
     if (catalogada.proposito === 'leer qué órdenes admite la puerta desde la plataforma') {
       return respuestaDe(200, ordenesDePuerta(guion));
@@ -784,7 +822,17 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       // relé no se mueve; con ellos, abre. Sólo el equipo sabe la diferencia.
       const desenlace = desenlaceDeApertura(String(opciones?.body ?? ''));
       if (desenlace === 'mal_formada') return respuestaDe(400, CONTENIDO_XML_MALO);
+      // J (15-L) · engañosa 3: 2xx sin `statusCode 1`, y el relé quieto.
+      if (guion.aperturaSinConfirmar === true) return respuestaDe(200, '');
       if (desenlace === 'acciona') anotarEn(aperturasFisicasPor, guion.destino);
+      return respuestaDe(200, OK);
+    }
+    if (catalogada.proposito === 'accionar la barrera vehicular') {
+      // J (15-L) · el oráculo de la talanquera, como el de las puertas.
+      if (guion.aperturaSinConfirmar === true) return respuestaDe(200, '');
+      if (/<ctrlMode>\s*open\s*<\/ctrlMode>/.test(String(opciones?.body ?? ''))) {
+        anotarEn(aperturasFisicasPor, guion.destino);
+      }
       return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'contestar o rechazar una llamada del videoportero') {
@@ -890,7 +938,7 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         200,
         `<DeviceInfo><model>${guion.modelo ?? 'SIMULADO'}</model>` +
           `<firmwareVersion>${guion.firmware ?? 'V0.0.0'}</firmwareVersion>` +
-          '<serialNumber>SIM0000001</serialNumber></DeviceInfo>',
+          `<serialNumber>${guion.serie ?? 'SIM0000001'}</serialNumber></DeviceInfo>`,
       );
     }
 

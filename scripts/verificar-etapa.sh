@@ -1045,6 +1045,26 @@ else
 fi
 rm -rf "$ensayo_guion"
 
+paso "12f · pnpm sitio:ensayo contra los equipos simulados: ocho pasos por equipo, respaldo y reversión"
+# 15-L (J) · el ensayo del día de entrega, como lo ejecutará el usuario: los
+# ocho pasos en los tres equipos simulados, y `--capturar`/`--restaurar` sobre
+# una carpeta temporal —nunca en el repositorio—. Sin terminal, nadie contesta
+# «¿se movió?»: en simulado contesta el oráculo del equipo.
+ensayo_sitio="$(mktemp -d "${TMPDIR:-/tmp}/ncr-ensayo.XXXXXX")"
+if salida_ensayo=$(con_limite "$LIMITE_CORTO" node scripts/sitio-ensayo.mjs --simulado </dev/null 2>&1) &&
+  grep -q "VEREDICTO: SIN FALLOS" <<<"$salida_ensayo" &&
+  con_limite "$LIMITE_CORTO" node scripts/sitio-ensayo.mjs --simulado \
+    --capturar="$ensayo_sitio/respaldo" </dev/null >/dev/null 2>&1 &&
+  con_limite "$LIMITE_CORTO" node scripts/sitio-ensayo.mjs --simulado \
+    --restaurar="$ensayo_sitio/respaldo" </dev/null >/dev/null 2>&1; then
+  grep -E "^VEREDICTO" <<<"$salida_ensayo" | sed 's/^/   /'
+  ok "el ensayo recorre los tres equipos simulados, respalda y revierte su configuración"
+else
+  mal "pnpm sitio:ensayo falla contra los equipos simulados (ensayo, --capturar o --restaurar)"
+  grep -E "FALLO|✗|VEREDICTO" <<<"${salida_ensayo:-}" | head -12 | sed 's/^/     /'
+fi
+rm -rf "$ensayo_sitio"
+
 if [[ "$CON_BASE" == "1" ]]; then
   paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)"
   # Estas dos pruebas se OMITEN solas si no alcanzan la base, y una omisión no
