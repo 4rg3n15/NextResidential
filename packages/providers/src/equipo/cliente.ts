@@ -58,7 +58,7 @@ export const TIEMPO_LIMITE_DE_EQUIPO_MS = 5000;
 
 /**
  * A5 (15-L) · cuánto se deja de presentar una credencial que el equipo
- * rechazó, salvo que se corrija antes. `[SUPUESTO]` S-67: del orden del
+ * rechazó, salvo que se corrija antes. `[SUPUESTO]` S-68: del orden del
  * bloqueo por inicios de sesión fallidos de estos equipos (30 min).
  */
 export const VENTANA_DE_CREDENCIAL_RECHAZADA_MS = 30 * 60_000;

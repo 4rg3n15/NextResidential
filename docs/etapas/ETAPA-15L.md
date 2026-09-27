@@ -2,10 +2,11 @@
 
 **Rama:** `etapa-15l-entrega-final` · **Base:** `develop` (`fc353bc`, con el PR #33 y `5466dfa`)
 
-> Informe en construcción. Esta primera sección es el **Bloque 0**, que el
+> Informe en construcción. La primera sección es el **Bloque 0**, que el
 > encargo exige ANTES de escribir código: cada respuesta con archivo:línea y
 > evidencia. Lo que sale «no existe» o «no probado» pasa a trabajo obligatorio
-> de esta corrección.
+> de esta corrección. El avance por bloque, con su commit, está en
+> [Avance](#avance).
 
 ---
 
@@ -106,9 +107,54 @@ o el cortafuegos del Mac.
 
 ## Puntos de parada: tocan el dominio o un ADR cerrado
 
-| Punto | Qué toca                                                                                                                                                              | Estado                     |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| A2    | El puerto del dominio `FaceTemplateProvider.sincronizar(dispositivoId, plantillaId, plantilla)` (`domain-core/src/puertos/proveedores.ts:31-34`) no lleva la vigencia | **Esperando confirmación** |
-| F4    | El agregado `ConsentimientoBiometrico` exige que acepte el titular (`domain-core/src/biometria/consentimiento.ts:134-138`, RN-10) · ADR-029 · Ley 1581                | **Esperando confirmación** |
-| H1–H3 | Sustituye ADR-023 (usuario + NIT)                                                                                                                                     | **Esperando confirmación** |
-| E1    | No es ADR, pero la evidencia de 0.5 dice que no arregla nada                                                                                                          | **Esperando confirmación** |
+Respondidos por el usuario el 2026-09-27. Las decisiones 5 a 9 del mismo mensaje (verificación remota armada, `offlineDevCheckOpenDoorEnabled`, clave con `serialNo`, foto normalizada, catálogo de `voiceTalkEvent`) se aplican en los bloques que las nombran.
+
+| Punto | Qué toca                                                                                                                                                              | Estado                                                                                                                                                                                                                                |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A2    | El puerto del dominio `FaceTemplateProvider.sincronizar(dispositivoId, plantillaId, plantilla)` (`domain-core/src/puertos/proveedores.ts:31-34`) no lleva la vigencia | **AUTORIZADO**: parámetro opcional y aditivo con el VO `Vigencia`; `Valid` en hora local de America/Bogota sin desplazamiento; `userType "visitor"`; prueba de que sin el parámetro nada cambia                                       |
+| F4    | El agregado `ConsentimientoBiometrico` exige que acepte el titular (`domain-core/src/biometria/consentimiento.ts:134-138`, RN-10) · ADR-029 · Ley 1581                | **CONFIRMADO**: la casilla es el único mecanismo obligatorio; origen «declarado por quien registra» distinto de «otorgado por el titular»; ADR nuevo que deroga ADR-029 en lo pertinente y registra el riesgo aceptado; RN-11 intacta |
+| H1–H3 | Sustituye ADR-023 (usuario + NIT)                                                                                                                                     | **CONFIRMADO**: ADR-023 derogado; NIT fuera de toda la interfaz; el correo y código+usuario de los demás roles, intactos                                                                                                              |
+| E1    | No es ADR, pero la evidencia de 0.5 dice que no arregla nada                                                                                                          | **SUSTITUIDO**: nada de `NSAllowsLocalNetworking` en release; se hacen E2 y E3 con la comprobación previa de `/health` desde Safari y una pantalla de error que nombra la causa                                                       |
+
+---
+
+## Avance
+
+Orden fijado por el usuario: «R1-R4, A1, A4, A5, la fuga WHEP y B, en ese
+orden. La fuga WHEP lleva prueba negativa entre copropiedades antes de
+cerrar». Después, el resto del Bloque A (A2, A3) y los bloques C, D, E, J, H,
+F, G, I.
+
+| Bloque                            | Commit    | Qué queda probado contra el simulador                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1–R4 · verificación armada       | `a7a2821` | La terminal simulada pregunta (`remoteCheck`), la plataforma contesta `PUT remoteCheck` con el MISMO `serialNo` dentro del plazo y la terminal abre; `failed` niega; tarde o con otra serie, nada. Clave de idempotencia con `serialNo`: dos rostros → dos eventos y dos veredictos. XML del Alarm Server leído. La copropiedad sale del registro de equipos, no de la petición |
+| A5 · credencial rechazada         | `3f9ceef` | Un 401 sin `stale` marca la credencial; durante 30 min (S-68) no se vuelve a presentar y el equipo sale «degradado» con el motivo. Reintentos sólo de lo reintentable (equipo ocupado, desafío vencido), 3 intentos con jitter                                                                                                                                                  |
+| Fuga entre copropiedades (WHEP +) | `3f9ceef` | 10 operaciones sobre un equipo de la copropiedad B pedidas desde la A → 404 y `auditoria_seguridad`. La prueba negativa se escribió ANTES de la corrección y fallaba                                                                                                                                                                                                            |
+| B · todos los eventos             | `6883c6c` | Tabla append-only `eventos_de_equipo` (0040, las cuatro capas de ADR-05, RLS forzada, prueba 97). Catálogo por código; nada se descarta; lo histórico en cola por lotes sin retrasar lo vivo; línea de tiempo con filtros y refresco en vivo en la consola                                                                                                                      |
+| A1 · desenlace en palabras        | `6883c6c` | La apertura del motor y la orden manual quedan en la línea de tiempo con «el equipo la aceptó / la rechazó — motivo / no respondió»; el mensaje técnico sólo va a la bitácora                                                                                                                                                                                                   |
+| A4 · la cámara decidió            | `6883c6c` | Si el control de la cámara no está atestado o el propio evento dice que abrió ella, la lectura se registra y se marca «La cámara decidió por su cuenta»                                                                                                                                                                                                                         |
+
+### Hallazgos de esta corrección
+
+- **La fuga del Bloque 0.4 era más ancha que el video.** Además del WHEP, el
+  identificador de equipo de otra copropiedad se aceptaba en las órdenes de
+  puerta, el bloqueo, el intercom (abrir, cerrar, estado, audio), la orden
+  del tablero de dispositivos y el envío de plantillas de biometría. Todas
+  pasan ahora por `AlcanceDeEquipos` (`apps/api/src/equipos/presentacion/alcance-de-equipos.ts`),
+  con la prueba negativa `apps/api/test/equipos-entre-copropiedades.e2e.test.ts`.
+- **Falso verde del tipo de la ETAPA 04.** La suite de la API resolvía
+  `@ncr/providers` a su `dist/`: la prueba negativa de R2 pasaba en verde con
+  el código corregido y sin él. Se corrigió con el alias al fuente en
+  `apps/api/vitest.config.ts`; es la regla de §2.8.0 («las pruebas resuelven
+  los paquetes internos a su código fuente, nunca a su `dist/`») aplicada a un
+  paquete que se había quedado fuera.
+- **Una puerta que se abría pasaba por el motor como un rostro.** Antes de la
+  15-L todo `AccessControllerEvent` se trataba como rostro, así que un botón de
+  salida o una puerta forzada producían un «acceso negado» sin persona. Ahora
+  decide el par de códigos mayor/menor.
+
+### Supuestos nuevos
+
+S-66 (`uid` y `serialNo` del firmware para la clave), S-67 (qué contesta la
+terminal a una serie que no espera) y S-68 (30 min de bloqueo por credencial
+rechazada), en `docs/auditoria/contradicciones-y-supuestos.md`.
