@@ -43,6 +43,8 @@ const APPEND_ONLY = [
   'bitacora_de_residentes',
   // ETAPA 15-K (D-11) · la atestación física del instalador sobre una cámara.
   'atestaciones_de_equipo',
+  // ETAPA 15-L (Bloque B) · todo lo que un equipo emite y lo que la plataforma hace con él.
+  'eventos_de_equipo',
 ];
 
 /**

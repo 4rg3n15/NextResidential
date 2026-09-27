@@ -95,10 +95,15 @@ describe('AccionadorPorProveedor · lo que contesta el proveedor no se maquilla'
         throw new CapacidadNoSoportada(DISPOSITIVO, 'aperturaRemota', false);
       }),
     });
-    const accionador = new AccionadorPorProveedor(proveedor, 'x', bitacora(), null);
+    const b = bitacora();
+    const accionador = new AccionadorPorProveedor(proveedor, 'x', b, null);
     const r = await accionador.accionar(DISPOSITIVO, true, 'op');
     expect(r.estado).toBe('rechazada');
-    expect(r.estado === 'rechazada' ? r.motivo : '').toMatch(/aperturaRemota/);
+    // A1 (15-L) · al operador, una frase; el nombre técnico, sólo a la bitácora.
+    const motivo = r.estado === 'rechazada' ? r.motivo : '';
+    expect(motivo).toBe('este equipo no admite esta orden desde la plataforma');
+    expect(motivo).not.toMatch(/aperturaRemota/);
+    expect(JSON.stringify(b.lineas)).toMatch(/"detalleTecnico":"[^"]*aperturaRemota/);
   });
 
   it('el cierre momentáneo no existe en el puerto del dominio: se dice, no se finge', async () => {

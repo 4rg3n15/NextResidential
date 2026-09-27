@@ -70,7 +70,12 @@ export class EquipoOcupado extends ErrorDeEquipo {
 /** Avería propia del equipo. Reintentar no lo arregla. */
 export class EquipoAveriado extends ErrorDeEquipo {
   readonly reintentable = false;
-  constructor(dispositivoId: string, detalle: string) {
+  constructor(
+    dispositivoId: string,
+    detalle: string,
+    /** 15-L · la traducción del código del fabricante, sin jerga, para la consola. */
+    readonly legible?: string,
+  ) {
     super(dispositivoId, `El equipo ${dispositivoId} informa de un error propio: ${detalle}`);
   }
 }
@@ -148,7 +153,12 @@ export class BibliotecaLlena extends ErrorDeEquipo {
 /** Se le mandó algo mal formado. El defecto es nuestro; no se reintenta. */
 export class PeticionRechazada extends ErrorDeEquipo {
   readonly reintentable = false;
-  constructor(dispositivoId: string, detalle: string) {
+  constructor(
+    dispositivoId: string,
+    detalle: string,
+    /** 15-L · la traducción del código del fabricante, sin jerga, para la consola. */
+    readonly legible?: string,
+  ) {
     super(dispositivoId, `El equipo ${dispositivoId} rechazó la petición: ${detalle}`);
   }
 }

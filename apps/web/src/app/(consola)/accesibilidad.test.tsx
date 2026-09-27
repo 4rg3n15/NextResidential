@@ -124,34 +124,52 @@ const CON_DATOS = (url: string): Response => {
                   ],
                   umbralSegundos: 300,
                 }
-              : url.includes('/eventos')
+              : url.includes('/eventos/linea-de-tiempo')
                 ? {
-                    filas: [
+                    // 15-L (Bloque B) · la consola de eventos pinta la línea de tiempo.
+                    elementos: [
                       {
+                        origen: 'acceso',
                         id: 'evt-1',
-                        copropiedadId: COP,
                         ocurridoEn: '2026-09-10T10:00:00.000Z',
-                        tipo: 'ingreso',
-                        resultado: 'permitido',
-                        motivo: null,
-                        metodo: 'placa',
-                        personaId: null,
-                        viviendaId: null,
-                        zonaId: null,
                         dispositivoId: 'dis-1',
-                        placaDetectada: 'ABC123',
-                        confianza: null,
-                        reglaAplicada: 'vigencia',
-                        versionReglas: 1,
-                        operadorId: null,
-                        motivoManual: null,
-                        evidenciaId: null,
-                        decididoPorEdge: false,
+                        tipo: 'acceso',
+                        titulo: 'Acceso permitido · placa ABC123',
+                        resultado: 'permitido',
+                        enVivo: true,
+                        eventoId: 'evt-1',
+                        codigo: null,
                       },
                     ],
-                    siguiente: null,
                   }
-                : [];
+                : url.includes('/eventos')
+                  ? {
+                      filas: [
+                        {
+                          id: 'evt-1',
+                          copropiedadId: COP,
+                          ocurridoEn: '2026-09-10T10:00:00.000Z',
+                          tipo: 'ingreso',
+                          resultado: 'permitido',
+                          motivo: null,
+                          metodo: 'placa',
+                          personaId: null,
+                          viviendaId: null,
+                          zonaId: null,
+                          dispositivoId: 'dis-1',
+                          placaDetectada: 'ABC123',
+                          confianza: null,
+                          reglaAplicada: 'vigencia',
+                          versionReglas: 1,
+                          operadorId: null,
+                          motivoManual: null,
+                          evidenciaId: null,
+                          decididoPorEdge: false,
+                        },
+                      ],
+                      siguiente: null,
+                    }
+                  : [];
   return new Response(JSON.stringify(cuerpo), {
     status: 200,
     headers: { 'content-type': 'application/json' },

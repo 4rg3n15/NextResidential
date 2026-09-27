@@ -372,7 +372,9 @@ describe('las clases `rostro` y `llamada` · 6.5', () => {
       'disp-terminal',
       AHORA2,
     );
-    expect(evento.clase).toBe('rostro');
+    // 15-L · no es un acceso: es un evento de equipo que se guarda y se enseña.
+    expect(evento.clase).toBe('equipo');
+    expect(evento.tipo).toBe('resultado_de_verificacion');
     expect(evento.esResultadoDeVerificacion).toBe(true);
     expect(evento.esperaVeredicto).toBe(false);
   });

@@ -95,6 +95,8 @@ export type { VeredictoDeCapacidadAnpr } from './camara/capacidades-anpr';
 export { EquipoDecidePorSuCuenta } from './camara/modo-de-control';
 export type { VeredictoDeModo } from './camara/modo-de-control';
 export { EquipoInalcanzable } from './equipo/cliente';
+// 15-L · lo que el operador lee cuando una orden no sale (A1, Bloque I).
+export { motivoLegible } from './nucleo/motivo-legible';
 export type { ReaccionAlError, ErrorDelFabricante } from './equipo/errores-del-fabricante';
 export { LISTAS_DEL_EQUIPO_NO_SE_USAN } from './equipo/errores-del-fabricante';
 

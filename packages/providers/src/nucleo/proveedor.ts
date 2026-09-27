@@ -68,4 +68,12 @@ export type ProveedorDeEquipos = AccessPointProvider &
      * rechaza. La credencial va dentro: nunca cruza a la presentación.
      */
     origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null>;
+    /**
+     * A4 (15-L) · ¿el equipo decide por su cuenta —una cámara sin control de la
+     * plataforma y sin atestación—? `null` si no se sabe. Lo pregunta el
+     * receptor DESPUÉS de registrar la lectura, para marcarla «la cámara
+     * decidió por su cuenta»: nunca delante de una apertura. Opcional: el
+     * simulado no lo implementa.
+     */
+    decideSolo?(dispositivoId: string): Promise<boolean | null>;
   };

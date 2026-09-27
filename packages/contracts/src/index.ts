@@ -32,6 +32,9 @@ export type EstadoDeDispositivos = Esquemas['EstadoDeDispositivosDto'];
 export type DispositivoDelTablero = Esquemas['DispositivoDelTableroDto'];
 export type EventoRegistrado = Esquemas['EventoRegistradoDto'];
 export type PaginaDeEventos = Esquemas['PaginaDeEventosDto'];
+/** 15-L (Bloque B) · accesos y eventos de equipo en una sola línea de tiempo. */
+export type ElementoDeLineaDeTiempo = Esquemas['ElementoDeLineaDeTiempoDto'];
+export type LineaDeTiempo = Esquemas['LineaDeTiempoDto'];
 export type AlertaExpuesta = Esquemas['AlertaExpuestaDto'];
 export type ErrorApi = Esquemas['ErrorApiDto'];
 /** ETAPA 14 · tablero de las cinco latencias comprometidas (RNF-11.3). */

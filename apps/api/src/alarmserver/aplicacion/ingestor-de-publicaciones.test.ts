@@ -48,6 +48,12 @@ const rostro = (extra: Partial<EventoDeEquipo> = {}): PublicacionDeEquipo => ({
     origenDeLlamada: null,
     unidadDeLlamada: null,
     edificioDeLlamada: null,
+    // 15-L (Bloque B) · lo que la consola de eventos enseña.
+    tipo: extra.clase === 'llamada' ? 'llamada' : 'rostro_reconocido',
+    titulo: 'Rostro reconocido',
+    codigo: null,
+    horaDelEquipo: null,
+    carga: {},
     ...extra,
   },
   foto: null,
@@ -224,7 +230,8 @@ describe('A2 · lo que NO es una petición', () => {
     const r = await ingestor.ingerir(
       rostro({ clase: 'llamada', personaId: null, esperaVeredicto: false }),
     );
-    expect(r.registrado).toBe(false);
+    // 15-L · se guarda como evento de equipo (registrado), nunca como acceso.
+    expect(r.registrado).toBe(true);
     expect(ejecutar).not.toHaveBeenCalled();
   });
 });
@@ -241,7 +248,7 @@ describe('A4 · la llamada del videoportero', () => {
         esperaVeredicto: false,
       }),
     );
-    expect(r.registrado).toBe(false);
+    expect(r.registrado).toBe(true);
     expect(ejecutar).not.toHaveBeenCalled();
     expect(llamadas).toHaveLength(1);
     expect(llamadas[0]).toMatchObject({

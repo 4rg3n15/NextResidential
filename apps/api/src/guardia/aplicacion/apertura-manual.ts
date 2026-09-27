@@ -142,6 +142,18 @@ export interface BitacoraDeOrdenes {
 export const BITACORA_DE_ORDENES = Symbol.for('ncr.puerto.BitacoraDeOrdenes');
 
 /**
+ * A1 (15-L) · la orden también va a la LÍNEA DE TIEMPO de la consola de
+ * eventos, con el desenlace que dio el equipo en lenguaje de persona. La
+ * bitácora de órdenes (`ordenes_manuales`) sigue siendo el rastro de RN-08;
+ * esto es lo que el portero ve junto a todo lo demás que pasó en la puerta.
+ * Nunca lanza: una constancia que falla no deshace una apertura.
+ */
+export interface ConstanciaDeOrdenes {
+  registrar(orden: OrdenEjecutada): Promise<void>;
+}
+export const CONSTANCIA_DE_ORDENES = Symbol.for('ncr.puerto.ConstanciaDeOrdenes');
+
+/**
  * Normaliza el motivo y dice por qué no vale, si no vale. Puro: es la regla, y
  * la comparte la consola para no ofrecer un botón que el servidor rechazará.
  */
@@ -179,6 +191,7 @@ export class AccionarPuertaAMano {
     private readonly bitacora: BitacoraDeOrdenes,
     private readonly reloj: Reloj,
     private readonly ids: GeneradorDeId,
+    private readonly constancia: ConstanciaDeOrdenes = { registrar: async () => undefined },
   ) {}
 
   async ejecutar(
@@ -220,7 +233,10 @@ export class AccionarPuertaAMano {
      * abrir: el operador lo ve, insiste, y el incidente queda documentado.
      */
     await this.bitacora.registrar(ejecutada);
-    if (orden.accion !== 'abrir') return exito(ejecutada);
+    if (orden.accion !== 'abrir') {
+      await this.constancia.registrar(ejecutada);
+      return exito(ejecutada);
+    }
 
     const resultado = await this.accionador.accionar(orden.dispositivoId, true, ctx.usuarioId);
     const detalle = resultado.estado === 'aceptada' ? null : resultado.motivo;
@@ -236,6 +252,8 @@ export class AccionarPuertaAMano {
      * (H-1, H-2). La consola muestra lo que el equipo contestó, que es lo único
      * que el sistema sabe mientras no haya señal de posición cableada.
      */
-    return exito({ ...ejecutada, resultado: resultado.estado, detalle });
+    const conDesenlace: OrdenEjecutada = { ...ejecutada, resultado: resultado.estado, detalle };
+    await this.constancia.registrar(conDesenlace);
+    return exito(conDesenlace);
   }
 }

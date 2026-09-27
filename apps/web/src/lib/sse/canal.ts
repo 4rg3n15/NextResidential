@@ -3,6 +3,8 @@
 import type { AlertaExpuesta, EventoRegistrado } from '@ncr/contracts';
 import { ESPERA_MAXIMA_MS, esperaDeReintento, msHastaRenovar } from './reconexion';
 import { esLlamadaEntrante } from './llamadas';
+import { esEventoDeEquipoEnVivo } from './eventos-de-equipo';
+import type { EventoDeEquipoEnVivo } from './eventos-de-equipo';
 import type { LlamadaEntrante } from './llamadas';
 import type { EstadoDeSesion } from '@/app/api/sesion/estado/route';
 
@@ -35,6 +37,11 @@ export interface MensajesDelCanal {
   readonly alerta: (alerta: AlertaExpuesta) => void;
   /** A4 · la llamada de un videoportero. Opcional: no toda vista la atiende. */
   readonly llamada?: (llamada: LlamadaEntrante) => void;
+  /**
+   * 15-L (Bloque B) · un evento de EQUIPO (puerta, botón, sabotaje…) o algo que
+   * la plataforma hizo con él. Opcional: sólo la consola de eventos lo pinta.
+   */
+  readonly eventoDeEquipo?: (evento: EventoDeEquipoEnVivo) => void;
   readonly estado: (estado: EstadoDelCanal, intento: number) => void;
   /** Eventos recuperados tras un corte, del más antiguo al más reciente. */
   readonly recuperados: (eventos: readonly EventoRegistrado[]) => void;
@@ -180,6 +187,15 @@ export const abrirCanal = ({
       try {
         const carga: unknown = JSON.parse((m as MessageEvent<string>).data);
         if (esLlamadaEntrante(carga)) mensajes.llamada?.(carga);
+      } catch {
+        /* ídem */
+      }
+    });
+
+    nueva.addEventListener('eventos-de-equipo', (m) => {
+      try {
+        const carga: unknown = JSON.parse((m as MessageEvent<string>).data);
+        if (esEventoDeEquipoEnVivo(carga)) mensajes.eventoDeEquipo?.(carga);
       } catch {
         /* ídem */
       }

@@ -155,12 +155,10 @@ export class AlarmServerController {
       });
     }
 
-    // A2/A4 · placa, rostro y llamada siguen adelante; lo demás se registra.
-    const sigueAdelante =
-      recepcion.desenlace === 'lectura' ||
-      recepcion.desenlace === 'rostro' ||
-      recepcion.desenlace === 'llamada';
-    if (!sigueAdelante || recepcion.publicacion === null) {
+    // 15-L (Bloque B) · TODO lo que se pudo leer sigue adelante: placa, rostro
+    // y llamada como antes, y también lo histórico y lo que no es un acceso,
+    // que se guardan como eventos de equipo. Sólo lo ilegible se queda aquí.
+    if (recepcion.publicacion === null) {
       this.bitacora.registrar(
         recepcion.desenlace === 'ilegible' ? 'aviso' : 'info',
         `publicación de equipo ignorada: ${recepcion.motivo}`,
@@ -186,7 +184,7 @@ export class AlarmServerController {
       return { ...RESPUESTA_AL_EQUIPO, ignorado: true, motivo: 'no se pudo procesar' };
     }
 
-    if (publicada.desenlace !== 'ingerida') {
+    if (publicada.desenlace !== 'ingerida' && publicada.desenlace !== 'historica') {
       return {
         ...RESPUESTA_AL_EQUIPO,
         ignorado: true,

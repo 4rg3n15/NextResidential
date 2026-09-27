@@ -2465,6 +2465,98 @@
         ]
       }
     },
+    "/copropiedades/{id}/eventos/linea-de-tiempo": {
+      "get": {
+        "operationId": "LineaDeTiempoController_lineaDeTiempo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "description": "Inicio del rango, ISO-8601 con zona",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "description": "Fin del rango, EXCLUIDO",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "description": "`acceso` para sólo accesos, o un tipo de evento de equipo (p. ej. `puerta_forzada`)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineaDeTiempoDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accesos y eventos de equipo en una sola línea de tiempo, con filtros (Bloque B)",
+        "tags": [
+          "eventos"
+        ]
+      }
+    },
     "/copropiedades/{id}/eventos/{eventoId}/evidencia": {
       "get": {
         "operationId": "EventosController_urlDeEvidencia",
@@ -7878,6 +7970,21 @@
           "xlsxBase64"
         ]
       },
+      "CodigoDelEquipoDto": {
+        "type": "object",
+        "properties": {
+          "mayor": {
+            "type": "number"
+          },
+          "menor": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "mayor",
+          "menor"
+        ]
+      },
       "CodigosDeRecuperacionDto": {
         "type": "object",
         "properties": {
@@ -8952,6 +9059,74 @@
             ]
           }
         }
+      },
+      "ElementoDeLineaDeTiempoDto": {
+        "type": "object",
+        "properties": {
+          "origen": {
+            "type": "string",
+            "enum": [
+              "acceso",
+              "equipo",
+              "plataforma"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "ocurridoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipo": {
+            "type": "string",
+            "description": "`acceso` o el tipo normalizado del evento de equipo"
+          },
+          "titulo": {
+            "type": "string",
+            "description": "Lo que la consola enseña, en español"
+          },
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "permitido",
+              "negado"
+            ],
+            "nullable": true
+          },
+          "enVivo": {
+            "type": "boolean",
+            "description": "`false` para lo que el equipo declaró histórico"
+          },
+          "eventoId": {
+            "type": "string",
+            "nullable": true
+          },
+          "codigo": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CodigoDelEquipoDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "origen",
+          "id",
+          "ocurridoEn",
+          "dispositivoId",
+          "tipo",
+          "titulo",
+          "resultado",
+          "enVivo",
+          "eventoId",
+          "codigo"
+        ]
       },
       "EmergenciaDto": {
         "type": "object",
@@ -10399,6 +10574,20 @@
         "required": [
           "copropiedadId",
           "dispositivoId"
+        ]
+      },
+      "LineaDeTiempoDto": {
+        "type": "object",
+        "properties": {
+          "elementos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ElementoDeLineaDeTiempoDto"
+            }
+          }
+        },
+        "required": [
+          "elementos"
         ]
       },
       "ListoDto": {

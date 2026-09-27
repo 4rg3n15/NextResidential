@@ -1,6 +1,6 @@
 import type { Bitacora, ControlDeBarrera, ResultadoDeAccionamiento } from '@ncr/domain-core';
 import { ordenAceptada, ordenInalcanzable, ordenRechazada } from '@ncr/domain-core';
-import { ErrorDeEquipo } from '@ncr/providers';
+import { motivoLegible } from '@ncr/providers';
 import type { ProveedorDeEquipos } from '@ncr/providers';
 import type { AccionadorDePuerta, BloqueoDeAcceso } from '../aplicacion/apertura-manual';
 
@@ -119,11 +119,16 @@ export class AccionadorPorProveedor implements AccionadorDePuerta, BloqueoDeAcce
     try {
       return await orden();
     } catch (error) {
-      const motivo =
-        error instanceof ErrorDeEquipo || error instanceof Error
-          ? error.message
-          : 'el proveedor de equipos rechazó la orden';
-      return ordenRechazada(motivo, 0);
+      /**
+       * A1 (15-L) · al operador —la portería, la línea de tiempo— le llega una
+       * frase sin jerga; el mensaje técnico (equipo, ruta, `statusCode`,
+       * `subStatusCode`) queda aquí, en la bitácora, para quien depura.
+       */
+      this.bitacora.registrar('aviso', 'orden rechazada por el proveedor de equipos', {
+        detalleTecnico: error instanceof Error ? error.message : String(error),
+        clase: error instanceof Error ? error.name : typeof error,
+      });
+      return ordenRechazada(motivoLegible(error), 0);
     }
   }
 

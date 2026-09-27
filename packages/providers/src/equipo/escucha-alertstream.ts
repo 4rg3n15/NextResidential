@@ -292,10 +292,10 @@ export class EscuchaDeAlertStream {
       bytes,
       ...(motivo === null ? {} : { descartado: motivo }),
     });
-    if (motivo !== null) {
-      this.descartados += 1;
-      return null;
-    }
+    // 15-L (Bloque B) · lo histórico ya no se tira: sigue marcado `enVivo:
+    // false`, y quien lo recibe lo GUARDA sin decidir ni avisar. Se sigue
+    // contando, que es lo que distingue «mudo» de «volcó su historial».
+    if (motivo !== null) this.descartados += 1;
     return desdeAlertStreamJson(bloque, this.opciones.dispositivoId, new Date());
   }
 

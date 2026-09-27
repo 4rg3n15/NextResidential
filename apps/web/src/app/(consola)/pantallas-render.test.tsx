@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { JSX, ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DirectorioDeViviendas } from './viviendas/directorio';
 import { PantallaDeVehiculos } from './vehiculos/pantalla';
@@ -196,6 +196,37 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
         },
       ]);
     }
+    if (url.includes('/eventos/linea-de-tiempo')) {
+      // 15-L (Bloque B) · accesos y eventos de equipo en una sola línea.
+      return respuesta({
+        elementos: [
+          {
+            origen: 'acceso',
+            id: EVENTO.id,
+            ocurridoEn: EVENTO.ocurridoEn,
+            dispositivoId: 'dis-1',
+            tipo: 'acceso',
+            titulo: 'Acceso negado · placa ABC123 · persona o placa en lista negra',
+            resultado: 'negado',
+            enVivo: true,
+            eventoId: EVENTO.id,
+            codigo: null,
+          },
+          {
+            origen: 'equipo',
+            id: 'ee-1',
+            ocurridoEn: '2026-09-10T09:59:00.000Z',
+            dispositivoId: 'dis-1',
+            tipo: 'puerta_forzada',
+            titulo: 'Puerta forzada',
+            resultado: null,
+            enVivo: true,
+            eventoId: null,
+            codigo: { mayor: 5, menor: 27 },
+          },
+        ],
+      });
+    }
     if (url.includes('/eventos')) return respuesta({ filas: [EVENTO], siguiente: null });
     return respuesta({});
   });
@@ -375,10 +406,30 @@ describe('dispositivos', () => {
 
 describe('eventos', () => {
   it('el banner de alertas críticas se pinta y el evento trae su motivo', async () => {
+    // El inventario de equipos, sólo aquí: la pantalla de dispositivos espera el suyo.
+    const base = servidorFalso();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (entrada: string | Request) => {
+        const url = typeof entrada === 'string' ? entrada : entrada.url;
+        if (url.includes('/equipos')) {
+          return respuesta({ equipos: [{ id: 'dis-1', nombre: 'Talanquera principal' }] });
+        }
+        return base(entrada);
+      }),
+    );
     montar(<PantallaDeEventos copropiedadId={COP} />);
     await waitFor(() => expect(screen.getByText(/1 alerta sin resolver/)).toBeDefined());
-    expect(screen.getByText('LISTA_NEGRA')).toBeDefined();
-    expect(screen.getByText(/Edge \(autónomo\)/)).toBeDefined();
+    // 15-L · una sola línea: el acceso con su motivo EN ESPAÑOL (no el código
+    // del dominio), el evento de equipo, y el equipo por su NOMBRE.
+    await waitFor(() => expect(screen.getByText(/persona o placa en lista negra/)).toBeDefined());
+    expect(within(screen.getByRole('table')).getByText('Puerta forzada')).toBeDefined();
+    await waitFor(() =>
+      expect(within(screen.getByRole('table')).getAllByText('Talanquera principal')).toHaveLength(
+        2,
+      ),
+    );
+    expect(screen.queryByText('LISTA_NEGRA')).toBeNull();
   });
 });
 

@@ -1,4 +1,13 @@
 import { Global, Module } from '@nestjs/common';
+import { ConsultarLineaDeTiempo } from './aplicacion/linea-de-tiempo';
+import { LineaDeTiempoController } from './presentacion/linea-de-tiempo.controller';
+import {
+  REGISTRO_DE_EVENTOS_DE_EQUIPO,
+  REPOSITORIO_EVENTOS_DE_EQUIPO,
+  RegistroDeEventosDeEquipo,
+} from './aplicacion/eventos-de-equipo';
+import type { RepositorioEventosDeEquipo } from './aplicacion/eventos-de-equipo';
+import { RepositorioEventosDeEquipoPg } from './infraestructura/repositorio-eventos-de-equipo-pg';
 import type { DynamicModule } from '@nestjs/common';
 import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
@@ -65,6 +74,7 @@ import {
 import {
   RepositorioAlertasEnMemoria,
   RepositorioDispositivosEnMemoria,
+  RepositorioEventosDeEquipoEnMemoria,
   RepositorioEventosEnMemoria,
 } from './infraestructura/repositorios-en-memoria';
 import { EventosController } from './presentacion/eventos.controller';
@@ -105,7 +115,13 @@ export class EventosModule {
        * lo que lo demuestra: la captura y el reconocimiento ven el mismo dato.
        */
       imports: [BiometriaModule.registrar()],
-      controllers: [EventosController, AlertasController, InformesController],
+      controllers: [
+        EventosController,
+        AlertasController,
+        InformesController,
+        // 15-L (B2) · accesos y eventos de equipo en una sola línea de tiempo.
+        LineaDeTiempoController,
+      ],
       providers: [
         {
           /**
@@ -134,6 +150,28 @@ export class EventosModule {
               ? new RepositorioEventosPgDeServicio(pool)
               : new RepositorioEventosEnMemoria();
           },
+        },
+        {
+          /**
+           * 15-L (Bloque B) · lo que un equipo emite y no es un acceso, con el
+           * mismo interruptor que el histórico de accesos.
+           */
+          provide: REPOSITORIO_EVENTOS_DE_EQUIPO,
+          inject: [CONFIGURACION, Pool],
+          useFactory: (config: Configuracion, pool: Pool): RepositorioEventosDeEquipo =>
+            config.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new RepositorioEventosDeEquipoPg(pool)
+              : new RepositorioEventosDeEquipoEnMemoria(),
+        },
+        {
+          provide: REGISTRO_DE_EVENTOS_DE_EQUIPO,
+          inject: [REPOSITORIO_EVENTOS_DE_EQUIPO, CANAL_TIEMPO_REAL, BITACORA, RELOJ],
+          useFactory: (
+            repositorio: RepositorioEventosDeEquipo,
+            canal: CanalTiempoReal,
+            bitacora: Bitacora,
+            reloj: Reloj,
+          ) => new RegistroDeEventosDeEquipo(repositorio, canal, bitacora, reloj),
         },
         {
           /**
@@ -346,6 +384,12 @@ export class EventosModule {
           useFactory: (repo: RepositorioEventos) => new ConsultarEventos(repo),
         },
         {
+          provide: ConsultarLineaDeTiempo,
+          inject: [REPOSITORIO_EVENTOS, REPOSITORIO_EVENTOS_DE_EQUIPO],
+          useFactory: (repo: RepositorioEventos, deEquipo: RepositorioEventosDeEquipo) =>
+            new ConsultarLineaDeTiempo(repo, deEquipo),
+        },
+        {
           provide: ExportarEventos,
           inject: [REPOSITORIO_EVENTOS],
           useFactory: (repo: RepositorioEventos) => new ExportarEventos(repo),
@@ -417,6 +461,8 @@ export class EventosModule {
         VigilarLatidos,
         EscalarAlerta,
         ESCALAMIENTO_DE_ALERTA,
+        REPOSITORIO_EVENTOS_DE_EQUIPO,
+        REGISTRO_DE_EVENTOS_DE_EQUIPO,
       ],
     };
   }

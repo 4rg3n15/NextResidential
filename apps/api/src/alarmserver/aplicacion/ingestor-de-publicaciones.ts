@@ -12,6 +12,8 @@ import type { RegistroDeEvidencia, TipoDeEvidencia } from '../../eventos';
 import type { AccionadorDePuerta } from '../../guardia';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import type { CopropiedadDelEquipoPorRegistro } from './copropiedad-del-equipo';
+import { ConstanciasDeEquipo, constanciasSinRegistro } from './constancias-de-equipo';
+import type { RegistroDeConstancias } from './constancias-de-equipo';
 import type {
   AvisadorDeLlamadas,
   LlamadaEntrante,
@@ -87,6 +89,16 @@ export const PRESUPUESTO_DE_EVIDENCIA_MS = 800;
 /** El único ingestor de publicaciones de equipo del proceso (A1). */
 export const INGESTOR_DE_EQUIPOS = Symbol.for('ncr.alarmserver.IngestorDeEquipos');
 
+/**
+ * 15-L · lo que el ingestor usa además de lo de siempre, agrupado para no
+ * alargar más el constructor: dónde deja las constancias de la línea de
+ * tiempo (Bloque B) y a quién pregunta si una cámara decide sola (A4).
+ */
+export interface ComplementosDelIngestor {
+  readonly eventosDeEquipo?: RegistroDeConstancias;
+  readonly control?: { decideSolo?(dispositivoId: string): Promise<boolean | null> };
+}
+
 export class IngestorDeEquipos implements IngestorDePublicaciones {
   constructor(
     private readonly registrar: RegistrarAcceso,
@@ -106,7 +118,15 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     private readonly avisador: AvisadorDeLlamadas,
     /** H-15I-07 · la fila de `evidencias` que el evento referencia (con base). */
     private readonly registroDeEvidencia: RegistroDeEvidencia = registroSinBase,
-  ) {}
+    private readonly complementos: ComplementosDelIngestor = {},
+  ) {
+    this.constancias = new ConstanciasDeEquipo(
+      complementos.eventosDeEquipo ?? constanciasSinRegistro,
+      ids,
+    );
+  }
+
+  private readonly constancias: ConstanciasDeEquipo;
 
   /**
    * §4 (15-K) · UNA LÍNEA `info` POR CADA EVENTO QUE LLEGA DE UN EQUIPO: tipo,
@@ -152,9 +172,30 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
       return { registrado: false, motivo: `equipo sin copropiedad: ${resuelta.motivo}` };
     }
     const copropiedadId = resuelta.copropiedadId;
+    /**
+     * 15-L (Bloque B) · lo HISTÓRICO se guarda —marcado— y no hace nada más:
+     * ni motor, ni aviso, ni veredicto. Va a una cola que nunca retrasa a un
+     * evento vivo.
+     */
+    if (!evento.enVivo) {
+      await this.constancias.delEquipo(evento, copropiedadId);
+      return { registrado: true, motivo: 'histórico: guardado sin decidir' };
+    }
     if (evento.clase === 'rostro') return this.ingerirRostro(publicacion, copropiedadId);
     if (evento.clase === 'llamada' || evento.clase === 'timbre') {
-      return this.ingerirLlamada(evento, copropiedadId, evento.clase);
+      await this.constancias.delEquipo(evento, copropiedadId);
+      // Sólo la llamada que EMPIEZA y el timbre avisan; cancelar, contestar o
+      // colgar se guardan y se ven en la línea de tiempo, sin otra alerta.
+      if (evento.clase === 'timbre' || evento.tipo === 'llamada') {
+        return this.ingerirLlamada(evento, copropiedadId, evento.clase);
+      }
+      return { registrado: true, motivo: null };
+    }
+    if (evento.clase !== 'placa' || evento.placa === null) {
+      // Puerta, botón, sabotaje, estado, un código sin catalogar —o un vehículo
+      // detectado sin lectura—: a la consola, nunca al motor como un acceso.
+      await this.constancias.delEquipo(evento, copropiedadId);
+      return { registrado: true, motivo: null };
     }
 
     if (evento.horaSinDesplazamiento) {
@@ -226,7 +267,11 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
         estado: orden.estado,
         latenciaDelEquipoMs: orden.latenciaMs,
       });
+      // A1 · toda apertura deja evento, salga bien o mal, con el desenlace legible.
+      await this.constancias.apertura(evento, copropiedadId, orden, constancia.valor.eventoId);
     }
+    // A4 · marcar, sin retrasar la respuesta al equipo, si la cámara decidió sola.
+    void this.marcarSiLaCamaraDecidio(evento, copropiedadId, constancia.valor.eventoId);
 
     this.bitacora.registrar('info', 'lectura de placa procesada', {
       copropiedadId,
@@ -314,7 +359,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
       origen: evento.origenDeLlamada,
       viviendaResuelta: vivienda !== null,
     });
-    return { registrado: false, motivo: 'llamada: avisada a las consolas; no es un acceso' };
+    // 15-L · ya no es «no registrado»: queda en `eventos_de_equipo` (Bloque B).
+    return { registrado: true, motivo: null };
   }
 
   /** La vivienda, si el equipo dice la unidad y el padrón la reconoce. Nunca lanza. */
@@ -405,6 +451,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
         evento,
         { serie: evento.serieDelEquipo, permitido: false, motivo: 'FALLO_TECNICO' },
         comienzo,
+        copropiedadId,
+        null,
       );
       return { registrado: false, motivo: 'el hecho no se pudo registrar' };
     }
@@ -426,6 +474,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
               : 'acceso negado',
         },
         comienzo,
+        copropiedadId,
+        constancia.valor.eventoId,
       );
     } else {
       // Terminal en `decide_el_equipo`: ya abrió sola. Se registra lo que
@@ -454,14 +504,49 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     return { registrado: true, motivo: null };
   }
 
+  /**
+   * A4 (15-L) · mientras la cámara no opere bajo la plataforma (sin
+   * atestación D-11), la lectura se registra y se enseña igual, MARCADA «la
+   * cámara decidió por su cuenta». También si el propio equipo declara que
+   * abrió él (`openGateType`). Nunca lanza.
+   */
+  private async marcarSiLaCamaraDecidio(
+    evento: EventoDeEquipo,
+    copropiedadId: string,
+    eventoId: string | null,
+  ): Promise<void> {
+    try {
+      let motivo: string | null = null;
+      if (evento.quienAbrio === 'lista' || evento.quienAbrio === 'anomalo') {
+        motivo = 'la cámara declaró haber abierto ella (lista interna o excepción suya)';
+      } else if ((await this.complementos.control?.decideSolo?.(evento.dispositivoId)) === true) {
+        motivo =
+          'la cámara no opera bajo control de la plataforma y no tiene atestación vigente: ' +
+          'la talanquera la gobierna el equipo';
+      }
+      if (motivo !== null) {
+        await this.constancias.decidioLaCamara(evento, copropiedadId, motivo, eventoId);
+      }
+    } catch (error) {
+      this.bitacora.registrar('aviso', 'no se pudo comprobar si la cámara decidió sola', {
+        dispositivoId: evento.dispositivoId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   /** Devuelve el veredicto y MIDE cuánto tardó el equipo en aceptarlo. */
   private async responder(
     evento: EventoDeEquipo,
     veredicto: VeredictoRemoto,
     comienzo: number,
+    copropiedadId: string,
+    eventoId: string | null,
   ): Promise<void> {
+    let aceptado = false;
     try {
       const r = await this.respondedor.responderVerificacionRemota(evento.dispositivoId, veredicto);
+      aceptado = r.aceptado;
       const totalMs = this.reloj.ahora().getTime() - comienzo;
       this.bitacora.registrar(r.aceptado ? 'info' : 'aviso', 'veredicto devuelto a la terminal', {
         dispositivoId: evento.dispositivoId,
@@ -481,6 +566,9 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
         motivo: 'la terminal negará por su cuenta al vencer su plazo (S-41): la dirección segura',
       });
     }
+    // 15-L (Bloque B) · la respuesta a la terminal también se ve en la consola,
+    // DESPUÉS de enviarla: escribirla antes gastaría plazo de la terminal.
+    await this.constancias.veredicto(evento, copropiedadId, veredicto, aceptado, eventoId);
   }
 
   /**

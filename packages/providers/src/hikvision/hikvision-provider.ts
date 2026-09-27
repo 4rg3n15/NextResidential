@@ -123,6 +123,11 @@ export class HikvisionProvider
 {
   private readonly fuente: FuenteDePlacas;
   private readonly aprobados = new Set<string>();
+  /** A4 (15-L) · el último veredicto de control por equipo, con su instante. */
+  private readonly veredictosDeControl = new Map<
+    string,
+    { readonly decideSolo: boolean; readonly en: number }
+  >();
   private readonly capacidades = new Map<string, CapacidadesDeEquipo>();
   private readonly puertas = new Map<string, AccessPointProvider>();
   private readonly terminales = new Map<string, TerminalFacial>();
@@ -218,6 +223,26 @@ export class HikvisionProvider
     }
     // A5 · ocupado o nonce vencido se reintentan con dispersión; nada más.
     return this.reintentando(() => puerta.abrir(dispositivoId, actorId));
+  }
+
+  /**
+   * A4 (15-L) · lo que el proveedor sabe de si el equipo decide solo. Lo
+   * aprobado vale para todo el proceso (como en `exigirQueNoDecidaSolo`); lo
+   * rechazado se recuerda un minuto —una atestación nueva tarda eso en
+   * notarse— y, si no se sabe, se comprueba UNA vez. `null` si no se pudo.
+   */
+  async decideSolo(dispositivoId: string): Promise<boolean | null> {
+    if (this.aprobados.has(dispositivoId)) return false;
+    const recordado = this.veredictosDeControl.get(dispositivoId);
+    if (recordado !== undefined && this.opciones.reloj.ahora().getTime() - recordado.en < 60_000) {
+      return recordado.decideSolo;
+    }
+    try {
+      await this.exigirQueNoDecidaSolo(await this.resolver(dispositivoId));
+      return false;
+    } catch (error) {
+      return error instanceof EquipoDecidePorSuCuenta ? true : null;
+    }
   }
 
   private reintentando<T>(orden: () => Promise<T>): Promise<T> {
@@ -545,6 +570,10 @@ export class HikvisionProvider
         this.aprobados.add(equipo.dispositivoId);
         return;
       }
+      this.veredictosDeControl.set(equipo.dispositivoId, {
+        decideSolo: true,
+        en: this.opciones.reloj.ahora().getTime(),
+      });
       throw new EquipoDecidePorSuCuenta(veredicto.modo, motivos);
     }
     this.aprobados.add(equipo.dispositivoId);

@@ -1,36 +1,51 @@
 'use client';
 
 import type { JSX } from 'react';
-import { useMemo, useState } from 'react';
-import type { EventoRegistrado, PaginaDeEventos } from '@ncr/contracts';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import type { ElementoDeLineaDeTiempo, LineaDeTiempo } from '@ncr/contracts';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { TablaDeDatos } from '@/componentes/tabla-datos';
 import type { Columna } from '@/componentes/tabla-datos';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
+import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
 import { EstadoCargando, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
-import { useAlertasAbiertas } from '@/lib/api/consultas';
-
-const TIPOS = ['ingreso', 'salida', 'manual', 'denegado', 'alerta'] as const;
-type Tipo = (typeof TIPOS)[number];
+import { useAlertasAbiertas, useEquipos } from '@/lib/api/consultas';
+import { abrirCanal } from '@/lib/sse/canal';
+import type { EstadoDelCanal } from '@/lib/sse/canal';
+import { ORIGEN, TIPOS_DE_LA_LINEA } from './tipos-de-evento';
 
 const haceDias = (dias: number): string =>
   new Date(Date.now() - dias * 86_400_000).toISOString().slice(0, 10);
 
+/** El color acompaña al texto, nunca lo sustituye (el distintivo lleva icono). */
+const tonoDe = (e: ElementoDeLineaDeTiempo): TonoDeDistintivo => {
+  if (!e.enVivo) return 'neutro';
+  if (e.origen === 'acceso') return e.resultado === 'permitido' ? 'exito' : 'peligro';
+  if (/forzada|sabotaje|coaccion|fuera_de_linea|la_camara_decidio|lista_negra/.test(e.tipo)) {
+    return 'peligro';
+  }
+  if (e.origen === 'plataforma') return 'marca';
+  return 'aviso';
+};
+
 /**
- * Eventos y alertas.
+ * Eventos y alertas · ETAPA 15-L (Bloque B).
+ *
+ * **Una sola línea de tiempo.** Arriba, lo último que pasó en cualquier equipo:
+ * el acceso que decidió el motor, la puerta que se abrió o se forzó, el botón
+ * de salida, el timbre, la llamada, el sabotaje, el equipo que se cayó, la
+ * apertura que ordenó un portero con lo que contestó el equipo, y lo que nadie
+ * catalogó. Se refresca sola cuando el canal en vivo trae algo nuevo.
  *
  * **El banner de alertas críticas va arriba y no se puede descartar.** Una
  * alerta sin resolver que se cierra con una «x» deja de verse y sigue sin
- * resolverse; aquí desaparece cuando alguien la atiende en el sistema, que es
- * lo único que la hace desaparecer de verdad (CA-18).
+ * resolverse; aquí desaparece cuando alguien la atiende (CA-18).
  *
- * **La exportación no pasa por el cliente tipado**: es un fichero binario, no
- * JSON. Se abre la URL del proxy directamente para que el navegador la
- * descargue con su nombre y su tipo. El cliente generado intentaría
- * deserializar el cuerpo, y por eso el contrato la declara como binaria.
+ * **La exportación es de ACCESOS** (HU-32): es un fichero binario que el
+ * navegador descarga con su nombre, no pasa por el cliente tipado.
  */
 export const PantallaDeEventos = ({
   copropiedadId,
@@ -39,8 +54,10 @@ export const PantallaDeEventos = ({
 }): JSX.Element => {
   const [desde, setDesde] = useState(haceDias(7));
   const [hasta, setHasta] = useState(haceDias(0));
-  const [tipo, setTipo] = useState<'' | Tipo>('');
+  const [tipo, setTipo] = useState('');
   const [dispositivoId, setDispositivoId] = useState('');
+  const [enVivo, setEnVivo] = useState<EstadoDelCanal>('conectando');
+  const clientes = useQueryClient();
 
   const rango = useMemo(
     () => ({
@@ -52,17 +69,18 @@ export const PantallaDeEventos = ({
     [desde, hasta],
   );
 
-  const consulta = useQuery<PaginaDeEventos>({
-    queryKey: ['eventos', copropiedadId, rango.desde, rango.hasta, tipo, dispositivoId],
+  const clave = ['linea-de-tiempo', copropiedadId, rango.desde, rango.hasta, tipo, dispositivoId];
+  const consulta = useQuery<LineaDeTiempo>({
+    queryKey: clave,
     queryFn: async () =>
       desenvolver(
-        await cliente.GET('/copropiedades/{id}/eventos', {
+        await cliente.GET('/copropiedades/{id}/eventos/linea-de-tiempo', {
           params: {
             path: { id: copropiedadId },
             query: {
               desde: rango.desde,
               hasta: rango.hasta,
-              tamanoPagina: 100,
+              limite: 200,
               ...(tipo === '' ? {} : { tipo }),
               ...(dispositivoId === '' ? {} : { dispositivoId }),
             },
@@ -70,6 +88,31 @@ export const PantallaDeEventos = ({
         }),
       ),
   });
+
+  // B2 · el canal en vivo que ya usa la consola: cualquier acceso o evento de
+  // equipo nuevo vuelve a pedir la línea (con sus filtros).
+  useEffect(() => {
+    if (typeof EventSource === 'undefined') return undefined;
+    const refrescar = (): void =>
+      void clientes.invalidateQueries({ queryKey: ['linea-de-tiempo', copropiedadId] });
+    return abrirCanal({
+      copropiedadId,
+      mensajes: {
+        evento: refrescar,
+        eventoDeEquipo: refrescar,
+        alerta: () => undefined,
+        recuperados: refrescar,
+        estado: (estado) => setEnVivo(estado),
+      },
+    });
+  }, [clientes, copropiedadId]);
+
+  const equipos = useEquipos(copropiedadId);
+  const nombres = useMemo(
+    () => new Map((equipos.data?.equipos ?? []).map((e) => [e.id, e.nombre] as const)),
+    [equipos.data],
+  );
+  const nombreDe = (id: string): string => nombres.get(id) ?? 'Equipo sin nombre';
 
   const alertas = useAlertasAbiertas(copropiedadId);
   const criticas = (alertas.data ?? []).filter(
@@ -81,12 +124,10 @@ export const PantallaDeEventos = ({
       desde: rango.desde,
       hasta: rango.hasta,
       formato,
-      ...(tipo === '' ? {} : { tipo }),
       ...(dispositivoId === '' ? {} : { dispositivoId }),
     });
     // Navegación directa y no `fetch`: la descarga la gestiona el navegador con
-    // la cabecera `Content-Disposition` que envía la API. Traerla por `fetch`
-    // obligaría a reconstruir el nombre del fichero en el cliente.
+    // la cabecera `Content-Disposition` que envía la API.
     window.location.assign(
       `/api/ncr/copropiedades/${copropiedadId}/eventos/exportacion?${parametros.toString()}`,
     );
@@ -101,7 +142,7 @@ export const PantallaDeEventos = ({
     );
   }
 
-  const columnas: readonly Columna<EventoRegistrado>[] = [
+  const columnas: readonly Columna<ElementoDeLineaDeTiempo>[] = [
     {
       clave: 'momento',
       titulo: 'Fecha y hora',
@@ -116,43 +157,25 @@ export const PantallaDeEventos = ({
       ),
     },
     {
-      clave: 'tipo',
-      titulo: 'Tipo',
-      texto: (e) => e.tipo,
-      celda: (e) => <Distintivo tono="neutro">{e.tipo}</Distintivo>,
+      clave: 'que',
+      titulo: 'Qué pasó',
+      texto: (e) => e.titulo,
+      celda: (e) => <Distintivo tono={tonoDe(e)}>{e.titulo}</Distintivo>,
     },
     {
-      clave: 'resultado',
-      titulo: 'Resultado',
-      texto: (e) => `${e.resultado} ${e.motivo ?? ''}`,
-      celda: (e) => (
-        <div>
-          <Distintivo tono={e.resultado === 'permitido' ? 'exito' : 'peligro'}>
-            {e.resultado === 'permitido' ? 'Permitido' : 'Negado'}
-          </Distintivo>
-          {e.motivo !== null ? (
-            <p className="mt-0.5 text-secundario text-texto-apagado">{e.motivo}</p>
-          ) : null}
-        </div>
-      ),
-    },
-    {
-      clave: 'dispositivo',
-      titulo: 'Dispositivo · método',
-      texto: (e) => `${e.dispositivoId} ${e.metodo}`,
-      celda: (e) => (
-        <div>
-          <p className="text-secundario text-texto">{e.dispositivoId}</p>
-          <p className="text-secundario text-texto-apagado">{e.metodo}</p>
-        </div>
-      ),
+      clave: 'equipo',
+      titulo: 'Equipo',
+      texto: (e) => nombreDe(e.dispositivoId),
+      celda: (e) => <span className="text-secundario text-texto">{nombreDe(e.dispositivoId)}</span>,
     },
     {
       clave: 'origen',
       titulo: 'Origen',
+      texto: (e) => ORIGEN[e.origen],
       celda: (e) => (
         <span className="text-secundario text-texto-apagado">
-          {e.decididoPorEdge ? 'Edge (autónomo)' : 'Nube'} · reglas v{e.versionReglas}
+          {ORIGEN[e.origen]}
+          {e.enVivo ? '' : ' · histórico del equipo'}
         </span>
       ),
     },
@@ -162,11 +185,18 @@ export const PantallaDeEventos = ({
     <>
       <EncabezadoDePantalla
         titulo="Eventos y alertas"
-        descripcion="Historial inmutable de accesos. Ningún evento se modifica ni se borra: lo impide la base de datos (RN-03, CA-23)."
+        descripcion="Todo lo que pasa en los equipos, en una sola línea de tiempo. Ningún evento se modifica ni se borra: lo impide la base de datos."
         acciones={
           <>
+            <span className="text-secundario text-texto-apagado" aria-live="polite">
+              {enVivo === 'conectado'
+                ? 'En vivo'
+                : enVivo === 'sin-conexion'
+                  ? 'Sin conexión en vivo'
+                  : 'Conectando…'}
+            </span>
             <Boton variante="secundario" onClick={() => exportar('csv')}>
-              CSV
+              Accesos en CSV
             </Boton>
             <Boton variante="secundario" onClick={() => exportar('excel')}>
               Excel
@@ -196,15 +226,15 @@ export const PantallaDeEventos = ({
         </div>
       ) : null}
 
-      {consulta.isLoading ? <EstadoCargando etiqueta="Cargando historial" /> : null}
+      {consulta.isLoading ? <EstadoCargando etiqueta="Cargando eventos" /> : null}
 
       <TablaDeDatos
-        titulo="Historial de eventos"
+        titulo="Línea de tiempo"
         columnas={columnas}
-        filas={consulta.data?.filas ?? []}
-        claveDeFila={(e) => e.id}
+        filas={consulta.data?.elementos ?? []}
+        claveDeFila={(e) => `${e.origen}-${e.id}`}
         cargando={consulta.isLoading}
-        porPagina={20}
+        porPagina={25}
         filtros={
           <>
             <label className="flex items-center gap-2 text-secundario">
@@ -229,34 +259,39 @@ export const PantallaDeEventos = ({
               <span className="text-texto-apagado">Tipo</span>
               <select
                 value={tipo}
-                onChange={(e) => setTipo(e.target.value as '' | Tipo)}
+                onChange={(e) => setTipo(e.target.value)}
                 className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
               >
                 <option value="">Todos</option>
-                {TIPOS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {TIPOS_DE_LA_LINEA.map((t) => (
+                  <option key={t.valor} value={t.valor}>
+                    {t.nombre}
                   </option>
                 ))}
               </select>
             </label>
             <label className="flex items-center gap-2 text-secundario">
-              <span className="text-texto-apagado">Dispositivo</span>
-              <input
-                type="text"
+              <span className="text-texto-apagado">Equipo</span>
+              <select
                 value={dispositivoId}
                 onChange={(e) => setDispositivoId(e.target.value)}
-                placeholder="Identificador"
-                aria-label="Filtrar por dispositivo"
-                className="w-48 rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
-              />
+                aria-label="Filtrar por equipo"
+                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
+              >
+                <option value="">Todos</option>
+                {(equipos.data?.equipos ?? []).map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </select>
             </label>
           </>
         }
         vacio={{
           titulo: 'Sin eventos en el rango',
           descripcion:
-            'No se registró ningún acceso con estos filtros. Amplía el rango de fechas o quita el filtro de tipo.',
+            'Ningún equipo reportó nada con estos filtros. Amplía el rango de fechas o quita el filtro de tipo o de equipo.',
         }}
       />
     </>

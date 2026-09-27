@@ -739,6 +739,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/eventos/linea-de-tiempo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accesos y eventos de equipo en una sola línea de tiempo, con filtros (Bloque B) */
+        get: operations["LineaDeTiempoController_lineaDeTiempo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/eventos/{eventoId}/evidencia": {
         parameters: {
             query?: never;
@@ -2348,6 +2365,10 @@ export interface components {
              */
             xlsxBase64: string;
         };
+        CodigoDelEquipoDto: {
+            mayor: number;
+            menor: number;
+        };
         CodigosDeRecuperacionDto: {
             /**
              * @description Códigos de un solo uso, en claro. Se entregan UNA vez: solo se guarda su hash. No dan acceso — autorizan a retirar el factor perdido para inscribir otro.
@@ -2737,6 +2758,25 @@ export interface components {
             agrupacion?: string | null;
             /** @enum {string} */
             estadoAdministrativo?: "al_dia" | "en_mora" | "suspendida";
+        };
+        ElementoDeLineaDeTiempoDto: {
+            /** @enum {string} */
+            origen: "acceso" | "equipo" | "plataforma";
+            id: string;
+            /** Format: date-time */
+            ocurridoEn: string;
+            /** Format: uuid */
+            dispositivoId: string;
+            /** @description `acceso` o el tipo normalizado del evento de equipo */
+            tipo: string;
+            /** @description Lo que la consola enseña, en español */
+            titulo: string;
+            /** @enum {string|null} */
+            resultado: "permitido" | "negado" | null;
+            /** @description `false` para lo que el equipo declaró histórico */
+            enVivo: boolean;
+            eventoId: string | null;
+            codigo: components["schemas"]["CodigoDelEquipoDto"] | null;
         };
         EmergenciaDto: {
             /** @description Qué ocurre. Obligatorio. */
@@ -3156,6 +3196,9 @@ export interface components {
         LatidoDto: {
             copropiedadId: string;
             dispositivoId: string;
+        };
+        LineaDeTiempoDto: {
+            elementos: components["schemas"]["ElementoDeLineaDeTiempoDto"][];
         };
         ListoDto: {
             /** @example listo */
@@ -5311,6 +5354,45 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    LineaDeTiempoController_lineaDeTiempo: {
+        parameters: {
+            query: {
+                /** @description Inicio del rango, ISO-8601 con zona */
+                desde: string;
+                /** @description Fin del rango, EXCLUIDO */
+                hasta: string;
+                dispositivoId?: string;
+                /** @description `acceso` para sólo accesos, o un tipo de evento de equipo (p. ej. `puerta_forzada`) */
+                tipo?: string;
+                limite?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LineaDeTiempoDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
                 };
             };
         };

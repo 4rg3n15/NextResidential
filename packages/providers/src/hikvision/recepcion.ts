@@ -31,10 +31,16 @@ import type { PublicacionDeEquipo } from '../equipo/fuente-de-placas';
 export type DesenlaceDeRecepcion =
   /** El sobre no se pudo abrir. Se responde 200 igual y se registra. */
   | 'ilegible'
-  /** El equipo marcó el evento como histórico: no ocurre ahora. */
+  /**
+   * El equipo marcó el evento como histórico: no ocurre ahora. Desde la 15-L
+   * SIGUE ADELANTE para guardarse como histórico (Bloque B): no decide nada,
+   * no avisa a nadie, pero no se pierde.
+   */
   | 'historico'
   /** Llegó, pero no era una placa, un rostro ni una llamada. */
   | 'sin_placa'
+  /** 15-L · un evento del equipo que no es un acceso (puerta, botón, sabotaje…). */
+  | 'evento_de_equipo'
   /** Una lectura de placa utilizable. */
   | 'lectura'
   /** A2 · una terminal reconoció a alguien (y quizá espera veredicto). */
@@ -109,12 +115,6 @@ export const recibirPublicacionDeEquipo = (
   if (evento === null) {
     return sinPublicacion('ilegible', 'el sobre no traía un evento reconocible', comunes);
   }
-  if (!evento.enVivo) {
-    return sinPublicacion('historico', 'el equipo lo marcó histórico', {
-      ...comunes,
-      horaSinDesplazamiento: evento.horaSinDesplazamiento,
-    });
-  }
   const publicacion: PublicacionDeEquipo = {
     evento,
     foto: sobre.foto,
@@ -128,6 +128,7 @@ export const recibirPublicacionDeEquipo = (
     horaSinDesplazamiento: evento.horaSinDesplazamiento,
     motivo,
   });
+  if (!evento.enVivo) return adelante('historico', 'el equipo lo marcó histórico');
 
   if (evento.clase === 'placa' && evento.placa !== null) {
     return adelante('lectura', 'lectura de placa');
@@ -143,8 +144,12 @@ export const recibirPublicacionDeEquipo = (
   if (evento.clase === 'llamada' || evento.clase === 'timbre') {
     return adelante('llamada', 'llamada del videoportero');
   }
-  return sinPublicacion('sin_placa', 'sin lectura de placa', {
-    ...comunes,
-    horaSinDesplazamiento: evento.horaSinDesplazamiento,
-  });
+  if (evento.clase === 'placa') {
+    return sinPublicacion('sin_placa', 'sin lectura de placa', {
+      ...comunes,
+      horaSinDesplazamiento: evento.horaSinDesplazamiento,
+    });
+  }
+  // 15-L · lo que no es un acceso también se guarda y se enseña (Bloque B).
+  return adelante('evento_de_equipo', evento.titulo);
 };

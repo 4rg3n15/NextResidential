@@ -566,7 +566,19 @@ describe('ENSAYO SIMULADO · videoportero: timbre → aviso → vista en vivo �
       )
       .expect(200);
     baja();
-    expect(r.body.motivo).toMatch(/avisada a las consolas/);
+    // 15-L (Bloque B) · el timbre queda también en la línea de tiempo (tabla
+    // `eventos_de_equipo`), y sigue sin ser un acceso.
+    expect(r.body).toEqual({ aceptado: true });
+    const linea = await con(admin).get(
+      `/copropiedades/${COP_A}/eventos/linea-de-tiempo?desde=${encodeURIComponent(
+        new Date(reloj.getTime() - 60_000).toISOString(),
+      )}&hasta=${encodeURIComponent(new Date(reloj.getTime() + 60_000).toISOString())}` +
+        `&dispositivoId=${INTERCOM}`,
+    );
+    expect(linea.status, JSON.stringify(linea.body)).toBe(200);
+    const elementos = (linea.body as { elementos: { origen: string; tipo: string }[] }).elementos;
+    expect(elementos.some((e) => e.origen === 'equipo' && e.tipo === 'llamada')).toBe(true);
+    expect(elementos.some((e) => e.origen === 'acceso')).toBe(false);
     const aviso = avisos.find((x) => x.tema === 'llamadas');
     anotar('V1', 'consola', aviso === undefined ? 'SIN AVISO' : 'aviso emergente recibido');
     expect(aviso?.carga).toMatchObject({ dispositivoId: INTERCOM, clase: 'llamada' });

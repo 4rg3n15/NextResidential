@@ -134,7 +134,7 @@ describe('el videoportero contra un equipo simulado', () => {
 });
 
 describe('el flujo de eventos con volcado histórico', () => {
-  it('entrega lo vivo y descarta lo viejo, que es la trampa de la puesta en marcha', async () => {
+  it('entrega lo vivo como vivo y lo viejo MARCADO como viejo: la trampa de la puesta en marcha', async () => {
     const historicos = Array.from({ length: 5 }, (_, i) => ({
       eventType: 'doorbell',
       currentEvent: false,
@@ -158,11 +158,13 @@ describe('el flujo de eventos con volcado histórico', () => {
     const vistos = [];
     for await (const evento of escucha.escuchar(cancelar.signal)) {
       vistos.push(evento);
-      cancelar.abort();
+      if (evento.enVivo) cancelar.abort();
     }
 
-    expect(vistos).toHaveLength(1);
-    expect(vistos[0]?.clase).toBe('timbre');
+    // 15-L · los cinco viejos llegan con `enVivo: false` (se guardan como
+    // históricos, no suenan) y el vivo, con `true`.
+    expect(vistos.filter((e) => !e.enVivo)).toHaveLength(5);
+    expect(vistos.filter((e) => e.enVivo).map((e) => e.clase)).toEqual(['timbre']);
     expect(escucha.historicosDescartados).toBe(5);
   });
 });

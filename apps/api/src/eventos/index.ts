@@ -23,6 +23,18 @@ export type {
   RepositorioEventos,
 } from './aplicacion/puertos';
 export { REGISTRO_DE_EVIDENCIA, registroSinBase } from './aplicacion/registro-de-evidencia';
+/** 15-L (Bloque B) · lo que un equipo emite y no es un acceso, y lo que la plataforma le hace. */
+export {
+  REGISTRO_DE_EVENTOS_DE_EQUIPO,
+  REPOSITORIO_EVENTOS_DE_EQUIPO,
+  RegistroDeEventosDeEquipo,
+  TEMA_EVENTOS_DE_EQUIPO,
+} from './aplicacion/eventos-de-equipo';
+export type {
+  EventoDeEquipoNuevo,
+  EventoDeEquipoGuardado,
+  RepositorioEventosDeEquipo,
+} from './aplicacion/eventos-de-equipo';
 export type { RegistroDeEvidencia, TipoDeEvidencia } from './aplicacion/registro-de-evidencia';
 export {
   LIMITADOR_DISPOSITIVO,

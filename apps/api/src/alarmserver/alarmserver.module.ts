@@ -15,8 +15,12 @@ import { GuardiaDeAlarmServer, EQUIPOS_DE_ALARM_SERVER } from './presentacion/gu
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 import type { EquipoDeclarado } from '../comun/equipos-de-alarm-server';
 import { INGESTOR_DE_EQUIPOS, IngestorDeEquipos } from './aplicacion/ingestor-de-publicaciones';
-import { CANAL_TIEMPO_REAL, REGISTRO_DE_EVIDENCIA } from '../eventos';
-import type { CanalTiempoReal, RegistroDeEvidencia } from '../eventos';
+import {
+  CANAL_TIEMPO_REAL,
+  REGISTRO_DE_EVENTOS_DE_EQUIPO,
+  REGISTRO_DE_EVIDENCIA,
+} from '../eventos';
+import type { CanalTiempoReal, RegistroDeEventosDeEquipo, RegistroDeEvidencia } from '../eventos';
 import { LOCALIZADOR_DE_VIVIENDA, PadronModule } from '../padron';
 import type { LocalizadorDeVivienda } from '../padron';
 import { COPROPIEDAD_DE_EQUIPO, EQUIPOS_QUE_EMITEN, EquiposModule } from '../equipos';
@@ -134,6 +138,7 @@ export class AlarmServerModule {
             AVISADOR_DE_LLAMADAS,
             REGISTRO_DE_EVIDENCIA,
             COPROPIEDAD_DE_EQUIPO,
+            REGISTRO_DE_EVENTOS_DE_EQUIPO,
           ],
           useFactory: (
             referencia: ModuleRef,
@@ -150,6 +155,7 @@ export class AlarmServerModule {
             avisador: AvisadorDeLlamadas,
             registroDeEvidencia: RegistroDeEvidencia,
             registroDeEquipos: LocalizadorDeCopropiedadDeEquipo,
+            eventosDeEquipo: RegistroDeEventosDeEquipo,
           ) => {
             const ingestor = new IngestorDeEquipos(
               registrar,
@@ -175,6 +181,8 @@ export class AlarmServerModule {
               avisador,
               // H-15I-07 · la foto queda en `evidencias` y el evento la referencia.
               registroDeEvidencia,
+              // 15-L · la línea de tiempo (Bloque B) y «¿decide sola?» (A4).
+              { eventosDeEquipo, control: proveedor },
             );
             fuente.fijarIngestor(ingestor);
             return ingestor;
