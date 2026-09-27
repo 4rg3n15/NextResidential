@@ -8,6 +8,7 @@ import {
   RegistrarVivienda,
 } from '../src/padron/aplicacion/casos-de-uso';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
+import { URL_BASE, exigirBase, omitirSinBase } from './base-exigida';
 
 /**
  * D-71 · el superadministrador da de alta el padrón **contra base real**.
@@ -20,7 +21,6 @@ import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
  *
  * Se OMITE si no hay base, y lo dice: una omisión no es un verde.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 
 let pool: Pool | undefined;
@@ -73,6 +73,9 @@ const vocabulario: LectorDeVocabulario = {
     etiquetaAgrupacion: 'Torre',
   }),
 };
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
 
 describe('alta de padrón con superadministrador, contra base', () => {
   it('crea una vivienda y devuelve su identificador', async () => {
@@ -141,7 +144,7 @@ describe('alta de padrón con superadministrador, contra base', () => {
     );
     const personaId = rows[0]?.id;
     if (personaId === undefined) {
-      console.log('OMITIDA: no hay persona libre en la copropiedad sembrada.');
+      omitirSinBase('no hay persona libre en la copropiedad sembrada');
       return;
     }
 

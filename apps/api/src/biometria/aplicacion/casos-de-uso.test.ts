@@ -10,11 +10,11 @@ import {
 import {
   BarrerPlantillasVencidas,
   CapturarRostro,
-  ResponderConsentimiento,
   RevocarConsentimiento,
   SincronizarPlantilla,
   SuprimirRostroDeAutorizacion,
 } from './casos-de-uso';
+import { RespuestaDelTitular } from '../../../test/dobles/respuesta-del-titular';
 
 const COP = 'cop-1';
 const TITULAR = 'visitante-1';
@@ -77,7 +77,7 @@ let boveda: BovedaAesGcm;
 let almacen: AlmacenEnMemoria;
 let reloj: RelojFijo;
 let capturar: CapturarRostro;
-let responder: ResponderConsentimiento;
+let responder: RespuestaDelTitular;
 let revocar: RevocarConsentimiento;
 let sincronizar: SincronizarPlantilla;
 let barrer: BarrerPlantillasVencidas;
@@ -94,7 +94,7 @@ beforeEach(() => {
   reloj = new RelojFijo(AHORA);
   const ids = new IdsSecuenciales();
   capturar = new CapturarRostro(consentimientos, plantillas, boveda, reloj, ids);
-  responder = new ResponderConsentimiento(consentimientos, plantillas, reloj);
+  responder = new RespuestaDelTitular(consentimientos, plantillas, reloj);
   revocar = new RevocarConsentimiento(consentimientos, plantillas, boveda, reloj);
   sincronizar = new SincronizarPlantilla(consentimientos, plantillas, boveda, reloj);
   barrer = new BarrerPlantillasVencidas(plantillas, boveda, reloj);
@@ -160,41 +160,6 @@ describe('CapturarRostro · CU-02, el orden es la regla', () => {
       suprimirEn: new Date(AHORA.getTime() + 6 * 365 * 24 * HORA),
     });
     expect(esFallo(r)).toBe(true);
-  });
-});
-
-describe('ResponderConsentimiento · RN-10, responde el titular', () => {
-  it('el residente no puede aceptar por el visitante', async () => {
-    const r = await capturaValida();
-    const respuesta = await responder.ejecutar(ctx, {
-      consentimientoId: r.consentimientoId,
-      quienResponde: RESIDENTE,
-      acepta: true,
-    });
-    expect(esFallo(respuesta)).toBe(true);
-    if (esFallo(respuesta)) expect(respuesta.error.regla).toBe('RN-10');
-  });
-
-  it('el titular acepta y la plantilla queda habilitada', async () => {
-    const r = await capturaValida();
-    await responder.ejecutar(ctx, {
-      consentimientoId: r.consentimientoId,
-      quienResponde: TITULAR,
-      acepta: true,
-    });
-    const p = await plantillas.porId(COP, r.plantillaId);
-    expect(p?.estado).toBe('pendiente_sincronizacion');
-  });
-
-  it('el titular rechaza y la plantilla NO se habilita', async () => {
-    const r = await capturaValida();
-    await responder.ejecutar(ctx, {
-      consentimientoId: r.consentimientoId,
-      quienResponde: TITULAR,
-      acepta: false,
-    });
-    const p = await plantillas.porId(COP, r.plantillaId);
-    expect(p?.estado).toBe('pendiente_consentimiento');
   });
 });
 

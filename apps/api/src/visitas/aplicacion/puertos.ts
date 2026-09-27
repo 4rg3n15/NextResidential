@@ -87,10 +87,6 @@ export interface VisitaListada {
   readonly casillaDeclaradaPor: string | null;
   readonly casillaEn: Date | null;
   readonly plantillaId: string | null;
-  /** Para la confirmación OPCIONAL del titular presente (D-10). */
-  readonly consentimientoId: string | null;
-  /** `true` si el titular ya confirmó en persona la casilla declarada. */
-  readonly confirmadoPorElTitular: boolean;
   readonly equiposSincronizados: number;
   readonly equiposFallidos: number;
 }

@@ -115,6 +115,10 @@ export type ResultadoDeSondeo = Esquemas['ResultadoDeSondeoDto'];
 export type FichaDelEquipo = Esquemas['FichaDelEquipoDto'];
 export type HallazgoDelEquipo = Esquemas['HallazgoDelEquipoDto'];
 export type ResultadoDeCorreccion = Esquemas['ResultadoDeCorreccionDto'];
+/** Corrección de la 15-L · «Enviar eventos a este Mac» y el interruptor de verificación remota. */
+export type ResultadoDeConfiguracion = Esquemas['ResultadoDeConfiguracionDto'];
+/** F3 · ¿llegan las órdenes a un equipo real? La franja de la consola. */
+export type EstadoDeEquiposSimulados = Esquemas['EstadoDeEquiposSimuladosDto'];
 export type TipoDeEquipo = Equipo['tipo'];
 /** Los cuatro tipos de conjunto, tomados del contrato. */
 export type TipoDeCopropiedad = NonNullable<ConfiguracionDeCopropiedad['tipo']>;

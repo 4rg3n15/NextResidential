@@ -1,3 +1,4 @@
+import { normalizarOrigen } from '../../comun/direccion-ip';
 import type {
   AjustesDePlataforma,
   EventoDeSeguridad,
@@ -51,7 +52,7 @@ export class RegistroDePresenciaEnMemoria implements RegistroDePresencia {
     const actual = this.sesiones.get(p.sesionId);
     if (actual?.cerrada === true) return;
     this.sesiones.set(p.sesionId, {
-      ip: p.ip.replace(/^::ffff:/i, ''),
+      ip: normalizarOrigen(p.ip),
       ultima: p.ahora,
       cerrada: false,
     });
@@ -77,11 +78,11 @@ export class RegistroDeSeguridadEnMemoria implements RegistroDeSeguridad {
   }
 
   async fallosRecientes(ip: string, identificador: string, desde: Date): Promise<number> {
-    const buscada = ip.replace(/^::ffff:/i, '');
+    const buscada = normalizarOrigen(ip);
     return this.eventos.filter(
       (e) =>
         e.tipo === 'login_fallido' &&
-        (e.ip ?? '').replace(/^::ffff:/i, '') === buscada &&
+        normalizarOrigen(e.ip) === buscada &&
         e.identificador === identificador &&
         e.ocurridoEn.getTime() >= desde.getTime(),
     ).length;

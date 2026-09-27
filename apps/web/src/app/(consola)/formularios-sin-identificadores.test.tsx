@@ -443,13 +443,6 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
   'configuracion/formulario.tsx':
     'campos numéricos con min/max declarados que el navegador impide enviar fuera de rango, y 422 por campo',
   /**
-   * ETAPA 15-L (F) · la confirmación en persona, OPCIONAL, del visitante: pide
-   * su nombre y su documento, datos de PERSONA que él escribe; el
-   * consentimiento viaja en la RUTA desde la tarjeta de la visita.
-   */
-  'visitantes/confirmacion-presencial.tsx':
-    'nombre y documento de persona escritos por el titular; el consentimiento viaja en la ruta',
-  /**
    * ETAPA 15-L (F) · la foto del visitante: un archivo de imagen elegido con el
    * selector o la cámara. No hay un solo campo de texto.
    */
@@ -468,6 +461,14 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    * hay campo de texto.
    */
   'configuracion/modo-pruebas.tsx': 'un interruptor: envía un booleano, nadie teclea nada',
+  /**
+   * Corrección de la 15-L · las acciones de la ficha: «Enviar eventos a este
+   * Mac» y el interruptor de la verificación remota. El equipo viaja en la
+   * RUTA desde su ficha; el cuerpo es el motivo ya escrito en la ficha y un
+   * booleano. Lo comprueba `dispositivos/acciones-de-sitio.test.tsx`.
+   */
+  'dispositivos/acciones-de-sitio.tsx':
+    'el equipo viaja en la ruta; el cuerpo es el motivo de la ficha y un booleano',
   /**
    * 15-L (H1, H2) · el cupo es un número de 0 a 999 y la baja lleva un motivo
    * en texto; el portero viaja en la RUTA desde la fila que lo muestra.

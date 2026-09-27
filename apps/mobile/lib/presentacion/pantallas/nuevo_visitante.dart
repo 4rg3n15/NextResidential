@@ -263,6 +263,7 @@ class _PantallaDeNuevoVisitanteState extends State<PantallaDeNuevoVisitante> {
 
             const SizedBox(height: 16),
             CasillaDeLaFoto(
+              nombreDelVisitante: _visitante.text,
               marcada: _casilla,
               habilitada: habilitado,
               alCambiar: (v) => setState(() => _casilla = v),

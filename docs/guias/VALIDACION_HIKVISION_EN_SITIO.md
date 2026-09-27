@@ -157,7 +157,7 @@ Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con 
 
     Cada fila lleva su evento de `/eventos` y su evidencia; sin identificador de evento no hay PASA (RN-02). La única excepción es V1, porque un timbre no deja evento. La lista negra de L5 y T5 se crea en Listas negras → Vetar.
     **Evidencia cruda, en cada fila:** las líneas de `api.log` de ese escenario —cada evento que llega de un equipo deja una línea `info` con tipo, equipo y resultado, y cada orden su petición y su respuesta saneadas (H-SITIO-13, 14)— o el fichero de `--capturar` que lo muestre. **Un FALLA sin evidencia cruda no se puede corregir desde aquí.**
-    **Consentimiento:** si el teléfono del visitante no abre el enlace, el titular puede aceptar en persona en la misma pantalla de la foto —«El titular está aquí: consentimiento presencial»—, escribiendo **él** su nombre y su documento (D-10, [ADR-029](../decisiones/ADR-029-consentimiento-presencial-del-titular.md); su validez jurídica está PENDIENTE DE DEFINICIÓN del área legal). El operador no rellena nada por él.
+    **Consentimiento:** la única constancia es la casilla del formulario, «Declaro que <nombre del visitante> me autorizó a usar su foto para su ingreso al conjunto» (decisión final del cliente, [ADR-032](../decisiones/ADR-032-consentimiento-declarado-por-quien-registra.md), enmienda). No hay enlace ni confirmación presencial.
 
 12. **Limpieza de datos de prueba:**
     1. levante los vetos de prueba;

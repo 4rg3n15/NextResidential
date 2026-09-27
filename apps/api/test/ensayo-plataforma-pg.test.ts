@@ -14,6 +14,7 @@ import {
 } from '../../../scripts/lib/ensayo-plataforma.mjs';
 import { RepositorioEventosDeEquipoPg } from '../src/eventos/infraestructura/repositorio-eventos-de-equipo-pg';
 import { ACTOR_INGESTA } from '../src/comun/actores-de-servicio';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -26,7 +27,6 @@ import { ACTOR_INGESTA } from '../src/comun/actores-de-servicio';
  * (salud de la API y migraciones pendientes) se prueban sin base.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 const CORRIDA = randomBytes(4).toString('hex');
 const HOST = `ensayo-${CORRIDA}.invalid`;
@@ -61,11 +61,7 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (dispositivoId !== '') return false;
-  console.warn('OMITIDA: sin DATABASE_URL_PRUEBAS o sin semillas (se exige con --con-base).');
-  return true;
-};
+const omitida = (): boolean => dispositivoId === '';
 
 const registrar = (titulo: string, enVivo: boolean) =>
   new RepositorioEventosDeEquipoPg(pool as Pool).registrar({
@@ -86,6 +82,9 @@ const registrar = (titulo: string, enVivo: boolean) =>
   });
 
 describe('paso 4 · el evento del gesto, leído de la base (RLS forzada)', () => {
+  // H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+  exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => dispositivoId !== '');
+
   it('lo anterior al gesto y lo histórico no cuentan; lo nuevo y en vivo, sí', async () => {
     if (omitida()) return;
     await registrar('anterior al gesto', true);

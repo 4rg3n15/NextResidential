@@ -9,7 +9,13 @@ import { bloques, etiqueta } from '../equipo/xml';
 import { recortado, sinSecretos } from '../equipo/intercambio';
 import type { Bitacora } from '@ncr/domain-core';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
-import { recuentoDeLaBiblioteca } from '../terminal/recuento-de-biblioteca';
+import {
+  PREGUNTA_DE_CONTROL_DE_ACCESO,
+  descubrirBiblioteca,
+  descubrirPersonas,
+  motivoDeLaRespuesta,
+} from './rostros-y-personas';
+import type { RespuestaDeCapacidad } from './rostros-y-personas';
 
 /**
  * DE LO QUE EL EQUIPO DECLARA A LO QUE EL SISTEMA PREGUNTA · ETAPA 15-D (O2).
@@ -34,9 +40,9 @@ import { recuentoDeLaBiblioteca } from '../terminal/recuento-de-biblioteca';
  * | suscripcionDeEventos     | SysCap.isSupportSubscribeEvent       | volcados reales (ambos)     |
  * | reconocimientoDePlacas   | ITCCap.isSupportVehicleDetection     | volcado real de la cámara   |
  * | audioBidireccional       | SysCap.AudioCap + lista de canales   | volcado real + DOCUMENTADA  |
- * | bibliotecaDeRostros      | FDLib capabilities / Count           | DOCUMENTADA, NO VERIFICADA  |
+ * | bibliotecaDeRostros      | FDLib capabilities, luego Count      | DOCUMENTADA, NO VERIFICADA  |
  * | verificacionRemota       | AcsCfg.remoteCheck                   | DOCUMENTADA, NO VERIFICADA  |
- * | gestionDePersonas        | AccessControl capabilities (UserInfo)| DOCUMENTADA, NO VERIFICADA  |
+ * | gestionDePersonas        | UserInfo caps., luego AccessControl  | DOCUMENTADA, NO VERIFICADA  |
  * | estadoDeBarrera          | BarrierGateCap.isSupportBarrierGateStatus | guía oficial           |
  *
  * Lo DOCUMENTADO se comprueba en sitio con `scripts/puesta-en-marcha-equipos.mjs`
@@ -169,51 +175,8 @@ export const verificacionRemotaSoportada = (documento: string | null): boolean |
   return m?.[1] === undefined ? null : m[1].toLowerCase() === 'true';
 };
 
-export interface EstadoDeBiblioteca {
-  readonly estado: EstadoDeCapacidad;
-  readonly maximo: number | null;
-  readonly almacenadas: number | null;
-}
-
-/**
- * Biblioteca de rostros: cuántas plantillas caben y cuántas hay.
- *
- * La segunda cifra es la que hace VERIFICABLE una supresión (RN-11): después
- * de suprimir, el recuento tiene que bajar. Un `OK` a la orden no lo demuestra.
- */
-export const bibliotecaDesde = (
-  capacidadesJson: string | null,
-  recuentoJson: string | null,
-): EstadoDeBiblioteca => {
-  const leerNumero = (json: string | null, claves: readonly string[]): number | null => {
-    if (json === null) return null;
-    try {
-      const objeto: unknown = JSON.parse(json);
-      if (typeof objeto !== 'object' || objeto === null) return null;
-      let actual: unknown = objeto;
-      for (const clave of claves) {
-        if (typeof actual !== 'object' || actual === null) return null;
-        actual = (actual as Record<string, unknown>)[clave];
-      }
-      if (typeof actual === 'object' && actual !== null && '@max' in actual) {
-        const max = (actual as Record<string, unknown>)['@max'];
-        return typeof max === 'number' ? max : null;
-      }
-      return typeof actual === 'number' && Number.isFinite(actual) ? actual : null;
-    } catch {
-      return null;
-    }
-  };
-  const maximo = leerNumero(capacidadesJson, ['FDLibCap', 'maxFDRecordNum']);
-  // Anexo 15-K · `recordDataNumber` de la biblioteca, como la guía («Face
-  // Picture Search»); `totalNum` es la forma anterior, que se sigue leyendo.
-  const almacenadas = recuentoDeLaBiblioteca(recuentoJson);
-  return {
-    estado: capacidadesJson === null && recuentoJson === null ? 'desconocida' : 'si',
-    maximo,
-    almacenadas,
-  };
-};
+/** F4 (15-L) · la biblioteca y las personas, con orden de respaldo y motivo. */
+export { bibliotecaDesde } from './rostros-y-personas';
 
 export interface OpcionesDeDescubrimiento {
   readonly cliente: ClienteDeEquipo;
@@ -244,15 +207,12 @@ export const descubrirCapacidades = async (
    * que separa `no` (NO APLICA) de `desconocida` (no se pudo leer): un
    * videoportero sin biblioteca de rostros no es un videoportero sin sondear.
    */
-  const consultar = async (
-    proposito: string,
-    fam = familia,
-  ): Promise<{ readonly cuerpo: string | null; readonly noAdmite: boolean }> => {
+  const consultar = async (proposito: string, fam = familia): Promise<RespuestaDeCapacidad> => {
     let ruta: RutaDeEquipo;
     try {
       ruta = rutaPara(proposito, fam, opciones.canal ?? CARRIL_VERIFICADO_DE_LA_CAMARA);
     } catch {
-      return { cuerpo: null, noAdmite: false };
+      return { cuerpo: null, noAdmite: false, motivo: `«${proposito}» no está catalogada aquí` };
     }
     // H-SITIO-15 · con el cuerpo que la ruta declara: nunca un POST vacío.
     const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta, ruta.cuerpo);
@@ -274,14 +234,23 @@ export const descubrirCapacidades = async (
     ) {
       throw new CredencialRechazada(opciones.dispositivoId ?? cliente.destino);
     }
+    // F4 (15-L) · lo que no se pudo leer lleva su motivo, en palabras.
+    const motivo = motivoDeLaRespuesta(proposito, respuesta.estado, respuesta.cuerpo);
     if (respuesta.estado === 404 || rechazado(respuesta.cuerpo)) {
-      return { cuerpo: null, noAdmite: true };
+      return { cuerpo: null, noAdmite: true, motivo };
     }
-    if (!respuesta.ok) return { cuerpo: null, noAdmite: false };
-    return { cuerpo: respuesta.cuerpo, noAdmite: false };
+    if (!respuesta.ok) return { cuerpo: null, noAdmite: false, motivo };
+    return { cuerpo: respuesta.cuerpo, noAdmite: false, motivo: null };
   };
   const pedir = async (proposito: string, fam = familia): Promise<string | null> =>
     (await consultar(proposito, fam)).cuerpo;
+  /** Rostros y personas viven en el catálogo de la terminal (F4). */
+  const deAcceso = (proposito: string): Promise<RespuestaDeCapacidad> =>
+    consultar(proposito, 'terminal');
+  const conMotivo = (p: { estado: EstadoDeCapacidad; motivo: string | null }) => ({
+    gestionDePersonas: p.estado,
+    ...(p.motivo === null ? {} : { motivoDeGestionDePersonas: p.motivo }),
+  });
 
   const sistema = await pedir('leer las capacidades del equipo', 'comun');
   const base = sistema === null ? {} : capacidadesDesdeDeviceCap(sistema);
@@ -313,11 +282,11 @@ export const descubrirCapacidades = async (
 
   if (familia === 'terminal') {
     const acs = await pedir('leer si la terminal espera el veredicto de la plataforma');
-    const personas = await pedir('capacidades de control de acceso de la terminal');
+    const acceso = await consultar(PREGUNTA_DE_CONTROL_DE_ACCESO);
     const leida = acs === null ? 'desconocida' : verificacionRemotaDesde(acs);
     // H-SITIO-05 · segunda lectura, la de la guía: si el equipo ni la admite,
     // es un «no» firme; si la admite, sigue sin saberse si está activada.
-    const soportada = verificacionRemotaSoportada(personas);
+    const soportada = verificacionRemotaSoportada(acceso.cuerpo);
     parciales.verificacionRemota = leida === 'desconocida' && soportada === false ? 'no' : leida;
     if (leida === 'desconocida') {
       opciones.traza?.registrar('aviso', 'verificación remota sin leer en AcsCfg', {
@@ -330,11 +299,8 @@ export const descubrirCapacidades = async (
             : 'no se sabe si está activada: en reporta_y_espera no se opera hasta saberlo',
       });
     }
-    const cap = await pedir('leer qué admite la biblioteca de rostros');
-    const cuenta = await pedir('contar las plantillas de la biblioteca de rostros');
-    const biblioteca = bibliotecaDesde(cap, cuenta);
-    parciales.bibliotecaDeRostros = biblioteca;
-    parciales.gestionDePersonas = personas === null ? 'desconocida' : 'si';
+    parciales.bibliotecaDeRostros = await descubrirBiblioteca(deAcceso, 'terminal');
+    Object.assign(parciales, conMotivo(await descubrirPersonas(deAcceso, 'terminal', acceso)));
     // La terminal también abre una puerta: la capacidad es la misma pregunta.
     const puerta = await pedir('leer qué órdenes admite la puerta desde la plataforma');
     if (puerta !== null) parciales.aperturaRemota = /open/i.test(puerta) ? 'si' : 'no';
@@ -342,23 +308,14 @@ export const descubrirCapacidades = async (
 
   if (familia === 'videoportero') {
     /**
-     * H-SITIO-09 · ¿tiene el videoportero biblioteca de rostros? En sitio
-     * quedaba «desconocida» porque ni se preguntaba, y la sincronización total
-     * lo saltaba sin decirlo. Se pregunta por las MISMAS rutas de la guía de
-     * control de acceso que la terminal: si contesta, recibe las plantillas;
-     * si dice «no admito», la ficha dice NO APLICA; si no se pudo leer, sigue
-     * desconocida y no se le envía nada.
+     * H-SITIO-09 · ¿tiene el videoportero biblioteca de rostros? Se pregunta
+     * por las MISMAS rutas de control de acceso que la terminal, con el orden
+     * de respaldo y el motivo de F4 (`rostros-y-personas.ts`): si contesta,
+     * recibe las plantillas; si dice «no admito», la ficha dice NO APLICA; si
+     * no se pudo leer, sigue desconocida, CON SU MOTIVO, y no se le envía nada.
      */
-    const cap = await consultar('leer qué admite la biblioteca de rostros', 'terminal');
-    const cuenta = await consultar('contar las plantillas de la biblioteca de rostros', 'terminal');
-    if (cap.cuerpo !== null || cuenta.cuerpo !== null) {
-      parciales.bibliotecaDeRostros = bibliotecaDesde(cap.cuerpo, cuenta.cuerpo);
-    } else if (cap.noAdmite && cuenta.noAdmite) {
-      parciales.bibliotecaDeRostros = { estado: 'no', maximo: null, almacenadas: null };
-    }
-    const personas = await consultar('capacidades de control de acceso de la terminal', 'terminal');
-    parciales.gestionDePersonas =
-      personas.cuerpo !== null ? 'si' : personas.noAdmite ? 'no' : 'desconocida';
+    parciales.bibliotecaDeRostros = await descubrirBiblioteca(deAcceso, 'videoportero');
+    Object.assign(parciales, conMotivo(await descubrirPersonas(deAcceso, 'videoportero')));
   }
 
   if (familia === 'camara') {

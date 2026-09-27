@@ -202,13 +202,6 @@ enum PeriodoDeHistorial { hoy, semana, mes, todo }
 // M-4 · Nuevo visitante con foto y casilla (15-L, bloque F)
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// F4 · el texto EXACTO de la casilla del formulario.
-///
-/// Es el mismo que el servidor guarda como la versión que se marcó: si la app
-/// dijera otra cosa, la constancia describiría un texto que el residente nunca
-/// leyó. Por eso vive aquí, con nombre, y la pantalla no lo reescribe.
-const textoDeLaCasilla = 'El visitante autorizó el uso de su foto para el ingreso';
-
 /// La foto frontal del visitante, lista para viajar: un JPEG en base64 y las
 /// medidas con las que se juzgó.
 ///
@@ -278,7 +271,8 @@ class NuevaVisita {
   final FotoDeVisita foto;
 
   /// F4 · la casilla. La marca el residente, y el servidor registra quién la
-  /// marcó, cuándo y con qué texto. Sin ella no se crea nada.
+  /// marcó, cuándo y con qué versión del texto —la fija él, no la app—. Sin
+  /// ella no se crea nada.
   final bool casillaMarcada;
 
   /// RN-17 · se genera al ABRIR el formulario y se repite en cada reintento.

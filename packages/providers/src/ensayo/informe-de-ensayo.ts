@@ -42,8 +42,17 @@ export interface Recuento {
   readonly no_aplica: number;
 }
 
-export const recuentoDe = (informes: readonly InformeDeEnsayo[]): Recuento => {
+/**
+ * Los pasos de cada equipo y, además, las comprobaciones de la plataforma
+ * (C1, F3): un FALLO del `.env` de la API cuenta en el veredicto como uno del
+ * equipo.
+ */
+export const recuentoDe = (
+  informes: readonly InformeDeEnsayo[],
+  comprobaciones: readonly { readonly estado: EstadoDePaso }[] = [],
+): Recuento => {
   const r = { ok: 0, fallo: 0, omitido: 0, no_aplica: 0 };
   for (const i of informes) for (const p of i.pasos) r[p.estado] += 1;
+  for (const c of comprobaciones) r[c.estado] += 1;
   return r;
 };

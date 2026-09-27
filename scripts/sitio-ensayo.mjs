@@ -3,13 +3,16 @@
  * ═════════════════════════════════════════════════════════════════════════════
  * pnpm sitio:ensayo · ETAPA 15-L (J1, J2) · EL ENSAYO DEL DÍA DE ENTREGA
  *
- * Recorre, equipo por equipo y en este orden, las ocho capacidades:
+ * Recorre, equipo por equipo y en este orden, las nueve capacidades:
  *   1 conexión y Digest · 2 hora frente al Mac · 3 configuración · 4 eventos
- *   5 apertura (con alguien mirando) · 6 alta y baja de un rostro · 7 video
- *   8 audio
+ *   (la cámara: ¿publica en ESTE Mac?) · 5 apertura (con alguien mirando) ·
+ *   6 alta, espera y baja de un rostro (terminal y videoportero con biblioteca)
+ *   · 7 video · 8 audio · 9 tiempo de la verificación remota (terminal: cinco
+ *   presentaciones, p50/p95 contra su plazo)
  * y dice OK/FALLO por paso, con la causa y la acción. Antes, las comprobaciones
- * del Mac: la API por el bucle local y POR LA IP DEL MAC (la del iPhone), el
- * puente de video y las migraciones pendientes.
+ * del Mac —la API por el bucle local y POR LA IP DEL MAC (la del iPhone), el
+ * puente de video, las migraciones— y las de la PLATAFORMA, que cuentan en el
+ * veredicto: el proveedor de equipos (F3) y la conexión de pg-boss (C1).
  *
  *   pnpm sitio:ensayo                               # los equipos del .env
  *   pnpm sitio:ensayo -- --solo-lectura             # nada que mueva o escriba
@@ -17,28 +20,36 @@
  *   pnpm sitio:ensayo -- --capturar=$HOME/ncr-sitio/respaldo   # J2, y sale
  *   pnpm sitio:ensayo -- --restaurar=$HOME/ncr-sitio/respaldo  # J2, y sale
  *   pnpm sitio:ensayo -- --simulado                 # sin red: equipos simulados
- *   otras: --espera=<s> (60) · --sin-plataforma · --informe=<ruta.md> · --env=<ruta>
+ *   otras: --espera=<s> (60) · --espera-sincronizacion=<s> (60; en --simulado,
+ *   0,2 s) · --sin-plataforma · --informe=<ruta.md> · --env=<ruta>
  *
  * Lee `apps/api/.env` —el mismo de la API—: BARRERA_*, TERMINAL_*,
- * VIDEOPORTERO_* (HOST, PUERTO, USUARIO, CLAVE, CANAL, CANAL_VIDEO). NUNCA
- * imprime una credencial: toda línea pasa por el tachado de los valores
- * secretos del `.env`. Informes y respaldos, sólo FUERA del repositorio.
+ * VIDEOPORTERO_* (HOST, PUERTO, USUARIO, CLAVE, CANAL, CANAL_VIDEO), PORT,
+ * ALARM_SERVER_EQUIPOS, ALARM_SERVER_IP_ANUNCIADA, TERMINAL_PLAZO_DE_VERIFICACION_S,
+ * PROVEEDOR_DE_EQUIPOS y las cadenas de la base. NUNCA imprime una credencial:
+ * toda línea pasa por el tachado de los valores secretos del `.env` (también
+ * los secretos de ruta de ALARM_SERVER_EQUIPOS). Informes y respaldos, sólo
+ * FUERA del repositorio.
  *
  * Salida: 0 sin fallos · 1 algún FALLO · 2 configuración incompleta.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { createRequire } from 'node:module';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ipDelMac } from './lib/red-del-mac.mjs';
+import { ipDelMacHacia } from './lib/red-del-mac.mjs';
 import {
   equipoRegistrado,
   eventosDeLaPlataforma,
-  migracionesPendientes,
-  sondearSalud,
+  verificacionesDeLaPlataforma,
 } from './lib/ensayo-plataforma.mjs';
+import {
+  comprobacionesDeLaPlataforma,
+  comprobacionesDelMac,
+} from './lib/comprobaciones-del-mac.mjs';
+import { respaldar, restaurar } from './lib/respaldo-en-sitio.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -71,6 +82,15 @@ if (!existsSync(compilado))
   salir('falta compilar el paquete de equipos: pnpm --filter @ncr/providers build');
 const P = createRequire(import.meta.url)(compilado);
 
+/**
+ * C2 · los secretos de ruta del servidor de alarma: `copropiedad|dispositivo|
+ * secreto|ip[,ip]` y `;` entre equipos. Se comparan con la ruta de la cámara y
+ * se tachan de toda salida.
+ */
+const SECRETOS_DE_ALARMA = (process.env.ALARM_SERVER_EQUIPOS ?? '')
+  .split(';')
+  .map((e) => e.split('|')[2]?.trim() ?? '')
+  .filter((s) => s !== '');
 /** Los valores del .env que nunca deben salir por pantalla ni al informe. */
 const SECRETOS = Object.entries(process.env)
   .filter(([k]) => /CLAVE|PASSWORD|SECRET|LLAVE|TOKEN|_KEY$|USUARIO/.test(k))
@@ -79,6 +99,7 @@ const SECRETOS = Object.entries(process.env)
     [process.env.DATABASE_URL, process.env.PGBOSS_DATABASE_URL]
       .map((u) => /\/\/[^:]+:([^@]+)@/.exec(u ?? '')?.[1] ?? '')
       .filter((x) => x !== ''),
+    SECRETOS_DE_ALARMA,
   );
 const salida = [];
 const decir = (linea = '') => {
@@ -120,57 +141,6 @@ const desdeEntorno = ({ familia, prefijo }) => {
   };
 };
 
-/** En `--simulado`, los tres equipos del paquete, sin red. */
-const simulados = async () => {
-  const rtsp = await P.servidorRtspSimulado({
-    usuario: 'servicio',
-    clave: 'clave-simulada',
-    canales: { 102: 'H264' },
-  });
-  const hora = new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'America/Bogota',
-    dateStyle: 'short',
-    timeStyle: 'medium',
-  })
-    .format(new Date())
-    .replace(' ', 'T');
-  const guion = (familia, extra) =>
-    P.equiposSimulados({
-      [`${familia}.simulado.invalid`]: {
-        familia,
-        usuario: 'servicio',
-        clave: 'clave-simulada',
-        hora: `${hora}-05:00`,
-        destino: familia,
-        ...extra,
-      },
-    });
-  const peticiones = {
-    camara: guion('camara', {}),
-    terminal: guion('terminal', { verificacionRemota: true }),
-    videoportero: guion('videoportero', {
-      aperturaRemota: true,
-      canalesDeAudio: [{ id: 1, habilitado: true, codec: 'G.711ulaw' }],
-    }),
-  };
-  // HTTP al simulado de su familia; RTSP al servidor del bucle local.
-  const equipos = FAMILIAS.map(({ familia }) => ({
-    familia,
-    host: '127.0.0.1',
-    usuario: 'servicio',
-    clave: 'clave-simulada',
-    puerta: 1,
-    canalDeVideo: '102',
-    puertoRtsp: rtsp.puerto,
-    peticion: async (u, o) => {
-      const url = new URL(String(u));
-      url.hostname = `${familia}.simulado.invalid`;
-      return peticiones[familia](url, o);
-    },
-  }));
-  return { equipos, cerrar: () => rtsp.cerrar() };
-};
-
 /** La persona delante del equipo. Sin terminal no hay nadie: `null`. */
 const persona = () => {
   const hayTerminal = process.stdin.isTTY === true;
@@ -198,129 +168,13 @@ const persona = () => {
   };
 };
 
-/** En `--simulado`, quien mira contesta lo que el simulado accionó. */
-const personaSimulada = () => {
-  let antes = 0;
-  let destino = '';
-  return (familia) => ({
-    indicar: async (texto) => {
-      destino = familia;
-      antes = P.aperturasFisicasPor.get(destino) ?? 0;
-      decir(`     ▶ ${texto}`);
-    },
-    confirmar: async (pregunta) => {
-      const r = /pitido/.test(pregunta) ? true : (P.aperturasFisicasPor.get(destino) ?? 0) > antes;
-      decir(`     ? ${pregunta} — ${r ? 'sí' : 'no'} (simulado)`);
-      return r;
-    },
-  });
-};
-
-// ── LAS COMPROBACIONES DEL MAC ────────────────────────────────────────────────
-const comprobaciones = async (pool) => {
-  decir('── Comprobaciones del Mac');
-  const puerto = process.env.PORT || '3000';
-  const ip = ipDelMac();
-  const local = await sondearSalud(`http://127.0.0.1:${puerto}/health`);
-  decir(
-    local.ok
-      ? `  ✓ API en marcha: http://127.0.0.1:${puerto}/health`
-      : `  ✗ la API no contesta en http://127.0.0.1:${puerto}/health (${local.motivo ?? `HTTP ${local.estado}`})` +
-          ' → arránquela: pnpm --filter @ncr/api start',
-  );
-  if (ip === null) {
-    decir('  ✗ el Mac no tiene IP en ninguna red → conéctelo a la Wi-Fi o al cable de los equipos');
-  } else {
-    const porIp = await sondearSalud(`http://${ip}:${puerto}/health`);
-    decir(
-      porIp.ok
-        ? `  ✓ la API contesta por la IP del Mac: http://${ip}:${puerto}/health`
-        : local.ok
-          ? `  ✗ la API contesta en el Mac pero NO por su IP (${ip}): cortafuegos del Mac → ` +
-            'Ajustes del Sistema → Red → Cortafuegos → permitir conexiones entrantes de «node»'
-          : `  ✗ tampoco por la IP del Mac (${ip})`,
-    );
-    decir(
-      `  ▶ iPhone: datos móviles apagados, misma Wi-Fi, y en Safari abra http://${ip}:${puerto}/health`,
-    );
-    decir(
-      '    Si Safari no la abre, el problema es la red, no la app (docs/guias/APP_EN_IPHONE.md §1)',
-    );
-  }
-  const go2rtc = process.env.GO2RTC_URL ?? '';
-  if (go2rtc === '') {
-    decir('  ✗ GO2RTC_URL vacía: sin video en vivo → GO2RTC_URL=http://127.0.0.1:1984');
-  } else {
-    const g = await sondearSalud(`${go2rtc.replace(/\/$/, '')}/api`);
-    decir(
-      g.alcanzada
-        ? '  ✓ puente de video (go2rtc) en marcha'
-        : '  ✗ go2rtc no contesta → pnpm sitio:video',
-    );
-  }
-  if (pool === null) {
-    decir('  · sin DATABASE_URL: no se comprueban migraciones ni eventos de la plataforma');
-    return;
-  }
-  try {
-    const pendientes = await migracionesPendientes(pool, join(RAIZ, 'supabase/migrations'));
-    decir(
-      pendientes === null
-        ? '  · la base no lleva el registro de migraciones de la CLI: compruébelo con supabase migration list'
-        : pendientes.length === 0
-          ? '  ✓ la base tiene todas las migraciones del repositorio'
-          : `  ✗ faltan ${pendientes.length} migraciones → supabase db push (${pendientes.join(', ')})`,
-    );
-  } catch (error) {
-    decir(`  ✗ no se pudo leer la base: ${error.message}`);
-  }
-};
-
-// ── J2 · RESPALDO Y REVERSIÓN ─────────────────────────────────────────────────
-const respaldar = async (equipos, carpeta) => {
-  mkdirSync(carpeta, { recursive: true, mode: 0o700 });
-  let fallos = 0;
-  for (const e of equipos) {
-    try {
-      const r = await P.capturarRespaldo(e, new Date());
-      const fichero = join(carpeta, `${e.familia}.json`);
-      writeFileSync(fichero, `${JSON.stringify(r, null, 2)}\n`, { mode: 0o600 });
-      chmodSync(fichero, 0o600);
-      decir(`  ✓ ${e.familia}: ${r.documentos.length} documentos → ${fichero}`);
-      for (const d of r.documentos.filter((x) => x.nota !== null))
-        decir(`     · ${d.clave}: ${d.nota}`);
-    } catch (error) {
-      fallos += 1;
-      decir(`  ✗ ${e.familia}: ${error.message}`);
-    }
-  }
-  return fallos;
-};
-
-const restaurar = async (equipos, carpeta) => {
-  let fallos = 0;
-  for (const e of equipos) {
-    const fichero = join(carpeta, `${e.familia}.json`);
-    if (!existsSync(fichero)) {
-      decir(`  · ${e.familia}: no hay respaldo en ${fichero}`);
-      continue;
-    }
-    const resultados = await P.restaurarRespaldo(e, JSON.parse(readFileSync(fichero, 'utf8')));
-    for (const r of resultados) {
-      if (r.estado === 'fallo') fallos += 1;
-      const signo = { igual: '✓', restaurado: '✓', fallo: '✗', no_restaurable: '⚠' }[r.estado];
-      decir(`  ${signo} ${e.familia} · ${r.clave}: ${r.estado} — ${r.detalle}`);
-    }
-  }
-  return fallos;
-};
-
 // ── EL ENSAYO ────────────────────────────────────────────────────────────────
 const principal = async () => {
   decir(
     `pnpm sitio:ensayo · ${new Date().toISOString()}${simulado ? ' · SIMULADO: no vale como verificación' : ''}`,
   );
-  const sim = simulado ? await simulados() : null;
+  // En `--simulado`, los tres equipos y la plataforma los monta el paquete.
+  const sim = simulado ? await P.montarEnsayoSimulado((l) => decir(l)) : null;
   const equipos = (
     sim === null ? FAMILIAS.map(desdeEntorno).filter((e) => e !== null) : sim.equipos
   ).filter((e) => pedidas.includes(e.familia));
@@ -336,8 +190,12 @@ const principal = async () => {
         ? `── Respaldo de la configuración en ${carpeta}`
         : `── Reversión desde ${carpeta}`,
     );
-    const fallos =
-      capturar !== null ? await respaldar(equipos, carpeta) : await restaurar(equipos, carpeta);
+    const fallos = await (capturar !== null ? respaldar : restaurar)({
+      P,
+      equipos,
+      carpeta,
+      decir,
+    });
     await sim?.cerrar();
     process.exit(fallos > 0 ? 1 : 0);
   }
@@ -347,15 +205,35 @@ const principal = async () => {
     const { Pool } = createRequire(join(RAIZ, 'apps/api/package.json'))('pg');
     pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
   }
-  if (!simulado) await comprobaciones(pool);
+  if (!simulado) await comprobacionesDelMac({ pool, decir, raiz: RAIZ });
+  // F3 y C1 · cuentan en el veredicto, también en `--simulado` (su API simulada).
+  const comprobaciones =
+    sim === null
+      ? await comprobacionesDeLaPlataforma({ P, entorno: process.env, pool })
+      : [
+          P.juzgarProveedorDeEquipos(sim.entorno, sim.equiposReales),
+          P.juzgarConexionDePgBoss(sim.entorno),
+        ];
+  decir(`── Comprobaciones de la plataforma${sim === null ? '' : ' (API simulada)'}`);
+  for (const l of P.lineasDeComprobaciones(comprobaciones, SECRETOS)) decir(l);
 
-  const plataforma = simulado
-    ? { primeroDesde: async () => ({ titulo: 'Evento simulado', ocurridoEn: new Date() }) }
-    : pool === null
-      ? undefined
-      : eventosDeLaPlataforma(pool);
+  const plataforma = sim?.plataforma ?? (pool === null ? undefined : eventosDeLaPlataforma(pool));
+  const verificaciones =
+    sim?.verificaciones ?? (pool === null ? undefined : verificacionesDeLaPlataforma(pool));
   const foto = valor('foto') === null ? undefined : readFileSync(resolve(valor('foto')));
-  const interlocutorDe = simulado ? personaSimulada() : () => persona();
+  const esperaDeSincronizacionMs =
+    valor('espera-sincronizacion') !== null
+      ? numero(valor('espera-sincronizacion'), 60) * 1000
+      : simulado
+        ? 200
+        : 60_000;
+  /** C2 · a dónde debe publicar la cámara: la IP del Mac EN SU RED y el PORT de la API. */
+  const receptorDe = (equipo) =>
+    sim?.receptorEsperado ?? {
+      direccion: ipDelMacHacia(P.ipHaciaElEquipo, equipo.host),
+      puerto: numero(process.env.PORT, 3000),
+      secretos: SECRETOS_DE_ALARMA,
+    };
   const informes = [];
   const ROTULO = {
     camara: 'Cámara LPR',
@@ -371,11 +249,15 @@ const principal = async () => {
     }
     const informe = await P.ensayarEquipo({
       equipo,
-      interlocutor: interlocutorDe(equipo.familia),
+      interlocutor: sim === null ? persona() : sim.interlocutorDe(equipo.familia),
       soloLectura: bandera('solo-lectura'),
       ...(plataforma === undefined ? {} : { plataforma }),
+      ...(verificaciones === undefined ? {} : { verificaciones }),
       ...(foto === undefined ? {} : { foto }),
+      ...(equipo.familia === 'camara' ? { receptorEsperado: receptorDe(equipo) } : {}),
       esperaDeEventoMs: numero(valor('espera'), 60) * 1000,
+      esperaDeSincronizacionMs,
+      plazoDeVerificacionS: numero(process.env.TERMINAL_PLAZO_DE_VERIFICACION_S, 8),
       limitesDeFoto: {
         bytesMaximos: numero(process.env.EQUIPOS_FOTO_KB_MAXIMOS, 200) * 1024,
         ladoMaximo: numero(process.env.EQUIPOS_FOTO_LADO_MAXIMO, 1024),
@@ -389,7 +271,7 @@ const principal = async () => {
   await pool?.end();
   await sim?.cerrar();
 
-  const r = P.recuentoDe(informes);
+  const r = P.recuentoDe(informes, comprobaciones);
   decir('');
   decir(
     `VEREDICTO: ${r.fallo === 0 ? 'SIN FALLOS' : 'CON FALLOS'} · ${r.ok} OK · ${r.fallo} FALLO · ` +

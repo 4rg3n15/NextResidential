@@ -89,7 +89,10 @@ export type ProveedorDeEquipos = AccessPointProvider &
      * eventos, sin abrir una segunda conexión que podría quitarle los suyos a
      * la escucha de la plataforma.
      */
-    senalDeEventos?(
-      dispositivoId: string,
-    ): { readonly transporte: TransporteDeEscucha; readonly ultimaSenal: Date | null } | null;
+    senalDeEventos?(dispositivoId: string): {
+      readonly transporte: TransporteDeEscucha;
+      readonly ultimaSenal: Date | null;
+      /** C7 (15-L) · la conexión la tiene otra plataforma: la frase con el remedio. */
+      readonly rechazo: string | null;
+    } | null;
   };

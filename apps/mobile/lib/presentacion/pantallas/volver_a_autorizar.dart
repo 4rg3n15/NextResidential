@@ -137,6 +137,7 @@ class _EstadoDeLaRepeticion extends State<PantallaDeVolverAAutorizar> {
           ),
           const SizedBox(height: 16),
           CasillaDeLaFoto(
+            nombreDelVisitante: v.visitante,
             marcada: _casilla,
             habilitada: habilitado,
             alCambiar: (c) => setState(() => _casilla = c),

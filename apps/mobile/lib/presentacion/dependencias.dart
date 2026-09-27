@@ -54,8 +54,8 @@ class Dependencias {
   /// 15-L · las notificaciones de la vivienda, leídas de la API.
   final RepositorioDeNotificaciones notificacionesDelConjunto;
 
-  /// 15-I (hito 3) · la cámara REAL del teléfono. `null` = la simulada (web,
-  /// recorrido y pruebas), declarada como tal en `fuente_de_fotos.dart`.
+  /// 15-I (hito 3) · la cámara REAL del teléfono, y su galería. `null` = la
+  /// simulada (web, recorrido y pruebas), declarada en `fuente_de_fotos.dart`.
   final TomarFoto? tomarFoto;
 
   /// 15-L · lo que la app recuerda entre arranques y NO es negocio: la bandeja

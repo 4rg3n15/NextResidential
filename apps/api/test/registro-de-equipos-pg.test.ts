@@ -8,6 +8,7 @@ import { RegistroDeEquiposPg } from '../src/equipos/infraestructura/registro-de-
 import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioDeAtestacionesPg } from '../src/equipos/infraestructura/atestaciones';
 import { RepositorioDispositivosPg } from '../src/eventos/infraestructura/repositorio-dispositivos-pg';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -24,7 +25,6 @@ import { RepositorioDispositivosPg } from '../src/eventos/infraestructura/reposi
  * Se salta si `DATABASE_URL_PRUEBAS` no está definida: el verificador lo
  * cuenta como omitida y lo dice.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP_A = '10000000-0000-4000-8000-000000000001';
 const COP_B = '10000000-0000-4000-8000-000000000002';
 const LLAVE = 'llave-de-equipos-solo-para-pruebas-32+';
@@ -82,6 +82,9 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool?.end();
 });
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin el administrador de la semilla', () => disponible);
 
 describe.skipIf(URL_BASE === undefined)('registro de equipos contra base real (D5, P6)', () => {
   it('un equipo dado de alta desde la consola se resuelve con su credencial DESCIFRADA', async () => {

@@ -21,8 +21,6 @@ export const aVisita = (v: VisitaListada): VisitaDto => ({
   casillaDeclaradaPor: v.casillaDeclaradaPor,
   casillaEn: v.casillaEn?.toISOString() ?? null,
   plantillaId: v.plantillaId,
-  consentimientoId: v.consentimientoId,
-  confirmadoPorElTitular: v.confirmadoPorElTitular,
   equiposSincronizados: v.equiposSincronizados,
   equiposFallidos: v.equiposFallidos,
 });

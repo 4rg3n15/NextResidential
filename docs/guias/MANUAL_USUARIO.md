@@ -152,8 +152,9 @@ tenga permiso (CU-05).
 
 **Generar autorización** (todos los roles de la consola): nombre y documento
 del visitante, fecha y hora, duración, la vivienda que visita, la **foto
-frontal** y la casilla «El visitante autorizó el uso de su foto para el
-ingreso». La visita queda autorizada al guardarla y su foto sale a todos los
+frontal** y la casilla «Declaro que <nombre del visitante> me autorizó a usar
+su foto para su ingreso al conjunto», que toma el nombre escrito en el
+formulario. La visita queda autorizada al guardarla y su foto sale a todos los
 equipos con reconocimiento facial; la consola dice en cuántos quedó y cuáles no
 la aceptaron, y permite reintentar.
 
@@ -184,6 +185,26 @@ Alta, estado y sincronización. El estado lo mantiene el sistema:
 > **Las credenciales de los equipos nunca se muestran** (RN-21). La pantalla
 > enseña una referencia, no la contraseña. Si necesita la contraseña de una
 > cámara, está en el gestor de secretos, no aquí.
+
+**En la ficha de un equipo** (superadministración y administración), con un
+motivo escrito que queda en la auditoría:
+
+- **Cámara · «Enviar eventos a este Mac».** Si el Mac cambió de red, la cámara
+  sigue enviando a la IP de antes. Esto le escribe la de ahora y lo comprueba
+  leyéndolo de vuelta.
+- **Terminal · «Verificación remota: activar / desactivar».** Desactivarla es el
+  plan B si la terminal no recibe a tiempo la respuesta de la plataforma: vuelve
+  a abrir con su propio reconocimiento, y la plataforma registra sin decidir.
+- **Rostros**: la ficha dice si el equipo los admite, si no, o si no se pudo
+  leer y por qué.
+- **Eventos del equipo**: si otra plataforma (HikCentral) tiene la conexión de
+  eventos del equipo, la ficha lo dice como bloqueo, con el remedio:
+  deshabilitar el equipo en HikCentral mientras se prueba.
+
+Si la consola muestra la franja roja **«Equipos simulados: las órdenes no
+llegan a ningún equipo real»**, la API está en modo simulado con equipos reales
+dados de alta: ninguna apertura mueve nada hasta cambiar
+`PROVEEDOR_DE_EQUIPOS` y reiniciarla.
 
 ### 3.5 · Eventos e informes
 
@@ -286,10 +307,13 @@ el sistema se lo dice en vez de dejarlo en una pantalla vacía.
    sistema la reconoce por su documento.
 2. **Cuándo**: fecha, hora de llegada y **duración**. Fuera de esa ventana no
    entra.
-3. **Foto frontal** del visitante, de frente y con buena luz. La app le dice si
-   sirve antes de enviarla.
-4. La casilla **«El visitante autorizó el uso de su foto para el ingreso»**.
-   Sin ella no se envía.
+3. **Foto frontal** del visitante, de frente y con buena luz: **«Tomar foto»**
+   con la cámara o **«Elegir de la galería»** si el visitante se la envió. Las
+   dos pasan por la misma revisión y la app le dice si sirve antes de enviarla.
+   La de la galería se envía sin sus datos ocultos (ubicación, teléfono, fecha).
+4. La casilla **«Declaro que <nombre del visitante> me autorizó a usar su foto
+   para su ingreso al conjunto»**, con el nombre que usted escribió. Sin ella
+   no se envía.
 5. **Placa** si llega en vehículo, y **observaciones** para el portero
    (opcionales).
 

@@ -17,12 +17,13 @@ import {
 import {
   BarrerPlantillasVencidas,
   CapturarRostro,
-  ResponderConsentimiento,
   RevocarConsentimiento,
   SincronizarPlantilla,
 } from '../src/biometria/aplicacion/casos-de-uso';
 import { SincronizarPlantillaEnTerminales } from '../src/biometria/aplicacion/sincronizacion-total';
 import { IdentidadBiometricaDesdeRepositorios } from '../src/biometria/aplicacion/identidad-biometrica';
+import { RespuestaDelTitular } from './dobles/respuesta-del-titular';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -39,7 +40,6 @@ import { IdentidadBiometricaDesdeRepositorios } from '../src/biometria/aplicacio
  *
  * Se OMITE —no falla— sin `DATABASE_URL_PRUEBAS`; el verificador lo cuenta.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP_A = '10000000-0000-4000-8000-000000000001';
 const LLAVE = 'llave-de-biometria-solo-para-pruebas-32+';
 const LLAVE_EQUIPOS = 'llave-de-equipos-solo-para-pruebas-32+';
@@ -120,7 +120,7 @@ let consentimientos: RepositorioConsentimientosPg;
 let plantillas: RepositorioPlantillasPg;
 let boveda: BovedaAesGcm;
 let capturar: CapturarRostro;
-let responder: ResponderConsentimiento;
+let responder: RespuestaDelTitular;
 let revocar: RevocarConsentimiento;
 let enTerminales: SincronizarPlantillaEnTerminales;
 let barrer: BarrerPlantillasVencidas;
@@ -190,7 +190,7 @@ beforeAll(async () => {
     plantillas = new RepositorioPlantillasPg(pool);
     boveda = new BovedaAesGcm(LLAVE, 'env:BIOMETRIA_LLAVE', new AlmacenDeBytesPg(pool), terminal);
     capturar = new CapturarRostro(consentimientos, plantillas, boveda, reloj, new Ids());
-    responder = new ResponderConsentimiento(consentimientos, plantillas, reloj);
+    responder = new RespuestaDelTitular(consentimientos, plantillas, reloj);
     revocar = new RevocarConsentimiento(consentimientos, plantillas, boveda, reloj);
     const una = new SincronizarPlantilla(consentimientos, plantillas, boveda, reloj);
     enTerminales = new SincronizarPlantillaEnTerminales(
@@ -243,6 +243,9 @@ const filaPlantilla = async (id: string) =>
       [id],
     )
   )[0];
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS, o la base no está preparada', () => disponible);
 
 describe.skipIf(URL_BASE === undefined)('A3 · biometría contra PostgreSQL', () => {
   it('la migración 0035 dejó al actor de ingesta como usuario de plataforma', async () => {

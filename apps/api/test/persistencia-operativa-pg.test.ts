@@ -9,6 +9,7 @@ import { RepositorioAlertasPg } from '../src/eventos/infraestructura/repositorio
 import { BitacoraDeOrdenesPg } from '../src/guardia/infraestructura/bitacora-de-ordenes-pg';
 import { RegistroDeAuditoriaPg } from '../src/comun/auditoria/auditoria-pg';
 import type { OrdenEjecutada } from '../src/guardia/aplicacion/apertura-manual';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -23,7 +24,6 @@ import type { OrdenEjecutada } from '../src/guardia/aplicacion/apertura-manual';
  * la exige.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 const CORRIDA = randomBytes(4).toString('hex');
 const bitacora: Bitacora = { registrar: () => undefined };
@@ -98,11 +98,9 @@ afterAll(async () => {
   await lee?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.warn('OMITIDA: sin DATABASE_URL_PRUEBAS o sin semillas (se exige con --con-base).');
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
+const omitida = (): boolean => !disponible;
 
 describe('eventos · un acceso registrado sigue ahí tras «reiniciar», y no se altera', () => {
   it('lo anexa una instancia, lo lee otra, y UPDATE/DELETE fallan incluso como dueño', async () => {

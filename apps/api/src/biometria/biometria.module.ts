@@ -6,11 +6,6 @@ import type { Bitacora, FaceTemplateProvider, GeneradorDeId, Reloj } from '@ncr/
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { EquiposModule, TERMINALES_DE_ROSTROS } from '../equipos';
-import { IDENTIDAD_DE_PERSONA } from '../padron';
-import type { IdentidadDePersona } from '../padron';
-import { REGISTRO_AUDITORIA } from '../comun/auditoria';
-import type { RegistroDeAuditoria } from '../comun/auditoria';
-import { AceptarConsentimientoPresencial } from './aplicacion/consentimiento-presencial';
 import {
   BOVEDA_DE_PLANTILLAS,
   CATALOGO_DE_TERMINALES,
@@ -29,14 +24,10 @@ import {
   BarrerPlantillasVencidas,
   CapturarRostro,
   SuprimirRostroDeAutorizacion,
-  ResponderConsentimiento,
   RevocarConsentimiento,
   SincronizarPlantilla,
 } from './aplicacion/casos-de-uso';
-import {
-  PropagarConsentimientoAceptado,
-  SincronizarPlantillaEnTerminales,
-} from './aplicacion/sincronizacion-total';
+import { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
 import { AlmacenEnMemoria, BovedaAesGcm } from './infraestructura/boveda-cifrada';
 import type { AlmacenDeBytes } from './infraestructura/boveda-cifrada';
 import {
@@ -184,44 +175,6 @@ export class BiometriaModule {
           ) => new CapturarRostro(consentimientos, plantillas, boveda, reloj, ids),
         },
         {
-          // D-10 · el titular en la portería. La identidad la sirve el padrón
-          // por su puerto estrecho; la auditoría, el núcleo.
-          provide: AceptarConsentimientoPresencial,
-          inject: [
-            REPOSITORIO_CONSENTIMIENTOS,
-            IDENTIDAD_DE_PERSONA,
-            ResponderConsentimiento,
-            REGISTRO_AUDITORIA,
-            BITACORA,
-            RELOJ,
-          ],
-          useFactory: (
-            consentimientos: RepositorioConsentimientos,
-            identidades: IdentidadDePersona,
-            responder: ResponderConsentimiento,
-            auditoria: RegistroDeAuditoria,
-            bitacora: Bitacora,
-            reloj: Reloj,
-          ) =>
-            new AceptarConsentimientoPresencial(
-              consentimientos,
-              identidades,
-              responder,
-              auditoria,
-              bitacora,
-              reloj,
-            ),
-        },
-        {
-          provide: ResponderConsentimiento,
-          inject: [REPOSITORIO_CONSENTIMIENTOS, REPOSITORIO_PLANTILLAS, RELOJ],
-          useFactory: (
-            consentimientos: RepositorioConsentimientos,
-            plantillas: RepositorioPlantillas,
-            reloj: Reloj,
-          ) => new ResponderConsentimiento(consentimientos, plantillas, reloj),
-        },
-        {
           provide: RevocarConsentimiento,
           inject: [
             REPOSITORIO_CONSENTIMIENTOS,
@@ -270,15 +223,6 @@ export class BiometriaModule {
             sincronizar: SincronizarPlantilla,
             bitacora: Bitacora,
           ) => new SincronizarPlantillaEnTerminales(plantillas, catalogo, sincronizar, bitacora),
-        },
-        {
-          provide: PropagarConsentimientoAceptado,
-          inject: [REPOSITORIO_PLANTILLAS, SincronizarPlantillaEnTerminales, BITACORA],
-          useFactory: (
-            plantillas: RepositorioPlantillas,
-            enTerminales: SincronizarPlantillaEnTerminales,
-            bitacora: Bitacora,
-          ) => new PropagarConsentimientoAceptado(plantillas, enTerminales, bitacora),
         },
         {
           // F2 (15-L) · el rechazo de una visita se lleva SU foto de los equipos.

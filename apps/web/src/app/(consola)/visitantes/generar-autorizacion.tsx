@@ -10,7 +10,12 @@ import type { FotoLista } from '@/componentes/captura-de-foto';
 import { Campo } from '@/componentes/ui/campo';
 import { Ayuda } from '@/componentes/ui/ayuda';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
-import { clavesDeVisitas, useTextoDeLaCasilla, useViviendasDeVisitas } from '@/lib/api/visitas';
+import {
+  clavesDeVisitas,
+  textoDeLaCasilla,
+  useTextoDeLaCasilla,
+  useViviendasDeVisitas,
+} from '@/lib/api/visitas';
 
 const TIPOS = [
   { valor: 'cedula', etiqueta: 'Cédula de ciudadanía' },
@@ -278,10 +283,15 @@ export const GenerarAutorizacion = ({
             name="casilla"
             checked={casillaMarcada}
             onChange={(e) => setCasilla(e.target.checked)}
+            // Sin el texto publicado por el servidor no hay nada que declarar:
+            // la versión que queda escrita es la de ESE texto (ADR-032).
+            disabled={casilla.data === undefined}
             required
           />
           <span className="text-secundario text-texto">
-            {casilla.data?.texto ?? 'El visitante autorizó el uso de su foto para el ingreso'}
+            {casilla.data === undefined
+              ? 'Cargando el texto de la declaración…'
+              : textoDeLaCasilla(casilla.data, nombre)}
             <Ayuda texto="Queda guardado quién marcó la casilla y cuándo. La foto se borra de los equipos al terminar la visita o si se rechaza." />
           </span>
         </label>

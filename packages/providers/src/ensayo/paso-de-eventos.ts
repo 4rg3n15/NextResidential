@@ -1,4 +1,7 @@
 import { EscuchaDeAlertStream } from '../equipo/escucha-alertstream';
+import { clasificarConexionDeEventosRechazada } from '../equipo/conexion-de-eventos-rechazada';
+import type { ConexionDeEventosRechazada } from '../equipo/conexion-de-eventos-rechazada';
+import { ACCION_DEL_RECEPTOR, compararReceptorDelMac } from './receptor-del-mac';
 import { resultado } from './tipos';
 import type { FamiliaDeEnsayo, OpcionesDeEnsayo, ResultadoDePaso } from './tipos';
 
@@ -16,6 +19,11 @@ import type { FamiliaDeEnsayo, OpcionesDeEnsayo, ResultadoDePaso } from './tipos
  *  · Sin la plataforma: el ensayo se suscribe él mismo al equipo (terminal y
  *    videoportero) y espera el primer evento EN VIVO —el volcado histórico no
  *    cuenta—. La cámara no tiene ese camino: publica hacia la API.
+ *
+ * C2 (corrección de la 15-L) · antes del gesto, la cámara: ¿publica en ESTE
+ * Mac? Si no, el evento no puede llegar y se dice ya, sin esperar el plazo.
+ * C7 · si el equipo rechaza la suscripción porque otra plataforma —HikCentral—
+ * la tiene o agotó las conexiones, se dice con esas palabras y se corta.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const GESTO: Readonly<Record<FamiliaDeEnsayo, string>> = {
@@ -47,9 +55,9 @@ const porLaPlataforma = async (o: OpcionesDeEnsayo): Promise<ResultadoDePaso> =>
       `En ${String(Math.round(o.esperaDeEventoMs / 1000))} s no llegó ningún evento de este ` +
         'equipo a la plataforma',
       equipo.familia === 'camara'
-        ? 'Revise en el panel de la cámara el servidor de alarma (IP del Mac, puerto de la API, ' +
-            'ruta /alarm-server/<secreto>) y «Cargar en el servidor de alarmas» marcado; y que ' +
-            'la cámara esté en ALARM_SERVER_EQUIPOS con el id de la consola'
+        ? 'En la ficha de la cámara pulse «Enviar eventos a este Mac»; en su panel, «Cargar en ' +
+            'el servidor de alarmas» marcado; y que la cámara esté en ALARM_SERVER_EQUIPOS con ' +
+            'el id de la consola'
         : 'Mire la bitácora de la API (líneas «escucha:»): ¿conectó con el equipo? ¿Está el ' +
             'equipo registrado en la consola con esta misma IP?',
     );
@@ -72,12 +80,25 @@ const porSuscripcionDirecta = async (o: OpcionesDeEnsayo): Promise<ResultadoDePa
     );
   }
   const cancelar = new AbortController();
+  let ocupada: ConexionDeEventosRechazada | null = null;
   const escucha = new EscuchaDeAlertStream({
     ...equipo,
     dispositivoId: 'ensayo-en-sitio',
     familia: equipo.familia,
     // Una sola conexión: reintentar aquí es presentar la credencial de nuevo.
     esperaMaximaMs: 1000,
+    // C7 · el rechazo por otra plataforma corta la espera: reintentar no lo arregla.
+    traza: {
+      registrar: (nivel, mensaje, contexto) => {
+        equipo.traza?.registrar(nivel, mensaje, contexto);
+        if (mensaje !== 'escucha: el equipo rechazó la conexión') return;
+        ocupada = clasificarConexionDeEventosRechazada(
+          Number(contexto?.['estadoHttp']),
+          String(contexto?.['cuerpo'] ?? ''),
+        );
+        if (ocupada !== null) cancelar.abort();
+      },
+    },
   });
   const plazo = setTimeout(() => cancelar.abort(), o.esperaDeEventoMs);
   try {
@@ -98,6 +119,12 @@ const porSuscripcionDirecta = async (o: OpcionesDeEnsayo): Promise<ResultadoDePa
     clearTimeout(plazo);
     cancelar.abort();
   }
+  const rechazo = ocupada as ConexionDeEventosRechazada | null;
+  if (rechazo !== null) {
+    return resultado('eventos', 'fallo', mayuscula(rechazo.motivo), mayuscula(rechazo.remedio), [
+      `descartados por históricos: ${String(escucha.historicosDescartados)}`,
+    ]);
+  }
   return resultado(
     'eventos',
     'fallo',
@@ -111,5 +138,17 @@ const porSuscripcionDirecta = async (o: OpcionesDeEnsayo): Promise<ResultadoDePa
   );
 };
 
-export const pasoDeEventos = (o: OpcionesDeEnsayo): Promise<ResultadoDePaso> =>
-  o.plataforma === undefined ? porSuscripcionDirecta(o) : porLaPlataforma(o);
+const mayuscula = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
+
+export const pasoDeEventos = async (o: OpcionesDeEnsayo): Promise<ResultadoDePaso> => {
+  const esperado = o.receptorEsperado;
+  const receptor =
+    o.equipo.familia === 'camara' && esperado !== undefined
+      ? await compararReceptorDelMac(o.equipo, esperado)
+      : null;
+  if (receptor !== null && !receptor.conforme) {
+    return resultado('eventos', 'fallo', receptor.causa, ACCION_DEL_RECEPTOR, receptor.detalle);
+  }
+  const r = o.plataforma === undefined ? await porSuscripcionDirecta(o) : await porLaPlataforma(o);
+  return receptor === null ? r : { ...r, detalle: [...receptor.detalle, ...r.detalle] };
+};

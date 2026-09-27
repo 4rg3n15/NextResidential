@@ -43,7 +43,7 @@ Future<void> montar(
     MaterialApp(
       home: PantallaDeNuevoVisitante(
         enviar: enviar,
-        tomarFoto: tomarFoto ?? () async => fotoTomada(medidasBuenas),
+        tomarFoto: tomarFoto ?? (_) async => fotoTomada(medidasBuenas),
         claveDeIdempotencia: clave,
         ahora: ahora,
       ),
@@ -59,12 +59,12 @@ Future<void> escribirQuien(WidgetTester t) async {
 }
 
 Future<void> tomarLaFoto(WidgetTester t) async {
-  await t.tap(find.text('Tomar la foto'));
+  await t.tap(find.text('Tomar foto'));
   await t.pumpAndSettle();
 }
 
 Future<void> marcarLaCasilla(WidgetTester t) async {
-  await t.tap(find.text(textoDeLaCasilla));
+  await t.tap(find.byKey(const Key('visita.casilla')));
   await t.pump();
 }
 
@@ -115,10 +115,22 @@ void main() {
     expect(intentos, 0);
   });
 
-  testWidgets('F4 · la casilla dice EXACTAMENTE el texto que guarda el servidor', (t) async {
+  testWidgets('F4 · la casilla lleva el nombre que se escribe, en vivo y sin bordes', (t) async {
     await montar(t, enviar: (_) async => const EnvioEncolado());
-    expect(find.text('El visitante autorizó el uso de su foto para el ingreso'), findsOneWidget);
+    const antes = 'Declaro que el visitante me autorizó a usar su foto para su ingreso al conjunto';
+    expect(find.text(antes), findsOneWidget, reason: 'con el nombre vacío, nunca un hueco');
     expect(find.byType(Checkbox), findsOneWidget);
+
+    await escribirQuien(t);
+    expect(
+      find.text('Declaro que Plomero Pérez me autorizó a usar su foto para su ingreso al conjunto'),
+      findsOneWidget,
+    );
+
+    // Borrar el nombre devuelve «el visitante»: la frase sigue al campo.
+    await t.enterText(find.byKey(const Key('visita.nombre')), '');
+    await t.pump();
+    expect(find.text(antes), findsOneWidget);
   });
 
   testWidgets('F1 · lo que se envía lleva inicio, duración, foto y casilla', (t) async {
@@ -162,7 +174,7 @@ void main() {
     await montar(
       t,
       enviar: (_) async => const EnvioEncolado(),
-      tomarFoto: () async => fotoTomada(medidasMalas),
+      tomarFoto: (_) async => fotoTomada(medidasMalas),
     );
     await escribirQuien(t);
     await tomarLaFoto(t);
@@ -377,8 +389,13 @@ void main() {
     expect(find.byKey(const Key('visita.hora')), findsOneWidget);
     expect(find.byKey(const Key('visita.duracion')), findsOneWidget);
     expect(find.byType(Checkbox), findsOneWidget);
-    // Y dice de quién se trata, para que no haya duda de a quién se autoriza.
+    // Y dice de quién se trata, para que no haya duda de a quién se autoriza;
+    // también la casilla, que es la constancia de ESTA visita.
     expect(find.text('Plomero Pérez'), findsOneWidget);
+    expect(
+      find.text('Declaro que Plomero Pérez me autorizó a usar su foto para su ingreso al conjunto'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('F6 · sin la casilla no sale; con ella, sale con la visita ANTERIOR y la clave',

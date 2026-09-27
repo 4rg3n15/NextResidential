@@ -2,18 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { Placa, esExito } from '@ncr/domain-core';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
-import {
-  IDENTIDAD_DE_PERSONA,
-  REPOSITORIO_PADRON,
-  LOCALIZADOR_DE_VIVIENDA,
-} from './aplicacion/puertos';
+import { REPOSITORIO_PADRON, LOCALIZADOR_DE_VIVIENDA } from './aplicacion/puertos';
 import type { LocalizadorDeVivienda } from './aplicacion/puertos';
-import { CONFIGURACION } from '../configuracion/configuracion.module';
-import type { Configuracion } from '../configuracion/esquema';
-import {
-  IdentidadDePersonaEnMemoria,
-  IdentidadDePersonaPg,
-} from './infraestructura/identidad-de-persona';
 import { LECTOR_DE_VOCABULARIO } from './aplicacion/vocabulario';
 import { REPOSITORIO_COPROPIEDADES } from '../multiempresa/repositorio-copropiedades';
 import type { RepositorioCopropiedades } from '../multiempresa/repositorio-copropiedades';
@@ -103,23 +93,12 @@ export class PadronModule {
           useFactory: (copropiedades: RepositorioCopropiedades) =>
             new VocabularioDesdeCopropiedad(copropiedades),
         },
-        // D-10 · la identidad del titular para el consentimiento presencial.
-        // Sin base (la suite), el doble que las pruebas siembran.
-        IdentidadDePersonaEnMemoria,
-        {
-          provide: IDENTIDAD_DE_PERSONA,
-          inject: [CONFIGURACION, Pool, IdentidadDePersonaEnMemoria],
-          useFactory: (c: Configuracion, pool: Pool, enMemoria: IdentidadDePersonaEnMemoria) =>
-            c.PERSISTENCIA_DE_EVENTOS === 'postgres' ? new IdentidadDePersonaPg(pool) : enMemoria,
-        },
       ],
       exports: [
         REPOSITORIO_PADRON,
         LECTOR_DE_VOCABULARIO,
         RESOLUTOR_DE_PLACA,
         LOCALIZADOR_DE_VIVIENDA,
-        IDENTIDAD_DE_PERSONA,
-        IdentidadDePersonaEnMemoria,
       ],
     };
   }

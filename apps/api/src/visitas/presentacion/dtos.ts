@@ -238,8 +238,6 @@ export class VisitaDto {
   @ApiProperty({ type: String, nullable: true }) casillaDeclaradaPor!: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) casillaEn!: string | null;
   @ApiProperty({ type: String, nullable: true }) plantillaId!: string | null;
-  @ApiProperty({ type: String, nullable: true }) consentimientoId!: string | null;
-  @ApiProperty() confirmadoPorElTitular!: boolean;
   @ApiProperty() equiposSincronizados!: number;
   @ApiProperty() equiposFallidos!: number;
 }
@@ -294,6 +292,14 @@ export class VisitaRechazadaDto {
 }
 
 export class TextoDeLaCasillaDto {
-  @ApiProperty() texto!: string;
+  /** El texto con `{visitante}`, que el cliente sustituye por el nombre del formulario. */
+  @ApiProperty({
+    description:
+      'Texto de la casilla con el marcador {visitante}: el cliente lo sustituye por el ' +
+      'nombre escrito en el formulario',
+  })
+  plantilla!: string;
+  @ApiProperty({ description: 'El marcador que se sustituye: {visitante}' })
+  marcador!: string;
   @ApiProperty() version!: string;
 }

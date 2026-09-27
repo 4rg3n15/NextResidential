@@ -1,11 +1,11 @@
 # ADR-032 · Consentimiento declarado por quien registra: la casilla del formulario es la única constancia obligatoria
 
-|              |                                                                                                                                                                                                                                              |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**   | Aceptada · ETAPA 15-L (2026-09-27) · **decisión del cliente F4**, con el **riesgo legal (Ley 1581 de 2012) aceptado por el cliente**                                                                                                         |
-| **Deroga**   | **ADR-029 en lo pertinente**: el consentimiento presencial deja de ser el camino para habilitar la plantilla y queda como **opción**. Deroga también el enlace firmado del titular (A3, 15-E) y su página pública, que se retiran del código |
-| **Afecta a** | migración `0043` · `packages/domain-core` (`ConsentimientoBiometrico.declarar`, `confirmarPorElTitular`) · `apps/api/src/visitas` (nuevo) · `biometria` · `residente` · consola (Visitantes) · app del residente (nuevo visitante)           |
-| **Registra** | C-41 (titularidad del consentimiento frente a la casilla) · C-42 («sólo fecha, hora y duración» frente a la casilla en todos los flujos) · S-78 a S-86 · E-05                                                                                |
+|              |                                                                                                                                                                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Estado**   | Aceptada · ETAPA 15-L (2026-09-27) · **decisión del cliente F4**, con el **riesgo legal (Ley 1581 de 2012) aceptado por el cliente** · **enmendada** en la corrección de la 15-L (misma fecha): la casilla nombra al visitante y es la ÚNICA constancia; la confirmación presencial se retira |
+| **Deroga**   | **ADR-029 en lo pertinente**: el consentimiento presencial deja de ser el camino para habilitar la plantilla y queda como **opción**. Deroga también el enlace firmado del titular (A3, 15-E) y su página pública, que se retiran del código                                                  |
+| **Afecta a** | migración `0043` · `packages/domain-core` (`ConsentimientoBiometrico.declarar`, `confirmarPorElTitular`) · `apps/api/src/visitas` (nuevo) · `biometria` · `residente` · consola (Visitantes) · app del residente (nuevo visitante)                                                            |
+| **Registra** | C-41 (titularidad del consentimiento frente a la casilla) · C-42 («sólo fecha, hora y duración» frente a la casilla en todos los flujos) · S-78 a S-86 · E-05                                                                                                                                 |
 
 ---
 
@@ -32,9 +32,10 @@ Para la entrega, el cliente decidió (F4, confirmado por escrito el 2026-09-27):
 ## Decisión
 
 1. **Una casilla en el formulario** de «Generar autorización» —el mismo en la
-   app y en la consola—: «El visitante autorizó el uso de su foto para el
-   ingreso». Sin ella no se genera nada (422). No hay enlace, QR, pantalla
-   aparte ni espera.
+   app y en la consola—. Sin ella no se genera nada (422). No hay enlace, QR,
+   pantalla aparte ni espera. Su texto, desde la enmienda de abajo: «Declaro
+   que <nombre del visitante> me autorizó a usar su foto para su ingreso al
+   conjunto».
 2. **Cada autorización guarda su casilla**: quién la marcó
    (`consentimiento_declarado_por`), cuándo y la **versión del texto**. La
    versión la pone el servidor, no el cliente.
@@ -46,9 +47,10 @@ Para la entrega, el cliente decidió (F4, confirmado por escrito el 2026-09-27):
 4. **Un consentimiento vigente por titular** (índice de la ETAPA 08): la
    segunda visita de la misma persona lo reutiliza, y su autorización lleva su
    propia casilla.
-5. **Confirmación del titular, opcional.** Si el visitante está presente puede
-   escribir su nombre y su documento (el mismo formulario de D-10); el origen
-   pasa a `otorgado_por_el_titular` y se conserva quién había declarado.
+5. ~~**Confirmación del titular, opcional.**~~ **Retirada por la enmienda de
+   abajo.** Si el visitante estaba presente podía escribir su nombre y su
+   documento (el formulario de D-10) y el origen pasaba a
+   `otorgado_por_el_titular`.
 6. **RN-11 intacta.** La plantilla vive lo que la visita (`suprimir_en` = fin
    de la visita); el rechazo anula la autorización y retira **su** plantilla de
    todos los equipos en la misma llamada; la revocación del titular sigue
@@ -98,3 +100,51 @@ bucket privado con URL firmada de vida corta (RN-21).
 - `P-21` (validez jurídica del consentimiento presencial) sigue abierta sólo
   para la confirmación opcional; la de la casilla no es una decisión pendiente:
   el cliente la tomó y aceptó el riesgo.
+
+---
+
+## Enmienda · decisión final del cliente (corrección de la 15-L, 2026-09-27)
+
+**Lo que el cliente decidió, antes de la visita final:** la ÚNICA constancia
+es la casilla, con el texto «Declaro que <nombre del visitante> me autorizó a
+usar su foto para su ingreso al conjunto», en la app y en la consola, con el
+nombre tomado del formulario y con una versión nueva del texto guardada. La
+confirmación presencial opcional se retira de la interfaz.
+
+**Motivo del cliente:** la foto la envía el propio visitante para su ingreso.
+Quien la registra —el residente en la app, el portero o el superadministrador
+en la consola— la recibe de él con ese fin; la casilla deja escrito que así
+fue y a nombre de quién.
+
+**Qué cambia:**
+
+- **El texto nombra al visitante.** El servidor publica la plantilla con el
+  marcador `{visitante}` (`GET …/visitas/casilla` → `plantilla`, `marcador`,
+  `version`) y la consola lo sustituye en vivo por el nombre escrito; sin
+  nombre todavía dice «el visitante». La app lleva la misma frase, con la
+  misma regla, porque el residente no tiene esa ruta (S-99).
+- **Versión nueva:** `casilla-v2-2026-09-27`. Las autorizaciones generadas con
+  la versión anterior (`casilla-2026-09-27`, sin nombre) la conservan: la
+  versión dice qué texto se marcó.
+- **Se retira, sin dejar código huérfano:** la confirmación presencial de la
+  consola; su ruta (`POST …/biometria/consentimientos/:id/aceptacion-presencial`)
+  y su caso de uso; el puerto de identidad del padrón que sólo servía para
+  comparar lo que escribía el titular; los casos de uso de la respuesta del
+  titular y de la propagación posterior, que ya no tenían quién los llamara;
+  y los campos `consentimientoId` y `confirmadoPorElTitular` de la lista de
+  visitas. Las suites que necesitan un consentimiento «otorgado por el
+  titular» para probar lo que viene después (sincronizar, suprimir, el
+  disparador de la 0013) llegan a él con un doble de prueba que usa el
+  agregado, no un camino de producción.
+- **Lo que NO se toca: el dominio.** `ConsentimientoBiometrico` conserva sus
+  dos orígenes (`otorgado_por_el_titular`, `declarado_por_quien_registra`) y
+  sus métodos, y `identidadCoincide` sigue en `domain-core`. Ya no los llama
+  ningún camino de producción. Retirarlos es tocar el dominio y queda para
+  decisión del usuario.
+
+**El riesgo legal no cambia; se estrecha la mitigación.** Sin la confirmación
+opcional, ningún consentimiento de visita será ya «otorgado por el titular»:
+todos serán declarados, con su autor, su fecha y el texto con el nombre. Lo
+que el registro prueba sigue siendo quién afirmó el consentimiento, cuándo y
+sobre qué texto. `P-21` queda sin objeto: era la validez de la confirmación
+presencial, que ya no existe.

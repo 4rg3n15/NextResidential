@@ -4,10 +4,15 @@
 <dict>
 	<!-- ETAPA 15-I (hito 3): la foto del visitante para la terminal facial. -->
 	<key>NSCameraUsageDescription</key>
-	<string>La cámara toma la foto del rostro de su visitante para la terminal facial del conjunto. El visitante decide si acepta.</string>
-	<!-- image_picker exige declararla aunque la app sólo abre la cámara. -->
+	<string>La cámara toma la foto del rostro de su visitante, con su autorización, para la terminal facial del conjunto.</string>
+	<!--
+	  Corrección de la 15-L: «Elegir de la galería». En iOS 14 o posterior (la
+	  app exige 15) la galería es PHPicker, que corre fuera de la app y NO pide
+	  este permiso, tampoco con el acceso limitado. La clave se declara porque
+	  image_picker la exige; el texto dice la verdad por si el sistema la enseña.
+	-->
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>La app no lee su fototeca: sólo usa la foto que toma con la cámara.</string>
+	<string>Cuando elige en su galería la foto de su visitante, la app usa sólo esa foto, reducida, para la terminal facial del conjunto. No lee ni guarda el resto de sus fotos.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

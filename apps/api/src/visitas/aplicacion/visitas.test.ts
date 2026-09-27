@@ -98,8 +98,6 @@ const visita = (sobre: Partial<VisitaListada> = {}): VisitaListada => ({
   casillaDeclaradaPor: 'Portero',
   casillaEn: AHORA,
   plantillaId: 'p-1',
-  consentimientoId: 'c-1',
-  confirmadoPorElTitular: false,
   equiposSincronizados: 1,
   equiposFallidos: 0,
   ...sobre,

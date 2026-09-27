@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
 import { RepositorioZonasPg } from '../src/zonas/infraestructura/repositorio-zonas-pg';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * RN-14 · CA-14 — **el aforo lo garantiza la base, no el código.**
@@ -23,7 +24,6 @@ import { RepositorioZonasPg } from '../src/zonas/infraestructura/repositorio-zon
  *
  * Se OMITE —no falla— sin `DATABASE_URL_PRUEBAS`. Cuando se omite, lo dice.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 /** Zona «Salón social» de las semillas: aforo 100, contador a cero. */
 const ZONA = '80000000-0000-4000-8000-000000000003';
@@ -93,11 +93,9 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.warn('OMITIDA: sin DATABASE_URL_PRUEBAS o sin semillas. Se ejecuta en CI (ETAPA 14).');
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
+const omitida = (): boolean => !disponible;
 
 describe('RN-14 · el aforo bajo concurrencia real', () => {
   it(`${INTENTOS} ingresos simultáneos sobre ${AFORO} plazas: entran ${AFORO}, ni una más`, async () => {

@@ -27,8 +27,6 @@ const visita = (extra: Partial<Visita> = {}): Visita => ({
   casillaDeclaradaPor: 'Residente Casa 12',
   casillaEn: '2026-09-27T14:55:00.000Z',
   plantillaId: 'p-1',
-  consentimientoId: 'c-1',
-  confirmadoPorElTitular: false,
   equiposSincronizados: 2,
   equiposFallidos: 0,
   ...extra,

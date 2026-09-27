@@ -544,10 +544,11 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     eventoId: string | null,
   ): Promise<void> {
     let aceptado = false;
+    let duracionMs: number;
     try {
       const r = await this.respondedor.responderVerificacionRemota(evento.dispositivoId, veredicto);
       aceptado = r.aceptado;
-      const totalMs = this.reloj.ahora().getTime() - comienzo;
+      duracionMs = this.reloj.ahora().getTime() - comienzo;
       this.bitacora.registrar(r.aceptado ? 'info' : 'aviso', 'veredicto devuelto a la terminal', {
         dispositivoId: evento.dispositivoId,
         serie: veredicto.serie,
@@ -556,19 +557,31 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
         latenciaDelEquipoMs: r.latenciaMs,
         // Del hecho recibido al veredicto aceptado: la cifra que decide si la
         // terminal espera lo bastante (S-41).
-        respuestaTotalMs: totalMs,
+        respuestaTotalMs: duracionMs,
       });
     } catch (error) {
+      duracionMs = this.reloj.ahora().getTime() - comienzo;
       this.bitacora.registrar('error', 'no se pudo devolver el veredicto a la terminal', {
         dispositivoId: evento.dispositivoId,
         serie: veredicto.serie,
+        // F2 (corrección de la 15-L) · también cuando falla: es la cifra que
+        // decide si hace falta el plan B (desactivar la verificación remota).
+        respuestaTotalMs: duracionMs,
         error: error instanceof Error ? error.message : String(error),
         motivo: 'la terminal negará por su cuenta al vencer su plazo (S-41): la dirección segura',
       });
     }
     // 15-L (Bloque B) · la respuesta a la terminal también se ve en la consola,
-    // DESPUÉS de enviarla: escribirla antes gastaría plazo de la terminal.
-    await this.constancias.veredicto(evento, copropiedadId, veredicto, aceptado, eventoId);
+    // DESPUÉS de enviarla: escribirla antes gastaría plazo de la terminal. Con
+    // su duración, para que el ensayo mida p50/p95 contra el plazo (F2).
+    await this.constancias.veredicto(
+      evento,
+      copropiedadId,
+      veredicto,
+      aceptado,
+      eventoId,
+      duracionMs,
+    );
   }
 
   /**

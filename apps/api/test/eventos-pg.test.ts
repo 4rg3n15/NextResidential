@@ -5,6 +5,7 @@ import { Acceso, FiltroDeEventos, VersionDeReglas, esExito } from '@ncr/domain-c
 import type { HechoDeAcceso } from '@ncr/domain-core';
 import { permitir } from '@ncr/domain-core';
 import { RepositorioEventosPg } from '../src/eventos/infraestructura/repositorio-eventos-pg';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * El adaptador PostgreSQL de eventos contra una base REAL — y con él, el
@@ -32,7 +33,6 @@ import { RepositorioEventosPg } from '../src/eventos/infraestructura/repositorio
  */
 const CORRIDA = randomBytes(6).toString('hex');
 
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 const COP_AJENA = '10000000-0000-4000-8000-000000000002';
 
@@ -115,11 +115,9 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.warn('OMITIDA: sin DATABASE_URL_PRUEBAS o sin semillas. Se ejecuta en CI (ETAPA 14).');
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
+const omitida = (): boolean => !disponible;
 
 describe('RepositorioEventosPg · anexado idempotente (RN-17, CA-22)', () => {
   it('anexa un evento y lo devuelve por identificador', async () => {

@@ -236,7 +236,7 @@ class Mundo {
         llamador: LlamadorFalso(),
         servidor: CambioDeServidor(direccion: direccion, comprobador: comprobador, sesion: sesion),
         notificacionesDelConjunto: notificaciones,
-        tomarFoto: () async => fotoTomada(medidasBuenas),
+        tomarFoto: (_) async => fotoTomada(medidasBuenas),
         almacen: llavero,
       ),
     );

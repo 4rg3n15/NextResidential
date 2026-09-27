@@ -11,6 +11,7 @@ import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { FichaDeEquipo } from './ficha-del-equipo';
 import { Boton } from '@/componentes/ui/boton';
 import { VideoEnVivo } from '@/componentes/video-en-vivo';
+import { AccionesDeSitio } from './acciones-de-sitio';
 
 /** D3 (15-L) · los equipos que entregan video por RTSP. */
 const CON_VIDEO = new Set<Equipo['tipo']>(['camara_lpr', 'terminal_facial', 'intercom']);
@@ -179,6 +180,20 @@ export const FichaDialogo = ({
             corrigiendo={corrigiendo}
             {...(puedeCorregir ? { alCorregir: (c: string) => void corregir(c) } : {})}
           />
+          {equipo === null ? null : (
+            <AccionesDeSitio
+              copropiedadId={copropiedadId}
+              equipo={equipo}
+              motivo={puedeCorregir ? motivo.trim() : null}
+              alTerminar={(texto) => {
+                setError(undefined);
+                setAviso(texto);
+                // La ficha enseña lo que el equipo dice AHORA.
+                void sondear(equipo.id);
+              }}
+              alFallar={(mensaje) => setError(mensaje)}
+            />
+          )}
         </>
       )}
     </DialogoDeFormulario>

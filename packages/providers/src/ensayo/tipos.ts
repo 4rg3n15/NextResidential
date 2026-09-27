@@ -1,12 +1,14 @@
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
+import type { IpHaciaElEquipo } from '../red/ip-hacia-el-equipo';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * J1 (ETAPA 15-L) · EL ENSAYO EN SITIO, EN SU VOCABULARIO
  *
- * Ocho pasos por equipo, siempre en este orden y siempre los ocho: el que no
- * aplica a una familia se dice («no aplica»), no se salta en silencio. Cada
+ * Nueve pasos por equipo, siempre en este orden y siempre los nueve: el que no
+ * aplica a una familia se dice («no aplica»), no se salta en silencio. El
+ * noveno (F2, corrección de la 15-L) mide la verificación remota. Cada
  * resultado lleva la CAUSA en palabras de quien está delante del equipo y la
  * ACCIÓN que la corrige; nunca un código del fabricante a secas.
  * ═════════════════════════════════════════════════════════════════════════════
@@ -24,13 +26,14 @@ export const PASOS_DEL_ENSAYO = [
   { paso: 'rostro', titulo: 'Alta y baja de un rostro de prueba' },
   { paso: 'video', titulo: 'Video' },
   { paso: 'audio', titulo: 'Audio' },
+  { paso: 'verificacion', titulo: 'Tiempo de la verificación remota' },
 ] as const;
 
 export type NombreDePaso = (typeof PASOS_DEL_ENSAYO)[number]['paso'];
 
 export interface ResultadoDePaso {
   readonly paso: NombreDePaso;
-  /** 1 a 8, el orden del guion. */
+  /** 1 a 9, el orden del guion. */
   readonly numero: number;
   readonly titulo: string;
   readonly estado: EstadoDePaso;
@@ -67,6 +70,40 @@ export interface EventosDeLaPlataforma {
   primeroDesde(host: string, desde: Date, plazoMs: number): Promise<EventoVisto | null>;
 }
 
+/**
+ * F2 (corrección de la 15-L) · un veredicto que la plataforma devolvió a la
+ * terminal, tal como lo registró la API (`eventos_de_equipo`, tipo
+ * `resultado_de_verificacion`): del hecho recibido al veredicto contestado.
+ */
+export interface VerificacionMedida {
+  readonly duracionMs: number;
+  /** `aceptadoPorElEquipo`. `null` si la API no lo dijo. */
+  readonly aceptado: boolean | null;
+}
+
+/** F2 · lo que la plataforma midió de las verificaciones remotas de un equipo. */
+export interface VerificacionesDeLaPlataforma {
+  /** Las primeras `cuantas` desde `desde`, esperando hasta `plazoMs` a que lleguen. */
+  medidasDesde(
+    host: string,
+    desde: Date,
+    cuantas: number,
+    plazoMs: number,
+  ): Promise<readonly VerificacionMedida[]>;
+}
+
+/**
+ * C2 (corrección de la 15-L) · a dónde tiene que publicar la cámara para que
+ * sus eventos lleguen a ESTE Mac: su IP en la red de la cámara, el puerto de la
+ * API y un secreto de `ALARM_SERVER_EQUIPOS` en la ruta. Los secretos sólo se
+ * comparan: nunca se imprimen.
+ */
+export interface ReceptorEsperado {
+  readonly direccion: IpHaciaElEquipo;
+  readonly puerto: number;
+  readonly secretos: readonly string[];
+}
+
 export interface EquipoDeEnsayo extends OpcionesDeEquipo {
   readonly familia: FamiliaDeEnsayo;
   /** Carril de la cámara o puerta de la terminal y del videoportero. */
@@ -89,6 +126,16 @@ export interface OpcionesDeEnsayo {
   /** La zona del conjunto: America/Bogota. */
   readonly zona: string;
   readonly ahora: () => Date;
+  /** C2 · a dónde debe publicar la cámara. Sin él, el paso 4 no lo compara. */
+  readonly receptorEsperado?: ReceptorEsperado;
+  /** F2 · los tiempos que registró la plataforma. Sin ellos, el paso 9 se omite. */
+  readonly verificaciones?: VerificacionesDeLaPlataforma;
+  /** F2 · `TERMINAL_PLAZO_DE_VERIFICACION_S`: tras él, la terminal niega. 8 por omisión. */
+  readonly plazoDeVerificacionS?: number;
+  /** F2 · cuántas veces se presenta el rostro. 5 por omisión. */
+  readonly presentaciones?: number;
+  /** C7 · cuánto esperar antes de volver a buscar el rostro de prueba. 60 s por omisión. */
+  readonly esperaDeSincronizacionMs?: number;
 }
 
 export const resultado = (

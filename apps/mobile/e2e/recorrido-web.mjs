@@ -720,6 +720,32 @@ try {
     : mal('las tarjetas no dicen la situación real de la visita');
   await captura('5-visitantes');
 
+  // ── 5b · el formulario: los dos orígenes de la foto y la casilla con nombre ─
+  // Decisiones del cliente para la visita de sitio (corrección de la 15-L). En
+  // web la fuente de fotos es la simulada, así que aquí no se elige ninguna:
+  // se comprueba que el residente VE las dos salidas y que la casilla dice el
+  // nombre que escribe, mientras lo escribe.
+  await pulsar('Nuevo visitante');
+  const casillaCon = (nombre) =>
+    `Declaro que ${nombre} me autorizó a usar su foto para su ingreso al conjunto`;
+  await escribirEn('Nombre del visitante', 'Ana Prueba');
+  // La casilla y los botones quedan al fondo del formulario: se baja hasta
+  // ellos como lo haría el pulgar, con la rueda, no saltando por el DOM.
+  await pagina.mouse.move(210, 600);
+  await pagina.mouse.wheel(0, 2000);
+  (await hay('Tomar foto')) && (await hay('Elegir de la galería'))
+    ? ok('la foto se toma o se elige de la galería: los dos botones están a la vista')
+    : mal('no se ven «Tomar foto» y «Elegir de la galería» en el formulario');
+  (await hay(casillaCon('Ana Prueba')))
+    ? ok('la casilla dice el nombre del visitante que se escribe, en vivo')
+    : mal('la casilla no lleva el nombre escrito en el formulario');
+  await captura('5b-nuevo-visitante');
+  await pagina
+    .getByRole('button', { name: /Back|Atrás/i })
+    .first()
+    .click();
+  await esperarTexto('Mis visitantes');
+
   // ── 6 · perfil e historial ────────────────────────────────────────────────
   await irAPestana('Perfil');
   (await hay('Maria Titular'))

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
 import 'package:ncr_residente/configuracion/ambiente.dart';
+import 'package:ncr_residente/dominio/casilla_de_la_foto.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/acceso.dart';
 import 'package:ncr_residente/dominio/notificaciones.dart';
@@ -314,6 +315,9 @@ void main() {
     // Ya no es un aviso de «llega más adelante»: es el formulario de verdad.
     expect(find.text('Nuevo visitante'), findsOneWidget);
     expect(find.byType(FotoDelVisitante), findsOneWidget);
+    // Los dos orígenes de la foto, decisión del cliente para la visita de sitio.
+    expect(find.text('Tomar foto'), findsOneWidget);
+    expect(find.text('Elegir de la galería'), findsOneWidget);
   });
 
   testWidgets('F6 · «Volver a autorizar» desde la pestaña: la visita anterior y la clave al abrir',
@@ -338,7 +342,8 @@ void main() {
     expect(find.byType(DropdownButtonFormField<int>), findsOneWidget);
     expect(find.byType(Checkbox), findsOneWidget);
 
-    await t.tap(find.text(textoDeLaCasilla));
+    // La casilla lleva el nombre del visitante que se vuelve a autorizar.
+    await t.tap(find.text(textoDeLaCasilla('Plomero Pérez')));
     await t.pump();
     await t.tap(find.text('Autorizar de nuevo'));
     await t.pumpAndSettle();

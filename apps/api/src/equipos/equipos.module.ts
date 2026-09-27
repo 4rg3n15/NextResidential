@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
-import { BITACORA } from '@ncr/domain-core';
-import type { Bitacora } from '@ncr/domain-core';
+import { BITACORA, RELOJ } from '@ncr/domain-core';
+import type { Bitacora, Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import {
@@ -14,7 +14,7 @@ import {
   OLVIDO_DE_EQUIPO,
   SONDA_DE_EQUIPO,
 } from './aplicacion/puertos';
-import type { OlvidoDeEquipo } from './aplicacion/puertos';
+import type { CorrectorDeEquipo, OlvidoDeEquipo } from './aplicacion/puertos';
 import { LECTOR_DE_SENALES } from './aplicacion/senal-de-eventos';
 import type { LectorDeSenales } from './aplicacion/senal-de-eventos';
 import { PROVEEDOR_DE_EQUIPOS } from '../proveedores';
@@ -34,6 +34,17 @@ import {
 import { RepositorioDeEquiposPg } from './infraestructura/repositorio-equipos-pg';
 import { SondaPorProveedor } from './infraestructura/sonda-por-proveedor';
 import { CorrectorPorProveedor } from './infraestructura/corrector-por-proveedor';
+import { CopropiedadDeEquipoEnCache } from './infraestructura/copropiedad-de-equipo-en-cache';
+import { IpDelMacPorInterfaces, SecretosDeLaDeclaracion } from './infraestructura/ip-del-mac';
+import {
+  CambiarVerificacionRemota,
+  EnviarEventosAEsteMac,
+} from './aplicacion/configuracion-en-sitio';
+import { ConfiguracionEnSitioController } from './presentacion/configuracion-en-sitio.controller';
+import {
+  AvisoDeEquiposSimuladosAlArrancar,
+  EquiposSimuladosController,
+} from './presentacion/equipos-simulados.controller';
 import { EquiposController } from './presentacion/equipos.controller';
 import { NombresDeEquiposController } from './presentacion/nombres-de-equipos.controller';
 import { ALCANCE_DE_EQUIPOS, AlcanceDeEquipos } from './presentacion/alcance-de-equipos';
@@ -54,14 +65,69 @@ export class EquiposModule {
   static registrar(): DynamicModule {
     return {
       module: EquiposModule,
-      controllers: [EquiposController, AtestacionesController, NombresDeEquiposController],
+      controllers: [
+        EquiposController,
+        AtestacionesController,
+        NombresDeEquiposController,
+        ConfiguracionEnSitioController,
+        EquiposSimuladosController,
+      ],
       providers: [
+        // F3 (corrección de la 15-L) · simulado con equipos reales: se dice al arrancar.
+        AvisoDeEquiposSimuladosAlArrancar,
         {
-          // C1 (15-L) · el proveedor olvida lo que recordaba de un equipo editado.
+          // F2 (corrección de la 15-L) · de quién es cada equipo, recordado
+          // 30 s para el camino del veredicto; se suelta con el olvido de abajo.
+          provide: CopropiedadDeEquipoEnCache,
+          inject: [REPOSITORIO_DE_EQUIPOS, RELOJ],
+          useFactory: (equipos: RepositorioDeEquipos, reloj: Reloj) =>
+            new CopropiedadDeEquipoEnCache(
+              { copropiedadDe: (id) => equipos.copropiedadDeActivo(id) },
+              () => reloj.ahora().getTime(),
+            ),
+        },
+        {
+          // C2 (corrección de la 15-L) · «Enviar eventos a este Mac».
+          provide: EnviarEventosAEsteMac,
+          inject: [REPOSITORIO_DE_EQUIPOS, CORRECTOR_DE_EQUIPO, CONFIGURACION, OLVIDO_DE_EQUIPO],
+          useFactory: (
+            equipos: RepositorioDeEquipos,
+            corrector: CorrectorDeEquipo,
+            c: Configuracion,
+            olvido: OlvidoDeEquipo,
+          ) =>
+            new EnviarEventosAEsteMac(
+              equipos,
+              corrector,
+              new IpDelMacPorInterfaces(c.ALARM_SERVER_IP_ANUNCIADA),
+              new SecretosDeLaDeclaracion(c.ALARM_SERVER_EQUIPOS),
+              c.PORT,
+              olvido,
+            ),
+        },
+        {
+          // F2 (corrección de la 15-L) · el interruptor de la verificación remota.
+          provide: CambiarVerificacionRemota,
+          inject: [REPOSITORIO_DE_EQUIPOS, CORRECTOR_DE_EQUIPO, OLVIDO_DE_EQUIPO],
+          useFactory: (
+            equipos: RepositorioDeEquipos,
+            corrector: CorrectorDeEquipo,
+            olvido: OlvidoDeEquipo,
+          ) => new CambiarVerificacionRemota(equipos, corrector, olvido),
+        },
+        {
+          // C1 (15-L) · el proveedor olvida lo que recordaba de un equipo editado;
+          // F2 · y también de quién era.
           provide: OLVIDO_DE_EQUIPO,
-          inject: [PROVEEDOR_DE_EQUIPOS],
-          useFactory: (proveedor: ProveedorDeEquipos): OlvidoDeEquipo => ({
-            olvidar: (dispositivoId) => proveedor.olvidar?.(dispositivoId),
+          inject: [PROVEEDOR_DE_EQUIPOS, CopropiedadDeEquipoEnCache],
+          useFactory: (
+            proveedor: ProveedorDeEquipos,
+            copropiedades: CopropiedadDeEquipoEnCache,
+          ): OlvidoDeEquipo => ({
+            olvidar: (dispositivoId) => {
+              proveedor.olvidar?.(dispositivoId);
+              copropiedades.olvidar(dispositivoId);
+            },
           }),
         },
         {
@@ -136,11 +202,9 @@ export class EquiposModule {
         },
         {
           // R1 (15-L) · lo que el receptor pregunta: de quién es este equipo.
+          // F2 · desde la caché de arriba.
           provide: COPROPIEDAD_DE_EQUIPO,
-          inject: [REPOSITORIO_DE_EQUIPOS],
-          useFactory: (equipos: RepositorioDeEquipos) => ({
-            copropiedadDe: (dispositivoId: string) => equipos.copropiedadDeActivo(dispositivoId),
-          }),
+          useExisting: CopropiedadDeEquipoEnCache,
         },
         {
           // 15-L · el equipo de la petición es de la copropiedad de la ruta.

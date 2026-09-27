@@ -414,18 +414,3 @@ export interface LocalizadorDeVivienda {
     identificador: string,
   ): Promise<{ readonly id: string; readonly identificador: string } | null>;
 }
-
-/**
- * D-10 · la identidad registrada del TITULAR de un consentimiento, para que el
- * consentimiento presencial compare lo que él escribe. Token y forma
- * estrecha, como el localizador: biometría no consulta la tabla de personas.
- */
-export const IDENTIDAD_DE_PERSONA = Symbol.for('ncr.padron.IdentidadDePersona');
-
-export interface IdentidadDePersona {
-  /** `null` si la persona no existe en esa copropiedad o está dada de baja. */
-  porId(
-    copropiedadId: string,
-    personaId: string,
-  ): Promise<{ readonly nombreCompleto: string; readonly numeroDocumento: string } | null>;
-}

@@ -8,8 +8,9 @@ import {
   RepositorioPlantillasEnMemoria,
 } from '../infraestructura/repositorios-en-memoria';
 import { VigenciaDesdeAutorizaciones } from '../infraestructura/vigencia-desde-autorizaciones';
-import { CapturarRostro, ResponderConsentimiento, SincronizarPlantilla } from './casos-de-uso';
+import { CapturarRostro, SincronizarPlantilla } from './casos-de-uso';
 import type { VigenciaDeAutorizaciones } from './puertos';
+import { RespuestaDelTitular } from '../../../test/dobles/respuesta-del-titular';
 
 /**
  * A2 (ETAPA 15-L) · la vigencia de la autorización viaja al equipo con el
@@ -77,7 +78,7 @@ const montar = async (
     suprimirEn: new Date(AHORA.getTime() + 8 * HORA),
   });
   if (!esExito(r) || !r.valor.aceptada) throw new Error('la captura debía aceptarse');
-  await new ResponderConsentimiento(consentimientos, plantillas, reloj).ejecutar(ctx, {
+  await new RespuestaDelTitular(consentimientos, plantillas, reloj).ejecutar(ctx, {
     consentimientoId: r.valor.consentimientoId,
     quienResponde: TITULAR,
     acepta: true,

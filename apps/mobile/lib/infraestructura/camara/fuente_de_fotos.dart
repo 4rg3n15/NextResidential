@@ -31,6 +31,7 @@ import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 
 import '../../dominio/calidad_de_captura.dart';
+import '../../dominio/origen_de_la_foto.dart';
 import '../../dominio/puertos.dart';
 
 class CamaraSimulada {
@@ -42,7 +43,10 @@ class CamaraSimulada {
   /// aporta nada. Fuera de ahí se deja en `false` A PROPÓSITO.
   final bool siempreBuena;
 
-  Future<FotoTomada?> tomar() async {
+  /// La galería se simula igual que la cámara: sin aparato no hay fototeca
+  /// que abrir, y lo que importa demostrar —que las dos terminan en el mismo
+  /// juicio— no depende de quién entrega los bytes.
+  Future<FotoTomada?> tomar(OrigenDeFoto origen) async {
     // Una espera corta: sin ella, el formulario nunca enseñaría su estado de
     // «tomando» y ese estado quedaría sin ejercer.
     await Future<void>.delayed(const Duration(milliseconds: 120));

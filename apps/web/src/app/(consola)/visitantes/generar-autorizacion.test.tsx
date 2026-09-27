@@ -62,8 +62,10 @@ beforeEach(() => {
       }
       if (entrada.method === 'GET' && ruta.endsWith('/visitas/casilla')) {
         return json({
-          texto: 'El visitante autorizó el uso de su foto para el ingreso',
-          version: 'casilla-1',
+          plantilla:
+            'Declaro que {visitante} me autorizó a usar su foto para su ingreso al conjunto',
+          marcador: '{visitante}',
+          version: 'casilla-v2',
         });
       }
       enviados.push(entrada);
@@ -100,13 +102,34 @@ const rellenar = async (): Promise<void> => {
 };
 
 describe('Generar autorización (F1, F4)', () => {
+  it('la casilla nombra al visitante con el nombre del formulario (ADR-032)', async () => {
+    montar();
+    // Sin nombre todavía: «el visitante», nunca el marcador.
+    expect(
+      await screen.findByLabelText(
+        'Declaro que el visitante me autorizó a usar su foto para su ingreso al conjunto',
+        { exact: false },
+      ),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Nombre del visitante/), {
+      target: { value: '  Ana Pérez ' },
+    });
+    expect(
+      screen.getByLabelText(
+        'Declaro que Ana Pérez me autorizó a usar su foto para su ingreso al conjunto',
+        { exact: false },
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/\{visitante\}/)).toBeNull();
+  });
+
   it('sin foto no se envía, y sin la casilla tampoco', async () => {
     montar();
     await rellenar();
     expect(enviar().disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Tomar foto' }));
     expect(enviar().disabled, 'sin la casilla marcada no se envía').toBe(true);
-    fireEvent.click(screen.getByLabelText(/El visitante autorizó el uso de su foto/));
+    fireEvent.click(screen.getByLabelText(/Declaro que Ana Pérez me autorizó a usar su foto/));
     expect(enviar().disabled).toBe(false);
   });
 
@@ -114,7 +137,7 @@ describe('Generar autorización (F1, F4)', () => {
     montar();
     await rellenar();
     fireEvent.click(screen.getByRole('button', { name: 'Tomar foto' }));
-    fireEvent.click(screen.getByLabelText(/El visitante autorizó el uso de su foto/));
+    fireEvent.click(screen.getByLabelText(/Declaro que Ana Pérez me autorizó a usar su foto/));
     fireEvent.click(enviar());
     await waitFor(() => expect(enviados.length).toBe(1));
     const r = enviados[0]!;
@@ -152,7 +175,7 @@ describe('Generar autorización (F1, F4)', () => {
     montar();
     await rellenar();
     fireEvent.click(screen.getByRole('button', { name: 'Tomar foto' }));
-    fireEvent.click(screen.getByLabelText(/El visitante autorizó el uso de su foto/));
+    fireEvent.click(screen.getByLabelText(/Declaro que Ana Pérez me autorizó a usar su foto/));
     fireEvent.click(enviar());
     const alerta = await screen.findByText(/La foto no sirve: se ve más de un rostro/);
     expect(alerta.textContent).not.toMatch(/ROSTROS_MULTIPLES/);

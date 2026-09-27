@@ -1,12 +1,6 @@
-import { randomBytes } from 'node:crypto';
-import { cargaDePruebaDeRostro } from '../diagnostico/carga-de-prueba';
-import { IMAGEN_SIN_ROSTRO } from '../diagnostico/imagen-sin-rostro';
 import { ClienteDeEquipo } from '../equipo/cliente';
 import { rutaPara, opcionesDeEscritura } from '../equipo/catalogo-de-rutas';
 import { confirmada } from '../equipo/confirmacion-isapi';
-import { soporta } from '../nucleo/capacidades';
-import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
-import { exigirFotoAdmisible, FotoNoAdmitida } from '../terminal/foto-del-rostro';
 import { motivoLegible } from '../nucleo/motivo-legible';
 import { TerminalFacial } from '../terminal/terminal-facial';
 import { Videoportero } from '../videoportero/videoportero';
@@ -15,7 +9,7 @@ import type { OpcionesDeEnsayo, ResultadoDePaso } from './tipos';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * J1 · PASOS 5 Y 6 · LO QUE MUEVE O ESCRIBE, SIEMPRE CON UNA PERSONA DELANTE
+ * J1 · PASO 5 · LO QUE MUEVE, SIEMPRE CON UNA PERSONA DELANTE
  *
  * La apertura es la de PRODUCCIÓN, que lleva el cuerpo DEMOSTRADO en sitio
  * (anexo 15-K): el mismo documento y el mismo Content-Type. Y «aceptada» no
@@ -136,71 +130,5 @@ export const pasoDeApertura = async (o: OpcionesDeEnsayo): Promise<ResultadoDePa
   }
 };
 
-/** ¿Lleva rostros este equipo? Lo DECLARA él; la terminal, siempre. */
-const llevaRostros = (o: OpcionesDeEnsayo, c: CapacidadesDeEquipo | null): boolean =>
-  o.equipo.familia === 'terminal' ||
-  (o.equipo.familia === 'videoportero' && c !== null && soporta(c, 'bibliotecaDeRostros'));
-
-export const pasoDeRostro = async (
-  o: OpcionesDeEnsayo,
-  capacidades: CapacidadesDeEquipo | null,
-): Promise<ResultadoDePaso> => {
-  if (!llevaRostros(o, capacidades)) {
-    return resultado(
-      'rostro',
-      'no_aplica',
-      o.equipo.familia === 'camara'
-        ? 'La cámara no lleva rostros'
-        : 'Este equipo no declara biblioteca de rostros: la sincronización lo omite y lo dice',
-    );
-  }
-  if (o.soloLectura) return resultado('rostro', 'omitido', SOLO_LECTURA);
-  if (o.foto !== undefined) {
-    try {
-      exigirFotoAdmisible(o.foto, o.limitesDeFoto);
-    } catch (error) {
-      return resultado(
-        'rostro',
-        'fallo',
-        `La foto de --foto no sirve: ${error instanceof FotoNoAdmitida ? error.legible : motivoLegible(error)}`,
-        'Use un JPEG de una sola cara, de frente, dentro de los límites de EQUIPOS_FOTO_*',
-      );
-    }
-  }
-  // Sin foto real, la imagen sintética: prueba el canal, pero no el alta.
-  const imagen = o.foto ?? IMAGEN_SIN_ROSTRO;
-  const r = await cargaDePruebaDeRostro(
-    o.equipo,
-    imagen,
-    `ENSAYO${randomBytes(4).toString('hex')}`,
-  );
-  const detalle = [`persona de prueba: ${r.employeeNo}`];
-  if (r.baja === null || !r.baja.ok) {
-    return resultado(
-      'rostro',
-      'fallo',
-      `La persona de prueba pudo QUEDAR en el equipo: ${r.errorDeBaja ?? 'la baja no se confirmó'}`,
-      `Bórrela a mano en el panel web (Persona → buscar ${r.employeeNo} → eliminar)`,
-      detalle,
-    );
-  }
-  if (!r.aceptada) {
-    return resultado(
-      'rostro',
-      'fallo',
-      `El equipo no aceptó el rostro: ${r.rechazo ?? 'sin motivo'}`,
-      o.foto === undefined
-        ? 'Repita con --foto=<JPEG de una cara real>: la imagen de prueba no tiene rostro y el ' +
-            'equipo de verdad la rechaza así. La persona de prueba ya se dio de baja'
-        : 'Pruebe otra foto: una sola cara, de frente y bien iluminada',
-      detalle,
-    );
-  }
-  return resultado(
-    'rostro',
-    'ok',
-    'Alta de persona y rostro aceptada, supresión verificada por búsqueda y baja confirmada',
-    null,
-    detalle,
-  );
-};
+// J1 · PASO 6 · el rostro de prueba vive en `paso-de-rostro.ts` (C7 y F4, 15-L).
+export { pasoDeRostro } from './paso-de-rostro';

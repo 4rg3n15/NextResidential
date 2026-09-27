@@ -9,13 +9,18 @@ part 'texto_de_la_casilla_dto.g.dart';
 @JsonSerializable()
 class TextoDeLaCasillaDto {
   const TextoDeLaCasillaDto({
-    required this.texto,
+    required this.plantilla,
+    required this.marcador,
     required this.version,
   });
   
   factory TextoDeLaCasillaDto.fromJson(Map<String, Object?> json) => _$TextoDeLaCasillaDtoFromJson(json);
   
-  final String texto;
+  /// Texto de la casilla con el marcador {visitante}: el cliente lo sustituye por el nombre escrito en el formulario
+  final String plantilla;
+
+  /// El marcador que se sustituye: {visitante}
+  final String marcador;
   final String version;
 
   Map<String, Object?> toJson() => _$TextoDeLaCasillaDtoToJson(this);

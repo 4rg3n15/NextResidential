@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import 'acceso.dart';
 import 'calidad_de_captura.dart';
 import 'entidades.dart';
+import 'origen_de_la_foto.dart';
 import 'sesion.dart';
 
 enum ClaseDeFallo {
@@ -104,9 +105,15 @@ abstract interface class RepositorioDelResidente {
 /// De dónde sale la foto del visitante. Es un puerto por lo de siempre: sin él
 /// el formulario no se podría probar sin una cámara, y con él se prueban las
 /// siete formas de salir mal sin sacar una sola foto.
-typedef TomarFoto = Future<FotoTomada?> Function();
+///
+/// El origen —cámara o galería— es un argumento, no un segundo puerto: lo que
+/// cambia es quién entrega los bytes, y la reducción y la medida tienen que
+/// ser las mismas (ver `origen_de_la_foto.dart`). `null` = el residente
+/// canceló; lo que no es cancelar llega como `FotoNoObtenida`, con su motivo.
+typedef TomarFoto = Future<FotoTomada?> Function(OrigenDeFoto origen);
 
-/// Lo que entrega la cámara: el JPEG ya reducido y lo que se midió de él.
+/// Lo que entrega la cámara o la galería: el JPEG ya reducido y lo que se midió
+/// de él, por el mismo camino para los dos orígenes.
 class FotoTomada {
   const FotoTomada({
     required this.jpeg,
@@ -124,9 +131,9 @@ class FotoTomada {
   /// produce una imagen que merezca enseñarse (la cámara simulada).
   final Uint8List? vistaPrevia;
 
-  /// La cámara del sistema no trae detector de rostros: el conteo y la
-  /// proporción los sustituye la confirmación del encuadre por quien captura,
-  /// igual que en la consola. Nunca se inventan.
+  /// Ni la cámara del sistema ni la galería traen detector de rostros: el
+  /// conteo y la proporción los sustituye la confirmación del encuadre por
+  /// quien captura, igual que en la consola. Nunca se inventan.
   final bool sinDetector;
 }
 

@@ -5,8 +5,6 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
-import '../models/aceptacion_presencial_dto.dart';
-import '../models/respuesta_de_consentimiento_dto.dart';
 import '../models/sincronizacion_total_dto.dart';
 import '../models/sincronizar_plantilla_dto.dart';
 
@@ -20,14 +18,6 @@ abstract class BiometriaApi {
   @POST('/copropiedades/{id}/biometria/barrido')
   Future<void> biometriaControllerEjecutarBarrido({
     @Path('id') required String id,
-  });
-
-  /// El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10)
-  @POST('/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial')
-  Future<RespuestaDeConsentimientoDto> biometriaControllerAceptarPresencialmente({
-    @Path('id') required String id,
-    @Path('consentimientoId') required String consentimientoId,
-    @Body() required AceptacionPresencialDto body,
   });
 
   /// Revocación del titular: supresión inmediata (RN-11, CA-11)

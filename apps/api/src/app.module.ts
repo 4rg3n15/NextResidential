@@ -48,6 +48,7 @@ import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
 import { GuardiaModule } from './guardia';
 import { AlarmServerModule } from './alarmserver';
 import { PlanificacionModule, conexionDePgBoss } from './planificacion';
+import { RegistroEnCache } from '@ncr/providers';
 import { EquiposModule, RegistroDeEquiposPg } from './equipos';
 
 /**
@@ -132,8 +133,10 @@ export class AppModule {
           // D5 · con el adaptador real, el registro lee `dispositivos` y descifra
           // el sobre de la credencial. Antes no había registro y la API no
           // arrancaba en modo hardware.
+          // F2 (corrección de la 15-L) · recordado 30 s y olvidado al editar:
+          // el veredicto a la terminal no relee la base en cada rostro.
           registroDesde: ({ pool, configuracion }) =>
-            new RegistroDeEquiposPg(pool, configuracion.EQUIPOS_LLAVE),
+            new RegistroEnCache(new RegistroDeEquiposPg(pool, configuracion.EQUIPOS_LLAVE)),
           // 15-K (§4) · y el simulado reconoce los equipos activos de la base.
           conocidoDesde: ({ pool, configuracion }) => {
             const registro = new RegistroDeEquiposPg(pool, configuracion.EQUIPOS_LLAVE);

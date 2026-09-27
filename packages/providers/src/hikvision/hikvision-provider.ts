@@ -173,6 +173,8 @@ export class HikvisionProvider
     this.intercomos.delete(dispositivoId);
     this.escuchas.get(dispositivoId)?.detener();
     this.escuchas.delete(dispositivoId);
+    // F2 · y el registro que lo recordaba para contestar rápido a la terminal.
+    this.opciones.registro.olvidar?.(dispositivoId);
     this.opciones.traza?.registrar('info', 'equipo olvidado tras un cambio en su ficha', {
       dispositivoId,
     });
@@ -361,13 +363,19 @@ export class HikvisionProvider
   }
 
   /** C3 (15-L) · la señal de la escucha de este equipo, si hay escucha. */
-  senalDeEventos(
-    dispositivoId: string,
-  ): { readonly transporte: TransporteDeEscucha; readonly ultimaSenal: Date | null } | null {
+  senalDeEventos(dispositivoId: string): {
+    readonly transporte: TransporteDeEscucha;
+    readonly ultimaSenal: Date | null;
+    readonly rechazo: string | null;
+  } | null {
     const escucha = this.escuchas.get(dispositivoId);
     return escucha === undefined
       ? null
-      : { transporte: escucha.transporte, ultimaSenal: escucha.ultimaSenal?.() ?? null };
+      : {
+          transporte: escucha.transporte,
+          ultimaSenal: escucha.ultimaSenal?.() ?? null,
+          rechazo: escucha.rechazoPorOtraPlataforma?.() ?? null,
+        };
   }
 
   // ── Escucha de lo que el equipo emite (A4) ───────────────────────────────
@@ -426,6 +434,7 @@ export class HikvisionProvider
       },
       activa: () => !terminada,
       ultimaSenal: () => escucha.ultimaSenal(),
+      rechazoPorOtraPlataforma: () => escucha.rechazoPorOtraPlataforma(),
     };
     this.escuchas.set(dispositivoId, nueva);
     return nueva;

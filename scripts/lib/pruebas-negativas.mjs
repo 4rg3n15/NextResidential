@@ -34,6 +34,7 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { arbolDeSonda } from '../../e2e/arbol-de-sonda.mjs';
+import { sinColores } from './sin-colores.mjs';
 
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
@@ -3145,6 +3146,180 @@ try {
     }
   }
 
+  console.log(
+    '\n▸ 39 · una prueba OMITIDA por falta de base FALLA con --con-base, y se nombra (H-15L-C01)',
+  );
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * EL DEFECTO QUE ESTA SONDA CIERRA
+     *
+     * `visitas-pg.test.ts` estuvo en verde con la base local caída: cada prueba
+     * salía por `if (omitida()) return;` y una prueba que retorna antes de su
+     * primera aserción PASA. La lista de visitas del residente salía vacía
+     * contra PostgreSQL (H-15L-C01) y el verificador, pedido con `--con-base`,
+     * no lo vio: vitest no la cuenta como saltada, así que D-112 tampoco.
+     *
+     * Se siembra la omisión DE VERDAD: una suite real de PostgreSQL contra una
+     * base que no contesta (el puerto 1 del bucle local rechaza al instante).
+     * `aforo-concurrencia.test.ts` y no la de visitas porque no arrastra Nest ni
+     * los equipos —dos segundos, y nada que otro trabajo en curso rompa—; el
+     * guardián es el mismo `exigirBase` de `base-exigida.ts`. Y sus informes
+     * JSON REALES alimentan el control del paso 5.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const apiDir = join(raiz, 'apps', 'api');
+    const vitest = join(
+      dirname(createRequire(join(apiDir, 'package.json')).resolve('vitest/package.json')),
+      'vitest.mjs',
+    );
+    const BASE_MUERTA = 'postgresql://nadie@127.0.0.1:1/ncr';
+    // El verificador exporta NCR_BASE_EXIGIDA con --con-base: aquí se decide caso a caso.
+    const entornoLibre = { ...process.env, CI: '1' };
+    delete entornoLibre.NCR_BASE_EXIGIDA;
+    const suiteContra = (caso, extra) => {
+      const informe = join(banco, `omision-${caso}.json`);
+      const r = correr(
+        'node',
+        [vitest, 'run', 'test/aforo-concurrencia.test.ts', `--outputFile.json=${informe}`],
+        { cwd: apiDir, timeout: 300_000, env: { ...entornoLibre, ...extra } },
+      );
+      return { ...r, salida: sinColores(r.salida), informe };
+    };
+    const PRUEBA = '50 ingresos simultáneos sobre 10 plazas: entran 10, ni una más';
+
+    const libre = suiteContra('libre', { DATABASE_URL_PRUEBAS: BASE_MUERTA });
+    libre.codigo === 0 && /OMITIDA: test\/aforo-concurrencia\.test\.ts › /.test(libre.salida)
+      ? ok('sin --con-base, la base caída OMITE —permitido— y lo anuncia con el nombre')
+      : mal(`sin --con-base la suite no parte de un estado sano (codigo ${libre.codigo})`);
+
+    const exigida = suiteContra('exigida', {
+      DATABASE_URL_PRUEBAS: BASE_MUERTA,
+      NCR_BASE_EXIGIDA: '1',
+    });
+    exigida.codigo !== 0
+      ? ok('con --con-base, la MISMA suite con la base caída FALLA')
+      : mal('con --con-base la suite sin base PASA: es el verde de H-15L-C01');
+    exigida.salida.includes(`OMISIÓN POR FALTA DE BASE con --con-base · test/aforo-concurrencia`) &&
+    exigida.salida.includes(PRUEBA)
+      ? ok('y cada prueba falla con su fichero, su bloque, su nombre y el motivo')
+      : mal('falla sin decir qué prueba se omitió ni por qué');
+
+    const sinUrl = suiteContra('sin-url', { DATABASE_URL_PRUEBAS: '', NCR_BASE_EXIGIDA: '1' });
+    sinUrl.codigo !== 0 && /DATABASE_URL_PRUEBAS no llega a esta suite/.test(sinUrl.salida)
+      ? ok('con --con-base y SIN la variable, el fichero no carga y dice por qué')
+      : mal('con --con-base y sin DATABASE_URL_PRUEBAS la suite se salta en silencio');
+
+    // ─── El control del paso 5, sobre esos informes reales y sobre un árbol ──
+    const arbol = join(banco, 'arbol-omisiones');
+    const dirApi = join(arbol, 'apps', 'api');
+    const informe = join(dirApi, '.informe-paso5.json');
+    mkdirSync(join(dirApi, 'test'), { recursive: true });
+    mkdirSync(join(arbol, 'apps', 'web'), { recursive: true });
+    const controlar = (...args) =>
+      correr('node', ['scripts/lib/omisiones-sin-base.mjs', ...args, arbol], { cwd: raiz });
+    const poner = (relativo, texto) => {
+      mkdirSync(dirname(join(arbol, relativo)), { recursive: true });
+      writeFileSync(join(arbol, relativo), texto);
+    };
+
+    // Línea base: un árbol que cumple la regla y un informe sin omisiones.
+    poner('apps/api/test/base-exigida.ts', 'export const u = process.env.DATABASE_URL_PRUEBAS;\n');
+    poner(
+      'apps/api/test/con-guardian-pg.test.ts',
+      "import { URL_BASE, exigirBase as guardian } from './base-exigida';\n" +
+        "guardian('sonda', () => URL_BASE !== undefined);\n",
+    );
+    poner('apps/api/test/sin-base.test.ts', "import { it } from 'vitest';\n");
+    poner('apps/api/src/config.ts', 'export const u = process.env.DATABASE_URL_PRUEBAS;\n');
+    poner(
+      'apps/api/node_modules/dep/leer.test.ts',
+      'export const u = process.env.DATABASE_URL_PRUEBAS;\n',
+    );
+    writeFileSync(
+      informe,
+      JSON.stringify({
+        testResults: [
+          {
+            name: '/x/apps/api/test/con-guardian-pg.test.ts',
+            status: 'passed',
+            message: '',
+            assertionResults: [{ fullName: 'corre contra la base', failureMessages: [] }],
+          },
+        ],
+      }),
+    );
+    const limpia = controlar('--exigida');
+    limpia.codigo === 0 && /ninguna · 1 fichero\(s\) de prueba usan la base/.test(limpia.salida)
+      ? ok('un árbol en regla y sin omisiones pasa, y cuenta los ficheros con guardián')
+      : mal(
+          `la línea base del control no pasa: sería un control que siempre grita (${limpia.salida.trim()})`,
+        );
+
+    // El informe REAL de la base caída sin --con-base: permitido y contado.
+    cpSync(libre.informe, informe);
+    const permitida = controlar();
+    permitida.codigo === 0 && /aforo-concurrencia\.test\.ts: 5 omitida/.test(permitida.salida)
+      ? ok('sin --con-base, las omisiones se permiten y se cuentan por fichero')
+      : mal(`sin --con-base el control rompe o calla las omisiones (codigo ${permitida.codigo})`);
+    const marcada = controlar('--exigida');
+    marcada.codigo !== 0 && marcada.salida.includes(PRUEBA)
+      ? ok('y ese mismo informe con --con-base FALLA y NOMBRA la prueba: si la variable no llegara')
+      : mal('una prueba MARCADA como omitida pasa por verde con --con-base');
+
+    cpSync(exigida.informe, informe);
+    const fallada = controlar('--exigida');
+    fallada.codigo !== 0 &&
+    fallada.salida.includes(PRUEBA) &&
+    /motivo: sin DATABASE_URL/.test(fallada.salida)
+      ? ok('las que FALLARON por omisión se nombran con su motivo, no como una roja cualquiera')
+      : mal('las pruebas falladas por omisión no se nombran como omisiones');
+
+    cpSync(sinUrl.informe, informe);
+    /aforo-concurrencia\.test\.ts › \(el fichero no cargó\)/.test(controlar('--exigida').salida)
+      ? ok('el fichero que no carga por falta de base también se nombra')
+      : mal('un fichero que no carga por falta de base no se nombra');
+
+    // Los que se saltan la regla, con y sin --con-base.
+    writeFileSync(informe, JSON.stringify({ testResults: [] }));
+    poner(
+      'apps/api/test/por-su-cuenta-pg.test.ts',
+      "const u = process.env['DATABASE_URL_PRUEBAS'];\n",
+    );
+    poner(
+      'apps/api/test/sin-guardian-pg.test.ts',
+      "import { URL_BASE } from './base-exigida';\nif (!URL_BASE) throw new Error('x');\n",
+    );
+    poner(
+      'apps/api/test/guardian-sin-llamar-pg.test.ts',
+      "import { exigirBase } from './base-exigida';\nexport const g = exigirBase;\n",
+    );
+    const fuera = controlar();
+    fuera.codigo !== 0 &&
+    /por-su-cuenta-pg\.test\.ts: lee DATABASE_URL_PRUEBAS/.test(fuera.salida) &&
+    /sin-guardian-pg\.test\.ts: importa de base-exigida\.ts y no registra/.test(fuera.salida) &&
+    /guardian-sin-llamar-pg\.test\.ts: importa/.test(fuera.salida)
+      ? ok('leer la base por su cuenta, o usarla sin guardián, rompe SIEMPRE y se nombra')
+      : mal(`un fichero que lee la base sin el guardián pasa (codigo ${fuera.codigo})`);
+    !/config\.ts|node_modules/.test(fuera.salida)
+      ? ok('y no confunde el código de la aplicación ni las dependencias con pruebas')
+      : mal('marca como prueba lo que no lo es');
+
+    // Y las dos formas de no tener nada que mirar.
+    writeFileSync(informe, '{esto no es json');
+    const rota = controlar('--exigida');
+    rota.codigo !== 0 && /no se pudo leer/.test(rota.salida)
+      ? ok('un informe ilegible se dice, no se confunde con «sin omisiones»')
+      : mal('un informe corrupto pasa como si no hubiera omisiones');
+    rmSync(informe, { force: true });
+    controlar('--exigida').codigo !== 0
+      ? ok('sin ningún informe del paso 5 no hay verde')
+      : mal('sin informes el control aprueba sin mirar nada');
+    correr('node', ['scripts/lib/omisiones-sin-base.mjs'], { cwd: raiz }).codigo !== 0
+      ? ok('invocarlo sin raíz no devuelve verde')
+      : mal('sin argumentos da 0: un control que no mira nada y aprueba');
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
@@ -3343,6 +3518,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 33 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 34 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

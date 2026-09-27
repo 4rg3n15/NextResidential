@@ -1,27 +1,12 @@
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:ncr_residente/infraestructura/camara/camara_del_telefono.dart';
 
-/// La parte comprobable sin cámara: de un JPEG grande a lo que viaja.
-/// Un degradado con algo de ruido: se parece más a una foto que el ruido puro,
-/// que ningún JPEG comprime y no representa lo que entrega una cámara.
-Uint8List jpegDeFoto(int ancho, int alto, {int calidad = 95, int ruido = 40}) {
-  final azar = Random(7);
-  final i = img.Image(width: ancho, height: alto);
-  for (final p in i) {
-    final base = (p.x * 255 ~/ ancho + p.y * 255 ~/ alto) ~/ 2;
-    int v() => (base + azar.nextInt(ruido) - ruido ~/ 2).clamp(0, 255);
-    p
-      ..r = v()
-      ..g = v()
-      ..b = v();
-  }
-  return Uint8List.fromList(img.encodeJpg(i, quality: calidad));
-}
+import '../dobles/fotos.dart';
 
+/// La parte comprobable sin cámara: de un JPEG grande a lo que viaja.
 void main() {
   test('una foto grande se reduce a 640 px y cabe en 180 KB (minimización)', () {
     final foto = fotoDesdeJpeg(jpegDeFoto(1600, 1200))!;

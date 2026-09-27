@@ -7,6 +7,7 @@ import { juzgarPersonasYRostros } from './capacidades-de-personas';
 import { pasoDeApertura, pasoDeRostro } from './pasos-de-accion';
 import { pasoDeAudio } from './paso-de-audio';
 import { pasoDeEventos } from './paso-de-eventos';
+import { pasoDeVerificacion } from './paso-de-verificacion';
 import { pasoDeConexion, pasoDeConfiguracion, pasoDeHora, pasoDeVideo } from './pasos-de-lectura';
 import { PASOS_DEL_ENSAYO, resultado } from './tipos';
 import type { FamiliaDeEnsayo, OpcionesDeEnsayo, ResultadoDePaso } from './tipos';
@@ -15,7 +16,7 @@ import type { FamiliaDeEnsayo, OpcionesDeEnsayo, ResultadoDePaso } from './tipos
  * ═════════════════════════════════════════════════════════════════════════════
  * J1 (ETAPA 15-L) · `pnpm sitio:ensayo`, EQUIPO POR EQUIPO
  *
- * Los ocho pasos, en orden, con un diagnóstico único al principio (el mismo de
+ * Los nueve pasos, en orden, con un diagnóstico único al principio (el mismo de
  * «Probar conexión»). Si el paso 1 falla, NO se sigue: con la credencial
  * rechazada, cada petición más es un intento fallido que acerca el bloqueo de
  * la IP del Mac, y sin conexión los demás pasos sólo repetirían la causa.
@@ -90,8 +91,9 @@ export const ensayarEquipo = async (
   pasos.push(pasoDeConfiguracion(fichaDe(d), extras));
   pasos.push(await pasoDeEventos(o));
   pasos.push(await pasoDeApertura(o));
-  pasos.push(await pasoDeRostro(o, c));
+  pasos.push(await pasoDeRostro(o, c, esperar));
   pasos.push(pasoDeVideo(d, equipo.familia));
   pasos.push(await pasoDeAudio(o, c, esperar));
+  pasos.push(await pasoDeVerificacion(o, c));
   return informe(pasos);
 };

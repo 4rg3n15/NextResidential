@@ -106,8 +106,9 @@ Future<void> main() async {
         // El cambio de contraseña va CON la sesión: su `Dio` es el de la API.
         cuenta: CuentaPorApi(api: CuentasApi(dio)),
         llamador: const LlamadorDelSistema(),
-        // Hito 3 · la foto real del visitante, reducida en el aparato. En web
-        // (el recorrido del verificador) no hay cámara que abrir: la simulada.
+        // Hito 3 · la foto real del visitante —de la cámara o de la galería—,
+        // reducida en el aparato. En web (el recorrido del verificador) no hay
+        // cámara ni fototeca que abrir: la simulada.
         tomarFoto: kIsWeb ? null : CamaraDelTelefono().tomar,
         servidor: CambioDeServidor(
           direccion: direccion,

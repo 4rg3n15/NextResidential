@@ -455,7 +455,7 @@ describe('O4 · la ficha es por tipo y el sondeo posterior usa la clave guardada
       (h) => h.campo,
     );
     expect(campos).toContain('quién decide la apertura');
-    expect(campos).toContain('biblioteca de rostros');
+    expect(campos).toContain('Rostros');
     expect(campos.some((c) => /país|receptor|disparador/.test(c))).toBe(false);
     expect(prueba.body.verificado).toBe(true);
     expect(prueba.body.capacidades.verificacionRemota).toBe('si');
@@ -534,7 +534,7 @@ describe('O4 · la ficha es por tipo y el sondeo posterior usa la clave guardada
     expect(diagnostico.body.verificado).toBe(true);
     const biblioteca = (
       diagnostico.body.ficha.hallazgos as { campo: string; estado: string }[]
-    ).find((h) => h.campo === 'biblioteca de rostros');
+    ).find((h) => h.campo === 'Rostros');
     expect(biblioteca?.estado).toBe('aviso');
     // Y nada de la respuesta lleva la clave.
     expect(JSON.stringify(diagnostico.body)).not.toContain(ALTA.secreto);

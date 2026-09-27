@@ -97,6 +97,12 @@ export class ConstanciasDeEquipo {
     veredicto: VeredictoRemoto,
     aceptadoPorElEquipo: boolean,
     eventoId: string | null,
+    /**
+     * F2 (corrección de la 15-L) · del hecho recibido al veredicto aceptado o
+     * rechazado por la terminal. Queda en la fila para que el ensayo compare
+     * p50/p95 con el plazo de la terminal sin leer registros de texto.
+     */
+    duracionMs: number,
   ): Promise<void> {
     await this.registro.vivo(
       filaDeEventoDeEquipo(evento, copropiedadId, this.ids, {
@@ -112,6 +118,7 @@ export class ConstanciasDeEquipo {
           permitido: veredicto.permitido,
           motivo: veredicto.motivo,
           aceptadoPorElEquipo,
+          duracionMs,
         },
       }),
     );

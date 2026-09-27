@@ -6,17 +6,10 @@ import {
   RepositorioConsentimientosEnMemoria,
   RepositorioPlantillasEnMemoria,
 } from '../infraestructura/repositorios-en-memoria';
-import {
-  CapturarRostro,
-  ResponderConsentimiento,
-  RevocarConsentimiento,
-  SincronizarPlantilla,
-} from './casos-de-uso';
+import { CapturarRostro, RevocarConsentimiento, SincronizarPlantilla } from './casos-de-uso';
 import type { CatalogoDeTerminales, TerminalConBiblioteca } from './puertos';
-import {
-  PropagarConsentimientoAceptado,
-  SincronizarPlantillaEnTerminales,
-} from './sincronizacion-total';
+import { SincronizarPlantillaEnTerminales } from './sincronizacion-total';
+import { RespuestaDelTitular } from '../../../test/dobles/respuesta-del-titular';
 
 const COP = 'cop-1';
 const TITULAR = 'visitante-1';
@@ -79,8 +72,7 @@ let plantillas: RepositorioPlantillasEnMemoria;
 let terminales: Terminales;
 let catalogo: Catalogo;
 let enTerminales: SincronizarPlantillaEnTerminales;
-let propagar: PropagarConsentimientoAceptado;
-let responder: ResponderConsentimiento;
+let responder: RespuestaDelTitular;
 let revocar: RevocarConsentimiento;
 let capturar: CapturarRostro;
 
@@ -109,11 +101,10 @@ beforeEach(() => {
   const boveda = new BovedaAesGcm(LLAVE, 'env:X', new AlmacenEnMemoria(), terminales);
   const reloj = new RelojFijo();
   capturar = new CapturarRostro(consentimientos, plantillas, boveda, reloj, new Ids());
-  responder = new ResponderConsentimiento(consentimientos, plantillas, reloj);
+  responder = new RespuestaDelTitular(consentimientos, plantillas, reloj);
   revocar = new RevocarConsentimiento(consentimientos, plantillas, boveda, reloj);
   const una = new SincronizarPlantilla(consentimientos, plantillas, boveda, reloj);
   enTerminales = new SincronizarPlantillaEnTerminales(plantillas, catalogo, una, bitacora);
-  propagar = new PropagarConsentimientoAceptado(plantillas, enTerminales, bitacora);
 });
 
 describe('SincronizarPlantillaEnTerminales · a TODAS, por capacidad (A3)', () => {
@@ -205,33 +196,6 @@ describe('SincronizarPlantillaEnTerminales · a TODAS, por capacidad (A3)', () =
     const r = await enTerminales.ejecutar(ctx, { plantillaId: 'no-existe' });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.codigo).toBe('ENTIDAD_NO_ENCONTRADA');
-  });
-});
-
-describe('PropagarConsentimientoAceptado · lo que pasa justo tras aceptar', () => {
-  it('empuja las plantillas pendientes de ese consentimiento a todas las terminales', async () => {
-    const { plantillaId, consentimientoId } = await captura();
-    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: true });
-
-    const resultados = await propagar.ejecutar(ctx, { consentimientoId });
-    expect(resultados).toHaveLength(1);
-    expect(resultados[0]).toMatchObject({ plantillaId, sincronizadas: 2 });
-  });
-
-  it('con el consentimiento rechazado no propaga nada', async () => {
-    const { consentimientoId } = await captura();
-    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: false });
-    expect(await propagar.ejecutar(ctx, { consentimientoId })).toEqual([]);
-    expect(terminales.recibidas).toEqual([]);
-  });
-
-  it('nunca lanza: una terminal que revienta queda en bitácora', async () => {
-    const { consentimientoId } = await captura();
-    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: true });
-    terminales.caidas.add('t-1');
-    terminales.caidas.add('v-1');
-    const resultados = await propagar.ejecutar(ctx, { consentimientoId });
-    expect(resultados[0]).toMatchObject({ sincronizadas: 0, fallidas: 2 });
   });
 });
 

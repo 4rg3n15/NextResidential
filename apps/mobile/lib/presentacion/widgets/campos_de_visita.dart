@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../configuracion/tema.dart';
+import '../../dominio/casilla_de_la_foto.dart';
 import '../../dominio/entidades.dart';
 import '../pantallas/comunes.dart';
 
@@ -133,17 +134,21 @@ class CuandoYCuantoDura extends StatelessWidget {
   }
 }
 
-/// F4 · la casilla, con su texto EXACTO. Es la constancia de que el visitante
-/// autorizó el uso de su foto: la marca el residente, y el servidor guarda
-/// quién la marcó y cuándo.
+/// F4 · la casilla, con su texto EXACTO. Es la ÚNICA constancia de que el
+/// visitante autorizó el uso de su foto: la marca el residente, y el servidor
+/// guarda quién la marcó, cuándo y con qué versión del texto.
 class CasillaDeLaFoto extends StatelessWidget {
   const CasillaDeLaFoto({
     super.key,
+    required this.nombreDelVisitante,
     required this.marcada,
     required this.alCambiar,
     this.habilitada = true,
   });
 
+  /// El nombre tal como está en el formulario, en vivo: la frase se reescribe
+  /// con cada letra. El dominio quita los bordes y cubre el campo vacío.
+  final String nombreDelVisitante;
   final bool marcada;
   final ValueChanged<bool> alCambiar;
   final bool habilitada;
@@ -156,7 +161,7 @@ class CasillaDeLaFoto extends StatelessWidget {
       controlAffinity: ListTileControlAffinity.leading,
       value: marcada,
       onChanged: habilitada ? (v) => alCambiar(v ?? false) : null,
-      title: const Text(textoDeLaCasilla),
+      title: Text(textoDeLaCasilla(nombreDelVisitante)),
       subtitle: const Text(
         'Márquela sólo si el visitante se lo autorizó. Queda registrado quién la marcó y '
         'cuándo, y la foto se borra de los equipos cuando termina la visita.',
@@ -216,8 +221,8 @@ class DesenlaceDeVisita extends StatelessWidget {
           titulo: 'El conjunto no aceptó la foto',
           // Nunca el código: «NITIDEZ» no le dice a nadie qué hacer con el
           // teléfono; «la foto está borrosa», sí.
-          cuerpo: 'La foto no sirve: ${f.razones.join('; ')}. Tómela de nuevo y vuelva a '
-              'registrar la visita.',
+          cuerpo: 'La foto no sirve: ${f.razones.join('; ')}. Tome otra foto o elija otra de '
+              'la galería y vuelva a registrar la visita.',
           alCerrar: alCerrar,
         ),
     };

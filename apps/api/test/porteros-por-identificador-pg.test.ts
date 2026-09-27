@@ -15,6 +15,7 @@ import type { Configuracion } from '../src/configuracion/esquema';
 import { crearApp, crearFirmante, tokenDe } from './utilidades';
 import type { Firmante } from './utilidades';
 import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -42,7 +43,6 @@ import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
  * OTRO proxy de confianza y comprueba que la misma cabecera ya no se cree.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const SUPER = '00000000-0000-4000-8000-000000000001';
 const INICIAL = 'Inicial#2026';
 const NUEVA = 'Garita#2026x';
@@ -143,13 +143,9 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.log(
-    'OMITIDA: sin DATABASE_URL_PRUEBAS o sin la migración 0042. Se ejecuta con --con-base.',
-  );
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin la migración 0042', () => disponible);
+const omitida = (): boolean => !disponible;
 
 type Metodo = 'get' | 'post' | 'put' | 'patch';
 const pedir = (

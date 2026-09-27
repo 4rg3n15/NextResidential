@@ -51,6 +51,8 @@ export class CorrectorPorProveedor implements CorrectorDeEquipo {
       confirmadaPor: datos.confirmadaPor,
       abrirSinPlataforma: this.ajustes.abrirSinPlataforma,
       ...(this.ajustes.plazoS === undefined ? {} : { plazoDeVerificacionS: this.ajustes.plazoS }),
+      ...(datos.activar === undefined ? {} : { activar: datos.activar }),
+      ...(datos.receptor === undefined ? {} : { receptor: datos.receptor }),
       ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
     });
 

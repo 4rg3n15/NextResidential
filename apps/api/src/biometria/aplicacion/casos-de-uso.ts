@@ -192,58 +192,6 @@ export class CapturarRostro {
 }
 
 /**
- * `ResponderConsentimiento` — CU-02 pasos 4 y 5 · RN-10, CA-09.
- *
- * `quienResponde` viene del token del titular, no de un campo del cuerpo: si lo
- * pusiera el cliente, RN-10 sería una casilla que cualquiera puede marcar.
- */
-export class ResponderConsentimiento {
-  constructor(
-    private readonly consentimientos: RepositorioConsentimientos,
-    private readonly plantillas: RepositorioPlantillas,
-    private readonly reloj: Reloj,
-  ) {}
-
-  async ejecutar(
-    ctx: ContextoTenant,
-    entrada: {
-      readonly consentimientoId: string;
-      readonly quienResponde: string;
-      readonly acepta: boolean;
-      readonly evidenciaId?: string;
-    },
-  ): Promise<Resultado<{ readonly estado: string }, ErrorDominio>> {
-    const copropiedadId = ctx.copropiedadId;
-    if (copropiedadId === null) return fallo(noEncontrado('La copropiedad'));
-
-    const actual = await this.consentimientos.porId(copropiedadId, entrada.consentimientoId);
-    if (actual === null) return fallo(noEncontrado('El consentimiento'));
-
-    const ahora = this.reloj.ahora();
-    const respondido = entrada.acepta
-      ? actual.otorgar(entrada.quienResponde, ahora, entrada.evidenciaId)
-      : actual.rechazar(entrada.quienResponde, ahora);
-    if (esFallo(respondido)) return respondido;
-
-    await this.consentimientos.guardar(respondido.valor, ctx.usuarioId);
-
-    // Aceptar habilita; rechazar deja la plantilla donde está y el barrido la
-    // suprimirá a su plazo. No se borra aquí: el rechazo no es una revocación,
-    // y el flujo alterno de CU-02 permite que la autorización siga viva solo
-    // por placa.
-    if (entrada.acepta) {
-      for (const p of await this.plantillas.deConsentimiento(copropiedadId, actual.id)) {
-        const habilitada = p.habilitarSincronizacion(respondido.valor);
-        if (esFallo(habilitada)) continue;
-        await this.plantillas.guardar(habilitada.valor, ctx.usuarioId);
-      }
-    }
-
-    return exito({ estado: respondido.valor.estado });
-  }
-}
-
-/**
  * `RevocarConsentimiento` — RN-11, CA-11.
  *
  * Suprime **antes** de guardar la revocación, y el orden importa: si se

@@ -329,23 +329,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10) */
-        post: operations["BiometriaController_aceptarPresencialmente"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/revocacion": {
         parameters: {
             query?: never;
@@ -501,6 +484,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/equipos-simulados": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Si las órdenes de la consola llegan a equipos reales (franja F3) */
+        get: operations["EquiposSimuladosController_estado"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/equipos/prueba-de-conexion": {
         parameters: {
             query?: never;
@@ -603,6 +603,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/equipos/{equipoId}/enviar-eventos-a-este-mac": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** C2 · escribe en la cámara el servidor de alarmas con la IP actual del Mac, el puerto de la API y la ruta con su secreto, y lo lee de vuelta */
+        post: operations["ConfiguracionEnSitioController_enviarEventos"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
         parameters: {
             query?: never;
@@ -614,6 +631,23 @@ export interface paths {
         put?: never;
         /** Vuelve a poner en servicio un equipo dado de baja */
         post: operations["EquiposController_reactivar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}/verificacion-remota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** F2 · activa o desactiva la verificación remota de la terminal (AcsCfg) y la lee de vuelta. Desactivarla es el plan B sin código */
+        put: operations["ConfiguracionEnSitioController_cambiarVerificacion"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2205,16 +2239,6 @@ export interface components {
             /** Format: date-time */
             hasta: string;
         };
-        AceptacionPresencialDto: {
-            /** @description Nombre completo, escrito por el propio titular */
-            nombreCompleto: string;
-            /** @description Número de documento, escrito por el propio titular */
-            numeroDocumento: string;
-            /** @description Versión de la política que se le mostró y aceptó */
-            versionPolitica: string;
-            /** @description Declaración expresa del titular: leyó y acepta. Sólo `true`; lo demás es 400. */
-            aceptaPolitica: boolean;
-        };
         AceptadoDto: {
             /** @example true */
             aceptado: boolean;
@@ -3090,6 +3114,14 @@ export interface components {
             /** @example 0 */
             caidos: number;
         };
+        EstadoDeEquiposSimuladosDto: {
+            /** @description Si la API opera con el proveedor simulado */
+            simulado: boolean;
+            /** @description Equipos activos dados de alta en ESTA copropiedad */
+            equiposRegistrados: number;
+            /** @description La franja de la consola, sólo si hay equipos reales que no recibirán órdenes */
+            aviso: string | null;
+        };
         EstadoDeMiAltaDto: {
             completa: boolean;
             viviendaVinculada: boolean;
@@ -3625,6 +3657,10 @@ export interface components {
             /** @description Con el modo pruebas activo, las restricciones de porteros se evalúan y se registran sin bloquear, no hay bloqueo por intentos fallidos y el límite de peticiones es más alto */
             activo: boolean;
         };
+        MotivoDeConfiguracionDto: {
+            /** @description Por qué se cambia. Queda en la auditoría junto a quién y cuándo. */
+            motivo: string;
+        };
         NombreDeEquipoDto: {
             /** Format: uuid */
             id: string;
@@ -3948,12 +3984,6 @@ export interface components {
             hasta: string;
             personas: number;
         };
-        RespuestaDeConsentimientoDto: {
-            /** @description Estado resultante del consentimiento */
-            estado: string;
-            /** @description Si el titular aceptó: el resultado de empujar cada plantilla a todas las terminales. Vacío si rechazó o si no había plantilla pendiente. */
-            propagacion: components["schemas"]["SincronizacionTotalDto"][];
-        };
         RestablecimientoDeContrasenaDto: {
             /**
              * Format: password
@@ -3990,6 +4020,13 @@ export interface components {
             personasCreadas: number;
             /** @description Identificadores que traían la palabra dentro («Casa 42») y se guardaron sin ella. Se recorta y se cuenta: contarlo es lo que impide que el recorte sea silencioso. */
             identificadoresRecortados: number;
+        };
+        ResultadoDeConfiguracionDto: {
+            aplicada: boolean;
+            valorAnterior: string | null;
+            valorNuevo: string | null;
+            /** @description Qué pasó, en palabras */
+            detalle: string;
         };
         ResultadoDeCorreccionDto: {
             /** @enum {string} */
@@ -4130,7 +4167,10 @@ export interface components {
             dispositivoId: string;
         };
         TextoDeLaCasillaDto: {
-            texto: string;
+            /** @description Texto de la casilla con el marcador {visitante}: el cliente lo sustituye por el nombre escrito en el formulario */
+            plantilla: string;
+            /** @description El marcador que se sustituye: {visitante} */
+            marcador: string;
             version: string;
         };
         TokenDeNotificacionDto: {
@@ -4247,6 +4287,12 @@ export interface components {
             conteo: number | null;
             motivo: string | null;
         };
+        VerificacionRemotaDto: {
+            /** @description Por qué se cambia. Queda en la auditoría junto a quién y cuándo. */
+            motivo: string;
+            /** @description `true` = la terminal reporta y espera el veredicto; `false` = decide sola (plan B) */
+            activar: boolean;
+        };
         VetoDto: {
             placa?: string | null;
             /** @description Documento de la persona a vetar; se resuelve en ESTA copropiedad */
@@ -4307,8 +4353,6 @@ export interface components {
             /** Format: date-time */
             casillaEn: string | null;
             plantillaId: string | null;
-            consentimientoId: string | null;
-            confirmadoPorElTitular: boolean;
             equiposSincronizados: number;
             equiposFallidos: number;
         };
@@ -5014,32 +5058,6 @@ export interface operations {
             };
         };
     };
-    BiometriaController_aceptarPresencialmente: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AceptacionPresencialDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RespuestaDeConsentimientoDto"];
-                };
-            };
-        };
-    };
     BiometriaController_revocarConsentimiento: {
         parameters: {
             query?: never;
@@ -5312,6 +5330,27 @@ export interface operations {
             };
         };
     };
+    EquiposSimuladosController_estado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeEquiposSimuladosDto"];
+                };
+            };
+        };
+    };
     EquiposController_probar: {
         parameters: {
             query?: never;
@@ -5463,6 +5502,32 @@ export interface operations {
             };
         };
     };
+    ConfiguracionEnSitioController_enviarEventos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MotivoDeConfiguracionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeConfiguracionDto"];
+                };
+            };
+        };
+    };
     EquiposController_reactivar: {
         parameters: {
             query?: never;
@@ -5481,6 +5546,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EquipoDto"];
+                };
+            };
+        };
+    };
+    ConfiguracionEnSitioController_cambiarVerificacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificacionRemotaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeConfiguracionDto"];
                 };
             };
         };

@@ -12,6 +12,12 @@ import type { HallazgoDelEquipo } from '@ncr/providers';
 export interface SenalDeEventos {
   readonly transporte: 'escucha' | 'suscripcion' | 'ninguna';
   readonly ultimaSenal: Date | null;
+  /**
+   * C7 (15-L) · el equipo rechaza la conexión porque otra plataforma —p. ej.
+   * HikCentral— la tiene o agotó las que admite: la frase del paquete de
+   * equipos, con el remedio. Ausente o `null`: no hay rechazo vigente.
+   */
+  readonly rechazo?: string | null;
 }
 
 export interface LectorDeSenales {
@@ -45,6 +51,17 @@ export const hallazgoDeEventos = (senal: SenalDeEventos | null, ahora: Date): Ha
     };
   }
   const via = TRANSPORTE[senal.transporte];
+  const rechazo = senal.rechazo ?? null;
+  if (rechazo !== null) {
+    // Sin conexión no llega ningún evento: ni timbres ni veredictos. Es BLOQUEO,
+    // y la frase dice quién la tiene y qué hacer (la misma del ensayo).
+    return {
+      ...base,
+      estado: 'bloqueo',
+      valorLeido: `${via} rechazado por el equipo`,
+      detalle: `${rechazo.charAt(0).toUpperCase()}${rechazo.slice(1)}`,
+    };
+  }
   if (senal.ultimaSenal === null) {
     return {
       ...base,

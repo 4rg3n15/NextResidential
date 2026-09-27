@@ -59,3 +59,27 @@ export type {
 export { LIMITES_DE_FOTO_POR_OMISION } from './terminal/foto-del-rostro';
 export { FlujoEnVivo } from './simulacion/equipo-simulado';
 export { servidorRtspSimulado } from './simulacion/servidor-rtsp';
+// C2 (corrección de la 15-L) · la IP del Mac en la red de cada equipo.
+export { ipHaciaElEquipo, mismaSubred } from './red/ip-hacia-el-equipo';
+export type { IpHaciaElEquipo, InterfazDeRed } from './red/ip-hacia-el-equipo';
+// Corrección de la 15-L (C1, C2, C7, F2, F3, F4) · lo que el ensayo añade: la
+// plataforma, el receptor de la cámara, los tiempos de la verificación remota y
+// la escucha que ya tiene otra plataforma; y el `--simulado` entero, montado aquí.
+export {
+  juzgarConexionDePgBoss,
+  juzgarProveedorDeEquipos,
+  lineasDeComprobaciones,
+} from './ensayo/comprobaciones-de-plataforma';
+export type {
+  ComprobacionDePlataforma,
+  EntornoDeLaPlataforma,
+} from './ensayo/comprobaciones-de-plataforma';
+export type {
+  ReceptorEsperado,
+  VerificacionMedida,
+  VerificacionesDeLaPlataforma,
+} from './ensayo/tipos';
+export { clasificarConexionDeEventosRechazada } from './equipo/conexion-de-eventos-rechazada';
+export type { ConexionDeEventosRechazada } from './equipo/conexion-de-eventos-rechazada';
+export { montarEnsayoSimulado } from './simulacion/ensayo-simulado';
+export type { EnsayoSimulado } from './simulacion/ensayo-simulado';

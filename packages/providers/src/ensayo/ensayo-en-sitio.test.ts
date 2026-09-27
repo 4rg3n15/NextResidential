@@ -103,7 +103,7 @@ const ensayar = (
 const estados = (pasos: readonly { paso: string; estado: string }[]) =>
   Object.fromEntries(pasos.map((p) => [p.paso, p.estado]));
 
-describe('pnpm sitio:ensayo · los ocho pasos, equipo por equipo (J1)', () => {
+describe('pnpm sitio:ensayo · los nueve pasos, equipo por equipo (J1)', () => {
   it('terminal: todo OK, con el evento en vivo por su propia suscripción', async () => {
     const destino = 'terminal-ensayo-1';
     const flujo = new FlujoEnVivo();
@@ -132,8 +132,10 @@ describe('pnpm sitio:ensayo · los ocho pasos, equipo por equipo (J1)', () => {
       rostro: 'ok',
       video: 'ok',
       audio: 'no_aplica',
+      // F2 · sin la base de la plataforma, los tiempos no se leen: se dice.
+      verificacion: 'omitido',
     });
-    expect(informe.pasos.map((p) => p.numero)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(informe.pasos.map((p) => p.numero)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(dichas).toContain('Acerque el rostro a la terminal. Se espera hasta 2 s');
     expect(aperturasFisicasPor.get(destino)).toBe(1);
     // La persona de prueba no se queda en el equipo.

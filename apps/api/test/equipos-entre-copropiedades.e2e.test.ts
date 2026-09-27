@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { randomBytes } from 'node:crypto';
 import request from 'supertest';
 import { Pool } from 'pg';
 import type { INestApplication } from '@nestjs/common';
@@ -6,8 +7,11 @@ import { ACCESS_POINT_PROVIDER } from '@ncr/domain-core';
 import type { MockProvider } from '@ncr/providers';
 import { REGISTRO_AUDITORIA } from '../src/comun/auditoria';
 import type { AuditoriaEnMemoria } from '../src/comun/auditoria';
+import type { ContextoTenant } from '../src/autenticacion';
+import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositorio-equipos-pg';
 import { COP_A, COP_B, EQUIPO_DE_B, crearApp, crearFirmante, tokenDe } from './utilidades';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -138,43 +142,86 @@ describe('un equipo de B desde A · registro en memoria', () => {
  * forzada y la lectura de servicio del repositorio. Sin base se omite y lo dice.
  */
 describe('un equipo de B desde A · tabla dispositivos (PostgreSQL)', () => {
-  const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
   let pool: Pool | undefined;
+  let repo: RepositorioDeEquiposPg | undefined;
   let app: INestApplication | undefined;
   let deA = '';
   let equipoDeB = '';
+  let adminDeB = '';
+  // H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+  exigirBase(
+    'sin DATABASE_URL_PRUEBAS o sin administrador de B en la base',
+    () => app !== undefined,
+  );
+
+  /**
+   * Corrección 2 de la 15-L · el equipo de B lo crea ESTA suite. Antes tomaba
+   * «cualquier equipo activo de B» de la base compartida, y el único que había
+   * lo creaba `registro-de-equipos-pg` en la misma corrida: cuando esta suite
+   * llegaba antes, no había ninguno y la prueba salía por el `return` —un
+   * verde que no probaba nada—. El guardián de `--con-base` lo destapó en el
+   * paso 14 del verificador (una roja en la primera de tres corridas).
+   */
+  const CORRIDA = randomBytes(3).toString('hex');
+  const comoAdminDeB = (): ContextoTenant => ({
+    usuarioId: adminDeB,
+    rol: 'administrador',
+    copropiedadId: COP_B,
+    copropiedadesAtendidas: [],
+    mfaVerificado: true,
+  });
 
   beforeAll(async () => {
     if (URL_BASE === undefined || URL_BASE === '') return;
     pool = new Pool({ connectionString: URL_BASE, max: 2 });
+    repo = new RepositorioDeEquiposPg(pool, 'llave-de-equipos-solo-para-pruebas-32+', 'env:X');
     const { rows } = await pool
-      .query<{
-        id: string;
-      }>(
-        `SELECT id FROM public.dispositivos WHERE copropiedad_id = $1 AND estado = 'activo' LIMIT 1`,
+      .query<{ id: string }>(
+        `SELECT u.id FROM public.usuarios u JOIN public.roles_usuario r ON r.usuario_id = u.id
+          WHERE r.copropiedad_id = $1 AND r.rol = 'administrador' LIMIT 1`,
         [COP_B],
       )
       .catch(() => ({ rows: [] as { id: string }[] }));
-    equipoDeB = rows[0]?.id ?? '';
-    if (equipoDeB === '') return;
+    adminDeB = rows[0]?.id ?? '';
+    if (adminDeB === '') return;
+    const creado = await repo.crear(
+      comoAdminDeB(),
+      COP_B,
+      {
+        nombre: `Equipo de B para el aislamiento ${CORRIDA}`,
+        tipo: 'intercom',
+        host: `203.0.113.${String(1 + (parseInt(CORRIDA, 16) % 200))}`,
+        puerto: 1024 + (parseInt(CORRIDA, 16) % 60_000),
+        protocolo: 'http',
+        usuario: 'servicio',
+        secreto: `aislamiento-${CORRIDA}`,
+      },
+      {
+        clase: 'alcanzado',
+        detalle: 'responde',
+        modelo: 'MODELO-DE-PRUEBA',
+        firmware: 'V0',
+        latenciaMs: 3,
+        verificado: true,
+      } as ResultadoDeSondeo,
+    );
+    equipoDeB = creado.id;
     const firmante = await crearFirmante();
-    app = await crearApp(firmante, undefined, undefined, {
-      repositorio: new RepositorioDeEquiposPg(
-        pool,
-        'llave-de-equipos-solo-para-pruebas-32+',
-        'env:X',
-      ),
-    });
+    app = await crearApp(firmante, undefined, undefined, { repositorio: repo });
     deA = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
   });
   afterAll(async () => {
     await app?.close();
+    // Baja lógica, como manda RN-19: ni una prueba borra un equipo.
+    if (repo !== undefined && equipoDeB !== '') {
+      await repo.desactivar(comoAdminDeB(), COP_B, equipoDeB, 'fin de la prueba de aislamiento');
+    }
     await pool?.end();
   });
 
   it('video, apertura e intercom de un equipo REAL de B, desde A: 404', async () => {
     if (app === undefined) {
-      console.log('OMITIDA: sin DATABASE_URL_PRUEBAS o sin equipos de B en la base.');
+      console.log('OMITIDA: sin DATABASE_URL_PRUEBAS o sin administrador de B en la base.');
       return;
     }
     for (const operacion of operaciones(COP_A, equipoDeB).slice(0, 5)) {

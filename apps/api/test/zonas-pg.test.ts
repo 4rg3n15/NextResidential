@@ -6,13 +6,13 @@ import {
   RepositorioAutorizacionesZonaPg,
   RepositorioZonasPg,
 } from '../src/zonas/infraestructura/repositorio-zonas-pg';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * P1 (ETAPA 15-D) · las zonas persisten en PostgreSQL de verdad: alta, icono,
  * baja y permiso de zona, contra la base migrada. Se omite sin
  * `DATABASE_URL_PRUEBAS`, y el verificador lo dice.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 const ACTOR = '00000000-0000-4000-8000-000000000002';
 const CORRIDA = randomBytes(4).toString('hex');
@@ -33,6 +33,9 @@ const abrir = <T>(r: { ok: boolean; valor?: T }): T => {
 };
 
 describe.skipIf(URL_BASE === undefined)('zonas en PostgreSQL (P1)', () => {
+  // H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+  exigirBase('sin DATABASE_URL_PRUEBAS', () => pool !== undefined);
+
   it('una zona nueva se crea con su aforo a cero, se lista, cambia de icono y se da de baja', async () => {
     const repo = new RepositorioZonasPg(pool as Pool, claims);
     const id = `80000000-0000-4000-8000-${CORRIDA}0000`.slice(0, 36);

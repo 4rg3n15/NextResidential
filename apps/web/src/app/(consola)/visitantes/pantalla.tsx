@@ -28,7 +28,6 @@ import {
 } from '@/lib/api/visitas';
 import type { FiltrosDeVisitas } from '@/lib/api/visitas';
 import { GenerarAutorizacion } from './generar-autorizacion';
-import { ConfirmacionPresencial } from './confirmacion-presencial';
 
 const ESTADOS: readonly { valor: EstadoDeVisita; etiqueta: string; tono: TonoDeDistintivo }[] = [
   { valor: 'vigente', etiqueta: 'Vigente', tono: 'exito' },
@@ -149,7 +148,6 @@ const TarjetaDeVisita = ({
   readonly alRechazar: (v: Visita) => void;
 }): JSX.Element => {
   const [abierta, setAbierta] = useState(false);
-  const [confirmando, setConfirmando] = useState(false);
   const estado = DEL_ESTADO[visita.estado];
   return (
     <li>
@@ -225,23 +223,6 @@ const TarjetaDeVisita = ({
               <div className="space-y-2">
                 <p className="text-etiqueta font-medium text-texto">Equipos</p>
                 <FotoEnEquipos copropiedadId={copropiedadId} visita={visita} />
-                {visita.consentimientoId !== null && sePuedeRechazar(visita) ? (
-                  visita.confirmadoPorElTitular ? (
-                    <p className="text-secundario text-exito-texto">
-                      El visitante lo confirmó en persona.
-                    </p>
-                  ) : confirmando ? (
-                    <ConfirmacionPresencial
-                      copropiedadId={copropiedadId}
-                      consentimientoId={visita.consentimientoId}
-                      alTerminar={() => setConfirmando(false)}
-                    />
-                  ) : (
-                    <Boton tamano="sm" variante="fantasma" onClick={() => setConfirmando(true)}>
-                      Confirmación en persona (opcional)
-                    </Boton>
-                  )
-                ) : null}
               </div>
             </div>
           ) : null}

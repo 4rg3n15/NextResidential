@@ -125,6 +125,38 @@ export const alcanceDeCopropiedades = cache(async (): Promise<AlcanceDeCopropied
  * surte efecto sin reiniciar— y, si la API no contesta, no se pinta: la
  * franja informa, no decide nada.
  */
+/**
+ * F3 (corrección de la 15-L) · la frase de la franja «equipos simulados», o
+ * `null`. La decide la API (simulado Y con equipos dados de alta en ESTA
+ * copropiedad); un fallo al preguntar no pinta nada: la franja es un aviso, no
+ * una condición para usar la consola.
+ */
+export const avisoDeEquiposSimulados = cache(
+  async (copropiedadId: string): Promise<string | null> => {
+    const token = await tokenVigente();
+    if (token === null) return null;
+    const { apiUrl } = configuracion();
+    try {
+      const r = await fetch(
+        `${apiUrl}/copropiedades/${encodeURIComponent(copropiedadId)}/equipos-simulados`,
+        {
+          headers: {
+            Authorization: `Bearer ${token.accessToken}`,
+            Accept: 'application/json',
+            ...(await reenvioDeIpActual()),
+          },
+          cache: 'no-store',
+        },
+      );
+      if (!r.ok) return null;
+      const aviso = ((await r.json()) as { aviso?: unknown }).aviso;
+      return typeof aviso === 'string' ? aviso : null;
+    } catch {
+      return null;
+    }
+  },
+);
+
 export const modoPruebasActivo = cache(async (): Promise<boolean> => {
   const token = await tokenVigente();
   if (token === null) return false;

@@ -7,11 +7,8 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-  Req,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import type { Request } from 'express';
-import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { esFallo } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
@@ -26,18 +23,9 @@ import {
   RevocarConsentimiento,
   SincronizarPlantilla,
 } from '../aplicacion/casos-de-uso';
-import {
-  PropagarConsentimientoAceptado,
-  SincronizarPlantillaEnTerminales,
-} from '../aplicacion/sincronizacion-total';
+import { SincronizarPlantillaEnTerminales } from '../aplicacion/sincronizacion-total';
 import type { ResultadoDeSincronizacionTotal } from '../aplicacion/sincronizacion-total';
-import { AceptarConsentimientoPresencial } from '../aplicacion/consentimiento-presencial';
-import {
-  AceptacionPresencialDto,
-  RespuestaDeConsentimientoDto,
-  SincronizacionTotalDto,
-  SincronizarPlantillaDto,
-} from './dtos';
+import { SincronizacionTotalDto, SincronizarPlantillaDto } from './dtos';
 
 const aSincronizacionDto = (r: ResultadoDeSincronizacionTotal): SincronizacionTotalDto => ({
   plantillaId: r.plantillaId,
@@ -91,53 +79,10 @@ export class BiometriaController {
     @Inject(BarrerPlantillasVencidas) private readonly barrer: BarrerPlantillasVencidas,
     @Inject(SincronizarPlantillaEnTerminales)
     private readonly sincronizarEnTerminales: SincronizarPlantillaEnTerminales,
-    @Inject(PropagarConsentimientoAceptado)
-    private readonly propagar: PropagarConsentimientoAceptado,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
     // 15-L · una plantilla de A no se empuja a una terminal de B.
     @Inject(ALCANCE_DE_EQUIPOS) private readonly equiposDeLaRuta: AlcanceDeEquipos,
-    @Inject(AceptarConsentimientoPresencial)
-    private readonly presencial: AceptarConsentimientoPresencial,
   ) {}
-
-  /**
-   * D-10 · el titular en la portería: escribe su nombre y documento y acepta la
-   * política que se le muestra. El residente queda fuera a propósito: nunca
-   * acepta por su visitante (RN-10). Límite estricto por identidad: comparar
-   * contra el padrón no puede convertirse en un oráculo de documentos.
-   */
-  @Post('consentimientos/:consentimientoId/aceptacion-presencial')
-  @Roles('superadministrador', 'administrador', 'portero', 'operador_central')
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({
-    summary: 'El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10)',
-  })
-  @ApiOkResponse({ type: RespuestaDeConsentimientoDto })
-  async aceptarPresencialmente(
-    @Param('id', ParseUUIDPipe) copropiedadId: string,
-    @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
-    @Contexto() ctx: ContextoTenant,
-    @Body() dto: AceptacionPresencialDto,
-    @Req() peticion: Request,
-  ): Promise<RespuestaDeConsentimientoDto> {
-    const destino = await this.aislamiento.exigirAlcance(
-      ctx,
-      copropiedadId,
-      'biometria/consentimientos/presencial',
-    );
-    const agente = peticion.headers['user-agent'];
-    const r = desenvolver(
-      await this.presencial.ejecutar(destino, {
-        consentimientoId,
-        identidad: { nombreCompleto: dto.nombreCompleto, numeroDocumento: dto.numeroDocumento },
-        versionPoliticaAceptada: dto.versionPolitica,
-        origen: { ip: peticion.ip ?? null, userAgent: typeof agente === 'string' ? agente : null },
-      }),
-    );
-    // Aceptado = hacia todos los equipos con biblioteca de rostros, ya.
-    const propagacion = await this.propagar.ejecutar(destino, { consentimientoId });
-    return { estado: r.estado, propagacion: propagacion.map(aSincronizacionDto) };
-  }
 
   @Post('consentimientos/:consentimientoId/revocacion')
   @Roles('residente', 'administrador', 'portero', 'operador_central')

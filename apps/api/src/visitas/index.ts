@@ -8,10 +8,11 @@ export { AvisoDeVisitas } from './aplicacion/aviso-de-visitas';
 export { DatosParaVolverAAutorizar, UltimosVisitantes } from './aplicacion/consultar-visitas';
 export type { Repeticion } from './aplicacion/consultar-visitas';
 export {
+  PLANTILLA_DE_LA_CASILLA,
   RegistrarRostroDeVisita,
-  TEXTO_DE_LA_CASILLA,
   VERSION_DE_LA_CASILLA,
   revisarFoto,
+  textoDeLaCasilla,
 } from './aplicacion/rostro-de-visita';
 export type { FotoDeVisita, RostroRegistrado } from './aplicacion/rostro-de-visita';
 export { hastaDe, revisarForma } from './aplicacion/generar-visita';

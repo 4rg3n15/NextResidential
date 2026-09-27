@@ -5,6 +5,7 @@ import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-p
 import { GenerarViviendas } from '../src/padron/aplicacion/generar-viviendas';
 import { BOM_UTF8, ExportarPadron } from '../src/padron/aplicacion/exportar-padron';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * La generación del padrón **contra base real**, que es donde vive lo único que
@@ -22,7 +23,6 @@ import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
  *
  * Se OMITE si no hay base, y lo dice: una omisión no es un verde.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 
 let pool: Pool | undefined;
@@ -90,6 +90,9 @@ afterAll(async () => {
   await pool?.end();
 });
 
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
+
 describe('generación del padrón contra base', () => {
   it('crea las 12 en una sentencia, con el mismo número en tres agrupaciones', async () => {
     if (!disponible || pool === undefined) {
@@ -135,22 +138,21 @@ describe('generación del padrón contra base', () => {
     if (!disponible || pool === undefined) return;
     const caso = new GenerarViviendas(new RepositorioPadronPg(pool, {}));
 
-    const antes = await pool.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM public.viviendas
-        WHERE copropiedad_id = $1 AND estado = 'activo'`,
-      [COP],
-    );
+    // Se cuentan SÓLO las agrupaciones del plan. Contar toda la copropiedad
+    // era una carrera: otras suites crean viviendas en ella en paralelo, y una
+    // que entrara entre las dos lecturas ponía roja esta prueba sin que la
+    // generación hubiera dejado nada (paso 14 del verificador, corrección 2).
+    const delPlan = `SELECT count(*)::text AS n FROM public.viviendas
+        WHERE copropiedad_id = $1 AND estado = 'activo' AND agrupacion IN ('1','2','3')`;
+    const antes = await pool.query<{ n: string }>(delPlan, [COP]);
+    expect(antes.rows[0]?.n).toBe('12');
 
     // El MISMO plan otra vez: las 12 ya existen.
     const r = await caso.confirmar(contexto(), PLAN, 12);
     expect(r.ok).toBe(false);
     expect(!r.ok && r.error.detalle).toMatch(/No se creó ninguna vivienda/);
 
-    const despues = await pool.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM public.viviendas
-        WHERE copropiedad_id = $1 AND estado = 'activo'`,
-      [COP],
-    );
+    const despues = await pool.query<{ n: string }>(delPlan, [COP]);
     // Ni una más. Es la comprobación de que «regenerar» no es destructivo ni
     // parcial: o entran todas, o no entra ninguna.
     expect(despues.rows[0]?.n).toBe(antes.rows[0]?.n);

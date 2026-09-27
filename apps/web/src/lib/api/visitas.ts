@@ -85,6 +85,16 @@ export const useViviendasDeVisitas = (copropiedadId: string): UseQueryResult<Viv
       ),
   });
 
+/**
+ * La declaración con el nombre del formulario (decisión final del cliente,
+ * ADR-032). El servidor publica la plantilla y su marcador; aquí sólo se
+ * sustituye. Sin nombre todavía, «el visitante».
+ */
+export const textoDeLaCasilla = (casilla: TextoDeLaCasilla, nombre: string): string => {
+  const limpio = nombre.trim();
+  return casilla.plantilla.replace(casilla.marcador, limpio === '' ? 'el visitante' : limpio);
+};
+
 export const useTextoDeLaCasilla = (copropiedadId: string): UseQueryResult<TextoDeLaCasilla> =>
   useQuery({
     queryKey: [...clavesDeVisitas.raiz(copropiedadId), 'casilla'] as const,

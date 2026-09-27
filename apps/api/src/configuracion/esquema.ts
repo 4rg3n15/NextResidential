@@ -155,6 +155,19 @@ export const esquemaConfiguracion = z.object({
    * —«entrada 2: el secreto tiene 12 caracteres»—, cosa que un `regex` de Zod
    * no haría.
    */
+  /**
+   * C2 (corrección de la 15-L) · la IP con la que ESTA API se anuncia a las
+   * cámaras en «Enviar eventos a este Mac». Vacía = la del Mac en la red de
+   * cada cámara (la interfaz cuya subred la contiene). Se define sólo si hay
+   * algo que las interfaces no dicen: un NAT, un puente, una VLAN enrutada.
+   */
+  ALARM_SERVER_IP_ANUNCIADA: z
+    .string()
+    .optional()
+    .refine(
+      (v) => v === undefined || v.trim() === '' || isIP(v.trim()) === 4,
+      'ALARM_SERVER_IP_ANUNCIADA debe ser una IPv4 (o quedar vacía)',
+    ),
   ALARM_SERVER_EQUIPOS: z
     .string()
     .optional()
@@ -264,9 +277,11 @@ export const esquemaConfiguracion = z.object({
     .transform((v) => v === 'true'),
   /**
    * 15-L · `remoteCheckTimeout` que la misma corrección escribe, en segundos.
-   * Ausente = no se toca el del equipo (la guía trae 5).
+   * F2 (corrección de la 15-L) · por omisión 8, no el 5 de fábrica: en la red
+   * de sitio el camino completo —el hecho llega, el motor decide, el veredicto
+   * vuelve— necesita holgura, y el ensayo mide p50/p95 contra este valor.
    */
-  TERMINAL_PLAZO_DE_VERIFICACION_S: z.coerce.number().int().min(1).max(60).optional(),
+  TERMINAL_PLAZO_DE_VERIFICACION_S: z.coerce.number().int().min(1).max(60).default(8),
   /**
    * A5 (15-L) · plazo de cada petición a un equipo, en ms. Por omisión 5000:
    * holgado para cargar una plantilla, corto para no dejar a un portero

@@ -10,6 +10,7 @@ import type { ContextoTenant } from '../src/autenticacion';
 import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositorio-equipos-pg';
 import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso';
 import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -29,10 +30,9 @@ import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
  *        con la foto copiada; la visita de otra vivienda no existe para él;
  *   F7 · administración filtra el historial por vivienda.
  *
- * Se OMITE —no falla— sin `DATABASE_URL_PRUEBAS`; el verificador lo cuenta.
+ * Se OMITE sin `DATABASE_URL_PRUEBAS`; con `--con-base`, omitir FALLA (`base-exigida.ts`).
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const CORRIDA = randomBytes(3).toString('hex').toUpperCase();
 const ADMIN = '00000000-0000-4000-8000-000000000010';
 const PORTERO = '00000000-0000-4000-8000-000000000011';
@@ -179,11 +179,9 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.log('OMITIDA: sin DATABASE_URL_PRUEBAS (se exige con --con-base).');
-  return true;
-};
+// Con `--con-base`, una prueba sin base ya FALLÓ en el guardián, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS, o la base no está preparada', () => disponible);
+const omitida = (): boolean => !disponible;
 
 const http = () => request((app as INestApplication).getHttpServer());
 const con = (token: string) => ({

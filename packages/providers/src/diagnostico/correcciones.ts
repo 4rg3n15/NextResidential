@@ -2,7 +2,6 @@ import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { interpretarError } from '../equipo/errores-del-fabricante';
-import { CAMPOS_DE_VERIFICACION_REMOTA } from '../hikvision/capacidades-hikvision';
 import { etiqueta, reemplazarEtiqueta } from '../equipo/xml';
 import { ETIQUETA_DE_MODO, MODO_EXIGIDO } from '../camara/modo-de-control';
 import {
@@ -13,6 +12,8 @@ import {
 import { IMAGENES } from '../camara/receptor-en-el-equipo';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import { confirmada } from '../equipo/confirmacion-isapi';
+import { corregirReceptorDeEventos, corregirVerificacionRemota } from './correcciones-de-sitio';
+import type { DestinoDeEventos, ResultadoDeEscritura } from './correcciones-de-sitio';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -46,7 +47,9 @@ export type ClaseDeCorreccion =
   | 'imagenes_del_receptor'
   | 'formato_del_receptor'
   /** A2 · la terminal pasa a REPORTAR Y ESPERAR el veredicto de la plataforma. */
-  | 'verificacion_remota';
+  | 'verificacion_remota'
+  /** C2 (corrección de la 15-L) · el servidor de alarmas de la cámara apunta a este Mac. */
+  | 'receptor_de_eventos';
 
 export interface ResultadoDeCorreccion {
   readonly clase: ClaseDeCorreccion;
@@ -85,6 +88,13 @@ export interface OpcionesDeCorreccion extends OpcionesDeEquipo {
   readonly abrirSinPlataforma?: boolean;
   /** 15-L · `remoteCheckTimeout` en segundos. Ausente = el del equipo, sin tocar. */
   readonly plazoDeVerificacionS?: number;
+  /**
+   * F2 (corrección de la 15-L) · activar o DESACTIVAR la verificación remota:
+   * desactivarla es el plan B sin código. Ausente = activar, como siempre.
+   */
+  readonly activar?: boolean;
+  /** C2 · adónde publica la cámara: la IP de este Mac, el puerto y la ruta con el secreto. */
+  readonly receptor?: DestinoDeEventos;
 }
 
 /**
@@ -106,6 +116,11 @@ const noAplicada = (
   valorAnterior: anterior,
   valorNuevo: null,
   detalle,
+});
+
+const conClase = (clase: ClaseDeCorreccion, r: ResultadoDeEscritura): ResultadoDeCorreccion => ({
+  clase,
+  ...r,
 });
 
 /**
@@ -181,12 +196,26 @@ export const aplicarCorreccion = async (
           'XML',
         );
       case 'verificacion_remota':
-        return await corregirVerificacionRemota(cliente, {
-          abrirSinPlataforma: opciones.abrirSinPlataforma === true,
-          ...(opciones.plazoDeVerificacionS === undefined
-            ? {}
-            : { plazoS: opciones.plazoDeVerificacionS }),
-        });
+        return conClase(
+          'verificacion_remota',
+          await corregirVerificacionRemota(cliente, {
+            activar: opciones.activar ?? true,
+            abrirSinPlataforma: opciones.abrirSinPlataforma === true,
+            ...(opciones.plazoDeVerificacionS === undefined
+              ? {}
+              : { plazoS: opciones.plazoDeVerificacionS }),
+          }),
+        );
+      case 'receptor_de_eventos':
+        return opciones.receptor === undefined
+          ? noAplicada(
+              'receptor_de_eventos',
+              'Falta adónde publicar: la IP de este Mac, el puerto y la ruta',
+            )
+          : conClase(
+              'receptor_de_eventos',
+              await corregirReceptorDeEventos(cliente, opciones.receptor),
+            );
     }
   } catch (error) {
     if (error instanceof EquipoInalcanzable) {
@@ -194,96 +223,6 @@ export const aplicarCorreccion = async (
     }
     throw error;
   }
-};
-
-/**
- * ═════════════════════════════════════════════════════════════════════════════
- * A2 · ACTIVAR LA VERIFICACIÓN REMOTA ES CAMBIAR QUIÉN DECIDE
- *
- * Con `remoteCheck` la terminal reconoce, REPORTA y espera; sin él abre sola y
- * el motor de reglas queda decorativo. Es la corrección que hace posible el
- * modo `reporta_y_espera`, y por eso exige lo mismo que las demás: confirmación
- * de una persona, valor anterior y nuevo para `auditoria_seguridad`, y
- * leer-modificar-escribir del documento completo. El documento es JSON —el de
- * `AcsCfg`—, así que no vale el reemplazo de etiquetas del XML: se analiza, se
- * cambia UN campo y se devuelve entero. Un documento que no trae el campo NO se
- * escribe: este firmware no lo tiene, y eso es un hallazgo de bloqueo, no algo
- * que se inventa.
- */
-const corregirVerificacionRemota = async (
-  cliente: ClienteDeEquipo,
-  ajustes: { readonly abrirSinPlataforma: boolean; readonly plazoS?: number },
-): Promise<ResultadoDeCorreccion> => {
-  const lectura = rutaPara('leer si la terminal espera el veredicto de la plataforma', 'terminal');
-  const respuesta = await cliente.pedir(lectura.metodo, lectura.ruta);
-  if (!respuesta.ok || rechazado(respuesta.cuerpo)) {
-    return noAplicada(
-      'verificacion_remota',
-      'El equipo no devolvió su configuración de control de acceso: este firmware no ' +
-        'declara la verificación remota y no se escribe a ciegas',
-    );
-  }
-  let documento: Record<string, unknown>;
-  try {
-    documento = JSON.parse(respuesta.cuerpo) as Record<string, unknown>;
-  } catch {
-    return noAplicada('verificacion_remota', 'La configuración del equipo no es JSON legible');
-  }
-  const acs = documento['AcsCfg'];
-  // H-SITIO-05 · el interruptor de la guía es `remoteCheckDoorEnabled`; el
-  // supuesto S-35 (`remoteCheck`) sólo si el documento trae ése.
-  const campo =
-    typeof acs === 'object' && acs !== null
-      ? CAMPOS_DE_VERIFICACION_REMOTA.find((c) => c in acs)
-      : undefined;
-  if (typeof acs !== 'object' || acs === null || campo === undefined) {
-    return noAplicada(
-      'verificacion_remota',
-      'La configuración del equipo no trae el campo de verificación remota: este modelo ' +
-        'no la admite. Es un hallazgo de BLOQUEO: no se opera contra una terminal que decide sola',
-    );
-  }
-  const actual = acs as Record<string, unknown>;
-  const anterior = String(actual[campo]);
-  /**
-   * 15-L · «Verification parameters in arming method» (guía): canal `ISAPI`,
-   * SIEMPRE. Es el único canal por el que esta plataforma escucha: con
-   * `ISAPIListen` la terminal pregunta a un servidor de escucha que nadie
-   * abre —y la guía advierte que el equipo admite UNO solo—, espera su plazo
-   * y niega. Antes sólo se escribía si el documento ya traía el campo, y un
-   * firmware que no lo devolvía se quedaba en el canal que tuviera.
-   *
-   * `offlineDevCheckOpenDoorEnabled` se escribe con lo que diga el `.env`; el
-   * plazo, sólo si se configuró.
-   */
-  const corregido = {
-    ...documento,
-    AcsCfg: {
-      ...actual,
-      [campo]: true,
-      checkChannelType: 'ISAPI',
-      offlineDevCheckOpenDoorEnabled: ajustes.abrirSinPlataforma,
-      ...(ajustes.plazoS === undefined ? {} : { remoteCheckTimeout: ajustes.plazoS }),
-    },
-  };
-  const escritura = rutaPara(
-    'fijar que la terminal espere el veredicto de la plataforma',
-    'terminal',
-  );
-  const escrito = await cliente.pedir(escritura.metodo, escritura.ruta, {
-    tipo: 'application/json',
-    contenido: JSON.stringify(corregido),
-  });
-  const ok = confirmada(escrito) && !rechazado(escrito.cuerpo);
-  return {
-    clase: 'verificacion_remota',
-    aplicada: ok,
-    valorAnterior: anterior,
-    valorNuevo: ok ? 'true' : null,
-    detalle: ok
-      ? `La terminal pasa a reportar y esperar el veredicto de la plataforma (${campo})`
-      : interpretarError(escrito.cuerpo).detalle,
-  };
 };
 
 const corregirModo = async (cliente: ClienteDeEquipo): Promise<ResultadoDeCorreccion> => {

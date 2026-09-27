@@ -5,6 +5,7 @@ import { CargarPadronDesdeArchivo, analizarCsv } from '../src/padron/aplicacion/
 import { BuscarPersonas, DesactivarVivienda } from '../src/padron/aplicacion/casos-de-uso';
 import type { LectorDeVocabulario } from '../src/padron/aplicacion/vocabulario';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * El vocabulario de la copropiedad de las semillas: «Casa» y «Manzana». Importa
@@ -27,7 +28,6 @@ const vocabulario: LectorDeVocabulario = {
  *
  * Se OMITE si no hay base, y lo dice: una omisión no es un verde.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 
 let pool: Pool | undefined;
@@ -79,6 +79,9 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool?.end();
 });
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
 
 describe('carga de padrón por nombre y documento, contra base', () => {
   it('una hoja sin un solo UUID crea las viviendas, las personas y sus vínculos', async () => {

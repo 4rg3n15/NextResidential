@@ -47,6 +47,7 @@ export * from './mock/intercom-simulado';
 export * from './mock/simulacion';
 export * from './hikvision/hikvision-provider';
 export * from './hikvision/registro-de-equipos';
+export { RegistroEnCache } from './hikvision/registro-en-cache';
 export * from './fabrica';
 export {
   capacidadesDesdeDeviceCap,
@@ -85,6 +86,9 @@ export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';
 // ── Diagnóstico y corrección de un equipo, para la consola ───────────────────
 export * from './diagnostico/diagnostico-de-equipo';
 export * from './diagnostico/correcciones';
+export type { DestinoDeEventos } from './diagnostico/correcciones-de-sitio';
+// C2 (corrección de la 15-L) · la IP del Mac en la red de cada equipo.
+export * from './red/ip-hacia-el-equipo';
 export * from './diagnostico/ficha';
 export type { VeredictoDeControl, HallazgoDeConfiguracion } from './camara/veredicto-de-control';
 export type { VeredictoDeDisparador } from './camara/disparadores-vinculados';
@@ -109,6 +113,15 @@ export { ZONA_POR_OMISION, zonaValida } from './terminal/persona-en-el-equipo';
 export type { AjustesDePersona } from './terminal/persona-en-el-equipo';
 export type { ReaccionAlError, ErrorDelFabricante } from './equipo/errores-del-fabricante';
 export { LISTAS_DEL_EQUIPO_NO_SE_USAN } from './equipo/errores-del-fabricante';
+/** C7 (15-L) · la escucha rechazada por otra plataforma, en la misma frase en todos lados. */
+export {
+  clasificarConexionDeEventosRechazada,
+  REMEDIO_OTRA_PLATAFORMA,
+} from './equipo/conexion-de-eventos-rechazada';
+export type {
+  ConexionDeEventosRechazada,
+  ClaseDeRechazoDeEventos,
+} from './equipo/conexion-de-eventos-rechazada';
 
 // ── El simulado de equipo, que es infraestructura de PRUEBA ──────────────────
 /**

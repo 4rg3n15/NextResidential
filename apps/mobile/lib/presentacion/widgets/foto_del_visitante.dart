@@ -1,5 +1,5 @@
-/// F1 · La foto frontal del visitante: tomarla, juzgarla y decir por qué
-/// repetirla.
+/// F1 · La foto frontal del visitante: tomarla o elegirla de la galería,
+/// juzgarla y decir por qué repetirla.
 ///
 /// ═════════════════════════════════════════════════════════════════════════════
 /// POR QUÉ ES UN WIDGET APARTE
@@ -33,6 +33,15 @@
 /// sustituye un BOTÓN sobre la foto —«sale una persona, de frente, cerca»—,
 /// igual que en la consola. Mientras no se pulse, la foto no sirve, y «no se
 /// ve ningún rostro» no se enseña como consejo: nadie lo ha medido todavía.
+///
+/// ═════════════════════════════════════════════════════════════════════════════
+/// DOS BOTONES, UN SOLO JUICIO
+///
+/// «Tomar foto» y «Elegir de la galería» piden al mismo puerto con distinto
+/// origen, y lo que vuelve se juzga aquí igual venga de donde venga: la foto
+/// que el visitante mandó por mensaje pasa los mismos umbrales que la que se
+/// toma en la portería. Cancelar no cambia nada; lo que no es cancelar —un
+/// archivo que no se lee, un permiso negado— se dice con su salida.
 library;
 
 import 'package:flutter/material.dart';
@@ -41,7 +50,9 @@ import '../../configuracion/tema.dart';
 import '../../dominio/calidad_de_captura.dart';
 import '../../dominio/entidades.dart';
 import '../../dominio/medidas_de_imagen.dart';
+import '../../dominio/origen_de_la_foto.dart';
 import '../../dominio/puertos.dart';
+import 'avisos_de_la_foto.dart';
 
 class FotoDelVisitante extends StatefulWidget {
   const FotoDelVisitante({
@@ -68,8 +79,14 @@ class _EstadoDeLaFoto extends State<FotoDelVisitante> {
   FotoTomada? _foto;
   bool _encuadreConfirmado = false;
   List<FalloDeCalidad> _fallos = const [];
-  bool _tomando = false;
-  bool _sinCamara = false;
+
+  /// El origen cuyo selector está abierto, o `null`. Con uno abierto, los dos
+  /// botones esperan: dos selectores a la vez el sistema no los admite.
+  OrigenDeFoto? _abriendo;
+
+  /// Por qué no llegó la foto que se pidió, en palabras. `null` si llegó o se
+  /// canceló.
+  String? _aviso;
 
   /// Lo que se juzga es lo que se envía: con la confirmación del encuadre, las
   /// medidas llevan un rostro y la proporción declarada; sin ella, cero.
@@ -90,28 +107,33 @@ class _EstadoDeLaFoto extends State<FotoDelVisitante> {
           .toList()
       : _fallos;
 
-  Future<void> _tomar() async {
+  Future<void> _obtener(OrigenDeFoto origen) async {
     setState(() {
-      _tomando = true;
-      _sinCamara = false;
+      _abriendo = origen;
+      _aviso = null;
     });
     try {
-      final foto = await widget.tomarFoto();
-      // Cancelar la cámara no borra la foto que ya servía.
+      final foto = await widget.tomarFoto(origen);
+      // Cancelar la cámara o la galería no borra la foto que ya servía.
       if (!mounted || foto == null) return;
       setState(() {
         _foto = foto;
         _encuadreConfirmado = false;
-        // El juicio del dominio, no un `if` aquí: los umbrales viven en un sitio.
+        // El juicio del dominio, no un `if` aquí: los umbrales viven en un
+        // sitio, y son los mismos para la cámara y para la galería.
         _fallos = evaluarCaptura(foto.medidas);
       });
       _avisar();
+    } on FotoNoObtenida catch (e) {
+      // [SUPUESTO] S-98 · Un archivo ilegible tampoco borra la foto que ya servía:
+      // se trata como cancelar, más el aviso. Sin foto previa, sigue vacía.
+      if (mounted) setState(() => _aviso = avisoSinFoto(e.motivo, origen));
     } on Exception {
-      // Permiso de cámara denegado, cámara ocupada: el residente tiene que
+      // Algo que el adaptador no supo nombrar: el residente tiene que
       // saberlo, no quedarse mirando un botón que no hizo nada.
-      if (mounted) setState(() => _sinCamara = true);
+      if (mounted) setState(() => _aviso = avisoSinFoto(MotivoSinFoto.noSeAbrio, origen));
     } finally {
-      if (mounted) setState(() => _tomando = false);
+      if (mounted) setState(() => _abriendo = null);
     }
   }
 
@@ -138,7 +160,7 @@ class _EstadoDeLaFoto extends State<FotoDelVisitante> {
   @override
   Widget build(BuildContext context) {
     final foto = _foto;
-    final activa = widget.habilitada && !_tomando;
+    final activa = widget.habilitada && _abriendo == null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -175,102 +197,44 @@ class _EstadoDeLaFoto extends State<FotoDelVisitante> {
           const SizedBox(height: 12),
         ],
         if (foto != null && _consejosVisibles.isNotEmpty) ...[
-          _Consejos(fallos: _consejosVisibles),
+          ConsejosDeLaFoto(fallos: _consejosVisibles),
           const SizedBox(height: 12),
         ],
         if (foto != null && _fallos.isEmpty) ...[
-          const _Nota(
+          const NotaDeLaFoto(
             icono: Icons.check_circle_outline,
             pareja: Paleta.exitoSuave,
             texto: 'La foto sirve. Viajará con la visita.',
           ),
           const SizedBox(height: 12),
         ],
-        if (_sinCamara) ...[
-          const _Nota(
+        if (_aviso != null) ...[
+          NotaDeLaFoto(
+            key: const Key('foto.aviso'),
             icono: Icons.no_photography_outlined,
             pareja: Paleta.peligroSuave,
-            texto: 'No se pudo abrir la cámara. Revise que la app tenga permiso para usarla.',
+            texto: _aviso!,
           ),
           const SizedBox(height: 12),
         ],
-        OutlinedButton.icon(
+        // Los mismos dos textos antes y después de tener foto: con una foto
+        // que no sirve, lo que se busca es otra, venga de donde venga.
+        BotonDeLaFoto(
           key: const Key('foto.tomar'),
-          onPressed: activa ? _tomar : null,
-          icon: _tomando
-              ? const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.photo_camera_outlined),
-          label: Text(foto == null ? 'Tomar la foto' : 'Repetir la foto'),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          icono: Icons.photo_camera_outlined,
+          texto: 'Tomar foto',
+          ocupado: _abriendo == OrigenDeFoto.camara,
+          alPulsar: activa ? () => _obtener(OrigenDeFoto.camara) : null,
+        ),
+        const SizedBox(height: 8),
+        BotonDeLaFoto(
+          key: const Key('foto.galeria'),
+          icono: Icons.photo_library_outlined,
+          texto: 'Elegir de la galería',
+          ocupado: _abriendo == OrigenDeFoto.galeria,
+          alPulsar: activa ? () => _obtener(OrigenDeFoto.galeria) : null,
         ),
       ],
-    );
-  }
-}
-
-class _Consejos extends StatelessWidget {
-  const _Consejos({required this.fallos});
-  final List<FalloDeCalidad> fallos;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Paleta.avisoSuave.fondo,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            fallos.length == 1 ? 'Repita la foto' : 'Repita la foto: hay ${fallos.length} cosas',
-            style: TextStyle(color: Paleta.avisoSuave.texto, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 6),
-          // Todos los consejos a la vez. Uno por uno serían tres viajes.
-          ...fallos.map(
-            (f) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '· ${consejoPara(f)}',
-                style: TextStyle(color: Paleta.avisoSuave.texto, fontSize: 13),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Nota extends StatelessWidget {
-  const _Nota({required this.icono, required this.pareja, required this.texto});
-  final IconData icono;
-  final Pareja pareja;
-  final String texto;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: pareja.fondo, borderRadius: BorderRadius.circular(10)),
-        child: Row(
-          children: [
-            Icon(icono, color: pareja.texto, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(texto, style: TextStyle(color: pareja.texto, fontSize: 13)),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -119,8 +119,6 @@ const VISITA = {
   casillaDeclaradaPor: 'Portería norte',
   casillaEn: '2026-09-10T12:55:00.000Z',
   plantillaId: 'pla-1',
-  consentimientoId: 'con-1',
-  confirmadoPorElTitular: false,
   equiposSincronizados: 2,
   equiposFallidos: 1,
 };
@@ -204,8 +202,9 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
     if (url.includes('/visitas/viviendas')) return respuesta([{ id: 'viv-1', nombre: 'Casa 12' }]);
     if (url.includes('/visitas/casilla')) {
       return respuesta({
-        texto: 'El visitante autorizó el uso de su foto para el ingreso',
-        version: 'casilla-1',
+        plantilla: 'Declaro que {visitante} me autorizó a usar su foto para su ingreso al conjunto',
+        marcador: '{visitante}',
+        version: 'casilla-v2',
       });
     }
     if (url.includes('/visitas')) {

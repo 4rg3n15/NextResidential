@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { DirectorioDelResidentePg } from '../src/residente/infraestructura/directorio-pg';
 import { AutorizacionesDelResidentePg } from '../src/residente/infraestructura/autorizaciones-pg';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * LOS ADAPTADORES DEL RESIDENTE CONTRA POSTGRESQL DE VERDAD.
@@ -39,7 +40,6 @@ import { AutorizacionesDelResidentePg } from '../src/residente/infraestructura/a
  * Se OMITE sin `DATABASE_URL_PRUEBAS`, y cuando se omite lo dice: la omisión no
  * es un verde, y el paso 13 del verificador exige que esté la base.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-0000000000aa';
 const VIVIENDA = '20000000-0000-4000-8000-0000000000aa';
 const USUARIO = '00000000-0000-4000-8000-0000000000aa';
@@ -86,6 +86,9 @@ const sinDesajuste = async (que: string, fn: () => Promise<unknown>): Promise<vo
     // inventados, y no es lo que esta suite juzga.
   }
 };
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS, o la base no contesta', () => disponible);
 
 describe('adaptadores del residente · el SQL encaja con el esquema migrado (D-89)', () => {
   it.runIf(URL_BASE !== undefined)('las seis lecturas del directorio se ejecutan', async () => {

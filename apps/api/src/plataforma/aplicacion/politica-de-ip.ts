@@ -1,4 +1,5 @@
 import { BlockList, isIP } from 'node:net';
+import { direccionComparable, redComparable } from '../../comun/direccion-ip';
 import type { ReglasDeIp } from './puertos';
 
 /**
@@ -12,26 +13,26 @@ import type { ReglasDeIp } from './puertos';
  *  · Desde la IP del computador de portería, la consola presencial —pero NO
  *    lo que es sólo de guardia remota (`soloRemota`)—.
  *  c/d · Sólo al portero: quien llama a esto ya lo sabe.
+ *
+ * Ítem 9 de la corrección (15-L) · la IP de la petición y cada entrada de la
+ * lista se comparan en su forma COMPARABLE (`comun/direccion-ip.ts`): el
+ * bucle local es uno solo —`::1`, `127.0.0.1`, `::ffff:127.0.0.1`—, porque en
+ * el Mac la consola llega por una grafía y la lista puede decir la otra.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const MENSAJE_GUARDIA_REMOTA = 'No autorizado para guardia remota';
 
-/** `::ffff:192.0.2.1` → `192.0.2.1`. */
-export const ipNormalizada = (ip: string): string => ip.trim().replace(/^::ffff:/i, '');
-
 /** ¿Está `ip` en alguna de estas IP o redes CIDR? Lo ilegible, no. */
 export const ipEnRedes = (ip: string, redes: readonly string[]): boolean => {
-  const buscada = ipNormalizada(ip);
+  const buscada = direccionComparable(ip);
   const familia = isIP(buscada);
   if (familia === 0) return false;
   const lista = new BlockList();
   for (const red of redes) {
-    const [direccion = '', prefijo] = ipNormalizada(red).split('/');
-    const tipo = isIP(direccion);
-    if (tipo === 0) continue;
-    const nombre = tipo === 4 ? 'ipv4' : 'ipv6';
-    if (prefijo === undefined) lista.addAddress(direccion, nombre);
-    else lista.addSubnet(direccion, Number(prefijo), nombre);
+    const r = redComparable(red);
+    if (r === null) continue;
+    if (r.prefijo === null) lista.addAddress(r.direccion, r.familia);
+    else lista.addSubnet(r.direccion, r.prefijo, r.familia);
   }
   return lista.check(buscada, familia === 4 ? 'ipv4' : 'ipv6');
 };
@@ -49,7 +50,8 @@ export const evaluarIpDePortero = (e: {
   readonly ipsDeSuperadministrador: readonly string[];
   readonly soloRemota: boolean;
 }): VeredictoDeIp => {
-  if (e.ip === null || isIP(ipNormalizada(e.ip)) === 0) return { permitido: false, via: null };
+  if (e.ip === null || isIP(direccionComparable(e.ip)) === 0)
+    return { permitido: false, via: null };
   if (e.reglas.ipsRemotas.length > 0) {
     if (ipEnRedes(e.ip, e.reglas.ipsRemotas)) return { permitido: true, via: 'remota' };
   } else if (ipEnRedes(e.ip, e.ipsDeSuperadministrador)) {

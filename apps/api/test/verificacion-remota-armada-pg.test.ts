@@ -22,6 +22,7 @@ import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositor
 import { FUENTE_DE_PLACAS, PROVEEDOR_DE_EQUIPOS } from '../src/proveedores';
 import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso';
 import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -47,7 +48,6 @@ import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
  * Sin `DATABASE_URL_PRUEBAS` se omite y lo dice; `--con-base` la exige.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const CORRIDA = randomBytes(3).toString('hex').toUpperCase();
 const ADMIN = '00000000-0000-4000-8000-000000000010';
 const VIVIENDA = '30000000-0000-4000-8000-000000000001';
@@ -178,11 +178,9 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.log('OMITIDA: sin DATABASE_URL_PRUEBAS (se exige con --con-base).');
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS', () => disponible);
+const omitida = (): boolean => !disponible;
 
 const http = () => request((app as INestApplication).getHttpServer());
 const con = (token: string) => ({

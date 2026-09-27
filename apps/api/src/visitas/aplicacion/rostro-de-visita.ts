@@ -25,10 +25,27 @@ import type { ConstanciaDeCasilla } from './puertos';
  * autorización. La versión la pone el SERVIDOR, no el cliente: el cliente sólo
  * dice que la casilla se marcó; qué texto se marcó lo sabe quien lo publica.
  * Si el texto cambia, cambia la versión.
+ *
+ * Decisión final del cliente (corrección de la 15-L): la casilla es la ÚNICA
+ * constancia, y nombra al visitante con el nombre del formulario, porque la
+ * foto la envía el propio visitante para su ingreso. `{visitante}` es el
+ * marcador que la consola y la app sustituyen; `casilla-v2` sustituye a la
+ * versión sin nombre (`casilla-2026-09-27`), que sigue en las autorizaciones
+ * que se generaron con ella.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-export const TEXTO_DE_LA_CASILLA = 'El visitante autorizó el uso de su foto para el ingreso';
-export const VERSION_DE_LA_CASILLA = 'casilla-2026-09-27';
+export const MARCADOR_DEL_VISITANTE = '{visitante}';
+export const PLANTILLA_DE_LA_CASILLA = `Declaro que ${MARCADOR_DEL_VISITANTE} me autorizó a usar su foto para su ingreso al conjunto`;
+export const VERSION_DE_LA_CASILLA = 'casilla-v2-2026-09-27';
+
+/** El texto con el nombre del formulario; sin nombre todavía, «el visitante». */
+export const textoDeLaCasilla = (nombre: string): string => {
+  const limpio = nombre.trim();
+  return PLANTILLA_DE_LA_CASILLA.replace(
+    MARCADOR_DEL_VISITANTE,
+    limpio === '' ? 'el visitante' : limpio,
+  );
+};
 
 export interface FotoDeVisita {
   readonly contenidoBase64: string;

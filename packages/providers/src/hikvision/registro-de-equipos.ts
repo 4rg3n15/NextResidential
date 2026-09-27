@@ -84,6 +84,8 @@ export interface EquipoRegistrado {
 
 export interface RegistroDeEquipos {
   buscar(dispositivoId: string): Promise<EquipoRegistrado | null>;
+  /** F2 (corrección de la 15-L) · el registro que recuerda, lo suelta aquí. */
+  olvidar?(dispositivoId: string): void;
 }
 
 /** Registro de memoria: lo que usan las pruebas y el arranque sin base. */

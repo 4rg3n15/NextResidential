@@ -6,6 +6,7 @@ import { Placa, esExito } from '@ncr/domain-core';
 import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-pg';
 import { RegistrarVehiculo } from '../src/padron/aplicacion/casos-de-uso';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * KPI-03 · ADR-04 · CA-03 — 100 inserciones SIMULTÁNEAS, 0 duplicados.
@@ -21,7 +22,6 @@ import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
  * Se OMITE —no falla— si no hay base: el entorno del usuario no tiene
  * PostgreSQL local (ETAPA 14 la lleva a CI). Cuando se omite, lo dice.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 
 let pool: Pool | undefined;
@@ -71,6 +71,9 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool?.end();
 });
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
 
 describe('KPI-03 · integridad concurrente en la base (ADR-04)', () => {
   it('100 inserciones simultáneas de la misma placa producen exactamente una fila activa', async () => {

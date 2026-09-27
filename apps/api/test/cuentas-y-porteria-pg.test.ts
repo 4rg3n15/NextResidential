@@ -8,6 +8,7 @@ import { franjaDe } from '../src/porteria';
 import { SesionesPg } from '../src/porteria/infraestructura/sesiones-pg';
 import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -21,7 +22,6 @@ import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
  * Se OMITE sin `DATABASE_URL_PRUEBAS`, y lo dice: una omisión no es un verde.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const SUPER = '00000000-0000-4000-8000-000000000001';
 const INICIAL = 'Inicial#2026';
 const NUEVA = 'Garita#2026x';
@@ -76,13 +76,9 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.log(
-    'OMITIDA: sin DATABASE_URL_PRUEBAS o sin la migración 0037. Se ejecuta con --con-base.',
-  );
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin la migración 0037', () => disponible);
+const omitida = (): boolean => !disponible;
 
 const http = () => request((app as INestApplication).getHttpServer());
 /** H3 (ADR-031) · el portero entra con su número y su contraseña. */

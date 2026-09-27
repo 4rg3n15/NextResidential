@@ -12,6 +12,20 @@ export function eventosDeLaPlataforma(
   primeroDesde(host: string, desde: Date, plazoMs: number): Promise<EventoVisto | null>;
 };
 
+export function verificacionesDeLaPlataforma(
+  pool: Pool,
+  opciones?: { readonly intervaloMs?: number },
+): {
+  medidasDesde(
+    host: string,
+    desde: Date,
+    cuantas: number,
+    plazoMs: number,
+  ): Promise<{ readonly duracionMs: number; readonly aceptado: boolean | null }[]>;
+};
+
+export function equiposRealesRegistrados(pool: Pool): Promise<number>;
+
 export function equipoRegistrado(
   pool: Pool,
   host: string,

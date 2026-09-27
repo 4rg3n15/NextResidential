@@ -8,10 +8,15 @@ part of 'texto_de_la_casilla_dto.dart';
 
 TextoDeLaCasillaDto _$TextoDeLaCasillaDtoFromJson(Map<String, dynamic> json) =>
     TextoDeLaCasillaDto(
-      texto: json['texto'] as String,
+      plantilla: json['plantilla'] as String,
+      marcador: json['marcador'] as String,
       version: json['version'] as String,
     );
 
 Map<String, dynamic> _$TextoDeLaCasillaDtoToJson(
   TextoDeLaCasillaDto instance,
-) => <String, dynamic>{'texto': instance.texto, 'version': instance.version};
+) => <String, dynamic>{
+  'plantilla': instance.plantilla,
+  'marcador': instance.marcador,
+  'version': instance.version,
+};

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { RepositorioCopropiedadesPg } from '../src/multiempresa/repositorio-copropiedades-pg';
 import type { ContextoTenant } from '../src/autenticacion';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * El catálogo de copropiedades **por el camino de la RLS**, contra PostgreSQL
@@ -17,7 +18,6 @@ import type { ContextoTenant } from '../src/autenticacion';
  *
  * Se OMITE —no falla— sin `DATABASE_URL_PRUEBAS`. Cuando se omite, lo dice.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP_MIRA = '10000000-0000-4000-8000-000000000001';
 const COP_ROBLE = '10000000-0000-4000-8000-000000000002';
 const USUARIO = '00000000-0000-4000-8000-000000000010';
@@ -51,11 +51,12 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.warn('OMITIDA: sin DATABASE_URL_PRUEBAS o sin las dos copropiedades de las semillas.');
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase(
+  'sin DATABASE_URL_PRUEBAS o sin las dos copropiedades de las semillas',
+  () => disponible,
+);
+const omitida = (): boolean => !disponible;
 
 /** Las copropiedades que hay en la base, leídas SIN RLS (el dueño de la conexión de pruebas). */
 const todas = async (): Promise<string[]> =>

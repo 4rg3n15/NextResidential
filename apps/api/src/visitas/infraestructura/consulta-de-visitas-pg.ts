@@ -38,8 +38,6 @@ interface FilaDeVisita {
   readonly casilla_por: string | null;
   readonly casilla_en: Date | null;
   readonly plantilla_id: string | null;
-  readonly consentimiento_id: string | null;
-  readonly confirmado: boolean;
   readonly sincronizados: string;
   readonly fallidos: string;
 }
@@ -72,8 +70,6 @@ const SELECCION_DE_VISITA = `
          uc.nombre AS casilla_por,
          a.consentimiento_declarado_en AS casilla_en,
          pl.id AS plantilla_id,
-         pl.consentimiento_id,
-         COALESCE(pl.origen = 'otorgado_por_el_titular', false) AS confirmado,
          COALESCE(s.sincronizados, 0) AS sincronizados,
          COALESCE(s.fallidos, 0) AS fallidos
     FROM public.autorizaciones a
@@ -83,10 +79,8 @@ const SELECCION_DE_VISITA = `
     LEFT JOIN public.usuarios u ON u.id = a.creado_por
     LEFT JOIN public.usuarios uc ON uc.id = a.consentimiento_declarado_por
     LEFT JOIN LATERAL (
-      SELECT pb.id, pb.consentimiento_id, cb.origen
+      SELECT pb.id
         FROM public.plantillas_biometricas pb
-        JOIN public.consentimientos_biometricos cb
-          ON cb.copropiedad_id = pb.copropiedad_id AND cb.id = pb.consentimiento_id
        WHERE pb.copropiedad_id = a.copropiedad_id AND pb.autorizacion_id = a.id
        ORDER BY pb.creado_en DESC LIMIT 1
     ) pl ON true
@@ -116,8 +110,6 @@ const aVisita = (f: FilaDeVisita): VisitaListada => ({
   casillaDeclaradaPor: f.casilla_por,
   casillaEn: f.casilla_en,
   plantillaId: f.plantilla_id,
-  consentimientoId: f.consentimiento_id,
-  confirmadoPorElTitular: f.confirmado,
   equiposSincronizados: Number(f.sincronizados),
   equiposFallidos: Number(f.fallidos),
 });

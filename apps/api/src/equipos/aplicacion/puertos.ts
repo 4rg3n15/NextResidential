@@ -214,19 +214,30 @@ export const CORRECCIONES = [
 ] as const;
 export type CorreccionDeEquipo = (typeof CORRECCIONES)[number];
 
+/**
+ * Correcciones con PARÁMETROS (corrección de la 15-L): no van por la ruta
+ * genérica, que sólo acepta las de `CORRECCIONES`, sino por las acciones de la
+ * ficha que las piden («Enviar eventos a este Mac», el interruptor).
+ */
+export type CorreccionConParametros = 'receptor_de_eventos';
+
 export interface DatosDeCorreccion {
   readonly host: string;
   readonly puerto: number;
   readonly protocolo: ProtocoloDeEquipo;
   readonly usuario: string;
   readonly secreto: string;
-  readonly correccion: CorreccionDeEquipo;
+  readonly correccion: CorreccionDeEquipo | CorreccionConParametros;
   /** Quién la autoriza. Sin esto no se emite la petición al equipo. */
   readonly confirmadaPor: string;
+  /** F2 (e) · para `verificacion_remota`: activar (por omisión) o desactivar. */
+  readonly activar?: boolean;
+  /** C2 · para `receptor_de_eventos`: IP del Mac, puerto y ruta con el secreto. */
+  readonly receptor?: { readonly ip: string; readonly puerto: number; readonly ruta: string };
 }
 
 export interface ResultadoDeCorreccionDeEquipo {
-  readonly correccion: CorreccionDeEquipo;
+  readonly correccion: CorreccionDeEquipo | CorreccionConParametros;
   readonly aplicada: boolean;
   readonly valorAnterior: string | null;
   readonly valorNuevo: string | null;

@@ -12,8 +12,9 @@ import { recortado, sinSecretos } from './intercambio';
 import type { OpcionesDeEquipo } from './cliente';
 import { rutaPara } from './catalogo-de-rutas';
 import type { RutaDeEquipo } from './catalogo-de-rutas';
-import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
-import { soporta } from '../nucleo/capacidades';
+import { CUERPO_DE_SUSCRIPCION } from './transporte-de-flujo';
+import type { TransporteDeFlujo } from './transporte-de-flujo';
+import { clasificarConexionDeEventosRechazada } from './conexion-de-eventos-rechazada';
 
 /**
  * ESCUCHA DEL FLUJO DE EVENTOS · terminal facial y videoportero.
@@ -41,34 +42,9 @@ import { soporta } from '../nucleo/capacidades';
  * vuelven todos a la vez y tiran lo que acaba de levantarse.
  */
 
-/**
- * ═════════════════════════════════════════════════════════════════════════════
- * DOS FORMAS DE MANTENER EL FLUJO ABIERTO · 6.5, ETAPA 15-D
- *
- * · `alertStream` — un GET que el equipo mantiene abierto y por el que vuelca
- *   TODO, historial incluido. Es el que existía.
- * · `subscribeEvent` — un POST con un cuerpo que dice qué eventos se quieren.
- *   Los dos equipos reales declaran `isSupportSubscribeEvent=true`. Que el
- *   volcado histórico también venga por aquí es lo que se confirma en sitio.
- *
- * Cuál se usa lo decide la CAPACIDAD del equipo (`transporteSegunCapacidades`),
- * no su tipo ni su marca. El filtrado de lo histórico es el mismo para los dos:
- * la trampa de la puesta en marcha no depende del transporte.
- */
-export type TransporteDeFlujo = 'alertStream' | 'subscribeEvent';
-
-export const transporteSegunCapacidades = (capacidades: CapacidadesDeEquipo): TransporteDeFlujo =>
-  soporta(capacidades, 'suscripcionDeEventos') ? 'subscribeEvent' : 'alertStream';
-
-/**
- * Lo que se pide al suscribirse. DOCUMENTADO, NO VERIFICADO: la forma del
- * cuerpo sale de la documentación de suscripción del fabricante. `all` para
- * que el filtrado lo haga el sistema —que sabe qué clases usa— y no un
- * firmware cuyo vocabulario de tipos varía por modelo.
- */
-const CUERPO_DE_SUSCRIPCION =
-  '<?xml version="1.0" encoding="UTF-8"?><SubscribeEvent version="2.0" ' +
-  'xmlns="http://www.isapi.org/ver20/XMLSchema"><eventMode>all</eventMode></SubscribeEvent>';
+// 6.5 (15-D) · los dos transportes y cuál usar: `transporte-de-flujo.ts`.
+export { transporteSegunCapacidades } from './transporte-de-flujo';
+export type { TransporteDeFlujo } from './transporte-de-flujo';
 
 export interface OpcionesDeEscucha extends OpcionesDeEquipo {
   readonly dispositivoId: string;
@@ -100,6 +76,8 @@ export class EscuchaDeAlertStream {
   private descartados = 0;
   /** C4 (15-L) · el instante del último trozo recibido, sea evento o latido. */
   private ultima: number | null = null;
+  /** C7 (15-L) · la frase del último rechazo por otra plataforma o por límite. */
+  private rechazada: string | null = null;
 
   private readonly ahora: () => number;
 
@@ -204,6 +182,16 @@ export class EscuchaDeAlertStream {
   }
 
   /**
+   * C7 (15-L) · si el último intento lo rechazó el equipo porque OTRA
+   * plataforma tiene la conexión o agotó las que admite, la frase con el
+   * remedio; `null` si no, o en cuanto una conexión vuelve a abrirse. Es lo que
+   * la ficha enseña: la misma frase que el ensayo y la bitácora.
+   */
+  rechazoPorOtraPlataforma(): string | null {
+    return this.rechazada;
+  }
+
+  /**
    * ═══════════════════════════════════════════════════════════════════════════
    * H-SITIO-14 · UNA CONEXIÓN, CONTADA ENTERA
    *
@@ -227,16 +215,23 @@ export class EscuchaDeAlertStream {
         cuerpo += new TextDecoder().decode(trozo);
         if (cuerpo.length > 2048) break;
       }
+      // C7 (15-L) · ¿la tiene otra plataforma, o agotó las conexiones? Dicho en palabras.
+      const ocupada = clasificarConexionDeEventosRechazada(flujo.estado, cuerpo);
+      this.rechazada = ocupada?.frase ?? null;
       this.anotar('error', 'escucha: el equipo rechazó la conexión', {
         estadoHttp: flujo.estado,
         desafioVencido: flujo.desafioVencido,
         cuerpo: recortado(sinSecretos(cuerpo), 512),
+        ...(ocupada === null ? {} : { motivo: ocupada.frase, clase: ocupada.clase }),
       });
       if (flujo.estado === 401 && !flujo.desafioVencido) {
         throw new CredencialRechazada(this.opciones.dispositivoId);
       }
-      throw new Error(`el equipo contestó HTTP ${String(flujo.estado)} a la escucha`);
+      throw new Error(
+        ocupada?.frase ?? `el equipo contestó HTTP ${String(flujo.estado)} a la escucha`,
+      );
     }
+    this.rechazada = null;
     this.anotar('info', 'escucha: conexión abierta', {
       estadoHttp: flujo.estado,
       tipo: flujo.tipo,

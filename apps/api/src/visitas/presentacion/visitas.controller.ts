@@ -28,7 +28,11 @@ import {
   ListarVisitas,
   ViviendasParaVisitas,
 } from '../aplicacion/consultar-visitas';
-import { TEXTO_DE_LA_CASILLA, VERSION_DE_LA_CASILLA } from '../aplicacion/rostro-de-visita';
+import {
+  MARCADOR_DEL_VISITANTE,
+  PLANTILLA_DE_LA_CASILLA,
+  VERSION_DE_LA_CASILLA,
+} from '../aplicacion/rostro-de-visita';
 import {
   ConsultaDeVisitasDto,
   FotoEnEquipoDto,
@@ -161,7 +165,11 @@ export class VisitasController {
     @Param('id', ParseUUIDPipe) copropiedadId: string,
   ): Promise<TextoDeLaCasillaDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'visitas');
-    return { texto: TEXTO_DE_LA_CASILLA, version: VERSION_DE_LA_CASILLA };
+    return {
+      plantilla: PLANTILLA_DE_LA_CASILLA,
+      marcador: MARCADOR_DEL_VISITANTE,
+      version: VERSION_DE_LA_CASILLA,
+    };
   }
 
   @Get(':autorizacionId/equipos')

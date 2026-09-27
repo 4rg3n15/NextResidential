@@ -203,9 +203,5 @@ void main() {
       expect(razonDeLaFoto('ENCUADRE_OBLICUO'), isNot(contains('ENCUADRE')));
       expect(razonDeLaFoto('ENCUADRE_OBLICUO'), contains('calidad'));
     });
-
-    test('el texto de la casilla es el que guarda el servidor, palabra por palabra', () {
-      expect(textoDeLaCasilla, 'El visitante autorizó el uso de su foto para el ingreso');
-    });
   });
 }

@@ -28,8 +28,6 @@ VisitaDto _$VisitaDtoFromJson(Map<String, dynamic> json) => VisitaDto(
       ? null
       : DateTime.parse(json['casillaEn'] as String),
   plantillaId: json['plantillaId'] as String?,
-  consentimientoId: json['consentimientoId'] as String?,
-  confirmadoPorElTitular: json['confirmadoPorElTitular'] as bool,
   equiposSincronizados: json['equiposSincronizados'] as num,
   equiposFallidos: json['equiposFallidos'] as num,
 );
@@ -52,8 +50,6 @@ Map<String, dynamic> _$VisitaDtoToJson(VisitaDto instance) => <String, dynamic>{
   'casillaDeclaradaPor': instance.casillaDeclaradaPor,
   'casillaEn': instance.casillaEn?.toIso8601String(),
   'plantillaId': instance.plantillaId,
-  'consentimientoId': instance.consentimientoId,
-  'confirmadoPorElTitular': instance.confirmadoPorElTitular,
   'equiposSincronizados': instance.equiposSincronizados,
   'equiposFallidos': instance.equiposFallidos,
 };

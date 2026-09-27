@@ -2,13 +2,15 @@
  * ═════════════════════════════════════════════════════════════════════════════
  * `pnpm sitio:ensayo` · LO QUE EL ENSAYO PREGUNTA A LA PLATAFORMA (J1, 15-L)
  *
- * Tres preguntas, todas de sólo lectura:
+ * Preguntas, todas de sólo lectura:
  *
  *  · ¿Contesta la API en el bucle local y POR LA IP DEL MAC? La segunda es la
  *    del iPhone: si el Mac no la contesta, la app tampoco podrá (E3).
  *  · ¿Faltan migraciones por aplicar (`supabase db push`)?
  *  · ¿Llegó el evento de este equipo desde que se pidió el gesto? Se busca por
  *    el host del equipo en `dispositivos` y en `eventos_de_equipo`/`eventos`.
+ *  · F2 · ¿cuánto tardaron los veredictos que la API devolvió a la terminal?
+ *  · F3 · ¿hay equipos reales dados de alta (activos y con usuario de servicio)?
  *
  * La RLS está FORZADA también para el dueño de las tablas (ADR-05), así que la
  * lectura lleva claims, como la API: los de superadministrador, dentro de una
@@ -74,6 +76,59 @@ export const eventosDeLaPlataforma = (pool, { intervaloMs = 1000 } = {}) => ({
     }
   },
 });
+
+/**
+ * F2 (corrección de la 15-L) · el puerto `VerificacionesDeLaPlataforma`: los
+ * veredictos que la API devolvió a este equipo desde `desde`. Los registra en
+ * `eventos_de_equipo` (migración 0040) con `tipo = 'resultado_de_verificacion'`
+ * y, en `carga`, `duracionMs` (del hecho recibido al veredicto) y
+ * `aceptadoPorElEquipo`. Sondea hasta tener `cuantas` o agotar el plazo.
+ */
+export const verificacionesDeLaPlataforma = (pool, { intervaloMs = 1000 } = {}) => ({
+  medidasDesde: async (host, desde, cuantas, plazoMs) => {
+    const limite = Date.now() + plazoMs;
+    for (;;) {
+      const filas = await leer(
+        pool,
+        `SELECT (e.carga->>'duracionMs')::float8 AS duracion_ms,
+                CASE WHEN jsonb_typeof(e.carga->'aceptadoPorElEquipo') = 'boolean'
+                     THEN (e.carga->>'aceptadoPorElEquipo')::boolean END AS aceptado
+           FROM public.eventos_de_equipo e
+           JOIN public.dispositivos d
+             ON d.id = e.dispositivo_id AND d.copropiedad_id = e.copropiedad_id
+          WHERE d.host = $1 AND e.tipo = 'resultado_de_verificacion'
+            AND jsonb_typeof(e.carga->'duracionMs') = 'number' AND e.recibido_en >= $2
+          ORDER BY e.recibido_en
+          LIMIT $3`,
+        [host, desde, cuantas],
+      );
+      const medidas = filas.map((f) => ({
+        duracionMs: Number(f.duracion_ms),
+        aceptado: typeof f.aceptado === 'boolean' ? f.aceptado : null,
+      }));
+      if (medidas.length >= cuantas || Date.now() >= limite) return medidas;
+      await esperar(Math.min(intervaloMs, Math.max(0, limite - Date.now())));
+    }
+  },
+});
+
+/**
+ * F3 (corrección de la 15-L) · cuántos equipos REALES hay dados de alta: activos
+ * y con usuario de servicio, que es lo que el registro de la API exige para
+ * hablar con ellos (`registro-de-equipos-pg.ts`). Los del seed no llevan usuario.
+ * `[SUPUESTO]` S-104: «real» = activo y con usuario. El sobre de la credencial
+ * no se mira: su política sólo admite los claims de SERVICIO de cada
+ * copropiedad, y el ensayo lee con los de superadministrador.
+ */
+export const equiposRealesRegistrados = async (pool) => {
+  const filas = await leer(
+    pool,
+    `SELECT count(*)::int AS n FROM public.dispositivos
+      WHERE estado = 'activo' AND usuario IS NOT NULL`,
+    [],
+  );
+  return Number(filas[0]?.n ?? 0);
+};
 
 /** ¿Está este host dado de alta en la consola? Sin eso el evento no puede llegar. */
 export const equipoRegistrado = async (pool, host) => {

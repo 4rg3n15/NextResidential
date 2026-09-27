@@ -15,3 +15,17 @@ export const ipDelMac = () => {
     .sort((a, b) => (a.nombre === 'en0' ? -1 : b.nombre === 'en0' ? 1 : 0));
   return candidatas[0]?.direccion ?? null;
 };
+
+/**
+ * C2 (corrección de la 15-L) · la IP del Mac EN LA RED DE UN EQUIPO —la de la
+ * cámara, para su servidor de alarma—: la de la interfaz cuya subred lo
+ * contiene, o `ALARM_SERVER_IP_ANUNCIADA`. La decide `ipHaciaElEquipo` del
+ * paquete de equipos, la misma regla que la consola; aquí sólo se le pasan las
+ * interfaces de este Mac. `ipDelMac` sigue siendo la del iPhone: la primera
+ * IPv4 de la Wi-Fi, que es la red por la que llega el teléfono.
+ */
+export const ipDelMacHacia = (
+  ipHaciaElEquipo,
+  host,
+  anunciada = process.env.ALARM_SERVER_IP_ANUNCIADA,
+) => ipHaciaElEquipo(host, networkInterfaces(), anunciada ?? null);

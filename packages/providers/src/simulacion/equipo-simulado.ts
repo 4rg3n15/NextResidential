@@ -22,6 +22,24 @@ import {
   personasPor,
 } from './personas-simuladas';
 import type { PersonaSimulada } from './personas-simuladas';
+import {
+  CANALES_POR_OMISION,
+  CAPACIDADES_DE_CANAL,
+  ESPACIO,
+  canalesDeAudio,
+  capacidadesDelSistema,
+  datosBasicos,
+  disparador,
+  documentoDelReceptor,
+  entranceParam,
+  ordenesDePuerta,
+  receptorEscrito,
+  receptorInicial,
+} from './documentos-del-simulado';
+import type { CanalDeAudioSimulado } from './documentos-del-simulado';
+import { caminoCasa, respuestaDe } from './respuesta-simulada';
+import { conSituacionesDeSitio } from './situaciones-de-sitio';
+import type { SituacionesDeSitio } from './situaciones-de-sitio';
 
 export { aperturasFisicasPor, escriturasSinCuerpoPor } from './comportamientos-de-sitio';
 export {
@@ -30,6 +48,7 @@ export {
   PLAZO_DE_VERIFICACION_MS,
 } from './verificacion-remota-simulada';
 export type { DesenlaceDeVerificacion, VerificacionResuelta } from './verificacion-remota-simulada';
+export type { SituacionesDeSitio } from './situaciones-de-sitio';
 
 /**
  * UN EQUIPO QUE HABLA COMO LOS DE VERDAD, Y QUE NO EXISTE.
@@ -187,189 +206,16 @@ export interface GuionDeEquipo {
   readonly funcionesDePersonas?: string;
   /** J2 (15-L) · la serie que declara: un respaldo de otro equipo no se aplica. */
   readonly serie?: string;
+  /** C2 (15-L) · a dónde publica la cámara. Lo escrito después se lee (tiene estado). */
+  readonly receptor?: {
+    readonly ip?: string;
+    readonly nombre?: string;
+    readonly puerto?: number;
+    readonly url?: string;
+  };
+  /** C7 y F4 (15-L) · lo que HikCentral y el firmware «Ultra» hicieron en sitio. */
+  readonly situaciones?: SituacionesDeSitio;
 }
-
-/**
- * ═════════════════════════════════════════════════════════════════════════════
- * LOS DOCUMENTOS SON LOS DE LA GUÍA, LITERALES
- *
- * No están escritos «como nos conviene»: llevan los nombres de elemento, el
- * espacio de nombres y las erratas del esquema del fabricante. Un simulado que
- * respondiera lo que el analizador espera no probaría el analizador — probaría
- * que dos ficheros nuestros se entienden entre sí.
- *
- * De ahí que el documento de parámetros de entrada traiga la lista de políticas
- * de vehículo y la de relés aunque la mayoría de las pruebas no las miren: es
- * lo que el equipo manda, y leerlo entero es justo lo que la 15-C añadió.
- */
-const ESPACIO = 'http://www.isapi.org/ver20/XMLSchema';
-
-const entranceParam = (guion: GuionDeEquipo): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<EntranceParamList version="2.0" xmlns="${ESPACIO}">`,
-    '<EntranceParam>',
-    '<laneNum>1</laneNum>',
-    '<bEnable>true</bEnable>',
-    `<ctrlMode>${guion.ctrlMod ?? '1'}</ctrlMode>`,
-    '<relateTriggerMode>vehicleDetect</relateTriggerMode>',
-    '<vehInfoManagList>',
-    '<vehInfoManag>',
-    '<vehInfoManagNum>1</vehInfoManagNum>',
-    '<barrierGateOper>off</barrierGateOper>',
-    '<upAlarmEnable>true</upAlarmEnable>',
-    '<hostUpAlarmEnable>true</hostUpAlarmEnable>',
-    '</vehInfoManag>',
-    '<vehInfoManag>',
-    '<vehInfoManagNum>2</vehInfoManagNum>',
-    `<barrierGateOper>${guion.operacionDeListaBlanca ?? 'off'}</barrierGateOper>`,
-    '<upAlarmEnable>true</upAlarmEnable>',
-    '<hostUpAlarmEnable>true</hostUpAlarmEnable>',
-    '</vehInfoManag>',
-    '</vehInfoManagList>',
-    '<relayList><relay>',
-    '<relayNum>1</relayNum>',
-    '<relayFunction>1</relayFunction>',
-    '</relay></relayList>',
-    `<notCloseCarFollow>${guion.noCierraConVehiculosPegados === true ? 'true' : 'false'}</notCloseCarFollow>`,
-    '<bigCarKeepOpen><enabled>false</enabled><duration>1</duration></bigCarKeepOpen>',
-    '<ParkingDetection><enabled>false</enabled><judgeTime>1</judgeTime></ParkingDetection>',
-    '</EntranceParam>',
-    '</EntranceParamList>',
-  ].join('');
-
-const disparador = (guion: GuionDeEquipo): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<EventTrigger version="2.0" xmlns="${ESPACIO}">`,
-    '<id>vehicledetection-1</id>',
-    '<eventType>vehicledetection</eventType>',
-    '<EventTriggerNotificationList>',
-    '<EventTriggerNotification>',
-    '<id>1</id>',
-    '<notificationMethod>center</notificationMethod>',
-    '</EventTriggerNotification>',
-    ...(guion.disparadorAccionaPuerto === undefined
-      ? []
-      : [
-          '<EventTriggerNotification>',
-          '<id>2</id>',
-          '<notificationMethod>IO</notificationMethod>',
-          `<outputIOPortID>${guion.disparadorAccionaPuerto}</outputIOPortID>`,
-          '</EventTriggerNotification>',
-        ]),
-    '</EventTriggerNotificationList>',
-    '</EventTrigger>',
-  ].join('');
-
-const datosBasicos = (guion: GuionDeEquipo): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<BasicInfo version="2.0" xmlns="${ESPACIO}">`,
-    '<channelID>1</channelID>',
-    '<directionNo>Upward</directionNo>',
-    '<monitoringSiteID>SITIO1</monitoringSiteID>',
-    '<deviceID>EQUIPO1</deviceID>',
-    '<monitorDescription>ENTRADA</monitorDescription>',
-    '<defaultCHN>1</defaultCHN>',
-    '<region>other</region>',
-    `<CRIndex>${guion.indiceDePais ?? '210'}</CRIndex>`,
-    '</BasicInfo>',
-  ].join('');
-
-const CAPACIDADES_DE_CANAL = [
-  '<?xml version="1.0" encoding="UTF-8"?>',
-  `<BasicInfoCap version="2.0" xmlns="${ESPACIO}">`,
-  '<channelID opt="1"/>',
-  '<region opt="default,EU,CIS,EU_CIS,ME"/>',
-  '<CRIndex opt="0,210,253,254"/>',
-  '</BasicInfoCap>',
-].join('');
-
-const receptor = (guion: GuionDeEquipo): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<HttpHostNotificationList version="2.0" xmlns="${ESPACIO}">`,
-    '<HttpHostNotification>',
-    '<id>1</id>',
-    '<url>/alarm-server</url>',
-    '<protocolType>HTTP</protocolType>',
-    `<parameterFormatType>${guion.formatoDeNotificacion ?? 'XML'}</parameterFormatType>`,
-    '<addressingFormatType>ipaddress</addressingFormatType>',
-    '<ipAddress>198.51.100.10</ipAddress>',
-    '<portNo>3000</portNo>',
-    '<httpAuthenticationMethod>none</httpAuthenticationMethod>',
-    '<ANPR>',
-    `<detectionUpLoadPicturesType>${guion.imagenesDelEvento ?? 'detectionPicture'}</detectionUpLoadPicturesType>`,
-    '</ANPR>',
-    '</HttpHostNotification>',
-    '</HttpHostNotificationList>',
-  ].join('');
-
-/**
- * El documento de capacidades, con las claves de los VOLCADOS REALES del
- * 23/09/2026 (`docs/insumos/hikvision/hik-*.xml`): `ITCCap` en la cámara,
- * `VideoIntercomCap` y `AudioCap` en el videoportero, `isSupportSubscribeEvent`
- * en los dos. Lo que el simulado declara se lee con el mismo lector que leerá
- * el aparato.
- */
-const capacidadesDelSistema = (guion: GuionDeEquipo): string => {
-  const canales = guion.canalesDeAudio ?? CANALES_POR_OMISION;
-  const conAudio = canales.length > 0;
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<DeviceCap version="2.0" xmlns="${ESPACIO}">`,
-    '<SysCap>',
-    ...(guion.familia === 'camara'
-      ? []
-      : [
-          '<AudioCap>',
-          `<audioInputNums>${conAudio ? '1' : '0'}</audioInputNums>`,
-          `<audioOutputNums>${conAudio ? '1' : '0'}</audioOutputNums>`,
-          '</AudioCap>',
-        ]),
-    `<isSupportSubscribeEvent>${guion.admiteSuscripcion === false ? 'false' : 'true'}</isSupportSubscribeEvent>`,
-    '</SysCap>',
-    ...(guion.familia === 'camara'
-      ? [
-          '<ITCCap>',
-          `<isSupportVehicleDetection>${guion.declaraReconocimiento === false ? 'false' : 'true'}</isSupportVehicleDetection>`,
-          '</ITCCap>',
-        ]
-      : [
-          '<VideoIntercomCap>',
-          `<isSupportRemoteOpenDoor>${guion.aperturaRemota === false ? 'false' : 'true'}</isSupportRemoteOpenDoor>`,
-          `<isSupportCallSignal>${guion.senalizaLlamadas === true ? 'true' : 'false'}</isSupportCallSignal>`,
-          '</VideoIntercomCap>',
-        ]),
-    '</DeviceCap>',
-  ].join('');
-};
-
-/** Un canal habilitado con G.711 µ-law: lo que el equipo real declara, salvo que viene deshabilitado. */
-const CANALES_POR_OMISION = [{ id: 1, habilitado: true, codec: 'G.711ulaw' }] as const;
-
-type CanalDeAudioSimulado = NonNullable<GuionDeEquipo['canalesDeAudio']>[number];
-
-const canalesDeAudio = (canales: readonly CanalDeAudioSimulado[]): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<TwoWayAudioChannelList version="2.0" xmlns="${ESPACIO}">`,
-    ...canales.map(
-      (c) =>
-        `<TwoWayAudioChannel><id>${String(c.id)}</id><enabled>${c.habilitado ? 'true' : 'false'}</enabled>` +
-        `<audioCompressionType>${c.codec ?? 'G.711ulaw'}</audioCompressionType>` +
-        '<audioInputType>MicIn</audioInputType><speakerVolume>50</speakerVolume>' +
-        '<noisereduce>false</noisereduce></TwoWayAudioChannel>',
-    ),
-    '</TwoWayAudioChannelList>',
-  ].join('');
-
-const ordenesDePuerta = (guion: GuionDeEquipo): string =>
-  '<?xml version="1.0" encoding="UTF-8"?>' +
-  `<RemoteControlDoorCap version="2.0" xmlns="${ESPACIO}">` +
-  `<cmd opt="${(guion.ordenesDePuerta ?? ['open', 'close']).join(',')}"/>` +
-  '</RemoteControlDoorCap>';
 
 /** Respuestas de error con el código de estado general del fabricante. */
 const ERROR_OCUPADO =
@@ -403,19 +249,6 @@ const NO_SOPORTA =
 /** El reino del desafío Digest del simulado. */
 const REINO = 'equipo-simulado';
 
-const respuestaDe = (
-  estado: number,
-  cuerpo: string,
-  cabeceras: Record<string, string> = {},
-): Response =>
-  ({
-    status: estado,
-    ok: estado >= 200 && estado < 300,
-    headers: new Headers(cabeceras),
-    text: async () => cuerpo,
-    body: null,
-  }) as unknown as Response;
-
 /** Flujo de eventos: los bloques, uno detrás de otro, y después se cierra. */
 const cuerpoDeFlujo = (
   bloques: readonly Record<string, unknown>[],
@@ -447,32 +280,6 @@ const cuerpoBinario = (trozos: readonly Uint8Array[]): ReadableStream<Uint8Array
       cancel: async () => undefined,
     }),
   } as unknown as ReadableStream<Uint8Array>;
-};
-
-/**
- * Devuelve un `fetch` que se comporta como el equipo descrito.
- *
- * Se inyecta en cualquier adaptador —todos aceptan `peticion`— y con él la
- * suite recorre el camino entero sin un solo aparato.
- */
-/**
- * ¿Casa la ruta del catálogo con el camino pedido? Las rutas con `{canal}` se
- * comparan como patrón: el simulado acepta cualquier número, igual que el
- * aparato acepta cualquier canal que exista. Qué canal era el bueno lo decide
- * la prueba mirando la petición, no el emparejamiento.
- */
-const caminoCasa = (rutaDelCatalogo: string, camino: string): boolean => {
-  const base = rutaDelCatalogo.split('?')[0] ?? rutaDelCatalogo;
-  if (!base.includes('{canal}')) return base === camino;
-  const patron = new RegExp(
-    '^' +
-      base
-        .split('{canal}')
-        .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-        .join('\\d+') +
-      '$',
-  );
-  return patron.test(camino);
 };
 
 /** Lo que cada terminal simulada recibió como veredicto, por destino (A2). */
@@ -550,8 +357,10 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   const canales: CanalDeAudioSimulado[] = [...(guion.canalesDeAudio ?? CANALES_POR_OMISION)];
   /** Anexo 15-K · el Digest del equipo, con el nonce que vence. */
   const digest = new DigestDelEquipo(guion.usuario, guion.clave, REINO, guion.nonce);
+  /** C2 (15-L) · a dónde publica la cámara: lo escrito se vuelve a leer. */
+  let receptor = receptorInicial(guion);
 
-  return (async (entrada: string | URL, opciones?: RequestInit): Promise<Response> => {
+  const equipo = (async (entrada: string | URL, opciones?: RequestInit): Promise<Response> => {
     const url = new URL(typeof entrada === 'string' ? entrada : String(entrada));
     const metodo = opciones?.method ?? 'GET';
     const cabeceras = (opciones?.headers ?? {}) as Record<string, string>;
@@ -879,7 +688,16 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     }
 
     if (catalogada.proposito === 'leer a qué receptor publica el equipo') {
-      return respuestaDe(200, receptor(guion));
+      return respuestaDe(200, documentoDelReceptor(receptor));
+    }
+    if (
+      catalogada.proposito === 'apuntar el equipo a nuestro receptor' ||
+      catalogada.proposito === 'apuntar un receptor concreto por su identificador'
+    ) {
+      const escrito = receptorEscrito(receptor, String(opciones?.body ?? ''));
+      if (escrito === null) return respuestaDe(400, PARAMETRO_MALO);
+      receptor = escrito;
+      return respuestaDe(200, OK);
     }
 
     if (catalogada.proposito === 'leer si este modelo reporta el estado de la barrera') {
@@ -951,6 +769,9 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
 
     return respuestaDe(200, OK);
   }) as typeof fetch;
+  return guion.situaciones === undefined
+    ? equipo
+    : conSituacionesDeSitio(equipo, guion.situaciones);
 };
 
 /**

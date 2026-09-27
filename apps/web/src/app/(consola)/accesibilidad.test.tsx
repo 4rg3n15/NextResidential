@@ -68,8 +68,10 @@ const CON_DATOS = (url: string): Response => {
         ? [{ id: 'viv-1', nombre: 'Casa 12' }]
         : url.includes('/visitas/casilla')
           ? {
-              texto: 'El visitante autorizó el uso de su foto para el ingreso',
-              version: 'casilla-1',
+              plantilla:
+                'Declaro que {visitante} me autorizó a usar su foto para su ingreso al conjunto',
+              marcador: '{visitante}',
+              version: 'casilla-v2',
             }
           : url.includes('/visitas')
             ? {
@@ -95,8 +97,6 @@ const CON_DATOS = (url: string): Response => {
                     casillaDeclaradaPor: 'Portería norte',
                     casillaEn: '2026-09-10T12:55:00.000Z',
                     plantillaId: 'pla-1',
-                    consentimientoId: 'con-1',
-                    confirmadoPorElTitular: false,
                     equiposSincronizados: 2,
                     equiposFallidos: 1,
                   },

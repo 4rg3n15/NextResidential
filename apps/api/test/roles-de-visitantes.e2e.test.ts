@@ -82,7 +82,12 @@ describe('H-SITIO-03 · las rutas de «Visitantes» contra los roles que la ven'
     expect(rutas).toContain('POST /copropiedades/:id/visitas');
     expect(rutas).toContain('GET /copropiedades/:id/visitas');
     expect(rutas).toContain('POST /copropiedades/:id/visitas/:autorizacionId/rechazo');
-    expect(rutas.length).toBeGreaterThanOrEqual(8);
+    // 7 desde la corrección de la 15-L: la confirmación presencial (y su ruta)
+    // se retiró de la pantalla por decisión del cliente (ADR-032, enmienda).
+    expect(rutas).not.toContain(
+      'POST /copropiedades/:id/biometria/consentimientos/:consentimientoId/aceptacion-presencial',
+    );
+    expect(rutas.length).toBeGreaterThanOrEqual(7);
   });
 
   it.each(ROLES)('%s: ninguna ruta que la pantalla le ofrece lo rechaza por rol', (rol) => {

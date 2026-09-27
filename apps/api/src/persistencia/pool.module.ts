@@ -6,6 +6,7 @@ import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
+import { PrecalentamientoDelPool } from './precalentamiento';
 
 /**
  * **Un solo `Pool` por proceso** — D-66.
@@ -81,6 +82,8 @@ export class PoolModule {
             }),
         },
         CierreDelPool,
+        // F2 (corrección de la 15-L) · conexiones abiertas antes del primer rostro.
+        PrecalentamientoDelPool,
       ],
       exports: [Pool],
     };

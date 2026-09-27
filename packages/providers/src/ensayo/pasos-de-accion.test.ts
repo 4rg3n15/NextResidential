@@ -40,6 +40,7 @@ const opciones = (
   interlocutor,
   soloLectura: false,
   esperaDeEventoMs: 100,
+  esperaDeSincronizacionMs: 0,
   limitesDeFoto: LIMITES_DE_FOTO_POR_OMISION,
   zona: 'America/Bogota',
   ahora: () => AHORA,
@@ -122,9 +123,17 @@ describe('paso 6 · rostro', () => {
   });
 
   it('el videoportero sin biblioteca no aplica; en solo lectura, omitido', async () => {
-    expect((await pasoDeRostro(opciones('videoportero', contesta(true)), null)).estado).toBe(
-      'no_aplica',
-    );
+    const sinBiblioteca = {
+      ...CAPACIDADES_SIN_CONSULTAR,
+      bibliotecaDeRostros: { estado: 'no' as const, maximo: null, almacenadas: null },
+    };
+    expect(
+      (await pasoDeRostro(opciones('videoportero', contesta(true)), sinBiblioteca)).estado,
+    ).toBe('no_aplica');
+    // F4 · sin capacidades leídas no es «no aplica»: no se sabe, y se dice.
+    const sinLeer = await pasoDeRostro(opciones('videoportero', contesta(true)), null);
+    expect(sinLeer.estado).toBe('fallo');
+    expect(sinLeer.causa).toMatch(/No se pudieron leer las capacidades del videoportero/);
     const o = { ...opciones('terminal', contesta(true)), soloLectura: true };
     expect((await pasoDeRostro(o, null)).estado).toBe('omitido');
   });

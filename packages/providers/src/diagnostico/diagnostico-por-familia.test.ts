@@ -47,7 +47,7 @@ describe('terminal facial · veredictos propios, no los de una cámara', () => {
     const nombres = campos(ficha.hallazgos);
     expect(nombres.some((c) => /país|receptor|disparador|matrícula/.test(c))).toBe(false);
     expect(nombres).toContain('quién decide la apertura');
-    expect(nombres).toContain('biblioteca de rostros');
+    expect(nombres).toContain('Rostros');
     expect(nombres).toContain('apertura desde la plataforma');
     expect(nombres).toContain('reloj del equipo');
   });
@@ -70,9 +70,9 @@ describe('terminal facial · veredictos propios, no los de una cámara', () => {
         bibliotecaAlmacenadas: 95,
       }),
     );
-    const hallazgo = llena.hallazgos.find((h) => h.campo === 'biblioteca de rostros');
+    const hallazgo = llena.hallazgos.find((h) => h.campo === 'Rostros');
     expect(hallazgo?.estado).toBe('aviso');
-    expect(hallazgo?.valorLeido).toBe('95 de 100 plantillas');
+    expect(hallazgo?.valorLeido).toBe('admite · 95 de 100 plantillas');
   });
 
   it('un equipo que no declara nada queda SIN COMPROBAR, nunca conforme', async () => {

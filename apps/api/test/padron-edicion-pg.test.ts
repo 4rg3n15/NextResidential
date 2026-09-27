@@ -9,6 +9,7 @@ import { BorrarVehiculoDefinitivamente } from '../src/padron/aplicacion/casos-de
 import { RepositorioAutorizacionesPg } from '../src/autorizaciones/infraestructura/repositorio-autorizaciones-pg';
 import { CrearAutorizacion } from '../src/autorizaciones/aplicacion/casos-de-uso';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * O3 · lo que la consola necesita del padrón, contra base real:
@@ -21,7 +22,6 @@ import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
  *
  * Se OMITE si no hay base, y lo dice.
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 const VIVIENDA_CON_TITULAR = '30000000-0000-4000-8000-000000000001';
 const CORRIDA = randomBytes(3).toString('hex').toUpperCase();
@@ -85,6 +85,9 @@ afterAll(async () => {
   );
   await pool?.end();
 });
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
 
 describe('O3 · regeneración con modos, edición y borrado definitivo contra base', () => {
   it('la base de pruebas contesta', () => {

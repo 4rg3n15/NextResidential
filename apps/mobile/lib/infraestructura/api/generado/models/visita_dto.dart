@@ -28,8 +28,6 @@ class VisitaDto {
     required this.casillaDeclaradaPor,
     required this.casillaEn,
     required this.plantillaId,
-    required this.consentimientoId,
-    required this.confirmadoPorElTitular,
     required this.equiposSincronizados,
     required this.equiposFallidos,
   });
@@ -53,8 +51,6 @@ class VisitaDto {
   final String? casillaDeclaradaPor;
   final DateTime? casillaEn;
   final String? plantillaId;
-  final String? consentimientoId;
-  final bool confirmadoPorElTitular;
   final num equiposSincronizados;
   final num equiposFallidos;
 

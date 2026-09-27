@@ -79,6 +79,35 @@ class _EquiposApi implements EquiposApi {
   }
 
   @override
+  Future<EstadoDeEquiposSimuladosDto> equiposSimuladosControllerEstado({
+    required String id,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<EstadoDeEquiposSimuladosDto>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/equipos-simulados',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late EstadoDeEquiposSimuladosDto _value;
+    try {
+      _value = EstadoDeEquiposSimuladosDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<ResultadoDeSondeoDto> equiposControllerProbar({
     required String id,
     required AltaDeEquipoDto body,
@@ -268,6 +297,39 @@ class _EquiposApi implements EquiposApi {
   }
 
   @override
+  Future<ResultadoDeConfiguracionDto>
+  configuracionEnSitioControllerEnviarEventos({
+    required String id,
+    required String equipoId,
+    required MotivoDeConfiguracionDto body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body.toJson());
+    final _options = _setStreamType<ResultadoDeConfiguracionDto>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/equipos/${equipoId}/enviar-eventos-a-este-mac',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late ResultadoDeConfiguracionDto _value;
+    try {
+      _value = ResultadoDeConfiguracionDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<EquipoDto> equiposControllerReactivar({
     required String id,
     required String equipoId,
@@ -290,6 +352,39 @@ class _EquiposApi implements EquiposApi {
     late EquipoDto _value;
     try {
       _value = EquipoDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<ResultadoDeConfiguracionDto>
+  configuracionEnSitioControllerCambiarVerificacion({
+    required String id,
+    required String equipoId,
+    required VerificacionRemotaDto body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body.toJson());
+    final _options = _setStreamType<ResultadoDeConfiguracionDto>(
+      Options(method: 'PUT', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/equipos/${equipoId}/verificacion-remota',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late ResultadoDeConfiguracionDto _value;
+    try {
+      _value = ResultadoDeConfiguracionDto.fromJson(_result.data!);
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
       rethrow;

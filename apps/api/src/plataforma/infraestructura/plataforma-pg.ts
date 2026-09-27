@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 import type { Pool, PoolClient } from 'pg';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
+import { normalizarOrigen } from '../../comun/direccion-ip';
 import type {
   AjustesDePlataforma,
   EventoDeSeguridad,
@@ -40,8 +41,10 @@ const con = async <T>(
   }
 };
 
-const ipOnull = (ip: string | null): string | null =>
-  ip !== null && isIP(ip.replace(/^::ffff:/i, '')) !== 0 ? ip.replace(/^::ffff:/i, '') : null;
+const ipOnull = (ip: string | null): string | null => {
+  const direccion = normalizarOrigen(ip);
+  return isIP(direccion) !== 0 ? direccion : null;
+};
 
 export class AjustesDePlataformaPg implements AjustesDePlataforma {
   constructor(private readonly pool: Pool) {}

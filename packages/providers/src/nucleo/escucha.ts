@@ -30,4 +30,10 @@ export interface EscuchaActiva {
    * una petición. `null` si todavía no llegó nada.
    */
   ultimaSenal?(): Date | null;
+  /**
+   * C7 (15-L) · el equipo rechazó la conexión porque otra plataforma —p. ej.
+   * HikCentral— la tiene o agotó las que admite: la frase, con el remedio.
+   * `null` si no hay rechazo vigente.
+   */
+  rechazoPorOtraPlataforma?(): string | null;
 }

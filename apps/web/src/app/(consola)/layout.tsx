@@ -1,8 +1,9 @@
 import type { JSX } from 'react';
 import { redirect } from 'next/navigation';
 import type { Rol } from '@ncr/contracts';
-import { modoPruebasActivo, sesionActual } from '@/lib/sesion/servidor';
+import { avisoDeEquiposSimulados, modoPruebasActivo, sesionActual } from '@/lib/sesion/servidor';
 import { FranjaDeModoPruebas } from '@/componentes/franja-modo-pruebas';
+import { FranjaDeEquiposSimulados } from '@/componentes/franja-equipos-simulados';
 import { claimsVisibles, estadoDePorteria } from '@/lib/sesion/porteria';
 import { BloqueoDePatrullaje } from '@/componentes/bloqueo-de-patrullaje';
 import { MarcoDeConsola } from '@/componentes/marco-consola';
@@ -52,9 +53,13 @@ const LayoutDeConsola = async ({
   // activa.
   const alcance = await alcanceActivo();
   const enPruebas = await modoPruebasActivo();
+  // F3 (corrección de la 15-L) · con equipos simulados, ninguna orden llega a un aparato.
+  const simulados =
+    alcance.copropiedadId === null ? null : await avisoDeEquiposSimulados(alcance.copropiedadId);
 
   return (
     <ProveedorDeConsultas>
+      {simulados === null ? null : <FranjaDeEquiposSimulados texto={simulados} />}
       {enPruebas ? <FranjaDeModoPruebas /> : null}
       <MarcoDeConsola sesion={sesion} rol={sesion.rol as Rol} alcance={alcance} porteria={porteria}>
         {children}
