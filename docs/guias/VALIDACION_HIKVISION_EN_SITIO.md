@@ -74,17 +74,17 @@ charset=UTF-8`, el cuerpo con espacio de nombres y `version="2.0"` y el
 - [ ] **`apps/web/.env`**: **`API_URL=http://127.0.0.1:3000`**, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`; `PUENTE_VIDEO_URL` vacío (ADR-022).
       `API_URL` la resuelve el **servidor** de la consola, que corre en el mismo Mac que la API; el navegador nunca habla con ella (todo pasa por `/api/ncr`, [`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](CONSOLA_EN_RED_Y_DESPLIEGUE.md) §4). Con la IP del Mac en vez del bucle local, `next start` —que es producción— **no arranca**: exige `https` a toda API que no sea de bucle local (§2.7.8).
 - [ ] **go2rtc**: `pnpm sitio:video -- --preparar` con Internet, ANTES de salir (descarga el binario a `.sitio/bin/` y escribe `.sitio/go2rtc.yaml` desde `apps/api/.env`; [`INTEGRACION_HIKVISION.md`](INTEGRACION_HIKVISION.md) §6, punto 4). **Sin equipos ni credenciales en el fichero**: la API registra cada flujo al pedirlo (§3.3). En sitio, si la IP del Mac cambió, basta con repetir `pnpm sitio:video`.
-- [ ] **App en el iPhone físico** (Xcode con la cuenta de desarrollo, iPhone de confianza), compilada en **Debug**, que es la única configuración que permite HTTP a una IP privada ([`DESPLIEGUE.md`](DESPLIEGUE.md) §8.1):
+- [ ] **App en el iPhone físico** (Xcode con la cuenta de desarrollo, iPhone de confianza), compilada en **Release**, instalada una vez y abierta desde el ícono sin el Mac conectado ([`APP_EN_IPHONE.md`](APP_EN_IPHONE.md), ADR-033):
 
   ```
   cd apps/mobile
-  flutter run -d <id-del-iPhone> \
-    --dart-define=API_URL=http://<IP-del-Mac>:3000 \
+  flutter run --release -d <id-del-iPhone> \
+    --dart-define=API_URL=http://<nombre>.local:3000 \
     --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
     --dart-define=SUPABASE_PUBLISHABLE_KEY=<la PUBLICABLE, nunca la secreta>
   ```
 
-  Al primer uso, acepte los permisos de **cámara** (foto del visitante, hito 3) y de **red local** (H-SITIO-11: sin él, «No hay conexión con el servidor» aunque Safari abra la API). En Debug, un fallo de red muestra el panel de detalle con la URL compilada y el tipo de error: anótelo si aparece.
+  Al primer uso, acepte los permisos de **cámara** (foto del visitante, hito 3) y de **red local** (H-SITIO-11: sin él, «No hay conexión con el servidor» aunque Safari abra la API). Si la app no llega, «Cambiar servidor» con la dirección que sí abrió Safari. Con Apple ID gratuito la app caduca a los 7 días.
 
 - [ ] **Superadministrador** con MFA inscrito (arranque en frío: `scripts/registrar-copropiedad.mjs` y `scripts/aprovisionar-rol.mjs`).
 - [ ] **La copropiedad de prueba**, desde Configuración → Ajustes de plataforma (superadministrador): **código corto** (p. ej. `MIRA`; es el que teclean app y consola, D1), tipo y etiquetas de vivienda, **teléfono de portería** (D7) y tope de vehículos propios (2).

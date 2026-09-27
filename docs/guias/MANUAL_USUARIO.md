@@ -269,16 +269,16 @@ el sistema se lo dice en vez de dejarlo en una pantalla vacía.
 
 ### Las ocho pantallas
 
-| Pantalla        | Para qué                                        |
-| --------------- | ----------------------------------------------- |
-| Inicio          | Su vivienda, lo que está pasando ahora          |
-| Mi familia      | Los residentes de su vivienda                   |
-| Mis vehículos   | Sus placas                                      |
-| Nuevo visitante | **La pantalla principal**: autorizar una visita |
-| Zonas comunes   | Aforo actual y solicitud de acceso              |
-| Historial       | Quién entró a su vivienda, con filtros          |
-| Notificaciones  | Avisos de llegada y alertas                     |
-| Perfil          | Sus datos y sus preferencias de aviso           |
+| Pantalla        | Para qué                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| Inicio          | Su vivienda, lo que está pasando ahora                                                      |
+| Mi familia      | Los residentes de su vivienda                                                               |
+| Mis vehículos   | Sus placas                                                                                  |
+| Nuevo visitante | **La pantalla principal**: autorizar una visita                                             |
+| Zonas comunes   | Aforo actual y solicitud de acceso                                                          |
+| Historial       | Quién entró a su vivienda, con filtros                                                      |
+| Notificaciones  | Visitas rechazadas, con su motivo, e ingresos de sus visitantes; el contador está en Inicio |
+| Perfil          | Sus datos                                                                                   |
 
 ### Autorizar una visita
 
@@ -309,7 +309,17 @@ Debería llevarle **menos de un minuto** (KPI-10).
 - **La plantilla del rostro se borra sola** al terminar la visita, y de
   inmediato si portería la rechaza o si el visitante revoca su autorización
   (RN-11).
-- **Sin conexión** la app guarda lo que usted hizo y lo reintenta al volver.
+- **Sin conexión** la visita queda «Pendiente de envío», con su foto, y se envía
+  sola al volver la conexión, sin duplicarse.
+- **La app y la consola ven lo mismo** (ADR-033): cada visita dice si está
+  vigente, vencida o **rechazada, con el motivo** que escribió portería. Con la
+  app abierta, la pantalla se recarga sola cada 20 s; también al volver a la
+  app y al arrastrar hacia abajo.
+- **Los avisos llegan mientras la app está abierta.** No hay avisos con la app
+  cerrada.
+- **«Servidor»**, en la pantalla de acceso, dice a qué servidor se conecta la
+  app y permite cambiarlo si en sitio la app no llega (la dirección la da quien
+  instala; ver `APP_EN_IPHONE.md`). Cambiarlo cierra la sesión.
 
 ---
 

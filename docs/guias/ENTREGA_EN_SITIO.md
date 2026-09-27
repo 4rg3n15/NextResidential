@@ -39,7 +39,12 @@ Con Internet, en la oficina:
    `VIDEOPORTERO_*` (`HOST`, `PUERTO`, `USUARIO`, `CLAVE`, `CANAL`), con el
    usuario de servicio de cada uno. **Sólo en ese fichero**: ni en la hoja, ni en
    un documento, ni en una foto.
-5. La app en el iPhone, compilada en Debug desde el Mac ([`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) §2).
+5. La app en el iPhone, **compilada en Release** con el nombre `.local` del Mac
+   (`--dart-define=API_URL=http://<nombre>.local:3000`), instalada **una sola
+   vez** con cable y abierta después desde el ícono, sin cable ni Mac conectado
+   ([`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) §1–§2, ADR-033). Con Apple ID
+   gratuito **caduca a los 7 días**: instálela como mucho una semana antes y
+   apunte la fecha.
 6. Una carpeta de sitio **fuera del repositorio**: `mkdir -p $HOME/ncr-sitio`.
    Ahí van el respaldo, los informes y la bitácora. El ensayo se niega a
    escribir dentro del repositorio.
@@ -52,6 +57,7 @@ Con Internet, en la oficina:
 Cada uno en su terminal del Mac, en este orden:
 
 ```
+caffeinate -dimsu                                       # que el Mac no se duerma
 pnpm sitio:video                                        # go2rtc, primer plano
 pnpm --filter @ncr/api start 2>&1 | tee -a $HOME/ncr-sitio/api.log
 pnpm --filter @ncr/web start                            # consola en el 3100
@@ -67,6 +73,10 @@ Si la IP del Mac cambió respecto de la oficina, `pnpm sitio:video` la toma sola
 (`en0`); si no es esa interfaz, `VIDEO_IP_ANUNCIADA` en el `.env`. La consola se
 abre **por IP**: `http://<IP-del-Mac>:3100`. El audio de la guardia (micrófono)
 sólo en `http://127.0.0.1:3100`, que el navegador trata como contexto seguro.
+
+El **cortafuegos del Mac** tiene que aceptar conexiones entrantes de `node`
+(Ajustes del Sistema → Red → Cortafuegos → Opciones); si macOS pregunta al
+arrancar la API, **Permitir**. Sin eso, ni Safari ni la app del iPhone llegan.
 
 > **Si el paso 3 dice que faltan migraciones**, la API arrancada sin ellas falla
 > al leer dispositivos (la 0041 añade el canal de video). Pare la API, haga el
@@ -95,13 +105,25 @@ pnpm sitio:ensayo -- --solo-lectura
 
 Al principio imprime:
 
-| Línea                                       | Qué significa                     | Si falla                                                                  |
-| ------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------- |
-| API en marcha (127.0.0.1)                   | La API contesta en el propio Mac  | Arránquela (paso 1)                                                       |
-| La API contesta por la IP del Mac           | La contestará el iPhone           | Cortafuegos del Mac → permitir conexiones entrantes de `node`             |
-| ▶ iPhone: … abra `http://<IP>:3000/health` | La comprobación del iPhone        | Si Safari no la abre, es la red: misma Wi-Fi y **datos móviles apagados** |
-| Puente de video (go2rtc)                    | go2rtc contesta                   | `pnpm sitio:video`                                                        |
-| Migraciones                                 | La base tiene las del repositorio | Paso 3                                                                    |
+| Línea                                       | Qué significa                    | Si falla                                                                  |
+| ------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------- |
+| API en marcha (127.0.0.1)                   | La API contesta en el propio Mac | Arránquela (paso 1)                                                       |
+| La API contesta por la IP del Mac           | La contestará el iPhone          | Cortafuegos del Mac → permitir conexiones entrantes de `node`             |
+| ▶ iPhone: … abra `http://<IP>:3000/health` | La comprobación del iPhone       | Si Safari no la abre, es la red: misma Wi-Fi y **datos móviles apagados** |
+
+**Después, el iPhone** ([`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) §3):
+
+1. En Safari del iPhone, `http://<nombre>.local:3000/health`. Si no resuelve
+   el nombre, la red bloquea mDNS: pruebe `http://<IP-del-Mac>:3000/health`.
+2. Abra la app **desde el ícono** y entre.
+3. Si la app no llega: **«Cambiar servidor»** en la pantalla de acceso (o en la
+   pantalla de error) con la dirección que sí abrió Safari. La app pregunta a
+   `/health` antes de aceptarla y la guarda; cambiarla cierra la sesión.
+4. **Plan B de red:** el Mac con cable Ethernet a la red del conjunto (para
+   los equipos) y por Wi-Fi al Punto de acceso personal del iPhone; en la app,
+   «Cambiar servidor» con el nombre `.local` o la IP del Mac en esa red.
+   | Puente de video (go2rtc) | go2rtc contesta | `pnpm sitio:video` |
+   | Migraciones | La base tiene las del repositorio | Paso 3 |
 
 Y por cada equipo, los pasos que no mueven nada: conexión, hora y **zona**,
 configuración, eventos y video. En la última visita la cámara tenía **reloj y

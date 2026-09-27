@@ -1,31 +1,30 @@
 #!/usr/bin/env node
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * H-SITIO-11 · EL Info.plist DE iOS, COMPROBADO YA PREPROCESADO
+ * H-SITIO-11 · EL Info.plist DE iOS, TAL COMO LO CONSTRUYE CADA CONFIGURACIÓN
  *
- * Xcode preprocesa `ios/Runner/Info.plist` con el preprocesador de C
- * (`INFOPLIST_PREPROCESS`, A6) y sólo Debug define `NCR_DEPURACION`. Mirar el
- * fichero crudo no dice nada: las dos compilaciones salen de él y cada una ve
- * un plist distinto. Aquí se preprocesa COMO Xcode —C tradicional, sin
- * trigrafos, `-P`— en las dos variantes y se comprueba lo que cada una lleva:
+ * Corrección de la 15-L · la app se usa en sitio compilada en RELEASE y
+ * abierta desde el ícono, sin el Mac conectado. Lo que la app necesita para la
+ * red local tiene que ir en las TRES configuraciones del target Runner —Debug,
+ * Release y Profile—, no sólo en depuración:
  *
- *   Debug y Release · `NSLocalNetworkUsageDescription` con texto. Sin ella, en
- *                     un iPhone físico la app no llegaba a la API por la IP
- *                     privada y decía «No hay conexión con el servidor»
- *                     (H-SITIO-11). Safari sí: es de Apple.
- *   Debug           · `NSAppTransportSecurity › NSAllowsLocalNetworking = true`.
- *   Release         · SIN `NSAppTransportSecurity`: el binario distribuido sólo
- *                     habla HTTPS.
- *   Las dos         · jamás `NSAllowsArbitraryLoads`.
+ *   · `NSLocalNetworkUsageDescription` con texto. Sin ella, en un iPhone físico
+ *     la app no llegaba a la API por la IP privada y decía «No hay conexión con
+ *     el servidor» (H-SITIO-11). Safari sí: es de Apple. `dart:io` —el
+ *     transporte de Dio— abre sockets POSIX y NO pasa por ATS; la privacidad de
+ *     red local sí lo alcanza.
+ *   · `NSAppTransportSecurity › NSAllowsLocalNetworking = true`, para lo que sí
+ *     use el sistema de URL de Apple (un WebView, un plugin nativo).
+ *   · jamás `NSAllowsArbitraryLoads`, en ninguna.
  *
- * Y que los `.xcconfig` activan el preprocesado y definen la marca sólo en
- * Debug: si no, lo comprobado aquí no es lo que Xcode construye.
+ * Qué construye cada configuración se lee del proyecto de Xcode —el
+ * `baseConfigurationReference` de cada configuración del target cuyo
+ * `INFOPLIST_FILE` es `Runner/Info.plist`— y, si ese `.xcconfig` activa
+ * `INFOPLIST_PREPROCESS`, el plist se preprocesa COMO Xcode (C tradicional,
+ * `-P`) con sus definiciones. Así un `#if` que vuelva a dejar la excepción
+ * sólo en depuración se ve en Release y Profile, que es donde rompería.
  *
- * `dart:io` —el transporte de Dio en la app— abre sockets POSIX y NO pasa por
- * ATS; la privacidad de red local sí lo alcanza. Por eso la clave que faltaba
- * era ésta y no otra de ATS.
- *
- *   node scripts/lib/info-plist-ios.mjs [--plist <ruta>] [--xcconfig <dir>]
+ *   node scripts/lib/info-plist-ios.mjs [--plist <ruta>] [--xcconfig <dir>] [--pbxproj <ruta>]
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { execFileSync } from 'node:child_process';
@@ -38,6 +37,7 @@ const argumento = (nombre, porOmision) => {
 };
 const PLIST = argumento('--plist', 'apps/mobile/ios/Runner/Info.plist');
 const XCCONFIG = argumento('--xcconfig', 'apps/mobile/ios/Flutter');
+const PBXPROJ = argumento('--pbxproj', 'apps/mobile/ios/Runner.xcodeproj/project.pbxproj');
 
 /** El preprocesador de C que haya: `clang`/`cc` en macOS, `cpp` en Linux. */
 const preprocesar = (definiciones) => {
@@ -116,12 +116,72 @@ const contieneClave = (nodo, clave) =>
   Object.entries(nodo).some(([k, v]) => k === clave || contieneClave(v, clave));
 
 const fallos = [];
-const comprobar = (nombre, definiciones, exigirAts) => {
+
+/**
+ * Las configuraciones del target Runner y el `.xcconfig` de cada una, leídas
+ * del proyecto. Un bloque de configuración con `INFOPLIST_FILE =
+ * Runner/Info.plist` es del target de la app (el de pruebas no lo lleva).
+ */
+const configuraciones = () => {
+  let proyecto;
+  try {
+    proyecto = readFileSync(PBXPROJ, 'utf8');
+  } catch {
+    fallos.push(`no se pudo leer ${PBXPROJ}`);
+    return [];
+  }
+  // El nombre de la configuración es el de `name = …;` dentro del bloque, no
+  // el comentario que Xcode pone delante: el comentario no se lee al construir.
+  const bloques = [...proyecto.matchAll(/isa = XCBuildConfiguration;([\s\S]*?)\n\t\t\};/g)].map(
+    ([, cuerpo]) => cuerpo,
+  );
+  // Un bloque sin `name = …;` no es una configuración que Xcode construya: se
+  // queda fuera, y la que falte la señala la comprobación de las tres.
+  return bloques
+    .filter((cuerpo) => /INFOPLIST_FILE = Runner\/Info\.plist;/.test(cuerpo))
+    .flatMap((cuerpo) => {
+      const nombre = /\n\t\t\tname = (\w+);/.exec(cuerpo);
+      const base = /baseConfigurationReference = \w+ \/\* ([\w.]+\.xcconfig) \*\//.exec(cuerpo);
+      return nombre === null ? [] : [{ nombre: nombre[1], xcconfig: base?.[1] }];
+    });
+};
+
+const definicionesDe = (xcconfig) => {
+  const activa = /^\s*INFOPLIST_PREPROCESS\s*=\s*YES\s*$/m.test(xcconfig);
+  const lista = /^\s*INFOPLIST_PREPROCESSOR_DEFINITIONS\s*=(.*)$/m.exec(xcconfig)?.[1] ?? '';
+  return {
+    activa,
+    definiciones: lista
+      .trim()
+      .split(/\s+/)
+      .filter((d) => d !== '' && d !== '$(inherited)')
+      .map((d) => `-D${d}`),
+  };
+};
+
+const leerXcconfig = (nombre) => {
+  try {
+    return readFileSync(join(XCCONFIG, nombre), 'utf8').replace(/\/\/.*$/gm, '');
+  } catch {
+    fallos.push(`no se pudo leer ${join(XCCONFIG, nombre)}`);
+    return null;
+  }
+};
+
+const comprobar = ({ nombre, xcconfig }) => {
+  if (xcconfig === undefined) {
+    fallos.push(`${nombre}: la configuración no declara su .xcconfig`);
+    return;
+  }
+  const texto = leerXcconfig(xcconfig);
+  if (texto === null) return;
+  const { activa, definiciones } = definicionesDe(texto);
   let plist;
   try {
-    plist = leerPlist(preprocesar(definiciones));
+    plist = leerPlist(activa ? preprocesar(definiciones) : readFileSync(PLIST, 'utf8'));
   } catch (e) {
-    fallos.push(`${nombre}: ${e instanceof Error ? e.message : String(e)}`);
+    // Todo lo que se lanza aquí es un Error: el lector y el preprocesador.
+    fallos.push(`${nombre}: ${e.message}`);
     return;
   }
   const red = plist.NSLocalNetworkUsageDescription;
@@ -131,48 +191,33 @@ const comprobar = (nombre, definiciones, exigirAts) => {
         'la API por la IP privada (H-SITIO-11)',
     );
   }
-  const ats = plist.NSAppTransportSecurity;
-  if (exigirAts && ats?.NSAllowsLocalNetworking !== true) {
-    fallos.push(`${nombre}: falta NSAppTransportSecurity › NSAllowsLocalNetworking = true (A6)`);
-  }
-  if (!exigirAts && ats !== undefined) {
+  if (plist.NSAppTransportSecurity?.NSAllowsLocalNetworking !== true) {
     fallos.push(
-      `${nombre}: lleva NSAppTransportSecurity — la excepción de ATS viajaría en el binario`,
+      `${nombre}: falta NSAppTransportSecurity › NSAllowsLocalNetworking = true — la app ` +
+        'instalada en Release no llevaría la excepción de red local',
     );
   }
   if (contieneClave(plist, 'NSAllowsArbitraryLoads')) {
-    fallos.push(`${nombre}: lleva NSAllowsArbitraryLoads — nunca, ni en depuración`);
+    fallos.push(`${nombre}: lleva NSAllowsArbitraryLoads — nunca, en ninguna configuración`);
   }
 };
 
-const leerXcconfig = (nombre) => {
-  try {
-    return readFileSync(join(XCCONFIG, nombre), 'utf8');
-  } catch {
-    fallos.push(`no se pudo leer ${join(XCCONFIG, nombre)}`);
-    return '';
+const encontradas = configuraciones();
+for (const esperada of ['Debug', 'Release', 'Profile']) {
+  if (!encontradas.some((c) => c.nombre === esperada)) {
+    fallos.push(`el target Runner no tiene la configuración ${esperada}`);
   }
-};
-const debug = leerXcconfig('Debug.xcconfig');
-const release = leerXcconfig('Release.xcconfig');
-const activa = /^\s*INFOPLIST_PREPROCESS\s*=\s*YES\s*$/m;
-const marca = /^\s*INFOPLIST_PREPROCESSOR_DEFINITIONS\s*=.*\bNCR_DEPURACION=1\b/m;
-if (!activa.test(debug)) fallos.push('Debug.xcconfig no activa INFOPLIST_PREPROCESS');
-if (!marca.test(debug)) fallos.push('Debug.xcconfig no define NCR_DEPURACION=1');
-if (!activa.test(release)) fallos.push('Release.xcconfig no activa INFOPLIST_PREPROCESS');
-if (/NCR_DEPURACION/.test(release.replace(/\/\/.*$/gm, ''))) {
-  fallos.push('Release.xcconfig define NCR_DEPURACION: la excepción de ATS llegaría a Release');
 }
-
-comprobar('Debug', ['-DNCR_DEPURACION=1'], true);
-comprobar('Release', [], false);
+for (const c of encontradas) comprobar(c);
 
 if (fallos.length > 0) {
-  console.error('FALLO el Info.plist de iOS, preprocesado como en Xcode, no es el esperado:');
+  console.error(
+    'FALLO el Info.plist de iOS, como lo construye cada configuración, no es el esperado:',
+  );
   for (const f of fallos) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
 console.log(
-  'OK Info.plist preprocesado: Debug y Release piden red local; ATS local sólo en Debug; ' +
-    'nunca NSAllowsArbitraryLoads',
+  `OK Info.plist en ${encontradas.map((c) => c.nombre).join(', ')}: red local pedida y ` +
+    'ATS relajado sólo para lo local en todas; nunca NSAllowsArbitraryLoads',
 );

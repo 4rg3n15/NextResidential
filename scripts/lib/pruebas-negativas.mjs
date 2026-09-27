@@ -2805,127 +2805,161 @@ try {
   }
 
   console.log(
-    '\n▸ 34 · un Info.plist de iOS que pierde la red local o suelta ATS se detecta (H-SITIO-11)',
+    '\n▸ 34 · un Info.plist de iOS que pierde la red local, o la deja sólo en depuración, se detecta (H-SITIO-11)',
   );
   {
     /**
      * En sitio, un iPhone físico no alcanzaba la API por la IP privada:
-     * faltaba `NSLocalNetworkUsageDescription`. El control preprocesa el plist
-     * como Xcode; aquí se le dan variantes rotas en el banco.
+     * faltaba `NSLocalNetworkUsageDescription`. Y la corrección de la 15-L
+     * exige la app en RELEASE, abierta desde el ícono: la excepción de red
+     * local va en Debug, Release y Profile. El control lee cada configuración
+     * como la construye Xcode; aquí se le dan variantes rotas en el banco.
      */
     if (exigeControl('scripts/lib/info-plist-ios.mjs')) {
       const original = readFileSync(join(raiz, 'apps/mobile/ios/Runner/Info.plist'), 'utf8');
+      const pbxproj = readFileSync(
+        join(raiz, 'apps/mobile/ios/Runner.xcodeproj/project.pbxproj'),
+        'utf8',
+      );
+      const debugXc = readFileSync(join(raiz, 'apps/mobile/ios/Flutter/Debug.xcconfig'), 'utf8');
+      const releaseXc = readFileSync(
+        join(raiz, 'apps/mobile/ios/Flutter/Release.xcconfig'),
+        'utf8',
+      );
       const sonda = join(banco, 'Info-sonda.plist');
+      const proyecto = join(banco, 'project-sonda.pbxproj');
+      const xc = join(banco, 'xcconfig-sonda');
+      mkdirSync(xc, { recursive: true });
+      const preparar = ({
+        plist = original,
+        debug = debugXc,
+        release = releaseXc,
+        pbx = pbxproj,
+      } = {}) => {
+        writeFileSync(sonda, plist);
+        writeFileSync(proyecto, pbx);
+        writeFileSync(join(xc, 'Debug.xcconfig'), debug);
+        writeFileSync(join(xc, 'Release.xcconfig'), release);
+      };
       const control = () =>
         correr('node', [
           'scripts/lib/info-plist-ios.mjs',
           '--plist',
           sonda,
           '--xcconfig',
-          join(raiz, 'apps/mobile/ios/Flutter'),
+          xc,
+          '--pbxproj',
+          proyecto,
         ]);
 
-      writeFileSync(sonda, original);
-      control().codigo === 0
-        ? ok('el Info.plist del repositorio pasa: línea base limpia')
-        : mal(`el Info.plist del repositorio NO pasa: ${control().salida.split('\n')[1] ?? ''}`);
+      preparar();
+      const base = control();
+      base.codigo === 0 &&
+      /Debug/.test(base.salida) &&
+      /Release/.test(base.salida) &&
+      /Profile/.test(base.salida)
+        ? ok('el Info.plist del repositorio pasa en Debug, Release y Profile: línea base limpia')
+        : mal(`el Info.plist del repositorio NO pasa: ${base.salida.split('\n')[1] ?? ''}`);
 
-      writeFileSync(
-        sonda,
-        original.replace(
+      preparar({
+        plist: original.replace(
           /<key>NSLocalNetworkUsageDescription<\/key>\s*<string>[^<]*<\/string>/,
           '',
         ),
-      );
+      });
       const a = control();
-      a.codigo !== 0 && /NSLocalNetworkUsageDescription/.test(a.salida)
+      a.codigo !== 0 && /Release: falta NSLocalNetworkUsageDescription/.test(a.salida)
         ? ok('sin la clave de red local se detecta (el síntoma de sitio)')
         : mal(`sin la clave de red local NO se detecta (codigo ${a.codigo})`);
 
-      // ATS fuera del bloque de depuración: llegaría al binario de Release.
-      writeFileSync(sonda, original.replace(/#if NCR_DEPURACION/, '#if 1'));
+      // La reversión exacta de esta corrección: ATS sólo bajo una marca que
+      // sólo Debug define, con el plist preprocesado como en la 15-K.
+      preparar({
+        plist: original.replace(
+          /(<key>NSAppTransportSecurity<\/key>\s*<dict>[\s\S]*?<\/dict>)/,
+          '<!--\n#if NCR_DEPURACION\n-->\n$1\n<!--\n#endif\n-->',
+        ),
+        debug: `${debugXc}\nINFOPLIST_PREPROCESS = YES\nINFOPLIST_PREPROCESSOR_DEFINITIONS = NCR_DEPURACION=1\n`,
+        release: `${releaseXc}\nINFOPLIST_PREPROCESS = YES\n`,
+      });
       const b = control();
-      b.codigo !== 0 && /Release: lleva NSAppTransportSecurity/.test(b.salida)
-        ? ok('la excepción de ATS en Release se detecta')
-        : mal(`ATS en Release NO se detecta (codigo ${b.codigo})`);
+      b.codigo !== 0 &&
+      /Release: falta NSAppTransportSecurity/.test(b.salida) &&
+      /Profile: falta NSAppTransportSecurity/.test(b.salida) &&
+      !/Debug: falta/.test(b.salida)
+        ? ok('la excepción de red local sólo en depuración se detecta en Release y en Profile')
+        : mal(`ATS sólo en depuración NO se detecta (codigo ${b.codigo})`);
 
-      writeFileSync(
-        sonda,
-        original.replace(
+      preparar({
+        plist: original.replace(
           '<key>NSAllowsLocalNetworking</key>',
           '<key>NSAllowsArbitraryLoads</key><true/><key>NSAllowsLocalNetworking</key>',
         ),
-      );
+      });
       const c = control();
       c.codigo !== 0 && /NSAllowsArbitraryLoads/.test(c.salida)
-        ? ok('NSAllowsArbitraryLoads se detecta, aunque sea sólo en Debug')
+        ? ok('NSAllowsArbitraryLoads se detecta')
         : mal(`NSAllowsArbitraryLoads NO se detecta (codigo ${c.codigo})`);
 
-      writeFileSync(sonda, original.replace('</dict>\n</plist>', '</plist>'));
+      preparar({ plist: original.replace('</dict>\n</plist>', '</plist>') });
       control().codigo !== 0
         ? ok('un plist mal formado es un fallo, no un «no encontrado»')
         : mal('un plist mal formado pasa');
 
-      // Sin el bloque de ATS: la app de depuración no alcanzaría la API por HTTP.
-      writeFileSync(
-        sonda,
-        original.replace(/<key>NSAppTransportSecurity<\/key>\s*<dict>[\s\S]*?<\/dict>/, ''),
-      );
+      preparar({
+        plist: original.replace(/<key>NSAppTransportSecurity<\/key>\s*<dict>[\s\S]*?<\/dict>/, ''),
+      });
       const d = control();
       d.codigo !== 0 && /Debug: falta NSAppTransportSecurity/.test(d.salida)
-        ? ok('Debug sin la excepción de red local se detecta')
-        : mal(`Debug sin ATS local NO se detecta (codigo ${d.codigo})`);
+        ? ok('sin la excepción de red local se detecta')
+        : mal(`sin ATS local NO se detecta (codigo ${d.codigo})`);
 
-      /**
-       * 15-K · las ramas de los .xcconfig, que el trinquete encontró sin
-       * ejercer: el plist puede estar bien y la compilación, no. Se copian al
-       * banco y se rompen allí.
-       */
-      writeFileSync(sonda, original);
-      const xc = join(banco, 'xcconfig-sonda');
-      mkdirSync(xc, { recursive: true });
-      const debugXc = readFileSync(join(raiz, 'apps/mobile/ios/Flutter/Debug.xcconfig'), 'utf8');
-      const releaseXc = readFileSync(
-        join(raiz, 'apps/mobile/ios/Flutter/Release.xcconfig'),
-        'utf8',
-      );
-      const conXc = () =>
-        correr('node', ['scripts/lib/info-plist-ios.mjs', '--plist', sonda, '--xcconfig', xc]);
+      // Profile sin su configuración: lo que no se construye no se comprueba.
+      preparar({ pbx: pbxproj.replace(/name = Profile;/g, 'name = Otra;') });
+      const e = control();
+      e.codigo !== 0 && /no tiene la configuración Profile/.test(e.salida)
+        ? ok('un proyecto sin la configuración Profile es un fallo, no un silencio')
+        : mal(`sin Profile NO se detecta (codigo ${e.codigo})`);
 
-      writeFileSync(join(xc, 'Debug.xcconfig'), debugXc);
-      writeFileSync(
-        join(xc, 'Release.xcconfig'),
-        `${releaseXc}\nINFOPLIST_PREPROCESSOR_DEFINITIONS = NCR_DEPURACION=1\n`,
-      );
-      const e = conXc();
-      e.codigo !== 0 && /Release\.xcconfig define NCR_DEPURACION/.test(e.salida)
-        ? ok('Release.xcconfig que define NCR_DEPURACION se detecta: ATS llegaría al binario')
-        : mal(`NCR_DEPURACION en Release NO se detecta (codigo ${e.codigo})`);
-
-      writeFileSync(
-        join(xc, 'Debug.xcconfig'),
-        debugXc.replace(/^INFOPLIST_PREPROCESS.*$/gm, '// quitado por la sonda'),
-      );
-      writeFileSync(
-        join(xc, 'Release.xcconfig'),
-        releaseXc.replace(/^INFOPLIST_PREPROCESS.*$/gm, '// quitado por la sonda'),
-      );
-      const f = conXc();
-      f.codigo !== 0 &&
-      /Debug\.xcconfig no activa/.test(f.salida) &&
-      /Debug\.xcconfig no define NCR_DEPURACION/.test(f.salida) &&
-      /Release\.xcconfig no activa/.test(f.salida)
-        ? ok('los .xcconfig sin preprocesado ni marca de depuración se detectan, los tres')
-        : mal(`los .xcconfig rotos NO se detectan (codigo ${f.codigo})`);
-
-      rmSync(join(xc, 'Debug.xcconfig'), { force: true });
-      const g = conXc();
-      g.codigo !== 0 && /no se pudo leer/.test(g.salida)
+      preparar();
+      rmSync(join(xc, 'Release.xcconfig'), { force: true });
+      const f = control();
+      f.codigo !== 0 && /no se pudo leer/.test(f.salida)
         ? ok('un .xcconfig que falta es un fallo, no un silencio')
-        : mal(`un .xcconfig que falta NO se detecta (codigo ${g.codigo})`);
+        : mal(`un .xcconfig que falta NO se detecta (codigo ${f.codigo})`);
+
+      // Sin el proyecto no se sabe qué construye cada configuración.
+      preparar();
+      rmSync(proyecto, { force: true });
+      const g = control();
+      g.codigo !== 0 && /no se pudo leer .*project-sonda\.pbxproj/.test(g.salida)
+        ? ok('un proyecto de Xcode que falta es un fallo, no un «todo en orden»')
+        : mal(`sin el proyecto de Xcode NO se detecta (codigo ${g.codigo})`);
+
+      // Release (y Profile, que lo usa) sin su .xcconfig: no se sabe si
+      // preprocesa, así que no se da por buena.
+      preparar({
+        pbx: pbxproj.replace(
+          /\t+baseConfigurationReference = \w+ \/\* Release\.xcconfig \*\/;\n/g,
+          '',
+        ),
+      });
+      const h = control();
+      h.codigo !== 0 &&
+      /Release: la configuración no declara su \.xcconfig/.test(h.salida) &&
+      /Profile: la configuración no declara su \.xcconfig/.test(h.salida)
+        ? ok('una configuración sin .xcconfig es un fallo, no un plist leído a ciegas')
+        : mal(`una configuración sin .xcconfig NO se detecta (codigo ${h.codigo})`);
+
+      preparar({ plist: original.replace('</plist>', '<dict/>\n</plist>') });
+      const i = control();
+      i.codigo !== 0 && /contenido después del <dict> raíz/.test(i.salida)
+        ? ok('lo que sobra tras el <dict> raíz es un fallo')
+        : mal(`contenido tras el <dict> raíz NO se detecta (codigo ${i.codigo})`);
 
       rmSync(xc, { recursive: true, force: true });
       rmSync(sonda, { force: true });
+      rmSync(proyecto, { force: true });
     }
   }
 
