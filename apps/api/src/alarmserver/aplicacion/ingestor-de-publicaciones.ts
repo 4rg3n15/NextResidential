@@ -107,7 +107,38 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     private readonly registroDeEvidencia: RegistroDeEvidencia = registroSinBase,
   ) {}
 
+  /**
+   * §4 (15-K) · UNA LÍNEA `info` POR CADA EVENTO QUE LLEGA DE UN EQUIPO: tipo,
+   * equipo y resultado. En sitio había que buscar entre veinte mensajes para
+   * saber si un evento había entrado; ahora sale uno por evento, siempre con
+   * la misma forma, también cuando se descarta o falla.
+   */
   async ingerir(publicacion: PublicacionDeEquipo): Promise<ResultadoDeIngesta> {
+    const { evento, transporte } = publicacion;
+    const linea = {
+      tipo: evento.clase,
+      dispositivoId: evento.dispositivoId,
+      transporte,
+    };
+    try {
+      const resultado = await this.procesar(publicacion);
+      this.bitacora.registrar('info', 'evento de equipo', {
+        ...linea,
+        resultado: resultado.registrado ? 'registrado' : 'no registrado',
+        ...(resultado.motivo === null ? {} : { motivo: resultado.motivo }),
+      });
+      return resultado;
+    } catch (error) {
+      this.bitacora.registrar('error', 'evento de equipo', {
+        ...linea,
+        resultado: 'falló',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  private async procesar(publicacion: PublicacionDeEquipo): Promise<ResultadoDeIngesta> {
     const evento = publicacion.evento;
     const copropiedadId = this.copropiedadDe(evento.dispositivoId);
     if (copropiedadId === null) {

@@ -4,7 +4,12 @@ import {
   ConfiguracionDeBarreraIncompleta,
   crearControlDeBarreraDesdeEntorno,
 } from './desde-entorno';
-import { SesionDigest, construirAutorizacion, interpretarDesafio } from './digest';
+import {
+  SesionDigest,
+  construirAutorizacion,
+  interpretarDesafio,
+  sesionDigestCompartida,
+} from './digest';
 
 /**
  * El adaptador de barrera, **sin red y sin equipo**.
@@ -18,7 +23,7 @@ const DESAFIO =
 
 const respuestaOk = (): Response =>
   new Response(
-    '<?xml version="1.0" encoding="UTF-8"?><ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString></ResponseStatus>',
+    '<?xml version="1.0" encoding="UTF-8"?><ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString><subStatusCode>ok</subStatusCode></ResponseStatus>',
     { status: 200 },
   );
 
@@ -245,6 +250,39 @@ describe('Digest MD5', () => {
     expect(interpretarDesafio(null)).toBeNull();
   });
 
+  it('H-SITIO-12 · lee `stale` y distingue el nonce vencido de un desafío normal', () => {
+    expect(interpretarDesafio(DESAFIO)?.stale).toBe(false);
+    expect(interpretarDesafio(DESAFIO.replace('stale="FALSE"', 'stale="TRUE"'))?.stale).toBe(true);
+    expect(interpretarDesafio('Digest realm="r", nonce="n"')?.stale).toBe(false);
+  });
+
+  it('H-SITIO-12 · con Basic y Digest en la misma cabecera, toma el Digest entero', () => {
+    // `fetch` une las cabeceras repetidas con «, »: el `realm` del Basic no
+    // puede pisar el del Digest.
+    const d = interpretarDesafio(
+      'Basic realm="basico", Digest realm="IP Camera(C1)", nonce="n1", qop="auth"',
+    );
+    expect(d?.realm).toBe('IP Camera(C1)');
+    expect(d?.nonce).toBe('n1');
+    const alReves = interpretarDesafio('Digest realm="r2", nonce="n2", Basic realm="basico"');
+    expect(alReves?.realm).toBe('r2');
+  });
+
+  it('H-SITIO-12 · la sesión compartida es UNA por equipo y transporte', () => {
+    const transporte = {};
+    const a = sesionDigestCompartida(transporte, 'http://h:80', { usuario: 'u', clave: 'c' });
+    const b = sesionDigestCompartida(transporte, 'http://h:80', { usuario: 'u', clave: 'c' });
+    expect(a).toBe(b);
+    // Otro equipo, otro transporte o la clave cambiada: sesión distinta.
+    expect(
+      sesionDigestCompartida(transporte, 'http://otro:80', { usuario: 'u', clave: 'c' }),
+    ).not.toBe(a);
+    expect(sesionDigestCompartida({}, 'http://h:80', { usuario: 'u', clave: 'c' })).not.toBe(a);
+    expect(
+      sesionDigestCompartida(transporte, 'http://h:80', { usuario: 'u', clave: 'x' }),
+    ).not.toBe(a);
+  });
+
   it('el contador `nc` avanza mientras el desafío se reutiliza', () => {
     const sesion = new SesionDigest({ usuario: 'u', clave: 'c' }, () => 'cn');
     expect(sesion.autorizacionPara('PUT', '/x')).toBeNull();
@@ -276,14 +314,52 @@ describe('Digest MD5', () => {
   it('renegocia ante un 401 TARDÍO y la orden acaba aceptada', async () => {
     // El equipo caduca el desafío a mitad de la sesión. Sin renegociar, la
     // orden se perdería y el operador vería un rechazo que no lo es.
-    const { barrera, llamadas } = control([respuesta401, respuestaOk, respuesta401, respuestaOk]);
+    const vencido = (): Response =>
+      new Response('', {
+        status: 401,
+        headers: {
+          'www-authenticate': DESAFIO.replace('4e4f4e43453a313233', 'otro-nonce').replace(
+            'stale="FALSE"',
+            'stale="TRUE"',
+          ),
+        },
+      });
+    const { barrera, llamadas } = control([respuesta401, respuestaOk, vencido, respuestaOk]);
     await barrera.accionar('d1', true);
     const r = await barrera.accionar('d1', true);
 
     expect(r.estado).toBe('aceptada');
     expect(llamadas).toHaveLength(4);
-    // Tras el desafío nuevo, el contador vuelve a empezar.
+    // Tras el desafío NUEVO, el contador vuelve a empezar.
     expect(llamadas[3]!.autorizacion).toContain('nc=00000001');
+    expect(llamadas[3]!.autorizacion).toContain('nonce="otro-nonce"');
+  });
+
+  it('H-SITIO-12 · si el equipo repite el MISMO nonce, el contador NO se reinicia', async () => {
+    // Reiniciarlo reenviaba `nc=00000001` ya usado: el equipo lo rechazaba otra
+    // vez y la orden salía como «credenciales». Así cayó la segunda orden de
+    // cada equipo en sitio.
+    const { barrera, llamadas } = control([respuesta401, respuestaOk, respuesta401, respuestaOk]);
+    await barrera.accionar('d1', true);
+    const r = await barrera.accionar('d1', true);
+
+    expect(r.estado).toBe('aceptada');
+    expect(llamadas[2]!.autorizacion).toContain('nc=00000002');
+    expect(llamadas[3]!.autorizacion).toContain('nc=00000003');
+  });
+
+  it('H-SITIO-12 · dos 401 con stale=true NO se leen como credenciales', async () => {
+    const vencido = (): Response =>
+      new Response('', {
+        status: 401,
+        headers: { 'www-authenticate': DESAFIO.replace('stale="FALSE"', 'stale="TRUE"') },
+      });
+    const { barrera, llamadas } = control([vencido, vencido]);
+    const r = await barrera.accionar('d1', true);
+    expect(r.estado).toBe('rechazada');
+    expect(r.estado === 'rechazada' ? r.motivo : '').toMatch(/no es la clave/);
+    // Y tampoco se insiste: dos viajes.
+    expect(llamadas).toHaveLength(2);
   });
 });
 

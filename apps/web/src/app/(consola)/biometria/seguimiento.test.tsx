@@ -46,6 +46,7 @@ const montar = (): void => {
       copropiedadId={COP}
       consentimientoId={CONSENTIMIENTO}
       plantillaId={PLANTILLA}
+      versionPolitica="v1"
     />,
   );
 };
@@ -92,6 +93,23 @@ describe('SeguimientoDeConsentimiento', () => {
     expect(Number(qr.getAttribute('data-modulos'))).toBeGreaterThanOrEqual(21);
     expect(qr.querySelectorAll('rect').length).toBeGreaterThan(50);
     expect(screen.getByText(/un solo uso/)).toBeTruthy();
+  });
+
+  it('H-SITIO-10 · con una URL de bucle local AVISA que ningún otro aparato la abre', async () => {
+    respuestas[`/copropiedades/${COP}/biometria/consentimientos/${CONSENTIMIENTO}/enlace`] = () =>
+      json({
+        consentimientoId: CONSENTIMIENTO,
+        estado: 'pendiente',
+        token: 'abc.def',
+        ruta: '/consentimiento/abc.def',
+        url: 'http://127.0.0.1:3000/consentimiento/abc.def',
+        alcance: 'bucle_local',
+        expiraEn: new Date(Date.now() + 3_600_000).toISOString(),
+      });
+    montar();
+    fireEvent.click(screen.getByRole('button', { name: /Generar enlace para el titular/ }));
+    const aviso = await screen.findByText(/NO se abre desde otro aparato/);
+    expect(aviso.getAttribute('role')).toBe('alert');
   });
 
   it('sin aceptación del titular NO sincroniza: lo comprueba y lo dice', async () => {
@@ -147,5 +165,94 @@ describe('SeguimientoDeConsentimiento', () => {
     montar();
     fireEvent.click(screen.getByRole('button', { name: /Generar enlace para el titular/ }));
     await screen.findByRole('alert');
+  });
+
+  describe('D-10 · consentimiento presencial: lo llena el TITULAR', () => {
+    const RUTA = `/copropiedades/${COP}/biometria/consentimientos/${CONSENTIMIENTO}/aceptacion-presencial`;
+    const abrir = (): HTMLFormElement => {
+      fireEvent.click(screen.getByRole('button', { name: /El titular está aquí/ }));
+      return screen.getByRole('form', { name: /Consentimiento presencial del titular/ });
+    };
+    const cuerpoEnviado = async (): Promise<Record<string, unknown>> => {
+      const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+      const peticion = (espia.mock.calls as [Request][])
+        .map(([r]) => r)
+        .find((r) => r instanceof Request && r.url.endsWith('/aceptacion-presencial'));
+      if (peticion === undefined) throw new Error('no se envió');
+      return (await peticion.clone().json()) as Record<string, unknown>;
+    };
+
+    it('los campos llegan VACÍOS y el envío exige nombre, documento y la declaración', () => {
+      montar();
+      const formulario = abrir();
+      const nombre = screen.getByLabelText('Su nombre completo') as HTMLInputElement;
+      const documento = screen.getByLabelText('Su número de documento') as HTMLInputElement;
+      expect(nombre.value).toBe('');
+      expect(documento.value).toBe('');
+      expect(formulario.textContent).toContain('versión v1');
+      const enviar = screen.getByRole('button', { name: 'Registrar mi consentimiento' });
+      expect((enviar as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.change(nombre, { target: { value: 'Visitante Uno' } });
+      fireEvent.change(documento, { target: { value: '10203040' } });
+      expect((enviar as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(screen.getByRole('checkbox'));
+      expect((enviar as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('envía lo escrito con la versión mostrada, sincroniza y vacía el formulario', async () => {
+      respuestas[RUTA] = () =>
+        json(
+          {
+            estado: 'vigente',
+            propagacion: [
+              {
+                plantillaId: PLANTILLA,
+                terminales: 2,
+                sincronizadas: 2,
+                fallidas: 0,
+                porTerminal: [],
+              },
+            ],
+          },
+          201,
+        );
+      montar();
+      abrir();
+      fireEvent.change(screen.getByLabelText('Su nombre completo'), {
+        target: { value: 'Visitante Uno' },
+      });
+      fireEvent.change(screen.getByLabelText('Su número de documento'), {
+        target: { value: '10.203.040' },
+      });
+      fireEvent.click(screen.getByRole('checkbox'));
+      fireEvent.click(screen.getByRole('button', { name: 'Registrar mi consentimiento' }));
+      await waitFor(() => expect(screen.getByText(/2 de 2/)).toBeTruthy());
+      expect(await cuerpoEnviado()).toEqual({
+        nombreCompleto: 'Visitante Uno',
+        numeroDocumento: '10.203.040',
+        versionPolitica: 'v1',
+        aceptaPolitica: true,
+      });
+      // Vigente: el formulario se cierra y el documento no queda en pantalla.
+      expect(screen.queryByLabelText('Su número de documento')).toBeNull();
+      expect(screen.queryByRole('button', { name: /El titular está aquí/ })).toBeNull();
+    });
+
+    it('si no coincide con el titular, lo dice y NO se cierra', async () => {
+      respuestas[RUTA] = () =>
+        json({ estado: 403, mensaje: 'El nombre o el documento escritos no coinciden' }, 403);
+      montar();
+      abrir();
+      fireEvent.change(screen.getByLabelText('Su nombre completo'), {
+        target: { value: 'Otra Persona' },
+      });
+      fireEvent.change(screen.getByLabelText('Su número de documento'), {
+        target: { value: '99999999' },
+      });
+      fireEvent.click(screen.getByRole('checkbox'));
+      fireEvent.click(screen.getByRole('button', { name: 'Registrar mi consentimiento' }));
+      await screen.findByRole('alert');
+      expect(screen.getByLabelText('Su número de documento')).toBeTruthy();
+    });
   });
 });

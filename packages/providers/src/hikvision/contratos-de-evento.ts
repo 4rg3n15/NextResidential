@@ -1,3 +1,5 @@
+import { plantillaDesdeElEquipo } from '../terminal/identificador-en-el-equipo';
+
 /**
  * Los DOS contratos de evento de Hikvision, y por qué son dos.
  *
@@ -460,6 +462,12 @@ export interface BloqueDeAlertStream {
   readonly AccessControllerEvent?: {
     readonly employeeNoString?: string;
     readonly employeeNo?: string | number;
+    /**
+     * H-SITIO-14 · en la terminal, `currentEvent` viaja AQUÍ DENTRO, no en la
+     * raíz del bloque: el ejemplo de la guía («Receive Verification Requests
+     * from Device») lo pone junto a `serialNo` y `remoteCheck`.
+     */
+    readonly currentEvent?: boolean;
     readonly remoteCheck?: boolean;
     /** A2 · el resultado de una verificación ya contestada: informativo. */
     readonly remoteCheckResult?: boolean | string | number;
@@ -537,7 +545,59 @@ export const claseDeBloque = (bloque: BloqueDeAlertStream): ClaseDeEvento => {
  * (ADR-05) y avisar a residentes de visitas de hace semanas.
  */
 export const esEventoEnVivo = (bloque: BloqueDeAlertStream): boolean =>
-  bloque.currentEvent === true;
+  bloque.currentEvent === true || bloque.AccessControllerEvent?.currentEvent === true;
+
+/**
+ * H-SITIO-14 · el MOTIVO por el que un bloque no es un evento en vivo, para
+ * la bitácora. En sitio una persona pasó por la terminal y no quedó ni una
+ * línea: el bloque llegó con `currentEvent` dentro de `AccessControllerEvent`,
+ * se leyó en la raíz, se tomó por histórico y se contó sin decir nada.
+ */
+export const motivoDeDescarte = (bloque: BloqueDeAlertStream): string | null => {
+  if (/heartbeat/i.test(bloque.eventType ?? '')) return 'latido del equipo';
+  if (esEventoEnVivo(bloque)) return null;
+  const declarado = bloque.currentEvent ?? bloque.AccessControllerEvent?.currentEvent;
+  return declarado === false
+    ? 'histórico: el equipo lo marca currentEvent=false'
+    : 'sin currentEvent: se trata como histórico (dirección segura, ADR-05)';
+};
+
+/**
+ * H-SITIO-14 · una parte XML del flujo. La guía dice que el enlace de armado
+ * lleva `<SubscribeEventResponse/>` primero y `<EventNotificationAlert/>` (el
+ * evento o el latido) después. Se leen los campos que el resto del sistema
+ * usa; lo demás no se inventa. DOCUMENTADO, NO VERIFICADO en estos modelos.
+ */
+export const bloqueDesdeXml = (
+  xml: string,
+): BloqueDeAlertStream | 'respuesta_de_suscripcion' | null => {
+  if (/<SubscribeEventResponse\b/i.test(xml)) return 'respuesta_de_suscripcion';
+  if (!/<EventNotificationAlert\b/i.test(xml)) return null;
+  const actual = etiqueta(xml, 'currentEvent');
+  const canal = etiqueta(xml, 'channelID');
+  const persona = etiqueta(xml, 'employeeNoString') ?? etiqueta(xml, 'employeeNo');
+  const tipo = etiqueta(xml, 'eventType');
+  const bloque: BloqueDeAlertStream = {
+    ...(tipo === null ? {} : { eventType: tipo }),
+    ...(etiqueta(xml, 'eventState') === null
+      ? {}
+      : { eventState: etiqueta(xml, 'eventState') as string }),
+    ...(etiqueta(xml, 'dateTime') === null
+      ? {}
+      : { dateTime: etiqueta(xml, 'dateTime') as string }),
+    ...(actual === null ? {} : { currentEvent: actual === 'true' }),
+    ...(canal === null ? {} : { channelID: canal }),
+    ...(persona === null && !/AccessController/i.test(tipo ?? '')
+      ? {}
+      : {
+          AccessControllerEvent: {
+            ...(persona === null ? {} : { employeeNoString: persona }),
+            ...(actual === null ? {} : { currentEvent: actual === 'true' }),
+          },
+        }),
+  };
+  return bloque;
+};
 
 export const desdeAlertStreamJson = (
   bloque: BloqueDeAlertStream,
@@ -588,7 +648,9 @@ export const desdeAlertStreamJson = (
     enVivo: esEventoEnVivo(bloque),
     referenciaDelEquipo:
       bloque.channelID === undefined ? null : `${dispositivoId}:${bloque.channelID}`,
-    personaId: personaId === null || personaId === '' ? null : personaId,
+    // H-SITIO-04 · la terminal devuelve el identificador compacto (sin guiones)
+    // con que se dio de alta; se vuelve al de la plantilla.
+    personaId: personaId === null || personaId === '' ? null : plantillaDesdeElEquipo(personaId),
     esperaVeredicto: acceso?.remoteCheck === true && !esResultado,
     serieDelEquipo: serie === null || Number.isNaN(serie) ? null : serie,
     esResultadoDeVerificacion: esResultado,

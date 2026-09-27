@@ -1,4 +1,7 @@
-import { SesionDigest, cnonceAleatorio } from '../barrera/digest';
+import type { Bitacora } from '@ncr/domain-core';
+import { cnonceAleatorio, interpretarDesafio, sesionDigestCompartida } from '../barrera/digest';
+import type { Renegociacion, SesionDigest } from '../barrera/digest';
+import { intercambioParaBitacora } from './intercambio';
 
 /**
  * EL CLIENTE QUE HABLA CON UN EQUIPO. Uno solo, para los tres aparatos.
@@ -39,6 +42,14 @@ export interface OpcionesDeEquipo {
   readonly peticion?: typeof fetch;
   readonly ahora?: () => number;
   readonly generarCnonce?: () => string;
+  /**
+   * H-SITIO-12/13/14 · a dónde va lo que en sitio no se veía: renegociaciones
+   * del Digest, intercambios de órdenes y el flujo de eventos. Sin ella, el
+   * cliente calla — que es lo que hacía hasta la 15-K.
+   */
+  readonly traza?: Bitacora;
+  /** Para la bitácora: el equipo al que pertenece este cliente. */
+  readonly dispositivoId?: string;
 }
 
 /** Más holgado que el de la barrera: la carga de una plantilla no es un pulso. */
@@ -49,6 +60,49 @@ export interface RespuestaDeEquipo {
   readonly ok: boolean;
   readonly cuerpo: string;
   readonly latenciaMs: number;
+  /**
+   * H-SITIO-12 · el `401` final llegó con `stale=true`: el equipo aceptó el
+   * resumen y rechazó el nonce. NO es una clave errónea.
+   */
+  readonly desafioVencido?: boolean;
+}
+
+/** Lo que el llamante pide además de la petición en sí. */
+export interface OpcionesDePeticion {
+  /**
+   * H-SITIO-13 · registra la petición y la respuesta completas —saneadas— con
+   * esta etiqueta. Sólo para órdenes: nunca para cargas con imagen.
+   */
+  readonly registrarIntercambio?: string;
+  /**
+   * Anexo 15-K · la escritura NO lleva cuerpo, y es a propósito: abrir y cerrar
+   * el canal de audio. Cualquier otra escritura sin cuerpo se niega (H-SITIO-15).
+   */
+  readonly sinCuerpo?: true;
+}
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * H-SITIO-15 · EL CLIENTE ISAPI NUNCA ENVÍA UNA ESCRITURA CON EL CUERPO VACÍO
+ *
+ * La terminal valida el contenido ANTES de autenticar: un `PUT`/`POST` vacío
+ * recibe `400 badXmlContent` (errorCode 1610612739) sin llegar al desafío, así
+ * que un cliente que sondea el Digest así —`curl --digest` lo hace— no se
+ * autentica nunca. Este cliente manda el cuerpo desde la PRIMERA petición, la
+ * que recibe el `401`, y la repite en la autenticada. Y una escritura sin
+ * cuerpo es un error de programación que se dice aquí, no un `400` que
+ * aparezca lejos: nuestro propio diagnóstico hacía `POST` vacíos a la
+ * biblioteca de rostros y el simulado del anexo lo destapó.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+export class EscrituraSinCuerpo extends Error {
+  constructor(metodo: string, ruta: string) {
+    super(
+      `${metodo} ${ruta} sin cuerpo: el equipo valida el contenido antes de autenticar y ` +
+        'contesta 400 badXmlContent. Declare el cuerpo en el catálogo',
+    );
+    this.name = 'EscrituraSinCuerpo';
+  }
 }
 
 export interface CuerpoDePeticion {
@@ -71,6 +125,21 @@ export class EquipoInalcanzable extends Error {
   }
 }
 
+/** Una respuesta con su veredicto de autenticación ya resuelto. */
+interface ConDigest {
+  readonly respuesta: Response;
+  readonly desafioVencido: boolean;
+}
+
+/** Libera el socket de una respuesta que no se va a leer. */
+const descartar = async (respuesta: Response): Promise<void> => {
+  try {
+    await respuesta.body?.cancel();
+  } catch {
+    /* ya cerrado */
+  }
+};
+
 export class ClienteDeEquipo {
   private readonly sesion: SesionDigest;
   private readonly base: string;
@@ -79,32 +148,65 @@ export class ClienteDeEquipo {
   private readonly ahora: () => number;
 
   constructor(private readonly opciones: OpcionesDeEquipo) {
-    this.sesion = new SesionDigest(
-      { usuario: opciones.usuario, clave: opciones.clave },
-      opciones.generarCnonce ?? cnonceAleatorio,
-    );
     // Los equipos medidos responden por HTTP con Digest, **no** por HTTPS:
     // forzar TLS aquí los dejaría inalcanzables. Anotado en la guía.
     this.base = `${opciones.protocolo ?? 'http'}://${opciones.host}:${String(opciones.puerto ?? 80)}`;
     this.tiempoLimiteMs = opciones.tiempoLimiteMs ?? TIEMPO_LIMITE_DE_EQUIPO_MS;
     this.peticion = opciones.peticion ?? fetch;
     this.ahora = opciones.ahora ?? (() => Date.now());
+    // H-SITIO-12 · UNA sesión por equipo en todo el proceso (ver digest.ts).
+    this.sesion = sesionDigestCompartida(
+      this.peticion,
+      this.base,
+      { usuario: opciones.usuario, clave: opciones.clave },
+      opciones.generarCnonce ?? cnonceAleatorio,
+    );
   }
 
-  async pedir(metodo: string, ruta: string, cuerpo?: CuerpoDePeticion): Promise<RespuestaDeEquipo> {
+  async pedir(
+    metodo: string,
+    ruta: string,
+    cuerpo?: CuerpoDePeticion,
+    extra?: OpcionesDePeticion,
+  ): Promise<RespuestaDeEquipo> {
+    if (metodo !== 'GET' && cuerpo === undefined && extra?.sinCuerpo !== true) {
+      throw new EscrituraSinCuerpo(metodo, ruta);
+    }
     const comienzo = this.ahora();
     try {
-      let respuesta = await this.enviar(metodo, ruta, cuerpo);
-      if (respuesta.status === 401) {
-        if (this.sesion.aceptarDesafio(respuesta.headers.get('www-authenticate'))) {
-          respuesta = await this.enviar(metodo, ruta, cuerpo);
-        }
+      const { respuesta, desafioVencido } = await this.conDigest(metodo, ruta, () =>
+        this.enviar(metodo, ruta, cuerpo),
+      );
+      const texto = await respuesta.text();
+      const latenciaMs = this.ahora() - comienzo;
+      if (extra?.registrarIntercambio !== undefined) {
+        this.opciones.traza?.registrar(
+          'info',
+          `intercambio con el equipo: ${extra.registrarIntercambio}`,
+          {
+            ...this.contexto(),
+            ...intercambioParaBitacora({
+              metodo,
+              ruta,
+              enviado:
+                cuerpo === undefined
+                  ? null
+                  : typeof cuerpo.contenido === 'string'
+                    ? cuerpo.contenido
+                    : `(${String(cuerpo.contenido.byteLength)} bytes ${cuerpo.tipo})`,
+              estado: respuesta.status,
+              recibido: texto,
+              latenciaMs,
+            }),
+          },
+        );
       }
       return {
         estado: respuesta.status,
         ok: respuesta.ok,
-        cuerpo: await respuesta.text(),
-        latenciaMs: this.ahora() - comienzo,
+        cuerpo: texto,
+        latenciaMs,
+        ...(desafioVencido ? { desafioVencido: true } : {}),
       };
     } catch (error) {
       throw new EquipoInalcanzable(this.motivoDe(error), this.ahora() - comienzo);
@@ -148,6 +250,52 @@ export class ClienteDeEquipo {
   }
 
   /**
+   * H-SITIO-14 · el flujo de eventos en BYTES, con su cabecera de tipo. El
+   * flujo del equipo es `multipart` con partes JSON o XML **e imágenes**; leído
+   * como texto, los bytes de una foto rompían el análisis del resto.
+   */
+  async abrirFlujoDeEventos(
+    ruta: string,
+    cancelar?: AbortSignal,
+    peticion?: { readonly metodo: string; readonly cuerpo?: CuerpoDePeticion },
+  ): Promise<{
+    readonly estado: number;
+    readonly tipo: string | null;
+    readonly desafioVencido: boolean;
+    readonly trozos: AsyncIterable<Uint8Array>;
+  }> {
+    const metodo = peticion?.metodo ?? 'GET';
+    const { respuesta, desafioVencido } = await this.conDigest(metodo, ruta, () =>
+      this.enviar(metodo, ruta, peticion?.cuerpo, cancelar),
+    );
+    const cuerpo = respuesta.body;
+    async function* trozos(): AsyncIterable<Uint8Array> {
+      if (cuerpo === null) {
+        // Un simulado sin flujo: su texto entero, de una vez.
+        const texto = await respuesta.text();
+        if (texto !== '') yield new TextEncoder().encode(texto);
+        return;
+      }
+      const lector = cuerpo.getReader();
+      try {
+        for (;;) {
+          const { done, value } = await lector.read();
+          if (done) return;
+          if (value !== undefined) yield value;
+        }
+      } finally {
+        await lector.cancel().catch(() => undefined);
+      }
+    }
+    return {
+      estado: respuesta.status,
+      tipo: respuesta.headers.get('content-type'),
+      desafioVencido,
+      trozos: trozos(),
+    };
+  }
+
+  /**
    * Como `flujo`, pero entrega los BYTES tal cual: es lo que necesita el audio,
    * donde decodificar como texto corrompería el códec.
    */
@@ -185,22 +333,108 @@ export class ClienteDeEquipo {
   ): Promise<RespuestaDeEquipo> {
     const comienzo = this.ahora();
     try {
-      let respuesta = await this.enviarFlujo('PUT', ruta, cuerpo(), tipo, cancelar);
-      if (
-        respuesta.status === 401 &&
-        this.sesion.aceptarDesafio(respuesta.headers.get('www-authenticate'))
-      ) {
-        respuesta = await this.enviarFlujo('PUT', ruta, cuerpo(), tipo, cancelar);
-      }
+      const { respuesta, desafioVencido } = await this.conDigest('PUT', ruta, () =>
+        this.enviarFlujo('PUT', ruta, cuerpo(), tipo, cancelar),
+      );
       return {
         estado: respuesta.status,
         ok: respuesta.ok,
         cuerpo: '',
         latenciaMs: this.ahora() - comienzo,
+        ...(desafioVencido ? { desafioVencido: true } : {}),
       };
     } catch (error) {
       throw new EquipoInalcanzable(this.motivoDe(error), this.ahora() - comienzo);
     }
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * H-SITIO-12 · UN SOLO REINTENTO, Y EL `401` FINAL CLASIFICADO
+   *
+   * Ante `401` se toma el desafío que trae —compartido con los demás clientes
+   * del mismo equipo— y se repite UNA vez. Si el segundo también es `401`:
+   *
+   *  · con `stale=true` es un nonce vencido otra vez, NO la clave. Se dice así
+   *    y quien llama lo trata como reintentable;
+   *  · sin él, es la credencial. No se insiste: el equipo bloquea la cuenta.
+   *
+   * Aplica igual a órdenes, sondeos y suscripciones: todas pasan por aquí.
+   */
+  private async conDigest(
+    metodo: string,
+    ruta: string,
+    enviar: () => Promise<Response>,
+  ): Promise<ConDigest> {
+    // ¿Viaja ya una credencial? Sin desafío previo, el primer 401 es el saludo.
+    const conCredencial = this.sesion.tieneDesafio;
+    const primera = await enviar();
+    if (primera.status !== 401) return { respuesta: primera, desafioVencido: false };
+
+    const renegociacion = this.sesion.renegociar(primera.headers.get('www-authenticate'));
+    if (renegociacion !== null && conCredencial && !renegociacion.vencido) {
+      /**
+       * Anexo 15-K (d) · con credencial enviada, un `401` SIN `stale` es la
+       * credencial: no se repite. Un segundo intento con la misma clave sólo
+       * suma un fallo más hacia el bloqueo de la cuenta del equipo.
+       */
+      this.opciones.traza?.registrar(
+        'error',
+        'el equipo rechazó usuario o clave (401 sin stale): NO se reintenta',
+        { ...this.contexto(), metodo, ruta },
+      );
+      return { respuesta: primera, desafioVencido: false };
+    }
+    if (renegociacion === null) {
+      this.opciones.traza?.registrar('aviso', 'el equipo contestó 401 SIN desafío Digest', {
+        ...this.contexto(),
+        metodo,
+        ruta,
+      });
+      return { respuesta: primera, desafioVencido: false };
+    }
+    this.anotarRenegociacion(renegociacion, metodo, ruta);
+    await descartar(primera);
+
+    const segunda = await enviar();
+    if (segunda.status !== 401) return { respuesta: segunda, desafioVencido: false };
+
+    const cabecera = segunda.headers.get('www-authenticate');
+    const vencido = interpretarDesafio(cabecera)?.stale === true;
+    // Se guarda para la PRÓXIMA petición; ésta no se repite.
+    this.sesion.renegociar(cabecera);
+    this.opciones.traza?.registrar(
+      vencido ? 'aviso' : 'error',
+      vencido
+        ? 'el equipo venció el desafío Digest dos veces seguidas: NO es la clave'
+        : 'el equipo rechazó usuario o clave tras renegociar el Digest: NO se reintenta',
+      { ...this.contexto(), metodo, ruta },
+    );
+    return { respuesta: segunda, desafioVencido: vencido };
+  }
+
+  private anotarRenegociacion(r: Renegociacion, metodo: string, ruta: string): void {
+    const motivo = r.primerContacto
+      ? 'primer contacto'
+      : r.vencido
+        ? 'nonce vencido (stale)'
+        : r.nonceNuevo
+          ? 'nonce nuevo del equipo'
+          : 'el equipo repitió el mismo nonce';
+    this.opciones.traza?.registrar(
+      r.primerContacto ? 'debug' : 'info',
+      'Digest renegociado con el equipo',
+      { ...this.contexto(), metodo, ruta, motivo },
+    );
+  }
+
+  private contexto(): Record<string, unknown> {
+    return {
+      destino: this.destino,
+      ...(this.opciones.dispositivoId === undefined
+        ? {}
+        : { dispositivoId: this.opciones.dispositivoId }),
+    };
   }
 
   private enviarFlujo(
@@ -235,10 +469,10 @@ export class ClienteDeEquipo {
     // La suscripción (6.5) abre el flujo con un POST y un cuerpo que dice qué
     // eventos se quieren; el `alertStream` clásico, con un GET sin cuerpo.
     const metodo = peticion?.metodo ?? 'GET';
-    const primera = await this.enviar(metodo, ruta, peticion?.cuerpo, cancelar);
-    if (primera.status !== 401) return primera;
-    if (!this.sesion.aceptarDesafio(primera.headers.get('www-authenticate'))) return primera;
-    return this.enviar(metodo, ruta, peticion?.cuerpo, cancelar);
+    const { respuesta } = await this.conDigest(metodo, ruta, () =>
+      this.enviar(metodo, ruta, peticion?.cuerpo, cancelar),
+    );
+    return respuesta;
   }
 
   private async enviar(

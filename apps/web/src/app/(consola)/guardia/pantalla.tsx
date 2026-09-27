@@ -14,6 +14,8 @@ import { useColaDeAtencion } from '@/lib/api/consultas';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
+import { resultadoDeOrden } from '@/componentes/resultado-de-orden';
+import type { OrdenConResultado } from '@/componentes/resultado-de-orden';
 import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
 import { DialogoDeMotivo } from '@/componentes/dialogo-motivo';
 import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
@@ -73,6 +75,8 @@ export const PantallaDeGuardiaVirtual = ({
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [pidiendo, setPidiendo] = useState<'abrir' | 'negar' | 'emergencia' | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
+  // H-SITIO-13 · lo que el equipo contestó a la última orden, dicho sin adorno.
+  const [ultimaOrden, setUltimaOrden] = useState<OrdenConResultado | null>(null);
   /** A4 · la llamada que el operador decidió atender. Manda sobre la cola hasta que la cierre. */
   const [llamada, setLlamada] = useState<LlamadaEntrante | null>(null);
 
@@ -156,9 +160,10 @@ export const PantallaDeGuardiaVirtual = ({
           },
         }),
       ),
-    onSuccess: () => {
+    onSuccess: (orden) => {
       setPidiendo(null);
       setError(undefined);
+      setUltimaOrden(orden);
       invalidar();
     },
     onError: alFallar,
@@ -399,6 +404,11 @@ export const PantallaDeGuardiaVirtual = ({
                   {emergencia.isSuccess ? (
                     <p aria-live="polite" className="text-secundario text-peligro-texto">
                       Emergencia escalada con severidad crítica.
+                    </p>
+                  ) : null}
+                  {ultimaOrden !== null ? (
+                    <p role="status" className="text-secundario text-texto-apagado">
+                      Última orden: {resultadoDeOrden(ultimaOrden).texto}
                     </p>
                   ) : null}
                   {error !== undefined && pidiendo === null ? (

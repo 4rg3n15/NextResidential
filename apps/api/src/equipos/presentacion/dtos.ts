@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { AtestacionDeEquipoDto } from './dtos-atestacion';
 import {
   IsBoolean,
   IsIn,
@@ -199,6 +200,14 @@ export class EquipoDto {
   @ApiProperty({ type: String, nullable: true }) verificadoEn!: string | null;
   @ApiProperty({ type: String, nullable: true }) motivoNoVerificado!: string | null;
   @ApiProperty({ type: String, enum: ['activo', 'inactivo'] }) estado!: string;
+  @ApiProperty({
+    type: AtestacionDeEquipoDto,
+    nullable: true,
+    description:
+      'D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si ' +
+      'nunca se atestó.',
+  })
+  atestacion!: AtestacionDeEquipoDto | null;
 }
 
 /**
@@ -229,6 +238,11 @@ export class HallazgoDelEquipoDto {
   correccion!: string | null;
 }
 
+export class DocumentoCrudoDelEquipoDto {
+  @ApiProperty({ type: String }) titulo!: string;
+  @ApiProperty({ type: String }) contenido!: string;
+}
+
 export class FichaDelEquipoDto {
   @ApiProperty({ type: String, nullable: true }) modelo!: string | null;
   @ApiProperty({ type: String, nullable: true }) firmware!: string | null;
@@ -237,6 +251,14 @@ export class FichaDelEquipoDto {
   @ApiProperty({ type: Number, nullable: true }) desvioDeRelojSegundos!: number | null;
   @ApiProperty({ type: [HallazgoDelEquipoDto] }) hallazgos!: HallazgoDelEquipoDto[];
   @ApiProperty({ type: [String] }) sinComprobar!: string[];
+  @ApiPropertyOptional({
+    type: [DocumentoCrudoDelEquipoDto],
+    description:
+      'H-SITIO-01 · lo que el equipo CONTESTÓ, saneado (sin claves, IPs enmascaradas), ' +
+      'para leer el veredicto contra el documento y no contra una interpretación. ' +
+      'Ausente cuando la familia no lo aporta.',
+  })
+  crudos?: DocumentoCrudoDelEquipoDto[];
 }
 
 /**

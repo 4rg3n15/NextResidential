@@ -26,6 +26,17 @@ export class PendientesDto {
       'Identificadores de equipos con una orden sin ejecutar: se muestran «sincronizando».',
   })
   dispositivos!: string[];
+
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'H-SITIO-02 · `false` si configurar, sincronizar y reiniciar sólo registran la orden ' +
+      'sin llegar al equipo. La consola lo escribe en el botón.',
+  })
+  ejecutaContraElEquipo!: boolean;
+
+  @ApiProperty({ type: String, description: 'Qué hacen de verdad esas tres órdenes.' })
+  detalleDeEjecucion!: string;
 }
 
 /**
@@ -71,7 +82,12 @@ export class DispositivosController {
     @Param('id', ParseUUIDPipe) copropiedadId: string,
   ): Promise<PendientesDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'dispositivos/pendientes');
-    return { dispositivos: [...(await this.operaciones.pendientesDe(copropiedadId))] };
+    const ejecucion = this.operaciones.ejecucion();
+    return {
+      dispositivos: [...(await this.operaciones.pendientesDe(copropiedadId))],
+      ejecutaContraElEquipo: ejecucion.ejecutaContraElEquipo,
+      detalleDeEjecucion: ejecucion.detalle,
+    };
   }
 
   @Post(':dispositivoId/configuracion')

@@ -5,6 +5,7 @@ import '../../configuracion/ambiente.dart';
 import '../../configuracion/tema.dart';
 import '../../dominio/acceso.dart';
 import '../../dominio/puertos.dart';
+import '../widgets/detalle_de_fallo.dart';
 
 /// Acceso del residente.
 ///
@@ -176,13 +177,20 @@ class _PantallaDeAccesoState extends State<PantallaDeAcceso> {
                             color: Paleta.peligroSuave.fondo,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
-                            // El texto sale del fallo tipado: «sin conexión» y
-                            // «credenciales incorrectas» no se pueden confundir,
-                            // que es lo que manda a reescribir una contraseña
-                            // que estaba bien.
-                            _fallo!.detalle,
-                            style: TextStyle(color: Paleta.peligroSuave.texto),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                // El texto sale del fallo tipado: «sin conexión» y
+                                // «credenciales incorrectas» no se pueden confundir,
+                                // que es lo que manda a reescribir una contraseña
+                                // que estaba bien.
+                                _fallo!.detalle,
+                                style: TextStyle(color: Paleta.peligroSuave.texto),
+                              ),
+                              // H-SITIO-11 · el porqué, sólo en Debug.
+                              DetalleDeFallo(fallo: _fallo!),
+                            ],
                           ),
                         ),
                       ),

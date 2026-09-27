@@ -6,6 +6,11 @@ import type { Bitacora, FaceTemplateProvider, GeneradorDeId, Reloj } from '@ncr/
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { EquiposModule, TERMINALES_DE_ROSTROS } from '../equipos';
+import { IDENTIDAD_DE_PERSONA } from '../padron';
+import type { IdentidadDePersona } from '../padron';
+import { REGISTRO_AUDITORIA } from '../comun/auditoria';
+import type { RegistroDeAuditoria } from '../comun/auditoria';
+import { AceptarConsentimientoPresencial } from './aplicacion/consentimiento-presencial';
 import {
   BOVEDA_DE_PLANTILLAS,
   CATALOGO_DE_TERMINALES,
@@ -188,6 +193,32 @@ export class BiometriaModule {
             reloj: Reloj,
             ids: GeneradorDeId,
           ) => new CapturarRostro(consentimientos, plantillas, boveda, reloj, ids),
+        },
+        {
+          // D-10 · el titular en la portería. La identidad la sirve el padrón
+          // por su puerto estrecho; la auditoría, el núcleo.
+          provide: AceptarConsentimientoPresencial,
+          inject: [
+            REPOSITORIO_CONSENTIMIENTOS,
+            IDENTIDAD_DE_PERSONA,
+            ResponderConsentimiento,
+            REGISTRO_AUDITORIA,
+            BITACORA,
+          ],
+          useFactory: (
+            consentimientos: RepositorioConsentimientos,
+            identidades: IdentidadDePersona,
+            responder: ResponderConsentimiento,
+            auditoria: RegistroDeAuditoria,
+            bitacora: Bitacora,
+          ) =>
+            new AceptarConsentimientoPresencial(
+              consentimientos,
+              identidades,
+              responder,
+              auditoria,
+              bitacora,
+            ),
         },
         {
           provide: ResponderConsentimiento,

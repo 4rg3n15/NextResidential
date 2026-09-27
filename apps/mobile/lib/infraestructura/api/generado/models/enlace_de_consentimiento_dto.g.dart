@@ -14,6 +14,7 @@ EnlaceDeConsentimientoDto _$EnlaceDeConsentimientoDtoFromJson(
   token: json['token'] as String,
   ruta: json['ruta'] as String,
   url: json['url'] as String?,
+  alcance: EnlaceDeConsentimientoDtoAlcance.fromJson(json['alcance'] as String),
   expiraEn: json['expiraEn'] as String,
 );
 
@@ -25,5 +26,6 @@ Map<String, dynamic> _$EnlaceDeConsentimientoDtoToJson(
   'token': instance.token,
   'ruta': instance.ruta,
   'url': instance.url,
+  'alcance': instance.alcance,
   'expiraEn': instance.expiraEn,
 };

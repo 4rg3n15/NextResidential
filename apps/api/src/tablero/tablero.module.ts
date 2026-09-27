@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
-import { RELOJ } from '@ncr/domain-core';
-import type { Reloj } from '@ncr/domain-core';
+import { Pool } from 'pg';
+import { BITACORA, RELOJ } from '@ncr/domain-core';
+import type { Bitacora, Reloj } from '@ncr/domain-core';
+import { CONFIGURACION } from '../configuracion/configuracion.module';
+import type { Configuracion } from '../configuracion/esquema';
 import { REPOSITORIO_ALERTAS, REPOSITORIO_EVENTOS } from '../eventos';
 import type { RepositorioAlertas, RepositorioEventos } from '../eventos';
 import {
@@ -12,6 +15,7 @@ import {
 import { REPOSITORIO_TABLERO } from './aplicacion/puertos';
 import type { RepositorioTablero } from './aplicacion/puertos';
 import { RepositorioTableroEnMemoria } from './infraestructura/repositorio-tablero-en-memoria';
+import { RepositorioTableroPg } from './infraestructura/repositorio-tablero-pg';
 import { TableroController } from './presentacion/tablero.controller';
 import { DispositivosController } from './presentacion/dispositivos.controller';
 import { OPERACIONES_DE_DISPOSITIVO } from './aplicacion/operaciones-de-dispositivo';
@@ -22,9 +26,14 @@ import { OperacionesEnMemoria } from './infraestructura/operaciones-en-memoria';
  *
  * Entra al módulo de eventos **por su barril** (§2.2) y solo para tomar dos
  * puertos ya publicados: el adaptador en memoria del tablero se apoya en los
- * repositorios que ya tienen los datos, en vez de duplicar su estado. Cuando
- * llegue la contraseña de PostgreSQL (D-17) se cambia esta fábrica por
- * `RepositorioTableroPg` y no se toca nada más.
+ * repositorios que ya tienen los datos, en vez de duplicar su estado.
+ *
+ * H-SITIO-02 · la nota decía «cuando llegue la contraseña de PostgreSQL (D-17)
+ * se cambia esta fábrica por `RepositorioTableroPg`». La contraseña llegó en la
+ * 09-B y la fábrica no se cambió: en sitio, la pantalla de Dispositivos leía
+ * SIEMPRE el doble en memoria —vacío— y un equipo recién dado de alta no
+ * aparecía en ninguna parte. Ahora sigue el mismo interruptor que el histórico
+ * y el arranque dice cuál quedó activo.
  */
 @Module({})
 export class TableroModule {
@@ -37,9 +46,29 @@ export class TableroModule {
         { provide: OPERACIONES_DE_DISPOSITIVO, useExisting: OperacionesEnMemoria },
         {
           provide: REPOSITORIO_TABLERO,
-          inject: [REPOSITORIO_EVENTOS, REPOSITORIO_ALERTAS],
-          useFactory: (eventos: RepositorioEventos, alertas: RepositorioAlertas) =>
-            new RepositorioTableroEnMemoria(eventos, alertas),
+          inject: [CONFIGURACION, Pool, BITACORA, REPOSITORIO_EVENTOS, REPOSITORIO_ALERTAS],
+          useFactory: (
+            configuracion: Configuracion,
+            pool: Pool,
+            bitacora: Bitacora,
+            eventos: RepositorioEventos,
+            alertas: RepositorioAlertas,
+          ): RepositorioTablero => {
+            const enBase = configuracion.PERSISTENCIA_DE_EVENTOS === 'postgres';
+            bitacora.registrar(
+              enBase ? 'info' : 'aviso',
+              `tablero y dispositivos leen de: ${configuracion.PERSISTENCIA_DE_EVENTOS}`,
+              {
+                persistencia: configuracion.PERSISTENCIA_DE_EVENTOS,
+                consecuencia: enBase
+                  ? 'la pantalla Dispositivos lista los equipos dados de alta en la base'
+                  : 'la pantalla Dispositivos sale VACÍA: los equipos del alta no se ven aquí',
+              },
+            );
+            return enBase
+              ? new RepositorioTableroPg(pool)
+              : new RepositorioTableroEnMemoria(eventos, alertas);
+          },
         },
         {
           provide: ConsultarIndicadores,

@@ -36,10 +36,15 @@ describe('catálogo de rutas', () => {
   });
 
   it('citar la sección NO asciende una ruta a verificada', () => {
-    // La única verificada sigue siendo la barrera, capturada del aparato. Que
-    // el fabricante lo documente no demuestra que ESTE firmware lo implemente.
-    expect(rutasPor('verificada')).toHaveLength(1);
-    expect(rutasPor('verificada')[0]?.proposito).toMatch(/barrera/i);
+    // Verificadas sólo las demostradas frente al aparato: la barrera y, desde
+    // el anexo 15-K, las dos aperturas de puerta. Que el fabricante lo
+    // documente no demuestra que ESTE firmware lo implemente.
+    expect(rutasPor('verificada').map((r) => r.proposito)).toEqual([
+      'accionar la barrera vehicular',
+      'abrir la puerta desde la plataforma',
+      'abrir la puerta del videoportero',
+    ]);
+    for (const r of rutasPor('verificada')) expect(r.capitulo).toBeUndefined();
   });
 
   it('la primera pregunta del sondeo NO exige credenciales', () => {
@@ -68,13 +73,22 @@ describe('catálogo de rutas', () => {
     }
   });
 
-  it('la única VERIFICADA hoy es la de la barrera, y cita su captura', () => {
-    const verificadas = rutasPor('verificada');
-    expect(verificadas).toHaveLength(1);
-    expect(verificadas[0]?.proposito).toBe('accionar la barrera vehicular');
-    expect(verificadas[0]?.fuente).toMatch(/15\/09\/2026/);
+  it('cada VERIFICADA cita su captura: la barrera y las dos aperturas de puerta', () => {
+    const barrera = rutasPor('verificada').find(
+      (r) => r.proposito === 'accionar la barrera vehicular',
+    );
+    expect(barrera?.fuente).toMatch(/15\/09\/2026/);
     // Y deja escrito el error que costó dos intentos, para que no se repita.
-    expect(verificadas[0]?.fuente).toMatch(/notSupport/);
+    expect(barrera?.fuente).toMatch(/notSupport/);
+    // Anexo 15-K · las puertas, con la fecha, el firmware y el Content-Type.
+    for (const r of rutasPor('verificada').filter((x) => /puerta/.test(x.proposito))) {
+      expect(r.fuente).toMatch(/26\/09\/2026/);
+      expect(r.fuente).toMatch(/V4\.47\.0|V2\.3\.9/);
+      expect(r.cuerpo?.tipo).toBe('application/x-www-form-urlencoded; charset=UTF-8');
+      expect(r.cuerpo?.contenido).toMatch(
+        /<RemoteControlDoor xmlns="http:\/\/www\.isapi\.org\/ver20\/XMLSchema" version="2\.0">/,
+      );
+    }
   });
 
   it('las rutas de una familia incluyen las comunes', () => {

@@ -15,16 +15,20 @@ import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import type { CapacidadesDeEquipo, FichaDelEquipo } from '@ncr/providers';
 import { Aislamiento } from '../../multiempresa/aislamiento';
+import { vigenciaDeAtestacion } from '@ncr/domain-core';
 import {
   CORRECTOR_DE_EQUIPO,
+  REPOSITORIO_DE_ATESTACIONES,
   REPOSITORIO_DE_EQUIPOS,
   SIN_PROBAR,
   SONDA_DE_EQUIPO,
 } from '../aplicacion/puertos';
 import type {
   AltaDeEquipo,
+  AtestacionDelInstalador,
   CorrectorDeEquipo,
   DatosDeEquipo,
+  RepositorioDeAtestaciones,
   RepositorioDeEquipos,
   ResultadoDeSondeo,
   SondaDeEquipo,
@@ -41,6 +45,29 @@ import {
   ResultadoDeSondeoDto,
   EdicionDeEquipoDto,
 } from './dtos';
+import type { AtestacionDeEquipoDto } from './dtos-atestacion';
+
+/**
+ * D-11 · la atestación a su DTO, con la vigencia calculada contra el firmware
+ * del último sondeo. El proveedor la vuelve a comprobar EN VIVO antes de operar.
+ */
+export const aAtestacionDto = (
+  a: AtestacionDelInstalador,
+  firmwareActual: string | null,
+): AtestacionDeEquipoDto => {
+  const vigencia = vigenciaDeAtestacion(a, firmwareActual);
+  return {
+    id: a.id,
+    firmware: a.firmware,
+    placaEnListaBlanca: a.placaEnListaBlanca,
+    placaDesconocida: a.placaDesconocida,
+    evidencia: a.evidencia,
+    registradaEn: a.registradaEn,
+    registradaPor: a.registradaPor,
+    vigente: vigencia.vigente,
+    motivoSinEfecto: vigencia.vigente ? null : vigencia.motivo,
+  };
+};
 
 /**
  * Alta, edición y baja de equipos — A.2.
@@ -83,6 +110,9 @@ const aFicha = (ficha: FichaDelEquipo): FichaDelEquipoDto => ({
     detalle: h.detalle,
     correccion: h.correccion,
   })),
+  ...(ficha.crudos === undefined
+    ? {}
+    : { crudos: ficha.crudos.map((c) => ({ titulo: c.titulo, contenido: c.contenido })) }),
 });
 
 /** Campo a campo, por la misma razón que la ficha: lo que sale es una decisión. */
@@ -108,14 +138,34 @@ export class EquiposController {
     @Inject(SONDA_DE_EQUIPO) private readonly sonda: SondaDeEquipo,
     @Inject(CORRECTOR_DE_EQUIPO) private readonly corrector: CorrectorDeEquipo,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    @Inject(REPOSITORIO_DE_ATESTACIONES) private readonly atestaciones: RepositorioDeAtestaciones,
   ) {}
+
+  /** D-11 · los equipos con su atestación más reciente, en una sola consulta. */
+  private async aDtos(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipos: readonly DatosDeEquipo[],
+  ): Promise<EquipoDto[]> {
+    const ultimas = await this.atestaciones.ultimasPorEquipo(ctx, copropiedadId);
+    return equipos.map((e) => this.aDto(e, ultimas.get(e.id) ?? null));
+  }
+
+  private async aDtoCompleto(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipo: DatosDeEquipo,
+  ): Promise<EquipoDto> {
+    const [dto] = await this.aDtos(ctx, copropiedadId, [equipo]);
+    return dto ?? this.aDto(equipo, null);
+  }
 
   /**
    * Campo a campo y NUNCA con `spread` (§7.1): `DatosDeEquipo` lleva host,
    * puerto, protocolo y usuario porque la sonda y el corrector los necesitan
    * en el servidor; ninguno cruza al cliente.
    */
-  private aDto(e: DatosDeEquipo): EquipoDto {
+  private aDto(e: DatosDeEquipo, atestacion: AtestacionDelInstalador | null): EquipoDto {
     return {
       id: e.id,
       nombre: e.nombre,
@@ -133,6 +183,7 @@ export class EquiposController {
       verificadoEn: e.verificadoEn,
       motivoNoVerificado: e.motivoNoVerificado,
       estado: e.estado,
+      atestacion: atestacion === null ? null : aAtestacionDto(atestacion, e.firmware),
     };
   }
 
@@ -249,7 +300,9 @@ export class EquiposController {
     @Param('id', ParseUUIDPipe) copropiedadId: string,
   ): Promise<EquiposDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/listar');
-    return { equipos: (await this.repo.listar(ctx, copropiedadId)).map((e) => this.aDto(e)) };
+    return {
+      equipos: await this.aDtos(ctx, copropiedadId, await this.repo.listar(ctx, copropiedadId)),
+    };
   }
 
   @Post('prueba-de-conexion')
@@ -282,7 +335,7 @@ export class EquiposController {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/alta');
     const veredicto = await this.sondear(dto);
     const equipo = await this.repo.crear(ctx, copropiedadId, this.altaDesdeDto(dto), veredicto);
-    return this.aDto(equipo);
+    return this.aDtoCompleto(ctx, copropiedadId, equipo);
   }
 
   @Put(':equipoId')
@@ -313,7 +366,7 @@ export class EquiposController {
       veredicto,
     );
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
-    return this.aDto(equipo);
+    return this.aDtoCompleto(ctx, copropiedadId, equipo);
   }
 
   /**
@@ -439,7 +492,7 @@ export class EquiposController {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/baja');
     const equipo = await this.repo.desactivar(ctx, copropiedadId, equipoId, dto.motivo);
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
-    return this.aDto(equipo);
+    return this.aDtoCompleto(ctx, copropiedadId, equipo);
   }
 
   @Post(':equipoId/reactivacion')
@@ -454,6 +507,6 @@ export class EquiposController {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/reactivacion');
     const equipo = await this.repo.reactivar(ctx, copropiedadId, equipoId);
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
-    return this.aDto(equipo);
+    return this.aDtoCompleto(ctx, copropiedadId, equipo);
   }
 }

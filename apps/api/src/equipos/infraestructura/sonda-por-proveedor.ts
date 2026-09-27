@@ -1,3 +1,4 @@
+import type { Bitacora } from '@ncr/domain-core';
 import { diagnosticarEquipo, fichaDe } from '@ncr/providers';
 import type { DatosDeSondeo, ResultadoDeSondeo, SondaDeEquipo } from '../aplicacion/puertos';
 
@@ -50,7 +51,11 @@ export const AVISO_DE_CREDENCIAL =
   'Confirme la credencial en el equipo antes de reintentar.';
 
 export class SondaPorProveedor implements SondaDeEquipo {
-  constructor(private readonly peticion?: typeof fetch) {}
+  constructor(
+    private readonly peticion?: typeof fetch,
+    /** H-SITIO-05 · qué ruta de capacidad se consultó y qué respondió. */
+    private readonly traza?: Bitacora,
+  ) {}
 
   async probar(datos: DatosDeSondeo): Promise<ResultadoDeSondeo> {
     /**
@@ -67,6 +72,7 @@ export class SondaPorProveedor implements SondaDeEquipo {
       clave: datos.secreto,
       familia: familiaDe(datos.tipo),
       ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
+      ...(this.traza === undefined ? {} : { traza: this.traza }),
       ...(datos.canalBarrera === undefined || datos.canalBarrera === null
         ? {}
         : { canal: datos.canalBarrera }),

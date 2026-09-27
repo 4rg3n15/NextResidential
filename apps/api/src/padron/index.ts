@@ -13,3 +13,7 @@ export { PadronModule } from './padron.module';
  */
 export { LOCALIZADOR_DE_VIVIENDA } from './aplicacion/puertos';
 export type { LocalizadorDeVivienda } from './aplicacion/puertos';
+/** D-10 · la identidad del titular, para el consentimiento presencial. */
+export { IDENTIDAD_DE_PERSONA } from './aplicacion/puertos';
+export type { IdentidadDePersona } from './aplicacion/puertos';
+export { IdentidadDePersonaEnMemoria } from './infraestructura/identidad-de-persona';

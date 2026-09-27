@@ -21,11 +21,41 @@ Future<T> pedirALaApi<T>(Future<T> Function() llamada) async {
   }
 }
 
+/// H-SITIO-11 · la URL base compilada, el tipo de `DioException` y su mensaje,
+/// para el panel de Debug. SIN tokens: se tachan los JWT y las cabeceras
+/// `Bearer` que un mensaje pudiera arrastrar, y nunca se leen las cabeceras
+/// de la petición. La consulta de la URL se quita: ahí no hay nada que
+/// diagnosticar y sí podría haber un identificador.
+String detalleTecnicoDe(DioException e) {
+  final base = e.requestOptions.baseUrl.isEmpty ? '(vacía)' : e.requestOptions.baseUrl;
+  final ruta = e.requestOptions.path.split('?').first;
+  final partes = <String>[
+    'URL base: $base',
+    'ruta: $ruta',
+    'tipo: ${e.type.name}',
+    if (e.message != null && e.message!.isNotEmpty) 'mensaje: ${e.message}',
+    if (e.error != null) 'causa: ${e.error}',
+  ];
+  return sinTokens(partes.join('\n'));
+}
+
+final _jwt = RegExp(r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*');
+final _portador = RegExp(r'Bearer\s+\S+', caseSensitive: false);
+
+/// Tacha lo que tenga forma de credencial. Es la segunda barrera: la primera
+/// es no leer nunca las cabeceras.
+String sinTokens(String texto) =>
+    texto.replaceAll(_jwt, '[token]').replaceAll(_portador, 'Bearer [token]');
+
 Fallo falloDeDio(DioException e) {
   if (e.type == DioExceptionType.connectionError ||
       e.type == DioExceptionType.connectionTimeout ||
       e.type == DioExceptionType.receiveTimeout) {
-    return Fallo(ClaseDeFallo.sinConexion, e.message ?? 'Sin conexión');
+    return Fallo(
+      ClaseDeFallo.sinConexion,
+      e.message ?? 'Sin conexión',
+      detalleTecnico: detalleTecnicoDe(e),
+    );
   }
   final codigo = e.response?.statusCode;
   final detalle = detalleDeError(e.response?.data) ?? e.message ?? 'Error de servidor';

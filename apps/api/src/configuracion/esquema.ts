@@ -376,6 +376,18 @@ export const esquemaConfiguracion = z.object({
    * habla con terminales lentas. Apagado, el planificador ESCRIBE qué no va a
    * ejecutar: el silencio dejaría creer que RN-11 se está cumpliendo.
    */
+  /**
+   * H-SITIO-07 · la conexión de pg-boss, si no es `DATABASE_URL`. Opcional.
+   * Existe porque la conexión directa de Supabase sólo resuelve por IPv6 y en
+   * sitio la red era sólo IPv4: el planificador murió con `ENOTFOUND`. pg-boss
+   * necesita una conexión de SESIÓN, así que aquí va el pooler en modo sesión
+   * (puerto 5432), no el de transacción (6543) de `DATABASE_POOLER_URL`.
+   */
+  PGBOSS_DATABASE_URL: z
+    .string()
+    .trim()
+    .url('PGBOSS_DATABASE_URL debe ser una cadena postgresql://… (pooler en modo sesión, :5432)')
+    .optional(),
   PGBOSS_SCHEMA: z
     .string()
     .trim()

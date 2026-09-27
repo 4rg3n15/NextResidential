@@ -1,4 +1,4 @@
-import type { Reloj } from '@ncr/domain-core';
+import type { Bitacora, Reloj } from '@ncr/domain-core';
 import { MockProvider } from './mock/mock-provider';
 import type { PerfilDeSimulacion } from './mock/simulacion';
 import { HikvisionProvider } from './hikvision/hikvision-provider';
@@ -61,6 +61,8 @@ export interface ConfiguracionDeProveedor {
   /** Semilla del simulado: la adversidad tiene que ser reproducible. */
   readonly semilla?: number;
   readonly dispositivosSimulados?: readonly string[];
+  /** 15-K (§4) · el simulado reconoce también lo que el registro conoce. */
+  readonly equipoConocido?: (dispositivoId: string) => Promise<boolean>;
   /**
    * Perfil del simulado. La suite de contrato pide el IDEAL porque compara los
    * proveedores: con latencia y fallos aleatorios en uno y no en otro, la
@@ -69,6 +71,11 @@ export interface ConfiguracionDeProveedor {
   readonly perfil?: PerfilDeSimulacion;
   /** `false` sólo en pruebas que no van contra una cámara. Nunca en producción. */
   readonly exigirVeredictoDeControl?: boolean;
+  /**
+   * H-SITIO-12/13/14 · la bitácora del proceso, para que el adaptador de
+   * hardware cuente lo que pasa con los equipos. El simulado no la usa.
+   */
+  readonly traza?: Bitacora;
 }
 
 export class ConfiguracionDeProveedorIncompleta extends Error {
@@ -140,6 +147,9 @@ registrarAdaptador({
       ...(configuracion.dispositivosSimulados === undefined
         ? {}
         : { dispositivos: configuracion.dispositivosSimulados }),
+      ...(configuracion.equipoConocido === undefined
+        ? {}
+        : { conocido: configuracion.equipoConocido }),
     }),
 });
 
@@ -155,6 +165,7 @@ registrarAdaptador({
       ...(configuracion.exigirVeredictoDeControl === undefined
         ? {}
         : { exigirVeredictoDeControl: configuracion.exigirVeredictoDeControl }),
+      ...(configuracion.traza === undefined ? {} : { traza: configuracion.traza }),
     }),
 });
 

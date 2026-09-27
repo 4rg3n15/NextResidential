@@ -50,3 +50,4 @@ export * from './residente/ocupantes';
 export * from './residente/vehiculo-propio';
 export * from './residente/perfil';
 export * from './autorizaciones/politica-de-aprobacion';
+export * from './dispositivos/atestacion';

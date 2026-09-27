@@ -33,6 +33,17 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!--
+	H-SITIO-11 (15-K) · Privacidad de red local (iOS 14+). La app habla con la API
+	por la IP privada del Mac en sitio, y en un iPhone físico iOS exige esta
+	clave para pedir el permiso de red local: sin ella la conexión se corta y la
+	app sólo decía «No hay conexión con el servidor» mientras Safari —que es de
+	Apple y no pasa por este permiso— abría la misma API. Va FUERA del bloque de
+	depuración: un despliegue del conjunto también puede servir la API en la
+	red local, y la clave sólo describe el permiso; no concede nada por sí sola.
+	-->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>La app se conecta al servidor de Next Control de su conjunto, que está en la red local.</string>
+	<!--
 	A6 · Excepción de App Transport Security SOLO en depuración.
 	Xcode preprocesa este fichero con el preprocesador de C (INFOPLIST_PREPROCESS
 	en ios/Flutter/Debug.xcconfig y Release.xcconfig). NCR_DEPURACION sólo se

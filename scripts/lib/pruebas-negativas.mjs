@@ -33,6 +33,7 @@ import {
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
+import { arbolDeSonda } from '../../e2e/arbol-de-sonda.mjs';
 
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
@@ -1670,10 +1671,24 @@ try {
         ? ok('una suite en rojo hace fallar la medición')
         : mal('una prueba roja pasa inadvertida: el paquete se mediría igual');
 
+      /**
+       * 15-K (anexo) · si esto falla, lo que dijo el control va en la propia
+       * línea ✗: el verificador sólo imprime las ✗, y en la corrida final de
+       * la 15-K esta sonda falló una vez sin dejar ni una pista de por qué.
+       */
+      const dijo = conRoja.salida
+        .split('\n')
+        .filter((l) => /SUITE EN ROJO|CORRIDA INTERRUMPIDA|no se pudo cargar|✗ /.test(l))
+        .slice(0, 4)
+        .map((l) => l.trim().slice(0, 160))
+        .join(' | ');
+
       // LO QUE IMPORTA: el nombre, no el recuento.
       /esta prueba falla a proposito y su nombre tiene que aparecer/.test(conRoja.salida)
         ? ok('el NOMBRE de la prueba roja aparece en la salida')
-        : mal('la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas');
+        : mal(
+            `la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas (dijo: ${dijo || 'nada'})`,
+          );
 
       /sonda-roja\.test\.ts/.test(conRoja.salida)
         ? ok('y también su fichero')
@@ -1687,6 +1702,23 @@ try {
       /saltadas=1\b/.test(conRoja.salida)
         ? ok('la prueba SALTADA se cuenta y se publica para que otro la compare (D-112)')
         : mal('una saltada no aparece en el recuento legible por máquina');
+
+      // 15-K (anexo) · un fichero que NO CARGA se nombra con su motivo, y no
+      // se disfraza de corrida interrumpida.
+      writeFileSync(
+        sonda,
+        "import { it } from 'vitest';\n" +
+          "throw new Error('esta sonda no carga a proposito');\n" +
+          "it('nunca llega a correr', () => undefined);\n",
+      );
+      const sinCargar = conConfig();
+      /no se pudo cargar \(o falló fuera de sus pruebas\) packages\/config\/src\/sonda-roja\.test\.ts/.test(
+        sinCargar.salida,
+      ) &&
+      /esta sonda no carga a proposito/.test(sinCargar.salida) &&
+      !/CORRIDA INTERRUMPIDA/.test(sinCargar.salida)
+        ? ok('un fichero de prueba que no carga se nombra con su motivo, como SUITE EN ROJO')
+        : mal('un fichero que no carga se informa sin su motivo: otra vez a buscar a ciegas');
 
       // El eco de pnpm no es el nombre de ninguna prueba.
       !/ERR_PNPM_/.test(conRoja.salida)
@@ -2714,6 +2746,371 @@ try {
     }
   }
 
+  console.log('\n▸ 33 · una clase que Nest construye e inyecta POR TIPO se detecta (H-SITIO-06)');
+  {
+    /**
+     * En sitio, `start:dev` (tsx, sin metadatos de tipos) inyectó `undefined`
+     * en el `ModuleRef` del planificador y la API cayó al arrancar. El control
+     * se ejecuta desde el repositorio real —necesita `typescript`— contra un
+     * árbol de sondas del banco, como el de Mermaid.
+     */
+    if (exigeControl('scripts/lib/inyeccion-explicita.mjs')) {
+      const arbol = join(banco, 'sonda-inyeccion');
+      mkdirSync(arbol, { recursive: true });
+      const sonda = join(arbol, 'sonda.module.ts');
+      const control = () =>
+        correr('node', ['scripts/lib/inyeccion-explicita.mjs', arbol], { cwd: raiz });
+      const modulo = (parametro, extra = '') =>
+        "import { Controller, Inject, Injectable, Module } from '@nestjs/common';\n" +
+        'class CasoDeUso {}\n' +
+        `@Controller('sonda') export class SondaController { constructor(${parametro}) {} }\n` +
+        `${extra}\n` +
+        '@Module({ controllers: [SondaController] }) export class SondaModule {}\n';
+
+      writeFileSync(sonda, modulo('private readonly caso: CasoDeUso'));
+      const a = control();
+      a.codigo !== 0 && /SondaController\(caso: CasoDeUso\)/.test(a.salida)
+        ? ok('un controlador que inyecta por tipo, sin @Inject, se detecta')
+        : mal(`el controlador sin @Inject NO se detecta (codigo ${a.codigo})`);
+
+      writeFileSync(
+        sonda,
+        "import { Inject, Injectable, Module } from '@nestjs/common';\n" +
+          'class Dependencia {}\n' +
+          '@Injectable() export class Servicio { constructor(private readonly d: Dependencia) {} }\n' +
+          '@Module({ providers: [{ provide: Servicio, useClass: Servicio }] }) export class M {}\n',
+      );
+      const b = control();
+      b.codigo !== 0 && /Servicio\(d: Dependencia\)/.test(b.salida)
+        ? ok('y un proveedor de `useClass:` que inyecta por tipo, también')
+        : mal(`el proveedor de useClass sin @Inject NO se detecta (codigo ${b.codigo})`);
+
+      writeFileSync(sonda, modulo('@Inject(CasoDeUso) private readonly caso: CasoDeUso'));
+      control().codigo === 0
+        ? ok('con @Inject explícito el control lo admite')
+        : mal('el control rechaza un @Inject explícito');
+
+      // Lo que se construye en una fábrica lleva sus argumentos escritos: no cuenta.
+      writeFileSync(
+        sonda,
+        "import { Injectable, Module } from '@nestjs/common';\n" +
+          '@Injectable() export class RepoPg { constructor(private readonly pool: object) {} }\n' +
+          '@Module({ providers: [{ provide: RepoPg, useFactory: () => new RepoPg({}) }] }) export class M {}\n',
+      );
+      control().codigo === 0
+        ? ok('una clase construida en `useFactory` no da falso positivo')
+        : mal('el control marca una clase que sólo se construye en una fábrica');
+      rmSync(arbol, { recursive: true, force: true });
+    }
+  }
+
+  console.log(
+    '\n▸ 34 · un Info.plist de iOS que pierde la red local o suelta ATS se detecta (H-SITIO-11)',
+  );
+  {
+    /**
+     * En sitio, un iPhone físico no alcanzaba la API por la IP privada:
+     * faltaba `NSLocalNetworkUsageDescription`. El control preprocesa el plist
+     * como Xcode; aquí se le dan variantes rotas en el banco.
+     */
+    if (exigeControl('scripts/lib/info-plist-ios.mjs')) {
+      const original = readFileSync(join(raiz, 'apps/mobile/ios/Runner/Info.plist'), 'utf8');
+      const sonda = join(banco, 'Info-sonda.plist');
+      const control = () =>
+        correr('node', [
+          'scripts/lib/info-plist-ios.mjs',
+          '--plist',
+          sonda,
+          '--xcconfig',
+          join(raiz, 'apps/mobile/ios/Flutter'),
+        ]);
+
+      writeFileSync(sonda, original);
+      control().codigo === 0
+        ? ok('el Info.plist del repositorio pasa: línea base limpia')
+        : mal(`el Info.plist del repositorio NO pasa: ${control().salida.split('\n')[1] ?? ''}`);
+
+      writeFileSync(
+        sonda,
+        original.replace(
+          /<key>NSLocalNetworkUsageDescription<\/key>\s*<string>[^<]*<\/string>/,
+          '',
+        ),
+      );
+      const a = control();
+      a.codigo !== 0 && /NSLocalNetworkUsageDescription/.test(a.salida)
+        ? ok('sin la clave de red local se detecta (el síntoma de sitio)')
+        : mal(`sin la clave de red local NO se detecta (codigo ${a.codigo})`);
+
+      // ATS fuera del bloque de depuración: llegaría al binario de Release.
+      writeFileSync(sonda, original.replace(/#if NCR_DEPURACION/, '#if 1'));
+      const b = control();
+      b.codigo !== 0 && /Release: lleva NSAppTransportSecurity/.test(b.salida)
+        ? ok('la excepción de ATS en Release se detecta')
+        : mal(`ATS en Release NO se detecta (codigo ${b.codigo})`);
+
+      writeFileSync(
+        sonda,
+        original.replace(
+          '<key>NSAllowsLocalNetworking</key>',
+          '<key>NSAllowsArbitraryLoads</key><true/><key>NSAllowsLocalNetworking</key>',
+        ),
+      );
+      const c = control();
+      c.codigo !== 0 && /NSAllowsArbitraryLoads/.test(c.salida)
+        ? ok('NSAllowsArbitraryLoads se detecta, aunque sea sólo en Debug')
+        : mal(`NSAllowsArbitraryLoads NO se detecta (codigo ${c.codigo})`);
+
+      writeFileSync(sonda, original.replace('</dict>\n</plist>', '</plist>'));
+      control().codigo !== 0
+        ? ok('un plist mal formado es un fallo, no un «no encontrado»')
+        : mal('un plist mal formado pasa');
+
+      // Sin el bloque de ATS: la app de depuración no alcanzaría la API por HTTP.
+      writeFileSync(
+        sonda,
+        original.replace(/<key>NSAppTransportSecurity<\/key>\s*<dict>[\s\S]*?<\/dict>/, ''),
+      );
+      const d = control();
+      d.codigo !== 0 && /Debug: falta NSAppTransportSecurity/.test(d.salida)
+        ? ok('Debug sin la excepción de red local se detecta')
+        : mal(`Debug sin ATS local NO se detecta (codigo ${d.codigo})`);
+
+      /**
+       * 15-K · las ramas de los .xcconfig, que el trinquete encontró sin
+       * ejercer: el plist puede estar bien y la compilación, no. Se copian al
+       * banco y se rompen allí.
+       */
+      writeFileSync(sonda, original);
+      const xc = join(banco, 'xcconfig-sonda');
+      mkdirSync(xc, { recursive: true });
+      const debugXc = readFileSync(join(raiz, 'apps/mobile/ios/Flutter/Debug.xcconfig'), 'utf8');
+      const releaseXc = readFileSync(
+        join(raiz, 'apps/mobile/ios/Flutter/Release.xcconfig'),
+        'utf8',
+      );
+      const conXc = () =>
+        correr('node', ['scripts/lib/info-plist-ios.mjs', '--plist', sonda, '--xcconfig', xc]);
+
+      writeFileSync(join(xc, 'Debug.xcconfig'), debugXc);
+      writeFileSync(
+        join(xc, 'Release.xcconfig'),
+        `${releaseXc}\nINFOPLIST_PREPROCESSOR_DEFINITIONS = NCR_DEPURACION=1\n`,
+      );
+      const e = conXc();
+      e.codigo !== 0 && /Release\.xcconfig define NCR_DEPURACION/.test(e.salida)
+        ? ok('Release.xcconfig que define NCR_DEPURACION se detecta: ATS llegaría al binario')
+        : mal(`NCR_DEPURACION en Release NO se detecta (codigo ${e.codigo})`);
+
+      writeFileSync(
+        join(xc, 'Debug.xcconfig'),
+        debugXc.replace(/^INFOPLIST_PREPROCESS.*$/gm, '// quitado por la sonda'),
+      );
+      writeFileSync(
+        join(xc, 'Release.xcconfig'),
+        releaseXc.replace(/^INFOPLIST_PREPROCESS.*$/gm, '// quitado por la sonda'),
+      );
+      const f = conXc();
+      f.codigo !== 0 &&
+      /Debug\.xcconfig no activa/.test(f.salida) &&
+      /Debug\.xcconfig no define NCR_DEPURACION/.test(f.salida) &&
+      /Release\.xcconfig no activa/.test(f.salida)
+        ? ok('los .xcconfig sin preprocesado ni marca de depuración se detectan, los tres')
+        : mal(`los .xcconfig rotos NO se detectan (codigo ${f.codigo})`);
+
+      rmSync(join(xc, 'Debug.xcconfig'), { force: true });
+      const g = conXc();
+      g.codigo !== 0 && /no se pudo leer/.test(g.salida)
+        ? ok('un .xcconfig que falta es un fallo, no un silencio')
+        : mal(`un .xcconfig que falta NO se detecta (codigo ${g.codigo})`);
+
+      rmSync(xc, { recursive: true, force: true });
+      rmSync(sonda, { force: true });
+    }
+  }
+
+  console.log(
+    '\n▸ 35 · start:dev con tsx deja el ValidationPipe inerte, y el paso 12d lo ve (H-SITIO-06)',
+  );
+  {
+    /**
+     * Anexo 15-K · el 12d arrancaba la API con tsx y sólo miraba la inyección;
+     * la mitad silenciosa —sin metadatos de tipos el `ValidationPipe` no valida
+     * ningún DTO— la destapó el recorrido de la consola. Dos sondas, en
+     * ÁRBOLES de sonda (sólo `apps/api` copiada, el resto enlazado):
+     *
+     *  · 35a · `start:dev` vuelve a ser tsx y se quita la negativa del
+     *          arranque: es la API de sitio. El paso debe decir que NO valida.
+     *  · 35b · sólo se quita la negativa: `start:dev` sigue sano, pero nada
+     *          impide arrancar con tsx. El paso debe decir que tsx ARRANCA.
+     */
+    const sinNegativa = [
+      'apps/api/src/main.ts',
+      'if (!emiteMetadatosDeTipos()) throw new ErrorDeConfiguracion([MOTIVO_SIN_METADATOS]);',
+      'void [emiteMetadatosDeTipos, MOTIVO_SIN_METADATOS];',
+    ];
+    const casos = [
+      {
+        id: '35a',
+        parches: [
+          sinNegativa,
+          ['apps/api/package.json', /"start:dev": "[^"]*"/, '"start:dev": "tsx watch src/main.ts"'],
+        ],
+        esperado: /ValidationPipe NO valida/,
+        bien: 'con el start:dev de sitio (tsx) el paso 12d dice que el ValidationPipe no valida',
+      },
+      {
+        id: '35b',
+        parches: [sinNegativa],
+        esperado: /con tsx la API ARRANCA sin metadatos/,
+        bien: 'sin la negativa del arranque el paso 12d dice que tsx arranca sin validar',
+      },
+    ];
+    for (const caso of casos) {
+      const arbol = arbolDeSonda({ copiar: ['apps/api'] });
+      try {
+        for (const [fichero, antes, despues] of caso.parches) arbol.mutar(fichero, antes, despues);
+        const r = correr('node', ['e2e/arranque-de-desarrollo.mjs'], {
+          timeout: 420_000,
+          env: { ...process.env, NCR_RAIZ: arbol.raiz },
+        });
+        r.codigo !== 0 && caso.esperado.test(r.salida)
+          ? ok(`${caso.id} · ${caso.bien}`)
+          : mal(`${caso.id} · el paso 12d NO lo detecta (codigo ${r.codigo})`);
+      } finally {
+        arbol.limpiar();
+      }
+    }
+  }
+
+  console.log(
+    '\n▸ 36 · el recorrido de la consola sin base o sin navegador NO pasa por verde (§4)',
+  );
+  {
+    /**
+     * La prueba negativa FUERTE del recorrido es el paso 13c: reintroduce
+     * H-SITIO-02, 03 y 08 y exige que lo nombre. Aquí, sin base de datos, se
+     * comprueba lo que puede comprobarse siempre: que la falta de lo que
+     * necesita es un fallo explícito, nunca un salto en silencio.
+     */
+    const sinBase = correr('node', ['e2e/recorrido-de-consola.mjs'], {
+      timeout: 60_000,
+      env: { ...process.env, DATABASE_URL_PRUEBAS: '' },
+    });
+    sinBase.codigo !== 0 && /sin DATABASE_URL_PRUEBAS/.test(sinBase.salida)
+      ? ok('sin base el recorrido falla y dice que NO se ha verificado')
+      : mal(`sin base el recorrido no falla como debe (codigo ${sinBase.codigo})`);
+    const sinNavegador = correr('node', ['e2e/recorrido-de-consola.mjs'], {
+      timeout: 60_000,
+      env: { ...process.env, NCR_CHROMIUM: join(banco, 'chromium-que-no-existe') },
+    });
+    sinNavegador.codigo !== 0 && /no hay Chromium/.test(sinNavegador.salida)
+      ? ok('sin Chromium el recorrido falla y lo dice')
+      : mal(`sin Chromium el recorrido no falla como debe (codigo ${sinNavegador.codigo})`);
+  }
+
+  console.log('\n▸ 37 · la sonda negativa del recorrido sin ninguna sonda NO es un verde (§4)');
+  {
+    const r = correr('node', ['e2e/recorrido-negativo.mjs'], {
+      timeout: 60_000,
+      env: { ...process.env, NCR_SONDAS: 'H-SITIO-INEXISTENTE' },
+    });
+    r.codigo !== 0 && /no se ejecutó ninguna sonda/.test(r.salida)
+      ? ok('un filtro que no casa con ninguna sonda es un fallo, no un «todo detectado»')
+      : mal(`sin sondas el recorrido negativo pasa (codigo ${r.codigo})`);
+  }
+
+  console.log(
+    '\n▸ 38 · el guion de sitio (paso 12e) ve H-SITIO-13 con --abrir y una escritura de audio sin declarar',
+  );
+  {
+    /**
+     * Anexo 15-K · el 12e ensaya el guion contra los simulados; aquí se le ve
+     * fallar. Se copia `packages/providers` a un árbol de sonda, se muta, se
+     * compila, y el guion se ejecuta DESDE el árbol (`--preserve-symlinks-main`:
+     * sin eso, `scripts/` —un enlace— se resolvería al repositorio real y
+     * cargaría el paquete sano).
+     *
+     *  · 38a · la apertura de la terminal vuelve al cuerpo mínimo: el equipo
+     *          dice «OK» y la puerta no se mueve. `--abrir` debe decirlo.
+     *  · 38b · el canal de audio pierde su `sinCuerpo`: el cliente se niega a
+     *          abrirlo. `--con-audio` debe decirlo.
+     */
+    const casos = [
+      {
+        id: '38a',
+        fichero: 'packages/providers/src/equipo/catalogo-de-rutas.ts',
+        antes: 'export const CUERPO_DE_APERTURA_DE_LA_TERMINAL = DOCUMENTO_DE_APERTURA;',
+        despues:
+          "export const CUERPO_DE_APERTURA_DE_LA_TERMINAL = '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>';",
+        argumentos: ['--simulado', '--abrir'],
+        esperado: /la puerta NO se movió/,
+        bien: '--abrir dice que la puerta de la terminal NO se movió con la orden aceptada',
+      },
+      {
+        id: '38b',
+        fichero: 'packages/providers/src/equipo/catalogo-de-rutas.ts',
+        antes: /\n {4}sinCuerpo: true,/g,
+        despues: '',
+        argumentos: ['--simulado', '--con-audio'],
+        esperado: /abrir el canal de audio bidireccional \(canal 1\) — inalcanzable/,
+        bien: '--con-audio dice que el canal de audio no se pudo abrir',
+      },
+    ];
+    // 38c · sin mutar nada: un equipo que no contesta NO es una apertura
+    // verificada, y `--abrir` lo dice con su salida.
+    {
+      const r = correr(
+        'node',
+        [
+          'scripts/puesta-en-marcha-equipos.mjs',
+          '--abrir',
+          `--informe=${join(banco, 'guion-38c.md')}`,
+        ],
+        {
+          timeout: 60_000,
+          input: '',
+          env: {
+            ...process.env,
+            TERMINAL_HOST: 'terminal-de-sonda.invalid',
+            TERMINAL_USUARIO: 'sonda',
+            TERMINAL_CLAVE: 'sonda',
+            VIDEOPORTERO_HOST: '',
+          },
+        },
+      );
+      r.codigo !== 0 &&
+      /orden NO aceptada/.test(r.salida) &&
+      /la apertura NO queda verificada/.test(r.salida)
+        ? ok('38c · --abrir contra un equipo que no contesta sale en 1 y lo dice')
+        : mal(`38c · --abrir sin equipo pasa por verde (codigo ${r.codigo})`);
+    }
+    for (const caso of casos) {
+      const arbol = arbolDeSonda({ copiar: ['packages/providers'] });
+      try {
+        arbol.mutar(caso.fichero, caso.antes, caso.despues);
+        arbol.compilar('packages/providers');
+        const informe = join(banco, `guion-${caso.id}.md`);
+        const r = correr(
+          'node',
+          [
+            '--preserve-symlinks-main',
+            join(arbol.raiz, 'scripts/puesta-en-marcha-equipos.mjs'),
+            ...caso.argumentos,
+            `--informe=${informe}`,
+            `--hoja=${join(banco, `hoja-${caso.id}.md`)}`,
+          ],
+          { timeout: 120_000, input: '' },
+        );
+        r.codigo !== 0 && caso.esperado.test(r.salida)
+          ? ok(`${caso.id} · ${caso.bien}`)
+          : mal(`${caso.id} · el guion NO lo detecta (codigo ${r.codigo})`);
+      } finally {
+        arbol.limpiar();
+      }
+    }
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
@@ -2912,6 +3309,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 28 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 33 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

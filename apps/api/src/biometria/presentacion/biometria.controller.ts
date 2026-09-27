@@ -8,8 +8,11 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { esFallo } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
@@ -32,7 +35,9 @@ import {
   SincronizarPlantillaEnTerminales,
 } from '../aplicacion/sincronizacion-total';
 import type { ResultadoDeSincronizacionTotal } from '../aplicacion/sincronizacion-total';
+import { AceptarConsentimientoPresencial } from '../aplicacion/consentimiento-presencial';
 import {
+  AceptacionPresencialDto,
   CapturarRostroDto,
   EnlaceDeConsentimientoDto,
   RespuestaDeConsentimientoDto,
@@ -84,17 +89,24 @@ const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
 @Controller('copropiedades/:id/biometria')
 export class BiometriaController {
   constructor(
-    private readonly capturar: CapturarRostro,
-    private readonly responder: ResponderConsentimiento,
-    private readonly revocar: RevocarConsentimiento,
-    private readonly sincronizar: SincronizarPlantilla,
-    private readonly barrer: BarrerPlantillasVencidas,
+    // H-SITIO-06 · `@Inject` explícito: con `tsx` (start:dev) no hay metadatos
+    // de tipos y estos ocho llegaban como `undefined` (inyeccion-explicita.mjs).
+    @Inject(CapturarRostro) private readonly capturar: CapturarRostro,
+    @Inject(ResponderConsentimiento) private readonly responder: ResponderConsentimiento,
+    @Inject(RevocarConsentimiento) private readonly revocar: RevocarConsentimiento,
+    @Inject(SincronizarPlantilla) private readonly sincronizar: SincronizarPlantilla,
+    @Inject(BarrerPlantillasVencidas) private readonly barrer: BarrerPlantillasVencidas,
+    @Inject(EmitirEnlaceDeConsentimiento)
     private readonly emitirEnlace: EmitirEnlaceDeConsentimiento,
+    @Inject(SincronizarPlantillaEnTerminales)
     private readonly sincronizarEnTerminales: SincronizarPlantillaEnTerminales,
+    @Inject(PropagarConsentimientoAceptado)
     private readonly propagar: PropagarConsentimientoAceptado,
     @Inject(REPOSITORIO_CONSENTIMIENTOS)
     private readonly consentimientos: RepositorioConsentimientos,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    @Inject(AceptarConsentimientoPresencial)
+    private readonly presencial: AceptarConsentimientoPresencial,
   ) {}
 
   @Post('capturas')
@@ -132,7 +144,14 @@ export class BiometriaController {
   }
 
   @Get('consentimientos/:consentimientoId')
-  @Roles('administrador', 'portero', 'operador_central', 'residente')
+  /**
+   * H-SITIO-03 · `superadministrador` faltaba aquí y la pantalla «Rostro del
+   * visitante», que él SÍ ve, llama a esta ruta tras cada captura: en sitio
+   * contestó 403 y el seguimiento del consentimiento no se pudo comprobar.
+   * `roles-de-biometria.e2e.test.ts` cruza ahora cada ruta que la pantalla
+   * llama con cada rol que la ve.
+   */
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central', 'residente')
   @ApiOperation({ summary: 'Estado de un consentimiento, sin dato biométrico alguno' })
   async verConsentimiento(
     @Param('id', ParseUUIDPipe) copropiedadId: string,
@@ -202,6 +221,7 @@ export class BiometriaController {
       token: e.token,
       ruta: e.ruta,
       url: e.url,
+      alcance: e.alcance,
       expiraEn: e.expiraEn.toISOString(),
     };
   }
@@ -234,6 +254,45 @@ export class BiometriaController {
     // A3 · aceptado = hacia todas las terminales, ya. Lo que no llegue se dice.
     const propagacion =
       r.estado === 'vigente' ? await this.propagar.ejecutar(destino, { consentimientoId }) : [];
+    return { estado: r.estado, propagacion: propagacion.map(aSincronizacionDto) };
+  }
+
+  /**
+   * D-10 · el titular en la portería: escribe su nombre y documento y acepta la
+   * política que se le muestra. El residente queda fuera a propósito: nunca
+   * acepta por su visitante (RN-10). Límite estricto por identidad: comparar
+   * contra el padrón no puede convertirse en un oráculo de documentos.
+   */
+  @Post('consentimientos/:consentimientoId/aceptacion-presencial')
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10)',
+  })
+  @ApiOkResponse({ type: RespuestaDeConsentimientoDto })
+  async aceptarPresencialmente(
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
+    @Contexto() ctx: ContextoTenant,
+    @Body() dto: AceptacionPresencialDto,
+    @Req() peticion: Request,
+  ): Promise<RespuestaDeConsentimientoDto> {
+    const destino = await this.aislamiento.exigirAlcance(
+      ctx,
+      copropiedadId,
+      'biometria/consentimientos/presencial',
+    );
+    const agente = peticion.headers['user-agent'];
+    const r = desenvolver(
+      await this.presencial.ejecutar(destino, {
+        consentimientoId,
+        identidad: { nombreCompleto: dto.nombreCompleto, numeroDocumento: dto.numeroDocumento },
+        versionPoliticaAceptada: dto.versionPolitica,
+        origen: { ip: peticion.ip ?? null, userAgent: typeof agente === 'string' ? agente : null },
+      }),
+    );
+    // Aceptado = hacia todos los equipos con biblioteca de rostros, ya.
+    const propagacion = await this.propagar.ejecutar(destino, { consentimientoId });
     return { estado: r.estado, propagacion: propagacion.map(aSincronizacionDto) };
   }
 
@@ -284,7 +343,14 @@ export class BiometriaController {
    * duplica.
    */
   @Post('plantillas/:plantillaId/sincronizacion-total')
-  @Roles('superadministrador', 'administrador')
+  /**
+   * H-SITIO-03 · la pantalla que captura el rostro la llaman también portero y
+   * operador de central —son quienes atienden al visitante— y aquí sólo
+   * entraban los dos roles administrativos: el «Comprobar y sincronizar» del
+   * seguimiento les devolvía 403. No relaja RN-09: el caso de uso sigue
+   * negándose sin consentimiento vigente, sea quien sea quien lo pida.
+   */
+  @Roles('superadministrador', 'administrador', 'portero', 'operador_central')
   @ApiOperation({
     summary: 'Empuja la plantilla a todos los equipos con biblioteca de rostros (RN-09)',
   })

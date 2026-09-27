@@ -4,11 +4,15 @@ import type {
   ResultadoAccionamiento,
 } from '@ncr/domain-core';
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
-import type { OpcionesDeEquipo } from '../equipo/cliente';
+import type { OpcionesDeEquipo, RespuestaDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
-import { comoErrorNeutral } from '../equipo/errores-del-fabricante';
+import { resumenIsapi } from '../equipo/errores-del-fabricante';
+import { identificadorEnElEquipo } from './identificador-en-el-equipo';
+import { AperturaNoSoportada, abrirPuertaRemota } from '../equipo/puerta-remota';
 import { BibliotecaLlena } from '../nucleo/errores';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
+import { recuentoDeLaBiblioteca } from './recuento-de-biblioteca';
+import { confirmada, exigirConfirmacion } from '../equipo/confirmacion-isapi';
 
 /**
  * TERMINAL FACIAL · `DS-K1T344MBFWX-E1` · V4.47.0 build 250722.
@@ -153,12 +157,19 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
 
     const ruta = rutaPara('cargar la plantilla facial', 'terminal');
     const separador = `----ncr${String(plantilla.byteLength)}`;
+    /**
+     * H-SITIO-04 · el registro PLANO, como el «Request Message» de la guía
+     * (`faceLibType` y `FDID` requeridos, `FPID` = `employeeNo`). Se enviaba
+     * envuelto en `{"FaceDataRecord": {…}}`, que el equipo no reconoce: para él
+     * faltaban los dos campos requeridos. `name` lleva el mismo identificador
+     * que la persona: ningún dato personal viaja al aparato.
+     */
+    const identificador = identificadorEnElEquipo(plantillaId);
     const descriptor = JSON.stringify({
-      FaceDataRecord: {
-        faceLibType: 'blackFD',
-        FDID: this.opciones.bibliotecaId ?? '1',
-        FPID: plantillaId,
-      },
+      faceLibType: 'blackFD',
+      FDID: this.opciones.bibliotecaId ?? '1',
+      FPID: identificador,
+      name: identificador,
     });
 
     const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
@@ -166,6 +177,21 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       contenido: this.sobre(separador, descriptor, plantilla),
     });
 
+    // H-SITIO-04 · lo que el equipo contestó, sin imagen ni datos personales.
+    const resumen = resumenIsapi(respuesta.cuerpo);
+    this.opciones.traza?.registrar(
+      respuesta.ok ? 'info' : 'error',
+      'carga de plantilla en la terminal',
+      {
+        dispositivoId,
+        estadoHttp: respuesta.estado,
+        statusCode: resumen.statusCode,
+        subStatusCode: resumen.subStatusCode,
+        errorCode: resumen.errorCode,
+        errorMsg: resumen.errorMsg,
+        bytesDeImagen: plantilla.byteLength,
+      },
+    );
     this.exigir(respuesta, ruta.proposito, ruta.ruta, dispositivoId);
     await this.exigirPresencia(dispositivoId, plantillaId, antes);
   }
@@ -242,7 +268,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
       tipo: 'application/json',
       contenido: JSON.stringify({
-        FPID: [{ value: plantillaId }],
+        FPID: [{ value: identificadorEnElEquipo(plantillaId) }],
         FDID: this.opciones.bibliotecaId ?? '1',
       }),
     });
@@ -257,16 +283,38 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
   }
 
   /** Cuántas plantillas hay en la biblioteca. `null` si el equipo no contesta. */
+  /**
+   * 15-K (§5) · la baja de la PERSONA, que es la que lleva el rostro colgado.
+   * La usa la captura de sitio para no dejar en el equipo la persona de la
+   * carga de prueba. Como «Person Deleting» de la guía: `mode: byEmployeeNo`,
+   * sin error si la persona no existe, y ASÍNCRONA —un 200 dice que empezó,
+   * no que terminó—. Por eso quien la llama no la da por hecha.
+   */
+  async darDeBajaPersona(plantillaId: string): Promise<RespuestaDeEquipo> {
+    const ruta = rutaPara('dar de baja a la persona y con ella su plantilla', 'terminal');
+    return this.cliente.pedir(ruta.metodo, ruta.ruta, {
+      tipo: 'application/json',
+      contenido: JSON.stringify({
+        UserInfoDetail: {
+          mode: 'byEmployeeNo',
+          EmployeeNoList: [{ employeeNo: identificadorEnElEquipo(plantillaId) }],
+        },
+      }),
+    });
+  }
+
   async contar(): Promise<number | null> {
     const ruta = rutaPara('contar las plantillas de la biblioteca de rostros', 'terminal');
+    // Anexo 15-K · GET con la biblioteca en la consulta, como la guía; antes,
+    // un POST que la terminal habría rechazado por validar el cuerpo primero.
+    const consulta = ruta.ruta.replace(
+      'FDID=1',
+      `FDID=${encodeURIComponent(this.opciones.bibliotecaId ?? '1')}`,
+    );
     try {
-      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
-        tipo: 'application/json',
-        contenido: JSON.stringify({ FDID: this.opciones.bibliotecaId ?? '1' }),
-      });
+      const respuesta = await this.cliente.pedir(ruta.metodo, consulta);
       if (!respuesta.ok || NO_SOPORTADO.test(respuesta.cuerpo)) return null;
-      const n = /"totalNum"\s*:\s*(\d+)/.exec(respuesta.cuerpo)?.[1];
-      return n === undefined ? null : Number(n);
+      return recuentoDeLaBiblioteca(respuesta.cuerpo);
     } catch (error) {
       if (error instanceof EquipoInalcanzable) return null;
       throw error;
@@ -283,7 +331,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
           searchResultPosition: 0,
           maxResults: 1,
           FDID: this.opciones.bibliotecaId ?? '1',
-          FPID: plantillaId,
+          FPID: identificadorEnElEquipo(plantillaId),
         }),
       });
       if (!respuesta.ok || NO_SOPORTADO.test(respuesta.cuerpo)) return null;
@@ -327,7 +375,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
         }),
       });
       if (NO_SOPORTADO.test(respuesta.cuerpo)) throw new RutaNoSoportada(ruta.proposito, ruta.ruta);
-      if (!respuesta.ok) throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
+      exigirConfirmacion(dispositivoId, respuesta);
       return { aceptado: true, latenciaMs: respuesta.latenciaMs };
     } catch (error) {
       if (error instanceof EquipoInalcanzable) {
@@ -345,16 +393,11 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       this.opciones.numeroDePuerta ?? undefined,
     );
     try {
-      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
-        tipo: 'application/xml',
-        contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
-      });
-      if (NO_SOPORTADO.test(respuesta.cuerpo)) throw new RutaNoSoportada(ruta.proposito, ruta.ruta);
-      if (!respuesta.ok) throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
-      return { aceptado: true, latenciaMs: respuesta.latenciaMs };
+      // H-SITIO-13 · cuerpo de la guía, código ISAPI e intercambio completo.
+      return await abrirPuertaRemota(this.cliente, ruta, dispositivoId);
     } catch (error) {
-      if (error instanceof EquipoInalcanzable) {
-        return { aceptado: false, latenciaMs: error.latenciaMs };
+      if (error instanceof AperturaNoSoportada) {
+        throw new RutaNoSoportada(ruta.proposito, ruta.ruta);
       }
       throw error;
     }
@@ -379,13 +422,15 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
    */
   private async altaDePersona(dispositivoId: string, plantillaId: string): Promise<void> {
     const ruta = rutaPara('dar de alta la persona a la que pertenece la plantilla', 'terminal');
+    // H-SITIO-04 · 32 letras y dígitos: el máximo que la guía da por general.
+    const identificador = identificadorEnElEquipo(plantillaId);
     const persona = JSON.stringify({
       UserInfo: {
-        employeeNo: plantillaId,
+        employeeNo: identificador,
         // El nombre NO viaja: el equipo no es fuente de verdad y no hay
         // motivo para dejar datos personales en un aparato cuyo registro se
         // puede borrar por API. La identidad vive en `plantillas_biometricas`.
-        name: plantillaId,
+        name: identificador,
         userType: 'normal',
         Valid: { enable: false },
       },
@@ -394,7 +439,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       tipo: 'application/json',
       contenido: persona,
     });
-    if (respuesta.ok) return;
+    if (confirmada(respuesta)) return;
     if (/exist|duplicat/i.test(respuesta.cuerpo)) {
       const modificar = rutaPara(
         'modificar la persona a la que pertenece la plantilla',
@@ -410,18 +455,35 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     this.exigir(respuesta, ruta.proposito, ruta.ruta, dispositivoId);
   }
 
+  /**
+   * H-SITIO-04 · el formulario como lo describe la guía: la parte JSON
+   * `FaceDataRecord` y la imagen en la parte **`img`** con `filename`
+   * `facePic.jpg`, cada una con su `Content-Length` (marco de formulario del
+   * capítulo 4.5.1.4). Se enviaba la imagen como `FaceImage`, sin nombre de
+   * fichero ni longitudes.
+   */
   private sobre(separador: string, descriptor: string, imagen: Uint8Array): Uint8Array {
+    const json = Buffer.from(descriptor, 'utf8');
     const cabecera = Buffer.from(
       `--${separador}\r\nContent-Disposition: form-data; name="FaceDataRecord"\r\n` +
-        `Content-Type: application/json\r\n\r\n${descriptor}\r\n` +
-        `--${separador}\r\nContent-Disposition: form-data; name="FaceImage"\r\n` +
-        'Content-Type: image/jpeg\r\n\r\n',
+        `Content-Type: application/json\r\nContent-Length: ${String(json.byteLength)}\r\n\r\n`,
     );
-    return Buffer.concat([cabecera, Buffer.from(imagen), Buffer.from(`\r\n--${separador}--\r\n`)]);
+    const entreMedias = Buffer.from(
+      `\r\n--${separador}\r\n` +
+        'Content-Disposition: form-data; name="img"; filename="facePic.jpg"\r\n' +
+        `Content-Type: image/jpeg\r\nContent-Length: ${String(imagen.byteLength)}\r\n\r\n`,
+    );
+    return Buffer.concat([
+      cabecera,
+      json,
+      entreMedias,
+      Buffer.from(imagen),
+      Buffer.from(`\r\n--${separador}--\r\n`),
+    ]);
   }
 
   private exigir(
-    respuesta: { ok: boolean; cuerpo: string; estado: number },
+    respuesta: { ok: boolean; cuerpo: string; estado: number; desafioVencido?: boolean },
     proposito: string,
     ruta: string,
     dispositivoId: string,
@@ -429,11 +491,8 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     if (NO_SOPORTADO.test(respuesta.cuerpo) || respuesta.estado === 404) {
       throw new RutaNoSoportada(proposito, ruta);
     }
-    // Un `200` con código de estado de error dentro también es un rechazo: así
-    // contestan estos equipos cuando exigen reinicio.
-    const codigo = /<statusCode>\s*(\d+)\s*<\/statusCode>/i.exec(respuesta.cuerpo)?.[1];
-    if (!respuesta.ok || (codigo !== undefined && codigo !== '0' && codigo !== '1')) {
-      throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
-    }
+    // Anexo 15-K (c) · aceptada sólo con statusCode 1 y su subStatusCode; un
+    // 200 sin ellos, o con otro código, no es una escritura hecha.
+    exigirConfirmacion(dispositivoId, respuesta);
   }
 }

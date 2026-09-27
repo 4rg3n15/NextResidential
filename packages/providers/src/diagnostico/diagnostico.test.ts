@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DESVIO_TOLERABLE_SEGUNDOS, diagnosticarEquipo, juzgarHora } from './diagnostico-de-equipo';
+import {
+  DESVIO_TOLERABLE_SEGUNDOS,
+  diagnosticarEquipo,
+  documentoSaneado,
+  juzgarHora,
+} from './diagnostico-de-equipo';
 import { fichaDe } from './ficha';
 import { CorreccionSinConfirmar, aplicarCorreccion } from './correcciones';
 import { equipoSimulado, equiposSimulados } from '../simulacion/equipo-simulado';
@@ -588,5 +593,72 @@ describe('A2 · la corrección de verificación remota de la terminal', () => {
     });
     expect(r.aplicada).toBe(false);
     expect(r.detalle).toMatch(/no declara|a ciegas/i);
+  });
+});
+
+describe('H-SITIO-01 · la ficha de la cámara trae lo que el equipo CONTESTÓ', () => {
+  it('EntranceParam y el disparador, junto al veredicto que se leyó de ellos', async () => {
+    const ficha = fichaDe(await diagnosticar({ ctrlMod: '0' }));
+    const titulos = (ficha.crudos ?? []).map((c) => c.titulo);
+    expect(titulos).toEqual(['Parámetros de entrada (EntranceParam)', 'Disparador vinculado']);
+    expect(ficha.crudos?.[0]?.contenido).toMatch(/<ctrlMode?>0</);
+  });
+
+  it('saneado: sin claves y sin la dirección del equipo', () => {
+    const crudo =
+      '<EntranceParam><host>203.0.113.40</host><password>clave-de-prueba</password>' +
+      '<secretKey>k</secretKey></EntranceParam>';
+    const saneado = documentoSaneado(crudo);
+    expect(saneado).not.toContain('203.0.113.40');
+    expect(saneado).not.toContain('clave-de-prueba');
+    expect(saneado).toContain('<password>***</password>');
+  });
+
+  it('una familia que no lo aporta no inventa documentos', async () => {
+    const d = await diagnosticarEquipo({
+      host: HOST,
+      puerto: 80,
+      protocolo: 'http',
+      ...CREDENCIAL,
+      familia: 'terminal',
+      peticion: equiposSimulados({ [HOST]: { familia: 'terminal', ...CREDENCIAL } }),
+      ahoraDelServidor: () => new Date(0),
+    });
+    expect(fichaDe(d).crudos).toBeUndefined();
+  });
+});
+
+describe('15-K (§4) · el simulado recuerda la corrección del modo de control', () => {
+  it('corregido, el siguiente diagnóstico ya no bloquea por el modo', async () => {
+    const peticion = camara({ ctrlMod: '0' });
+    const opciones = {
+      host: HOST,
+      puerto: 80,
+      protocolo: 'http' as const,
+      ...CREDENCIAL,
+      peticion,
+    };
+    const antes = fichaDe(
+      await diagnosticarEquipo({
+        ...opciones,
+        familia: 'camara',
+        ahoraDelServidor: () => new Date(0),
+      }),
+    );
+    expect(antes.hallazgos.some((h) => h.correccion === 'modo_de_control')).toBe(true);
+    const r = await aplicarCorreccion({
+      ...opciones,
+      clase: 'modo_de_control',
+      confirmadaPor: 'instalador-1',
+    });
+    expect(r.aplicada).toBe(true);
+    const despues = fichaDe(
+      await diagnosticarEquipo({
+        ...opciones,
+        familia: 'camara',
+        ahoraDelServidor: () => new Date(0),
+      }),
+    );
+    expect(despues.hallazgos.some((h) => h.correccion === 'modo_de_control')).toBe(false);
   });
 });

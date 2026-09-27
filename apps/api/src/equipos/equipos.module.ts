@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
+import { BITACORA } from '@ncr/domain-core';
+import type { Bitacora } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import {
@@ -9,7 +11,14 @@ import {
   REPOSITORIO_DE_EQUIPOS,
   SONDA_DE_EQUIPO,
 } from './aplicacion/puertos';
-import type { RepositorioDeEquipos } from './aplicacion/puertos';
+import type { RepositorioDeAtestaciones, RepositorioDeEquipos } from './aplicacion/puertos';
+import { REPOSITORIO_DE_ATESTACIONES } from './aplicacion/puertos';
+import { RegistrarAtestacionDelInstalador } from './aplicacion/atestacion-del-instalador';
+import {
+  RepositorioDeAtestacionesEnMemoria,
+  RepositorioDeAtestacionesPg,
+} from './infraestructura/atestaciones';
+import { AtestacionesController } from './presentacion/atestaciones.controller';
 import {
   TERMINALES_DE_ROSTROS,
   TerminalesDeRostrosDesdeRegistro,
@@ -33,10 +42,37 @@ export class EquiposModule {
   static registrar(): DynamicModule {
     return {
       module: EquiposModule,
-      controllers: [EquiposController],
+      controllers: [EquiposController, AtestacionesController],
       providers: [
-        { provide: SONDA_DE_EQUIPO, useFactory: () => new SondaPorProveedor() },
+        {
+          provide: SONDA_DE_EQUIPO,
+          inject: [BITACORA],
+          useFactory: (bitacora: Bitacora) => new SondaPorProveedor(undefined, bitacora),
+        },
         { provide: CORRECTOR_DE_EQUIPO, useFactory: () => new CorrectorPorProveedor() },
+        // D-11 · atestaciones: PostgreSQL con base; sin ella, el doble de la suite.
+        RepositorioDeAtestacionesEnMemoria,
+        {
+          provide: REPOSITORIO_DE_ATESTACIONES,
+          inject: [Pool, CONFIGURACION, RepositorioDeAtestacionesEnMemoria],
+          useFactory: (
+            pool: Pool,
+            c: Configuracion,
+            enMemoria: RepositorioDeAtestacionesEnMemoria,
+          ) =>
+            c.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new RepositorioDeAtestacionesPg(pool)
+              : enMemoria,
+        },
+        {
+          provide: RegistrarAtestacionDelInstalador,
+          inject: [REPOSITORIO_DE_EQUIPOS, REPOSITORIO_DE_ATESTACIONES, BITACORA],
+          useFactory: (
+            equipos: RepositorioDeEquipos,
+            atestaciones: RepositorioDeAtestaciones,
+            bitacora: Bitacora,
+          ) => new RegistrarAtestacionDelInstalador(equipos, atestaciones, bitacora),
+        },
         {
           provide: REPOSITORIO_DE_EQUIPOS,
           inject: [Pool, CONFIGURACION],

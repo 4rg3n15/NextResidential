@@ -504,8 +504,21 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    * comprueba `seguimiento.test.tsx` es que se muestre por terminal el estado
    * que la API devuelve.
    */
+  // ETAPA 15-K (D-10) · y el formulario presencial del TITULAR: nombre y
+  // documento de PERSONA que él escribe, no identificadores internos. Lo
+  // comprueba `seguimiento.test.tsx` («D-10»): campos vacíos al abrir, envío
+  // con la versión mostrada y formulario vaciado al aceptar.
   'biometria/seguimiento.tsx':
-    'dos botones; consentimiento y plantilla vienen de la captura y viajan en la ruta; el único input es de sólo lectura',
+    'consentimiento y plantilla viajan en la ruta; el formulario presencial pide nombre y documento de persona, con prueba propia',
+  /**
+   * ETAPA 15-K (D-11) · la atestación del instalador: dos placas, «ninguna
+   * abrió» y la evidencia en texto. El equipo viaja en la RUTA desde su fila;
+   * el diálogo sólo aparece para el superadministrador y con una cámara en el
+   * inventario, que este barrido (inventario vacío) no siembra. Lo comprueba
+   * `dispositivos/atestacion-dialogo.test.tsx`: el cuerpo exacto que envía.
+   */
+  'dispositivos/atestacion-dialogo.tsx':
+    'placas y evidencia en texto; el equipo viaja en la ruta; prueba propia del cuerpo enviado',
   /**
    * ETAPA 15-D (O3) · la fotografía del visitante: la entrada es un archivo de
    * imagen elegido con el selector del navegador, y el identificador de la

@@ -346,6 +346,11 @@ supabase db push
 pnpm --filter @ncr/api start:dev
 ```
 
+`start:dev` compila con `tsc` y arranca `dist/main.js` con `node --watch`; para
+recompilar en caliente, `pnpm --filter @ncr/api start:compilar` en otra
+terminal. **No con `tsx`**: no emite metadatos de tipos, el `ValidationPipe` no
+validaría ningún DTO y la API se niega a arrancar (H-SITIO-06, anexo 15-K).
+
 Endpoints de salud: `/health` (proceso vivo) y `/ready` (dependencias alcanzables, incluida una sonda real contra JWKS).
 
 ### Las tres aplicaciones contra una base, y los tres equipos (ETAPAS 15-E a 15-I)
@@ -357,8 +362,8 @@ casa» y «en sitio», es
 [`VALIDACION_HIKVISION_EN_SITIO.md`](docs/guias/VALIDACION_HIKVISION_EN_SITIO.md)
 §V**; aquí va el resumen:
 
-1. **Base.** `supabase db push` con todas las migraciones, **hasta la 0038**
-   (residentes y acceso por código) y, para ensayar con datos, la semilla:
+1. **Base.** `supabase db push` con todas las migraciones, **hasta la 0039**
+   (atestación del instalador) y, para ensayar con datos, la semilla:
    `./supabase/verificar.sh --con-semillas`.
 2. **API** (`apps/api/.env`, sólo nombres en el repositorio):
    `PERSISTENCIA_DE_EVENTOS=postgres` y `PERSISTENCIA_DE_BIOMETRIA=postgres`
@@ -366,16 +371,19 @@ casa» y «en sitio», es
    `CARGADOR_DE_CONTEXTO=postgres`; `PROVEEDOR_DE_EQUIPOS=hikvision`;
    `API_URL_PUBLICA` con la IP de la máquina, porque el teléfono del visitante
    abre el enlace de consentimiento contra ella; `GO2RTC_URL` si va a haber
-   video; `ALARM_SERVER_EQUIPOS` con la cámara. Arranque:
-   `pnpm --filter @ncr/api start:dev`. La bitácora dice qué persistencia, qué
-   accionador y qué puente quedaron activos.
+   video; `ALARM_SERVER_EQUIPOS` con la cámara. Arranque, compilado y no con
+   `start:dev` (15-K): `pnpm turbo run build --filter=@ncr/api` y
+   `pnpm --filter @ncr/api start`. La bitácora dice qué persistencia, qué
+   accionador, qué puente y qué conexión de pg-boss quedaron activos.
 3. **go2rtc** en la misma máquina, sin ningún equipo en su fichero: la API
    registra cada flujo al pedirlo.
-4. **Consola** (`apps/web/.env`: `API_URL=http://<IP>:3000`, `PUENTE_VIDEO_URL`
-   vacío, ADR-022), **en el portátil y no en Netlify** durante la visita: el
-   SSE y el audio pasan por su servidor (ADR-028, C-37). Arranque:
-   `pnpm --filter @ncr/web build && pnpm --filter @ncr/web start`. Por IP sin
-   TLS se ve el video; el micrófono exige `https` o `localhost`
+4. **Consola** (`apps/web/.env`: `API_URL=http://127.0.0.1:3000` —la resuelve
+   el servidor de la consola, en la misma máquina que la API—,
+   `PUENTE_VIDEO_URL` vacío, ADR-022), **en el portátil y no en Netlify**
+   durante la visita: el SSE y el audio pasan por su servidor (ADR-028, C-37).
+   Arranque: `pnpm --filter @ncr/web build && pnpm --filter @ncr/web start`, y
+   se abre **por IP** (`http://<IP>:3100`). Por IP sin TLS se ve el video; el
+   micrófono exige `https` o el bucle local
    ([`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](docs/guias/CONSOLA_EN_RED_Y_DESPLIEGUE.md)).
    Se entra con el **código corto o el NIT** de la copropiedad, el usuario y la
    contraseña (D1).
@@ -389,8 +397,11 @@ casa» y «en sitio», es
    corregir antes de operar. La cámara, además, se apunta a
    `http://<IP>:3000/alarm-server/<secreto>`; la terminal y el videoportero no
    se configuran hacia la API: es la API la que se suscribe a sus eventos.
-7. **Guion de sitio** (`scripts/puesta-en-marcha-equipos.mjs --sin-accionar`
-   primero) y la **hoja de resultados** que escribe: los 16 escenarios en 26
+7. **Guion de sitio** (`scripts/puesta-en-marcha-equipos.mjs --sin-accionar
+--capturar=<carpeta fuera del repositorio>` primero, ANTES de tocar ningún
+   equipo: es la referencia de la reversión), después `--abrir` —la apertura
+   demostrada en sitio, que pregunta si la puerta se movió (anexo 15-K)— y la
+   **hoja de resultados** que escribe: los 16 escenarios en 26
    filas escenario × canal de
    [`INTEGRACION_HIKVISION.md`](docs/guias/INTEGRACION_HIKVISION.md) §9, ya
    ensayados en SIMULADO en

@@ -1,6 +1,7 @@
 import type { ControlDeBarrera, ResultadoDeAccionamiento } from '@ncr/domain-core';
 import { ordenAceptada, ordenInalcanzable, ordenRechazada } from '@ncr/domain-core';
-import { SesionDigest, cnonceAleatorio } from './digest';
+import { cnonceAleatorio, interpretarDesafio, sesionDigestCompartida } from './digest';
+import type { SesionDigest } from './digest';
 
 /**
  * Adaptador real de la barrera vehicular.
@@ -82,15 +83,18 @@ export class ControlDeBarreraVehicular implements ControlDeBarrera {
   private readonly ahora: () => number;
 
   constructor(private readonly opciones: OpcionesDeBarrera) {
-    this.sesion = new SesionDigest(
-      { usuario: opciones.usuario, clave: opciones.clave },
-      opciones.generarCnonce ?? cnonceAleatorio,
-    );
     // El equipo medido responde por HTTP con Digest, **no** por HTTPS: forzar
     // TLS aquí lo dejaría inalcanzable. Está anotado en la guía de validación.
     this.base = `http://${opciones.host}:${String(opciones.puerto ?? 80)}`;
     this.tiempoLimiteMs = opciones.tiempoLimiteMs ?? TIEMPO_LIMITE_POR_OMISION_MS;
     this.peticion = opciones.peticion ?? fetch;
+    // H-SITIO-12 · la MISMA sesión Digest que el resto de clientes del equipo.
+    this.sesion = sesionDigestCompartida(
+      this.peticion,
+      this.base,
+      { usuario: opciones.usuario, clave: opciones.clave },
+      opciones.generarCnonce ?? cnonceAleatorio,
+    );
     this.ahora = opciones.ahora ?? (() => Date.now());
   }
 
@@ -127,15 +131,25 @@ export class ControlDeBarreraVehicular implements ControlDeBarrera {
       }
 
       if (respuesta.status === 401) {
-        // Dos rechazos seguidos son credenciales, no caducidad. No se insiste:
-        // el equipo bloquea la cuenta tras unos pocos intentos fallidos.
-        return ordenRechazada('El equipo rechazó las credenciales', transcurrido());
+        // H-SITIO-12 · dos rechazos seguidos NO son siempre credenciales: con
+        // `stale=true` el equipo aceptó el resumen y venció el nonce otra vez.
+        // En ninguno de los dos casos se insiste: la cuenta se bloquea.
+        const cabecera = respuesta.headers.get('www-authenticate');
+        this.sesion.aceptarDesafio(cabecera);
+        return interpretarDesafio(cabecera)?.stale === true
+          ? ordenRechazada(
+              'El equipo venció el desafío de acceso dos veces seguidas: no es la clave. ' +
+                'Reintente la orden',
+              transcurrido(),
+            )
+          : ordenRechazada('El equipo rechazó las credenciales', transcurrido());
       }
 
       const cuerpo = await respuesta.text();
       const codigo = codigoDeRespuesta(cuerpo);
 
-      if (respuesta.ok && codigo === CODIGO_DE_ACEPTACION) {
+      // Anexo 15-K (c) · statusCode 1 Y su subStatusCode: lo exige la guía.
+      if (respuesta.ok && codigo === CODIGO_DE_ACEPTACION && /<subStatusCode>/i.test(cuerpo)) {
         /**
          * **H-1 · aceptada NO es abierta.** Observado en el equipo: con la
          * barrera bloqueada, la orden de abrir contesta afirmativamente y el

@@ -167,3 +167,14 @@ describe('cobertura de la ETAPA 09-A', () => {
     }
   });
 });
+
+describe('H-SITIO-02 · las órdenes de configurar/sincronizar/reiniciar dicen si llegan al equipo', () => {
+  it('pendientes declara que SÓLO se registran: la consola lo escribe en el botón', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_A}/dispositivos/pendientes`)
+      .set('authorization', `Bearer ${await comoAdmin()}`)
+      .expect(200);
+    expect(res.body.ejecutaContraElEquipo).toBe(false);
+    expect(res.body.detalleDeEjecucion).toMatch(/ninguna llega al equipo/);
+  });
+});

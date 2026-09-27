@@ -363,6 +363,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10) */
+        post: operations["BiometriaController_aceptarPresencialmente"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace": {
         parameters: {
             query?: never;
@@ -580,6 +597,23 @@ export interface paths {
         /** Edita un equipo. Sin «secreto» en el cuerpo, la clave no cambia */
         put: operations["EquiposController_editar"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}/atestacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** D-11 · registra la verificación FÍSICA de una cámara: una placa de su lista blanca y una desconocida, ninguna abrió. Vale para el firmware actual del equipo */
+        post: operations["AtestacionesController_atestar"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2000,6 +2034,16 @@ export interface components {
             /** Format: date-time */
             hasta: string;
         };
+        AceptacionPresencialDto: {
+            /** @description Nombre completo, escrito por el propio titular */
+            nombreCompleto: string;
+            /** @description Número de documento, escrito por el propio titular */
+            numeroDocumento: string;
+            /** @description Versión de la política que se le mostró y aceptó */
+            versionPolitica: string;
+            /** @description Declaración expresa del titular: leyó y acepta. Sólo `true`; lo demás es 400. */
+            aceptaPolitica: boolean;
+        };
         AceptadoDto: {
             /** @example true */
             aceptado: boolean;
@@ -2110,6 +2154,28 @@ export interface components {
             /** @description false cierra la zona; true la vuelve a abrir */
             abierta: boolean;
             motivo: string;
+        };
+        AtestacionDeEquipoDto: {
+            id: string;
+            firmware: string;
+            placaEnListaBlanca: string;
+            placaDesconocida: string;
+            evidencia: string;
+            registradaEn: string;
+            registradaPor: string;
+            vigente: boolean;
+            /** @description Por qué no vale (p. ej. el firmware cambió). `null` si está vigente. */
+            motivoSinEfecto: string | null;
+        };
+        AtestacionDeEquipoEntradaDto: {
+            /** @description Una placa que ESTÁ en la lista blanca del equipo */
+            placaEnListaBlanca: string;
+            /** @description Una placa que NO está en ninguna lista del equipo */
+            placaDesconocida: string;
+            /** @description Lo que se atesta: ninguna de las dos abrió. Sólo `true`; lo demás es 400. */
+            ningunaAbrio: boolean;
+            /** @description Lo que vio el instalador: hora, carril, qué pasó con cada placa */
+            evidencia: string;
         };
         AutorizacionDto: {
             /** Format: uuid */
@@ -2623,6 +2689,10 @@ export interface components {
             /** @description Cuántas plantillas siguen sin llegar a este equipo. Distingue «falló la última» de «hay catorce sin llegar». */
             sincronizacionesFallidas: number;
         };
+        DocumentoCrudoDelEquipoDto: {
+            titulo: string;
+            contenido: string;
+        };
         EdicionAplicadaDto: {
             editado: boolean;
         };
@@ -2703,6 +2773,11 @@ export interface components {
             ruta: string;
             /** @description URL completa si API_URL_PUBLICA está declarada; null si no lo está */
             url: string | null;
+            /**
+             * @description H-SITIO-10 · si otro aparato puede abrir `url`. `bucle_local`: 127.0.0.1/localhost, que en un teléfono es el propio teléfono; la consola lo advierte junto al QR.
+             * @enum {string}
+             */
+            alcance: "ausente" | "bucle_local" | "alcanzable";
             /** @description Caducidad del enlace (ISO 8601) */
             expiraEn: string;
         };
@@ -2727,6 +2802,8 @@ export interface components {
             motivoNoVerificado: string | null;
             /** @enum {string} */
             estado: "activo" | "inactivo";
+            /** @description D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó. */
+            atestacion: components["schemas"]["AtestacionDeEquipoDto"] | null;
         };
         EquiposDto: {
             equipos: components["schemas"]["EquipoDto"][];
@@ -2894,6 +2971,8 @@ export interface components {
             desvioDeRelojSegundos: number | null;
             hallazgos: components["schemas"]["HallazgoDelEquipoDto"][];
             sinComprobar: string[];
+            /** @description H-SITIO-01 · lo que el equipo CONTESTÓ, saneado (sin claves, IPs enmascaradas), para leer el veredicto contra el documento y no contra una interpretación. Ausente cuando la familia no lo aporta. */
+            crudos?: components["schemas"]["DocumentoCrudoDelEquipoDto"][];
         };
         FilaDeInformeDto: {
             /** Format: date-time */
@@ -3340,6 +3419,10 @@ export interface components {
         PendientesDto: {
             /** @description Identificadores de equipos con una orden sin ejecutar: se muestran «sincronizando». */
             dispositivos: string[];
+            /** @description H-SITIO-02 · `false` si configurar, sincronizar y reiniciar sólo registran la orden sin llegar al equipo. La consola lo escribe en el botón. */
+            ejecutaContraElEquipo: boolean;
+            /** @description Qué hacen de verdad esas tres órdenes. */
+            detalleDeEjecucion: string;
         };
         PerfilDelResidenteDto: {
             nombres: string | null;
@@ -4588,6 +4671,32 @@ export interface operations {
             };
         };
     };
+    BiometriaController_aceptarPresencialmente: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                consentimientoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AceptacionPresencialDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespuestaDeConsentimientoDto"];
+                };
+            };
+        };
+    };
     BiometriaController_emitirEnlaceDeConsentimiento: {
         parameters: {
             query?: never;
@@ -4955,6 +5064,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EquipoDto"];
+                };
+            };
+        };
+    };
+    AtestacionesController_atestar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtestacionDeEquipoEntradaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtestacionDeEquipoDto"];
                 };
             };
         };

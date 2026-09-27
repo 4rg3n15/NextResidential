@@ -131,3 +131,28 @@ describe('las consultas que el equipo no contestó', () => {
     expect(screen.getByText(/1 consulta\(s\) que el equipo no contestó/)).toBeTruthy();
   });
 });
+
+describe('H-SITIO-01 · la respuesta cruda del equipo, junto al veredicto', () => {
+  it('se enseña, plegada, con su título', () => {
+    render(
+      <FichaDeEquipo
+        ficha={{
+          ...ficha([hallazgo({ estado: 'bloqueo' })]),
+          crudos: [
+            {
+              titulo: 'Parámetros de entrada (EntranceParam)',
+              contenido: '<documento>0</documento>',
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText(/Respuesta del equipo · Parámetros de entrada/)).toBeTruthy();
+    expect(screen.getByText('<documento>0</documento>')).toBeTruthy();
+  });
+
+  it('sin crudos no se pinta ninguna sección vacía', () => {
+    render(<FichaDeEquipo ficha={ficha([hallazgo({})])} />);
+    expect(screen.queryByText(/Respuesta del equipo/)).toBeNull();
+  });
+});

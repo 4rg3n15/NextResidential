@@ -63,9 +63,12 @@ const RUTA = '/consentimiento';
 @Throttle({ default: { limit: 30, ttl: 60_000 } })
 export class ConsentimientoPublicoController {
   constructor(
+    // H-SITIO-06 · explícitos: con `tsx` no hay metadatos de tipos.
+    @Inject(ResolverEnlaceDeConsentimiento)
     private readonly resolver: ResolverEnlaceDeConsentimiento,
-    private readonly responder: ResponderConsentimiento,
-    private readonly revocar: RevocarConsentimiento,
+    @Inject(ResponderConsentimiento) private readonly responder: ResponderConsentimiento,
+    @Inject(RevocarConsentimiento) private readonly revocar: RevocarConsentimiento,
+    @Inject(PropagarConsentimientoAceptado)
     private readonly propagar: PropagarConsentimientoAceptado,
     @Inject(BITACORA) private readonly bitacora: Bitacora,
     @Inject(REGISTRO_AUDITORIA) private readonly auditoria: RegistroDeAuditoria,

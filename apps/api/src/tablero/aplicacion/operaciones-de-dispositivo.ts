@@ -31,10 +31,25 @@ export interface ResultadoDeOperacion {
   readonly detalle: string;
 }
 
+/**
+ * H-SITIO-02 · SI LA ORDEN LLEGA AL EQUIPO O SÓLO SE ANOTA, SE DICE.
+ *
+ * En sitio, con el proveedor real activo, «Configurar», «Sincronizar» y
+ * «Reiniciar» seguían sólo anotando la intención y la consola los pintaba
+ * como botones que actúan. Un botón que no hace lo que dice es peor que
+ * ninguno: quien lo pulsa cree que reinició el equipo. La consola lee esto y
+ * lo escribe EN el botón.
+ */
+export interface EjecucionDeOperaciones {
+  readonly ejecutaContraElEquipo: boolean;
+  readonly detalle: string;
+}
+
 export interface OperacionesDeDispositivo {
   solicitar(solicitud: SolicitudDeOperacion): Promise<ResultadoDeOperacion>;
   /** Operaciones pendientes de un equipo; la interfaz muestra «sincronizando». */
   pendientesDe(copropiedadId: string): Promise<readonly string[]>;
+  ejecucion(): EjecucionDeOperaciones;
 }
 
 export const OPERACIONES_DE_DISPOSITIVO = Symbol.for('ncr.puerto.OperacionesDeDispositivo');

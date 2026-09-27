@@ -1,4 +1,5 @@
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
+import { recortado, sinSecretos } from '../equipo/intercambio';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { interpretarError } from '../equipo/errores-del-fabricante';
@@ -90,7 +91,21 @@ export interface DiagnosticoDeEquipo {
   readonly hora: HoraDelEquipo | null;
   /** Consultas que no contestaron, con el motivo. Se enseñan, no se ocultan. */
   readonly sinRespuesta: readonly { readonly que: string; readonly motivo: string }[];
+  /**
+   * H-SITIO-01 · los documentos CRUDOS que deciden el veredicto de la cámara,
+   * saneados (`documentoSaneado`). En sitio el veredicto dijo «decide sola» y
+   * no había forma de ver QUÉ contestó el equipo sin el panel del aparato.
+   */
+  readonly crudos?: readonly { readonly titulo: string; readonly contenido: string }[];
 }
+
+/**
+ * Un documento del equipo, apto para enseñarse en la consola: sin secretos,
+ * con las direcciones IPv4 tachadas (la red del conjunto no llega al
+ * navegador, §7.1) y acotado.
+ */
+export const documentoSaneado = (texto: string): string =>
+  recortado(sinSecretos(texto).replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, 'x.x.x.x'), 8192);
 
 /** Desvío a partir del cual el reloj del equipo corrompe la trazabilidad. */
 export const DESVIO_TOLERABLE_SEGUNDOS = 60;
@@ -117,7 +132,8 @@ export const diagnosticarEquipo = async (
   const pedir = async (proposito: string, familia = opciones.familia): Promise<string | null> => {
     const ruta = rutaPara(proposito, familia, opciones.canal ?? CARRIL_VERIFICADO_DE_LA_CAMARA);
     try {
-      const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta);
+      // H-SITIO-15 · con el cuerpo que la ruta declara: nunca un POST vacío.
+      const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta, ruta.cuerpo);
       /**
        * ═══════════════════════════════════════════════════════════════════════
        * UN `200` CON UN RECHAZO DENTRO NO ES UNA RESPUESTA
@@ -208,6 +224,9 @@ export const diagnosticarEquipo = async (
       cliente,
       familia: opciones.familia,
       ...(opciones.canal === undefined ? {} : { canal: opciones.canal }),
+      // H-SITIO-05 · cada ruta de capacidad y su respuesta, a la bitácora.
+      ...(opciones.traza === undefined ? {} : { traza: opciones.traza }),
+      ...(opciones.dispositivoId === undefined ? {} : { dispositivoId: opciones.dispositivoId }),
     });
   } catch (error) {
     sinRespuesta.push({
@@ -224,6 +243,22 @@ export const diagnosticarEquipo = async (
     serie: identidad === null ? null : etiqueta(identidad, 'serialNumber'),
     control: control === null ? null : leerVeredictoDeControl(control),
     disparador: disparador === null ? null : leerDisparador(disparador),
+    ...(esCamara
+      ? {
+          crudos: [
+            {
+              titulo: 'Parámetros de entrada (EntranceParam)',
+              contenido:
+                control === null ? '(el equipo no lo devolvió)' : documentoSaneado(control),
+            },
+            {
+              titulo: 'Disparador vinculado',
+              contenido:
+                disparador === null ? '(el equipo no lo devolvió)' : documentoSaneado(disparador),
+            },
+          ],
+        }
+      : {}),
     pais: basicos === null ? null : juzgarPais(leerDatosBasicos(basicos), paisAdmitido ?? ''),
     receptor: receptor === null ? null : juzgarReceptor(receptor),
     capacidades: esCamara

@@ -56,6 +56,14 @@ export interface RegistroDeAuditoria {
     versionPolitica: string;
     ip: string | null;
     userAgent: string | null;
+    /**
+     * D-10 · por dónde respondió. Ausente = `enlace` (su teléfono). En
+     * `presencial` el titular escribió su nombre y documento en la pantalla de
+     * la portería, y `operadorId` es QUIÉN atendía esa pantalla: no el que
+     * consiente, sino el que tendrá que responder de cómo se obtuvo.
+     */
+    canal?: 'enlace' | 'presencial';
+    operadorId?: string;
   }): Promise<void>;
 }
 

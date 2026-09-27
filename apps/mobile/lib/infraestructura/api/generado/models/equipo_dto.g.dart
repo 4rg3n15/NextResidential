@@ -29,6 +29,11 @@ EquipoDto _$EquipoDtoFromJson(Map<String, dynamic> json) => EquipoDto(
   verificadoEn: json['verificadoEn'] as String?,
   motivoNoVerificado: json['motivoNoVerificado'] as String?,
   estado: EquipoDtoEstado.fromJson(json['estado'] as String),
+  atestacion: json['atestacion'] == null
+      ? null
+      : AtestacionDeEquipoDto.fromJson(
+          json['atestacion'] as Map<String, dynamic>,
+        ),
 );
 
 Map<String, dynamic> _$EquipoDtoToJson(EquipoDto instance) => <String, dynamic>{
@@ -48,4 +53,5 @@ Map<String, dynamic> _$EquipoDtoToJson(EquipoDto instance) => <String, dynamic>{
   'verificadoEn': instance.verificadoEn,
   'motivoNoVerificado': instance.motivoNoVerificado,
   'estado': instance.estado,
+  'atestacion': instance.atestacion,
 };

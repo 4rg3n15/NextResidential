@@ -3,6 +3,8 @@ import type { ConsentimientoBiometrico, ErrorDominio, Reloj, Resultado } from '@
 import type { EstadoConsentimiento } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type { DatosDelEnlace, FirmanteDeEnlaces, RepositorioConsentimientos } from './puertos';
+import { alcanceDeLaUrlPublica } from '../../comun/url-publica';
+import type { AlcanceDeLaUrlPublica } from '../../comun/url-publica';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -29,6 +31,11 @@ export interface EnlaceEmitido {
   readonly ruta: string;
   /** La URL completa si `API_URL_PUBLICA` está declarada; si no, `null` y se dice. */
   readonly url: string | null;
+  /**
+   * H-SITIO-10 · si otro aparato puede abrir `url`. `bucle_local` es el caso
+   * de sitio: `127.0.0.1` en un QR es el propio teléfono que lo escanea.
+   */
+  readonly alcance: AlcanceDeLaUrlPublica;
   readonly expiraEn: Date;
 }
 
@@ -86,6 +93,7 @@ export class EmitirEnlaceDeConsentimiento {
       token,
       ruta,
       url: base === null ? null : `${base}${ruta}`,
+      alcance: alcanceDeLaUrlPublica(this.opciones.urlPublica),
       expiraEn,
     });
   }

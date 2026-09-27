@@ -95,9 +95,12 @@ describe('el equipo decide por su cuenta · las TRES vías bloquean', () => {
   it('la guarda se comprueba UNA vez por dispositivo, no en cada apertura', async () => {
     // Es una comprobación de arranque, no un peaje por cada coche que llega.
     let consultas = 0;
+    // UN equipo: desde el anexo 15-K cada simulado lleva su propio nonce, y
+    // uno nuevo por petición no conocería el desafío que emitió el anterior.
+    const camara = camaraConforme();
     const contando: typeof fetch = (entrada, opciones) => {
       if (String(entrada).includes('entranceParam')) consultas += 1;
-      return camaraConforme()(entrada, opciones);
+      return camara(entrada, opciones);
     };
     const proveedor = proveedorCon(contando);
     await proveedor.abrir(CAMARA, 'operador-1');
@@ -170,11 +173,13 @@ describe('los demás desenlaces, cada uno con su reacción', () => {
     );
   });
 
-  it('sincronizar contra un equipo que NO es terminal se niega, y dice por qué', async () => {
-    // Dejaría el dato biométrico en un aparato donde nadie lo busca.
+  it('sincronizar contra un equipo SIN biblioteca de rostros se niega, y dice por qué', async () => {
+    // Dejaría el dato biométrico en un aparato donde nadie lo busca. Desde
+    // H-SITIO-09 la terminal no es el único que la tiene: el videoportero que
+    // la declare también la recibe; una cámara, nunca.
     const proveedor = proveedorCon(camaraConforme());
     await expect(proveedor.sincronizar(CAMARA, 'plantilla-1', new Uint8Array([1]))).rejects.toThrow(
-      /no es una terminal facial/i,
+      /no tiene biblioteca de rostros/i,
     );
   });
 });
@@ -237,5 +242,145 @@ describe('un relé suelto, sin cámara delante', () => {
     );
     const resultado = await proveedor.abrir(CAMARA, 'operador-1');
     expect(typeof resultado.aceptado).toBe('boolean');
+  });
+});
+
+describe('H-SITIO-09 · la plantilla va a TODOS los equipos con biblioteca de rostros', () => {
+  const PORTERO = 'disp-portero-con-rostros';
+  const portero = (bibliotecaEnVideoportero: boolean) =>
+    proveedorCon(
+      equiposSimulados({
+        [HOST]: {
+          familia: 'videoportero',
+          usuario: 'servicio',
+          clave: 'clave-de-prueba',
+          bibliotecaEnVideoportero,
+        },
+      }),
+      equipo({ dispositivoId: PORTERO, tipo: 'intercom' }),
+    );
+
+  it('un videoportero que la declara RECIBE la plantilla, con el formulario de la guía', async () => {
+    const proveedor = portero(true);
+    expect((await proveedor.capacidadesDe(PORTERO)).bibliotecaDeRostros.estado).toBe('si');
+    await expect(
+      proveedor.sincronizar(
+        PORTERO,
+        '1b4e28ba-2fa1-11d2-883f-0016d3cca427',
+        new Uint8Array([1, 2]),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('un videoportero sin biblioteca se niega por CAPACIDAD, no por tipo', async () => {
+    const proveedor = portero(false);
+    await expect(
+      proveedor.sincronizar(PORTERO, 'plantilla-1', new Uint8Array([1])),
+    ).rejects.toThrow(/bibliotecaDeRostros/);
+  });
+});
+
+describe('D-11 · la atestación del instalador, contra el firmware EN VIVO', () => {
+  const traza = (): { lineas: string[]; registrar: (n: string, m: string) => void } => {
+    const lineas: string[] = [];
+    return { lineas, registrar: (n, m) => lineas.push(`${n}: ${m}`) };
+  };
+  const conAtestacion = (peticion: typeof fetch, firmware: string, t = traza()) =>
+    new HikvisionProvider({
+      registro: new RegistroEnMemoria([equipo({ atestacion: { firmware } })]),
+      reloj: RELOJ,
+      peticion,
+      traza: t,
+    });
+
+  it('mismo firmware: la cámara que la API no confirma SE OPERA, y la bitácora lo dice', async () => {
+    const t = traza();
+    const proveedor = conAtestacion(
+      camaraConforme({ ctrlMod: '0', firmware: 'V5.3.0 build 220101' }),
+      'V5.3.0 build 220101',
+      t,
+    );
+    await expect(proveedor.abrir(CAMARA, 'operador-1')).resolves.toBeDefined();
+    expect(t.lineas.some((l) => /aviso: .*ATESTACIÓN del instalador/.test(l))).toBe(true);
+  });
+
+  it('el aparato cambió de firmware: la atestación NO vale, y el motivo lo dice', async () => {
+    const proveedor = conAtestacion(
+      camaraConforme({ ctrlMod: '0', firmware: 'V5.3.2 build 230601' }),
+      'V5.3.0 build 220101',
+    );
+    const error = await proveedor.abrir(CAMARA, 'operador-1').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(EquipoDecidePorSuCuenta);
+    expect(String((error as Error).message)).toMatch(/atestación del instalador sin efecto/);
+  });
+
+  /** El simulado, salvo en las rutas que se rompen: ésas contestan 500 o no contestan. */
+  const conRutasRotas =
+    (base: typeof fetch, rotas: Record<string, 'error' | 'inalcanzable'>): typeof fetch =>
+    async (url, opciones) => {
+      const ruta = new URL(String(url)).pathname;
+      const clave = Object.keys(rotas).find((r) => ruta.includes(r));
+      if (clave === undefined) return base(url, opciones);
+      if (rotas[clave] === 'inalcanzable') throw new TypeError('fetch failed');
+      return {
+        status: 500,
+        ok: false,
+        headers: new Headers(),
+        text: async () => '<ResponseStatus><statusCode>3</statusCode></ResponseStatus>',
+        body: null,
+      } as unknown as Response;
+    };
+
+  it.each([
+    ['contesta con error', 'error'],
+    ['no contesta', 'inalcanzable'],
+  ] as const)(
+    'si el firmware no se puede leer (%s), no se da por el mismo: NO se opera',
+    async (_caso, rotura) => {
+      const proveedor = conAtestacion(
+        conRutasRotas(camaraConforme({ ctrlMod: '0', firmware: 'V5.3.0 build 220101' }), {
+          '/System/deviceInfo': rotura,
+        }),
+        'V5.3.0 build 220101',
+      );
+      const error = await proveedor.abrir(CAMARA, 'operador-1').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(EquipoDecidePorSuCuenta);
+      expect(String((error as Error).message)).toMatch(/atestación del instalador sin efecto/);
+    },
+  );
+
+  it.each([
+    ['contesta con error', 'error'],
+    ['no contesta', 'inalcanzable'],
+  ] as const)(
+    'un disparador que no se puede leer (%s) cuenta como «abre»: la atestación es la única salida',
+    async (_caso, rotura) => {
+      const t = traza();
+      const proveedor = conAtestacion(
+        conRutasRotas(camaraConforme({ firmware: 'V5.3.0 build 220101' }), {
+          '/Event/triggers/': rotura,
+        }),
+        'V5.3.0 build 220101',
+        t,
+      );
+      await expect(proveedor.abrir(CAMARA, 'operador-1')).resolves.toBeDefined();
+      expect(t.lineas.some((l) => /ATESTACIÓN del instalador/.test(l))).toBe(true);
+    },
+  );
+
+  it('sin atestación, un modo de control ilegible bloquea: no leerlo no es «conforme»', async () => {
+    const proveedor = proveedorCon(
+      conRutasRotas(camaraConforme(), { '/ITC/Entrance/entranceParam': 'error' }),
+    );
+    await expect(proveedor.abrir(CAMARA, 'operador-1')).rejects.toBeInstanceOf(
+      EquipoDecidePorSuCuenta,
+    );
+  });
+
+  it('sin atestación todo sigue como antes: bloquea', async () => {
+    const proveedor = proveedorCon(camaraConforme({ ctrlMod: '0' }));
+    await expect(proveedor.abrir(CAMARA, 'operador-1')).rejects.toBeInstanceOf(
+      EquipoDecidePorSuCuenta,
+    );
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RutaNoSoportada, TerminalFacial } from './terminal-facial';
 import type { ModoDeTerminal } from './terminal-facial';
+import { equipoSimulado } from '../simulacion/equipo-simulado';
 
 /** Respuesta de equipo, sin red. ADR-03: la suite corre sin un solo aparato. */
 const respuesta = (estado: number, cuerpo = '', cabeceras: Record<string, string> = {}): Response =>
@@ -12,7 +13,7 @@ const respuesta = (estado: number, cuerpo = '', cabeceras: Record<string, string
   }) as unknown as Response;
 
 const OK_XML =
-  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString></ResponseStatus>';
+  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString><subStatusCode>ok</subStatusCode></ResponseStatus>';
 
 interface Llamada {
   readonly url: string;
@@ -125,7 +126,53 @@ describe('alta de plantilla', () => {
     await terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1]));
     const alta = llamadas.find((l) => l.url.includes('UserInfo/Record'));
     expect(String(alta?.cuerpo)).not.toMatch(/nombre|apellido/i);
-    expect(String(alta?.cuerpo)).toContain('plantilla-7');
+    // H-SITIO-04 · sólo letras y dígitos: el identificador que el equipo admite.
+    expect(String(alta?.cuerpo)).toContain('"employeeNo":"plantilla7"');
+  });
+
+  it('H-SITIO-04 · un UUID viaja como 32 letras y dígitos, en la persona y en el rostro', async () => {
+    const uuid = '1b4e28ba-2fa1-11d2-883f-0016d3cca427';
+    const compacto = '1b4e28ba2fa111d2883f0016d3cca427';
+    const { terminal, llamadas } = montar([
+      respuesta(200, OK_XML),
+      respuesta(200, OK_XML),
+      respuesta(200, OK_XML),
+    ]);
+    await terminal.sincronizar('terminal-1', uuid, new Uint8Array([1, 2, 3]));
+    const alta = String(llamadas.find((l) => l.url.includes('UserInfo/Record'))?.cuerpo);
+    expect(alta).toContain(`"employeeNo":"${compacto}"`);
+    expect(alta).not.toContain(uuid);
+
+    // El formulario de la guía: registro PLANO en `FaceDataRecord` e imagen en `img`.
+    const carga = llamadas.find((l) => l.url.includes('FDSetUp'));
+    const cuerpo = Buffer.from(carga?.cuerpo as Uint8Array).toString('latin1');
+    expect(cuerpo).toContain('name="FaceDataRecord"');
+    expect(cuerpo).toContain(`"FPID":"${compacto}"`);
+    expect(cuerpo).toContain('"faceLibType":"blackFD"');
+    expect(cuerpo).not.toContain('{"FaceDataRecord"');
+    expect(cuerpo).toContain('name="img"; filename="facePic.jpg"');
+    expect(cuerpo).toMatch(/Content-Length: 3\r\n/);
+  });
+
+  it('H-SITIO-04 · el rechazo de la carga dice statusCode, subStatusCode, errorCode y errorMsg', async () => {
+    const { terminal } = montar([
+      respuesta(200, OK_XML),
+      respuesta(200, OK_XML),
+      respuesta(
+        400,
+        '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"badParameters",' +
+          '"errorCode":1610612737,"errorMsg":"FPID"}',
+      ),
+    ]);
+    const fallo = await terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+    expect(fallo?.message).toMatch(/statusCode 6/);
+    expect(fallo?.message).toMatch(/subStatusCode badParameters/);
+    expect(fallo?.message).toMatch(/errorCode 0x60000001/);
+    expect(fallo?.message).toMatch(/errorMsg FPID/);
+    expect(fallo?.message).not.toMatch(/sin decir por qué/);
   });
 
   it('un alta repetida NO es un fallo: la sincronización tiene que poder reintentarse', async () => {
@@ -358,5 +405,49 @@ describe('A2 · responder la verificación remota', () => {
       motivo: 'x',
     });
     expect(r.aceptado).toBe(false);
+  });
+});
+
+describe('15-K (§5) · la baja de la persona de la carga de prueba', () => {
+  it('se lleva la plantilla: la búsqueda posterior ya no la encuentra', async () => {
+    const peticion = equipoSimulado({ familia: 'terminal', usuario: 'servicio', clave: 'k' });
+    const terminal = new TerminalFacial({
+      host: 'terminal.invalid',
+      usuario: 'servicio',
+      clave: 'k',
+      peticion,
+      modo: 'decide_el_equipo',
+    });
+    const plantillaId = '5e2b7c1a-0000-4000-8000-000000000001';
+    await terminal.sincronizar('t-1', plantillaId, new Uint8Array([0xff, 0xd8, 0xff, 0xd9]));
+    const r = await terminal.darDeBajaPersona(plantillaId);
+    expect(r.ok).toBe(true);
+    expect((await terminal.suprimirYVerificar('t-1', plantillaId)).ausente).toBe(true);
+  });
+
+  it('usa la ruta y el cuerpo de «Person Deleting» de la guía de la serie de la terminal', async () => {
+    const vistas: { url: string; cuerpo: string }[] = [];
+    const simulado = equipoSimulado({ familia: 'terminal', usuario: 'servicio', clave: 'k' });
+    const terminal = new TerminalFacial({
+      host: 'terminal.invalid',
+      usuario: 'servicio',
+      clave: 'k',
+      peticion: async (url, opciones) => {
+        vistas.push({ url: String(url), cuerpo: String(opciones?.body ?? '') });
+        return simulado(url, opciones);
+      },
+      modo: 'decide_el_equipo',
+    });
+    // Borrar a quien no está no es error (la guía lo dice): la baja es idempotente.
+    const r = await terminal.darDeBajaPersona('5e2b7c1a-0000-4000-8000-000000000002');
+    expect(r.ok).toBe(true);
+    const baja = vistas.find((v) => v.url.includes('/ISAPI/AccessControl/UserInfoDetail/Delete'));
+    expect(baja).toBeDefined();
+    expect(JSON.parse(baja?.cuerpo ?? '{}')).toEqual({
+      UserInfoDetail: {
+        mode: 'byEmployeeNo',
+        EmployeeNoList: [{ employeeNo: '5e2b7c1a000040008000000000000002' }],
+      },
+    });
   });
 });

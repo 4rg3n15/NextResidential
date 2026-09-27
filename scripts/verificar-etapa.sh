@@ -244,11 +244,51 @@ echo "$salida" | grep -E "Tests +[0-9]" | sed 's/^/   /'
 # cuando `grep -q` puede terminar antes que `echo`.
 #
 # Por eso aquí se usa `<<<`, que no crea tubería y no puede romperse así.
+# ─────────────────────────────────────────────────────────────────────────────
+# 15-K · LA ROJA SE NOMBRA DESDE EL JSON, NO DESDE UN `grep` SOBRE LA CONSOLA.
+#
+# En la segunda corrida final de la 15-K, `@ncr/api` terminó con «1 failed» y
+# este paso imprimió diez líneas que contenían «error»: pruebas VERDES llamadas
+# `errores-…` y trazas JSON de peticiones fallidas a propósito. El nombre de la
+# roja estaba en el `.informe-paso5.json` que este mismo paso acaba de pedir, y
+# no se leyó. Es la familia de D-100 otra vez: el dato está y nadie lo imprime.
+# ─────────────────────────────────────────────────────────────────────────────
+nombrar_rojas() {
+  node -e '
+    const { existsSync, readFileSync, readdirSync } = require("node:fs");
+    let n = 0;
+    for (const raiz of ["apps", "packages"]) {
+      for (const p of readdirSync(raiz)) {
+        const f = `${raiz}/${p}/.informe-paso5.json`;
+        if (!existsSync(f)) continue;
+        let r;
+        try { r = JSON.parse(readFileSync(f, "utf8")); } catch { console.log(`${f}: ilegible`); continue; }
+        for (const t of r.testResults ?? []) {
+          const fichero = String(t.name).replace(/.*?\/(apps|packages)\//, "$1/");
+          if ((t.assertionResults ?? []).length === 0 && t.status === "failed") {
+            n += 1;
+            console.log(`ROJA ${fichero} (el fichero no llegó a ejecutar pruebas)`);
+            console.log(`  ${String(t.message ?? "").replace(/\s+/g, " ").slice(0, 300)}`);
+          }
+          for (const a of t.assertionResults ?? []) {
+            if (a.status !== "failed") continue;
+            n += 1;
+            console.log(`ROJA ${fichero} › ${a.fullName}`);
+            console.log(`  ${(a.failureMessages ?? []).join(" ").replace(/\s+/g, " ").slice(0, 300)}`);
+          }
+        }
+      }
+    }
+    if (n === 0) console.log("ningún informe JSON nombra una roja: mire la salida de turbo");
+  ' 2>&1 | head -24 | sed 's/^/     /'
+}
 if [[ $codigo_pruebas -ne 0 ]]; then
   mal "la suite no terminó bien (código $codigo_pruebas): puede que ni siquiera llegara a correr"
-  grep -E "error|Error|ERR_|×|→" "$salida_pruebas" | head -10 | sed 's/^/     /'
+  nombrar_rojas
+  grep -E "ERR_|×|→|FAIL " "$salida_pruebas" | head -10 | sed 's/^/     /'
 elif grep -qE "Tests +[0-9]+ failed|FAIL " <<<"$salida"; then
   mal "hay pruebas en rojo"
+  nombrar_rojas
   echo "$salida" | grep -E "×|→" | head -10 | sed 's/^/     /'
 elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida" && [[ "$CON_BASE" == "1" ]]; then
   # ───────────────────────────────────────────────────────────────────────────
@@ -530,6 +570,15 @@ else
   mal "hay una dependencia acotada a ciegas"
   echo "$salida_acot" | sed 's/^/     /'
 fi
+# H-SITIO-11 (15-K) · el Info.plist de iOS YA PREPROCESADO, Debug y Release. En
+# sitio el iPhone no alcanzaba la API por la IP privada: faltaba la clave de
+# privacidad de red local. Mirar el fichero crudo no basta: Xcode lo preprocesa.
+if salida_plist=$(con_limite "$LIMITE_CORTO" node scripts/lib/info-plist-ios.mjs 2>&1); then
+  ok "${salida_plist#OK }"
+else
+  mal "el Info.plist de iOS, preprocesado como en Xcode, no es el esperado (H-SITIO-11)"
+  echo "$salida_plist" | sed 's/^/     /'
+fi
 if ! hay_flutter; then
   mal "no hay SDK de Flutter ($FLUTTER_BIN): no se pudo comprobar si el cliente Dart está al día"
 elif salida_cliente=$(con_limite "$LIMITE_MEDIO" node scripts/lib/cliente-dart-desfasado.mjs 2>&1); then
@@ -759,6 +808,15 @@ else
   mal "hay campos de texto sin longitud máxima declarada (§2.7.4)"
   echo "$salida_long" | head -10 | sed 's/^/     /'
 fi
+# H-SITIO-06 (15-K) · `start:dev` usaba tsx, que no emite metadatos de tipos:
+# una clase que Nest construye e inyecta POR TIPO recibía `undefined`. En sitio
+# la API cayó al arrancar. Defensa estática; la que arranca, en 12d.
+if salida_iny=$(con_limite "$LIMITE_CORTO" node scripts/lib/inyeccion-explicita.mjs 2>&1); then
+  ok "${salida_iny#OK }"
+else
+  mal "hay clases que Nest construye e inyecta por tipo: con tsx reciben undefined (H-SITIO-06)"
+  echo "$salida_iny" | head -10 | sed 's/^/     /'
+fi
 # KPI-11 · la sustitución de MockProvider por HikvisionProvider en la ETAPA 15
 # solo es posible si nadie fuera de `packages/providers` conoce el protocolo.
 if salida_kpi11=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-hardware.mjs 2>&1); then
@@ -952,6 +1010,41 @@ else
   grep -E "✗|     " /tmp/ncr-camino.log | head -6 | sed 's/^/     /'
 fi
 
+paso "12d · start:dev —el arranque de sitio— inyecta y VALIDA; con tsx la API se niega a arrancar"
+# H-SITIO-06 (15-K) · el 26/09/2026 `start:dev` (tsx) cayó en sitio con «Cannot
+# read properties of undefined (reading 'get')». Ni la suite (SWC con
+# metadatos) ni el 12c (`node dist/main.js`) pasaban por tsx. El anexo destapó
+# la mitad silenciosa: sin metadatos de tipos el ValidationPipe no valida
+# ningún DTO. `start:dev` compila ahora con tsc y la API se niega a arrancar
+# sin metadatos; este paso arranca las dos cosas. Sin base: adaptadores en
+# memoria y un doble de GoTrue, como el 12c.
+if salida_dev=$(con_limite "$LIMITE_MEDIO" node e2e/arranque-de-desarrollo.mjs 2>&1); then
+  echo "$salida_dev" | grep -E "^   ✓" | sed 's/^   //' | sed 's/^/   /'
+  ok "start:dev arranca, inyecta y valida; tsx no arranca sin metadatos"
+else
+  mal "start:dev no arranca, no inyecta o no valida, o tsx arranca sin metadatos (H-SITIO-06)"
+  echo "$salida_dev" | head -16 | sed 's/^/     /'
+fi
+
+paso "12e · el guion de sitio, ensayado contra los equipos simulados: --con-audio y --abrir"
+# Anexo 15-K · nada ejecutaba el guion de sitio, y la negativa del cliente a
+# escribir sin cuerpo (H-SITIO-15) lo rompió en `--con-audio` sin un rojo: se
+# vio al ensayarlo a mano. `--abrir` es la verificación de la próxima visita:
+# en simulado, el equipo dice si la puerta se movió. El informe y la hoja van a
+# un directorio temporal, nunca al repositorio.
+ensayo_guion="$(mktemp -d "${TMPDIR:-/tmp}/ncr-guion.XXXXXX")"
+if salida_guion=$(con_limite "$LIMITE_CORTO" node scripts/puesta-en-marcha-equipos.mjs --simulado --con-audio \
+  --informe="$ensayo_guion/informe.md" --hoja="$ensayo_guion/hoja.md" </dev/null 2>&1) &&
+  salida_abrir=$(con_limite "$LIMITE_CORTO" node scripts/puesta-en-marcha-equipos.mjs --simulado --abrir \
+    --informe="$ensayo_guion/abrir.md" </dev/null 2>&1); then
+  echo "$salida_abrir" | grep -E "SE MOVIÓ" | sed 's/^ *//' | sed 's/^/   /'
+  ok "el guion recorre los tres equipos simulados y --abrir abre como en sitio"
+else
+  mal "el guion de sitio falla contra los equipos simulados (--con-audio o --abrir)"
+  printf '%s\n%s\n' "${salida_guion:-}" "${salida_abrir:-}" | grep -E "✗|⚠|VEREDICTO" | head -12 | sed 's/^/     /'
+fi
+rm -rf "$ensayo_guion"
+
 if [[ "$CON_BASE" == "1" ]]; then
   paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)"
   # Estas dos pruebas se OMITEN solas si no alcanzan la base, y una omisión no
@@ -1026,6 +1119,34 @@ if [[ "$CON_BASE" == "1" ]]; then
     # rojo. Quien no tenga base, que corra sin `--con-base` y lo diga en el
     # informe; pedirla y no tenerla es un fallo.
     mal "se pidió --con-base y no hay DATABASE_URL_PRUEBAS: estas pruebas NO se ejecutaron"
+  fi
+fi
+
+if [[ "$CON_BASE" == "1" ]]; then
+  paso "13b · el recorrido de la CONSOLA contra la API real, PostgreSQL y el simulado (requiere --con-base)"
+  # 15-K (§4) · los tres defectos que en sitio se vieron en el primer minuto
+  # (H-SITIO-02, 03 y 08) vivían en la costura consola ↔ proxy ↔ API ↔ base, y
+  # cada pieza tenía sus pruebas en verde con dobles de las otras. Esto la
+  # recorre en Chromium como el superadministrador y como el portero, con una
+  # base propia, el gancho de claims real y equipos simulados por HTTP.
+  if con_limite "$LIMITE_LARGO" node e2e/recorrido-de-consola.mjs >/tmp/ncr-recorrido.log 2>&1; then
+    ok "el superadministrador y el portero recorren la consola de punta a punta"
+  else
+    mal "el recorrido de la consola falla (ver /tmp/ncr-recorrido.log)"
+    grep -E "✗" /tmp/ncr-recorrido.log | head -8 | sed 's/^/     /'
+  fi
+  paso "13c · el recorrido FALLA con H-SITIO-02, 03, 08, 13 y 15 reintroducidos (requiere --con-base)"
+  # Un recorrido en verde sólo demuestra algo si se le ha visto rojo con el
+  # defecto que dice cazar. Cada uno se reintroduce en su árbol de sonda y se
+  # exige que el recorrido lo NOMBRE; un fallo por otra causa no cuenta. 13 y
+  # 15 (anexo) viven en `packages/providers`: su sonda copia y compila el
+  # paquete, y el veredicto lo da el equipo simulado, no la consola.
+  if NCR_REUTILIZAR_CONSOLA=1 con_limite "$LIMITE_LARGO" node e2e/recorrido-negativo.mjs \
+       >/tmp/ncr-recorrido-negativo.log 2>&1; then
+    ok "los cinco defectos de sitio, reintroducidos, se detectan cada uno por su nombre"
+  else
+    mal "el recorrido no detecta algún defecto de sitio (ver /tmp/ncr-recorrido-negativo.log)"
+    grep -E "✗|✓" /tmp/ncr-recorrido-negativo.log | head -8 | sed 's/^/     /'
   fi
 fi
 

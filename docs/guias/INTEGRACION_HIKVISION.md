@@ -55,13 +55,13 @@ seguir.
 | Elemento                  | Requisito                                                                                                                                                                              |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cámara LPR con barrera    | Firmware con ISAPI `Traffic`/`ITC` y `Parking/barrierGate` (la ruta de la barrera está **VERIFICADA**). `ctrlMode` accesible                                                           |
-| Terminal facial           | ISAPI `AccessControl` con `remoteCheck` en `AcsCfg` y biblioteca `FDLib`. **DOCUMENTADO**                                                                                              |
+| Terminal facial           | ISAPI `AccessControl` con `remoteCheckDoorEnabled` en `AcsCfg` (15-K, H-SITIO-05) y biblioteca `FDLib`. **DOCUMENTADO**                                                                |
 | Videoportero              | ISAPI `TwoWayAudio` (G.711 µ-law, **VERIFICADO** que existe y estaba deshabilitado), `VideoIntercom` (llamada), RTSP en el canal 1. `callSignal` sólo si el equipo lo declara          |
 | Red                       | **IP fija** en cada equipo; el servidor de Next Control en la **misma red** o alcanzable por el Edge; VLAN de equipos recomendada (H-15-1)                                             |
 | Puertos hacia los equipos | HTTP ISAPI (80 o el configurado), RTSP 554 desde la máquina de go2rtc                                                                                                                  |
 | Puertos hacia la API      | El de la API (3000 por omisión) desde la cámara (servidor de alarma) y desde el teléfono del visitante (enlace de consentimiento); `webrtc.listen` de go2rtc (8555) desde el navegador |
-| Máquina de la API         | Node según `.nvmrc`, pnpm, `go2rtc` si va a haber video, Supabase alcanzable con las migraciones aplicadas (0035 incluida)                                                             |
-| Consola y app             | Consola por `http://<IP>:3001` (video sí; micrófono no sin TLS) o por `https`; app con `--dart-define=API_URL=http://<IP>:3000`                                                        |
+| Máquina de la API         | Node según `.nvmrc`, pnpm, `go2rtc` si va a haber video, Supabase alcanzable con las migraciones aplicadas (0039 incluida)                                                             |
+| Consola y app             | Consola por `http://<IP>:3100` (video sí; micrófono no sin TLS) o por `https`, con `API_URL=http://127.0.0.1:3000`; app con `--dart-define=API_URL=http://<IP>:3000`                   |
 
 Antes de nada: `VALIDACION_HIKVISION_EN_SITIO.md` §1 (qué NO hacer, la red de
 seguridad, variables de la sesión).
@@ -284,7 +284,7 @@ la 15-E:
 | Escuchar eventos (terminal, videoportero)     | `GET /ISAPI/Event/notification/alertStream` o `POST …/subscribeEvent` según capacidad                         | comunes                        | documentada    |
 | ¿Espera el veredicto? / fijarlo               | `GET`/`PUT /ISAPI/AccessControl/AcsCfg?format=json`                                                           | terminal                       | documentada    |
 | Responder la verificación remota              | `PUT /ISAPI/AccessControl/remoteCheck?format=json`                                                            | terminal                       | documentada    |
-| Persona, plantilla, conteo, supresión         | `UserInfo/Record` · `FDLib/FDSetUp` · `FDLib/Count` · `FDLib/FDSearch/Delete` · `UserInfo/Delete`             | terminal                       | documentada    |
+| Persona, plantilla, conteo, supresión         | `UserInfo/Record` · `FDLib/FDSetUp` · `FDLib/Count` · `FDLib/FDSearch/Delete` · `UserInfoDetail/Delete`       | terminal                       | documentada    |
 | Abrir la puerta                               | `PUT /ISAPI/AccessControl/RemoteControl/door/{canal}`                                                         | terminal, videoportero         | documentada    |
 | Canal de audio: canales, abrir, audio, cerrar | `GET …/TwoWayAudio/channels` · `PUT …/{canal}/open` · `PUT`/`GET …/{canal}/audioData` · `PUT …/{canal}/close` | videoportero                   | documentada    |
 | Contestar o colgar (sólo si lo declara)       | `PUT /ISAPI/VideoIntercom/callSignal?format=json`                                                             | videoportero                   | documentada    |

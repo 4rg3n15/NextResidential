@@ -4,6 +4,8 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'enlace_de_consentimiento_dto_alcance.dart';
+
 part 'enlace_de_consentimiento_dto.g.dart';
 
 @JsonSerializable()
@@ -14,6 +16,7 @@ class EnlaceDeConsentimientoDto {
     required this.token,
     required this.ruta,
     required this.url,
+    required this.alcance,
     required this.expiraEn,
   });
   
@@ -32,6 +35,9 @@ class EnlaceDeConsentimientoDto {
 
   /// URL completa si API_URL_PUBLICA está declarada; null si no lo está
   final String? url;
+
+  /// H-SITIO-10 · si otro aparato puede abrir `url`. `bucle_local`: 127.0.0.1/localhost, que en un teléfono es el propio teléfono; la consola lo advierte junto al QR.
+  final EnlaceDeConsentimientoDtoAlcance alcance;
 
   /// Caducidad del enlace (ISO 8601)
   final String expiraEn;

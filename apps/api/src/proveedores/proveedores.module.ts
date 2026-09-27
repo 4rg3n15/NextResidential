@@ -88,6 +88,15 @@ export class ProveedoresModule {
     }) => RegistroDeEquipos;
     /** Semilla del simulado: la adversidad tiene que ser reproducible. */
     readonly semilla?: number;
+    /**
+     * 15-K (§4) · con base real, qué equipos reconoce el SIMULADO: los activos
+     * de `dispositivos`. Sin esto, toda orden a un equipo dado de alta en la
+     * consola fallaba en modo simulado, que es el modo por omisión (ADR-03).
+     */
+    readonly conocidoDesde?: (dependencias: {
+      readonly pool: Pool;
+      readonly configuracion: Configuracion;
+    }) => (dispositivoId: string) => Promise<boolean>;
   }): DynamicModule {
     const alias = [
       ACCESS_POINT_PROVIDER,
@@ -139,10 +148,19 @@ export class ProveedoresModule {
                   ? 'ningún equipo físico recibe órdenes; las aperturas son simuladas'
                   : 'las órdenes van a los equipos dados de alta en la consola',
             });
+            const equipoConocido =
+              opciones.clase === 'simulado' &&
+              configuracion.PERSISTENCIA_DE_EVENTOS === 'postgres' &&
+              opciones.conocidoDesde !== undefined
+                ? opciones.conocidoDesde({ pool, configuracion })
+                : undefined;
             return crearProveedorDeEquipos({
               clase: opciones.clase,
+              ...(equipoConocido === undefined ? {} : { equipoConocido }),
               reloj,
               fuente,
+              // H-SITIO-12/13/14 · lo que pasa con los equipos, a la bitácora.
+              traza: bitacora,
               ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
             });

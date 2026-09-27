@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'atestacion_de_equipo_dto.dart';
 import 'capacidades_de_equipo_dto.dart';
 import 'equipo_dto_estado.dart';
 import 'equipo_dto_modo_de_terminal.dart';
@@ -31,6 +32,7 @@ class EquipoDto {
     required this.verificadoEn,
     required this.motivoNoVerificado,
     required this.estado,
+    required this.atestacion,
   });
   
   factory EquipoDto.fromJson(Map<String, Object?> json) => _$EquipoDtoFromJson(json);
@@ -51,6 +53,9 @@ class EquipoDto {
   final String? verificadoEn;
   final String? motivoNoVerificado;
   final EquipoDtoEstado estado;
+
+  /// D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó.
+  final AtestacionDeEquipoDto? atestacion;
 
   Map<String, Object?> toJson() => _$EquipoDtoToJson(this);
 }

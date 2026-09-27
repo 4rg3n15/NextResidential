@@ -3,6 +3,7 @@ import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { Inject } from '@nestjs/common';
 import type {
+  EjecucionDeOperaciones,
   OperacionesDeDispositivo,
   ResultadoDeOperacion,
   SolicitudDeOperacion,
@@ -51,5 +52,20 @@ export class OperacionesEnMemoria implements OperacionesDeDispositivo {
 
   async pendientesDe(copropiedadId: string): Promise<readonly string[]> {
     return [...(this.pendientes.get(copropiedadId) ?? [])];
+  }
+
+  /**
+   * H-SITIO-02 · este adaptador NO habla con ningún equipo, sea cual sea el
+   * proveedor activo. Con el proveedor real eso sorprende —la barrera y la
+   * apertura sí van al aparato— y por eso se declara, no se deduce.
+   */
+  ejecucion(): EjecucionDeOperaciones {
+    return {
+      ejecutaContraElEquipo: false,
+      detalle:
+        'Configurar, sincronizar y reiniciar SÓLO registran la orden y a quién la pidió: ' +
+        'ninguna llega al equipo todavía. La plantilla de un rostro se sincroniza desde ' +
+        'Biometría, que sí habla con los equipos.',
+    };
   }
 }

@@ -1,5 +1,6 @@
 import type {
   AccessPointProvider,
+  Bitacora,
   EstadoSesionIntercom,
   FaceTemplateProvider,
   IntercomProvider,
@@ -9,7 +10,8 @@ import type {
   ResultadoAccionamiento,
   ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
-import { ordenInalcanzable } from '@ncr/domain-core';
+import { ordenInalcanzable, vigenciaDeAtestacion } from '@ncr/domain-core';
+import { etiqueta } from '../equipo/xml';
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { FuenteDePlacas } from '../equipo/fuente-de-placas';
@@ -86,6 +88,12 @@ export interface OpcionesDeHikvision {
    * producción: es la guarda del principio rector.
    */
   readonly exigirVeredictoDeControl?: boolean;
+  /**
+   * H-SITIO-12/13/14 · la bitácora del proceso. Por aquí salen la
+   * renegociación del Digest, el intercambio de cada orden de puerta y todo lo
+   * que pasa en una escucha. Sin ella, el adaptador calla.
+   */
+  readonly traza?: Bitacora;
 }
 
 const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
@@ -149,6 +157,7 @@ export class HikvisionProvider
       cliente: this.cliente(equipo),
       familia: FAMILIA_DE[equipo.tipo],
       dispositivoId,
+      ...(this.opciones.traza === undefined ? {} : { traza: this.opciones.traza }),
       ...(equipo.canalBarrera === null || equipo.canalBarrera === undefined
         ? {}
         : { canal: equipo.canalBarrera }),
@@ -328,29 +337,41 @@ export class HikvisionProvider
       for await (const evento of escucha.escuchar(cancelar)) {
         await this.fuente.publicar({ evento, foto: null, recorte: null, transporte });
       }
-    } catch {
-      // La escucha reintenta sola; si salió del bucle es porque se canceló.
+    } catch (error) {
+      // La escucha reintenta sola; si salió del bucle es porque se canceló o
+      // porque publicar falló. Lo segundo se DICE (H-SITIO-14).
+      if (!cancelar.aborted) {
+        this.opciones.traza?.registrar('error', 'escucha: el bombeo hacia la fuente se detuvo', {
+          dispositivoId: escucha.dispositivoId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 
   // ── FaceTemplateProvider ─────────────────────────────────────────────────
 
+  /**
+   * H-SITIO-09 · a CUALQUIER equipo que declare biblioteca de rostros: la
+   * terminal y, si la trae, el videoportero. La guarda es la CAPACIDAD
+   * (ADR-019); el tipo sólo excluye lo que no puede tenerla —cámara, relé—.
+   */
   async sincronizar(
     dispositivoId: string,
     plantillaId: string,
     plantilla: Uint8Array,
   ): Promise<void> {
-    await this.exigirQueSeaTerminal(dispositivoId);
+    await this.exigirQuePuedaTenerRostros(dispositivoId);
     await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
-    const terminal = await this.terminalDe(dispositivoId);
-    await terminal.sincronizar(dispositivoId, plantillaId, plantilla);
+    const biblioteca = await this.bibliotecaDe(dispositivoId);
+    await biblioteca.sincronizar(dispositivoId, plantillaId, plantilla);
   }
 
   async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
-    await this.exigirQueSeaTerminal(dispositivoId);
+    await this.exigirQuePuedaTenerRostros(dispositivoId);
     await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
-    const terminal = await this.terminalDe(dispositivoId);
-    await terminal.suprimir(dispositivoId, plantillaId);
+    const biblioteca = await this.bibliotecaDe(dispositivoId);
+    await biblioteca.suprimir(dispositivoId, plantillaId);
   }
 
   /**
@@ -431,6 +452,8 @@ export class HikvisionProvider
     usuario: string;
     clave: string;
     peticion?: typeof fetch;
+    traza?: Bitacora;
+    dispositivoId: string;
   } {
     return {
       host: equipo.host,
@@ -438,7 +461,9 @@ export class HikvisionProvider
       protocolo: equipo.protocolo,
       usuario: equipo.usuario,
       clave: equipo.clave,
+      dispositivoId: equipo.dispositivoId,
       ...(this.opciones.peticion === undefined ? {} : { peticion: this.opciones.peticion }),
+      ...(this.opciones.traza === undefined ? {} : { traza: this.opciones.traza }),
     };
   }
 
@@ -486,12 +511,54 @@ export class HikvisionProvider
     }
 
     if (!veredicto.admisible || abrePorDisparador) {
-      throw new EquipoDecidePorSuCuenta(veredicto.modo, [
+      const motivos = [
         ...veredicto.bloqueos.map((b) => `${b.campo}: ${b.detalle}`),
         ...(abrePorDisparador ? [detalleDelDisparador] : []),
-      ]);
+      ];
+      if (await this.atestadaParaEsteFirmware(equipo, cliente, motivos)) {
+        this.aprobados.add(equipo.dispositivoId);
+        return;
+      }
+      throw new EquipoDecidePorSuCuenta(veredicto.modo, motivos);
     }
     this.aprobados.add(equipo.dispositivoId);
+  }
+
+  /**
+   * D-11 · la API no confirma que la cámara no decida, pero un instalador lo
+   * VERIFICÓ físicamente con este mismo firmware. Se opera, y se deja escrito
+   * en la bitácora cada vez que se aprueba así: no es un verde, es una firma.
+   *
+   * El firmware se lee EN VIVO: una actualización del aparato deja la
+   * atestación sin efecto aunque la base no se haya enterado todavía. Si no se
+   * puede leer, no se da por el mismo. Añade a `motivos` por qué no vale.
+   */
+  private async atestadaParaEsteFirmware(
+    equipo: EquipoRegistrado,
+    cliente: ClienteDeEquipo,
+    motivos: string[],
+  ): Promise<boolean> {
+    const atestacion = equipo.atestacion ?? null;
+    if (atestacion === null) return false;
+    const identidad = rutaPara('leer la identidad del equipo (modelo, firmware, serie)', 'comun');
+    let firmware: string | null = null;
+    try {
+      const r = await cliente.pedir(identidad.metodo, identidad.ruta);
+      firmware = r.ok ? etiqueta(r.cuerpo, 'firmwareVersion') : null;
+    } catch (error) {
+      if (!(error instanceof EquipoInalcanzable)) throw error;
+    }
+    const vigencia = vigenciaDeAtestacion(atestacion, firmware);
+    if (!vigencia.vigente) {
+      motivos.push(`atestación del instalador sin efecto: ${vigencia.motivo}`);
+      return false;
+    }
+    this.opciones.traza?.registrar(
+      'aviso',
+      'cámara operada por ATESTACIÓN del instalador: la API no confirma que no decida sola',
+      { dispositivoId: equipo.dispositivoId, firmware: vigencia.firmware, bloqueos: motivos },
+    );
+    return true;
   }
 
   /**
@@ -548,6 +615,38 @@ export class HikvisionProvider
       bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
     });
     this.terminales.set(equipo.dispositivoId, creada);
+    return creada;
+  }
+
+  private async exigirQuePuedaTenerRostros(dispositivoId: string): Promise<void> {
+    const equipo = await this.resolver(dispositivoId);
+    if (equipo.tipo !== 'terminal_facial' && equipo.tipo !== 'intercom') {
+      throw new Error(
+        `El equipo ${dispositivoId} no tiene biblioteca de rostros (${equipo.tipo}): ` +
+          'sincronizar una plantilla contra otro aparato dejaría el dato biométrico donde nadie lo busca',
+      );
+    }
+  }
+
+  /**
+   * La biblioteca de rostros del equipo: la terminal, o el videoportero que la
+   * declara. Las rutas son las mismas de la guía de control de acceso; el
+   * videoportero no decide el acceso por rostro en este sistema, así que su
+   * modo es el conservador y su puerta sigue abriéndose por orden.
+   */
+  private async bibliotecaDe(dispositivoId: string): Promise<TerminalFacial> {
+    const equipo = await this.resolver(dispositivoId);
+    if (equipo.tipo === 'terminal_facial') return this.terminalDe(dispositivoId);
+    const guardada = this.terminales.get(dispositivoId);
+    if (guardada !== undefined) return guardada;
+    const capacidades = await this.capacidadesDe(dispositivoId);
+    const creada = new TerminalFacial({
+      ...this.conexionDe(equipo),
+      modo: 'decide_el_equipo',
+      numeroDePuerta: equipo.numeroDePuerta ?? null,
+      bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
+    });
+    this.terminales.set(dispositivoId, creada);
     return creada;
   }
 

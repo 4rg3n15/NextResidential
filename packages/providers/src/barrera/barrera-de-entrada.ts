@@ -3,6 +3,7 @@ import { ordenAceptada, ordenInalcanzable, ordenRechazada } from '@ncr/domain-co
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { booleano, entero, etiqueta } from '../equipo/xml';
+import { confirmada } from '../equipo/confirmacion-isapi';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -98,8 +99,6 @@ export interface OpcionesDeBarreraDeEntrada extends OpcionesDeEquipo {
   readonly ruta: string;
 }
 
-const CODIGO_DE_ACEPTACION = 1;
-
 /**
  * Repliegue documentado de la barrera, con el vocabulario de entrada y salida.
  *
@@ -139,8 +138,8 @@ export class BarreraDeEntrada implements ControlDeBarrera {
         tipo: 'application/xml',
         contenido: cuerpoDeBarreraDeEntrada(this.opciones.numeroDeBarrera ?? 1, operacion),
       });
-      const codigo = entero(etiqueta(respuesta.cuerpo, 'statusCode'));
-      if (respuesta.ok && (codigo === CODIGO_DE_ACEPTACION || codigo === 0)) {
+      // Anexo 15-K (c) · aceptada sólo con statusCode 1 y su subStatusCode.
+      if (confirmada(respuesta)) {
         // H-1 · aceptada NO es abierta, aquí tampoco.
         return ordenAceptada(respuesta.latenciaMs);
       }

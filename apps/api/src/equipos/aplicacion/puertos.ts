@@ -296,3 +296,42 @@ export const SIN_PROBAR: ResultadoDeSondeo = {
   latenciaMs: null,
   verificado: false,
 };
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * D-11 · LA ATESTACIÓN DEL INSTALADOR
+ *
+ * La prueba física de que una cámara no abre sola: una placa de su lista
+ * blanca y una desconocida, ninguna abrió. La registra el superadministrador;
+ * se guarda con el firmware del equipo y no se modifica ni se borra nunca
+ * (tabla de sólo inserción, migración 0039). Vigente = la más reciente y del
+ * MISMO firmware (`vigenciaDeAtestacion`, dominio).
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+export interface AtestacionDelInstalador {
+  readonly id: string;
+  readonly dispositivoId: string;
+  readonly firmware: string;
+  readonly placaEnListaBlanca: string;
+  readonly placaDesconocida: string;
+  readonly evidencia: string;
+  readonly registradaEn: string;
+  readonly registradaPor: string;
+}
+
+export type AtestacionNueva = Omit<AtestacionDelInstalador, 'id' | 'registradaEn'>;
+
+export const REPOSITORIO_DE_ATESTACIONES = Symbol.for('ncr.equipos.RepositorioDeAtestaciones');
+
+export interface RepositorioDeAtestaciones {
+  registrar(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    nueva: AtestacionNueva,
+  ): Promise<AtestacionDelInstalador>;
+  /** La más reciente de cada equipo de la copropiedad, en UNA consulta (sin N+1). */
+  ultimasPorEquipo(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+  ): Promise<ReadonlyMap<string, AtestacionDelInstalador>>;
+}

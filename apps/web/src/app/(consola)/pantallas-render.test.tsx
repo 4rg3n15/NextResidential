@@ -302,6 +302,35 @@ describe('dispositivos', () => {
     expect(screen.getByText(/14 plantillas sin llegar/)).toBeDefined();
   });
 
+  /**
+   * H-SITIO-02 · en sitio, con el proveedor real, «Reiniciar» sólo anotaba la
+   * orden y se leía como si reiniciara. Si la API declara que no llega al
+   * equipo, el botón lo dice; y la frase de qué hacen de verdad se muestra.
+   */
+  it('si la orden no llega al equipo, el BOTÓN lo dice', async () => {
+    const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    espia.mockImplementation(async (entrada: Request | string) => {
+      const url = typeof entrada === 'string' ? entrada : entrada.url;
+      if (url.includes('/dispositivos/pendientes')) {
+        return respuesta({
+          dispositivos: [],
+          ejecutaContraElEquipo: false,
+          detalleDeEjecucion: 'ninguna llega al equipo todavía',
+        });
+      }
+      if (url.includes('/tablero/dispositivos')) {
+        return respuesta({ dispositivos: [DISPOSITIVO], umbralSegundos: 300 });
+      }
+      return respuesta({});
+    });
+
+    montar(<PantallaDeDispositivos copropiedadId={COP} />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Reiniciar · sólo registra/ })).toBeDefined(),
+    );
+    expect(screen.getByText('ninguna llega al equipo todavía')).toBeDefined();
+  });
+
   it('«nunca sincronizó» NO se muestra como un fallo', async () => {
     const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     espia.mockImplementation(async (entrada: Request | string) => {

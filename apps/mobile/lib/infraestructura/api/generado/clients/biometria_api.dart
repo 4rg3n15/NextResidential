@@ -5,6 +5,7 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
+import '../models/aceptacion_presencial_dto.dart';
 import '../models/capturar_rostro_dto.dart';
 import '../models/enlace_de_consentimiento_dto.dart';
 import '../models/responder_consentimiento_dto.dart';
@@ -36,6 +37,14 @@ abstract class BiometriaApi {
   Future<void> biometriaControllerVerConsentimiento({
     @Path('id') required String id,
     @Path('consentimientoId') required String consentimientoId,
+  });
+
+  /// El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10)
+  @POST('/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial')
+  Future<RespuestaDeConsentimientoDto> biometriaControllerAceptarPresencialmente({
+    @Path('id') required String id,
+    @Path('consentimientoId') required String consentimientoId,
+    @Body() required AceptacionPresencialDto body,
   });
 
   /// Emite el enlace firmado con el que el TITULAR responde (RN-10)

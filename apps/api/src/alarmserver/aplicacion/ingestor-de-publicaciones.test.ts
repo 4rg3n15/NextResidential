@@ -259,3 +259,25 @@ describe('A4 · la llamada del videoportero', () => {
     expect(llamadas[0]).toMatchObject({ clase: 'timbre', viviendaId: null, vivienda: '999' });
   });
 });
+
+describe('§4 (15-K) · una línea info por cada evento que llega de un equipo', () => {
+  it('rostro: tipo, equipo, transporte y resultado, en UNA línea', async () => {
+    const { ingestor, lineas } = montar({ permitido: true });
+    await ingestor.ingerir(rostro());
+    const propias = lineas.filter((l) => l.mensaje === 'evento de equipo');
+    expect(propias).toHaveLength(1);
+    expect(propias[0]?.nivel).toBe('info');
+    expect(propias[0]?.contexto).toMatchObject({
+      tipo: 'rostro',
+      dispositivoId: 'terminal-1',
+      resultado: 'registrado',
+    });
+  });
+
+  it('también cuando el evento NO se registra: dice el motivo', async () => {
+    const { ingestor, lineas } = montar({ registroFalla: true });
+    await ingestor.ingerir(rostro());
+    const linea = lineas.find((l) => l.mensaje === 'evento de equipo');
+    expect(linea?.contexto).toMatchObject({ tipo: 'rostro', resultado: 'no registrado' });
+  });
+});

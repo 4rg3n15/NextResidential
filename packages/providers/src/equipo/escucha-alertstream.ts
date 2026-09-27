@@ -1,6 +1,13 @@
 import type { BloqueDeAlertStream, EventoDeEquipo } from '../hikvision/contratos-de-evento';
-import { desdeAlertStreamJson, esEventoEnVivo } from '../hikvision/contratos-de-evento';
+import {
+  bloqueDesdeXml,
+  desdeAlertStreamJson,
+  motivoDeDescarte,
+} from '../hikvision/contratos-de-evento';
 import { ClienteDeEquipo } from './cliente';
+import { lectorPara } from './partes-del-flujo';
+import type { ParteDelFlujo as ParteCruda } from './partes-del-flujo';
+import { recortado, sinSecretos } from './intercambio';
 import type { OpcionesDeEquipo } from './cliente';
 import { rutaPara } from './catalogo-de-rutas';
 import type { RutaDeEquipo } from './catalogo-de-rutas';
@@ -83,50 +90,7 @@ export interface ParteDelFlujo {
 const ESPERA_INICIAL_MS = 1000;
 const ESPERA_MAXIMA_POR_OMISION_MS = 30_000;
 
-/**
- * Saca los objetos JSON completos de un texto acumulado.
- *
- * El flujo llega en trozos que **no** respetan los límites de los bloques: un
- * objeto puede partirse entre dos lecturas. Se cuentan llaves fuera de cadena
- * —con su escape— y se emite sólo lo que está cerrado; el resto se queda para
- * la siguiente vuelta. Contar llaves a secas partiría cualquier objeto que
- * tuviera una `{` dentro de un texto.
- */
-export const extraerObjetos = (
-  acumulado: string,
-): { readonly objetos: readonly string[]; readonly resto: string } => {
-  const objetos: string[] = [];
-  let profundidad = 0;
-  let inicio = -1;
-  let enCadena = false;
-  let escapado = false;
-
-  for (let i = 0; i < acumulado.length; i += 1) {
-    const c = acumulado[i];
-    if (enCadena) {
-      if (escapado) escapado = false;
-      else if (c === '\\') escapado = true;
-      else if (c === '"') enCadena = false;
-      continue;
-    }
-    if (c === '"') enCadena = true;
-    else if (c === '{') {
-      if (profundidad === 0) inicio = i;
-      profundidad += 1;
-    } else if (c === '}') {
-      profundidad -= 1;
-      if (profundidad === 0 && inicio !== -1) {
-        objetos.push(acumulado.slice(inicio, i + 1));
-        inicio = -1;
-      }
-      // Una llave de cierre de más es ruido del transporte, no un objeto.
-      if (profundidad < 0) profundidad = 0;
-    }
-  }
-
-  const resto = inicio === -1 ? '' : acumulado.slice(inicio);
-  return { objetos, resto };
-};
+export { extraerObjetos } from './extraer-objetos';
 
 export class EscuchaDeAlertStream {
   private readonly cliente: ClienteDeEquipo;
@@ -134,10 +98,18 @@ export class EscuchaDeAlertStream {
   private readonly azar: () => number;
   private descartados = 0;
 
+  private readonly ahora: () => number;
+
   constructor(private readonly opciones: OpcionesDeEscucha) {
     this.cliente = new ClienteDeEquipo(opciones);
+    this.ahora = opciones.ahora ?? (() => Date.now());
     this.esperar = opciones.esperar ?? ((ms) => new Promise((listo) => setTimeout(listo, ms)));
     this.azar = opciones.azar ?? Math.random;
+  }
+
+  /** El equipo que escucha. Para la bitácora de quien la consume. */
+  get dispositivoId(): string {
+    return this.opciones.dispositivoId;
   }
 
   /** Cuántos eventos históricos se han descartado en lo que va de proceso. */
@@ -168,12 +140,19 @@ export class EscuchaDeAlertStream {
           espera = ESPERA_INICIAL_MS;
           yield evento;
         }
-      } catch {
-        // Cualquier caída es una caída: se reintenta. Distinguirlas aquí no
-        // cambiaría lo que hay que hacer.
+      } catch (error) {
+        // Cualquier caída es una caída: se reintenta. Pero se DICE (H-SITIO-14):
+        // en sitio una escucha que no conectaba no dejaba ni una línea.
+        if (cancelar === undefined || !cancelar.aborted) {
+          this.anotar('aviso', 'escucha: la conexión falló', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
       if (cancelar !== undefined && cancelar.aborted) return;
-      await this.esperarSalvoCancelacion(this.conDispersion(espera), cancelar);
+      const esperaConDispersion = this.conDispersion(espera);
+      this.anotar('info', 'escucha: se reconecta', { esperaMs: esperaConDispersion });
+      await this.esperarSalvoCancelacion(esperaConDispersion, cancelar);
       espera = Math.min(espera * 2, this.opciones.esperaMaximaMs ?? ESPERA_MAXIMA_POR_OMISION_MS);
     }
   }
@@ -201,27 +180,116 @@ export class EscuchaDeAlertStream {
     return this.opciones.transporte ?? 'alertStream';
   }
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * H-SITIO-14 · UNA CONEXIÓN, CONTADA ENTERA
+   *
+   * En sitio, con la suscripción «activa», una persona con rostro registrado
+   * pasó por la terminal y no quedó ni una línea. Ahora cada paso deja rastro:
+   * la apertura (estado HTTP y tipo), la renegociación del Digest (en el
+   * cliente), cada bloque recibido (tipo y tamaño), cada descarte con su motivo
+   * y el cierre. Los latidos y las fotos van a `debug`: son ruido esperado.
+   */
   private async *unaConexion(ruta: string, cancelar?: AbortSignal): AsyncIterable<EventoDeEquipo> {
-    let acumulado = '';
     const peticion =
       this.transporte === 'subscribeEvent'
         ? { metodo: 'POST', cuerpo: { tipo: 'application/xml', contenido: CUERPO_DE_SUSCRIPCION } }
         : undefined;
-    for await (const trozo of this.cliente.flujo(ruta, cancelar, peticion)) {
-      acumulado += trozo;
-      const { objetos, resto } = extraerObjetos(acumulado);
-      acumulado = resto;
+    const abierto = this.ahora();
+    const flujo = await this.cliente.abrirFlujoDeEventos(ruta, cancelar, peticion);
 
-      for (const crudo of objetos) {
-        const bloque = this.interpretar(crudo);
-        if (bloque === null) continue;
-        if (!esEventoEnVivo(bloque)) {
-          this.descartados += 1;
-          continue;
-        }
-        yield desdeAlertStreamJson(bloque, this.opciones.dispositivoId, new Date());
+    if (flujo.estado < 200 || flujo.estado >= 300) {
+      let cuerpo = '';
+      for await (const trozo of flujo.trozos) {
+        cuerpo += new TextDecoder().decode(trozo);
+        if (cuerpo.length > 2048) break;
       }
+      this.anotar('error', 'escucha: el equipo rechazó la conexión', {
+        estadoHttp: flujo.estado,
+        desafioVencido: flujo.desafioVencido,
+        cuerpo: recortado(sinSecretos(cuerpo), 512),
+      });
+      throw new Error(`el equipo contestó HTTP ${String(flujo.estado)} a la escucha`);
     }
+    this.anotar('info', 'escucha: conexión abierta', {
+      estadoHttp: flujo.estado,
+      tipo: flujo.tipo,
+      transporte: this.transporte,
+    });
+
+    const lector = lectorPara(flujo.tipo);
+    let bloques = 0;
+    try {
+      for await (const trozo of flujo.trozos) {
+        for (const parte of lector.alimentar(trozo)) {
+          bloques += 1;
+          const evento = this.interpretarParte(parte);
+          if (evento !== null) yield evento;
+        }
+      }
+    } finally {
+      this.anotar('aviso', 'escucha: el equipo cerró el flujo', {
+        bloques,
+        duracionMs: this.ahora() - abierto,
+        bytesSinTerminar: lector.pendientes,
+      });
+    }
+  }
+
+  /** Una parte del flujo: a evento, o a descarte con su motivo. */
+  private interpretarParte(parte: ParteCruda): EventoDeEquipo | null {
+    const bytes = parte.bytes.byteLength;
+    if (parte.tipo.startsWith('image/')) {
+      this.anotar('debug', 'escucha: imagen del evento, no se procesa', {
+        tipo: parte.tipo,
+        bytes,
+      });
+      return null;
+    }
+    const texto = new TextDecoder().decode(parte.bytes);
+    const esXml = parte.tipo.includes('xml') || /^\s*</.test(texto);
+    const bloque = esXml ? bloqueDesdeXml(texto) : this.interpretar(texto);
+    if (bloque === 'respuesta_de_suscripcion') {
+      this.anotar('info', 'escucha: el equipo confirmó la suscripción', { bytes });
+      return null;
+    }
+    if (bloque === null) {
+      this.anotar('aviso', 'escucha: bloque descartado', {
+        motivo: esXml ? 'XML sin EventNotificationAlert' : 'ilegible: no es un objeto JSON',
+        tipo: parte.tipo,
+        bytes,
+        inicio: recortado(sinSecretos(texto), 160),
+      });
+      return null;
+    }
+    const motivo = motivoDeDescarte(bloque);
+    if (motivo === 'latido del equipo') {
+      this.anotar('debug', 'escucha: latido del equipo', { bytes });
+      return null;
+    }
+    this.anotar(motivo === null ? 'info' : 'aviso', 'escucha: bloque recibido', {
+      tipo: parte.tipo,
+      eventType: bloque.eventType ?? null,
+      bytes,
+      ...(motivo === null ? {} : { descartado: motivo }),
+    });
+    if (motivo !== null) {
+      this.descartados += 1;
+      return null;
+    }
+    return desdeAlertStreamJson(bloque, this.opciones.dispositivoId, new Date());
+  }
+
+  private anotar(
+    nivel: 'debug' | 'info' | 'aviso' | 'error',
+    mensaje: string,
+    contexto: Record<string, unknown>,
+  ): void {
+    this.opciones.traza?.registrar(nivel, mensaje, {
+      dispositivoId: this.opciones.dispositivoId,
+      familia: this.opciones.familia,
+      ...contexto,
+    });
   }
 
   private interpretar(crudo: string): BloqueDeAlertStream | null {
@@ -234,7 +302,8 @@ export class EscuchaDeAlertStream {
       return interior as BloqueDeAlertStream;
     } catch {
       // Un bloque ilegible se tira: un objeto que no analiza no es un evento,
-      // y tratarlo como uno escribiría basura en una tabla inmutable.
+      // y tratarlo como uno escribiría basura en una tabla inmutable. Desde la
+      // 15-K, con su línea en la bitácora.
       return null;
     }
   }

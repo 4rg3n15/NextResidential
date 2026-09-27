@@ -73,6 +73,8 @@ export const PantallaDeBiometria = ({
   const [capturada, setCapturada] = useState<{
     readonly consentimientoId: string;
     readonly plantillaId: string;
+    /** D-10 · la versión con la que se SOLICITÓ: es la que el titular acepta. */
+    readonly versionPolitica: string;
   } | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
 
@@ -171,6 +173,7 @@ export const PantallaDeBiometria = ({
       setCapturada({
         consentimientoId: r.consentimientoId ?? 'solicitado',
         plantillaId: r.plantillaId ?? '',
+        versionPolitica,
       });
     } catch (fallo) {
       setError(
@@ -313,6 +316,7 @@ export const PantallaDeBiometria = ({
                 copropiedadId={copropiedadId}
                 consentimientoId={capturada.consentimientoId}
                 plantillaId={capturada.plantillaId}
+                versionPolitica={capturada.versionPolitica}
               />
             )}
 

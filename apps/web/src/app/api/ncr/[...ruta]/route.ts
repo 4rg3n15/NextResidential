@@ -132,7 +132,18 @@ const manejar = async (
   return reenviar(peticion, ruta);
 };
 
+/**
+ * H-SITIO-08 · UN VERBO QUE FALTA AQUÍ ES UNA PANTALLA QUE NO GUARDA.
+ *
+ * Hasta el 26/09/2026 faltaba `PUT`, y Next contestaba `405` a toda edición:
+ * equipos, porteros, turnos, vehículos y visitas. Ninguna suite lo vio porque
+ * las pantallas se prueban con el `fetch` sustituido y el proxy, con `GET`.
+ * `proxy-verbos.test.ts` deriva ahora la lista del CONTRATO generado y de las
+ * llamadas de la consola, y falla si alguno de los dos usa un verbo que aquí no
+ * se exporta.
+ */
 export const GET = manejar;
 export const POST = manejar;
+export const PUT = manejar;
 export const PATCH = manejar;
 export const DELETE = manejar;

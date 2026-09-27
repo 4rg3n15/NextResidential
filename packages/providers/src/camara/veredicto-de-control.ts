@@ -61,7 +61,10 @@ const CLASE_POR_NUMERO: Readonly<Record<string, ClaseDeReglaInterna>> = {
  * brazo; el de aparcamiento usa `open`. Se admiten las dos porque el campo de
  * la política no declara cuál de los dos vocabularios habla.
  */
-const ABRE = /^(on|open)$/i;
+// H-SITIO-01 · la guía (`EntranceParam`, `barrierGateOper`) lo declara ENTERO:
+// «0 (no operation), 1 (open barrier gate)». El catálogo sólo conocía las
+// palabras, así que un `1` caía en «operación desconocida» en vez de «abre».
+const ABRE = /^(on|open|1)$/i;
 
 /** Operaciones que NO abren, y que por tanto son admisibles en una política. */
 const NO_ABRE = /^(off|close|stop|locked|lock|none|noaction|no_action)$/i;
@@ -178,6 +181,24 @@ export const leerVeredictoDeControl = (cuerpo: string): VeredictoDeControl => {
           'Es un motor de reglas dentro del aparato: decide sin vigencia, sin patrón, sin ' +
           'zona y sin lista negra nuestras, y lo que registremos será una segunda opinión',
         valorCorrecto: 'una operación que no suba el brazo',
+      });
+    } else if (regla.operacionDesconocida && regla.operacionDeBarrera === '0') {
+      /**
+       * H-SITIO-01 · la guía general (`EntranceParam`) documenta `0` como «no
+       * operation». Pero en sitio, el 26/09/2026, «Vehículo registrado» tenía
+       * «Paso automático» ENCENDIDO y las cuatro políticas leían `0`: este
+       * campo NO refleja el interruptor que abre. No se da por «no abre»; se
+       * dice exactamente eso, y la salida es la verificación física (D-11).
+       */
+      bloqueos.push({
+        campo: `política interna ${String(regla.numero ?? '?')}`,
+        valorLeido: '0',
+        detalle:
+          'La guía documenta 0 como «sin operación», pero en sitio el «Paso automático» estaba ' +
+          'encendido con 0 en las cuatro políticas: este campo no refleja el interruptor que ' +
+          'abre. No se puede afirmar por la API que la cámara no abra sola: requiere ' +
+          'verificación física del instalador (atestación)',
+        valorCorrecto: null,
       });
     } else if (regla.operacionDesconocida) {
       bloqueos.push({

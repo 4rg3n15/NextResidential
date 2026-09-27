@@ -1,8 +1,8 @@
 import type { AccessPointProvider, ResultadoAccionamiento } from '@ncr/domain-core';
-import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
+import { ClienteDeEquipo } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
-import { comoErrorNeutral } from '../equipo/errores-del-fabricante';
+import { abrirPuertaRemota } from '../equipo/puerta-remota';
 
 /**
  * VIDEOPORTERO · `DS-KD9633-WBE6` · V2.3.9 build 230905.
@@ -55,24 +55,8 @@ export class Videoportero implements AccessPointProvider {
       'videoportero',
       this.opciones.numeroDePuerta ?? undefined,
     );
-    try {
-      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
-        tipo: 'application/xml',
-        contenido: '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>',
-      });
-      // Un rechazo del equipo sale con su clase neutral: ocupado se reintenta,
-      // credencial no, avería tampoco. «aceptado: false» a secas escondía cuál.
-      const codigo = /<statusCode>\s*(\d+)\s*<\/statusCode>/i.exec(respuesta.cuerpo)?.[1];
-      if (!respuesta.ok || (codigo !== undefined && codigo !== '0' && codigo !== '1')) {
-        throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
-      }
-      return { aceptado: true, latenciaMs: respuesta.latenciaMs };
-    } catch (error) {
-      if (error instanceof EquipoInalcanzable) {
-        return { aceptado: false, latenciaMs: error.latenciaMs };
-      }
-      throw error;
-    }
+    // H-SITIO-13 · cuerpo de la guía e intercambio completo en la bitácora.
+    return abrirPuertaRemota(this.cliente, ruta, dispositivoId);
   }
 
   async estado(_dispositivoId: string): Promise<'en_linea' | 'fuera_de_linea' | 'degradado'> {

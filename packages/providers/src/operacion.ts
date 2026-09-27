@@ -19,12 +19,24 @@ export {
   rutaPara,
   rutasDeFamilia,
   exigeCanal,
+  opcionesDeEscritura,
 } from './equipo/catalogo-de-rutas';
 export type { RutaDeEquipo, Procedencia } from './equipo/tipos-de-ruta';
 export { ClienteDeEquipo, EquipoInalcanzable } from './equipo/cliente';
 export { interpretarError } from './equipo/errores-del-fabricante';
 export { juzgarModo, leerCtrlMod } from './camara/modo-de-control';
 export { CARRIL_VERIFICADO_DE_LA_CAMARA } from './camara/carril';
-export { diagnosticarEquipo } from './diagnostico/diagnostico-de-equipo';
+export { diagnosticarEquipo, documentoSaneado } from './diagnostico/diagnostico-de-equipo';
+// 15-K (§5) · lo que necesita `--capturar`: la carga de prueba (que construye
+// el adaptador DENTRO del paquete, O2) y el saneado.
+export { cargaDePruebaDeRostro } from './diagnostico/carga-de-prueba';
+export type { ResultadoDeCargaDePrueba } from './diagnostico/carga-de-prueba';
 export { fichaDe } from './diagnostico/ficha';
-export { equiposSimulados } from './simulacion/equipo-simulado';
+// Anexo 15-K · `--abrir`: la apertura como abrió en sitio, y el oráculo del
+// simulado para ensayarla (¿se movió la puerta?).
+export { aperturaDeVerificacion } from './diagnostico/apertura-de-verificacion';
+export type {
+  FamiliaConPuerta,
+  ResultadoDeAperturaDeVerificacion,
+} from './diagnostico/apertura-de-verificacion';
+export { equiposSimulados, aperturasFisicasPor } from './simulacion/equipo-simulado';

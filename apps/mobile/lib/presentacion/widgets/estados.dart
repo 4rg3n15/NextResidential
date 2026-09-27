@@ -22,6 +22,7 @@ import 'package:flutter/material.dart';
 import '../../aplicacion/estado.dart';
 import '../../configuracion/tema.dart';
 import '../../dominio/puertos.dart';
+import 'detalle_de_fallo.dart';
 
 class VistaConEstado<T> extends StatelessWidget {
   const VistaConEstado({
@@ -114,6 +115,7 @@ class VistaConEstado<T> extends StatelessWidget {
       detalle: fallo.detalle,
       pareja: pareja,
       accion: accion,
+      fallo: fallo,
     );
     if (previo == null) return aviso;
     // Con dato previo, el fallo va ARRIBA y el dato viejo debajo, marcado. Un
@@ -137,6 +139,7 @@ class _Aviso extends StatelessWidget {
     required this.detalle,
     required this.pareja,
     this.accion,
+    this.fallo,
   });
 
   final IconData icono;
@@ -144,6 +147,9 @@ class _Aviso extends StatelessWidget {
   final String detalle;
   final Pareja pareja;
   final _Accion? accion;
+
+  /// H-SITIO-11 · para el panel de Debug con el porqué técnico.
+  final Fallo? fallo;
 
   @override
   Widget build(BuildContext context) {
@@ -178,6 +184,7 @@ class _Aviso extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(detalle, style: TextStyle(color: pareja.texto, fontSize: 14)),
+            if (fallo != null) DetalleDeFallo(fallo: fallo!),
             if (accion != null) ...[
               const SizedBox(height: 12),
               FilledButton(

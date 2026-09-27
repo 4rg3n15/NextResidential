@@ -240,6 +240,28 @@ const camara = (guion: Record<string, unknown> = {}): typeof fetch =>
 describe('A.3 · «probar conexión» distingue cuatro situaciones, no una', () => {
   const sondaCon = (peticion: typeof fetch): SondaPorProveedor => new SondaPorProveedor(peticion);
 
+  it('H-SITIO-01 · la cámara que decide sola queda RECHAZADA, con su EntranceParam a la vista', async () => {
+    const { app: a, firmante } = await conEquipos(sondaCon(camara({ ctrlMod: '0' })));
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const prueba = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/prueba-de-conexion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(ALTA)
+      .expect(201);
+    const crudos = prueba.body.ficha.crudos as { titulo: string; contenido: string }[];
+    expect(crudos.map((c) => c.titulo)).toContain('Parámetros de entrada (EntranceParam)');
+    // Saneado: ni la clave ni la dirección del equipo salen hacia el navegador.
+    expect(JSON.stringify(crudos)).not.toContain(ALTA.secreto);
+    expect(JSON.stringify(crudos)).not.toContain(ALTA.host);
+
+    const alta = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(ALTA)
+      .expect(201);
+    expect(alta.body.verificacion).toBe('rechazado');
+  });
+
   it('alcanzado: guarda modelo y firmware del propio equipo', async () => {
     const r = await sondaCon(camara({ modelo: 'MODELO-DE-PRUEBA', firmware: 'V9.9.9' })).probar({
       ...ALTA,
@@ -633,5 +655,121 @@ describe('O5 · ninguna respuesta lleva dirección, puerto, protocolo ni usuario
     // cliente nunca vio, y el sobre del secreto no se tocó.
     expect(sondeos.at(-1)).toMatchObject({ host: ALTA.host, usuario: ALTA.usuario });
     expect(repo.sobreDe(COP_B, creado.body.id as string)).toEqual(antes);
+  });
+});
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * D-11 · LA ATESTACIÓN DEL INSTALADOR
+ *
+ * Sólo el superadministrador; sólo una cámara; sólo con firmware conocido. La
+ * fila del equipo la trae con su vigencia, y un firmware nuevo la deja sin
+ * efecto sin tocar la atestación (la tabla es de sólo inserción).
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+describe('D-11 · atestación del instalador sobre una cámara', () => {
+  const ENTRADA = {
+    placaEnListaBlanca: 'abc-123',
+    placaDesconocida: 'XYZ 987',
+    ningunaAbrio: true,
+    evidencia: 'Carril 1, 10:40: dos pasadas; el brazo no subió en ninguna de las dos.',
+  };
+  const RECHAZADA: ResultadoDeSondeo = {
+    ...ALCANZADO,
+    clase: 'decide_solo',
+    verificado: false,
+    firmware: 'V5.3.0',
+    detalle: 'la cámara decide por su cuenta',
+  };
+
+  const montar = async (veredicto: ResultadoDeSondeo = RECHAZADA) => {
+    const { app: a, firmante } = await conEquipos({ probar: async () => veredicto });
+    const admin = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const superadmin = await tokenDe(firmante, {
+      rol: 'superadministrador',
+      copropiedadId: COP_B,
+    });
+    const camara = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send(ALTA)
+      .expect(201);
+    return { a, admin, superadmin, id: camara.body.id as string };
+  };
+  const atestar = (a: INestApplication, token: string, id: string, cuerpo: object = ENTRADA) =>
+    request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/${id}/atestacion`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(cuerpo);
+
+  it('el administrador del conjunto NO atesta: 403 por rol', async () => {
+    const { a, admin, id } = await montar();
+    await atestar(a, admin, id).expect(403);
+  });
+
+  it('sin la declaración «ninguna abrió» no hay atestación: 400', async () => {
+    const { a, superadmin, id } = await montar();
+    await atestar(a, superadmin, id, { ...ENTRADA, ningunaAbrio: false }).expect(400);
+  });
+
+  it('la misma placa dos veces no prueba nada: 400', async () => {
+    const { a, superadmin, id } = await montar();
+    await atestar(a, superadmin, id, { ...ENTRADA, placaDesconocida: 'ABC123' }).expect(400);
+  });
+
+  it('el superadministrador atesta; la fila la trae VIGENTE, con placas normalizadas', async () => {
+    const { a, admin, superadmin, id } = await montar();
+    const r = await atestar(a, superadmin, id).expect(201);
+    expect(r.body).toMatchObject({
+      firmware: 'V5.3.0',
+      placaEnListaBlanca: 'ABC123',
+      placaDesconocida: 'XYZ987',
+      vigente: true,
+      motivoSinEfecto: null,
+    });
+    const lista = await request(a.getHttpServer())
+      .get(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    const fila = (
+      lista.body.equipos as { id: string; verificacion: string; atestacion: unknown }[]
+    ).find((e) => e.id === id);
+    // La atestación NO vuelve verde a la cámara: sigue rechazada por la API.
+    expect(fila?.verificacion).toBe('rechazado');
+    expect(fila?.atestacion).toMatchObject({ vigente: true, firmware: 'V5.3.0' });
+  });
+
+  it('otro firmware tras un sondeo nuevo: la atestación queda SIN EFECTO y lo dice', async () => {
+    let firmware = 'V5.3.0';
+    const { app: a, firmante } = await conEquipos({
+      probar: async () => ({ ...RECHAZADA, firmware }),
+    });
+    const admin = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const superadmin = await tokenDe(firmante, { rol: 'superadministrador', copropiedadId: COP_B });
+    const alta = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send(ALTA)
+      .expect(201);
+    await atestar(a, superadmin, alta.body.id as string).expect(201);
+
+    firmware = 'V5.3.2';
+    const editado = await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${alta.body.id as string}`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send({ nombre: 'Cámara de la entrada' })
+      .expect(200);
+    expect(editado.body.atestacion).toMatchObject({ vigente: false });
+    expect(editado.body.atestacion.motivoSinEfecto).toMatch(/V5\.3\.0.*V5\.3\.2/);
+  });
+
+  it('un equipo que no es cámara no se atesta', async () => {
+    const { a, admin, superadmin } = await montar({ ...ALCANZADO, firmware: 'V1' });
+    const terminal = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send({ ...ALTA, nombre: 'Terminal', tipo: 'terminal_facial' })
+      .expect(201);
+    await atestar(a, superadmin, terminal.body.id as string).expect(400);
   });
 });
