@@ -13,12 +13,29 @@
  *   · H-SITIO-08 · el proxy de la consola vuelve a no exportar PUT → la
  *                  edición no se guarda.
  *
+ * Y, desde el anexo de sitio, los dos que viven en el adaptador de equipos
+ * (`packages/providers`), que la API del recorrido usa de verdad contra el
+ * simulado HTTP:
+ *
+ *   · H-SITIO-13 · la apertura de la terminal vuelve al cuerpo mínimo, sin
+ *                  espacio de nombres → el equipo dice «OK» y la puerta no se
+ *                  mueve; la consola, «aceptada».
+ *   · H-SITIO-15 · el cliente vuelve a sondear cada escritura con el cuerpo
+ *                  vacío, como `curl --digest` → el equipo contesta 400
+ *                  badXmlContent antes de autenticar.
+ *
  * Un fallo por OTRO motivo no cuenta: si el recorrido se cae antes de llegar a
  * la comprobación, la sonda no ha demostrado nada y lo dice.
  *
- * La API de las sondas corre con `tsx` desde el fuente del árbol (no hay que
- * compilarla); la consola se reutiliza compilada salvo en H-SITIO-08, donde el
- * defecto vive en ella y se compila en el árbol.
+ * La API de las sondas se compila con `tsc` en su árbol, como `build`: con
+ * `tsx` el ValidationPipe no validaba nada y el historial de eventos daba 400
+ * en TODAS las sondas sin que ninguna lo contara (H-SITIO-06, anexo). Por eso
+ * las demás faltas del recorrido se imprimen también: una cascada del defecto
+ * es esperable; una falta ajena es un aviso. La consola se reutiliza compilada
+ * salvo en H-SITIO-08, donde el defecto vive en ella y se compila en el árbol. En H-SITIO-13 y 15 se copia
+ * además `packages/providers`, se muta y se compila en el árbol: la API de la
+ * sonda carga esa copia y el simulado —que corre en el recorrido, desde el
+ * repositorio— sigue siendo el sano, el que dice qué hizo el equipo.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { spawnSync } from 'node:child_process';
@@ -27,14 +44,14 @@ import { arbolDeSonda, raizDelRepositorio } from './arbol-de-sonda.mjs';
 const SONDAS = [
   {
     id: 'H-SITIO-02',
-    copiar: 'apps/api',
+    copiar: ['apps/api'],
     fichero: 'apps/api/src/tablero/tablero.module.ts',
     antes: "const enBase = configuracion.PERSISTENCIA_DE_EVENTOS === 'postgres';",
     despues: 'const enBase = false;',
   },
   {
     id: 'H-SITIO-03',
-    copiar: 'apps/api',
+    copiar: ['apps/api'],
     fichero: 'apps/api/src/biometria/presentacion/biometria.controller.ts',
     antes:
       "@Roles('superadministrador', 'administrador', 'portero', 'operador_central', 'residente')",
@@ -42,10 +59,28 @@ const SONDAS = [
   },
   {
     id: 'H-SITIO-08',
-    copiar: 'apps/web',
+    copiar: ['apps/web'],
     fichero: 'apps/web/src/app/api/ncr/[...ruta]/route.ts',
     antes: 'export const PUT = manejar;',
     despues: '',
+  },
+  {
+    id: 'H-SITIO-13',
+    copiar: ['apps/api', 'packages/providers'],
+    fichero: 'packages/providers/src/equipo/catalogo-de-rutas.ts',
+    antes: 'export const CUERPO_DE_APERTURA_DE_LA_TERMINAL = DOCUMENTO_DE_APERTURA;',
+    // Lo que enviaba terminal-facial.ts antes del anexo.
+    despues:
+      "export const CUERPO_DE_APERTURA_DE_LA_TERMINAL = '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>';",
+  },
+  {
+    id: 'H-SITIO-15',
+    copiar: ['apps/api', 'packages/providers'],
+    fichero: 'packages/providers/src/equipo/cliente.ts',
+    antes: /\(\) =>\s*this\.enviar\(metodo, ruta, cuerpo\),/,
+    // El primer envío de cada escritura, el que recibe el desafío, sin cuerpo.
+    despues:
+      '((sondeo) => () => this.enviar(metodo, ruta, sondeo.n++ === 0 ? undefined : cuerpo))({ n: 0 }),',
   },
 ];
 
@@ -56,10 +91,17 @@ let corridas = 0;
 for (const sonda of SONDAS.filter((s) => soloEstas.length === 0 || soloEstas.includes(s.id))) {
   corridas += 1;
   console.log(`\n▸ ${sonda.id} reintroducido`);
-  const arbol = arbolDeSonda({ copiar: [sonda.copiar] });
+  const arbol = arbolDeSonda({ copiar: sonda.copiar });
   try {
     arbol.mutar(sonda.fichero, sonda.antes, sonda.despues);
-    const enLaApi = sonda.copiar === 'apps/api';
+    // Primero los paquetes y después las aplicaciones que los cargan.
+    for (const copia of [
+      ...sonda.copiar.filter((c) => c.startsWith('packages/')),
+      ...sonda.copiar.filter((c) => c === 'apps/api'),
+    ]) {
+      arbol.compilar(copia);
+    }
+    const enLaApi = sonda.copiar.includes('apps/api');
     const r = spawnSync('node', ['e2e/recorrido-de-consola.mjs'], {
       cwd: raizDelRepositorio,
       encoding: 'utf8',
@@ -67,7 +109,7 @@ for (const sonda of SONDAS.filter((s) => soloEstas.length === 0 || soloEstas.inc
       env: {
         ...process.env,
         ...(enLaApi
-          ? { NCR_RAIZ_API: arbol.raiz, NCR_API_CON_TSX: '1', NCR_REUTILIZAR_CONSOLA: '1' }
+          ? { NCR_RAIZ_API: arbol.raiz, NCR_REUTILIZAR_CONSOLA: '1' }
           : { NCR_RAIZ_WEB: arbol.raiz }),
       },
     });
@@ -75,6 +117,12 @@ for (const sonda of SONDAS.filter((s) => soloEstas.length === 0 || soloEstas.inc
     const nombrado = salida.split('\n').find((l) => l.includes('✗') && l.includes(sonda.id));
     if (r.status !== 0 && nombrado !== undefined) {
       console.log(`   ✓ el recorrido lo detecta: ${nombrado.trim()}`);
+      for (const l of salida
+        .split('\n')
+        .filter((x) => x.includes('✗') && x !== nombrado)
+        .slice(0, 4)) {
+        console.log(`     · también: ${l.trim()}`);
+      }
     } else {
       fallos += 1;
       console.log(

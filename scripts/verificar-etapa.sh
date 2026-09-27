@@ -808,9 +808,9 @@ else
   mal "hay campos de texto sin longitud máxima declarada (§2.7.4)"
   echo "$salida_long" | head -10 | sed 's/^/     /'
 fi
-# H-SITIO-06 (15-K) · `start:dev` usa tsx, que no emite metadatos de tipos: una
-# clase que Nest construye e inyecta POR TIPO recibe `undefined`. En sitio la
-# API cayó al arrancar. La mitad estática del control; la que arranca, en 12d.
+# H-SITIO-06 (15-K) · `start:dev` usaba tsx, que no emite metadatos de tipos:
+# una clase que Nest construye e inyecta POR TIPO recibía `undefined`. En sitio
+# la API cayó al arrancar. Defensa estática; la que arranca, en 12d.
 if salida_iny=$(con_limite "$LIMITE_CORTO" node scripts/lib/inyeccion-explicita.mjs 2>&1); then
   ok "${salida_iny#OK }"
 else
@@ -1010,19 +1010,40 @@ else
   grep -E "✗|     " /tmp/ncr-camino.log | head -6 | sed 's/^/     /'
 fi
 
-paso "12d · la API arranca con tsx —el start:dev de sitio— y sus controladores reciben sus dependencias"
-# H-SITIO-06 (15-K) · el 26/09/2026 `start:dev` cayó en sitio con «Cannot read
-# properties of undefined (reading 'get')». Ni la suite (SWC con metadatos) ni
-# el 12c (`node dist/main.js`, compilado con tsc) pasan por tsx: el único
-# arranque que el usuario ejecutó en sitio era el único que nadie probaba. Sin
-# base: usa adaptadores en memoria y un doble de GoTrue, como el 12c.
-if salida_tsx=$(con_limite "$LIMITE_MEDIO" node e2e/arranque-con-tsx.mjs 2>&1); then
-  echo "$salida_tsx" | grep -E "^   ✓" | sed 's/^   //' | sed 's/^/   /'
-  ok "la API arranca con tsx y un controlador inyectado contesta"
+paso "12d · start:dev —el arranque de sitio— inyecta y VALIDA; con tsx la API se niega a arrancar"
+# H-SITIO-06 (15-K) · el 26/09/2026 `start:dev` (tsx) cayó en sitio con «Cannot
+# read properties of undefined (reading 'get')». Ni la suite (SWC con
+# metadatos) ni el 12c (`node dist/main.js`) pasaban por tsx. El anexo destapó
+# la mitad silenciosa: sin metadatos de tipos el ValidationPipe no valida
+# ningún DTO. `start:dev` compila ahora con tsc y la API se niega a arrancar
+# sin metadatos; este paso arranca las dos cosas. Sin base: adaptadores en
+# memoria y un doble de GoTrue, como el 12c.
+if salida_dev=$(con_limite "$LIMITE_MEDIO" node e2e/arranque-de-desarrollo.mjs 2>&1); then
+  echo "$salida_dev" | grep -E "^   ✓" | sed 's/^   //' | sed 's/^/   /'
+  ok "start:dev arranca, inyecta y valida; tsx no arranca sin metadatos"
 else
-  mal "con tsx (start:dev) la API no arranca o un controlador no recibe sus dependencias"
-  echo "$salida_tsx" | head -16 | sed 's/^/     /'
+  mal "start:dev no arranca, no inyecta o no valida, o tsx arranca sin metadatos (H-SITIO-06)"
+  echo "$salida_dev" | head -16 | sed 's/^/     /'
 fi
+
+paso "12e · el guion de sitio, ensayado contra los equipos simulados: --con-audio y --abrir"
+# Anexo 15-K · nada ejecutaba el guion de sitio, y la negativa del cliente a
+# escribir sin cuerpo (H-SITIO-15) lo rompió en `--con-audio` sin un rojo: se
+# vio al ensayarlo a mano. `--abrir` es la verificación de la próxima visita:
+# en simulado, el equipo dice si la puerta se movió. El informe y la hoja van a
+# un directorio temporal, nunca al repositorio.
+ensayo_guion="$(mktemp -d "${TMPDIR:-/tmp}/ncr-guion.XXXXXX")"
+if salida_guion=$(con_limite "$LIMITE_CORTO" node scripts/puesta-en-marcha-equipos.mjs --simulado --con-audio \
+  --informe="$ensayo_guion/informe.md" --hoja="$ensayo_guion/hoja.md" </dev/null 2>&1) &&
+  salida_abrir=$(con_limite "$LIMITE_CORTO" node scripts/puesta-en-marcha-equipos.mjs --simulado --abrir \
+    --informe="$ensayo_guion/abrir.md" </dev/null 2>&1); then
+  echo "$salida_abrir" | grep -E "SE MOVIÓ" | sed 's/^ *//' | sed 's/^/   /'
+  ok "el guion recorre los tres equipos simulados y --abrir abre como en sitio"
+else
+  mal "el guion de sitio falla contra los equipos simulados (--con-audio o --abrir)"
+  printf '%s\n%s\n' "${salida_guion:-}" "${salida_abrir:-}" | grep -E "✗|⚠|VEREDICTO" | head -12 | sed 's/^/     /'
+fi
+rm -rf "$ensayo_guion"
 
 if [[ "$CON_BASE" == "1" ]]; then
   paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)"

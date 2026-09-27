@@ -14,12 +14,15 @@
  *   · base PostgreSQL PROPIA, recién migrada y sembrada, con la API conectada
  *     como el rol dueño NO superusuario (`sb_postgres_sim`), igual que Supabase;
  *   · un doble de GoTrue que emite los claims del GANCHO REAL de la base;
- *   · la API real (`dist` o, para las sondas, `tsx` sobre el fuente);
+ *   · la API real, compilada con `tsc` (la de una sonda, compilada en su
+ *     árbol): con `tsx` el ValidationPipe no valida nada (H-SITIO-06, anexo)
+ *     y la API se niega a arrancar;
  *   · la consola COMPILADA;
  *   · dos equipos SIMULADOS escuchando por HTTP con Digest —cámara y terminal—,
  *     los mismos de `packages/providers`: el alta, el diagnóstico y la
  *     corrección van por la red de verdad;
- *   · el proveedor de equipos `simulado`, que es el de por omisión.
+ *   · el proveedor de equipos `hikvision` —el adaptador real— contra esos
+ *     equipos simulados, que reproducen lo visto en sitio (anexo 15-K).
  *
  * Como SUPERADMINISTRADOR: acceso con segundo factor, alta de la cámara y de
  * la terminal, ficha con diagnóstico y corrección, edición (PUT), apertura
@@ -30,9 +33,9 @@
  * Las afirmaciones que cazan los defectos de sitio llevan su identificador:
  * `e2e/recorrido-negativo.mjs` los reintroduce uno a uno y exige verlos fallar.
  *
- * Variables para las sondas: `NCR_RAIZ_API`, `NCR_RAIZ_WEB` (árboles de sonda),
- * `NCR_API_CON_TSX=1` (la API desde el fuente), `NCR_REUTILIZAR_CONSOLA=1`
- * (no recompilar la consola si ya hay `.next`).
+ * Variables para las sondas: `NCR_RAIZ_API`, `NCR_RAIZ_WEB` (árboles de sonda,
+ * con la API ya compilada), `NCR_REUTILIZAR_CONSOLA=1` (no recompilar la
+ * consola si ya hay `.next`).
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { spawn, spawnSync } from 'node:child_process';
@@ -346,7 +349,6 @@ const prepararBase = () => {
 
 // ── API y consola ───────────────────────────────────────────────────────────
 const arrancarApi = (doble, puerto, puertoWeb) => {
-  const conTsx = process.env.NCR_API_CON_TSX === '1';
   const cwd = resolve(raizApi, 'apps/api');
   const url = urlDe(BASE, ROL_DE_LA_API);
   const entorno = {
@@ -375,15 +377,6 @@ const arrancarApi = (doble, puerto, puertoWeb) => {
     API_URL_PUBLICA: `http://127.0.0.1:${String(puerto)}`,
     PLANIFICADOR_HABILITADO: 'false',
   };
-  if (conTsx) {
-    const cli = createRequire(resolve(cwd, 'package.json')).resolve('tsx/cli');
-    return lanzar(process.execPath, [cli, 'src/main.ts'], {
-      cwd,
-      env: entorno,
-      detached: true,
-      nombre: 'api',
-    });
-  }
   if (!existsSync(resolve(cwd, 'dist/main.js'))) {
     console.log('   · compilando la API (no hay dist)');
     const b = spawnSync('pnpm', ['--filter', '@ncr/api...', 'build'], { cwd: raizApi });

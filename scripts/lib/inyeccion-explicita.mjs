@@ -117,7 +117,7 @@ if (faltas.length > 0) {
   );
   for (const f of faltas) console.error(`  ${f}`);
   console.error(
-    '\n  Con `tsx` (start:dev) esos parámetros llegan como `undefined`: esbuild no emite\n' +
+    '\n  Con `tsx` (el start:dev de sitio) llegan como `undefined`: esbuild no emite\n' +
       '  `design:paramtypes`. Añada `@Inject(Clase)` o `@Inject(TOKEN)` en cada uno.',
   );
   process.exit(1);

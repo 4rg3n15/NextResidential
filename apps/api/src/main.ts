@@ -52,6 +52,7 @@ import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from './comun/rut
 import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from './comun/ruta-de-video';
 import { AppModule } from './app.module';
 import { avisoDeUrlPublica } from './comun/url-publica';
+import { MOTIVO_SIN_METADATOS, emiteMetadatosDeTipos } from './arranque/metadatos-de-tipos';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
 import { aplicarSaneamiento, aplicarSeguridad } from './seguridad';
 import { FiltroGlobalDeExcepciones } from './comun/filtros/filtro-global';
@@ -76,6 +77,9 @@ import {
 } from './arranque/recursos';
 
 async function arrancar(): Promise<void> {
+  // H-SITIO-06 (anexo 15-K) · antes que nada: sin metadatos de tipos el
+  // ValidationPipe no valida ningún DTO, y eso no es un modo de desarrollo.
+  if (!emiteMetadatosDeTipos()) throw new ErrorDeConfiguracion([MOTIVO_SIN_METADATOS]);
   // Primero la configuración, antes de construir nada: si falta una variable,
   // el proceso muere aquí con un motivo legible y un código de salida útil,
   // en vez de dentro del contenedor de inyección (§2.7.1).

@@ -2899,31 +2899,56 @@ try {
   }
 
   console.log(
-    '\n▸ 35 · con tsx, un controlador inyectado POR TIPO contesta 500 y el paso 12d lo ve (H-SITIO-06)',
+    '\n▸ 35 · start:dev con tsx deja el ValidationPipe inerte, y el paso 12d lo ve (H-SITIO-06)',
   );
   {
     /**
-     * El 12d se añadió en la 15-K y nadie lo había visto fallar: lo destapó el
-     * propio control de cobertura negativa. Se reintroduce el defecto de sitio
-     * —un `@Inject` quitado— en un ÁRBOL DE SONDA (sólo `apps/api` copiada,
-     * el resto enlazado) y se exige que el paso lo nombre.
+     * Anexo 15-K · el 12d arrancaba la API con tsx y sólo miraba la inyección;
+     * la mitad silenciosa —sin metadatos de tipos el `ValidationPipe` no valida
+     * ningún DTO— la destapó el recorrido de la consola. Dos sondas, en
+     * ÁRBOLES de sonda (sólo `apps/api` copiada, el resto enlazado):
+     *
+     *  · 35a · `start:dev` vuelve a ser tsx y se quita la negativa del
+     *          arranque: es la API de sitio. El paso debe decir que NO valida.
+     *  · 35b · sólo se quita la negativa: `start:dev` sigue sano, pero nada
+     *          impide arrancar con tsx. El paso debe decir que tsx ARRANCA.
      */
-    const arbol = arbolDeSonda({ copiar: ['apps/api'] });
-    try {
-      arbol.mutar(
-        'apps/api/src/biometria/presentacion/consentimiento-publico.controller.ts',
-        /@Inject\(ResolverEnlaceDeConsentimiento\)\s*\n/,
-        '',
-      );
-      const r = correr('node', ['e2e/arranque-con-tsx.mjs'], {
-        timeout: 240_000,
-        env: { ...process.env, NCR_RAIZ: arbol.raiz },
-      });
-      r.codigo !== 0 && /le falta una dependencia/.test(r.salida)
-        ? ok('sin el @Inject explícito, el arranque con tsx falla y dice por qué')
-        : mal(`sin el @Inject explícito el paso 12d NO falla (codigo ${r.codigo})`);
-    } finally {
-      arbol.limpiar();
+    const sinNegativa = [
+      'apps/api/src/main.ts',
+      'if (!emiteMetadatosDeTipos()) throw new ErrorDeConfiguracion([MOTIVO_SIN_METADATOS]);',
+      'void [emiteMetadatosDeTipos, MOTIVO_SIN_METADATOS];',
+    ];
+    const casos = [
+      {
+        id: '35a',
+        parches: [
+          sinNegativa,
+          ['apps/api/package.json', /"start:dev": "[^"]*"/, '"start:dev": "tsx watch src/main.ts"'],
+        ],
+        esperado: /ValidationPipe NO valida/,
+        bien: 'con el start:dev de sitio (tsx) el paso 12d dice que el ValidationPipe no valida',
+      },
+      {
+        id: '35b',
+        parches: [sinNegativa],
+        esperado: /con tsx la API ARRANCA sin metadatos/,
+        bien: 'sin la negativa del arranque el paso 12d dice que tsx arranca sin validar',
+      },
+    ];
+    for (const caso of casos) {
+      const arbol = arbolDeSonda({ copiar: ['apps/api'] });
+      try {
+        for (const [fichero, antes, despues] of caso.parches) arbol.mutar(fichero, antes, despues);
+        const r = correr('node', ['e2e/arranque-de-desarrollo.mjs'], {
+          timeout: 420_000,
+          env: { ...process.env, NCR_RAIZ: arbol.raiz },
+        });
+        r.codigo !== 0 && caso.esperado.test(r.salida)
+          ? ok(`${caso.id} · ${caso.bien}`)
+          : mal(`${caso.id} · el paso 12d NO lo detecta (codigo ${r.codigo})`);
+      } finally {
+        arbol.limpiar();
+      }
     }
   }
 
@@ -2962,6 +2987,69 @@ try {
     r.codigo !== 0 && /no se ejecutó ninguna sonda/.test(r.salida)
       ? ok('un filtro que no casa con ninguna sonda es un fallo, no un «todo detectado»')
       : mal(`sin sondas el recorrido negativo pasa (codigo ${r.codigo})`);
+  }
+
+  console.log(
+    '\n▸ 38 · el guion de sitio (paso 12e) ve H-SITIO-13 con --abrir y una escritura de audio sin declarar',
+  );
+  {
+    /**
+     * Anexo 15-K · el 12e ensaya el guion contra los simulados; aquí se le ve
+     * fallar. Se copia `packages/providers` a un árbol de sonda, se muta, se
+     * compila, y el guion se ejecuta DESDE el árbol (`--preserve-symlinks-main`:
+     * sin eso, `scripts/` —un enlace— se resolvería al repositorio real y
+     * cargaría el paquete sano).
+     *
+     *  · 38a · la apertura de la terminal vuelve al cuerpo mínimo: el equipo
+     *          dice «OK» y la puerta no se mueve. `--abrir` debe decirlo.
+     *  · 38b · el canal de audio pierde su `sinCuerpo`: el cliente se niega a
+     *          abrirlo. `--con-audio` debe decirlo.
+     */
+    const casos = [
+      {
+        id: '38a',
+        fichero: 'packages/providers/src/equipo/catalogo-de-rutas.ts',
+        antes: 'export const CUERPO_DE_APERTURA_DE_LA_TERMINAL = DOCUMENTO_DE_APERTURA;',
+        despues:
+          "export const CUERPO_DE_APERTURA_DE_LA_TERMINAL = '<RemoteControlDoor><cmd>open</cmd></RemoteControlDoor>';",
+        argumentos: ['--simulado', '--abrir'],
+        esperado: /la puerta NO se movió/,
+        bien: '--abrir dice que la puerta de la terminal NO se movió con la orden aceptada',
+      },
+      {
+        id: '38b',
+        fichero: 'packages/providers/src/equipo/catalogo-de-rutas.ts',
+        antes: /\n {4}sinCuerpo: true,/g,
+        despues: '',
+        argumentos: ['--simulado', '--con-audio'],
+        esperado: /abrir el canal de audio bidireccional \(canal 1\) — inalcanzable/,
+        bien: '--con-audio dice que el canal de audio no se pudo abrir',
+      },
+    ];
+    for (const caso of casos) {
+      const arbol = arbolDeSonda({ copiar: ['packages/providers'] });
+      try {
+        arbol.mutar(caso.fichero, caso.antes, caso.despues);
+        arbol.compilar('packages/providers');
+        const informe = join(banco, `guion-${caso.id}.md`);
+        const r = correr(
+          'node',
+          [
+            '--preserve-symlinks-main',
+            join(arbol.raiz, 'scripts/puesta-en-marcha-equipos.mjs'),
+            ...caso.argumentos,
+            `--informe=${informe}`,
+            `--hoja=${join(banco, `hoja-${caso.id}.md`)}`,
+          ],
+          { timeout: 120_000, input: '' },
+        );
+        r.codigo !== 0 && caso.esperado.test(r.salida)
+          ? ok(`${caso.id} · ${caso.bien}`)
+          : mal(`${caso.id} · el guion NO lo detecta (codigo ${r.codigo})`);
+      } finally {
+        arbol.limpiar();
+      }
+    }
   }
 
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
