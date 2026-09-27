@@ -697,7 +697,7 @@ a C-43 (C-43 nueva en el cierre). **Extensión:** E-05. **Pendiente:** P-21
 
 ## 10 · Rama y commits
 
-Rama `etapa-15l-entrega-final`, base `develop`. PR: ⟪PR⟫ (sin fusionar).
+Rama `etapa-15l-entrega-final`, base `develop`. PR: [4rg3n15/NextResidential#34](https://github.com/4rg3n15/NextResidential/pull/34) (sin fusionar: la fusión es del usuario).
 
 - `0669b28` docs(etapa-15l): bloque 0 · informe de bloqueos antes de escribir código
 - `a7a2821` fix(etapa-15l/equipos): la terminal pregunta, la plataforma contesta y la terminal abre (R1–R4)
