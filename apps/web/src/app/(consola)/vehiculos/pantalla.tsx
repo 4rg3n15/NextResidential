@@ -269,7 +269,7 @@ export const PantallaDeVehiculos = ({
     <>
       <EncabezadoDePantalla
         titulo="Vehículos y placas"
-        descripcion="Una placa activa por copropiedad; la garantía es de la base de datos, no del formulario (RN-04)."
+        descripcion="Una misma placa sólo puede estar activa una vez en la copropiedad."
         resumen={
           consulta.data === undefined ? null : (
             <>
@@ -307,7 +307,7 @@ export const PantallaDeVehiculos = ({
       <DialogoDeFormulario
         abierto={editar !== null}
         titulo={`Editar ${editar?.placa ?? ''}`}
-        descripcion="Placa, tipo, marca, modelo y color. Cambiar la placa la vuelve a normalizar; si ya está activa en otra vivienda, la base lo rechaza (RN-04)."
+        descripcion="Placa, tipo, marca, modelo y color. Si la placa nueva ya está activa en otra vivienda, no se guarda."
         etiquetaEnviar="Guardar cambios"
         enviando={enviando}
         error={error}
@@ -352,7 +352,7 @@ export const PantallaDeVehiculos = ({
       <DialogoDeConfirmacion
         abierto={borrado !== null}
         titulo={`Borrar definitivamente ${borrado?.placa ?? ''}`}
-        descripcion="Esto BORRA el vehículo. Solo se permite si no tiene ningún evento ni autorización con su placa: con historial, el sistema lo rechaza y dice qué lo impide (RN-19)."
+        descripcion="Esto BORRA el vehículo. Sólo se permite si no tiene ningún acceso ni autorización con su placa; si los tiene, el sistema lo impide y dice por qué."
         etiquetaConfirmar="Borrar definitivamente"
         enviando={enviando}
         error={error}

@@ -1,5 +1,6 @@
 'use client';
 
+import { Ayuda } from '@/componentes/ui/ayuda';
 import type { JSX } from 'react';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -104,7 +105,8 @@ export const PantallaDeListasNegras = ({
         <div>
           <h1 className="text-xl font-semibold">Listas negras</h1>
           <p className="text-sm text-texto-suave">
-            Un veto activo niega el paso aunque haya una autorización vigente (RN-06).
+            Un veto activo niega el paso aunque haya una autorización vigente.
+            <Ayuda texto="El veto manda sobre cualquier permiso: aunque el residente autorice la visita, la persona vetada no pasa hasta que alguien lo levante." />
           </p>
         </div>
         <Boton onClick={() => setNuevo(true)}>Vetar</Boton>
@@ -129,7 +131,7 @@ export const PantallaDeListasNegras = ({
       <DialogoDeConfirmacion
         abierto={levantar !== null}
         titulo="Levantar el veto"
-        descripcion="Desde este momento vuelve a decidir la autorización. Queda con su autor y su hora (RN-07)."
+        descripcion="Desde este momento vuelve a decidir la autorización. Queda registrado quién lo levantó y cuándo."
         etiquetaConfirmar="Levantar"
         sinMotivo
         enviando={enviando}

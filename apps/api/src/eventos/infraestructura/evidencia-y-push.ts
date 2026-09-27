@@ -27,6 +27,11 @@ export class AlmacenEvidenciaFirmado implements AlmacenEvidencia {
     return clave;
   }
 
+  /** F6 (15-L) · los bytes guardados, para copiar la foto a otra visita. */
+  async leer(clave: string): Promise<Uint8Array | null> {
+    return this.contenidos.get(clave)?.bytes ?? null;
+  }
+
   async urlFirmada(clave: string, segundosDeVida: number): Promise<string> {
     const expira = Math.floor(this.ahora() / 1000) + segundosDeVida;
     const firma = this.firmar(clave, expira);

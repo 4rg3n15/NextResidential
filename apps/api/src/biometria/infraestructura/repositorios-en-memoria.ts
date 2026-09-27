@@ -43,16 +43,6 @@ export class RepositorioConsentimientosEnMemoria implements RepositorioConsentim
     return null;
   }
 
-  async pendientesVencidos(
-    copropiedadId: string,
-    ahora: Date,
-    plazoHoras: number,
-  ): Promise<readonly ConsentimientoBiometrico[]> {
-    return [...this.filas.values()].filter(
-      (c) => c.copropiedadId === copropiedadId && c.venciendo(ahora, plazoHoras),
-    );
-  }
-
   async guardar(consentimiento: ConsentimientoBiometrico): Promise<void> {
     this.declarar(consentimiento);
   }
@@ -62,6 +52,10 @@ export class RepositorioPlantillasEnMemoria implements RepositorioPlantillas {
   private readonly filas = new Map<string, PlantillaBiometrica>();
   /** `plantillaId → dispositivos que la tienen`. Espejo de la tabla real. */
   readonly sincronizaciones = new Map<string, Set<string>>();
+  /** F3 · `plantillaId/dispositivoId → motivo` de lo que un equipo no aceptó. */
+  readonly fallos = new Map<string, string>();
+  /** F2 · autorizaciones revocadas que el doble conoce (en la base, una consulta). */
+  readonly autorizacionesRevocadas = new Set<string>();
 
   private clave(copropiedadId: string, id: string): string {
     return `${copropiedadId}/${id}`;
@@ -99,6 +93,25 @@ export class RepositorioPlantillasEnMemoria implements RepositorioPlantillas {
     );
   }
 
+  async deAutorizacion(
+    copropiedadId: string,
+    autorizacionId: string,
+  ): Promise<readonly PlantillaBiometrica[]> {
+    return [...this.filas.values()].filter(
+      (p) => p.copropiedadId === copropiedadId && p.autorizacionId === autorizacionId,
+    );
+  }
+
+  async deAutorizacionesRevocadas(copropiedadId: string): Promise<readonly PlantillaBiometrica[]> {
+    return [...this.filas.values()].filter(
+      (p) =>
+        p.copropiedadId === copropiedadId &&
+        !p.suprimida &&
+        p.autorizacionId !== null &&
+        this.autorizacionesRevocadas.has(p.autorizacionId),
+    );
+  }
+
   /**
    * La cola de retirada se DERIVA, igual que en la base: plantillas suprimidas
    * que siguen constando en un equipo. No hay estado «pendiente de retirada»
@@ -128,6 +141,12 @@ export class RepositorioPlantillasEnMemoria implements RepositorioPlantillas {
     const equipos = this.sincronizaciones.get(destino.plantillaId) ?? new Set<string>();
     equipos.add(destino.dispositivoId);
     this.sincronizaciones.set(destino.plantillaId, equipos);
+    this.fallos.delete(`${destino.plantillaId}/${destino.dispositivoId}`);
+  }
+
+  async registrarFallo(destino: DestinoDePlantilla, detalle: string): Promise<void> {
+    if (this.sincronizaciones.get(destino.plantillaId)?.has(destino.dispositivoId) === true) return;
+    this.fallos.set(`${destino.plantillaId}/${destino.dispositivoId}`, detalle);
   }
 
   async registrarRetirada(destino: DestinoDePlantilla): Promise<void> {

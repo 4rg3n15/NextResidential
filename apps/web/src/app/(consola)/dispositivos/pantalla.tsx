@@ -445,7 +445,7 @@ export const PantallaDeDispositivos = ({
     <>
       <EncabezadoDePantalla
         titulo="Dispositivos"
-        descripcion="Inventario y estado de los equipos. Las credenciales no salen de la API: no hay nada que ocultar aquí porque no llega (RN-21)."
+        descripcion="Inventario y estado de los equipos. Sus contraseñas nunca se muestran: no salen del servidor."
         resumen={
           consulta.data === undefined ? null : (
             <>

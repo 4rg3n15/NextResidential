@@ -20,10 +20,8 @@ import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { EditarMiPerfil, VerMiPerfil } from '../aplicacion/perfil';
 import { DesactivarMiVehiculo, RegistrarMiVehiculo } from '../aplicacion/vehiculos-propios';
-import { EstadoDelConsentimientoDeMiVisitante } from '../aplicacion/consentimiento-de-mi-visitante';
 import { PerfilDto, VehiculoPropioDto } from './dtos-hogar';
 import {
-  EstadoDeConsentimientoDto,
   PerfilDelResidenteDto,
   ResultadoDePerfilDto,
   ResultadoDeVehiculoPropioDto,
@@ -54,8 +52,6 @@ export class MiHogarController {
     @Inject(EditarMiPerfil) private readonly editarPerfil: EditarMiPerfil,
     @Inject(RegistrarMiVehiculo) private readonly registrarVehiculo: RegistrarMiVehiculo,
     @Inject(DesactivarMiVehiculo) private readonly desactivarVehiculo: DesactivarMiVehiculo,
-    @Inject(EstadoDelConsentimientoDeMiVisitante)
-    private readonly consentimiento: EstadoDelConsentimientoDeMiVisitante,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
 
@@ -139,25 +135,5 @@ export class MiHogarController {
     );
     if (!hecho) throw new NotFoundException('Vehículo propio no encontrado');
     return { desactivado: true };
-  }
-
-  @Get('autorizaciones/:autorizacionId/consentimientos/:consentimientoId')
-  @Roles('residente')
-  @ApiOperation({ summary: '¿Respondió mi visitante? pendiente, aceptado o rechazado (RN-10)' })
-  @ApiOkResponse({ type: EstadoDeConsentimientoDto })
-  async estadoDelConsentimiento(
-    @Contexto() ctx: ContextoTenant,
-    @Param('id', ParseUUIDPipe) copropiedadId: string,
-    @Param('autorizacionId', ParseUUIDPipe) autorizacionId: string,
-    @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
-  ): Promise<EstadoDeConsentimientoDto> {
-    const destino = await this.aislamiento.exigirAlcance(
-      ctx,
-      copropiedadId,
-      'mi/autorizaciones/consentimiento',
-    );
-    return desenvolver(
-      await this.consentimiento.ejecutar(destino, copropiedadId, autorizacionId, consentimientoId),
-    );
   }
 }

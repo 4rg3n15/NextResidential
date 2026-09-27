@@ -436,7 +436,7 @@ export const AltaDeEquipo = ({
             className="mt-1 h-4 w-4 accent-marca"
           />
           <span>
-            Una persona habilitó el canal de audio EN EL APARATO (ADR-01)
+            Una persona habilitó el canal de audio EN EL APARATO
             <span className="block text-texto-apagado">
               El sistema no lo habilita solo; el sondeo comprueba si el equipo lo declara.
             </span>

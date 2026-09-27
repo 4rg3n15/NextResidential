@@ -13,6 +13,7 @@ import {
   RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
 } from '../src/autorizaciones/presentacion/limites';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../src/comun/sobre-de-equipo';
+import { RUTAS_CON_FOTO_DE_VISITA } from '../src/visitas/presentacion/limites';
 import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from '../src/comun/ruta-de-audio';
 import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from '../src/comun/ruta-de-video';
 import type { INestApplication } from '@nestjs/common';
@@ -107,7 +108,6 @@ export const configuracionDePrueba: Configuracion = {
   BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
   EQUIPOS_LLAVE: 'llave-de-equipos-solo-para-pruebas-32+',
   EQUIPOS_LLAVE_REF: 'env:EQUIPOS_LLAVE',
-  BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: 24,
   /**
    * La suite corre SIEMPRE contra el simulado, que es lo que ADR-03 exige poder
    * hacer: el sistema completo tiene que demostrarse sin hardware. El adaptador
@@ -499,6 +499,10 @@ export const crearApp = async (
     RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
     express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
   );
+  // F (15-L) · «Generar autorización» lleva la foto en el cuerpo: mismo tope.
+  for (const ruta of RUTAS_CON_FOTO_DE_VISITA) {
+    app.use(ruta, express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }));
+  }
   app.use(express.json({ limit: efectiva.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
   app.use(express.urlencoded({ limit: efectiva.LIMITE_PAYLOAD, extended: false }));
   aplicarSaneamiento(app);

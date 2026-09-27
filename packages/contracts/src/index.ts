@@ -151,3 +151,12 @@ export type ModoPruebas = Esquemas['ModoPruebasDto'];
 export type CuentaDeResidente = Esquemas['CuentaDeResidenteDto'];
 export type PlazaDeOcupante = Esquemas['PlazaDeOcupanteDto'];
 export type VehiculoDeResidente = Esquemas['VehiculoDeResidenteDto'];
+
+/** ETAPA 15-L (F) · visitas con foto y casilla: generar, listar, rechazar, equipos. */
+export type Visita = Esquemas['VisitaDto'];
+export type ListaDeVisitas = Esquemas['ListaDeVisitasDto'];
+export type EstadoDeVisita = Visita['estado'];
+export type FotoEnEquipo = Esquemas['FotoEnEquipoDto'];
+export type ViviendaDeVisita = Esquemas['ViviendaDeVisitaDto'];
+export type VisitaGenerada = Esquemas['VisitaGeneradaDto'];
+export type TextoDeLaCasilla = Esquemas['TextoDeLaCasillaDto'];

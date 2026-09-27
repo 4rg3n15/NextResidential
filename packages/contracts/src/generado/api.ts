@@ -329,40 +329,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/biometria/capturas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Valida la calidad y solicita el consentimiento al TITULAR (CU-02, CA-08) */
-        post: operations["BiometriaController_capturarRostro"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Estado de un consentimiento, sin dato biométrico alguno */
-        get: operations["BiometriaController_verConsentimiento"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial": {
         parameters: {
             query?: never;
@@ -374,40 +340,6 @@ export interface paths {
         put?: never;
         /** El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10) */
         post: operations["BiometriaController_aceptarPresencialmente"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Emite el enlace firmado con el que el TITULAR responde (RN-10) */
-        post: operations["BiometriaController_emitirEnlaceDeConsentimiento"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** El TITULAR acepta o rechaza. Nadie responde por él (RN-10) */
-        post: operations["BiometriaController_responderConsentimiento"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1034,40 +966,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/consentimientos/{consentimientoId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** ¿Respondió mi visitante? pendiente, aceptado o rechazado (RN-10) */
-        get: operations["MiHogarController_estadoDelConsentimiento"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/rostro": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10) */
-        post: operations["MiController_capturarRostro"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/copropiedades/{id}/mi/familia": {
         parameters: {
             query?: never;
@@ -1201,6 +1099,57 @@ export interface paths {
         put?: never;
         /** Cambio de vivienda desde el perfil: siempre con código (3.5) */
         post: operations["MiAltaController_cambioDeVivienda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/visitas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Autorizo a un visitante con su foto y la casilla (F1, F4) */
+        post: operations["MisVisitasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/visitas/ultimas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mis últimos visitantes, uno por persona (F6) */
+        get: operations["MisVisitasController_ultimas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/visitas/{autorizacionId}/repeticion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vuelvo a autorizar a un visitante anterior con su foto (F6) */
+        post: operations["MisVisitasController_repetir"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1754,6 +1703,92 @@ export interface paths {
         put?: never;
         /** Restablece la contraseña de una cuenta con una temporal y cambio obligatorio */
         post: operations["CuentasController_restablecimiento"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Visitas: las del día en portería; con filtros en administración */
+        get: operations["VisitasController_lista"];
+        put?: never;
+        /** Genera la autorización de un visitante con su foto (F1, F2, F3, F4) */
+        post: operations["VisitasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas/casilla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El texto de la casilla de consentimiento y su versión */
+        get: operations["VisitasController_casilla"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas/viviendas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Las viviendas activas, para elegir a cuál va la visita */
+        get: operations["VisitasController_viviendas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas/{autorizacionId}/equipos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** En qué equipos está la foto de la visita, equipo por equipo (F3) */
+        get: operations["VisitasController_equipos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas/{autorizacionId}/rechazo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rechaza la visita: la anula y retira la foto de los equipos (F2) */
+        post: operations["VisitasController_rechazo"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2455,20 +2490,6 @@ export interface components {
             estadoDeBarrera: "si" | "no" | "desconocida";
             video: components["schemas"]["CapacidadDeVideoDto"];
         };
-        CapturarRostroDto: {
-            /** @description El TITULAR del dato: el visitante (RN-10) */
-            titularId: string;
-            autorizacionId?: string;
-            medidas: components["schemas"]["MedidasDto"];
-            /** @description Dato biométrico en base64, cifrado en la bóveda al guardarse. Con la terminal de la ETAPA 15 es la imagen del rostro reducida, no un vector derivado: el equipo construye la plantilla y no admite otra cosa. */
-            vector: string;
-            /** @description Versión de la política de tratamiento aceptada */
-            versionPolitica: string;
-            /** @enum {string} */
-            canal: "app" | "sms" | "correo" | "whatsapp" | "presencial";
-            /** @description Instante de supresión programada (RN-11) */
-            suprimirEn: string;
-        };
         CargarPadronDto: {
             /** @description Contenido CSV con cabecera; sin bytes nulos. */
             csv: string;
@@ -2940,24 +2961,11 @@ export interface components {
             /** @description Pasado el umbral de KPI-34 */
             demorado: boolean;
         };
-        EnlaceDeConsentimientoDto: {
-            /** Format: uuid */
-            consentimientoId: string;
-            /** @description Estado del consentimiento al emitir el enlace */
-            estado: string;
-            /** @description Token firmado; vale sólo para este consentimiento y caduca */
-            token: string;
-            /** @description Ruta en la API: /consentimiento/<token> */
-            ruta: string;
-            /** @description URL completa si API_URL_PUBLICA está declarada; null si no lo está */
-            url: string | null;
-            /**
-             * @description H-SITIO-10 · si otro aparato puede abrir `url`. `bucle_local`: 127.0.0.1/localhost, que en un teléfono es el propio teléfono; la consola lo advierte junto al QR.
-             * @enum {string}
-             */
-            alcance: "ausente" | "bucle_local" | "alcanzable";
-            /** @description Caducidad del enlace (ISO 8601) */
-            expiraEn: string;
+        EquipoDeLaSincronizacionDto: {
+            dispositivoId: string;
+            nombre: string;
+            sincronizada: boolean;
+            detalle: string;
         };
         EquipoDto: {
             id: string;
@@ -3038,10 +3046,6 @@ export interface components {
             detalleTransporte: string | null;
             /** @description A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice. */
             formatoDeAudio: string | null;
-        };
-        EstadoDeConsentimientoDto: {
-            /** @enum {string} */
-            estado: "pendiente" | "aceptado" | "rechazado" | "revocado" | "expirado";
         };
         EstadoDeDispositivosDto: {
             dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
@@ -3190,6 +3194,23 @@ export interface components {
             /** @description `null` significa SIN MUESTRAS, que no es lo mismo que incumplir */
             cumple?: boolean | null;
         };
+        FotoDeVisitaDto: {
+            /** @description La foto frontal, JPEG o PNG, en base64 */
+            contenidoBase64: string;
+            /** @enum {string} */
+            tipoMime: "image/jpeg" | "image/png";
+            medidas: components["schemas"]["MedidasDeFotoDto"];
+        };
+        FotoEnEquipoDto: {
+            dispositivoId: string;
+            equipo: string;
+            /** @enum {string} */
+            estado: "pendiente" | "sincronizada" | "fallida" | "suprimida";
+            detalle: string | null;
+            intentos: number;
+            /** Format: date-time */
+            actualizadoEn: string;
+        };
         FotografiaAdjuntadaDto: {
             adjuntada: boolean;
             tipoMime: string;
@@ -3237,6 +3258,25 @@ export interface components {
             conservadas: number;
             /** @description De baja, reactivadas por «sobrescribir». */
             reactivadas: number;
+        };
+        GenerarVisitaDto: {
+            /**
+             * Format: date-time
+             * @description Fecha y hora de la visita
+             */
+            inicio: string;
+            duracionMinutos: number;
+            placa?: string | null;
+            observaciones?: string | null;
+            /** @description La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria. */
+            casillaMarcada: boolean;
+            nombre: string;
+            /** @enum {string} */
+            tipoDocumento: "cedula" | "cedula_extranjeria" | "pasaporte" | "otro";
+            documento: string;
+            /** Format: uuid */
+            viviendaId: string;
+            foto: components["schemas"]["FotoDeVisitaDto"];
         };
         GrupoProyectadoDto: {
             agrupacion: string | null;
@@ -3349,6 +3389,15 @@ export interface components {
         LineaDeTiempoDto: {
             elementos: components["schemas"]["ElementoDeLineaDeTiempoDto"][];
         };
+        ListaDeVisitasDto: {
+            /** @description La lista es la del día, sin importar los filtros pedidos */
+            soloElDia: boolean;
+            /** Format: date-time */
+            desde: string | null;
+            /** Format: date-time */
+            hasta: string | null;
+            visitas: components["schemas"]["VisitaDto"][];
+        };
         ListoDto: {
             /** @example listo */
             estado: string;
@@ -3372,13 +3421,7 @@ export interface components {
             /** @description Uno por evento procesado, EN ORDEN. Se corta en el primero que falla. */
             resultados: components["schemas"]["ResultadoDeReconciliacionDto"][];
         };
-        MedidasDeCapturaDto: {
-            nitidez: number;
-            iluminacion: number;
-            rostrosDetectados: number;
-            proporcionRostro: number;
-        };
-        MedidasDto: {
+        MedidasDeFotoDto: {
             rostrosDetectados: number;
             nitidez: number;
             iluminacion: number;
@@ -3436,6 +3479,39 @@ export interface components {
             esTitular: boolean;
             /** @description P-11 · por defecto el más restrictivo mientras no se defina. */
             nivelAcceso: string | null;
+        };
+        MiVisitaDto: {
+            /**
+             * Format: date-time
+             * @description Fecha y hora de la visita
+             */
+            inicio: string;
+            duracionMinutos: number;
+            placa?: string | null;
+            observaciones?: string | null;
+            /** @description La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria. */
+            casillaMarcada: boolean;
+            nombre: string;
+            documento: string;
+            foto: components["schemas"]["FotoDeVisitaDto"];
+            /** @description La reusa cada reintento sin conexión */
+            claveDeIdempotencia: string;
+        };
+        MiVisitaGeneradaDto: {
+            creada: boolean;
+            /** Format: uuid */
+            id: string | null;
+            repetida: boolean;
+            /** @enum {string|null} */
+            motivo: "LISTA_NEGRA" | "VIVIENDA_INACTIVA" | "SIN_NIVEL_DE_ACCESO" | "PLACA_DUPLICADA" | null;
+            explicacion: string | null;
+            /** @description Por qué la foto no sirvió, si no sirvió */
+            motivosDeFoto: string[];
+            /** @description Equipos de la copropiedad que admiten rostros */
+            equipos: number;
+            sincronizadas: number;
+            fallidas: number;
+            avisoDeSincronizacion: string | null;
         };
         MiViviendaDto: {
             /** Format: uuid */
@@ -3733,6 +3809,9 @@ export interface components {
             /** @example debe estar entre 0,500 y 1,000 */
             motivo: string;
         };
+        RechazoDeVisitaDto: {
+            motivo: string;
+        };
         RecuperacionDeFactorDto: {
             /**
              * @description Factores TOTP verificados que se retiraron. Ya se puede inscribir uno nuevo.
@@ -3792,6 +3871,13 @@ export interface components {
             /** @example B */
             agrupacion?: string;
         };
+        RepetirVisitaDto: {
+            /** Format: date-time */
+            inicio: string;
+            duracionMinutos: number;
+            casillaMarcada: boolean;
+            claveDeIdempotencia: string;
+        };
         ReservaDelDiaDto: {
             /** Format: uuid */
             id: string;
@@ -3801,12 +3887,6 @@ export interface components {
             /** Format: date-time */
             hasta: string;
             personas: number;
-        };
-        ResponderConsentimientoDto: {
-            /** @description true acepta, false rechaza. Lo responde el TITULAR. */
-            acepta: boolean;
-            /** @description Evidencia de la aceptación (RN-09) */
-            evidenciaId?: string;
         };
         RespuestaDeConsentimientoDto: {
             /** @description Estado resultante del consentimiento */
@@ -3930,35 +4010,6 @@ export interface components {
         RevocarAutorizacionDto: {
             motivo: string;
         };
-        RostroCapturadoDto: {
-            aceptada: boolean;
-            /** @description Por qué no sirve la foto. Vacío cuando sí sirve. */
-            motivos: string[];
-            /** Format: uuid */
-            plantillaId: string | null;
-            /**
-             * Format: uuid
-             * @description El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10).
-             */
-            consentimientoId: string | null;
-            /** @description A3 (15-E) · el enlace que el residente ENTREGA al visitante para que responda desde su teléfono, sin cuenta. De un solo uso y con caducidad. URL completa si la API declara API_URL_PUBLICA; si no, la ruta. Nulo cuando la captura no se aceptó. */
-            enlaceDeConsentimiento: string | null;
-            /** @description A quién se le pidió: el visitante, no el residente que tomó la foto */
-            titular: string | null;
-            calidad: number | null;
-        };
-        RostroDeMiVisitanteDto: {
-            /** @description Plantilla derivada, en base64. Entra cifrada a la bóveda y no vuelve a salir. */
-            vector: string;
-            medidas: components["schemas"]["MedidasDeCapturaDto"];
-            /** @description Versión de la política de tratamiento que se le mostró */
-            versionPolitica: string;
-            /**
-             * Format: date-time
-             * @description Cuándo se suprime la plantilla. RN-11: no más allá de la visita.
-             */
-            suprimirEn: string;
-        };
         SaludDto: {
             /** @example vivo */
             estado: string;
@@ -4017,6 +4068,10 @@ export interface components {
         SolicitudDeCanalDto: {
             /** Format: uuid */
             dispositivoId: string;
+        };
+        TextoDeLaCasillaDto: {
+            texto: string;
+            version: string;
         };
         TokenDeNotificacionDto: {
             /** @description Identificador estable del aparato */
@@ -4168,11 +4223,70 @@ export interface components {
             /** @description El mismo motivo en castellano llano; lo escribe el dominio, no la pantalla */
             explicacion: string | null;
         };
+        VisitaDto: {
+            autorizacionId: string;
+            visitante: string;
+            documento: string;
+            viviendaId: string;
+            vivienda: string;
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
+            /** @enum {string} */
+            estado: "programada" | "vigente" | "vencida" | "anulada";
+            placa: string | null;
+            generadaPor: string | null;
+            /** Format: date-time */
+            generadaEn: string;
+            /** Format: date-time */
+            anuladaEn: string | null;
+            motivoAnulacion: string | null;
+            tieneFoto: boolean;
+            casillaDeclaradaPor: string | null;
+            /** Format: date-time */
+            casillaEn: string | null;
+            plantillaId: string | null;
+            consentimientoId: string | null;
+            confirmadoPorElTitular: boolean;
+            equiposSincronizados: number;
+            equiposFallidos: number;
+        };
+        VisitaGeneradaDto: {
+            generada: boolean;
+            autorizacionId: string | null;
+            /** @description Por qué no sirvió la foto, si no sirvió */
+            motivosDeFoto: string[];
+            /** @description Equipos con biblioteca de rostros de la copropiedad */
+            equipos: number;
+            sincronizadas: number;
+            fallidas: number;
+            porEquipo: components["schemas"]["EquipoDeLaSincronizacionDto"][];
+            avisoDeSincronizacion: string | null;
+        };
+        VisitaRechazadaDto: {
+            equiposRetirados: number;
+            equiposPendientes: number;
+        };
+        VisitanteRecienteDto: {
+            /** Format: uuid */
+            autorizacionId: string;
+            visitante: string;
+            documento: string;
+            /** Format: date-time */
+            ultimaVisita: string;
+            placa: string | null;
+            tieneFoto: boolean;
+        };
         VistaPreviaDeGeneracionDto: {
             total: number;
             grupos: components["schemas"]["GrupoProyectadoDto"][];
             /** @description Las que ya existen activas. Con una sola, la confirmacion se niega entera: la generacion solo inserta y nunca sustituye nada. */
             colisiones: components["schemas"]["ViviendaProyectadaDto"][];
+        };
+        ViviendaDeVisitaDto: {
+            id: string;
+            nombre: string;
         };
         ViviendaDto: {
             /** Format: uuid */
@@ -4840,49 +4954,6 @@ export interface operations {
             };
         };
     };
-    BiometriaController_capturarRostro: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CapturarRostroDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    BiometriaController_verConsentimiento: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     BiometriaController_aceptarPresencialmente: {
         parameters: {
             query?: never;
@@ -4896,54 +4967,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AceptacionPresencialDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RespuestaDeConsentimientoDto"];
-                };
-            };
-        };
-    };
-    BiometriaController_emitirEnlaceDeConsentimiento: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnlaceDeConsentimientoDto"];
-                };
-            };
-        };
-    };
-    BiometriaController_responderConsentimiento: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResponderConsentimientoDto"];
             };
         };
         responses: {
@@ -6242,55 +6265,6 @@ export interface operations {
             };
         };
     };
-    MiHogarController_estadoDelConsentimiento: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                autorizacionId: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EstadoDeConsentimientoDto"];
-                };
-            };
-        };
-    };
-    MiController_capturarRostro: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                autorizacionId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RostroDeMiVisitanteDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RostroCapturadoDto"];
-                };
-            };
-        };
-    };
     MiController_familia: {
         parameters: {
             query?: never;
@@ -6542,6 +6516,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultadoDeAltaDto"];
+                };
+            };
+        };
+    };
+    MisVisitasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MiVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiVisitaGeneradaDto"];
+                };
+            };
+        };
+    };
+    MisVisitasController_ultimas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitanteRecienteDto"][];
+                };
+            };
+        };
+    };
+    MisVisitasController_repetir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepetirVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiVisitaGeneradaDto"];
                 };
             };
         };
@@ -7536,6 +7582,149 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    VisitasController_lista: {
+        parameters: {
+            query?: {
+                desde?: string;
+                hasta?: string;
+                viviendaId?: string;
+                estado?: "programada" | "vigente" | "vencida" | "anulada";
+                /** @description Nombre o documento del visitante */
+                texto?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaDeVisitasDto"];
+                };
+            };
+        };
+    };
+    VisitasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerarVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitaGeneradaDto"];
+                };
+            };
+        };
+    };
+    VisitasController_casilla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextoDeLaCasillaDto"];
+                };
+            };
+        };
+    };
+    VisitasController_viviendas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViviendaDeVisitaDto"][];
+                };
+            };
+        };
+    };
+    VisitasController_equipos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FotoEnEquipoDto"][];
+                };
+            };
+        };
+    };
+    VisitasController_rechazo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RechazoDeVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitaRechazadaDto"];
                 };
             };
         };

@@ -22,6 +22,7 @@ import { ProveedoresModule } from './proveedores';
 import { BiometriaModule } from './biometria';
 import { TableroModule } from './tablero';
 import { ResidenteModule } from './residente';
+import { VisitasModule } from './visitas';
 import { limitadorPorDispositivo } from './eventos';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
@@ -180,6 +181,12 @@ export class AppModule {
          * módulo lo escribe, y el orden deja claro cuál depende de cuál.
          */
         EquiposModule.registrar(),
+        /**
+         * F (15-L) · «Generar autorización» con foto y casilla. Después de
+         * autorizaciones, biometría y eventos, cuyos casos de uso orquesta, y
+         * ANTES del residente, que genera sus visitas con la misma segunda mitad.
+         */
+        VisitasModule.registrar(),
         // La superficie del residente, después del padrón: lee por su propio
         // puerto y no entra en el de administración (ver `mi.controller.ts`).
         ResidenteModule.registrar(),

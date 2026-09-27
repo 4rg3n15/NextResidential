@@ -176,7 +176,7 @@ export const PantallaDeConfiguracion = ({
         >
           <Dato
             etiqueta="Eventos de acceso"
-            bloqueado="Cota de retención en el esquema (migración 0016). Acortarla desde la consola destruiría la trazabilidad que sostiene RN-03."
+            bloqueado="Se conservan dos años para que siempre se pueda saber quién entró y cuándo. No se acorta desde la consola."
           >
             Purga por particiones mensuales · 24 meses
           </Dato>
@@ -193,8 +193,8 @@ export const PantallaDeConfiguracion = ({
             Supresión inmediata al revocar el consentimiento
           </Dato>
           <Dato
-            etiqueta="Margen de caché de reglas del Edge"
-            bloqueado="Decide cuándo una decisión tomada sin WAN se marca como potencialmente obsoleta (KPI-31). Aflojarlo degradaría en silencio la auditoría del Edge."
+            etiqueta="Margen sin conexión del equipo local"
+            bloqueado="Pasado este plazo sin conexión, lo que decide el equipo local de portería queda marcado como posiblemente desactualizado. Aflojarlo quitaría esa advertencia."
           >
             24 horas
           </Dato>
@@ -207,7 +207,7 @@ export const PantallaDeConfiguracion = ({
         >
           <Dato
             etiqueta="Segundo factor obligatorio"
-            bloqueado="Superadministrador, administrador y operador de central (RN-20, CA-25). Un interruptor para apagarlo sería el propio agujero."
+            bloqueado="Superadministrador, administrador y operador de central. No se puede apagar: sería dejar la puerta abierta."
           >
             Tres roles administrativos
           </Dato>

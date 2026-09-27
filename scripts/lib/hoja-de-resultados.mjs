@@ -112,7 +112,7 @@ export const ESCENARIOS = [
     ensayo: 'LISTA_NEGRA por los dos canales (veto por la ruta nueva de la consola)',
   },
 
-  /* ── Terminal facial · 5: captura → consentimiento del VISITANTE → contador → verificación remota ── */
+  /* ── Terminal facial · 5: visita con foto y casilla → contador → verificación remota ── */
   {
     id: 'T1',
     familia: 'terminal',

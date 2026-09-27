@@ -5,10 +5,6 @@ import type { Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { CrearCuentaPorUsuario } from '../cuentas';
-import { REPOSITORIO_CONSENTIMIENTOS } from '../biometria';
-import type { RepositorioConsentimientos } from '../biometria';
-import { AUTORIZACIONES_DEL_RESIDENTE } from './aplicacion/puertos';
-import type { AutorizacionesDelResidente } from './aplicacion/puertos';
 import {
   ALTA_DEL_RESIDENTE,
   BITACORA_DE_RESIDENTES,
@@ -32,7 +28,6 @@ import { VerMiAlta, VincularMiVivienda } from './aplicacion/alta';
 import { DeclararMisOcupantes, VerMisOcupantes } from './aplicacion/ocupantes';
 import { DesactivarMiVehiculo, RegistrarMiVehiculo } from './aplicacion/vehiculos-propios';
 import { EditarMiPerfil, PerfilDeResidentePorSuperadmin, VerMiPerfil } from './aplicacion/perfil';
-import { EstadoDelConsentimientoDeMiVisitante } from './aplicacion/consentimiento-de-mi-visitante';
 import {
   CuentasDeResidentesDelSuperadmin,
   OcupantesDelSuperadmin,
@@ -155,15 +150,6 @@ export const PROVEEDORES_DEL_HOGAR: Provider[] = [
     inject: [PERFIL_DEL_RESIDENTE, BITACORA_DE_RESIDENTES, RELOJ],
     useFactory: (p: PerfilDelResidente, b: BitacoraDeResidentes, r: Reloj) =>
       new PerfilDeResidentePorSuperadmin(p, b, r),
-  },
-  {
-    provide: EstadoDelConsentimientoDeMiVisitante,
-    inject: [ResolverMiAmbito, AUTORIZACIONES_DEL_RESIDENTE, REPOSITORIO_CONSENTIMIENTOS],
-    useFactory: (
-      r: ResolverMiAmbito,
-      a: AutorizacionesDelResidente,
-      c: RepositorioConsentimientos,
-    ) => new EstadoDelConsentimientoDeMiVisitante(r, a, c),
   },
   {
     provide: CuentasDeResidentesDelSuperadmin,

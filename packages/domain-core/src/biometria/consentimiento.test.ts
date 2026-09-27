@@ -132,3 +132,70 @@ describe('ConsentimientoBiometrico · consentimiento informado', () => {
     if (esExito(r)) expect(r.valor).not.toBe(pendiente);
   });
 });
+
+describe('F4 (15-L) · el consentimiento DECLARADO por quien registra no se confunde con el del titular', () => {
+  const declaracion = {
+    id: 'c-2',
+    copropiedadId: 'cop-1',
+    titularId: TITULAR,
+    finalidad: 'control_acceso',
+    versionPolitica: 'casilla-v1',
+    canal: 'app' as const,
+    declaradoPor: RESIDENTE,
+    ahora: AHORA,
+  };
+
+  it('nace vigente, con su origen, su autor y la versión del texto marcado', () => {
+    const r = ConsentimientoBiometrico.declarar(declaracion);
+    expect(esExito(r)).toBe(true);
+    if (!esExito(r)) return;
+    expect(r.valor.vigente).toBe(true);
+    expect(r.valor.origen).toBe('declarado_por_quien_registra');
+    expect(r.valor.declaradoPor).toBe(RESIDENTE);
+    expect(r.valor.versionPolitica).toBe('casilla-v1');
+    expect(r.valor.otorgadoEn).toEqual(AHORA);
+  });
+
+  it('sin autor, o sin versión del texto, no hay declaración', () => {
+    expect(esFallo(ConsentimientoBiometrico.declarar({ ...declaracion, declaradoPor: ' ' }))).toBe(
+      true,
+    );
+    expect(
+      esFallo(ConsentimientoBiometrico.declarar({ ...declaracion, versionPolitica: '' })),
+    ).toBe(true);
+  });
+
+  it('lo solicitado a la antigua sigue siendo del titular, y la declaración no se «otorga»', () => {
+    expect(abrir().origen).toBe('otorgado_por_el_titular');
+    const r = ConsentimientoBiometrico.declarar(declaracion);
+    if (!esExito(r)) throw new Error('declarar');
+    // Ya está vigente: otorgar() no la convierte en del titular.
+    expect(esFallo(r.valor.otorgar(TITULAR, AHORA))).toBe(true);
+  });
+
+  it('el titular presente puede confirmarla (D-10 como opción); nadie más', () => {
+    const r = ConsentimientoBiometrico.declarar(declaracion);
+    if (!esExito(r)) throw new Error('declarar');
+    expect(esFallo(r.valor.confirmarPorElTitular(RESIDENTE, AHORA))).toBe(true);
+    const despues = new Date(AHORA.getTime() + 60_000);
+    const c = r.valor.confirmarPorElTitular(TITULAR, despues);
+    expect(esExito(c)).toBe(true);
+    if (!esExito(c)) return;
+    expect(c.valor.origen).toBe('otorgado_por_el_titular');
+    expect(c.valor.vigente).toBe(true);
+    expect(c.valor.otorgadoEn).toEqual(despues);
+    // Una ya del titular, o una revocada, no se confirma.
+    expect(esFallo(c.valor.confirmarPorElTitular(TITULAR, despues))).toBe(true);
+    const revocada = r.valor.revocar(TITULAR, despues);
+    if (!esExito(revocada)) throw new Error('revocar');
+    expect(esFallo(revocada.valor.confirmarPorElTitular(TITULAR, despues))).toBe(true);
+  });
+
+  it('revocar sigue siendo del titular también en una declaración (RN-11 intacta)', () => {
+    const r = ConsentimientoBiometrico.declarar(declaracion);
+    if (!esExito(r)) throw new Error('declarar');
+    expect(esFallo(r.valor.revocar(RESIDENTE, AHORA))).toBe(true);
+    const revocada = r.valor.revocar(TITULAR, AHORA);
+    expect(esExito(revocada) && revocada.valor.vigente).toBe(false);
+  });
+});

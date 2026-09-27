@@ -107,7 +107,7 @@ export const PantallaDeLatencias = (): JSX.Element => {
     <div className="space-y-6">
       <EncabezadoDePantalla
         titulo="Latencias comprometidas"
-        descripcion="p50, p95 y p99 de los cinco indicadores de latencia del proyecto (KPI-09, 13, 25, 32 y 33)."
+        descripcion="Cuánto tardan las cinco operaciones que el sistema promete hacer rápido: el tiempo habitual y el de los casos más lentos."
       />
 
       <Tarjeta>

@@ -6,10 +6,13 @@ import { FranjaDeModoPruebas } from '@/componentes/franja-modo-pruebas';
 import { claimsVisibles, estadoDePorteria } from '@/lib/sesion/porteria';
 import { BloqueoDePatrullaje } from '@/componentes/bloqueo-de-patrullaje';
 import { MarcoDeConsola } from '@/componentes/marco-consola';
+import { AvisoDeVisita } from '@/componentes/aviso-de-visita';
 import { ProveedorDeConsultas } from '@/lib/api/proveedor';
 import { alcanceActivo } from './copropiedad';
 
 export const dynamic = 'force-dynamic';
+
+const AVISAN_VISITAS: ReadonlySet<string> = new Set(['portero', 'superadministrador']);
 
 /**
  * Marco de la consola. La sesión se resuelve **en el servidor y antes de pintar
@@ -56,6 +59,10 @@ const LayoutDeConsola = async ({
       <MarcoDeConsola sesion={sesion} rol={sesion.rol as Rol} alcance={alcance} porteria={porteria}>
         {children}
       </MarcoDeConsola>
+      {/* F2 (15-L) · portería y superadministración se enteran de cada visita nueva. */}
+      {alcance.copropiedadId !== null && AVISAN_VISITAS.has(sesion.rol) ? (
+        <AvisoDeVisita copropiedadId={alcance.copropiedadId} />
+      ) : null}
     </ProveedorDeConsultas>
   );
 };

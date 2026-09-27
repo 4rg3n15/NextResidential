@@ -39,7 +39,7 @@ export const problemaDeVigencia = (
     return 'La vigencia termina antes de empezar. Revisa a. m. y p. m.: «hasta» debe ser posterior a «desde».';
   }
   if (fin.getTime() <= ahora.getTime()) {
-    return 'La vigencia ya estaría expirada al crearse (RN-01): «hasta» tiene que estar en el futuro.';
+    return 'La vigencia ya estaría vencida al crearse: «hasta» tiene que estar en el futuro.';
   }
   return null;
 };

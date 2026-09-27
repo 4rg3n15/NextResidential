@@ -6,6 +6,8 @@ import { esLlamadaEntrante } from './llamadas';
 import { esEventoDeEquipoEnVivo } from './eventos-de-equipo';
 import type { EventoDeEquipoEnVivo } from './eventos-de-equipo';
 import type { LlamadaEntrante } from './llamadas';
+import { esAvisoDeVisita } from './visitas';
+import type { AvisoDeVisitaEnVivo } from './visitas';
 import type { EstadoDeSesion } from '@/app/api/sesion/estado/route';
 
 /**
@@ -42,6 +44,8 @@ export interface MensajesDelCanal {
    * la plataforma hizo con él. Opcional: sólo la consola de eventos lo pinta.
    */
   readonly eventoDeEquipo?: (evento: EventoDeEquipoEnVivo) => void;
+  /** F2 (15-L) · una visita generada o anulada. Opcional: la atiende quien la muestra. */
+  readonly visita?: (aviso: AvisoDeVisitaEnVivo) => void;
   readonly estado: (estado: EstadoDelCanal, intento: number) => void;
   /** Eventos recuperados tras un corte, del más antiguo al más reciente. */
   readonly recuperados: (eventos: readonly EventoRegistrado[]) => void;
@@ -196,6 +200,15 @@ export const abrirCanal = ({
       try {
         const carga: unknown = JSON.parse((m as MessageEvent<string>).data);
         if (esEventoDeEquipoEnVivo(carga)) mensajes.eventoDeEquipo?.(carga);
+      } catch {
+        /* ídem */
+      }
+    });
+
+    nueva.addEventListener('visitas', (m) => {
+      try {
+        const carga: unknown = JSON.parse((m as MessageEvent<string>).data);
+        if (esAvisoDeVisita(carga)) mensajes.visita?.(carga);
       } catch {
         /* ídem */
       }

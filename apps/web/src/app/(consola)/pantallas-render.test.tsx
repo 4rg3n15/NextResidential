@@ -100,6 +100,31 @@ const AUTORIZACION = {
   motivoRevocacion: null,
 };
 
+/** F (15-L) · una visita tal como la lista la API. */
+const VISITA = {
+  autorizacionId: 'aut-1',
+  visitante: 'Ana Pérez',
+  documento: 'CC123',
+  viviendaId: 'viv-1',
+  vivienda: 'Casa 12',
+  desde: '2026-09-10T13:00:00.000Z',
+  hasta: '2026-09-10T15:00:00.000Z',
+  estado: 'vigente',
+  placa: 'XYZ789',
+  generadaPor: 'Portería norte',
+  generadaEn: '2026-09-10T12:55:00.000Z',
+  anuladaEn: null,
+  motivoAnulacion: null,
+  tieneFoto: true,
+  casillaDeclaradaPor: 'Portería norte',
+  casillaEn: '2026-09-10T12:55:00.000Z',
+  plantillaId: 'pla-1',
+  consentimientoId: 'con-1',
+  confirmadoPorElTitular: false,
+  equiposSincronizados: 2,
+  equiposFallidos: 1,
+};
+
 const ZONA = {
   id: 'zon-1',
   nombre: 'Salón social',
@@ -176,6 +201,16 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
     }
     if (url.includes('/configuracion')) return respuesta(CONFIGURACION);
     if (url.includes('/padron/vehiculos')) return respuesta([VEHICULO]);
+    if (url.includes('/visitas/viviendas')) return respuesta([{ id: 'viv-1', nombre: 'Casa 12' }]);
+    if (url.includes('/visitas/casilla')) {
+      return respuesta({
+        texto: 'El visitante autorizó el uso de su foto para el ingreso',
+        version: 'casilla-1',
+      });
+    }
+    if (url.includes('/visitas')) {
+      return respuesta({ soloElDia: false, desde: null, hasta: null, visitas: [VISITA] });
+    }
     if (url.includes('/autorizaciones')) return respuesta([AUTORIZACION]);
     if (url.includes('/zonas')) return respuesta([ZONA]);
     if (url.includes('/dispositivos/pendientes')) return respuesta({ dispositivos: ['dis-1'] });
@@ -272,11 +307,22 @@ describe('vehículos', () => {
 });
 
 describe('visitantes', () => {
-  it('una recurrente ENSEÑA su patrón; sin él sería indistinguible de una que abre siempre', async () => {
-    montar(<PantallaDeVisitantes copropiedadId={COP} />);
+  it('F3 · cada visita dice su estado y en cuántos equipos está su foto, con los que fallaron', async () => {
+    montar(<PantallaDeVisitantes copropiedadId={COP} rol="administrador" />);
     await waitFor(() => expect(screen.getByText('Ana Pérez')).toBeDefined());
-    expect(screen.getByText(/Lun, Mié · 08:00–18:00/)).toBeDefined();
-    expect(screen.getByText(/Luis Gómez/)).toBeDefined();
+    const lista = screen.getByRole('list', { name: 'Visitas' });
+    expect(lista.textContent).toMatch(/Vigente/);
+    expect(lista.textContent).toMatch(/Foto en 2 equipos · 1 fallaron/);
+    // Administración ve filtros; no rechaza (eso es de portería y superadministración).
+    expect(screen.getByLabelText('Vivienda')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Rechazar' })).toBeNull();
+  });
+
+  it('F5 · portería ve sólo el día, sin filtros de fechas, y SÍ puede rechazar', async () => {
+    montar(<PantallaDeVisitantes copropiedadId={COP} rol="portero" />);
+    await waitFor(() => expect(screen.getByText('Ana Pérez')).toBeDefined());
+    expect(screen.queryByLabelText('Desde')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Rechazar' })).toBeDefined();
   });
 });
 

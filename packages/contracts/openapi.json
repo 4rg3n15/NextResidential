@@ -994,82 +994,6 @@
         ]
       }
     },
-    "/copropiedades/{id}/biometria/capturas": {
-      "post": {
-        "operationId": "BiometriaController_capturarRostro",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CapturarRostroDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Valida la calidad y solicita el consentimiento al TITULAR (CU-02, CA-08)",
-        "tags": [
-          "biometria"
-        ]
-      }
-    },
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}": {
-      "get": {
-        "operationId": "BiometriaController_verConsentimiento",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "consentimientoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Estado de un consentimiento, sin dato biométrico alguno",
-        "tags": [
-          "biometria"
-        ]
-      }
-    },
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial": {
       "post": {
         "operationId": "BiometriaController_aceptarPresencialmente",
@@ -1119,104 +1043,6 @@
           }
         ],
         "summary": "El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10)",
-        "tags": [
-          "biometria"
-        ]
-      }
-    },
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace": {
-      "post": {
-        "operationId": "BiometriaController_emitirEnlaceDeConsentimiento",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "consentimientoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnlaceDeConsentimientoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Emite el enlace firmado con el que el TITULAR responde (RN-10)",
-        "tags": [
-          "biometria"
-        ]
-      }
-    },
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta": {
-      "post": {
-        "operationId": "BiometriaController_responderConsentimiento",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "consentimientoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResponderConsentimientoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RespuestaDeConsentimientoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "El TITULAR acepta o rechaza. Nadie responde por él (RN-10)",
         "tags": [
           "biometria"
         ]
@@ -3721,112 +3547,6 @@
         ]
       }
     },
-    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/consentimientos/{consentimientoId}": {
-      "get": {
-        "operationId": "MiHogarController_estadoDelConsentimiento",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "autorizacionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "consentimientoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EstadoDeConsentimientoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "¿Respondió mi visitante? pendiente, aceptado o rechazado (RN-10)",
-        "tags": [
-          "residente"
-        ]
-      }
-    },
-    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/rostro": {
-      "post": {
-        "operationId": "MiController_capturarRostro",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "autorizacionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RostroDeMiVisitanteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RostroCapturadoDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10)",
-        "tags": [
-          "residente"
-        ]
-      }
-    },
     "/copropiedades/{id}/mi/familia": {
       "get": {
         "operationId": "MiController_familia",
@@ -4305,6 +4025,145 @@
           }
         ],
         "summary": "Cambio de vivienda desde el perfil: siempre con código (3.5)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/visitas": {
+      "post": {
+        "operationId": "MisVisitasController_crear",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MiVisitaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiVisitaGeneradaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Autorizo a un visitante con su foto y la casilla (F1, F4)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/visitas/ultimas": {
+      "get": {
+        "operationId": "MisVisitasController_ultimas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VisitanteRecienteDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mis últimos visitantes, uno por persona (F6)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/visitas/{autorizacionId}/repeticion": {
+      "post": {
+        "operationId": "MisVisitasController_repetir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepetirVisitaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiVisitaGeneradaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vuelvo a autorizar a un visitante anterior con su foto (F6)",
         "tags": [
           "residente"
         ]
@@ -6223,6 +6082,313 @@
         "summary": "Restablece la contraseña de una cuenta con una temporal y cambio obligatorio",
         "tags": [
           "cuentas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/visitas": {
+      "get": {
+        "operationId": "VisitasController_lista",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "programada",
+                "vigente",
+                "vencida",
+                "anulada"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "texto",
+            "required": false,
+            "in": "query",
+            "description": "Nombre o documento del visitante",
+            "schema": {
+              "maxLength": 80,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaDeVisitasDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Visitas: las del día en portería; con filtros en administración",
+        "tags": [
+          "visitas"
+        ]
+      },
+      "post": {
+        "operationId": "VisitasController_crear",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerarVisitaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitaGeneradaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Genera la autorización de un visitante con su foto (F1, F2, F3, F4)",
+        "tags": [
+          "visitas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/visitas/casilla": {
+      "get": {
+        "operationId": "VisitasController_casilla",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextoDeLaCasillaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El texto de la casilla de consentimiento y su versión",
+        "tags": [
+          "visitas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/visitas/viviendas": {
+      "get": {
+        "operationId": "VisitasController_viviendas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViviendaDeVisitaDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Las viviendas activas, para elegir a cuál va la visita",
+        "tags": [
+          "visitas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/visitas/{autorizacionId}/equipos": {
+      "get": {
+        "operationId": "VisitasController_equipos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FotoEnEquipoDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "En qué equipos está la foto de la visita, equipo por equipo (F3)",
+        "tags": [
+          "visitas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/visitas/{autorizacionId}/rechazo": {
+      "post": {
+        "operationId": "VisitasController_rechazo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RechazoDeVisitaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitaRechazadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rechaza la visita: la anula y retira la foto de los equipos (F2)",
+        "tags": [
+          "visitas"
         ]
       }
     },
@@ -8253,51 +8419,6 @@
           "video"
         ]
       },
-      "CapturarRostroDto": {
-        "type": "object",
-        "properties": {
-          "titularId": {
-            "type": "string",
-            "description": "El TITULAR del dato: el visitante (RN-10)"
-          },
-          "autorizacionId": {
-            "type": "string"
-          },
-          "medidas": {
-            "$ref": "#/components/schemas/MedidasDto"
-          },
-          "vector": {
-            "type": "string",
-            "description": "Dato biométrico en base64, cifrado en la bóveda al guardarse. Con la terminal de la ETAPA 15 es la imagen del rostro reducida, no un vector derivado: el equipo construye la plantilla y no admite otra cosa."
-          },
-          "versionPolitica": {
-            "type": "string",
-            "description": "Versión de la política de tratamiento aceptada"
-          },
-          "canal": {
-            "type": "string",
-            "enum": [
-              "app",
-              "sms",
-              "correo",
-              "whatsapp",
-              "presencial"
-            ]
-          },
-          "suprimirEn": {
-            "type": "string",
-            "description": "Instante de supresión programada (RN-11)"
-          }
-        },
-        "required": [
-          "titularId",
-          "medidas",
-          "vector",
-          "versionPolitica",
-          "canal",
-          "suprimirEn"
-        ]
-      },
       "CargarPadronDto": {
         "type": "object",
         "properties": {
@@ -9607,52 +9728,27 @@
           "demorado"
         ]
       },
-      "EnlaceDeConsentimientoDto": {
+      "EquipoDeLaSincronizacionDto": {
         "type": "object",
         "properties": {
-          "consentimientoId": {
-            "type": "string",
-            "format": "uuid"
+          "dispositivoId": {
+            "type": "string"
           },
-          "estado": {
-            "type": "string",
-            "description": "Estado del consentimiento al emitir el enlace"
+          "nombre": {
+            "type": "string"
           },
-          "token": {
-            "type": "string",
-            "description": "Token firmado; vale sólo para este consentimiento y caduca"
+          "sincronizada": {
+            "type": "boolean"
           },
-          "ruta": {
-            "type": "string",
-            "description": "Ruta en la API: /consentimiento/<token>"
-          },
-          "url": {
-            "type": "string",
-            "nullable": true,
-            "description": "URL completa si API_URL_PUBLICA está declarada; null si no lo está"
-          },
-          "alcance": {
-            "type": "string",
-            "enum": [
-              "ausente",
-              "bucle_local",
-              "alcanzable"
-            ],
-            "description": "H-SITIO-10 · si otro aparato puede abrir `url`. `bucle_local`: 127.0.0.1/localhost, que en un teléfono es el propio teléfono; la consola lo advierte junto al QR."
-          },
-          "expiraEn": {
-            "type": "string",
-            "description": "Caducidad del enlace (ISO 8601)"
+          "detalle": {
+            "type": "string"
           }
         },
         "required": [
-          "consentimientoId",
-          "estado",
-          "token",
-          "ruta",
-          "url",
-          "alcance",
-          "expiraEn"
+          "dispositivoId",
+          "nombre",
+          "sincronizada",
+          "detalle"
         ]
       },
       "EquipoDto": {
@@ -9920,24 +10016,6 @@
           "transporte",
           "detalleTransporte",
           "formatoDeAudio"
-        ]
-      },
-      "EstadoDeConsentimientoDto": {
-        "type": "object",
-        "properties": {
-          "estado": {
-            "type": "string",
-            "enum": [
-              "pendiente",
-              "aceptado",
-              "rechazado",
-              "revocado",
-              "expirado"
-            ]
-          }
-        },
-        "required": [
-          "estado"
         ]
       },
       "EstadoDeDispositivosDto": {
@@ -10456,6 +10534,70 @@
           "incumplimientos"
         ]
       },
+      "FotoDeVisitaDto": {
+        "type": "object",
+        "properties": {
+          "contenidoBase64": {
+            "type": "string",
+            "description": "La foto frontal, JPEG o PNG, en base64",
+            "maxLength": 2097152
+          },
+          "tipoMime": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png"
+            ]
+          },
+          "medidas": {
+            "$ref": "#/components/schemas/MedidasDeFotoDto"
+          }
+        },
+        "required": [
+          "contenidoBase64",
+          "tipoMime",
+          "medidas"
+        ]
+      },
+      "FotoEnEquipoDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string"
+          },
+          "equipo": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "sincronizada",
+              "fallida",
+              "suprimida"
+            ]
+          },
+          "detalle": {
+            "type": "string",
+            "nullable": true
+          },
+          "intentos": {
+            "type": "number"
+          },
+          "actualizadoEn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "equipo",
+          "estado",
+          "detalle",
+          "intentos",
+          "actualizadoEn"
+        ]
+      },
       "FotografiaAdjuntadaDto": {
         "type": "object",
         "properties": {
@@ -10604,6 +10746,71 @@
           "creadas",
           "conservadas",
           "reactivadas"
+        ]
+      },
+      "GenerarVisitaDto": {
+        "type": "object",
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha y hora de la visita"
+          },
+          "duracionMinutos": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 1440
+          },
+          "placa": {
+            "type": "string",
+            "maxLength": 8,
+            "nullable": true
+          },
+          "observaciones": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true
+          },
+          "casillaMarcada": {
+            "type": "boolean",
+            "description": "La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria."
+          },
+          "nombre": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "cedula",
+              "cedula_extranjeria",
+              "pasaporte",
+              "otro"
+            ]
+          },
+          "documento": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32
+          },
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "foto": {
+            "$ref": "#/components/schemas/FotoDeVisitaDto"
+          }
+        },
+        "required": [
+          "inicio",
+          "duracionMinutos",
+          "casillaMarcada",
+          "nombre",
+          "tipoDocumento",
+          "documento",
+          "viviendaId",
+          "foto"
         ]
       },
       "GrupoProyectadoDto": {
@@ -11028,6 +11235,37 @@
           "elementos"
         ]
       },
+      "ListaDeVisitasDto": {
+        "type": "object",
+        "properties": {
+          "soloElDia": {
+            "type": "boolean",
+            "description": "La lista es la del día, sin importar los filtros pedidos"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "visitas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitaDto"
+            }
+          }
+        },
+        "required": [
+          "soloElDia",
+          "desde",
+          "hasta",
+          "visitas"
+        ]
+      },
       "ListoDto": {
         "type": "object",
         "properties": {
@@ -11087,38 +11325,7 @@
           "resultados"
         ]
       },
-      "MedidasDeCapturaDto": {
-        "type": "object",
-        "properties": {
-          "nitidez": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "iluminacion": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "rostrosDetectados": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 20
-          },
-          "proporcionRostro": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          }
-        },
-        "required": [
-          "nitidez",
-          "iluminacion",
-          "rostrosDetectados",
-          "proporcionRostro"
-        ]
-      },
-      "MedidasDto": {
+      "MedidasDeFotoDto": {
         "type": "object",
         "properties": {
           "rostrosDetectados": {
@@ -11331,6 +11538,126 @@
           "residenteId",
           "esTitular",
           "nivelAcceso"
+        ]
+      },
+      "MiVisitaDto": {
+        "type": "object",
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha y hora de la visita"
+          },
+          "duracionMinutos": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 1440
+          },
+          "placa": {
+            "type": "string",
+            "maxLength": 8,
+            "nullable": true
+          },
+          "observaciones": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true
+          },
+          "casillaMarcada": {
+            "type": "boolean",
+            "description": "La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria."
+          },
+          "nombre": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "documento": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32
+          },
+          "foto": {
+            "$ref": "#/components/schemas/FotoDeVisitaDto"
+          },
+          "claveDeIdempotencia": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "description": "La reusa cada reintento sin conexión"
+          }
+        },
+        "required": [
+          "inicio",
+          "duracionMinutos",
+          "casillaMarcada",
+          "nombre",
+          "documento",
+          "foto",
+          "claveDeIdempotencia"
+        ]
+      },
+      "MiVisitaGeneradaDto": {
+        "type": "object",
+        "properties": {
+          "creada": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "repetida": {
+            "type": "boolean"
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "LISTA_NEGRA",
+              "VIVIENDA_INACTIVA",
+              "SIN_NIVEL_DE_ACCESO",
+              "PLACA_DUPLICADA"
+            ]
+          },
+          "explicacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivosDeFoto": {
+            "description": "Por qué la foto no sirvió, si no sirvió",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "equipos": {
+            "type": "number",
+            "description": "Equipos de la copropiedad que admiten rostros"
+          },
+          "sincronizadas": {
+            "type": "number"
+          },
+          "fallidas": {
+            "type": "number"
+          },
+          "avisoDeSincronizacion": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "creada",
+          "id",
+          "repetida",
+          "motivo",
+          "explicacion",
+          "motivosDeFoto",
+          "equipos",
+          "sincronizadas",
+          "fallidas",
+          "avisoDeSincronizacion"
         ]
       },
       "MiViviendaDto": {
@@ -12313,6 +12640,19 @@
           "motivo"
         ]
       },
+      "RechazoDeVisitaDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
       "RecuperacionDeFactorDto": {
         "type": "object",
         "properties": {
@@ -12470,6 +12810,34 @@
           "identificador"
         ]
       },
+      "RepetirVisitaDto": {
+        "type": "object",
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "duracionMinutos": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 1440
+          },
+          "casillaMarcada": {
+            "type": "boolean"
+          },
+          "claveDeIdempotencia": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "inicio",
+          "duracionMinutos",
+          "casillaMarcada",
+          "claveDeIdempotencia"
+        ]
+      },
       "ReservaDelDiaDto": {
         "type": "object",
         "properties": {
@@ -12498,22 +12866,6 @@
           "desde",
           "hasta",
           "personas"
-        ]
-      },
-      "ResponderConsentimientoDto": {
-        "type": "object",
-        "properties": {
-          "acepta": {
-            "type": "boolean",
-            "description": "true acepta, false rechaza. Lo responde el TITULAR."
-          },
-          "evidenciaId": {
-            "type": "string",
-            "description": "Evidencia de la aceptación (RN-09)"
-          }
-        },
-        "required": [
-          "acepta"
         ]
       },
       "RespuestaDeConsentimientoDto": {
@@ -12960,83 +13312,6 @@
           "motivo"
         ]
       },
-      "RostroCapturadoDto": {
-        "type": "object",
-        "properties": {
-          "aceptada": {
-            "type": "boolean"
-          },
-          "motivos": {
-            "description": "Por qué no sirve la foto. Vacío cuando sí sirve.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "plantillaId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "consentimientoId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true,
-            "description": "El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10)."
-          },
-          "enlaceDeConsentimiento": {
-            "type": "string",
-            "nullable": true,
-            "description": "A3 (15-E) · el enlace que el residente ENTREGA al visitante para que responda desde su teléfono, sin cuenta. De un solo uso y con caducidad. URL completa si la API declara API_URL_PUBLICA; si no, la ruta. Nulo cuando la captura no se aceptó."
-          },
-          "titular": {
-            "type": "string",
-            "nullable": true,
-            "description": "A quién se le pidió: el visitante, no el residente que tomó la foto"
-          },
-          "calidad": {
-            "type": "number",
-            "nullable": true
-          }
-        },
-        "required": [
-          "aceptada",
-          "motivos",
-          "plantillaId",
-          "consentimientoId",
-          "enlaceDeConsentimiento",
-          "titular",
-          "calidad"
-        ]
-      },
-      "RostroDeMiVisitanteDto": {
-        "type": "object",
-        "properties": {
-          "vector": {
-            "type": "string",
-            "description": "Plantilla derivada, en base64. Entra cifrada a la bóveda y no vuelve a salir.",
-            "maxLength": 262144
-          },
-          "medidas": {
-            "$ref": "#/components/schemas/MedidasDeCapturaDto"
-          },
-          "versionPolitica": {
-            "type": "string",
-            "description": "Versión de la política de tratamiento que se le mostró"
-          },
-          "suprimirEn": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Cuándo se suprime la plantilla. RN-11: no más allá de la visita."
-          }
-        },
-        "required": [
-          "vector",
-          "medidas",
-          "versionPolitica",
-          "suprimirEn"
-        ]
-      },
       "SaludDto": {
         "type": "object",
         "properties": {
@@ -13216,6 +13491,21 @@
         },
         "required": [
           "dispositivoId"
+        ]
+      },
+      "TextoDeLaCasillaDto": {
+        "type": "object",
+        "properties": {
+          "texto": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "texto",
+          "version"
         ]
       },
       "TokenDeNotificacionDto": {
@@ -13738,6 +14028,214 @@
           "explicacion"
         ]
       },
+      "VisitaDto": {
+        "type": "object",
+        "properties": {
+          "autorizacionId": {
+            "type": "string"
+          },
+          "visitante": {
+            "type": "string"
+          },
+          "documento": {
+            "type": "string"
+          },
+          "viviendaId": {
+            "type": "string"
+          },
+          "vivienda": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "programada",
+              "vigente",
+              "vencida",
+              "anulada"
+            ]
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true
+          },
+          "generadaPor": {
+            "type": "string",
+            "nullable": true
+          },
+          "generadaEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "anuladaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "motivoAnulacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "tieneFoto": {
+            "type": "boolean"
+          },
+          "casillaDeclaradaPor": {
+            "type": "string",
+            "nullable": true
+          },
+          "casillaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "plantillaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "consentimientoId": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmadoPorElTitular": {
+            "type": "boolean"
+          },
+          "equiposSincronizados": {
+            "type": "number"
+          },
+          "equiposFallidos": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "autorizacionId",
+          "visitante",
+          "documento",
+          "viviendaId",
+          "vivienda",
+          "desde",
+          "hasta",
+          "estado",
+          "placa",
+          "generadaPor",
+          "generadaEn",
+          "anuladaEn",
+          "motivoAnulacion",
+          "tieneFoto",
+          "casillaDeclaradaPor",
+          "casillaEn",
+          "plantillaId",
+          "consentimientoId",
+          "confirmadoPorElTitular",
+          "equiposSincronizados",
+          "equiposFallidos"
+        ]
+      },
+      "VisitaGeneradaDto": {
+        "type": "object",
+        "properties": {
+          "generada": {
+            "type": "boolean"
+          },
+          "autorizacionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivosDeFoto": {
+            "description": "Por qué no sirvió la foto, si no sirvió",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "equipos": {
+            "type": "number",
+            "description": "Equipos con biblioteca de rostros de la copropiedad"
+          },
+          "sincronizadas": {
+            "type": "number"
+          },
+          "fallidas": {
+            "type": "number"
+          },
+          "porEquipo": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipoDeLaSincronizacionDto"
+            }
+          },
+          "avisoDeSincronizacion": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "generada",
+          "autorizacionId",
+          "motivosDeFoto",
+          "equipos",
+          "sincronizadas",
+          "fallidas",
+          "porEquipo",
+          "avisoDeSincronizacion"
+        ]
+      },
+      "VisitaRechazadaDto": {
+        "type": "object",
+        "properties": {
+          "equiposRetirados": {
+            "type": "number"
+          },
+          "equiposPendientes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "equiposRetirados",
+          "equiposPendientes"
+        ]
+      },
+      "VisitanteRecienteDto": {
+        "type": "object",
+        "properties": {
+          "autorizacionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "visitante": {
+            "type": "string"
+          },
+          "documento": {
+            "type": "string"
+          },
+          "ultimaVisita": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true
+          },
+          "tieneFoto": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "autorizacionId",
+          "visitante",
+          "documento",
+          "ultimaVisita",
+          "placa",
+          "tieneFoto"
+        ]
+      },
       "VistaPreviaDeGeneracionDto": {
         "type": "object",
         "properties": {
@@ -13762,6 +14260,21 @@
           "total",
           "grupos",
           "colisiones"
+        ]
+      },
+      "ViviendaDeVisitaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
         ]
       },
       "ViviendaDto": {

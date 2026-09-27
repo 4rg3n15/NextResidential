@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   ForbiddenException,
-  Get,
   Inject,
   NotFoundException,
   Param,
@@ -22,16 +21,11 @@ import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { ALCANCE_DE_EQUIPOS } from '../../equipos';
 import type { AlcanceDeEquipos } from '../../equipos';
-import { REPOSITORIO_CONSENTIMIENTOS } from '../aplicacion/puertos';
-import type { RepositorioConsentimientos } from '../aplicacion/puertos';
 import {
   BarrerPlantillasVencidas,
-  CapturarRostro,
-  ResponderConsentimiento,
   RevocarConsentimiento,
   SincronizarPlantilla,
 } from '../aplicacion/casos-de-uso';
-import { EmitirEnlaceDeConsentimiento } from '../aplicacion/enlace-de-consentimiento';
 import {
   PropagarConsentimientoAceptado,
   SincronizarPlantillaEnTerminales,
@@ -40,10 +34,7 @@ import type { ResultadoDeSincronizacionTotal } from '../aplicacion/sincronizacio
 import { AceptarConsentimientoPresencial } from '../aplicacion/consentimiento-presencial';
 import {
   AceptacionPresencialDto,
-  CapturarRostroDto,
-  EnlaceDeConsentimientoDto,
   RespuestaDeConsentimientoDto,
-  ResponderConsentimientoDto,
   SincronizacionTotalDto,
   SincronizarPlantillaDto,
 } from './dtos';
@@ -67,10 +58,11 @@ const aSincronizacionDto = (r: ResultadoDeSincronizacionTotal): SincronizacionTo
  * exponerlo sin añadir antes la operación al puerto — que es una decisión
  * visible en una revisión, no un descuido.
  *
- * Las rutas de consentimiento las ejecuta **el titular** (RN-10). El titular es
- * un visitante, que no es usuario administrativo: alcanza estas rutas con el
- * token que le llega por el canal de la solicitud, y el caso de uso comprueba
- * que `personaId` del token coincide con el titular del consentimiento.
+ * F (15-L, ADR-032) · la foto del visitante y su consentimiento declarado
+ * nacen al generar la autorización (módulo de visitas). Aquí queda lo que
+ * sigue a eso: la confirmación OPCIONAL del titular presente (D-10), la
+ * revocación, la sincronización y su reintento, y el barrido. El enlace para
+ * el titular, su página pública y la captura suelta ya no existen.
  */
 const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
   if (esFallo(r)) {
@@ -94,173 +86,19 @@ export class BiometriaController {
   constructor(
     // H-SITIO-06 · `@Inject` explícito: con `tsx` (start:dev) no hay metadatos
     // de tipos y estos ocho llegaban como `undefined` (inyeccion-explicita.mjs).
-    @Inject(CapturarRostro) private readonly capturar: CapturarRostro,
-    @Inject(ResponderConsentimiento) private readonly responder: ResponderConsentimiento,
     @Inject(RevocarConsentimiento) private readonly revocar: RevocarConsentimiento,
     @Inject(SincronizarPlantilla) private readonly sincronizar: SincronizarPlantilla,
     @Inject(BarrerPlantillasVencidas) private readonly barrer: BarrerPlantillasVencidas,
-    @Inject(EmitirEnlaceDeConsentimiento)
-    private readonly emitirEnlace: EmitirEnlaceDeConsentimiento,
     @Inject(SincronizarPlantillaEnTerminales)
     private readonly sincronizarEnTerminales: SincronizarPlantillaEnTerminales,
     @Inject(PropagarConsentimientoAceptado)
     private readonly propagar: PropagarConsentimientoAceptado,
-    @Inject(REPOSITORIO_CONSENTIMIENTOS)
-    private readonly consentimientos: RepositorioConsentimientos,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
     // 15-L · una plantilla de A no se empuja a una terminal de B.
     @Inject(ALCANCE_DE_EQUIPOS) private readonly equiposDeLaRuta: AlcanceDeEquipos,
     @Inject(AceptarConsentimientoPresencial)
     private readonly presencial: AceptarConsentimientoPresencial,
   ) {}
-
-  @Post('capturas')
-  /**
-   * `superadministrador` entra desde la ETAPA 15, y el motivo no es de
-   * comodidad: **no había ninguna superficie por la que adjuntar un rostro
-   * desde la consola** —la captura vivía sólo en la app del residente
-   * (ADR-016)—, así que el recorrido facial no se podía originar desde el
-   * escritorio. Este proyecto no da jerarquía implícita a los roles
-   * (`GuardaDeRoles` compara pertenencia, no rango), de modo que omitirlo aquí
-   * lo dejaba fuera de verdad. Añadirlo NO relaja RN-10: el consentimiento lo
-   * sigue respondiendo el titular y ninguna de las otras rutas cambia.
-   */
-  @Roles('superadministrador', 'administrador', 'portero', 'operador_central')
-  @ApiOperation({
-    summary: 'Valida la calidad y solicita el consentimiento al TITULAR (CU-02, CA-08)',
-  })
-  async capturarRostro(
-    @Param('id', ParseUUIDPipe) copropiedadId: string,
-    @Contexto() ctx: ContextoTenant,
-    @Body() dto: CapturarRostroDto,
-  ) {
-    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/capturas');
-    return desenvolver(
-      await this.capturar.ejecutar(destino, {
-        titularId: dto.titularId,
-        ...(dto.autorizacionId === undefined ? {} : { autorizacionId: dto.autorizacionId }),
-        medidas: dto.medidas,
-        vector: new Uint8Array(Buffer.from(dto.vector, 'base64')),
-        versionPolitica: dto.versionPolitica,
-        canal: dto.canal,
-        suprimirEn: new Date(dto.suprimirEn),
-      }),
-    );
-  }
-
-  @Get('consentimientos/:consentimientoId')
-  /**
-   * H-SITIO-03 · `superadministrador` faltaba aquí y la pantalla «Rostro del
-   * visitante», que él SÍ ve, llama a esta ruta tras cada captura: en sitio
-   * contestó 403 y el seguimiento del consentimiento no se pudo comprobar.
-   * `roles-de-biometria.e2e.test.ts` cruza ahora cada ruta que la pantalla
-   * llama con cada rol que la ve.
-   */
-  @Roles('superadministrador', 'administrador', 'portero', 'operador_central', 'residente')
-  @ApiOperation({ summary: 'Estado de un consentimiento, sin dato biométrico alguno' })
-  async verConsentimiento(
-    @Param('id', ParseUUIDPipe) copropiedadId: string,
-    @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
-    @Contexto() ctx: ContextoTenant,
-  ) {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'biometria/consentimientos');
-    const c = await this.consentimientos.porId(copropiedadId, consentimientoId);
-    if (c === null) throw new NotFoundException('El consentimiento no existe');
-
-    /**
-     * D-77 · el residente solo ve el SUYO.
-     *
-     * El aislamiento por copropiedad ya estaba, y no bastaba: dentro del mismo
-     * conjunto, cualquier residente que conociera un UUID podía leer el estado
-     * del consentimiento de otra persona —si lo otorgó, si lo revocó y cuándo—.
-     * No hay dato biométrico ahí, pero sí hay un hecho sobre un tercero, y la
-     * Ley 1581 lo trata como dato personal.
-     *
-     * Es el mismo defecto que D-76: una ruta acotada por el PRIMER eje de
-     * aislamiento y no por el segundo. Se responde 404 y no 403 a propósito: un
-     * 403 confirmaría que ese consentimiento existe, que es la mitad de lo que
-     * el curioso quería averiguar.
-     *
-     * El personal operativo sí lo ve: es quien atiende la captura en la
-     * portería y necesita saber si puede sincronizar (RN-09).
-     */
-    if (ctx.rol === 'residente' && c.titularId !== (ctx.personaId ?? ctx.usuarioId)) {
-      throw new NotFoundException('El consentimiento no existe');
-    }
-
-    return {
-      id: c.id,
-      estado: c.estado,
-      finalidad: c.finalidad,
-      versionPolitica: c.versionPolitica,
-      canal: c.canal,
-      solicitadoEn: c.solicitadoEn.toISOString(),
-      otorgadoEn: c.otorgadoEn?.toISOString() ?? null,
-      revocadoEn: c.revocadoEn?.toISOString() ?? null,
-    };
-  }
-
-  /**
-   * A3 (15-E) · el enlace con el que el TITULAR responde desde su teléfono.
-   * Lo emite quien atiende la captura; lo responde el titular. Ver
-   * `ConsentimientoPublicoController` y `EmitirEnlaceDeConsentimiento`.
-   */
-  @Post('consentimientos/:consentimientoId/enlace')
-  @Roles('superadministrador', 'administrador', 'portero', 'operador_central')
-  @ApiOperation({ summary: 'Emite el enlace firmado con el que el TITULAR responde (RN-10)' })
-  @ApiOkResponse({ type: EnlaceDeConsentimientoDto })
-  async emitirEnlaceDeConsentimiento(
-    @Param('id', ParseUUIDPipe) copropiedadId: string,
-    @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
-    @Contexto() ctx: ContextoTenant,
-  ): Promise<EnlaceDeConsentimientoDto> {
-    const destino = await this.aislamiento.exigirAlcance(
-      ctx,
-      copropiedadId,
-      'biometria/consentimientos/enlace',
-    );
-    const e = desenvolver(await this.emitirEnlace.ejecutar(destino, { consentimientoId }));
-    return {
-      consentimientoId: e.consentimientoId,
-      estado: e.estado,
-      token: e.token,
-      ruta: e.ruta,
-      url: e.url,
-      alcance: e.alcance,
-      expiraEn: e.expiraEn.toISOString(),
-    };
-  }
-
-  @Post('consentimientos/:consentimientoId/respuesta')
-  @Roles('residente', 'administrador', 'portero', 'operador_central')
-  @ApiOperation({ summary: 'El TITULAR acepta o rechaza. Nadie responde por él (RN-10)' })
-  @ApiOkResponse({ type: RespuestaDeConsentimientoDto })
-  async responderConsentimiento(
-    @Param('id', ParseUUIDPipe) copropiedadId: string,
-    @Param('consentimientoId', ParseUUIDPipe) consentimientoId: string,
-    @Contexto() ctx: ContextoTenant,
-    @Body() dto: ResponderConsentimientoDto,
-  ): Promise<RespuestaDeConsentimientoDto> {
-    const destino = await this.aislamiento.exigirAlcance(
-      ctx,
-      copropiedadId,
-      'biometria/consentimientos',
-    );
-    // `quienResponde` sale del TOKEN, nunca del cuerpo: si el cliente lo
-    // pusiera, RN-10 sería una casilla que cualquiera marca.
-    const r = desenvolver(
-      await this.responder.ejecutar(destino, {
-        consentimientoId,
-        quienResponde: ctx.personaId ?? ctx.usuarioId,
-        acepta: dto.acepta,
-        ...(dto.evidenciaId === undefined ? {} : { evidenciaId: dto.evidenciaId }),
-      }),
-    );
-    // A3 · aceptado = hacia todas las terminales, ya. Lo que no llegue se dice.
-    const propagacion =
-      r.estado === 'vigente' ? await this.propagar.ejecutar(destino, { consentimientoId }) : [];
-    return { estado: r.estado, propagacion: propagacion.map(aSincronizacionDto) };
-  }
 
   /**
    * D-10 · el titular en la portería: escribe su nombre y documento y acepta la

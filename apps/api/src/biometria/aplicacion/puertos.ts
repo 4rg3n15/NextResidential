@@ -1,4 +1,3 @@
-import type { EstadoConsentimiento } from '@ncr/domain-core';
 import type { ConsentimientoBiometrico, PlantillaBiometrica, Vigencia } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 
@@ -33,17 +32,9 @@ export const IDENTIDAD_BIOMETRICA = Symbol.for('ncr.puerto.IdentidadBiometrica')
  * nunca marca ni modelo · ADR-019). Lo satisface el módulo de equipos.
  */
 export const CATALOGO_DE_TERMINALES = Symbol.for('ncr.puerto.CatalogoDeTerminales');
-/** A3 · quien firma y verifica el enlace con el que el TITULAR responde. */
-export const FIRMANTE_DE_ENLACES = Symbol.for('ncr.puerto.FirmanteDeEnlaces');
-
 export interface RepositorioConsentimientos {
   porId(copropiedadId: string, id: string): Promise<ConsentimientoBiometrico | null>;
   vigenteDe(copropiedadId: string, titularId: string): Promise<ConsentimientoBiometrico | null>;
-  pendientesVencidos(
-    copropiedadId: string,
-    ahora: Date,
-    plazoHoras: number,
-  ): Promise<readonly ConsentimientoBiometrico[]>;
   guardar(consentimiento: ConsentimientoBiometrico, actorId: string): Promise<void>;
 }
 
@@ -67,12 +58,29 @@ export interface RepositorioPlantillas {
     consentimientoId: string,
   ): Promise<readonly PlantillaBiometrica[]>;
   vencidas(copropiedadId: string, ahora: Date): Promise<readonly PlantillaBiometrica[]>;
+  /** F (15-L) · la plantilla (o plantillas) de UNA autorización. */
+  deAutorizacion(
+    copropiedadId: string,
+    autorizacionId: string,
+  ): Promise<readonly PlantillaBiometrica[]>;
+  /**
+   * F2 (15-L) · plantillas sin suprimir cuya autorización fue revocada o
+   * rechazada, por cualquier camino: el barrido las suprime aunque quien
+   * revocó no lo hiciera (RN-11).
+   */
+  deAutorizacionesRevocadas(copropiedadId: string): Promise<readonly PlantillaBiometrica[]>;
   /** Cola de retirada de CA-10: derivada, nunca un estado que alguien escribe. */
   porRetirar(copropiedadId: string): Promise<readonly DestinoDePlantilla[]>;
   guardar(plantilla: PlantillaBiometrica, actorId: string): Promise<void>;
   /** Borra el vector y marca la fila. Suprimir es borrar, no etiquetar (CA-10). */
   suprimirVector(copropiedadId: string, plantillaId: string, actorId: string): Promise<void>;
   registrarSincronizacion(destino: DestinoDePlantilla, actorId: string): Promise<void>;
+  /**
+   * F3 (15-L) · el equipo no la aceptó: queda escrito con su motivo, para que
+   * la consola enseñe el estado por equipo. No pisa una sincronización que ya
+   * se había logrado: si el equipo la tiene, la tiene.
+   */
+  registrarFallo(destino: DestinoDePlantilla, detalle: string, actorId: string): Promise<void>;
   registrarRetirada(destino: DestinoDePlantilla, actorId: string): Promise<void>;
 }
 
@@ -137,33 +145,4 @@ export interface CatalogoDeTerminales {
   ): Promise<
     readonly (TerminalConBiblioteca & { readonly motivo: 'no_admite' | 'sin_comprobar' })[]
   >;
-}
-
-/** Lo que el enlace del titular lleva dentro. Nada más: ni nombre ni dato. */
-export interface DatosDelEnlace {
-  readonly copropiedadId: string;
-  readonly consentimientoId: string;
-  readonly titularId: string;
-  /** Instante de caducidad. Un enlace sin caducidad es una contraseña. */
-  readonly expiraEn: Date;
-  /**
-   * Estado del consentimiento AL EMITIR. Es lo que hace al enlace de UN SOLO
-   * USO: usarlo cambia el estado —aceptado, rechazado, revocado— y con ese
-   * cambio todo enlace emitido para el estado anterior deja de valer. No hace
-   * falta una lista de tokens usados ni depender del reloj: el propio agregado
-   * dice en qué estado está.
-   */
-  readonly estadoAlEmitir: EstadoConsentimiento;
-}
-
-/**
- * El enlace es una credencial AL PORTADOR, acotada a UN consentimiento y con
- * caducidad. Quien lo tiene responde como titular: por eso lo firma el
- * servidor con una llave derivada por copropiedad, y por eso el token no es
- * un identificador que se pueda adivinar ni reutilizar en otra copropiedad.
- */
-export interface FirmanteDeEnlaces {
-  firmar(datos: DatosDelEnlace): string;
-  /** `null` si la firma no cuadra, el token está malformado o caducó. */
-  verificar(token: string, ahora: Date): DatosDelEnlace | null;
 }

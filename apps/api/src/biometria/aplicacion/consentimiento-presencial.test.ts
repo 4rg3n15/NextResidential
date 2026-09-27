@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { esExito, esFallo } from '@ncr/domain-core';
+import { ConsentimientoBiometrico, esExito, esFallo } from '@ncr/domain-core';
 import type { Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import { AuditoriaEnMemoria } from '../../comun/auditoria';
@@ -81,6 +81,7 @@ beforeEach(async () => {
     new ResponderConsentimiento(consentimientos, plantillas, reloj),
     auditoria,
     bitacora,
+    reloj,
   );
 });
 
@@ -156,6 +157,7 @@ describe('D-10 · aceptación presencial por el titular', () => {
       new ResponderConsentimiento(consentimientos, plantillas, reloj),
       auditoria,
       { registrar: () => undefined },
+      reloj,
     );
     const r = await vacio.ejecutar(portero, {
       consentimientoId,
@@ -164,5 +166,45 @@ describe('D-10 · aceptación presencial por el titular', () => {
       origen: { ip: null, userAgent: null },
     });
     expect(esFallo(r)).toBe(true);
+  });
+});
+
+describe('F4 (15-L) · D-10 como OPCIÓN sobre una casilla ya declarada', () => {
+  it('el titular, presente, confirma la declaración: el origen pasa a ser suyo', async () => {
+    const identidades = new IdentidadDePersonaEnMemoria();
+    identidades.declarar(COP, TITULAR, IDENTIDAD);
+    const declarada = ConsentimientoBiometrico.declarar({
+      id: 'declarada-1',
+      copropiedadId: COP,
+      titularId: TITULAR,
+      finalidad: 'control_acceso',
+      versionPolitica: 'casilla-v1',
+      canal: 'presencial',
+      declaradoPor: 'portero-1',
+      ahora: AHORA,
+    });
+    if (!esExito(declarada)) throw new Error('declaración inválida');
+    const repo = new RepositorioConsentimientosEnMemoria();
+    await repo.guardar(declarada.valor);
+    const opcional = new AceptarConsentimientoPresencial(
+      repo,
+      identidades,
+      new ResponderConsentimiento(repo, plantillas, reloj),
+      auditoria,
+      { registrar: () => undefined },
+      reloj,
+    );
+    const r = await opcional.ejecutar(portero, {
+      consentimientoId: 'declarada-1',
+      identidad: IDENTIDAD,
+      versionPoliticaAceptada: 'casilla-v1',
+      origen: { ip: null, userAgent: null },
+    });
+    expect(esExito(r) && r.valor.estado).toBe('vigente');
+    expect(await repo.porId(COP, 'declarada-1')).toMatchObject({
+      origen: 'otorgado_por_el_titular',
+      declaradoPor: 'portero-1',
+      estado: 'vigente',
+    });
   });
 });

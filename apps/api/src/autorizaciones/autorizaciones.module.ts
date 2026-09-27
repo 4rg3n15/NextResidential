@@ -150,7 +150,15 @@ export class AutorizacionesModule {
             new UrlDeFotografiaDeVisitante(repo, reloj, almacen),
         },
       ],
-      exports: [REPOSITORIO_AUTORIZACIONES, CONSULTA_AUTORIZACIONES, REPOSITORIO_LISTA_NEGRA],
+      exports: [
+        REPOSITORIO_AUTORIZACIONES,
+        CONSULTA_AUTORIZACIONES,
+        REPOSITORIO_LISTA_NEGRA,
+        // F (15-L) · los orquesta el módulo de visitas.
+        CrearAutorizacion,
+        RevocarAutorizacion,
+        AdjuntarFotografiaDeVisitante,
+      ],
     };
   }
 }

@@ -5,36 +5,45 @@ import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import type { Firmante } from './utilidades';
 import { FACE_TEMPLATE_PROVIDER } from '@ncr/domain-core';
 import type { MockProvider } from '@ncr/providers';
+import type { ContextoTenant } from '../src/autenticacion';
+import { CapturarRostro } from '../src/biometria';
 import { AlmacenEnMemoria } from '../src/biometria/infraestructura/boveda-cifrada';
 
 /**
- * CU-02 completo por HTTP: captura → calidad → consentimiento del TITULAR →
- * sincronización → revocación → supresión.
+ * Lo que sigue a la foto de la visita, por HTTP: sincronizar, reintentar,
+ * revocar y barrer (RN-09, RN-11, CA-09, CA-10, CA-11).
  *
- * Lo que esta suite vigila además del camino feliz es una ausencia: **ninguna
- * ruta devuelve un vector biométrico**. Se comprueba enumerando el enrutador,
- * no leyendo el código, para que siga siendo cierto cuando alguien añada un
- * controlador dentro de seis meses.
+ * F (15-L, ADR-032) · la foto y su consentimiento declarado nacen al generar
+ * la autorización (`visitas-pg.test.ts` recorre ese camino contra la base).
+ * Aquí se parte de una captura con casilla hecha por el caso de uso, y se
+ * vigila además una ausencia: **ninguna ruta devuelve un vector biométrico**,
+ * y ya no existe el enlace ni la página pública del titular.
  */
 const TITULAR = '40000000-0000-4000-8000-000000000103';
 const HORA = 3_600_000;
 /** Terminal facial dada de alta en el `MockProvider` (ADR-03). */
 const TERMINAL = '90000000-0000-4000-8000-000000000001';
 const TERMINAL_DESCONOCIDA = '90000000-0000-4000-8000-0000000000ff';
+const ADMIN = '00000000-0000-4000-8000-000000000010';
 
 let app: INestApplication;
 let firmante: Firmante;
 let tokenAdmin: string;
 let tokenTitular: string;
 
-const VECTOR = Buffer.from([9, 8, 7, 6, 5, 4, 3, 2, 1]).toString('base64');
+const ctxAdmin: ContextoTenant = {
+  usuarioId: ADMIN,
+  rol: 'administrador',
+  copropiedadId: COP_A,
+  copropiedadesAtendidas: [],
+  mfaVerificado: true,
+};
 
 beforeAll(async () => {
   firmante = await crearFirmante();
   app = await crearApp(firmante);
   tokenAdmin = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
-  // El titular es un visitante: alcanza sus rutas con el token que recibe por
-  // el canal de la solicitud, y su `usuario_id` es su propia persona.
+  // Revocar es del TITULAR (RN-10): su `usuario_id` es su propia persona.
   tokenTitular = await tokenDe(firmante, {
     rol: 'residente',
     copropiedadId: COP_A,
@@ -56,102 +65,24 @@ const comoTitular = (metodo: 'get' | 'post', ruta: string) =>
 
 const base = `/copropiedades/${COP_A}/biometria`;
 
-const capturar = async (extra: Record<string, unknown> = {}) => {
-  const r = await comoAdmin('post', `${base}/capturas`)
-    .send({
-      titularId: TITULAR,
-      medidas: { rostrosDetectados: 1, nitidez: 0.85, iluminacion: 0.6, proporcionRostro: 0.4 },
-      vector: VECTOR,
-      versionPolitica: 'v1.0',
-      canal: 'app',
-      suprimirEn: new Date(Date.now() + 8 * HORA).toISOString(),
-      ...extra,
-    })
-    .expect(201);
-  return r.body as { aceptada: boolean; plantillaId: string; consentimientoId: string };
+/** La foto de una visita con la casilla marcada, como la deja «Generar autorización». */
+const conCasilla = async (): Promise<{ plantillaId: string; consentimientoId: string }> => {
+  const r = await app.get(CapturarRostro).ejecutar(ctxAdmin, {
+    titularId: TITULAR,
+    medidas: { rostrosDetectados: 1, nitidez: 0.85, iluminacion: 0.6, proporcionRostro: 0.4 },
+    vector: new Uint8Array([9, 8, 7, 6, 5, 4, 3, 2, 1]),
+    versionPolitica: 'casilla-v1',
+    canal: 'presencial',
+    suprimirEn: new Date(Date.now() + 8 * HORA),
+    declaracion: { declaradoPor: ADMIN },
+  });
+  if (!r.ok || !r.valor.aceptada) throw new Error('la captura debía aceptarse');
+  return r.valor;
 };
 
-describe('biometría · CU-02 por HTTP', () => {
-  it('una captura de mala calidad se rechaza CON los motivos, sin pedir consentimiento', async () => {
-    const r = await comoAdmin('post', `${base}/capturas`)
-      .send({
-        titularId: TITULAR,
-        medidas: { rostrosDetectados: 2, nitidez: 0.2, iluminacion: 0.6, proporcionRostro: 0.4 },
-        vector: VECTOR,
-        versionPolitica: 'v1.0',
-        canal: 'app',
-        suprimirEn: new Date(Date.now() + 8 * HORA).toISOString(),
-      })
-      .expect(201);
-    expect(r.body.aceptada).toBe(false);
-    expect(r.body.motivos).toEqual(expect.arrayContaining(['ROSTROS_MULTIPLES', 'NITIDEZ']));
-    expect(r.body).not.toHaveProperty('consentimientoId');
-  });
-
-  it('una captura buena crea la solicitud PENDIENTE', async () => {
-    const { consentimientoId } = await capturar();
-    const r = await comoAdmin('get', `${base}/consentimientos/${consentimientoId}`).expect(200);
-    expect(r.body).toMatchObject({ estado: 'pendiente', versionPolitica: 'v1.0' });
-  });
-
-  it('la consulta del consentimiento NO devuelve dato biométrico alguno', async () => {
-    const { consentimientoId } = await capturar();
-    const r = await comoAdmin('get', `${base}/consentimientos/${consentimientoId}`).expect(200);
-    const texto = JSON.stringify(r.body);
-    expect(texto).not.toContain('vector');
-    expect(texto).not.toContain('llave');
-    expect(texto).not.toContain(VECTOR.slice(0, 8));
-  });
-
-  it('D-77 · un residente que NO es el titular no puede leer el consentimiento', async () => {
-    /**
-     * El aislamiento por copropiedad ya estaba y no bastaba: dentro del mismo
-     * conjunto, cualquier residente con el UUID leía si su vecino otorgó o
-     * revocó, y cuándo. No hay dato biométrico ahí, pero sí un hecho sobre un
-     * tercero.
-     *
-     * Y se exige 404, no 403: un 403 confirmaría que ese consentimiento
-     * existe, que es la mitad de lo que el curioso quería averiguar.
-     */
-    const { consentimientoId } = await capturar();
-    const tokenVecino = await tokenDe(firmante, {
-      rol: 'residente',
-      copropiedadId: COP_A,
-      usuarioId: '00000000-0000-4000-8000-00000000cafe',
-    });
-    await request(app.getHttpServer())
-      .get(`${base}/consentimientos/${consentimientoId}`)
-      .set('Authorization', `Bearer ${tokenVecino}`)
-      .expect(404);
-  });
-
-  it('D-77 · y el titular SÍ lee el suyo: HU-15 sigue en pie', async () => {
-    // La corrección no puede cerrarle la puerta al titular, que es quien tiene
-    // que poder consultarlo para revocarlo (RN-11).
-    const { consentimientoId } = await capturar();
-    const r = await comoTitular('get', `${base}/consentimientos/${consentimientoId}`).expect(200);
-    expect(r.body).toMatchObject({ estado: 'pendiente' });
-  });
-
-  it('el ADMINISTRADOR no puede aceptar por el titular (RN-10)', async () => {
-    const { consentimientoId } = await capturar();
-    const r = await comoAdmin('post', `${base}/consentimientos/${consentimientoId}/respuesta`)
-      .send({ acepta: true })
-      .expect(403);
-    expect(JSON.stringify(r.body)).toContain('titular');
-  });
-
-  it('el titular acepta, y solo entonces se puede sincronizar (RN-09, CA-09)', async () => {
-    const { consentimientoId, plantillaId } = await capturar();
-
-    await comoAdmin('post', `${base}/plantillas/${plantillaId}/sincronizacion`)
-      .send({ dispositivoId: TERMINAL })
-      .expect(403);
-
-    await comoTitular('post', `${base}/consentimientos/${consentimientoId}/respuesta`)
-      .send({ acepta: true })
-      .expect(201);
-
+describe('biometría · lo que sigue a la foto de la visita', () => {
+  it('con la casilla, la plantilla ya se sincroniza (RN-09, CA-09)', async () => {
+    const { plantillaId } = await conCasilla();
     await comoAdmin('post', `${base}/plantillas/${plantillaId}/sincronizacion`)
       .send({ dispositivoId: TERMINAL })
       .expect(201);
@@ -160,33 +91,23 @@ describe('biometría · CU-02 por HTTP', () => {
   it('una terminal que no responde da 503, NO un 403 ni un 500', async () => {
     // Distinguirlo importa: 403 acusaría al visitante de no haber consentido, y
     // 500 diría «error interno» donde el hecho es «el lector no contestó».
-    const { consentimientoId, plantillaId } = await capturar();
-    await comoTitular('post', `${base}/consentimientos/${consentimientoId}/respuesta`)
-      .send({ acepta: true })
-      .expect(201);
-
+    const { plantillaId } = await conCasilla();
     const r = await comoAdmin('post', `${base}/plantillas/${plantillaId}/sincronizacion`)
       .send({ dispositivoId: TERMINAL_DESCONOCIDA })
       .expect(503);
     expect(JSON.stringify(r.body)).toContain(TERMINAL_DESCONOCIDA);
   });
 
-  it('el titular rechaza y la sincronización sigue cerrada', async () => {
-    const { consentimientoId, plantillaId } = await capturar();
-    await comoTitular('post', `${base}/consentimientos/${consentimientoId}/respuesta`)
-      .send({ acepta: false })
-      .expect(201);
-    await comoAdmin('post', `${base}/plantillas/${plantillaId}/sincronizacion`)
-      .send({ dispositivoId: TERMINAL })
+  it('el ADMINISTRADOR no revoca por el titular (RN-10)', async () => {
+    const { consentimientoId } = await conCasilla();
+    const r = await comoAdmin('post', `${base}/consentimientos/${consentimientoId}/revocacion`)
+      .send({})
       .expect(403);
+    expect(JSON.stringify(r.body)).toContain('titular');
   });
 
   it('revocar suprime: el sobre cifrado desaparece del almacén (CA-11)', async () => {
-    const { consentimientoId, plantillaId } = await capturar();
-    await comoTitular('post', `${base}/consentimientos/${consentimientoId}/respuesta`)
-      .send({ acepta: true })
-      .expect(201);
-
+    const { consentimientoId, plantillaId } = await conCasilla();
     const almacen = app.get(AlmacenEnMemoria);
     const r = await comoTitular(
       'post',
@@ -194,32 +115,10 @@ describe('biometría · CU-02 por HTTP', () => {
     ).expect(201);
     expect(r.body.plantillasSuprimidas).toBeGreaterThanOrEqual(1);
     expect(await almacen.tomar(COP_A, plantillaId)).toBeNull();
-  });
-
-  it('un plazo de conservación fuera de la cota se rechaza (RN-11)', async () => {
-    await comoAdmin('post', `${base}/capturas`)
-      .send({
-        titularId: TITULAR,
-        medidas: { rostrosDetectados: 1, nitidez: 0.85, iluminacion: 0.6, proporcionRostro: 0.4 },
-        vector: VECTOR,
-        versionPolitica: 'v1.0',
-        canal: 'app',
-        suprimirEn: new Date(Date.now() + 6 * 365 * 24 * HORA).toISOString(),
-      })
+    // Y lo suprimido no vuelve a ningún equipo.
+    await comoAdmin('post', `${base}/plantillas/${plantillaId}/sincronizacion`)
+      .send({ dispositivoId: TERMINAL })
       .expect(403);
-  });
-
-  it('el DTO rechaza un vector que no es base64 y medidas fuera de rango', async () => {
-    await comoAdmin('post', `${base}/capturas`)
-      .send({
-        titularId: TITULAR,
-        medidas: { rostrosDetectados: 1, nitidez: 5, iluminacion: 0.6, proporcionRostro: 0.4 },
-        vector: 'no-es-base64-***',
-        versionPolitica: 'v1.0',
-        canal: 'app',
-        suprimirEn: new Date(Date.now() + 8 * HORA).toISOString(),
-      })
-      .expect(400);
   });
 
   it('el barrido responde con las dos cuentas separadas', async () => {
@@ -231,34 +130,38 @@ describe('biometría · CU-02 por HTTP', () => {
 });
 
 describe('biometría · lo que no existe', () => {
-  it('NINGUNA ruta expone un vector, una plantilla en claro ni una llave', () => {
+  const rutas = (): string[] => {
     const servidor = app.getHttpAdapter().getInstance() as {
       _router?: { stack: { route?: { path: string } }[] };
       router?: { stack: { route?: { path: string } }[] };
     };
     const pila = servidor._router?.stack ?? servidor.router?.stack ?? [];
-    const rutas = pila.flatMap((c) => (c.route ? [c.route.path] : []));
-    expect(rutas.filter((r) => /vector|llave|plantillas\/[^/]+$/.test(r))).toEqual([]);
+    return pila.flatMap((c) => (c.route ? [c.route.path] : []));
+  };
+
+  it('NINGUNA ruta expone un vector, una plantilla en claro ni una llave', () => {
+    expect(rutas().filter((r) => /vector|llave|plantillas\/[^/]+$/.test(r))).toEqual([]);
     // Y sí existen las del ciclo, para que la prueba no pase por estar vacía.
-    expect(rutas.some((r) => r.includes('biometria/capturas'))).toBe(true);
+    expect(rutas().some((r) => r.includes('biometria/barrido'))).toBe(true);
+  });
+
+  it('F4 · el flujo anterior ya no existe: ni enlace, ni página pública, ni captura suelta', () => {
+    const anteriores = rutas().filter((r) =>
+      /\/consentimiento\/|\/enlace$|\/respuesta$|biometria\/capturas|\/rostro$/.test(r),
+    );
+    expect(anteriores).toEqual([]);
   });
 });
 
 describe('biometría · aislamiento', () => {
-  it('un administrador de otra copropiedad no captura aquí', async () => {
+  it('un administrador de otra copropiedad no sincroniza aquí', async () => {
+    const { plantillaId } = await conCasilla();
     const ajeno = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
-    await request(app.getHttpServer())
-      .post(`${base}/capturas`)
+    const r = await request(app.getHttpServer())
+      .post(`${base}/plantillas/${plantillaId}/sincronizacion`)
       .set('Authorization', `Bearer ${ajeno}`)
-      .send({
-        titularId: TITULAR,
-        medidas: { rostrosDetectados: 1, nitidez: 0.85, iluminacion: 0.6, proporcionRostro: 0.4 },
-        vector: VECTOR,
-        versionPolitica: 'v1.0',
-        canal: 'app',
-        suprimirEn: new Date(Date.now() + 8 * HORA).toISOString(),
-      })
-      .expect(404);
+      .send({ dispositivoId: TERMINAL });
+    expect([403, 404]).toContain(r.status);
   });
 
   it('sin token no se llega a ninguna ruta de biometría', async () => {

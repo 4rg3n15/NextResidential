@@ -151,6 +151,9 @@ describe('SincronizarPlantillaEnTerminales · a TODAS, por capacidad (A3)', () =
       detalle: expect.stringContaining('fuera de línea'),
     });
     expect(terminales.recibidas).toEqual([`v-1/${plantillaId}`]);
+    // F3 (15-L) · el fallo queda escrito POR EQUIPO, con su motivo.
+    expect(plantillas.fallos.get(`${plantillaId}/t-1`)).toContain('fuera de línea');
+    expect(plantillas.fallos.has(`${plantillaId}/v-1`)).toBe(false);
   });
 
   it('sin equipos con biblioteca de rostros: cero destinos, y lo dice en bitácora', async () => {

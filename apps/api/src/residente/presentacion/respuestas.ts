@@ -182,49 +182,32 @@ export class MiZonaDto {
   @ApiProperty({ type: Boolean }) requiereAutorizacion!: boolean;
 }
 
-/**
- * CU-02 · el desenlace de la captura, tal como lo lee la app.
- *
- * `aceptada: false` con sus motivos es una RESPUESTA, no un error: el servidor
- * volvió a juzgar la calidad y no pasó (KPI-16). Y `aceptada: true` no dice
- * «listo»: dice que el consentimiento quedó PEDIDO. Quien lo otorga es el
- * titular, por su canal, con su identidad (RN-10) — y hasta entonces la
- * plantilla no se sincroniza con ninguna terminal (RN-09).
- */
-export class RostroCapturadoDto {
-  @ApiProperty({ type: Boolean }) aceptada!: boolean;
-
-  @ApiProperty({
-    type: [String],
-    description: 'Por qué no sirve la foto. Vacío cuando sí sirve.',
-  })
-  motivos!: string[];
-
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  plantillaId!: string | null;
-
-  @ApiProperty({
-    type: String,
-    format: 'uuid',
-    nullable: true,
-    description: 'El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10).',
-  })
-  consentimientoId!: string | null;
-
+/** F (15-L) · la visita del residente con foto: creada, rechazada o foto inservible. */
+export class MiVisitaGeneradaDto {
+  @ApiProperty({ type: Boolean }) creada!: boolean;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) id!: string | null;
+  @ApiProperty({ type: Boolean }) repetida!: boolean;
   @ApiProperty({
     type: String,
     nullable: true,
-    description:
-      'A3 (15-E) · el enlace que el residente ENTREGA al visitante para que responda desde su teléfono, sin cuenta. De un solo uso y con caducidad. URL completa si la API declara API_URL_PUBLICA; si no, la ruta. Nulo cuando la captura no se aceptó.',
+    enum: ['LISTA_NEGRA', 'VIVIENDA_INACTIVA', 'SIN_NIVEL_DE_ACCESO', 'PLACA_DUPLICADA'],
   })
-  enlaceDeConsentimiento!: string | null;
+  motivo!: string | null;
+  @ApiProperty({ type: String, nullable: true }) explicacion!: string | null;
+  @ApiProperty({ type: [String], description: 'Por qué la foto no sirvió, si no sirvió' })
+  motivosDeFoto!: string[];
+  @ApiProperty({ description: 'Equipos de la copropiedad que admiten rostros' }) equipos!: number;
+  @ApiProperty() sincronizadas!: number;
+  @ApiProperty() fallidas!: number;
+  @ApiProperty({ type: String, nullable: true }) avisoDeSincronizacion!: string | null;
+}
 
-  @ApiProperty({
-    type: String,
-    nullable: true,
-    description: 'A quién se le pidió: el visitante, no el residente que tomó la foto',
-  })
-  titular!: string | null;
-
-  @ApiProperty({ type: Number, nullable: true }) calidad!: number | null;
+/** F6 · un visitante reciente de mi vivienda, con lo que hace falta para repetirlo. */
+export class VisitanteRecienteDto {
+  @ApiProperty({ format: 'uuid' }) autorizacionId!: string;
+  @ApiProperty() visitante!: string;
+  @ApiProperty() documento!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) ultimaVisita!: string;
+  @ApiProperty({ type: String, nullable: true }) placa!: string | null;
+  @ApiProperty() tieneFoto!: boolean;
 }

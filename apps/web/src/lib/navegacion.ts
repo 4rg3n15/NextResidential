@@ -113,22 +113,6 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     pendienteDeEtapa: null,
     icono: 'ShieldBan',
   },
-  /**
-   * ETAPA 15 · anticipo autorizado del punto 4 de la ETAPA 16.
-   *
-   * Va junto a Visitantes y no en Dispositivos porque lo que se captura es el
-   * rostro de **una persona que visita**, y quien lo hace está atendiéndola.
-   * Colgarlo del inventario de equipos lo habría convertido en una tarea de
-   * mantenimiento, que es justo lo que no es.
-   */
-  {
-    clave: 'biometria',
-    etiqueta: 'Rostro del visitante',
-    ruta: '/biometria',
-    roles: OPERACION,
-    pendienteDeEtapa: null,
-    icono: 'ScanFace',
-  },
   {
     clave: 'zonas',
     etiqueta: 'Zonas Comunes',

@@ -61,7 +61,10 @@ const PANTALLAS: readonly {
 }[] = [
   { nombre: 'viviendas', montar: () => <DirectorioDeViviendas copropiedadId={COP} /> },
   { nombre: 'vehículos', montar: () => <PantallaDeVehiculos copropiedadId={COP} /> },
-  { nombre: 'visitantes', montar: () => <PantallaDeVisitantes copropiedadId={COP} /> },
+  {
+    nombre: 'visitantes',
+    montar: () => <PantallaDeVisitantes copropiedadId={COP} rol="administrador" />,
+  },
   { nombre: 'zonas comunes', montar: () => <PantallaDeZonas copropiedadId={COP} /> },
   { nombre: 'dispositivos', montar: () => <PantallaDeDispositivos copropiedadId={COP} /> },
   { nombre: 'eventos', montar: () => <PantallaDeEventos copropiedadId={COP} /> },

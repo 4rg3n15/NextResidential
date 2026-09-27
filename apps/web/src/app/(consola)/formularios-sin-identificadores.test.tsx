@@ -6,7 +6,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DirectorioDeViviendas } from './viviendas/directorio';
 import { PantallaDeVehiculos } from './vehiculos/pantalla';
-import { PantallaDeVisitantes } from './visitantes/pantalla';
 import { PantallaDeDispositivos } from './dispositivos/pantalla';
 import { PantallaDeZonas } from './zonas/pantalla';
 
@@ -305,11 +304,6 @@ const PANTALLAS = [
     boton: /Registrar vehículo/,
   },
   {
-    nombre: 'visitantes',
-    elemento: <PantallaDeVisitantes copropiedadId={COP} />,
-    boton: /Nueva autorización/,
-  },
-  {
     // ETAPA 15-B · el alta de equipos. Entra en el barrido como una pantalla
     // más: escribe, y la regla de D-72 se le aplica igual. Aquí lo que se
     // comprueba de paso es que un formulario de conexión —el sitio natural
@@ -370,61 +364,6 @@ describe('ningún formulario pide un identificador interno (D-72)', () => {
   }
 });
 
-describe('las restricciones del dominio se señalan antes de enviarlas (D-73)', () => {
-  it('una vigencia invertida no sale del navegador y se dice cuál es el problema', async () => {
-    render(
-      <Envoltura>
-        <PantallaDeVisitantes copropiedadId={COP} />
-      </Envoltura>,
-    );
-    fireEvent.click((await screen.findAllByRole('button', { name: /Nueva autorización/ }))[0]!);
-    await rellenar();
-
-    // Se invierte el par: «hasta» pasa a ser anterior a «desde», que es
-    // exactamente lo que se aceptó el 13/09.
-    const dialogo = screen.getByRole('dialog');
-    const fechas = Array.from(
-      dialogo.querySelectorAll<HTMLInputElement>('input[type="datetime-local"]'),
-    );
-    escribir(fechas[1]!, enHoras(-4));
-
-    expect(screen.getByRole('alert').textContent).toMatch(/termina antes de empezar/);
-
-    const enviar = botonDeEnvio();
-    expect(enviar.disabled).toBe(true);
-
-    fireEvent.click(enviar);
-    expect((await escrituras()).filter((p) => p.ruta.endsWith('/autorizaciones'))).toHaveLength(0);
-  });
-
-  it('el patrón recurrente enseña sus días y su franja, y rechaza la que cruza la medianoche', async () => {
-    render(
-      <Envoltura>
-        <PantallaDeVisitantes copropiedadId={COP} />
-      </Envoltura>,
-    );
-    fireEvent.click((await screen.findAllByRole('button', { name: /Nueva autorización/ }))[0]!);
-
-    // Antes de marcar la casilla, la etiqueta NO puede prometer unos días que
-    // no se ven por ninguna parte: era la tercera mitad del defecto.
-    expect(screen.queryByRole('group', { name: /Días de la semana/ })).toBeNull();
-    expect(
-      screen.getByRole('dialog').textContent ?? '',
-      'el formulario anuncia unos «días marcados» que no se ven por ninguna parte',
-    ).not.toMatch(/días marcados/i);
-
-    fireEvent.click(screen.getByLabelText(/Autorización recurrente/));
-    expect(screen.getByRole('group', { name: /Días de la semana/ })).toBeDefined();
-
-    escribir(screen.getByLabelText(/Hasta la hora/), '02:00');
-    await waitFor(() =>
-      expect(screen.getAllByRole('alert').some((a) => /medianoche/.test(a.textContent ?? ''))).toBe(
-        true,
-      ),
-    );
-  });
-});
-
 /**
  * Guardia estructural, en el espíritu del barrido de D-71: la lista de arriba
  * es explícita, así que algo tiene que vigilar que no se quede corta. Se
@@ -432,6 +371,24 @@ describe('las restricciones del dominio se señalan antes de enviarlas (D-73)', 
  * clasificado — con formulario que este barrido recorre, o exento con motivo.
  */
 const SIN_FORMULARIO: Readonly<Record<string, string>> = {
+  /**
+   * ETAPA 15-L (F) · «Generar autorización». No entra en el barrido porque exige
+   * dos cosas que el barrido no sabe dar a propósito: una FOTO que pase la
+   * calidad y la CASILLA marcada por quien registra. El único identificador,
+   * la vivienda, sale de un desplegable que llena la API; la vigencia no se
+   * puede invertir porque es fecha, hora y una duración elegida de una lista.
+   * Lo comprueba `visitantes/generar-autorizacion.test.tsx`: el cuerpo exacto
+   * que envía, y que sin foto o sin casilla no se envía nada.
+   */
+  'visitantes/generar-autorizacion.tsx':
+    'foto y casilla obligatorias; la vivienda sale de un desplegable de la API; prueba propia del cuerpo enviado',
+  /**
+   * ETAPA 15-L (F2) · el rechazo de una visita: sólo pide el MOTIVO, que es
+   * texto de persona; la visita viaja en la RUTA desde su tarjeta o el aviso.
+   */
+  'componentes/rechazo-de-visita.tsx': 'sólo pide el motivo; la visita viaja en la ruta',
+  'visitantes/pantalla.tsx':
+    'lista y filtros; lo que escribe son el reintento de la foto (la plantilla viaja en la ruta) y los diálogos declarados aparte',
   /**
    * ETAPA 15-H (ADR-023/024) · supervisión de portería y consola del portero.
    * Ninguna pide un identificador tecleado: el portero de un turno sale de un
@@ -486,32 +443,17 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
   'configuracion/formulario.tsx':
     'campos numéricos con min/max declarados que el navegador impide enviar fuera de rango, y 422 por campo',
   /**
-   * ETAPA 15 · no abre diálogo: es una secuencia de tres tarjetas en la propia
-   * página, así que el recorrido de arriba —que busca `role="dialog"` y su
-   * botón de envío— no la alcanza. El único identificador que viaja,
-   * `titularId`, sale del buscador compartido, que SÍ entra en este barrido
-   * por vivir en `componentes/`. Lo que aquí se declara lo comprueba
-   * `biometria/pantalla.test.tsx`, con lo propio de una captura encima: que no
-   * exista forma de aceptar el consentimiento desde la consola (RN-10) y que
-   * sin detector de rostros no se invente uno.
+   * ETAPA 15-L (F) · la confirmación en persona, OPCIONAL, del visitante: pide
+   * su nombre y su documento, datos de PERSONA que él escribe; el
+   * consentimiento viaja en la RUTA desde la tarjeta de la visita.
    */
-  'biometria/pantalla.tsx':
-    'no es un diálogo; el único identificador lo aporta el buscador compartido, y tiene prueba propia',
+  'visitantes/confirmacion-presencial.tsx':
+    'nombre y documento de persona escritos por el titular; el consentimiento viaja en la ruta',
   /**
-   * ETAPA 15-E (A3) · el seguimiento tras la captura: dos botones —emitir el
-   * enlace del titular y comprobar la respuesta para sincronizar a todas las
-   * terminales—. Los dos identificadores (consentimiento y plantilla) vienen de
-   * la captura recién hecha y viajan en la RUTA del POST; el único `<input>` es
-   * de sólo lectura, para copiar el enlace. No hay nada que teclear. Lo que sí
-   * comprueba `seguimiento.test.tsx` es que se muestre por terminal el estado
-   * que la API devuelve.
+   * ETAPA 15-L (F) · la foto del visitante: un archivo de imagen elegido con el
+   * selector o la cámara. No hay un solo campo de texto.
    */
-  // ETAPA 15-K (D-10) · y el formulario presencial del TITULAR: nombre y
-  // documento de PERSONA que él escribe, no identificadores internos. Lo
-  // comprueba `seguimiento.test.tsx` («D-10»): campos vacíos al abrir, envío
-  // con la versión mostrada y formulario vaciado al aceptar.
-  'biometria/seguimiento.tsx':
-    'consentimiento y plantilla viajan en la ruta; el formulario presencial pide nombre y documento de persona, con prueba propia',
+  'componentes/captura-de-foto.tsx': 'la entrada es un archivo de imagen; no hay campo de texto',
   /**
    * ETAPA 15-K (D-11) · la atestación del instalador: dos placas, «ninguna
    * abrió» y la evidencia en texto. El equipo viaja en la RUTA desde su fila;
@@ -521,14 +463,6 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    */
   'dispositivos/atestacion-dialogo.tsx':
     'placas y evidencia en texto; el equipo viaja en la ruta; prueba propia del cuerpo enviado',
-  /**
-   * ETAPA 15-D (O3) · la fotografía del visitante: la entrada es un archivo de
-   * imagen elegido con el selector del navegador, y el identificador de la
-   * autorización viaja en la RUTA desde la tarjeta que lo muestra. No hay un
-   * solo campo de texto.
-   */
-  'componentes/fotografia-visitante.tsx':
-    'la entrada es un archivo; el identificador viaja en la ruta desde la tarjeta, nadie lo teclea',
   /**
    * 15-L (H5) · el interruptor del modo pruebas: dos botones, un booleano. No
    * hay campo de texto.
@@ -579,7 +513,6 @@ describe('cobertura del barrido', () => {
       'viviendas/directorio.tsx',
       'viviendas/asistente-de-generacion.tsx',
       'vehiculos/pantalla.tsx',
-      'visitantes/pantalla.tsx',
       'dispositivos/alta-de-equipo.tsx',
       'zonas/pantalla.tsx',
     ]);

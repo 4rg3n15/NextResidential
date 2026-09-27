@@ -1,5 +1,12 @@
 import { errorDominio, esFallo, exito, fallo, identidadCoincide } from '@ncr/domain-core';
-import type { Bitacora, ErrorDominio, IdentidadEscrita, Resultado } from '@ncr/domain-core';
+import type {
+  Bitacora,
+  ConsentimientoBiometrico,
+  ErrorDominio,
+  IdentidadEscrita,
+  Reloj,
+  Resultado,
+} from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type { RegistroDeAuditoria } from '../../comun/auditoria';
 import type { IdentidadDePersona } from '../../padron';
@@ -55,6 +62,7 @@ export class AceptarConsentimientoPresencial {
     private readonly responder: ResponderConsentimiento,
     private readonly auditoria: RegistroDeAuditoria,
     private readonly bitacora: Bitacora,
+    private readonly reloj: Reloj,
   ) {}
 
   async ejecutar(
@@ -69,7 +77,10 @@ export class AceptarConsentimientoPresencial {
     if (c === null) {
       return fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'El consentimiento no existe', 'RN-15'));
     }
-    if (c.estado !== 'pendiente') {
+    // F4 (15-L) · la confirmación OPCIONAL de una casilla ya declarada (D-10
+    // como opción, nunca como paso): el titular, presente, la hace suya.
+    const confirmacion = c.estado === 'vigente' && c.origen === 'declarado_por_quien_registra';
+    if (c.estado !== 'pendiente' && !confirmacion) {
       return fallo(
         errorDominio(
           'OPERACION_NO_PERMITIDA',
@@ -100,13 +111,15 @@ export class AceptarConsentimientoPresencial {
       return fallo(errorDominio('OPERACION_NO_PERMITIDA', NO_COINCIDE, 'RN-10'));
     }
 
-    // El mismo agregado y el mismo camino que el enlace: quien acepta es el
-    // TITULAR. El operador queda como actor de la escritura, no como quien consiente.
-    const r = await this.responder.ejecutar(ctx, {
-      consentimientoId: c.id,
-      quienResponde: c.titularId,
-      acepta: true,
-    });
+    // Quien acepta es el TITULAR; el operador queda como actor de la escritura,
+    // no como quien consiente.
+    const r = confirmacion
+      ? await this.confirmar(ctx, c)
+      : await this.responder.ejecutar(ctx, {
+          consentimientoId: c.id,
+          quienResponde: c.titularId,
+          acepta: true,
+        });
     if (esFallo(r)) return r;
 
     await this.auditoria.registrarRespuestaDeTitular({
@@ -126,5 +139,15 @@ export class AceptarConsentimientoPresencial {
       versionPolitica: c.versionPolitica,
     });
     return exito({ estado: r.valor.estado });
+  }
+
+  private async confirmar(
+    ctx: ContextoTenant,
+    c: ConsentimientoBiometrico,
+  ): Promise<Resultado<{ readonly estado: string }, ErrorDominio>> {
+    const confirmado = c.confirmarPorElTitular(c.titularId, this.reloj.ahora());
+    if (esFallo(confirmado)) return confirmado;
+    await this.consentimientos.guardar(confirmado.valor, ctx.usuarioId);
+    return exito({ estado: confirmado.valor.estado });
   }
 }

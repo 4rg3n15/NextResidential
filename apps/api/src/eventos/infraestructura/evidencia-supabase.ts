@@ -121,6 +121,27 @@ export class AlmacenEvidenciaSupabase implements AlmacenEvidencia {
     return clave;
   }
 
+  /**
+   * F6 (15-L) · descarga autenticada de un objeto del bucket privado, con la
+   * llave secreta y desde el servidor: es para copiar la foto de una visita a
+   * la siguiente, nunca para servirla. Un objeto que no está devuelve `null`.
+   */
+  async leer(clave: string): Promise<Uint8Array | null> {
+    const { supabaseUrl, bucket } = this.opciones;
+    const segmentos = clave.split('/').map(encodeURIComponent).join('/');
+    const respuesta = await this.pedir(
+      `${supabaseUrl}/storage/v1/object/authenticated/${encodeURIComponent(bucket)}/${segmentos}`,
+      { method: 'GET', headers: this.cabeceras },
+    );
+    if (respuesta.status === 404 || respuesta.status === 400) return null;
+    if (!respuesta.ok) {
+      throw new ErrorDeEvidencia(
+        `no se pudo leer la evidencia: ${await AlmacenEvidenciaSupabase.detalle(respuesta)}`,
+      );
+    }
+    return new Uint8Array(await respuesta.arrayBuffer());
+  }
+
   async urlFirmada(clave: string, segundosDeVida: number): Promise<string> {
     const { supabaseUrl, bucket } = this.opciones;
     const segmentos = clave.split('/').map(encodeURIComponent).join('/');

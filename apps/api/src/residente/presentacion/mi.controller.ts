@@ -25,14 +25,8 @@ import {
   VerMiVivienda,
 } from '../aplicacion/casos-de-uso';
 import { CrearMiAutorizacion } from '../aplicacion/crear-mi-autorizacion';
-import { CapturarRostroDeMiVisitante } from '../aplicacion/capturar-rostro-de-mi-visitante';
 import { RegistrarMiAparato, VerMisZonas } from '../aplicacion/casos-de-uso-11b';
-import {
-  HistorialQueryDto,
-  NuevaVisitaDto,
-  RostroDeMiVisitanteDto,
-  TokenDeNotificacionDto,
-} from './dtos';
+import { HistorialQueryDto, NuevaVisitaDto, TokenDeNotificacionDto } from './dtos';
 import {
   AparatoRegistradoDto,
   MiAutorizacionDto,
@@ -41,7 +35,6 @@ import {
   MiVehiculoDto,
   MiZonaDto,
   MiembroDeFamiliaDto,
-  RostroCapturadoDto,
   VisitaCreadaDto,
 } from './respuestas';
 
@@ -89,8 +82,6 @@ export class MiController {
     @Inject(CrearMiAutorizacion) private readonly crearMiAutorizacion: CrearMiAutorizacion,
     @Inject(VerMisZonas) private readonly verMisZonas: VerMisZonas,
     @Inject(RegistrarMiAparato) private readonly registrarMiAparato: RegistrarMiAparato,
-    @Inject(CapturarRostroDeMiVisitante)
-    private readonly capturarRostroDeMiVisitante: CapturarRostroDeMiVisitante,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
 
@@ -223,63 +214,6 @@ export class MiController {
           repetida: false,
           motivo: r.motivo,
           explicacion: explicacionDe(r.motivo),
-        };
-  }
-
-  /**
-   * HU-12 · HU-13 · CU-02 · el rostro de MI visitante.
-   *
-   * La autorización va en la ruta y el TITULAR no va a ninguna parte: se deriva
-   * de ella. Es la diferencia con `POST …/biometria/capturas`, que recibe
-   * `titularId` desde el cuerpo y por eso es del mostrador de portería y no del
-   * residente (RN-10).
-   */
-  @Post('autorizaciones/:autorizacionId/rostro')
-  @Roles('residente')
-  @ApiOperation({
-    summary: 'Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10)',
-  })
-  @ApiOkResponse({ type: RostroCapturadoDto })
-  async capturarRostro(
-    @Contexto() ctx: ContextoTenant,
-    @Param('id', ParseUUIDPipe) copropiedadId: string,
-    @Param('autorizacionId', ParseUUIDPipe) autorizacionId: string,
-    @Body() cuerpo: RostroDeMiVisitanteDto,
-  ): Promise<RostroCapturadoDto> {
-    const destino = await this.aislamiento.exigirAlcance(
-      ctx,
-      copropiedadId,
-      'mi/autorizaciones/rostro',
-    );
-    const r = this.desenvolver(
-      await this.capturarRostroDeMiVisitante.ejecutar(destino, copropiedadId, {
-        autorizacionId,
-        medidas: cuerpo.medidas,
-        vector: cuerpo.vector,
-        versionPolitica: cuerpo.versionPolitica,
-        suprimirEn: cuerpo.suprimirEn,
-      }),
-    );
-    return r.aceptada
-      ? {
-          aceptada: true,
-          motivos: [],
-          plantillaId: r.plantillaId,
-          consentimientoId: r.consentimientoId,
-          titular: r.titular ?? null,
-          calidad: r.calidad,
-          // El enlace del titular: la app lo muestra y el residente lo
-          // entrega. Se quedaba en el caso de uso y no llegaba (15-E).
-          enlaceDeConsentimiento: r.enlaceDeConsentimiento ?? null,
-        }
-      : {
-          aceptada: false,
-          motivos: [...r.motivos],
-          plantillaId: null,
-          consentimientoId: null,
-          titular: null,
-          calidad: null,
-          enlaceDeConsentimiento: null,
         };
   }
 

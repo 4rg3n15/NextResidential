@@ -107,6 +107,12 @@ export class SincronizarPlantillaEnTerminales {
         // Una prohibición de RN-09 no depende del equipo: se devuelve entera.
         if (r.error.codigo !== 'CONFLICTO_DE_CONCURRENCIA') return r;
         porTerminal.push({ ...terminal, sincronizada: false, detalle: r.error.detalle });
+        // F3 (15-L) · queda escrito por equipo: la consola lo enseña y lo reintenta.
+        await this.plantillas.registrarFallo(
+          { copropiedadId, plantillaId: plantilla.id, dispositivoId: terminal.dispositivoId },
+          r.error.detalle,
+          ctx.usuarioId,
+        );
         this.bitacora.registrar('aviso', 'una terminal no aceptó la plantilla', {
           copropiedadId,
           plantillaId: plantilla.id,

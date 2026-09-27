@@ -204,7 +204,7 @@ export const AjustesDePlataforma = ({
       <AjusteFijo
         etiqueta="Aprobación de vehículos de terceros"
         valor={<span>Automática</span>}
-        motivo="La autorización de un tercero se aprueba al crearse y sólo deja pasar en su día y franja. El modo «aprobación del portero» existe como punto de extensión (ADR-027) y no está activado."
+        motivo="La autorización de un tercero se aprueba al crearse y sólo deja pasar en su día y franja. La aprobación previa del portero no está activada."
       />
     </>
   );

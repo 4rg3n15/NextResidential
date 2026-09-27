@@ -188,7 +188,7 @@ export const VideoEnVivo = ({
                   : undefined
               }
             >
-              · KPI-33 &lt; 2 s
+              · meta &lt; 2 s
             </span>
           </>
         )}

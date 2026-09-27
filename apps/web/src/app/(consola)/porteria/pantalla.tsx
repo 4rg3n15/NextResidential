@@ -303,7 +303,7 @@ export const PantallaDePorteria = ({
           <Tarjeta>
             <CabeceraDeTarjeta
               titulo="Historial inmediato"
-              descripcion="Lo accionado a mano en esta portería (HU-23)."
+              descripcion="Lo que se abrió o se negó a mano en esta portería."
             />
             <CuerpoDeTarjeta>
               {ultimaOrden !== null ? (
@@ -342,7 +342,7 @@ export const PantallaDePorteria = ({
           <Tarjeta>
             <CabeceraDeTarjeta
               titulo="Alertas y listas negras"
-              descripcion="Lo que exige mirar antes de abrir (HU-24)."
+              descripcion="Lo que hay que revisar antes de abrir."
             />
             <CuerpoDeTarjeta>
               <div className="flex items-start gap-2 text-secundario text-texto-apagado">
@@ -352,9 +352,9 @@ export const PantallaDePorteria = ({
                   strokeWidth={1.75}
                 />
                 <p>
-                  Las listas negras vetan por sí solas: el motor las aplica con precedencia sobre
-                  cualquier autorización vigente (RN-06), y un evento vetado llega aquí marcado como
-                  de atención inmediata.
+                  La lista negra manda sobre cualquier autorización: una persona o una placa vetada
+                  no entra aunque tenga visita autorizada, y el intento llega aquí marcado como de
+                  atención inmediata.
                 </p>
               </div>
             </CuerpoDeTarjeta>

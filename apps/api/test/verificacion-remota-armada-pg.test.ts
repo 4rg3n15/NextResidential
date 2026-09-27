@@ -196,44 +196,28 @@ const MEDIDAS = { nitidez: 0.9, iluminacion: 0.5, rostrosDetectados: 1, proporci
 // «foto» cuyas medidas no se pueden leer.
 const JPEG = Buffer.from(jpegConMedidas(320, 240, 64));
 
-/** Visita de consola en la franja 14–18 Z de ayer, con rostro aceptado por el titular. */
+/**
+ * Visita de consola en la franja 14–18 Z de ayer, con su foto y la casilla
+ * (F, 15-L · ADR-032): la plantilla queda lista y viaja al generarla.
+ */
 const visitaConRostro = async (): Promise<string> => {
-  const documento = `VA${CORRIDA}`;
-  const { rows } = await (pool as Pool).query<{ id: string }>(
-    `INSERT INTO public.personas (copropiedad_id, tipo_documento, numero_documento,
-                                  nombre_completo, creado_por, actualizado_por)
-     VALUES ($1, 'cedula', $2, $3, $4, $4) RETURNING id`,
-    [COP_A, documento, `Visitante armado ${CORRIDA}`, ADMIN],
-  );
-  const personaId = rows[0]?.id ?? '';
   reloj = hora(3);
-  const a = await con(admin).post(`/copropiedades/${COP_A}/autorizaciones`, {
+  const r = await con(admin).post(`/copropiedades/${COP_A}/visitas`, {
+    nombre: `Visitante armado ${CORRIDA}`,
+    tipoDocumento: 'cedula',
+    documento: `VA${CORRIDA}`,
     viviendaId: VIVIENDA,
-    personaId,
-    desde: new Date(DIA.getTime() + 14 * 3_600_000).toISOString(),
-    hasta: new Date(DIA.getTime() + 18 * 3_600_000).toISOString(),
+    inicio: new Date(DIA.getTime() + 14 * 3_600_000).toISOString(),
+    duracionMinutos: 240,
+    foto: { contenidoBase64: JPEG.toString('base64'), tipoMime: 'image/jpeg', medidas: MEDIDAS },
+    casillaMarcada: true,
   });
-  expect(a.status, JSON.stringify(a.body)).toBe(201);
-  const c = await con(admin).post(`/copropiedades/${COP_A}/biometria/capturas`, {
-    titularId: personaId,
-    autorizacionId: a.body.id,
-    medidas: MEDIDAS,
-    vector: JPEG.toString('base64'),
-    versionPolitica: 'v1.0',
-    canal: 'presencial',
-    suprimirEn: new Date(DIA.getTime() + 18 * 3_600_000).toISOString(),
-  });
-  expect(c.status, JSON.stringify(c.body)).toBe(201);
-  const enlace = await con(admin).post(
-    `/copropiedades/${COP_A}/biometria/consentimientos/${String(c.body.consentimientoId)}/enlace`,
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  const { rows } = await (pool as Pool).query<{ id: string }>(
+    'SELECT id FROM public.plantillas_biometricas WHERE autorizacion_id = $1',
+    [r.body.autorizacionId],
   );
-  expect(enlace.status, JSON.stringify(enlace.body)).toBe(201);
-  await http()
-    .post(`/consentimiento/${String(enlace.body.token)}/respuesta`)
-    .type('form')
-    .send({ acepta: 'si' })
-    .expect(303);
-  return c.body.plantillaId as string;
+  return rows[0]?.id ?? '';
 };
 
 /** Lo que la terminal emite cuando reconoce a alguien y pregunta. */

@@ -64,112 +64,150 @@ const CON_DATOS = (url: string): Response => {
             propietarioNombre: null,
           },
         ]
-      : url.includes('/autorizaciones')
-        ? [
-            {
-              id: 'aut-1',
-              viviendaId: 'viv-1',
-              vivienda: 'Casa 12',
-              visitante: 'Ana Pérez',
-              documento: 'CC123',
-              desde: '2026-09-10T08:00:00.000Z',
-              hasta: '2026-09-11T08:00:00.000Z',
-              tipo: 'unica',
-              estado: 'activa',
-              placa: null,
-              acompanantes: [],
-              patron: null,
-              revocadaEn: null,
-              motivoRevocacion: null,
-            },
-          ]
-        : url.includes('/zonas')
-          ? [
-              {
-                id: 'zon-1',
-                nombre: 'Salón social',
-                tipo: 'salon',
-                abierta: true,
-                politicaReinicio: 'diario',
-                normas: [],
-                aforoMaximo: 10,
-                aforoActual: 2,
-                aforoDisponible: 8,
-                dentroDeHorario: true,
-                aforoCompleto: false,
-                horario: [],
-                desplazamientoUtcMinutos: -300,
-                reservasDelDia: [],
-              },
-            ]
-          : url.includes('/dispositivos/pendientes')
-            ? { dispositivos: [] }
-            : url.includes('/tablero/dispositivos')
-              ? {
-                  dispositivos: [
+      : url.includes('/visitas/viviendas')
+        ? [{ id: 'viv-1', nombre: 'Casa 12' }]
+        : url.includes('/visitas/casilla')
+          ? {
+              texto: 'El visitante autorizó el uso de su foto para el ingreso',
+              version: 'casilla-1',
+            }
+          : url.includes('/visitas')
+            ? {
+                soloElDia: false,
+                desde: null,
+                hasta: null,
+                visitas: [
+                  {
+                    autorizacionId: 'aut-1',
+                    visitante: 'Ana Pérez',
+                    documento: 'CC123',
+                    viviendaId: 'viv-1',
+                    vivienda: 'Casa 12',
+                    desde: '2026-09-10T13:00:00.000Z',
+                    hasta: '2026-09-10T15:00:00.000Z',
+                    estado: 'vigente',
+                    placa: 'XYZ789',
+                    generadaPor: 'Portería norte',
+                    generadaEn: '2026-09-10T12:55:00.000Z',
+                    anuladaEn: null,
+                    motivoAnulacion: null,
+                    tieneFoto: true,
+                    casillaDeclaradaPor: 'Portería norte',
+                    casillaEn: '2026-09-10T12:55:00.000Z',
+                    plantillaId: 'pla-1',
+                    consentimientoId: 'con-1',
+                    confirmadoPorElTitular: false,
+                    equiposSincronizados: 2,
+                    equiposFallidos: 1,
+                  },
+                ],
+              }
+            : url.includes('/autorizaciones')
+              ? [
+                  {
+                    id: 'aut-1',
+                    viviendaId: 'viv-1',
+                    vivienda: 'Casa 12',
+                    visitante: 'Ana Pérez',
+                    documento: 'CC123',
+                    desde: '2026-09-10T08:00:00.000Z',
+                    hasta: '2026-09-11T08:00:00.000Z',
+                    tipo: 'unica',
+                    estado: 'activa',
+                    placa: null,
+                    acompanantes: [],
+                    patron: null,
+                    revocadaEn: null,
+                    motivoRevocacion: null,
+                  },
+                ]
+              : url.includes('/zonas')
+                ? [
                     {
-                      id: 'dis-1',
-                      nombre: 'Talanquera principal',
-                      tipo: 'camara_lpr',
-                      zonaId: null,
-                      modelo: null,
-                      firmware: null,
-                      estado: 'saludable',
-                      ultimoLatido: null,
-                      ultimaSincronizacion: null,
-                      ultimoResultadoDeSincronizacion: null,
-                      sincronizacionesFallidas: 0,
-                      segundosSinLatir: null,
+                      id: 'zon-1',
+                      nombre: 'Salón social',
+                      tipo: 'salon',
+                      abierta: true,
+                      politicaReinicio: 'diario',
+                      normas: [],
+                      aforoMaximo: 10,
+                      aforoActual: 2,
+                      aforoDisponible: 8,
+                      dentroDeHorario: true,
+                      aforoCompleto: false,
+                      horario: [],
+                      desplazamientoUtcMinutos: -300,
+                      reservasDelDia: [],
                     },
-                  ],
-                  umbralSegundos: 300,
-                }
-              : url.includes('/eventos/linea-de-tiempo')
-                ? {
-                    // 15-L (Bloque B) · la consola de eventos pinta la línea de tiempo.
-                    elementos: [
-                      {
-                        origen: 'acceso',
-                        id: 'evt-1',
-                        ocurridoEn: '2026-09-10T10:00:00.000Z',
-                        dispositivoId: 'dis-1',
-                        tipo: 'acceso',
-                        titulo: 'Acceso permitido · placa ABC123',
-                        resultado: 'permitido',
-                        enVivo: true,
-                        eventoId: 'evt-1',
-                        codigo: null,
-                      },
-                    ],
-                  }
-                : url.includes('/eventos')
-                  ? {
-                      filas: [
-                        {
-                          id: 'evt-1',
-                          copropiedadId: COP,
-                          ocurridoEn: '2026-09-10T10:00:00.000Z',
-                          tipo: 'ingreso',
-                          resultado: 'permitido',
-                          motivo: null,
-                          metodo: 'placa',
-                          personaId: null,
-                          viviendaId: null,
-                          zonaId: null,
-                          dispositivoId: 'dis-1',
-                          placaDetectada: 'ABC123',
-                          confianza: null,
-                          reglaAplicada: 'vigencia',
-                          versionReglas: 1,
-                          operadorId: null,
-                          motivoManual: null,
-                          evidenciaId: null,
-                          decididoPorEdge: false,
-                        },
-                      ],
-                      siguiente: null,
-                    }
-                  : [];
+                  ]
+                : url.includes('/dispositivos/pendientes')
+                  ? { dispositivos: [] }
+                  : url.includes('/tablero/dispositivos')
+                    ? {
+                        dispositivos: [
+                          {
+                            id: 'dis-1',
+                            nombre: 'Talanquera principal',
+                            tipo: 'camara_lpr',
+                            zonaId: null,
+                            modelo: null,
+                            firmware: null,
+                            estado: 'saludable',
+                            ultimoLatido: null,
+                            ultimaSincronizacion: null,
+                            ultimoResultadoDeSincronizacion: null,
+                            sincronizacionesFallidas: 0,
+                            segundosSinLatir: null,
+                          },
+                        ],
+                        umbralSegundos: 300,
+                      }
+                    : url.includes('/eventos/linea-de-tiempo')
+                      ? {
+                          // 15-L (Bloque B) · la consola de eventos pinta la línea de tiempo.
+                          elementos: [
+                            {
+                              origen: 'acceso',
+                              id: 'evt-1',
+                              ocurridoEn: '2026-09-10T10:00:00.000Z',
+                              dispositivoId: 'dis-1',
+                              tipo: 'acceso',
+                              titulo: 'Acceso permitido · placa ABC123',
+                              resultado: 'permitido',
+                              enVivo: true,
+                              eventoId: 'evt-1',
+                              codigo: null,
+                            },
+                          ],
+                        }
+                      : url.includes('/eventos')
+                        ? {
+                            filas: [
+                              {
+                                id: 'evt-1',
+                                copropiedadId: COP,
+                                ocurridoEn: '2026-09-10T10:00:00.000Z',
+                                tipo: 'ingreso',
+                                resultado: 'permitido',
+                                motivo: null,
+                                metodo: 'placa',
+                                personaId: null,
+                                viviendaId: null,
+                                zonaId: null,
+                                dispositivoId: 'dis-1',
+                                placaDetectada: 'ABC123',
+                                confianza: null,
+                                reglaAplicada: 'vigencia',
+                                versionReglas: 1,
+                                operadorId: null,
+                                motivoManual: null,
+                                evidenciaId: null,
+                                decididoPorEdge: false,
+                              },
+                            ],
+                            siguiente: null,
+                          }
+                        : [];
   return new Response(JSON.stringify(cuerpo), {
     status: 200,
     headers: { 'content-type': 'application/json' },
@@ -215,7 +253,7 @@ const PANTALLAS: readonly PantallaEnPrueba[] = [
   },
   {
     nombre: 'visitantes',
-    montar: () => <PantallaDeVisitantes copropiedadId={COP} />,
+    montar: () => <PantallaDeVisitantes copropiedadId={COP} rol="administrador" />,
     senal: /Ana Pérez/,
   },
   {

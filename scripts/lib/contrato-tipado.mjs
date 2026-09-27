@@ -53,8 +53,6 @@ const EXENTAS = new Map([
   // fueron también las dos de zonas que la 10 iba a heredar. Lo que queda es
   // exclusivamente lo que NINGUNA interfaz consume todavía.
 
-  ['POST /copropiedades/{id}/biometria/capturas', 'ETAPA 11 · captura desde la app'],
-  ['GET /copropiedades/{id}/biometria/consentimientos/{consentimientoId}', 'ETAPA 11'],
   ['POST /copropiedades/{id}/biometria/consentimientos/{consentimientoId}/revocacion', 'ETAPA 11'],
   ['POST /copropiedades/{id}/biometria/plantillas/{plantillaId}/sincronizacion', 'ETAPA 15'],
   ['POST /copropiedades/{id}/biometria/barrido', 'ETAPA 15 · sin consumidor de interfaz'],

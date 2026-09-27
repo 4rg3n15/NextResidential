@@ -149,8 +149,8 @@ export const InscripcionDeFactor = ({
         <div>
           <h2 className="text-seccion">Configura tu segundo factor</h2>
           <p className="mt-1 text-secundario text-texto-apagado">
-            Tu rol lo exige (RN-20). Escanea el código con tu aplicación de autenticación y escribe
-            el número que te muestre.
+            Tu rol lo exige. Escanea el código con tu aplicación de autenticación y escribe el
+            número que te muestre.
           </p>
         </div>
 

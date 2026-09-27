@@ -1,4 +1,5 @@
 import {
+  CalidadDeCaptura,
   ConsentimientoBiometrico,
   PlantillaBiometrica,
   errorDominio,
@@ -11,6 +12,7 @@ import {
 import type {
   CanalConsentimiento,
   ErrorDominio,
+  EvaluacionDeCaptura,
   GeneradorDeId,
   MedidasDeCaptura,
   MotivoRechazoCaptura,
@@ -48,17 +50,34 @@ export type ResultadoCaptura =
       readonly plantillaId: string;
       readonly consentimientoId: string;
       readonly calidad: number;
+      /** F4 (15-L) · con la casilla declarada, la plantilla ya puede viajar. */
+      readonly lista?: boolean;
     }
   | { readonly aceptada: false; readonly motivos: readonly MotivoRechazoCaptura[] };
 
 export interface SolicitudDeCaptura {
   readonly titularId: string;
   readonly autorizacionId?: string;
-  readonly medidas: MedidasDeCaptura;
+  /** Las medidas de ESTA captura. Obligatorias salvo con `calidadPrevia`. */
+  readonly medidas?: MedidasDeCaptura;
+  /**
+   * F6 (15-L) · «Volver a autorizar» reutiliza una foto que YA se evaluó: su
+   * calidad es la que se midió entonces y quedó en la plantilla original. No
+   * se inventan medidas nuevas para una foto que nadie volvió a tomar.
+   */
+  readonly calidadPrevia?: number;
   readonly vector: Uint8Array;
   readonly versionPolitica: string;
   readonly canal: CanalConsentimiento;
   readonly suprimirEn: Date;
+  /**
+   * F4 (15-L, ADR-032) · la casilla del formulario: quien registra declara que
+   * el visitante autorizó el uso de su foto. Con ella el consentimiento nace
+   * vigente —o se reutiliza el que el titular ya tenga vigente— y la plantilla
+   * queda lista para sincronizar. Sin ella, el camino de siempre: solicitud
+   * pendiente del titular.
+   */
+  readonly declaracion?: { readonly declaradoPor: string };
 }
 
 export class CapturarRostro {
@@ -78,27 +97,17 @@ export class CapturarRostro {
     const copropiedadId = ctx.copropiedadId;
     if (copropiedadId === null) return fallo(noEncontrado('La copropiedad'));
 
-    const evaluacion =
-      this.umbrales === undefined
-        ? evaluarCaptura(solicitud.medidas)
-        : evaluarCaptura(solicitud.medidas, this.umbrales);
-    if (!evaluacion.aceptada) {
-      return exito({ aceptada: false, motivos: evaluacion.motivos });
+    const evaluacion = this.evaluar(solicitud);
+    if (esFallo(evaluacion)) return evaluacion;
+    if (!evaluacion.valor.aceptada) {
+      return exito({ aceptada: false, motivos: evaluacion.valor.motivos });
     }
 
     const ahora = this.reloj.ahora();
-    const consentimiento = ConsentimientoBiometrico.solicitar({
-      id: this.ids.nuevo(),
-      copropiedadId,
-      titularId: solicitud.titularId,
-      finalidad: 'control_acceso',
-      versionPolitica: solicitud.versionPolitica,
-      canal: solicitud.canal,
-      solicitadoEn: ahora,
-    });
+    const consentimiento = await this.consentimientoPara(copropiedadId, solicitud, ahora);
     if (esFallo(consentimiento)) return consentimiento;
 
-    const plantilla = PlantillaBiometrica.crear({
+    const creada = PlantillaBiometrica.crear({
       id: this.ids.nuevo(),
       copropiedadId,
       titularId: solicitud.titularId,
@@ -106,10 +115,16 @@ export class CapturarRostro {
       ...(solicitud.autorizacionId === undefined
         ? {}
         : { autorizacionId: solicitud.autorizacionId }),
-      calidad: evaluacion.calidad,
+      calidad: evaluacion.valor.calidad,
       creadoEn: ahora,
       suprimirEn: solicitud.suprimirEn,
     });
+    if (esFallo(creada)) return creada;
+    // Con el consentimiento ya vigente (declarado o previo), la plantilla nace
+    // habilitada: el agregado comprueba que sea de este titular y vigente.
+    const plantilla = consentimiento.valor.vigente
+      ? creada.valor.habilitarSincronizacion(consentimiento.valor)
+      : creada;
     if (esFallo(plantilla)) return plantilla;
 
     await this.consentimientos.guardar(consentimiento.valor, ctx.usuarioId);
@@ -121,7 +136,57 @@ export class CapturarRostro {
       aceptada: true,
       plantillaId: plantilla.valor.id,
       consentimientoId: consentimiento.valor.id,
-      calidad: evaluacion.calidad.valor,
+      calidad: evaluacion.valor.calidad.valor,
+      lista: plantilla.valor.estado === 'pendiente_sincronizacion',
+    });
+  }
+
+  /** Las medidas de esta captura, o la calidad ya medida de la foto que se reutiliza. */
+  private evaluar(solicitud: SolicitudDeCaptura): Resultado<EvaluacionDeCaptura, ErrorDominio> {
+    if (solicitud.calidadPrevia !== undefined) {
+      const calidad = CalidadDeCaptura.crear(solicitud.calidadPrevia);
+      if (esFallo(calidad)) return calidad;
+      return exito({ aceptada: true, calidad: calidad.valor });
+    }
+    if (solicitud.medidas === undefined) {
+      return fallo(
+        errorDominio('DATO_INVALIDO', 'Faltan las medidas de calidad de la foto', 'KPI-16'),
+      );
+    }
+    return exito(
+      this.umbrales === undefined
+        ? evaluarCaptura(solicitud.medidas)
+        : evaluarCaptura(solicitud.medidas, this.umbrales),
+    );
+  }
+
+  /**
+   * Sin casilla: una solicitud nueva, pendiente del titular. Con casilla
+   * (F4): el consentimiento vigente del titular si ya lo tiene —la base admite
+   * uno solo vigente por persona— y, si no, uno DECLARADO por quien registra.
+   */
+  private async consentimientoPara(
+    copropiedadId: string,
+    solicitud: SolicitudDeCaptura,
+    ahora: Date,
+  ): Promise<Resultado<ConsentimientoBiometrico, ErrorDominio>> {
+    const base = {
+      id: this.ids.nuevo(),
+      copropiedadId,
+      titularId: solicitud.titularId,
+      finalidad: 'control_acceso',
+      versionPolitica: solicitud.versionPolitica,
+      canal: solicitud.canal,
+    };
+    if (solicitud.declaracion === undefined) {
+      return ConsentimientoBiometrico.solicitar({ ...base, solicitadoEn: ahora });
+    }
+    const vigente = await this.consentimientos.vigenteDe(copropiedadId, solicitud.titularId);
+    if (vigente !== null) return exito(vigente);
+    return ConsentimientoBiometrico.declarar({
+      ...base,
+      declaradoPor: solicitud.declaracion.declaradoPor,
+      ahora,
     });
   }
 }
@@ -411,6 +476,14 @@ export class BarrerPlantillasVencidas {
       await this.plantillas.guardar(r.valor, ctx.usuarioId);
       suprimidas += 1;
     }
+    // F2 (15-L) · la autorización rechazada o revocada se lleva su rostro YA,
+    // aunque su plazo no haya llegado (RN-11).
+    for (const p of await this.plantillas.deAutorizacionesRevocadas(copropiedadId)) {
+      await this.boveda.olvidar(copropiedadId, p.id);
+      await this.plantillas.suprimirVector(copropiedadId, p.id, ctx.usuarioId);
+      await this.plantillas.guardar(p.suprimirPorRevocacion(ahora), ctx.usuarioId);
+      suprimidas += 1;
+    }
 
     let retiradas = 0;
     let retiradasFallidas = 0;
@@ -428,5 +501,63 @@ export class BarrerPlantillasVencidas {
     }
 
     return exito({ suprimidas, retiradas, retiradasFallidas });
+  }
+}
+
+export interface ResultadoDeSupresionDeVisita {
+  readonly suprimidas: number;
+  /** Equipos que confirmaron la retirada en esta llamada. */
+  readonly retiradas: number;
+  /** Equipos que no respondieron: siguen en la cola y el barrido los reintenta. */
+  readonly retiradasPendientes: number;
+}
+
+/**
+ * `SuprimirRostroDeAutorizacion` — F2 (15-L) · RN-11.
+ *
+ * Una visita rechazada se lleva SU foto, y sólo la suya: el vector se borra y
+ * la plantilla sale de cada equipo que la tenía, en la misma llamada. No es un
+ * barrido de la copropiedad —eso lo hace el trabajo programado—: rechazar una
+ * visita no debe suprimir de paso las plantillas de otras.
+ */
+export class SuprimirRostroDeAutorizacion {
+  constructor(
+    private readonly plantillas: RepositorioPlantillas,
+    private readonly boveda: BovedaDePlantillas,
+    private readonly reloj: Reloj,
+  ) {}
+
+  async ejecutar(
+    ctx: ContextoTenant,
+    autorizacionId: string,
+  ): Promise<Resultado<ResultadoDeSupresionDeVisita, ErrorDominio>> {
+    const copropiedadId = ctx.copropiedadId;
+    if (copropiedadId === null) return fallo(noEncontrado('La copropiedad'));
+
+    const ahora = this.reloj.ahora();
+    const suyas = await this.plantillas.deAutorizacion(copropiedadId, autorizacionId);
+    let suprimidas = 0;
+    for (const p of suyas) {
+      if (p.suprimida) continue;
+      await this.boveda.olvidar(copropiedadId, p.id);
+      await this.plantillas.suprimirVector(copropiedadId, p.id, ctx.usuarioId);
+      await this.plantillas.guardar(p.suprimirPorRevocacion(ahora), ctx.usuarioId);
+      suprimidas += 1;
+    }
+
+    const ids = new Set(suyas.map((p) => p.id));
+    let retiradas = 0;
+    let retiradasPendientes = 0;
+    for (const destino of await this.plantillas.porRetirar(copropiedadId)) {
+      if (!ids.has(destino.plantillaId)) continue;
+      try {
+        await this.boveda.retirarDeTerminal(destino.plantillaId, destino.dispositivoId);
+        await this.plantillas.registrarRetirada(destino, ctx.usuarioId);
+        retiradas += 1;
+      } catch {
+        retiradasPendientes += 1;
+      }
+    }
+    return exito({ suprimidas, retiradas, retiradasPendientes });
   }
 }

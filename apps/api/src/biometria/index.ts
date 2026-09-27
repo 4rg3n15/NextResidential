@@ -20,16 +20,21 @@ export { BiometriaModule } from './biometria.module';
  */
 // ETAPA 14 · el barrido sale por el barril porque lo invoca el planificador
 // (D-40). Antes solo lo alcanzaba su propio controlador.
-export { BarrerPlantillasVencidas, CapturarRostro } from './aplicacion/casos-de-uso';
+export {
+  BarrerPlantillasVencidas,
+  CapturarRostro,
+  SuprimirRostroDeAutorizacion,
+} from './aplicacion/casos-de-uso';
 export type { ResultadoBarrido } from './aplicacion/casos-de-uso';
 /**
  * A3 (15-E) · el residente entrega a su visitante el enlace con el que éste
  * responde. Sale el caso de uso, no el firmante: quien lo llama recibe un
  * token ya firmado y no sabe cómo se firma.
  */
-export { EmitirEnlaceDeConsentimiento } from './aplicacion/enlace-de-consentimiento';
-export type { EnlaceEmitido } from './aplicacion/enlace-de-consentimiento';
 export type { ResultadoCaptura, SolicitudDeCaptura } from './aplicacion/casos-de-uso';
+// F (15-L) · la visita envía su foto a todos los equipos con el mismo caso de uso.
+export { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
+export type { ResultadoDeSincronizacionTotal } from './aplicacion/sincronizacion-total';
 export {
   BOVEDA_DE_PLANTILLAS,
   IDENTIDAD_BIOMETRICA,

@@ -13,6 +13,7 @@ import {
   ResponderConsentimiento,
   RevocarConsentimiento,
   SincronizarPlantilla,
+  SuprimirRostroDeAutorizacion,
 } from './casos-de-uso';
 
 const COP = 'cop-1';
@@ -372,6 +373,134 @@ describe('BarrerPlantillasVencidas · RN-11, KPI-21', () => {
   });
 });
 
+describe('F4 (15-L) · la casilla del formulario: consentimiento declarado por quien registra', () => {
+  const conCasilla = (titularId = TITULAR, autorizacionId = 'aut-1') =>
+    capturar.ejecutar(ctx, {
+      titularId,
+      autorizacionId,
+      medidas: medidasBuenas,
+      vector: VECTOR,
+      versionPolitica: 'casilla-v1',
+      canal: 'app',
+      suprimirEn: new Date(AHORA.getTime() + 8 * HORA),
+      declaracion: { declaradoPor: RESIDENTE },
+    });
+
+  it('nace VIGENTE, con su origen y su autor, y la plantilla lista para viajar', async () => {
+    const r = await conCasilla();
+    if (!esExito(r) || !r.valor.aceptada) throw new Error('la captura debía aceptarse');
+    expect(r.valor.lista).toBe(true);
+    const c = await consentimientos.porId(COP, r.valor.consentimientoId);
+    expect(c).toMatchObject({
+      estado: 'vigente',
+      origen: 'declarado_por_quien_registra',
+      declaradoPor: RESIDENTE,
+      titularId: TITULAR,
+      versionPolitica: 'casilla-v1',
+    });
+    expect((await plantillas.porId(COP, r.valor.plantillaId))?.estado).toBe(
+      'pendiente_sincronizacion',
+    );
+  });
+
+  it('se sincroniza sin que nadie más responda nada', async () => {
+    const r = await conCasilla();
+    if (!esExito(r) || !r.valor.aceptada) throw new Error('la captura debía aceptarse');
+    const s = await sincronizar.ejecutar(ctx, {
+      plantillaId: r.valor.plantillaId,
+      dispositivoId: 'disp-1',
+    });
+    expect(esExito(s)).toBe(true);
+    expect(terminal.recibidas).toHaveLength(1);
+  });
+
+  it('una segunda visita del mismo titular reutiliza su consentimiento vigente', async () => {
+    const a = await conCasilla(TITULAR, 'aut-1');
+    const b = await conCasilla(TITULAR, 'aut-2');
+    if (!esExito(a) || !a.valor.aceptada || !esExito(b) || !b.valor.aceptada) {
+      throw new Error('las dos capturas debían aceptarse');
+    }
+    expect(b.valor.consentimientoId).toBe(a.valor.consentimientoId);
+    expect(b.valor.plantillaId).not.toBe(a.valor.plantillaId);
+  });
+
+  it('una foto mala no declara nada: la casilla no salta la calidad', async () => {
+    const r = await capturar.ejecutar(ctx, {
+      titularId: TITULAR,
+      medidas: { ...medidasBuenas, rostrosDetectados: 2 },
+      vector: VECTOR,
+      versionPolitica: 'casilla-v1',
+      canal: 'app',
+      suprimirEn: new Date(AHORA.getTime() + 8 * HORA),
+      declaracion: { declaradoPor: RESIDENTE },
+    });
+    if (esExito(r)) expect(r.valor.aceptada).toBe(false);
+    expect(await consentimientos.vigenteDe(COP, TITULAR)).toBeNull();
+  });
+
+  it('una declaración sin autor no se acepta', async () => {
+    const r = await capturar.ejecutar(ctx, {
+      titularId: TITULAR,
+      medidas: medidasBuenas,
+      vector: VECTOR,
+      versionPolitica: 'casilla-v1',
+      canal: 'app',
+      suprimirEn: new Date(AHORA.getTime() + 8 * HORA),
+      declaracion: { declaradoPor: '  ' },
+    });
+    expect(esFallo(r)).toBe(true);
+  });
+
+  it('F2 · el barrido suprime YA la plantilla de una autorización revocada', async () => {
+    const r = await conCasilla(TITULAR, 'aut-rechazada');
+    if (!esExito(r) || !r.valor.aceptada) throw new Error('la captura debía aceptarse');
+    await sincronizar.ejecutar(ctx, { plantillaId: r.valor.plantillaId, dispositivoId: 'disp-1' });
+    plantillas.autorizacionesRevocadas.add('aut-rechazada');
+
+    const res = await barrer.ejecutar(ctx);
+    if (esExito(res)) expect(res.valor).toMatchObject({ suprimidas: 1, retiradas: 1 });
+    expect((await plantillas.porId(COP, r.valor.plantillaId))?.estado).toBe('suprimida');
+    expect(await almacen.tomar(COP, r.valor.plantillaId)).toBeNull();
+    expect(terminal.retiradas).toEqual([`disp-1/${r.valor.plantillaId}`]);
+    // Y el consentimiento sigue: la visita se rechazó, el titular no revocó nada.
+    expect((await consentimientos.porId(COP, r.valor.consentimientoId))?.estado).toBe('vigente');
+  });
+
+  it('F2 · rechazar una visita suprime SU foto y deja en paz las de otras visitas', async () => {
+    const suprimir = new SuprimirRostroDeAutorizacion(plantillas, boveda, reloj);
+    const rechazada = await conCasilla('titular-a', 'aut-a');
+    const otra = await conCasilla('titular-b', 'aut-b');
+    if (
+      !esExito(rechazada) ||
+      !rechazada.valor.aceptada ||
+      !esExito(otra) ||
+      !otra.valor.aceptada
+    ) {
+      throw new Error('las capturas debían aceptarse');
+    }
+    await sincronizar.ejecutar(ctx, {
+      plantillaId: rechazada.valor.plantillaId,
+      dispositivoId: 'disp-1',
+    });
+    await sincronizar.ejecutar(ctx, {
+      plantillaId: otra.valor.plantillaId,
+      dispositivoId: 'disp-1',
+    });
+    // La OTRA ya venció: un barrido la suprimiría; el rechazo de «aut-a», no.
+    reloj.avanzar(9 * HORA);
+
+    const r = await suprimir.ejecutar(ctx, 'aut-a');
+    expect(esExito(r) && r.valor).toMatchObject({
+      suprimidas: 1,
+      retiradas: 1,
+      retiradasPendientes: 0,
+    });
+    expect((await plantillas.porId(COP, rechazada.valor.plantillaId))?.estado).toBe('suprimida');
+    expect((await plantillas.porId(COP, otra.valor.plantillaId))?.estado).not.toBe('suprimida');
+    expect(terminal.retiradas).toEqual([`disp-1/${rechazada.valor.plantillaId}`]);
+  });
+});
+
 describe('BovedaAesGcm · el vector no sale de la bóveda', () => {
   it('el puerto no ofrece ninguna forma de leer el vector', () => {
     const metodos = Object.getOwnPropertyNames(BovedaAesGcm.prototype);
@@ -413,16 +542,6 @@ describe('ConsentimientoBiometrico · el plazo de respuesta (P-03)', () => {
     const expirado = c.expirar(new Date(AHORA.getTime() + 25 * HORA));
     expect(esExito(expirado)).toBe(true);
     if (esExito(expirado)) expect(expirado.valor.estado).toBe('expirado');
-  });
-
-  it('el repositorio encuentra los pendientes vencidos', async () => {
-    await capturaValida();
-    const vencidos = await consentimientos.pendientesVencidos(
-      COP,
-      new Date(AHORA.getTime() + 25 * HORA),
-      24,
-    );
-    expect(vencidos).toHaveLength(1);
   });
 });
 
