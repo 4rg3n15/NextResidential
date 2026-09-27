@@ -8,6 +8,11 @@
 > avance por bloque, con su commit, está en [Avance](#avance); el cierre según
 > §2.8, al final, con las dos listas «Probado contra simulador» y «Requiere
 > prueba en sitio». **La ETAPA 15 sigue BLOQUEADA sólo por `BE-02`**.
+>
+> **Corrección antes de la fusión (2026-09-27):** la app en Release por la red
+> local, el servidor configurable desde la app y la sincronización con la
+> consola (ADR-033), con su propio cierre según §2.8 al final:
+> [Corrección de la 15-L](#corrección-de-la-15-l-antes-de-la-fusión--según-28).
 
 ---
 
@@ -650,9 +655,9 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
   terminal. Se acumulan registros hasta el tope del equipo. Propuesta: tras
   verificar la ausencia del rostro, `darDeBajaPersona`, que el adaptador ya
   tiene.
-- **DT-15L-02 · el portero ve «Equipo sin nombre» en la línea de tiempo.** La
-  lista de equipos es de administración. Propuesta: el nombre del equipo en
-  el evento de equipo.
+- **DT-15L-02 · el portero ve «Equipo sin nombre» en la línea de tiempo.**
+  **CERRADO en la corrección:** `GET …/nombres-de-equipos` le da el nombre y
+  nada más (ver [la corrección](#corrección-de-la-15-l-antes-de-la-fusión--según-28)).
 - **DT-15L-03 · §2.3.** Cruzaron las 300 líneas en esta ronda
   `multiempresa/copropiedades.controller.ts` (330),
   `(consola)/eventos/pantalla.tsx` (307) y
@@ -689,8 +694,8 @@ a C-43 (C-43 nueva en el cierre). **Extensión:** E-05. **Pendiente:** P-21
 5. **Seguir `docs/guias/ENTREGA_EN_SITIO.md`**: `pnpm sitio:video`,
    `pnpm sitio:ensayo --capturar` antes de tocar ningún equipo, los tres hitos
    y `--restaurar` al terminar.
-6. **Compilar la app para el iPhone** con la IP del Mac
-   (`docs/guias/APP_EN_IPHONE.md`).
+6. **Instalar la app en el iPhone en Release** con el nombre `.local` del Mac
+   (`docs/guias/APP_EN_IPHONE.md`, reescrita en la corrección).
 7. **Apagar el modo pruebas** en Configuración cuando termine la entrega.
 8. **Confirmar que el barrido programado está activo**
    (`PLANIFICADOR_HABILITADO=true`) para la supresión al vencer.
@@ -749,6 +754,11 @@ Rama `etapa-15l-entrega-final`, base `develop`. PR: [4rg3n15/NextResidential#34]
   simulada, lista del día, historial, últimos visitantes y volver a autorizar.
 - Cero texto técnico en el fuente de la consola y de la app y en las
   pantallas reales de la consola (I).
+- **Corrección:** la visita creada en la app aparece en la consola, el rechazo
+  del portero vuelve a la app como «Rechazada» con su motivo y su aviso, y el
+  vehículo cambiado en la app se ve en la consola, **por la API contra
+  PostgreSQL**; en la app, con reloj falso, la tarjeta cambia sola en el
+  siguiente ciclo y la bandeja envía una sola vez al reconectar.
 
 ## Requiere prueba en sitio
 
@@ -766,8 +776,492 @@ Rama `etapa-15l-entrega-final`, base `develop`. PR: [4rg3n15/NextResidential#34]
   la ficha lo diga.
 - Eventos reales de los tres equipos (multipart y alertStream) y su catálogo.
 - La cámara LPR en modo evento.
-- **La app en el iPhone** contra la API del Mac por la red local (permiso de
-  red local y compilación con la IP).
+- **La app en el iPhone, en Release y abierta desde el ícono,** contra la API
+  del Mac por la red local: el nombre `.local` (y qué pasa si la red bloquea
+  mDNS), el permiso de red local (S-71), «Cambiar servidor» con la IP, y la
+  recarga de 20 s con la consola al lado.
 - Las listas de IP de porteros con la red real del conjunto (el Mac y otro
   equipo).
 - Las migraciones 0040–0043 en el proyecto real de Supabase.
+
+---
+
+# Corrección de la 15-L, antes de la fusión · según §2.8
+
+**Encargo (`CORRIGE ETAPA 15-L`, 2026-09-27).** Requisitos del cliente, literales:
+«la app debe poder funcionar en modo normal, no estrictamente en modo
+depuración, y debo poder abrirla sin estar conectado a cable»; «en sitio la
+app debe funcionar igual que en casa, sin error de conexión con el servidor»;
+«la información de la app debe sincronizarse con la de la consola web, porque
+ambas comparten información». Decisión: [ADR-033](../decisiones/ADR-033-app-en-release-por-la-red-local.md).
+
+**Lo incómodo primero.**
+
+- **La guía del iPhone atribuía al cliente una decisión que no tomó.** La
+  excepción de App Transport Security sólo en Debug la puso el agente (A6 de
+  la 15-E, E1 de esta ronda) y `APP_EN_IPHONE.md` decía «por decisión del
+  cliente». Además contradecía el Bloque 0.5 de este mismo informe: Dio usa
+  `dart:io`, que no pasa por ATS. Rectificado en la fila E1, en la guía y en
+  ADR-033.
+- **H-15L-C01 · la lista «Mis visitas» de la app salía SIEMPRE vacía contra
+  PostgreSQL, desde la 11-A.** El directorio del residente unía
+  `autorizaciones.visitante_id` con `personas.id`, pero ese campo apunta a
+  `visitantes`. El doble en memoria lo tapaba y la prueba de esquema sólo
+  comprobaba columnas. Lo destapó la prueba de sincronización 3i en el CI; en
+  local la di por buena **sin haberla ejecutado**: la base de pruebas estaba
+  apagada y la suite la omitía. Es el falso verde que §2.8.0 prohíbe, y queda
+  dicho. Corregido en `d095a2c`.
+- **Con un Apple ID gratuito la app caduca a los 7 días**; por HTTP en la red
+  local el tráfico va sin cifrar; sin Firebase no hay avisos con la app
+  cerrada. Los tres están escritos en la guía y en la app.
+
+## C1 · Qué se construyó
+
+La app del residente se instala una vez en **Release** y se abre desde el
+ícono, sin cable ni Mac conectado; sólo necesita la misma red que la API. La
+dirección del servidor deja de ser algo que se compila y ya: el valor
+compilado admite un nombre `.local`, que no cambia de la casa al sitio, y la
+opción **«Servidor»** del acceso —más «Cambiar servidor» y «Reintentar» en
+toda pantalla de error de conexión— deja ver y cambiar la dirección sin
+recompilar. La app sólo acepta `http://` hacia una IP privada o un `.local`
+(`https://` hacia cualquier destino), pregunta a `/health` y dice el resultado
+en palabras antes de aceptarla, la guarda en el llavero y, al cambiarla,
+cierra la sesión.
+
+La app y la consola dicen lo mismo porque leen lo mismo, y lo leen a menudo:
+la pantalla visible se recarga cada 20 s en primer plano (se detiene en
+segundo plano, se espacia ante fallos, nunca dispara dos peticiones iguales y
+renueva la sesión antes de pedir) y siempre al volver a primer plano; tirar
+hacia abajo recarga en todas las pantallas de datos. Cada tarjeta de visita
+dice su situación real —vigente, programada, vencida o **rechazada con el
+motivo** que escribió el portero o el superadministrador—, y la pantalla de
+Notificaciones lista los rechazos y los ingresos de sus visitantes, con un
+contador en Inicio. Sin Firebase no hay avisos con la app cerrada, y la app lo
+dice así: «Los avisos llegan mientras la app está abierta»; los interruptores
+que prometían otra cosa se fueron. Una visita creada sin servidor —foto
+incluida— queda **«Pendiente de envío»**, sobrevive al cierre de la app y sale
+sola al reconectar, una vez, con su clave de idempotencia.
+
+En la API, la situación de cada visita —vigente, programada, vencida o
+rechazada con el motivo que escribió quien la rechazó— la calcula el servidor
+con su reloj y viaja en `GET …/mi/autorizaciones`; las notificaciones del
+residente (visita rechazada con su motivo, ingreso de su visitante) salen de
+`GET …/mi/notificaciones`, acotado a su vivienda. El portero ve el **nombre**
+de cada equipo en la línea de tiempo por `GET …/nombres-de-equipos`, que no
+lleva nada más (DT-15L-02 cerrado). La consola vuelve a pedir Visitantes,
+Residentes y Vehículos al recuperar el foco y cada 15 s. En iOS, la excepción
+de red local va en Debug, Release y Profile, y la app se instala una vez en
+Release y se abre desde el ícono.
+
+## C2 · Cómo se organizó y por qué
+
+- **El servidor calcula la situación de la visita, no la app.** `situacionDe`
+  vive en la capa de aplicación del módulo `residente` y usa el reloj
+  inyectado del servidor: la app y la consola dicen lo mismo aunque el reloj
+  del teléfono vaya mal. La app sólo pinta el enumerado.
+- **Las notificaciones se derivan, no se guardan.** Salen de las autorizaciones
+  rechazadas y de los eventos permitidos con autorización de los últimos 30
+  días (50 como mucho). No hay tabla nueva ni migración: la fuente de verdad ya
+  existía y es append-only. El precio es que «leída» vive en el teléfono
+  (S-92).
+- **Una ruta de nombres aparte, no un rol más en `/equipos`.** La lista de
+  equipos lleva dirección, usuario de servicio y estado de la credencial; el
+  portero sólo necesita el nombre. Abrirle `/equipos` habría sido darle lo
+  demás.
+- **Recarga por intervalo y no tiempo real en la app.** El canal SSE existe
+  para la consola; en el teléfono, con la app en segundo plano y redes que
+  cortan conexiones largas, un ciclo de 20 s con backoff es predecible y no
+  necesita nada nuevo en el servidor.
+- **El Info.plist deja de preprocesarse.** La excepción es la misma en las tres
+  configuraciones, así que el `#if` sobraba; el control lee el `.xcconfig` de
+  cada configuración del proyecto de Xcode y, si alguien vuelve a preprocesar,
+  preprocesa como Xcode.
+
+- **La dirección es un valor de la app, con una sola fuente.**
+  `DireccionDelServidor` es la única que cambia; los dos clientes Dio de la
+  API la siguen, y el de renovación de sesión sigue en `SUPABASE_URL`. La
+  regla de qué se admite vive en el dominio de la app
+  (`direccion_del_servidor.dart`), pura y probada sin red; la prueba de
+  `/health` usa un Dio propio, sin token y sin seguir redirecciones, y valida
+  la forma del cuerpo con el `SaludDto` generado (una dirección que contesta
+  200 pero no es Next Control se rechaza).
+- **Reinstalar con otra `API_URL` gana a lo guardado** (S-91): el llavero de
+  iOS sobrevive a desinstalar, y sin esto recompilar con la dirección correcta
+  no tendría efecto.
+- **El ciclo de recarga es de aplicación, con temporizador inyectado.**
+  `CicloDeRecarga` no sabe qué pantalla hay; `SincronizacionDeLaApp` decide qué
+  se recarga y en qué orden (renovar → vaciar la bandeja → recargar lo visible
+  y las notificaciones). Sin dependencia nueva: en lugar de `fake_async`, el
+  temporizador se inyecta en las unitarias y las de widget usan
+  `pump(Duration)`.
+- **«Vista» vive en el teléfono** (S-92): las notificaciones se derivan en el
+  servidor sin tabla; marcar leídas en el servidor pediría una migración para
+  un contador.
+- **La bandeja guarda cada envío con la cuenta que lo creó** (S-93): en un
+  teléfono compartido, lo pendiente de un residente no sale con la sesión de
+  otro. Tope de 10; la foto queda en el llavero sólo mientras espera.
+- **Los errores de conexión nombran la dirección y la salida.** El texto
+  técnico de Dio en inglés ya no llega a pantalla; `direccionInvalida` dejó de
+  decir «reinstale con `--dart-define`» y remite a «Cambiar servidor».
+
+## C3 · Árbol de archivos
+
+**API**
+
+- `apps/api/src/residente/aplicacion/mis-notificaciones.ts` — situación de la visita y notificaciones, puras, con el reloj del servidor.
+- `apps/api/src/residente/presentacion/mis-notificaciones.controller.ts` — `GET …/mi/notificaciones`, sólo residente, con alcance.
+- `apps/api/src/residente/presentacion/respuestas.ts` — `situacion`, `motivoRechazo`, `MiNotificacionDto`, `deVisitante`.
+- `apps/api/src/residente/infraestructura/directorio-pg.ts` — revocación y motivo en la consulta; **H-15L-C01**.
+- `apps/api/src/equipos/presentacion/nombres-de-equipos.controller.ts` — id y nombre, nada más.
+- `apps/api/test/nombres-de-equipos.e2e.test.ts`, `…/mis-notificaciones.test.ts`, `visitas-pg.test.ts` §3i, `residentes-y-vehiculos-pg.test.ts` — pruebas.
+
+**Consola**
+
+- `apps/web/src/lib/api/recarga.ts` — la política de recarga de las listas compartidas.
+- `apps/web/src/lib/api/visitas.ts`, `lib/api/consultas.ts`, `(consola)/residentes/consultas.ts` — la usan.
+- `apps/web/src/app/(consola)/eventos/pantalla.tsx` — nombres de equipos para todos los roles.
+
+**iOS y controles**
+
+- `apps/mobile/ios/Runner/Info.plist`, `ios/Flutter/{Debug,Release}.xcconfig` — ATS local en todas; sin preprocesado.
+- `scripts/lib/info-plist-ios.mjs` — lee cada configuración del proyecto de Xcode.
+- `scripts/lib/pruebas-negativas.mjs` §34 — once casos, entre ellos la reversión «sólo en depuración».
+
+**App**
+
+Nuevos:
+
+- `lib/dominio/direccion_del_servidor.dart` — qué dirección se admite, cómo resuelve un `.local`, y los resultados de `/health` en palabras.
+- `lib/dominio/notificaciones.dart` · `lib/dominio/situacion_de_visita.dart` — la notificación y la situación de una visita.
+- `lib/aplicacion/servidor_en_uso.dart` — la dirección en uso y el caso de uso `CambioDeServidor` (S-91).
+- `lib/aplicacion/ciclo_de_recarga.dart` — 20 s, retroceso y parada en segundo plano (S-94).
+- `lib/aplicacion/notificaciones_vistas.dart` — lo visto, en el teléfono (S-92).
+- `lib/aplicacion/cuerpo_de_visita.dart` — el cuerpo de una visita, sacado de `envio_de_visitas.dart`.
+- `lib/infraestructura/almacen/almacen_de_texto.dart` — el llavero y su versión en memoria.
+- `lib/infraestructura/bandeja/bandeja_guardada.dart` — la bandeja en el llavero (S-93).
+- `lib/infraestructura/api/comprobador_de_salud.dart` · `notificaciones_api.dart` — `/health` y `mi/notificaciones`.
+- `lib/presentacion/dependencias.dart` · `pestanas.dart` · `sincronizacion_de_la_app.dart` · `acciones_de_visitas.dart` · `contador_de_notificaciones.dart` — el armazón partido por responsabilidad.
+- `lib/presentacion/pantallas/servidor.dart` · `widgets/servidor.dart` · `widgets/filas_de_visitas.dart` — «Servidor», «Cambiar servidor», la situación y «Pendiente de envío».
+
+Modificados: `main.dart`, `presentacion/app.dart` (499 → 357 líneas),
+`controlador.dart`, las pantallas de datos (acceso, inicio, visitantes,
+notificaciones —reescrita—, perfil, zonas, familia, vehículos, historial,
+primer ingreso), `widgets/estados.dart`, `envio_de_visitas.dart`,
+`bandeja_de_salida.dart`, `entidades.dart` (sin `vigenteEn`: la situación la
+da el servidor), `puertos.dart`, `repositorio_api.dart`, `soporte_de_api.dart`,
+`causa_de_red.dart`, `tipo_de_red.dart`, `avisos_en_uso.dart`,
+`.env.example` (comentario), `README.md` y `e2e/recorrido-web.mjs`.
+
+**Documentos**
+
+- `docs/decisiones/ADR-033-app-en-release-por-la-red-local.md` — la decisión.
+- `docs/guias/APP_EN_IPHONE.md` — reescrita.
+- `docs/guias/ENTREGA_EN_SITIO.md`, `DESPLIEGUE.md`, `MANUAL_USUARIO.md`, `VALIDACION_HIKVISION_EN_SITIO.md` — al día.
+
+## C4 · Tabla SOLID
+
+| Principio | Cumplimiento                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SRP**   | En la API, `situacionDe` y `notificacionesDe` son funciones puras y cada caso de uso hace una lectura (`VerMisNotificaciones`, `VerMisVisitasConSituacion`). En la app, `CicloDeRecarga` sólo marca el paso, `CambioDeServidor` sólo cambia la dirección, `BandejaGuardada` sólo persiste y `ComprobadorDeSalud` sólo pregunta a `/health`; el armazón (`app.dart`) bajó de 499 a 357 líneas al sacar la sincronización y las acciones. **Declarado:** `entidades.dart` (498), `repositorio_api.dart` (384) y `app.dart` (357) ya pasaban de 300 antes de la corrección (DT-15L-03); `perfil.dart` se devolvió a 289 |
+| **OCP**   | Un tipo de notificación nuevo es una entrada en `TIPOS_DE_NOTIFICACION` y su frase, sin tocar el caso de uso; el ciclo recibe «qué recargar» como función y no conoce pantallas; el almacén de la bandeja es un puerto con dos implementaciones                                                                                                                                                                                                                                                                                                                                                                      |
+| **LSP**   | `AlmacenDeTexto` en memoria y en el llavero pasan las mismas pruebas; el directorio del residente en memoria y en PostgreSQL cumplen el mismo puerto —y H-15L-C01 es justo lo que pasa cuando no: por eso la 3i corre contra la base—                                                                                                                                                                                                                                                                                                                                                                                |
+| **ISP**   | `ComprobadorDeServidor` tiene un método; `GET …/nombres-de-equipos` devuelve `id` y `nombre` y nada más; `AlmacenDeTexto` es leer, escribir y borrar                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **DIP**   | Los casos de uso de la API dependen de `DIRECTORIO_DEL_RESIDENTE` y `RELOJ` con `@Inject` explícito; en la app, `Dependencias` inyecta el almacén, el comprobador, el temporizador y el intervalo                                                                                                                                                                                                                                                                                                                                                                                                                    |
+
+## C5 · Trazabilidad
+
+- **Cubiertos:** OE-02 de extremo a extremo con el teléfono fuera del cable
+  (HU-07 a HU-11, CA-04 a CA-07: la visita creada en la app aparece en la
+  consola y su rechazo vuelve a la app con el motivo); HU-33 (historial y
+  visitas con su situación real); RN-15 (`mi/notificaciones` en la suite de
+  aislamiento entre viviendas y copropiedades; `nombres-de-equipos` niega otra
+  copropiedad); RN-21 (el portero ve el nombre del equipo, nunca su
+  credencial); KPI-10 sin cable: el residente autoriza desde el ícono.
+- **Parcial:** HU-34 — los avisos llegan **con la app abierta** (cada 20 s y
+  al volver a primer plano); el push con la app cerrada sigue esperando
+  Firebase, y la app lo dice.
+- **Sin HU en el documento:** «Servidor» y la bandeja persistente responden a
+  los requisitos literales del cliente de esta corrección (ADR-033).
+- **Deuda cerrada:** DT-15L-02 (el portero veía «Equipo sin nombre»).
+
+## C6 · Pruebas
+
+### Qué se probó y cómo
+
+- **Sincronización en los dos sentidos, por la API contra PostgreSQL (3i):**
+  `apps/api/test/visitas-pg.test.ts` §3i —el residente crea la visita en la
+  app y la consola la lista vigente; el portero la rechaza y la app la ve
+  «rechazada» con su motivo y su notificación; otra copropiedad, 403/404— y
+  `residentes-y-vehiculos-pg.test.ts` —el vehículo cambiado en la app se ve en
+  la lista de la consola—. El caso «el superadministrador edita un residente y
+  la app lo refleja» ya lo cubría el Bloque G en la misma suite.
+- **Regresión de H-15L-C01:** la misma §3i. Falla con la consulta anterior
+  (lista vacía) y pasa con la corregida; se vio en el CI de `edc3f1e` y
+  `e34e0d0` y en local con la base encendida.
+- **Situación y notificaciones:** `residente/aplicacion/mis-notificaciones.test.ts`
+  (7, con reloj fijo: el instante exacto del fin ya no es vigente; el motivo
+  sólo acompaña a una rechazada; 30 días y 50 como mucho).
+- **Aislamiento:** `mi/notificaciones` en `aislamiento-residente.e2e.test.ts`;
+  `nombres-de-equipos.e2e.test.ts` (5: el portero ve nombres, sólo `id` y
+  `nombre`, `/equipos` sigue en 403, central sí y residente no, otra
+  copropiedad no).
+- **Consola (3h):** `apps/web/src/lib/api/recarga.test.tsx` —Visitantes,
+  Residentes, Vehículos de residentes y Vehículos piden otra vez a los 15 s
+  sin que nadie recargue—.
+- **App, con reloj falso (3a–3g, 2d):** `test/presentacion/sincronizacion_test.dart`
+  (la visita que portería rechaza cambia sola a «Rechazada» con su motivo; el
+  contador de Inicio sube y vuelve a cero; segundo plano detiene y volver
+  recarga; renovar antes de pedir; retroceso 20 → 40 s; tirar hacia abajo;
+  sólo se pide lo visible), `servidor_test.dart` (una dirección cuyo `/health`
+  no es Next Control se rechaza; la dirección sobrevive a cerrar y abrir;
+  cambiarla cierra la sesión; «Reintentar» y «Cambiar servidor» en el error),
+  `bandeja_en_pantalla_test.dart` (sin red → «Pendiente de envío» → cierre de
+  la app → una sola visita; con la respuesta perdida, la misma clave no
+  duplica) y `test/dominio/direccion_del_servidor_test.dart` (IP pública con
+  `http` rechazada, `.local` y `https` aceptados, bordes de 172.16/12, octal,
+  usuario, ruta, puerto fuera de rango). **Prueba negativa del ciclo:** con el
+  intervalo a 60 s fallan 6 de las 7 de sincronización (la de tirar hacia
+  abajo no depende del intervalo).
+- **iOS (1b):** `scripts/lib/info-plist-ios.mjs` y su prueba negativa §34
+  (once casos; entre ellos, la reversión exacta «sólo en depuración», que se
+  detecta en Release y Profile y no en Debug). En el CI de macOS se ejerce
+  además con `clang` preprocesando.
+- **Recorrido de la app en navegador (5e):** «Servidor» visible en el acceso,
+  contador de notificaciones, la pantalla con la visita rechazada y su motivo,
+  y las tarjetas «Vigente»/«Rechazada».
+
+### Resultado
+
+**Primera corrida local: FALLIDA, por el entorno y por mí.** Levanté la base
+de pruebas a mano con `max_connections=100` y la prueba de KPI-03 —cien
+conexiones reales— murió con «sorry, too many clients already»; el paso 7b lo
+señaló como discrepancia entre los dos recuentos. `scripts/base-de-pruebas.sh`
+exige 200 como mínimo y arranca con 300 precisamente por esto; reinicié la
+base con 300 y repetí la verificación entera. **El CI, con la base que
+levanta ese guion, dio verde en `d984fb4`** en los ocho trabajos, incluidos
+los dos `verificar-etapa.sh --con-base` de macOS.
+
+Segunda corrida (Linux, Node 22.22.2, Flutter 3.47.4, PostgreSQL 16.13):
+
+| Paquete            | Pruebas                                          |
+| ------------------ | ------------------------------------------------ |
+| `@ncr/api`         | 1508 (5 saltadas, declaradas y ejercidas en 12b) |
+| `@ncr/providers`   | 916                                              |
+| `@ncr/web`         | 545                                              |
+| `@ncr/domain-core` | 438                                              |
+| `@ncr/config`      | 144                                              |
+| `@ncr/edge`        | 101                                              |
+| app Flutter        | 338                                              |
+| **Total**          | **3990**                                         |
+
+Cobertura: dominio 96,20 %, aplicación 96,38 % (ramas 89,04 %), global
+84,55 %; en la app, dominio 97,98 %, aplicación 96,89 %, global 89,06 %.
+Tres corridas idénticas sin caché.
+
+### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
+
+```
+▸ 0 · borrando artefactos de compilación (así corre un checkout nuevo)
+   ✓ dist, .turbo, coverage, registros de compilación y claims de arranque eliminados
+▸ 1 · entorno dentro de lo declarado
+   ✓ entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2 · Flutter 3.47.4 (Dart 3.13.3) dentro de lo declarado · recorrido listo (Chromium + puerto 4599)
+▸ 1c · el árbol es escribible por las herramientas que van a usarlo
+   ✓ escritura: 9 rutas ejercidas de verdad (crear, escribir, leer, borrar)
+   ✓ base de pruebas: 127.0.0.1:55432/ncr como postgres · PostgreSQL 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu · conectado como postgres · esquema presente · 11 copropiedad(es) sembrada(s)
+▸ 1b · docs/ESTADO_ETAPAS.md no se contradice a sí mismo
+   ✓ coherente: 17 etapas en el mapa, 15 cerradas con ficha e informe, cabecera al día · 0 de 0 rama(s) «en curso» comprobadas contra git
+▸ 2 · instalación coherente con el lockfile
+   ✓ pnpm install --frozen-lockfile
+▸ 3 · compilación desde cero
+   ✓ @ncr/api construye SOLO, sin que nadie le prepare las dependencias
+   ✓ @ncr/edge construye SOLO, sin que nadie le prepare las dependencias
+   ✓ pnpm build
+   ✓ ninguna aplicación compila contra un dist/ desfasado (7 paquetes del espacio de trabajo, D-65)
+▸ 4 · lint y typecheck
+   ✓ pnpm lint
+   ✓ pnpm typecheck
+▸ 5 · suite completa
+   @ncr/config:test:       Tests  144 passed (144)
+   @ncr/edge:test:       Tests  101 passed (101)
+   @ncr/domain-core:test:       Tests  438 passed (438)
+   @ncr/providers:test:       Tests  916 passed (916)
+   @ncr/web:test:       Tests  545 passed (545)
+   @ncr/api:test:       Tests  1503 passed | 5 skipped (1508)
+   ⚠ suite sin rojas · las saltadas están DECLARADAS y se ejercen en otro paso
+▸ 5b · app móvil: análisis estático de Dart
+   ✓ flutter analyze sin hallazgos
+▸ 5c · app móvil: suite de Dart y cobertura POR CAPA
+   ✓ dominio           97.98 % (umbral 90 %, 291/297 líneas)
+   ✓ aplicacion        96.89 % (umbral 90 %, 280/289 líneas)
+   ✓ configuracion    100.00 % (umbral 70 %, 33/33 líneas)
+   ✓ infraestructura   88.41 % (umbral 60 %, 610/690 líneas)
+   ✓ presentacion      88.45 % (umbral 50 %, 2022/2286 líneas)
+   ✓ resto             21.57 % (umbral 0 %, 11/51 líneas)
+   ✓ global            89.06 % (umbral 70 %, sin contar lo generado)
+   ✓ cobertura de la app dentro de los umbrales por capa
+   ✓ la suite de Dart da lo mismo en otro huso (Pacific/Auckland): ninguna prueba depende del reloj del sistema
+▸ 5d · app móvil: cliente al día, sin secretos y sin dependencias a ciegas
+   ✓ sin secretos: la app no nombra ni incrusta ninguna llave que omita la RLS
+   ✓ dependencias: 1 acotación(es) con motivo escrito · objective_c fuera del grafo (lo arrastraba el plugin de Windows)
+   ✓ Info.plist en Profile, Debug, Release: red local pedida y ATS relajado sólo para lo local en todas; nunca NSAllowsArbitraryLoads
+   ✓ cliente Dart al día: 358 ficheros generados desde packages/contracts/openapi.json, sin diferencias
+▸ 5e · app móvil: el RECORRIDO en un navegador de verdad
+   ✓ el residente desactivado sigue apareciendo (RN-19)
+   ✓ y está marcado
+   ✓ la placa se muestra como la normalizó el dominio
+   ✓ la pestaña de visitantes muestra lo que el conjunto tiene a su nombre
+   ✓ y ofrece autorizar una visita, que es para lo que se abre (HU-07)
+   ✓ los últimos visitantes se ofrecen para volver a autorizarlos (F6)
+   ✓ cada visita dice su situación real, y la rechazada su motivo
+   ✓ el perfil trae el nombre de la persona (3.5)
+   ✓ y el botón de portería (D7)
+   ✓ el correo sintético del token no aparece en ninguna parte (C-36)
+   ✓ el motivo de la negación se explica en lenguaje llano
+   ✓ lo decidido por el Edge se marca (KPI-31)
+   ✓ ni un error de JavaScript en el recorrido completo
+   ✓ la app se recorre entera en el navegador, sin un error de JavaScript
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 299 de 299 ficheros de prueba ejecutados
+▸ 7 · umbrales de cobertura por capa (§2.4)
+     OK   dominio (packages/domain-core/src): lineas 96.20 % · ramas 96.91 % · funciones 96.04 % (umbral 90 %, 40 archivos)
+     OK   aplicacion (**/aplicacion/**): lineas 96.38 % · ramas 89.04 % · funciones 97.65 % (umbral 90 %, 98 archivos)
+     OK   global: lineas 84.55 % · ramas 85.61 % · funciones 83.77 % (umbral 70 %, 653 archivos)
+   ✓ las tres capas cumplen su umbral
+▸ 7b · los dos recuentos de la MISMA suite coinciden (D-112)
+   ✓ recuentos: 6 paquete(s) con el mismo resultado por los dos caminos (turbo y vitest directo) · 3652 pruebas
+▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
+   ✓ portabilidad: 17 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
+▸ 9 · pruebas negativas de los propios controles
+   ✓ entorno declarado: 63 variables de 2 esquemas, todas en su .env.example · 27 leídas fuera de Zod, con motivo
+   ✓ declaraciones: 1 paso(s) declarado(s) no ejercido(s), 0 de ellos en linux, con motivo y etapa de revisión vigente
+   ✓ controles: 40 de 42 con prueba negativa · 2 en deuda declarada (no puede crecer)
+   ✓ PRUEBAS NEGATIVAS: los 33 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ ramas: 40 controles medidos · 259 bloques sin ejercer (no puede subir)
+▸ 10 · fronteras de arquitectura y secretos
+   ✓ fronteras (DoD ETAPA 02)
+   ✓ frontera-modulos: 17 módulos (alarmserver, autenticacion, autorizaciones, biometria, cuentas, equipos, eventos, guardia, observabilidad, padron, planificacion, plataforma, porteria, residente, tablero, visitas, zonas), ninguna importación entra por dentro y un solo Pool de PostgreSQL (D-66)
+   ✓ sin secretos
+   ✓ escaneo de secretos: limpio (4894 blobs del historial alcanzable · 2 de línea base declarados)
+   ✓ longitud por campo: 127 campo(s) @IsString(), todos con cota declarada
+   ✓ 67 clases que Nest construye inyectan con @Inject() explícito en todos sus parámetros
+   ✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers/ (los rangos de documentación de RFC 5737 no cuentan: no son de nadie)
+   ✓ frontera-extensibilidad: 227 fichero(s) de dominio/aplicación sin @ncr/providers, ningún adaptador nombrado fuera del paquete, y el ficticio sólo toca el núcleo
+   ✓ ningún atributo `style` en la consola (223 ficheros, §2.7.7)
+   ✓ 223 ficheros de la consola: todo color sale de un token con pareja medida en los dos temas
+   ✓ frontera-vocabulario: 83 ficheros del dominio, sin tipo de copropiedad ni etiquetas (el tipo se puede cambiar sin consecuencias)
+   ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 8 tablas vigiladas)
+   ✓ pwa: manifiesto completo, iconos reales de 192/512 y uno enmascarable distinto, service worker registrado con `/api/` fuera de la caché y página de sin conexión
+   ✓ paleta: paleta.g.dart al día con el preset (40 tokens por tema)
+   ✓ mermaid: 9 diagrama(s) en 2 fichero(s) analizan con Mermaid 11.17.2
+▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
+   ✓ esquemas: 232 DTO con nombre único en apps/api/src
+   ✓ 146 de 152 operaciones con respuesta tipada; 6 exentas con etapa declarada
+   ✓ contrato y cliente generado al día respecto de los controladores
+▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
+   ✓ KPI-25 con margen sobre el umbral
+▸ 12 · esquema y aislamiento en --modo-supabase (requiere --con-base)
+   ✓ migraciones, semillas y suite SQL
+▸ 12b · arranque en frío: base vacía → migraciones → superadministrador (requiere --con-base)
+   ✓ una base recién migrada llega a un superadministrador con claims válidos
+   ✓ y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1
+▸ 12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero
+   ✓ el camino completo se recorre en el navegador
+▸ 12d · start:dev —el arranque de sitio— inyecta y VALIDA; con tsx la API se niega a arrancar
+   ✓ con start:dev la API llega a «API arrancada»
+   ✓ un controlador inyectado contesta con su lógica (503, no 500)
+   ✓ el ValidationPipe valida: un cuerpo fuera del DTO recibe 400
+   ✓ con tsx la API se niega a arrancar y dice por qué: sin metadatos no valida
+   ✓ start:dev arranca, inyecta y valida; tsx no arranca sin metadatos
+▸ 12e · el guion de sitio, ensayado contra los equipos simulados: --con-audio y --abrir
+   ✓ la puerta SE MOVIÓ: H-SITIO-13 verificado en este equipo
+   ✓ la puerta SE MOVIÓ: H-SITIO-13 verificado en este equipo
+   ✓ el guion recorre los tres equipos simulados y --abrir abre como en sitio
+▸ 12f · pnpm sitio:ensayo contra los equipos simulados: ocho pasos por equipo, respaldo y reversión
+   VEREDICTO: SIN FALLOS · 20 OK · 0 FALLO · 0 omitidos · 4 no aplica
+   ✓ el ensayo recorre los tres equipos simulados, respalda y revierte su configuración
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+   ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
+   ✓ una hoja sin un solo UUID crea viviendas, personas y sus vínculos (D-72, RN-06)
+   ✓ el superadministrador escribe el padrón en la copropiedad del selector (D-71)
+   ✓ las 12 en una sentencia, el mismo número en tres agrupaciones, y una colisión revierte las 12
+▸ 13b · el recorrido de la CONSOLA contra la API real, PostgreSQL y el simulado (requiere --con-base)
+   ✓ el superadministrador y el portero recorren la consola de punta a punta
+▸ 13c · el recorrido FALLA con H-SITIO-02, 03, 08, 13 y 15 reintroducidos (requiere --con-base)
+   ✓ los cinco defectos de sitio, reintroducidos, se detectan cada uno por su nombre
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+      corrida 1/3: codigo 0 · @ncr/api:test: Tests 1508 passed (1508) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 438 passed (438) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 916 passed (916) · @ncr/web:test: Tests 545 passed (545)
+      corrida 2/3: codigo 0 · @ncr/api:test: Tests 1508 passed (1508) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 438 passed (438) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 916 passed (916) · @ncr/web:test: Tests 545 passed (545)
+      corrida 3/3: codigo 0 · @ncr/api:test: Tests 1508 passed (1508) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 438 passed (438) · @ncr/edge:test: Tests 101 passed (101) · @ncr/providers:test: Tests 916 passed (916) · @ncr/web:test: Tests 545 passed (545)
+   ✓ OK estabilidad: 3 corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 31 de 31 pasos ejecutados
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El control declarado no ejercido es el 5e **sólo en macOS**; en esta corrida,
+en Linux, se ejerció y pasó.
+
+## C7 · Verificación de seguridad (§2.7)
+
+| Medida                | Verificación en esta corrección                                                                                                                                                                                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 · Secretos          | Ninguna IP, credencial ni llave en código, pruebas o documentos: las IP privadas de las pruebas de la app se componen con `ip(…)` y los documentos usan `<nombre>.local` y `192.168.x.y`. `flutter-sin-secretos` y el escaneo, limpios. La app se niega a arrancar con una `sb_secret_…` |
+| 2 · CORS              | Sin cambios; la app nativa no envía `Origin`                                                                                                                                                                                                                                             |
+| 3 · Validación        | Las rutas nuevas son `GET` sin cuerpo; la dirección del servidor se valida en la app (es una entrada del usuario del teléfono, no del servidor)                                                                                                                                          |
+| 4 · SQL               | Consultas parametrizadas; la corrección de H-15L-C01 es un `JOIN`, sin concatenar nada                                                                                                                                                                                                   |
+| 5 · Límites           | El ciclo de la app hace unas 3 lecturas cada 20 s y se espacia ante fallos (S-94); la consola, 4 listas cada 15 s por pestaña: por debajo de `THROTTLE_LIMITE` (120/min) con holgura                                                                                                     |
+| 6 · RLS y aislamiento | `mi/notificaciones` entra en la suite de aislamiento (residente contra residente y copropiedad cruzada); la 3i prueba COP_B por la API contra la base; el directorio sigue filtrando por ámbito en la aplicación (S-62)                                                                  |
+| 7 · CSP               | Sin cambios                                                                                                                                                                                                                                                                              |
+| 8 · Transversales     | **HTTP en la red local va sin cifrar**: ADR-033 lo acota a IP privadas y `.local` y exige HTTPS para producción. La foto de una visita pendiente queda en el llavero, cifrada por el sistema, hasta que sale (S-93, DT-15L-06). RBAC declarativo en las rutas nuevas                     |
+
+## C8 · Deuda técnica, supuestos y pendientes
+
+- **DT-15L-02 CERRADO** (nombres de equipos para portería).
+- **H-15L-C01 CORREGIDO** (la lista de visitas de la app, vacía contra la base
+  desde la 11-A).
+- **DT-15L-06 · la bandeja conserva lo pendiente de una cuenta que cerró
+  sesión.** Sus visitas —con la foto del visitante— esperan en el llavero
+  hasta que esa cuenta vuelva a entrar en ese teléfono. Propuesta: caducidad
+  (p. ej. 24 h) o borrado al cerrar sesión con aviso de lo que se pierde.
+- **DT-15L-07 · la bandeja reintenta también lo que agotó sus 8 intentos**
+  (era así antes; con el ciclo, una visita creada sin red sale sola al
+  reconectar, así que el efecto es favorable, pero no hay «abandonada»).
+- **DT-15L-08 · el diagnóstico del paso 5c confunde un fallo de código con
+  uno de permisos.** Clasifica como «ENTORNO: permisos de escritura» cualquier
+  salida que contenga «Operation not permitted», y las pruebas de la app lo
+  imprimen a propósito (S-71). Pasó en el CI de `d095a2c`, con dos pruebas de
+  la app en rojo por el cliente regenerado. El veredicto siguió FALLIDA —no es
+  un falso verde—, pero el diagnóstico manda a mirar el sitio equivocado.
+  Propuesta: exigir el contexto de sistema de ficheros
+  (`PathAccessException`, `FileSystemException`).
+- **DT-15L-03 sigue:** `entidades.dart`, `repositorio_api.dart` y `app.dart`
+  pasan de 300 líneas desde antes.
+- **Supuestos:** S-90 a S-95. **Por probar en aparato:** la resolución de
+  `.local` en un iPhone (y en Android), y una red que bloquee mDNS.
+
+## C9 · Qué debe hacer el usuario manualmente
+
+1. **Fusionar el PR** cuando lo revise (no se fusiona desde aquí).
+2. **Instalar la app en el iPhone en Release** con el nombre `.local` del Mac,
+   una vez, siguiendo [`APP_EN_IPHONE.md`](../guias/APP_EN_IPHONE.md) §1–§2;
+   apuntar la fecha: con Apple ID gratuito caduca a los 7 días.
+3. **En sitio**, antes de la prueba del residente: `caffeinate -dimsu`,
+   cortafuegos del Mac aceptando `node`, Safari del iPhone en
+   `http://<nombre>.local:3000/health`; si no abre, la IP del Mac con
+   «Cambiar servidor» (§3).
+4. **Probar una vez, a propósito, negando el permiso de red local**, para
+   confirmar S-71 (qué dice la app).
+5. **Decidir DT-15L-06** (qué hacer con lo pendiente de una cuenta que cierra
+   sesión).
+
+## C10 · Rama y commits
+
+Rama `etapa-15l-entrega-final`, en el mismo PR [4rg3n15/NextResidential#34](https://github.com/4rg3n15/NextResidential/pull/34) (sin fusionar: la fusión es del usuario).
+
+- `d984fb4` feat(etapa-15l/app): servidor configurable, sincronización con la consola y bandeja sin conexión
+- `d095a2c` fix(etapa-15l/residente): la lista de visitas de la app deja de salir vacía contra la base
+- `e34e0d0` feat(etapa-15l/ios): la app en Release por la red local; ATS local en las tres configuraciones
+- `edc3f1e` feat(etapa-15l/sincronizacion): la app lee el estado real de sus visitas y sus notificaciones; el portero ve el nombre de cada equipo
+- el commit de cierre de la corrección, con este informe
