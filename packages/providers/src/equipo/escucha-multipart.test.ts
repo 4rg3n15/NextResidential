@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Bitacora } from '@ncr/domain-core';
 import { EscuchaDeAlertStream } from './escucha-alertstream';
-import { LectorMultipart, boundaryDe, lectorPara } from './partes-del-flujo';
+import { LectorDeJsonSeguido, LectorMultipart, boundaryDe, lectorPara } from './partes-del-flujo';
 import { bloqueDesdeXml, esEventoEnVivo, motivoDeDescarte } from '../hikvision/contratos-de-evento';
 
 /**
@@ -198,6 +198,90 @@ describe('H-SITIO-14 · el flujo multipart con foto', () => {
     const rechazo = t.lineas.find((l) => l.mensaje === 'escucha: el equipo rechazó la conexión');
     expect(rechazo?.c['estadoHttp']).toBe(401);
     expect(t.lineas.some((l) => l.mensaje === 'escucha: la conexión falló')).toBe(true);
+  });
+});
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ANEXO 15-K (4) · ¿EXPLICA EL JPEG DENTRO DEL FLUJO H-SITIO-14?
+ *
+ * Un JPEG de verdad —el gris sintético de 64×64 de la carga de prueba del
+ * guion, sin rostro— lleva UNA comilla (0x22) suelta entre sus bytes. El
+ * lector de antes (texto y llaves, que sigue siendo el de un flujo no
+ * multipart) la toma por el comienzo de una cadena que no se cierra: todo lo
+ * que viene después de la foto deja de ser JSON para él, y se pierde sin una
+ * línea. La «foto» de arriba no lo demostraba: sus comillas van a pares y el
+ * lector anterior se recuperaba.
+ *
+ * Respuesta: SOLO, no. El primer evento de cada conexión llega ANTES de la
+ * foto y el lector anterior lo leía; lo perdía el otro defecto (`currentEvent`
+ * en la raíz). Juntos sí explican «ni una línea»: el primero, por
+ * `currentEvent`; todos los siguientes, por la foto. Corregido sólo el primero,
+ * la visita habría visto UN paso y ninguno más.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+const JPEG_REAL = Uint8Array.from(
+  Buffer.from(
+    '/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCABAAEADASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/9k=',
+    'base64',
+  ),
+);
+
+describe('anexo 15-K (4) · un JPEG real dentro del flujo, y H-SITIO-14', () => {
+  const eventoDe = (persona: string): Uint8Array =>
+    codificar(
+      JSON.stringify({
+        ...EVENTO_DE_LA_GUIA,
+        AccessControllerEvent: {
+          ...EVENTO_DE_LA_GUIA.AccessControllerEvent,
+          employeeNoString: persona,
+        },
+      }),
+    );
+  const flujo = (): Uint8Array =>
+    unir(
+      parte('application/json', eventoDe('p1'), 'AccessControllerEvent'),
+      parte('image/jpeg', JPEG_REAL, 'Picture'),
+      parte('application/json', eventoDe('p2'), 'AccessControllerEvent'),
+      parte('application/json', eventoDe('p3'), 'AccessControllerEvent'),
+    );
+  const personas = (partes: { bytes: Uint8Array }[]): string[] =>
+    partes.flatMap((p) => {
+      try {
+        const o = JSON.parse(new TextDecoder().decode(p.bytes)) as {
+          AccessControllerEvent?: { employeeNoString?: string };
+        };
+        return o.AccessControllerEvent?.employeeNoString ?? [];
+      } catch {
+        return [];
+      }
+    });
+
+  it('el JPEG real es un JPEG y lleva un número IMPAR de comillas: basta una', () => {
+    expect([JPEG_REAL[0], JPEG_REAL[1]]).toEqual([0xff, 0xd8]);
+    expect(JPEG_REAL.filter((b) => b === 0x22).length % 2).toBe(1);
+  });
+
+  it('el lector de antes (texto y llaves) lee el evento previo a la foto y PIERDE todos los siguientes', () => {
+    expect(personas(new LectorDeJsonSeguido().alimentar(flujo()))).toEqual(['p1']);
+  });
+
+  it('el lector multipart los lee los tres, con la foto en medio', () => {
+    expect(personas(new LectorMultipart('frontera').alimentar(flujo()))).toEqual([
+      'p1',
+      'p2',
+      'p3',
+    ]);
+  });
+
+  it('y el primero, que sí llegaba, lo descartaba el OTRO defecto: currentEvent se buscaba en la raíz', () => {
+    const enLaRaizNo = Object.fromEntries(
+      Object.entries(EVENTO_DE_LA_GUIA.AccessControllerEvent).filter(([k]) => k !== 'currentEvent'),
+    );
+    // Es lo que veía el código anterior: sin `currentEvent` en la raíz, «histórico».
+    expect('currentEvent' in EVENTO_DE_LA_GUIA).toBe(false);
+    expect(esEventoEnVivo({ ...EVENTO_DE_LA_GUIA, AccessControllerEvent: enLaRaizNo })).toBe(false);
+    expect(esEventoEnVivo(EVENTO_DE_LA_GUIA)).toBe(true);
   });
 });
 

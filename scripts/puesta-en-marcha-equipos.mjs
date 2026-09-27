@@ -47,6 +47,14 @@
  *      hace una CARGA DE PRUEBA con una imagen sintética sin rostro, captura
  *      cómo la trata el equipo y da de baja la persona de prueba. En sitio, el
  *      26/09/2026, cuatro fallos quedaron sin diagnóstico por no tener esto.
+ *  9 · Con `--abrir` (anexo 15-K) hace SÓLO la verificación de la próxima
+ *      visita: abre la puerta de la terminal y la del videoportero como
+ *      abrieron en sitio —`PUT door/<n>`, Content-Type de formulario, cuerpo
+ *      con el espacio de nombres y `version="2.0"`, Digest con el cuerpo desde
+ *      la primera petición, 401 → 200 con `statusCode 1`—, escribe cada
+ *      petición y respuesta, y PREGUNTA si la puerta se movió. La barrera de la
+ *      cámara no entra: su orden es otra y la acciona el recorrido normal
+ *      (`scripts/lib/apertura-en-sitio.mjs`).
  *
  * ═════════════════════════════════════════════════════════════════════════════
  * LO QUE NO HACE, Y ES DELIBERADO
@@ -77,6 +85,8 @@
  *   node scripts/puesta-en-marcha-equipos.mjs --simulado --hoja=./hoja.md --informe=./informe.md
  *   node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --sin-accionar --capturar
  *   node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --capturar=$HOME/capturas-sitio
+ *   node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --abrir --capturar
+ *   node scripts/puesta-en-marcha-equipos.mjs --simulado --abrir
  *
  * `--simulado` NO habla con ningún aparato: monta los tres equipos simulados de
  * `@ncr/providers` y recorre exactamente el mismo guion. Sirve para ensayar el
@@ -99,6 +109,7 @@
  */
 import { createRequire } from 'node:module';
 import { hojaDeResultados } from './lib/hoja-de-resultados.mjs';
+import { preguntarSiSeMovio, verificarApertura } from './lib/apertura-en-sitio.mjs';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -120,6 +131,8 @@ if (!existsSync(compilado)) {
 const {
   RUTAS,
   ClienteDeEquipo,
+  aperturaDeVerificacion,
+  aperturasFisicasPor,
   CARRIL_VERIFICADO_DE_LA_CAMARA,
   cargaDePruebaDeRostro,
   diagnosticarEquipo,
@@ -130,6 +143,7 @@ const {
   interpretarError,
   juzgarModo,
   leerCtrlMod,
+  opcionesDeEscritura,
   rutaPara,
 } = createRequire(import.meta.url)(compilado);
 
@@ -137,6 +151,7 @@ const argumentos = process.argv.slice(2);
 const sinAccionar = argumentos.includes('--sin-accionar');
 const conAudio = argumentos.includes('--con-audio');
 const simulado = argumentos.includes('--simulado');
+const abrir = argumentos.includes('--abrir');
 const destinoInforme =
   argumentos.find((a) => a.startsWith('--informe='))?.slice('--informe='.length) ??
   join(process.env.TMPDIR ?? '/tmp', 'puesta-en-marcha-equipos.md');
@@ -290,7 +305,14 @@ const peticionSimulada = () =>
 const sondear = async (cliente, ruta) => {
   const cuerpo = ruta.cuerpo;
   try {
-    const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta, cuerpo);
+    // Anexo 15-K · una escritura sin cuerpo sólo sale si el catálogo lo declara
+    // (el canal de audio); cualquier otra, el cliente la rechaza (H-SITIO-15).
+    const respuesta = await cliente.pedir(
+      ruta.metodo,
+      ruta.ruta,
+      cuerpo,
+      opcionesDeEscritura(ruta),
+    );
     if (respuesta.estado === 401) {
       return {
         veredicto: 'credenciales',
@@ -442,7 +464,11 @@ anotar(`Fecha: ${new Date().toISOString()}`);
 anotar(
   `Modo: ${simulado ? 'SIMULADO — ningún aparato real; NO vale como verificación' : 'contra equipos reales'}`,
 );
-anotar(`Accionamiento de relés y puertas: ${sinAccionar ? 'OMITIDO (--sin-accionar)' : 'SÍ'}`);
+anotar(
+  abrir
+    ? 'Modo --abrir: SÓLO la apertura de puerta de la terminal y del videoportero, como abrió en sitio'
+    : `Accionamiento de relés y puertas: ${sinAccionar ? 'OMITIDO (--sin-accionar)' : 'SÍ'}`,
+);
 anotar(
   `Canal de audio del videoportero: ${conAudio ? 'se abre y se cierra (--con-audio)' : 'no se toca'}`,
 );
@@ -456,6 +482,84 @@ const resuelta = (ruta, canal) =>
   exigeCanal(ruta) ? rutaPara(ruta.proposito, ruta.familia, canal) : ruta;
 
 const peticion = simulado ? peticionSimulada() : undefined;
+
+const escribirInforme = () => {
+  try {
+    const cuerpo = `# Puesta en marcha en sitio${simulado ? ' (SIMULADO)' : ''}\n\n\`\`\`\n${lineas.join('\n')}\n\`\`\`\n`;
+    writeFileSync(resolve(destinoInforme), cuerpo, 'utf8');
+    console.log('');
+    console.log(`Informe escrito en ${resolve(destinoInforme)}`);
+    console.log('Host y usuario salen ELIDIDOS: el informe se puede adjuntar.');
+  } catch (error) {
+    console.error(`No se pudo escribir el informe: ${String(error?.message ?? error)}`);
+  }
+};
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ANEXO 15-K · `--abrir`: la apertura demostrada, y la pregunta que sólo puede
+ * contestar quien mira la puerta. En `--simulado` la contesta el equipo
+ * simulado, que sabe si accionó.
+ */
+if (abrir) {
+  let alguna = false;
+  for (const entrada of FAMILIAS.filter((f) => f.familia !== 'camara')) {
+    const config = configuracionDe(entrada);
+    if (config === null || config.faltan !== undefined) {
+      anotar(
+        `── ${entrada.rotulo} · ${config === null ? `NO DECLARADO (sin ${entrada.prefijo}_HOST)` : `faltan ${config.faltan.join(', ')}`}. Se omite.`,
+      );
+      huboProblema ||= config !== null;
+      continue;
+    }
+    alguna = true;
+    const registro = [];
+    const transporte = capturar ? grabadoraDe(peticion ?? fetch, registro) : peticion;
+    const destino = config.host;
+    const antes = aperturasFisicasPor.get(destino) ?? 0;
+    const problema = await verificarApertura({
+      familia: entrada.familia,
+      rotulo: entrada.rotulo,
+      cabecera: `${entrada.rotulo} · ${elidir(config.host)}:${config.puerto}`,
+      kpi: entrada.kpi,
+      puerta: config.canal,
+      umbralMs: UMBRAL_DE_ACCIONAMIENTO_MS,
+      conexion: {
+        host: config.host,
+        puerto: config.puerto,
+        protocolo: 'http',
+        usuario: config.usuario,
+        clave: config.clave,
+        tiempoLimiteMs: 6000,
+        ...(transporte === undefined ? {} : { peticion: transporte }),
+      },
+      aperturaDeVerificacion,
+      seMovio: simulado
+        ? async () => ((aperturasFisicasPor.get(destino) ?? 0) > antes ? 'si' : 'no')
+        : () => preguntarSiSeMovio(entrada.rotulo),
+      anotar,
+    });
+    huboProblema ||= problema;
+    if (capturar) {
+      const carpeta = join(carpetaDeCapturas, `${entrada.familia}-abrir`);
+      anotar(
+        `   ── ${String(await volcarCapturas(carpeta, registro))} intercambio(s) capturados en ${carpeta}`,
+      );
+    }
+  }
+  if (!alguna) {
+    anotar('Ni terminal ni videoportero declarados: defina TERMINAL_HOST o VIDEOPORTERO_HOST.');
+    huboProblema = true;
+  }
+  anotar(
+    huboProblema
+      ? 'VEREDICTO --abrir: la apertura NO queda verificada (arriba, qué falta).'
+      : 'VEREDICTO --abrir: la orden se aceptó como en sitio y la puerta se movió.',
+  );
+  if (simulado) anotar('SIMULADO: el ensayo del procedimiento, no una verificación.');
+  escribirInforme();
+  process.exit(huboProblema ? 1 : 0);
+}
 
 for (const entrada of FAMILIAS) {
   const config = configuracionDe(entrada);
@@ -746,15 +850,7 @@ anotar(
 );
 anotar('Anote el estado PREVIO de cada ajuste antes de tocarlo.');
 
-try {
-  const cuerpo = `# Puesta en marcha en sitio${simulado ? ' (SIMULADO)' : ''}\n\n\`\`\`\n${lineas.join('\n')}\n\`\`\`\n`;
-  writeFileSync(resolve(destinoInforme), cuerpo, 'utf8');
-  console.log('');
-  console.log(`Informe escrito en ${resolve(destinoInforme)}`);
-  console.log('Host y usuario salen ELIDIDOS: el informe se puede adjuntar.');
-} catch (error) {
-  console.error(`No se pudo escribir el informe: ${String(error?.message ?? error)}`);
-}
+escribirInforme();
 
 /**
  * A8 · la hoja de resultados. Es una PLANTILLA: lo que el guion sabe va

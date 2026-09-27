@@ -798,7 +798,12 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
  */
 export const equiposSimulados = (porDestino: Record<string, GuionDeEquipo>): typeof fetch => {
   const simulados = new Map<string, typeof fetch>(
-    Object.entries(porDestino).map(([destino, guion]) => [destino, equipoSimulado(guion)]),
+    // El rótulo de cada equipo es su dirección, salvo que el guion diga otro:
+    // así el oráculo (`aperturasFisicasPor`) sabe de quién habla.
+    Object.entries(porDestino).map(([destino, guion]) => [
+      destino,
+      equipoSimulado({ destino, ...guion }),
+    ]),
   );
   return (async (entrada: string | URL, opciones?: RequestInit): Promise<Response> => {
     const url = new URL(typeof entrada === 'string' ? entrada : String(entrada));

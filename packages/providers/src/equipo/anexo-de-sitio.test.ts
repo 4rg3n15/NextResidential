@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClienteDeEquipo, EscrituraSinCuerpo } from './cliente';
-import { rutaPara } from './catalogo-de-rutas';
+import { RUTAS, opcionesDeEscritura, rutaPara } from './catalogo-de-rutas';
 import { abrirPuertaRemota } from './puerta-remota';
 import { TerminalFacial } from '../terminal/terminal-facial';
 import { Videoportero } from '../videoportero/videoportero';
@@ -150,6 +150,19 @@ describe('anexo 15-K · H-SITIO-15 · nunca una escritura con el cuerpo vacío',
     await expect(cliente.pedir('PUT', '/ISAPI/AccessControl/RemoteControl/door/1')).rejects.toThrow(
       EscrituraSinCuerpo,
     );
+  });
+
+  it('sólo el canal de audio declara su escritura sin cuerpo; el resto la lleva o no escribe', () => {
+    const sinCuerpo = RUTAS.filter((r) => opcionesDeEscritura(r).sinCuerpo === true).map(
+      (r) => r.proposito,
+    );
+    expect(sinCuerpo.sort()).toEqual([
+      'abrir el canal de audio bidireccional',
+      'cerrar el canal de audio bidireccional',
+    ]);
+    expect(
+      opcionesDeEscritura(rutaPara('abrir la puerta desde la plataforma', 'terminal', 1)),
+    ).toEqual({});
   });
 
   it('descubrir y diagnosticar la terminal no deja ni un POST vacío, y la biblioteca se cuenta', async () => {

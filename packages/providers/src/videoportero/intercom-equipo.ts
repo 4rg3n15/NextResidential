@@ -15,7 +15,7 @@ import type {
 } from '@ncr/domain-core';
 import { ClienteDeEquipo } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
-import { rutaPara } from '../equipo/catalogo-de-rutas';
+import { opcionesDeEscritura, rutaPara } from '../equipo/catalogo-de-rutas';
 
 /**
  * AUDIO BIDIRECCIONAL CONTRA EL EQUIPO · ADR-01.
@@ -201,10 +201,14 @@ export class IntercomDeEquipo implements IntercomProvider {
       'videoportero',
       this.opciones.canal,
     );
-    // TwoWayAudio `open` no lleva cuerpo en la guía: se declara, no se olvida.
-    const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, undefined, {
-      sinCuerpo: true,
-    });
+    // TwoWayAudio `open` no lleva cuerpo en la guía: lo declara el catálogo
+    // (`sinCuerpo`), y sin esa declaración el cliente se niega a enviarla.
+    const respuesta = await this.cliente.pedir(
+      ruta.metodo,
+      ruta.ruta,
+      undefined,
+      opcionesDeEscritura(ruta),
+    );
     if (!respuesta.ok) {
       // El equipo dijo que no: se suelta el turno en vez de dejar al operador
       // con un canal que cree tener. Un turno retenido sobre un canal muerto
@@ -334,7 +338,7 @@ export class IntercomDeEquipo implements IntercomProvider {
       this.opciones.canal,
     );
     try {
-      await this.cliente.pedir(ruta.metodo, ruta.ruta, undefined, { sinCuerpo: true });
+      await this.cliente.pedir(ruta.metodo, ruta.ruta, undefined, opcionesDeEscritura(ruta));
     } catch {
       // Si no se pudo cerrar, el equipo lo soltará por su propio vencimiento.
       // No se reintenta aquí: `motivo` ya está en el histórico y encadenar

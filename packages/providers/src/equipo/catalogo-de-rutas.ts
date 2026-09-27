@@ -31,6 +31,7 @@
  */
 
 import type { Procedencia, RutaDeEquipo } from './tipos-de-ruta';
+import type { OpcionesDePeticion } from './cliente';
 import { RUTAS_DE_LA_GUIA } from './catalogo-de-la-guia';
 
 /**
@@ -623,6 +624,7 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
       'midió el 18/09/2026 (§0.quater de la guía)',
     confirmarEnSitio:
       'que el canal quede exclusivo, y qué pasa si dos operadores lo piden a la vez',
+    sinCuerpo: true,
     dejaRastro: true,
   },
   {
@@ -633,6 +635,7 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     familia: 'videoportero',
     fuente: 'ADR-01, misma fuente que la apertura',
     confirmarEnSitio: 'que el cierre libere el canal aunque la sesión se haya caído antes',
+    sinCuerpo: true,
     dejaRastro: true,
   },
 ];
@@ -695,3 +698,12 @@ export class RutaSinCanal extends Error {
 
 /** `true` si la ruta lleva el marcador y por tanto exige canal. */
 export const exigeCanal = (ruta: RutaDeEquipo): boolean => ruta.ruta.includes(MARCADOR_DE_CANAL);
+
+/**
+ * Anexo 15-K · H-SITIO-15 · lo que la ruta declara sobre su cuerpo, en la
+ * forma que entiende el cliente. Una sola fuente: el adaptador del intercom y
+ * el guion de sitio preguntan aquí, y una escritura sin cuerpo que el catálogo
+ * no declare la rechaza el cliente.
+ */
+export const opcionesDeEscritura = (ruta: RutaDeEquipo): OpcionesDePeticion =>
+  ruta.sinCuerpo === true ? { sinCuerpo: true } : {};
