@@ -240,7 +240,11 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
                 (SELECT count(*) FROM public.autorizacion_acompanantes ac
                   WHERE ac.autorizacion_id = a.id) AS acompanantes
            FROM public.autorizaciones a
-           JOIN public.personas p ON p.id = a.visitante_id
+           -- H-15L-C01 · visitante_id es de visitantes, no de personas:
+           -- unirlo directo a personas dejaba la lista SIEMPRE vacía.
+           JOIN public.visitantes vi ON vi.copropiedad_id = a.copropiedad_id
+                                    AND vi.id = a.visitante_id
+           JOIN public.personas p ON p.id = vi.persona_id
           WHERE a.copropiedad_id = $1 AND a.vivienda_id = $2
           ORDER BY lower(a.vigencia) DESC
           LIMIT 200`,

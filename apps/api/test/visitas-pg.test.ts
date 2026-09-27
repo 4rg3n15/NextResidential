@@ -549,6 +549,12 @@ describe('F6 · el residente', () => {
  * El ciclo de recarga de la app, con reloj falso, lo prueba su propia suite.
  * ═════════════════════════════════════════════════════════════════════════════
  */
+/**
+ * 3i (corrección de la 15-L) · lo que uno escribe, el otro lo lee, por la API
+ * y contra la base. Es también la regresión de H-15L-C01: el directorio del
+ * residente unía `autorizaciones.visitante_id` con `personas` y la lista de la
+ * app salía siempre vacía contra PostgreSQL; el doble en memoria lo tapaba.
+ */
 describe('3i · sincronización app ↔ consola, contra la base', () => {
   let desdeLaApp = '';
 
