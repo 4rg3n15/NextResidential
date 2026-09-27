@@ -53,7 +53,11 @@ const raizApi = process.env.NCR_RAIZ_API ?? raiz;
 const raizWeb = process.env.NCR_RAIZ_WEB ?? raiz;
 const requerirDe = (paquete) => createRequire(resolve(raiz, paquete, 'package.json'));
 const { Pool } = requerirDe('apps/api')('pg');
-const { equipoSimulado } = requerirDe('apps/api')('@ncr/providers');
+const { equipoSimulado, aperturasFisicasPor, escriturasSinCuerpoPor } =
+  requerirDe('apps/api')('@ncr/providers');
+/** Rótulos del simulado: el oráculo de lo que el EQUIPO hizo (anexo 15-K). */
+const CAMARA_SIMULADA = 'camara-del-recorrido';
+const TERMINAL_SIMULADA = 'terminal-del-recorrido';
 
 const MIRA = '10000000-0000-4000-8000-000000000001';
 const BASE_PLANTILLA = 'ncr_recorrido_plantilla';
@@ -356,7 +360,12 @@ const arrancarApi = (doble, puerto, puertoWeb) => {
     DATABASE_URL: url,
     DATABASE_POOLER_URL: url,
     PERSISTENCIA_DE_EVENTOS: 'postgres',
-    PROVEEDOR_DE_EQUIPOS: 'simulado',
+    /**
+     * Anexo 15-K · el adaptador REAL (`HikvisionProvider`) hablando Digest por
+     * HTTP con los equipos simulados. Con `simulado` las órdenes las atendía el
+     * MockProvider y nunca llegaban al equipo: H-SITIO-13 y 15 no se podían ver.
+     */
+    PROVEEDOR_DE_EQUIPOS: 'hikvision', // kpi-11-exento: nombre del adaptador, no del protocolo
     INGESTA_FIRMA_SECRETO: SECRETO_DE_INGESTA,
     BIOMETRIA_LLAVE: 'llave-de-biometria-para-el-recorrido-32+',
     BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
@@ -415,14 +424,16 @@ const arrancarConsola = (doble, puertoApi, puertoWeb) => {
 };
 
 /** El Edge firma lo que ingesta; el recorrido firma con el secreto de SU API. */
-const ingestarLectura = async (puertoApi, dispositivoId, placa) => {
+const ingestarLectura = async (puertoApi, dispositivoId, placa) =>
+  ingestar(puertoApi, { dispositivoId, metodo: 'placa', placaLeida: placa });
+
+/** Un evento del Edge, firmado como lo firma él. */
+const ingestar = async (puertoApi, evento) => {
   const cuerpo = JSON.stringify({
     copropiedadId: MIRA,
-    dispositivoId,
-    metodo: 'placa',
-    placaLeida: placa,
     confianzaCentesimas: 97,
     referenciaExterna: `recorrido-${randomUUID()}`,
+    ...evento,
   });
   const marca = String(Math.floor(Date.now() / 1000));
   const firma = createHmac('sha256', SECRETO_DE_INGESTA).update(`${marca}.${cuerpo}`).digest('hex');
@@ -550,6 +561,7 @@ const principal = async () => {
     familia: 'camara',
     usuario: 'servicio',
     clave: claveCamara,
+    destino: CAMARA_SIMULADA,
     ctrlMod: '0',
     modelo: 'CAMARA-SIMULADA',
     firmware: 'V5.3.0 build 220101',
@@ -558,6 +570,7 @@ const principal = async () => {
     familia: 'terminal',
     usuario: 'servicio',
     clave: claveTerminal,
+    destino: TERMINAL_SIMULADA,
     verificacionRemota: true,
     modelo: 'TERMINAL-SIMULADA',
     firmware: 'V3.2.0',
@@ -571,12 +584,12 @@ const principal = async () => {
 
   const puertoApi = await puertoLibre();
   const puertoWeb = await puertoLibre();
-  paso('3 · API real sobre la base propia, proveedor simulado');
+  paso('3 · API real sobre la base propia, con el adaptador real contra los equipos simulados');
   const api = arrancarApi(doble, puertoApi, puertoWeb);
   if (!(await esperar(`http://127.0.0.1:${String(puertoApi)}/health`, 'la API'))) return;
   afirmar(
-    /proveedor de equipos activo: simulado/.test(api.salida.join('')),
-    'la API dice al arrancar que el proveedor activo es el simulado',
+    /proveedor de equipos activo: hikvision/.test(api.salida.join('')), // kpi-11-exento: nombre del adaptador
+    'la API arranca con el adaptador REAL: las órdenes viajan por HTTP y Digest a los equipos simulados',
   );
 
   paso('4 · consola compilada');
@@ -655,6 +668,7 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
   const camara = `Cámara del recorrido ${sufijo}`;
   const terminal = `Terminal del recorrido ${sufijo}`;
   let camaraId = null;
+  let terminalId = null;
 
   paso('5 · superadministrador: acceso con segundo factor y copropiedad');
   try {
@@ -714,6 +728,7 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
       usuario: 'servicio',
       clave: equipos.claveTerminal,
     });
+    terminalId = alta.cuerpo.id ?? null;
     afirmar(
       alta.estado === 201 && alta.cuerpo.capacidades?.bibliotecaDeRostros?.estado === 'si',
       'la terminal se da de alta y declara biblioteca de rostros',
@@ -787,6 +802,37 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
     await ordenarConMotivo(pagina, 'Recorrido: apertura remota desde la central');
     ok('la orden de Guardia virtual deja su «Última orden»');
   });
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ANEXO 15-K · LA PUERTA DE LA TERMINAL, Y LO QUE HIZO EL EQUIPO
+   *
+   * Hasta aquí las órdenes iban a la barrera de la cámara, y la puerta de la
+   * terminal —donde en sitio el «OK» no movió nada (H-SITIO-13)— no la cruzaba
+   * nadie. Un evento facial de la terminal sube a la cola (motivo crítico) y
+   * se abre desde Portería. La consola dice «aceptada» también cuando el relé
+   * no se mueve, así que el veredicto no sale de la pantalla: sale del EQUIPO
+   * simulado, que sabe si accionó y si le llegó una escritura vacía (H-SITIO-15).
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  const abiertasAntes = aperturasFisicasPor.get(TERMINAL_SIMULADA) ?? 0;
+  await bloque('la puerta de la terminal, desde Portería', async () => {
+    if (terminalId === null) throw new Error('no hay terminal dada de alta');
+    const estado = await ingestar(puertoApi, { dispositivoId: terminalId, metodo: 'facial' });
+    afirmar(estado === 202, `la API recibe el evento facial de la terminal (${String(estado)})`);
+    await pagina.goto(`${base}/porteria`, { waitUntil: 'networkidle' });
+    await ordenarConMotivo(pagina, 'Recorrido: la puerta de la terminal, con motivo');
+  });
+  afirmar(
+    (aperturasFisicasPor.get(TERMINAL_SIMULADA) ?? 0) > abiertasAntes,
+    'H-SITIO-13 · la orden llega a la terminal y su PUERTA se mueve: lo dice el equipo, no la consola',
+  );
+  const vacias =
+    (escriturasSinCuerpoPor.get(TERMINAL_SIMULADA) ?? 0) +
+    (escriturasSinCuerpoPor.get(CAMARA_SIMULADA) ?? 0);
+  afirmar(
+    vacias === 0,
+    `H-SITIO-15 · ninguna escritura llegó a los equipos con el cuerpo vacío (${String(vacias)} rechazadas con badXmlContent)`,
+  );
 
   paso('10 · Rostro del visitante: enlace, respuesta del titular, estado y sincronización');
   await bloque('consentimiento', async () => {
