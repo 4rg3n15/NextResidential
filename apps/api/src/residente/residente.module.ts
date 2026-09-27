@@ -26,13 +26,14 @@ import {
   ResolverMiAmbito,
   VerMiFamilia,
   VerMiHistorial,
-  VerMisAutorizaciones,
   VerMisVehiculos,
   VerMiVivienda,
 } from './aplicacion/casos-de-uso';
 import { BiometriaModule } from '../biometria';
 import { MiController } from './presentacion/mi.controller';
 import { MisVisitasController } from './presentacion/mis-visitas.controller';
+import { MisNotificacionesController } from './presentacion/mis-notificaciones.controller';
+import { VerMisNotificaciones, VerMisVisitasConSituacion } from './aplicacion/mis-notificaciones';
 import { GenerarMiVisita, MisUltimosVisitantes, VolverAAutorizar } from './aplicacion/mis-visitas';
 import { RevocarAutorizacion } from '../autorizaciones';
 import {
@@ -72,6 +73,8 @@ export class ResidenteModule {
       imports: [BiometriaModule.registrar()],
       controllers: [
         MiController,
+        // 15-L · lo que le importa al residente, desde la API (sin push).
+        MisNotificacionesController,
         // ETAPA 15-I · primer ingreso, ocupantes, perfil, vehículos propios y
         // su supervisión por el superadministrador.
         MiAltaController,
@@ -107,10 +110,16 @@ export class ResidenteModule {
           useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente) => new VerMisVehiculos(r, d),
         },
         {
-          provide: VerMisAutorizaciones,
-          inject: [ResolverMiAmbito, DIRECTORIO_DEL_RESIDENTE],
-          useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente) =>
-            new VerMisAutorizaciones(r, d),
+          provide: VerMisVisitasConSituacion,
+          inject: [ResolverMiAmbito, DIRECTORIO_DEL_RESIDENTE, RELOJ],
+          useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente, reloj: Reloj) =>
+            new VerMisVisitasConSituacion(r, d, reloj),
+        },
+        {
+          provide: VerMisNotificaciones,
+          inject: [ResolverMiAmbito, DIRECTORIO_DEL_RESIDENTE, RELOJ],
+          useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente, reloj: Reloj) =>
+            new VerMisNotificaciones(r, d, reloj),
         },
         {
           provide: AUTORIZACIONES_DEL_RESIDENTE,

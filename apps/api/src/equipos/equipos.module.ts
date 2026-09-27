@@ -35,6 +35,7 @@ import { RepositorioDeEquiposPg } from './infraestructura/repositorio-equipos-pg
 import { SondaPorProveedor } from './infraestructura/sonda-por-proveedor';
 import { CorrectorPorProveedor } from './infraestructura/corrector-por-proveedor';
 import { EquiposController } from './presentacion/equipos.controller';
+import { NombresDeEquiposController } from './presentacion/nombres-de-equipos.controller';
 import { ALCANCE_DE_EQUIPOS, AlcanceDeEquipos } from './presentacion/alcance-de-equipos';
 import { REGISTRO_AUDITORIA } from '../comun/auditoria';
 import type { RegistroDeAuditoria } from '../comun/auditoria';
@@ -53,7 +54,7 @@ export class EquiposModule {
   static registrar(): DynamicModule {
     return {
       module: EquiposModule,
-      controllers: [EquiposController, AtestacionesController],
+      controllers: [EquiposController, AtestacionesController, NombresDeEquiposController],
       providers: [
         {
           // C1 (15-L) · el proveedor olvida lo que recordaba de un equipo editado.

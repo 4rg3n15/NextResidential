@@ -25,6 +25,7 @@ import type {
   Equipos,
 } from '@ncr/contracts';
 import { cliente, desenvolver } from './cliente';
+import { RECARGA_DE_LISTAS_COMPARTIDAS } from './recarga';
 
 /**
  * Consultas del tablero.
@@ -198,6 +199,9 @@ export const useVehiculos = (
   useQuery({
     enabled: habilitada && copropiedadId !== '',
     queryKey: clavesDe09B.vehiculos(copropiedadId),
+    // 3h · los vehículos propios los registra y los da de baja el residente
+    // desde la app: la pantalla de Vehículos los ve sin recargar la página.
+    ...RECARGA_DE_LISTAS_COMPARTIDAS,
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/padron/vehiculos', {
@@ -412,17 +416,30 @@ export const useFotografiaDeVisitante = (
  * el estado en línea; la ficha y la edición necesitan esto. Cuelga de la misma
  * clave `['dispositivos', copropiedad]` que invalidan el alta y las órdenes.
  */
-/**
- * `habilitada` en falso para los roles a los que la API no da la lista (sólo
- * administración la lee): preguntar para recibir un 403 no informa de nada.
- */
-export const useEquipos = (copropiedadId: string, habilitada = true): UseQueryResult<Equipos> =>
+export const useEquipos = (copropiedadId: string): UseQueryResult<Equipos> =>
   useQuery({
     queryKey: ['dispositivos', copropiedadId, 'equipos'] as const,
-    enabled: habilitada,
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/equipos', {
+          params: { path: { id: copropiedadId } },
+        }),
+      ),
+  });
+
+/**
+ * DT-15L-02 · sólo el nombre de cada equipo, para todos los roles que operan.
+ * La lista completa (`useEquipos`) es de administración.
+ */
+export const useNombresDeEquipos = (
+  copropiedadId: string,
+): UseQueryResult<readonly { readonly id: string; readonly nombre: string }[]> =>
+  useQuery({
+    queryKey: ['dispositivos', copropiedadId, 'nombres'] as const,
+    enabled: copropiedadId !== '',
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/nombres-de-equipos', {
           params: { path: { id: copropiedadId } },
         }),
       ),

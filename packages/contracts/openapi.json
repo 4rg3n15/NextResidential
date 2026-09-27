@@ -3651,6 +3651,45 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/notificaciones": {
+      "get": {
+        "operationId": "MisNotificacionesController_notificaciones",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MiNotificacionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mis notificaciones: visitas rechazadas con su motivo e ingresos de mis visitantes",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/notificaciones/aparatos": {
       "post": {
         "operationId": "MiController_registrarAparato",
@@ -4241,6 +4280,45 @@
         "summary": "Zonas comunes con aforo y horario en vivo (HU-19, M-5)",
         "tags": [
           "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/nombres-de-equipos": {
+      "get": {
+        "operationId": "NombresDeEquiposController_nombres",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NombreDeEquipoDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El nombre de cada equipo de la copropiedad, sin nada más",
+        "tags": [
+          "equipos"
         ]
       }
     },
@@ -11389,6 +11467,21 @@
           },
           "acompanantes": {
             "type": "number"
+          },
+          "situacion": {
+            "type": "string",
+            "enum": [
+              "vigente",
+              "programada",
+              "vencida",
+              "rechazada"
+            ],
+            "description": "Lo que enseña la tarjeta de la app, con el reloj del servidor: vigente, programada, vencida o rechazada (anulada por portería o superadministración)"
+          },
+          "motivoRechazo": {
+            "type": "string",
+            "nullable": true,
+            "description": "El motivo que escribió quien la rechazó. `null` si no está rechazada"
           }
         },
         "required": [
@@ -11400,7 +11493,9 @@
           "placa",
           "permiteAccesoVehicular",
           "estado",
-          "acompanantes"
+          "acompanantes",
+          "situacion",
+          "motivoRechazo"
         ]
       },
       "MiEventoDto": {
@@ -11444,6 +11539,10 @@
           "decididoPorEdge": {
             "type": "boolean",
             "description": "KPI-31 · decidido por el Edge: la app lo marca, no lo esconde."
+          },
+          "deVisitante": {
+            "type": "boolean",
+            "description": "El acceso fue por una autorización de visita"
           }
         },
         "required": [
@@ -11456,7 +11555,8 @@
           "placaDetectada",
           "persona",
           "zona",
-          "decididoPorEdge"
+          "decididoPorEdge",
+          "deVisitante"
         ]
       },
       "MiInicioDto": {
@@ -11477,6 +11577,47 @@
           "vivienda",
           "vinculo",
           "puedeAutorizar"
+        ]
+      },
+      "MiNotificacionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Estable: la app la usa para saber qué ya vio"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "visita_rechazada",
+              "ingreso_de_visitante"
+            ]
+          },
+          "en": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "visitante": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true
+          },
+          "autorizacionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "en",
+          "visitante",
+          "motivo",
+          "autorizacionId"
         ]
       },
       "MiVehiculoDto": {
@@ -11853,6 +11994,22 @@
         },
         "required": [
           "activo"
+        ]
+      },
+      "NombreDeEquipoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
         ]
       },
       "NotasDeAlertaDto": {

@@ -19,6 +19,7 @@ class MiEventoDto {
     required this.persona,
     required this.zona,
     required this.decididoPorEdge,
+    required this.deVisitante,
   });
   
   factory MiEventoDto.fromJson(Map<String, Object?> json) => _$MiEventoDtoFromJson(json);
@@ -37,6 +38,9 @@ class MiEventoDto {
 
   /// KPI-31 · decidido por el Edge: la app lo marca, no lo esconde.
   final bool decididoPorEdge;
+
+  /// El acceso fue por una autorización de visita
+  final bool deVisitante;
 
   Map<String, Object?> toJson() => _$MiEventoDtoToJson(this);
 }

@@ -454,14 +454,18 @@ describe('dispositivos', () => {
 
 describe('eventos', () => {
   it('el banner de alertas críticas se pinta y el evento trae su motivo', async () => {
-    // El inventario de equipos, sólo aquí: la pantalla de dispositivos espera el suyo.
+    // Los NOMBRES de los equipos (DT-15L-02): la ruta que también lee el
+    // portero. La lista completa de equipos es de administración y esta
+    // pantalla ya no la pide.
     const base = servidorFalso();
+    const pedidas: string[] = [];
     vi.stubGlobal(
       'fetch',
       vi.fn(async (entrada: string | Request) => {
         const url = typeof entrada === 'string' ? entrada : entrada.url;
-        if (url.includes('/equipos')) {
-          return respuesta({ equipos: [{ id: 'dis-1', nombre: 'Talanquera principal' }] });
+        pedidas.push(url);
+        if (url.includes('/nombres-de-equipos')) {
+          return respuesta([{ id: 'dis-1', nombre: 'Talanquera principal' }]);
         }
         return base(entrada);
       }),
@@ -478,6 +482,9 @@ describe('eventos', () => {
       ),
     );
     expect(screen.queryByText('LISTA_NEGRA')).toBeNull();
+    expect(pedidas.some((u) => /\/equipos(\?|$)/.test(new URL(u, 'http://x').pathname))).toBe(
+      false,
+    );
   });
 });
 

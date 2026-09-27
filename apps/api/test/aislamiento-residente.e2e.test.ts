@@ -75,6 +75,8 @@ const RECORRIDAS: Record<string, { readonly esperaLista: boolean }> = {
   // 15-I · ocupantes (con los códigos libres) y perfil: de SU vivienda y de SU persona.
   'GET /copropiedades/:id/mi/ocupantes': { esperaLista: false },
   'GET /copropiedades/:id/mi/perfil': { esperaLista: false },
+  // 15-L · las notificaciones salen del mismo directorio acotado a SU vivienda.
+  'GET /copropiedades/:id/mi/notificaciones': { esperaLista: true },
 };
 
 /**

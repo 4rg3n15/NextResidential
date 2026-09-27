@@ -10,6 +10,7 @@ import type {
   ViviendaDeVisita,
 } from '@ncr/contracts';
 import { cliente, desenvolver } from './cliente';
+import { RECARGA_DE_LISTAS_COMPARTIDAS } from './recarga';
 
 /**
  * F (15-L) · las consultas de «Visitantes».
@@ -51,9 +52,10 @@ export const useVisitas = (
 ): UseQueryResult<ListaDeVisitas> =>
   useQuery({
     queryKey: [...clavesDeVisitas.raiz(copropiedadId), 'lista', filtros] as const,
-    // La lista de portería cambia sola a medianoche: se vuelve a pedir cada
-    // minuto aunque el canal en vivo esté mudo.
-    refetchInterval: 60_000,
+    // La lista cambia sola a medianoche y cuando el residente genera una
+    // visita desde la app: se vuelve a pedir al volver a la ventana y cada
+    // 15 s aunque el canal en vivo esté mudo (3h).
+    ...RECARGA_DE_LISTAS_COMPARTIDAS,
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/visitas', {

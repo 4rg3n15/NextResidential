@@ -12,7 +12,7 @@ import { Distintivo } from '@/componentes/ui/distintivo';
 import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
 import { EstadoCargando, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
-import { useAlertasAbiertas, useEquipos } from '@/lib/api/consultas';
+import { useAlertasAbiertas, useNombresDeEquipos } from '@/lib/api/consultas';
 import { abrirCanal } from '@/lib/sse/canal';
 import type { EstadoDelCanal } from '@/lib/sse/canal';
 import { ORIGEN, TIPOS_DE_LA_LINEA } from './tipos-de-evento';
@@ -49,14 +49,8 @@ const tonoDe = (e: ElementoDeLineaDeTiempo): TonoDeDistintivo => {
  */
 export const PantallaDeEventos = ({
   copropiedadId,
-  veEquipos = true,
 }: {
   readonly copropiedadId: string;
-  /**
-   * 15-L · portería y central no leen la lista de equipos (es de
-   * administración): sin ella la pantalla no pide nada que la API le niegue.
-   */
-  readonly veEquipos?: boolean;
 }): JSX.Element => {
   const [desde, setDesde] = useState(haceDias(7));
   const [hasta, setHasta] = useState(haceDias(0));
@@ -113,9 +107,11 @@ export const PantallaDeEventos = ({
     });
   }, [clientes, copropiedadId]);
 
-  const equipos = useEquipos(copropiedadId, veEquipos);
+  // DT-15L-02 · sólo los nombres: portería y central los necesitan para saber
+  // qué equipo emitió cada evento, y la lista completa es de administración.
+  const equipos = useNombresDeEquipos(copropiedadId);
   const nombres = useMemo(
-    () => new Map((equipos.data?.equipos ?? []).map((e) => [e.id, e.nombre] as const)),
+    () => new Map((equipos.data ?? []).map((e) => [e.id, e.nombre] as const)),
     [equipos.data],
   );
   const nombreDe = (id: string): string => nombres.get(id) ?? 'Equipo sin nombre';
@@ -276,24 +272,22 @@ export const PantallaDeEventos = ({
                 ))}
               </select>
             </label>
-            {veEquipos ? (
-              <label className="flex items-center gap-2 text-secundario">
-                <span className="text-texto-apagado">Equipo</span>
-                <select
-                  value={dispositivoId}
-                  onChange={(e) => setDispositivoId(e.target.value)}
-                  aria-label="Filtrar por equipo"
-                  className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
-                >
-                  <option value="">Todos</option>
-                  {(equipos.data?.equipos ?? []).map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nombre}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
+            <label className="flex items-center gap-2 text-secundario">
+              <span className="text-texto-apagado">Equipo</span>
+              <select
+                value={dispositivoId}
+                onChange={(e) => setDispositivoId(e.target.value)}
+                aria-label="Filtrar por equipo"
+                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
+              >
+                <option value="">Todos</option>
+                {(equipos.data ?? []).map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
           </>
         }
         vacio={{

@@ -89,6 +89,9 @@ export interface AutorizacionDelResidente {
   readonly permiteAccesoVehicular: boolean;
   readonly estado: string;
   readonly acompanantes: number;
+  /** 15-L · si se anuló (rechazo de portería o superadministración), cuándo y por qué. */
+  readonly revocadaEn: string | null;
+  readonly motivoRevocacion: string | null;
 }
 
 export interface EventoDelResidente {
@@ -103,6 +106,8 @@ export interface EventoDelResidente {
   readonly persona: string | null;
   readonly zona: string | null;
   readonly decididoPorEdge: boolean;
+  /** 15-L · el acceso fue por una autorización de visita (no de un residente). */
+  readonly deVisitante: boolean;
 }
 
 export interface FiltroDeHistorial {

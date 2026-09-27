@@ -20,12 +20,12 @@ import { Aislamiento } from '../../multiempresa/aislamiento';
 import {
   VerMiFamilia,
   VerMiHistorial,
-  VerMisAutorizaciones,
   VerMisVehiculos,
   VerMiVivienda,
 } from '../aplicacion/casos-de-uso';
 import { CrearMiAutorizacion } from '../aplicacion/crear-mi-autorizacion';
 import { RegistrarMiAparato, VerMisZonas } from '../aplicacion/casos-de-uso-11b';
+import { VerMisVisitasConSituacion } from '../aplicacion/mis-notificaciones';
 import { HistorialQueryDto, NuevaVisitaDto, TokenDeNotificacionDto } from './dtos';
 import {
   AparatoRegistradoDto,
@@ -77,7 +77,8 @@ export class MiController {
     @Inject(VerMiVivienda) private readonly verVivienda: VerMiVivienda,
     @Inject(VerMiFamilia) private readonly verFamilia: VerMiFamilia,
     @Inject(VerMisVehiculos) private readonly verVehiculos: VerMisVehiculos,
-    @Inject(VerMisAutorizaciones) private readonly verAutorizaciones: VerMisAutorizaciones,
+    @Inject(VerMisVisitasConSituacion)
+    private readonly verAutorizaciones: VerMisVisitasConSituacion,
     @Inject(VerMiHistorial) private readonly verHistorial: VerMiHistorial,
     @Inject(CrearMiAutorizacion) private readonly crearMiAutorizacion: CrearMiAutorizacion,
     @Inject(VerMisZonas) private readonly verMisZonas: VerMisZonas,

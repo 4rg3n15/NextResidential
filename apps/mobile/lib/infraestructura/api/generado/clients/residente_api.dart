@@ -12,6 +12,7 @@ import '../models/estado_de_mi_alta_dto.dart';
 import '../models/mi_autorizacion_dto.dart';
 import '../models/mi_evento_dto.dart';
 import '../models/mi_inicio_dto.dart';
+import '../models/mi_notificacion_dto.dart';
 import '../models/mi_vehiculo_dto.dart';
 import '../models/mi_visita_dto.dart';
 import '../models/mi_visita_generada_dto.dart';
@@ -76,6 +77,12 @@ abstract class ResidenteApi {
     @Path('id') required String id,
     @Query('periodo') Periodo? periodo = Periodo.mes,
     @Query('limite') num? limite = 50,
+  });
+
+  /// Mis notificaciones: visitas rechazadas con su motivo e ingresos de mis visitantes
+  @GET('/copropiedades/{id}/mi/notificaciones')
+  Future<List<MiNotificacionDto>> misNotificacionesControllerNotificaciones({
+    @Path('id') required String id,
   });
 
   /// Registro este aparato para recibir notificaciones (HU-34, M-7)

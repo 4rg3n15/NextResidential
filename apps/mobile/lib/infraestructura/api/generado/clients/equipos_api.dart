@@ -13,6 +13,7 @@ import '../models/correccion_de_equipo_dto.dart';
 import '../models/edicion_de_equipo_dto.dart';
 import '../models/equipo_dto.dart';
 import '../models/equipos_dto.dart';
+import '../models/nombre_de_equipo_dto.dart';
 import '../models/resultado_de_correccion_dto.dart';
 import '../models/resultado_de_sondeo_dto.dart';
 
@@ -86,5 +87,11 @@ abstract class EquiposApi {
   Future<EquipoDto> equiposControllerReactivar({
     @Path('id') required String id,
     @Path('equipoId') required String equipoId,
+  });
+
+  /// El nombre de cada equipo de la copropiedad, sin nada más
+  @GET('/copropiedades/{id}/nombres-de-equipos')
+  Future<List<NombreDeEquipoDto>> nombresDeEquiposControllerNombres({
+    @Path('id') required String id,
   });
 }

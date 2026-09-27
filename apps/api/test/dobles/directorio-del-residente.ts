@@ -128,6 +128,8 @@ const DATOS: ReadonlyMap<string, Datos> = new Map([
           permiteAccesoVehicular: true,
           estado: 'activa',
           acompanantes: 1,
+          revocadaEn: null,
+          motivoRevocacion: null,
         },
       ],
       eventos: [
@@ -142,6 +144,7 @@ const DATOS: ReadonlyMap<string, Datos> = new Map([
           persona: 'Visitante propio',
           zona: null,
           decididoPorEdge: false,
+          deVisitante: false,
         },
       ],
     },
@@ -182,6 +185,8 @@ const DATOS: ReadonlyMap<string, Datos> = new Map([
           permiteAccesoVehicular: true,
           estado: 'activa',
           acompanantes: 0,
+          revocadaEn: null,
+          motivoRevocacion: null,
         },
       ],
       eventos: [
@@ -196,6 +201,7 @@ const DATOS: ReadonlyMap<string, Datos> = new Map([
           persona: 'Visitante del vecino',
           zona: null,
           decididoPorEdge: false,
+          deVisitante: false,
         },
       ],
     },

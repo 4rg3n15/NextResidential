@@ -9,7 +9,7 @@ import { capacidadesDescubiertas } from '@ncr/providers';
 import type { ContextoTenant } from '../src/autenticacion';
 import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositorio-equipos-pg';
 import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso';
-import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
+import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -536,5 +536,76 @@ describe('F6 · el residente', () => {
       },
     );
     expect(r.status).toBe(404);
+  });
+});
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 3i (corrección de la 15-L) · LA APP Y LA CONSOLA LEEN LO MISMO
+ *
+ * Las dos superficies usan la MISMA API sobre la MISMA base: lo que una cambia,
+ * la otra lo lee en su siguiente recarga. Aquí se hace con las rutas que usa
+ * cada una —la app, `…/mi/…`; la consola, `…/visitas`— y sin nada en medio.
+ * El ciclo de recarga de la app, con reloj falso, lo prueba su propia suite.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+describe('3i · sincronización app ↔ consola, contra la base', () => {
+  let desdeLaApp = '';
+
+  it('el residente crea una visita en la app y la consola la lista en el acto', async () => {
+    if (omitida()) return;
+    const r = await con(residente).post(`/copropiedades/${COP_A}/mi/visitas`, visitaDeLaApp(8));
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
+    desdeLaApp = r.body.id as string;
+    const consola = await con(portero).get(`/copropiedades/${COP_A}/visitas`);
+    const v = (consola.body.visitas as { autorizacionId: string; estado: string }[]).find(
+      (x) => x.autorizacionId === desdeLaApp,
+    );
+    expect(v?.estado).toBe('vigente');
+    const app = await con(residente).get(`/copropiedades/${COP_A}/mi/autorizaciones`);
+    expect(
+      (app.body as { id: string; situacion: string; motivoRechazo: string | null }[]).find(
+        (a) => a.id === desdeLaApp,
+      ),
+    ).toMatchObject({ situacion: 'vigente', motivoRechazo: null });
+  });
+
+  it('el portero la rechaza en la consola y la app la ve «rechazada», con su motivo y su aviso', async () => {
+    if (omitida()) return;
+    const motivo = `El residente no la espera ${CORRIDA}`;
+    const rechazo = await con(portero).post(
+      `/copropiedades/${COP_A}/visitas/${desdeLaApp}/rechazo`,
+      { motivo },
+    );
+    expect(rechazo.status, JSON.stringify(rechazo.body)).toBe(201);
+
+    const app = await con(residente).get(`/copropiedades/${COP_A}/mi/autorizaciones`);
+    expect(
+      (app.body as { id: string; situacion: string; motivoRechazo: string | null }[]).find(
+        (a) => a.id === desdeLaApp,
+      ),
+    ).toMatchObject({ situacion: 'rechazada', motivoRechazo: motivo });
+
+    const avisos = await con(residente).get(`/copropiedades/${COP_A}/mi/notificaciones`);
+    expect(avisos.status).toBe(200);
+    expect(
+      (
+        avisos.body as { tipo: string; autorizacionId: string | null; motivo: string | null }[]
+      ).find((n) => n.autorizacionId === desdeLaApp),
+    ).toMatchObject({ tipo: 'visita_rechazada', motivo });
+  });
+
+  it('las notificaciones son de SU copropiedad: otra, con el mismo token, se niega', async () => {
+    if (omitida()) return;
+    const ajena = await con(residente).get(`/copropiedades/${COP_B}/mi/notificaciones`);
+    expect([403, 404]).toContain(ajena.status);
+    // Y la visita rechazada de ESTA vivienda no aparece en la lista del portero
+    // como de otra: la consola la sigue viendo, anulada.
+    const consola = await con(portero).get(`/copropiedades/${COP_A}/visitas`);
+    expect(
+      (consola.body.visitas as { autorizacionId: string; estado: string }[]).find(
+        (x) => x.autorizacionId === desdeLaApp,
+      )?.estado,
+    ).toBe('anulada');
   });
 });

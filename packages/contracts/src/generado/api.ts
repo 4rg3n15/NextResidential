@@ -1000,6 +1000,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/mi/notificaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mis notificaciones: visitas rechazadas con su motivo e ingresos de mis visitantes */
+        get: operations["MisNotificacionesController_notificaciones"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/notificaciones/aparatos": {
         parameters: {
             query?: never;
@@ -1182,6 +1199,23 @@ export interface paths {
         };
         /** Zonas comunes con aforo y horario en vivo (HU-19, M-5) */
         get: operations["MiController_zonas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/nombres-de-equipos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El nombre de cada equipo de la copropiedad, sin nada más */
+        get: operations["NombresDeEquiposController_nombres"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3440,6 +3474,13 @@ export interface components {
             permiteAccesoVehicular: boolean;
             estado: string;
             acompanantes: number;
+            /**
+             * @description Lo que enseña la tarjeta de la app, con el reloj del servidor: vigente, programada, vencida o rechazada (anulada por portería o superadministración)
+             * @enum {string}
+             */
+            situacion: "vigente" | "programada" | "vencida" | "rechazada";
+            /** @description El motivo que escribió quien la rechazó. `null` si no está rechazada */
+            motivoRechazo: string | null;
         };
         MiEventoDto: {
             /** Format: uuid */
@@ -3456,12 +3497,26 @@ export interface components {
             zona: string | null;
             /** @description KPI-31 · decidido por el Edge: la app lo marca, no lo esconde. */
             decididoPorEdge: boolean;
+            /** @description El acceso fue por una autorización de visita */
+            deVisitante: boolean;
         };
         MiInicioDto: {
             vivienda: components["schemas"]["MiViviendaDto"];
             vinculo: components["schemas"]["MiVinculoDto"];
             /** @description Si puede crear autorizaciones: exige vivienda activa (RN-13) y ser titular (RN-05). Lo decide el servidor; la app no repite la regla. */
             puedeAutorizar: boolean;
+        };
+        MiNotificacionDto: {
+            /** @description Estable: la app la usa para saber qué ya vio */
+            id: string;
+            /** @enum {string} */
+            tipo: "visita_rechazada" | "ingreso_de_visitante";
+            /** Format: date-time */
+            en: string;
+            visitante: string | null;
+            motivo: string | null;
+            /** Format: uuid */
+            autorizacionId: string | null;
         };
         MiVehiculoDto: {
             /** Format: uuid */
@@ -3569,6 +3624,11 @@ export interface components {
         ModoPruebasDto: {
             /** @description Con el modo pruebas activo, las restricciones de porteros se evalúan y se registran sin bloquear, no hay bloqueo por intentos fallidos y el límite de peticiones es más alto */
             activo: boolean;
+        };
+        NombreDeEquipoDto: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
         };
         NotasDeAlertaDto: {
             notas: string;
@@ -6310,6 +6370,27 @@ export interface operations {
             };
         };
     };
+    MisNotificacionesController_notificaciones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiNotificacionDto"][];
+                };
+            };
+        };
+    };
     MiController_registrarAparato: {
         parameters: {
             query?: never;
@@ -6630,6 +6711,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MiZonaDto"][];
+                };
+            };
+        };
+    };
+    NombresDeEquiposController_nombres: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NombreDeEquipoDto"][];
                 };
             };
         };

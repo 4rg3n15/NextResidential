@@ -1,4 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { SITUACIONES_DE_VISITA, TIPOS_DE_NOTIFICACION } from '../aplicacion/mis-notificaciones';
+import type { SituacionDeVisita, TipoDeNotificacion } from '../aplicacion/mis-notificaciones';
 
 /**
  * DTOs de salida de la superficie del residente.
@@ -90,6 +92,29 @@ export class MiAutorizacionDto {
   @ApiProperty({ type: Boolean }) permiteAccesoVehicular!: boolean;
   @ApiProperty({ type: String }) estado!: string;
   @ApiProperty({ type: Number }) acompanantes!: number;
+  @ApiProperty({
+    enum: SITUACIONES_DE_VISITA,
+    description:
+      'Lo que enseña la tarjeta de la app, con el reloj del servidor: vigente, programada, ' +
+      'vencida o rechazada (anulada por portería o superadministración)',
+  })
+  situacion!: SituacionDeVisita;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'El motivo que escribió quien la rechazó. `null` si no está rechazada',
+  })
+  motivoRechazo!: string | null;
+}
+
+export class MiNotificacionDto {
+  @ApiProperty({ type: String, description: 'Estable: la app la usa para saber qué ya vio' })
+  id!: string;
+  @ApiProperty({ enum: TIPOS_DE_NOTIFICACION }) tipo!: TipoDeNotificacion;
+  @ApiProperty({ type: String, format: 'date-time' }) en!: string;
+  @ApiProperty({ type: String, nullable: true }) visitante!: string | null;
+  @ApiProperty({ type: String, nullable: true }) motivo!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) autorizacionId!: string | null;
 }
 
 export class MiEventoDto {
@@ -112,6 +137,8 @@ export class MiEventoDto {
     description: 'KPI-31 · decidido por el Edge: la app lo marca, no lo esconde.',
   })
   decididoPorEdge!: boolean;
+  @ApiProperty({ type: Boolean, description: 'El acceso fue por una autorización de visita' })
+  deVisitante!: boolean;
 }
 
 /**

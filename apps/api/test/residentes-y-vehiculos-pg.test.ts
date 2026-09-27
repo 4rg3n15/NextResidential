@@ -438,6 +438,18 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
     }
     const cabe = await con(primero).post(`/copropiedades/${COP_A}/mi/vehiculos`, nueva);
     expect(cabe.body.registrado, JSON.stringify(cabe.body)).toBe(true);
+
+    // 3i (corrección de la 15-L) · lo que el residente cambió en la APP es lo
+    // que la CONSOLA lista en su siguiente recarga: la misma API, la misma base.
+    const consola = await comoSuper('get', `/copropiedades/${COP_A}/residentes/vehiculos`);
+    const porPlaca = new Map(
+      (consola.body as { placa: string; activo: boolean }[]).map((v) => [v.placa, v.activo]),
+    );
+    expect(porPlaca.get(nueva.placa)).toBe(true);
+    for (const v of propios.rows.slice(0, 2)) {
+      const dado = (consola.body as { id: string; activo: boolean }[]).find((x) => x.id === v.id);
+      expect(dado?.activo ?? false, 'dado de baja en la app, inactivo en la consola').toBe(false);
+    }
   });
 
   it('ADR-04 · altas CONCURRENTES no rebasan el tope: la base decide', async () => {
