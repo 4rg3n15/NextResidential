@@ -447,6 +447,12 @@ const vigilar = (pagina, registro) => {
     if (r.status() === 404 && /\/eventos\/[^/]+\/evidencia$/.test(new URL(r.url()).pathname)) {
       return;
     }
+    // El recorrido no levanta go2rtc (el vídeo no es lo que mide): la vista en
+    // vivo de Guardia contesta 503 «puente de vídeo no disponible», como en el
+    // ensayo V3. En macOS Chromium la pide y en Linux no; no es un fallo.
+    if (r.status() === 503 && /\/guardia\/video\/[^/]+\/whep$/.test(new URL(r.url()).pathname)) {
+      return;
+    }
     registro.push(`${String(r.status())} ${r.request().method()} ${new URL(r.url()).pathname}`);
   });
 };
@@ -524,14 +530,16 @@ const enBogota = (fecha) => {
 const principal = async () => {
   paso('0 · Chromium y base de pruebas');
   const ejecutable = chromiumDelEntorno();
-  if (ejecutable === null) {
-    mal('no hay Chromium: el recorrido de la consola NO se ha verificado');
-    return;
-  }
-  if (process.env.DATABASE_URL_PRUEBAS === undefined || process.env.DATABASE_URL_PRUEBAS === '') {
+  const sinBase =
+    process.env.DATABASE_URL_PRUEBAS === undefined || process.env.DATABASE_URL_PRUEBAS === '';
+  // Las DOS faltas se dicen, no sólo la primera: en el CI de «controles» no
+  // hay ni Chromium ni base, y la prueba negativa de la base esperaba su
+  // mensaje y recibía el del navegador (el CI de la 15-K lo destapó).
+  if (ejecutable === null) mal('no hay Chromium: el recorrido de la consola NO se ha verificado');
+  if (sinBase) {
     mal('sin DATABASE_URL_PRUEBAS no hay base: el recorrido de la consola NO se ha verificado');
-    return;
   }
+  if (ejecutable === null || sinBase) return;
   prepararBase();
   ok(`base ${BASE} recién copiada de la plantilla migrada y sembrada`);
 
