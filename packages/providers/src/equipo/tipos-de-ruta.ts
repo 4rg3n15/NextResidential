@@ -76,7 +76,8 @@ export interface RutaDeEquipo {
   readonly cuerpo?: { readonly tipo: string; readonly contenido: string };
   /**
    * Anexo 15-K · H-SITIO-15 · `true` si la escritura NO lleva cuerpo en la
-   * guía (el canal de audio). El cliente rechaza toda escritura sin cuerpo que
+   * guía (el canal de audio; [SUPUESTO] S-65 que el videoportero lo acepte).
+   * El cliente rechaza toda escritura sin cuerpo que
    * no lo declare: la terminal contesta 400 antes de autenticar, y un olvido
    * no puede parecerse a una decisión.
    */

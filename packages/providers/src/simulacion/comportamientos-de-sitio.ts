@@ -27,7 +27,7 @@ export const ESPACIO_ISAPI = 'http://www.isapi.org/ver20/XMLSchema';
 /**
  * H-SITIO-15 · lo que contestó la terminal a un cuerpo vacío: `badXmlContent`
  * con el errorCode 1610612739 (0x60000003). El `statusCode 6` es un
- * [SUPUESTO] de esta simulación: el anexo de sitio no lo recoge, y es el que la
+ * [SUPUESTO] S-63 de esta simulación: el anexo de sitio no lo recoge, y es el que la
  * guía asigna a «Invalid Content».
  */
 export const CONTENIDO_XML_MALO =
@@ -83,7 +83,7 @@ export const anotarEn = (mapa: Map<string, number>, destino: string | undefined)
  * ═════════════════════════════════════════════════════════════════════════════
  * H-SITIO-12 · EL DIGEST DE UN EQUIPO CUYO NONCE VENCE
  *
- * Por omisión el nonce vale 20 s de reloj, del orden de lo que se vio en sitio
+ * Por omisión el nonce vale 20 s de reloj ([SUPUESTO] S-64), del orden de lo que se vio en sitio
  * (la segunda orden, entre 9 y 35 s después de la primera, se rechazó). Un
  * cliente sin credencial recibe el nonce VIGENTE: dos clientes del mismo equipo
  * lo comparten sin saberlo. Rota una sola vez al vencer, así que las

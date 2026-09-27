@@ -602,6 +602,18 @@ const principal = async () => {
       claveTerminal,
     });
     await recorridoDelPortero(navegador, base);
+    /**
+     * H-SITIO-15 · al FINAL, no tras la puerta: así cuenta también las
+     * escrituras de la sincronización de la plantilla (persona y rostro) y la
+     * orden del portero. Lo dice el equipo, que es quien las rechaza.
+     */
+    const vacias =
+      (escriturasSinCuerpoPor.get(TERMINAL_SIMULADA) ?? 0) +
+      (escriturasSinCuerpoPor.get(CAMARA_SIMULADA) ?? 0);
+    afirmar(
+      vacias === 0,
+      `H-SITIO-15 · ninguna escritura llegó a los equipos con el cuerpo vacío (${String(vacias)} rechazadas con badXmlContent)`,
+    );
   } finally {
     await navegador.close();
     await lectura.end();
@@ -804,7 +816,8 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
    * nadie. Un evento facial de la terminal sube a la cola (motivo crítico) y
    * se abre desde Portería. La consola dice «aceptada» también cuando el relé
    * no se mueve, así que el veredicto no sale de la pantalla: sale del EQUIPO
-   * simulado, que sabe si accionó y si le llegó una escritura vacía (H-SITIO-15).
+   * simulado, que sabe si accionó. Si le llegó una escritura vacía (H-SITIO-15)
+   * se cuenta al final del recorrido, con todas las escrituras dentro.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   const abiertasAntes = aperturasFisicasPor.get(TERMINAL_SIMULADA) ?? 0;
@@ -818,13 +831,6 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
   afirmar(
     (aperturasFisicasPor.get(TERMINAL_SIMULADA) ?? 0) > abiertasAntes,
     'H-SITIO-13 · la orden llega a la terminal y su PUERTA se mueve: lo dice el equipo, no la consola',
-  );
-  const vacias =
-    (escriturasSinCuerpoPor.get(TERMINAL_SIMULADA) ?? 0) +
-    (escriturasSinCuerpoPor.get(CAMARA_SIMULADA) ?? 0);
-  afirmar(
-    vacias === 0,
-    `H-SITIO-15 · ninguna escritura llegó a los equipos con el cuerpo vacío (${String(vacias)} rechazadas con badXmlContent)`,
   );
 
   paso('10 · Rostro del visitante: enlace, respuesta del titular, estado y sincronización');

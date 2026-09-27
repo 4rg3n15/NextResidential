@@ -3026,6 +3026,34 @@ try {
         bien: '--con-audio dice que el canal de audio no se pudo abrir',
       },
     ];
+    // 38c · sin mutar nada: un equipo que no contesta NO es una apertura
+    // verificada, y `--abrir` lo dice con su salida.
+    {
+      const r = correr(
+        'node',
+        [
+          'scripts/puesta-en-marcha-equipos.mjs',
+          '--abrir',
+          `--informe=${join(banco, 'guion-38c.md')}`,
+        ],
+        {
+          timeout: 60_000,
+          input: '',
+          env: {
+            ...process.env,
+            TERMINAL_HOST: 'terminal-de-sonda.invalid',
+            TERMINAL_USUARIO: 'sonda',
+            TERMINAL_CLAVE: 'sonda',
+            VIDEOPORTERO_HOST: '',
+          },
+        },
+      );
+      r.codigo !== 0 &&
+      /orden NO aceptada/.test(r.salida) &&
+      /la apertura NO queda verificada/.test(r.salida)
+        ? ok('38c · --abrir contra un equipo que no contesta sale en 1 y lo dice')
+        : mal(`38c · --abrir sin equipo pasa por verde (codigo ${r.codigo})`);
+    }
     for (const caso of casos) {
       const arbol = arbolDeSonda({ copiar: ['packages/providers'] });
       try {
