@@ -322,6 +322,11 @@ desplegar el resto:
 
 ### 8.1 · Probar en un iPhone físico contra la API que corre en el Mac
 
+> **Paso a paso de la entrega en sitio (ETAPA 15-L, E3):** > [`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) — la comprobación previa con Safari
+> (`/health`), la confianza del desarrollador, el permiso de red local, qué
+> significa cada mensaje de error de la app y por qué la app en Debug sólo
+> arranca lanzada desde el Mac.
+
 ```
 flutter run -d <id-del-iPhone> \
   --dart-define=API_URL=http://<IP-del-Mac>:3000 \

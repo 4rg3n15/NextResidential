@@ -29,6 +29,7 @@ import 'infraestructura/notificaciones/fuente.dart';
 import 'infraestructura/plataforma/telefono_y_compartir.dart';
 import 'infraestructura/sesion/almacen_seguro.dart';
 import 'infraestructura/sesion/autenticador_por_api.dart';
+import 'infraestructura/red/tipo_de_red.dart';
 import 'infraestructura/sesion/autenticador_supabase.dart';
 import 'presentacion/app.dart';
 
@@ -61,6 +62,8 @@ Future<void> main() async {
         urlBase: ambiente.supabaseUrl,
         clavePublicable: ambiente.supabaseClavePublicable,
       ),
+      // E2 (15-L) · con la red del teléfono, el fallo de conexión dice su causa.
+      consultarRed: tipoDeRedActual,
     ),
     reloj: reloj,
   );
@@ -77,7 +80,9 @@ Future<void> main() async {
         sesion: sesion,
         repositorio: repositorio,
         reloj: reloj,
-        notificaciones: SinServicioDeMensajeria(identidad: IdentidadDelAparato()),
+        notificaciones: SinServicioDeMensajeria(
+          identidad: IdentidadDelAparato(),
+        ),
         claves: claveDeIdempotencia,
         alta: AltaPorApi(api: api, sesion: sesion),
         hogar: HogarPorApi(api: api, sesion: sesion),
@@ -122,7 +127,11 @@ class PantallaDeArranqueBloqueado extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.dangerous_outlined, size: 56, color: Color(0xFFDC3341)),
+                const Icon(
+                  Icons.dangerous_outlined,
+                  size: 56,
+                  color: Color(0xFFDC3341),
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'La app no puede arrancar con esta configuración',
