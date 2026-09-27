@@ -24,6 +24,8 @@ import type { ContextoTenant } from '../../autenticacion';
 export const REPOSITORIO_DE_EQUIPOS = Symbol.for('ncr.puerto.RepositorioDeEquipos');
 /** A4 · `{ activos() }`: los equipos que emiten y hay que escuchar. */
 export const EQUIPOS_QUE_EMITEN = Symbol.for('ncr.equipos.EquiposQueEmiten');
+/** C4 (15-L) · todos los equipos activos, para el latido. */
+export const EQUIPOS_ACTIVOS = Symbol.for('ncr.equipos.EquiposActivos');
 /** R1 (15-L) · `{ copropiedadDe(id) }`: de quién es un equipo que publica. */
 export const COPROPIEDAD_DE_EQUIPO = Symbol.for('ncr.equipos.CopropiedadDeEquipo');
 export const SONDA_DE_EQUIPO = Symbol.for('ncr.puerto.SondaDeEquipo');
@@ -122,6 +124,12 @@ export interface RepositorioDeEquipos {
    * es el proceso quien los escucha, no un usuario. Lectura de servicio.
    */
   activosQueEmiten(): Promise<readonly EquipoQueEmite[]>;
+  /**
+   * C4 (15-L) · TODOS los equipos activos, de todas las copropiedades, para
+   * el latido: la cámara y el relé también tienen que verse en línea. Lectura
+   * de servicio, como la anterior.
+   */
+  activos(): Promise<readonly EquipoQueEmite[]>;
   /**
    * R1 (15-L) · la copropiedad de un equipo ACTIVO, por su id. Lectura de
    * servicio como la anterior: la hace el receptor de eventos, que no tiene

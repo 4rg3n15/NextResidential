@@ -195,6 +195,27 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     });
   }
 
+  async activos(): Promise<readonly EquipoQueEmite[]> {
+    const lectura: ContextoTenant = {
+      usuarioId: ACTOR_INGESTA,
+      rol: 'superadministrador',
+      copropiedadId: null,
+      copropiedadesAtendidas: [],
+      mfaVerificado: true,
+    };
+    return this.conCliente(lectura, async (c) => {
+      const { rows } = await c.query<{ id: string; copropiedad_id: string; nombre: string }>(
+        `SELECT id, copropiedad_id, nombre FROM public.dispositivos
+          WHERE estado = 'activo' ORDER BY copropiedad_id, nombre`,
+      );
+      return rows.map((r) => ({
+        dispositivoId: r.id,
+        copropiedadId: r.copropiedad_id,
+        nombre: r.nombre,
+      }));
+    });
+  }
+
   async copropiedadDeActivo(dispositivoId: string): Promise<string | null> {
     // Un id que no es UUID no está en la tabla: se dice que no, en vez de
     // dejar que PostgreSQL lance por el tipo de la columna.

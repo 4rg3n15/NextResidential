@@ -24,4 +24,10 @@ export interface EscuchaActiva {
    * credencial— y quien la armó tiene que volver a pedirla. Ausente = sigue.
    */
   activa?(): boolean;
+  /**
+   * C4 (15-L) · cuándo llegó por última vez ALGO del equipo por esta escucha
+   * —un evento o su propio latido—. Es la señal de vida más barata: no cuesta
+   * una petición. `null` si todavía no llegó nada.
+   */
+  ultimaSenal?(): Date | null;
 }

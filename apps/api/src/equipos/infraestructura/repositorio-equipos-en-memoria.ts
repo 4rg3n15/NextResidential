@@ -107,6 +107,14 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
     return todos;
   }
 
+  async activos(): Promise<readonly EquipoQueEmite[]> {
+    return [...this.equipos].flatMap(([copropiedadId, equipos]) =>
+      equipos
+        .filter((e) => e.estado === 'activo')
+        .map((e) => ({ dispositivoId: e.id, copropiedadId, nombre: e.nombre })),
+    );
+  }
+
   async copropiedadDeActivo(dispositivoId: string): Promise<string | null> {
     for (const [copropiedadId, equipos] of this.equipos) {
       if (equipos.some((e) => e.id === dispositivoId && e.estado === 'activo')) {

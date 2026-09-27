@@ -8,6 +8,7 @@ import type { Configuracion } from '../configuracion/esquema';
 import {
   COPROPIEDAD_DE_EQUIPO,
   CORRECTOR_DE_EQUIPO,
+  EQUIPOS_ACTIVOS,
   EQUIPOS_QUE_EMITEN,
   REPOSITORIO_DE_EQUIPOS,
   OLVIDO_DE_EQUIPO,
@@ -115,6 +116,12 @@ export class EquiposModule {
           }),
         },
         {
+          // C4 (15-L) · a quién tomarle el latido: a todos los activos.
+          provide: EQUIPOS_ACTIVOS,
+          inject: [REPOSITORIO_DE_EQUIPOS],
+          useFactory: (equipos: RepositorioDeEquipos) => ({ activos: () => equipos.activos() }),
+        },
+        {
           // R1 (15-L) · lo que el receptor pregunta: de quién es este equipo.
           provide: COPROPIEDAD_DE_EQUIPO,
           inject: [REPOSITORIO_DE_EQUIPOS],
@@ -144,6 +151,7 @@ export class EquiposModule {
         REPOSITORIO_DE_EQUIPOS,
         TERMINALES_DE_ROSTROS,
         EQUIPOS_QUE_EMITEN,
+        EQUIPOS_ACTIVOS,
         COPROPIEDAD_DE_EQUIPO,
         ALCANCE_DE_EQUIPOS,
       ],

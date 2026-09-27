@@ -272,6 +272,11 @@ export const esquemaConfiguracion = z.object({
    * lo cambiaron, se dice aquí y no en el código.
    */
   VIDEO_PUERTO_RTSP: z.coerce.number().int().min(1).max(65535).default(554),
+  /**
+   * C4 (15-L) · cada cuántos segundos se toma el latido de los equipos
+   * (señal de su escucha o una lectura real de su identidad). 0 lo apaga.
+   */
+  EQUIPOS_LATIDO_S: z.coerce.number().int().min(0).max(3600).default(60),
   EQUIPOS_FOTO_LADO_MAXIMO: z.coerce.number().int().min(160).max(4096).default(1024),
 
   /**

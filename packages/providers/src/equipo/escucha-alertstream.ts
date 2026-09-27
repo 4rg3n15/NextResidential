@@ -98,6 +98,8 @@ export class EscuchaDeAlertStream {
   private readonly esperar: (ms: number) => Promise<void>;
   private readonly azar: () => number;
   private descartados = 0;
+  /** C4 (15-L) · el instante del último trozo recibido, sea evento o latido. */
+  private ultima: number | null = null;
 
   private readonly ahora: () => number;
 
@@ -196,6 +198,11 @@ export class EscuchaDeAlertStream {
     return this.opciones.transporte ?? 'alertStream';
   }
 
+  /** C4 (15-L) · la última vez que el equipo mandó algo por este flujo. */
+  ultimaSenal(): Date | null {
+    return this.ultima === null ? null : new Date(this.ultima);
+  }
+
   /**
    * ═══════════════════════════════════════════════════════════════════════════
    * H-SITIO-14 · UNA CONEXIÓN, CONTADA ENTERA
@@ -240,6 +247,7 @@ export class EscuchaDeAlertStream {
     let bloques = 0;
     try {
       for await (const trozo of flujo.trozos) {
+        this.ultima = this.ahora();
         for (const parte of lector.alimentar(trozo)) {
           bloques += 1;
           const evento = this.interpretarParte(parte);

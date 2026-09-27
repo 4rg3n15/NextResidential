@@ -7,6 +7,7 @@ import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositor
 import { RegistroDeEquiposPg } from '../src/equipos/infraestructura/registro-de-equipos-pg';
 import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioDeAtestacionesPg } from '../src/equipos/infraestructura/atestaciones';
+import { RepositorioDispositivosPg } from '../src/eventos/infraestructura/repositorio-dispositivos-pg';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -287,6 +288,53 @@ describe.skipIf(URL_BASE === undefined)('registro de equipos contra base real (D
       repo.editar(ctxAdmin(COP_A), COP_A, creado.id, { ...alta, zonaId: zonaAjena }, VEREDICTO),
     ).rejects.toMatchObject({ code: '23503' });
     await repo.desactivar(ctxAdmin(COP_A), COP_A, creado.id, 'fin de la prueba C2');
+  });
+
+  it('C4 (15-L) · el latido llega a `ultimo_latido`, no retrocede y no toca otra copropiedad', async () => {
+    if (!disponible)
+      throw new Error('la base de pruebas no tiene el actor administrador de la semilla');
+    const p = pool as Pool;
+    const repo = new RepositorioDeEquiposPg(p, LLAVE, 'env:EQUIPOS_LLAVE');
+    const creado = await repo.crear(
+      ctxAdmin(COP_A),
+      COP_A,
+      {
+        nombre: `Relé con latido ${CORRIDA}`,
+        tipo: 'rele',
+        host: `198.51.100.${String(1 + ((parseInt(CORRIDA, 16) + 13) % 200))}`,
+        puerto: PUERTO + 2,
+        protocolo: 'http',
+        usuario: 'servicio',
+        secreto: `clave-${CORRIDA}`,
+      },
+      VEREDICTO,
+    );
+    const latidos = new RepositorioDispositivosPg(p);
+    const leer = async (): Promise<Date | null> =>
+      (
+        await p.query<{ ultimo_latido: Date | null }>(
+          'SELECT ultimo_latido FROM public.dispositivos WHERE id = $1',
+          [creado.id],
+        )
+      ).rows[0]?.ultimo_latido ?? null;
+    expect(await leer()).toBeNull();
+
+    const reciente = new Date('2026-09-27T15:00:00Z');
+    await latidos.registrarLatido(COP_A, creado.id, reciente);
+    expect((await leer())?.toISOString()).toBe(reciente.toISOString());
+
+    // Una señal vieja que llega tarde no hace parecer caído al equipo.
+    await latidos.registrarLatido(COP_A, creado.id, new Date('2026-09-27T14:00:00Z'));
+    expect((await leer())?.toISOString()).toBe(reciente.toISOString());
+
+    // Con los claims de OTRA copropiedad, el equipo no se toca.
+    await latidos.registrarLatido(COP_B, creado.id, new Date('2026-09-27T16:00:00Z'));
+    expect((await leer())?.toISOString()).toBe(reciente.toISOString());
+
+    expect(
+      (await latidos.latidos(COP_A)).find((l) => l.dispositivoId === creado.id)?.ultimoLatido,
+    ).toEqual(reciente);
+    await repo.desactivar(ctxAdmin(COP_A), COP_A, creado.id, 'fin de la prueba C4');
   });
 
   it('un equipo que no existe o está dado de baja no se resuelve', async () => {

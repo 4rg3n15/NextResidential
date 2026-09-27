@@ -65,6 +65,11 @@ export class EscuchasDeEquipos implements OnApplicationBootstrap, OnApplicationS
     this.activas.clear();
   }
 
+  /** C4 (15-L) · cuándo mandó algo el equipo por su escucha, si la hay. */
+  ultimaSenal(dispositivoId: string): Date | null {
+    return this.activas.get(dispositivoId)?.ultimaSenal?.() ?? null;
+  }
+
   /** Abre lo que falta, cierra lo que sobra. Idempotente: se llama cada rato. */
   async rearmar(): Promise<ParteDeEscuchas> {
     let equipos: Awaited<ReturnType<EquiposParaEscucha['activos']>>;

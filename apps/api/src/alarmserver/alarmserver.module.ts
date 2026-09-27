@@ -19,11 +19,22 @@ import {
   CANAL_TIEMPO_REAL,
   REGISTRO_DE_EVENTOS_DE_EQUIPO,
   REGISTRO_DE_EVIDENCIA,
+  REPOSITORIO_DISPOSITIVOS,
 } from '../eventos';
-import type { CanalTiempoReal, RegistroDeEventosDeEquipo, RegistroDeEvidencia } from '../eventos';
+import type {
+  CanalTiempoReal,
+  RegistroDeEventosDeEquipo,
+  RegistroDeEvidencia,
+  RepositorioDispositivos,
+} from '../eventos';
 import { LOCALIZADOR_DE_VIVIENDA, PadronModule } from '../padron';
 import type { LocalizadorDeVivienda } from '../padron';
-import { COPROPIEDAD_DE_EQUIPO, EQUIPOS_QUE_EMITEN, EquiposModule } from '../equipos';
+import {
+  COPROPIEDAD_DE_EQUIPO,
+  EQUIPOS_ACTIVOS,
+  EQUIPOS_QUE_EMITEN,
+  EquiposModule,
+} from '../equipos';
 import { CopropiedadDelEquipoPorRegistro } from './aplicacion/copropiedad-del-equipo';
 import type { LocalizadorDeCopropiedadDeEquipo } from './aplicacion/copropiedad-del-equipo';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
@@ -36,6 +47,7 @@ import type {
 } from './aplicacion/puertos';
 import { AvisadorPorCanal } from './infraestructura/avisador-por-canal';
 import { EscuchasDeEquipos } from './aplicacion/escuchas-de-equipos';
+import { LatidosDeEquipos } from './aplicacion/latidos-de-equipos';
 
 /**
  * El receptor del «servidor de alarma», y la fuente por la que entran las
@@ -113,6 +125,31 @@ export class AlarmServerModule {
           ) =>
             new EscuchasDeEquipos(catalogo, proveedor, bitacora, {
               habilitadas: c.PROVEEDOR_DE_EQUIPOS !== 'simulado',
+            }),
+        },
+        {
+          // C4 (15-L) · el latido de TODOS los equipos activos, de una señal real.
+          provide: LatidosDeEquipos,
+          inject: [
+            EQUIPOS_ACTIVOS,
+            PROVEEDOR_DE_EQUIPOS,
+            EscuchasDeEquipos,
+            REPOSITORIO_DISPOSITIVOS,
+            RELOJ,
+            BITACORA,
+            CONFIGURACION,
+          ],
+          useFactory: (
+            equipos: EquiposParaEscucha,
+            proveedor: ProveedorDeEquipos,
+            escuchas: EscuchasDeEquipos,
+            latidos: RepositorioDispositivos,
+            reloj: Reloj,
+            bitacora: Bitacora,
+            c: Configuracion,
+          ) =>
+            new LatidosDeEquipos(equipos, proveedor, escuchas, latidos, reloj, bitacora, {
+              intervaloMs: c.EQUIPOS_LATIDO_S * 1000,
             }),
         },
         {

@@ -403,6 +403,7 @@ export class HikvisionProvider
         this.escuchas.delete(dispositivoId);
       },
       activa: () => !terminada,
+      ultimaSenal: () => escucha.ultimaSenal(),
     };
     this.escuchas.set(dispositivoId, nueva);
     return nueva;

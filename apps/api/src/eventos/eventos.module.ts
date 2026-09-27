@@ -8,6 +8,7 @@ import {
 } from './aplicacion/eventos-de-equipo';
 import type { RepositorioEventosDeEquipo } from './aplicacion/eventos-de-equipo';
 import { RepositorioEventosDeEquipoPg } from './infraestructura/repositorio-eventos-de-equipo-pg';
+import { RepositorioDispositivosPg } from './infraestructura/repositorio-dispositivos-pg';
 import type { DynamicModule } from '@nestjs/common';
 import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
@@ -187,8 +188,16 @@ export class EventosModule {
               : new RepositorioAlertasEnMemoria(),
         },
         {
+          /**
+           * C4 (15-L) · el latido de los equipos va a `dispositivos.ultimo_latido`,
+           * que es lo que el tablero lee. Con el mismo interruptor que el resto.
+           */
           provide: REPOSITORIO_DISPOSITIVOS,
-          useFactory: () => new RepositorioDispositivosEnMemoria(),
+          inject: [CONFIGURACION, Pool],
+          useFactory: (config: Configuracion, pool: Pool): RepositorioDispositivos =>
+            config.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new RepositorioDispositivosPg(pool)
+              : new RepositorioDispositivosEnMemoria(),
         },
         {
           provide: CanalEnProceso,

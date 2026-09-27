@@ -306,3 +306,32 @@ describe('A4 · detener durante la espera entre reintentos', () => {
     ).resolves.toBeUndefined();
   });
 });
+
+describe('C4 (15-L) · la escucha recuerda cuándo habló el equipo por última vez', () => {
+  it('un latido del equipo, aunque no sea un evento, cuenta como señal de vida', async () => {
+    let reloj = 1_000;
+    const escucha = new EscuchaDeAlertStream({
+      host: 'equipo.invalid',
+      usuario: 'u',
+      clave: 'c',
+      dispositivoId: 'terminal-1',
+      familia: 'terminal',
+      peticion: (async () =>
+        flujoDe([
+          JSON.stringify({ eventType: 'heartBeat', dateTime: '2026-09-27T10:00:00-05:00' }),
+          bloque({ currentEvent: true, channelID: 1 }),
+        ])) as unknown as typeof fetch,
+      esperar: async () => undefined,
+      azar: () => 0.5,
+      ahora: () => (reloj += 500),
+    });
+    expect(escucha.ultimaSenal()).toBeNull();
+
+    const cancelar = new AbortController();
+    for await (const evento of escucha.escuchar(cancelar.signal)) {
+      if (evento.enVivo) cancelar.abort();
+    }
+    // Dos trozos leídos: el último marca la hora de la señal.
+    expect(escucha.ultimaSenal()?.getTime()).toBeGreaterThan(1_000);
+  });
+});
