@@ -12,6 +12,7 @@ import {
 } from '../camara/pais-del-algoritmo';
 import { IMAGENES } from '../camara/receptor-en-el-equipo';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
+import { confirmada } from '../equipo/confirmacion-isapi';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -128,7 +129,8 @@ const escribir = async (
     tipo: 'application/xml',
     contenido: documento,
   });
-  return respuesta.ok && !rechazado(respuesta.cuerpo)
+  // Anexo 15-K (c) · un cambio aceptado es statusCode 1 con su subStatusCode.
+  return confirmada(respuesta) && !rechazado(respuesta.cuerpo)
     ? { ok: true, detalle: 'El equipo aceptó el cambio' }
     : { ok: false, detalle: interpretarError(respuesta.cuerpo).detalle };
 };
@@ -245,7 +247,7 @@ const corregirVerificacionRemota = async (
     tipo: 'application/json',
     contenido: JSON.stringify(corregido),
   });
-  const ok = escrito.ok && !rechazado(escrito.cuerpo);
+  const ok = confirmada(escrito) && !rechazado(escrito.cuerpo);
   return {
     clase: 'verificacion_remota',
     aplicada: ok,

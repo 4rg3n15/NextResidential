@@ -140,3 +140,20 @@ export class PeticionRechazada extends ErrorDeEquipo {
     super(dispositivoId, `El equipo ${dispositivoId} rechazó la petición: ${detalle}`);
   }
 }
+
+/**
+ * Anexo 15-K · el equipo contestó `200` a una ESCRITURA sin confirmarla:
+ * sin `statusCode` y `subStatusCode`, o con un `statusCode` distinto de 1. En
+ * sitio, un «OK» sin espacio de nombres fue un «OK» y la puerta no se movió;
+ * una respuesta que ni siquiera dice «1» no se cuenta como aceptada.
+ */
+export class OrdenSinConfirmar extends ErrorDeEquipo {
+  readonly reintentable = false;
+  constructor(dispositivoId: string, detalle: string) {
+    super(
+      dispositivoId,
+      `El equipo ${dispositivoId} no confirmó la orden (se exige statusCode 1 con su ` +
+        `subStatusCode): ${detalle}`,
+    );
+  }
+}

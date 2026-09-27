@@ -13,7 +13,7 @@ const respuesta = (estado: number, cuerpo = '', cabeceras: Record<string, string
   }) as unknown as Response;
 
 const OK_XML =
-  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString></ResponseStatus>';
+  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString><subStatusCode>ok</subStatusCode></ResponseStatus>';
 
 interface Llamada {
   readonly url: string;

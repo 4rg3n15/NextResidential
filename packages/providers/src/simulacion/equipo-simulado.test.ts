@@ -88,18 +88,21 @@ describe('el simulado responde con lo que se le declara', () => {
      */
     const falso = equipoSimulado({ familia: 'terminal', ...CREDENCIALES });
     const uri = '/ISAPI/System/deviceInfo';
+    // El nonce lo da el desafío: desde el anexo 15-K vence y no es fijo.
+    const reto = (await falso(`http://x.invalid${uri}`)).headers.get('www-authenticate') ?? '';
+    const nonce = /nonce="([^"]+)"/.exec(reto)?.[1] ?? '';
     const ha1 = createHash('md5')
       .update(`${CREDENCIALES.usuario}:equipo-simulado:${CREDENCIALES.clave}`)
       .digest('hex');
     const ha2 = createHash('md5').update(`GET:${uri}`).digest('hex');
-    const respuestaDigest = createHash('md5').update(`${ha1}:nonce-de-prueba:${ha2}`).digest('hex');
+    const respuestaDigest = createHash('md5').update(`${ha1}:${nonce}:${ha2}`).digest('hex');
 
     const r = await falso(`http://x.invalid${uri}`, {
       method: 'GET',
       headers: {
         authorization:
           `Digest username="${CREDENCIALES.usuario}", realm="equipo-simulado", ` +
-          `nonce="nonce-de-prueba", uri="${uri}", response="${respuestaDigest}"`,
+          `nonce="${nonce}", uri="${uri}", response="${respuestaDigest}"`,
       },
     });
     expect(r.status).toBe(200);

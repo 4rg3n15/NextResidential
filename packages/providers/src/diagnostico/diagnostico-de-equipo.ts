@@ -132,7 +132,8 @@ export const diagnosticarEquipo = async (
   const pedir = async (proposito: string, familia = opciones.familia): Promise<string | null> => {
     const ruta = rutaPara(proposito, familia, opciones.canal ?? CARRIL_VERIFICADO_DE_LA_CAMARA);
     try {
-      const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta);
+      // H-SITIO-15 · con el cuerpo que la ruta declara: nunca un POST vacío.
+      const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta, ruta.cuerpo);
       /**
        * ═══════════════════════════════════════════════════════════════════════
        * UN `200` CON UN RECHAZO DENTRO NO ES UNA RESPUESTA

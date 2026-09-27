@@ -17,7 +17,7 @@ import {
  */
 
 const RESPUESTA_OK =
-  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString></ResponseStatus>';
+  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString><subStatusCode>ok</subStatusCode></ResponseStatus>';
 
 const equipoQueResponde = (
   cuerpo: string,

@@ -95,9 +95,12 @@ describe('el equipo decide por su cuenta · las TRES vías bloquean', () => {
   it('la guarda se comprueba UNA vez por dispositivo, no en cada apertura', async () => {
     // Es una comprobación de arranque, no un peaje por cada coche que llega.
     let consultas = 0;
+    // UN equipo: desde el anexo 15-K cada simulado lleva su propio nonce, y
+    // uno nuevo por petición no conocería el desafío que emitió el anterior.
+    const camara = camaraConforme();
     const contando: typeof fetch = (entrada, opciones) => {
       if (String(entrada).includes('entranceParam')) consultas += 1;
-      return camaraConforme()(entrada, opciones);
+      return camara(entrada, opciones);
     };
     const proveedor = proveedorCon(contando);
     await proveedor.abrir(CAMARA, 'operador-1');

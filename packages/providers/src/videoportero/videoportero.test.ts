@@ -42,7 +42,9 @@ describe('apertura remota del videoportero', () => {
   });
 
   it('con operador, acciona y devuelve la latencia', async () => {
-    const peticion = vi.fn(async () => respuesta(200, '<statusCode>1</statusCode>'));
+    const peticion = vi.fn(async () =>
+      respuesta(200, '<statusCode>1</statusCode><subStatusCode>ok</subStatusCode>'),
+    );
     const equipo = new Videoportero({
       host: 'portero.invalid',
       usuario: 'u',

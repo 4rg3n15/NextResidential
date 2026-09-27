@@ -1,6 +1,7 @@
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { TerminalFacial } from '../terminal/terminal-facial';
 import { identificadorEnElEquipo } from '../terminal/identificador-en-el-equipo';
+import { confirmada } from '../equipo/confirmacion-isapi';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -52,7 +53,8 @@ export const cargaDePruebaDeRostro = async (
     return {
       aceptada,
       rechazo,
-      baja: { estado: r.estado, ok: r.ok },
+      // Anexo 15-K (c) · «aceptada» sólo con statusCode 1 y su subStatusCode.
+      baja: { estado: r.estado, ok: confirmada(r) },
       errorDeBaja: null,
       employeeNo: identificadorEnElEquipo(plantillaId),
     };

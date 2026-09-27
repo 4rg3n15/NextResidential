@@ -23,7 +23,7 @@ import type { PoliticaDeNonce } from '../simulacion/servidor-digest';
 const USUARIO = 'servicio';
 const CLAVE = 'clave-de-prueba';
 const OK_XML =
-  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString></ResponseStatus>';
+  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString><subStatusCode>ok</subStatusCode></ResponseStatus>';
 
 const relojManual = (): { ahora: () => number; avanzar: (ms: number) => void } => {
   let t = 1_000_000;

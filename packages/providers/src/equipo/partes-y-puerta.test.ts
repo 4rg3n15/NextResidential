@@ -93,7 +93,11 @@ describe('15-K · la puerta remota fuera del camino feliz (H-SITIO-13)', () => {
 
   it('el código ISAPI en JSON también decide: 1 es aceptada, 3 es rechazo', async () => {
     await expect(
-      abrirPuertaRemota(clienteQueContesta(200, '{"statusCode":1}'), ruta, 'terminal-1'),
+      abrirPuertaRemota(
+        clienteQueContesta(200, '{"statusCode":1,"subStatusCode":"ok"}'),
+        ruta,
+        'terminal-1',
+      ),
     ).resolves.toMatchObject({ aceptado: true });
     await expect(
       abrirPuertaRemota(

@@ -34,14 +34,28 @@ import type { Procedencia, RutaDeEquipo } from './tipos-de-ruta';
 import { RUTAS_DE_LA_GUIA } from './catalogo-de-la-guia';
 
 /**
- * H-SITIO-13 · el cuerpo de «Remote Door Control» tal como lo da la guía de
- * control de acceso: declaración, espacio de nombres y `version="2.0"`, que la
- * guía marca como atributo requerido. Se enviaba sin ninguno de los tres.
+ * ═════════════════════════════════════════════════════════════════════════════
+ * H-SITIO-13 · LA APERTURA REMOTA, COMO ABRIÓ EN SITIO · anexo 15-K
+ *
+ * Demostrado el 26/09/2026: la terminal (V4.47.0) y el videoportero (V2.3.9)
+ * ABRIERON con este cuerpo —espacio de nombres ISAPI y `version="2.0"`— y este
+ * Content-Type, que es lo que envía la interfaz web del fabricante. El cuerpo
+ * mínimo, sin espacio de nombres, contesta «OK» y la puerta NO se mueve: era
+ * lo que se enviaba. Se declara por familia porque cada equipo se demostró con
+ * su forma: el videoportero antepone la declaración XML, como su interfaz.
+ * ═════════════════════════════════════════════════════════════════════════════
  */
-export const CUERPO_DE_APERTURA_REMOTA =
-  '<?xml version="1.0" encoding="UTF-8"?>' +
+export const TIPO_DE_APERTURA_REMOTA = 'application/x-www-form-urlencoded; charset=UTF-8';
+const DOCUMENTO_DE_APERTURA =
   '<RemoteControlDoor xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0">' +
   '<cmd>open</cmd></RemoteControlDoor>';
+export const CUERPO_DE_APERTURA_DE_LA_TERMINAL = DOCUMENTO_DE_APERTURA;
+export const CUERPO_DE_APERTURA_DEL_VIDEOPORTERO =
+  "<?xml version='1.0' encoding='utf-8'?>" + DOCUMENTO_DE_APERTURA;
+const EVIDENCIA_DE_APERTURA =
+  'Demostrado en sitio el 26/09/2026 (anexo 15-K): PUT sobre door/1 con este cuerpo y este ' +
+  'Content-Type, Digest qop=auth con el cuerpo desde la primera petición → 401, 200 ' +
+  'statusCode=1 y la puerta se movió';
 
 export type { Procedencia, RutaDeEquipo } from './tipos-de-ruta';
 
@@ -296,14 +310,13 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     proposito: 'abrir la puerta desde la plataforma',
     metodo: 'PUT',
     ruta: '/ISAPI/AccessControl/RemoteControl/door/{canal}',
-    procedencia: 'documentada',
+    procedencia: 'verificada',
     familia: 'terminal',
-    fuente: 'Documentación ISAPI del fabricante, control remoto de puerta',
-    confirmarEnSitio: 'que abra el relé correcto: la terminal declara dos, y sólo uno es la puerta',
+    fuente: `${EVIDENCIA_DE_APERTURA} (terminal V4.47.0)`,
     acciona: true,
     cuerpo: {
-      tipo: 'application/xml',
-      contenido: CUERPO_DE_APERTURA_REMOTA,
+      tipo: TIPO_DE_APERTURA_REMOTA,
+      contenido: CUERPO_DE_APERTURA_DE_LA_TERMINAL,
     },
   },
 
@@ -378,11 +391,16 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
      * recuento tiene que bajar. Un `OK` a la orden no demuestra nada.
      */
     proposito: 'contar las plantillas de la biblioteca de rostros',
-    metodo: 'POST',
-    ruta: '/ISAPI/Intelligent/FDLib/Count?format=json',
+    // Anexo 15-K · GET con la biblioteca en la consulta, como las guías de las
+    // dos series («Face Picture Search»). Se hacía POST con el cuerpo vacío: la
+    // terminal valida el cuerpo antes de autenticar y contesta 400 (H-SITIO-15).
+    metodo: 'GET',
+    ruta: '/ISAPI/Intelligent/FDLib/Count?format=json&FDID=1&faceLibType=blackFD',
     procedencia: 'documentada',
     familia: 'terminal',
-    fuente: 'Documentación ISAPI del fabricante, biblioteca de rostros (FDLib/Count)',
+    fuente:
+      'Documentación ISAPI del fabricante, «Face Picture Search» de las series Value e ' +
+      'IP/Ultra: GET FDLib/Count con FDID y faceLibType; responde recordDataNumber',
     confirmarEnSitio: 'que el recuento baje tras una supresión: es la prueba de RN-11',
   },
   {
@@ -392,6 +410,11 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     procedencia: 'documentada',
     familia: 'terminal',
     fuente: 'Documentación ISAPI del fabricante, biblioteca de rostros (FDLib/FDSearch)',
+    // Anexo 15-K · H-SITIO-15: el sondeo de la ruta lleva cuerpo, nunca vacío.
+    cuerpo: {
+      tipo: 'application/json',
+      contenido: '{"searchResultPosition":0,"maxResults":1,"faceLibType":"blackFD","FDID":"1"}',
+    },
     confirmarEnSitio: 'que una plantilla suprimida NO aparezca en la búsqueda por su identificador',
   },
   {
@@ -580,14 +603,13 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     proposito: 'abrir la puerta del videoportero',
     metodo: 'PUT',
     ruta: '/ISAPI/AccessControl/RemoteControl/door/{canal}',
-    procedencia: 'documentada',
+    procedencia: 'verificada',
     familia: 'videoportero',
-    fuente: 'Documentación ISAPI del fabricante, control remoto de puerta',
-    confirmarEnSitio: 'que sea la misma ruta que en la terminal, y no se dé por hecho que lo es',
+    fuente: `${EVIDENCIA_DE_APERTURA} (videoportero V2.3.9)`,
     acciona: true,
     cuerpo: {
-      tipo: 'application/xml',
-      contenido: CUERPO_DE_APERTURA_REMOTA,
+      tipo: TIPO_DE_APERTURA_REMOTA,
+      contenido: CUERPO_DE_APERTURA_DEL_VIDEOPORTERO,
     },
   },
   {

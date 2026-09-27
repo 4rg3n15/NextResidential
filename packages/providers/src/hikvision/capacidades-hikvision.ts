@@ -9,6 +9,7 @@ import { bloques, etiqueta } from '../equipo/xml';
 import { recortado, sinSecretos } from '../equipo/intercambio';
 import type { Bitacora } from '@ncr/domain-core';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
+import { recuentoDeLaBiblioteca } from '../terminal/recuento-de-biblioteca';
 
 /**
  * DE LO QUE EL EQUIPO DECLARA A LO QUE EL SISTEMA PREGUNTA · ETAPA 15-D (O2).
@@ -204,7 +205,9 @@ export const bibliotecaDesde = (
     }
   };
   const maximo = leerNumero(capacidadesJson, ['FDLibCap', 'maxFDRecordNum']);
-  const almacenadas = leerNumero(recuentoJson, ['FDRecordCount', 'totalNum']);
+  // Anexo 15-K · `recordDataNumber` de la biblioteca, como la guía («Face
+  // Picture Search»); `totalNum` es la forma anterior, que se sigue leyendo.
+  const almacenadas = recuentoDeLaBiblioteca(recuentoJson);
   return {
     estado: capacidadesJson === null && recuentoJson === null ? 'desconocida' : 'si',
     maximo,
@@ -251,7 +254,8 @@ export const descubrirCapacidades = async (
     } catch {
       return { cuerpo: null, noAdmite: false };
     }
-    const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta);
+    // H-SITIO-15 · con el cuerpo que la ruta declara: nunca un POST vacío.
+    const respuesta = await cliente.pedir(ruta.metodo, ruta.ruta, ruta.cuerpo);
     // H-SITIO-05 · qué se preguntó y qué contestó, para comparar con la guía.
     opciones.traza?.registrar('info', 'capacidad consultada al equipo', {
       ...(opciones.dispositivoId === undefined ? {} : { dispositivoId: opciones.dispositivoId }),

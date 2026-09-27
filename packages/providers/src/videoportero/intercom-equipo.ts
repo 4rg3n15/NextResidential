@@ -201,7 +201,10 @@ export class IntercomDeEquipo implements IntercomProvider {
       'videoportero',
       this.opciones.canal,
     );
-    const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta);
+    // TwoWayAudio `open` no lleva cuerpo en la guía: se declara, no se olvida.
+    const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, undefined, {
+      sinCuerpo: true,
+    });
     if (!respuesta.ok) {
       // El equipo dijo que no: se suelta el turno en vez de dejar al operador
       // con un canal que cree tener. Un turno retenido sobre un canal muerto
@@ -331,7 +334,7 @@ export class IntercomDeEquipo implements IntercomProvider {
       this.opciones.canal,
     );
     try {
-      await this.cliente.pedir(ruta.metodo, ruta.ruta);
+      await this.cliente.pedir(ruta.metodo, ruta.ruta, undefined, { sinCuerpo: true });
     } catch {
       // Si no se pudo cerrar, el equipo lo soltará por su propio vencimiento.
       // No se reintenta aquí: `motivo` ya está en el histórico y encadenar

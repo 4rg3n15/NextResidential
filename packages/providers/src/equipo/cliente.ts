@@ -74,6 +74,35 @@ export interface OpcionesDePeticion {
    * esta etiqueta. Sólo para órdenes: nunca para cargas con imagen.
    */
   readonly registrarIntercambio?: string;
+  /**
+   * Anexo 15-K · la escritura NO lleva cuerpo, y es a propósito: abrir y cerrar
+   * el canal de audio. Cualquier otra escritura sin cuerpo se niega (H-SITIO-15).
+   */
+  readonly sinCuerpo?: true;
+}
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * H-SITIO-15 · EL CLIENTE ISAPI NUNCA ENVÍA UNA ESCRITURA CON EL CUERPO VACÍO
+ *
+ * La terminal valida el contenido ANTES de autenticar: un `PUT`/`POST` vacío
+ * recibe `400 badXmlContent` (errorCode 1610612739) sin llegar al desafío, así
+ * que un cliente que sondea el Digest así —`curl --digest` lo hace— no se
+ * autentica nunca. Este cliente manda el cuerpo desde la PRIMERA petición, la
+ * que recibe el `401`, y la repite en la autenticada. Y una escritura sin
+ * cuerpo es un error de programación que se dice aquí, no un `400` que
+ * aparezca lejos: nuestro propio diagnóstico hacía `POST` vacíos a la
+ * biblioteca de rostros y el simulado del anexo lo destapó.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+export class EscrituraSinCuerpo extends Error {
+  constructor(metodo: string, ruta: string) {
+    super(
+      `${metodo} ${ruta} sin cuerpo: el equipo valida el contenido antes de autenticar y ` +
+        'contesta 400 badXmlContent. Declare el cuerpo en el catálogo',
+    );
+    this.name = 'EscrituraSinCuerpo';
+  }
 }
 
 export interface CuerpoDePeticion {
@@ -140,6 +169,9 @@ export class ClienteDeEquipo {
     cuerpo?: CuerpoDePeticion,
     extra?: OpcionesDePeticion,
   ): Promise<RespuestaDeEquipo> {
+    if (metodo !== 'GET' && cuerpo === undefined && extra?.sinCuerpo !== true) {
+      throw new EscrituraSinCuerpo(metodo, ruta);
+    }
     const comienzo = this.ahora();
     try {
       const { respuesta, desafioVencido } = await this.conDigest(metodo, ruta, () =>
@@ -334,10 +366,25 @@ export class ClienteDeEquipo {
     ruta: string,
     enviar: () => Promise<Response>,
   ): Promise<ConDigest> {
+    // ¿Viaja ya una credencial? Sin desafío previo, el primer 401 es el saludo.
+    const conCredencial = this.sesion.tieneDesafio;
     const primera = await enviar();
     if (primera.status !== 401) return { respuesta: primera, desafioVencido: false };
 
     const renegociacion = this.sesion.renegociar(primera.headers.get('www-authenticate'));
+    if (renegociacion !== null && conCredencial && !renegociacion.vencido) {
+      /**
+       * Anexo 15-K (d) · con credencial enviada, un `401` SIN `stale` es la
+       * credencial: no se repite. Un segundo intento con la misma clave sólo
+       * suma un fallo más hacia el bloqueo de la cuenta del equipo.
+       */
+      this.opciones.traza?.registrar(
+        'error',
+        'el equipo rechazó usuario o clave (401 sin stale): NO se reintenta',
+        { ...this.contexto(), metodo, ruta },
+      );
+      return { respuesta: primera, desafioVencido: false };
+    }
     if (renegociacion === null) {
       this.opciones.traza?.registrar('aviso', 'el equipo contestó 401 SIN desafío Digest', {
         ...this.contexto(),

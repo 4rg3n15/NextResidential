@@ -1,6 +1,18 @@
-import { createHash } from 'node:crypto';
 import { RUTAS } from '../equipo/catalogo-de-rutas';
 import type { RutaDeEquipo } from '../equipo/catalogo-de-rutas';
+import {
+  CONTENIDO_XML_MALO,
+  DigestDelEquipo,
+  anotarEn,
+  aperturasFisicasPor,
+  cuerpoVacio,
+  desenlaceDeApertura,
+  escriturasSinCuerpoPor,
+  exigeCuerpo,
+} from './comportamientos-de-sitio';
+import type { PoliticaDeNonceDelEquipo } from './comportamientos-de-sitio';
+
+export { aperturasFisicasPor, escriturasSinCuerpoPor } from './comportamientos-de-sitio';
 
 /**
  * UN EQUIPO QUE HABLA COMO LOS DE VERDAD, Y QUE NO EXISTE.
@@ -20,7 +32,9 @@ import type { RutaDeEquipo } from '../equipo/catalogo-de-rutas';
  * · **Digest de dos viajes.** El primer intento sin credenciales recibe `401`
  *   con desafío, como el aparato. Un simulado que aceptara a la primera dejaría
  *   sin ejercitar la renegociación, que es donde vive el fallo que bloquea la
- *   cuenta del equipo.
+ *   cuenta del equipo. Y desde el anexo 15-K el nonce VENCE, el cuerpo vacío se
+ *   rechaza antes de autenticar y la apertura sin espacio de nombres contesta
+ *   «OK» sin accionar: `comportamientos-de-sitio.ts`.
  * · **`notSupport` por ruta.** Se le puede decir qué rutas NO soporta, que es
  *   el desenlace esperado de las once DOCUMENTADAS, NO VERIFICADAS. Probar sólo
  *   el camino feliz de una ruta sin verificar es probar la suposición.
@@ -128,6 +142,8 @@ export interface GuionDeEquipo {
   readonly reinicioNecesario?: boolean;
   /** Rechaza la credencial aunque el Digest sea correcto: cuenta bloqueada. */
   readonly rechazaCredencial?: boolean;
+  /** Anexo 15-K · cuándo vence el nonce. Por omisión, a los 20 s. */
+  readonly nonce?: PoliticaDeNonceDelEquipo;
 }
 
 /**
@@ -324,16 +340,15 @@ const PARAMETRO_MALO =
   '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"badParameters",' +
   '"errorCode":1610612737,"errorMsg":"badParameters"}';
 
-const md5 = (t: string): string => createHash('md5').update(t, 'utf8').digest('hex');
-
+/** Como la guía: `subStatusCode` es obligatorio también en el «OK». */
 const OK =
-  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString></ResponseStatus>';
+  '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString>' +
+  '<subStatusCode>ok</subStatusCode></ResponseStatus>';
 const NO_SOPORTA =
   '<ResponseStatus><statusCode>4</statusCode><statusString>notSupport</statusString></ResponseStatus>';
 
-/** Lo que el equipo contesta al primer intento: el desafío. */
+/** El reino del desafío Digest del simulado. */
 const REINO = 'equipo-simulado';
-const NONCE = 'nonce-de-prueba';
 
 const respuestaDe = (
   estado: number,
@@ -347,26 +362,6 @@ const respuestaDe = (
     text: async () => cuerpo,
     body: null,
   }) as unknown as Response;
-
-/** Comprueba la respuesta Digest como lo haría el aparato. */
-const digestCorrecto = (
-  autorizacion: string | null,
-  metodo: string,
-  guion: GuionDeEquipo,
-): boolean => {
-  if (autorizacion === null || !/^digest /i.test(autorizacion)) return false;
-  const valor = (nombre: string): string =>
-    new RegExp(`${nombre}="?([^",]+)"?`).exec(autorizacion)?.[1] ?? '';
-  const uri = valor('uri');
-  const ha1 = md5(`${guion.usuario}:${REINO}:${guion.clave}`);
-  const ha2 = md5(`${metodo}:${uri}`);
-  const qop = valor('qop');
-  const esperado =
-    qop === ''
-      ? md5(`${ha1}:${NONCE}:${ha2}`)
-      : md5(`${ha1}:${NONCE}:${valor('nc')}:${valor('cnonce')}:${qop}:${ha2}`);
-  return valor('response') === esperado;
-};
 
 /** Flujo de eventos: los bloques, uno detrás de otro, y después se cierra. */
 const cuerpoDeFlujo = (bloques: readonly Record<string, unknown>[]): ReadableStream<Uint8Array> => {
@@ -438,22 +433,13 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   const enBiblioteca = (): number => almacenadasSinNombre + plantillas.size;
   /** Audio recibido, para devolverlo como eco por el flujo de salida. */
   const audioRecibido: Uint8Array[] = [];
+  /** Anexo 15-K · el Digest del equipo, con el nonce que vence. */
+  const digest = new DigestDelEquipo(guion.usuario, guion.clave, REINO, guion.nonce);
 
   return (async (entrada: string | URL, opciones?: RequestInit): Promise<Response> => {
     const url = new URL(typeof entrada === 'string' ? entrada : String(entrada));
     const metodo = opciones?.method ?? 'GET';
     const cabeceras = (opciones?.headers ?? {}) as Record<string, string>;
-
-    // Primer viaje: sin credenciales, el equipo contesta con su desafío. Y con
-    // la cuenta bloqueada contesta 401 aunque el Digest sea correcto.
-    if (
-      guion.rechazaCredencial === true ||
-      !digestCorrecto(cabeceras['authorization'] ?? null, metodo, guion)
-    ) {
-      return respuestaDe(401, '', {
-        'www-authenticate': `Digest realm="${REINO}", nonce="${NONCE}", qop="auth"`,
-      });
-    }
 
     /**
      * ═══════════════════════════════════════════════════════════════════════
@@ -479,6 +465,34 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
             /biblioteca|plantilla|persona|control de acceso de la terminal/.test(r.proposito))),
     );
     const catalogada = delMismoCamino.find((r) => r.metodo === metodo) ?? delMismoCamino[0];
+
+    /**
+     * Anexo 15-K · H-SITIO-15 · el equipo valida el CONTENIDO antes que la
+     * credencial: una escritura con el cuerpo vacío recibe `400 badXmlContent`
+     * sin pasar por el desafío. Un cliente que sondea el Digest con el cuerpo
+     * vacío no llega nunca a autenticarse.
+     */
+    if (
+      catalogada !== undefined &&
+      exigeCuerpo(catalogada, metodo) &&
+      cuerpoVacio(opciones?.body)
+    ) {
+      anotarEn(escriturasSinCuerpoPor, guion.destino);
+      return respuestaDe(400, CONTENIDO_XML_MALO);
+    }
+
+    // Primer viaje: sin credenciales, el equipo contesta con su desafío. Con la
+    // cuenta bloqueada, 401 aunque el Digest sea correcto. Anexo 15-K ·
+    // H-SITIO-12: con el nonce vencido o un `nc` repetido, `stale="TRUE"`.
+    const acceso =
+      guion.rechazaCredencial === true
+        ? 'clave'
+        : digest.comprobar(cabeceras['authorization'] ?? null, metodo);
+    if (acceso !== 'autenticado') {
+      return respuestaDe(401, '', {
+        'www-authenticate': digest.cabeceraDeDesafio(acceso === 'vencido'),
+      });
+    }
 
     // Una ruta que el adaptador pide y el catálogo no conoce es un error de
     // programación: el equipo contesta 404, igual que el de verdad.
@@ -542,7 +556,18 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       );
     }
     if (catalogada.proposito === 'contar las plantillas de la biblioteca de rostros') {
-      return respuestaDe(200, JSON.stringify({ FDRecordCount: { totalNum: enBiblioteca() } }));
+      // Como la guía: `recordDataNumber` por biblioteca, con su ResponseStatus.
+      return respuestaDe(
+        200,
+        JSON.stringify({
+          statusCode: 1,
+          statusString: 'ok',
+          subStatusCode: 'ok',
+          FDRecordDataInfo: [
+            { FDID: '1', faceLibType: 'blackFD', recordDataNumber: enBiblioteca() },
+          ],
+        }),
+      );
     }
     if (catalogada.proposito === 'buscar una plantilla en la biblioteca de rostros') {
       const pedido = /"FPID"\s*:\s*"([^"]+)"/.exec(String(opciones?.body ?? ''))?.[1] ?? null;
@@ -631,6 +656,17 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       const trozos = audioRecibido.splice(0, audioRecibido.length);
       Object.defineProperty(respuesta, 'body', { value: cuerpoBinario(trozos) });
       return respuesta;
+    }
+    if (
+      catalogada.proposito === 'abrir la puerta desde la plataforma' ||
+      catalogada.proposito === 'abrir la puerta del videoportero'
+    ) {
+      // Anexo 15-K · H-SITIO-13 · sin espacio de nombres ni versión, «OK» y el
+      // relé no se mueve; con ellos, abre. Sólo el equipo sabe la diferencia.
+      const desenlace = desenlaceDeApertura(String(opciones?.body ?? ''));
+      if (desenlace === 'mal_formada') return respuestaDe(400, CONTENIDO_XML_MALO);
+      if (desenlace === 'acciona') anotarEn(aperturasFisicasPor, guion.destino);
+      return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'contestar o rechazar una llamada del videoportero') {
       return respuestaDe(200, guion.senalizaLlamadas === true ? OK : NO_SOPORTA);

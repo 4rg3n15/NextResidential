@@ -23,7 +23,7 @@ const DESAFIO =
 
 const respuestaOk = (): Response =>
   new Response(
-    '<?xml version="1.0" encoding="UTF-8"?><ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString></ResponseStatus>',
+    '<?xml version="1.0" encoding="UTF-8"?><ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString><subStatusCode>ok</subStatusCode></ResponseStatus>',
     { status: 200 },
   );
 

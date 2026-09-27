@@ -6,11 +6,13 @@ import type {
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import type { OpcionesDeEquipo, RespuestaDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
-import { comoErrorNeutral, resumenIsapi } from '../equipo/errores-del-fabricante';
+import { resumenIsapi } from '../equipo/errores-del-fabricante';
 import { identificadorEnElEquipo } from './identificador-en-el-equipo';
 import { AperturaNoSoportada, abrirPuertaRemota } from '../equipo/puerta-remota';
 import { BibliotecaLlena } from '../nucleo/errores';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
+import { recuentoDeLaBiblioteca } from './recuento-de-biblioteca';
+import { confirmada, exigirConfirmacion } from '../equipo/confirmacion-isapi';
 
 /**
  * TERMINAL FACIAL · `DS-K1T344MBFWX-E1` · V4.47.0 build 250722.
@@ -303,14 +305,16 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
 
   async contar(): Promise<number | null> {
     const ruta = rutaPara('contar las plantillas de la biblioteca de rostros', 'terminal');
+    // Anexo 15-K · GET con la biblioteca en la consulta, como la guía; antes,
+    // un POST que la terminal habría rechazado por validar el cuerpo primero.
+    const consulta = ruta.ruta.replace(
+      'FDID=1',
+      `FDID=${encodeURIComponent(this.opciones.bibliotecaId ?? '1')}`,
+    );
     try {
-      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
-        tipo: 'application/json',
-        contenido: JSON.stringify({ FDID: this.opciones.bibliotecaId ?? '1' }),
-      });
+      const respuesta = await this.cliente.pedir(ruta.metodo, consulta);
       if (!respuesta.ok || NO_SOPORTADO.test(respuesta.cuerpo)) return null;
-      const n = /"totalNum"\s*:\s*(\d+)/.exec(respuesta.cuerpo)?.[1];
-      return n === undefined ? null : Number(n);
+      return recuentoDeLaBiblioteca(respuesta.cuerpo);
     } catch (error) {
       if (error instanceof EquipoInalcanzable) return null;
       throw error;
@@ -371,7 +375,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
         }),
       });
       if (NO_SOPORTADO.test(respuesta.cuerpo)) throw new RutaNoSoportada(ruta.proposito, ruta.ruta);
-      if (!respuesta.ok) throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
+      exigirConfirmacion(dispositivoId, respuesta);
       return { aceptado: true, latenciaMs: respuesta.latenciaMs };
     } catch (error) {
       if (error instanceof EquipoInalcanzable) {
@@ -435,7 +439,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       tipo: 'application/json',
       contenido: persona,
     });
-    if (respuesta.ok) return;
+    if (confirmada(respuesta)) return;
     if (/exist|duplicat/i.test(respuesta.cuerpo)) {
       const modificar = rutaPara(
         'modificar la persona a la que pertenece la plantilla',
@@ -479,7 +483,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
   }
 
   private exigir(
-    respuesta: { ok: boolean; cuerpo: string; estado: number },
+    respuesta: { ok: boolean; cuerpo: string; estado: number; desafioVencido?: boolean },
     proposito: string,
     ruta: string,
     dispositivoId: string,
@@ -487,11 +491,8 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     if (NO_SOPORTADO.test(respuesta.cuerpo) || respuesta.estado === 404) {
       throw new RutaNoSoportada(proposito, ruta);
     }
-    // Un `200` con código de estado de error dentro también es un rechazo: así
-    // contestan estos equipos cuando exigen reinicio.
-    const codigo = /<statusCode>\s*(\d+)\s*<\/statusCode>/i.exec(respuesta.cuerpo)?.[1];
-    if (!respuesta.ok || (codigo !== undefined && codigo !== '0' && codigo !== '1')) {
-      throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado);
-    }
+    // Anexo 15-K (c) · aceptada sólo con statusCode 1 y su subStatusCode; un
+    // 200 sin ellos, o con otro código, no es una escritura hecha.
+    exigirConfirmacion(dispositivoId, respuesta);
   }
 }

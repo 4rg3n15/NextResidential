@@ -148,7 +148,8 @@ export class ControlDeBarreraVehicular implements ControlDeBarrera {
       const cuerpo = await respuesta.text();
       const codigo = codigoDeRespuesta(cuerpo);
 
-      if (respuesta.ok && codigo === CODIGO_DE_ACEPTACION) {
+      // Anexo 15-K (c) · statusCode 1 Y su subStatusCode: lo exige la guía.
+      if (respuesta.ok && codigo === CODIGO_DE_ACEPTACION && /<subStatusCode>/i.test(cuerpo)) {
         /**
          * **H-1 · aceptada NO es abierta.** Observado en el equipo: con la
          * barrera bloqueada, la orden de abrir contesta afirmativamente y el
