@@ -24,6 +24,8 @@ import type { ContextoTenant } from '../../autenticacion';
 export const REPOSITORIO_DE_EQUIPOS = Symbol.for('ncr.puerto.RepositorioDeEquipos');
 /** A4 · `{ activos() }`: los equipos que emiten y hay que escuchar. */
 export const EQUIPOS_QUE_EMITEN = Symbol.for('ncr.equipos.EquiposQueEmiten');
+/** R1 (15-L) · `{ copropiedadDe(id) }`: de quién es un equipo que publica. */
+export const COPROPIEDAD_DE_EQUIPO = Symbol.for('ncr.equipos.CopropiedadDeEquipo');
 export const SONDA_DE_EQUIPO = Symbol.for('ncr.puerto.SondaDeEquipo');
 
 export const TIPOS_DE_EQUIPO = [
@@ -114,6 +116,12 @@ export interface RepositorioDeEquipos {
    * es el proceso quien los escucha, no un usuario. Lectura de servicio.
    */
   activosQueEmiten(): Promise<readonly EquipoQueEmite[]>;
+  /**
+   * R1 (15-L) · la copropiedad de un equipo ACTIVO, por su id. Lectura de
+   * servicio como la anterior: la hace el receptor de eventos, que no tiene
+   * usuario. `null` si no existe, está inactivo o el id no es de la tabla.
+   */
+  copropiedadDeActivo(dispositivoId: string): Promise<string | null>;
   crear(
     ctx: ContextoTenant,
     copropiedadId: string,

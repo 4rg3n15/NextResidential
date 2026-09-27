@@ -19,7 +19,9 @@ import { CANAL_TIEMPO_REAL, REGISTRO_DE_EVIDENCIA } from '../eventos';
 import type { CanalTiempoReal, RegistroDeEvidencia } from '../eventos';
 import { LOCALIZADOR_DE_VIVIENDA, PadronModule } from '../padron';
 import type { LocalizadorDeVivienda } from '../padron';
-import { EQUIPOS_QUE_EMITEN, EquiposModule } from '../equipos';
+import { COPROPIEDAD_DE_EQUIPO, EQUIPOS_QUE_EMITEN, EquiposModule } from '../equipos';
+import { CopropiedadDelEquipoPorRegistro } from './aplicacion/copropiedad-del-equipo';
+import type { LocalizadorDeCopropiedadDeEquipo } from './aplicacion/copropiedad-del-equipo';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { AVISADOR_DE_LLAMADAS, RESOLUTOR_DE_VIVIENDA_DE_LLAMADA } from './aplicacion/puertos';
@@ -131,6 +133,7 @@ export class AlarmServerModule {
             RESOLUTOR_DE_VIVIENDA_DE_LLAMADA,
             AVISADOR_DE_LLAMADAS,
             REGISTRO_DE_EVIDENCIA,
+            COPROPIEDAD_DE_EQUIPO,
           ],
           useFactory: (
             referencia: ModuleRef,
@@ -146,6 +149,7 @@ export class AlarmServerModule {
             viviendas: ResolutorDeViviendaDeLlamada,
             avisador: AvisadorDeLlamadas,
             registroDeEvidencia: RegistroDeEvidencia,
+            registroDeEquipos: LocalizadorDeCopropiedadDeEquipo,
           ) => {
             const ingestor = new IngestorDeEquipos(
               registrar,
@@ -158,7 +162,9 @@ export class AlarmServerModule {
               evidencia,
               bitacora,
               ids,
-              declarados,
+              // R1 (15-L) · la copropiedad la da el registro de la consola; la
+              // declaración del Alarm Server queda de respaldo para la cámara.
+              new CopropiedadDelEquipoPorRegistro(registroDeEquipos, declarados),
               // A2 · la terminal reconoce plantillas; biometría sabe de quién son.
               identidad,
               // A2 · el veredicto vuelve por el MISMO proveedor que abre puertas.

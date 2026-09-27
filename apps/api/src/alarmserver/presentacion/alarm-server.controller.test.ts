@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  CopropiedadDelEquipoPorRegistro,
+  sinRegistroDeEquipos,
+} from '../aplicacion/copropiedad-del-equipo';
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { exito, fallo, errorDominio, ordenAceptada } from '@ncr/domain-core';
 import type { ResultadoDeAccionamiento } from '@ncr/domain-core';
@@ -124,7 +128,7 @@ const montar = (opciones: {
     almacen,
     bitacora,
     ids,
-    [EQUIPO],
+    new CopropiedadDelEquipoPorRegistro(sinRegistroDeEquipos, [EQUIPO]),
     { titularDePlantilla: async () => null },
     { responderVerificacionRemota: async () => ({ aceptado: true, latenciaMs: 5 }) },
     reloj,

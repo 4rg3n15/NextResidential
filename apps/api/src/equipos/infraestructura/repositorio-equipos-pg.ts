@@ -190,6 +190,28 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     });
   }
 
+  async copropiedadDeActivo(dispositivoId: string): Promise<string | null> {
+    // Un id que no es UUID no está en la tabla: se dice que no, en vez de
+    // dejar que PostgreSQL lance por el tipo de la columna.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dispositivoId)) {
+      return null;
+    }
+    const lectura: ContextoTenant = {
+      usuarioId: ACTOR_INGESTA,
+      rol: 'superadministrador',
+      copropiedadId: null,
+      copropiedadesAtendidas: [],
+      mfaVerificado: true,
+    };
+    return this.conCliente(lectura, async (c) => {
+      const { rows } = await c.query<{ copropiedad_id: string }>(
+        `SELECT copropiedad_id FROM public.dispositivos WHERE id = $1 AND estado = 'activo'`,
+        [dispositivoId],
+      );
+      return rows[0]?.copropiedad_id ?? null;
+    });
+  }
+
   async listar(ctx: ContextoTenant, copropiedadId: string): Promise<readonly DatosDeEquipo[]> {
     return this.conCliente(ctx, async (c) => {
       const { rows } = await c.query<FilaDeEquipo>(

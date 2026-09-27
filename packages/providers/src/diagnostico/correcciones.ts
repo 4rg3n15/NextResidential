@@ -75,6 +75,16 @@ export interface OpcionesDeCorreccion extends OpcionesDeEquipo {
   readonly indiceDePais?: number;
   /** Para las imágenes: qué debe enviar el equipo. Nunca `all`. */
   readonly imagenes?: string;
+  /**
+   * 15-L · para la verificación remota: ¿abre la terminal con su propio
+   * reconocimiento si la plataforma no está (`offlineDevCheckOpenDoorEnabled`)?
+   * Por omisión NO, que es también lo que trae el equipo: sin plataforma no
+   * abre nadie y el plan B es la apertura desde la consola o la llave. Se
+   * decide en el `.env` de la API (`TERMINAL_ABRE_SIN_PLATAFORMA`), no aquí.
+   */
+  readonly abrirSinPlataforma?: boolean;
+  /** 15-L · `remoteCheckTimeout` en segundos. Ausente = el del equipo, sin tocar. */
+  readonly plazoDeVerificacionS?: number;
 }
 
 /**
@@ -171,7 +181,12 @@ export const aplicarCorreccion = async (
           'XML',
         );
       case 'verificacion_remota':
-        return await corregirVerificacionRemota(cliente);
+        return await corregirVerificacionRemota(cliente, {
+          abrirSinPlataforma: opciones.abrirSinPlataforma === true,
+          ...(opciones.plazoDeVerificacionS === undefined
+            ? {}
+            : { plazoS: opciones.plazoDeVerificacionS }),
+        });
     }
   } catch (error) {
     if (error instanceof EquipoInalcanzable) {
@@ -197,6 +212,7 @@ export const aplicarCorreccion = async (
  */
 const corregirVerificacionRemota = async (
   cliente: ClienteDeEquipo,
+  ajustes: { readonly abrirSinPlataforma: boolean; readonly plazoS?: number },
 ): Promise<ResultadoDeCorreccion> => {
   const lectura = rutaPara('leer si la terminal espera el veredicto de la plataforma', 'terminal');
   const respuesta = await cliente.pedir(lectura.metodo, lectura.ruta);
@@ -229,14 +245,25 @@ const corregirVerificacionRemota = async (
   }
   const actual = acs as Record<string, unknown>;
   const anterior = String(actual[campo]);
+  /**
+   * 15-L · «Verification parameters in arming method» (guía): canal `ISAPI`,
+   * SIEMPRE. Es el único canal por el que esta plataforma escucha: con
+   * `ISAPIListen` la terminal pregunta a un servidor de escucha que nadie
+   * abre —y la guía advierte que el equipo admite UNO solo—, espera su plazo
+   * y niega. Antes sólo se escribía si el documento ya traía el campo, y un
+   * firmware que no lo devolvía se quedaba en el canal que tuviera.
+   *
+   * `offlineDevCheckOpenDoorEnabled` se escribe con lo que diga el `.env`; el
+   * plazo, sólo si se configuró.
+   */
   const corregido = {
     ...documento,
     AcsCfg: {
       ...actual,
       [campo]: true,
-      // «Verification parameters in arming method» (guía): canal `ISAPI`. Sólo
-      // se toca si el documento lo trae; no se añaden campos a ciegas.
-      ...('checkChannelType' in actual ? { checkChannelType: 'ISAPI' } : {}),
+      checkChannelType: 'ISAPI',
+      offlineDevCheckOpenDoorEnabled: ajustes.abrirSinPlataforma,
+      ...(ajustes.plazoS === undefined ? {} : { remoteCheckTimeout: ajustes.plazoS }),
     },
   };
   const escritura = rutaPara(

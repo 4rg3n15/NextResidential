@@ -11,7 +11,7 @@ import { registroSinBase } from '../../eventos';
 import type { RegistroDeEvidencia, TipoDeEvidencia } from '../../eventos';
 import type { AccionadorDePuerta } from '../../guardia';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
-import type { EquipoDeclarado } from '../../comun/equipos-de-alarm-server';
+import type { CopropiedadDelEquipoPorRegistro } from './copropiedad-del-equipo';
 import type {
   AvisadorDeLlamadas,
   LlamadaEntrante,
@@ -94,7 +94,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     private readonly evidencia: AlmacenEvidencia,
     private readonly bitacora: Bitacora,
     private readonly ids: GeneradorDeId,
-    private readonly equipos: readonly EquipoDeclarado[],
+    /** R1 (15-L) · de quién es el equipo: el registro, y la declaración de respaldo. */
+    private readonly copropiedades: Pick<CopropiedadDelEquipoPorRegistro, 'resolver'>,
     /** A2 · quién traduce la plantilla que la terminal reconoció a una persona. */
     private readonly titulares: ResolutorDeTitularBiometrico,
     /** A2 · a quién se le devuelve el veredicto: el proveedor de equipos. */
@@ -140,15 +141,17 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
 
   private async procesar(publicacion: PublicacionDeEquipo): Promise<ResultadoDeIngesta> {
     const evento = publicacion.evento;
-    const copropiedadId = this.copropiedadDe(evento.dispositivoId);
-    if (copropiedadId === null) {
+    const resuelta = await this.copropiedades.resolver(evento.dispositivoId);
+    if (resuelta.copropiedadId === null) {
       // Sin copropiedad no se escribe: un evento sin frontera de tenant es
       // exactamente lo que RN-15 impide, y adivinarla sería peor que perderlo.
-      this.bitacora.registrar('error', 'lectura de un equipo sin copropiedad declarada', {
+      this.bitacora.registrar('error', 'evento de un equipo sin copropiedad', {
         dispositivoId: evento.dispositivoId,
+        motivo: resuelta.motivo,
       });
-      return { registrado: false, motivo: 'el equipo no tiene copropiedad declarada' };
+      return { registrado: false, motivo: `equipo sin copropiedad: ${resuelta.motivo}` };
     }
+    const copropiedadId = resuelta.copropiedadId;
     if (evento.clase === 'rostro') return this.ingerirRostro(publicacion, copropiedadId);
     if (evento.clase === 'llamada' || evento.clase === 'timbre') {
       return this.ingerirLlamada(evento, copropiedadId, evento.clase);
@@ -478,10 +481,6 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
         motivo: 'la terminal negará por su cuenta al vencer su plazo (S-41): la dirección segura',
       });
     }
-  }
-
-  private copropiedadDe(dispositivoId: string): string | null {
-    return this.equipos.find((e) => e.dispositivoId === dispositivoId)?.copropiedadId ?? null;
   }
 
   /**

@@ -71,6 +71,15 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
     return todos;
   }
 
+  async copropiedadDeActivo(dispositivoId: string): Promise<string | null> {
+    for (const [copropiedadId, equipos] of this.equipos) {
+      if (equipos.some((e) => e.id === dispositivoId && e.estado === 'activo')) {
+        return copropiedadId;
+      }
+    }
+    return null;
+  }
+
   async crear(
     ctx: ContextoTenant,
     copropiedadId: string,

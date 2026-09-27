@@ -111,6 +111,7 @@ export const configuracionDePrueba: Configuracion = {
    */
   PROVEEDOR_DE_EQUIPOS: 'simulado',
   PROVEEDOR_SEMILLA: 20260908,
+  TERMINAL_ABRE_SIN_PLATAFORMA: false,
   // Este banco no tiene base: el cargador que lee de ella fallaría en cada
   // lectura. El conservador deniega, que es lo que las suites de la API
   // esperan; el cargador PostgreSQL tiene su propia suite contra base real.

@@ -6,6 +6,7 @@ import type { Bitacora } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import {
+  COPROPIEDAD_DE_EQUIPO,
   CORRECTOR_DE_EQUIPO,
   EQUIPOS_QUE_EMITEN,
   REPOSITORIO_DE_EQUIPOS,
@@ -49,7 +50,18 @@ export class EquiposModule {
           inject: [BITACORA],
           useFactory: (bitacora: Bitacora) => new SondaPorProveedor(undefined, bitacora),
         },
-        { provide: CORRECTOR_DE_EQUIPO, useFactory: () => new CorrectorPorProveedor() },
+        {
+          // 15-L · la apertura sin plataforma y el plazo, del `.env`: nunca del código.
+          provide: CORRECTOR_DE_EQUIPO,
+          inject: [CONFIGURACION],
+          useFactory: (c: Configuracion) =>
+            new CorrectorPorProveedor(undefined, {
+              abrirSinPlataforma: c.TERMINAL_ABRE_SIN_PLATAFORMA,
+              ...(c.TERMINAL_PLAZO_DE_VERIFICACION_S === undefined
+                ? {}
+                : { plazoS: c.TERMINAL_PLAZO_DE_VERIFICACION_S }),
+            }),
+        },
         // D-11 · atestaciones: PostgreSQL con base; sin ella, el doble de la suite.
         RepositorioDeAtestacionesEnMemoria,
         {
@@ -88,6 +100,14 @@ export class EquiposModule {
           }),
         },
         {
+          // R1 (15-L) · lo que el receptor pregunta: de quién es este equipo.
+          provide: COPROPIEDAD_DE_EQUIPO,
+          inject: [REPOSITORIO_DE_EQUIPOS],
+          useFactory: (equipos: RepositorioDeEquipos) => ({
+            copropiedadDe: (dispositivoId: string) => equipos.copropiedadDeActivo(dispositivoId),
+          }),
+        },
+        {
           // A3 · lo que biometría pregunta: a qué equipos llega una plantilla.
           provide: TERMINALES_DE_ROSTROS,
           inject: [REPOSITORIO_DE_EQUIPOS],
@@ -95,7 +115,12 @@ export class EquiposModule {
             new TerminalesDeRostrosDesdeRegistro(equipos),
         },
       ],
-      exports: [REPOSITORIO_DE_EQUIPOS, TERMINALES_DE_ROSTROS, EQUIPOS_QUE_EMITEN],
+      exports: [
+        REPOSITORIO_DE_EQUIPOS,
+        TERMINALES_DE_ROSTROS,
+        EQUIPOS_QUE_EMITEN,
+        COPROPIEDAD_DE_EQUIPO,
+      ],
     };
   }
 }

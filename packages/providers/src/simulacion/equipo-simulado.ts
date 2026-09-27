@@ -11,8 +11,16 @@ import {
   exigeCuerpo,
 } from './comportamientos-de-sitio';
 import type { PoliticaDeNonceDelEquipo } from './comportamientos-de-sitio';
+import { VerificacionRemotaSimulada } from './verificacion-remota-simulada';
+import type { FlujoEnVivo } from './verificacion-remota-simulada';
 
 export { aperturasFisicasPor, escriturasSinCuerpoPor } from './comportamientos-de-sitio';
+export {
+  FlujoEnVivo,
+  desenlacesDeVerificacionPor,
+  PLAZO_DE_VERIFICACION_MS,
+} from './verificacion-remota-simulada';
+export type { DesenlaceDeVerificacion, VerificacionResuelta } from './verificacion-remota-simulada';
 
 /**
  * UN EQUIPO QUE HABLA COMO LOS DE VERDAD, Y QUE NO EXISTE.
@@ -55,6 +63,19 @@ export interface GuionDeEquipo {
   readonly sinSoporte?: readonly string[];
   /** Bloques que el flujo de eventos entrega al conectar, en orden. */
   readonly flujo?: readonly Record<string, unknown>[];
+  /**
+   * 15-L · un flujo que se queda ABIERTO y emite cuando la prueba lo pide,
+   * como el del equipo. Si está, manda sobre `flujo`.
+   */
+  readonly enVivo?: FlujoEnVivo;
+  /**
+   * 15-L · el canal de verificación con el que está configurada la terminal.
+   * Sólo con `ISAPI` (modo armado) pregunta por el flujo: con `ISAPIListen`
+   * pregunta a un servidor de escucha que la plataforma no abre.
+   */
+  readonly canalDeVerificacion?: 'ISAPI' | 'ISAPIListen';
+  /** 15-L · plazo de la verificación, en ms, para probar el vencimiento. */
+  readonly plazoDeVerificacionMs?: number;
   /** Identidad que devuelve la ruta de `deviceInfo`. */
   readonly modelo?: string;
   readonly firmware?: string;
@@ -364,15 +385,20 @@ const respuestaDe = (
   }) as unknown as Response;
 
 /** Flujo de eventos: los bloques, uno detrás de otro, y después se cierra. */
-const cuerpoDeFlujo = (bloques: readonly Record<string, unknown>[]): ReadableStream<Uint8Array> => {
+const cuerpoDeFlujo = (
+  bloques: readonly Record<string, unknown>[],
+  alEmitir: (bloque: Record<string, unknown>) => void,
+): ReadableStream<Uint8Array> => {
   const codificador = new TextEncoder();
   let i = 0;
   return {
     getReader: () => ({
-      read: async () =>
-        i < bloques.length
-          ? { done: false, value: codificador.encode(JSON.stringify(bloques[i++])) }
-          : { done: true, value: undefined },
+      read: async () => {
+        const bloque = bloques[i++];
+        if (bloque === undefined) return { done: true, value: undefined };
+        alEmitir(bloque);
+        return { done: false, value: codificador.encode(JSON.stringify(bloque)) };
+      },
       cancel: async () => undefined,
     }),
   } as unknown as ReadableStream<Uint8Array>;
@@ -420,8 +446,30 @@ const caminoCasa = (rutaDelCatalogo: string, camino: string): boolean => {
 export const veredictosRecibidosPor = new Map<string, string[]>();
 
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
-  /** Estado mutable del equipo: la corrección lo cambia y la lectura lo ve. */
-  let verificacionRemota = guion.verificacionRemota !== false;
+  /**
+   * Estado mutable del equipo: la corrección lo cambia y la lectura lo ve. Es
+   * el `AcsCfg` entero de la guía, no un booleano: la corrección de la 15-L
+   * escribe también el canal y la apertura sin plataforma, y un simulado que
+   * sólo guardara el interruptor diría «aplicada» sin que lo estuviera.
+   */
+  const acs: Record<string, unknown> = {
+    remoteCheckDoorEnabled: guion.verificacionRemota !== false,
+    checkChannelType: guion.canalDeVerificacion ?? 'ISAPI',
+    needDeviceCheck: true,
+    remoteCheckTimeout: 5,
+    offlineDevCheckOpenDoorEnabled: false,
+  };
+  const verificacion = new VerificacionRemotaSimulada(guion.destino, guion.plazoDeVerificacionMs);
+  /** Sólo en modo armado, y con el interruptor puesto, pregunta por el flujo. */
+  const preguntaPorElFlujo = (bloque: Record<string, unknown>): void => {
+    if (acs['remoteCheckDoorEnabled'] === true && acs['checkChannelType'] === 'ISAPI') {
+      verificacion.alEmitir(bloque);
+    }
+  };
+  const flujoDeEventos = (): ReadableStream<Uint8Array> =>
+    guion.enVivo === undefined
+      ? cuerpoDeFlujo(guion.flujo ?? [], preguntaPorElFlujo)
+      : guion.enVivo.cuerpo(preguntaPorElFlujo);
   /** 15-K (§4) · el modo de control también: la corrección lo escribe y se lee. */
   let modoDeControl = guion.ctrlMod ?? '1';
   const veredictosRecibidos: string[] = [];
@@ -525,28 +573,40 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     }
     if (catalogada.proposito === 'leer si la terminal espera el veredicto de la plataforma') {
       // H-SITIO-05 · el interruptor con el nombre de la guía.
-      return respuestaDe(
-        200,
-        JSON.stringify({
-          AcsCfg: { remoteCheckDoorEnabled: verificacionRemota, checkChannelType: 'ISAPI' },
-        }),
-      );
+      return respuestaDe(200, JSON.stringify({ AcsCfg: acs }));
     }
     if (catalogada.proposito === 'fijar que la terminal espere el veredicto de la plataforma') {
       // Leer-modificar-escribir de verdad: lo que se escribe es lo que la
       // siguiente lectura devuelve. Sin esto, la corrección parecería aplicada
       // y la ficha seguiría en bloqueo.
-      const cuerpo = String(opciones?.body ?? '');
-      const pedido = /"remoteCheckDoorEnabled"\s*:\s*(true|false)/.exec(cuerpo)?.[1];
-      if (pedido === undefined) return respuestaDe(400, ERROR_AVERIADO);
-      verificacionRemota = pedido === 'true';
+      let escrito: unknown;
+      try {
+        escrito = (JSON.parse(String(opciones?.body ?? '')) as { AcsCfg?: unknown }).AcsCfg;
+      } catch {
+        return respuestaDe(400, ERROR_AVERIADO);
+      }
+      if (
+        typeof escrito !== 'object' ||
+        escrito === null ||
+        typeof (escrito as Record<string, unknown>)['remoteCheckDoorEnabled'] !== 'boolean'
+      ) {
+        return respuestaDe(400, ERROR_AVERIADO);
+      }
+      // Sólo los campos que el equipo tiene: uno desconocido no se inventa.
+      for (const [campo, valor] of Object.entries(escrito)) {
+        if (campo in acs) acs[campo] = valor;
+      }
       return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'responder la verificación remota de la terminal') {
       // Sin verificación remota activa no hay petición pendiente que contestar.
-      if (!verificacionRemota) return respuestaDe(200, NO_SOPORTA);
+      if (acs['remoteCheckDoorEnabled'] !== true) return respuestaDe(200, NO_SOPORTA);
       const cuerpo = String(opciones?.body ?? '');
       veredictosRecibidos.push(cuerpo);
+      // 15-L · la terminal ACTÚA: abre con `success` a tiempo y con su serie.
+      if (verificacion.contestar(cuerpo) === 'abrio') {
+        anotarEn(aperturasFisicasPor, guion.destino);
+      }
       return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'leer qué admite la biblioteca de rostros') {
@@ -671,15 +731,12 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     if (catalogada.proposito === 'contestar o rechazar una llamada del videoportero') {
       return respuestaDe(200, guion.senalizaLlamadas === true ? OK : NO_SOPORTA);
     }
-    if (catalogada.proposito === 'suscribirse a los eventos del equipo') {
+    if (
+      catalogada.proposito === 'suscribirse a los eventos del equipo' ||
+      catalogada.proposito === 'escuchar los eventos que el equipo emite'
+    ) {
       const respuesta = respuestaDe(200, '');
-      Object.defineProperty(respuesta, 'body', { value: cuerpoDeFlujo(guion.flujo ?? []) });
-      return respuesta;
-    }
-
-    if (catalogada.proposito === 'escuchar los eventos que el equipo emite') {
-      const respuesta = respuestaDe(200, '');
-      Object.defineProperty(respuesta, 'body', { value: cuerpoDeFlujo(guion.flujo ?? []) });
+      Object.defineProperty(respuesta, 'body', { value: flujoDeEventos() });
       return respuesta;
     }
 

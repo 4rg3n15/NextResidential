@@ -18,6 +18,8 @@ export {
 } from './aplicacion/puertos';
 /** A4 (15-E) · los equipos activos que emiten, para que el receptor los escuche. */
 export { EQUIPOS_QUE_EMITEN } from './aplicacion/puertos';
+/** R1 (15-L) · de quién es un equipo que publica: lo pregunta el receptor. */
+export { COPROPIEDAD_DE_EQUIPO } from './aplicacion/puertos';
 export type { EquipoQueEmite } from './aplicacion/puertos';
 /** A3 (15-E) · las terminales con biblioteca de rostros, por capacidad. */
 export { TERMINALES_DE_ROSTROS } from './aplicacion/terminales-de-rostros';

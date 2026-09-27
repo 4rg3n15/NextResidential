@@ -215,6 +215,28 @@ export const esquemaConfiguracion = z.object({
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════
+   * LA TERMINAL CUANDO LA PLATAFORMA NO CONTESTA · ETAPA 15-L, decisión del cliente
+   *
+   * La corrección «verificación remota» de la consola escribe en la terminal
+   * `offlineDevCheckOpenDoorEnabled` con este valor. `false` (por omisión, y
+   * también lo que trae el equipo): sin la API, la terminal NO abre por su
+   * cuenta; el plan B es abrir desde la consola o con la llave
+   * (`docs/guias/ENTREGA_EN_SITIO.md`). `true` la deja abrir con su propio
+   * reconocimiento cuando la plataforma no está: nadie queda fuera, y el motor
+   * de reglas deja de decidir mientras tanto.
+   */
+  TERMINAL_ABRE_SIN_PLATAFORMA: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /**
+   * 15-L · `remoteCheckTimeout` que la misma corrección escribe, en segundos.
+   * Ausente = no se toca el del equipo (la guía trae 5).
+   */
+  TERMINAL_PLAZO_DE_VERIFICACION_S: z.coerce.number().int().min(1).max(60).optional(),
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
    * QUIÉN CARGA EL CONTEXTO DEL MOTOR · D-25, ETAPA 15-D
    *
    *   postgres     (por omisión) — lee autorizaciones, padrón y lista negra

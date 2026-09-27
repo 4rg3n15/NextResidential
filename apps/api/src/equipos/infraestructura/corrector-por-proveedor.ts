@@ -24,8 +24,21 @@ import type {
  * corrigió algo y no qué. Reconstruir después quién dejó el equipo como está
  * sería imposible, que es justo lo que una auditoría necesita poder hacer.
  */
+/**
+ * 15-L · lo que la verificación remota escribe en la terminal y NO decide el
+ * código: sale del `.env` (`TERMINAL_ABRE_SIN_PLATAFORMA`,
+ * `TERMINAL_PLAZO_DE_VERIFICACION_S`). En sitio se cambia sin tocar código.
+ */
+export interface AjustesDeVerificacionRemota {
+  readonly abrirSinPlataforma: boolean;
+  readonly plazoS?: number;
+}
+
 export class CorrectorPorProveedor implements CorrectorDeEquipo {
-  constructor(private readonly peticion?: typeof fetch) {}
+  constructor(
+    private readonly peticion?: typeof fetch,
+    private readonly ajustes: AjustesDeVerificacionRemota = { abrirSinPlataforma: false },
+  ) {}
 
   async corregir(datos: DatosDeCorreccion): Promise<ResultadoDeCorreccionDeEquipo> {
     const resultado = await aplicarCorreccion({
@@ -36,6 +49,8 @@ export class CorrectorPorProveedor implements CorrectorDeEquipo {
       clave: datos.secreto,
       clase: datos.correccion,
       confirmadaPor: datos.confirmadaPor,
+      abrirSinPlataforma: this.ajustes.abrirSinPlataforma,
+      ...(this.ajustes.plazoS === undefined ? {} : { plazoDeVerificacionS: this.ajustes.plazoS }),
       ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
     });
 
