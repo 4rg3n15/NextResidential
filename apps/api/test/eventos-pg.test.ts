@@ -159,9 +159,13 @@ describe('RepositorioEventosPg · anexado idempotente (RN-17, CA-22)', () => {
     const primero = acceso();
     await repo.anexar(primero, actorId);
 
-    const antes = await contarEventos();
+    // Se cuentan las filas de ESA clave. Contar todos los eventos de la
+    // copropiedad era una carrera: otras suites anexan en paralelo, y una que
+    // entrara entre las dos lecturas ponía roja esta prueba (paso 14 del CI en
+    // macOS, «expected 55 to be 54», corrección 2 de la 15-L).
+    expect(await contarEventos(primero.claveIdempotencia)).toBe(1);
     await repo.anexar(acceso({ claveIdempotencia: primero.claveIdempotencia }), actorId);
-    expect(await contarEventos()).toBe(antes);
+    expect(await contarEventos(primero.claveIdempotencia)).toBe(1);
   });
 
   it('una clave distinta del mismo dispositivo sí entra', async () => {
@@ -307,15 +311,15 @@ describe('INMUTABILIDAD SOBRE UN EVENTO REAL · cierra el pendiente de la ETAPA 
   });
 });
 
-const contarEventos = async (): Promise<number> => {
+const contarEventos = async (clave: string): Promise<number> => {
   const cliente = await (pool as Pool).connect();
   try {
     await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
       JSON.stringify(claims()),
     ]);
     const { rows } = await cliente.query<{ n: string }>(
-      'SELECT count(*)::text AS n FROM public.eventos WHERE copropiedad_id=$1',
-      [COP],
+      'SELECT count(*)::text AS n FROM public.eventos WHERE copropiedad_id=$1 AND clave_idempotencia=$2',
+      [COP, clave],
     );
     return Number(rows[0]?.n ?? '0');
   } finally {

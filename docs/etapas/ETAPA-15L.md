@@ -1626,6 +1626,22 @@ Retirados: `biometria/aplicacion/consentimiento-presencial.ts` (y su prueba),
 
 Las pruebas negativas (34 controles) pasan y el trinquete de ramas sigue en 259.
 
+**Después del push, el CI de `2e35dd7` en macOS encontró una tercera carrera del
+mismo tipo**, y la trajo con su mensaje gracias al cambio de `estabilidad.mjs`:
+`eventos-pg › el duplicado NO deja una fila a medias` dio «expected 55 to be 54»
+en la primera de tres corridas. Contaba **todos** los eventos de la copropiedad
+antes y después del duplicado. Ahora cuenta las filas de esa clave de
+idempotencia, que deben ser 1 antes y 1 después. La reproduje con cuatro copias
+de la suite anexando eventos a la vez en la misma copropiedad:
+
+| Versión   | Rondas en rojo | Mensaje                              |
+| --------- | -------------- | ------------------------------------ |
+| Anterior  | 5 de 6         | «expected 237 to be 236» y parecidos |
+| Corregida | 0 de 18        | —                                    |
+
+El veredicto literal de abajo es anterior a esta corrección, que sólo toca esa
+prueba; la verificación de ese commit la hace el CI.
+
 **La tercera verificación es correcta.** Resultados:
 
 - **Suites:** API 1551 (5 saltadas declaradas, del paso 12b), consola 552,
