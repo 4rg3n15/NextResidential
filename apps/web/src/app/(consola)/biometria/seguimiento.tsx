@@ -49,6 +49,8 @@ interface Total {
   readonly sincronizadas: number;
   readonly fallidas: number;
   readonly porTerminal: readonly PorTerminal[];
+  /** A3 (15-L) · lo que se omitió y por qué; una API anterior no lo trae. */
+  readonly omitidas?: readonly { dispositivoId: string; nombre: string; detalle: string }[];
 }
 
 const mensajeDe = (fallo: unknown, porOmision: string): string =>
@@ -357,6 +359,14 @@ export const SeguimientoDeConsentimiento = ({
                 </Distintivo>
                 <span>
                   {t.nombre} · {t.detalle}
+                </span>
+              </li>
+            ))}
+            {(total.omitidas ?? []).map((o) => (
+              <li key={o.dispositivoId} className="flex items-start gap-2">
+                <Distintivo tono="neutro">Omitido</Distintivo>
+                <span>
+                  {o.nombre} · {o.detalle}
                 </span>
               </li>
             ))}

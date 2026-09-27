@@ -54,6 +54,7 @@ const aSincronizacionDto = (r: ResultadoDeSincronizacionTotal): SincronizacionTo
   sincronizadas: r.sincronizadas,
   fallidas: r.fallidas,
   porTerminal: r.porTerminal.map((t) => ({ ...t })),
+  omitidas: r.omitidas.map((o) => ({ ...o })),
 });
 
 /**

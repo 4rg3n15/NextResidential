@@ -78,13 +78,15 @@ export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto
               : palabra(c.audioBidireccional.estado, 'Audio', 'Sin audio', 'Audio sin comprobar'),
         },
         {
-          // H-SITIO-09 · si recibe plantillas, y si no, que NO APLICA: no es
-          // lo mismo que «sin comprobar», que se resuelve sondeando.
+          // H-SITIO-09 · si recibe plantillas, y si no, que NO los admite: no
+          // es lo mismo que «sin comprobar», que se resuelve sondeando. A3
+          // (15-L) · con las palabras del encargo, las mismas que la
+          // sincronización deja en su resultado.
           tono: c.bibliotecaDeRostros.estado === 'si' ? 'exito' : 'neutro',
           texto: palabra(
             c.bibliotecaDeRostros.estado,
             'Rostros: recibe plantillas',
-            'Rostros: no aplica',
+            'Este equipo no admite rostros',
             'Rostros sin comprobar',
           ),
         },

@@ -16,6 +16,9 @@ SincronizacionTotalDto _$SincronizacionTotalDtoFromJson(
   porTerminal: (json['porTerminal'] as List<dynamic>)
       .map((e) => ResultadoPorTerminalDto.fromJson(e as Map<String, dynamic>))
       .toList(),
+  omitidas: (json['omitidas'] as List<dynamic>)
+      .map((e) => EquipoOmitidoDto.fromJson(e as Map<String, dynamic>))
+      .toList(),
 );
 
 Map<String, dynamic> _$SincronizacionTotalDtoToJson(
@@ -26,4 +29,5 @@ Map<String, dynamic> _$SincronizacionTotalDtoToJson(
   'sincronizadas': instance.sincronizadas,
   'fallidas': instance.fallidas,
   'porTerminal': instance.porTerminal,
+  'omitidas': instance.omitidas,
 };

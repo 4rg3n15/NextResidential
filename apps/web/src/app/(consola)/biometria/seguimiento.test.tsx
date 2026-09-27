@@ -151,12 +151,24 @@ describe('SeguimientoDeConsentimiento', () => {
               detalle: 'no respondió',
             },
           ],
+          omitidas: [
+            {
+              dispositivoId: 'v-2',
+              nombre: 'Videoportero de servicio',
+              detalle: 'este equipo no admite rostros',
+            },
+          ],
         });
     montar();
     fireEvent.click(screen.getByRole('button', { name: /Comprobar respuesta/ }));
     await waitFor(() => expect(screen.getByText(/1 de 2/)).toBeTruthy());
     expect(screen.getByText(/Terminal peatonal/)).toBeTruthy();
     expect(screen.getByText(/Videoportero · no respondió/)).toBeTruthy();
+    // A3 (15-L) · el omitido se nombra, con su porqué: nada queda en silencio.
+    expect(screen.getByText('Omitido')).toBeTruthy();
+    expect(
+      screen.getByText(/Videoportero de servicio · este equipo no admite rostros/),
+    ).toBeTruthy();
   });
 
   it('un fallo de la API se muestra, no se esconde', async () => {

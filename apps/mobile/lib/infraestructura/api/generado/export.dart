@@ -100,6 +100,7 @@ export 'models/emergencia_dto.dart';
 export 'models/en_atencion_dto.dart';
 export 'models/enlace_de_consentimiento_dto.dart';
 export 'models/equipo_dto.dart';
+export 'models/equipo_omitido_dto.dart';
 export 'models/equipos_dto.dart';
 export 'models/error_api_dto.dart';
 export 'models/error_de_fila_dto.dart';

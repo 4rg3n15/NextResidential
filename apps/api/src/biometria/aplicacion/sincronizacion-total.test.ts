@@ -49,10 +49,15 @@ class Terminales implements FaceTemplateProvider {
     this.retiradas.push(`${dispositivoId}/${plantillaId}`);
   }
 }
+type Omitido = TerminalConBiblioteca & { readonly motivo: 'no_admite' | 'sin_comprobar' };
 class Catalogo implements CatalogoDeTerminales {
+  omitidos: Omitido[] = [];
   constructor(readonly terminales: TerminalConBiblioteca[]) {}
   async conBibliotecaDeRostros(): Promise<readonly TerminalConBiblioteca[]> {
     return this.terminales;
+  }
+  async sinBibliotecaDeRostros(): Promise<readonly Omitido[]> {
+    return this.omitidos;
   }
 }
 const bitacora: Bitacora & { lineas: string[] } = {
@@ -155,6 +160,34 @@ describe('SincronizarPlantillaEnTerminales · a TODAS, por capacidad (A3)', () =
     const r = await enTerminales.ejecutar(ctx, { plantillaId });
     expect(r.ok && r.valor.terminales).toBe(0);
     expect(bitacora.lineas).toContain('sincronización total sin destino');
+  });
+
+  it('A3 (15-L) · lo que no admite rostros se OMITE y se dice: en el resultado y en bitácora', async () => {
+    catalogo.omitidos = [
+      { dispositivoId: 'v-2', nombre: 'Videoportero de servicio', motivo: 'no_admite' },
+      { dispositivoId: 't-9', nombre: 'Terminal nueva', motivo: 'sin_comprobar' },
+    ];
+    const { plantillaId, consentimientoId } = await captura();
+    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: true });
+    const r = await enTerminales.ejecutar(ctx, { plantillaId });
+    if (!r.ok) throw new Error(r.error.detalle);
+    expect(r.valor.omitidas).toEqual([
+      {
+        dispositivoId: 'v-2',
+        nombre: 'Videoportero de servicio',
+        detalle: 'este equipo no admite rostros',
+      },
+      {
+        dispositivoId: 't-9',
+        nombre: 'Terminal nueva',
+        detalle: 'aún no se sabe si admite rostros: use «Probar conexión» en su ficha',
+      },
+    ]);
+    // Omitir no es fallar: las dos con biblioteca la tienen igual.
+    expect(r.valor.sincronizadas).toBe(2);
+    expect(
+      bitacora.lineas.filter((l) => l === 'equipo omitido en la sincronización de rostros'),
+    ).toHaveLength(2);
   });
 
   it('relanzarla no duplica: la terminal la vuelve a recibir y la fila es la misma', async () => {

@@ -139,6 +139,17 @@ describe('Bloque B · lo que no es un acceso se guarda y no pasa por el motor', 
     expect(ejecutar).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['el timbre de la terminal (5/37)', { clase: 'timbre' as const, tipo: 'timbre' as const }],
+    ['la llamada del videoportero', { clase: 'llamada' as const, tipo: 'llamada' as const }],
+  ])('A3 · %s: evento Y aviso a la guardia virtual', async (_caso, extra) => {
+    const { ingestor, vivos, llamadas, ejecutar } = montar();
+    await ingestor.ingerir(publicacion(extra));
+    expect(vivos.map((v) => v.tipo)).toEqual([extra.tipo]);
+    expect(llamadas).toHaveLength(1);
+    expect(ejecutar).not.toHaveBeenCalled();
+  });
+
   it('una llamada que se cancela se guarda, pero no vuelve a avisar', async () => {
     const { ingestor, vivos, llamadas } = montar();
     await ingestor.ingerir(publicacion({ clase: 'llamada', tipo: 'llamada_cancelada' }));

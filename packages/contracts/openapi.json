@@ -9368,6 +9368,27 @@
           "atestacion"
         ]
       },
+      "EquipoOmitidoDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "detalle": {
+            "type": "string",
+            "description": "Por qué no recibió la plantilla, en palabras"
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "nombre",
+          "detalle"
+        ]
+      },
       "EquiposDto": {
         "type": "object",
         "properties": {
@@ -12686,6 +12707,13 @@
             "items": {
               "$ref": "#/components/schemas/ResultadoPorTerminalDto"
             }
+          },
+          "omitidas": {
+            "description": "A3 (15-L) · terminales y videoporteros sin biblioteca de rostros: se omiten y se dice",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipoOmitidoDto"
+            }
           }
         },
         "required": [
@@ -12693,7 +12721,8 @@
           "terminales",
           "sincronizadas",
           "fallidas",
-          "porTerminal"
+          "porTerminal",
+          "omitidas"
         ]
       },
       "SincronizarPlantillaDto": {

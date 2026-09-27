@@ -127,6 +127,16 @@ export interface CatalogoDeTerminales {
     ctx: ContextoTenant,
     copropiedadId: string,
   ): Promise<readonly TerminalConBiblioteca[]>;
+  /**
+   * A3 (15-L) · las terminales y videoporteros activos SIN biblioteca: se
+   * omiten, pero se dice cuáles y por qué. Opcional para los dobles de prueba.
+   */
+  sinBibliotecaDeRostros?(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+  ): Promise<
+    readonly (TerminalConBiblioteca & { readonly motivo: 'no_admite' | 'sin_comprobar' })[]
+  >;
 }
 
 /** Lo que el enlace del titular lleva dentro. Nada más: ni nombre ni dato. */

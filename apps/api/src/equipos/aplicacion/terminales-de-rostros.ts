@@ -21,6 +21,17 @@ export interface TerminalDeRostros {
 }
 
 /**
+ * A3 (15-L) · una terminal o un videoportero que la sincronización OMITE, con
+ * el porqué: que no admite rostros es un hecho del modelo; que no se sabe se
+ * resuelve sondeándolo. Ninguno de los dos es un fallo silencioso.
+ */
+export interface EquipoSinRostros {
+  readonly dispositivoId: string;
+  readonly nombre: string;
+  readonly motivo: 'no_admite' | 'sin_comprobar';
+}
+
+/**
  * `true` sólo con `si`; `desconocida` cuenta como no (la dirección segura).
  * Se escribe aquí y no se importa de `@ncr/providers` porque la capa de
  * aplicación sólo conoce el paquete por sus TIPOS (O2): un valor importado
@@ -40,5 +51,25 @@ export class TerminalesDeRostrosDesdeRegistro {
     return equipos
       .filter((e) => e.estado === 'activo' && conBiblioteca(e.capacidades))
       .map((e) => ({ dispositivoId: e.id, nombre: e.nombre }));
+  }
+
+  /** A3 (15-L) · las terminales y videoporteros activos que se quedan fuera. */
+  async sinBibliotecaDeRostros(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+  ): Promise<readonly EquipoSinRostros[]> {
+    const equipos = await this.equipos.listar(ctx, copropiedadId);
+    return equipos
+      .filter(
+        (e) =>
+          e.estado === 'activo' &&
+          (e.tipo === 'terminal_facial' || e.tipo === 'intercom') &&
+          !conBiblioteca(e.capacidades),
+      )
+      .map((e) => ({
+        dispositivoId: e.id,
+        nombre: e.nombre,
+        motivo: e.capacidades?.bibliotecaDeRostros.estado === 'no' ? 'no_admite' : 'sin_comprobar',
+      }));
   }
 }

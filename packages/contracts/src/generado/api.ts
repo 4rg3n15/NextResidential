@@ -2845,6 +2845,13 @@ export interface components {
             /** @description D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó. */
             atestacion: components["schemas"]["AtestacionDeEquipoDto"] | null;
         };
+        EquipoOmitidoDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            nombre: string;
+            /** @description Por qué no recibió la plantilla, en palabras */
+            detalle: string;
+        };
         EquiposDto: {
             equipos: components["schemas"]["EquipoDto"][];
         };
@@ -3841,6 +3848,8 @@ export interface components {
             sincronizadas: number;
             fallidas: number;
             porTerminal: components["schemas"]["ResultadoPorTerminalDto"][];
+            /** @description A3 (15-L) · terminales y videoporteros sin biblioteca de rostros: se omiten y se dice */
+            omitidas: components["schemas"]["EquipoOmitidoDto"][];
         };
         SincronizarPlantillaDto: {
             dispositivoId: string;

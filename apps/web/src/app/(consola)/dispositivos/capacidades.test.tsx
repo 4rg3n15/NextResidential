@@ -27,7 +27,7 @@ const videoportero = (biblioteca: 'si' | 'no' | 'desconocida'): Equipo =>
 describe('H-SITIO-09 · el videoportero dice si recibe rostros', () => {
   it.each([
     ['si', 'Rostros: recibe plantillas'],
-    ['no', 'Rostros: no aplica'],
+    ['no', 'Este equipo no admite rostros'],
     ['desconocida', 'Rostros sin comprobar'],
   ] as const)('%s → «%s»', (estado, texto) => {
     expect(resumenDeCapacidades(videoportero(estado)).map((x) => x.texto)).toContain(texto);
