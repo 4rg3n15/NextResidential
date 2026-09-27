@@ -2,11 +2,12 @@
 
 **Rama:** `etapa-15l-entrega-final` · **Base:** `develop` (`fc353bc`, con el PR #33 y `5466dfa`)
 
-> Informe en construcción. La primera sección es el **Bloque 0**, que el
-> encargo exige ANTES de escribir código: cada respuesta con archivo:línea y
-> evidencia. Lo que sale «no existe» o «no probado» pasa a trabajo obligatorio
-> de esta corrección. El avance por bloque, con su commit, está en
-> [Avance](#avance).
+> **Ronda CERRADA el 2026-09-27** con `./scripts/verificar-etapa.sh --con-base`
+> en «correcta» (veredicto literal en el §6 del cierre). La primera sección es
+> el **Bloque 0**, escrito ANTES del código, con archivo:línea y evidencia. El
+> avance por bloque, con su commit, está en [Avance](#avance); el cierre según
+> §2.8, al final, con las dos listas «Probado contra simulador» y «Requiere
+> prueba en sitio». **La ETAPA 15 sigue BLOQUEADA sólo por `BE-02`**.
 
 ---
 
@@ -462,12 +463,168 @@ con foto (403)`).
 
 ### Resultado
 
-⟪RESULTADO_PRUEBAS⟫
+Todo en verde en la corrida del verificador (Linux, Node 22.22.2, Flutter
+3.47.4, PostgreSQL 16.13), tres veces seguidas sin caché con el mismo
+resultado:
+
+| Paquete            | Pruebas                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `@ncr/api`         | 1464 (1459 + 5 saltadas en el paso 5, **declaradas** y ejercidas en otro paso; 1464 en las tres corridas del paso 14) |
+| `@ncr/providers`   | 916                                                                                                                   |
+| `@ncr/web`         | 541                                                                                                                   |
+| `@ncr/domain-core` | 438                                                                                                                   |
+| `@ncr/config`      | 144                                                                                                                   |
+| `@ncr/edge`        | 101                                                                                                                   |
+| App Flutter        | 251                                                                                                                   |
+| **Total**          | **3855**                                                                                                              |
+
+Cobertura por capa (§2.4): dominio 96,20 % de líneas (ramas 96,91 %),
+aplicación 95,59 % (ramas 86,84 %), global 84,39 %; app: dominio 96,41 %,
+aplicación 95,38 %, global 85,15 %. El recorrido de la consola (13b), su
+prueba negativa con los cinco defectos de sitio (13c), el camino del
+navegador (12c), `start:dev` (12d), el guion y el ensayo de sitio contra los
+simulados (12e, 12f) y el recorrido de la app en Chromium (5e) pasan.
+
+**El control declarado no ejercido** es el 5e —el recorrido de la app en el
+navegador—, declarado desde la ETAPA 14 **sólo para macOS** (el motor de
+Flutter web no engancha el campo bajo Chromium en macOS). En esta corrida, en
+Linux, **se ejerció y pasó**: «1 paso declarado no ejercido, 0 de ellos en
+linux».
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh` (§2.8.0)
 
 ```
-⟪VEREDICTO⟫
+$ ./scripts/verificar-etapa.sh --con-base   (extracto literal: pasos, comprobaciones y veredicto)
+
+▸ 0 · borrando artefactos de compilación (así corre un checkout nuevo)
+   ✓ dist, .turbo, coverage, registros de compilación y claims de arranque eliminados
+▸ 1 · entorno dentro de lo declarado
+   ✓ entorno: Node 22.22.2 y pnpm dentro de engines · .nvmrc 22.22.2 · Flutter 3.47.4 (Dart 3.13.3) dentro de lo declarado · recorrido listo (Chromium + puerto 4599)
+▸ 1c · el árbol es escribible por las herramientas que van a usarlo
+   ✓ escritura: 9 rutas ejercidas de verdad (crear, escribir, leer, borrar)
+   ✓ base de pruebas: 127.0.0.1:55432/ncr como postgres · PostgreSQL 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu · conectado como postgres · esquema presente · 2 copropiedad(es) sembrada(s)
+▸ 1b · docs/ESTADO_ETAPAS.md no se contradice a sí mismo
+   ✓ coherente: 17 etapas en el mapa, 15 cerradas con ficha e informe, cabecera al día · 0 de 0 rama(s) «en curso» comprobadas contra git
+▸ 2 · instalación coherente con el lockfile
+   ✓ pnpm install --frozen-lockfile
+▸ 3 · compilación desde cero
+   ✓ @ncr/api construye SOLO, sin que nadie le prepare las dependencias
+   ✓ @ncr/edge construye SOLO, sin que nadie le prepare las dependencias
+   ✓ pnpm build
+   ✓ ninguna aplicación compila contra un dist/ desfasado (7 paquetes del espacio de trabajo, D-65)
+▸ 4 · lint y typecheck
+   ✓ pnpm lint
+   ✓ pnpm typecheck
+▸ 5 · suite completa
+   @ncr/config:test:       Tests  144 passed (144)
+   @ncr/edge:test:       Tests  101 passed (101)
+   @ncr/domain-core:test:       Tests  438 passed (438)
+   @ncr/providers:test:       Tests  916 passed (916)
+   @ncr/web:test:       Tests  541 passed (541)
+   @ncr/api:test:       Tests  1459 passed | 5 skipped (1464)
+   ⚠ suite sin rojas · las saltadas están DECLARADAS y se ejercen en otro paso
+▸ 5b · app móvil: análisis estático de Dart
+   ✓ flutter analyze sin hallazgos
+▸ 5c · app móvil: suite de Dart y cobertura POR CAPA
+   ✓ dominio           96.41 % (umbral 90 %, 215/223 líneas)
+   ✓ aplicacion        95.38 % (umbral 90 %, 165/173 líneas)
+   ✓ configuracion    100.00 % (umbral 70 %, 33/33 líneas)
+   ✓ infraestructura   86.41 % (umbral 60 %, 477/552 líneas)
+   ✓ presentacion      83.67 % (umbral 50 %, 1680/2008 líneas)
+   ✓ resto             26.19 % (umbral 0 %, 11/42 líneas)
+   ✓ global            85.15 % (umbral 70 %, sin contar lo generado)
+   ✓ cobertura de la app dentro de los umbrales por capa
+   ✓ la suite de Dart da lo mismo en otro huso (Pacific/Auckland): ninguna prueba depende del reloj del sistema
+▸ 5d · app móvil: cliente al día, sin secretos y sin dependencias a ciegas
+   ✓ sin secretos: la app no nombra ni incrusta ninguna llave que omita la RLS
+   ✓ dependencias: 1 acotación(es) con motivo escrito · objective_c fuera del grafo (lo arrastraba el plugin de Windows)
+   ✓ Info.plist preprocesado: Debug y Release piden red local; ATS local sólo en Debug; nunca NSAllowsArbitraryLoads
+   ✓ cliente Dart al día: 354 ficheros generados desde packages/contracts/openapi.json, sin diferencias
+▸ 5e · app móvil: el RECORRIDO en un navegador de verdad
+   ✓ las 10 lecturas salieron con el token en la cabecera
+   ✓ el residente desactivado sigue apareciendo (RN-19)
+   ✓ y está marcado
+   ✓ la placa se muestra como la normalizó el dominio
+   ✓ la pestaña de visitantes muestra lo que el conjunto tiene a su nombre
+   ✓ y ofrece autorizar una visita, que es para lo que se abre (HU-07)
+   ✓ los últimos visitantes se ofrecen para volver a autorizarlos (F6)
+   ✓ el perfil trae el nombre de la persona (3.5)
+   ✓ y el botón de portería (D7)
+   ✓ el correo sintético del token no aparece en ninguna parte (C-36)
+   ✓ el motivo de la negación se explica en lenguaje llano
+   ✓ lo decidido por el Edge se marca (KPI-31)
+   ✓ ni un error de JavaScript en el recorrido completo
+   ✓ la app se recorre entera en el navegador, sin un error de JavaScript
+▸ 6 · ningún fichero de prueba se quedó sin recoger
+   ✓ 294 de 294 ficheros de prueba ejecutados
+▸ 7 · umbrales de cobertura por capa (§2.4)
+   ✓ las tres capas cumplen su umbral
+▸ 7b · los dos recuentos de la MISMA suite coinciden (D-112)
+   ✓ recuentos: 6 paquete(s) con el mismo resultado por los dos caminos (turbo y vitest directo) · 3604 pruebas
+▸ 8 · portabilidad de las superficies con shell (macOS/BSD y CI/GNU)
+   ✓ portabilidad: 17 superficies con shell sin construcciones divergentes BSD/GNU (.sh, scripts de package.json, .husky/, run: de workflows, Makefile)
+▸ 9 · pruebas negativas de los propios controles
+   ✓ entorno declarado: 63 variables de 2 esquemas, todas en su .env.example · 27 leídas fuera de Zod, con motivo
+   ✓ declaraciones: 1 paso(s) declarado(s) no ejercido(s), 0 de ellos en linux, con motivo y etapa de revisión vigente
+   ✓ controles: 40 de 42 con prueba negativa · 2 en deuda declarada (no puede crecer)
+   ✓ PRUEBAS NEGATIVAS: los 33 controles detectan su violación y aceptan el caso legítimo, sin tocar el árbol
+   ✓ ramas: 40 controles medidos · 261 bloques sin ejercer (no puede subir)
+▸ 10 · fronteras de arquitectura y secretos
+   ✓ fronteras (DoD ETAPA 02)
+   ✓ frontera-modulos: 17 módulos (alarmserver, autenticacion, autorizaciones, biometria, cuentas, equipos, eventos, guardia, observabilidad, padron, planificacion, plataforma, porteria, residente, tablero, visitas, zonas), nin
+   ✓ sin secretos
+   ✓ escaneo de secretos: limpio (4763 blobs del historial alcanzable · 2 de línea base declarados)
+   ✓ longitud por campo: 127 campo(s) @IsString(), todos con cota declarada
+   ✓ 65 clases que Nest construye inyectan con @Inject() explícito en todos sus parámetros
+   ✓ KPI-11: sin ISAPI ni IPs de dispositivo fuera de packages/providers/ (los rangos de documentación de RFC 5737 no cuentan: no son de nadie)
+   ✓ frontera-extensibilidad: 223 fichero(s) de dominio/aplicación sin @ncr/providers, ningún adaptador nombrado fuera del paquete, y el ficticio sólo toca el núcleo
+   ✓ ningún atributo `style` en la consola (221 ficheros, §2.7.7)
+   ✓ 221 ficheros de la consola: todo color sale de un token con pareja medida en los dos temas
+   ✓ frontera-vocabulario: 83 ficheros del dominio, sin tipo de copropiedad ni etiquetas (el tipo se puede cambiar sin consecuencias)
+   ✓ sin claves ajenas vigentes hacia tablas append-only (2 declaradas, 2 retiradas, 8 tablas vigiladas)
+   ✓ pwa: manifiesto completo, iconos reales de 192/512 y uno enmascarable distinto, service worker registrado con `/api/` fuera de la caché y página de sin conexión
+   ✓ paleta: paleta.g.dart al día con el preset (40 tokens por tema)
+   ✓ mermaid: 9 diagrama(s) en 2 fichero(s) analizan con Mermaid 11.17.2
+▸ 10b · el contrato OpenAPI tiene tipos y el cliente generado está al día
+   ✓ esquemas: 230 DTO con nombre único en apps/api/src
+   ✓ 144 de 150 operaciones con respuesta tipada; 6 exentas con etapa declarada
+   ✓ contrato y cliente generado al día respecto de los controladores
+▸ 11 · latencia del canal de tiempo real bajo carga (KPI-25)
+   ✓ KPI-25 con margen sobre el umbral
+▸ 12 · esquema y aislamiento en --modo-supabase (requiere --con-base)
+   ✓ migraciones, semillas y suite SQL
+▸ 12b · arranque en frío: base vacía → migraciones → superadministrador (requiere --con-base)
+   ✓ una base recién migrada llega a un superadministrador con claims válidos
+   ✓ y esa sesión ENTRA: la API la acepta con aal2 y la rechaza con aal1
+▸ 12c · el camino del NAVEGADOR: contraseña → factor → QR → aal2 → tablero
+   ✓ el camino completo se recorre en el navegador
+▸ 12d · start:dev —el arranque de sitio— inyecta y VALIDA; con tsx la API se niega a arrancar
+   ✓ con start:dev la API llega a «API arrancada»
+   ✓ un controlador inyectado contesta con su lógica (503, no 500)
+   ✓ el ValidationPipe valida: un cuerpo fuera del DTO recibe 400
+   ✓ con tsx la API se niega a arrancar y dice por qué: sin metadatos no valida
+   ✓ start:dev arranca, inyecta y valida; tsx no arranca sin metadatos
+▸ 12e · el guion de sitio, ensayado contra los equipos simulados: --con-audio y --abrir
+   ✓ la puerta SE MOVIÓ: H-SITIO-13 verificado en este equipo
+   ✓ la puerta SE MOVIÓ: H-SITIO-13 verificado en este equipo
+   ✓ el guion recorre los tres equipos simulados y --abrir abre como en sitio
+▸ 12f · pnpm sitio:ensayo contra los equipos simulados: ocho pasos por equipo, respaldo y reversión
+   ✓ el ensayo recorre los tres equipos simulados, respalda y revierte su configuración
+▸ 13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)
+   ✓ 100 inserciones concurrentes, 0 duplicados (KPI-03)
+   ✓ UPDATE y DELETE rechazados sobre un evento real (RN-03, CA-23)
+   ✓ 50 ingresos simultáneos sobre 10 plazas, ni una de más (RN-14, CA-14)
+   ✓ una hoja sin un solo UUID crea viviendas, personas y sus vínculos (D-72, RN-06)
+   ✓ el superadministrador escribe el padrón en la copropiedad del selector (D-71)
+   ✓ las 12 en una sentencia, el mismo número en tres agrupaciones, y una colisión revierte las 12
+▸ 13b · el recorrido de la CONSOLA contra la API real, PostgreSQL y el simulado (requiere --con-base)
+   ✓ el superadministrador y el portero recorren la consola de punta a punta
+▸ 13c · el recorrido FALLA con H-SITIO-02, 03, 08, 13 y 15 reintroducidos (requiere --con-base)
+   ✓ los cinco defectos de sitio, reintroducidos, se detectan cada uno por su nombre
+▸ 14 · estabilidad: la suite da lo mismo tres veces seguidas
+▸ 15 · ningún paso declarado se quedó sin ejecutar
+   ✓ OK 31 de 31 pasos ejecutados
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
 ```
 
 ## 7 · Verificación de seguridad (§2.7)
@@ -542,7 +699,30 @@ a C-43 (C-43 nueva en el cierre). **Extensión:** E-05. **Pendiente:** P-21
 
 Rama `etapa-15l-entrega-final`, base `develop`. PR: ⟪PR⟫ (sin fusionar).
 
-⟪COMMITS⟫
+- `0669b28` docs(etapa-15l): bloque 0 · informe de bloqueos antes de escribir código
+- `a7a2821` fix(etapa-15l/equipos): la terminal pregunta, la plataforma contesta y la terminal abre (R1–R4)
+- `3f9ceef` fix(etapa-15l/equipos): credencial rechazada sin reintento, y ningún equipo de otra copropiedad (A5 + fuga del Bloque 0.4)
+- `6883c6c` feat(etapa-15l/eventos): todo lo que emite un equipo queda guardado y a la vista (Bloque B, A1, A4)
+- `5698103` docs(etapa-15l): avance por bloque, puntos de parada respondidos y S-66 a S-68
+- `e042264` feat(etapa-15l/biometria): la terminal recibe la vigencia del visitante y la caduca por su cuenta (A2)
+- `ac04d6d` feat(etapa-15l/biometria): el videoportero sin biblioteca se omite y se dice (A3)
+- `c3ad781` feat(etapa-15l/app): el acceso dice por qué no llega al servidor, y guía del iPhone (E2, E3)
+- `a02f8a0` feat(etapa-15l/equipos): dispositivos editables de verdad, sin reiniciar (C1, C2, D2 canal)
+- `4aeed02` feat(etapa-15l/equipos): en línea o fuera de línea por un latido real (C4)
+- `912086b` feat(etapa-15l/video): el códec se le pregunta al equipo y el video tiene estados (D2, C3, D3)
+- `3d7cabe` feat(etapa-15l/video): go2rtc en el Mac con un comando, desde el .env (D1)
+- `c9f00e8` feat(etapa-15l/sitio): pnpm sitio:ensayo, respaldo y reversión, y el guion de la entrega (J)
+- `3be3b30` feat(etapa-15l/porteros): número de portero por pool, lista blanca de IP y modo pruebas (H1-H7)
+- `650652b` docs(etapa-15l/porteros): commit del Bloque H en el informe
+- `543f1a8` feat(etapa-15l/residentes): el superadministrador edita el perfil de un residente (G)
+- `2496484` docs(etapa-15l/residentes): commit del Bloque G en el informe
+- `84d6f6c` feat(etapa-15l/visitas): generar autorización con foto y casilla, rechazo y lista del día (F-a/b/c, I web)
+- `7fcac5d` feat(etapa-15l/visitas): recorrido de la entrega con la visita de punta a punta, ADR-032 y cero códigos en pantalla (F-e, I)
+- `c5df04e` refactor(etapa-15l/visitas): consulta de la consola e historial del residente en puertos y ficheros separados
+- `e2520bd` feat(etapa-15l/app): nuevo visitante con foto y casilla, últimos visitantes y volver a autorizar (F-d, I app)
+- `28dd75e` feat(etapa-15l/app): los rechazos de la API llegan a la pantalla sin citas de regla (I)
+- `ad058d7` docs(etapa-15l): ronda 15-L en el estado y el informe de cierre (§2.8), a falta del veredicto
+- `451a58c` fix(etapa-15l/verificacion): el 12c declara sus adaptadores en memoria y el 12d deja de usar las rutas del enlace retirado
 
 ---
 

@@ -915,7 +915,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 | I      | Cero códigos del proyecto en la interfaz: prueba sobre el fuente de la consola y de la app, y sobre las pantallas reales en el recorrido               |
 | J      | `pnpm sitio:ensayo`, `--capturar`/`--restaurar` y `ENTREGA_EN_SITIO.md`                                                                                |
 
-**Verificación:** el veredicto literal de `./scripts/verificar-etapa.sh --con-base` está en el §6 del informe.
+**Verificación:** `./scripts/verificar-etapa.sh --con-base` → «VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe» (el 5e, declarado sólo para macOS; en esta corrida, en Linux, se ejerció y pasó). 31 de 31 pasos, 3855 pruebas, tres corridas idénticas. Extracto literal en el §6 del informe.
 
 ---
 
