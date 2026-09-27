@@ -45,6 +45,7 @@ class EnvioPendiente {
     this.intentos = 0,
     this.proximoIntentoEn,
     this.ultimoError,
+    this.propietario,
   });
 
   final String claveDeIdempotencia;
@@ -57,6 +58,12 @@ class EnvioPendiente {
   final int intentos;
   final DateTime? proximoIntentoEn;
   final String? ultimoError;
+
+  /// De qué cuenta es. La bandeja sobrevive al cierre de la app y al cierre de
+  /// sesión, y un teléfono puede ser de dos residentes: lo que encoló uno NO
+  /// puede salir con la sesión del otro, porque el servidor lo crearía en la
+  /// vivienda equivocada. `null` = sin sesión conocida al encolar.
+  final String? propietario;
 
   EnvioPendiente copiaCon({
     int? intentos,
@@ -71,6 +78,7 @@ class EnvioPendiente {
         intentos: intentos ?? this.intentos,
         proximoIntentoEn: proximoIntentoEn ?? this.proximoIntentoEn,
         ultimoError: ultimoError ?? this.ultimoError,
+        propietario: propietario,
       );
 }
 
@@ -144,6 +152,12 @@ class BandejaDeSalida {
       .where((p) => p.proximoIntentoEn == null || !p.proximoIntentoEn!.isAfter(ahora))
       .toList();
 
+  /// Sólo lo de una cuenta. Es la vista que se envía y que se enseña.
+  BandejaDeSalida delPropietario(String? propietario) =>
+      BandejaDeSalida(pendientes.where((p) => p.propietario == propietario).toList());
+
+  bool contiene(String clave) => pendientes.any((p) => p.claveDeIdempotencia == clave);
+
   BandejaDeSalida quitar(String clave) =>
       BandejaDeSalida(pendientes.where((p) => p.claveDeIdempotencia != clave).toList());
 
@@ -178,4 +192,16 @@ class BandejaDeSalida {
     PoliticaDeReintento politica = const PoliticaDeReintento(),
   }) =>
       pendientes.where((p) => p.intentos >= politica.intentosMaximos).toList();
+}
+
+/// Dónde espera la bandeja mientras la app está cerrada.
+///
+/// Es un puerto porque «sobrevive al cierre» es una promesa que se prueba: la
+/// prueba vuelve a construir la app con el mismo almacén y mira que la visita
+/// siga ahí. El adaptador del teléfono la guarda en Keychain o Keystore.
+abstract interface class AlmacenDeBandeja {
+  Future<List<EnvioPendiente>> leer();
+
+  /// Deja guardada EXACTAMENTE esta lista: lo que no está, se borra.
+  Future<void> guardar(List<EnvioPendiente> pendientes);
 }

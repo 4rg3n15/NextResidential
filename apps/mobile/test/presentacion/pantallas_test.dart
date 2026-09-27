@@ -304,8 +304,7 @@ void main() {
     expect(motivoLegible('LISTA_NEGRA'), 'La persona o la placa está en lista negra');
   });
 
-  testWidgets('M-8 · las notificaciones ya NO son un interruptor, y lo que sigue pendiente sí',
-      (t) async {
+  testWidgets('M-8 · ningún interruptor de avisos: la verdad en una frase (15-L)', (t) async {
     final repo = RepositorioFalso();
     final inicio = controladorDeInicio(repo);
     await inicio.cargarAhora();
@@ -331,7 +330,6 @@ void main() {
             alEditarPerfil: (_) {},
             alCambiarVivienda: (_) {},
             alCambiarContrasena: () {},
-            estadoDeAvisos: EstadoDeAvisos.sinDeterminar,
           ),
         ),
       ),
@@ -347,18 +345,15 @@ void main() {
         scrollable: find.byType(Scrollable).first);
     expect(find.text('Código: ABCD-EFGH'), findsOneWidget);
 
-    // En 11-A las notificaciones eran dos interruptores apagados. Ahora son una
-    // fila con estado, porque «activadas» resumía tres condiciones distintas y
-    // dejaba al residente creyendo que le avisarían.
+    // En 11-A las notificaciones eran dos interruptores apagados; en 11-B, el
+    // estado del registro push. Esta compilación no lleva servicio de
+    // mensajería (15-L): la fila dice lo que es verdad y ningún interruptor
+    // promete otra cosa, tampoco uno deshabilitado.
     await t.scrollUntilVisible(find.text('Notificaciones'), 200,
         scrollable: find.byType(Scrollable).first);
     expect(find.text('Notificaciones'), findsOneWidget);
-    expect(find.text(resumenDeAvisos(EstadoDeAvisos.sinDeterminar)), findsOneWidget);
-
-    final interruptores = t.widgetList<SwitchListTile>(find.byType(SwitchListTile));
-    expect(interruptores.length, 1, reason: 'solo queda el resumen semanal');
-    // `onChanged: null` es lo que lo deshabilita de verdad. Uno que se mueva y
-    // no guarde nada es una mentira con animación.
-    expect(interruptores.every((s) => s.onChanged == null), isTrue);
+    expect(find.text(avisosConLaAppAbierta), findsOneWidget);
+    expect(find.byType(SwitchListTile), findsNothing);
+    expect(find.byType(Switch), findsNothing);
   });
 }

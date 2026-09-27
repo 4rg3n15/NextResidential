@@ -7,8 +7,10 @@
 library;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../aplicacion/sesion_en_uso.dart';
+import '../../dominio/causa_de_red.dart';
 import '../../dominio/puertos.dart';
 
 /// Ejecuta la llamada y convierte cualquier `DioException` en un `Fallo`
@@ -47,13 +49,33 @@ final _portador = RegExp(r'Bearer\s+\S+', caseSensitive: false);
 String sinTokens(String texto) =>
     texto.replaceAll(_jwt, '[token]').replaceAll(_portador, 'Bearer [token]');
 
+/// 15-L · la dirección del servidor ya no es fija: los `Dio` que hablan con la
+/// API la SIGUEN. Se fija ahora y cada vez que cambie.
+void seguirLaDireccion(ValueListenable<String> direccion, List<Dio> dios) {
+  void aplicar() {
+    for (final d in dios) {
+      d.options.baseUrl = direccion.value;
+    }
+  }
+
+  aplicar();
+  direccion.addListener(aplicar);
+}
+
 Fallo falloDeDio(DioException e) {
   if (e.type == DioExceptionType.connectionError ||
       e.type == DioExceptionType.connectionTimeout ||
       e.type == DioExceptionType.receiveTimeout) {
+    // El mensaje de Dio está en inglés y habla de sockets. El residente lee la
+    // causa en su idioma y con la dirección a la que se intentó llegar.
+    final causa = causaDeRed(
+      red: TipoDeRed.desconocida,
+      error: '${e.error ?? ''} ${e.message ?? ''}',
+      agotoElTiempo: e.type != DioExceptionType.connectionError,
+    );
     return Fallo(
       ClaseDeFallo.sinConexion,
-      e.message ?? 'Sin conexión',
+      mensajeDeCausa(causa, e.requestOptions.baseUrl),
       detalleTecnico: detalleTecnicoDe(e),
     );
   }

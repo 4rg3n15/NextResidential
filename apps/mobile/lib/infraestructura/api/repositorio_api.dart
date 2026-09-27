@@ -28,6 +28,7 @@ import 'generado/models/foto_de_visita_dto.dart';
 import 'generado/models/foto_de_visita_dto_tipo_mime.dart';
 import 'generado/models/medidas_de_foto_dto.dart';
 import 'generado/models/mi_autorizacion_dto.dart';
+import 'generado/models/mi_autorizacion_dto_situacion.dart';
 import 'generado/models/mi_evento_dto.dart';
 import 'generado/models/mi_inicio_dto.dart';
 import 'generado/models/mi_vehiculo_dto.dart';
@@ -278,6 +279,16 @@ Autorizacion _autorizacionDe(MiAutorizacionDto d) => Autorizacion(
       permiteAccesoVehicular: d.permiteAccesoVehicular,
       estado: d.estado,
       acompanantes: d.acompanantes.toInt(),
+      // 15-L · la situación la decide el SERVIDOR con su reloj; la app no la
+      // recalcula. Una que esta versión no conozca no se disfraza de otra.
+      situacion: switch (d.situacion) {
+        MiAutorizacionDtoSituacion.vigente => SituacionDeVisita.vigente,
+        MiAutorizacionDtoSituacion.programada => SituacionDeVisita.programada,
+        MiAutorizacionDtoSituacion.vencida => SituacionDeVisita.vencida,
+        MiAutorizacionDtoSituacion.rechazada => SituacionDeVisita.rechazada,
+        MiAutorizacionDtoSituacion.$unknown => SituacionDeVisita.desconocida,
+      },
+      motivoRechazo: d.motivoRechazo,
     );
 
 EventoDeAcceso _eventoDe(MiEventoDto d) => EventoDeAcceso(

@@ -298,14 +298,53 @@ void main() {
             'permiteAccesoVehicular': true,
             'estado': 'activa',
             'acompanantes': 2,
+            'situacion': 'vigente',
+            'motivoRechazo': null,
           },
         ]),
       );
       final a = (await repo.misAutorizaciones()).single;
       expect(a.desde.toUtc().hour, 14);
       expect(a.acompanantes, 2);
-      expect(a.vigenteEn(DateTime.utc(2026, 9, 20, 15)), isTrue);
-      expect(a.vigenteEn(DateTime.utc(2026, 9, 20, 19)), isFalse);
+      // 15-L · la situación la da el servidor; la app no la recalcula.
+      expect(a.situacion, SituacionDeVisita.vigente);
+      expect(a.motivoRechazo, isNull);
+    });
+
+    test('autorizaciones: las cuatro situaciones del servidor, y la rechazada con su motivo',
+        () async {
+      Map<String, Object?> una(String id, String situacion, [String? motivo]) => {
+            'id': id,
+            'visitante': 'Visitante $id',
+            'tipo': 'unica',
+            'desde': '2026-09-20T14:00:00.000Z',
+            'hasta': '2026-09-20T18:00:00.000Z',
+            'placa': null,
+            'permiteAccesoVehicular': false,
+            'estado': situacion == 'rechazada' ? 'revocada' : 'activa',
+            'acompanantes': 0,
+            'situacion': situacion,
+            'motivoRechazo': motivo,
+          };
+      final (repo, _) = await montar(
+        (_, _) => json(200, [
+          una('a-1', 'vigente'),
+          una('a-2', 'programada'),
+          una('a-3', 'vencida'),
+          una('a-4', 'rechazada', 'El residente no la espera'),
+          una('a-5', 'situacion_del_futuro'),
+        ]),
+      );
+      final l = await repo.misAutorizaciones();
+      expect(l.map((a) => a.situacion), [
+        SituacionDeVisita.vigente,
+        SituacionDeVisita.programada,
+        SituacionDeVisita.vencida,
+        SituacionDeVisita.rechazada,
+        // Una que esta versión no conoce no se disfraza de otra.
+        SituacionDeVisita.desconocida,
+      ]);
+      expect(l[3].motivoRechazo, 'El residente no la espera');
     });
 
     test('historial: el evento decidido por el Edge se distingue (CA-21)', () async {
@@ -322,6 +361,7 @@ void main() {
             'persona': 'Visitante',
             'zona': 'Piscina',
             'decididoPorEdge': true,
+            'deVisitante': true,
           },
         ]),
       );

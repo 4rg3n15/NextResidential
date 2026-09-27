@@ -154,6 +154,19 @@ abstract interface class AlmacenDeSesion {
   Future<void> borrar();
 }
 
+/// Texto por clave que sobrevive al cierre de la app: la dirección del
+/// servidor, qué notificaciones ya se vieron y la bandeja de salida.
+///
+/// Nada de esto es negocio —el negocio vive en la API y se comparte con la
+/// consola—: es estado del aparato. El adaptador del teléfono lo guarda en
+/// Keychain o Keystore por lo mismo que la sesión: la bandeja lleva la foto de
+/// un visitante, y eso no se deja en un XML legible.
+abstract interface class AlmacenDeTexto {
+  Future<String?> leer(String clave);
+  Future<void> escribir(String clave, String valor);
+  Future<void> borrar(String clave);
+}
+
 /// Quién emite y renueva la sesión.
 abstract interface class Autenticador {
   /// D1 · por código y usuario, o por correo (cuentas anteriores a la 15-H).

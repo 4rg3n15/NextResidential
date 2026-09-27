@@ -76,10 +76,13 @@ void main() {
           mensajeDeCausa(CausaDeRed.servidorApagado, url),
           contains('$url/health'),
         );
+        // 15-L · el remedio ya no es reinstalar: «Cambiar servidor», y la
+        // pista de por qué un nombre .local puede no resolverse.
         expect(
           mensajeDeCausa(CausaDeRed.direccionInvalida, url),
-          contains('API_URL'),
+          allOf(contains('Cambiar servidor'), contains('.local'), contains(url)),
         );
+        expect(mensajeDeCausa(CausaDeRed.direccionInvalida, url), isNot(contains('dart-define')));
         expect(
           mensajeDeCausa(CausaDeRed.desconocida, ''),
           contains('(sin API_URL)/health'),

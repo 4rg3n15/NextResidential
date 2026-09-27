@@ -21,6 +21,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'calidad_de_captura.dart';
+import 'situacion_de_visita.dart';
+
+export 'situacion_de_visita.dart';
 
 class Vivienda {
   const Vivienda({
@@ -137,6 +140,8 @@ class Autorizacion {
     required this.permiteAccesoVehicular,
     required this.estado,
     required this.acompanantes,
+    this.situacion = SituacionDeVisita.desconocida,
+    this.motivoRechazo,
   });
 
   final String id;
@@ -149,8 +154,12 @@ class Autorizacion {
   final String estado;
   final int acompanantes;
 
-  bool vigenteEn(DateTime ahora) =>
-      estado == 'activa' && !ahora.isBefore(desde) && ahora.isBefore(hasta);
+  /// Lo que enseña la tarjeta, decidido por el SERVIDOR con su reloj (ver
+  /// `situacion_de_visita.dart`). La app no lo recalcula.
+  final SituacionDeVisita situacion;
+
+  /// El motivo que escribió quien la rechazó. `null` si no está rechazada.
+  final String? motivoRechazo;
 }
 
 class EventoDeAcceso {
@@ -215,8 +224,10 @@ const textoDeLaCasilla = 'El visitante autorizó el uso de su foto para el ingre
 /// residente confirmó el encuadre, llevan el rostro y la proporción que esa
 /// confirmación declara, no los ceros de la foto cruda.
 ///
-/// La foto vive en memoria mientras el formulario está abierto o mientras la
-/// visita espera en la bandeja; en el teléfono no queda nada.
+/// La foto vive en memoria mientras el formulario está abierto. Si no hay red,
+/// espera en la bandeja de salida, que desde 15-L se guarda en el llavero del
+/// teléfono (Keychain · Keystore) para sobrevivir al cierre de la app, y se
+/// borra de ahí en cuanto el conjunto contesta. No queda en ningún otro sitio.
 class FotoDeVisita {
   const FotoDeVisita({required this.jpegBase64, required this.medidas});
 

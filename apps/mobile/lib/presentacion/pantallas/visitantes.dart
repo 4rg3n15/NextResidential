@@ -26,6 +26,14 @@
 /// autoriza con dos toques: cuándo, cuánto y la casilla. Es una lectura aparte
 /// de la de las autorizaciones y se pinta aparte: si fallara, la lista de lo
 /// autorizado sigue a la vista, que es lo que importa en la puerta.
+///
+/// ═════════════════════════════════════════════════════════════════════════════
+/// 15-L · AL DÍA CON LA CONSOLA
+///
+/// Cada tarjeta dice la situación que da el SERVIDOR —«Vigente», «Programada»,
+/// «Vencida» o «Rechazada» con el motivo— y la pantalla se recarga sola
+/// mientras está a la vista; tirar hacia abajo la recarga en el acto. Lo que
+/// espera en la bandeja sobrevive al cierre de la app.
 library;
 
 import 'package:flutter/material.dart';
@@ -36,6 +44,8 @@ import '../../dominio/entidades.dart';
 import '../../configuracion/tema.dart';
 import '../controlador.dart';
 import '../widgets/estados.dart';
+import '../widgets/filas_de_visitas.dart';
+import '../widgets/servidor.dart';
 import 'comunes.dart';
 
 class PantallaDeVisitantes extends StatelessWidget {
@@ -48,7 +58,7 @@ class PantallaDeVisitantes extends StatelessWidget {
     required this.alVolverAAutorizar,
     required this.pendientes,
     required this.alReintentarPendientes,
-    required this.ahora,
+    this.alRecargar,
   });
 
   final ControladorDeVista<List<Autorizacion>> controlador;
@@ -63,7 +73,17 @@ class PantallaDeVisitantes extends StatelessWidget {
   /// reintentar, solo lo enseña.
   final List<EnvioPendiente> pendientes;
   final Future<void> Function() alReintentarPendientes;
-  final DateTime ahora;
+
+  /// Tirar hacia abajo. El armazón pasa su vuelta del ciclo —renovar la
+  /// sesión, recargar lo visible, vaciar la bandeja—; sin armazón, las dos
+  /// lecturas de la pestaña.
+  final Future<void> Function()? alRecargar;
+
+  Future<void> _recargar() async {
+    final r = alRecargar;
+    if (r != null) return r();
+    await Future.wait([controlador.refrescar(), ultimos.refrescar()]);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,49 +91,51 @@ class PantallaDeVisitantes extends StatelessWidget {
       body: SafeArea(
         child: AnimatedBuilder(
           animation: Listenable.merge([controlador, ultimos]),
-          builder: (context, _) => VistaConEstado<List<Autorizacion>>(
-            // «Vacía» no es un estado aparte en esta pestaña: la bandeja y los
-            // últimos visitantes tienen que verse aunque hoy no haya nada
-            // autorizado, que es justo cuando más se vuelve a autorizar.
-            estado: switch (controlador.estado) {
-              Vacio<List<Autorizacion>>() => const ConDatos<List<Autorizacion>>([]),
-              final e => e,
-            },
-            alReintentar: controlador.cargarAhora,
-            alPedirAcceso: alPedirAcceso,
-            conDatos: (lista, {required bool desdeCache}) => ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-              children: [
-                Text('Mis visitantes', style: Theme.of(context).textTheme.headlineSmall),
-                if (desdeCache) ...[const SizedBox(height: 8), const MarcaDeCache()],
-                if (pendientes.isNotEmpty) ...[
+          builder: (context, _) => RefreshIndicator(
+            onRefresh: _recargar,
+            child: VistaConEstado<List<Autorizacion>>(
+              // «Vacía» no es un estado aparte en esta pestaña: la bandeja y los
+              // últimos visitantes tienen que verse aunque hoy no haya nada
+              // autorizado, que es justo cuando más se vuelve a autorizar.
+              estado: switch (controlador.estado) {
+                Vacio<List<Autorizacion>>() => const ConDatos<List<Autorizacion>>([]),
+                final e => e,
+              },
+              alReintentar: controlador.cargarAhora,
+              alPedirAcceso: alPedirAcceso,
+              conDatos: (lista, {required bool desdeCache}) => ListView(
+                // Siempre desplazable: con dos tarjetas la lista no llena la
+                // pantalla, y sin esto el gesto de recargar no responde.
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                children: [
+                  Text('Mis visitantes', style: Theme.of(context).textTheme.headlineSmall),
+                  if (desdeCache) ...[const SizedBox(height: 8), const MarcaDeCache()],
+                  if (pendientes.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    BandejaDeVisitas(pendientes: pendientes, alReintentar: alReintentarPendientes),
+                  ],
+                  _UltimosVisitantes(
+                    estado: ultimos.estado,
+                    alReintentar: ultimos.cargarAhora,
+                    alVolverAAutorizar: alVolverAAutorizar,
+                  ),
                   const SizedBox(height: 16),
-                  _Bandeja(
-                    pendientes: pendientes,
-                    ahora: ahora,
-                    alReintentar: alReintentarPendientes,
-                  ),
-                ],
-                _UltimosVisitantes(
-                  estado: ultimos.estado,
-                  alReintentar: ultimos.cargarAhora,
-                  alVolverAAutorizar: alVolverAAutorizar,
-                ),
-                const SizedBox(height: 16),
-                Text('Autorizaciones', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                const Text(
-                  'Lo que el conjunto ya tiene registrado a su nombre.',
-                  style: TextStyle(color: Paleta.textoSuave, fontSize: 13),
-                ),
-                const SizedBox(height: 8),
-                if (lista.isEmpty)
+                  Text('Autorizaciones', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 4),
                   const Text(
-                    'Todavía no ha autorizado a ningún visitante.',
-                    style: TextStyle(color: Paleta.textoSuave),
+                    'Lo que el conjunto ya tiene registrado a su nombre.',
+                    style: TextStyle(color: Paleta.textoSuave, fontSize: 13),
                   ),
-                ...lista.map((a) => _Fila(a, ahora: ahora)),
-              ],
+                  const SizedBox(height: 8),
+                  if (lista.isEmpty)
+                    const Text(
+                      'Todavía no ha autorizado a ningún visitante.',
+                      style: TextStyle(color: Paleta.textoSuave),
+                    ),
+                  ...lista.map(FilaDeAutorizacion.new),
+                ],
+              ),
             ),
           ),
         ),
@@ -122,109 +144,6 @@ class PantallaDeVisitantes extends StatelessWidget {
         onPressed: alCrear,
         icon: const Icon(Icons.person_add_alt),
         label: const Text('Nuevo visitante'),
-      ),
-    );
-  }
-}
-
-class _Bandeja extends StatelessWidget {
-  const _Bandeja({
-    required this.pendientes,
-    required this.ahora,
-    required this.alReintentar,
-  });
-
-  final List<EnvioPendiente> pendientes;
-  final DateTime ahora;
-  final Future<void> Function() alReintentar;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Paleta.avisoSuave.fondo,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.cloud_upload_outlined, size: 18, color: Paleta.avisoSuave.texto),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${pendientes.length} sin enviar',
-                  style: TextStyle(
-                    color: Paleta.avisoSuave.texto,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Estas visitas se guardaron en el teléfono y se enviarán solas cuando vuelva la '
-            'conexión. Todavía NO están autorizadas: el portero no las verá.',
-            style: TextStyle(color: Paleta.avisoSuave.texto, fontSize: 12),
-          ),
-          const SizedBox(height: 8),
-          ...pendientes.map(
-            (p) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '· ${p.cuerpo['visitante'] ?? 'Visita'} — encolada ${momentoLegible(p.encoladoEn)}'
-                '${p.intentos > 0 ? ' · ${p.intentos} intento(s)' : ''}'
-                '${p.ultimoError == null ? '' : ' · ${p.ultimoError}'}',
-                style: TextStyle(color: Paleta.avisoSuave.texto, fontSize: 12),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          TextButton.icon(
-            onPressed: alReintentar,
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('Intentar ahora'),
-          ),
-          Text(
-            'Reintentar no duplica: si la visita ya se había creado, se conserva la misma.',
-            style: TextStyle(color: Paleta.avisoSuave.texto, fontSize: 11),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Fila extends StatelessWidget {
-  const _Fila(this.a, {required this.ahora});
-  final Autorizacion a;
-  final DateTime ahora;
-
-  @override
-  Widget build(BuildContext context) {
-    final vigente = a.vigenteEn(ahora);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(
-          a.permiteAccesoVehicular ? Icons.directions_car_outlined : Icons.how_to_reg_outlined,
-        ),
-        title: Text(a.visitante),
-        subtitle: Text(
-          [
-            a.tipo,
-            if (a.placa != null) a.placa!,
-            if (a.acompanantes > 0) '${a.acompanantes} acompañante(s)',
-            'hasta ${momentoLegible(a.hasta)}',
-          ].join(' · '),
-        ),
-        trailing: Distintivo(
-          texto: vigente ? 'vigente' : a.estado,
-          pareja: vigente ? Paleta.exitoSuave : Paleta.neutroSuave,
-        ),
       ),
     );
   }
@@ -274,6 +193,8 @@ class _UltimosVisitantes extends StatelessWidget {
               TextButton(onPressed: alReintentar, child: const Text('Reintentar')),
             ],
           ),
+        if (fallo != null && esFalloDeConexion(fallo))
+          const Align(alignment: Alignment.centerLeft, child: BotonCambiarServidor()),
         const SizedBox(height: 8),
         ...?lista?.map((v) => _Reciente(v, alVolverAAutorizar: () => alVolverAAutorizar(v))),
       ],

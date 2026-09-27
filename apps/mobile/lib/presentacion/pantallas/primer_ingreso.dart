@@ -20,6 +20,7 @@ import '../../dominio/puertos.dart';
 import 'alta.dart';
 import 'cambio_de_contrasena.dart';
 import 'ocupantes.dart';
+import '../widgets/servidor.dart';
 
 class PuertaDePrimerIngreso extends StatefulWidget {
   const PuertaDePrimerIngreso({
@@ -191,6 +192,11 @@ class _Consultando extends StatelessWidget {
                       Text(f.detalle, textAlign: TextAlign.center),
                       const SizedBox(height: 16),
                       FilledButton(onPressed: alReintentar, child: const Text('Reintentar')),
+                      // 15-L · sin servidor, la salida está aquí mismo.
+                      if (esFalloDeConexion(f)) ...[
+                        const SizedBox(height: 8),
+                        const BotonCambiarServidor(),
+                      ],
                       TextButton(onPressed: alSalir, child: const Text('Salir')),
                     ],
                   ),

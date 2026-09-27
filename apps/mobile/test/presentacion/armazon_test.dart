@@ -5,6 +5,7 @@ import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
 import 'package:ncr_residente/configuracion/ambiente.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/acceso.dart';
+import 'package:ncr_residente/dominio/notificaciones.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/dominio/sesion.dart';
 import 'package:ncr_residente/infraestructura/sesion/almacen_seguro.dart';
@@ -12,6 +13,7 @@ import 'package:ncr_residente/presentacion/app.dart';
 import 'package:ncr_residente/presentacion/widgets/foto_del_visitante.dart';
 
 import '../dobles/hogar_falso.dart';
+import '../dobles/sincronizacion.dart';
 import '../dobles/visitas.dart';
 
 /// EL ORDEN AL VOLVER A PRIMER PLANO
@@ -146,6 +148,15 @@ class RepositorioQueAnota implements RepositorioDelResidente {
   }
 }
 
+/// 15-L · las notificaciones de la API, apuntando cada lectura en la bitácora.
+class NotificacionesQueAnotan extends NotificacionesFalsas {
+  @override
+  Future<List<Notificacion>> misNotificaciones() {
+    bitacora.add('leer:notificaciones');
+    return super.misNotificaciones();
+  }
+}
+
 /// Fuente de avisos gobernada: el permiso y el token se deciden en la prueba,
 /// que es la única forma de ejercer los cinco estados de M-7 sin un teléfono
 /// con Google Play.
@@ -205,6 +216,8 @@ void main() {
       hogar: HogarFalso(),
       cuenta: CuentaFalsa(),
       llamador: LlamadorFalso(),
+      servidor: cambioDeServidor(sesion),
+      notificacionesDelConjunto: NotificacionesQueAnotan(),
     );
   });
 
@@ -237,18 +250,24 @@ void main() {
     );
   });
 
-  testWidgets('al volver con el token fresco, no renueva ni recarga de más', (t) async {
+  testWidgets('15-L · al volver con el token fresco, NO renueva pero SÍ recarga lo visible',
+      (t) async {
     await t.pumpWidget(AppDelResidente(dependencias: dependencias));
     await t.pumpAndSettle();
     bitacora.clear();
 
-    // Un minuto fuera: nada que renovar y nada que recargar.
+    // Un minuto fuera: nada que renovar. Antes tampoco se recargaba —el dato
+    // tenía menos de dos minutos— y en ese minuto portería pudo rechazar una
+    // visita. Ahora se recarga SIEMPRE lo que se ve.
     reloj.avanzar(const Duration(minutes: 1));
     final estado = t.state<State<Armazon>>(find.byType(Armazon)) as dynamic;
     await estado.alVolverAPrimerPlano();
     await t.pumpAndSettle();
 
-    expect(bitacora, isEmpty);
+    expect(bitacora, isNot(contains('renovar')));
+    expect(bitacora, containsAll(['leer:hogar', 'leer:autorizaciones', 'leer:notificaciones']));
+    // Lo que NO se ve no se pide: la pestaña de zonas está cerrada.
+    expect(bitacora, isNot(contains('leer:zonas')));
   });
 
   testWidgets('sin sesión, la app empieza pidiendo acceso', (t) async {

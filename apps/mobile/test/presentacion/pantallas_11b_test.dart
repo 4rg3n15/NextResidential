@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/dominio/bandeja_de_salida.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
+import 'package:ncr_residente/dominio/notificaciones.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/presentacion/controlador.dart';
 import 'package:ncr_residente/presentacion/pantallas/notificaciones.dart';
@@ -115,53 +116,68 @@ void main() {
   // M-7 · NOTIFICACIONES
   // ═══════════════════════════════════════════════════════════════════════════
 
-  group('M-7 · los cinco estados se pintan distinto', () {
-    Future<void> montar(WidgetTester t, EstadoDeAvisos e) async {
-      await t.pumpWidget(
-        envolver(
-          PantallaDeNotificaciones(
-            estado: e,
-            alActivar: () async {},
-            alReintentar: () async {},
-          ),
-        ),
+  group('M-7 · las notificaciones de la API, sin prometer avisos (15-L)', () {
+    Future<ControladorDeVista<List<Notificacion>>> montar(
+      WidgetTester t,
+      List<Notificacion> lista,
+    ) async {
+      final c = ControladorDeVista<List<Notificacion>>(
+        leer: () async => lista,
+        estaVacio: (l) => l.isEmpty,
       );
+      await c.cargarAhora();
+      await t.pumpWidget(envolver(PantallaDeNotificaciones(controlador: c, alPedirAcceso: () {})));
       await t.pumpAndSettle();
+      return c;
     }
 
-    testWidgets('sinToken NO se presenta como «activadas»', (t) async {
-      await montar(t, EstadoDeAvisos.sinToken);
-      expect(find.text('El servicio de avisos no respondió'), findsOneWidget);
-      // La única forma de equivocarse aquí es dejar al residente creyendo que
-      // le avisarán cuando llegue su visitante.
-      expect(find.textContaining('le avisará'), findsNothing);
+    testWidgets('dice que los avisos llegan con la app abierta, y ningún botón promete otra cosa',
+        (t) async {
+      await montar(t, const []);
+      expect(find.textContaining(avisosConLaAppAbierta), findsOneWidget);
+      expect(find.textContaining('Todavía no hay avisos'), findsOneWidget);
+      // Ni «Activar», ni interruptor: sin servicio de mensajería no hay nada que
+      // activar.
+      expect(find.textContaining('Activar'), findsNothing);
+      expect(find.byType(Switch), findsNothing);
     });
 
-    testWidgets('EL MÁS ENGAÑOSO · el teléfono listo y el conjunto sin apuntarlo', (t) async {
-      // Permiso concedido, token en mano, y los avisos NO llegan. Un
-      // interruptor lo pintaría encendido.
-      await montar(t, EstadoDeAvisos.sinRegistrar);
-      expect(find.textContaining('NO llegarán a este aparato'), findsOneWidget);
+    testWidgets('la visita rechazada con su motivo, y el ingreso, con fecha y hora', (t) async {
+      final en = DateTime(2026, 9, 20, 9, 5);
+      await montar(t, [
+        Notificacion(
+          id: 'n-1',
+          tipo: TipoDeNotificacion.visitaRechazada,
+          en: en,
+          visitante: 'Ana',
+          motivo: 'El residente no la espera',
+        ),
+        Notificacion(
+          id: 'n-2',
+          tipo: TipoDeNotificacion.ingresoDeVisitante,
+          en: en,
+          visitante: 'Luis',
+        ),
+      ]);
+      expect(find.text('Rechazaron la visita de Ana: El residente no la espera'), findsOneWidget);
+      expect(find.text('Luis ingresó'), findsOneWidget);
+      expect(find.text('20/09 · 09:05'), findsNWidgets(2));
     });
 
-    testWidgets('permisoNegado se distingue de sinRegistrar', (t) async {
-      await montar(t, EstadoDeAvisos.permisoNegado);
-      final negado = t.widgetList<Text>(find.byType(Text)).map((w) => w.data ?? '').join(' ');
-      await montar(t, EstadoDeAvisos.sinRegistrar);
-      final sinRegistrar = t.widgetList<Text>(find.byType(Text)).map((w) => w.data ?? '').join(' ');
-      expect(negado, isNot(sinRegistrar));
-    });
-
-    testWidgets('registrado es el único que dice que sí llegarán', (t) async {
-      await montar(t, EstadoDeAvisos.registrado);
-      expect(find.textContaining('le avisará'), findsOneWidget);
-    });
-
-    testWidgets('los cinco se montan sin reventar', (t) async {
-      for (final e in EstadoDeAvisos.values) {
-        await montar(t, e);
-        expect(find.byType(Scaffold), findsOneWidget, reason: '\$e');
-      }
+    testWidgets('tirar hacia abajo la vuelve a pedir', (t) async {
+      var pedidas = 0;
+      final c = ControladorDeVista<List<Notificacion>>(
+        leer: () async {
+          pedidas += 1;
+          return const [];
+        },
+      );
+      await c.cargarAhora();
+      await t.pumpWidget(envolver(PantallaDeNotificaciones(controlador: c, alPedirAcceso: () {})));
+      await t.pumpAndSettle();
+      await t.fling(find.byType(ListView), const Offset(0, 400), 1000);
+      await t.pumpAndSettle();
+      expect(pedidas, 2);
     });
   });
 
@@ -189,7 +205,6 @@ void main() {
           alPedirAcceso: () {},
           alCrear: () {},
           alVolverAAutorizar: pulsados.add,
-          ahora: ahora,
           alReintentarPendientes: () async {},
           pendientes: pendientes,
         ),

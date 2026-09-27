@@ -41,7 +41,7 @@ class PantallaDeFamilia extends StatelessWidget {
       body: AnimatedBuilder(
         animation: controlador,
         builder: (context, _) => RefreshIndicator(
-          onRefresh: controlador.cargarAhora,
+          onRefresh: controlador.refrescar,
           child: VistaConEstado<List<MiembroDeFamilia>>(
             estado: controlador.estado as Estado<List<MiembroDeFamilia>>,
             alReintentar: controlador.cargarAhora,
@@ -50,6 +50,7 @@ class PantallaDeFamilia extends StatelessWidget {
                 'No hay más residentes registrados en su vivienda. La administración del conjunto '
                 'los vincula desde la consola.',
             conDatos: (miembros, {required desdeCache}) => ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
                 if (desdeCache) const MarcaDeCache(),

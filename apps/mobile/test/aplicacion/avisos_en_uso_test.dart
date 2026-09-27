@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/avisos_en_uso.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
-import 'package:ncr_residente/presentacion/pantallas/notificaciones.dart';
 
 class RelojFijo implements Reloj {
   const RelojFijo();
@@ -147,13 +146,5 @@ void main() {
     // Y la cuenta siguiente en el mismo teléfono SÍ vuelve a registrarse.
     await avisos.asegurarRegistro();
     expect(repo.registrados.length, 2);
-  });
-
-  test('el resumen del perfil cubre los cinco estados y ninguno dice el enum', () {
-    for (final e in EstadoDeAvisos.values) {
-      final texto = resumenDeAvisos(e);
-      expect(texto.length, greaterThan(8));
-      expect(texto, isNot(contains(e.name)));
-    }
   });
 }

@@ -35,32 +35,46 @@ flutter run -d emulator-5554 \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=<sb_publishable_…>
 ```
 
-### iPhone físico
+### iPhone físico, en Release y abierta desde el ícono
+
+La guía completa, paso a paso, es
+[`docs/guias/APP_EN_IPHONE.md`](../../docs/guias/APP_EN_IPHONE.md); la
+decisión, [ADR-033](../../docs/decisiones/ADR-033-app-en-release-por-la-red-local.md).
+En resumen:
 
 ```
-flutter run -d <id-del-iPhone> \
-  --dart-define=API_URL=http://<IP-del-Mac>:3000 \
+flutter run --release -d <id-del-iPhone> \
+  --dart-define=API_URL=http://<nombre-del-Mac>.local:3000 \
   --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=<sb_publishable_…>
 ```
 
-`<id-del-iPhone>` sale de `flutter devices`; `<IP-del-Mac>` de
-`ipconfig getifaddr en0`. Y tenga en cuenta:
+`<id-del-iPhone>` sale de `flutter devices`; `<nombre-del-Mac>` de
+`scutil --get LocalHostName`. Se instala una vez con cable; después se abre
+desde el ícono sin el Mac conectado. Y tenga en cuenta:
 
-- **El Mac y el iPhone deben estar en la misma red.** La API se alcanza por la
-  IP privada del Mac; desde datos móviles no hay ruta.
+- **El nombre `.local` no cambia de una red a otra**; la IP sí. Si la red
+  bloquea mDNS, la opción **«Servidor»** de la pantalla de acceso —y «Cambiar
+  servidor» en toda pantalla de error de conexión— deja escribir la IP del Mac
+  sin recompilar. La app la prueba contra `/health` antes de aceptarla, la
+  guarda en el llavero y, al cambiarla, cierra la sesión. `http://` sólo hacia
+  IP privadas o `.local`; `https://` hacia cualquier destino.
+- **El Mac y el iPhone deben estar en la misma red.** Desde datos móviles no
+  hay ruta.
 - **La API ya escucha en todas las interfaces**: `app.listen(PORT)` sin host en
   `apps/api/src/main.ts` enlaza `0.0.0.0` / `::`. Si no responde, mire el
   cortafuegos de macOS, que pide permiso para `node` la primera vez.
 - **`CORS_ALLOWED_ORIGINS` de la API no aplica a la app nativa.** CORS es un
-  mecanismo del navegador; la app no envía `Origin` y la API acepta peticiones
-  sin esa cabecera. Añadir ahí la IP del teléfono no hace nada.
-- **HTTP por IP privada sólo funciona en depuración (iOS).** App Transport
-  Security lo bloquea; la excepción `NSAllowsLocalNetworking` —nunca
-  `NSAllowsArbitraryLoads`— sólo existe en la configuración Debug:
-  `ios/Runner/Info.plist` se preprocesa y el bloque está bajo
-  `#if NCR_DEPURACION`, que define `ios/Flutter/Debug.xcconfig` y no
-  `Release.xcconfig`. Un binario de Release sólo habla HTTPS.
+  mecanismo del navegador; la app no envía `Origin`.
+- **Red local en iOS, igual en Debug, Release y Profile.** La app habla con la
+  API por `dart:io`, que no pasa por App Transport Security; lo que sí la
+  alcanza es el permiso de red local (`NSLocalNetworkUsageDescription`). La
+  excepción `NSAllowsLocalNetworking` —nunca `NSAllowsArbitraryLoads`— va en
+  las tres configuraciones para lo que use el sistema de URL de Apple.
+  `scripts/lib/info-plist-ios.mjs` lo comprueba configuración por
+  configuración.
+- **Con un Apple ID gratuito la app caduca a los 7 días**; hay que
+  reinstalarla con cable.
 
 ## Pruebas y verificación
 

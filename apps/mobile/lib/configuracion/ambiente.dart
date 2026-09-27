@@ -32,6 +32,14 @@ library;
 
 /// Valores inyectados con `--dart-define`. Nunca leídos de un `.env` empacado:
 /// un fichero de activos viaja dentro del `.apk` y se lee con un descompresor.
+///
+/// 15-L · `API_URL` es el valor INICIAL de la dirección del servidor, no el
+/// definitivo: la opción «Servidor» del acceso la cambia sin recompilar y la
+/// guardada gana al arrancar (`aplicacion/servidor_en_uso.dart`). Lo más
+/// cómodo es compilar con el nombre `.local` del Mac
+/// (`http://mac-de-argenis.local:3000`), que no cambia de una red a otra; cómo
+/// se resuelve y qué pasa si la red no lo deja está en
+/// `dominio/direccion_del_servidor.dart`.
 class Ambiente {
   const Ambiente({
     required this.apiUrl,
@@ -79,8 +87,10 @@ class Ambiente {
       // el alias de la máquina anfitriona que documenta `.env.example`.
       problemas.add(
         'Falta API_URL: la app no sabe a quién preguntar. Compile con '
-        '--dart-define=API_URL=http://<IP-del-Mac>:3000 (en el emulador Android, '
-        'el alias de la máquina anfitriona; ver apps/mobile/.env.example).',
+        '--dart-define=API_URL=http://<IP-del-Mac>:3000 o, mejor, con el nombre '
+        'local del Mac (http://<nombre-del-Mac>.local:3000), que no cambia de una '
+        'red a otra (en el emulador Android, el alias de la máquina anfitriona; ver '
+        'apps/mobile/.env.example).',
       );
     }
     return problemas;

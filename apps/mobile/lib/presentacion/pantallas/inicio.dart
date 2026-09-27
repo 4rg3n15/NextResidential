@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../aplicacion/estado.dart';
@@ -5,6 +6,7 @@ import '../../configuracion/tema.dart';
 import '../../dominio/entidades.dart';
 import '../controlador.dart';
 import '../widgets/estados.dart';
+import '../widgets/filas_de_visitas.dart';
 import 'comunes.dart';
 
 /// M-1 · Inicio / Mi Vivienda — HU-33.
@@ -20,6 +22,10 @@ import 'comunes.dart';
 ///    `puedeAutorizar` viene decidido (RN-13 + RN-05). Dejar pulsar y luego
 ///    mostrar un error enseña a pulsar dos veces; y recomponer la regla en Dart
 ///    daría dos versiones de RN-13.
+///
+/// 15-L · y un contador de **notificaciones sin ver**, que sube solo mientras
+/// la app está abierta: es donde el residente se entera de que portería
+/// rechazó una visita sin tener que ir a buscarlo.
 class PantallaDeInicio extends StatelessWidget {
   const PantallaDeInicio({
     super.key,
@@ -30,11 +36,28 @@ class PantallaDeInicio extends StatelessWidget {
     required this.alAbrirFamilia,
     required this.alAbrirHistorial,
     required this.alAbrirVehiculos,
+    this.sinVer,
+    this.alAbrirNotificaciones,
+    this.alRecargar,
   });
 
   final ControladorDeVista controlador;
   final ControladorDeVista autorizaciones;
   final void Function() alPedirAcceso;
+
+  /// Cuántas notificaciones no ha visto. Sin él (una prueba suelta), no se
+  /// pinta el contador.
+  final ValueListenable<int>? sinVer;
+  final void Function()? alAbrirNotificaciones;
+
+  /// Tirar hacia abajo: la vuelta del ciclo del armazón, si la hay.
+  final Future<void> Function()? alRecargar;
+
+  Future<void> _recargar() async {
+    final r = alRecargar;
+    if (r != null) return r();
+    await Future.wait([controlador.refrescar(), autorizaciones.refrescar()]);
+  }
 
   /// Abre el formulario de «Nuevo visitante», el mismo de la pestaña.
   final void Function() alRegistrarVisita;
@@ -47,7 +70,7 @@ class PantallaDeInicio extends StatelessWidget {
     return AnimatedBuilder(
       animation: controlador,
       builder: (context, _) => RefreshIndicator(
-        onRefresh: controlador.cargarAhora,
+        onRefresh: _recargar,
         child: VistaConEstado<MiHogar>(
           estado: controlador.estado as Estado<MiHogar>,
           alReintentar: controlador.cargarAhora,
@@ -61,6 +84,8 @@ class PantallaDeInicio extends StatelessWidget {
             alAbrirHistorial: alAbrirHistorial,
             alAbrirVehiculos: alAbrirVehiculos,
             alPedirAcceso: alPedirAcceso,
+            sinVer: sinVer,
+            alAbrirNotificaciones: alAbrirNotificaciones,
           ),
         ),
       ),
@@ -78,8 +103,12 @@ class _Contenido extends StatelessWidget {
     required this.alAbrirHistorial,
     required this.alAbrirVehiculos,
     required this.alPedirAcceso,
+    required this.sinVer,
+    required this.alAbrirNotificaciones,
   });
 
+  final ValueListenable<int>? sinVer;
+  final void Function()? alAbrirNotificaciones;
   final MiHogar hogar;
   final ControladorDeVista autorizaciones;
   final bool desdeCache;
@@ -92,7 +121,9 @@ class _Contenido extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = hogar.vivienda;
+    final contador = sinVer;
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       children: [
         if (desdeCache) const MarcaDeCache(),
@@ -149,6 +180,13 @@ class _Contenido extends StatelessWidget {
             ),
           ),
         ),
+        if (contador != null) ...[
+          const SizedBox(height: 12),
+          ValueListenableBuilder<int>(
+            valueListenable: contador,
+            builder: (context, n, _) => _Notificaciones(sinVer: n, alAbrir: alAbrirNotificaciones),
+          ),
+        ],
         const SizedBox(height: 20),
         Text('Accesos rápidos', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
@@ -206,7 +244,7 @@ class _Contenido extends StatelessWidget {
             mensajeVacio: 'Sin visitas autorizadas por ahora.',
             esqueleto: const EsqueletoCorto(),
             conDatos: (lista, {required desdeCache}) => Column(
-              children: lista.take(4).map((a) => _FilaDeAutorizacion(a)).toList(),
+              children: lista.take(4).map((a) => FilaDeAutorizacion(a, conHasta: false)).toList(),
             ),
           ),
         ),
@@ -221,28 +259,31 @@ class _Contenido extends StatelessWidget {
       };
 }
 
-class _FilaDeAutorizacion extends StatelessWidget {
-  const _FilaDeAutorizacion(this.a);
-  final Autorizacion a;
+/// El contador de lo que no ha visto. Es una fila y no sólo un punto rojo:
+/// el número dice cuántas, y la frase dice qué son.
+class _Notificaciones extends StatelessWidget {
+  const _Notificaciones({required this.sinVer, required this.alAbrir});
+  final int sinVer;
+  final void Function()? alAbrir;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: const Icon(Icons.how_to_reg_outlined),
-        title: Text(a.visitante),
-        subtitle: Text(
-          [
-            a.tipo,
-            if (a.placa != null) a.placa!,
-            if (a.acompanantes > 0) '${a.acompanantes} acompañante(s)',
-          ].join(' · '),
+        key: const Key('inicio.notificaciones'),
+        leading: Badge(
+          isLabelVisible: sinVer > 0,
+          label: Text('$sinVer'),
+          child: const Icon(Icons.notifications_outlined),
         ),
-        trailing: Distintivo(
-          texto: a.estado,
-          pareja: a.estado == 'activa' ? Paleta.exitoSuave : Paleta.neutroSuave,
-        ),
+        title: const Text('Notificaciones'),
+        subtitle: Text(switch (sinVer) {
+          0 => 'Nada nuevo',
+          1 => '1 sin ver',
+          _ => '$sinVer sin ver',
+        }),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: alAbrir,
       ),
     );
   }

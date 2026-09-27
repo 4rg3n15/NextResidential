@@ -36,32 +36,41 @@ class PantallaDeZonas extends StatelessWidget {
     super.key,
     required this.controlador,
     required this.alPedirAcceso,
+    this.alRecargar,
   });
 
   final ControladorDeVista<List<ZonaComun>> controlador;
   final VoidCallback alPedirAcceso;
+
+  /// 15-L · tirar hacia abajo: la vuelta del ciclo del armazón, si la hay. El
+  /// aforo es justo el dato que más envejece mientras se mira.
+  final Future<void> Function()? alRecargar;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: controlador,
       builder: (context, _) => SafeArea(
-        child: VistaConEstado<List<ZonaComun>>(
-          estado: controlador.estado,
-          alReintentar: controlador.cargarAhora,
-          alPedirAcceso: alPedirAcceso,
-          mensajeVacio: 'Este conjunto todavía no tiene zonas comunes configuradas. '
-              'Cuando la administración añada alguna, aparecerá aquí con su aforo.',
-          conDatos: (zonas, {required desdeCache}) => ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              if (desdeCache) const MarcaDeCache(),
-              Text('Zonas comunes', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              const _AvisoDeReflejo(),
-              const SizedBox(height: 12),
-              for (final z in zonas) _TarjetaDeZona(zona: z),
-            ],
+        child: RefreshIndicator(
+          onRefresh: alRecargar ?? controlador.refrescar,
+          child: VistaConEstado<List<ZonaComun>>(
+            estado: controlador.estado,
+            alReintentar: controlador.cargarAhora,
+            alPedirAcceso: alPedirAcceso,
+            mensajeVacio: 'Este conjunto todavía no tiene zonas comunes configuradas. '
+                'Cuando la administración añada alguna, aparecerá aquí con su aforo.',
+            conDatos: (zonas, {required desdeCache}) => ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                if (desdeCache) const MarcaDeCache(),
+                Text('Zonas comunes', style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 8),
+                const _AvisoDeReflejo(),
+                const SizedBox(height: 12),
+                for (final z in zonas) _TarjetaDeZona(zona: z),
+              ],
+            ),
           ),
         ),
       ),

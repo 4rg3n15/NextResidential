@@ -87,9 +87,13 @@ String mensajeDeCausa(CausaDeRed causa, String urlDeLaApi) {
     CausaDeRed.servidorApagado =>
       'El Mac contesta, pero el servidor no está en marcha en $url. Arránquelo en el Mac '
           'y compruebe $salud en Safari.',
+    // 15-L · con un nombre `.local`, esto es lo que pasa cuando la red no deja
+    // pasar mDNS (ver `direccion_del_servidor.dart`). El remedio ya no es
+    // reinstalar: es escribir la IP en «Cambiar servidor».
     CausaDeRed.direccionInvalida =>
-      'La dirección con que se instaló la app ($url) no existe en esta red. Vuelva a '
-          'instalarla con --dart-define=API_URL=http://<IP-del-Mac>:3000.',
+      'El nombre del servidor ($url) no se encuentra en esta red. Si termina en .local, puede '
+          'que esta red no lo anuncie: pulse «Cambiar servidor» y escriba la IP del Mac (algo '
+          'como http://192.168.1.x:3000).',
     CausaDeRed.desconocida =>
       'No se pudo llegar al servidor en $url. Abra $salud en Safari: si abre, avise a '
           'soporte con el detalle técnico; si no, el problema es la red o el Mac.',

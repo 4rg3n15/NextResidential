@@ -7,6 +7,15 @@
 ///
 /// **El dato previo se conserva al recargar.** `Cargando(previo: …)` es lo que
 /// permite que un regreso a primer plano no parpadee a blanco.
+///
+/// 15-L · **y ahora se recarga sola cada 20 s**, así que dos reglas más:
+///
+///  · `refrescar()` es la recarga SILENCIOSA del ciclo y del gesto de tirar: si
+///    hay datos, no pasa por `Cargando` —la marca «lo último que se pudo
+///    cargar» y la barra parpadearían cada 20 s— y cambia la pantalla sólo
+///    cuando llega la respuesta.
+///  · **Nunca dos lecturas iguales en vuelo.** Si ya hay una, la segunda
+///    llamada espera a ESA en vez de pedir otra vez lo mismo.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -38,23 +47,49 @@ class ControladorDeVista<T> extends ChangeNotifier {
         _ => null,
       };
 
-  Future<void> cargarAhora() async {
-    _estado = Cargando<T>(previo: _previo);
-    notifyListeners();
-    final resultado = await cargar<T>(_leer, estaVacio: _estaVacio);
-    // Si falló pero había dato previo, se conserva para que la vista pueda
-    // mostrar los dos: el aviso y lo último que sí se supo.
-    _estado = switch (resultado) {
-      Fallido<T>(fallo: final f) => Fallido<T>(f, previo: _previo),
-      _ => resultado,
-    };
-    notifyListeners();
+  Future<void>? _enCurso;
+
+  /// Sube con cada `olvidar()`: una lectura que empezó antes no puede pintar
+  /// al volver los datos de la cuenta que ya se fue.
+  int _generacion = 0;
+
+  /// Recarga ENSEÑANDO que recarga: el botón «Reintentar» y la primera carga.
+  Future<void> cargarAhora() => _enCurso ??= _cargar(silenciosa: false);
+
+  /// Recarga SIN pasar por `Cargando` si ya hay datos: el ciclo y el gesto.
+  Future<void> refrescar() => _enCurso ??= _cargar(silenciosa: true);
+
+  Future<void> _cargar({required bool silenciosa}) async {
+    final generacion = _generacion;
+    try {
+      // Con algo ya en pantalla —datos, un vacío, un fallo— la recarga
+      // silenciosa lo deja ahí hasta que llega la respuesta.
+      final hayAlgo = _estado is! Inicial<T> && _estado is! Cargando<T>;
+      if (!silenciosa || !hayAlgo) {
+        _estado = Cargando<T>(previo: _previo);
+        notifyListeners();
+      }
+      final resultado = await cargar<T>(_leer, estaVacio: _estaVacio);
+      if (generacion != _generacion) return;
+      // Si falló pero había dato previo, se conserva para que la vista pueda
+      // mostrar los dos: el aviso y lo último que sí se supo.
+      _estado = switch (resultado) {
+        Fallido<T>(fallo: final f) => Fallido<T>(f, previo: _previo),
+        _ => resultado,
+      };
+      notifyListeners();
+    } finally {
+      // Si entre tanto se olvidó todo, `_enCurso` ya es de otra lectura.
+      if (generacion == _generacion) _enCurso = null;
+    }
   }
 
   /// Vacía el estado sin pedir nada. Se usa al cerrar sesión: dejar los datos
   /// del residente anterior en memoria sería una fuga entre cuentas en el mismo
   /// dispositivo.
   void olvidar() {
+    _generacion += 1;
+    _enCurso = null;
     _estado = Inicial<T>();
     notifyListeners();
   }
@@ -121,6 +156,9 @@ class ControladorDeHistorial extends ControladorDeVista<List<EventoDeAcceso>> {
   Future<void> cambiarPeriodo(PeriodoDeHistorial nuevo) async {
     _periodo = nuevo;
     _leer = () => _repo.miHistorial(nuevo);
+    // Una lectura del periodo anterior en vuelo no puede ser la respuesta a
+    // este: se espera a que termine y se pide la del periodo nuevo.
+    await _enCurso;
     await cargarAhora();
   }
 }

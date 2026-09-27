@@ -30,3 +30,8 @@ Future<TipoDeRed> tipoDeRedActual() async {
     return TipoDeRed.desconocida;
   }
 }
+
+/// 15-L · cada vez que el teléfono cambia de red. Al volver la red, la app no
+/// espera a la siguiente vuelta del ciclo para enviar lo que quedó en la
+/// bandeja: lo intenta en el acto.
+Stream<TipoDeRed> cambiosDeRed() => Connectivity().onConnectivityChanged.map(tipoDeRedDe);

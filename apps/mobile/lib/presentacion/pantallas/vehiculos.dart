@@ -40,7 +40,7 @@ class PantallaDeVehiculos extends StatelessWidget {
     final lista = AnimatedBuilder(
       animation: controlador,
       builder: (context, _) => RefreshIndicator(
-        onRefresh: controlador.cargarAhora,
+        onRefresh: controlador.refrescar,
         child: VistaConEstado<List<Vehiculo>>(
           estado: controlador.estado as Estado<List<Vehiculo>>,
           alReintentar: controlador.cargarAhora,
@@ -50,6 +50,7 @@ class PantallaDeVehiculos extends StatelessWidget {
               : 'No hay vehículos registrados en su vivienda. Registre los suyos con el botón '
                     '«Registrar».',
           conDatos: (vehiculos, {required desdeCache}) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
               if (desdeCache) const MarcaDeCache(),
