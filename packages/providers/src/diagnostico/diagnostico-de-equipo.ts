@@ -1,4 +1,5 @@
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
+import { CredencialRechazada } from '../nucleo/errores';
 import { recortado, sinSecretos } from '../equipo/intercambio';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
@@ -332,6 +333,17 @@ const contactar = async (
       latenciaMs: respuesta.latenciaMs,
     };
   } catch (error) {
+    if (error instanceof CredencialRechazada) {
+      // A5 (15-L) · la rechazó ya en la pregunta anterior y no se volvió a
+      // presentar: es la credencial, no el cable.
+      return {
+        clase: 'credencial',
+        detalle:
+          'Hay un equipo en esa dirección y rechazó el usuario o la clave. NO reintente a ' +
+          'ciegas: estos aparatos bloquean la cuenta tras unos pocos intentos fallidos',
+        latenciaMs: latencia,
+      };
+    }
     const detalle = error instanceof EquipoInalcanzable ? error.detalle : 'no contesta';
     return {
       clase: hayEquipo ? 'credencial' : 'sin_equipo',

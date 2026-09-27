@@ -29,6 +29,8 @@ export interface ParteDeEscuchas {
 
 export class EscuchasDeEquipos implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly activas = new Map<string, EscuchaActiva>();
+  /** A5 (15-L) · lo último que se dijo de cada equipo: sólo se repite si cambia. */
+  private readonly ultimoParte = new Map<string, string>();
   private temporizador: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -77,12 +79,20 @@ export class EscuchasDeEquipos implements OnApplicationBootstrap, OnApplicationS
 
     let armadas = 0;
     const vigentes = new Set(equipos.map((e) => e.dispositivoId));
+    // A5 (15-L) · una escucha que terminó SOLA (credencial rechazada) se
+    // retira para volver a pedirla: sólo conecta si la credencial cambió.
+    for (const [dispositivoId, escucha] of this.activas) {
+      if (escucha.activa?.() === false) this.activas.delete(dispositivoId);
+    }
     for (const equipo of equipos) {
       if (this.activas.has(equipo.dispositivoId)) continue;
       try {
         const escucha = await this.proveedor.escuchar(equipo.dispositivoId);
         this.activas.set(equipo.dispositivoId, escucha);
         armadas += 1;
+        const parte = `${escucha.transporte}|${escucha.detalle}`;
+        if (this.ultimoParte.get(equipo.dispositivoId) === parte) continue;
+        this.ultimoParte.set(equipo.dispositivoId, parte);
         this.bitacora.registrar(
           escucha.transporte === 'ninguna' ? 'aviso' : 'info',
           'escucha de equipo',

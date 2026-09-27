@@ -58,6 +58,8 @@ export interface ConfiguracionDeProveedor {
   readonly fuente?: FuenteDePlacas;
   /** Inyectable para que la suite corra sin red y sin equipo. */
   readonly peticion?: typeof fetch;
+  /** A5 (15-L) · plazo de cada petición a un equipo, en ms (del `.env`). */
+  readonly tiempoLimiteMs?: number;
   /** Semilla del simulado: la adversidad tiene que ser reproducible. */
   readonly semilla?: number;
   readonly dispositivosSimulados?: readonly string[];
@@ -166,6 +168,9 @@ registrarAdaptador({
         ? {}
         : { exigirVeredictoDeControl: configuracion.exigirVeredictoDeControl }),
       ...(configuracion.traza === undefined ? {} : { traza: configuracion.traza }),
+      ...(configuracion.tiempoLimiteMs === undefined
+        ? {}
+        : { tiempoLimiteMs: configuracion.tiempoLimiteMs }),
     }),
 });
 

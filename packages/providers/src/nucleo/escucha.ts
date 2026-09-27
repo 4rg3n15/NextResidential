@@ -19,4 +19,9 @@ export interface EscuchaActiva {
   readonly detalle: string;
   /** Cierra el flujo y deja de reintentar. Idempotente. */
   detener(): void;
+  /**
+   * A5 (15-L) · `false` cuando la escucha terminó SOLA —el equipo rechazó la
+   * credencial— y quien la armó tiene que volver a pedirla. Ausente = sigue.
+   */
+  activa?(): boolean;
 }

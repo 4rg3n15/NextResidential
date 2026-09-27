@@ -39,7 +39,7 @@ import { REPOSITORIO_DE_EQUIPOS, SIN_PROBAR, SONDA_DE_EQUIPO } from '../src/equi
 import { REPOSITORIO_AUTORIZACIONES_ZONA, REPOSITORIO_ZONAS } from '../src/zonas';
 import { RepositorioZonasEnMemoria } from '../src/zonas/infraestructura/repositorio-zonas-memoria';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
-import { COP_A, COP_B } from './constantes';
+import { COP_A, COP_B, EQUIPOS_DEL_BANCO } from './constantes';
 import {
   CODIGO_DE_PATRULLAJE,
   ControlDeSesiones,
@@ -80,7 +80,7 @@ import {
   VEHICULOS_PROPIOS,
 } from '../src/residente/aplicacion/puertos-hogar';
 
-export { COP_A, COP_B } from './constantes';
+export { COP_A, COP_B, EQUIPO_DE_B } from './constantes';
 
 export const configuracionDePrueba: Configuracion = {
   NODE_ENV: 'test',
@@ -112,6 +112,7 @@ export const configuracionDePrueba: Configuracion = {
   PROVEEDOR_DE_EQUIPOS: 'simulado',
   PROVEEDOR_SEMILLA: 20260908,
   TERMINAL_ABRE_SIN_PLATAFORMA: false,
+  EQUIPOS_TIEMPO_LIMITE_MS: 5000,
   // Este banco no tiene base: el cargador que lee de ella fallaría en cada
   // lectura. El conservador deniega, que es lo que las suites de la API
   // esperan; el cargador PostgreSQL tiene su propia suite contra base real.
@@ -271,6 +272,13 @@ const conDoblesDelResidente = (b: TestingModuleBuilder): TestingModuleBuilder =>
     .useValue(hogar);
 };
 
+/** 15-L · el registro de equipos del banco sin base, cada uno en su copropiedad. */
+export const registroDelBanco = (): RepositorioDeEquiposEnMemoria => {
+  const registro = new RepositorioDeEquiposEnMemoria();
+  for (const equipo of EQUIPOS_DEL_BANCO) registro.sembrar(equipo.copropiedadId, equipo);
+  return registro;
+};
+
 export const crearApp = async (
   firmante: Firmante,
   sustituir?: (constructor: TestingModuleBuilder) => TestingModuleBuilder,
@@ -373,7 +381,7 @@ export const crearApp = async (
       inject: [RepositorioZonasEnMemoria],
     })
     .overrideProvider(REPOSITORIO_DE_EQUIPOS)
-    .useFactory({ factory: () => equiposPorOmision ?? new RepositorioDeEquiposEnMemoria() })
+    .useFactory({ factory: () => equiposPorOmision ?? registroDelBanco() })
     .overrideProvider(SONDA_DE_EQUIPO)
     .useValue(sondaPorOmision ?? { probar: async () => SIN_PROBAR })
     .overrideProvider(ProveedorDeJwks)

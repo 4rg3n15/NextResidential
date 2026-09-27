@@ -43,8 +43,10 @@ import {
   conSesionDePorteriaDeLaSuite,
   configuracionDePrueba,
   crearFirmante,
+  registroDelBanco,
   tokenDe,
 } from './utilidades';
+import { REPOSITORIO_DE_EQUIPOS } from '../src/equipos';
 
 let app: INestApplication;
 let portero = '';
@@ -80,6 +82,9 @@ beforeAll(async () => {
     })
     .overrideProvider(SONDA_POSTGRES)
     .useValue({ comprobar: async () => ({ estado: 'ok', detalle: 'doble' }) })
+    // 15-L · la orden comprueba que el equipo es de la copropiedad: el registro del banco.
+    .overrideProvider(REPOSITORIO_DE_EQUIPOS)
+    .useFactory({ factory: registroDelBanco })
     .compile();
 
   // ─── EXACTAMENTE el orden de main.ts (77, 82, 83, 85) ───

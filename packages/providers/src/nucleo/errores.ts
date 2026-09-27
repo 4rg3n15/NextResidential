@@ -91,11 +91,23 @@ export class ReinicioNecesario extends ErrorDeEquipo {
  */
 export class CredencialRechazada extends ErrorDeEquipo {
   readonly reintentable = false;
-  constructor(dispositivoId: string) {
+  constructor(
+    dispositivoId: string,
+    /**
+     * A5 (15-L) · cuánto hace que el equipo la rechazó, cuando esta vez NI SE
+     * PRESENTÓ: la plataforma ya sabía que no vale. `undefined` = la rechazó
+     * el equipo ahora.
+     */
+    readonly rechazadaHaceMs?: number,
+  ) {
     super(
       dispositivoId,
-      `El equipo ${dispositivoId} rechazó el usuario o la clave. NO se reintenta: estos ` +
-        'aparatos bloquean la cuenta tras unos pocos intentos fallidos',
+      rechazadaHaceMs === undefined
+        ? `El equipo ${dispositivoId} rechazó el usuario o la clave. NO se reintenta: estos ` +
+            'aparatos bloquean la cuenta tras unos pocos intentos fallidos'
+        : `Credencial rechazada por el equipo ${dispositivoId} hace ` +
+            `${String(Math.round(rechazadaHaceMs / 60_000))} min: no se vuelve a presentar ` +
+            'hasta que se corrija en la consola, para que el equipo no bloquee esta dirección',
     );
   }
 }

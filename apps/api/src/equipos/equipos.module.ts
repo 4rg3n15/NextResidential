@@ -28,6 +28,9 @@ import { RepositorioDeEquiposPg } from './infraestructura/repositorio-equipos-pg
 import { SondaPorProveedor } from './infraestructura/sonda-por-proveedor';
 import { CorrectorPorProveedor } from './infraestructura/corrector-por-proveedor';
 import { EquiposController } from './presentacion/equipos.controller';
+import { ALCANCE_DE_EQUIPOS, AlcanceDeEquipos } from './presentacion/alcance-de-equipos';
+import { REGISTRO_AUDITORIA } from '../comun/auditoria';
+import type { RegistroDeAuditoria } from '../comun/auditoria';
 
 /**
  * Raíz de composición del aprovisionamiento de equipos.
@@ -108,6 +111,16 @@ export class EquiposModule {
           }),
         },
         {
+          // 15-L · el equipo de la petición es de la copropiedad de la ruta.
+          provide: ALCANCE_DE_EQUIPOS,
+          inject: [REPOSITORIO_DE_EQUIPOS, REGISTRO_AUDITORIA, BITACORA],
+          useFactory: (
+            equipos: RepositorioDeEquipos,
+            auditoria: RegistroDeAuditoria,
+            bitacora: Bitacora,
+          ) => new AlcanceDeEquipos(equipos, auditoria, bitacora),
+        },
+        {
           // A3 · lo que biometría pregunta: a qué equipos llega una plantilla.
           provide: TERMINALES_DE_ROSTROS,
           inject: [REPOSITORIO_DE_EQUIPOS],
@@ -120,6 +133,7 @@ export class EquiposModule {
         TERMINALES_DE_ROSTROS,
         EQUIPOS_QUE_EMITEN,
         COPROPIEDAD_DE_EQUIPO,
+        ALCANCE_DE_EQUIPOS,
       ],
     };
   }

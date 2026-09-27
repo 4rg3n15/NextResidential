@@ -33,6 +33,8 @@ import {
 } from '@ncr/domain-core';
 import type { Bitacora, ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
 import { Aislamiento } from '../../multiempresa/aislamiento';
+import { ALCANCE_DE_EQUIPOS } from '../../equipos';
+import type { AlcanceDeEquipos } from '../../equipos';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
@@ -91,6 +93,8 @@ import { MideKpi } from '../../observabilidad';
 export class GuardiaController {
   constructor(
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    // 15-L · el equipo de la petición es de la copropiedad de la ruta.
+    @Inject(ALCANCE_DE_EQUIPOS) private readonly equiposDeLaRuta: AlcanceDeEquipos,
     @Inject(AccionarPuertaAMano) private readonly accionar: AccionarPuertaAMano,
     @Inject(BITACORA_DE_ORDENES) private readonly ordenes: BitacoraDeOrdenes,
     @Inject(REPOSITORIO_EVENTOS) private readonly eventos: RepositorioEventos,
@@ -148,6 +152,7 @@ export class GuardiaController {
     @Body() dto: OrdenManualDto,
   ): Promise<OrdenEjecutadaDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/ordenes');
+    await this.equiposDeLaRuta.exigir(ctx, copropiedadId, dto.dispositivoId, 'guardia/ordenes');
     const orden = this.desenvolver(
       await this.accionar.ejecutar(ctx, {
         copropiedadId,
@@ -186,6 +191,7 @@ export class GuardiaController {
     @Body() dto: OrdenDeBloqueoDto,
   ): Promise<BloqueoVigenteDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/bloqueo');
+    await this.equiposDeLaRuta.exigir(ctx, copropiedadId, dto.dispositivoId, 'guardia/bloqueo');
     const vigente = this.desenvolver(
       await this.bloquear.ejecutar(ctx, {
         copropiedadId,
@@ -316,6 +322,7 @@ export class GuardiaController {
     @Body() dto: SolicitudDeCanalDto,
   ): Promise<EstadoDeCanalDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom');
+    await this.equiposDeLaRuta.exigir(ctx, copropiedadId, dto.dispositivoId, 'guardia/intercom');
     try {
       return await this.intercom.pedir(copropiedadId, dto.dispositivoId, ctx.usuarioId);
     } catch (error) {
@@ -343,6 +350,7 @@ export class GuardiaController {
     @Body() dto: SolicitudDeCanalDto,
   ): Promise<EstadoDeCanalDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom');
+    await this.equiposDeLaRuta.exigir(ctx, copropiedadId, dto.dispositivoId, 'guardia/intercom');
     return this.intercom.soltar(copropiedadId, dto.dispositivoId, ctx.usuarioId);
   }
 
@@ -357,6 +365,7 @@ export class GuardiaController {
     @Param('dispositivoId', ParseUUIDPipe) dispositivoId: string,
   ): Promise<EstadoDeCanalDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom');
+    await this.equiposDeLaRuta.exigir(ctx, copropiedadId, dispositivoId, 'guardia/intercom');
     return this.intercom.estado(copropiedadId, dispositivoId, ctx.usuarioId);
   }
 
@@ -387,6 +396,7 @@ export class GuardiaController {
     @Res() respuesta: Response,
   ): Promise<void> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom/audio');
+    await this.equiposDeLaRuta.exigir(ctx, copropiedadId, dispositivoId, 'guardia/intercom/audio');
     const estado = await this.intercom.estado(copropiedadId, dispositivoId, ctx.usuarioId);
     if (estado.transporte !== 'equipo') {
       // Antes de abrir el flujo: una vez enviadas las cabeceras ya no hay
@@ -447,6 +457,7 @@ export class GuardiaController {
     @Req() peticion: Request,
   ): Promise<void> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/intercom/audio');
+    await this.equiposDeLaRuta.exigir(ctx, copropiedadId, dispositivoId, 'guardia/intercom/audio');
     const cuerpo: unknown = peticion.body;
     if (!Buffer.isBuffer(cuerpo) || cuerpo.length === 0) {
       throw new BadRequestException('El audio viaja como application/octet-stream, no vacío');

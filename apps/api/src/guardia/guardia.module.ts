@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EquiposModule } from '../equipos';
 import type { DynamicModule } from '@nestjs/common';
 import { BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
@@ -60,6 +61,8 @@ export class GuardiaModule {
   static registrar(): DynamicModule {
     return {
       module: GuardiaModule,
+      // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
+      imports: [EquiposModule.registrar()],
       controllers: [GuardiaController, VideoController],
       providers: [
         {

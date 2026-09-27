@@ -5,6 +5,7 @@ import {
   motivoDeDescarte,
 } from '../hikvision/contratos-de-evento';
 import { ClienteDeEquipo } from './cliente';
+import { CredencialRechazada } from '../nucleo/errores';
 import { lectorPara } from './partes-del-flujo';
 import type { ParteDelFlujo as ParteCruda } from './partes-del-flujo';
 import { recortado, sinSecretos } from './intercambio';
@@ -141,6 +142,21 @@ export class EscuchaDeAlertStream {
           yield evento;
         }
       } catch (error) {
+        if (error instanceof CredencialRechazada) {
+          /**
+           * A5 (15-L) · con la credencial rechazada NO se reconecta: cada
+           * reconexión es un inicio de sesión fallido y el equipo bloquea la
+           * dirección del Mac. La escucha se detiene; quien la armó la vuelve a
+           * pedir, y sólo conecta de verdad cuando la credencial cambia.
+           */
+          this.anotar(
+            error.rechazadaHaceMs === undefined ? 'error' : 'debug',
+            'escucha: credencial rechazada — se DETIENE sin reintentar; corrija usuario o clave ' +
+              'del equipo en la consola',
+            {},
+          );
+          return;
+        }
         // Cualquier caída es una caída: se reintenta. Pero se DICE (H-SITIO-14):
         // en sitio una escucha que no conectaba no dejaba ni una línea.
         if (cancelar === undefined || !cancelar.aborted) {
@@ -209,6 +225,9 @@ export class EscuchaDeAlertStream {
         desafioVencido: flujo.desafioVencido,
         cuerpo: recortado(sinSecretos(cuerpo), 512),
       });
+      if (flujo.estado === 401 && !flujo.desafioVencido) {
+        throw new CredencialRechazada(this.opciones.dispositivoId);
+      }
       throw new Error(`el equipo contestó HTTP ${String(flujo.estado)} a la escucha`);
     }
     this.anotar('info', 'escucha: conexión abierta', {

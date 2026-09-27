@@ -161,6 +161,8 @@ export class ProveedoresModule {
               fuente,
               // H-SITIO-12/13/14 · lo que pasa con los equipos, a la bitácora.
               traza: bitacora,
+              // A5 (15-L) · el plazo de cada petición, del `.env`.
+              tiempoLimiteMs: configuracion.EQUIPOS_TIEMPO_LIMITE_MS,
               ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
             });

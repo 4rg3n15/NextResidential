@@ -20,6 +20,8 @@ import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
+import { ALCANCE_DE_EQUIPOS } from '../../equipos';
+import type { AlcanceDeEquipos } from '../../equipos';
 import { REPOSITORIO_CONSENTIMIENTOS } from '../aplicacion/puertos';
 import type { RepositorioConsentimientos } from '../aplicacion/puertos';
 import {
@@ -105,6 +107,8 @@ export class BiometriaController {
     @Inject(REPOSITORIO_CONSENTIMIENTOS)
     private readonly consentimientos: RepositorioConsentimientos,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    // 15-L · una plantilla de A no se empuja a una terminal de B.
+    @Inject(ALCANCE_DE_EQUIPOS) private readonly equiposDeLaRuta: AlcanceDeEquipos,
     @Inject(AceptarConsentimientoPresencial)
     private readonly presencial: AceptarConsentimientoPresencial,
   ) {}
@@ -329,6 +333,12 @@ export class BiometriaController {
     const destino = await this.aislamiento.exigirAlcance(
       ctx,
       copropiedadId,
+      'biometria/plantillas',
+    );
+    await this.equiposDeLaRuta.exigir(
+      ctx,
+      copropiedadId,
+      dto.dispositivoId,
       'biometria/plantillas',
     );
     return desenvolver(

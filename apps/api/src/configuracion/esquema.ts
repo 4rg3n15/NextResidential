@@ -234,6 +234,12 @@ export const esquemaConfiguracion = z.object({
    * Ausente = no se toca el del equipo (la guía trae 5).
    */
   TERMINAL_PLAZO_DE_VERIFICACION_S: z.coerce.number().int().min(1).max(60).optional(),
+  /**
+   * A5 (15-L) · plazo de cada petición a un equipo, en ms. Por omisión 5000:
+   * holgado para cargar una plantilla, corto para no dejar a un portero
+   * esperando. En una red de sitio lenta se sube aquí, sin tocar código.
+   */
+  EQUIPOS_TIEMPO_LIMITE_MS: z.coerce.number().int().min(500).max(30_000).default(5000),
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════

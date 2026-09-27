@@ -50,6 +50,40 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
     );
   }
 
+  /**
+   * 15-L · un equipo que ya estaba en `dispositivos` antes de la prueba (el
+   * seed, o el alta de otra etapa). Sin él, el banco sin base no tenía de
+   * quién es cada equipo, y la comprobación de que el equipo es de la
+   * copropiedad de la ruta no se podía ejercitar sin base.
+   */
+  sembrar(
+    copropiedadId: string,
+    equipo: { readonly id: string; readonly nombre: string; readonly tipo: DatosDeEquipo['tipo'] },
+  ): void {
+    this.lista(copropiedadId).push({
+      id: equipo.id,
+      nombre: equipo.nombre,
+      tipo: equipo.tipo,
+      host: `${equipo.id}.invalid`,
+      puerto: 80,
+      protocolo: 'http',
+      usuario: 'servicio',
+      modelo: null,
+      firmware: null,
+      fabricante: null,
+      canalBarrera: null,
+      numeroDePuerta: null,
+      canalDeAudio: null,
+      modoDeTerminal: null,
+      canalDeAudioHabilitado: false,
+      capacidades: null,
+      verificacion: 'no_verificado',
+      verificadoEn: null,
+      motivoNoVerificado: null,
+      estado: 'activo',
+    });
+  }
+
   /** Solo para que la suite compruebe que hay sobre y que NO es el texto. */
   sobreDe(copropiedadId: string, equipoId: string): Buffer | undefined {
     return this.sobres.get(`${copropiedadId}/${equipoId}`);
