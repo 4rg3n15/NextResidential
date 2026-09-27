@@ -56,6 +56,9 @@ import {
 } from './infraestructura/repositorios-pg';
 import { BiometriaController } from './presentacion/biometria.controller';
 import { ConsentimientoPublicoController } from './presentacion/consentimiento-publico.controller';
+import { REPOSITORIO_AUTORIZACIONES } from '../autorizaciones';
+import type { RepositorioAutorizaciones } from '../autorizaciones';
+import { VigenciaDesdeAutorizaciones } from './infraestructura/vigencia-desde-autorizaciones';
 
 /** Dónde vive el sobre cifrado: en memoria (suite) o en la fila de la plantilla. */
 export const ALMACEN_DE_PLANTILLAS = Symbol.for('ncr.biometria.AlmacenDePlantillas');
@@ -251,13 +254,23 @@ export class BiometriaModule {
             REPOSITORIO_PLANTILLAS,
             BOVEDA_DE_PLANTILLAS,
             RELOJ,
+            REPOSITORIO_AUTORIZACIONES,
           ],
           useFactory: (
             consentimientos: RepositorioConsentimientos,
             plantillas: RepositorioPlantillas,
             boveda: BovedaDePlantillas,
             reloj: Reloj,
-          ) => new SincronizarPlantilla(consentimientos, plantillas, boveda, reloj),
+            autorizaciones: RepositorioAutorizaciones,
+          ) =>
+            new SincronizarPlantilla(
+              consentimientos,
+              plantillas,
+              boveda,
+              reloj,
+              // A2 (15-L) · la vigencia de la autorización viaja al equipo.
+              new VigenciaDesdeAutorizaciones(autorizaciones),
+            ),
         },
         {
           provide: SincronizarPlantillaEnTerminales,

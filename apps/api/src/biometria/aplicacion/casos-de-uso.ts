@@ -17,12 +17,14 @@ import type {
   Reloj,
   Resultado,
   UmbralesDeCalidad,
+  Vigencia,
 } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type {
   BovedaDePlantillas,
   RepositorioConsentimientos,
   RepositorioPlantillas,
+  VigenciaDeAutorizaciones,
 } from './puertos';
 
 const noEncontrado = (que: string): ErrorDominio =>
@@ -269,6 +271,11 @@ export class SincronizarPlantilla {
     private readonly plantillas: RepositorioPlantillas,
     private readonly boveda: BovedaDePlantillas,
     private readonly reloj: Reloj,
+    /**
+     * A2 (15-L) · de dónde sale la vigencia que viaja al equipo. Sin él, la
+     * plantilla se sincroniza como antes de la 15-L: sin vigencia.
+     */
+    private readonly vigencias?: VigenciaDeAutorizaciones,
   ) {}
 
   async ejecutar(
@@ -297,8 +304,16 @@ export class SincronizarPlantilla {
       );
     }
 
+    const vigencia = await this.vigenciaDe(copropiedadId, plantilla.autorizacionId, ahora);
+    if (!vigencia.ok) return fallo(vigencia.error);
+
     try {
-      await this.boveda.empujarATerminal(copropiedadId, plantilla.id, entrada.dispositivoId);
+      await this.boveda.empujarATerminal(
+        copropiedadId,
+        plantilla.id,
+        entrada.dispositivoId,
+        vigencia.valor ?? undefined,
+      );
     } catch (causa) {
       // Un lector apagado, fuera de la red o desconocido es un fallo TÉCNICO, y
       // se dice así. Dejarlo escapar producía un 500: el operador leía «error
@@ -323,6 +338,40 @@ export class SincronizarPlantilla {
     if (!esFallo(marcada)) await this.plantillas.guardar(marcada.valor, ctx.usuarioId);
 
     return exito({ sincronizada: true });
+  }
+
+  /**
+   * A2 (15-L) · la vigencia de la autorización de la plantilla, para que el
+   * equipo caduque el rostro por su cuenta. Sin autorización (o sin quien la
+   * consulte), ninguna —como antes—. Con una autorización que no está, está
+   * revocada o ya venció, NO se sincroniza: denegar por defecto.
+   */
+  private async vigenciaDe(
+    copropiedadId: string,
+    autorizacionId: string | null,
+    ahora: Date,
+  ): Promise<Resultado<Vigencia | null, ErrorDominio>> {
+    if (autorizacionId === null || this.vigencias === undefined) return exito(null);
+    const vigencia = await this.vigencias.deLaAutorizacion(copropiedadId, autorizacionId);
+    if (vigencia === null) {
+      return fallo(
+        errorDominio(
+          'OPERACION_NO_PERMITIDA',
+          'No se sincroniza esta plantilla: su autorización no existe o fue revocada',
+          'RN-11',
+        ),
+      );
+    }
+    if (vigencia.expiradaEn(ahora)) {
+      return fallo(
+        errorDominio(
+          'OPERACION_NO_PERMITIDA',
+          'No se sincroniza esta plantilla: su autorización ya venció',
+          'RN-01',
+        ),
+      );
+    }
+    return exito(vigencia);
   }
 }
 

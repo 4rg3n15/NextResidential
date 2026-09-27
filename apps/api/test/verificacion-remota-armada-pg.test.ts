@@ -12,6 +12,8 @@ import {
   crearProveedorDeEquipos,
   desenlacesDeVerificacionPor,
   equiposSimulados,
+  jpegConMedidas,
+  personasPor,
 } from '@ncr/providers';
 import type { EscuchaActiva, FuenteDePlacas, ProveedorDeEquipos } from '@ncr/providers';
 import type { ContextoTenant } from '../src/autenticacion';
@@ -185,11 +187,9 @@ const con = (token: string) => ({
 });
 
 const MEDIDAS = { nitidez: 0.9, iluminacion: 0.5, rostrosDetectados: 1, proporcionRostro: 0.4 };
-const JPEG = Buffer.concat([
-  Buffer.from([0xff, 0xd8, 0xff]),
-  randomBytes(64),
-  Buffer.from([0xff, 0xd9]),
-]);
+// A2 (15-L) · con cabecera de cuadro legible: la terminal ya no recibe una
+// «foto» cuyas medidas no se pueden leer.
+const JPEG = Buffer.from(jpegConMedidas(320, 240, 64));
 
 /** Visita de consola en la franja 14–18 Z de mañana, con rostro aceptado por el titular. */
 const visitaConRostro = async (): Promise<string> => {
@@ -263,6 +263,16 @@ describe('verificación remota ARMADA · la terminal pregunta por el flujo y act
     if (omitida()) return;
     const plantillaId = await visitaConRostro();
     const enElEquipo = plantillaId.replace(/-/g, '').toLowerCase();
+
+    // A2 (15-L) · la persona llegó al equipo como VISITANTE con la vigencia de
+    // su autorización (14–18 Z), escrita en hora de Bogotá y sin desfase.
+    const fecha = DIA.toISOString().slice(0, 10);
+    expect(personasPor.get(HOST)?.get(enElEquipo)).toEqual({
+      tipo: 'visitor',
+      desde: `${fecha}T09:00:00`,
+      hasta: `${fecha}T12:59:59`,
+      puertas: [1],
+    });
 
     // La API abre el flujo como lo hace `EscuchasDeEquipos`: por el proveedor.
     const proveedor = (app as INestApplication).get<ProveedorDeEquipos>(PROVEEDOR_DE_EQUIPOS);

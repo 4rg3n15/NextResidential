@@ -163,6 +163,15 @@ export class ProveedoresModule {
               traza: bitacora,
               // A5 (15-L) · el plazo de cada petición, del `.env`.
               tiempoLimiteMs: configuracion.EQUIPOS_TIEMPO_LIMITE_MS,
+              // A2 (15-L) · la persona y la foto que van a una terminal.
+              persona: {
+                zonaHoraria: configuracion.EQUIPOS_ZONA_HORARIA,
+                planDeHorario: configuracion.TERMINAL_PLAN_DE_HORARIO,
+              },
+              limitesDeFoto: {
+                bytesMaximos: configuracion.EQUIPOS_FOTO_KB_MAXIMOS * 1024,
+                ladoMaximo: configuracion.EQUIPOS_FOTO_LADO_MAXIMO,
+              },
               ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
             });

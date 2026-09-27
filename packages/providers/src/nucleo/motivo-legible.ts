@@ -15,6 +15,7 @@ import { AperturaNoSoportada } from '../equipo/puerta-remota';
 import { RutaNoSoportada } from '../terminal/terminal-facial';
 import { EquipoDecidePorSuCuenta } from '../camara/modo-de-control';
 import { EquipoNoRegistrado } from '../hikvision/registro-de-equipos';
+import { FotoNoAdmitida } from '../terminal/foto-del-rostro';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -39,6 +40,7 @@ export const motivoLegible = (error: unknown): string => {
   if (error instanceof ReinicioNecesario)
     return 'el equipo necesita reiniciarse para aplicar el cambio';
   if (error instanceof BibliotecaLlena) return 'la biblioteca de rostros del equipo está llena';
+  if (error instanceof FotoNoAdmitida) return `la foto no sirve: ${error.legible}`;
   if (error instanceof OrdenSinConfirmar) {
     return 'el equipo contestó sin confirmar la orden: puede que la puerta no se haya movido';
   }

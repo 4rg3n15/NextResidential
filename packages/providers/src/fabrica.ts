@@ -1,6 +1,8 @@
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import { MockProvider } from './mock/mock-provider';
 import type { PerfilDeSimulacion } from './mock/simulacion';
+import type { AjustesDePersona } from './terminal/persona-en-el-equipo';
+import type { LimitesDeFoto } from './terminal/foto-del-rostro';
 import { HikvisionProvider } from './hikvision/hikvision-provider';
 import { RegistroEnMemoria } from './hikvision/registro-de-equipos';
 import type { EquipoRegistrado, RegistroDeEquipos } from './hikvision/registro-de-equipos';
@@ -60,6 +62,10 @@ export interface ConfiguracionDeProveedor {
   readonly peticion?: typeof fetch;
   /** A5 (15-L) · plazo de cada petición a un equipo, en ms (del `.env`). */
   readonly tiempoLimiteMs?: number;
+  /** A2 (15-L) · zona y plantilla horaria de la persona en la terminal (del `.env`). */
+  readonly persona?: AjustesDePersona;
+  /** A2 (15-L) · peso y lado máximos de la foto que se sube (del `.env`). */
+  readonly limitesDeFoto?: LimitesDeFoto;
   /** Semilla del simulado: la adversidad tiene que ser reproducible. */
   readonly semilla?: number;
   readonly dispositivosSimulados?: readonly string[];
@@ -171,6 +177,10 @@ registrarAdaptador({
       ...(configuracion.tiempoLimiteMs === undefined
         ? {}
         : { tiempoLimiteMs: configuracion.tiempoLimiteMs }),
+      ...(configuracion.persona === undefined ? {} : { persona: configuracion.persona }),
+      ...(configuracion.limitesDeFoto === undefined
+        ? {}
+        : { limitesDeFoto: configuracion.limitesDeFoto }),
     }),
 });
 

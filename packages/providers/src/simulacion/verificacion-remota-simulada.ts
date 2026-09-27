@@ -31,6 +31,12 @@ export interface VerificacionResuelta {
   readonly esperaMs: number | null;
 }
 
+/**
+ * Lo que el equipo hace al emitir un bloque. Si devuelve otro, es ÉSE el que
+ * sale por el flujo: la terminal que niega en local no pregunta (A2, S-70).
+ */
+export type AlEmitir = (bloque: Record<string, unknown>) => Record<string, unknown> | undefined;
+
 /** Lo que cada terminal simulada hizo con cada veredicto, por destino. */
 export const desenlacesDeVerificacionPor = new Map<string, VerificacionResuelta[]>();
 
@@ -109,7 +115,7 @@ export class FlujoEnVivo {
   }
 
   /** El cuerpo de UNA conexión. Una conexión nueva deja sin bloques a la anterior. */
-  cuerpo(alEmitir: (bloque: Record<string, unknown>) => void): ReadableStream<Uint8Array> {
+  cuerpo(alEmitir: AlEmitir): ReadableStream<Uint8Array> {
     this.lectores += 1;
     const esta = this.lectores;
     const codificador = new TextEncoder();
@@ -127,8 +133,8 @@ export class FlujoEnVivo {
           if (esta !== this.lectores) return { done: true, value: undefined };
           const bloque = await siguiente();
           if (bloque === null || esta !== this.lectores) return { done: true, value: undefined };
-          alEmitir(bloque);
-          return { done: false, value: codificador.encode(JSON.stringify(bloque)) };
+          const emitido = alEmitir(bloque) ?? bloque;
+          return { done: false, value: codificador.encode(JSON.stringify(emitido)) };
         },
         cancel: async () => {
           if (esta !== this.lectores) return;

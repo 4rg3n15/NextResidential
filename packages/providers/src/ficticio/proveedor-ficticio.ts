@@ -12,6 +12,7 @@ import type {
   Reloj,
   ResultadoAccionamiento,
   ResultadoDeAccionamiento,
+  Vigencia,
 } from '@ncr/domain-core';
 import { ordenAceptada, ordenInalcanzable } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
@@ -209,6 +210,8 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
     dispositivoId: string,
     plantillaId: string,
     plantilla: Uint8Array,
+    // A2 (15-L) · el ficticio no caduca nada: la acepta y la ignora.
+    _vigencia?: Vigencia,
   ): Promise<void> {
     const equipo = this.exigir(dispositivoId, 'bibliotecaDeRostros');
     if (plantilla.length === 0) {

@@ -12,7 +12,16 @@ import {
 } from './comportamientos-de-sitio';
 import type { PoliticaDeNonceDelEquipo } from './comportamientos-de-sitio';
 import { VerificacionRemotaSimulada } from './verificacion-remota-simulada';
-import type { FlujoEnVivo } from './verificacion-remota-simulada';
+import type { AlEmitir, FlujoEnVivo } from './verificacion-remota-simulada';
+import {
+  decisionLocal,
+  horaDePared,
+  leerPersona,
+  negacionesLocalesPor,
+  negadoEnLocal,
+  personasPor,
+} from './personas-simuladas';
+import type { PersonaSimulada } from './personas-simuladas';
 
 export { aperturasFisicasPor, escriturasSinCuerpoPor } from './comportamientos-de-sitio';
 export {
@@ -165,6 +174,10 @@ export interface GuionDeEquipo {
   readonly rechazaCredencial?: boolean;
   /** Anexo 15-K · cuándo vence el nonce. Por omisión, a los 20 s. */
   readonly nonce?: PoliticaDeNonceDelEquipo;
+  /** A2 (15-L) · la puerta que gobierna esta terminal, para su `doorRight`. */
+  readonly puerta?: number;
+  /** A2 (15-L) · la zona del reloj del equipo. America/Bogota por omisión. */
+  readonly zonaHoraria?: string;
 }
 
 /**
@@ -362,6 +375,14 @@ const PARAMETRO_MALO =
   '"errorCode":1610612737,"errorMsg":"badParameters"}';
 
 /** Como la guía: `subStatusCode` es obligatorio también en el «OK». */
+/** A2 (15-L) · `[SUPUESTO]` S-70: el texto exacto de estos dos no está en el extracto. */
+const PERSONA_YA_EXISTE =
+  '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"employeeNoAlreadyExist",' +
+  '"errorCode":1610637344,"errorMsg":"employeeNoAlreadyExist"}';
+const PERSONA_NO_EXISTE =
+  '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"employeeNoNotExist",' +
+  '"errorCode":1610637345,"errorMsg":"employeeNoNotExist"}';
+
 const OK =
   '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString>' +
   '<subStatusCode>ok</subStatusCode></ResponseStatus>';
@@ -387,7 +408,7 @@ const respuestaDe = (
 /** Flujo de eventos: los bloques, uno detrás de otro, y después se cierra. */
 const cuerpoDeFlujo = (
   bloques: readonly Record<string, unknown>[],
-  alEmitir: (bloque: Record<string, unknown>) => void,
+  alEmitir: AlEmitir,
 ): ReadableStream<Uint8Array> => {
   const codificador = new TextEncoder();
   let i = 0;
@@ -396,8 +417,9 @@ const cuerpoDeFlujo = (
       read: async () => {
         const bloque = bloques[i++];
         if (bloque === undefined) return { done: true, value: undefined };
-        alEmitir(bloque);
-        return { done: false, value: codificador.encode(JSON.stringify(bloque)) };
+        // A2 · el equipo puede negar en local: entonces emite OTRO bloque.
+        const emitido = alEmitir(bloque) ?? bloque;
+        return { done: false, value: codificador.encode(JSON.stringify(emitido)) };
       },
       cancel: async () => undefined,
     }),
@@ -460,11 +482,36 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     offlineDevCheckOpenDoorEnabled: false,
   };
   const verificacion = new VerificacionRemotaSimulada(guion.destino, guion.plazoDeVerificacionMs);
-  /** Sólo en modo armado, y con el interruptor puesto, pregunta por el flujo. */
-  const preguntaPorElFlujo = (bloque: Record<string, unknown>): void => {
+  /** A2 (15-L) · las personas dadas de alta, con su vigencia y sus puertas. */
+  const personas = new Map<string, PersonaSimulada>();
+  if (guion.destino !== undefined) personasPor.set(guion.destino, personas);
+  /**
+   * Antes de preguntar, la terminal decide en local (S-70): fuera de vigencia o
+   * sin permiso de puerta, niega y emite otro bloque. Después, sólo en modo
+   * armado y con el interruptor puesto, pregunta por el flujo.
+   */
+  const preguntaPorElFlujo: AlEmitir = (bloque) => {
+    const acceso = bloque['AccessControllerEvent'] as Record<string, unknown> | undefined;
+    const quien = acceso?.['employeeNoString'] ?? acceso?.['employeeNo'];
+    if (acceso !== undefined && (typeof quien === 'string' || typeof quien === 'number')) {
+      const decision = decisionLocal(
+        personas.get(String(quien)),
+        horaDePared(bloque['dateTime'] ?? acceso['time'], guion.zonaHoraria ?? 'America/Bogota'),
+        guion.puerta ?? 1,
+      );
+      if (decision !== 'pregunta') {
+        if (guion.destino !== undefined) {
+          const lista = negacionesLocalesPor.get(guion.destino) ?? [];
+          lista.push(`${String(quien)}:${decision}`);
+          negacionesLocalesPor.set(guion.destino, lista);
+        }
+        return negadoEnLocal(bloque);
+      }
+    }
     if (acs['remoteCheckDoorEnabled'] === true && acs['checkChannelType'] === 'ISAPI') {
       verificacion.alEmitir(bloque);
     }
+    return undefined;
   };
   const flujoDeEventos = (): ReadableStream<Uint8Array> =>
     guion.enVivo === undefined
@@ -650,12 +697,21 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         return respuestaDe(400, PARAMETRO_MALO);
       }
       plantillas.delete(empleado);
+      personas.delete(empleado);
       return respuestaDe(200, OK);
     }
-    if (catalogada.proposito === 'dar de alta la persona a la que pertenece la plantilla') {
-      // H-SITIO-04 · como la guía: el `employeeNo` admite hasta 32 bytes.
-      const empleado = /"employeeNo"\s*:\s*"([^"]*)"/.exec(String(opciones?.body ?? ''))?.[1];
-      if (empleado === undefined || empleado.length > 32) return respuestaDe(400, PARAMETRO_MALO);
+    if (
+      catalogada.proposito === 'dar de alta la persona a la que pertenece la plantilla' ||
+      catalogada.proposito === 'modificar la persona a la que pertenece la plantilla'
+    ) {
+      // H-SITIO-04 · como la guía: el `employeeNo` admite hasta 32 bytes. A2 ·
+      // y el registro entero se valida y se RECUERDA, con su vigencia.
+      const leida = leerPersona(String(opciones?.body ?? ''));
+      if (leida === null) return respuestaDe(400, PARAMETRO_MALO);
+      const alta = catalogada.proposito.startsWith('dar de alta');
+      if (alta && personas.has(leida.id)) return respuestaDe(400, PERSONA_YA_EXISTE);
+      if (!alta && !personas.has(leida.id)) return respuestaDe(400, PERSONA_NO_EXISTE);
+      personas.set(leida.id, leida.persona);
       return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'cargar la plantilla facial') {
@@ -678,6 +734,9 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         fpid !== undefined &&
         /^[A-Za-z0-9]{1,63}$/.test(fpid);
       if (!conforme) return respuestaDe(400, PARAMETRO_MALO);
+      // A2 (15-L) · el rostro se enlaza a una persona por `FPID` = `employeeNo`:
+      // sin persona previa, el equipo no tiene a quién dárselo.
+      if (!personas.has(fpid)) return respuestaDe(400, PERSONA_NO_EXISTE);
       plantillas.add(fpid);
       return respuestaDe(200, OK);
     }

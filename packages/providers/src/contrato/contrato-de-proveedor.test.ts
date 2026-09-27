@@ -23,6 +23,7 @@ import {
   EquipoOcupado,
   ReinicioNecesario,
 } from '../nucleo/errores';
+import { jpegConMedidas } from '../simulacion/imagenes-de-prueba';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -427,7 +428,7 @@ describe.each(CASOS)('contrato de proveedor · $nombre', (caso) => {
   });
 
   describe('FaceTemplateProvider', () => {
-    const PLANTILLA = new Uint8Array([1, 2, 3, 4]);
+    const PLANTILLA = jpegConMedidas();
 
     it('sincroniza una plantilla contra una terminal CON biblioteca', async () => {
       const { proveedor } = caso.montar();
@@ -617,7 +618,7 @@ describe.each(casosCon('terminalSinBiblioteca'))(
       const { proveedor } = caso.montar({ terminalSinBiblioteca: true });
       expect(estadoDe(await proveedor.capacidadesDe(TERMINAL), 'bibliotecaDeRostros')).toBe('no');
       const error = await proveedor
-        .sincronizar(TERMINAL, 'p-1', new Uint8Array([1]))
+        .sincronizar(TERMINAL, 'p-1', jpegConMedidas())
         .then(() => null)
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(CapacidadNoSoportada);
@@ -633,7 +634,7 @@ describe.each(casosCon('terminalSinCapacidadesConocidas'))(
     it('DESCONOCIDA no es SÍ: se niega, y el motivo dice que fue por no saber', async () => {
       const { proveedor } = caso.montar({ terminalSinCapacidadesConocidas: true });
       const error = await proveedor
-        .sincronizar(TERMINAL, 'p-1', new Uint8Array([1]))
+        .sincronizar(TERMINAL, 'p-1', jpegConMedidas())
         .then(() => null)
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(CapacidadNoSoportada);
@@ -646,9 +647,9 @@ describe.each(casosCon('terminalSinCapacidadesConocidas'))(
 describe.each(casosCon('bibliotecaLlena'))('biblioteca de rostros LLENA · $nombre', (caso) => {
   it('sincronizar falla con BibliotecaLlena, no con un error opaco', async () => {
     const { proveedor } = caso.montar({ bibliotecaLlena: true });
-    await expect(
-      proveedor.sincronizar(TERMINAL, 'p-1', new Uint8Array([1])),
-    ).rejects.toBeInstanceOf(BibliotecaLlena);
+    await expect(proveedor.sincronizar(TERMINAL, 'p-1', jpegConMedidas())).rejects.toBeInstanceOf(
+      BibliotecaLlena,
+    );
   });
 });
 

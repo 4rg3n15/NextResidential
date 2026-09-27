@@ -97,6 +97,16 @@ export type { VeredictoDeModo } from './camara/modo-de-control';
 export { EquipoInalcanzable } from './equipo/cliente';
 // 15-L · lo que el operador lee cuando una orden no sale (A1, Bloque I).
 export { motivoLegible } from './nucleo/motivo-legible';
+// A2 (15-L) · lo que la API valida y configura de la persona y la foto que
+// van a la terminal: la zona, los límites y el error que los hace cumplir.
+export {
+  FotoNoAdmitida,
+  LIMITES_DE_FOTO_POR_OMISION,
+  inspeccionarFoto,
+} from './terminal/foto-del-rostro';
+export type { LimitesDeFoto, FotoInspeccionada } from './terminal/foto-del-rostro';
+export { ZONA_POR_OMISION, zonaValida } from './terminal/persona-en-el-equipo';
+export type { AjustesDePersona } from './terminal/persona-en-el-equipo';
 export type { ReaccionAlError, ErrorDelFabricante } from './equipo/errores-del-fabricante';
 export { LISTAS_DEL_EQUIPO_NO_SE_USAN } from './equipo/errores-del-fabricante';
 
@@ -108,3 +118,6 @@ export { LISTAS_DEL_EQUIPO_NO_SE_USAN } from './equipo/errores-del-fabricante';
  */
 export * from './simulacion/equipo-simulado';
 export * from './simulacion/camara-que-publica';
+export { jpegConMedidas } from './simulacion/imagenes-de-prueba';
+export { negacionesLocalesPor, personasPor } from './simulacion/personas-simuladas';
+export type { PersonaSimulada } from './simulacion/personas-simuladas';

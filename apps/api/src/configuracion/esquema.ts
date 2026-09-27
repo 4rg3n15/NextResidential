@@ -240,6 +240,34 @@ export const esquemaConfiguracion = z.object({
    * esperando. En una red de sitio lenta se sube aquí, sin tocar código.
    */
   EQUIPOS_TIEMPO_LIMITE_MS: z.coerce.number().int().min(500).max(30_000).default(5000),
+  /**
+   * A2 (15-L) · zona en la que la terminal lleva su reloj: la vigencia del
+   * visitante se le escribe en hora local sin desfase. Una zona mal escrita
+   * IMPIDE EL ARRANQUE: si no, la credencial caducaría a la hora equivocada.
+   */
+  EQUIPOS_ZONA_HORARIA: z
+    .string()
+    .default('America/Bogota')
+    .refine((zona) => {
+      try {
+        new Intl.DateTimeFormat('en-CA', { timeZone: zona });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'zona horaria IANA desconocida (p. ej. America/Bogota)'),
+  /** A2 (15-L) · `planTemplateNo` de la puerta en el alta de persona. «1» por omisión. */
+  TERMINAL_PLAN_DE_HORARIO: z
+    .string()
+    .regex(/^\d{1,5}$/, 'número de plantilla horaria del equipo')
+    .default('1'),
+  /**
+   * A2 (15-L) · peso y lado mayor máximos de la foto que se sube a una
+   * terminal. No son del fabricante —la guía no los fija—: son el valor
+   * prudente de la práctica, y se cambian aquí si el equipo declara otros.
+   */
+  EQUIPOS_FOTO_KB_MAXIMOS: z.coerce.number().int().min(16).max(2048).default(200),
+  EQUIPOS_FOTO_LADO_MAXIMO: z.coerce.number().int().min(160).max(4096).default(1024),
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════

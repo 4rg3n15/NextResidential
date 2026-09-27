@@ -125,14 +125,15 @@ orden. La fuga WHEP lleva prueba negativa entre copropiedades antes de
 cerrar». Después, el resto del Bloque A (A2, A3) y los bloques C, D, E, J, H,
 F, G, I.
 
-| Bloque                            | Commit    | Qué queda probado contra el simulador                                                                                                                                                                                                                                                                                                                                           |
-| --------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1–R4 · verificación armada       | `a7a2821` | La terminal simulada pregunta (`remoteCheck`), la plataforma contesta `PUT remoteCheck` con el MISMO `serialNo` dentro del plazo y la terminal abre; `failed` niega; tarde o con otra serie, nada. Clave de idempotencia con `serialNo`: dos rostros → dos eventos y dos veredictos. XML del Alarm Server leído. La copropiedad sale del registro de equipos, no de la petición |
-| A5 · credencial rechazada         | `3f9ceef` | Un 401 sin `stale` marca la credencial; durante 30 min (S-68) no se vuelve a presentar y el equipo sale «degradado» con el motivo. Reintentos sólo de lo reintentable (equipo ocupado, desafío vencido), 3 intentos con jitter                                                                                                                                                  |
-| Fuga entre copropiedades (WHEP +) | `3f9ceef` | 10 operaciones sobre un equipo de la copropiedad B pedidas desde la A → 404 y `auditoria_seguridad`. La prueba negativa se escribió ANTES de la corrección y fallaba                                                                                                                                                                                                            |
-| B · todos los eventos             | `6883c6c` | Tabla append-only `eventos_de_equipo` (0040, las cuatro capas de ADR-05, RLS forzada, prueba 97). Catálogo por código; nada se descarta; lo histórico en cola por lotes sin retrasar lo vivo; línea de tiempo con filtros y refresco en vivo en la consola                                                                                                                      |
-| A1 · desenlace en palabras        | `6883c6c` | La apertura del motor y la orden manual quedan en la línea de tiempo con «el equipo la aceptó / la rechazó — motivo / no respondió»; el mensaje técnico sólo va a la bitácora                                                                                                                                                                                                   |
-| A4 · la cámara decidió            | `6883c6c` | Si el control de la cámara no está atestado o el propio evento dice que abrió ella, la lectura se registra y se marca «La cámara decidió por su cuenta»                                                                                                                                                                                                                         |
+| Bloque                            | Commit    | Qué queda probado contra el simulador                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1–R4 · verificación armada       | `a7a2821` | La terminal simulada pregunta (`remoteCheck`), la plataforma contesta `PUT remoteCheck` con el MISMO `serialNo` dentro del plazo y la terminal abre; `failed` niega; tarde o con otra serie, nada. Clave de idempotencia con `serialNo`: dos rostros → dos eventos y dos veredictos. XML del Alarm Server leído. La copropiedad sale del registro de equipos, no de la petición                                                                                                  |
+| A5 · credencial rechazada         | `3f9ceef` | Un 401 sin `stale` marca la credencial; durante 30 min (S-68) no se vuelve a presentar y el equipo sale «degradado» con el motivo. Reintentos sólo de lo reintentable (equipo ocupado, desafío vencido), 3 intentos con jitter                                                                                                                                                                                                                                                   |
+| Fuga entre copropiedades (WHEP +) | `3f9ceef` | 10 operaciones sobre un equipo de la copropiedad B pedidas desde la A → 404 y `auditoria_seguridad`. La prueba negativa se escribió ANTES de la corrección y fallaba                                                                                                                                                                                                                                                                                                             |
+| B · todos los eventos             | `6883c6c` | Tabla append-only `eventos_de_equipo` (0040, las cuatro capas de ADR-05, RLS forzada, prueba 97). Catálogo por código; nada se descarta; lo histórico en cola por lotes sin retrasar lo vivo; línea de tiempo con filtros y refresco en vivo en la consola                                                                                                                                                                                                                       |
+| A1 · desenlace en palabras        | `6883c6c` | La apertura del motor y la orden manual quedan en la línea de tiempo con «el equipo la aceptó / la rechazó — motivo / no respondió»; el mensaje técnico sólo va a la bitácora                                                                                                                                                                                                                                                                                                    |
+| A4 · la cámara decidió            | `6883c6c` | Si el control de la cámara no está atestado o el propio evento dice que abrió ella, la lectura se registra y se marca «La cámara decidió por su cuenta»                                                                                                                                                                                                                                                                                                                          |
+| A2 · persona con vigencia         | (este)    | Con la vigencia de la autorización, la terminal simulada guarda al visitante (`userType: "visitor"`) con `Valid` en hora de Bogotá sin desfase, su puerta y su plantilla horaria; y **niega en local** pasada la vigencia, aunque la supresión no haya llegado. Sin el parámetro, el alta es byte a byte la de antes. La foto se comprueba antes de subirla (JPEG/PNG, ≤ 200 KB, ≤ 1024 px, configurables). Una autorización inexistente, revocada o vencida no deja sincronizar |
 
 ### Hallazgos de esta corrección
 
@@ -153,8 +154,28 @@ F, G, I.
   salida o una puerta forzada producían un «acceso negado» sin persona. Ahora
   decide el par de códigos mayor/menor.
 
+### A2: lo que se hizo distinto del encargo, y por qué
+
+- **`employeeNo` sale del identificador de la PLANTILLA, no del de la
+  autorización.** El encargo pide «derivado del id de la autorización». El
+  puerto que el cliente autorizó ampliar sólo añade la vigencia; pasar además
+  el id de la autorización sería una segunda ampliación del dominio, no
+  autorizada. El identificador de la plantilla cumple lo que la regla protege
+  —estable, nunca documento ni nombre— y cada plantilla pertenece a una sola
+  autorización (`plantillas_biometricas.autorizacion_id`).
+- **La foto no se recomprime en el servidor.** Se comprueba (formato, peso,
+  lado) y, si no cabe, se dice en palabras. La reducción ya la hacen la
+  consola y la app (640 px, 180 KB); recomprimir en la API exigiría una
+  biblioteca nativa de imagen para un caso que los dos clientes cubren.
+- **`doorRight`/`RightPlan` van siempre que la terminal tenga puerta
+  declarada**, con o sin vigencia: no dependen de ella. Por eso la prueba
+  «sin el parámetro nada cambia» se hace con una terminal sin puerta, y la de
+  la puerta, aparte.
+
 ### Supuestos nuevos
 
 S-66 (`uid` y `serialNo` del firmware para la clave), S-67 (qué contesta la
-terminal a una serie que no espera) y S-68 (30 min de bloqueo por credencial
-rechazada), en `docs/auditoria/contradicciones-y-supuestos.md`.
+terminal a una serie que no espera), S-68 (30 min de bloqueo por credencial
+rechazada), S-69 (plantilla con vigencia = visitante) y S-70 (la negación
+local de la terminal y sus textos de rechazo), en
+`docs/auditoria/contradicciones-y-supuestos.md`.

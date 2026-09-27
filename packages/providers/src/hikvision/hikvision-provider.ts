@@ -9,6 +9,7 @@ import type {
   Reloj,
   ResultadoAccionamiento,
   ResultadoDeAccionamiento,
+  Vigencia,
 } from '@ncr/domain-core';
 import { ordenInalcanzable, vigenciaDeAtestacion } from '@ncr/domain-core';
 import { etiqueta } from '../equipo/xml';
@@ -17,6 +18,9 @@ import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { FuenteDePlacas } from '../equipo/fuente-de-placas';
 import { ControlDeBarreraVehicular } from '../barrera/control-barrera';
 import { TerminalFacial } from '../terminal/terminal-facial';
+import type { OpcionesDeTerminal } from '../terminal/terminal-facial';
+import type { AjustesDePersona } from '../terminal/persona-en-el-equipo';
+import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
 import { Videoportero } from '../videoportero/videoportero';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
 import { EscuchaDeAlertStream, transporteSegunCapacidades } from '../equipo/escucha-alertstream';
@@ -103,6 +107,12 @@ export interface OpcionesDeHikvision {
   readonly tiempoLimiteMs?: number;
   /** A5 · la espera de los reintentos, inyectable: sin ella una prueba espera de verdad. */
   readonly medioDeReintento?: MedioDeEspera;
+  /**
+   * A2 (15-L) · cómo se escribe la persona en la terminal (zona, plantilla
+   * horaria) y qué foto se admite. Del `.env`: varía por sitio, no por código.
+   */
+  readonly persona?: AjustesDePersona;
+  readonly limitesDeFoto?: LimitesDeFoto;
 }
 
 const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
@@ -407,11 +417,14 @@ export class HikvisionProvider
     dispositivoId: string,
     plantillaId: string,
     plantilla: Uint8Array,
+    vigencia?: Vigencia,
   ): Promise<void> {
     await this.exigirQuePuedaTenerRostros(dispositivoId);
     await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
     const biblioteca = await this.bibliotecaDe(dispositivoId);
-    await this.reintentando(() => biblioteca.sincronizar(dispositivoId, plantillaId, plantilla));
+    await this.reintentando(() =>
+      biblioteca.sincronizar(dispositivoId, plantillaId, plantilla, vigencia),
+    );
   }
 
   async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
@@ -668,9 +681,20 @@ export class HikvisionProvider
       modo: equipo.modoDeTerminal ?? 'decide_el_equipo',
       numeroDePuerta: equipo.numeroDePuerta ?? null,
       bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
+      ...this.ajustesDeBiblioteca(),
     });
     this.terminales.set(equipo.dispositivoId, creada);
     return creada;
+  }
+
+  /** A2 (15-L) · lo que el `.env` fija para toda biblioteca de rostros. */
+  private ajustesDeBiblioteca(): Pick<OpcionesDeTerminal, 'persona' | 'limitesDeFoto'> {
+    return {
+      ...(this.opciones.persona === undefined ? {} : { persona: this.opciones.persona }),
+      ...(this.opciones.limitesDeFoto === undefined
+        ? {}
+        : { limitesDeFoto: this.opciones.limitesDeFoto }),
+    };
   }
 
   private async exigirQuePuedaTenerRostros(dispositivoId: string): Promise<void> {
@@ -700,6 +724,7 @@ export class HikvisionProvider
       modo: 'decide_el_equipo',
       numeroDePuerta: equipo.numeroDePuerta ?? null,
       bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
+      ...this.ajustesDeBiblioteca(),
     });
     this.terminales.set(dispositivoId, creada);
     return creada;

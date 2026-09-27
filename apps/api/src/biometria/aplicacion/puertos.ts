@@ -1,5 +1,5 @@
 import type { EstadoConsentimiento } from '@ncr/domain-core';
-import type { ConsentimientoBiometrico, PlantillaBiometrica } from '@ncr/domain-core';
+import type { ConsentimientoBiometrico, PlantillaBiometrica, Vigencia } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 
 /**
@@ -92,10 +92,25 @@ export interface BovedaDePlantillas {
     copropiedadId: string,
     plantillaId: string,
     dispositivoId: string,
+    /** A2 (15-L) · la de la autorización: el equipo caduca el rostro con ella. */
+    vigencia?: Vigencia,
   ): Promise<void>;
   retirarDeTerminal(plantillaId: string, dispositivoId: string): Promise<void>;
   olvidar(copropiedadId: string, plantillaId: string): Promise<void>;
 }
+
+/**
+ * A2 (15-L) · la vigencia de la autorización a la que pertenece una plantilla.
+ *
+ * Es lo que viaja al equipo para que caduque el rostro por su cuenta, aunque
+ * la supresión de RN-11 no llegue. `null` si la autorización no existe o está
+ * revocada: entonces NO se sincroniza (denegar por defecto), porque un rostro
+ * sin autorización que lo respalde no tiene nada que hacer en una puerta.
+ */
+export interface VigenciaDeAutorizaciones {
+  deLaAutorizacion(copropiedadId: string, autorizacionId: string): Promise<Vigencia | null>;
+}
+export const VIGENCIA_DE_AUTORIZACIONES = Symbol.for('ncr.puerto.VigenciaDeAutorizaciones');
 
 /** Una terminal (o videoportero) con biblioteca de rostros, tal como se nombra. */
 export interface TerminalConBiblioteca {

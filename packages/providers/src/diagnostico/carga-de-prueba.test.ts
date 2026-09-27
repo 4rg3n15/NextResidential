@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { cargaDePruebaDeRostro } from './carga-de-prueba';
 import { equipoSimulado } from '../simulacion/equipo-simulado';
+import { jpegConMedidas } from '../simulacion/imagenes-de-prueba';
 
-const IMAGEN = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+const IMAGEN = jpegConMedidas();
 const ID = '5e2b7c1a-0000-4000-8000-0000000000c1';
 
 const conexion = (peticion: typeof fetch) => ({
