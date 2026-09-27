@@ -673,7 +673,13 @@ const principal = async () => {
       ok('el código del autenticador ENTRA por IP de red, igual que por el bucle local');
     } else {
       const dicho = await pRed.locator('body').innerText();
-      const linea = dicho.split('\n').find((l) => /sesión|código|expir|no se pudo/i.test(l));
+      // La primera línea que casaba era la ENTRADILLA del formulario («Tu rol
+      // exige un segundo factor…»), no el error: se salta y se dice el error.
+      const linea = dicho
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => !/^Tu rol exige un segundo factor/.test(l))
+        .find((l) => /sesión|código|expir|no se pudo|incorrect|inválid/i.test(l));
       mal(`el segundo factor NO entra por IP de red · la consola dice: «${linea ?? 'nada'}»`);
     }
 

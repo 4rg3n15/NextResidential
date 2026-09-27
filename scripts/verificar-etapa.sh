@@ -1135,13 +1135,15 @@ if [[ "$CON_BASE" == "1" ]]; then
     mal "el recorrido de la consola falla (ver /tmp/ncr-recorrido.log)"
     grep -E "✗" /tmp/ncr-recorrido.log | head -8 | sed 's/^/     /'
   fi
-  paso "13c · el recorrido FALLA con H-SITIO-02, 03 y 08 reintroducidos (requiere --con-base)"
+  paso "13c · el recorrido FALLA con H-SITIO-02, 03, 08, 13 y 15 reintroducidos (requiere --con-base)"
   # Un recorrido en verde sólo demuestra algo si se le ha visto rojo con el
   # defecto que dice cazar. Cada uno se reintroduce en su árbol de sonda y se
-  # exige que el recorrido lo NOMBRE; un fallo por otra causa no cuenta.
+  # exige que el recorrido lo NOMBRE; un fallo por otra causa no cuenta. 13 y
+  # 15 (anexo) viven en `packages/providers`: su sonda copia y compila el
+  # paquete, y el veredicto lo da el equipo simulado, no la consola.
   if NCR_REUTILIZAR_CONSOLA=1 con_limite "$LIMITE_LARGO" node e2e/recorrido-negativo.mjs \
        >/tmp/ncr-recorrido-negativo.log 2>&1; then
-    ok "los tres defectos de sitio, reintroducidos, se detectan cada uno por su nombre"
+    ok "los cinco defectos de sitio, reintroducidos, se detectan cada uno por su nombre"
   else
     mal "el recorrido no detecta algún defecto de sitio (ver /tmp/ncr-recorrido-negativo.log)"
     grep -E "✗|✓" /tmp/ncr-recorrido-negativo.log | head -8 | sed 's/^/     /'

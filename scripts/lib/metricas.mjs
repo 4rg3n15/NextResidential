@@ -160,6 +160,38 @@ const correr = (paquete, dir) => {
 
   if (codigoSalida === 0 && rojas === 0) return { informe, cobertura, fallo: null };
 
+  /**
+   * 15-K (anexo) · UN FICHERO QUE NO CARGA TAMBIÉN TIENE NOMBRE. Vitest lo
+   * informa como suite `failed` SIN aserciones rojas, con el motivo en
+   * `message`, y aquí caía en «interrumpida · Command failed: pnpm …»: el
+   * fichero salía en la lista de cobertura y el motivo no salía en ninguna
+   * parte. Es el mismo «buscar a ciegas» que D-100 cerró para las rojas. Se
+   * vio en la corrida final de la 15-K: la sonda 22 plantó su prueba y el
+   * fichero no llegó a cargarse, sin que nada dijera por qué.
+   */
+  const sinCargar =
+    rojas === 0 && informe !== null
+      ? // Sin ninguna prueba roja, una suite `failed` falló FUERA de sus
+        // pruebas: no cargó, o falló un gancho.
+        informe.testResults.filter((suite) => suite.status === 'failed')
+      : [];
+  if (sinCargar.length > 0) {
+    // El informe JSON de vitest trae siempre `name` y `message` por fichero:
+    // aquí no hay valores por omisión que inventar.
+    const nombrados = sinCargar.map((suite) => {
+      const motivo = String(suite.message)
+        .split('\n')
+        .map((l) => sinColores(l).trim())
+        .filter((l) => l.length > 0)
+        .slice(0, 3);
+      return `✗ no se pudo cargar (o falló fuera de sus pruebas) ${relative(raiz, suite.name)}\n         ${motivo.join('\n         ')}`;
+    });
+    const detalle =
+      `SUITE EN ROJO · ${sinCargar.length} fichero(s) de prueba no se pudieron cargar` +
+      `\n       ${nombrados.join('\n       ')}`;
+    return { informe, cobertura, fallo: { clase: 'roja', detalle } };
+  }
+
   if (rojas > 0) {
     /**
      * El informe ya trae, por fichero, cada aserción con su `status` y su

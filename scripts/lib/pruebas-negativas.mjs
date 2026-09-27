@@ -1671,10 +1671,24 @@ try {
         ? ok('una suite en rojo hace fallar la medición')
         : mal('una prueba roja pasa inadvertida: el paquete se mediría igual');
 
+      /**
+       * 15-K (anexo) · si esto falla, lo que dijo el control va en la propia
+       * línea ✗: el verificador sólo imprime las ✗, y en la corrida final de
+       * la 15-K esta sonda falló una vez sin dejar ni una pista de por qué.
+       */
+      const dijo = conRoja.salida
+        .split('\n')
+        .filter((l) => /SUITE EN ROJO|CORRIDA INTERRUMPIDA|no se pudo cargar|✗ /.test(l))
+        .slice(0, 4)
+        .map((l) => l.trim().slice(0, 160))
+        .join(' | ');
+
       // LO QUE IMPORTA: el nombre, no el recuento.
       /esta prueba falla a proposito y su nombre tiene que aparecer/.test(conRoja.salida)
         ? ok('el NOMBRE de la prueba roja aparece en la salida')
-        : mal('la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas');
+        : mal(
+            `la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas (dijo: ${dijo || 'nada'})`,
+          );
 
       /sonda-roja\.test\.ts/.test(conRoja.salida)
         ? ok('y también su fichero')
@@ -1688,6 +1702,23 @@ try {
       /saltadas=1\b/.test(conRoja.salida)
         ? ok('la prueba SALTADA se cuenta y se publica para que otro la compare (D-112)')
         : mal('una saltada no aparece en el recuento legible por máquina');
+
+      // 15-K (anexo) · un fichero que NO CARGA se nombra con su motivo, y no
+      // se disfraza de corrida interrumpida.
+      writeFileSync(
+        sonda,
+        "import { it } from 'vitest';\n" +
+          "throw new Error('esta sonda no carga a proposito');\n" +
+          "it('nunca llega a correr', () => undefined);\n",
+      );
+      const sinCargar = conConfig();
+      /no se pudo cargar \(o falló fuera de sus pruebas\) packages\/config\/src\/sonda-roja\.test\.ts/.test(
+        sinCargar.salida,
+      ) &&
+      /esta sonda no carga a proposito/.test(sinCargar.salida) &&
+      !/CORRIDA INTERRUMPIDA/.test(sinCargar.salida)
+        ? ok('un fichero de prueba que no carga se nombra con su motivo, como SUITE EN ROJO')
+        : mal('un fichero que no carga se informa sin su motivo: otra vez a buscar a ciegas');
 
       // El eco de pnpm no es el nombre de ninguna prueba.
       !/ERR_PNPM_/.test(conRoja.salida)

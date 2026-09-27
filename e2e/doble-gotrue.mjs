@@ -75,6 +75,17 @@ const svgDeQr = (semilla) => {
  * Sin opciones, el comportamiento es el de siempre: un superadministrador con
  * claims fijos (12c y 12d no cambian).
  */
+/**
+ * 15-K (anexo) · GoTrue valida el código TOTP con una tolerancia de ±1 paso de
+ * 30 s (`Skew: 1`); `authenticator.check` a secas no admite ninguno. Un código
+ * tecleado a un segundo del cambio de ventana, que viaja consola → API → doble,
+ * llegaba en la ventana siguiente y el doble lo rechazaba donde GoTrue lo
+ * habría aceptado: un doble MÁS estricto que el servicio da rojos que no son.
+ * El 12c del CI de macOS lo sufrió una vez («el segundo factor NO entra por IP
+ * de red») en un commit que no tocaba el acceso.
+ */
+const verificadorTotp = authenticator.clone({ window: 1 });
+
 export const arrancarDobleGotrue = async ({ usuarios = [USUARIO], claimsDe } = {}) => {
   const { publicKey, privateKey } = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...(await exportJWK(publicKey)), kid: 'doble', alg: 'RS256', use: 'sig' };
@@ -232,7 +243,7 @@ export const arrancarDobleGotrue = async ({ usuarios = [USUARIO], claimsDe } = {
       if (sesion === null) return responder(401, { error_code: 'no_authorization' });
       const factor = factoresDe(sesion.usuario.id).find((f) => f.id === verificar[1]);
       if (factor === undefined) return responder(404, { error_code: 'mfa_factor_not_found' });
-      if (!authenticator.check(String(cuerpo.code ?? ''), factor.secret)) {
+      if (!verificadorTotp.check(String(cuerpo.code ?? ''), factor.secret)) {
         return responder(400, { error_code: 'mfa_verification_failed' });
       }
       factor.status = 'verified';
