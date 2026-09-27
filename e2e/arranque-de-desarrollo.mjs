@@ -17,11 +17,16 @@
  * niega a arrancar sin ellos. Qué comprueba, en este orden:
  *
  *   1. que `pnpm run start:dev` llega a «API arrancada»;
- *   2. que un controlador que se inyectaba por tipo contesta con su lógica y no
- *      con un 500 —el del consentimiento público—;
- *   3. que el `ValidationPipe` VALIDA: una respuesta del titular con un valor
- *      fuera de su enumerado y un campo no declarado recibe 400; inerte, la
- *      petición llegaría al caso de uso y volvería con la redirección 303;
+ *   2. que un controlador con dependencias inyectadas contesta con su lógica y
+ *      no con un 500 —`/ready`, que pregunta a sus sondas y dice 200 o 503—;
+ *   3. que el `ValidationPipe` VALIDA: un acceso con un correo que no lo es y
+ *      un campo no declarado recibe 400; inerte, la petición llegaría al caso
+ *      de uso y volvería con otra cosa (401 o 500).
+ *
+ *      15-L · hasta aquí se usaban las dos rutas públicas del enlace del
+ *      titular, que ADR-032 retiró. Con ellas fuera, la primera comprobación
+ *      pasaba por la razón equivocada: un 404 de ruta inexistente no es «un
+ *      controlador que contesta con su lógica».
  *   4. que con `tsx` la API NO arranca y dice por qué.
  *
  * Sin base: adaptadores en memoria y un doble de GoTrue, como el 12c. Los
@@ -139,11 +144,13 @@ const comprobarStartDev = async (doble) => {
     console.log('   ✓ con start:dev la API llega a «API arrancada»');
 
     const base = `http://127.0.0.1:${String(puerto)}`;
-    // Un controlador que se inyectaba por tipo: con `undefined` dentro, 500.
-    const inyectado = await fetch(`${base}/consentimiento/enlace-que-no-existe`);
-    if (inyectado.status >= 500) {
+    // Un controlador con sus sondas inyectadas: con `undefined` dentro, 500.
+    // Con ellas, su lógica: 200 si todo responde, 503 si falta una (aquí la
+    // base es un marcador, así que lo esperable es 503).
+    const inyectado = await fetch(`${base}/ready`);
+    if (inyectado.status !== 200 && inyectado.status !== 503) {
       fallos.push(
-        `✗ con start:dev el controlador del consentimiento contesta ${String(inyectado.status)}: le falta una dependencia`,
+        `✗ con start:dev el controlador de salud contesta ${String(inyectado.status)}: le falta una dependencia`,
       );
     } else {
       console.log(
@@ -151,13 +158,13 @@ const comprobarStartDev = async (doble) => {
       );
     }
 
-    // El DTO sólo admite `acepta: 'si' | 'no'`. Inerte, esto llega al caso de
-    // uso, que no encuentra el enlace y redirige (303).
-    const validada = await fetch(`${base}/consentimiento/enlace-que-no-existe/respuesta`, {
+    // El DTO exige un correo con forma de correo y no admite campos que no
+    // declara. Inerte, esto llega al caso de uso, que no contesta 400.
+    const validada = await fetch(`${base}/auth/acceso`, {
       method: 'POST',
       redirect: 'manual',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ acepta: 'quizas', campoNoDeclarado: 1 }),
+      body: JSON.stringify({ correo: 'no-es-un-correo', contrasena: 'x', campoNoDeclarado: 1 }),
     });
     if (validada.status !== 400) {
       fallos.push(

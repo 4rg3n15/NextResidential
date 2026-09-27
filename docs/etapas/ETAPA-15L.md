@@ -162,7 +162,7 @@ F, G, I.
 | F6 · últimos visitantes (API)                   | `84d6f6c`, `c5df04e` | `mi/visitas/ultimas` (lo último registrado, una fila por persona, sólo de SU vivienda) y `mi/visitas/:id/repeticion` (copia datos y foto; pide fecha, hora, duración y la casilla, C-42). La visita de otra vivienda no existe para él                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | F-e · recorrido de la entrega                   | `7fcac5d`            | Ver §6: los ocho pasos del cierre contra API real, PostgreSQL y equipos simulados por HTTP con Digest                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | I · cero texto técnico (consola)                | `84d6f6c`, `7fcac5d` | Prueba sobre el árbol sintáctico de `apps/web/src` (texto de JSX y cadenas, nunca comentarios) con sus casos negativos; «!» con explicación en lenguaje de usuario (`componentes/ui/ayuda.tsx`, teclado y toque); los rechazos de la API se pintan sin su cita de regla; y el recorrido lee el texto REAL de cada pantalla del menú de cada rol                                                                                                                                                                                                                                                                                                                                                                                              |
-| F-d · la app del residente                      | ⟪COMMIT_APP⟫         | ⟪RESUMEN_APP⟫                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| F-d · la app del residente                      | `e2520bd`, `28dd75e` | El mismo formulario que la consola (sin elegir vivienda: es la del residente), con la foto revisada en el teléfono antes de enviarla y la casilla; la respuesta dice en cuántos equipos quedó la foto. La bandeja de salida guarda el cuerpo nuevo y no reintenta un 400/422 (S-87). «Últimos visitantes» con «Volver a autorizar» (fecha, hora, duración y casilla). Retirados la captura suelta, el enlace, el QR, el compartir, el estado del consentimiento, sus modelos generados y `qr_flutter`/`share_plus`. 251 pruebas de Flutter, `flutter analyze` limpio, cliente Dart al día, recorrido web de la app completo                                                                                                                  |
 
 ### Hallazgos de esta corrección
 
@@ -233,6 +233,21 @@ F, G, I.
   «Exactamente dos copropiedades», «las últimas 20 órdenes» (con otra suite
   fechándolas mañana), una placa entre mil y un nombre repetido en cada corrida.
   Se corrigieron sin aflojar lo que prueban.
+
+- **Cierre · el verificador vio dos controles rotos por esta misma ronda.**
+  (1) El 12c —el camino del navegador— se rompió con H: todo acceso de la
+  consola pasa ahora por `/auth/acceso`, que consulta el modo pruebas y los
+  intentos, y el camino corría con la base de marcador confiando en un valor
+  por omisión que la 15-K había cambiado a `postgres`. Ahora declara sus
+  adaptadores en memoria. (2) El 12d —`start:dev` inyecta y valida— usaba las
+  rutas públicas del enlace del titular, que ADR-032 retiró: la validación
+  daba 404 y, peor, la comprobación de inyección **pasaba por la razón
+  equivocada** (un 404 de ruta inexistente). Ahora pregunta a `/ready` y
+  valida con `/auth/acceso`. Ninguno de los dos se había corrido después de
+  H y de F: la regla de §2.8.0 existe por esto.
+- **Cierre · el recorrido de la entrega vio lo que ninguna suite veía** (C-43 y
+  DT-15L-02): el portero aterrizaba en un tablero que la API le niega, y
+  «Eventos» y «Observabilidad» pedían o enseñaban cosas que no debían.
 
 ### A2: lo que se hizo distinto del encargo, y por qué
 
@@ -373,7 +388,13 @@ apps/web/src/componentes/{captura-de-foto,rechazo-de-visita,aviso-de-visita}.tsx
 apps/web/src/componentes/ui/ayuda.tsx                    «!» con explicación, teclado y toque
 apps/web/src/texto-visible.test.ts                       Bloque I sobre el fuente de la consola
 apps/web/src/lib/api/cliente.ts                          rechazos de la API sin citas de regla
-apps/mobile/…                                            ⟪ARBOL_APP⟫
+apps/mobile/lib/presentacion/pantallas/nuevo_visitante.dart   F1 en la app: el formulario de la consola
+apps/mobile/lib/presentacion/pantallas/volver_a_autorizar.dart F6: sólo cuándo, cuánto y la casilla
+apps/mobile/lib/presentacion/widgets/foto_del_visitante.dart   la foto con sus consejos de calidad
+apps/mobile/lib/presentacion/widgets/campos_de_visita.dart     fecha, hora, duración, casilla y el resultado
+apps/mobile/lib/aplicacion/envio_de_visitas.dart               bandeja de salida con el cuerpo nuevo
+apps/mobile/lib/infraestructura/api/soporte_de_api.dart        400/422 no se reintentan; rechazos sin citas de regla
+apps/mobile/test/texto_visible_test.dart                       Bloque I sobre las cadenas de lib/
 e2e/recorrido-de-consola.mjs                             los ocho pasos del cierre
 e2e/recorrido-negativo.mjs                               H-SITIO-03 apunta a la ruta que genera la visita
 docs/decisiones/ADR-032-consentimiento-declarado-por-quien-registra.md
@@ -437,7 +458,7 @@ con foto (403)`).
   `packages/providers/src/ensayo/ensayo-enganosas.test.ts` (J1) y
   `anexo-de-sitio.test.ts`.
 - **Bloque I:** `apps/web/src/texto-visible.test.ts`, `apps/web/src/lib/api/cliente.test.ts`
-  y ⟪PRUEBA_TEXTO_DART⟫.
+  y `apps/mobile/test/texto_visible_test.dart` (un analizador léxico de Dart: cadenas triples, crudas, interpoladas y adyacentes; nunca comentarios; visto fallar con un texto plantado) y `apps/mobile/test/infraestructura/sin_codigos_test.dart`.
 
 ### Resultado
 
@@ -484,7 +505,7 @@ con foto (403)`).
   `POST /copropiedades/:id/autorizaciones` y `POST …/mi/autorizaciones`
   siguen en la API para visitas por placa; ninguna pantalla las ofrece.
 - **DT-15L-05 · los mensajes de la API siguen citando reglas.** La consola los
-  limpia al pintarlos ⟪APP_MENSAJES⟫; el texto en la API no se cambió.
+  limpia al pintarlos y la app también (`sinCodigosDelProyecto` en los dos clientes); el texto en la API no se cambió.
 
 **Siguen abiertos del Bloque 0.3** (en memoria en producción):
 `REGISTRO_DE_BLOQUEOS`, `OPERACIONES_DE_DISPOSITIVO` (DT-15K-03),

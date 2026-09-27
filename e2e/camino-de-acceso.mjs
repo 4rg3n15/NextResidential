@@ -191,6 +191,14 @@ const entornoDeApi = (doble, puerto) => ({
   SUPABASE_JWKS_URL: doble.jwksUrl,
   DATABASE_URL: 'marcador',
   DATABASE_POOLER_URL: 'marcador',
+  /**
+   * 15-L · explícito. Este camino se escribió para adaptadores EN MEMORIA y
+   * confiaba en el valor por omisión, que la 15-K cambió a `postgres`. No se
+   * notó mientras el acceso por correo iba directo al proveedor de identidad;
+   * desde H (15-L) todo acceso pasa por `/auth/acceso`, que consulta el modo
+   * pruebas y los intentos, y con la base de marcador contestaba 500.
+   */
+  PERSISTENCIA_DE_EVENTOS: 'memoria',
   INGESTA_FIRMA_SECRETO: 'secreto-de-ingesta-para-el-camino-e2e-32',
   BIOMETRIA_LLAVE: 'llave-de-biometria-para-el-camino-e2e-32+',
   BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
