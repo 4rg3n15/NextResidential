@@ -70,9 +70,14 @@ describe('motivos de denegación · los diez, sin colapsar', () => {
 describe('navegación por rol · la interfaz oculta, no protege', () => {
   it('el portero no ve las pantallas exclusivas de administración', () => {
     const claves = navegacionDe('portero').map((e) => e.clave);
-    expect(claves).toContain('tablero');
     expect(claves).not.toContain('configuracion');
     expect(claves).not.toContain('viviendas');
+  });
+
+  it('el portero aterriza en Portería: el tablero lee indicadores que la API no le da (15-L)', () => {
+    expect(navegacionDe('portero').map((e) => e.clave)).not.toContain('tablero');
+    expect(rutaInicialDe('portero')).toBe('/porteria');
+    expect(rutaInicialDe('administrador')).toBe('/tablero');
   });
 
   it('el administrador ve las trece entradas, y cada añadido tiene su etapa', () => {

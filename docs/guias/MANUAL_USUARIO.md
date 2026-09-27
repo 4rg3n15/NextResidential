@@ -148,10 +148,23 @@ tenga permiso (CU-05).
   nadie entre**: antes, una zona que nadie tocaba conservaba el conteo antiguo
   indefinidamente.
 
-### 3.3 · Visitantes y autorizaciones
+### 3.3 · Visitantes
 
-El residente autoriza desde su app; el administrador ve todas las
-autorizaciones de la copropiedad y puede **revocar** cualquiera con motivo.
+**Generar autorización** (todos los roles de la consola): nombre y documento
+del visitante, fecha y hora, duración, la vivienda que visita, la **foto
+frontal** y la casilla «El visitante autorizó el uso de su foto para el
+ingreso». La visita queda autorizada al guardarla y su foto sale a todos los
+equipos con reconocimiento facial; la consola dice en cuántos quedó y cuáles no
+la aceptaron, y permite reintentar.
+
+- **Portería** ve sólo las visitas de hoy; la lista empieza de nuevo a
+  medianoche y el historial se conserva. **Administración** ve el historial
+  completo con filtros por vivienda, fechas, estado, nombre o documento.
+- **Portería y superadministración** reciben un aviso en pantalla por cada
+  visita nueva y pueden **rechazarla** con motivo: queda anulada y su foto se
+  borra de todos los equipos.
+- Si el visitante está presente, puede **confirmar en persona** que autoriza su
+  foto (opcional): escribe él mismo su nombre y su documento.
 
 - **Listas negras** (RN-06, RN-07): una persona o una placa en lista negra **no
   entra por ningún medio**, aunque tenga autorización vigente. Quien la incluye
@@ -188,7 +201,9 @@ alguien lo cite como si lo supiera.
 
 ## 4 · Portero / Seguridad
 
-Una sola pantalla, **Portería**, y está pensada para usarse de pie y con prisa.
+Al entrar aterriza en **Portería**, su pantalla, pensada para usarse de pie y
+con prisa. No tiene el tablero de indicadores: esos datos son de administración
+y central (15-L).
 
 ### El flujo
 
@@ -207,9 +222,10 @@ Una sola pantalla, **Portería**, y está pensada para usarse de pie y con prisa
 
 ### Lo que el portero no ve
 
-No ve el padrón completo, ni otras copropiedades, ni los informes. **Y no ve la
-guardia virtual**: no es un permiso que le falte, es otra consola. Él atiende su
-puerta; el operador de central atiende varias copropiedades que no ve.
+No ve el padrón completo, ni otras copropiedades, ni los informes, ni el
+tablero. Desde la 15-L (H4) **sí ve la guardia virtual** para atender de forma
+remota, y es la API la que decide en cada petición si su IP está entre las
+permitidas por el superadministrador.
 
 ---
 
@@ -266,13 +282,19 @@ el sistema se lo dice en vez de dejarlo en una pantalla vacía.
 
 ### Autorizar una visita
 
-1. **Nuevo visitante** → nombre y documento. No hace falta ningún identificador
-   interno: si la persona ya visitó antes, el sistema la reconoce por su
-   documento.
-2. **Vigencia**: desde cuándo y hasta cuándo. Fuera de esa ventana no entra.
-3. **Acompañantes**, si vienen más personas.
-4. **Placa**, si llega en vehículo.
-5. **Observaciones** para el portero.
+1. **Nuevo visitante** → nombre y documento. Si la persona ya visitó antes, el
+   sistema la reconoce por su documento.
+2. **Cuándo**: fecha, hora de llegada y **duración**. Fuera de esa ventana no
+   entra.
+3. **Foto frontal** del visitante, de frente y con buena luz. La app le dice si
+   sirve antes de enviarla.
+4. La casilla **«El visitante autorizó el uso de su foto para el ingreso»**.
+   Sin ella no se envía.
+5. **Placa** si llega en vehículo, y **observaciones** para el portero
+   (opcionales).
+
+**Últimos visitantes → Volver a autorizar**: para alguien que ya vino, la app
+copia sus datos y su foto y sólo le pide fecha, hora, duración y la casilla.
 
 Debería llevarle **menos de un minuto** (KPI-10).
 
@@ -281,12 +303,12 @@ Debería llevarle **menos de un minuto** (KPI-10).
 - **Usted solo autoriza a su vivienda** (RN-05). No puede autorizar a otra.
 - Una persona en **lista negra no entra**, aunque usted la autorice (RN-06). La
   lista negra pesa más que cualquier autorización vigente.
-- **La foto del visitante es del visitante.** Si la visita se identifica con
-  reconocimiento facial, el consentimiento se le pide **a él, no a usted**
-  (RN-10, Ley 1581 de 2012). Si no responde, la autorización sigue vigente pero
-  solo por placa.
-- **Su plantilla biométrica se borra sola** al vencer, y de inmediato si el
-  titular revoca el consentimiento (RN-11).
+- **La foto del visitante es del visitante.** Al marcar la casilla usted declara
+  que él autorizó el uso de su foto para entrar: queda registrado que fue usted
+  quien lo declaró, cuándo y sobre qué texto (Ley 1581 de 2012, ADR-032).
+- **La plantilla del rostro se borra sola** al terminar la visita, y de
+  inmediato si portería la rechaza o si el visitante revoca su autorización
+  (RN-11).
 - **Sin conexión** la app guarda lo que usted hizo y lo reintenta al volver.
 
 ---

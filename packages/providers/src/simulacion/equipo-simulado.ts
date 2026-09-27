@@ -477,6 +477,12 @@ const caminoCasa = (rutaDelCatalogo: string, camino: string): boolean => {
 
 /** Lo que cada terminal simulada recibió como veredicto, por destino (A2). */
 export const veredictosRecibidosPor = new Map<string, string[]>();
+/**
+ * F (15-L) · la biblioteca de rostros de cada terminal simulada, por destino:
+ * el recorrido de la consola pregunta al EQUIPO si el rechazo de una visita
+ * le quitó la plantilla, no a la pantalla que dice que sí.
+ */
+export const plantillasPor = new Map<string, ReadonlySet<string>>();
 
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   /**
@@ -535,6 +541,7 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   const sinSoporte = new Set(guion.sinSoporte ?? []);
   /** Estado de la biblioteca de rostros: lo que se carga se cuenta y se busca. */
   const plantillas = new Set<string>();
+  if (guion.destino !== undefined) plantillasPor.set(guion.destino, plantillas);
   const almacenadasSinNombre = guion.bibliotecaAlmacenadas ?? 0;
   const enBiblioteca = (): number => almacenadasSinNombre + plantillas.size;
   /** Audio recibido, para devolverlo como eco por el flujo de salida. */

@@ -52,16 +52,16 @@ seguir.
 
 ## 1 · Inventario y prerrequisitos
 
-| Elemento                  | Requisito                                                                                                                                                                              |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cámara LPR con barrera    | Firmware con ISAPI `Traffic`/`ITC` y `Parking/barrierGate` (la ruta de la barrera está **VERIFICADA**). `ctrlMode` accesible                                                           |
-| Terminal facial           | ISAPI `AccessControl` con `remoteCheckDoorEnabled` en `AcsCfg` (15-K, H-SITIO-05) y biblioteca `FDLib`. **DOCUMENTADO**                                                                |
-| Videoportero              | ISAPI `TwoWayAudio` (G.711 µ-law, **VERIFICADO** que existe y estaba deshabilitado), `VideoIntercom` (llamada), RTSP en el canal 1. `callSignal` sólo si el equipo lo declara          |
-| Red                       | **IP fija** en cada equipo; el servidor de Next Control en la **misma red** o alcanzable por el Edge; VLAN de equipos recomendada (H-15-1)                                             |
-| Puertos hacia los equipos | HTTP ISAPI (80 o el configurado), RTSP 554 desde la máquina de go2rtc                                                                                                                  |
-| Puertos hacia la API      | El de la API (3000 por omisión) desde la cámara (servidor de alarma) y desde el teléfono del visitante (enlace de consentimiento); `webrtc.listen` de go2rtc (8555) desde el navegador |
-| Máquina de la API         | Node según `.nvmrc`, pnpm, `go2rtc` si va a haber video, Supabase alcanzable con las migraciones aplicadas (0039 incluida)                                                             |
-| Consola y app             | Consola por `http://<IP>:3100` (video sí; micrófono no sin TLS) o por `https`, con `API_URL=http://127.0.0.1:3000`; app con `--dart-define=API_URL=http://<IP>:3000`                   |
+| Elemento                  | Requisito                                                                                                                                                                     |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cámara LPR con barrera    | Firmware con ISAPI `Traffic`/`ITC` y `Parking/barrierGate` (la ruta de la barrera está **VERIFICADA**). `ctrlMode` accesible                                                  |
+| Terminal facial           | ISAPI `AccessControl` con `remoteCheckDoorEnabled` en `AcsCfg` (15-K, H-SITIO-05) y biblioteca `FDLib`. **DOCUMENTADO**                                                       |
+| Videoportero              | ISAPI `TwoWayAudio` (G.711 µ-law, **VERIFICADO** que existe y estaba deshabilitado), `VideoIntercom` (llamada), RTSP en el canal 1. `callSignal` sólo si el equipo lo declara |
+| Red                       | **IP fija** en cada equipo; el servidor de Next Control en la **misma red** o alcanzable por el Edge; VLAN de equipos recomendada (H-15-1)                                    |
+| Puertos hacia los equipos | HTTP ISAPI (80 o el configurado), RTSP 554 desde la máquina de go2rtc                                                                                                         |
+| Puertos hacia la API      | El de la API (3000 por omisión) desde la cámara (servidor de alarma); `webrtc.listen` de go2rtc (8555) desde el navegador                                                     |
+| Máquina de la API         | Node según `.nvmrc`, pnpm, `go2rtc` si va a haber video, Supabase alcanzable con las migraciones aplicadas (0039 incluida)                                                    |
+| Consola y app             | Consola por `http://<IP>:3100` (video sí; micrófono no sin TLS) o por `https`, con `API_URL=http://127.0.0.1:3000`; app con `--dart-define=API_URL=http://<IP>:3000`          |
 
 Antes de nada: `VALIDACION_HIKVISION_EN_SITIO.md` §1 (qué NO hacer, la red de
 seguridad, variables de la sesión).
@@ -178,22 +178,20 @@ idempotencia (RN-17). El equipo también admite JSON por parte
    `PUT /ISAPI/AccessControl/remoteCheck?format=json` con el veredicto; la
    terminal abre o no. El evento distingue `remoteCheck` (pregunta) de
    `remoteCheckResult` (eco del veredicto) para no registrar dos accesos.
-3. **Enrolamiento por CU-02** (A3): desde la app del residente se captura el
-   rostro del visitante (calidad validada antes de enviar), la API crea el
-   consentimiento **a nombre del visitante** (RN-10) y devuelve un **enlace
-   firmado** (`API_URL_PUBLICA/consentimiento/<token>`) que el residente le
-   pasa al visitante. El visitante acepta o rechaza en su teléfono, sin sesión.
-   El enlace es de **un solo uso** (deja de valer en cuanto el consentimiento
-   cambia de estado) y la consola lo muestra también como **QR** (BE-01: el
-   correo está bloqueado). La respuesta queda en `auditoria_seguridad` con la
-   versión de la política, el momento, la IP y el agente del teléfono.
-   Sólo tras aceptar se genera la plantilla y se sincroniza a **todas** las
+3. **Enrolamiento con la visita** (F, 15-L · ADR-032): la foto frontal se
+   toma en «Generar autorización» —app del residente o consola, el mismo
+   formulario—, con la calidad validada antes de enviar y la **casilla** «El
+   visitante autorizó el uso de su foto para el ingreso» marcada por quien
+   registra (queda quién, cuándo y la versión del texto). No hay enlace ni
+   espera: al generarse la visita se crea la plantilla y se sincroniza a
+   **todas** las
    terminales con biblioteca (`FDLib`): alta de persona
    (`POST /ISAPI/AccessControl/UserInfo/Record`), carga de la plantilla
    (`PUT /ISAPI/Intelligent/FDLib/FDSetUp`) y **verificación por conteo**
    (`POST /ISAPI/Intelligent/FDLib/Count` antes y después): un `200` no basta.
-4. **Supresión.** Al vencer (dentro de 24 h, RN-11) o **de inmediato al
-   revocar** (CA-11): `PUT /ISAPI/Intelligent/FDLib/FDSearch/Delete` y baja de
+4. **Supresión.** Al vencer (dentro de 24 h, RN-11), **de inmediato al
+   revocar** (CA-11) o **al rechazar la visita** desde portería o
+   superadministración (F2): `PUT /ISAPI/Intelligent/FDLib/FDSearch/Delete` y baja de
    la persona, verificadas por conteo; si la plantilla sigue en la terminal, la
    API lo dice y la deja en la cola de retirada (la cola se **deriva**: no hay
    estado que alguien pueda olvidar).
@@ -285,12 +283,11 @@ la 15-E:
 
 ### 8.1 · Del equipo hacia la API
 
-| Equipo                 | Qué hace el equipo                                                                                    | Ruta en la API                                                           | Acreditación                                                         |
-| ---------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| Cámara LPR             | `POST` multipart (o JSON) por cada lectura, y reenvía si no recibe `200`                              | `POST /alarm-server/<secreto>` (§3)                                      | Secreto largo en la ruta **y** IP de origen (`ALARM_SERVER_EQUIPOS`) |
-| Terminal               | **Nada que configurar hacia la API.** Emite eventos por su flujo; la API se suscribe (§8.2)           | —                                                                        | La de la API contra el equipo (Digest, usuario de servicio)          |
-| Videoportero           | **Nada que configurar hacia la API.** Emite llamada y eventos por su flujo; la API se suscribe (§8.2) | —                                                                        | Ídem                                                                 |
-| Teléfono del visitante | Abre el enlace del consentimiento, acepta, rechaza o revoca                                           | `GET /consentimiento/<token>` · `POST …/respuesta` · `POST …/revocacion` | Token HMAC por copropiedad con caducidad; sin sesión                 |
+| Equipo       | Qué hace el equipo                                                                                    | Ruta en la API                      | Acreditación                                                         |
+| ------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------- |
+| Cámara LPR   | `POST` multipart (o JSON) por cada lectura, y reenvía si no recibe `200`                              | `POST /alarm-server/<secreto>` (§3) | Secreto largo en la ruta **y** IP de origen (`ALARM_SERVER_EQUIPOS`) |
+| Terminal     | **Nada que configurar hacia la API.** Emite eventos por su flujo; la API se suscribe (§8.2)           | —                                   | La de la API contra el equipo (Digest, usuario de servicio)          |
+| Videoportero | **Nada que configurar hacia la API.** Emite llamada y eventos por su flujo; la API se suscribe (§8.2) | —                                   | Ídem                                                                 |
 
 ### 8.2 · De la API hacia el equipo (por el proveedor, nunca desde el navegador)
 

@@ -1,10 +1,10 @@
 # ADR-029 · Consentimiento presencial: el titular escribe su identidad en la portería
 
-|                 |                                                                                                                   |
-| --------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Estado**      | Aceptada · ETAPA 15-K (2026-09-26) · decisión del cliente **D-10** · **validez jurídica PENDIENTE DE DEFINICIÓN** |
-| **Sustituye a** | Nada. Complementa el enlace del titular (A3, ETAPA 15-E) como segundo canal de respuesta                          |
-| **Afecta a**    | `biometria` (API), `padron` (puerto `IDENTIDAD_DE_PERSONA`), consola «Rostro del visitante», auditoría            |
+|                 |                                                                                                                                                                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Estado**      | Aceptada · ETAPA 15-K (2026-09-26) · decisión del cliente **D-10** · **validez jurídica PENDIENTE DE DEFINICIÓN** · **derogada en lo pertinente por ADR-032** (15-L): deja de ser el camino obligatorio y queda como confirmación OPCIONAL del titular |
+| **Sustituye a** | Nada. Complementa el enlace del titular (A3, ETAPA 15-E) como segundo canal de respuesta                                                                                                                                                               |
+| **Afecta a**    | `biometria` (API), `padron` (puerto `IDENTIDAD_DE_PERSONA`), consola «Rostro del visitante», auditoría                                                                                                                                                 |
 
 ---
 

@@ -412,9 +412,14 @@ export const useFotografiaDeVisitante = (
  * el estado en línea; la ficha y la edición necesitan esto. Cuelga de la misma
  * clave `['dispositivos', copropiedad]` que invalidan el alta y las órdenes.
  */
-export const useEquipos = (copropiedadId: string): UseQueryResult<Equipos> =>
+/**
+ * `habilitada` en falso para los roles a los que la API no da la lista (sólo
+ * administración la lee): preguntar para recibir un 403 no informa de nada.
+ */
+export const useEquipos = (copropiedadId: string, habilitada = true): UseQueryResult<Equipos> =>
   useQuery({
     queryKey: ['dispositivos', copropiedadId, 'equipos'] as const,
+    enabled: habilitada,
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/equipos', {

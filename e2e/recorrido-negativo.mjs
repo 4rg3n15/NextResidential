@@ -8,8 +8,11 @@
  * consola ↔ proxy ↔ API ↔ base, y se exige que el recorrido falle NOMBRÁNDOLO:
  *
  *   · H-SITIO-02 · el tablero vuelve a leer de memoria → el alta no aparece.
- *   · H-SITIO-03 · la ruta del consentimiento vuelve a negar al
- *                  superadministrador → no puede comprobarlo.
+ *   · H-SITIO-03 · la ruta que lleva la foto del visitante a los equipos
+ *                  vuelve a negar al superadministrador → no puede
+ *                  generar la autorización con foto. Desde la 15-L esa ruta
+ *                  es `POST …/visitas` (F1): la del enlace del titular ya
+ *                  no existe (ADR-032).
  *   · H-SITIO-08 · el proxy de la consola vuelve a no exportar PUT → la
  *                  edición no se guarda.
  *
@@ -52,10 +55,11 @@ const SONDAS = [
   {
     id: 'H-SITIO-03',
     copiar: ['apps/api'],
-    fichero: 'apps/api/src/biometria/presentacion/biometria.controller.ts',
-    antes:
-      "@Roles('superadministrador', 'administrador', 'portero', 'operador_central', 'residente')",
-    despues: "@Roles('administrador', 'portero', 'operador_central', 'residente')",
+    fichero: 'apps/api/src/visitas/presentacion/visitas.controller.ts',
+    // Sólo la ruta que GENERA: la lista y las viviendas siguen abiertas, así
+    // el recorrido llega al envío y el fallo es el de H-SITIO-03, no otro.
+    antes: /@Roles\(\.\.\.CONSOLA\)(\s*@ApiOperation\(\{ summary: 'Genera la autorización)/,
+    despues: "@Roles('administrador', 'portero', 'operador_central')$1",
   },
   {
     id: 'H-SITIO-08',

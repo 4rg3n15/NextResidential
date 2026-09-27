@@ -1,13 +1,49 @@
 # Ciclo de vida del dato biométrico
 
 **Next Control Residencial · Ley 1581 de 2012 (Colombia)**
-Vigente desde la ETAPA 08 · última revisión 2026-09-08
+Vigente desde la ETAPA 08 · última revisión 2026-09-27 (ETAPA 15-L, ADR-032)
 
 > Este documento describe qué le pasa a la cara de una persona desde que una
 > cámara la mide hasta que no queda rastro de ella, y **dónde está escrito cada
 > compromiso**. No es una declaración de intenciones: cada afirmación remite a
 > una migración, un disparador, un CHECK o una prueba, y las que no se pueden
 > demostrar todavía están marcadas como tales.
+
+---
+
+## 0 · Lo que cambió en la ETAPA 15-L (F4, ADR-032) — léase primero
+
+**Decisión del cliente, con el riesgo legal aceptado por él.** La única
+constancia obligatoria del consentimiento es una **casilla** en el formulario de
+«Generar autorización» —el mismo en la app del residente y en la consola—: «El
+visitante autorizó el uso de su foto para el ingreso». La marca **quien
+registra** la visita, no el titular.
+
+| Antes (ETAPA 08 a 15-K)                                            | Desde la 15-L                                                                                                     |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| El titular respondía por un enlace firmado o en persona (D-10)     | La casilla es la constancia; la confirmación en persona del titular queda como **opción**                         |
+| La plantilla esperaba la respuesta del titular para viajar (RN-09) | La plantilla viaja al generar la visita: el consentimiento declarado nace vigente                                 |
+| Todo consentimiento vigente era «otorgado por el titular»          | Cada consentimiento lleva su **origen**: `otorgado_por_el_titular` o `declarado_por_quien_registra`, con su autor |
+| —                                                                  | Cada autorización guarda **quién marcó la casilla, cuándo y la versión del texto** (migración `0043`)             |
+
+**Lo que la casilla prueba y lo que no.** Prueba quién declaró que el titular
+consintió, cuándo y sobre qué texto. **No prueba** que el titular lo haya dado
+(arts. 9 y 12 de la Ley 1581). El sistema no lo disfraza: el origen se guarda,
+se distingue en el dominio y en la base, y la consola muestra quién marcó la
+casilla. Ningún consentimiento declarado se presenta como otorgado por el
+titular. Ver ADR-032, C-41 y E-05.
+
+**Lo que NO cambió (RN-11):** la plantilla vive lo que la visita y se suprime
+sola al terminar; el **rechazo** de una visita (portería o superadministración)
+la anula y retira su plantilla de todos los equipos en la misma llamada; la
+**revocación** del titular sigue suprimiendo en el acto; el barrido programado
+suprime además las plantillas de autorizaciones revocadas por cualquier camino.
+El vector va cifrado y ninguna ruta lo devuelve.
+
+**La foto de identificación** (desde la 15-D, ADR-021) se guarda como evidencia
+en el bucket privado y sólo se sirve por URL firmada de vida corta (RN-21);
+«Volver a autorizar» la reutiliza para la nueva visita sin que salga del
+servidor. El enlace del titular, su página pública y el QR **ya no existen**.
 
 ---
 
@@ -198,8 +234,7 @@ porque CA-10 se acredita con esa cola vacía.
 
 **Y al revocar, la retirada se intenta en el acto (ETAPA 15-E, A3).** Hasta la
 15-E «inmediato» era el vector en la base; la terminal esperaba al barrido.
-Ahora la revocación —por la ruta autenticada o por el enlace del titular—
-recorre la cola de sus propias plantillas y las retira equipo por equipo en la
+Ahora la revocación del titular recorre la cola de sus propias plantillas y las retira equipo por equipo en la
 misma llamada, devolviendo dos cuentas separadas: `retiradas` y
 `retiradasPendientes`. La que no respondió sigue en la cola.
 
@@ -284,11 +319,9 @@ Ninguna de estas es una decisión de ingeniería, y ninguna se ha inventado:
 5. **Menores de edad**: hoy el sistema no distingue. Tratar datos biométricos de
    un menor exige el consentimiento de su representante legal, y eso es un
    requisito nuevo, no un ajuste — se anota como riesgo abierto.
-6. **Canal de entrega del enlace de consentimiento** (P-15). El sistema lo
-   emite y lo muestra a quien capturó; enviarlo por SMS o WhatsApp exige un
-   proveedor de mensajería y una decisión sobre qué canal acredita al titular.
-   Hasta entonces, el enlace se entrega en mano y así queda registrado el
-   canal (`presencial`, `sms`, `app`) en el consentimiento.
+6. **Canal del consentimiento** (P-15, superado por ADR-032 en la 15-L). Ya no
+   hay enlace que entregar: la constancia es la casilla que marca quien
+   registra, y el canal anotado es `app` (residente) o `presencial` (consola).
 
 ---
 

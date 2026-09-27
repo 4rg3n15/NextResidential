@@ -5,6 +5,8 @@ import { sesionActual } from '@/lib/sesion/servidor';
 import { alcanceActivo, motivoSinCopropiedad } from '../copropiedad';
 import { TableroOperativo } from './tablero-operativo';
 import { EstadoSinPermiso } from '@/componentes/estados';
+import { navegacionDe, rutaInicialDe } from '@/lib/navegacion';
+import type { Rol } from '@ncr/contracts';
 
 export const metadata: Metadata = { title: 'Dashboard operativo' };
 export const dynamic = 'force-dynamic';
@@ -26,6 +28,10 @@ export const dynamic = 'force-dynamic';
 const Tablero = async (): Promise<JSX.Element> => {
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
+  // 15-L · quien no tiene el tablero en su menú (el portero) va a su inicio:
+  // pintarlo sería pedir tres indicadores que la API le niega.
+  const rol = sesion.rol as Rol;
+  if (!navegacionDe(rol).some((e) => e.clave === 'tablero')) redirect(rutaInicialDe(rol));
 
   const alcance = await alcanceActivo();
   const copropiedadId = alcance.copropiedadId;

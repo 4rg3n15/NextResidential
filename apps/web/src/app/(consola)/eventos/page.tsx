@@ -18,7 +18,8 @@ const Eventos = async (): Promise<JSX.Element> => {
   if (copropiedadId === null) {
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
-  return <PantallaDeEventos copropiedadId={copropiedadId} />;
+  const veEquipos = sesion.rol === 'superadministrador' || sesion.rol === 'administrador';
+  return <PantallaDeEventos copropiedadId={copropiedadId} veEquipos={veEquipos} />;
 };
 
 export default Eventos;

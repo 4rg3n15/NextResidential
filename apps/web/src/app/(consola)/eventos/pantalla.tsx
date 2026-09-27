@@ -49,8 +49,14 @@ const tonoDe = (e: ElementoDeLineaDeTiempo): TonoDeDistintivo => {
  */
 export const PantallaDeEventos = ({
   copropiedadId,
+  veEquipos = true,
 }: {
   readonly copropiedadId: string;
+  /**
+   * 15-L · portería y central no leen la lista de equipos (es de
+   * administración): sin ella la pantalla no pide nada que la API le niegue.
+   */
+  readonly veEquipos?: boolean;
 }): JSX.Element => {
   const [desde, setDesde] = useState(haceDias(7));
   const [hasta, setHasta] = useState(haceDias(0));
@@ -107,7 +113,7 @@ export const PantallaDeEventos = ({
     });
   }, [clientes, copropiedadId]);
 
-  const equipos = useEquipos(copropiedadId);
+  const equipos = useEquipos(copropiedadId, veEquipos);
   const nombres = useMemo(
     () => new Map((equipos.data?.equipos ?? []).map((e) => [e.id, e.nombre] as const)),
     [equipos.data],
@@ -270,22 +276,24 @@ export const PantallaDeEventos = ({
                 ))}
               </select>
             </label>
-            <label className="flex items-center gap-2 text-secundario">
-              <span className="text-texto-apagado">Equipo</span>
-              <select
-                value={dispositivoId}
-                onChange={(e) => setDispositivoId(e.target.value)}
-                aria-label="Filtrar por equipo"
-                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
-              >
-                <option value="">Todos</option>
-                {(equipos.data?.equipos ?? []).map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {veEquipos ? (
+              <label className="flex items-center gap-2 text-secundario">
+                <span className="text-texto-apagado">Equipo</span>
+                <select
+                  value={dispositivoId}
+                  onChange={(e) => setDispositivoId(e.target.value)}
+                  aria-label="Filtrar por equipo"
+                  className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
+                >
+                  <option value="">Todos</option>
+                  {(equipos.data?.equipos ?? []).map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </>
         }
         vacio={{

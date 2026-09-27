@@ -63,11 +63,10 @@ charset=UTF-8`, el cuerpo con espacio de nombres y `version="2.0"` y el
   | `PROVEEDOR_DE_EQUIPOS=hikvision`                                                       | Equipos reales (con `simulado`, ninguno)                                                                                                                                              |
   | `CARGADOR_DE_CONTEXTO=postgres`                                                        | El motor lee autorizaciones, padrón y lista negra de la base                                                                                                                          |
   | `PERSISTENCIA_DE_EVENTOS=postgres`, `PERSISTENCIA_DE_BIOMETRIA=postgres`               | Histórico, evidencias, biometría y la lista de Dispositivos en la base (con `memoria` no hay trazabilidad, y el equipo dado de alta no aparece: H-SITIO-02)                           |
-  | `API_URL_PUBLICA`                                                                      | `http://<IP-del-Mac>:3000`. **Nunca `127.0.0.1` ni `localhost`**: el teléfono del VISITANTE abre contra ella el enlace y el QR del consentimiento (H-SITIO-10)                        |
   | `GO2RTC_URL`                                                                           | `http://127.0.0.1:1984`: el puente de vídeo, visto desde la API                                                                                                                       |
   | `ALARM_SERVER_EQUIPOS`                                                                 | `copropiedad\|equipo\|secreto\|ip` de la cámara (se completa en sitio, paso V.2.7)                                                                                                    |
   | `INGESTA_FIRMA_SECRETO`                                                                | Firma de la ingesta del Edge                                                                                                                                                          |
-  | `BIOMETRIA_LLAVE`, `BIOMETRIA_LLAVE_REF`                                               | Bóveda biométrica, enlace del titular, códigos de patrullaje y de ocupante (ADR-025)                                                                                                  |
+  | `BIOMETRIA_LLAVE`, `BIOMETRIA_LLAVE_REF`                                               | Bóveda biométrica, códigos de patrullaje y de ocupante (ADR-025)                                                                                                                      |
   | `EQUIPOS_LLAVE`, `EQUIPOS_LLAVE_REF`                                                   | Cifrado de las claves de servicio de los equipos en la base                                                                                                                           |
   | `EVIDENCIA_BUCKET`                                                                     | Bucket privado de evidencias (si falta, la API avisa y usa memoria)                                                                                                                   |
   | `BARRERA_*`, `TERMINAL_*`, `VIDEOPORTERO_*`                                            | `HOST`, `PUERTO`, `USUARIO`, `CLAVE`, `CANAL` de cada equipo, para el guion de sitio (§8.1). Sólo en el `.env` local                                                                  |
@@ -96,7 +95,7 @@ charset=UTF-8`, el cuerpo con espacio de nombres y `version="2.0"` y el
 
 ### V.2 · En sitio
 
-1. **Red.** Mac, iPhone y equipos en la misma LAN. Anote la IP del Mac: es la de `API_URL_PUBLICA`, la de la consola por IP, la de la app y la del Alarm Server. **No** es la de `API_URL` de la consola, que sigue en `127.0.0.1`.
+1. **Red.** Mac, iPhone y equipos en la misma LAN. Anote la IP del Mac: es la de la consola por IP, la de la app y la del Alarm Server. **No** es la de `API_URL` de la consola, que sigue en `127.0.0.1`.
 2. **Estado previo de los equipos, capturado ANTES de tocar nada** —ni la consola, ni el panel web de ningún equipo—:
 
    ```

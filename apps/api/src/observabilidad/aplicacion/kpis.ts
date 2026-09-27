@@ -60,8 +60,7 @@ export const KPIS: Readonly<Record<ClaveKpi, DefinicionKpi>> = {
       'la cámara tarda en reconocer la placa y emitir el POST, ni el que el relé tarda ' +
       'en cerrar. El contrato de ingesta en vivo NO trae marca del equipo —solo la trae ' +
       'la reconciliación del Edge, que es otro caso—, así que desde aquí no hay forma de ' +
-      'medir el primer tramo. Se cierra en la ETAPA 15, que tiene el equipo delante y ' +
-      'puede llevar la marca del dispositivo al contrato (deuda D-120)',
+      'medir el primer tramo: se podrá cuando el equipo envíe su propia marca de tiempo',
     rnf: 'RNF-01.1',
     ca: 'CA-12',
   },
@@ -81,7 +80,8 @@ export const KPIS: Readonly<Record<ClaveKpi, DefinicionKpi>> = {
     titulo: 'Acción del operador → accionamiento remoto',
     umbralMs: 3_000,
     segmento: 'la orden manual completa: validación de motivo, decisión, evento y accionador',
-    noIncluye: 'el tramo físico del equipo, igual que KPI-13',
+    // Bloque I (15-L) · este texto se ve en la consola: sin códigos.
+    noIncluye: 'el tramo físico del equipo, igual que la apertura por placa',
     rnf: 'RNF-01.3',
     ca: 'CA-20',
   },
@@ -91,8 +91,8 @@ export const KPIS: Readonly<Record<ClaveKpi, DefinicionKpi>> = {
     umbralMs: 2_000,
     segmento: 'la apertura del canal de intercom: desde la petición hasta el canal disponible',
     noIncluye:
-      'hoy mide el canal SIMULADO (ADR-03): el adaptador real llega en la ETAPA 15 y el ' +
-      'tablero lo dice en cada fila para que nadie lea esta cifra como si fuera el equipo',
+      'el audio y el vídeo que ya viajan por el canal abierto; y con el proveedor ' +
+      'simulado la cifra es la del simulado, no la del equipo',
     rnf: 'RNF-01.4',
     ca: 'CA-19',
   },

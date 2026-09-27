@@ -369,9 +369,7 @@ casa» y «en sitio», es
    `PERSISTENCIA_DE_EVENTOS=postgres` y `PERSISTENCIA_DE_BIOMETRIA=postgres`
    (con `memoria` el arranque avisa que no hay trazabilidad);
    `CARGADOR_DE_CONTEXTO=postgres`; `PROVEEDOR_DE_EQUIPOS=hikvision`;
-   `API_URL_PUBLICA` con la IP de la máquina, porque el teléfono del visitante
-   abre el enlace de consentimiento contra ella; `GO2RTC_URL` si va a haber
-   video; `ALARM_SERVER_EQUIPOS` con la cámara. Arranque, compilado y no con
+   `GO2RTC_URL` si va a haber video; `ALARM_SERVER_EQUIPOS` con la cámara. Arranque, compilado y no con
    `start:dev` (15-K): `pnpm turbo run build --filter=@ncr/api` y
    `pnpm --filter @ncr/api start`. La bitácora dice qué persistencia, qué
    accionador, qué puente y qué conexión de pg-boss quedaron activos.

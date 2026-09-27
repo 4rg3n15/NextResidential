@@ -50,10 +50,8 @@ export const PantallaDeLatencias = (): JSX.Element => {
       clave: 'indicador',
       titulo: 'Indicador',
       celda: (f) => (
-        <div>
-          <p className="font-medium text-texto">{f.definicion.clave}</p>
-          <p className="text-xs text-texto-apagado">{f.definicion.titulo}</p>
-        </div>
+        // Bloque I (15-L) · el nombre de la medida, no su código de indicador.
+        <p className="font-medium text-texto">{f.definicion.titulo}</p>
       ),
     },
     {
@@ -142,12 +140,7 @@ export const PantallaDeLatencias = (): JSX.Element => {
           <dl className="space-y-4">
             {datos.filas.map((f: FilaDeLatencia) => (
               <div key={f.definicion.clave}>
-                <dt className="text-sm font-medium text-texto">
-                  {f.definicion.clave} · {f.definicion.rnf}
-                  {f.definicion.ca === null || f.definicion.ca === undefined
-                    ? ''
-                    : ` · ${f.definicion.ca}`}
-                </dt>
+                <dt className="text-sm font-medium text-texto">{f.definicion.titulo}</dt>
                 <dd className="mt-1 text-sm text-texto-apagado">
                   <span className="font-medium text-texto">Mide:</span> {f.definicion.segmento}
                 </dd>

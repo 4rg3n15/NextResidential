@@ -70,25 +70,25 @@ A esas se suman las tres comprobaciones adicionales (L6, L7 y T6), también en v
 | L5        | app     | NEGADO por lista negra con visita vigente | NEGADO            | `LISTA_NEGRA`       | «L1–L5 por app» (veto desde la consola) |
 | L5        | consola | NEGADO por lista negra con visita vigente | NEGADO            | `LISTA_NEGRA`       | «L1–L5 por consola»                     |
 
-### Terminal facial · captura → consentimiento del VISITANTE → contador → verificación remota
+### Terminal facial · visita con foto y casilla → contador → verificación remota
 
-En cada canal: la foto sale de la app (`/mi/autorizaciones/:id/rostro`) o de
-la consola (`/biometria/capturas`, más el enlace). **El visitante acepta desde
-el enlace público**; antes de aceptar, el contador de la biblioteca de la
-terminal simulada NO cambia; después, sí. Luego la terminal pide su veredicto.
+En cada canal: la visita se genera CON su foto y la casilla, desde la app
+(`POST …/mi/visitas`) o desde la consola (`POST …/visitas`). No hay enlace ni
+espera (ADR-032): cuando la respuesta vuelve, el contador de la biblioteca de la
+terminal simulada ya cambió. Luego la terminal pide su veredicto.
 
-| Escenario | Canal   | Esperado                                       | Obtenido  | Motivo                                                          | Prueba                       |
-| --------- | ------- | ---------------------------------------------- | --------- | --------------------------------------------------------------- | ---------------------------- |
-| T1        | app     | PERMITIDO tras consentimiento y sincronización | PERMITIDO | —                                                               | «T1–T5 por app»              |
-| T1        | consola | PERMITIDO tras consentimiento y sincronización | PERMITIDO | —                                                               | «T1–T5 por consola»          |
-| T2        | app     | NEGADO sin identidad (rostro no enrolado)      | NEGADO    | `FALLO_TECNICO` (no hay titular)                                | «T1–T5 por app» (id no UUID) |
-| T2        | consola | NEGADO sin identidad                           | NEGADO    | `FALLO_TECNICO` (no hay titular)                                | «T1–T5 por consola»          |
-| T3        | app     | NEGADO (día correcto, hora fuera)              | NEGADO    | `VIGENCIA_EXPIRADA`                                             | «T1–T5 por app»              |
-| T3        | consola | NEGADO (día correcto, hora fuera)              | NEGADO    | `VIGENCIA_EXPIRADA`                                             | «T1–T5 por consola»          |
-| T4        | app     | NEGADO (hora correcta, día distinto)           | NEGADO    | `SIN_CONSENTIMIENTO` (la plantilla venció con la visita, RN-11) | «T1–T5 por app»              |
-| T4        | consola | NEGADO (hora correcta, día distinto)           | NEGADO    | `SIN_CONSENTIMIENTO`                                            | «T1–T5 por consola»          |
-| T5        | app     | NEGADO por lista negra con visita vigente      | NEGADO    | `LISTA_NEGRA` (veto por documento)                              | «T1–T5 por app»              |
-| T5        | consola | NEGADO por lista negra con visita vigente      | NEGADO    | `LISTA_NEGRA`                                                   | «T1–T5 por consola»          |
+| Escenario | Canal   | Esperado                                  | Obtenido  | Motivo                                                          | Prueba                       |
+| --------- | ------- | ----------------------------------------- | --------- | --------------------------------------------------------------- | ---------------------------- |
+| T1        | app     | PERMITIDO tras generar la visita con foto | PERMITIDO | —                                                               | «T1–T5 por app»              |
+| T1        | consola | PERMITIDO tras generar la visita con foto | PERMITIDO | —                                                               | «T1–T5 por consola»          |
+| T2        | app     | NEGADO sin identidad (rostro no enrolado) | NEGADO    | `FALLO_TECNICO` (no hay titular)                                | «T1–T5 por app» (id no UUID) |
+| T2        | consola | NEGADO sin identidad                      | NEGADO    | `FALLO_TECNICO` (no hay titular)                                | «T1–T5 por consola»          |
+| T3        | app     | NEGADO (día correcto, hora fuera)         | NEGADO    | `VIGENCIA_EXPIRADA`                                             | «T1–T5 por app»              |
+| T3        | consola | NEGADO (día correcto, hora fuera)         | NEGADO    | `VIGENCIA_EXPIRADA`                                             | «T1–T5 por consola»          |
+| T4        | app     | NEGADO (hora correcta, día distinto)      | NEGADO    | `SIN_CONSENTIMIENTO` (la plantilla venció con la visita, RN-11) | «T1–T5 por app»              |
+| T4        | consola | NEGADO (hora correcta, día distinto)      | NEGADO    | `SIN_CONSENTIMIENTO`                                            | «T1–T5 por consola»          |
+| T5        | app     | NEGADO por lista negra con visita vigente | NEGADO    | `LISTA_NEGRA` (veto por documento)                              | «T1–T5 por app»              |
+| T5        | consola | NEGADO por lista negra con visita vigente | NEGADO    | `LISTA_NEGRA`                                                   | «T1–T5 por consola»          |
 
 **T2, motivo `FALLO_TECNICO`.** Con un rostro que no es de ninguna plantilla
 nuestra, el motor no tiene titular que evaluar y el evento lo dice así. En sitio,

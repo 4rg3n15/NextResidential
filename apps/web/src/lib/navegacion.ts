@@ -72,7 +72,13 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     clave: 'tablero',
     etiqueta: 'Dashboard',
     ruta: '/tablero',
-    roles: OPERACION,
+    /**
+     * 15-L · sin el portero. La API nunca le dio los indicadores del tablero
+     * (administración y central), y la consola lo aterrizaba ahí: tres
+     * rechazos en la primera pantalla de su turno. Lo destapó el recorrido
+     * de la entrega; el portero entra por Portería.
+     */
+    roles: ['superadministrador', 'administrador', 'operador_central'],
     pendienteDeEtapa: null,
     icono: 'LayoutDashboard',
   },
@@ -244,9 +250,11 @@ export const NOMBRE_DE_ROL: Readonly<Record<Rol, string>> = {
  *
  * El residente **no tiene consola web**: su superficie es la app Flutter de la
  * ETAPA 11. Se le dice, en vez de dejarlo en un tablero vacío sin explicación.
- * La identidad de servicio no es una persona y nunca inicia sesión aquí.
+ * La identidad de servicio no es una persona y nunca inicia sesión aquí. El
+ * portero empieza su turno en Portería, que es su pantalla.
  */
 export const rutaInicialDe = (rol: Rol): string => {
   if (rol === 'residente' || rol === 'servicio') return '/sin-consola';
+  if (rol === 'portero') return '/porteria';
   return '/tablero';
 };
