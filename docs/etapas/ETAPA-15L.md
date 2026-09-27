@@ -125,36 +125,44 @@ orden. La fuga WHEP lleva prueba negativa entre copropiedades antes de
 cerrar». Después, el resto del Bloque A (A2, A3) y los bloques C, D, E, J, H,
 F, G, I.
 
-| Bloque                                     | Commit    | Qué queda probado contra el simulador                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1–R4 · verificación armada                | `a7a2821` | La terminal simulada pregunta (`remoteCheck`), la plataforma contesta `PUT remoteCheck` con el MISMO `serialNo` dentro del plazo y la terminal abre; `failed` niega; tarde o con otra serie, nada. Clave de idempotencia con `serialNo`: dos rostros → dos eventos y dos veredictos. XML del Alarm Server leído. La copropiedad sale del registro de equipos, no de la petición                                                                                                                                                                                                                                                                                                                                                              |
-| A5 · credencial rechazada                  | `3f9ceef` | Un 401 sin `stale` marca la credencial; durante 30 min (S-68) no se vuelve a presentar y el equipo sale «degradado» con el motivo. Reintentos sólo de lo reintentable (equipo ocupado, desafío vencido), 3 intentos con jitter                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Fuga entre copropiedades (WHEP +)          | `3f9ceef` | 10 operaciones sobre un equipo de la copropiedad B pedidas desde la A → 404 y `auditoria_seguridad`. La prueba negativa se escribió ANTES de la corrección y fallaba                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| B · todos los eventos                      | `6883c6c` | Tabla append-only `eventos_de_equipo` (0040, las cuatro capas de ADR-05, RLS forzada, prueba 97). Catálogo por código; nada se descarta; lo histórico en cola por lotes sin retrasar lo vivo; línea de tiempo con filtros y refresco en vivo en la consola                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| A1 · desenlace en palabras                 | `6883c6c` | La apertura del motor y la orden manual quedan en la línea de tiempo con «el equipo la aceptó / la rechazó — motivo / no respondió»; el mensaje técnico sólo va a la bitácora                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| A4 · la cámara decidió                     | `6883c6c` | Si el control de la cámara no está atestado o el propio evento dice que abrió ella, la lectura se registra y se marca «La cámara decidió por su cuenta»                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| A2 · persona con vigencia                  | `e042264` | Con la vigencia de la autorización, la terminal simulada guarda al visitante (`userType: "visitor"`) con `Valid` en hora de Bogotá sin desfase, su puerta y su plantilla horaria; y **niega en local** pasada la vigencia, aunque la supresión no haya llegado. Sin el parámetro, el alta es byte a byte la de antes. La foto se comprueba antes de subirla (JPEG/PNG, ≤ 200 KB, ≤ 1024 px, configurables). Una autorización inexistente, revocada o vencida no deja sincronizar                                                                                                                                                                                                                                                             |
-| A3 · videoportero                          | `ac04d6d` | La biblioteca de rostros y el audio bidireccional se leen por capacidad. Con biblioteca, el videoportero recibe la plantilla por el mismo ciclo de A2 (persona con vigencia, rostro, búsqueda). Sin ella, la sincronización lo **omite y lo dice**: en su resultado («este equipo no admite rostros» o «aún no se sabe: pruebe la conexión»), en la bitácora y en la consola; la ficha usa las mismas palabras. `CapacidadNoSoportada` no se reintenta. El timbre de la terminal (5/37) y la llamada del videoportero dejan evento **y** aviso a la guardia virtual. El audio (abrir, transmitir, cerrar, exclusividad) es el de la 15-K, con sus pruebas                                                                                    |
-| E2 · la app dice la causa                  | `c3ad781` | La pantalla de acceso nombra la causa de un fallo de red con la red del teléfono y lo que contestó el sistema (datos móviles, sin red, permiso de red local, el Mac no contesta, servidor apagado, dirección mal compilada), y manda a comparar con Safari en `/health`. E3: `docs/guias/APP_EN_IPHONE.md`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| C1 · el equipo nuevo o editado             | `a02f8a0` | Guardar refresca la tabla de Dispositivos (que sale del tablero) en el acto, no a los 30 s. Editar, dar de baja, reactivar, corregir o volver a sondear un equipo hace que el proceso **olvide** lo que recordaba de él: la siguiente orden sale hacia la dirección nueva (probado contra el simulado, con la prueba del defecto al lado)                                                                                                                                                                                                                                                                                                                                                                                                    |
-| C2 · edición completa y auditada           | `a02f8a0` | Número de puerta del videoportero, **canal de video** (migración 0041, con su forma validada en la base) y **zona** (la base rechaza la de otra copropiedad) editables desde la ficha. La auditoría dice qué cambió, con valores salvo dirección, usuario y credencial («credencial reemplazada»)                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| D2 · canal y puerto del video              | `a02f8a0` | El flujo RTSP usa el canal de la ficha (102 por omisión) y `VIDEO_PUERTO_RTSP` del `.env`: ningún canal ni puerto fijo en el código                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| C4 · latido real                           | `4aeed02` | `dispositivos.ultimo_latido` se escribe (antes nadie lo hacía y con PostgreSQL todos los equipos salían «Fuera de línea»). Cada 60 s (`EQUIPOS_LATIDO_S`): la señal de la escucha si oyó al equipo hace poco —evento o su propio latido—, si no una lectura real del equipo; sólo «en línea» late. Nunca retrocede y no toca equipos de otra copropiedad (probado contra PostgreSQL). El `POST /ingesta/latidos` del Edge también persiste ya                                                                                                                                                                                                                                                                                                |
-| D2 · el códec, preguntado                  | `912086b` | «Probar conexión» le hace al equipo un `DESCRIBE` RTSP (Digest, un solo intento autenticado) en el canal de su ficha y lee el códec del SDP. La ficha lo dice («H.264 · respuesta RTSP del equipo», o H.265 con qué hacer, o el canal que no existe); la fila del equipo muestra «Video H.265: no se ve en el navegador», y la ruta del video lo niega con esa frase en vez de negociar un negro. Probado contra un equipo RTSP simulado en el bucle local                                                                                                                                                                                                                                                                                   |
-| C3 · probar conexión por capacidad         | `912086b` | El botón de cada equipo se llama «Probar conexión» y la ficha trae, por capacidad, lo que el equipo contestó: apertura, audio, rostros, suscripción (ya estaban), **video** (respuesta RTSP) y **eventos** (la escucha real: transporte y segundos desde la última señal del equipo). Los eventos NO se prueban abriendo una segunda conexión: en un equipo de un solo flujo le quitaría los eventos a la escucha de verdad                                                                                                                                                                                                                                                                                                                  |
-| D3 · video con estados                     | `912086b` | Video en la guardia (ya estaba), en **Portería** (el equipo del evento en curso) y en la **ficha** (a pedido, para no ocupar el puente por mirar). Estados: negociando, en vivo, error con su causa, **sin señal** (negoció y no llega imagen en 8 s) y **se cortó** (la conexión WebRTC cayó después de negociar)                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| D1 · `pnpm sitio:video`                    | `3d7cabe` | Un comando genera `.sitio/go2rtc.yaml` (no versionado) desde `apps/api/.env`: API de go2rtc en `GO2RTC_URL` —se niega a abrirla a la red salvo `--api-en-red`—, medio en `VIDEO_PUERTO_WEBRTC` anunciado en `VIDEO_IP_ANUNCIADA` o la IPv4 de `en0`, sin flujos ni credenciales. Descarga go2rtc para la arquitectura del Mac si falta (versión fijable, SHA-256 impreso) y lo arranca; `--preparar` lo deja listo sin arrancar. Probado ejecutando el guion real contra `.env` de prueba (7 casos, incluida la credencial que no sale al fichero)                                                                                                                                                                                           |
-| J1 · `pnpm sitio:ensayo`                   | `c9f00e8` | Los ocho pasos por equipo (conexión y Digest, hora **y zona** frente al Mac, configuración con las capacidades de personas y rostros leídas del equipo —decisión 8—, eventos, apertura con confirmación humana, alta y baja de rostro, video, audio con un pitido G.711), OK/FALLO con causa y acción, credenciales tachadas y modo `--solo-lectura`. Antes, las comprobaciones del Mac: `/health` por el bucle local y **por la IP del Mac** (la del iPhone, E3), go2rtc y migraciones pendientes. Con la API en marcha el paso 4 mira la BASE (RLS con claims, transacción de sólo lectura) en vez de abrir otra suscripción. Probado contra los simulados, con las tres respuestas engañosas y el 400 de la terminal, y contra PostgreSQL |
-| J2 · `--capturar` / `--restaurar`          | `c9f00e8` | Respaldo por equipo (quién controla la barrera, receptor, disparador y país de la cámara; `AcsCfg` de la terminal; canales de audio del videoportero) en ficheros `0600` fuera del repositorio. La reversión sólo escribe lo que cambió, **relee** lo escrito (un «OK» sin efecto sale como fallo), no aplica el respaldo de otra serie y no guarda contraseñas                                                                                                                                                                                                                                                                                                                                                                              |
-| J3 · `ENTREGA_EN_SITIO.md`                 | `c9f00e8` | El guion del día en el orden pedido —arranque, comprobaciones, `supabase db push`, ensayo, los tres hitos, reversión, plan B por equipo— con `offlineDevCheckOpenDoorEnabled=false` por omisión y su plan B (decisión 6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| H1 · pools por copropiedad                 | `3be3b30` | `pools_de_porteros` con restricción de exclusión (0042); la copropiedad nueva recibe el suyo por disparador; la de un número se resuelve SIEMPRE por la tabla. Probado contra PostgreSQL: todos los pools cumplen `[n·1000+1, n·1000+999]` y el primero empieza en 1001                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| H2 · alta, cupo y baja                     | `3be3b30` | Alta con nombre, documento y contraseña temporal; el número lo asigna la base con el pool bloqueado: **20 altas simultáneas, 20 números consecutivos, sin duplicados**. Cupo 0–999 auditado; con el cupo lleno, 409 con mensaje claro. **Baja** (nueva): cierra sus sesiones, libera la plaza y su número no vuelve al pool; con él ya no se entra                                                                                                                                                                                                                                                                                                                                                                                           |
-| H3 · entrada por número                    | `3be3b30` | `POST /auth/acceso` con el número y la contraseña, sin NIT ni código (el NIT ya no es un campo: 400). Un portero por correo anterior a la 15-H entra con el número que le dio la 0042 (S-77); por correo, ya no. La consola: un solo campo «Usuario» —arroba, correo; cifras, portero; lo demás, residente con código— y ni una mención al NIT                                                                                                                                                                                                                                                                                                                                                                                               |
-| H4 · IP de portería y remotas              | `3be3b30` | El superadministrador edita las dos listas (IPv4, IPv6, CIDR; auditado). Portero fuera de la lista remota: 403 «No autorizado para guardia remota» **al entrar y en cada petición**, con la fila en `auditoria_seguridad`. Lista vacía: sólo desde la IP de un superadministrador activo (el mismo Mac), y deja de valer en cuanto la lista tiene una entrada. La IP de portería sirve para la consola presencial, no para la guardia remota. El superadministrador, desde cualquier IP                                                                                                                                                                                                                                                      |
-| H5 · modo pruebas                          | `3be3b30` | Interruptor global en Configuración (sólo superadministrador), ACTIVO por omisión, auditado, sin reiniciar. Activo: el caso de la IP no permitida entra y queda «habría sido rechazado»; sin bloqueo por intentos; el límite sube ×10 y no se apaga. Franja fija «Modo pruebas activo: restricciones de porteros desactivadas» en toda la consola. Apagado: 5 fallos desde la misma IP bloquean 5 min (429 con `Retry-After`); desde otra IP, no                                                                                                                                                                                                                                                                                             |
-| H6 · la IP del cliente                     | `3be3b30` | La API cree `X-Forwarded-For` sólo del proxy propio (`API_PROXIES_DE_CONFIANZA`, `loopback` por omisión); la consola arranca con `servidor.mjs`, que sustituye la cabecera del navegador por la IP del socket y la reenvía a la API en todo lo que pide en nombre de la persona. Probado: la misma cabecera falsificada, desde un proxy que no es de confianza, no se cree                                                                                                                                                                                                                                                                                                                                                                   |
-| H7 · los doce casos                        | `3be3b30` | `apps/api/test/porteros-por-identificador-pg.test.ts`: los doce casos de H7 contra PostgreSQL con el modo pruebas apagado salvo el último, más la baja, la IP de portería frente a la guardia remota y el adaptador del interruptor en la base                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| G · el superadministrador edita residentes | `543f1a8` | Residentes → «Editar perfil»: nombres, apellidos, documento, fecha de nacimiento, correo y teléfono, con las MISMAS validaciones del dominio que usa el residente y la unicidad del documento en la base. Cada cambio queda en la bitácora del residente con el autor y los NOMBRES de los campos cambiados (nunca los valores). Sólo cuentas de residente de esa copropiedad: otra, 404. Los vehículos se editan en Vehículos (placa única activa por índice parcial, sin borrado con historial), como ya estaba                                                                                                                                                                                                                            |
+| Bloque                                          | Commit               | Qué queda probado contra el simulador                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1–R4 · verificación armada                     | `a7a2821`            | La terminal simulada pregunta (`remoteCheck`), la plataforma contesta `PUT remoteCheck` con el MISMO `serialNo` dentro del plazo y la terminal abre; `failed` niega; tarde o con otra serie, nada. Clave de idempotencia con `serialNo`: dos rostros → dos eventos y dos veredictos. XML del Alarm Server leído. La copropiedad sale del registro de equipos, no de la petición                                                                                                                                                                                                                                                                                                                                                              |
+| A5 · credencial rechazada                       | `3f9ceef`            | Un 401 sin `stale` marca la credencial; durante 30 min (S-68) no se vuelve a presentar y el equipo sale «degradado» con el motivo. Reintentos sólo de lo reintentable (equipo ocupado, desafío vencido), 3 intentos con jitter                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Fuga entre copropiedades (WHEP +)               | `3f9ceef`            | 10 operaciones sobre un equipo de la copropiedad B pedidas desde la A → 404 y `auditoria_seguridad`. La prueba negativa se escribió ANTES de la corrección y fallaba                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| B · todos los eventos                           | `6883c6c`            | Tabla append-only `eventos_de_equipo` (0040, las cuatro capas de ADR-05, RLS forzada, prueba 97). Catálogo por código; nada se descarta; lo histórico en cola por lotes sin retrasar lo vivo; línea de tiempo con filtros y refresco en vivo en la consola                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| A1 · desenlace en palabras                      | `6883c6c`            | La apertura del motor y la orden manual quedan en la línea de tiempo con «el equipo la aceptó / la rechazó — motivo / no respondió»; el mensaje técnico sólo va a la bitácora                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| A4 · la cámara decidió                          | `6883c6c`            | Si el control de la cámara no está atestado o el propio evento dice que abrió ella, la lectura se registra y se marca «La cámara decidió por su cuenta»                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| A2 · persona con vigencia                       | `e042264`            | Con la vigencia de la autorización, la terminal simulada guarda al visitante (`userType: "visitor"`) con `Valid` en hora de Bogotá sin desfase, su puerta y su plantilla horaria; y **niega en local** pasada la vigencia, aunque la supresión no haya llegado. Sin el parámetro, el alta es byte a byte la de antes. La foto se comprueba antes de subirla (JPEG/PNG, ≤ 200 KB, ≤ 1024 px, configurables). Una autorización inexistente, revocada o vencida no deja sincronizar                                                                                                                                                                                                                                                             |
+| A3 · videoportero                               | `ac04d6d`            | La biblioteca de rostros y el audio bidireccional se leen por capacidad. Con biblioteca, el videoportero recibe la plantilla por el mismo ciclo de A2 (persona con vigencia, rostro, búsqueda). Sin ella, la sincronización lo **omite y lo dice**: en su resultado («este equipo no admite rostros» o «aún no se sabe: pruebe la conexión»), en la bitácora y en la consola; la ficha usa las mismas palabras. `CapacidadNoSoportada` no se reintenta. El timbre de la terminal (5/37) y la llamada del videoportero dejan evento **y** aviso a la guardia virtual. El audio (abrir, transmitir, cerrar, exclusividad) es el de la 15-K, con sus pruebas                                                                                    |
+| E2 · la app dice la causa                       | `c3ad781`            | La pantalla de acceso nombra la causa de un fallo de red con la red del teléfono y lo que contestó el sistema (datos móviles, sin red, permiso de red local, el Mac no contesta, servidor apagado, dirección mal compilada), y manda a comparar con Safari en `/health`. E3: `docs/guias/APP_EN_IPHONE.md`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| C1 · el equipo nuevo o editado                  | `a02f8a0`            | Guardar refresca la tabla de Dispositivos (que sale del tablero) en el acto, no a los 30 s. Editar, dar de baja, reactivar, corregir o volver a sondear un equipo hace que el proceso **olvide** lo que recordaba de él: la siguiente orden sale hacia la dirección nueva (probado contra el simulado, con la prueba del defecto al lado)                                                                                                                                                                                                                                                                                                                                                                                                    |
+| C2 · edición completa y auditada                | `a02f8a0`            | Número de puerta del videoportero, **canal de video** (migración 0041, con su forma validada en la base) y **zona** (la base rechaza la de otra copropiedad) editables desde la ficha. La auditoría dice qué cambió, con valores salvo dirección, usuario y credencial («credencial reemplazada»)                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| D2 · canal y puerto del video                   | `a02f8a0`            | El flujo RTSP usa el canal de la ficha (102 por omisión) y `VIDEO_PUERTO_RTSP` del `.env`: ningún canal ni puerto fijo en el código                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| C4 · latido real                                | `4aeed02`            | `dispositivos.ultimo_latido` se escribe (antes nadie lo hacía y con PostgreSQL todos los equipos salían «Fuera de línea»). Cada 60 s (`EQUIPOS_LATIDO_S`): la señal de la escucha si oyó al equipo hace poco —evento o su propio latido—, si no una lectura real del equipo; sólo «en línea» late. Nunca retrocede y no toca equipos de otra copropiedad (probado contra PostgreSQL). El `POST /ingesta/latidos` del Edge también persiste ya                                                                                                                                                                                                                                                                                                |
+| D2 · el códec, preguntado                       | `912086b`            | «Probar conexión» le hace al equipo un `DESCRIBE` RTSP (Digest, un solo intento autenticado) en el canal de su ficha y lee el códec del SDP. La ficha lo dice («H.264 · respuesta RTSP del equipo», o H.265 con qué hacer, o el canal que no existe); la fila del equipo muestra «Video H.265: no se ve en el navegador», y la ruta del video lo niega con esa frase en vez de negociar un negro. Probado contra un equipo RTSP simulado en el bucle local                                                                                                                                                                                                                                                                                   |
+| C3 · probar conexión por capacidad              | `912086b`            | El botón de cada equipo se llama «Probar conexión» y la ficha trae, por capacidad, lo que el equipo contestó: apertura, audio, rostros, suscripción (ya estaban), **video** (respuesta RTSP) y **eventos** (la escucha real: transporte y segundos desde la última señal del equipo). Los eventos NO se prueban abriendo una segunda conexión: en un equipo de un solo flujo le quitaría los eventos a la escucha de verdad                                                                                                                                                                                                                                                                                                                  |
+| D3 · video con estados                          | `912086b`            | Video en la guardia (ya estaba), en **Portería** (el equipo del evento en curso) y en la **ficha** (a pedido, para no ocupar el puente por mirar). Estados: negociando, en vivo, error con su causa, **sin señal** (negoció y no llega imagen en 8 s) y **se cortó** (la conexión WebRTC cayó después de negociar)                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| D1 · `pnpm sitio:video`                         | `3d7cabe`            | Un comando genera `.sitio/go2rtc.yaml` (no versionado) desde `apps/api/.env`: API de go2rtc en `GO2RTC_URL` —se niega a abrirla a la red salvo `--api-en-red`—, medio en `VIDEO_PUERTO_WEBRTC` anunciado en `VIDEO_IP_ANUNCIADA` o la IPv4 de `en0`, sin flujos ni credenciales. Descarga go2rtc para la arquitectura del Mac si falta (versión fijable, SHA-256 impreso) y lo arranca; `--preparar` lo deja listo sin arrancar. Probado ejecutando el guion real contra `.env` de prueba (7 casos, incluida la credencial que no sale al fichero)                                                                                                                                                                                           |
+| J1 · `pnpm sitio:ensayo`                        | `c9f00e8`            | Los ocho pasos por equipo (conexión y Digest, hora **y zona** frente al Mac, configuración con las capacidades de personas y rostros leídas del equipo —decisión 8—, eventos, apertura con confirmación humana, alta y baja de rostro, video, audio con un pitido G.711), OK/FALLO con causa y acción, credenciales tachadas y modo `--solo-lectura`. Antes, las comprobaciones del Mac: `/health` por el bucle local y **por la IP del Mac** (la del iPhone, E3), go2rtc y migraciones pendientes. Con la API en marcha el paso 4 mira la BASE (RLS con claims, transacción de sólo lectura) en vez de abrir otra suscripción. Probado contra los simulados, con las tres respuestas engañosas y el 400 de la terminal, y contra PostgreSQL |
+| J2 · `--capturar` / `--restaurar`               | `c9f00e8`            | Respaldo por equipo (quién controla la barrera, receptor, disparador y país de la cámara; `AcsCfg` de la terminal; canales de audio del videoportero) en ficheros `0600` fuera del repositorio. La reversión sólo escribe lo que cambió, **relee** lo escrito (un «OK» sin efecto sale como fallo), no aplica el respaldo de otra serie y no guarda contraseñas                                                                                                                                                                                                                                                                                                                                                                              |
+| J3 · `ENTREGA_EN_SITIO.md`                      | `c9f00e8`            | El guion del día en el orden pedido —arranque, comprobaciones, `supabase db push`, ensayo, los tres hitos, reversión, plan B por equipo— con `offlineDevCheckOpenDoorEnabled=false` por omisión y su plan B (decisión 6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| H1 · pools por copropiedad                      | `3be3b30`            | `pools_de_porteros` con restricción de exclusión (0042); la copropiedad nueva recibe el suyo por disparador; la de un número se resuelve SIEMPRE por la tabla. Probado contra PostgreSQL: todos los pools cumplen `[n·1000+1, n·1000+999]` y el primero empieza en 1001                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| H2 · alta, cupo y baja                          | `3be3b30`            | Alta con nombre, documento y contraseña temporal; el número lo asigna la base con el pool bloqueado: **20 altas simultáneas, 20 números consecutivos, sin duplicados**. Cupo 0–999 auditado; con el cupo lleno, 409 con mensaje claro. **Baja** (nueva): cierra sus sesiones, libera la plaza y su número no vuelve al pool; con él ya no se entra                                                                                                                                                                                                                                                                                                                                                                                           |
+| H3 · entrada por número                         | `3be3b30`            | `POST /auth/acceso` con el número y la contraseña, sin NIT ni código (el NIT ya no es un campo: 400). Un portero por correo anterior a la 15-H entra con el número que le dio la 0042 (S-77); por correo, ya no. La consola: un solo campo «Usuario» —arroba, correo; cifras, portero; lo demás, residente con código— y ni una mención al NIT                                                                                                                                                                                                                                                                                                                                                                                               |
+| H4 · IP de portería y remotas                   | `3be3b30`            | El superadministrador edita las dos listas (IPv4, IPv6, CIDR; auditado). Portero fuera de la lista remota: 403 «No autorizado para guardia remota» **al entrar y en cada petición**, con la fila en `auditoria_seguridad`. Lista vacía: sólo desde la IP de un superadministrador activo (el mismo Mac), y deja de valer en cuanto la lista tiene una entrada. La IP de portería sirve para la consola presencial, no para la guardia remota. El superadministrador, desde cualquier IP                                                                                                                                                                                                                                                      |
+| H5 · modo pruebas                               | `3be3b30`            | Interruptor global en Configuración (sólo superadministrador), ACTIVO por omisión, auditado, sin reiniciar. Activo: el caso de la IP no permitida entra y queda «habría sido rechazado»; sin bloqueo por intentos; el límite sube ×10 y no se apaga. Franja fija «Modo pruebas activo: restricciones de porteros desactivadas» en toda la consola. Apagado: 5 fallos desde la misma IP bloquean 5 min (429 con `Retry-After`); desde otra IP, no                                                                                                                                                                                                                                                                                             |
+| H6 · la IP del cliente                          | `3be3b30`            | La API cree `X-Forwarded-For` sólo del proxy propio (`API_PROXIES_DE_CONFIANZA`, `loopback` por omisión); la consola arranca con `servidor.mjs`, que sustituye la cabecera del navegador por la IP del socket y la reenvía a la API en todo lo que pide en nombre de la persona. Probado: la misma cabecera falsificada, desde un proxy que no es de confianza, no se cree                                                                                                                                                                                                                                                                                                                                                                   |
+| H7 · los doce casos                             | `3be3b30`            | `apps/api/test/porteros-por-identificador-pg.test.ts`: los doce casos de H7 contra PostgreSQL con el modo pruebas apagado salvo el último, más la baja, la IP de portería frente a la guardia remota y el adaptador del interruptor en la base                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| G · el superadministrador edita residentes      | `543f1a8`            | Residentes → «Editar perfil»: nombres, apellidos, documento, fecha de nacimiento, correo y teléfono, con las MISMAS validaciones del dominio que usa el residente y la unicidad del documento en la base. Cada cambio queda en la bitácora del residente con el autor y los NOMBRES de los campos cambiados (nunca los valores). Sólo cuentas de residente de esa copropiedad: otra, 404. Los vehículos se editan en Vehículos (placa única activa por índice parcial, sin borrado con historial), como ya estaba                                                                                                                                                                                                                            |
+| F1–F4 · generar autorización con foto y casilla | `84d6f6c`            | Consola: «Generar autorización» para los cuatro roles, con nombre, documento, vivienda, fecha, hora, duración, placa opcional, FOTO obligatoria y la casilla. La foto se revisa ANTES de crear nada; la visita nace vigente; la foto va a todos los equipos con biblioteca de rostros y la respuesta dice a cuántos llegó y cuáles no la aceptaron. Sin la casilla, 422. Contra PostgreSQL (`visitas-pg.test.ts`, 17) y en el recorrido, con la foto en la biblioteca de la terminal simulada                                                                                                                                                                                                                                                |
+| F2 · aviso y rechazo                            | `84d6f6c`            | Aviso en vivo «Nueva visita para …» en la consola de portero y superadministrador; «Rechazar» con motivo: la autorización queda anulada y SU plantilla sale de todos los equipos en la misma llamada (no el barrido global). El recorrido lo comprueba preguntando a la terminal simulada, y la lista del superadministrador cambia a «Anulada» sin recargar                                                                                                                                                                                                                                                                                                                                                                                 |
+| F5 · el día del portero                         | `84d6f6c`            | Portería y central ven sólo las visitas que tocan hoy EN LA ZONA HORARIA DE LA COPROPIEDAD, calculado en la base con el reloj inyectado: a medianoche la lista cambia sola, nada se borra. El servidor impone el filtro; la pantalla no puede pedir otro rango                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| F7 · historial por vivienda                     | `84d6f6c`            | Superadministración y administración: fechas, vivienda, estado y texto, con el detalle por equipo y la confirmación en persona (opcional)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| F6 · últimos visitantes (API)                   | `84d6f6c`, `c5df04e` | `mi/visitas/ultimas` (lo último registrado, una fila por persona, sólo de SU vivienda) y `mi/visitas/:id/repeticion` (copia datos y foto; pide fecha, hora, duración y la casilla, C-42). La visita de otra vivienda no existe para él                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| F-e · recorrido de la entrega                   | `7fcac5d`            | Ver §6: los ocho pasos del cierre contra API real, PostgreSQL y equipos simulados por HTTP con Digest                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| I · cero texto técnico (consola)                | `84d6f6c`, `7fcac5d` | Prueba sobre el árbol sintáctico de `apps/web/src` (texto de JSX y cadenas, nunca comentarios) con sus casos negativos; «!» con explicación en lenguaje de usuario (`componentes/ui/ayuda.tsx`, teclado y toque); los rechazos de la API se pintan sin su cita de regla; y el recorrido lee el texto REAL de cada pantalla del menú de cada rol                                                                                                                                                                                                                                                                                                                                                                                              |
+| F-d · la app del residente                      | ⟪COMMIT_APP⟫         | ⟪RESUMEN_APP⟫                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ### Hallazgos de esta corrección
 
@@ -257,3 +265,308 @@ s) y S-77 (el portero por correo entra con su número), en
 `docs/auditoria/contradicciones-y-supuestos.md`. Contradicciones nuevas: C-39
 (numeración progresiva frente a pools) y C-40 (el portero y la guardia remota),
 resueltas por ADR-031.
+
+---
+
+# Cierre de la 15-L según §2.8
+
+## 1 · Qué se construyó
+
+La 15-L deja la plataforma lista para la entrega en sitio **sin escribir código
+allí**: todo lo que puede variar en sitio (direcciones, puertos, número de
+puerta, canal de video, códec, rutas, umbrales, modo pruebas) se configura en
+la consola o en el `.env` local del usuario.
+
+Con los equipos, la conversación es de ida y vuelta: la terminal pregunta y la
+plataforma contesta dentro del plazo (verificación remota), la puerta se abre
+con un documento que el equipo acepta de verdad, el visitante llega a la
+terminal con su vigencia para que el propio equipo lo niegue al vencer, el
+videoportero recibe rostros si tiene biblioteca y dice que no si no la tiene,
+y una credencial rechazada no se vuelve a presentar en bucle. Todo lo que un
+equipo emite queda guardado (tabla de sólo inserción) y a la vista en la
+línea de tiempo de «Eventos y alertas». Los equipos se editan sin reiniciar,
+se prueban capacidad por capacidad con lo que el equipo contestó, laten de
+verdad y muestran su video en la guardia, la portería y la ficha. Para el día
+de la entrega hay tres comandos (`pnpm sitio:video`, `pnpm sitio:ensayo`,
+`--capturar`/`--restaurar`) y un guion (`ENTREGA_EN_SITIO.md`).
+
+Los porteros entran con un **número** de un pool por copropiedad, sin NIT; el
+superadministrador decide desde qué IP pueden entrar (portería y guardia
+remota) y hay un **modo pruebas** para que la entrega no se bloquee. El
+superadministrador edita el perfil de los residentes.
+
+Y el flujo de visitantes es el que pidió el cliente: **un mismo formulario**
+en la consola y en la app —nombre, documento, fecha, hora, duración, foto
+frontal y una casilla—; la visita **nace autorizada**, la foto sale a todos
+los equipos con rostros, portería y superadministración reciben el aviso en
+vivo y pueden **rechazarla**, y el rechazo retira la foto de los equipos en el
+acto. El portero ve sólo el día; el residente, sus últimos visitantes con
+«Volver a autorizar»; la administración, el historial con filtros. La casilla
+es la única constancia obligatoria del consentimiento (ADR-032, riesgo legal
+aceptado por el cliente). Ninguna pantalla enseña ya un código del proyecto.
+
+## 2 · Cómo se organizó y por qué (F e I; los demás bloques, en [Avance](#avance))
+
+- **Un módulo `visitas` nuevo, no una ampliación de `autorizaciones` ni de
+  `biometria`.** Generar una visita orquesta cuatro cosas que ya existían
+  —crear la autorización, adjuntar la foto, capturar el rostro, sincronizarlo—
+  más la casilla y el aviso. Es un caso de uso de aplicación (`GenerarVisita`)
+  que compone los de los otros módulos por su barril; ninguno de ellos cambia
+  de responsabilidad. El residente usa la misma segunda mitad
+  (`RegistrarRostroDeVisita`), así que la consola y la app no pueden divergir.
+- **El consentimiento declarado es un ORIGEN, no un `otorgar()` más**
+  (ADR-032). `ConsentimientoBiometrico.declarar` crea el consentimiento vigente
+  con `origen = declarado_por_quien_registra` y su autor; la regla de
+  titularidad de `otorgar`, `rechazar` y `revocar` no se toca. La base rechaza
+  una declaración sin autor (0043). Así ningún registro dice que el titular
+  consintió cuando no consta.
+- **La casilla vive en la autorización**, con quién, cuándo y la versión del
+  texto que pone el servidor. Un consentimiento vigente por titular se
+  reutiliza; cada visita guarda su propia constancia.
+- **La foto se revisa ANTES de crear nada.** Tipo real, peso y medidas; si no
+  sirve, no hay autorización a medias que limpiar. Si el registro del rostro
+  falla después de crear, la autorización se revoca (compensación).
+- **El rechazo suprime SÓLO la plantilla de esa visita.** La primera versión
+  llamaba al barrido global y, en la suite completa, retiraba plantillas
+  vencidas de otras visitas: `SuprimirRostroDeAutorizacion` se acota a la
+  autorización.
+- **El «día» del portero se calcula en PostgreSQL**, con
+  `copropiedades.zona_horaria` y el instante del reloj inyectado. El servidor
+  impone el filtro al rol: la pantalla no puede pedir otro rango.
+- **La consola y el residente leen por puertos distintos**
+  (`ConsultaDeVisitas`, 5 métodos; `HistorialDeVisitantes`, 2), cada uno en su
+  fichero (§2.3).
+- **Bloque I en tres capas.** (1) El fuente: una prueba recorre el árbol
+  sintáctico de `apps/web/src` y de `apps/mobile/lib` —el texto de la interfaz
+  y las cadenas, nunca los comentarios— y falla ante un código del proyecto;
+  cada una se vio fallar con un texto plantado. (2) Lo que llega de la API: la
+  consola quita las citas de regla («(RN-19)», «D-11 · ») de los rechazos antes
+  de pintarlos. (3) La pantalla real: el recorrido abre cada entrada del menú
+  de cada rol, con datos, y lee su texto. Esta tercera capa encontró lo que
+  las otras dos no podían ver: los textos de «Observabilidad» venían de la API.
+- **Lo que el recorrido destapó y se corrigió aquí** (C-43): el portero
+  aterrizaba en un tablero cuyos indicadores la API nunca le dio; «Eventos»
+  pedía la lista de equipos, que es de administración. Se resolvió a favor de
+  la API (denegar por defecto): el portero entra por Portería.
+
+## 3 · Árbol de archivos (selección de F e I)
+
+```
+supabase/migrations/20260927150000_0043_consentimiento_declarado.sql  origen del consentimiento y casilla en la autorización
+supabase/reversion/0043_revert.sql                                   su reversión
+supabase/policies/tests/100_consentimiento_declarado.sql              la base rechaza una declaración sin autor
+packages/domain-core/src/biometria/consentimiento.ts                  declarar() y confirmarPorElTitular()
+apps/api/src/visitas/
+  aplicacion/generar-visita.ts        F1-F3 · generar, con compensación si falla el rostro
+  aplicacion/rostro-de-visita.ts      foto + casilla + plantilla + equipos (consola y app)
+  aplicacion/rechazar-visita.ts       F2 · anular y retirar SU foto
+  aplicacion/aviso-de-visitas.ts      F2 · aviso en vivo por el canal existente
+  aplicacion/consultar-visitas.ts     F5/F6/F7 · lista, día, equipos, últimos, repetir
+  infraestructura/visitas-pg.ts       persona y casilla
+  infraestructura/consulta-de-visitas-pg.ts     la consola
+  infraestructura/historial-de-visitantes-pg.ts el residente
+  presentacion/visitas.controller.ts  rutas de la consola; rechazo sólo portero y superadministración
+apps/api/src/residente/aplicacion/mis-visitas.ts         F1/F6 del residente
+apps/api/src/biometria/aplicacion/casos-de-uso.ts        SuprimirRostroDeAutorizacion; barrido de revocadas
+apps/web/src/app/(consola)/visitantes/                   pantalla, «Generar autorización», confirmación opcional
+apps/web/src/componentes/{captura-de-foto,rechazo-de-visita,aviso-de-visita}.tsx
+apps/web/src/componentes/ui/ayuda.tsx                    «!» con explicación, teclado y toque
+apps/web/src/texto-visible.test.ts                       Bloque I sobre el fuente de la consola
+apps/web/src/lib/api/cliente.ts                          rechazos de la API sin citas de regla
+apps/mobile/…                                            ⟪ARBOL_APP⟫
+e2e/recorrido-de-consola.mjs                             los ocho pasos del cierre
+e2e/recorrido-negativo.mjs                               H-SITIO-03 apunta a la ruta que genera la visita
+docs/decisiones/ADR-032-consentimiento-declarado-por-quien-registra.md
+```
+
+## 4 · Tabla SOLID (lo creado en F e I)
+
+| Principio | Cumplimiento                                                                                                                                                                                                                                                                                                                           |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SRP**   | Un caso de uso por operación (`GenerarVisita`, `RechazarVisita`, `RegistrarRostroDeVisita`, `ListarVisitas`, `UltimosVisitantes`, `DatosParaVolverAAutorizar`); la consulta de la consola y el historial del residente en ficheros y puertos distintos. **Declarado (DT-15L-03):** tres ficheros cruzaron las 300 líneas en esta ronda |
+| **OCP**   | El origen del consentimiento es un dato nuevo con su fábrica (`declarar`), no una rama en `otorgar`; el rechazo compone `RevocarAutorizacion` y `SuprimirRostroDeAutorizacion` sin cambiarlos                                                                                                                                          |
+| **LSP**   | Los repositorios de biometría en memoria y en PostgreSQL cumplen los métodos nuevos (`deAutorizacion`, `registrarFallo`, `deAutorizacionesRevocadas`) con las mismas pruebas; el recorrido corre con el adaptador real contra los equipos simulados por HTTP                                                                           |
+| **ISP**   | `HistorialDeVisitantes` (2 métodos) separado de `ConsultaDeVisitas` (5); `LectorDeFotosDeVisita` expone sólo `leer`                                                                                                                                                                                                                    |
+| **DIP**   | Los casos de uso dependen de tokens (`CONSULTA_DE_VISITAS`, `HISTORIAL_DE_VISITANTES`, `PERSONAS_DE_VISITA`, `CONSTANCIA_DE_CASILLA`, `LECTOR_DE_FOTOS_DE_VISITA`); `@Inject` explícito en el controlador (control `inyeccion-explicita`); el dominio no importa nada de infraestructura                                               |
+
+## 5 · Trazabilidad
+
+- **Cubiertos en esta ronda:** CU-02 en su forma nueva (captura → calidad →
+  casilla → plantilla → sincronización → supresión); RN-09 (sin
+  consentimiento vigente no hay sincronización: la casilla lo crea y sin ella
+  hay 422), RN-11 (supresión al vencer, revocar y **rechazar**), RN-15
+  (aislamiento por los dos caminos en las rutas nuevas), RN-21 (foto en
+  almacén privado; el vector nunca sale); HU-07 a HU-11 (la visita desde la app, con foto); CA-09, CA-10; KPI-09 medido en `POST …/visitas`.
+- **Sin HU en el documento de requisitos:** el aviso en vivo y el rechazo de
+  la visita por portería y superadministración (F2), la lista del día (F5) y
+  «Volver a autorizar» (F6) son decisiones del cliente de la 15-L, no historias
+  del documento; se trazan al encargo y a ADR-032.
+- **Modificado por decisión del cliente:** RN-10 (el consentimiento lo da el
+  titular) queda sustituido por la casilla de quien registra — ADR-032, C-41,
+  E-05, con el riesgo legal escrito.
+- **Parcial:** CA-11 (supresión dentro de 24 h del vencimiento) sigue
+  dependiendo del barrido programado (`PLANIFICADOR_HABILITADO`); en sitio hay
+  que confirmar que está activo.
+
+## 6 · Pruebas
+
+### Qué se probó y cómo
+
+- **Contra PostgreSQL:** `visitas-pg.test.ts` (17: generar con foto y casilla,
+  422 sin casilla, 422 con foto que no sirve, autoaprobación, rechazo con
+  retiro por equipo, lista del día en hora de la copropiedad, historial con
+  filtros, últimos visitantes sólo de su vivienda, volver a autorizar y la
+  visita de otra vivienda), la prueba SQL `100_consentimiento_declarado.sql`,
+  las suites de aislamiento y de roles actualizadas.
+- **Recorrido de la entrega** (`node e2e/recorrido-de-consola.mjs`): API real
+  compilada, PostgreSQL propio, consola compilada en Chromium y dos equipos
+  simulados por HTTP con Digest, con el adaptador REAL. Los ocho pasos del
+  cierre: (1) el superadministrador genera la autorización con foto y casilla
+  —y sin la casilla el botón no deja—; (2) nace vigente; (3) el portero, con
+  su pantalla abierta, recibe el aviso sin recargar; (4) la rechaza con motivo
+  y **la foto sale de la biblioteca de la terminal simulada**, que es quien lo
+  dice; (5) la lectura de placa del recorrido está en «Eventos y alertas»;
+  (6) el equipo se edita por PUT; (7) el portero entra con su número;
+  (8) ninguna de las pantallas del menú del superadministrador (15) ni del
+  portero (7) enseña un código del proyecto.
+- **Su prueba negativa** (`e2e/recorrido-negativo.mjs`): con H-SITIO-03
+  reintroducido en la ruta que genera la visita, el recorrido falla
+  nombrándolo (`✗ H-SITIO-03 · el superadministrador genera la autorización
+con foto (403)`).
+- **Simulador con las tres respuestas engañosas y el 400 de la terminal:**
+  `packages/providers/src/ensayo/ensayo-enganosas.test.ts` (J1) y
+  `anexo-de-sitio.test.ts`.
+- **Bloque I:** `apps/web/src/texto-visible.test.ts`, `apps/web/src/lib/api/cliente.test.ts`
+  y ⟪PRUEBA_TEXTO_DART⟫.
+
+### Resultado
+
+⟪RESULTADO_PRUEBAS⟫
+
+### Veredicto literal de `./scripts/verificar-etapa.sh` (§2.8.0)
+
+```
+⟪VEREDICTO⟫
+```
+
+## 7 · Verificación de seguridad (§2.7)
+
+| Medida                       | En F e I                                                                                                                                                                                                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 · Secretos                 | Ninguno en código, pruebas, semillas ni documentos; las IP y credenciales de los equipos sólo en el `.env` del usuario. El recorrido usa equipos simulados en `127.0.0.1` con claves aleatorias por corrida. `API_URL_PUBLICA` desaparece con el enlace del titular    |
+| 2 · CORS                     | Sin cambios                                                                                                                                                                                                                                                            |
+| 3 · Validación en el backend | DTOs con lista blanca (`GenerarVisitaDto`, `RechazoDeVisitaDto`, `RepetirVisitaDto`): duración 15–1440 min, foto con tope de tamaño y tipo, casilla booleana obligatoria. La foto se valida por su contenido antes de crear nada; el motivo del rechazo es obligatorio |
+| 4 · Inyección SQL            | Todo parametrizado; la búsqueda por texto escapa `%` y `_` del usuario                                                                                                                                                                                                 |
+| 5 · Rate limiting            | `POST …/visitas` y `POST …/rechazo`: 30 por minuto, además del global; ruta de foto con su propio límite de cuerpo                                                                                                                                                     |
+| 6 · RLS                      | Las columnas de la 0043 viven en tablas con RLS forzada; prueba SQL 100; cada consulta con claims de servicio por copropiedad y `exigirAlcance` antes (los dos caminos); la visita de otra vivienda no existe para el residente                                        |
+| 7 · CSP                      | Sin cambios; la vista previa de la foto es un `data:` de la propia pestaña                                                                                                                                                                                             |
+| 8 · Transversales            | RBAC declarativo (`@Roles`): rechazar sólo portero y superadministrador; el vector nunca sale por ninguna ruta; la foto en almacén privado con URL firmada; la casilla y el rechazo quedan auditados con su autor                                                      |
+
+## 8 · Deuda técnica, supuestos y pendientes
+
+**Deuda nueva:**
+
+- **DT-15L-01 · la persona se queda en la terminal.** La supresión retira el
+  rostro (y lo comprueba buscándolo), pero la persona —sin datos personales:
+  su nombre es un identificador opaco y su vigencia ya venció— sigue en la
+  terminal. Se acumulan registros hasta el tope del equipo. Propuesta: tras
+  verificar la ausencia del rostro, `darDeBajaPersona`, que el adaptador ya
+  tiene.
+- **DT-15L-02 · el portero ve «Equipo sin nombre» en la línea de tiempo.** La
+  lista de equipos es de administración. Propuesta: el nombre del equipo en
+  el evento de equipo.
+- **DT-15L-03 · §2.3.** Cruzaron las 300 líneas en esta ronda
+  `multiempresa/copropiedades.controller.ts` (330),
+  `(consola)/eventos/pantalla.tsx` (307) y
+  `domain-core/src/biometria/consentimiento.ts` (351); 38 ficheros tocados ya
+  las superaban en `develop`.
+- **DT-15L-04 · rutas sólo-placa sin pantalla** (S-78):
+  `POST /copropiedades/:id/autorizaciones` y `POST …/mi/autorizaciones`
+  siguen en la API para visitas por placa; ninguna pantalla las ofrece.
+- **DT-15L-05 · los mensajes de la API siguen citando reglas.** La consola los
+  limpia al pintarlos ⟪APP_MENSAJES⟫; el texto en la API no se cambió.
+
+**Siguen abiertos del Bloque 0.3** (en memoria en producción):
+`REGISTRO_DE_BLOQUEOS`, `OPERACIONES_DE_DISPOSITIVO` (DT-15K-03),
+`REPOSITORIO_CODIGOS_MFA` (los códigos de recuperación se pierden al
+reiniciar la API; el segundo factor, que vive en Supabase, no),
+`NOTIFICADOR_PUSH` y la evidencia sin `EVIDENCIA_BUCKET`. Siguen también
+DT-15K-02 / S-62 y H-15J-01.
+
+**Supuestos:** S-66 a S-86 (los de F: S-78 a S-86). **Contradicciones:** C-39
+a C-43 (C-43 nueva en el cierre). **Extensión:** E-05. **Pendiente:** P-21
+(validez jurídica de la confirmación presencial, ahora opcional).
+
+## 9 · Qué debe hacer el usuario manualmente
+
+1. **Fusionar el PR** hacia `develop` cuando lo revise (no se fusiona desde
+   aquí).
+2. **Aplicar las migraciones 0040 a 0043** en el proyecto de Supabase
+   (`supabase db push`) y comprobar la RLS como dice
+   `docs/guias/CONEXION_SUPABASE.md`.
+3. **Leer y firmar el riesgo legal de ADR-032** (la casilla no prueba el
+   consentimiento del titular).
+4. **Completar su `.env` local** (IP, puertos, credenciales de los tres
+   equipos, `GO2RTC_URL`, `VIDEO_*`), nunca en el repositorio.
+5. **Seguir `docs/guias/ENTREGA_EN_SITIO.md`**: `pnpm sitio:video`,
+   `pnpm sitio:ensayo --capturar` antes de tocar ningún equipo, los tres hitos
+   y `--restaurar` al terminar.
+6. **Compilar la app para el iPhone** con la IP del Mac
+   (`docs/guias/APP_EN_IPHONE.md`).
+7. **Apagar el modo pruebas** en Configuración cuando termine la entrega.
+8. **Confirmar que el barrido programado está activo**
+   (`PLANIFICADOR_HABILITADO=true`) para la supresión al vencer.
+
+## 10 · Rama y commits
+
+Rama `etapa-15l-entrega-final`, base `develop`. PR: ⟪PR⟫ (sin fusionar).
+
+⟪COMMITS⟫
+
+---
+
+## Probado contra simulador
+
+- Verificación remota armada: la terminal pregunta, la plataforma contesta con
+  el mismo `serialNo` dentro del plazo y abre; `failed` niega; tarde o con
+  otra serie, nada (R1–R4).
+- Apertura con su desenlace en palabras; la cámara que decide por su cuenta,
+  marcada (A1, A4).
+- Persona con vigencia en la terminal y negación local al vencer (A2); el
+  videoportero con y sin biblioteca de rostros (A3).
+- Credencial rechazada sin reintento y reintentos sólo de lo reintentable (A5).
+- **Las tres respuestas engañosas y el 400 `badXmlContent`** (J1, anexo 15-K).
+- Todos los eventos de equipo guardados y visibles, incluido uno desconocido
+  (B); la fuga entre copropiedades, cerrada con prueba negativa.
+- Dispositivos editables sin reiniciar, «Probar conexión» por capacidad,
+  latido, códec leído por RTSP, estados del video (C, D).
+- El ensayo de sitio y el respaldo/reversión contra equipos simulados (J).
+- Porteros por número, lista blanca de IP, modo pruebas e IP real, contra
+  PostgreSQL (H); edición de residentes (G).
+- **El flujo de visitantes de punta a punta** (F): generar con foto y casilla,
+  autoaprobación, aviso al portero, rechazo que retira la foto de la terminal
+  simulada, lista del día, historial, últimos visitantes y volver a autorizar.
+- Cero texto técnico en el fuente de la consola y de la app y en las
+  pantallas reales de la consola (I).
+
+## Requiere prueba en sitio
+
+- Verificación remota con el firmware real: nombres de campo, `serialNo`,
+  plazo y textos de rechazo (S-66, S-67, S-70).
+- **Que la puerta y la talanquera se muevan** con la orden (confirmación
+  humana en el ensayo, paso 5).
+- Vigencia de la persona en la terminal real (hora de Bogotá, `visitor`) y su
+  negación local al vencer.
+- **Alta y retiro del rostro** en la terminal y en el videoportero reales, con
+  la búsqueda posterior (RN-11), y la calidad de fotos tomadas con el iPhone y
+  la cámara del Mac.
+- Audio bidireccional real (G.711, semiduplex/duplex) y su latencia (KPI-33).
+- Video del subflujo 102 por go2rtc en el Mac; si la cámara entrega H.265, que
+  la ficha lo diga.
+- Eventos reales de los tres equipos (multipart y alertStream) y su catálogo.
+- La cámara LPR en modo evento.
+- **La app en el iPhone** contra la API del Mac por la red local (permiso de
+  red local y compilación con la IP).
+- Las listas de IP de porteros con la red real del conjunto (el Mac y otro
+  equipo).
+- Las migraciones 0040–0043 en el proyecto real de Supabase.
