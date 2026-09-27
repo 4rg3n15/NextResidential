@@ -74,7 +74,7 @@ charset=UTF-8`, el cuerpo con espacio de nombres y `version="2.0"` y el
 
 - [ ] **`apps/web/.env`**: **`API_URL=http://127.0.0.1:3000`**, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`; `PUENTE_VIDEO_URL` vacío (ADR-022).
       `API_URL` la resuelve el **servidor** de la consola, que corre en el mismo Mac que la API; el navegador nunca habla con ella (todo pasa por `/api/ncr`, [`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](CONSOLA_EN_RED_Y_DESPLIEGUE.md) §4). Con la IP del Mac en vez del bucle local, `next start` —que es producción— **no arranca**: exige `https` a toda API que no sea de bucle local (§2.7.8).
-- [ ] **go2rtc** descargado para el Mac, con un `go2rtc.yaml` mínimo: `api.listen: "127.0.0.1:1984"` y `webrtc.listen: ":8555"` (`candidates` con la IP del Mac). **Sin equipos en el fichero**: la API registra cada flujo al pedirlo (§3.3).
+- [ ] **go2rtc**: `pnpm sitio:video -- --preparar` con Internet, ANTES de salir (descarga el binario a `.sitio/bin/` y escribe `.sitio/go2rtc.yaml` desde `apps/api/.env`; [`INTEGRACION_HIKVISION.md`](INTEGRACION_HIKVISION.md) §6, punto 4). **Sin equipos ni credenciales en el fichero**: la API registra cada flujo al pedirlo (§3.3). En sitio, si la IP del Mac cambió, basta con repetir `pnpm sitio:video`.
 - [ ] **App en el iPhone físico** (Xcode con la cuenta de desarrollo, iPhone de confianza), compilada en **Debug**, que es la única configuración que permite HTTP a una IP privada ([`DESPLIEGUE.md`](DESPLIEGUE.md) §8.1):
 
   ```
@@ -116,7 +116,7 @@ node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs \
 
 Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con el cuerpo y el Content-Type de formulario), la respuesta (`statusCode 1`, `subStatusCode ok`) y **pregunta si la puerta se movió**: mírela y conteste `s` o `n`. Sale en 0 sólo si las dos se movieron. Si una **no** se movió con la orden aceptada, H-SITIO-13 sigue abierto en ese equipo: no haga sus escenarios de puerta y devuelva la carpeta `abrir/`. Si la terminal contesta `400 badXmlContent`, algo entre el Mac y el equipo le quita el cuerpo (H-SITIO-15).
 
-3. **Arranque.** Primero go2rtc. Después compile y arranque la API **con `start`**, guardando su bitácora en la carpeta de sitio:
+3. **Arranque.** Primero go2rtc, en su propia terminal: `pnpm sitio:video` (queda en primer plano). Después compile y arranque la API **con `start`**, guardando su bitácora en la carpeta de sitio:
 
    ```
    pnpm turbo run build --filter=@ncr/api --filter=@ncr/web
