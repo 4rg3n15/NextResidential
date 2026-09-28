@@ -17,6 +17,7 @@ MiEventoDto _$MiEventoDtoFromJson(Map<String, dynamic> json) => MiEventoDto(
   persona: json['persona'] as String?,
   zona: json['zona'] as String?,
   decididoPorEdge: json['decididoPorEdge'] as bool,
+  deVisitante: json['deVisitante'] as bool,
 );
 
 Map<String, dynamic> _$MiEventoDtoToJson(MiEventoDto instance) =>
@@ -31,4 +32,5 @@ Map<String, dynamic> _$MiEventoDtoToJson(MiEventoDto instance) =>
       'persona': instance.persona,
       'zona': instance.zona,
       'decididoPorEdge': instance.decididoPorEdge,
+      'deVisitante': instance.deVisitante,
     };

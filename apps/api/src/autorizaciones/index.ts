@@ -52,3 +52,15 @@ export {
  * adaptador— rompería la frontera de §2.2, que el verificador comprueba.
  */
 export { RepositorioListaNegraPg } from './infraestructura/repositorio-lista-negra-pg';
+/**
+ * F (15-L) · «Generar autorización» desde la consola la orquesta el módulo de
+ * visitas: crear, anular (rechazo, F2) y adjuntar la foto son los MISMOS casos
+ * de uso de siempre. `CrearAutorizacion` recibe la vivienda del cuerpo, y por
+ * eso sólo la consumen rutas de la consola; el residente sigue creando por
+ * `CrearMiAutorizacion`, que la saca de su vínculo.
+ */
+export { CrearAutorizacion, RevocarAutorizacion } from './aplicacion/casos-de-uso';
+export {
+  AdjuntarFotografiaDeVisitante,
+  MAX_BASE64_FOTOGRAFIA,
+} from './aplicacion/fotografia-de-visitante';

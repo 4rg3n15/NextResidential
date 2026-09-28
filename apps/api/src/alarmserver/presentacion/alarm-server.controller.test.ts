@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  CopropiedadDelEquipoPorRegistro,
+  sinRegistroDeEquipos,
+} from '../aplicacion/copropiedad-del-equipo';
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { exito, fallo, errorDominio, ordenAceptada } from '@ncr/domain-core';
 import type { ResultadoDeAccionamiento } from '@ncr/domain-core';
@@ -124,7 +128,7 @@ const montar = (opciones: {
     almacen,
     bitacora,
     ids,
-    [EQUIPO],
+    new CopropiedadDelEquipoPorRegistro(sinRegistroDeEquipos, [EQUIPO]),
     { titularDePlantilla: async () => null },
     { responderVerificacionRemota: async () => ({ aceptado: true, latenciaMs: 5 }) },
     reloj,
@@ -224,7 +228,7 @@ describe('lo que se entrega al caso de uso', () => {
 });
 
 describe('lo que NO es una lectura de placa', () => {
-  it('un evento de otra clase se acepta y se ignora, sin llegar al caso de uso', async () => {
+  it('un evento de otra clase se acepta y se GUARDA como evento de equipo, sin llegar al caso de uso', async () => {
     const otro =
       '<EventNotificationAlert><eventType>IO</eventType>' +
       '<alarmDataType>0</alarmDataType></EventNotificationAlert>';
@@ -232,7 +236,9 @@ describe('lo que NO es una lectura de placa', () => {
     const respuesta = await controlador.publicar(peticion(sobre(otro)), 'x');
     // Aceptado y no rechazado: un error haría que la cámara reintentara ese
     // mismo aviso para siempre. Lo que hay que decirle es «recibido, no sirve».
-    expect(respuesta).toEqual({ aceptado: true, ignorado: true, motivo: 'sin lectura de placa' });
+    // 15-L (Bloque B) · ya no se ignora: se guarda y se enseña. Pero sigue sin
+    // ser un acceso: ni motor ni relé.
+    expect(respuesta).toEqual({ aceptado: true });
     expect(ejecutar).not.toHaveBeenCalled();
     expect(accionar).not.toHaveBeenCalled();
   });
@@ -274,14 +280,15 @@ describe('lo que NO es una lectura de placa', () => {
     expect(accionar).not.toHaveBeenCalled();
   });
 
-  it('un evento que el equipo marca HISTÓRICO no llega al caso de uso', async () => {
+  it('un evento que el equipo marca HISTÓRICO se guarda como histórico y no llega al caso de uso', async () => {
     // El equipo reenvía su historial por este mismo canal. Sin el corte, la
     // portería mostraría accesos de hace días como si ocurrieran ahora, en una
     // tabla append-only que no se puede limpiar.
     const historico = XML_DE_PLACA.replace('<alarmDataType>0<', '<alarmDataType>1<');
     const { controlador, ejecutar, accionar } = montar({ permitido: true });
     const respuesta = await controlador.publicar(peticion(sobre(historico)), 'x');
-    expect(respuesta).toMatchObject({ ignorado: true, motivo: 'el equipo lo marcó histórico' });
+    // 15-L (Bloque B) · no se ignora: se guarda marcado. Pero ni motor ni relé.
+    expect(respuesta).toEqual({ aceptado: true });
     expect(ejecutar).not.toHaveBeenCalled();
     expect(accionar).not.toHaveBeenCalled();
   });

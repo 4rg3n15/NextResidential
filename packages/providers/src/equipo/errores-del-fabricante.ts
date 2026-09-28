@@ -357,6 +357,17 @@ export const interpretarError = (cuerpo: string): ErrorDelFabricante => {
  * reintentes». Aquí la taxonomía se convierte en clases que la suite de
  * contrato exige a cualquier adaptador, de esta marca o de otra.
  */
+/**
+ * 15-L · el texto del mapa, sin la primera letra en mayúscula ni el punto: va
+ * detrás de «el equipo rechazó la orden:». Un código que el mapa no conoce no
+ * se enseña a una persona (lleva el número del fabricante): se calla.
+ */
+const legibleDe = (detalle: string): string | undefined => {
+  if (/0x[0-9a-f]{8}|no conoce/i.test(detalle)) return undefined;
+  const limpio = detalle.trim().replace(/\.$/, '');
+  return limpio === '' ? undefined : limpio.charAt(0).toLowerCase() + limpio.slice(1);
+};
+
 export const comoErrorNeutral = (
   dispositivoId: string,
   cuerpo: string,
@@ -395,14 +406,14 @@ export const comoErrorNeutral = (
     case 'equipo_ocupado':
       return new EquipoOcupado(dispositivoId, detalle);
     case 'equipo_averiado':
-      return new EquipoAveriado(dispositivoId, detalle);
+      return new EquipoAveriado(dispositivoId, detalle, legibleDe(error.detalle));
     case 'reinicio_necesario':
       return new ReinicioNecesario(dispositivoId, detalle);
     case 'peticion_mal_formada':
     case 'placa_no_reconocible':
-      return new PeticionRechazada(dispositivoId, detalle);
+      return new PeticionRechazada(dispositivoId, detalle, legibleDe(error.detalle));
     default:
-      return new EquipoAveriado(dispositivoId, detalle);
+      return new EquipoAveriado(dispositivoId, detalle, legibleDe(error.detalle));
   }
 };
 

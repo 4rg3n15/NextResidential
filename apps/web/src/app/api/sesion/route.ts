@@ -11,6 +11,7 @@ import { accederPorApi, cerrarEnLaApi } from '@/lib/sesion/acceso-por-api';
 import type { IdentificadorDeAcceso } from '@/lib/sesion/acceso-por-api';
 import { estadoDeFalloDeAcceso, textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
 import { ipDe } from '@/lib/limitador';
+import { reenvioDeIp } from '@/lib/ip-de-la-peticion';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -18,10 +19,12 @@ export const runtime = 'nodejs';
 /**
  * Alta y baja de sesión.
  *
- * El navegador manda correo —o NIT y usuario— y contraseña a **su propio
- * origen**; nunca a Supabase. Desde la 15-H la consola los pasa a la API
- * (ADR-023), que es donde viven el correo sintético, el turno y los límites. La respuesta no lleva token: lleva qué hacer a continuación —entrar
- * o pedir el segundo factor—, y el token se queda en la cookie `httpOnly`.
+ * El navegador manda correo —o código y usuario, o el número del portero— y
+ * contraseña a **su propio origen**; nunca a Supabase. Desde la 15-H la
+ * consola los pasa a la API (ADR-023), que es donde viven el correo sintético,
+ * el turno y los límites. La respuesta no lleva token: lleva qué hacer a
+ * continuación —entrar o pedir el segundo factor—, y el token se queda en la
+ * cookie `httpOnly`.
  *
  * El cuerpo se valida aquí aunque el servidor de identidad vuelva a validarlo:
  * un cuerpo con la forma equivocada debe dar 400 con un mensaje útil, no un
@@ -63,13 +66,14 @@ const leerCredenciales = async (peticion: NextRequest): Promise<Credenciales | n
     return null;
   }
   if (typeof cuerpo !== 'object' || cuerpo === null) return null;
-  const { correo, nit, codigo, usuario, contrasena, recordar } = cuerpo as Record<string, unknown>;
+  const { correo, codigo, usuario, contrasena, recordar } = cuerpo as Record<string, unknown>;
   const identificador: IdentificadorDeAcceso | null = esCorreo(correo)
     ? { correo }
     : esTexto(codigo, 3, 8) && esTexto(usuario, 3, 32)
       ? { codigo: codigo.trim(), usuario: usuario.trim() }
-      : esTexto(nit, 5, 20) && esTexto(usuario, 3, 32)
-        ? { nit: nit.trim(), usuario: usuario.trim() }
+      : // H3 (ADR-031) · el portero: su número y nada más.
+        typeof usuario === 'string' && /^[0-9]{4,9}$/.test(usuario.trim())
+        ? { usuario: usuario.trim() }
         : null;
   if (identificador === null) return null;
   if (typeof contrasena !== 'string' || contrasena.length === 0 || contrasena.length > 256) {
@@ -150,10 +154,11 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
   }
 };
 
-export const DELETE = async (): Promise<NextResponse> => {
+export const DELETE = async (peticion: NextRequest): Promise<NextResponse> => {
   const sesion = await leerSesion();
   if (sesion !== null && sesion.accessToken !== '') {
-    await cerrarEnLaApi(sesion.accessToken);
+    // H6 · el cierre de un portero también pasa por su regla de IP.
+    await cerrarEnLaApi(sesion.accessToken, reenvioDeIp(peticion.headers));
     await cerrarSesionRemota(sesion.accessToken);
   }
   await borrarSesion();

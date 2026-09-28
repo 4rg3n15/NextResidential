@@ -59,6 +59,26 @@ export class CapacidadNoSoportada extends ErrorDeEquipo {
   }
 }
 
+/**
+ * D2 (15-L) · el equipo entrega un video que el navegador no reproduce (H.265
+ * en el canal de la ficha, según su propia respuesta RTSP). Se niega ANTES de
+ * negociar: un reproductor negro con «primer cuadro pendiente» no explica nada.
+ */
+export class VideoNoReproducible extends ErrorDeEquipo {
+  constructor(
+    dispositivoId: string,
+    readonly codec: string,
+    readonly canal: string,
+  ) {
+    // Sin el identificador: esta frase la lee el operador en la consola de video.
+    super(
+      dispositivoId,
+      `Este equipo entrega ${codec} en el canal ${canal} y el navegador no lo reproduce: ` +
+        'cámbielo a H.264 en el equipo o elija otro canal en su ficha',
+    );
+  }
+}
+
 /** Ocupado ahora. Reintentable con espera. Es FALLO_TECNICO, no denegación. */
 export class EquipoOcupado extends ErrorDeEquipo {
   readonly reintentable = true;
@@ -70,7 +90,12 @@ export class EquipoOcupado extends ErrorDeEquipo {
 /** Avería propia del equipo. Reintentar no lo arregla. */
 export class EquipoAveriado extends ErrorDeEquipo {
   readonly reintentable = false;
-  constructor(dispositivoId: string, detalle: string) {
+  constructor(
+    dispositivoId: string,
+    detalle: string,
+    /** 15-L · la traducción del código del fabricante, sin jerga, para la consola. */
+    readonly legible?: string,
+  ) {
     super(dispositivoId, `El equipo ${dispositivoId} informa de un error propio: ${detalle}`);
   }
 }
@@ -91,11 +116,23 @@ export class ReinicioNecesario extends ErrorDeEquipo {
  */
 export class CredencialRechazada extends ErrorDeEquipo {
   readonly reintentable = false;
-  constructor(dispositivoId: string) {
+  constructor(
+    dispositivoId: string,
+    /**
+     * A5 (15-L) · cuánto hace que el equipo la rechazó, cuando esta vez NI SE
+     * PRESENTÓ: la plataforma ya sabía que no vale. `undefined` = la rechazó
+     * el equipo ahora.
+     */
+    readonly rechazadaHaceMs?: number,
+  ) {
     super(
       dispositivoId,
-      `El equipo ${dispositivoId} rechazó el usuario o la clave. NO se reintenta: estos ` +
-        'aparatos bloquean la cuenta tras unos pocos intentos fallidos',
+      rechazadaHaceMs === undefined
+        ? `El equipo ${dispositivoId} rechazó el usuario o la clave. NO se reintenta: estos ` +
+            'aparatos bloquean la cuenta tras unos pocos intentos fallidos'
+        : `Credencial rechazada por el equipo ${dispositivoId} hace ` +
+            `${String(Math.round(rechazadaHaceMs / 60_000))} min: no se vuelve a presentar ` +
+            'hasta que se corrija en la consola, para que el equipo no bloquee esta dirección',
     );
   }
 }
@@ -136,7 +173,12 @@ export class BibliotecaLlena extends ErrorDeEquipo {
 /** Se le mandó algo mal formado. El defecto es nuestro; no se reintenta. */
 export class PeticionRechazada extends ErrorDeEquipo {
   readonly reintentable = false;
-  constructor(dispositivoId: string, detalle: string) {
+  constructor(
+    dispositivoId: string,
+    detalle: string,
+    /** 15-L · la traducción del código del fabricante, sin jerga, para la consola. */
+    readonly legible?: string,
+  ) {
     super(dispositivoId, `El equipo ${dispositivoId} rechazó la petición: ${detalle}`);
   }
 }

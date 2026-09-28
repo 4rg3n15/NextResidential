@@ -9,6 +9,7 @@ import type {
   Reloj,
   ResultadoAccionamiento,
   ResultadoDeAccionamiento,
+  Vigencia,
 } from '@ncr/domain-core';
 import { ordenInalcanzable, vigenciaDeAtestacion } from '@ncr/domain-core';
 import { etiqueta } from '../equipo/xml';
@@ -17,12 +18,15 @@ import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { FuenteDePlacas } from '../equipo/fuente-de-placas';
 import { ControlDeBarreraVehicular } from '../barrera/control-barrera';
 import { TerminalFacial } from '../terminal/terminal-facial';
+import type { OpcionesDeTerminal } from '../terminal/terminal-facial';
+import type { AjustesDePersona } from '../terminal/persona-en-el-equipo';
+import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
 import { Videoportero } from '../videoportero/videoportero';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
 import { EscuchaDeAlertStream, transporteSegunCapacidades } from '../equipo/escucha-alertstream';
-import type { EscuchaActiva } from '../nucleo/escucha';
+import type { EscuchaActiva, TransporteDeEscucha } from '../nucleo/escucha';
 import type { OrigenDeVideo } from '../nucleo/video';
-import { origenRtspDe } from './video-rtsp';
+import { canalDeVideoDe, origenRtspDe } from './video-rtsp';
 import { EquipoDecidePorSuCuenta } from '../camara/modo-de-control';
 import { leerVeredictoDeControl } from '../camara/veredicto-de-control';
 import { leerDisparador } from '../camara/disparadores-vinculados';
@@ -32,7 +36,9 @@ import { descubrirCapacidades } from './capacidades-hikvision';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe, soporta } from '../nucleo/capacidades';
-import { CapacidadNoSoportada } from '../nucleo/errores';
+import { CapacidadNoSoportada, CredencialRechazada, VideoNoReproducible } from '../nucleo/errores';
+import { POLITICA_DE_ORDENES, conReintentos } from '../nucleo/reintentos';
+import type { MedioDeEspera } from '../nucleo/reintentos';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
@@ -94,6 +100,21 @@ export interface OpcionesDeHikvision {
    * que pasa en una escucha. Sin ella, el adaptador calla.
    */
   readonly traza?: Bitacora;
+  /**
+   * A5 (15-L) · plazo de cada petición al equipo, en ms. Sale del `.env`
+   * (`EQUIPOS_TIEMPO_LIMITE_MS`): la red de sitio no es la del banco.
+   */
+  readonly tiempoLimiteMs?: number;
+  /** A5 · la espera de los reintentos, inyectable: sin ella una prueba espera de verdad. */
+  readonly medioDeReintento?: MedioDeEspera;
+  /**
+   * A2 (15-L) · cómo se escribe la persona en la terminal (zona, plantilla
+   * horaria) y qué foto se admite. Del `.env`: varía por sitio, no por código.
+   */
+  readonly persona?: AjustesDePersona;
+  readonly limitesDeFoto?: LimitesDeFoto;
+  /** D2 (15-L) · puerto RTSP de los equipos (`VIDEO_PUERTO_RTSP`). 554 por omisión. */
+  readonly puertoRtsp?: number;
 }
 
 const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
@@ -114,6 +135,11 @@ export class HikvisionProvider
 {
   private readonly fuente: FuenteDePlacas;
   private readonly aprobados = new Set<string>();
+  /** A4 (15-L) · el último veredicto de control por equipo, con su instante. */
+  private readonly veredictosDeControl = new Map<
+    string,
+    { readonly decideSolo: boolean; readonly en: number }
+  >();
   private readonly capacidades = new Map<string, CapacidadesDeEquipo>();
   private readonly puertas = new Map<string, AccessPointProvider>();
   private readonly terminales = new Map<string, TerminalFacial>();
@@ -129,6 +155,29 @@ export class HikvisionProvider
   /** La fuente de placas, para que el receptor publique en ella. */
   get fuenteDePlacas(): FuenteDePlacas {
     return this.fuente;
+  }
+
+  /**
+   * C1 (15-L) · lo recordado de un equipo, fuera. Los clientes guardan la
+   * dirección, la credencial y la puerta con que se crearon: sin esto, una
+   * edición en la consola no llegaba al equipo hasta reiniciar la API. La
+   * escucha se cierra y quien la vigila (la API, cada 30 s) la reabre ya con
+   * lo nuevo.
+   */
+  olvidar(dispositivoId: string): void {
+    this.aprobados.delete(dispositivoId);
+    this.veredictosDeControl.delete(dispositivoId);
+    this.capacidades.delete(dispositivoId);
+    this.puertas.delete(dispositivoId);
+    this.terminales.delete(dispositivoId);
+    this.intercomos.delete(dispositivoId);
+    this.escuchas.get(dispositivoId)?.detener();
+    this.escuchas.delete(dispositivoId);
+    // F2 · y el registro que lo recordaba para contestar rápido a la terminal.
+    this.opciones.registro.olvidar?.(dispositivoId);
+    this.opciones.traza?.registrar('info', 'equipo olvidado tras un cambio en su ficha', {
+      dispositivoId,
+    });
   }
 
   // ── Capacidades ──────────────────────────────────────────────────────────
@@ -207,7 +256,32 @@ export class HikvisionProvider
       // afirma: dice que la orden se aceptó.
       return { aceptado: resultado.estado === 'aceptada', latenciaMs: resultado.latenciaMs };
     }
-    return puerta.abrir(dispositivoId, actorId);
+    // A5 · ocupado o nonce vencido se reintentan con dispersión; nada más.
+    return this.reintentando(() => puerta.abrir(dispositivoId, actorId));
+  }
+
+  /**
+   * A4 (15-L) · lo que el proveedor sabe de si el equipo decide solo. Lo
+   * aprobado vale para todo el proceso (como en `exigirQueNoDecidaSolo`); lo
+   * rechazado se recuerda un minuto —una atestación nueva tarda eso en
+   * notarse— y, si no se sabe, se comprueba UNA vez. `null` si no se pudo.
+   */
+  async decideSolo(dispositivoId: string): Promise<boolean | null> {
+    if (this.aprobados.has(dispositivoId)) return false;
+    const recordado = this.veredictosDeControl.get(dispositivoId);
+    if (recordado !== undefined && this.opciones.reloj.ahora().getTime() - recordado.en < 60_000) {
+      return recordado.decideSolo;
+    }
+    try {
+      await this.exigirQueNoDecidaSolo(await this.resolver(dispositivoId));
+      return false;
+    } catch (error) {
+      return error instanceof EquipoDecidePorSuCuenta ? true : null;
+    }
+  }
+
+  private reintentando<T>(orden: () => Promise<T>): Promise<T> {
+    return conReintentos(orden, POLITICA_DE_ORDENES, this.opciones.medioDeReintento);
   }
 
   /**
@@ -247,8 +321,9 @@ export class HikvisionProvider
       // separa de «no contesta», que se resuelve llamando al técnico.
       if (respuesta.estado === 401 || respuesta.estado === 403) return 'degradado';
       return respuesta.ok ? 'en_linea' : 'degradado';
-    } catch {
-      return 'fuera_de_linea';
+    } catch (error) {
+      // A5 · con la credencial ya rechazada ni se pregunta: contesta, pero no nos deja.
+      return error instanceof CredencialRechazada ? 'degradado' : 'fuera_de_linea';
     }
   }
 
@@ -272,7 +347,35 @@ export class HikvisionProvider
    */
   async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
     const equipo = await this.resolver(dispositivoId);
-    return origenRtspDe(equipo);
+    // D2 (15-L) · si la última respuesta RTSP del equipo, en ESTE canal, fue un
+    // códec que el navegador no reproduce, se dice ahora y no con un negro.
+    const video = equipo.capacidades?.video;
+    const canal = canalDeVideoDe(equipo);
+    if (
+      video !== undefined &&
+      video.codec !== null &&
+      video.codec !== 'H.264' &&
+      video.canal === canal
+    ) {
+      throw new VideoNoReproducible(dispositivoId, video.codec, canal);
+    }
+    return origenRtspDe(equipo, this.opciones.puertoRtsp);
+  }
+
+  /** C3 (15-L) · la señal de la escucha de este equipo, si hay escucha. */
+  senalDeEventos(dispositivoId: string): {
+    readonly transporte: TransporteDeEscucha;
+    readonly ultimaSenal: Date | null;
+    readonly rechazo: string | null;
+  } | null {
+    const escucha = this.escuchas.get(dispositivoId);
+    return escucha === undefined
+      ? null
+      : {
+          transporte: escucha.transporte,
+          ultimaSenal: escucha.ultimaSenal?.() ?? null,
+          rechazo: escucha.rechazoPorOtraPlataforma?.() ?? null,
+        };
   }
 
   // ── Escucha de lo que el equipo emite (A4) ───────────────────────────────
@@ -310,7 +413,13 @@ export class HikvisionProvider
       transporte: flujo,
     });
     const control = new AbortController();
-    void this.bombear(escucha, control.signal, transporte);
+    let terminada = false;
+    void this.bombear(escucha, control.signal, transporte).then(() => {
+      // A5 (15-L) · terminó sola (credencial rechazada): se retira, y el
+      // próximo rearme la vuelve a pedir con la credencial que haya entonces.
+      terminada = true;
+      if (this.escuchas.get(dispositivoId) === nueva) this.escuchas.delete(dispositivoId);
+    });
 
     const nueva: EscuchaActiva = {
       dispositivoId,
@@ -323,6 +432,9 @@ export class HikvisionProvider
         control.abort();
         this.escuchas.delete(dispositivoId);
       },
+      activa: () => !terminada,
+      ultimaSenal: () => escucha.ultimaSenal(),
+      rechazoPorOtraPlataforma: () => escucha.rechazoPorOtraPlataforma(),
     };
     this.escuchas.set(dispositivoId, nueva);
     return nueva;
@@ -360,18 +472,21 @@ export class HikvisionProvider
     dispositivoId: string,
     plantillaId: string,
     plantilla: Uint8Array,
+    vigencia?: Vigencia,
   ): Promise<void> {
     await this.exigirQuePuedaTenerRostros(dispositivoId);
     await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
     const biblioteca = await this.bibliotecaDe(dispositivoId);
-    await biblioteca.sincronizar(dispositivoId, plantillaId, plantilla);
+    await this.reintentando(() =>
+      biblioteca.sincronizar(dispositivoId, plantillaId, plantilla, vigencia),
+    );
   }
 
   async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
     await this.exigirQuePuedaTenerRostros(dispositivoId);
     await this.exigirCapacidad(dispositivoId, 'bibliotecaDeRostros');
     const biblioteca = await this.bibliotecaDe(dispositivoId);
-    await biblioteca.suprimir(dispositivoId, plantillaId);
+    await this.reintentando(() => biblioteca.suprimir(dispositivoId, plantillaId));
   }
 
   /**
@@ -389,7 +504,7 @@ export class HikvisionProvider
     await this.exigirCapacidad(dispositivoId, 'verificacionRemota');
     await this.exigirQueSeaTerminal(dispositivoId);
     const terminal = await this.terminalDe(dispositivoId);
-    return terminal.responderVerificacion(dispositivoId, veredicto);
+    return this.reintentando(() => terminal.responderVerificacion(dispositivoId, veredicto));
   }
 
   // ── IntercomProvider ─────────────────────────────────────────────────────
@@ -454,6 +569,7 @@ export class HikvisionProvider
     peticion?: typeof fetch;
     traza?: Bitacora;
     dispositivoId: string;
+    tiempoLimiteMs?: number;
   } {
     return {
       host: equipo.host,
@@ -464,6 +580,9 @@ export class HikvisionProvider
       dispositivoId: equipo.dispositivoId,
       ...(this.opciones.peticion === undefined ? {} : { peticion: this.opciones.peticion }),
       ...(this.opciones.traza === undefined ? {} : { traza: this.opciones.traza }),
+      ...(this.opciones.tiempoLimiteMs === undefined
+        ? {}
+        : { tiempoLimiteMs: this.opciones.tiempoLimiteMs }),
     };
   }
 
@@ -519,6 +638,10 @@ export class HikvisionProvider
         this.aprobados.add(equipo.dispositivoId);
         return;
       }
+      this.veredictosDeControl.set(equipo.dispositivoId, {
+        decideSolo: true,
+        en: this.opciones.reloj.ahora().getTime(),
+      });
       throw new EquipoDecidePorSuCuenta(veredicto.modo, motivos);
     }
     this.aprobados.add(equipo.dispositivoId);
@@ -613,9 +736,20 @@ export class HikvisionProvider
       modo: equipo.modoDeTerminal ?? 'decide_el_equipo',
       numeroDePuerta: equipo.numeroDePuerta ?? null,
       bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
+      ...this.ajustesDeBiblioteca(),
     });
     this.terminales.set(equipo.dispositivoId, creada);
     return creada;
+  }
+
+  /** A2 (15-L) · lo que el `.env` fija para toda biblioteca de rostros. */
+  private ajustesDeBiblioteca(): Pick<OpcionesDeTerminal, 'persona' | 'limitesDeFoto'> {
+    return {
+      ...(this.opciones.persona === undefined ? {} : { persona: this.opciones.persona }),
+      ...(this.opciones.limitesDeFoto === undefined
+        ? {}
+        : { limitesDeFoto: this.opciones.limitesDeFoto }),
+    };
   }
 
   private async exigirQuePuedaTenerRostros(dispositivoId: string): Promise<void> {
@@ -645,6 +779,7 @@ export class HikvisionProvider
       modo: 'decide_el_equipo',
       numeroDePuerta: equipo.numeroDePuerta ?? null,
       bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
+      ...this.ajustesDeBiblioteca(),
     });
     this.terminales.set(dispositivoId, creada);
     return creada;

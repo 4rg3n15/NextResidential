@@ -34,17 +34,6 @@ const PUBLICAS = new Set([
   'GET /health',
   'GET /ready',
   /**
-   * A3 (15-E) · la puerta del TITULAR del dato biométrico (RN-10). No hay
-   * sesión porque el visitante no es usuario: lo que sustituye al token es un
-   * enlace FIRMADO por copropiedad, con caducidad, que nombra un solo
-   * consentimiento. Sin él responden 404 y no revelan nada; su prueba está en
-   * `consentimiento-publico.e2e.test.ts`, incluido el token de otra
-   * copropiedad.
-   */
-  'GET /consentimiento/:token',
-  'POST /consentimiento/:token/respuesta',
-  'POST /consentimiento/:token/revocacion',
-  /**
    * 15-H (ADR-023) · el inicio de sesión por correo o por NIT y usuario. Sin
    * sesión por definición; lo que la protege son sus tres límites (por cuenta,
    * por origen declarado y por dirección) y el tiempo uniforme de sus fallos.
@@ -85,6 +74,10 @@ const SIN_RECURSO_TENANT = new Set([
   '/porteria/sesion/patrullaje',
   '/porteria/sesion/desbloqueo',
   '/porteria/perfil',
+  // ETAPA 15-L (H5, ADR-031) · el interruptor GLOBAL del modo pruebas: es de la
+  // plataforma, no de una copropiedad. Lo lee todo el que tiene sesión (la
+  // franja de la consola) y lo cambia sólo el superadministrador.
+  '/plataforma/modo-pruebas',
 ]);
 
 /**

@@ -1,8 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/hogar.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
@@ -11,7 +8,6 @@ import 'package:ncr_residente/presentacion/pantallas/familia.dart';
 import 'package:ncr_residente/presentacion/pantallas/historial.dart';
 import 'package:ncr_residente/presentacion/pantallas/inicio.dart';
 import 'package:ncr_residente/presentacion/pantallas/notificaciones.dart';
-import 'package:ncr_residente/presentacion/pantallas/pendiente.dart';
 import 'package:ncr_residente/presentacion/pantallas/perfil.dart';
 import 'package:ncr_residente/presentacion/pantallas/vehiculos.dart';
 
@@ -31,19 +27,28 @@ class RepositorioFalso implements RepositorioDelResidente {
     this.zonas = const [],
     this.respuesta,
     this.falloAlCrear,
+    this.recientes = const [],
   });
   final bool puedeAutorizar;
   final bool activa;
   final List<ZonaComun> zonas;
 
-  /// Qué contesta el conjunto al crear. `null` = aceptada.
+  /// Qué contesta el conjunto al crear o al volver a autorizar. `null` =
+  /// aceptada.
   final ResultadoDeVisita? respuesta;
 
   /// Un fallo de TRANSPORTE, que es cosa distinta de un rechazo de negocio.
   final Fallo? falloAlCrear;
 
+  /// F6 · lo que devuelve «últimos visitantes».
+  final List<VisitanteReciente> recientes;
+
   final List<NuevaVisita> creadas = [];
   final List<AparatoDeNotificaciones> aparatos = [];
+
+  /// Cada «volver a autorizar», con lo que se pidió.
+  final List<({String autorizacionId, DateTime inicio, int duracion, bool casilla, String clave})>
+      repeticiones = [];
 
   @override
   Future<MiHogar> miHogar() async => MiHogar(
@@ -145,21 +150,26 @@ class RepositorioFalso implements RepositorioDelResidente {
     aparatos.add(aparato);
   }
 
-  final List<String> capturas = [];
-@override
-  Future<ResultadoDeCaptura> capturarRostro({
+  @override
+  Future<List<VisitanteReciente>> ultimosVisitantes() async => recientes;
+
+  @override
+  Future<ResultadoDeVisita> volverAAutorizar({
     required String autorizacionId,
-    required MedidasDeCaptura medidas,
-    required Uint8List vector,
-    required String versionPolitica,
-    required DateTime suprimirEn,
+    required DateTime inicio,
+    required int duracionMinutos,
+    required bool casillaMarcada,
+    required String claveDeIdempotencia,
   }) async {
-    capturas.add(autorizacionId);
-    return const CapturaAceptada(
-      consentimientoId: 'c-1',
-      titular: 'Visitante de prueba',
-      calidad: 0.8,
-    );
+    if (falloAlCrear != null) throw falloAlCrear!;
+    repeticiones.add((
+      autorizacionId: autorizacionId,
+      inicio: inicio,
+      duracion: duracionMinutos,
+      casilla: casillaMarcada,
+      clave: claveDeIdempotencia,
+    ));
+    return respuesta ?? const VisitaCreada(id: 'a-2', repetida: false, equipos: 1, sincronizadas: 1);
   }
 }
 
@@ -179,6 +189,7 @@ void main() {
           controlador: inicio,
           autorizaciones: autorizaciones,
           alPedirAcceso: () {},
+          alRegistrarVisita: () {},
           alAbrirFamilia: () {},
           alAbrirHistorial: () {},
           alAbrirVehiculos: () {},
@@ -207,7 +218,7 @@ void main() {
     expect(find.text('Visitante propio'), findsOneWidget);
   });
 
-  testWidgets('M-1 · con la vivienda inactiva, RN-13 se explica y el botón no está activo',
+  testWidgets('M-1 · con la vivienda inactiva, se explica y el botón no está activo',
       (t) async {
     final repo = RepositorioFalso(puedeAutorizar: false, activa: false);
     final inicio = controladorDeInicio(repo);
@@ -221,6 +232,7 @@ void main() {
           controlador: inicio,
           autorizaciones: autorizaciones,
           alPedirAcceso: () {},
+          alRegistrarVisita: () {},
           alAbrirFamilia: () {},
           alAbrirHistorial: () {},
           alAbrirVehiculos: () {},
@@ -229,7 +241,7 @@ void main() {
     );
     await t.pumpAndSettle();
 
-    expect(find.textContaining('RN-13'), findsOneWidget);
+    expect(find.textContaining('Su vivienda está inactiva'), findsOneWidget);
     // El botón sigue visible —esconderlo dejaría al residente buscándolo— y no
     // responde. Se comprueba sobre el `InkWell`, que es quien recibe el toque:
     // un `Semantics` de adorno podría decir «habilitado» con el `onTap` nulo.
@@ -258,7 +270,7 @@ void main() {
     expect(find.text('Desactivado'), findsOneWidget);
     // Y el conteo cuenta los ACTIVOS, no las filas.
     expect(find.text('1 residente(s) en su vivienda'), findsOneWidget);
-    expect(find.textContaining('P-11'), findsOneWidget);
+    expect(find.textContaining('sólo el titular de la vivienda puede autorizar'), findsOneWidget);
   });
 
   testWidgets('M-3 · la placa se muestra como la normalizó el dominio', (t) async {
@@ -292,8 +304,7 @@ void main() {
     expect(motivoLegible('LISTA_NEGRA'), 'La persona o la placa está en lista negra');
   });
 
-  testWidgets('M-8 · las notificaciones ya NO son un interruptor, y lo que sigue pendiente sí',
-      (t) async {
+  testWidgets('M-8 · ningún interruptor de avisos: la verdad en una frase (15-L)', (t) async {
     final repo = RepositorioFalso();
     final inicio = controladorDeInicio(repo);
     await inicio.cargarAhora();
@@ -319,7 +330,6 @@ void main() {
             alEditarPerfil: (_) {},
             alCambiarVivienda: (_) {},
             alCambiarContrasena: () {},
-            estadoDeAvisos: EstadoDeAvisos.sinDeterminar,
           ),
         ),
       ),
@@ -335,34 +345,15 @@ void main() {
         scrollable: find.byType(Scrollable).first);
     expect(find.text('Código: ABCD-EFGH'), findsOneWidget);
 
-    // En 11-A las notificaciones eran dos interruptores apagados. Ahora son una
-    // fila con estado, porque «activadas» resumía tres condiciones distintas y
-    // dejaba al residente creyendo que le avisarían.
+    // En 11-A las notificaciones eran dos interruptores apagados; en 11-B, el
+    // estado del registro push. Esta compilación no lleva servicio de
+    // mensajería (15-L): la fila dice lo que es verdad y ningún interruptor
+    // promete otra cosa, tampoco uno deshabilitado.
     await t.scrollUntilVisible(find.text('Notificaciones'), 200,
         scrollable: find.byType(Scrollable).first);
     expect(find.text('Notificaciones'), findsOneWidget);
-    expect(find.text(resumenDeAvisos(EstadoDeAvisos.sinDeterminar)), findsOneWidget);
-
-    final interruptores = t.widgetList<SwitchListTile>(find.byType(SwitchListTile));
-    expect(interruptores.length, 1, reason: 'solo queda el resumen semanal');
-    // `onChanged: null` es lo que lo deshabilita de verdad. Uno que se mueva y
-    // no guarde nada es una mentira con animación.
-    expect(interruptores.every((s) => s.onChanged == null), isTrue);
-  });
-
-  testWidgets('las pestañas de 11-B dicen qué falta en vez de quedarse mudas', (t) async {
-    await t.pumpWidget(
-      envolver(
-        const Scaffold(
-          body: PantallaPendiente(
-            titulo: 'Visitantes',
-            pantalla: 'M-4',
-            detalle: 'Llega en 11-B con la cámara y el modo sin conexión.',
-          ),
-        ),
-      ),
-    );
-    expect(find.text('Pantalla M-4 · en construcción'), findsOneWidget);
-    expect(find.textContaining('modo sin conexión'), findsOneWidget);
+    expect(find.text(avisosConLaAppAbierta), findsOneWidget);
+    expect(find.byType(SwitchListTile), findsNothing);
+    expect(find.byType(Switch), findsNothing);
   });
 }

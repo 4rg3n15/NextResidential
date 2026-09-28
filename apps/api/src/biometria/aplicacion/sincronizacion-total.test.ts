@@ -6,17 +6,10 @@ import {
   RepositorioConsentimientosEnMemoria,
   RepositorioPlantillasEnMemoria,
 } from '../infraestructura/repositorios-en-memoria';
-import {
-  CapturarRostro,
-  ResponderConsentimiento,
-  RevocarConsentimiento,
-  SincronizarPlantilla,
-} from './casos-de-uso';
+import { CapturarRostro, RevocarConsentimiento, SincronizarPlantilla } from './casos-de-uso';
 import type { CatalogoDeTerminales, TerminalConBiblioteca } from './puertos';
-import {
-  PropagarConsentimientoAceptado,
-  SincronizarPlantillaEnTerminales,
-} from './sincronizacion-total';
+import { SincronizarPlantillaEnTerminales } from './sincronizacion-total';
+import { RespuestaDelTitular } from '../../../test/dobles/respuesta-del-titular';
 
 const COP = 'cop-1';
 const TITULAR = 'visitante-1';
@@ -49,10 +42,15 @@ class Terminales implements FaceTemplateProvider {
     this.retiradas.push(`${dispositivoId}/${plantillaId}`);
   }
 }
+type Omitido = TerminalConBiblioteca & { readonly motivo: 'no_admite' | 'sin_comprobar' };
 class Catalogo implements CatalogoDeTerminales {
+  omitidos: Omitido[] = [];
   constructor(readonly terminales: TerminalConBiblioteca[]) {}
   async conBibliotecaDeRostros(): Promise<readonly TerminalConBiblioteca[]> {
     return this.terminales;
+  }
+  async sinBibliotecaDeRostros(): Promise<readonly Omitido[]> {
+    return this.omitidos;
   }
 }
 const bitacora: Bitacora & { lineas: string[] } = {
@@ -74,8 +72,7 @@ let plantillas: RepositorioPlantillasEnMemoria;
 let terminales: Terminales;
 let catalogo: Catalogo;
 let enTerminales: SincronizarPlantillaEnTerminales;
-let propagar: PropagarConsentimientoAceptado;
-let responder: ResponderConsentimiento;
+let responder: RespuestaDelTitular;
 let revocar: RevocarConsentimiento;
 let capturar: CapturarRostro;
 
@@ -104,11 +101,10 @@ beforeEach(() => {
   const boveda = new BovedaAesGcm(LLAVE, 'env:X', new AlmacenEnMemoria(), terminales);
   const reloj = new RelojFijo();
   capturar = new CapturarRostro(consentimientos, plantillas, boveda, reloj, new Ids());
-  responder = new ResponderConsentimiento(consentimientos, plantillas, reloj);
+  responder = new RespuestaDelTitular(consentimientos, plantillas, reloj);
   revocar = new RevocarConsentimiento(consentimientos, plantillas, boveda, reloj);
   const una = new SincronizarPlantilla(consentimientos, plantillas, boveda, reloj);
   enTerminales = new SincronizarPlantillaEnTerminales(plantillas, catalogo, una, bitacora);
-  propagar = new PropagarConsentimientoAceptado(plantillas, enTerminales, bitacora);
 });
 
 describe('SincronizarPlantillaEnTerminales · a TODAS, por capacidad (A3)', () => {
@@ -146,6 +142,9 @@ describe('SincronizarPlantillaEnTerminales · a TODAS, por capacidad (A3)', () =
       detalle: expect.stringContaining('fuera de línea'),
     });
     expect(terminales.recibidas).toEqual([`v-1/${plantillaId}`]);
+    // F3 (15-L) · el fallo queda escrito POR EQUIPO, con su motivo.
+    expect(plantillas.fallos.get(`${plantillaId}/t-1`)).toContain('fuera de línea');
+    expect(plantillas.fallos.has(`${plantillaId}/v-1`)).toBe(false);
   });
 
   it('sin equipos con biblioteca de rostros: cero destinos, y lo dice en bitácora', async () => {
@@ -155,6 +154,34 @@ describe('SincronizarPlantillaEnTerminales · a TODAS, por capacidad (A3)', () =
     const r = await enTerminales.ejecutar(ctx, { plantillaId });
     expect(r.ok && r.valor.terminales).toBe(0);
     expect(bitacora.lineas).toContain('sincronización total sin destino');
+  });
+
+  it('A3 (15-L) · lo que no admite rostros se OMITE y se dice: en el resultado y en bitácora', async () => {
+    catalogo.omitidos = [
+      { dispositivoId: 'v-2', nombre: 'Videoportero de servicio', motivo: 'no_admite' },
+      { dispositivoId: 't-9', nombre: 'Terminal nueva', motivo: 'sin_comprobar' },
+    ];
+    const { plantillaId, consentimientoId } = await captura();
+    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: true });
+    const r = await enTerminales.ejecutar(ctx, { plantillaId });
+    if (!r.ok) throw new Error(r.error.detalle);
+    expect(r.valor.omitidas).toEqual([
+      {
+        dispositivoId: 'v-2',
+        nombre: 'Videoportero de servicio',
+        detalle: 'este equipo no admite rostros',
+      },
+      {
+        dispositivoId: 't-9',
+        nombre: 'Terminal nueva',
+        detalle: 'aún no se sabe si admite rostros: use «Probar conexión» en su ficha',
+      },
+    ]);
+    // Omitir no es fallar: las dos con biblioteca la tienen igual.
+    expect(r.valor.sincronizadas).toBe(2);
+    expect(
+      bitacora.lineas.filter((l) => l === 'equipo omitido en la sincronización de rostros'),
+    ).toHaveLength(2);
   });
 
   it('relanzarla no duplica: la terminal la vuelve a recibir y la fila es la misma', async () => {
@@ -169,33 +196,6 @@ describe('SincronizarPlantillaEnTerminales · a TODAS, por capacidad (A3)', () =
     const r = await enTerminales.ejecutar(ctx, { plantillaId: 'no-existe' });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.codigo).toBe('ENTIDAD_NO_ENCONTRADA');
-  });
-});
-
-describe('PropagarConsentimientoAceptado · lo que pasa justo tras aceptar', () => {
-  it('empuja las plantillas pendientes de ese consentimiento a todas las terminales', async () => {
-    const { plantillaId, consentimientoId } = await captura();
-    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: true });
-
-    const resultados = await propagar.ejecutar(ctx, { consentimientoId });
-    expect(resultados).toHaveLength(1);
-    expect(resultados[0]).toMatchObject({ plantillaId, sincronizadas: 2 });
-  });
-
-  it('con el consentimiento rechazado no propaga nada', async () => {
-    const { consentimientoId } = await captura();
-    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: false });
-    expect(await propagar.ejecutar(ctx, { consentimientoId })).toEqual([]);
-    expect(terminales.recibidas).toEqual([]);
-  });
-
-  it('nunca lanza: una terminal que revienta queda en bitácora', async () => {
-    const { consentimientoId } = await captura();
-    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: true });
-    terminales.caidas.add('t-1');
-    terminales.caidas.add('v-1');
-    const resultados = await propagar.ejecutar(ctx, { consentimientoId });
-    expect(resultados[0]).toMatchObject({ sincronizadas: 0, fallidas: 2 });
   });
 });
 

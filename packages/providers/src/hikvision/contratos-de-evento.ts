@@ -1,4 +1,12 @@
 import { plantillaDesdeElEquipo } from '../terminal/identificador-en-el-equipo';
+import { referenciaDelEvento } from './referencia-del-evento';
+import { clasificarBloque } from './clasificacion-de-bloque';
+import { cargaSaneada } from './carga-saneada';
+import type { TipoDeEventoDeEquipo } from './catalogo-de-eventos';
+
+// R3 (15-L) · la parte XML del flujo se lee en su propio fichero; se reexporta
+// aquí para que nadie tenga que saber dónde vive.
+export { bloqueDesdeXml } from './bloque-del-flujo-xml';
 
 /**
  * Los DOS contratos de evento de Hikvision, y por qué son dos.
@@ -80,12 +88,13 @@ export interface RecuadroDetectado {
  * | `timbre`       | Videoportero              | que alguien pulsó                        |
  * | `llamada`      | Videoportero              | origen de la llamada (edificio/unidad)   |
  * | `rostro`       | Terminal facial           | persona reconocida y si ESPERA veredicto |
+ * | `equipo`       | Terminal y videoportero   | puerta, botón, sabotaje, estado (15-L)   |
  * | `desconocido`  | Cualquiera                | nada que el sistema sepa usar            |
  *
  * `rostro` con `esperaVeredicto: true` es el corazón de la verificación remota
  * (O4): la terminal reconoció y NO abrió, y espera que la plataforma decida.
  */
-export type ClaseDeEvento = 'placa' | 'timbre' | 'llamada' | 'rostro' | 'desconocido';
+export type ClaseDeEvento = 'placa' | 'timbre' | 'llamada' | 'rostro' | 'equipo' | 'desconocido';
 
 /** Evento normalizado: lo único que sale de este módulo hacia el resto. */
 export interface EventoDeEquipo {
@@ -157,6 +166,18 @@ export interface EventoDeEquipo {
    */
   readonly unidadDeLlamada: string | null;
   readonly edificioDeLlamada: string | null;
+
+  // ── Bloque B (15-L) · lo que la consola de eventos enseña de CADA evento ──
+  /** Tipo normalizado por el catálogo (`catalogo-de-eventos.ts`). */
+  readonly tipo: TipoDeEventoDeEquipo;
+  /** Lo que la consola enseña, en español. «Evento del equipo (código X/Y)» si no se conoce. */
+  readonly titulo: string;
+  /** `majorEventType`/`subEventType` tal cual, si el equipo los emitió. */
+  readonly codigo: { readonly mayor: number; readonly menor: number } | null;
+  /** La hora como la escribió el equipo, para auditar su reloj. */
+  readonly horaDelEquipo: string | null;
+  /** El bloque recibido, saneado (`carga-saneada.ts`): sin credenciales ni imágenes. */
+  readonly carga: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -355,8 +376,25 @@ export const desdeAlarmServerXml = (
    */
   const placaLegible = placa === null || placa === '' || /^noplate$/i.test(placa) ? null : placa;
 
+  const esPlaca = /ANPR|vehicle|LPR/i.test(tipo ?? '');
   return {
-    clase: /ANPR|vehicle|LPR/i.test(tipo ?? '') ? 'placa' : 'desconocido',
+    clase: esPlaca ? 'placa' : 'desconocido',
+    tipo: esPlaca ? 'lectura_de_placa' : 'desconocido',
+    titulo: esPlaca
+      ? 'Lectura de placa'
+      : `Evento del equipo (${(tipo ?? 'sin tipo').trim().slice(0, 40)})`,
+    codigo: null,
+    horaDelEquipo: cuando === null ? null : cuando.slice(0, 64),
+    // Del XML sólo lo que ya se leyó: nunca el documento entero (lleva el
+    // recuadro, la analítica de conducta que se ignora a propósito, etc.).
+    carga: cargaSaneada({
+      eventType: tipo,
+      licensePlate: placaLegible,
+      confidenceLevel: etiqueta(cuerpo, 'confidenceLevel'),
+      openGateType: etiqueta(cuerpo, 'openGateType'),
+      alarmDataType: etiqueta(cuerpo, 'alarmDataType'),
+      channelID: etiqueta(cuerpo, 'channelID'),
+    }),
     placa: placaLegible,
     confianza: confianza === null || Number.isNaN(confianza) ? null : confianza,
     quienAbrio: quienAbrioDe(etiqueta(cuerpo, 'openGateType')),
@@ -404,7 +442,14 @@ export const desdeAlarmServerXml = (
  *
  * La forma JSON del evento ANPR es la del bloque de `alertStream` (mismas
  * claves), y se normaliza por el mismo sitio. `alarmDataType` se busca en la
- * raíz y dentro de `ANPR`; si no está, HISTÓRICO, como en XML.
+ * raíz y dentro de `ANPR`, y si está, MANDA.
+ *
+ * R4 (15-L) · si NO está, decide `currentEvent`, como en el flujo. Antes era
+ * histórico sin más, y la terminal y el videoportero no emiten
+ * `alarmDataType`: ponen `currentEvent` DENTRO de `AccessControllerEvent` o de
+ * `VoiceTalkEvent`. Todo lo que la terminal publicaba por aquí se descartaba
+ * como historial. Sin ninguno de los dos, sigue siendo histórico: la dirección
+ * segura (ADR-05).
  */
 export const esJsonDeAlarmServer = (cuerpo: string): boolean =>
   /^\s*\{/.test(cuerpo) && /"eventType"/.test(cuerpo);
@@ -429,8 +474,10 @@ export const desdeAlarmServerJson = (
   const base = desdeAlertStreamJson(bloque, dispositivoId, ahora);
   return {
     ...base,
-    // En el sobre del receptor manda `alarmDataType`, no `currentEvent`.
-    enVivo: esDatoEnVivo(alarmDataType === undefined ? null : String(alarmDataType)),
+    enVivo:
+      alarmDataType === undefined || alarmDataType === null
+        ? esEventoEnVivo(bloque)
+        : esDatoEnVivo(String(alarmDataType)),
     referenciaDelEquipo:
       typeof bloque['eventId'] === 'string'
         ? bloque['eventId']
@@ -476,6 +523,8 @@ export interface BloqueDeAlertStream {
     readonly majorEventType?: number;
     readonly subEventType?: number;
     readonly verifyNo?: number;
+    /** La hora que el equipo escribe dentro del bloque (la guía: `time`). */
+    readonly time?: string;
   };
   /**
    * Llamada del VIDEOPORTERO (6.5). Origen tal como el equipo lo declara:
@@ -489,11 +538,29 @@ export interface BloqueDeAlertStream {
     readonly roomNumber?: number | string;
   };
   readonly voiceTalkEvent?: { readonly src?: BloqueDeAlertStream['CallInfo'] };
+  /**
+   * La llamada del VIDEOPORTERO según su guía (`eventType "voiceTalkEvent"`):
+   * la clave va con MAYÚSCULA y `currentEvent` y `serialNo` viajan dentro.
+   * `cmdType`: request · cancel · answer · reject · bellTimeout · hangUp ·
+   * deviceOnCall.
+   */
+  readonly VoiceTalkEvent?: {
+    readonly cmdType?: string;
+    readonly serialNo?: number | string;
+    readonly currentEvent?: boolean;
+    readonly src?: BloqueDeAlertStream['CallInfo'];
+    readonly target?: BloqueDeAlertStream['CallInfo'];
+  };
+  /** Identificador del evento si el firmware lo emite. `[SUPUESTO]` S-66. */
+  readonly uid?: string;
 }
 
 /** «edificio 1 · unidad 2 · periodo 3», con lo que venga. */
+const origenDe = (bloque: BloqueDeAlertStream): BloqueDeAlertStream['CallInfo'] =>
+  bloque.CallInfo ?? bloque.VoiceTalkEvent?.src ?? bloque.voiceTalkEvent?.src;
+
 const origenDeLlamadaDe = (bloque: BloqueDeAlertStream): string | null => {
-  const origen = bloque.CallInfo ?? bloque.voiceTalkEvent?.src;
+  const origen = origenDe(bloque);
   if (origen === undefined) return null;
   const partes = [
     ['periodo', origen.periodNumber],
@@ -512,28 +579,18 @@ const parteDeLlamada = (
   bloque: BloqueDeAlertStream,
   clave: 'unitNumber' | 'buildingNumber',
 ): string | null => {
-  const origen = bloque.CallInfo ?? bloque.voiceTalkEvent?.src;
-  const valor = origen?.[clave];
+  const valor = origenDe(bloque)?.[clave];
   if (valor === undefined || valor === null) return null;
   const texto = String(valor).trim();
   return texto === '' ? null : texto;
 };
 
-/** La clase de un bloque JSON, por lo que TRAE y no sólo por su tipo. */
-export const claseDeBloque = (bloque: BloqueDeAlertStream): ClaseDeEvento => {
-  const tipo = bloque.eventType ?? '';
-  if ((bloque.ANPR?.licensePlate ?? null) !== null) return 'placa';
-  if (bloque.AccessControllerEvent !== undefined || /AccessController/i.test(tipo)) return 'rostro';
-  if (
-    bloque.CallInfo !== undefined ||
-    bloque.voiceTalkEvent !== undefined ||
-    /videoIntercom|callSignal|voiceTalk/i.test(tipo)
-  ) {
-    return 'llamada';
-  }
-  if (/doorbell/i.test(tipo)) return 'timbre';
-  return 'desconocido';
-};
+/**
+ * La clase de un bloque JSON, por lo que TRAE y no sólo por su tipo. Desde la
+ * 15-L la decide el catálogo de códigos (`clasificacion-de-bloque.ts`).
+ */
+export const claseDeBloque = (bloque: BloqueDeAlertStream): ClaseDeEvento =>
+  clasificarBloque(bloque).clase;
 
 /**
  * **La línea que impide inundar el sistema al conectar.**
@@ -545,7 +602,9 @@ export const claseDeBloque = (bloque: BloqueDeAlertStream): ClaseDeEvento => {
  * (ADR-05) y avisar a residentes de visitas de hace semanas.
  */
 export const esEventoEnVivo = (bloque: BloqueDeAlertStream): boolean =>
-  bloque.currentEvent === true || bloque.AccessControllerEvent?.currentEvent === true;
+  bloque.currentEvent === true ||
+  bloque.AccessControllerEvent?.currentEvent === true ||
+  bloque.VoiceTalkEvent?.currentEvent === true;
 
 /**
  * H-SITIO-14 · el MOTIVO por el que un bloque no es un evento en vivo, para
@@ -556,47 +615,13 @@ export const esEventoEnVivo = (bloque: BloqueDeAlertStream): boolean =>
 export const motivoDeDescarte = (bloque: BloqueDeAlertStream): string | null => {
   if (/heartbeat/i.test(bloque.eventType ?? '')) return 'latido del equipo';
   if (esEventoEnVivo(bloque)) return null;
-  const declarado = bloque.currentEvent ?? bloque.AccessControllerEvent?.currentEvent;
+  const declarado =
+    bloque.currentEvent ??
+    bloque.AccessControllerEvent?.currentEvent ??
+    bloque.VoiceTalkEvent?.currentEvent;
   return declarado === false
     ? 'histórico: el equipo lo marca currentEvent=false'
     : 'sin currentEvent: se trata como histórico (dirección segura, ADR-05)';
-};
-
-/**
- * H-SITIO-14 · una parte XML del flujo. La guía dice que el enlace de armado
- * lleva `<SubscribeEventResponse/>` primero y `<EventNotificationAlert/>` (el
- * evento o el latido) después. Se leen los campos que el resto del sistema
- * usa; lo demás no se inventa. DOCUMENTADO, NO VERIFICADO en estos modelos.
- */
-export const bloqueDesdeXml = (
-  xml: string,
-): BloqueDeAlertStream | 'respuesta_de_suscripcion' | null => {
-  if (/<SubscribeEventResponse\b/i.test(xml)) return 'respuesta_de_suscripcion';
-  if (!/<EventNotificationAlert\b/i.test(xml)) return null;
-  const actual = etiqueta(xml, 'currentEvent');
-  const canal = etiqueta(xml, 'channelID');
-  const persona = etiqueta(xml, 'employeeNoString') ?? etiqueta(xml, 'employeeNo');
-  const tipo = etiqueta(xml, 'eventType');
-  const bloque: BloqueDeAlertStream = {
-    ...(tipo === null ? {} : { eventType: tipo }),
-    ...(etiqueta(xml, 'eventState') === null
-      ? {}
-      : { eventState: etiqueta(xml, 'eventState') as string }),
-    ...(etiqueta(xml, 'dateTime') === null
-      ? {}
-      : { dateTime: etiqueta(xml, 'dateTime') as string }),
-    ...(actual === null ? {} : { currentEvent: actual === 'true' }),
-    ...(canal === null ? {} : { channelID: canal }),
-    ...(persona === null && !/AccessController/i.test(tipo ?? '')
-      ? {}
-      : {
-          AccessControllerEvent: {
-            ...(persona === null ? {} : { employeeNoString: persona }),
-            ...(actual === null ? {} : { currentEvent: actual === 'true' }),
-          },
-        }),
-  };
-  return bloque;
 };
 
 export const desdeAlertStreamJson = (
@@ -619,8 +644,15 @@ export const desdeAlertStreamJson = (
   const esResultado =
     acceso?.remoteCheckResult !== undefined || /remoteCheckResult/i.test(bloque.eventType ?? '');
 
+  const clasificacion = clasificarBloque(bloque);
+  const horaDelEquipo = cuando ?? acceso?.time ?? null;
   return {
-    clase: claseDeBloque(bloque),
+    clase: clasificacion.clase,
+    tipo: clasificacion.tipo,
+    titulo: clasificacion.titulo,
+    codigo: clasificacion.codigo,
+    horaDelEquipo: horaDelEquipo === null ? null : horaDelEquipo.slice(0, 64),
+    carga: cargaSaneada(bloque),
     placa,
     // Mismo campo documentado y misma escala que en el sobre del Alarm Server:
     // porcentaje entero. Se normaliza por el mismo sitio para que no haya dos
@@ -646,8 +678,14 @@ export const desdeAlertStreamJson = (
     ocurridoEn: fechaDelEquipo(cuando ?? null, ahora),
     horaSinDesplazamiento: cuando !== undefined && cuando !== '' && !traeDesplazamiento(cuando),
     enVivo: esEventoEnVivo(bloque),
-    referenciaDelEquipo:
-      bloque.channelID === undefined ? null : `${dispositivoId}:${bloque.channelID}`,
+    // R2 (15-L) · la serie del equipo, su hora y su uid; nunca sólo el canal.
+    referenciaDelEquipo: referenciaDelEvento({
+      canal: bloque.channelID,
+      serie: acceso?.serialNo ?? bloque.VoiceTalkEvent?.serialNo,
+      fecha: bloque.dateTime ?? acceso?.time,
+      uid: bloque.uid,
+      orden: bloque.VoiceTalkEvent?.cmdType,
+    }),
     // H-SITIO-04 · la terminal devuelve el identificador compacto (sin guiones)
     // con que se dio de alta; se vuelve al de la plantilla.
     personaId: personaId === null || personaId === '' ? null : plantillaDesdeElEquipo(personaId),

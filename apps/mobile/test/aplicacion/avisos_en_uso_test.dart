@@ -1,11 +1,7 @@
-import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/avisos_en_uso.dart';
-import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
-import 'package:ncr_residente/presentacion/pantallas/notificaciones.dart';
 
 class RelojFijo implements Reloj {
   const RelojFijo();
@@ -50,18 +46,20 @@ class RepoDeAvisos implements RepositorioDelResidente {
 
   @override
   Future<List<ZonaComun>> misZonas() async => const [];
-@override
-  Future<ResultadoDeCaptura> capturarRostro({
-    required String autorizacionId,
-    required MedidasDeCaptura medidas,
-    required Uint8List vector,
-    required String versionPolitica,
-    required DateTime suprimirEn,
-  }) =>
-      throw UnimplementedError();
 
   @override
   Future<ResultadoDeVisita> crearVisita(NuevaVisita v) => throw UnimplementedError();
+  @override
+  Future<List<VisitanteReciente>> ultimosVisitantes() => throw UnimplementedError();
+  @override
+  Future<ResultadoDeVisita> volverAAutorizar({
+    required String autorizacionId,
+    required DateTime inicio,
+    required int duracionMinutos,
+    required bool casillaMarcada,
+    required String claveDeIdempotencia,
+  }) =>
+      throw UnimplementedError();
   @override
   Future<MiHogar> miHogar() => throw UnimplementedError();
   @override
@@ -148,13 +146,5 @@ void main() {
     // Y la cuenta siguiente en el mismo teléfono SÍ vuelve a registrarse.
     await avisos.asegurarRegistro();
     expect(repo.registrados.length, 2);
-  });
-
-  test('el resumen del perfil cubre los cinco estados y ninguno dice el enum', () {
-    for (final e in EstadoDeAvisos.values) {
-      final texto = resumenDeAvisos(e);
-      expect(texto.length, greaterThan(8));
-      expect(texto, isNot(contains(e.name)));
-    }
   });
 }

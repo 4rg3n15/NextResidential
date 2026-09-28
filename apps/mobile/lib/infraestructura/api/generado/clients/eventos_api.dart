@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/formato.dart';
+import '../models/linea_de_tiempo_dto.dart';
 import '../models/motivo.dart';
 import '../models/pagina_de_eventos_dto.dart';
 import '../models/resultado.dart';
@@ -73,6 +74,23 @@ abstract class EventosApi {
   @DioResponseType(ResponseType.stream)
   Stream<String> eventosControllerFlujo({
     @Path('id') required String id,
+  });
+
+  /// Accesos y eventos de equipo en una sola línea de tiempo, con filtros (Bloque B).
+  ///
+  /// [desde] - Inicio del rango, ISO-8601 con zona.
+  ///
+  /// [hasta] - Fin del rango, EXCLUIDO.
+  ///
+  /// [tipo] - `acceso` para sólo accesos, o un tipo de evento de equipo (p. ej. `puerta_forzada`).
+  @GET('/copropiedades/{id}/eventos/linea-de-tiempo')
+  Future<LineaDeTiempoDto> lineaDeTiempoControllerLineaDeTiempo({
+    @Path('id') required String id,
+    @Query('desde') required String desde,
+    @Query('hasta') required String hasta,
+    @Query('dispositivoId') String? dispositivoId,
+    @Query('tipo') String? tipo,
+    @Query('limite') num? limite,
   });
 
   /// URL firmada de vida corta a la evidencia (RN-21)

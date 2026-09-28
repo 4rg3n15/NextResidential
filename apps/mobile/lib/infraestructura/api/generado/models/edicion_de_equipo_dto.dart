@@ -27,6 +27,8 @@ class EdicionDeEquipoDto {
     this.canalDeAudio,
     this.fabricante,
     this.modoDeTerminal,
+    this.canalDeVideo,
+    this.zonaId,
   });
   
   factory EdicionDeEquipoDto.fromJson(Map<String, Object?> json) => _$EdicionDeEquipoDtoFromJson(json);
@@ -44,6 +46,8 @@ class EdicionDeEquipoDto {
   final String? fabricante;
   final EdicionDeEquipoDtoModoDeTerminal? modoDeTerminal;
   final bool canalDeAudioHabilitado;
+  final String? canalDeVideo;
+  final String? zonaId;
   final bool probarConexion;
 
   Map<String, Object?> toJson() => _$EdicionDeEquipoDtoToJson(this);

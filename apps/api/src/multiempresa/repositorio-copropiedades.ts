@@ -129,6 +129,8 @@ export class RepositorioCopropiedadesEnMemoria implements RepositorioCopropiedad
           codigoCorto: null,
           telefonoPorteria: null,
           topeVehiculosPropios: TOPE_VEHICULOS_POR_OMISION,
+          ipsPorteria: [],
+          ipsGuardiaRemota: [],
           aprobacionDeTerceros: APROBACION_DE_TERCEROS,
         });
       }

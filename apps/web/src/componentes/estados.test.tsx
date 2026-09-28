@@ -70,23 +70,29 @@ describe('motivos de denegación · los diez, sin colapsar', () => {
 describe('navegación por rol · la interfaz oculta, no protege', () => {
   it('el portero no ve las pantallas exclusivas de administración', () => {
     const claves = navegacionDe('portero').map((e) => e.clave);
-    expect(claves).toContain('tablero');
     expect(claves).not.toContain('configuracion');
     expect(claves).not.toContain('viviendas');
   });
 
-  it('el administrador ve las catorce entradas, y cada añadido tiene su etapa', () => {
+  it('el portero aterriza en Portería: el tablero lee indicadores que la API no le da (15-L)', () => {
+    expect(navegacionDe('portero').map((e) => e.clave)).not.toContain('tablero');
+    expect(rutaInicialDe('portero')).toBe('/porteria');
+    expect(rutaInicialDe('administrador')).toBe('/tablero');
+  });
+
+  it('el administrador ve las trece entradas, y cada añadido tiene su etapa', () => {
     // Nueve hasta la ETAPA 09; la 10 añade Portería y Guardia virtual, que son
     // DOS superficies y no una (C-12); la 14 añade Latencias, que no está en
-    // el mockup porque el mockup no tenía tablero de observabilidad; y la 15
-    // añade Rostro del visitante, que tampoco estaba: la captura vivía sólo en
-    // la app del residente (ADR-016) y el escritorio no tenía por dónde.
-    expect(navegacionDe('administrador')).toHaveLength(14);
+    // el mockup porque el mockup no tenía tablero de observabilidad. La 15
+    // añadió Rostro del visitante y la 15-L (F) la retira: la foto se toma
+    // ahora en «Generar autorización», dentro de Visitantes.
+    expect(navegacionDe('administrador')).toHaveLength(13);
+    expect(NAVEGACION.map((e) => e.clave)).not.toContain('biometria');
     // La 15-H añade DOS entradas que el administrador NO ve: «Porteros», del
     // superadministrador (B4), y «Mi perfil», del portero (E-02). La 15-I añade
     // «Residentes», también sólo del superadministrador (3.1, D5 a, D6), y
     // «Listas negras» (HU-35), que sí ve el administrador.
-    expect(NAVEGACION).toHaveLength(17);
+    expect(NAVEGACION).toHaveLength(16);
   });
 
   it('15-I · sólo el superadministrador supervisa residentes', () => {
@@ -107,12 +113,13 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
     expect(navegacionDe('operador_central').map((e) => e.clave)).toContain('observabilidad');
   });
 
-  it('el portero ve Portería y NO la guardia virtual', () => {
-    // No es un permiso que falte: es otra consola. El portero atiende su
-    // puerta; el operador de central atiende varias copropiedades que no ve.
+  it('el portero ve Portería y, desde la 15-L, también la guardia virtual (H4)', () => {
+    // Eran dos consolas (C-12). El cliente pidió porteros de guardia REMOTA
+    // (H4): la ve, y es la API la que decide en cada petición si su IP está
+    // entre las permitidas. La interfaz oculta; no protege.
     const claves = navegacionDe('portero').map((e) => e.clave);
     expect(claves).toContain('porteria');
-    expect(claves).not.toContain('guardia');
+    expect(claves).toContain('guardia');
   });
 
   it('el operador de central ve las dos', () => {

@@ -1,4 +1,4 @@
-/// El armazón de la app: navegación, sesión y el ciclo de vida.
+/// El armazón de la app: navegación, sesión, el ciclo de vida y la recarga.
 ///
 /// ═════════════════════════════════════════════════════════════════════════════
 /// AQUÍ VIVE LA CONDICIÓN QUE EL USUARIO PUSO POR ESCRITO
@@ -10,25 +10,29 @@
 /// `AppLifecycleState.resumed` hace **dos** cosas, en este orden:
 ///
 ///   1. `sesion.alVolverAPrimerPlano()` — renueva si la política dice que toca.
-///   2. Recarga lo que hay en pantalla, si renovó o si el dato ya es viejo.
+///   2. Recarga lo que hay en pantalla. **Siempre** (15-L): antes sólo si el
+///      dato tenía más de dos minutos, y eso dejaba al residente mirando una
+///      visita «vigente» que portería había rechazado hacía uno.
 ///
 /// El orden no es negociable: recargar primero enviaría la petición con el
-/// token vencido, que es el 401 que se quiere evitar. Y el segundo paso existe
-/// porque una sesión renovada sin recargar deja al residente mirando datos de
-/// hace horas con una sesión nueva — técnicamente correcto, inútil.
+/// token vencido, que es el 401 que se quiere evitar.
 ///
 /// ═════════════════════════════════════════════════════════════════════════════
-/// LA NAVEGACIÓN ES LA DEL MOCKUP, INCLUIDAS LAS DOS PESTAÑAS QUE AÚN NO SON
+/// 15-L · AL DÍA CON LA CONSOLA, SIN TOCAR NADA
+///
+/// «La información de la app debe sincronizarse con la de la consola web.»
+/// Mientras la app está en primer plano, un `CicloDeRecarga` vuelve cada 20 s
+/// a pedir LO QUE SE VE —la pestaña o la pantalla abierta encima—, además de
+/// las notificaciones (el contador de Inicio) y la bandeja de salida. En cada
+/// vuelta, primero `asegurar()` la sesión y DESPUÉS pedir: el mismo orden de
+/// arriba. En segundo plano se detiene; ante fallos se espacia hasta 2 min.
+///
+/// ═════════════════════════════════════════════════════════════════════════════
+/// LA NAVEGACIÓN ES LA DEL MOCKUP
 ///
 /// `03-mockups.md` §3 fija cinco pestañas —Inicio · Visitantes · Vehículos ·
 /// Zonas · Perfil— y deja Mi Familia, Historial y Notificaciones fuera de la
 /// barra, alcanzables desde Inicio y Perfil. Se respeta.
-///
-/// Visitantes (M-4) y Zonas (M-5) son de 11-B. **No se esconden**: la pestaña
-/// está y explica qué falta, como la consola de guardia virtual explica que el
-/// puente de vídeo llega en la 15 en vez de mostrar un recuadro negro. Quitar
-/// las pestañas dejaría una barra de tres que habría que rehacer, y al
-/// residente sin saber que lo que busca existe y aún no está.
 library;
 
 import 'dart:async';
@@ -37,76 +41,30 @@ import 'package:flutter/material.dart';
 
 import '../aplicacion/avisos_en_uso.dart';
 import '../aplicacion/envio_de_visitas.dart';
+import '../aplicacion/notificaciones_vistas.dart';
+import '../aplicacion/servidor_en_uso.dart';
 import '../aplicacion/sesion_en_uso.dart';
-import '../configuracion/ambiente.dart';
-import '../infraestructura/camara/fuente_de_fotos.dart';
 import '../configuracion/tema.dart';
-import '../aplicacion/estado.dart';
-import '../dominio/entidades.dart';
-import '../dominio/hogar.dart';
+import '../dominio/causa_de_red.dart';
 import '../dominio/puertos.dart';
+import '../infraestructura/almacen/almacen_de_texto.dart';
+import '../infraestructura/bandeja/bandeja_guardada.dart';
+import '../infraestructura/camara/fuente_de_fotos.dart';
+import 'acciones_de_visitas.dart';
 import 'acciones_del_hogar.dart';
+import 'contador_de_notificaciones.dart';
 import 'controlador.dart';
+import 'dependencias.dart';
 import 'pantallas/acceso.dart';
 import 'pantallas/familia.dart';
 import 'pantallas/historial.dart';
-import 'pantallas/inicio.dart';
 import 'pantallas/notificaciones.dart';
-import 'pantallas/nuevo_visitante.dart';
-import 'pantallas/perfil.dart';
 import 'pantallas/primer_ingreso.dart';
-import 'pantallas/rostro_del_visitante.dart';
-import 'pantallas/vehiculos.dart';
-import 'pantallas/visitantes.dart';
-import 'pantallas/zonas.dart';
+import 'pestanas.dart';
+import 'sincronizacion_de_la_app.dart';
+import 'widgets/servidor.dart';
 
-/// Todo lo que la app necesita, construido una vez en `main`.
-class Dependencias {
-  const Dependencias({
-    required this.ambiente,
-    required this.sesion,
-    required this.repositorio,
-    required this.reloj,
-    required this.notificaciones,
-    required this.claves,
-    required this.alta,
-    required this.hogar,
-    required this.cuenta,
-    required this.llamador,
-    required this.compartidor,
-    this.tomarFoto,
-    this.versionPoliticaBiometrica = 'v1.0',
-  });
-
-  final Ambiente ambiente;
-  final SesionEnUso sesion;
-  final RepositorioDelResidente repositorio;
-  final Reloj reloj;
-  final FuenteDeNotificaciones notificaciones;
-
-  /// ETAPA 15-I · el primer ingreso, el hogar, la contraseña y los dos puertos
-  /// que tocan el sistema operativo (marcador y panel de compartir).
-  final RepositorioDeAlta alta;
-  final RepositorioDelHogar hogar;
-  final ServicioDeCuenta cuenta;
-  final LlamadorDeTelefono llamador;
-  final Compartidor compartidor;
-
-  /// 15-I (hito 3) · la cámara REAL del teléfono. `null` = la simulada (web,
-  /// recorrido y pruebas), declarada como tal en `fuente_de_fotos.dart`.
-  final TomarFoto? tomarFoto;
-
-  /// De dónde sale la clave de idempotencia de cada visita. Se inyecta porque
-  /// una clave que la pantalla fabricara al construirse cambiaría con cada
-  /// `setState`, y entonces dejaría de ser una clave de idempotencia. Y porque
-  /// una prueba necesita poder fijarla.
-  final String Function() claves;
-
-  /// Qué versión de la política de tratamiento se le muestra al titular. Queda
-  /// escrita en el consentimiento: sin ella no se puede demostrar QUÉ aceptó
-  /// quien aceptó, que es la mitad de lo que exige la Ley 1581.
-  final String versionPoliticaBiometrica;
-}
+export 'dependencias.dart';
 
 class AppDelResidente extends StatelessWidget {
   const AppDelResidente({super.key, required this.dependencias});
@@ -114,12 +72,17 @@ class AppDelResidente extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Next Control Residencial',
-      debugShowCheckedModeBanner: false,
-      theme: temaClaro(),
-      darkTheme: temaOscuro(),
-      home: Armazon(dependencias: dependencias),
+    // Por ENCIMA de la navegación: toda pantalla, también las que se abren
+    // encima de las pestañas, encuentra «Cambiar servidor» en su contexto.
+    return ServidorDeLaApp(
+      cambio: dependencias.servidor,
+      child: MaterialApp(
+        title: 'Next Control Residencial',
+        debugShowCheckedModeBanner: false,
+        theme: temaClaro(),
+        darkTheme: temaOscuro(),
+        home: Armazon(dependencias: dependencias),
+      ),
     );
   }
 }
@@ -133,41 +96,66 @@ class Armazon extends StatefulWidget {
 }
 
 class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
-  late final ControladorDeVista _inicio = controladorDeInicio(_repo);
-  late final ControladorDeVista<List<MiembroDeFamilia>> _familia = controladorDeFamilia(_repo);
-  late final ControladorDeVista<List<Vehiculo>> _vehiculos = controladorDeVehiculos(_repo);
-  late final ControladorDeVista<PerfilDelResidente> _perfil =
-      ControladorDeVista<PerfilDelResidente>(leer: widget.dependencias.hogar.miPerfil);
-  late final ControladorDeVista<MisOcupantes> _ocupantes = ControladorDeVista<MisOcupantes>(
-    leer: widget.dependencias.alta.misOcupantes,
+  Dependencias get _d => widget.dependencias;
+  RepositorioDelResidente get _repo => _d.repositorio;
+  SesionEnUso get _sesion => _d.sesion;
+  DireccionDelServidor get _direccion => _d.servidor.direccion;
+
+  late final _c = ControladoresDelArmazon(
+    repo: _repo,
+    hogar: _d.hogar,
+    alta: _d.alta,
+    notificaciones: _d.notificacionesDelConjunto,
   );
   late final AccionesDelHogar _acciones = AccionesDelHogar(
     sesion: _sesion,
-    alta: widget.dependencias.alta,
-    hogar: widget.dependencias.hogar,
-    cuenta: widget.dependencias.cuenta,
-    familia: _familia,
-    vehiculos: _vehiculos,
-    perfil: _perfil,
+    alta: _d.alta,
+    hogar: _d.hogar,
+    cuenta: _d.cuenta,
+    familia: _c.familia,
+    vehiculos: _c.vehiculos,
+    perfil: _c.perfil,
     alCambiarDeVivienda: _cargarTodo,
   );
-  late final ControladorDeVista<List<Autorizacion>> _autorizaciones = controladorDeAutorizaciones(
-    _repo,
-  );
-  late final ControladorDeHistorial _historial = ControladorDeHistorial(_repo);
-  late final ControladorDeVista<List<ZonaComun>> _zonas = controladorDeZonas(_repo);
   late final ControladorDeAvisos _avisos = ControladorDeAvisos(
-    fuente: widget.dependencias.notificaciones,
+    fuente: _d.notificaciones,
     repositorio: _repo,
-    reloj: widget.dependencias.reloj,
+    reloj: _d.reloj,
+  );
+  late final AlmacenDeTexto _almacen = _d.almacen ?? AlmacenDeTextoEnMemoria();
+  late final ContadorDeNotificaciones _sinVer = ContadorDeNotificaciones(
+    controlador: _c.notificaciones,
+    vistas: NotificacionesVistas(almacen: _almacen),
   );
   late final EnvioDeVisitas _envio = EnvioDeVisitas(
     repositorio: _repo,
-    reloj: widget.dependencias.reloj,
+    reloj: _d.reloj,
+    almacen: BandejaGuardada(_almacen),
+    propietario: _propietario,
   );
-
-  RepositorioDelResidente get _repo => widget.dependencias.repositorio;
-  SesionEnUso get _sesion => widget.dependencias.sesion;
+  late final AccionesDeVisitas _visitas = AccionesDeVisitas(
+    envio: _envio,
+    repositorio: _repo,
+    reloj: _d.reloj,
+    claves: _d.claves,
+    // La cámara real si la hay; si no, la simulada y declarada como tal.
+    tomarFoto: _d.tomarFoto ?? CamaraSimulada().tomar,
+    conSesion: _conSesion,
+    alCambiarLaBandeja: () => mounted ? setState(() {}) : null,
+    recargarVisitas: () {
+      unawaited(_c.autorizaciones.refrescar());
+      unawaited(_c.ultimos.refrescar());
+    },
+  );
+  late final SincronizacionDeLaApp _sincronia = SincronizacionDeLaApp(
+    sesion: _sesion,
+    controladores: _c,
+    pestana: () => _pestana,
+    vaciarBandeja: () => mounted ? _visitas.vaciarBandeja(context) : Future.value(),
+    alPerderLaSesion: _pedirAcceso,
+    intervalo: _d.intervaloDeRecarga,
+  );
+  StreamSubscription<TipoDeRed>? _red;
 
   int _pestana = 0;
   bool _autenticado = false;
@@ -178,119 +166,90 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
 
   /// La sesión vino del llavero al arrancar (S-59), no de un acceso de ahora.
   bool _recuperada = false;
-  DateTime? _ultimaCarga;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // El estado de los avisos se pinta en Perfil como valor, no como widget con
-    // su propio `AnimatedBuilder`: así la tarjeta de Perfil no tiene que saber
-    // que existe un controlador detrás.
-    _avisos.addListener(_alCambiarAvisos);
     _autenticado = _sesion.haySesion;
     _recuperada = _autenticado;
+    _direccion.addListener(_alCambiarServidor);
+    _red = _d.cambiosDeRed?.listen(_sincronia.alCambiarDeRed);
+    unawaited(_recuperarLoGuardado());
   }
 
   @override
   void dispose() {
-    _avisos.removeListener(_alCambiarAvisos);
+    _sincronia.alPasarASegundoPlano();
+    unawaited(_red?.cancel());
+    _direccion.removeListener(_alCambiarServidor);
+    _sinVer.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  void _alCambiarAvisos() {
+  /// La bandeja y las notificaciones vistas de antes de cerrar la app.
+  Future<void> _recuperarLoGuardado() async {
+    await Future.wait([_envio.recuperar(), _sinVer.recuperar()]);
     if (mounted) setState(() {});
   }
 
+  String? _propietario() {
+    final s = _sesion.sesion;
+    return s == null ? null : '${s.usuarioId}@${s.copropiedadId ?? ''}';
+  }
+
+  bool get _enLaApp => _autenticado && _primerIngresoHecho;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState estado) {
-    if (estado != AppLifecycleState.resumed || !_autenticado || !_primerIngresoHecho) return;
-    alVolverAPrimerPlano();
+    if (!_enLaApp) return;
+    if (estado == AppLifecycleState.resumed) {
+      unawaited(alVolverAPrimerPlano());
+    } else if (estado == AppLifecycleState.paused || estado == AppLifecycleState.hidden) {
+      _sincronia.alPasarASegundoPlano();
+    }
   }
 
   /// Público para que la prueba de widget lo ejerza sin simular el sistema
   /// operativo: lo que hay que demostrar es el ORDEN —renovar y luego pedir—, y
   /// eso se prueba llamando a esto con un autenticador que cuenta llamadas.
-  Future<void> alVolverAPrimerPlano() async {
-    final renovo = await _sesion.alVolverAPrimerPlano();
-    if (!mounted) return;
-    if (!_sesion.haySesion) {
-      // El refresco falló: la sesión está muerta y se pide acceso, en vez de
-      // dejar en pantalla datos que ya no se pueden recargar.
-      setState(() => _autenticado = false);
-      return;
-    }
-    final viejo =
-        _ultimaCarga == null ||
-        widget.dependencias.reloj.ahora().difference(_ultimaCarga!) > const Duration(minutes: 2);
-    if (renovo || viejo) _cargarTodo();
+  Future<void> alVolverAPrimerPlano() => _sincronia.alVolverAPrimerPlano();
+
+  /// La dirección cambió: el caso de uso ya cerró la sesión, y aquí se olvida
+  /// lo que se veía del servidor anterior y se vuelve al acceso.
+  void _alCambiarServidor() {
+    if (mounted) _cerrarSesion();
   }
 
   void _cargarTodo() {
-    _ultimaCarga = widget.dependencias.reloj.ahora();
-    _inicio.cargarAhora();
-    _familia.cargarAhora();
-    _vehiculos.cargarAhora();
-    _autorizaciones.cargarAhora();
-    _historial.cargarAhora();
-    _zonas.cargarAhora();
-    _perfil.cargarAhora();
-    _ocupantes.cargarAhora();
-    // El token de FCM rota solo. Si el registro solo ocurriera al entrar en la
-    // pantalla de notificaciones, dejaría de funcionar en silencio el día que
-    // rote y nadie se enteraría hasta que un visitante esperara en la portería.
+    for (final c in _c.todos) {
+      unawaited(c.cargarAhora());
+    }
+    // El token de FCM rota solo. Sin Firebase en esta compilación no hay
+    // token y esto no registra nada; queda conectado para cuando lo haya.
     unawaited(_avisos.asegurarRegistro());
-    // Y lo que quedó sin enviar se intenta ahora, que es cuando más probable es
-    // que haya red: acaba de volver la app a primer plano.
-    unawaited(_vaciarBandeja());
+    _sincronia.ciclo.reanudar();
+    // Lo que quedó sin enviar se intenta ahora.
+    unawaited(_visitas.vaciarBandeja(context));
   }
 
-  Future<void> _vaciarBandeja() async {
-    try {
-      final aceptados = await _envio.vaciar();
-      if (!mounted) return;
-      setState(() {});
-      if (aceptados > 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              aceptados == 1
-                  ? 'Se envió 1 visita que estaba pendiente.'
-                  : 'Se enviaron $aceptados visitas que estaban pendientes.',
-            ),
-          ),
-        );
-        _autorizaciones.cargarAhora();
-      }
-    } on Fallo {
-      // La sesión murió a mitad del vaciado. Lo resuelve el refresco de primer
-      // plano; aquí lo que no puede pasar es que reviente el armazón entero.
-      if (mounted) setState(() {});
-    }
+  void _volverAlPrimero() {
+    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
   void _cerrarSesion() {
     // Olvidar ANTES de cerrar: si se cerrara primero y la app se redibujara con
     // los controladores llenos, los datos del residente anterior seguirían en
     // pantalla un instante. En un teléfono compartido eso es una fuga.
-    for (final c in <ControladorDeVista<Object?>>[
-      _inicio,
-      _familia,
-      _vehiculos,
-      _autorizaciones,
-      _historial,
-      _zonas,
-      _perfil,
-      _ocupantes,
-    ]) {
+    _sincronia.alPasarASegundoPlano();
+    for (final c in _c.todos) {
       c.olvidar();
     }
-    // El token pertenece al aparato; el REGISTRO pertenece a la cuenta. Sin
-    // esto, la siguiente cuenta en el mismo teléfono no volvería a registrarse
-    // y creería que le avisarán.
+    // El token pertenece al aparato; el REGISTRO pertenece a la cuenta.
     _avisos.olvidar();
-    _sesion.cerrar();
+    unawaited(_sesion.cerrar());
+    _volverAlPrimero();
     setState(() {
       _autenticado = false;
       _primerIngresoHecho = false;
@@ -298,110 +257,49 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     });
   }
 
-  void _pedirAcceso() => setState(() => _autenticado = false);
-
-  /// Abre M-4. **La clave se genera aquí, al abrir el formulario**, y no dentro
-  /// de la pantalla: si la fabricara el widget, cada reconstrucción la
-  /// cambiaría y un reintento crearía una visita distinta en vez de recuperar
-  /// la anterior (RN-17).
-  Future<void> _crearVisitante() async {
-    final clave = widget.dependencias.claves();
-    final zonas = switch (_zonas.estado) {
-      ConDatos<List<ZonaComun>>(datos: final d) => d,
-      Cargando<List<ZonaComun>>(previo: final p) => p ?? const <ZonaComun>[],
-      Fallido<List<ZonaComun>>(previo: final p) => p ?? const <ZonaComun>[],
-      _ => const <ZonaComun>[],
-    };
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => PantallaDeNuevoVisitante(
-          enviar: _enviarVisita,
-          zonas: zonas,
-          claveDeIdempotencia: clave,
-          alCapturarRostro: _capturarRostro,
-        ),
-      ),
-    );
+  void _pedirAcceso() {
+    _sincronia.alPasarASegundoPlano();
     if (!mounted) return;
-    // Al volver se recarga aunque se haya encolado: la bandeja también cambió.
-    setState(() {});
-    _autorizaciones.cargarAhora();
+    _volverAlPrimero();
+    setState(() => _autenticado = false);
   }
 
-  /// El puente entre la pantalla y la bandeja. Traduce el desenlace del envío al
-  /// vocabulario de la pantalla, que no conoce la bandeja ni el repositorio.
-  Future<ResultadoDeEnvio> _enviarVisita(NuevaVisita visita) async {
+  /// Una escritura que se encuentra la sesión muerta lleva a la pantalla de
+  /// acceso en vez de dejar al residente frente a un formulario que ya no
+  /// puede enviar. El fallo se relanza igual: la pantalla decide qué decir.
+  Future<T> _conSesion<T>(Future<T> Function() operacion) async {
     try {
-      final desenlace = await _envio.enviar(visita);
-      return switch (desenlace) {
-        Aceptado(resultado: final r) => EnvioAceptado(repetida: r.repetida, id: r.id),
-        Rechazado(resultado: final r) => EnvioRechazado(r),
-        Pendiente() => const EnvioEncolado(),
-      };
+      return await operacion();
     } on Fallo catch (f) {
-      if (f.clase == ClaseDeFallo.sesionInvalida && mounted) {
-        _pedirAcceso();
-        Navigator.of(context).popUntil((r) => r.isFirst);
-      }
+      if (f.clase == ClaseDeFallo.sesionInvalida && mounted) _pedirAcceso();
       rethrow;
     }
   }
 
-  /// CU-02 · la foto cuelga de la AUTORIZACIÓN, no del residente: es de ahí de
-  /// donde el servidor deriva quién es el titular del dato (RN-10).
-  void _capturarRostro(String autorizacionId, String nombreDelVisitante, DateTime hasta) {
-    _abrir(
-      PantallaDeRostroDelVisitante(
-        nombreDelVisitante: nombreDelVisitante,
-        tomarFoto: widget.dependencias.tomarFoto ?? CamaraSimulada().tomar,
-        versionPolitica: widget.dependencias.versionPoliticaBiometrica,
-        enviar: (foto) => _repo.capturarRostro(
-          autorizacionId: autorizacionId,
-          medidas: foto.medidas,
-          vector: foto.vector,
-          versionPolitica: widget.dependencias.versionPoliticaBiometrica,
-          // RN-11 · la plantilla no vive más que la VISITA: se suprime cuando
-          // termina. Antes era «captura + 24 h», que para una visita de mañana
-          // la borraba antes de que llegara el visitante (H-15I-10).
-          suprimirEn: hasta,
-        ),
-        // Punto 5 (15-I) · el enlace se ENTREGA al visitante y su respuesta se
-        // consulta; el residente no responde por él (RN-10).
-        compartidor: widget.dependencias.compartidor,
-        urlDeLaApi: widget.dependencias.ambiente.apiUrl,
-        consultarConsentimiento: (consentimientoId) =>
-            widget.dependencias.hogar.estadoDelConsentimiento(
-              autorizacionId: autorizacionId,
-              consentimientoId: consentimientoId,
-            ),
-      ),
-    );
-  }
+  Future<void> _abrir(Widget pantalla, List<ControladorDeVista<Object?>> visibles) =>
+      _sincronia.conEncima(
+        visibles,
+        () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => pantalla)),
+      );
 
-  void _abrirNotificaciones() {
-    _abrir(
-      AnimatedBuilder(
-        animation: _avisos,
-        builder: (_, _) => PantallaDeNotificaciones(
-          estado: _avisos.estado,
-          alActivar: _avisos.activar,
-          alReintentar: _avisos.reintentar,
-          ultimoRegistro: _avisos.ultimoRegistro,
-          detalleDelFallo: _avisos.detalleDelFallo,
-        ),
+  Future<void> _abrirNotificaciones() async {
+    _sinVer.abierta = true;
+    await _abrir(
+      PantallaDeNotificaciones(
+        controlador: _c.notificaciones,
+        alPedirAcceso: _pedirAcceso,
+        alRecargar: _sincronia.ciclo.ahora,
       ),
+      [_c.notificaciones],
     );
-  }
-
-  void _abrir(Widget pantalla) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => pantalla));
+    _sinVer.abierta = false;
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_autenticado) {
       return PantallaDeAcceso(
-        ambiente: widget.dependencias.ambiente,
+        ambiente: _d.ambiente,
         sesion: _sesion,
         alEntrar: () => setState(() {
           _autenticado = true;
@@ -414,8 +312,8 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     if (!_primerIngresoHecho) {
       return PuertaDePrimerIngreso(
         sesion: _sesion,
-        alta: widget.dependencias.alta,
-        cuenta: widget.dependencias.cuenta,
+        alta: _d.alta,
+        cuenta: _d.cuenta,
         recuperada: _recuperada,
         alSalir: _cerrarSesion,
         alTerminar: () {
@@ -425,64 +323,35 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
       );
     }
 
-    final pantallas = <Widget>[
-      PantallaDeInicio(
-        controlador: _inicio,
-        autorizaciones: _autorizaciones,
-        alPedirAcceso: _pedirAcceso,
-        alAbrirFamilia: () =>
-            _abrir(PantallaDeFamilia(controlador: _familia, alPedirAcceso: _pedirAcceso)),
-        alAbrirHistorial: () =>
-            _abrir(PantallaDeHistorial(controlador: _historial, alPedirAcceso: _pedirAcceso)),
-        alAbrirVehiculos: () => setState(() => _pestana = 2),
+    return PestanasDelArmazon(
+      pestana: _pestana,
+      alElegir: (i) {
+        setState(() => _pestana = i);
+        // La pestaña que aparece se pone al día en el acto.
+        unawaited(_sincronia.ciclo.ahora());
+      },
+      controladores: _c,
+      sinVer: _sinVer,
+      pendientes: _envio.bandeja.pendientes,
+      llamador: _d.llamador,
+      alRecargar: _sincronia.ciclo.ahora,
+      alPedirAcceso: _pedirAcceso,
+      alCerrarSesion: _cerrarSesion,
+      alRegistrarVisita: () =>
+          _sincronia.conEncima(const [], () => _visitas.crearVisitante(context)),
+      alVolverAAutorizar: (v) =>
+          _sincronia.conEncima(const [], () => _visitas.volverAAutorizar(context, v)),
+      alReintentarPendientes: () => _visitas.vaciarBandeja(context),
+      alAbrirFamilia: () => _abrir(
+        PantallaDeFamilia(controlador: _c.familia, alPedirAcceso: _pedirAcceso),
+        [_c.familia],
       ),
-      PantallaDeVisitantes(
-        controlador: _autorizaciones,
-        alPedirAcceso: _pedirAcceso,
-        alCrear: _crearVisitante,
-        pendientes: _envio.bandeja.pendientes,
-        alReintentarPendientes: _vaciarBandeja,
-        ahora: widget.dependencias.reloj.ahora(),
+      alAbrirHistorial: () => _abrir(
+        PantallaDeHistorial(controlador: _c.historial, alPedirAcceso: _pedirAcceso),
+        [_c.historial],
       ),
-      PantallaDeVehiculos(
-        controlador: _vehiculos,
-        alPedirAcceso: _pedirAcceso,
-        alRegistrar: () => _acciones.registrarVehiculo(context),
-        alDesactivar: (v) => _acciones.desactivarVehiculo(context, v),
-      ),
-      PantallaDeZonas(controlador: _zonas, alPedirAcceso: _pedirAcceso),
-      PantallaDePerfil(
-        controladorDeInicio: _inicio,
-        controladorDePerfil: _perfil,
-        controladorDeOcupantes: _ocupantes,
-        llamador: widget.dependencias.llamador,
-        alCerrarSesion: _cerrarSesion,
-        alAbrirFamilia: () =>
-            _abrir(PantallaDeFamilia(controlador: _familia, alPedirAcceso: _pedirAcceso)),
-        alAbrirHistorial: () =>
-            _abrir(PantallaDeHistorial(controlador: _historial, alPedirAcceso: _pedirAcceso)),
-        alAbrirVehiculos: () => setState(() => _pestana = 2),
-        alAbrirNotificaciones: _abrirNotificaciones,
-        alEditarPerfil: (p) => _acciones.editarPerfil(context, p),
-        alCambiarVivienda: (p) => _acciones.cambiarVivienda(context, p),
-        alCambiarContrasena: () => _acciones.cambiarContrasena(context),
-        estadoDeAvisos: _avisos.estado,
-      ),
-    ];
-
-    return Scaffold(
-      body: SafeArea(child: pantallas[_pestana]),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _pestana,
-        onDestinationSelected: (i) => setState(() => _pestana = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Inicio'),
-          NavigationDestination(icon: Icon(Icons.person_add_alt_outlined), label: 'Visitantes'),
-          NavigationDestination(icon: Icon(Icons.directions_car_outlined), label: 'Vehículos'),
-          NavigationDestination(icon: Icon(Icons.pool_outlined), label: 'Zonas'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Perfil'),
-        ],
-      ),
+      alAbrirNotificaciones: _abrirNotificaciones,
+      acciones: _acciones,
     );
   }
 }

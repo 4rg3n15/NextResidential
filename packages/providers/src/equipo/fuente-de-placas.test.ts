@@ -96,10 +96,11 @@ describe('UN SOLO ingestor, y la fuente se niega al segundo', () => {
   });
 });
 
-describe('lo HISTÓRICO no llega a nadie', () => {
-  it('ni al ingestor ni a los suscriptores', async () => {
+describe('lo HISTÓRICO no llega a los observadores ni al motor', () => {
+  it('llega al ingestor MARCADO (para guardarlo, Bloque B), nunca a los suscriptores', async () => {
     // Sin este corte, la portería mostraría accesos de hace días como si
-    // ocurrieran ahora, en una tabla que no se puede limpiar.
+    // ocurrieran ahora. El ingestor lo recibe con `enVivo: false` y sólo lo
+    // guarda como histórico: ni decide ni avisa.
     const espia = ingestorQueCuenta();
     const fuente = new FuenteDePlacas(espia);
     let avisos = 0;
@@ -111,16 +112,23 @@ describe('lo HISTÓRICO no llega a nadie', () => {
     const resultado = await fuente.publicar(publicacionDe(historico));
 
     expect(resultado.desenlace).toBe('historica');
-    expect(espia.veces).toBe(0);
+    expect(espia.veces).toBe(1);
     expect(avisos).toBe(0);
   });
 
-  it('una publicación SIN placa tampoco se ingiere', async () => {
+  it('una detección SIN placa llega al ingestor (se guarda), y no a los observadores', async () => {
+    // 15-L (Bloque B) · antes se perdía; ahora es un evento de equipo. Los
+    // observadores del puerto sólo reciben LECTURAS: sin placa no hay lectura.
     const espia = ingestorQueCuenta();
     const fuente = new FuenteDePlacas(espia);
+    let avisos = 0;
+    await fuente.suscribir(async () => {
+      avisos += 1;
+    });
     const sinPlaca = xml().replace('<licensePlate>ABC123</licensePlate>', '');
-    expect((await fuente.publicar(publicacionDe(sinPlaca))).desenlace).toBe('sin_placa');
-    expect(espia.veces).toBe(0);
+    expect((await fuente.publicar(publicacionDe(sinPlaca))).desenlace).toBe('ingerida');
+    expect(espia.veces).toBe(1);
+    expect(avisos).toBe(0);
   });
 });
 

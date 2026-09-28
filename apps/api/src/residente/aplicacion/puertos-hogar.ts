@@ -185,12 +185,18 @@ export interface PerfilGuardado {
 }
 
 export interface PerfilDelResidente {
+  /** Sólo de una cuenta ACTIVA con rol de residente en esa copropiedad. */
   perfil(copropiedadId: string, usuarioId: string): Promise<PerfilGuardado | null>;
-  /** `false` si el documento ya es de otra persona de la copropiedad. */
+  /**
+   * `false` si el documento ya es de otra persona de la copropiedad. `actorId`
+   * es quien escribe —el propio residente, o el superadministrador (G, 15-L)—
+   * y firma la fila; por omisión, el residente.
+   */
   guardar(
     copropiedadId: string,
     usuarioId: string,
     perfil: PerfilValido,
+    actorId?: string,
   ): Promise<'guardado' | 'DOCUMENTO_EN_USO' | 'SIN_VINCULO'>;
 }
 

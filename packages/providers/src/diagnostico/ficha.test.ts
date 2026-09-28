@@ -252,22 +252,43 @@ describe('A4 · el videoportero dice qué NO aplica por capacidad', () => {
       }),
     );
 
-  it('sin biblioteca de rostros: el reconocimiento facial en este equipo NO APLICA', () => {
+  it('sin biblioteca de rostros: «Rostros: no admite», y NO APLICA', () => {
     const ficha = videoportero({
       bibliotecaDeRostros: { estado: 'no', maximo: null, almacenadas: null },
     });
-    const h = ficha.hallazgos.find((x) => x.campo === 'reconocimiento facial en este equipo');
+    const h = ficha.hallazgos.find((x) => x.campo === 'Rostros');
     expect(h?.estado).toBe('aviso');
+    expect(h?.valorLeido).toBe('no admite');
     expect(h?.detalle).toMatch(/NO APLICA POR CAPACIDAD/);
   });
 
-  it('con biblioteca declarada: conforme, y dice cuántos caben', () => {
+  it('con biblioteca declarada: «Rostros: admite», conforme, y dice cuántos caben', () => {
     const ficha = videoportero({
       bibliotecaDeRostros: { estado: 'si', maximo: 500, almacenadas: 3 },
     });
-    const h = ficha.hallazgos.find((x) => x.campo === 'reconocimiento facial en este equipo');
+    const h = ficha.hallazgos.find((x) => x.campo === 'Rostros');
     expect(h?.estado).toBe('conforme');
-    expect(h?.valorLeido).toContain('500');
+    expect(h?.valorLeido).toBe('admite · hasta 500 rostros');
+  });
+
+  it('F4 (15-L) · ilegible: «Rostros: no se pudo leer (motivo)», con lo que contestó el equipo', () => {
+    const motivo = 'el equipo contestó HTTP 400 (badParameters) a leer qué admite la biblioteca';
+    const ficha = videoportero({
+      bibliotecaDeRostros: { estado: 'desconocida', maximo: null, almacenadas: null, motivo },
+    });
+    const h = ficha.hallazgos.find((x) => x.campo === 'Rostros');
+    // Sin comprobar, nunca conforme: pero ya no en blanco.
+    expect(h?.estado).toBe('no_comprobado');
+    expect(h?.valorLeido).toBe(`no se pudo leer (${motivo})`);
+  });
+
+  it('F4 · ilegible y sin motivo: «no se pudo leer», sin paréntesis vacíos', () => {
+    const ficha = videoportero({
+      bibliotecaDeRostros: { estado: 'desconocida', maximo: null, almacenadas: null },
+    });
+    const h = ficha.hallazgos.find((x) => x.campo === 'Rostros');
+    expect(h?.valorLeido).toBe('no se pudo leer');
+    expect(h?.detalle).toMatch(/sondee de nuevo/);
   });
 
   it('sin señalización de llamada (el DS-KD9633 real): NO APLICA, y se dice quién atiende', () => {

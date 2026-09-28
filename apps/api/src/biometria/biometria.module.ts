@@ -6,15 +6,9 @@ import type { Bitacora, FaceTemplateProvider, GeneradorDeId, Reloj } from '@ncr/
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { EquiposModule, TERMINALES_DE_ROSTROS } from '../equipos';
-import { IDENTIDAD_DE_PERSONA } from '../padron';
-import type { IdentidadDePersona } from '../padron';
-import { REGISTRO_AUDITORIA } from '../comun/auditoria';
-import type { RegistroDeAuditoria } from '../comun/auditoria';
-import { AceptarConsentimientoPresencial } from './aplicacion/consentimiento-presencial';
 import {
   BOVEDA_DE_PLANTILLAS,
   CATALOGO_DE_TERMINALES,
-  FIRMANTE_DE_ENLACES,
   IDENTIDAD_BIOMETRICA,
   REPOSITORIO_CONSENTIMIENTOS,
   REPOSITORIO_PLANTILLAS,
@@ -23,28 +17,19 @@ import { IdentidadBiometricaDesdeRepositorios } from './aplicacion/identidad-bio
 import type {
   BovedaDePlantillas,
   CatalogoDeTerminales,
-  FirmanteDeEnlaces,
   RepositorioConsentimientos,
   RepositorioPlantillas,
 } from './aplicacion/puertos';
 import {
   BarrerPlantillasVencidas,
   CapturarRostro,
-  ResponderConsentimiento,
+  SuprimirRostroDeAutorizacion,
   RevocarConsentimiento,
   SincronizarPlantilla,
 } from './aplicacion/casos-de-uso';
-import {
-  EmitirEnlaceDeConsentimiento,
-  ResolverEnlaceDeConsentimiento,
-} from './aplicacion/enlace-de-consentimiento';
-import {
-  PropagarConsentimientoAceptado,
-  SincronizarPlantillaEnTerminales,
-} from './aplicacion/sincronizacion-total';
+import { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
 import { AlmacenEnMemoria, BovedaAesGcm } from './infraestructura/boveda-cifrada';
 import type { AlmacenDeBytes } from './infraestructura/boveda-cifrada';
-import { FirmanteHmacDeEnlaces } from './infraestructura/firmante-de-enlaces';
 import {
   RepositorioConsentimientosEnMemoria,
   RepositorioPlantillasEnMemoria,
@@ -55,7 +40,9 @@ import {
   RepositorioPlantillasPg,
 } from './infraestructura/repositorios-pg';
 import { BiometriaController } from './presentacion/biometria.controller';
-import { ConsentimientoPublicoController } from './presentacion/consentimiento-publico.controller';
+import { REPOSITORIO_AUTORIZACIONES } from '../autorizaciones';
+import type { RepositorioAutorizaciones } from '../autorizaciones';
+import { VigenciaDesdeAutorizaciones } from './infraestructura/vigencia-desde-autorizaciones';
 
 /** Dónde vive el sobre cifrado: en memoria (suite) o en la fila de la plantilla. */
 export const ALMACEN_DE_PLANTILLAS = Symbol.for('ncr.biometria.AlmacenDePlantillas');
@@ -86,7 +73,7 @@ export class BiometriaModule {
     return {
       module: BiometriaModule,
       imports: [EquiposModule.registrar()],
-      controllers: [BiometriaController, ConsentimientoPublicoController],
+      controllers: [BiometriaController],
       providers: [
         {
           provide: REPOSITORIO_CONSENTIMIENTOS,
@@ -165,13 +152,6 @@ export class BiometriaModule {
           ) => new BovedaAesGcm(c.BIOMETRIA_LLAVE, c.BIOMETRIA_LLAVE_REF, almacen, terminales),
         },
         {
-          // A3 · la misma llave maestra de biometría, derivada por copropiedad
-          // y por propósito (HKDF): un enlace no comparte llave con un vector.
-          provide: FIRMANTE_DE_ENLACES,
-          inject: [CONFIGURACION],
-          useFactory: (c: Configuracion) => new FirmanteHmacDeEnlaces(c.BIOMETRIA_LLAVE),
-        },
-        {
           // A3 · el catálogo lo satisface equipos por forma (§2.2).
           provide: CATALOGO_DE_TERMINALES,
           inject: [TERMINALES_DE_ROSTROS],
@@ -195,41 +175,6 @@ export class BiometriaModule {
           ) => new CapturarRostro(consentimientos, plantillas, boveda, reloj, ids),
         },
         {
-          // D-10 · el titular en la portería. La identidad la sirve el padrón
-          // por su puerto estrecho; la auditoría, el núcleo.
-          provide: AceptarConsentimientoPresencial,
-          inject: [
-            REPOSITORIO_CONSENTIMIENTOS,
-            IDENTIDAD_DE_PERSONA,
-            ResponderConsentimiento,
-            REGISTRO_AUDITORIA,
-            BITACORA,
-          ],
-          useFactory: (
-            consentimientos: RepositorioConsentimientos,
-            identidades: IdentidadDePersona,
-            responder: ResponderConsentimiento,
-            auditoria: RegistroDeAuditoria,
-            bitacora: Bitacora,
-          ) =>
-            new AceptarConsentimientoPresencial(
-              consentimientos,
-              identidades,
-              responder,
-              auditoria,
-              bitacora,
-            ),
-        },
-        {
-          provide: ResponderConsentimiento,
-          inject: [REPOSITORIO_CONSENTIMIENTOS, REPOSITORIO_PLANTILLAS, RELOJ],
-          useFactory: (
-            consentimientos: RepositorioConsentimientos,
-            plantillas: RepositorioPlantillas,
-            reloj: Reloj,
-          ) => new ResponderConsentimiento(consentimientos, plantillas, reloj),
-        },
-        {
           provide: RevocarConsentimiento,
           inject: [
             REPOSITORIO_CONSENTIMIENTOS,
@@ -251,13 +196,23 @@ export class BiometriaModule {
             REPOSITORIO_PLANTILLAS,
             BOVEDA_DE_PLANTILLAS,
             RELOJ,
+            REPOSITORIO_AUTORIZACIONES,
           ],
           useFactory: (
             consentimientos: RepositorioConsentimientos,
             plantillas: RepositorioPlantillas,
             boveda: BovedaDePlantillas,
             reloj: Reloj,
-          ) => new SincronizarPlantilla(consentimientos, plantillas, boveda, reloj),
+            autorizaciones: RepositorioAutorizaciones,
+          ) =>
+            new SincronizarPlantilla(
+              consentimientos,
+              plantillas,
+              boveda,
+              reloj,
+              // A2 (15-L) · la vigencia de la autorización viaja al equipo.
+              new VigenciaDesdeAutorizaciones(autorizaciones),
+            ),
         },
         {
           provide: SincronizarPlantillaEnTerminales,
@@ -270,36 +225,14 @@ export class BiometriaModule {
           ) => new SincronizarPlantillaEnTerminales(plantillas, catalogo, sincronizar, bitacora),
         },
         {
-          provide: PropagarConsentimientoAceptado,
-          inject: [REPOSITORIO_PLANTILLAS, SincronizarPlantillaEnTerminales, BITACORA],
+          // F2 (15-L) · el rechazo de una visita se lleva SU foto de los equipos.
+          provide: SuprimirRostroDeAutorizacion,
+          inject: [REPOSITORIO_PLANTILLAS, BOVEDA_DE_PLANTILLAS, RELOJ],
           useFactory: (
             plantillas: RepositorioPlantillas,
-            enTerminales: SincronizarPlantillaEnTerminales,
-            bitacora: Bitacora,
-          ) => new PropagarConsentimientoAceptado(plantillas, enTerminales, bitacora),
-        },
-        {
-          provide: EmitirEnlaceDeConsentimiento,
-          inject: [REPOSITORIO_CONSENTIMIENTOS, FIRMANTE_DE_ENLACES, RELOJ, CONFIGURACION],
-          useFactory: (
-            consentimientos: RepositorioConsentimientos,
-            firmante: FirmanteDeEnlaces,
+            boveda: BovedaDePlantillas,
             reloj: Reloj,
-            c: Configuracion,
-          ) =>
-            new EmitirEnlaceDeConsentimiento(consentimientos, firmante, reloj, {
-              plazoHoras: c.BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS,
-              urlPublica: c.API_URL_PUBLICA ?? null,
-            }),
-        },
-        {
-          provide: ResolverEnlaceDeConsentimiento,
-          inject: [REPOSITORIO_CONSENTIMIENTOS, FIRMANTE_DE_ENLACES, RELOJ],
-          useFactory: (
-            consentimientos: RepositorioConsentimientos,
-            firmante: FirmanteDeEnlaces,
-            reloj: Reloj,
-          ) => new ResolverEnlaceDeConsentimiento(consentimientos, firmante, reloj),
+          ) => new SuprimirRostroDeAutorizacion(plantillas, boveda, reloj),
         },
         {
           provide: BarrerPlantillasVencidas,
@@ -312,15 +245,17 @@ export class BiometriaModule {
         },
       ],
       exports: [
-        // Lo consume el módulo del residente para su propia ruta de captura.
+        // F (15-L) · lo consume el módulo de visitas: la foto de la visita.
         CapturarRostro,
-        // A3 · y el enlace con el que su visitante responde.
-        EmitirEnlaceDeConsentimiento,
         // A2 · lo consumen el receptor de equipos y el cargador del motor.
         IDENTIDAD_BIOMETRICA,
         // ETAPA 14 · lo consume el planificador (D-40): RN-11 da 24 h para
         // suprimir, y hasta ahora el barrido solo salía por su ruta HTTP.
         BarrerPlantillasVencidas,
+        // F (15-L) · la visita generada envía su foto a todos los equipos, y la
+        // rechazada se la lleva de todos.
+        SincronizarPlantillaEnTerminales,
+        SuprimirRostroDeAutorizacion,
         REPOSITORIO_CONSENTIMIENTOS,
         REPOSITORIO_PLANTILLAS,
         BOVEDA_DE_PLANTILLAS,

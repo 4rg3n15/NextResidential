@@ -161,6 +161,19 @@ export class ProveedoresModule {
               fuente,
               // H-SITIO-12/13/14 · lo que pasa con los equipos, a la bitácora.
               traza: bitacora,
+              // A5 (15-L) · el plazo de cada petición, del `.env`.
+              tiempoLimiteMs: configuracion.EQUIPOS_TIEMPO_LIMITE_MS,
+              // A2 (15-L) · la persona y la foto que van a una terminal.
+              persona: {
+                zonaHoraria: configuracion.EQUIPOS_ZONA_HORARIA,
+                planDeHorario: configuracion.TERMINAL_PLAN_DE_HORARIO,
+              },
+              limitesDeFoto: {
+                bytesMaximos: configuracion.EQUIPOS_FOTO_KB_MAXIMOS * 1024,
+                ladoMaximo: configuracion.EQUIPOS_FOTO_LADO_MAXIMO,
+              },
+              // D2 (15-L) · el puerto RTSP, del `.env`.
+              puertoRtsp: configuracion.VIDEO_PUERTO_RTSP,
               ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
             });

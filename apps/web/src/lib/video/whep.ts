@@ -44,6 +44,12 @@ export interface OpcionesDeNegociacion {
   readonly fetchFn?: typeof fetch;
   /** Cuánto se espera a que el ICE local termine antes de mandar la oferta. */
   readonly plazoIceMs?: number;
+  /**
+   * D3 (15-L) · la conexión se cayó DESPUÉS de negociar (`failed` o
+   * `disconnected`): sin esto el recuadro se quedaba en el último cuadro, o en
+   * negro, diciendo «En vivo».
+   */
+  readonly alCortarse?: () => void;
 }
 
 export const rutaWhep = (copropiedadId: string, dispositivoId: string): string =>
@@ -108,6 +114,10 @@ export const negociarVistaEnVivo = async (
   conexion.addEventListener('track', (evento) => {
     const [flujo] = evento.streams;
     if (flujo !== undefined) opciones.alFlujo(flujo);
+  });
+  conexion.addEventListener('connectionstatechange', () => {
+    const estado = conexion.connectionState;
+    if (estado === 'failed' || estado === 'disconnected') opciones.alCortarse?.();
   });
   try {
     conexion.addTransceiver('video', { direction: 'recvonly' });

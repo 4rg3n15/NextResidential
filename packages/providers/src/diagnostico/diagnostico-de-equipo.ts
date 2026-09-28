@@ -1,4 +1,5 @@
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
+import { CredencialRechazada } from '../nucleo/errores';
 import { recortado, sinSecretos } from '../equipo/intercambio';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
@@ -17,7 +18,10 @@ import type { VeredictoDelReceptor } from '../camara/receptor-en-el-equipo';
 import { reportaEstadoDeBarrera } from '../barrera/barrera-de-entrada';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import { descubrirCapacidades } from '../hikvision/capacidades-hikvision';
-import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
+import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
+import { describirRtsp } from '../equipo/rtsp-describe';
+import type { ResultadoRtsp } from '../equipo/rtsp-describe';
+import { caminoRtspDe } from '../hikvision/video-rtsp';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -88,6 +92,8 @@ export interface DiagnosticoDeEquipo {
    * videoportero tenga veredictos propios y no los de una cámara.
    */
   readonly capacidadesDelEquipo: CapacidadesDeEquipo | null;
+  /** D2 · C3 (15-L) · la respuesta RTSP del equipo. Ausente si no se preguntó. */
+  readonly video?: VideoDelEquipo;
   readonly hora: HoraDelEquipo | null;
   /** Consultas que no contestaron, con el motivo. Se enseñan, no se ocultan. */
   readonly sinRespuesta: readonly { readonly que: string; readonly motivo: string }[];
@@ -116,7 +122,21 @@ export interface OpcionesDeDiagnostico extends OpcionesDeEquipo {
   readonly ahoraDelServidor?: () => Date;
   /** Carril de la cámara. Si no se declaró, el VERIFICADO (ver `camara/carril.ts`). */
   readonly canal?: number;
+  /**
+   * D2 · C3 (15-L) · con él, se le pregunta al equipo por RTSP qué video
+   * entrega en ese canal y puerto (los de su ficha y del `.env`).
+   */
+  readonly video?: { readonly puerto: number; readonly canal: string };
 }
+
+/** D2 · C3 (15-L) · lo que el equipo contestó por RTSP, con lo que se preguntó. */
+export interface VideoDelEquipo extends ResultadoRtsp {
+  readonly canal: string;
+  readonly puerto: number;
+}
+
+const estadoDelVideo = (r: ResultadoRtsp): EstadoDeCapacidad =>
+  r.clase === 'respondio' && r.codec !== null ? 'si' : r.clase === 'rechazo' ? 'no' : 'desconocida';
 
 /** Lo que el equipo contesta cuando la ruta no existe en ese firmware. */
 const rechazado = (cuerpo: string): boolean =>
@@ -235,6 +255,32 @@ export const diagnosticarEquipo = async (
     });
   }
 
+  /**
+   * D2 · C3 (15-L) · el video, preguntado por RTSP. Se suma a las capacidades
+   * SÓLO si éstas se leyeron: unas capacidades inventadas a partir de un
+   * descubrimiento fallido pisarían en la base las buenas que ya había.
+   */
+  const video: VideoDelEquipo | undefined =
+    opciones.video === undefined || opciones.familia === 'comun'
+      ? undefined
+      : {
+          ...(await describirRtsp({
+            host: opciones.host,
+            puerto: opciones.video.puerto,
+            camino: caminoRtspDe(opciones.video.canal),
+            usuario: opciones.usuario,
+            clave: opciones.clave,
+          })),
+          canal: opciones.video.canal,
+          puerto: opciones.video.puerto,
+        };
+  if (video !== undefined && capacidadesDelEquipo !== null) {
+    capacidadesDelEquipo = {
+      ...capacidadesDelEquipo,
+      video: { estado: estadoDelVideo(video), codec: video.codec, canal: video.canal },
+    };
+  }
+
   return {
     familia: opciones.familia,
     contacto,
@@ -271,6 +317,7 @@ export const diagnosticarEquipo = async (
       : null,
     reportaEstadoDeBarrera: barrera === null ? null : reportaEstadoDeBarrera(barrera),
     capacidadesDelEquipo,
+    ...(video === undefined ? {} : { video }),
     hora:
       hora === null ? null : juzgarHora(hora, (opciones.ahoraDelServidor ?? (() => new Date()))()),
     sinRespuesta,
@@ -332,6 +379,17 @@ const contactar = async (
       latenciaMs: respuesta.latenciaMs,
     };
   } catch (error) {
+    if (error instanceof CredencialRechazada) {
+      // A5 (15-L) · la rechazó ya en la pregunta anterior y no se volvió a
+      // presentar: es la credencial, no el cable.
+      return {
+        clase: 'credencial',
+        detalle:
+          'Hay un equipo en esa dirección y rechazó el usuario o la clave. NO reintente a ' +
+          'ciegas: estos aparatos bloquean la cuenta tras unos pocos intentos fallidos',
+        latenciaMs: latencia,
+      };
+    }
     const detalle = error instanceof EquipoInalcanzable ? error.detalle : 'no contesta';
     return {
       clase: hayEquipo ? 'credencial' : 'sin_equipo',

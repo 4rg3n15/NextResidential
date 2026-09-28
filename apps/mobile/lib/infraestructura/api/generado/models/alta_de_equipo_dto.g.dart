@@ -23,6 +23,8 @@ AltaDeEquipoDto _$AltaDeEquipoDtoFromJson(Map<String, dynamic> json) =>
           : AltaDeEquipoDtoModoDeTerminal.fromJson(
               json['modoDeTerminal'] as String,
             ),
+      canalDeVideo: json['canalDeVideo'] as String?,
+      zonaId: json['zonaId'] as String?,
       protocolo: json['protocolo'] == null
           ? AltaDeEquipoDtoProtocolo.http
           : AltaDeEquipoDtoProtocolo.fromJson(json['protocolo'] as String),
@@ -45,5 +47,7 @@ Map<String, dynamic> _$AltaDeEquipoDtoToJson(AltaDeEquipoDto instance) =>
       'fabricante': instance.fabricante,
       'modoDeTerminal': instance.modoDeTerminal,
       'canalDeAudioHabilitado': instance.canalDeAudioHabilitado,
+      'canalDeVideo': instance.canalDeVideo,
+      'zonaId': instance.zonaId,
       'probarConexion': instance.probarConexion,
     };

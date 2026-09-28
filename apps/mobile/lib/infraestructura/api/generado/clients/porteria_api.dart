@@ -6,12 +6,15 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/alta_de_portero_dto.dart';
+import '../models/baja_de_portero_dto.dart';
 import '../models/bitacora_de_porteria_dto.dart';
+import '../models/cupo_de_porteros_dto.dart';
 import '../models/datos_de_turno_dto.dart';
 import '../models/datos_del_portero_dto.dart';
 import '../models/desbloqueo_dto.dart';
 import '../models/estado_de_sesion_dto.dart';
 import '../models/hecho_de_porteria_dto.dart';
+import '../models/pool_de_porteros_dto.dart';
 import '../models/portero_creado_dto.dart';
 import '../models/portero_dto.dart';
 import '../models/porteros_dto.dart';
@@ -42,11 +45,24 @@ abstract class PorteriaApi {
     @Path('id') required String id,
   });
 
-  /// Alta de portero con usuario y contraseña inicial (cambio obligatorio)
+  /// Alta de portero con nombre, documento y contraseña temporal; recibe el siguiente número del pool (cambio de contraseña obligatorio)
   @POST('/copropiedades/{id}/porteros')
   Future<PorteroCreadoDto> supervisionControllerAlta({
     @Path('id') required String id,
     @Body() required AltaDePorteroDto body,
+  });
+
+  /// Cupo de porteros activos de la copropiedad (0 a 999), auditado
+  @PUT('/copropiedades/{id}/porteros/cupo')
+  Future<HechoDePorteriaDto> poolDePorterosControllerFijarCupo({
+    @Path('id') required String id,
+    @Body() required CupoDePorterosDto body,
+  });
+
+  /// Pool de números de portero de la copropiedad, el siguiente a asignar y el cupo
+  @GET('/copropiedades/{id}/porteros/pool')
+  Future<PoolDePorterosDto> poolDePorterosControllerPool({
+    @Path('id') required String id,
   });
 
   /// Datos del portero (nombre, teléfono, correo de contacto, portería, sectores)
@@ -55,6 +71,14 @@ abstract class PorteriaApi {
     @Path('id') required String id,
     @Path('usuarioId') required String usuarioId,
     @Body() required DatosDelPorteroDto body,
+  });
+
+  /// Da de baja a un portero: cierra sus sesiones y su número no se reutiliza
+  @POST('/copropiedades/{id}/porteros/{usuarioId}/baja')
+  Future<HechoDePorteriaDto> poolDePorterosControllerBaja({
+    @Path('id') required String id,
+    @Path('usuarioId') required String usuarioId,
+    @Body() required BajaDePorteroDto body,
   });
 
   /// Calendario de turnos en un rango (hasta 62 días)

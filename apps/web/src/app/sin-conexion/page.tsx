@@ -22,8 +22,8 @@ const SinConexion = (): JSX.Element => (
       acceso, un dato viejo presentado como actual es peor que ningún dato.
     </p>
     <p className="max-w-md text-secundario text-texto-apagado">
-      El control de accesos sigue funcionando: el Edge Gateway decide localmente cuando pierde la
-      conexión (OE-06) y reconcilia al recuperarla.
+      El control de accesos sigue funcionando: el equipo local de portería decide por su cuenta
+      mientras no hay conexión y envía todo lo ocurrido al recuperarla.
     </p>
   </main>
 );

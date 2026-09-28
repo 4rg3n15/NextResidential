@@ -17,18 +17,24 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'aplicacion/servidor_en_uso.dart';
 import 'aplicacion/sesion_en_uso.dart';
 import 'configuracion/ambiente.dart';
 import 'dominio/puertos.dart';
+import 'infraestructura/almacen/almacen_de_texto.dart';
+import 'infraestructura/api/comprobador_de_salud.dart';
 import 'infraestructura/api/generado/clients/cuentas_api.dart';
 import 'infraestructura/api/generado/clients/residente_api.dart';
 import 'infraestructura/api/hogar_api.dart';
+import 'infraestructura/api/notificaciones_api.dart';
 import 'infraestructura/api/repositorio_api.dart';
+import 'infraestructura/api/soporte_de_api.dart';
 import 'infraestructura/camara/camara_del_telefono.dart';
 import 'infraestructura/notificaciones/fuente.dart';
-import 'infraestructura/plataforma/telefono_y_compartir.dart';
+import 'infraestructura/plataforma/telefono.dart';
 import 'infraestructura/sesion/almacen_seguro.dart';
 import 'infraestructura/sesion/autenticador_por_api.dart';
+import 'infraestructura/red/tipo_de_red.dart';
 import 'infraestructura/sesion/autenticador_supabase.dart';
 import 'presentacion/app.dart';
 
@@ -48,25 +54,39 @@ Future<void> main() async {
   // recorrido de esta etapa, así que allí se usa memoria —la sesión no
   // sobrevive a la recarga y eso se declara— en vez de fingir un llavero.
   final almacen = kIsWeb ? AlmacenEnMemoria() : AlmacenSeguroDeSesion();
+  // 15-L · lo que la app recuerda entre arranques y no es negocio: la
+  // dirección del servidor, la bandeja de salida y las notificaciones vistas.
+  final AlmacenDeTexto recuerdos = kIsWeb ? AlmacenDeTextoEnMemoria() : AlmacenDeTextoSeguro();
+
+  // 15-L · la dirección del servidor: la compilada es el valor INICIAL, la
+  // guardada gana. Se lee antes de crear ningún `Dio`.
+  final direccion = DireccionDelServidor(compilada: ambiente.apiUrl, almacen: recuerdos);
+  await direccion.recuperar();
 
   // D1 · se ENTRA por la API (código + usuario, o correo) y se RENUEVA contra
   // el proveedor. El `Dio` del acceso no lleva el interceptor de sesión: es la
   // petición que la crea, no una que la use.
+  final dioDeAcceso = Dio();
   final sesion = SesionEnUso(
     almacen: almacen,
     autenticador: AutenticadorPorApi(
-      api: CuentasApi(Dio(BaseOptions(baseUrl: ambiente.apiUrl))),
+      api: CuentasApi(dioDeAcceso),
       renovacion: AutenticadorSupabase(
         dio: Dio(),
         urlBase: ambiente.supabaseUrl,
         clavePublicable: ambiente.supabaseClavePublicable,
       ),
+      // E2 (15-L) · con la red del teléfono, el fallo de conexión dice su causa.
+      consultarRed: tipoDeRedActual,
     ),
     reloj: reloj,
   );
   await sesion.recuperar();
 
-  final dio = crearDioDeApi(urlBase: ambiente.apiUrl, sesion: sesion);
+  final dio = crearDioDeApi(urlBase: direccion.actual, sesion: sesion);
+  // Los dos `Dio` que hablan con la API siguen la dirección: cambiarla los
+  // cambia a los dos. El de la renovación habla con el proveedor y no la sigue.
+  seguirLaDireccion(direccion, [dio, dioDeAcceso]);
   final api = ResidenteApi(dio);
   final repositorio = RepositorioApiDelResidente(api: api, sesion: sesion);
 
@@ -77,17 +97,27 @@ Future<void> main() async {
         sesion: sesion,
         repositorio: repositorio,
         reloj: reloj,
-        notificaciones: SinServicioDeMensajeria(identidad: IdentidadDelAparato()),
+        notificaciones: SinServicioDeMensajeria(
+          identidad: IdentidadDelAparato(),
+        ),
         claves: claveDeIdempotencia,
         alta: AltaPorApi(api: api, sesion: sesion),
         hogar: HogarPorApi(api: api, sesion: sesion),
         // El cambio de contraseña va CON la sesión: su `Dio` es el de la API.
         cuenta: CuentaPorApi(api: CuentasApi(dio)),
         llamador: const LlamadorDelSistema(),
-        compartidor: const CompartidorDelSistema(),
-        // Hito 3 · la foto real del visitante, reducida en el aparato. En web
-        // (el recorrido del verificador) no hay cámara que abrir: la simulada.
+        // Hito 3 · la foto real del visitante —de la cámara o de la galería—,
+        // reducida en el aparato. En web (el recorrido del verificador) no hay
+        // cámara ni fototeca que abrir: la simulada.
         tomarFoto: kIsWeb ? null : CamaraDelTelefono().tomar,
+        servidor: CambioDeServidor(
+          direccion: direccion,
+          comprobador: ComprobadorPorHttp(),
+          sesion: sesion,
+        ),
+        notificacionesDelConjunto: NotificacionesPorApi(api: api, sesion: sesion),
+        almacen: recuerdos,
+        cambiosDeRed: cambiosDeRed(),
       ),
     ),
   );
@@ -122,7 +152,11 @@ class PantallaDeArranqueBloqueado extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.dangerous_outlined, size: 56, color: Color(0xFFDC3341)),
+                const Icon(
+                  Icons.dangerous_outlined,
+                  size: 56,
+                  color: Color(0xFFDC3341),
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'La app no puede arrancar con esta configuración',

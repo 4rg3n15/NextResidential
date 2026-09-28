@@ -220,7 +220,7 @@ export const AsistenteDeGeneracion = ({
               ['conservar', 'Conservar las que existen y crear sólo las que faltan'],
               [
                 'sobrescribir',
-                'Además, volver a activar las que estaban dadas de baja (no se borra ni se renombra nada, RN-19)',
+                'Además, volver a activar las que estaban dadas de baja (no se borra ni se renombra nada)',
               ],
             ] as const
           ).map(([valor, texto]) => (

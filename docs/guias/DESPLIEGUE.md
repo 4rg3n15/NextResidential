@@ -322,15 +322,22 @@ desplegar el resto:
 
 ### 8.1 · Probar en un iPhone físico contra la API que corre en el Mac
 
+> **Paso a paso de la entrega en sitio (ETAPA 15-L, E3):** > [`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) — la comprobación previa con Safari
+> (`/health`), la confianza del desarrollador, el permiso de red local, la
+> compilación en **Release** que abre desde el ícono sin el Mac conectado, el
+> nombre `.local` del Mac y «Cambiar servidor» (ADR-033).
+
 ```
-flutter run -d <id-del-iPhone> \
-  --dart-define=API_URL=http://<IP-del-Mac>:3000 \
+flutter run --release -d <id-del-iPhone> \
+  --dart-define=API_URL=http://<nombre>.local:3000 \
   --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=<sb_publishable_…>
 ```
 
-`<id-del-iPhone>` sale de `flutter devices`; `<IP-del-Mac>` es la dirección del
-Mac en la red local (`ipconfig getifaddr en0`). En el emulador Android, en su
+`<id-del-iPhone>` sale de `flutter devices`; `<nombre>` es el nombre de host
+local del Mac (`scutil --get LocalHostName`), que no cambia de red a red; si la
+red bloquea mDNS, la app acepta la IP del Mac (`ipconfig getifaddr en0`) desde
+«Cambiar servidor». En el emulador Android, en su
 lugar, va el alias de la máquina anfitriona que trae `apps/mobile/.env.example`.
 
 - **El Mac y el iPhone en la misma red.** El teléfono alcanza la API por la IP
@@ -343,12 +350,13 @@ lugar, va el alias de la máquina anfitriona que trae `apps/mobile/.env.example`
   navegador; la app no envía cabecera `Origin` y la API acepta las peticiones
   sin ella (`apps/api/src/seguridad.ts`). No añada la IP del teléfono a esa
   lista: no haría nada.
-- **HTTP por IP privada sólo en depuración (iOS).** App Transport Security lo
-  bloquea; la excepción `NSAllowsLocalNetworking` —nunca
-  `NSAllowsArbitraryLoads`— sólo existe en la configuración Debug, porque
-  `Info.plist` se preprocesa y el bloque está bajo `#if NCR_DEPURACION`, que
-  define `ios/Flutter/Debug.xcconfig` y no `Release.xcconfig`. Un binario de
-  Release no lleva la excepción y sólo habla HTTPS.
+- **HTTP por la red local en Debug, Release y Profile (iOS, ADR-033).** La app
+  habla con la API por `dart:io`, que no pasa por App Transport Security; lo
+  que la alcanza es el permiso de red local (`NSLocalNetworkUsageDescription`).
+  Aun así, la excepción `NSAllowsLocalNetworking` —nunca
+  `NSAllowsArbitraryLoads`— va en las tres configuraciones para lo que use el
+  sistema de URL de Apple, y `scripts/lib/info-plist-ios.mjs` lo comprueba.
+  Producción exige HTTPS: por HTTP, el tráfico de la red local va sin cifrar.
 - **Ningún secreto va en el binario.** Todo `--dart-define` es extraíble del
   `.ipa` con `strings`; por eso sólo viajan la URL de la API, la de Supabase y
   la llave **publicable**. El paso 5d del verificador

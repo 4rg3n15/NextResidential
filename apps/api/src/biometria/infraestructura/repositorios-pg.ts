@@ -1,6 +1,11 @@
 import type { Pool, PoolClient } from 'pg';
 import { CalidadDeCaptura, ConsentimientoBiometrico, PlantillaBiometrica } from '@ncr/domain-core';
-import type { CanalConsentimiento, EstadoConsentimiento, EstadoPlantilla } from '@ncr/domain-core';
+import type {
+  CanalConsentimiento,
+  EstadoConsentimiento,
+  EstadoPlantilla,
+  OrigenDeConsentimiento,
+} from '@ncr/domain-core';
 import { claimsDeServicio } from '../../comun/claims-de-servicio';
 import { EXPONE_MENSAJE } from '../../comun/filtros/error-expuesto';
 import type {
@@ -95,10 +100,12 @@ interface FilaConsentimiento {
   readonly revocado_en: Date | null;
   readonly evidencia_id: string | null;
   readonly estado: EstadoConsentimiento;
+  readonly origen: OrigenDeConsentimiento;
+  readonly declarado_por: string | null;
 }
 
 const CAMPOS_CONSENTIMIENTO = `id, copropiedad_id, persona_id, finalidad, version_politica, canal,
-  solicitado_en, otorgado_en, revocado_en, evidencia_id, estado`;
+  solicitado_en, otorgado_en, revocado_en, evidencia_id, estado, origen, declarado_por`;
 
 const aConsentimiento = (f: FilaConsentimiento): ConsentimientoBiometrico => {
   const r = ConsentimientoBiometrico.solicitar({
@@ -113,6 +120,8 @@ const aConsentimiento = (f: FilaConsentimiento): ConsentimientoBiometrico => {
     revocadoEn: f.revocado_en,
     evidenciaId: f.evidencia_id,
     estado: f.estado,
+    origen: f.origen,
+    declaradoPor: f.declarado_por,
   });
   if (!r.ok) throw new Error(`fila de consentimiento ${f.id} inconsistente: ${r.error.detalle}`);
   return r.valor;
@@ -148,38 +157,27 @@ export class RepositorioConsentimientosPg implements RepositorioConsentimientos 
     });
   }
 
-  async pendientesVencidos(
-    copropiedadId: string,
-    ahora: Date,
-    plazoHoras: number,
-  ): Promise<readonly ConsentimientoBiometrico[]> {
-    return conServicio(this.pool, copropiedadId, async (c) => {
-      const { rows } = await c.query<FilaConsentimiento>(
-        `SELECT ${CAMPOS_CONSENTIMIENTO} FROM public.consentimientos_biometricos
-          WHERE copropiedad_id = $1 AND estado = 'pendiente'
-            AND solicitado_en <= $2::timestamptz - ($3::numeric * interval '1 hour')
-          ORDER BY solicitado_en`,
-        [copropiedadId, ahora, plazoHoras],
-      );
-      return rows.map(aConsentimiento);
-    });
-  }
-
   /**
    * Alta o cambio de estado en UNA sentencia: la fila nace `pendiente` en la
    * captura y la misma llamada la lleva a `vigente`, `rechazado`, `revocado` o
    * `expirado`. Lo que NO cambia nunca tras nacer —titular, finalidad, versión,
    * canal, solicitado_en— no está en el `UPDATE`, así que tampoco puede
    * cambiar por un descuido del llamador.
+   *
+   * F4 (15-L) · el ORIGEN sí se actualiza: una declaración que el titular
+   * confirma en persona pasa a ser suya. Quién la declaró, no: se escribe al
+   * nacer y se conserva.
    */
   async guardar(consentimiento: ConsentimientoBiometrico, actorId: string): Promise<void> {
     await conServicio(this.pool, consentimiento.copropiedadId, async (c) => {
       await c.query(
         `INSERT INTO public.consentimientos_biometricos
            (id, copropiedad_id, persona_id, finalidad, version_politica, canal, solicitado_en,
-            otorgado_en, revocado_en, evidencia_id, estado, creado_por, actualizado_por)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+            otorgado_en, revocado_en, evidencia_id, estado, origen, declarado_por,
+            creado_por, actualizado_por)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $13, $14, $12, $12)
          ON CONFLICT (id) DO UPDATE SET
+           origen          = EXCLUDED.origen,
            otorgado_en     = EXCLUDED.otorgado_en,
            revocado_en     = EXCLUDED.revocado_en,
            evidencia_id    = EXCLUDED.evidencia_id,
@@ -199,6 +197,8 @@ export class RepositorioConsentimientosPg implements RepositorioConsentimientos 
           consentimiento.evidenciaId,
           consentimiento.estado,
           actorId,
+          consentimiento.origen,
+          consentimiento.declaradoPor,
         ],
       );
     });
@@ -291,6 +291,27 @@ export class RepositorioPlantillasPg implements RepositorioPlantillas {
 
   vencidas(copropiedadId: string, ahora: Date): Promise<readonly PlantillaBiometrica[]> {
     return this.varias(copropiedadId, "estado <> 'suprimida' AND suprimir_en <= $2", [ahora]);
+  }
+
+  deAutorizacion(
+    copropiedadId: string,
+    autorizacionId: string,
+  ): Promise<readonly PlantillaBiometrica[]> {
+    return this.varias(copropiedadId, 'autorizacion_id = $2', [autorizacionId]);
+  }
+
+  /**
+   * F2 (15-L) · lo que el barrido debe suprimir aunque su plazo no haya
+   * llegado: la autorización que la justificaba ya no existe como tal.
+   */
+  deAutorizacionesRevocadas(copropiedadId: string): Promise<readonly PlantillaBiometrica[]> {
+    return this.varias(
+      copropiedadId,
+      `estado <> 'suprimida' AND autorizacion_id IN (
+         SELECT a.id FROM public.autorizaciones a
+          WHERE a.copropiedad_id = $1 AND a.estado = 'revocada')`,
+      [],
+    );
   }
 
   /** La cola de CA-10 tal como la define el índice `sincronizaciones_por_retirar_idx`. */
@@ -395,6 +416,40 @@ export class RepositorioPlantillasPg implements RepositorioPlantillas {
            actualizado_en  = now(),
            actualizado_por = EXCLUDED.actualizado_por`,
         [destino.copropiedadId, destino.plantillaId, destino.dispositivoId, actorId],
+      );
+    });
+  }
+
+  /**
+   * `fallida` con su motivo y un intento más. El `WHERE` del conflicto es la
+   * regla: una fila `sincronizada` no se pisa (el equipo ya la tiene y la cola
+   * de retirada depende de ese estado).
+   */
+  async registrarFallo(
+    destino: DestinoDePlantilla,
+    detalle: string,
+    actorId: string,
+  ): Promise<void> {
+    await conServicio(this.pool, destino.copropiedadId, async (c) => {
+      await c.query(
+        `INSERT INTO public.plantilla_sincronizaciones
+           (copropiedad_id, plantilla_id, dispositivo_id, estado, intentos, ultimo_error,
+            creado_por, actualizado_por)
+         VALUES ($1, $2, $3, 'fallida', 1, $4, $5, $5)
+         ON CONFLICT (plantilla_id, dispositivo_id) DO UPDATE SET
+           estado          = 'fallida',
+           intentos        = public.plantilla_sincronizaciones.intentos + 1,
+           ultimo_error    = EXCLUDED.ultimo_error,
+           actualizado_en  = now(),
+           actualizado_por = EXCLUDED.actualizado_por
+         WHERE public.plantilla_sincronizaciones.estado <> 'sincronizada'`,
+        [
+          destino.copropiedadId,
+          destino.plantillaId,
+          destino.dispositivoId,
+          detalle.slice(0, 500),
+          actorId,
+        ],
       );
     });
   }

@@ -37,7 +37,10 @@ export class PerfilDelResidentePg implements PerfilDelResidente {
            FROM public.usuarios u
            JOIN public.personas per ON per.id = u.persona_id
            JOIN public.copropiedades c ON c.id = u.copropiedad_id
-          WHERE u.id = $2 AND u.copropiedad_id = $1 AND u.estado = 'activo'`,
+          WHERE u.id = $2 AND u.copropiedad_id = $1 AND u.estado = 'activo'
+            AND EXISTS (SELECT 1 FROM public.roles_usuario r
+                         WHERE r.usuario_id = u.id AND r.copropiedad_id = u.copropiedad_id
+                           AND r.rol = 'residente' AND r.estado = 'activo')`,
         [copropiedadId, usuarioId],
       );
       const f = rows[0];
@@ -62,9 +65,10 @@ export class PerfilDelResidentePg implements PerfilDelResidente {
     copropiedadId: string,
     usuarioId: string,
     d: PerfilValido,
+    actorId: string = usuarioId,
   ): Promise<'guardado' | 'DOCUMENTO_EN_USO' | 'SIN_VINCULO'> {
     try {
-      return await comoServicio(this.pool, copropiedadId, usuarioId, async (c) => {
+      return await comoServicio(this.pool, copropiedadId, actorId, async (c) => {
         const { rows } = await c.query<{ persona_id: string | null }>(
           'SELECT persona_id FROM public.usuarios WHERE id = $1 AND copropiedad_id = $2',
           [usuarioId, copropiedadId],

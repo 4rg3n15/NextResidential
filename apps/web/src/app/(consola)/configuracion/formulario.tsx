@@ -294,7 +294,7 @@ export const FormularioDeConfiguracion = ({
             {' del evento ANPR)'}
           </>
         }
-        motivo="Por debajo de este valor la lectura de placa no decide sola: escala al portero (CU-01, excepción 3a). No es un ajuste de la copropiedad sino la constante documentada del fabricante, fijada por restricción de base (migración 0032, P-02): cambiarla exige una migración."
+        motivo="Por debajo de este valor la lectura de placa no decide sola: pasa al portero. No es un ajuste de la copropiedad: es el valor que documenta el fabricante de la cámara, igual para todas."
       />
 
       <div className="space-y-1.5">
@@ -319,7 +319,7 @@ export const FormularioDeConfiguracion = ({
         </select>
         <p className="text-secundario text-texto-apagado">
           {editable('politicaContingenciaEdge')
-            ? 'Qué hace el Edge cuando decide sin WAN y la regla no está en su caché (RN-16).'
+            ? 'Qué hace el equipo local de portería cuando se queda sin Internet y no tiene la regla guardada.'
             : `${bloqueado} «Denegar» es el valor conservador que impone el contrato.`}
         </p>
       </div>
@@ -334,7 +334,7 @@ export const FormularioDeConfiguracion = ({
       <AjusteFijo
         etiqueta="Margen de latido de dispositivo"
         valor={<span className="tabular-nums">{enMinutos(datos.umbralLatidoMinutos)}</span>}
-        motivo="Sin latido en este plazo el dispositivo pasa a «fuera de línea» (RN-12, CA-26). No es un ajuste de la copropiedad: la base lo ata al periodo de latido y a los latidos tolerados (migración 0020) y lo normaliza a su valor documentado (migración 0032, P-06); cambiarlo exige una migración."
+        motivo="Si un equipo no da señales en este plazo, pasa a «fuera de línea». No es un ajuste de la copropiedad: es el mismo valor para todas."
       />
 
       {rechazos['general'] !== undefined ? (

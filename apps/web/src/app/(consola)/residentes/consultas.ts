@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { CuentaDeResidente, PlazaDeOcupante, VehiculoDeResidente } from '@ncr/contracts';
 import { cliente, desenvolver } from '@/lib/api/cliente';
+import { RECARGA_DE_LISTAS_COMPARTIDAS } from '@/lib/api/recarga';
 
 /** Claves de caché del panel: una invalidación por sección. */
 export const clavesDeResidentes = {
@@ -18,6 +19,8 @@ export const useCuentasDeResidentes = (
 ): UseQueryResult<readonly CuentaDeResidente[]> =>
   useQuery({
     queryKey: clavesDeResidentes.cuentas(copropiedadId),
+    // 3h · el residente edita su perfil y sus vehículos desde la app.
+    ...RECARGA_DE_LISTAS_COMPARTIDAS,
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/residentes/cuentas', {
@@ -31,6 +34,7 @@ export const useVehiculosDeResidentes = (
 ): UseQueryResult<readonly VehiculoDeResidente[]> =>
   useQuery({
     queryKey: clavesDeResidentes.vehiculos(copropiedadId),
+    ...RECARGA_DE_LISTAS_COMPARTIDAS,
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/residentes/vehiculos', {

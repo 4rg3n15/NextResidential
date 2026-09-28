@@ -231,9 +231,6 @@ final class VehiculoRechazado extends ResultadoDeVehiculo {
   bool get esTope => motivo == 'TOPE_ALCANZADO';
 }
 
-/// RN-10 · lo que respondió el VISITANTE, no el residente.
-enum EstadoDeConsentimiento { pendiente, aceptado, rechazado, revocado, expirado }
-
 /// Alta y ocupantes (3.2, 3.3). Ninguna recibe la vivienda del vecino: la del
 /// alta se busca por número y exige código si ya hay alguien dentro.
 abstract interface class RepositorioDeAlta {
@@ -245,16 +242,12 @@ abstract interface class RepositorioDeAlta {
   Future<MisOcupantes> declararOcupantes(int numero);
 }
 
-/// Perfil, vehículos propios y el consentimiento del visitante (3.4, 3.5, 5).
+/// Perfil y vehículos propios (3.4, 3.5).
 abstract interface class RepositorioDelHogar {
   Future<PerfilDelResidente> miPerfil();
   Future<ResultadoDePerfil> editarPerfil(DatosDePerfil datos);
   Future<ResultadoDeVehiculo> registrarVehiculo(NuevoVehiculo vehiculo);
   Future<bool> desactivarVehiculo(String vehiculoId);
-  Future<EstadoDeConsentimiento> estadoDelConsentimiento({
-    required String autorizacionId,
-    required String consentimientoId,
-  });
 }
 
 /// ADR-023 · el cambio de contraseña de la propia cuenta.
@@ -266,25 +259,3 @@ abstract interface class ServicioDeCuenta {
 abstract interface class LlamadorDeTelefono {
   Future<bool> llamar(String numero);
 }
-
-/// Punto 5 · el panel nativo de compartir (WhatsApp, SMS…).
-abstract interface class Compartidor {
-  Future<void> compartir(String texto);
-}
-
-/// Punto 5 · la API devuelve la URL completa si declara `API_URL_PUBLICA` y, si
-/// no, sólo la ruta (`/consentimiento/<token>`). Una ruta suelta no le sirve al
-/// visitante, así que se completa con la URL de la API con la que habla la app.
-String enlaceParaCompartir(String enlace, String urlDeLaApi) {
-  if (enlace.startsWith('http://') || enlace.startsWith('https://')) return enlace;
-  final base = urlDeLaApi.endsWith('/')
-      ? urlDeLaApi.substring(0, urlDeLaApi.length - 1)
-      : urlDeLaApi;
-  return '$base${enlace.startsWith('/') ? '' : '/'}$enlace';
-}
-
-/// El texto que acompaña al enlace en el panel de compartir. Dice QUIÉN decide:
-/// el visitante, no el residente (RN-10).
-String mensajeParaElVisitante(String titular, String enlace) =>
-    'Hola, $titular. Para entrar con reconocimiento facial necesito que usted mismo '
-    'acepte o rechace el uso de su foto. Es un enlace de un solo uso: $enlace';

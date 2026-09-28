@@ -10,6 +10,21 @@ import { SaneamientoMiddleware } from './comun/saneamiento';
  * repartida por `main.ts`.
  */
 export const aplicarSeguridad = (app: INestApplication, config: Configuracion): void => {
+  /**
+   * H6 (15-L) · la IP del cliente. Sin esto la API veía 127.0.0.1 en TODA
+   * petición de la consola: la lista blanca de porteros no serviría, «la
+   * misma IP que el superadministrador» sería siempre cierto y el límite de
+   * peticiones trataría a todos como uno. La `X-Forwarded-For` sólo se cree si
+   * la petición llega de un proxy declarado; la app móvil llega directa y
+   * cuenta la IP de su socket.
+   */
+  const express = app.getHttpAdapter().getInstance() as {
+    set(clave: string, valor: unknown): void;
+  };
+  express.set(
+    'trust proxy',
+    config.API_PROXIES_DE_CONFIANZA.split(',').map((x) => x.trim()),
+  );
   app.use(
     helmet({
       contentSecurityPolicy: {

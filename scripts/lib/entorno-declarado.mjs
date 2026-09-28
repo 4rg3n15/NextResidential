@@ -109,6 +109,14 @@ const FUERA_DE_ZOD = new Map([
   ['API:VIDEOPORTERO_USUARIO', 'ídem'],
   ['API:VIDEOPORTERO_CLAVE', 'ídem'],
   ['API:VIDEOPORTERO_CANAL', 'ídem'],
+  // ETAPA 15-L (D1) · `pnpm sitio:video` genera la configuración de go2rtc con
+  // éstas; la API no las lee (su puente sólo necesita GO2RTC_URL).
+  ['API:VIDEO_IP_ANUNCIADA', 'la lee scripts/sitio-video.mjs'],
+  ['API:VIDEO_PUERTO_WEBRTC', 'ídem'],
+  ['API:GO2RTC_VERSION', 'ídem'],
+  ['API:BARRERA_CANAL_VIDEO', 'la lee scripts/sitio-ensayo.mjs'],
+  ['API:TERMINAL_CANAL_VIDEO', 'ídem'],
+  ['API:VIDEOPORTERO_CANAL_VIDEO', 'ídem'],
   // De las SEIS registradas como deuda en ESTADO_ETAPAS quedan CUATRO. La ETAPA
   // 14 saldó las dos suyas —`LOG_LEVEL` y `SENTRY_DSN`— dándoles uso, no
   // borrándolas del ejemplo: ahora Zod las valida y el código las lee, así que

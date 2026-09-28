@@ -13,6 +13,7 @@ import {
   RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
 } from '../src/autorizaciones/presentacion/limites';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../src/comun/sobre-de-equipo';
+import { RUTAS_CON_FOTO_DE_VISITA } from '../src/visitas/presentacion/limites';
 import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from '../src/comun/ruta-de-audio';
 import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from '../src/comun/ruta-de-video';
 import type { INestApplication } from '@nestjs/common';
@@ -24,6 +25,7 @@ import type { ReporteDeErrores } from '../src/observabilidad';
 import { GENERADOR_DE_ID } from '@ncr/domain-core';
 import type { GeneradorDeId } from '@ncr/domain-core';
 import { AppModule } from '../src/app.module';
+import { ControlDeIpDePorteros, ModoPruebas } from '../src/plataforma';
 import { SONDA_POSTGRES } from '../src/arranque/sonda-postgres';
 import { ProveedorDeJwks } from '../src/autenticacion/infraestructura/jwks';
 import {
@@ -39,7 +41,7 @@ import { REPOSITORIO_DE_EQUIPOS, SIN_PROBAR, SONDA_DE_EQUIPO } from '../src/equi
 import { REPOSITORIO_AUTORIZACIONES_ZONA, REPOSITORIO_ZONAS } from '../src/zonas';
 import { RepositorioZonasEnMemoria } from '../src/zonas/infraestructura/repositorio-zonas-memoria';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
-import { COP_A, COP_B } from './constantes';
+import { COP_A, COP_B, EQUIPOS_DEL_BANCO } from './constantes';
 import {
   CODIGO_DE_PATRULLAJE,
   ControlDeSesiones,
@@ -80,12 +82,15 @@ import {
   VEHICULOS_PROPIOS,
 } from '../src/residente/aplicacion/puertos-hogar';
 
-export { COP_A, COP_B } from './constantes';
+export { COP_A, COP_B, EQUIPO_DE_B } from './constantes';
 
 export const configuracionDePrueba: Configuracion = {
   NODE_ENV: 'test',
   PG_POOL_MAX: 20,
   PORT: 0,
+  // H6 (15-L) · supertest llega por el bucle local: como el proxy de la consola.
+  API_PROXIES_DE_CONFIANZA: 'loopback',
+  MODO_PRUEBAS_FACTOR_DE_LIMITE: 10,
   SUPABASE_URL: 'https://proyecto-de-prueba.invalid',
   SUPABASE_PUBLISHABLE_KEY: 'marcador',
   SUPABASE_SECRET_KEY: 'marcador',
@@ -103,7 +108,6 @@ export const configuracionDePrueba: Configuracion = {
   BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
   EQUIPOS_LLAVE: 'llave-de-equipos-solo-para-pruebas-32+',
   EQUIPOS_LLAVE_REF: 'env:EQUIPOS_LLAVE',
-  BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: 24,
   /**
    * La suite corre SIEMPRE contra el simulado, que es lo que ADR-03 exige poder
    * hacer: el sistema completo tiene que demostrarse sin hardware. El adaptador
@@ -111,6 +115,16 @@ export const configuracionDePrueba: Configuracion = {
    */
   PROVEEDOR_DE_EQUIPOS: 'simulado',
   PROVEEDOR_SEMILLA: 20260908,
+  TERMINAL_ABRE_SIN_PLATAFORMA: false,
+  TERMINAL_PLAZO_DE_VERIFICACION_S: 8,
+  EQUIPOS_TIEMPO_LIMITE_MS: 5000,
+  EQUIPOS_ZONA_HORARIA: 'America/Bogota',
+  TERMINAL_PLAN_DE_HORARIO: '1',
+  EQUIPOS_FOTO_KB_MAXIMOS: 200,
+  EQUIPOS_FOTO_LADO_MAXIMO: 1024,
+  VIDEO_PUERTO_RTSP: 554,
+  // C4 · el latido corre por intervalo; las suites que lo miran llaman a la pasada.
+  EQUIPOS_LATIDO_S: 0,
   // Este banco no tiene base: el cargador que lee de ella fallaría en cada
   // lectura. El conservador deniega, que es lo que las suites de la API
   // esperan; el cargador PostgreSQL tiene su propia suite contra base real.
@@ -217,7 +231,8 @@ export const conSesionDePorteriaDeLaSuite = (b: TestingModuleBuilder): TestingMo
       c: CodigoDePatrullaje,
       bi: BitacoraDeIdentidad,
       r: Reloj,
-    ) => new ControlConLaSesionDeLaSuite(p, t, se, c, bi, r),
+      origen: ControlDeIpDePorteros,
+    ) => new ControlConLaSesionDeLaSuite(p, t, se, c, bi, r, origen),
     inject: [
       REPOSITORIO_DE_PERFILES,
       REPOSITORIO_DE_TURNOS,
@@ -225,6 +240,9 @@ export const conSesionDePorteriaDeLaSuite = (b: TestingModuleBuilder): TestingMo
       CODIGO_DE_PATRULLAJE,
       BITACORA_DE_IDENTIDAD,
       RELOJ,
+      // H4 (15-L) · la regla de IP REAL también en el doble: el inicio de
+      // sesión del portero la evalúa como en producción.
+      ControlDeIpDePorteros,
     ],
   });
 
@@ -270,6 +288,22 @@ const conDoblesDelResidente = (b: TestingModuleBuilder): TestingModuleBuilder =>
     .useValue(hogar);
 };
 
+/** 15-L · el registro de equipos del banco sin base, cada uno en su copropiedad. */
+export const registroDelBanco = (): RepositorioDeEquiposEnMemoria => {
+  const registro = new RepositorioDeEquiposEnMemoria();
+  for (const equipo of EQUIPOS_DEL_BANCO) registro.sembrar(equipo.copropiedadId, equipo);
+  return registro;
+};
+
+/**
+ * H5 (15-L) · el modo pruebas arranca ACTIVO, como en la base. La suite que
+ * prueba una restricción de porteros —límites, bloqueo, reglas de IP— lo apaga
+ * por el camino de producción (el mismo que usa la consola).
+ */
+export const sinModoPruebas = async (app: INestApplication): Promise<void> => {
+  await app.get(ModoPruebas).cambiar(false, '00000000-0000-4000-8000-0000000000aa', null);
+};
+
 export const crearApp = async (
   firmante: Firmante,
   sustituir?: (constructor: TestingModuleBuilder) => TestingModuleBuilder,
@@ -295,17 +329,21 @@ export const crearApp = async (
 ): Promise<INestApplication> => {
   const equiposPorOmision = equipos?.repositorio;
   const sondaPorOmision = equipos?.sonda;
+  // La MISMA configuración para el módulo y para lo que se monta fuera de él
+  // (seguridad, límites del cuerpo). Hasta la 15-L, `aplicarSeguridad` recibía
+  // siempre la de prueba: una suite que variaba `API_PROXIES_DE_CONFIANZA`
+  // probaba el `trust proxy` por omisión sin saberlo.
+  const efectiva: Configuracion =
+    configuracion === undefined
+      ? configuracionDePrueba
+      : { ...configuracionDePrueba, ...configuracion };
   const base = Test.createTestingModule({
     imports: [
       // `DiscoveryModule` para poder LEER los decoradores del código en la
       // suite de aislamiento, en vez de mantener una lista paralela en la
       // prueba que diga verificarlos y no los verifique.
       DiscoveryModule,
-      AppModule.conConfiguracion(
-        configuracion === undefined
-          ? configuracionDePrueba
-          : { ...configuracionDePrueba, ...configuracion },
-      ),
+      AppModule.conConfiguracion(efectiva),
     ],
   });
   // La sesión de la suite va ANTES de `sustituir`, para que una suite que
@@ -372,7 +410,7 @@ export const crearApp = async (
       inject: [RepositorioZonasEnMemoria],
     })
     .overrideProvider(REPOSITORIO_DE_EQUIPOS)
-    .useFactory({ factory: () => equiposPorOmision ?? new RepositorioDeEquiposEnMemoria() })
+    .useFactory({ factory: () => equiposPorOmision ?? registroDelBanco() })
     .overrideProvider(SONDA_DE_EQUIPO)
     .useValue(sondaPorOmision ?? { probar: async () => SIN_PROBAR })
     .overrideProvider(ProveedorDeJwks)
@@ -443,7 +481,7 @@ export const crearApp = async (
    */
   aplicarContextoDePeticion(app, () => app.get<GeneradorDeId>(GENERADOR_DE_ID).nuevo());
 
-  aplicarSeguridad(app, configuracionDePrueba);
+  aplicarSeguridad(app, efectiva);
   /**
    * ETAPA 15 · el acumulador del sobre crudo, ANTES de `express.json` y sólo
    * bajo su ruta — igual que en `main.ts`, y por la misma lección de H-13-11.
@@ -462,10 +500,12 @@ export const crearApp = async (
     RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
     express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
   );
-  app.use(
-    express.json({ limit: configuracionDePrueba.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }),
-  );
-  app.use(express.urlencoded({ limit: configuracionDePrueba.LIMITE_PAYLOAD, extended: false }));
+  // F (15-L) · «Generar autorización» lleva la foto en el cuerpo: mismo tope.
+  for (const ruta of RUTAS_CON_FOTO_DE_VISITA) {
+    app.use(ruta, express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }));
+  }
+  app.use(express.json({ limit: efectiva.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
+  app.use(express.urlencoded({ limit: efectiva.LIMITE_PAYLOAD, extended: false }));
   aplicarSaneamiento(app);
   /**
    * EL MISMO FILTRO GLOBAL QUE PRODUCCIÓN.

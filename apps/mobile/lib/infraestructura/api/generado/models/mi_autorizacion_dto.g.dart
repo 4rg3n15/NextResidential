@@ -17,6 +17,10 @@ MiAutorizacionDto _$MiAutorizacionDtoFromJson(Map<String, dynamic> json) =>
       permiteAccesoVehicular: json['permiteAccesoVehicular'] as bool,
       estado: json['estado'] as String,
       acompanantes: json['acompanantes'] as num,
+      situacion: MiAutorizacionDtoSituacion.fromJson(
+        json['situacion'] as String,
+      ),
+      motivoRechazo: json['motivoRechazo'] as String?,
     );
 
 Map<String, dynamic> _$MiAutorizacionDtoToJson(MiAutorizacionDto instance) =>
@@ -30,4 +34,6 @@ Map<String, dynamic> _$MiAutorizacionDtoToJson(MiAutorizacionDto instance) =>
       'permiteAccesoVehicular': instance.permiteAccesoVehicular,
       'estado': instance.estado,
       'acompanantes': instance.acompanantes,
+      'situacion': instance.situacion,
+      'motivoRechazo': instance.motivoRechazo,
     };

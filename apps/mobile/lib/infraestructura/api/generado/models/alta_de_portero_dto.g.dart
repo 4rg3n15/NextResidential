@@ -12,11 +12,11 @@ AltaDePorteroDto _$AltaDePorteroDtoFromJson(Map<String, dynamic> json) =>
       sectores: (json['sectores'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
-      usuario: json['usuario'] as String,
       contrasenaInicial: json['contrasenaInicial'] as String,
       telefono: json['telefono'] as String?,
       correoContacto: json['correoContacto'] as String?,
       porteria: json['porteria'] as String?,
+      documento: json['documento'] as String?,
     );
 
 Map<String, dynamic> _$AltaDePorteroDtoToJson(AltaDePorteroDto instance) =>
@@ -26,6 +26,6 @@ Map<String, dynamic> _$AltaDePorteroDtoToJson(AltaDePorteroDto instance) =>
       'correoContacto': instance.correoContacto,
       'porteria': instance.porteria,
       'sectores': instance.sectores,
-      'usuario': instance.usuario,
+      'documento': instance.documento,
       'contrasenaInicial': instance.contrasenaInicial,
     };

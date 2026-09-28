@@ -45,7 +45,7 @@ const Acceso = async ({
   return (
     <MarcoDeAcceso
       titulo="Bienvenido"
-      descripcion="Accede con tu correo, o con tu usuario y el NIT de la copropiedad. El sistema te lleva a la superficie que corresponde a tu rol."
+      descripcion="Accede con tu correo; si eres portero, con tu número; si eres residente, con tu usuario y el código de la copropiedad. El sistema te lleva a la superficie que corresponde a tu rol."
     >
       {aviso === undefined ? null : (
         <p

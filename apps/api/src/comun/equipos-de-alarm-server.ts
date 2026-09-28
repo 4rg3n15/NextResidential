@@ -1,3 +1,5 @@
+import { normalizarOrigen } from './direccion-ip';
+
 /**
  * QUIÉN PUEDE PUBLICAR EN EL ALARM SERVER, Y CON QUÉ.
  *
@@ -141,12 +143,11 @@ export const coincideEnTiempoConstante = (a: string, b: string): boolean => {
   return diferencia === 0;
 };
 
-/** Normaliza el origen: IPv6 con IPv4 dentro, y el `::ffff:` de los sockets. */
-export const normalizarOrigen = (crudo: string | undefined | null): string => {
-  const valor = (crudo ?? '').trim();
-  const sinPrefijo = /^::ffff:(.+)$/i.exec(valor)?.[1] ?? valor;
-  return sinPrefijo.toLowerCase();
-};
+/**
+ * La normalización del origen vive en `direccion-ip.ts`, la misma que usa la
+ * regla de IP de los porteros; se reexporta aquí para quien ya la importaba.
+ */
+export { normalizarOrigen };
 
 export const buscarEquipoPorSecreto = (
   equipos: readonly EquipoDeclarado[],

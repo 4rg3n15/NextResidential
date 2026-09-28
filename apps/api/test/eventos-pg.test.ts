@@ -5,6 +5,7 @@ import { Acceso, FiltroDeEventos, VersionDeReglas, esExito } from '@ncr/domain-c
 import type { HechoDeAcceso } from '@ncr/domain-core';
 import { permitir } from '@ncr/domain-core';
 import { RepositorioEventosPg } from '../src/eventos/infraestructura/repositorio-eventos-pg';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * El adaptador PostgreSQL de eventos contra una base REAL — y con él, el
@@ -32,7 +33,6 @@ import { RepositorioEventosPg } from '../src/eventos/infraestructura/repositorio
  */
 const CORRIDA = randomBytes(6).toString('hex');
 
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 const COP_AJENA = '10000000-0000-4000-8000-000000000002';
 
@@ -115,11 +115,9 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.warn('OMITIDA: sin DATABASE_URL_PRUEBAS o sin semillas. Se ejecuta en CI (ETAPA 14).');
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
+const omitida = (): boolean => !disponible;
 
 describe('RepositorioEventosPg · anexado idempotente (RN-17, CA-22)', () => {
   it('anexa un evento y lo devuelve por identificador', async () => {
@@ -161,9 +159,13 @@ describe('RepositorioEventosPg · anexado idempotente (RN-17, CA-22)', () => {
     const primero = acceso();
     await repo.anexar(primero, actorId);
 
-    const antes = await contarEventos();
+    // Se cuentan las filas de ESA clave. Contar todos los eventos de la
+    // copropiedad era una carrera: otras suites anexan en paralelo, y una que
+    // entrara entre las dos lecturas ponía roja esta prueba (paso 14 del CI en
+    // macOS, «expected 55 to be 54», corrección 2 de la 15-L).
+    expect(await contarEventos(primero.claveIdempotencia)).toBe(1);
     await repo.anexar(acceso({ claveIdempotencia: primero.claveIdempotencia }), actorId);
-    expect(await contarEventos()).toBe(antes);
+    expect(await contarEventos(primero.claveIdempotencia)).toBe(1);
   });
 
   it('una clave distinta del mismo dispositivo sí entra', async () => {
@@ -309,15 +311,15 @@ describe('INMUTABILIDAD SOBRE UN EVENTO REAL · cierra el pendiente de la ETAPA 
   });
 });
 
-const contarEventos = async (): Promise<number> => {
+const contarEventos = async (clave: string): Promise<number> => {
   const cliente = await (pool as Pool).connect();
   try {
     await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
       JSON.stringify(claims()),
     ]);
     const { rows } = await cliente.query<{ n: string }>(
-      'SELECT count(*)::text AS n FROM public.eventos WHERE copropiedad_id=$1',
-      [COP],
+      'SELECT count(*)::text AS n FROM public.eventos WHERE copropiedad_id=$1 AND clave_idempotencia=$2',
+      [COP, clave],
     );
     return Number(rows[0]?.n ?? '0');
   } finally {

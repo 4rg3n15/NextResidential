@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common';
+import { REGISTRO_DE_EVENTOS_DE_EQUIPO } from '../eventos';
+import type { RegistroDeEventosDeEquipo } from '../eventos';
+import { ConstanciaDeOrdenesEnLineaDeTiempo } from './infraestructura/constancia-de-ordenes';
+import { EquiposModule } from '../equipos';
 import type { DynamicModule } from '@nestjs/common';
 import { BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
@@ -60,6 +64,8 @@ export class GuardiaModule {
   static registrar(): DynamicModule {
     return {
       module: GuardiaModule,
+      // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
+      imports: [EquiposModule.registrar()],
       controllers: [GuardiaController, VideoController],
       providers: [
         {
@@ -183,13 +189,30 @@ export class GuardiaModule {
         },
         {
           provide: AccionarPuertaAMano,
-          inject: [ACCIONADOR_DE_PUERTA, BITACORA_DE_ORDENES, RELOJ, GENERADOR_DE_ID],
+          inject: [
+            ACCIONADOR_DE_PUERTA,
+            BITACORA_DE_ORDENES,
+            RELOJ,
+            GENERADOR_DE_ID,
+            REGISTRO_DE_EVENTOS_DE_EQUIPO,
+            BITACORA,
+          ],
           useFactory: (
             accionador: AccionadorDePuerta,
             ordenes: BitacoraDeOrdenes,
             reloj: Reloj,
             ids: GeneradorDeId,
-          ) => new AccionarPuertaAMano(accionador, ordenes, reloj, ids),
+            eventosDeEquipo: RegistroDeEventosDeEquipo,
+            bitacora: Bitacora,
+          ) =>
+            new AccionarPuertaAMano(
+              accionador,
+              ordenes,
+              reloj,
+              ids,
+              // A1 (15-L) · la orden, con su desenlace, en la línea de tiempo.
+              new ConstanciaDeOrdenesEnLineaDeTiempo(eventosDeEquipo, bitacora),
+            ),
         },
       ],
       exports: [CANAL_DE_INTERCOM, BITACORA_DE_ORDENES, REGISTRO_DE_BLOQUEOS],

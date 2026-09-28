@@ -148,10 +148,24 @@ tenga permiso (CU-05).
   nadie entre**: antes, una zona que nadie tocaba conservaba el conteo antiguo
   indefinidamente.
 
-### 3.3 · Visitantes y autorizaciones
+### 3.3 · Visitantes
 
-El residente autoriza desde su app; el administrador ve todas las
-autorizaciones de la copropiedad y puede **revocar** cualquiera con motivo.
+**Generar autorización** (todos los roles de la consola): nombre y documento
+del visitante, fecha y hora, duración, la vivienda que visita, la **foto
+frontal** y la casilla «Declaro que <nombre del visitante> me autorizó a usar
+su foto para su ingreso al conjunto», que toma el nombre escrito en el
+formulario. La visita queda autorizada al guardarla y su foto sale a todos los
+equipos con reconocimiento facial; la consola dice en cuántos quedó y cuáles no
+la aceptaron, y permite reintentar.
+
+- **Portería** ve sólo las visitas de hoy; la lista empieza de nuevo a
+  medianoche y el historial se conserva. **Administración** ve el historial
+  completo con filtros por vivienda, fechas, estado, nombre o documento.
+- **Portería y superadministración** reciben un aviso en pantalla por cada
+  visita nueva y pueden **rechazarla** con motivo: queda anulada y su foto se
+  borra de todos los equipos.
+- Si el visitante está presente, puede **confirmar en persona** que autoriza su
+  foto (opcional): escribe él mismo su nombre y su documento.
 
 - **Listas negras** (RN-06, RN-07): una persona o una placa en lista negra **no
   entra por ningún medio**, aunque tenga autorización vigente. Quien la incluye
@@ -172,6 +186,26 @@ Alta, estado y sincronización. El estado lo mantiene el sistema:
 > enseña una referencia, no la contraseña. Si necesita la contraseña de una
 > cámara, está en el gestor de secretos, no aquí.
 
+**En la ficha de un equipo** (superadministración y administración), con un
+motivo escrito que queda en la auditoría:
+
+- **Cámara · «Enviar eventos a este Mac».** Si el Mac cambió de red, la cámara
+  sigue enviando a la IP de antes. Esto le escribe la de ahora y lo comprueba
+  leyéndolo de vuelta.
+- **Terminal · «Verificación remota: activar / desactivar».** Desactivarla es el
+  plan B si la terminal no recibe a tiempo la respuesta de la plataforma: vuelve
+  a abrir con su propio reconocimiento, y la plataforma registra sin decidir.
+- **Rostros**: la ficha dice si el equipo los admite, si no, o si no se pudo
+  leer y por qué.
+- **Eventos del equipo**: si otra plataforma (HikCentral) tiene la conexión de
+  eventos del equipo, la ficha lo dice como bloqueo, con el remedio:
+  deshabilitar el equipo en HikCentral mientras se prueba.
+
+Si la consola muestra la franja roja **«Equipos simulados: las órdenes no
+llegan a ningún equipo real»**, la API está en modo simulado con equipos reales
+dados de alta: ninguna apertura mueve nada hasta cambiar
+`PROVEEDOR_DE_EQUIPOS` y reiniciarla.
+
 ### 3.5 · Eventos e informes
 
 **Todo intento de acceso genera un evento**, permitido o denegado (RN-02), con
@@ -188,7 +222,9 @@ alguien lo cite como si lo supiera.
 
 ## 4 · Portero / Seguridad
 
-Una sola pantalla, **Portería**, y está pensada para usarse de pie y con prisa.
+Al entrar aterriza en **Portería**, su pantalla, pensada para usarse de pie y
+con prisa. No tiene el tablero de indicadores: esos datos son de administración
+y central (15-L).
 
 ### El flujo
 
@@ -207,9 +243,10 @@ Una sola pantalla, **Portería**, y está pensada para usarse de pie y con prisa
 
 ### Lo que el portero no ve
 
-No ve el padrón completo, ni otras copropiedades, ni los informes. **Y no ve la
-guardia virtual**: no es un permiso que le falte, es otra consola. Él atiende su
-puerta; el operador de central atiende varias copropiedades que no ve.
+No ve el padrón completo, ni otras copropiedades, ni los informes, ni el
+tablero. Desde la 15-L (H4) **sí ve la guardia virtual** para atender de forma
+remota, y es la API la que decide en cada petición si su IP está entre las
+permitidas por el superadministrador.
 
 ---
 
@@ -253,26 +290,35 @@ el sistema se lo dice en vez de dejarlo en una pantalla vacía.
 
 ### Las ocho pantallas
 
-| Pantalla        | Para qué                                        |
-| --------------- | ----------------------------------------------- |
-| Inicio          | Su vivienda, lo que está pasando ahora          |
-| Mi familia      | Los residentes de su vivienda                   |
-| Mis vehículos   | Sus placas                                      |
-| Nuevo visitante | **La pantalla principal**: autorizar una visita |
-| Zonas comunes   | Aforo actual y solicitud de acceso              |
-| Historial       | Quién entró a su vivienda, con filtros          |
-| Notificaciones  | Avisos de llegada y alertas                     |
-| Perfil          | Sus datos y sus preferencias de aviso           |
+| Pantalla        | Para qué                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| Inicio          | Su vivienda, lo que está pasando ahora                                                      |
+| Mi familia      | Los residentes de su vivienda                                                               |
+| Mis vehículos   | Sus placas                                                                                  |
+| Nuevo visitante | **La pantalla principal**: autorizar una visita                                             |
+| Zonas comunes   | Aforo actual y solicitud de acceso                                                          |
+| Historial       | Quién entró a su vivienda, con filtros                                                      |
+| Notificaciones  | Visitas rechazadas, con su motivo, e ingresos de sus visitantes; el contador está en Inicio |
+| Perfil          | Sus datos                                                                                   |
 
 ### Autorizar una visita
 
-1. **Nuevo visitante** → nombre y documento. No hace falta ningún identificador
-   interno: si la persona ya visitó antes, el sistema la reconoce por su
-   documento.
-2. **Vigencia**: desde cuándo y hasta cuándo. Fuera de esa ventana no entra.
-3. **Acompañantes**, si vienen más personas.
-4. **Placa**, si llega en vehículo.
-5. **Observaciones** para el portero.
+1. **Nuevo visitante** → nombre y documento. Si la persona ya visitó antes, el
+   sistema la reconoce por su documento.
+2. **Cuándo**: fecha, hora de llegada y **duración**. Fuera de esa ventana no
+   entra.
+3. **Foto frontal** del visitante, de frente y con buena luz: **«Tomar foto»**
+   con la cámara o **«Elegir de la galería»** si el visitante se la envió. Las
+   dos pasan por la misma revisión y la app le dice si sirve antes de enviarla.
+   La de la galería se envía sin sus datos ocultos (ubicación, teléfono, fecha).
+4. La casilla **«Declaro que <nombre del visitante> me autorizó a usar su foto
+   para su ingreso al conjunto»**, con el nombre que usted escribió. Sin ella
+   no se envía.
+5. **Placa** si llega en vehículo, y **observaciones** para el portero
+   (opcionales).
+
+**Últimos visitantes → Volver a autorizar**: para alguien que ya vino, la app
+copia sus datos y su foto y sólo le pide fecha, hora, duración y la casilla.
 
 Debería llevarle **menos de un minuto** (KPI-10).
 
@@ -281,13 +327,23 @@ Debería llevarle **menos de un minuto** (KPI-10).
 - **Usted solo autoriza a su vivienda** (RN-05). No puede autorizar a otra.
 - Una persona en **lista negra no entra**, aunque usted la autorice (RN-06). La
   lista negra pesa más que cualquier autorización vigente.
-- **La foto del visitante es del visitante.** Si la visita se identifica con
-  reconocimiento facial, el consentimiento se le pide **a él, no a usted**
-  (RN-10, Ley 1581 de 2012). Si no responde, la autorización sigue vigente pero
-  solo por placa.
-- **Su plantilla biométrica se borra sola** al vencer, y de inmediato si el
-  titular revoca el consentimiento (RN-11).
-- **Sin conexión** la app guarda lo que usted hizo y lo reintenta al volver.
+- **La foto del visitante es del visitante.** Al marcar la casilla usted declara
+  que él autorizó el uso de su foto para entrar: queda registrado que fue usted
+  quien lo declaró, cuándo y sobre qué texto (Ley 1581 de 2012, ADR-032).
+- **La plantilla del rostro se borra sola** al terminar la visita, y de
+  inmediato si portería la rechaza o si el visitante revoca su autorización
+  (RN-11).
+- **Sin conexión** la visita queda «Pendiente de envío», con su foto, y se envía
+  sola al volver la conexión, sin duplicarse.
+- **La app y la consola ven lo mismo** (ADR-033): cada visita dice si está
+  vigente, vencida o **rechazada, con el motivo** que escribió portería. Con la
+  app abierta, la pantalla se recarga sola cada 20 s; también al volver a la
+  app y al arrastrar hacia abajo.
+- **Los avisos llegan mientras la app está abierta.** No hay avisos con la app
+  cerrada.
+- **«Servidor»**, en la pantalla de acceso, dice a qué servidor se conecta la
+  app y permite cambiarlo si en sitio la app no llega (la dirección la da quien
+  instala; ver `APP_EN_IPHONE.md`). Cambiarlo cierra la sesión.
 
 ---
 

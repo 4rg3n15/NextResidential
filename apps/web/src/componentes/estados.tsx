@@ -140,13 +140,16 @@ export const EstadoError = ({
  * respondió 403. Esto explica por qué no hay nada que ver, no impide nada.
  */
 export const EstadoSinPermiso = ({
+  titulo = 'Sin permiso',
   descripcion = 'Tu rol no tiene acceso a esta información. Si crees que debería tenerlo, habla con el administrador de la copropiedad.',
 }: {
+  /** 15-L (H4) · cuando la API da un motivo concreto —la IP—, ése es el título. */
+  readonly titulo?: string;
   readonly descripcion?: string;
 }): JSX.Element => (
   <MarcoDeEstado
     tono="aviso"
-    titulo="Sin permiso"
+    titulo={titulo}
     descripcion={descripcion}
     icono={
       <Icono>

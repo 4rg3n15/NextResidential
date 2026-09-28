@@ -34,6 +34,7 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { arbolDeSonda } from '../../e2e/arbol-de-sonda.mjs';
+import { sinColores } from './sin-colores.mjs';
 
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
@@ -2805,127 +2806,161 @@ try {
   }
 
   console.log(
-    '\n▸ 34 · un Info.plist de iOS que pierde la red local o suelta ATS se detecta (H-SITIO-11)',
+    '\n▸ 34 · un Info.plist de iOS que pierde la red local, o la deja sólo en depuración, se detecta (H-SITIO-11)',
   );
   {
     /**
      * En sitio, un iPhone físico no alcanzaba la API por la IP privada:
-     * faltaba `NSLocalNetworkUsageDescription`. El control preprocesa el plist
-     * como Xcode; aquí se le dan variantes rotas en el banco.
+     * faltaba `NSLocalNetworkUsageDescription`. Y la corrección de la 15-L
+     * exige la app en RELEASE, abierta desde el ícono: la excepción de red
+     * local va en Debug, Release y Profile. El control lee cada configuración
+     * como la construye Xcode; aquí se le dan variantes rotas en el banco.
      */
     if (exigeControl('scripts/lib/info-plist-ios.mjs')) {
       const original = readFileSync(join(raiz, 'apps/mobile/ios/Runner/Info.plist'), 'utf8');
+      const pbxproj = readFileSync(
+        join(raiz, 'apps/mobile/ios/Runner.xcodeproj/project.pbxproj'),
+        'utf8',
+      );
+      const debugXc = readFileSync(join(raiz, 'apps/mobile/ios/Flutter/Debug.xcconfig'), 'utf8');
+      const releaseXc = readFileSync(
+        join(raiz, 'apps/mobile/ios/Flutter/Release.xcconfig'),
+        'utf8',
+      );
       const sonda = join(banco, 'Info-sonda.plist');
+      const proyecto = join(banco, 'project-sonda.pbxproj');
+      const xc = join(banco, 'xcconfig-sonda');
+      mkdirSync(xc, { recursive: true });
+      const preparar = ({
+        plist = original,
+        debug = debugXc,
+        release = releaseXc,
+        pbx = pbxproj,
+      } = {}) => {
+        writeFileSync(sonda, plist);
+        writeFileSync(proyecto, pbx);
+        writeFileSync(join(xc, 'Debug.xcconfig'), debug);
+        writeFileSync(join(xc, 'Release.xcconfig'), release);
+      };
       const control = () =>
         correr('node', [
           'scripts/lib/info-plist-ios.mjs',
           '--plist',
           sonda,
           '--xcconfig',
-          join(raiz, 'apps/mobile/ios/Flutter'),
+          xc,
+          '--pbxproj',
+          proyecto,
         ]);
 
-      writeFileSync(sonda, original);
-      control().codigo === 0
-        ? ok('el Info.plist del repositorio pasa: línea base limpia')
-        : mal(`el Info.plist del repositorio NO pasa: ${control().salida.split('\n')[1] ?? ''}`);
+      preparar();
+      const base = control();
+      base.codigo === 0 &&
+      /Debug/.test(base.salida) &&
+      /Release/.test(base.salida) &&
+      /Profile/.test(base.salida)
+        ? ok('el Info.plist del repositorio pasa en Debug, Release y Profile: línea base limpia')
+        : mal(`el Info.plist del repositorio NO pasa: ${base.salida.split('\n')[1] ?? ''}`);
 
-      writeFileSync(
-        sonda,
-        original.replace(
+      preparar({
+        plist: original.replace(
           /<key>NSLocalNetworkUsageDescription<\/key>\s*<string>[^<]*<\/string>/,
           '',
         ),
-      );
+      });
       const a = control();
-      a.codigo !== 0 && /NSLocalNetworkUsageDescription/.test(a.salida)
+      a.codigo !== 0 && /Release: falta NSLocalNetworkUsageDescription/.test(a.salida)
         ? ok('sin la clave de red local se detecta (el síntoma de sitio)')
         : mal(`sin la clave de red local NO se detecta (codigo ${a.codigo})`);
 
-      // ATS fuera del bloque de depuración: llegaría al binario de Release.
-      writeFileSync(sonda, original.replace(/#if NCR_DEPURACION/, '#if 1'));
+      // La reversión exacta de esta corrección: ATS sólo bajo una marca que
+      // sólo Debug define, con el plist preprocesado como en la 15-K.
+      preparar({
+        plist: original.replace(
+          /(<key>NSAppTransportSecurity<\/key>\s*<dict>[\s\S]*?<\/dict>)/,
+          '<!--\n#if NCR_DEPURACION\n-->\n$1\n<!--\n#endif\n-->',
+        ),
+        debug: `${debugXc}\nINFOPLIST_PREPROCESS = YES\nINFOPLIST_PREPROCESSOR_DEFINITIONS = NCR_DEPURACION=1\n`,
+        release: `${releaseXc}\nINFOPLIST_PREPROCESS = YES\n`,
+      });
       const b = control();
-      b.codigo !== 0 && /Release: lleva NSAppTransportSecurity/.test(b.salida)
-        ? ok('la excepción de ATS en Release se detecta')
-        : mal(`ATS en Release NO se detecta (codigo ${b.codigo})`);
+      b.codigo !== 0 &&
+      /Release: falta NSAppTransportSecurity/.test(b.salida) &&
+      /Profile: falta NSAppTransportSecurity/.test(b.salida) &&
+      !/Debug: falta/.test(b.salida)
+        ? ok('la excepción de red local sólo en depuración se detecta en Release y en Profile')
+        : mal(`ATS sólo en depuración NO se detecta (codigo ${b.codigo})`);
 
-      writeFileSync(
-        sonda,
-        original.replace(
+      preparar({
+        plist: original.replace(
           '<key>NSAllowsLocalNetworking</key>',
           '<key>NSAllowsArbitraryLoads</key><true/><key>NSAllowsLocalNetworking</key>',
         ),
-      );
+      });
       const c = control();
       c.codigo !== 0 && /NSAllowsArbitraryLoads/.test(c.salida)
-        ? ok('NSAllowsArbitraryLoads se detecta, aunque sea sólo en Debug')
+        ? ok('NSAllowsArbitraryLoads se detecta')
         : mal(`NSAllowsArbitraryLoads NO se detecta (codigo ${c.codigo})`);
 
-      writeFileSync(sonda, original.replace('</dict>\n</plist>', '</plist>'));
+      preparar({ plist: original.replace('</dict>\n</plist>', '</plist>') });
       control().codigo !== 0
         ? ok('un plist mal formado es un fallo, no un «no encontrado»')
         : mal('un plist mal formado pasa');
 
-      // Sin el bloque de ATS: la app de depuración no alcanzaría la API por HTTP.
-      writeFileSync(
-        sonda,
-        original.replace(/<key>NSAppTransportSecurity<\/key>\s*<dict>[\s\S]*?<\/dict>/, ''),
-      );
+      preparar({
+        plist: original.replace(/<key>NSAppTransportSecurity<\/key>\s*<dict>[\s\S]*?<\/dict>/, ''),
+      });
       const d = control();
       d.codigo !== 0 && /Debug: falta NSAppTransportSecurity/.test(d.salida)
-        ? ok('Debug sin la excepción de red local se detecta')
-        : mal(`Debug sin ATS local NO se detecta (codigo ${d.codigo})`);
+        ? ok('sin la excepción de red local se detecta')
+        : mal(`sin ATS local NO se detecta (codigo ${d.codigo})`);
 
-      /**
-       * 15-K · las ramas de los .xcconfig, que el trinquete encontró sin
-       * ejercer: el plist puede estar bien y la compilación, no. Se copian al
-       * banco y se rompen allí.
-       */
-      writeFileSync(sonda, original);
-      const xc = join(banco, 'xcconfig-sonda');
-      mkdirSync(xc, { recursive: true });
-      const debugXc = readFileSync(join(raiz, 'apps/mobile/ios/Flutter/Debug.xcconfig'), 'utf8');
-      const releaseXc = readFileSync(
-        join(raiz, 'apps/mobile/ios/Flutter/Release.xcconfig'),
-        'utf8',
-      );
-      const conXc = () =>
-        correr('node', ['scripts/lib/info-plist-ios.mjs', '--plist', sonda, '--xcconfig', xc]);
+      // Profile sin su configuración: lo que no se construye no se comprueba.
+      preparar({ pbx: pbxproj.replace(/name = Profile;/g, 'name = Otra;') });
+      const e = control();
+      e.codigo !== 0 && /no tiene la configuración Profile/.test(e.salida)
+        ? ok('un proyecto sin la configuración Profile es un fallo, no un silencio')
+        : mal(`sin Profile NO se detecta (codigo ${e.codigo})`);
 
-      writeFileSync(join(xc, 'Debug.xcconfig'), debugXc);
-      writeFileSync(
-        join(xc, 'Release.xcconfig'),
-        `${releaseXc}\nINFOPLIST_PREPROCESSOR_DEFINITIONS = NCR_DEPURACION=1\n`,
-      );
-      const e = conXc();
-      e.codigo !== 0 && /Release\.xcconfig define NCR_DEPURACION/.test(e.salida)
-        ? ok('Release.xcconfig que define NCR_DEPURACION se detecta: ATS llegaría al binario')
-        : mal(`NCR_DEPURACION en Release NO se detecta (codigo ${e.codigo})`);
-
-      writeFileSync(
-        join(xc, 'Debug.xcconfig'),
-        debugXc.replace(/^INFOPLIST_PREPROCESS.*$/gm, '// quitado por la sonda'),
-      );
-      writeFileSync(
-        join(xc, 'Release.xcconfig'),
-        releaseXc.replace(/^INFOPLIST_PREPROCESS.*$/gm, '// quitado por la sonda'),
-      );
-      const f = conXc();
-      f.codigo !== 0 &&
-      /Debug\.xcconfig no activa/.test(f.salida) &&
-      /Debug\.xcconfig no define NCR_DEPURACION/.test(f.salida) &&
-      /Release\.xcconfig no activa/.test(f.salida)
-        ? ok('los .xcconfig sin preprocesado ni marca de depuración se detectan, los tres')
-        : mal(`los .xcconfig rotos NO se detectan (codigo ${f.codigo})`);
-
-      rmSync(join(xc, 'Debug.xcconfig'), { force: true });
-      const g = conXc();
-      g.codigo !== 0 && /no se pudo leer/.test(g.salida)
+      preparar();
+      rmSync(join(xc, 'Release.xcconfig'), { force: true });
+      const f = control();
+      f.codigo !== 0 && /no se pudo leer/.test(f.salida)
         ? ok('un .xcconfig que falta es un fallo, no un silencio')
-        : mal(`un .xcconfig que falta NO se detecta (codigo ${g.codigo})`);
+        : mal(`un .xcconfig que falta NO se detecta (codigo ${f.codigo})`);
+
+      // Sin el proyecto no se sabe qué construye cada configuración.
+      preparar();
+      rmSync(proyecto, { force: true });
+      const g = control();
+      g.codigo !== 0 && /no se pudo leer .*project-sonda\.pbxproj/.test(g.salida)
+        ? ok('un proyecto de Xcode que falta es un fallo, no un «todo en orden»')
+        : mal(`sin el proyecto de Xcode NO se detecta (codigo ${g.codigo})`);
+
+      // Release (y Profile, que lo usa) sin su .xcconfig: no se sabe si
+      // preprocesa, así que no se da por buena.
+      preparar({
+        pbx: pbxproj.replace(
+          /\t+baseConfigurationReference = \w+ \/\* Release\.xcconfig \*\/;\n/g,
+          '',
+        ),
+      });
+      const h = control();
+      h.codigo !== 0 &&
+      /Release: la configuración no declara su \.xcconfig/.test(h.salida) &&
+      /Profile: la configuración no declara su \.xcconfig/.test(h.salida)
+        ? ok('una configuración sin .xcconfig es un fallo, no un plist leído a ciegas')
+        : mal(`una configuración sin .xcconfig NO se detecta (codigo ${h.codigo})`);
+
+      preparar({ plist: original.replace('</plist>', '<dict/>\n</plist>') });
+      const i = control();
+      i.codigo !== 0 && /contenido después del <dict> raíz/.test(i.salida)
+        ? ok('lo que sobra tras el <dict> raíz es un fallo')
+        : mal(`contenido tras el <dict> raíz NO se detecta (codigo ${i.codigo})`);
 
       rmSync(xc, { recursive: true, force: true });
       rmSync(sonda, { force: true });
+      rmSync(proyecto, { force: true });
     }
   }
 
@@ -3109,6 +3144,180 @@ try {
         arbol.limpiar();
       }
     }
+  }
+
+  console.log(
+    '\n▸ 39 · una prueba OMITIDA por falta de base FALLA con --con-base, y se nombra (H-15L-C01)',
+  );
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * EL DEFECTO QUE ESTA SONDA CIERRA
+     *
+     * `visitas-pg.test.ts` estuvo en verde con la base local caída: cada prueba
+     * salía por `if (omitida()) return;` y una prueba que retorna antes de su
+     * primera aserción PASA. La lista de visitas del residente salía vacía
+     * contra PostgreSQL (H-15L-C01) y el verificador, pedido con `--con-base`,
+     * no lo vio: vitest no la cuenta como saltada, así que D-112 tampoco.
+     *
+     * Se siembra la omisión DE VERDAD: una suite real de PostgreSQL contra una
+     * base que no contesta (el puerto 1 del bucle local rechaza al instante).
+     * `aforo-concurrencia.test.ts` y no la de visitas porque no arrastra Nest ni
+     * los equipos —dos segundos, y nada que otro trabajo en curso rompa—; el
+     * guardián es el mismo `exigirBase` de `base-exigida.ts`. Y sus informes
+     * JSON REALES alimentan el control del paso 5.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    const apiDir = join(raiz, 'apps', 'api');
+    const vitest = join(
+      dirname(createRequire(join(apiDir, 'package.json')).resolve('vitest/package.json')),
+      'vitest.mjs',
+    );
+    const BASE_MUERTA = 'postgresql://nadie@127.0.0.1:1/ncr';
+    // El verificador exporta NCR_BASE_EXIGIDA con --con-base: aquí se decide caso a caso.
+    const entornoLibre = { ...process.env, CI: '1' };
+    delete entornoLibre.NCR_BASE_EXIGIDA;
+    const suiteContra = (caso, extra) => {
+      const informe = join(banco, `omision-${caso}.json`);
+      const r = correr(
+        'node',
+        [vitest, 'run', 'test/aforo-concurrencia.test.ts', `--outputFile.json=${informe}`],
+        { cwd: apiDir, timeout: 300_000, env: { ...entornoLibre, ...extra } },
+      );
+      return { ...r, salida: sinColores(r.salida), informe };
+    };
+    const PRUEBA = '50 ingresos simultáneos sobre 10 plazas: entran 10, ni una más';
+
+    const libre = suiteContra('libre', { DATABASE_URL_PRUEBAS: BASE_MUERTA });
+    libre.codigo === 0 && /OMITIDA: test\/aforo-concurrencia\.test\.ts › /.test(libre.salida)
+      ? ok('sin --con-base, la base caída OMITE —permitido— y lo anuncia con el nombre')
+      : mal(`sin --con-base la suite no parte de un estado sano (codigo ${libre.codigo})`);
+
+    const exigida = suiteContra('exigida', {
+      DATABASE_URL_PRUEBAS: BASE_MUERTA,
+      NCR_BASE_EXIGIDA: '1',
+    });
+    exigida.codigo !== 0
+      ? ok('con --con-base, la MISMA suite con la base caída FALLA')
+      : mal('con --con-base la suite sin base PASA: es el verde de H-15L-C01');
+    exigida.salida.includes(`OMISIÓN POR FALTA DE BASE con --con-base · test/aforo-concurrencia`) &&
+    exigida.salida.includes(PRUEBA)
+      ? ok('y cada prueba falla con su fichero, su bloque, su nombre y el motivo')
+      : mal('falla sin decir qué prueba se omitió ni por qué');
+
+    const sinUrl = suiteContra('sin-url', { DATABASE_URL_PRUEBAS: '', NCR_BASE_EXIGIDA: '1' });
+    sinUrl.codigo !== 0 && /DATABASE_URL_PRUEBAS no llega a esta suite/.test(sinUrl.salida)
+      ? ok('con --con-base y SIN la variable, el fichero no carga y dice por qué')
+      : mal('con --con-base y sin DATABASE_URL_PRUEBAS la suite se salta en silencio');
+
+    // ─── El control del paso 5, sobre esos informes reales y sobre un árbol ──
+    const arbol = join(banco, 'arbol-omisiones');
+    const dirApi = join(arbol, 'apps', 'api');
+    const informe = join(dirApi, '.informe-paso5.json');
+    mkdirSync(join(dirApi, 'test'), { recursive: true });
+    mkdirSync(join(arbol, 'apps', 'web'), { recursive: true });
+    const controlar = (...args) =>
+      correr('node', ['scripts/lib/omisiones-sin-base.mjs', ...args, arbol], { cwd: raiz });
+    const poner = (relativo, texto) => {
+      mkdirSync(dirname(join(arbol, relativo)), { recursive: true });
+      writeFileSync(join(arbol, relativo), texto);
+    };
+
+    // Línea base: un árbol que cumple la regla y un informe sin omisiones.
+    poner('apps/api/test/base-exigida.ts', 'export const u = process.env.DATABASE_URL_PRUEBAS;\n');
+    poner(
+      'apps/api/test/con-guardian-pg.test.ts',
+      "import { URL_BASE, exigirBase as guardian } from './base-exigida';\n" +
+        "guardian('sonda', () => URL_BASE !== undefined);\n",
+    );
+    poner('apps/api/test/sin-base.test.ts', "import { it } from 'vitest';\n");
+    poner('apps/api/src/config.ts', 'export const u = process.env.DATABASE_URL_PRUEBAS;\n');
+    poner(
+      'apps/api/node_modules/dep/leer.test.ts',
+      'export const u = process.env.DATABASE_URL_PRUEBAS;\n',
+    );
+    writeFileSync(
+      informe,
+      JSON.stringify({
+        testResults: [
+          {
+            name: '/x/apps/api/test/con-guardian-pg.test.ts',
+            status: 'passed',
+            message: '',
+            assertionResults: [{ fullName: 'corre contra la base', failureMessages: [] }],
+          },
+        ],
+      }),
+    );
+    const limpia = controlar('--exigida');
+    limpia.codigo === 0 && /ninguna · 1 fichero\(s\) de prueba usan la base/.test(limpia.salida)
+      ? ok('un árbol en regla y sin omisiones pasa, y cuenta los ficheros con guardián')
+      : mal(
+          `la línea base del control no pasa: sería un control que siempre grita (${limpia.salida.trim()})`,
+        );
+
+    // El informe REAL de la base caída sin --con-base: permitido y contado.
+    cpSync(libre.informe, informe);
+    const permitida = controlar();
+    permitida.codigo === 0 && /aforo-concurrencia\.test\.ts: 5 omitida/.test(permitida.salida)
+      ? ok('sin --con-base, las omisiones se permiten y se cuentan por fichero')
+      : mal(`sin --con-base el control rompe o calla las omisiones (codigo ${permitida.codigo})`);
+    const marcada = controlar('--exigida');
+    marcada.codigo !== 0 && marcada.salida.includes(PRUEBA)
+      ? ok('y ese mismo informe con --con-base FALLA y NOMBRA la prueba: si la variable no llegara')
+      : mal('una prueba MARCADA como omitida pasa por verde con --con-base');
+
+    cpSync(exigida.informe, informe);
+    const fallada = controlar('--exigida');
+    fallada.codigo !== 0 &&
+    fallada.salida.includes(PRUEBA) &&
+    /motivo: sin DATABASE_URL/.test(fallada.salida)
+      ? ok('las que FALLARON por omisión se nombran con su motivo, no como una roja cualquiera')
+      : mal('las pruebas falladas por omisión no se nombran como omisiones');
+
+    cpSync(sinUrl.informe, informe);
+    /aforo-concurrencia\.test\.ts › \(el fichero no cargó\)/.test(controlar('--exigida').salida)
+      ? ok('el fichero que no carga por falta de base también se nombra')
+      : mal('un fichero que no carga por falta de base no se nombra');
+
+    // Los que se saltan la regla, con y sin --con-base.
+    writeFileSync(informe, JSON.stringify({ testResults: [] }));
+    poner(
+      'apps/api/test/por-su-cuenta-pg.test.ts',
+      "const u = process.env['DATABASE_URL_PRUEBAS'];\n",
+    );
+    poner(
+      'apps/api/test/sin-guardian-pg.test.ts',
+      "import { URL_BASE } from './base-exigida';\nif (!URL_BASE) throw new Error('x');\n",
+    );
+    poner(
+      'apps/api/test/guardian-sin-llamar-pg.test.ts',
+      "import { exigirBase } from './base-exigida';\nexport const g = exigirBase;\n",
+    );
+    const fuera = controlar();
+    fuera.codigo !== 0 &&
+    /por-su-cuenta-pg\.test\.ts: lee DATABASE_URL_PRUEBAS/.test(fuera.salida) &&
+    /sin-guardian-pg\.test\.ts: importa de base-exigida\.ts y no registra/.test(fuera.salida) &&
+    /guardian-sin-llamar-pg\.test\.ts: importa/.test(fuera.salida)
+      ? ok('leer la base por su cuenta, o usarla sin guardián, rompe SIEMPRE y se nombra')
+      : mal(`un fichero que lee la base sin el guardián pasa (codigo ${fuera.codigo})`);
+    !/config\.ts|node_modules/.test(fuera.salida)
+      ? ok('y no confunde el código de la aplicación ni las dependencias con pruebas')
+      : mal('marca como prueba lo que no lo es');
+
+    // Y las dos formas de no tener nada que mirar.
+    writeFileSync(informe, '{esto no es json');
+    const rota = controlar('--exigida');
+    rota.codigo !== 0 && /no se pudo leer/.test(rota.salida)
+      ? ok('un informe ilegible se dice, no se confunde con «sin omisiones»')
+      : mal('un informe corrupto pasa como si no hubiera omisiones');
+    rmSync(informe, { force: true });
+    controlar('--exigida').codigo !== 0
+      ? ok('sin ningún informe del paso 5 no hay verde')
+      : mal('sin informes el control aprueba sin mirar nada');
+    correr('node', ['scripts/lib/omisiones-sin-base.mjs'], { cwd: raiz }).codigo !== 0
+      ? ok('invocarlo sin raíz no devuelve verde')
+      : mal('sin argumentos da 0: un control que no mira nada y aprueba');
   }
 
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
@@ -3309,6 +3518,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 33 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 34 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

@@ -5,11 +5,6 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
-import '../models/aceptacion_presencial_dto.dart';
-import '../models/capturar_rostro_dto.dart';
-import '../models/enlace_de_consentimiento_dto.dart';
-import '../models/responder_consentimiento_dto.dart';
-import '../models/respuesta_de_consentimiento_dto.dart';
 import '../models/sincronizacion_total_dto.dart';
 import '../models/sincronizar_plantilla_dto.dart';
 
@@ -23,43 +18,6 @@ abstract class BiometriaApi {
   @POST('/copropiedades/{id}/biometria/barrido')
   Future<void> biometriaControllerEjecutarBarrido({
     @Path('id') required String id,
-  });
-
-  /// Valida la calidad y solicita el consentimiento al TITULAR (CU-02, CA-08)
-  @POST('/copropiedades/{id}/biometria/capturas')
-  Future<void> biometriaControllerCapturarRostro({
-    @Path('id') required String id,
-    @Body() required CapturarRostroDto body,
-  });
-
-  /// Estado de un consentimiento, sin dato biométrico alguno
-  @GET('/copropiedades/{id}/biometria/consentimientos/{consentimientoId}')
-  Future<void> biometriaControllerVerConsentimiento({
-    @Path('id') required String id,
-    @Path('consentimientoId') required String consentimientoId,
-  });
-
-  /// El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10)
-  @POST('/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial')
-  Future<RespuestaDeConsentimientoDto> biometriaControllerAceptarPresencialmente({
-    @Path('id') required String id,
-    @Path('consentimientoId') required String consentimientoId,
-    @Body() required AceptacionPresencialDto body,
-  });
-
-  /// Emite el enlace firmado con el que el TITULAR responde (RN-10)
-  @POST('/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace')
-  Future<EnlaceDeConsentimientoDto> biometriaControllerEmitirEnlaceDeConsentimiento({
-    @Path('id') required String id,
-    @Path('consentimientoId') required String consentimientoId,
-  });
-
-  /// El TITULAR acepta o rechaza. Nadie responde por él (RN-10)
-  @POST('/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta')
-  Future<RespuestaDeConsentimientoDto> biometriaControllerResponderConsentimiento({
-    @Path('id') required String id,
-    @Path('consentimientoId') required String consentimientoId,
-    @Body() required ResponderConsentimientoDto body,
   });
 
   /// Revocación del titular: supresión inmediata (RN-11, CA-11)

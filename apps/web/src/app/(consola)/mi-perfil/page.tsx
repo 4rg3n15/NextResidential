@@ -5,6 +5,7 @@ import type { Portero } from '@ncr/contracts';
 import { sesionActual } from '@/lib/sesion/servidor';
 import { tokenVigente } from '@/lib/sesion/token';
 import { configuracion } from '@/lib/configuracion';
+import { reenvioDeIpActual } from '@/lib/sesion/ip-del-navegador';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { EstadoError, EstadoSinPermiso } from '@/componentes/estados';
 import { Tarjeta } from '@/componentes/ui/tarjeta';
@@ -17,7 +18,11 @@ const perfil = async (): Promise<Portero | null> => {
   if (token === null) return null;
   try {
     const r = await fetch(`${configuracion().apiUrl}/porteria/perfil`, {
-      headers: { Authorization: `Bearer ${token.accessToken}`, Accept: 'application/json' },
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        Accept: 'application/json',
+        ...(await reenvioDeIpActual()),
+      },
       cache: 'no-store',
     });
     return r.ok ? ((await r.json()) as Portero) : null;
@@ -62,7 +67,8 @@ const MiPerfil = async (): Promise<JSX.Element> => {
       <Tarjeta className="p-4">
         <dl>
           <Fila etiqueta="Nombre" valor={p.nombre} />
-          <Fila etiqueta="Usuario" valor={p.usuario ?? '—'} />
+          <Fila etiqueta="Número de portero" valor={p.numero === null ? '—' : String(p.numero)} />
+          <Fila etiqueta="Documento" valor={p.documento ?? '—'} />
           <Fila etiqueta="Teléfono" valor={p.telefono ?? '—'} />
           <Fila etiqueta="Correo de contacto" valor={p.correoContacto ?? '—'} />
           <Fila etiqueta="Portería" valor={p.porteria ?? '—'} />

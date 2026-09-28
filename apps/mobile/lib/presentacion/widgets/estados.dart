@@ -9,11 +9,12 @@
 ///
 /// | Estado           | Qué se ofrece                                             |
 /// | ---------------- | --------------------------------------------------------- |
-/// | sin conexión     | Reintentar, y lo último bueno si lo había                  |
+/// | sin conexión     | Reintentar y Cambiar servidor, y lo último bueno si lo había |
 /// | sesión inválida  | Entrar otra vez — reintentar no lo arregla                 |
 /// | sin permiso      | El motivo. Ni reintento ni botón que no lleva a nada       |
 /// | sin vivienda     | La explicación de M-1: a quién pedirle el vínculo          |
-/// | servidor         | La causa y reintentar                                      |
+/// | servidor         | La causa, reintentar y cambiar servidor                    |
+/// | datos no válidos | El motivo. Reintentar lo mismo daría lo mismo              |
 /// | vacío            | Que está vacío, no que falló                               |
 library;
 
@@ -23,6 +24,7 @@ import '../../aplicacion/estado.dart';
 import '../../configuracion/tema.dart';
 import '../../dominio/puertos.dart';
 import 'detalle_de_fallo.dart';
+import 'servidor.dart';
 
 class VistaConEstado<T> extends StatelessWidget {
   const VistaConEstado({
@@ -62,11 +64,13 @@ class VistaConEstado<T> extends StatelessWidget {
                 ),
               ],
             ),
-      Vacio<T>() => _Aviso(
-          icono: Icons.inbox_outlined,
-          titulo: 'Sin datos',
-          detalle: mensajeVacio,
-          pareja: Paleta.neutroSuave,
+      Vacio<T>() => _desplazable(
+          _Aviso(
+            icono: Icons.inbox_outlined,
+            titulo: 'Sin datos',
+            detalle: mensajeVacio,
+            pareja: Paleta.neutroSuave,
+          ),
         ),
       ConDatos<T>(datos: final datos, desdeCache: final cache) =>
         conDatos(datos, desdeCache: cache),
@@ -107,6 +111,14 @@ class VistaConEstado<T> extends StatelessWidget {
           Icons.error_outline,
           _Accion('Reintentar', alReintentar),
         ),
+      // Una lectura no debería recibirlo nunca. Si llega, se dice el motivo y
+      // no se ofrece reintentar: la misma petición daría la misma respuesta.
+      ClaseDeFallo.datosNoValidos => (
+          'No se pudo cargar',
+          Paleta.peligroSuave,
+          Icons.error_outline,
+          null,
+        ),
     };
 
     final aviso = _Aviso(
@@ -116,8 +128,11 @@ class VistaConEstado<T> extends StatelessWidget {
       pareja: pareja,
       accion: accion,
       fallo: fallo,
+      // 15-L · ante un fallo de conexión, la salida está AQUÍ: la dirección
+      // del Mac cambia de una red a otra.
+      ofrecerServidor: esFalloDeConexion(fallo),
     );
-    if (previo == null) return aviso;
+    if (previo == null) return _desplazable(aviso);
     // Con dato previo, el fallo va ARRIBA y el dato viejo debajo, marcado. Un
     // fallo que borra lo que ya se veía es peor que un fallo anunciado.
     return Column(
@@ -125,6 +140,20 @@ class VistaConEstado<T> extends StatelessWidget {
     );
   }
 }
+
+/// 15-L · el aviso, desplazable cuando ocupa la pantalla: así «tirar hacia
+/// abajo para recargar» también funciona sobre «Sin conexión» y sobre un vacío,
+/// que es justo cuando más se intenta. Incrustado en una lista (la actividad de
+/// Inicio) la altura no está acotada, y se deja tal cual.
+Widget _desplazable(Widget aviso) => LayoutBuilder(
+      builder: (context, limites) => limites.hasBoundedHeight
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              children: [aviso],
+            )
+          : aviso,
+    );
 
 class _Accion {
   const _Accion(this.etiqueta, this.alPulsar);
@@ -140,6 +169,7 @@ class _Aviso extends StatelessWidget {
     required this.pareja,
     this.accion,
     this.fallo,
+    this.ofrecerServidor = false,
   });
 
   final IconData icono;
@@ -147,6 +177,7 @@ class _Aviso extends StatelessWidget {
   final String detalle;
   final Pareja pareja;
   final _Accion? accion;
+  final bool ofrecerServidor;
 
   /// H-SITIO-11 · para el panel de Debug con el porqué técnico.
   final Fallo? fallo;
@@ -185,11 +216,19 @@ class _Aviso extends StatelessWidget {
             const SizedBox(height: 6),
             Text(detalle, style: TextStyle(color: pareja.texto, fontSize: 14)),
             if (fallo != null) DetalleDeFallo(fallo: fallo!),
-            if (accion != null) ...[
+            if (accion != null || ofrecerServidor) ...[
               const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () => accion!.alPulsar(),
-                child: Text(accion!.etiqueta),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (accion != null)
+                    FilledButton(
+                      onPressed: () => accion!.alPulsar(),
+                      child: Text(accion!.etiqueta),
+                    ),
+                  if (ofrecerServidor) const BotonCambiarServidor(),
+                ],
               ),
             ],
           ],

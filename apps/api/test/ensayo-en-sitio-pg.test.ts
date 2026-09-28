@@ -10,6 +10,7 @@ import type { ContextoTenant } from '../src/autenticacion';
 import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositorio-equipos-pg';
 import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso';
 import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -31,7 +32,6 @@ import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
  * Sin `DATABASE_URL_PRUEBAS` se omite y lo dice; `--con-base` la exige.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const CORRIDA = randomBytes(3).toString('hex').toUpperCase();
 const ADMIN = '00000000-0000-4000-8000-000000000010';
 const OPERADOR = '00000000-0000-4000-8000-000000000012';
@@ -177,11 +177,9 @@ afterAll(async () => {
   if (OBTENIDO.length > 0) console.log(`ENSAYO-EN-SITIO ${JSON.stringify(OBTENIDO)}`);
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.log('OMITIDA: sin DATABASE_URL_PRUEBAS (se exige con --con-base).');
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS', () => disponible);
+const omitida = (): boolean => !disponible;
 
 const http = () => request((app as INestApplication).getHttpServer());
 const con = (token: string) => ({
@@ -322,53 +320,47 @@ const JPEG = Buffer.concat([
 ]);
 
 /**
- * CU-02 completo por el canal: captura → enlace del VISITANTE → acepta él →
- * sincronización a la terminal, comprobada por el contador de su biblioteca.
+ * F (15-L) · «Generar autorización» con foto y casilla, por el canal: la app
+ * del residente o la consola. La foto viaja con la visita y la casilla es la
+ * constancia (ADR-032): no hay enlace ni espera, así que la plantilla está en
+ * la terminal cuando la respuesta vuelve, comprobado por el contador de su
+ * biblioteca.
  */
-const enrolar = async (
+const visitaConRostro = async (
   canal: 'app' | 'consola',
-  v: { autorizacionId: string; personaId: string | null },
-): Promise<string> => {
-  // RN-11 · la plantilla vive lo que la visita: como la app desde la 15-I.
-  const suprimirEn = franja(18).toISOString();
-  let plantillaId = '';
-  let token = '';
-  if (canal === 'app') {
-    const r = await con(residente).post(
-      `/copropiedades/${COP_A}/mi/autorizaciones/${v.autorizacionId}/rostro`,
-      { vector: JPEG.toString('base64'), medidas: MEDIDAS, versionPolitica: 'v1.0', suprimirEn },
-    );
-    expect(r.status, JSON.stringify(r.body)).toBe(201);
-    expect(r.body.aceptada).toBe(true);
-    plantillaId = r.body.plantillaId as string;
-    token = String(r.body.enlaceDeConsentimiento).split('/').pop() ?? '';
-  } else {
-    const r = await con(admin).post(`/copropiedades/${COP_A}/biometria/capturas`, {
-      titularId: v.personaId,
-      autorizacionId: v.autorizacionId,
-      medidas: MEDIDAS,
-      vector: JPEG.toString('base64'),
-      versionPolitica: 'v1.0',
-      canal: 'presencial',
-      suprimirEn,
-    });
-    expect(r.status, JSON.stringify(r.body)).toBe(201);
-    plantillaId = r.body.plantillaId as string;
-    const enlace = await con(admin).post(
-      `/copropiedades/${COP_A}/biometria/consentimientos/${String(r.body.consentimientoId)}/enlace`,
-    );
-    expect(enlace.status, JSON.stringify(enlace.body)).toBe(201);
-    token = enlace.body.token as string;
-  }
-  // Antes de que el visitante responda, nada llega a la terminal (RN-09).
-  expect(mock.plantillas.get(terminalId)?.has(plantillaId) ?? false).toBe(false);
-  await http()
-    .post(`/consentimiento/${token}/respuesta`)
-    .type('form')
-    .send({ acepta: 'si' })
-    .expect(303);
+  n: string,
+): Promise<{ autorizacionId: string; documento: string; plantillaId: string }> => {
+  reloj = a(-12);
+  const documento = `${canal === 'app' ? 'AP' : 'EN'}${CORRIDA}${n}`;
+  const comun = {
+    nombre: `Tercero ${canal} ${n}`,
+    documento,
+    inicio: FRANJA.desde,
+    duracionMinutos: 240,
+    foto: { contenidoBase64: JPEG.toString('base64'), tipoMime: 'image/jpeg', medidas: MEDIDAS },
+    casillaMarcada: true,
+  };
+  const r =
+    canal === 'app'
+      ? await con(residente).post(`/copropiedades/${COP_A}/mi/visitas`, {
+          ...comun,
+          claveDeIdempotencia: `ensayo-${CORRIDA}-${n}`,
+        })
+      : await con(admin).post(`/copropiedades/${COP_A}/visitas`, {
+          ...comun,
+          tipoDocumento: 'cedula',
+          viviendaId: VIVIENDA_CONSOLA,
+        });
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  const autorizacionId = String(canal === 'app' ? r.body.id : r.body.autorizacionId);
+  const { rows } = await (pool as Pool).query<{ id: string }>(
+    'SELECT id FROM public.plantillas_biometricas WHERE autorizacion_id = $1',
+    [autorizacionId],
+  );
+  const plantillaId = rows[0]?.id ?? '';
+  // Sin esperar a nadie: la casilla ya es la constancia y la foto ya viajó.
   expect(mock.plantillas.get(terminalId)?.has(plantillaId)).toBe(true);
-  return plantillaId;
+  return { autorizacionId, documento, plantillaId };
 };
 
 describe('ENSAYO SIMULADO · cámara LPR con vehículo de TERCERO (día y franja)', () => {
@@ -485,13 +477,13 @@ describe('ENSAYO SIMULADO · cámara LPR con vehículo de TERCERO (día y franja
   });
 });
 
-describe('ENSAYO SIMULADO · terminal facial: captura → consentimiento del VISITANTE → contador → verificación remota', () => {
+describe('ENSAYO SIMULADO · terminal facial: visita con foto y casilla → contador → verificación remota', () => {
   for (const canal of ['app', 'consola'] as const) {
     it(`T1–T5 por ${canal}`, async () => {
       if (omitida()) return;
       const sufijo = canal === 'app' ? 'A' : 'C';
-      const v = await visita(canal, null, `${sufijo}T1`);
-      const plantilla = await enrolar(canal, v);
+      const v = await visitaConRostro(canal, `${sufijo}T1`);
+      const plantilla = v.plantillaId;
       // Cada canal en su propia media hora de la franja: la misma terminal y el
       // mismo instante harían que la consulta del evento viera el del otro canal.
       const h = canal === 'app' ? 0 : 1.5;
@@ -566,7 +558,19 @@ describe('ENSAYO SIMULADO · videoportero: timbre → aviso → vista en vivo �
       )
       .expect(200);
     baja();
-    expect(r.body.motivo).toMatch(/avisada a las consolas/);
+    // 15-L (Bloque B) · el timbre queda también en la línea de tiempo (tabla
+    // `eventos_de_equipo`), y sigue sin ser un acceso.
+    expect(r.body).toEqual({ aceptado: true });
+    const linea = await con(admin).get(
+      `/copropiedades/${COP_A}/eventos/linea-de-tiempo?desde=${encodeURIComponent(
+        new Date(reloj.getTime() - 60_000).toISOString(),
+      )}&hasta=${encodeURIComponent(new Date(reloj.getTime() + 60_000).toISOString())}` +
+        `&dispositivoId=${INTERCOM}`,
+    );
+    expect(linea.status, JSON.stringify(linea.body)).toBe(200);
+    const elementos = (linea.body as { elementos: { origen: string; tipo: string }[] }).elementos;
+    expect(elementos.some((e) => e.origen === 'equipo' && e.tipo === 'llamada')).toBe(true);
+    expect(elementos.some((e) => e.origen === 'acceso')).toBe(false);
     const aviso = avisos.find((x) => x.tema === 'llamadas');
     anotar('V1', 'consola', aviso === undefined ? 'SIN AVISO' : 'aviso emergente recibido');
     expect(aviso?.carga).toMatchObject({ dispositivoId: INTERCOM, clase: 'llamada' });

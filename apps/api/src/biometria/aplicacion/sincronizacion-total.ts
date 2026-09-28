@@ -29,13 +29,26 @@ export interface ResultadoPorTerminal {
   readonly detalle: string;
 }
 
+/** A3 (15-L) · un equipo que no recibió la plantilla porque no puede tenerla. */
+export interface EquipoOmitido {
+  readonly dispositivoId: string;
+  readonly nombre: string;
+  readonly detalle: string;
+}
+
 export interface ResultadoDeSincronizacionTotal {
   readonly plantillaId: string;
   readonly terminales: number;
   readonly sincronizadas: number;
   readonly fallidas: number;
   readonly porTerminal: readonly ResultadoPorTerminal[];
+  readonly omitidas: readonly EquipoOmitido[];
 }
+
+const POR_QUE_SE_OMITE = {
+  no_admite: 'este equipo no admite rostros',
+  sin_comprobar: 'aún no se sabe si admite rostros: use «Probar conexión» en su ficha',
+} as const;
 
 const noEncontrado = (que: string): ErrorDominio =>
   errorDominio('ENTIDAD_NO_ENCONTRADA', `${que} no existe en esta copropiedad`, 'RN-15');
@@ -59,6 +72,22 @@ export class SincronizarPlantillaEnTerminales {
     if (plantilla === null) return fallo(noEncontrado('La plantilla'));
 
     const terminales = await this.catalogo.conBibliotecaDeRostros(ctx, copropiedadId);
+    // A3 (15-L) · lo que se omite se dice: en el resultado y en la bitácora.
+    const omitidas: EquipoOmitido[] = (
+      (await this.catalogo.sinBibliotecaDeRostros?.(ctx, copropiedadId)) ?? []
+    ).map((e) => ({
+      dispositivoId: e.dispositivoId,
+      nombre: e.nombre,
+      detalle: POR_QUE_SE_OMITE[e.motivo],
+    }));
+    for (const omitida of omitidas) {
+      this.bitacora.registrar('info', 'equipo omitido en la sincronización de rostros', {
+        copropiedadId,
+        plantillaId: plantilla.id,
+        dispositivoId: omitida.dispositivoId,
+        motivo: omitida.detalle,
+      });
+    }
     if (terminales.length === 0) {
       this.bitacora.registrar('aviso', 'sincronización total sin destino', {
         copropiedadId,
@@ -78,6 +107,12 @@ export class SincronizarPlantillaEnTerminales {
         // Una prohibición de RN-09 no depende del equipo: se devuelve entera.
         if (r.error.codigo !== 'CONFLICTO_DE_CONCURRENCIA') return r;
         porTerminal.push({ ...terminal, sincronizada: false, detalle: r.error.detalle });
+        // F3 (15-L) · queda escrito por equipo: la consola lo enseña y lo reintenta.
+        await this.plantillas.registrarFallo(
+          { copropiedadId, plantillaId: plantilla.id, dispositivoId: terminal.dispositivoId },
+          r.error.detalle,
+          ctx.usuarioId,
+        );
         this.bitacora.registrar('aviso', 'una terminal no aceptó la plantilla', {
           copropiedadId,
           plantillaId: plantilla.id,
@@ -100,58 +135,7 @@ export class SincronizarPlantillaEnTerminales {
       sincronizadas,
       fallidas: porTerminal.length - sincronizadas,
       porTerminal,
+      omitidas,
     });
-  }
-}
-
-/**
- * `PropagarConsentimientoAceptado` — lo que ocurre justo después de que el
- * TITULAR acepte: cada plantilla que esperaba ese consentimiento sale hacia
- * todas las terminales.
- *
- * **No falla nunca hacia fuera.** La aceptación es un acto del titular que ya
- * quedó escrito; que una terminal esté apagada no lo deshace ni lo esconde.
- * Lo que no llegó queda en bitácora y se relanza desde la consola.
- */
-export class PropagarConsentimientoAceptado {
-  constructor(
-    private readonly plantillas: RepositorioPlantillas,
-    private readonly enTerminales: SincronizarPlantillaEnTerminales,
-    private readonly bitacora: Bitacora,
-  ) {}
-
-  async ejecutar(
-    ctx: ContextoTenant,
-    entrada: { readonly consentimientoId: string },
-  ): Promise<readonly ResultadoDeSincronizacionTotal[]> {
-    const copropiedadId = ctx.copropiedadId;
-    if (copropiedadId === null) return [];
-
-    const resultados: ResultadoDeSincronizacionTotal[] = [];
-    for (const p of await this.plantillas.deConsentimiento(
-      copropiedadId,
-      entrada.consentimientoId,
-    )) {
-      if (p.estado !== 'pendiente_sincronizacion') continue;
-      try {
-        const r = await this.enTerminales.ejecutar(ctx, { plantillaId: p.id });
-        if (esFallo(r)) {
-          this.bitacora.registrar('aviso', 'la plantilla aceptada no se pudo propagar', {
-            copropiedadId,
-            plantillaId: p.id,
-            detalle: r.error.detalle,
-          });
-          continue;
-        }
-        resultados.push(r.valor);
-      } catch (error) {
-        this.bitacora.registrar('error', 'fallo al propagar la plantilla aceptada', {
-          copropiedadId,
-          plantillaId: p.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-    return resultados;
   }
 }

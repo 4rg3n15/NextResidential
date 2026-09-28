@@ -156,9 +156,7 @@ describe('reconciliación desde el Edge', () => {
       ],
     }).expect(202);
 
-    const historial = await comoAdmin(
-      `/copropiedades/${COP_A}/eventos`,
-    ).expect(200);
+    const historial = await comoAdmin(`/copropiedades/${COP_A}/eventos`).expect(200);
     const evt = (historial.body.filas as Registro[]).find(
       (e) => e.reglaAplicada === 'politica.listaNegra',
     );
@@ -177,9 +175,7 @@ describe('reconciliación desde el Edge', () => {
       eventos: [evento('rec-instante', { ocurridoEn: cuandoDeVerdad })],
     }).expect(202);
 
-    const historial = await comoAdmin(
-      `/copropiedades/${COP_A}/eventos`,
-    ).expect(200);
+    const historial = await comoAdmin(`/copropiedades/${COP_A}/eventos`).expect(200);
     const evt = (historial.body.filas as Registro[]).find(
       (e) => new Date(e.ocurridoEn).toISOString() === cuandoDeVerdad,
     );
@@ -226,7 +222,9 @@ describe('reconciliación desde el Edge', () => {
     const r = await enviar({
       eventos: [evento('rec-orden-1'), evento('rec-orden-2'), evento('rec-orden-3')],
     }).expect(202);
-    expect(r.body.resultados.map((x: { claveIdempotencia: string }) => x.claveIdempotencia)).toEqual(
+    expect(
+      r.body.resultados.map((x: { claveIdempotencia: string }) => x.claveIdempotencia),
+    ).toEqual(
       ['rec-orden-1', 'rec-orden-2', 'rec-orden-3'].map(
         (ref) => `${COP_A}:disp-talanquera-1:placa:${ref}`,
       ),

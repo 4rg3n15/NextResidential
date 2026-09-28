@@ -6,6 +6,7 @@ import type { EquipoRegistrado } from '../hikvision/registro-de-equipos';
 import { EquipoNoRegistrado } from '../hikvision/registro-de-equipos';
 import { equipoSimulado, equiposSimulados } from '../simulacion/equipo-simulado';
 import { EquipoDecidePorSuCuenta } from '../camara/modo-de-control';
+import { jpegConMedidas } from '../simulacion/imagenes-de-prueba';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -144,7 +145,7 @@ describe('los demás desenlaces, cada uno con su reacción', () => {
       }),
     });
     await expect(
-      proveedor.sincronizar('disp-terminal', 'plantilla-1', new Uint8Array([1, 2])),
+      proveedor.sincronizar('disp-terminal', 'plantilla-1', jpegConMedidas()),
     ).rejects.toThrow(/no soporta/i);
   });
 
@@ -178,7 +179,7 @@ describe('los demás desenlaces, cada uno con su reacción', () => {
     // H-SITIO-09 la terminal no es el único que la tiene: el videoportero que
     // la declare también la recibe; una cámara, nunca.
     const proveedor = proveedorCon(camaraConforme());
-    await expect(proveedor.sincronizar(CAMARA, 'plantilla-1', new Uint8Array([1]))).rejects.toThrow(
+    await expect(proveedor.sincronizar(CAMARA, 'plantilla-1', jpegConMedidas())).rejects.toThrow(
       /no tiene biblioteca de rostros/i,
     );
   });
@@ -264,19 +265,15 @@ describe('H-SITIO-09 · la plantilla va a TODOS los equipos con biblioteca de ro
     const proveedor = portero(true);
     expect((await proveedor.capacidadesDe(PORTERO)).bibliotecaDeRostros.estado).toBe('si');
     await expect(
-      proveedor.sincronizar(
-        PORTERO,
-        '1b4e28ba-2fa1-11d2-883f-0016d3cca427',
-        new Uint8Array([1, 2]),
-      ),
+      proveedor.sincronizar(PORTERO, '1b4e28ba-2fa1-11d2-883f-0016d3cca427', jpegConMedidas()),
     ).resolves.toBeUndefined();
   });
 
   it('un videoportero sin biblioteca se niega por CAPACIDAD, no por tipo', async () => {
     const proveedor = portero(false);
-    await expect(
-      proveedor.sincronizar(PORTERO, 'plantilla-1', new Uint8Array([1])),
-    ).rejects.toThrow(/bibliotecaDeRostros/);
+    await expect(proveedor.sincronizar(PORTERO, 'plantilla-1', jpegConMedidas())).rejects.toThrow(
+      /bibliotecaDeRostros/,
+    );
   });
 });
 

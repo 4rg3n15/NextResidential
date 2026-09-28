@@ -96,6 +96,12 @@ const rojasDelInforme = () => {
   if (!existsSync(DIRECTORIO_DE_INFORMES)) return { rojas: [], informes: 0 };
   const ficheros = readdirSync(DIRECTORIO_DE_INFORMES).filter((f) => f.endsWith('.json'));
   const rojas = [];
+  // Corrección 2 de la 15-L · el NOMBRE de una roja intermitente no basta para
+  // diagnosticarla: el informe se borra en la corrida siguiente y con él el
+  // mensaje. Se guarda la primera línea útil de cada fallo para IMPRIMIRLA; la
+  // comparación entre corridas sigue siendo por nombre (el mensaje lleva
+  // duraciones y valores que cambian).
+  const motivos = new Map();
   for (const fichero of ficheros) {
     const paquete = basename(fichero, '.json');
     let informe;
@@ -111,11 +117,20 @@ const rojasDelInforme = () => {
       for (const a of suite.assertionResults ?? []) {
         if (a.status !== 'failed') continue;
         const relativo = suite.name ? relative(RAIZ, suite.name) : '(fichero desconocido)';
-        rojas.push(`${paquete} › ${a.fullName ?? a.title} (${relativo})`);
+        const nombre = `${paquete} › ${a.fullName ?? a.title} (${relativo})`;
+        rojas.push(nombre);
+        // `join` escribe vacío un `undefined`: sin rama para el informe sin mensajes.
+        const primera = [a.failureMessages]
+          .flat()
+          .join('\n')
+          .split('\n')
+          .map((l) => l.replace(SIN_COLOR, '').trim())
+          .find((l) => l !== '');
+        if (primera !== undefined) motivos.set(nombre, primera.slice(0, 300));
       }
     }
   }
-  return { rojas: rojas.sort(), informes: ficheros.length };
+  return { rojas: rojas.sort(), motivos, informes: ficheros.length };
 };
 
 const firmaDe = (salida, codigo, rojas) => {
@@ -144,9 +159,10 @@ for (let i = 1; i <= repeticiones; i += 1) {
     env: { ...process.env, TURBO_FORCE: 'true', CI: '1' },
     maxBuffer: 64 * 1024 * 1024,
   });
-  const { rojas, informes } = rojasDelInforme();
+  const { rojas, motivos, informes } = rojasDelInforme();
   const firma = firmaDe(`${r.stdout ?? ''}${r.stderr ?? ''}`, r.status ?? 1, rojas);
   firma.informes = informes;
+  firma.motivos = motivos;
   corridas.push(firma);
   const resumen =
     firma.recuentos.filter((l) => l.includes('Tests ')).join(' · ') || '(sin recuento)';
@@ -173,7 +189,11 @@ for (const [i, c] of corridas.entries()) {
   if (c.codigo !== 0) {
     console.log(`   ✗ la corrida ${i + 1} terminó en rojo (codigo ${c.codigo})`);
     if (c.rojas.length > 0) {
-      c.rojas.slice(0, 8).forEach((r) => console.log(`     ${r}`));
+      c.rojas.slice(0, 8).forEach((r) => {
+        console.log(`     ${r}`);
+        const motivo = c.motivos.get(r);
+        if (motivo !== undefined) console.log(`       → ${motivo}`);
+      });
       if (c.rojas.length > 8) console.log(`     … y ${c.rojas.length - 8} más`);
     } else if (c.informes === 0) {
       // Ninguna prueba falló Y no hay un solo informe: la suite ni llegó a

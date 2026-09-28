@@ -24,7 +24,6 @@ import { exito, fallo } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import { DIRECTORIO_DEL_RESIDENTE } from './puertos';
 import type {
-  AutorizacionDelResidente,
   DirectorioDelResidente,
   EventoDelResidente,
   FiltroDeHistorial,
@@ -161,22 +160,6 @@ export class VerMisVehiculos extends LecturaDelResidente<readonly VehiculoDelRes
 
   ejecutar(ctx: ContextoTenant, copropiedadId: string) {
     return this.conAmbito(ctx, copropiedadId, ({ ambito }) => this.directorio.vehiculos(ambito));
-  }
-}
-
-@Injectable()
-export class VerMisAutorizaciones extends LecturaDelResidente<readonly AutorizacionDelResidente[]> {
-  constructor(
-    resolver: ResolverMiAmbito,
-    @Inject(DIRECTORIO_DEL_RESIDENTE) directorio: DirectorioDelResidente,
-  ) {
-    super(resolver, directorio);
-  }
-
-  ejecutar(ctx: ContextoTenant, copropiedadId: string) {
-    return this.conAmbito(ctx, copropiedadId, ({ ambito }) =>
-      this.directorio.autorizaciones(ambito),
-    );
   }
 }
 

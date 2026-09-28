@@ -20,7 +20,8 @@ export const aTurnoDto = (t: TurnoRegistrado): TurnoDto => ({
 
 export const aPorteroDto = (f: FichaDelPortero): PorteroDto => ({
   usuarioId: f.cuenta.usuarioId,
-  usuario: f.cuenta.usuario,
+  numero: f.cuenta.numeroDePortero,
+  documento: f.perfil.documento ?? null,
   nombre: f.cuenta.nombre,
   telefono: f.cuenta.telefono,
   correoContacto: f.perfil.correoContacto,

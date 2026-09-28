@@ -146,6 +146,8 @@ const DATOS = {
       activo: true,
     },
   ],
+  // 15-L · la SITUACIÓN la da el servidor (la misma que ve la consola), y la
+  // rechazada trae el motivo que escribió portería.
   autorizaciones: [
     {
       id: 'aut-1',
@@ -157,6 +159,51 @@ const DATOS = {
       permiteAccesoVehicular: true,
       estado: 'activa',
       acompanantes: 1,
+      situacion: 'vigente',
+      motivoRechazo: null,
+    },
+    {
+      id: 'aut-2',
+      visitante: 'Ana Rechazada',
+      tipo: 'unica',
+      desde: new Date(Date.now() - 1800_000).toISOString(),
+      hasta: new Date(Date.now() + 1800_000).toISOString(),
+      placa: null,
+      permiteAccesoVehicular: false,
+      estado: 'revocada',
+      acompanantes: 0,
+      situacion: 'rechazada',
+      motivoRechazo: 'El residente no la espera',
+    },
+  ],
+  // 15-L · lo que la app lista en «Notificaciones» y cuenta en Inicio.
+  notificaciones: [
+    {
+      id: 'not-1',
+      tipo: 'visita_rechazada',
+      en: new Date(Date.now() - 600_000).toISOString(),
+      visitante: 'Ana Rechazada',
+      motivo: 'El residente no la espera',
+      autorizacionId: 'aut-2',
+    },
+    {
+      id: 'not-2',
+      tipo: 'ingreso_de_visitante',
+      en: new Date(Date.now() - 3000_000).toISOString(),
+      visitante: 'Visitante propio',
+      motivo: null,
+      autorizacionId: 'aut-1',
+    },
+  ],
+  // 15-L (F6) · un visitante que ya vino, para «Volver a autorizar».
+  ultimas: [
+    {
+      autorizacionId: 'aut-0',
+      visitante: 'Plomero de la semana',
+      documento: '79000111',
+      ultimaVisita: new Date(Date.now() - 7 * 86400_000).toISOString(),
+      placa: null,
+      tieneFoto: true,
     },
   ],
   historial: [
@@ -171,6 +218,7 @@ const DATOS = {
       persona: 'Visitante propio',
       zona: 'Piscina',
       decididoPorEdge: true,
+      deVisitante: true,
     },
   ],
 };
@@ -223,6 +271,11 @@ const servidor = createServer(async (peticion, respuesta) => {
     });
   }
 
+  // 15-L · la prueba de una dirección antes de guardarla («Servidor»).
+  if (url.pathname === '/health') {
+    return responder(200, { estado: 'vivo', momento: new Date().toISOString() });
+  }
+
   if (url.pathname === '/supabase/auth/v1/token') {
     // 40 s de vida: suficiente para el recorrido y corto para que el margen de
     // refresco entre en juego si alguien deja la pestaña abierta.
@@ -233,12 +286,13 @@ const servidor = createServer(async (peticion, respuesta) => {
     });
   }
 
-  const mi = new RegExp(`^/copropiedades/${COP}/mi/(\\w+)$`).exec(url.pathname);
+  // 15-L (F6) · la única ruta del residente con dos tramos: `visitas/ultimas`.
+  const mi = new RegExp(`^/copropiedades/${COP}/mi/(\\w+(?:/ultimas)?)$`).exec(url.pathname);
   if (mi !== null) {
     if (!peticion.headers.authorization?.startsWith('Bearer ')) {
       return responder(401, { mensaje: 'sin token' });
     }
-    const clave = mi[1] === 'vivienda' ? 'vivienda' : mi[1];
+    const clave = mi[1] === 'visitas/ultimas' ? 'ultimas' : mi[1];
     const datos = DATOS[clave];
     if (datos === undefined) return responder(404, { mensaje: 'ruta desconocida' });
     return responder(200, datos);
@@ -351,6 +405,27 @@ const esperarTexto = async (frase, ms = 20000) => {
   return false;
 };
 const hay = (frase) => esperarTexto(frase);
+
+/**
+ * Pulsa lo que lleve ese texto. Una fila de `ListTile` con título, subtítulo y
+ * contador llega al árbol de semántica como UN botón cuyo nombre es todo junto
+ * («2 Notificaciones 2 sin ver»): se prueba por texto exacto, por nombre del
+ * botón y por etiqueta, en ese orden, igual que las pestañas.
+ */
+const pulsar = async (frase) => {
+  const vias = [
+    pagina.getByText(frase, { exact: true }),
+    pagina.getByRole('button', { name: new RegExp(frase) }),
+    pagina.getByLabel(frase),
+  ];
+  for (const via of vias) {
+    if ((await via.count()) === 0) continue;
+    await via.first().click();
+    await pagina.waitForTimeout(500);
+    return;
+  }
+  throw new Error(`no se encontró «${frase}» para pulsarlo`);
+};
 
 try {
   await pagina.goto(`http://127.0.0.1:${PUERTO}/`, { waitUntil: 'networkidle' });
@@ -513,6 +588,10 @@ try {
   (await hay('Acceso del residente'))
     ? ok('la app arranca en la pantalla de acceso')
     : mal('no se ve la pantalla de acceso');
+  // 15-L · la dirección del servidor, a la vista y con el camino para cambiarla.
+  (await hay('Servidor')) && (await hay(`http://127.0.0.1:${PUERTO}`))
+    ? ok('el acceso enseña «Servidor» con la dirección en uso')
+    : mal('el acceso no enseña la dirección del servidor');
   await captura('1-acceso');
 
   /**
@@ -550,6 +629,32 @@ try {
   conToken.length >= 4
     ? ok(`las ${conToken.length} lecturas salieron con el token en la cabecera`)
     : mal(`solo ${conToken.length} lecturas llevaron token`);
+
+  // ── 2b · notificaciones (15-L) ────────────────────────────────────────────
+  (await hay('2 sin ver'))
+    ? ok('Inicio cuenta las notificaciones sin ver')
+    : mal('Inicio no cuenta las notificaciones sin ver');
+  await pulsar('Notificaciones');
+  (await hay('Rechazaron la visita de Ana Rechazada: El residente no la espera'))
+    ? ok('Notificaciones enseña la visita rechazada con el motivo de portería')
+    : mal('Notificaciones no enseña la visita rechazada con su motivo');
+  (await hay('Visitante propio ingresó'))
+    ? ok('y el ingreso del visitante')
+    : mal('no se ve el ingreso del visitante');
+  (await hay('Los avisos llegan mientras la app está abierta'))
+    ? ok('dice que los avisos llegan con la app abierta, sin prometer otra cosa')
+    : mal('no dice cuándo llegan los avisos');
+  vistas.some((v) => v.ruta.endsWith('/mi/notificaciones') && v.autorizacion)
+    ? ok('la lista sale de la API, con token')
+    : mal('la lista de notificaciones no se pidió a la API');
+  await captura('2b-notificaciones');
+  await pagina
+    .getByRole('button', { name: /Back|Atrás/i })
+    .first()
+    .click();
+  (await hay('Nada nuevo'))
+    ? ok('al volver, el contador está a cero: abrirlas las marca vistas')
+    : mal('el contador no vuelve a cero tras abrir las notificaciones');
 
   // ── 3 · familia ───────────────────────────────────────────────────────────
   // `exact` en la barra inferior: «Vehículos» también casa con el acceso
@@ -603,7 +708,43 @@ try {
   (await hay('Nuevo visitante'))
     ? ok('y ofrece autorizar una visita, que es para lo que se abre (HU-07)')
     : mal('no se ve la acción de autorizar');
-  await captura('5-pendiente');
+  // 15-L (F6) · quien ya vino se vuelve a autorizar sin dictar sus datos.
+  (await hay('Plomero de la semana')) && (await hay('Volver a autorizar'))
+    ? ok('los últimos visitantes se ofrecen para volver a autorizarlos (F6)')
+    : mal('no se ven los últimos visitantes con «Volver a autorizar»');
+  // 15-L · la situación es la del servidor, y la rechazada lleva su motivo.
+  (await hay('Vigente')) &&
+  (await hay('Rechazada')) &&
+  (await hay('Motivo: El residente no la espera'))
+    ? ok('cada visita dice su situación real, y la rechazada su motivo')
+    : mal('las tarjetas no dicen la situación real de la visita');
+  await captura('5-visitantes');
+
+  // ── 5b · el formulario: los dos orígenes de la foto y la casilla con nombre ─
+  // Decisiones del cliente para la visita de sitio (corrección de la 15-L). En
+  // web la fuente de fotos es la simulada, así que aquí no se elige ninguna:
+  // se comprueba que el residente VE las dos salidas y que la casilla dice el
+  // nombre que escribe, mientras lo escribe.
+  await pulsar('Nuevo visitante');
+  const casillaCon = (nombre) =>
+    `Declaro que ${nombre} me autorizó a usar su foto para su ingreso al conjunto`;
+  await escribirEn('Nombre del visitante', 'Ana Prueba');
+  // La casilla y los botones quedan al fondo del formulario: se baja hasta
+  // ellos como lo haría el pulgar, con la rueda, no saltando por el DOM.
+  await pagina.mouse.move(210, 600);
+  await pagina.mouse.wheel(0, 2000);
+  (await hay('Tomar foto')) && (await hay('Elegir de la galería'))
+    ? ok('la foto se toma o se elige de la galería: los dos botones están a la vista')
+    : mal('no se ven «Tomar foto» y «Elegir de la galería» en el formulario');
+  (await hay(casillaCon('Ana Prueba')))
+    ? ok('la casilla dice el nombre del visitante que se escribe, en vivo')
+    : mal('la casilla no lleva el nombre escrito en el formulario');
+  await captura('5b-nuevo-visitante');
+  await pagina
+    .getByRole('button', { name: /Back|Atrás/i })
+    .first()
+    .click();
+  await esperarTexto('Mis visitantes');
 
   // ── 6 · perfil e historial ────────────────────────────────────────────────
   await irAPestana('Perfil');

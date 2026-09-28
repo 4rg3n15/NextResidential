@@ -83,10 +83,7 @@ export const generarCodigosDeRecuperacion = (
  * Recorre **todos** los candidatos aunque ya haya encontrado uno: salir antes
  * haría que el tiempo dependiera de la posición del código en la lista.
  */
-export const casarCodigo = (
-  codigo: string,
-  hashesVigentes: readonly string[],
-): string | null => {
+export const casarCodigo = (codigo: string, hashesVigentes: readonly string[]): string | null => {
   const objetivo = Buffer.from(hashDeCodigo(codigo), 'utf8');
   let encontrado: string | null = null;
   for (const hash of hashesVigentes) {

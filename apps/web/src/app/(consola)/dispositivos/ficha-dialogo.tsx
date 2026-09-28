@@ -9,6 +9,12 @@ import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { EstadoCargando } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { FichaDeEquipo } from './ficha-del-equipo';
+import { Boton } from '@/componentes/ui/boton';
+import { VideoEnVivo } from '@/componentes/video-en-vivo';
+import { AccionesDeSitio } from './acciones-de-sitio';
+
+/** D3 (15-L) · los equipos que entregan video por RTSP. */
+const CON_VIDEO = new Set<Equipo['tipo']>(['camara_lpr', 'terminal_facial', 'intercom']);
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -50,6 +56,10 @@ export const FichaDialogo = ({
   const [motivo, setMotivo] = useState('');
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
+  // D3 (15-L) · el video se pide al pulsar, no al abrir: negociar por cada
+  // ficha que alguien mira ocuparía el puente y el equipo sin motivo.
+  const [conVideo, setConVideo] = useState(false);
+  useEffect(() => setConVideo(false), [equipo]);
 
   const sondear = async (id: string): Promise<void> => {
     setSondeando(true);
@@ -64,6 +74,8 @@ export const FichaDialogo = ({
       );
       // La verificación y las capacidades acaban de cambiar en el inventario.
       await clientes.invalidateQueries({ queryKey: ['dispositivos', copropiedadId] });
+      // C1 (15-L) · la tabla de Dispositivos sale del tablero: también se refresca.
+      await clientes.invalidateQueries({ queryKey: ['tablero', copropiedadId, 'dispositivos'] });
     } catch (e) {
       setSondeo(null);
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo sondear el equipo');
@@ -145,6 +157,16 @@ export const FichaDialogo = ({
         </p>
       ) : null}
 
+      {equipo !== null && CON_VIDEO.has(equipo.tipo) ? (
+        conVideo ? (
+          <VideoEnVivo copropiedadId={copropiedadId} dispositivoId={equipo.id} />
+        ) : (
+          <Boton type="button" variante="secundario" tamano="sm" onClick={() => setConVideo(true)}>
+            Ver video en vivo
+          </Boton>
+        )
+      ) : null}
+
       {sondeo?.ficha === undefined ? null : (
         <>
           <Campo
@@ -158,6 +180,20 @@ export const FichaDialogo = ({
             corrigiendo={corrigiendo}
             {...(puedeCorregir ? { alCorregir: (c: string) => void corregir(c) } : {})}
           />
+          {equipo === null ? null : (
+            <AccionesDeSitio
+              copropiedadId={copropiedadId}
+              equipo={equipo}
+              motivo={puedeCorregir ? motivo.trim() : null}
+              alTerminar={(texto) => {
+                setError(undefined);
+                setAviso(texto);
+                // La ficha enseña lo que el equipo dice AHORA.
+                void sondear(equipo.id);
+              }}
+              alFallar={(mensaje) => setError(mensaje)}
+            />
+          )}
         </>
       )}
     </DialogoDeFormulario>

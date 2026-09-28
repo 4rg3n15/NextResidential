@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import 'acceso.dart';
 import 'calidad_de_captura.dart';
 import 'entidades.dart';
+import 'origen_de_la_foto.dart';
 import 'sesion.dart';
 
 enum ClaseDeFallo {
@@ -36,6 +37,13 @@ enum ClaseDeFallo {
 
   /// El servidor contestó mal. Se muestra la causa y se ofrece reintentar.
   servidor,
+
+  /// 400 · 422 · el servidor rechazó la FORMA de lo enviado: falta la casilla,
+  /// la duración se sale de lo admitido, la foto no es la imagen que dice ser,
+  /// la visita a repetir no tiene foto. Distinto de `servidor` porque aquí
+  /// **reintentar lo mismo da lo mismo**: la bandeja de salida no lo reintenta
+  /// y la pantalla enseña el motivo para que se corrija.
+  datosNoValidos,
 }
 
 class Fallo implements Exception {
@@ -67,27 +75,66 @@ abstract interface class RepositorioDelResidente {
   /// M-5 · las zonas del conjunto con su aforo y su horario de AHORA.
   Future<List<ZonaComun>> misZonas();
 
-  /// M-4 · crea la visita. **No lanza ante un rechazo de negocio**: devuelve
-  /// `VisitaRechazada` con su motivo. Lanzar habría obligado a la pantalla a
-  /// interrogar al error para distinguir los cuatro motivos, que es justo lo
-  /// que el tipo de retorno evita.
+  /// F1 · crea la visita con su foto y la casilla. **No lanza ante un rechazo
+  /// de negocio ni ante una foto que no sirve**: devuelve `VisitaRechazada` o
+  /// `FotoRechazada`. Lanzar habría obligado a la pantalla a interrogar al
+  /// error para distinguir los motivos, que es justo lo que el tipo evita.
   Future<ResultadoDeVisita> crearVisita(NuevaVisita visita);
+
+  /// F6 · los últimos visitantes de MI vivienda, uno por persona.
+  Future<List<VisitanteReciente>> ultimosVisitantes();
+
+  /// F6 · vuelve a autorizar a un visitante que ya vino.
+  ///
+  /// **Sólo viaja lo que cambia**: cuándo, cuánto y la casilla. El nombre, el
+  /// documento, la placa y la foto los copia el servidor de `autorizacionId`,
+  /// y sólo si esa visita es de la vivienda de quien lo pide. La casilla se
+  /// vuelve a marcar porque cada autorización lleva su propia constancia.
+  Future<ResultadoDeVisita> volverAAutorizar({
+    required String autorizacionId,
+    required DateTime inicio,
+    required int duracionMinutos,
+    required bool casillaMarcada,
+    required String claveDeIdempotencia,
+  });
 
   /// M-7 · HU-34 · registra este aparato para recibir avisos.
   Future<void> registrarAparato(AparatoDeNotificaciones aparato);
+}
 
-  /// HU-12 · HU-13 · CU-02 · el rostro de MI visitante.
-  ///
-  /// **No recibe titular y esa ausencia es la regla.** El servidor lo deriva de
-  /// la autorización (RN-10): si la app pudiera nombrarlo, podría pedirle el
-  /// consentimiento a quien quisiera.
-  Future<ResultadoDeCaptura> capturarRostro({
-    required String autorizacionId,
-    required MedidasDeCaptura medidas,
-    required Uint8List vector,
-    required String versionPolitica,
-    required DateTime suprimirEn,
+/// De dónde sale la foto del visitante. Es un puerto por lo de siempre: sin él
+/// el formulario no se podría probar sin una cámara, y con él se prueban las
+/// siete formas de salir mal sin sacar una sola foto.
+///
+/// El origen —cámara o galería— es un argumento, no un segundo puerto: lo que
+/// cambia es quién entrega los bytes, y la reducción y la medida tienen que
+/// ser las mismas (ver `origen_de_la_foto.dart`). `null` = el residente
+/// canceló; lo que no es cancelar llega como `FotoNoObtenida`, con su motivo.
+typedef TomarFoto = Future<FotoTomada?> Function(OrigenDeFoto origen);
+
+/// Lo que entrega la cámara o la galería: el JPEG ya reducido y lo que se midió
+/// de él, por el mismo camino para los dos orígenes.
+class FotoTomada {
+  const FotoTomada({
+    required this.jpeg,
+    required this.medidas,
+    this.vistaPrevia,
+    this.sinDetector = false,
   });
+
+  /// La foto que viaja, ya reducida en el aparato. Vive en memoria mientras el
+  /// formulario está abierto; en el teléfono no se guarda.
+  final Uint8List jpeg;
+  final MedidasDeCaptura medidas;
+
+  /// Miniatura para que el residente vea qué salió. `null` si la fuente no
+  /// produce una imagen que merezca enseñarse (la cámara simulada).
+  final Uint8List? vistaPrevia;
+
+  /// Ni la cámara del sistema ni la galería traen detector de rostros: el
+  /// conteo y la proporción los sustituye la confirmación del encuadre por
+  /// quien captura, igual que en la consola. Nunca se inventan.
+  final bool sinDetector;
 }
 
 /// De dónde sale el identificador estable del aparato y su token de FCM.
@@ -112,6 +159,19 @@ abstract interface class AlmacenDeSesion {
   Future<void> guardar(Sesion sesion, {required DateTime ultimoUso});
   Future<DateTime?> ultimoUso();
   Future<void> borrar();
+}
+
+/// Texto por clave que sobrevive al cierre de la app: la dirección del
+/// servidor, qué notificaciones ya se vieron y la bandeja de salida.
+///
+/// Nada de esto es negocio —el negocio vive en la API y se comparte con la
+/// consola—: es estado del aparato. El adaptador del teléfono lo guarda en
+/// Keychain o Keystore por lo mismo que la sesión: la bandeja lleva la foto de
+/// un visitante, y eso no se deja en un XML legible.
+abstract interface class AlmacenDeTexto {
+  Future<String?> leer(String clave);
+  Future<void> escribir(String clave, String valor);
+  Future<void> borrar(String clave);
 }
 
 /// Quién emite y renueva la sesión.

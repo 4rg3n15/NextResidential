@@ -93,11 +93,9 @@ class HogarFalso implements RepositorioDelHogar {
   PerfilDelResidente perfil;
   ResultadoDeVehiculo? respuestaVehiculo;
   final bool desactiva;
-  EstadoDeConsentimiento consentimiento = EstadoDeConsentimiento.pendiente;
   final List<NuevoVehiculo> vehiculos = [];
   final List<String> bajas = [];
   final List<DatosDePerfil> ediciones = [];
-  int consultasDeConsentimiento = 0;
 
   @override
   Future<PerfilDelResidente> miPerfil() async => perfil;
@@ -118,15 +116,6 @@ class HogarFalso implements RepositorioDelHogar {
   Future<bool> desactivarVehiculo(String vehiculoId) async {
     bajas.add(vehiculoId);
     return desactiva;
-  }
-
-  @override
-  Future<EstadoDeConsentimiento> estadoDelConsentimiento({
-    required String autorizacionId,
-    required String consentimientoId,
-  }) async {
-    consultasDeConsentimiento += 1;
-    return consentimiento;
   }
 }
 
@@ -153,11 +142,4 @@ class LlamadorFalso implements LlamadorDeTelefono {
     llamadas.add(numero);
     return puede;
   }
-}
-
-class CompartidorFalso implements Compartidor {
-  final List<String> compartidos = [];
-
-  @override
-  Future<void> compartir(String texto) async => compartidos.add(texto);
 }

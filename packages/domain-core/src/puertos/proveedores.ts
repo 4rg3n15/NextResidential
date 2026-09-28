@@ -7,6 +7,8 @@
  * nombra. Si algún día se cambia de protocolo, esta interfaz no se entera — que
  * es exactamente la prueba de OE-03.
  */
+import type { Vigencia } from '../autorizaciones/vigencia';
+
 export interface ResultadoAccionamiento {
   readonly aceptado: boolean;
   readonly latenciaMs: number;
@@ -29,7 +31,19 @@ export interface PlateEventSource {
 }
 
 export interface FaceTemplateProvider {
-  sincronizar(dispositivoId: string, plantillaId: string, plantilla: Uint8Array): Promise<void>;
+  /**
+   * `vigencia` (ETAPA 15-L · A2, autorizada por el cliente el 2026-09-27) es
+   * OPCIONAL y ADITIVA: con ella, el equipo caduca la credencial por su cuenta
+   * aunque la supresión de RN-11 no llegue; sin ella, el comportamiento es
+   * exactamente el de antes. El dominio dice el intervalo; cómo se escribe en
+   * el aparato —hora local, zona, tipo de persona— es asunto del adaptador.
+   */
+  sincronizar(
+    dispositivoId: string,
+    plantillaId: string,
+    plantilla: Uint8Array,
+    vigencia?: Vigencia,
+  ): Promise<void>;
   suprimir(dispositivoId: string, plantillaId: string): Promise<void>;
 }
 

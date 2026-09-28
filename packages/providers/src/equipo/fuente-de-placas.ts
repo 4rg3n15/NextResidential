@@ -134,27 +134,30 @@ export class FuenteDePlacas implements PlateEventSource {
   /**
    * Publica lo que un transporte trajo.
    *
-   * **Lo histórico no llega a nadie.** El equipo reenvía su historial por los
-   * dos transportes, y sin este corte la portería mostraría accesos de hace
-   * días como si ocurrieran ahora, en una tabla que no se puede limpiar.
+   * **Lo histórico no llega a los observadores ni al motor.** El equipo
+   * reenvía su historial por los dos transportes, y sin este corte la
+   * portería mostraría accesos de hace días como si ocurrieran ahora. Pero
+   * desde la 15-L SÍ llega al ingestor, que lo GUARDA como histórico en los
+   * eventos de equipo (Bloque B: ninguno se descarta) sin decidir nada.
    */
   async publicar(publicacion: PublicacionDeEquipo): Promise<ResultadoDePublicacion> {
     if (!publicacion.evento.enVivo) {
+      if (this.ingestor !== null) await this.ingestor.ingerir(publicacion);
       return { desenlace: 'historica', motivo: 'el equipo lo marcó histórico' };
     }
 
     const lectura = lecturaDe(publicacion.evento);
-    const clase = publicacion.evento.clase;
     /**
      * A2/A4 (ETAPA 15-E) · un rostro o una llamada no son una placa y el
      * puerto del dominio no tiene forma para ellos: van al ingestor —que sí
      * sabe qué hacer— y no a los observadores del puerto. Es el mismo canal
      * de este paquete por el que ya entraba la evidencia que el puerto no
      * expresa; el puerto sigue intacto.
+     *
+     * 15-L (Bloque B) · TODO va al ingestor: también lo que no es un acceso y
+     * la detección SIN lectura (`noPlate`). Se guarda como evento de equipo;
+     * nunca entra al motor como un acceso negado.
      */
-    if (lectura === null && clase !== 'rostro' && clase !== 'llamada' && clase !== 'timbre') {
-      return { desenlace: 'sin_placa', motivo: 'sin lectura de placa' };
-    }
 
     const ingesta =
       this.ingestor === null

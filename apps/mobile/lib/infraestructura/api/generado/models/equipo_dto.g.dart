@@ -20,6 +20,8 @@ EquipoDto _$EquipoDtoFromJson(Map<String, dynamic> json) => EquipoDto(
       ? null
       : EquipoDtoModoDeTerminal.fromJson(json['modoDeTerminal'] as String),
   canalDeAudioHabilitado: json['canalDeAudioHabilitado'] as bool,
+  canalDeVideo: json['canalDeVideo'] as String?,
+  zonaId: json['zonaId'] as String?,
   capacidades: json['capacidades'] == null
       ? null
       : CapacidadesDeEquipoDto.fromJson(
@@ -48,6 +50,8 @@ Map<String, dynamic> _$EquipoDtoToJson(EquipoDto instance) => <String, dynamic>{
   'fabricante': instance.fabricante,
   'modoDeTerminal': instance.modoDeTerminal,
   'canalDeAudioHabilitado': instance.canalDeAudioHabilitado,
+  'canalDeVideo': instance.canalDeVideo,
+  'zonaId': instance.zonaId,
   'capacidades': instance.capacidades,
   'verificacion': instance.verificacion,
   'verificadoEn': instance.verificadoEn,

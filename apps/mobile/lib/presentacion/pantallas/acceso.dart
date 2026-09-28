@@ -6,6 +6,7 @@ import '../../configuracion/tema.dart';
 import '../../dominio/acceso.dart';
 import '../../dominio/puertos.dart';
 import '../widgets/detalle_de_fallo.dart';
+import '../widgets/servidor.dart';
 
 /// Acceso del residente.
 ///
@@ -23,6 +24,12 @@ import '../widgets/detalle_de_fallo.dart';
 /// bloquearía a quien no tiene app de autenticador —que es la mayoría de los
 /// residentes— sin ningún requisito que lo respalde. El perfil ofrecerá
 /// activarlo voluntariamente en 11-B.
+///
+/// **«Servidor», a la vista (15-L).** La dirección del Mac cambia de una red a
+/// otra; si la app no llega, el acceso es la primera pantalla donde se nota y
+/// la única donde no hay otra cosa que hacer. Por eso la dirección se ve abajo
+/// y se cambia desde aquí, y un error de conexión ofrece «Reintentar» y
+/// «Cambiar servidor» en el mismo recuadro.
 class PantallaDeAcceso extends StatefulWidget {
   const PantallaDeAcceso({
     super.key,
@@ -190,11 +197,29 @@ class _PantallaDeAccesoState extends State<PantallaDeAcceso> {
                               ),
                               // H-SITIO-11 · el porqué, sólo en Debug.
                               DetalleDeFallo(fallo: _fallo!),
+                              if (esFalloDeConexion(_fallo!)) ...[
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    FilledButton.tonal(
+                                      onPressed: _enviando ? null : _entrar,
+                                      child: const Text('Reintentar'),
+                                    ),
+                                    BotonCambiarServidor(
+                                      alCambiar: () => setState(() => _fallo = null),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),
                       ),
                     ],
+                    const SizedBox(height: 24),
+                    _OpcionDeServidor(alCambiar: () => setState(() => _fallo = null)),
                   ],
                 ),
               ),
@@ -202,6 +227,29 @@ class _PantallaDeAccesoState extends State<PantallaDeAcceso> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// «Servidor»: a qué dirección habla la app, y el camino para cambiarla.
+class _OpcionDeServidor extends StatelessWidget {
+  const _OpcionDeServidor({required this.alCambiar});
+  final VoidCallback alCambiar;
+
+  @override
+  Widget build(BuildContext context) {
+    final cambio = ServidorDeLaApp.de(context);
+    if (cambio == null) return const SizedBox.shrink();
+    return ListTile(
+      key: const Key('acceso.servidor'),
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.dns_outlined),
+      title: const Text('Servidor'),
+      subtitle: Text(cambio.direccion.actual),
+      trailing: const Text('Cambiar'),
+      onTap: () async {
+        if (await abrirServidor(context, cambio)) alCambiar();
+      },
     );
   }
 }

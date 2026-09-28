@@ -41,7 +41,7 @@ class PantallaDeFamilia extends StatelessWidget {
       body: AnimatedBuilder(
         animation: controlador,
         builder: (context, _) => RefreshIndicator(
-          onRefresh: controlador.cargarAhora,
+          onRefresh: controlador.refrescar,
           child: VistaConEstado<List<MiembroDeFamilia>>(
             estado: controlador.estado as Estado<List<MiembroDeFamilia>>,
             alReintentar: controlador.cargarAhora,
@@ -50,6 +50,7 @@ class PantallaDeFamilia extends StatelessWidget {
                 'No hay más residentes registrados en su vivienda. La administración del conjunto '
                 'los vincula desde la consola.',
             conDatos: (miembros, {required desdeCache}) => ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
                 if (desdeCache) const MarcaDeCache(),
@@ -123,8 +124,7 @@ class _AvisoDeNivelDeAcceso extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        'El «nivel de acceso» viene del mockup y no de un requisito (P-11, sin definir). Hoy solo '
-        'el titular de la vivienda puede autorizar visitantes, como exige RN-05.',
+        'Hoy sólo el titular de la vivienda puede autorizar visitantes.',
         style: TextStyle(color: Paleta.neutroSuave.texto, fontSize: 13),
       ),
     );

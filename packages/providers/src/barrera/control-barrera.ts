@@ -1,6 +1,8 @@
 import type { ControlDeBarrera, ResultadoDeAccionamiento } from '@ncr/domain-core';
 import { ordenAceptada, ordenInalcanzable, ordenRechazada } from '@ncr/domain-core';
 import { cnonceAleatorio, interpretarDesafio, sesionDigestCompartida } from './digest';
+import { VENTANA_DE_CREDENCIAL_RECHAZADA_MS } from '../equipo/cliente';
+import { CredencialRechazada } from '../nucleo/errores';
 import type { SesionDigest } from './digest';
 
 /**
@@ -118,6 +120,12 @@ export class ControlDeBarreraVehicular implements ControlDeBarrera {
   private async ordenar(modo: ModoDeControl): Promise<ResultadoDeAccionamiento> {
     const comienzo = this.ahora();
     const transcurrido = (): number => this.ahora() - comienzo;
+    // A5 (15-L) · la misma marca que el cliente de equipos: una credencial ya
+    // rechazada no se vuelve a presentar, tampoco por la barrera de entorno.
+    const hace = this.sesion.rechazadaHace(this.ahora(), VENTANA_DE_CREDENCIAL_RECHAZADA_MS);
+    if (hace !== null) {
+      return ordenRechazada(new CredencialRechazada('barrera', hace).message, 0);
+    }
 
     try {
       let respuesta = await this.enviar(modo);
@@ -136,13 +144,15 @@ export class ControlDeBarreraVehicular implements ControlDeBarrera {
         // En ninguno de los dos casos se insiste: la cuenta se bloquea.
         const cabecera = respuesta.headers.get('www-authenticate');
         this.sesion.aceptarDesafio(cabecera);
-        return interpretarDesafio(cabecera)?.stale === true
-          ? ordenRechazada(
-              'El equipo venció el desafío de acceso dos veces seguidas: no es la clave. ' +
-                'Reintente la orden',
-              transcurrido(),
-            )
-          : ordenRechazada('El equipo rechazó las credenciales', transcurrido());
+        if (interpretarDesafio(cabecera)?.stale === true) {
+          return ordenRechazada(
+            'El equipo venció el desafío de acceso dos veces seguidas: no es la clave. ' +
+              'Reintente la orden',
+            transcurrido(),
+          );
+        }
+        this.sesion.marcarRechazada(this.ahora());
+        return ordenRechazada('El equipo rechazó las credenciales', transcurrido());
       }
 
       const cuerpo = await respuesta.text();

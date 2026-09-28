@@ -88,3 +88,20 @@ describe('NegociarVistaEnVivo (A5)', () => {
     expect(texto).not.toContain('rtsp://');
   });
 });
+
+describe('D2 (15-L) · un video que el navegador no reproduce se dice antes de negociar', () => {
+  it('el H.265 del proveedor llega como «sin video» con su frase, y el puente no se toca', async () => {
+    const { caso, asegurados } = banco(async () => {
+      // La frase de `VideoNoReproducible` (probada en el paquete de proveedores):
+      // la capa de aplicación no importa valores de él (frontera O2).
+      throw new Error(
+        'Este equipo entrega H.265 en el canal 101 y el navegador no lo reproduce: ' +
+          'cámbielo a H.264 en el equipo o elija otro canal en su ficha',
+      );
+    });
+    const error = await caso.ejecutar(solicitud).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SinOrigenDeVideo);
+    expect((error as Error).message).toMatch(/entrega H\.265 en el canal 101 .* cámbielo a H\.264/);
+    expect(asegurados).toEqual([]);
+  });
+});

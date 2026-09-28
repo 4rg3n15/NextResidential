@@ -29,9 +29,22 @@ export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto
     estado === 'si' ? 'exito' : estado === 'no' ? 'peligro' : 'neutro';
   const palabra = (estado: string, siTexto: string, noTexto: string, dudaTexto: string): string =>
     estado === 'si' ? siTexto : estado === 'no' ? noTexto : dudaTexto;
+  // D2 (15-L) · el video, como lo describió el equipo por RTSP al probarlo.
+  const video = (): { tono: TonoDeDistintivo; texto: string } => {
+    const v = c.video;
+    const canal = v.canal === null ? '' : ` (${v.canal})`;
+    if (v.codec === 'H.264') return { tono: 'exito', texto: `Video H.264${canal}` };
+    if (v.codec !== null) {
+      return { tono: 'peligro', texto: `Video ${v.codec}${canal}: no se ve en el navegador` };
+    }
+    return v.estado === 'no'
+      ? { tono: 'aviso', texto: `Sin video en el canal${canal}` }
+      : { tono: 'neutro', texto: 'Video sin comprobar' };
+  };
+  const conVideo = (lista: { tono: TonoDeDistintivo; texto: string }[]) => [...lista, video()];
   switch (e.tipo) {
     case 'terminal_facial':
-      return [
+      return conVideo([
         {
           tono: si(c.verificacionRemota),
           texto: palabra(
@@ -53,9 +66,9 @@ export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto
                   'Biblioteca sin comprobar',
                 ),
         },
-      ];
+      ]);
     case 'intercom':
-      return [
+      return conVideo([
         {
           tono: si(c.aperturaRemota),
           texto: palabra(
@@ -78,19 +91,21 @@ export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto
               : palabra(c.audioBidireccional.estado, 'Audio', 'Sin audio', 'Audio sin comprobar'),
         },
         {
-          // H-SITIO-09 · si recibe plantillas, y si no, que NO APLICA: no es
-          // lo mismo que «sin comprobar», que se resuelve sondeando.
+          // H-SITIO-09 · si recibe plantillas, y si no, que NO los admite: no
+          // es lo mismo que «sin comprobar», que se resuelve sondeando. A3
+          // (15-L) · con las palabras del encargo, las mismas que la
+          // sincronización deja en su resultado.
           tono: c.bibliotecaDeRostros.estado === 'si' ? 'exito' : 'neutro',
           texto: palabra(
             c.bibliotecaDeRostros.estado,
             'Rostros: recibe plantillas',
-            'Rostros: no aplica',
+            'Este equipo no admite rostros',
             'Rostros sin comprobar',
           ),
         },
-      ];
+      ]);
     case 'camara_lpr':
-      return [
+      return conVideo([
         {
           tono: si(c.reconocimientoDePlacas),
           texto: palabra(
@@ -100,7 +115,7 @@ export const resumenDeCapacidades = (e: Equipo): { tono: TonoDeDistintivo; texto
             'Placas sin comprobar',
           ),
         },
-      ];
+      ]);
     default:
       return [
         {
@@ -214,6 +229,8 @@ export const PantallaDeDispositivos = ({
       );
       setAviso(r.detalle);
       await clientes.invalidateQueries({ queryKey: ['dispositivos', copropiedadId] });
+      // C1 (15-L) · la tabla de Dispositivos sale del tablero: también se refresca.
+      await clientes.invalidateQueries({ queryKey: ['tablero', copropiedadId, 'dispositivos'] });
     } catch (e) {
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo enviar la orden');
     } finally {
@@ -364,7 +381,8 @@ export const PantallaDeDispositivos = ({
                 disabled={enCurso !== null}
                 onClick={() => setFichaDe(porId.get(d.id) ?? null)}
               >
-                Ficha
+                {/* C3 (15-L) · la ficha SONDEA el equipo: capacidad por capacidad. */}
+                Probar conexión
               </Boton>
               <Boton
                 variante="secundario"
@@ -427,7 +445,7 @@ export const PantallaDeDispositivos = ({
     <>
       <EncabezadoDePantalla
         titulo="Dispositivos"
-        descripcion="Inventario y estado de los equipos. Las credenciales no salen de la API: no hay nada que ocultar aquí porque no llega (RN-21)."
+        descripcion="Inventario y estado de los equipos. Sus contraseñas nunca se muestran: no salen del servidor."
         resumen={
           consulta.data === undefined ? null : (
             <>

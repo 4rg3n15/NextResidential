@@ -1,6 +1,15 @@
 /// M-7 · HU-34 · el registro del aparato para recibir avisos, como máquina.
 ///
 /// ═════════════════════════════════════════════════════════════════════════════
+/// 15-L · SIN FIREBASE EN ESTA COMPILACIÓN
+///
+/// Con `SinServicioDeMensajeria` no hay token, así que el registro nunca se
+/// completa y NADA de esto se enseña: la pantalla de notificaciones lista las
+/// de la API y dice «Los avisos llegan mientras la app está abierta». La
+/// máquina sigue conectada al arranque para que el día que llegue el adaptador
+/// real el registro funcione sin tocar el armazón.
+///
+/// ═════════════════════════════════════════════════════════════════════════════
 /// POR QUÉ ESTO NO ES UN `bool`
 ///
 /// «Notificaciones activadas» suena a interruptor y son tres condiciones
@@ -33,7 +42,30 @@ import 'package:flutter/foundation.dart';
 
 import '../dominio/entidades.dart';
 import '../dominio/puertos.dart';
-import '../presentacion/pantallas/notificaciones.dart';
+
+/// En qué punto de los tres está el aparato.
+///
+/// Vivía en la pantalla de notificaciones, que lo pintaba. Esta compilación no
+/// lleva servicio de mensajería (15-L): la pantalla ya no enseña el registro
+/// —enseñarlo prometía avisos que no pueden llegar con la app cerrada— y el
+/// estado se queda aquí, junto a la máquina que lo mueve, listo para el día en
+/// que llegue Firebase.
+enum EstadoDeAvisos {
+  /// Todavía no se ha preguntado nada.
+  sinDeterminar,
+
+  /// El residente dijo que no al permiso del sistema. NO es un error.
+  permisoNegado,
+
+  /// Hay permiso, pero no hay token: el servicio de mensajería no respondió.
+  sinToken,
+
+  /// Hay token y el conjunto lo tiene registrado.
+  registrado,
+
+  /// Hay token y el registro en el servidor falló.
+  sinRegistrar,
+}
 
 class ControladorDeAvisos extends ChangeNotifier {
   ControladorDeAvisos({

@@ -113,11 +113,6 @@ export class VehiculoDesactivadoDto {
   @ApiProperty() desactivado!: boolean;
 }
 
-export class EstadoDeConsentimientoDto {
-  @ApiProperty({ enum: ['pendiente', 'aceptado', 'rechazado', 'revocado', 'expirado'] })
-  estado!: 'pendiente' | 'aceptado' | 'rechazado' | 'revocado' | 'expirado';
-}
-
 export class CuentaDeResidenteDto {
   @ApiProperty({ format: 'uuid' }) usuarioId!: string;
   @ApiProperty({ type: String, nullable: true }) usuario!: string | null;

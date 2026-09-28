@@ -215,6 +215,33 @@ export class SesionDigest {
     return this.contador;
   }
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * A5 (15-L) · UNA CREDENCIAL RECHAZADA NO SE VUELVE A PRESENTAR
+   *
+   * Estos equipos bloquean la IP de origen tras unos pocos inicios de sesión
+   * fallidos. Cada cliente ya se negaba a repetir una orden con la clave mala,
+   * pero la escucha reconectaba cada pocos segundos y el sondeo de estado cada
+   * cinco minutos: cada intento, un fallo más hacia el bloqueo del Mac. La
+   * marca vive en la sesión compartida del equipo —la misma para órdenes,
+   * escuchas y sondeos— y se borra sola cuando la credencial cambia (la
+   * sesión es otra) o cuando pasa la ventana.
+   */
+  private rechazadaEn: number | null = null;
+
+  marcarRechazada(ahora: number): void {
+    this.rechazadaEn = ahora;
+  }
+
+  /** Cuánto hace que el equipo la rechazó, o `null` si no la rechazó dentro de la ventana. */
+  rechazadaHace(ahora: number, ventanaMs: number): number | null {
+    if (this.rechazadaEn === null) return null;
+    const hace = ahora - this.rechazadaEn;
+    if (hace < ventanaMs) return hace;
+    this.rechazadaEn = null;
+    return null;
+  }
+
   /** Para las pruebas: las credenciales con las que se creó (nunca se registra). */
   mismasCredenciales(credenciales: CredencialesDigest): boolean {
     return (

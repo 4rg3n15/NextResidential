@@ -240,7 +240,9 @@ describe('videoportero · JSON del alertStream que ABRE nuestro sistema', () => 
     const evento = desdeAlertStreamJson(vivo, DISPOSITIVO, AHORA);
     expect(evento.enVivo).toBe(true);
     expect(evento.clase).toBe('timbre');
-    expect(evento.referenciaDelEquipo).toBe('disp-1:1');
+    // R2 (15-L) · sólo el canal NO identifica un evento: era la referencia
+    // constante que convertía el segundo rostro en «DUPLICADO».
+    expect(evento.referenciaDelEquipo).toBeNull();
   });
 
   it('cuenta cuántos históricos descartó, que es lo que distingue mudo de inundado', () => {
@@ -370,7 +372,9 @@ describe('las clases `rostro` y `llamada` · 6.5', () => {
       'disp-terminal',
       AHORA2,
     );
-    expect(evento.clase).toBe('rostro');
+    // 15-L · no es un acceso: es un evento de equipo que se guarda y se enseña.
+    expect(evento.clase).toBe('equipo');
+    expect(evento.tipo).toBe('resultado_de_verificacion');
     expect(evento.esResultadoDeVerificacion).toBe(true);
     expect(evento.esperaVeredicto).toBe(false);
   });

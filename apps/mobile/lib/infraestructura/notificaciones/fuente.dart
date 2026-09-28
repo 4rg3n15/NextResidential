@@ -19,6 +19,11 @@
 /// `sinToken` y la pantalla lo dice con esas palabras. Lo que no hace es
 /// enseñarle al residente un interruptor encendido, que es la única forma de
 /// equivocarse aquí: creer que le avisarán cuando llegue su visitante.
+///
+/// 15-L · y la app tampoco enseña ya el estado de este registro: la pantalla de
+/// notificaciones lista las de la API y dice «Los avisos llegan mientras la app
+/// está abierta». Cuando llegue el adaptador de Firebase, esa frase cambia con
+/// él.
 library;
 
 import 'dart:math';

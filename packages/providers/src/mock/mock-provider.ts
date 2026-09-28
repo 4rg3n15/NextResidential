@@ -7,6 +7,7 @@ import type {
   PlateEventSource,
   ResultadoAccionamiento,
   ResultadoDeAccionamiento,
+  Vigencia,
 } from '@ncr/domain-core';
 import { ordenAceptada } from '@ncr/domain-core';
 import type { PerfilDeSimulacion } from './simulacion';
@@ -73,6 +74,8 @@ export class MockProvider
   /** Veredictos devueltos a terminales que esperaban (A2), para afirmar sobre ellos. */
   readonly veredictos: { dispositivoId: string; veredicto: VeredictoRemoto }[] = [];
   readonly plantillas = new Map<string, Set<string>>();
+  /** A2 (15-L) · vigencia con que se cargó cada plantilla, por `equipo:plantilla`. */
+  readonly vigenciasEnDispositivo = new Map<string, Vigencia>();
   private readonly suscriptores: ((l: LecturaDePlaca) => Promise<void>)[] = [];
 
   /** Exclusividad del canal de audio: consecuencia directa de ADR-01. */
@@ -293,6 +296,7 @@ export class MockProvider
     dispositivoId: string,
     plantillaId: string,
     plantilla: Uint8Array,
+    vigencia?: Vigencia,
   ): Promise<void> {
     // Una plantilla vacía no es un caso raro: es lo que llega cuando la captura
     // falló y nadie lo comprobó. Sincronizarla dejaría una plantilla inservible
@@ -304,11 +308,16 @@ export class MockProvider
     const enDispositivo = this.plantillas.get(dispositivoId) ?? new Set<string>();
     enDispositivo.add(plantillaId);
     this.plantillas.set(dispositivoId, enDispositivo);
+    // A2 (15-L) · lo que el equipo real guardaría como `Valid`, a la vista.
+    if (vigencia === undefined)
+      this.vigenciasEnDispositivo.delete(`${dispositivoId}:${plantillaId}`);
+    else this.vigenciasEnDispositivo.set(`${dispositivoId}:${plantillaId}`, vigencia);
   }
 
   async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
     await this.conReintentos(dispositivoId, 'suprimir');
     this.plantillas.get(dispositivoId)?.delete(plantillaId);
+    this.vigenciasEnDispositivo.delete(`${dispositivoId}:${plantillaId}`);
   }
 
   // ── IntercomProvider ─────────────────────────────────────────────────────

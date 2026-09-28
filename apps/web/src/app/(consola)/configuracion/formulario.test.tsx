@@ -38,6 +38,8 @@ const CONFIGURACION = {
   politicaContingenciaEdge: 'denegar',
   umbralLatidoMinutos: 5,
   nit: '900123456',
+  ipsPorteria: [],
+  ipsGuardiaRemota: [],
   estado: 'activa',
   plazoConsentimientoHoras: 24,
   margenCacheReglasHoras: 24,
@@ -144,8 +146,9 @@ describe('los dos umbrales técnicos se VEN y no se editan (15-B, B.5)', () => {
     const latido = await screen.findByRole('group', { name: /margen de latido/i });
     for (const grupo of [umbral, latido]) {
       expect(grupo.textContent).toMatch(/no es un ajuste de la copropiedad/i);
-      expect(grupo.textContent).toMatch(/migración 0032/i);
-      expect(grupo.textContent).toMatch(/exige una migración/i);
+      expect(grupo.textContent).toMatch(/para todas/i);
+      // Bloque I (15-L) · se explica con palabras de usuario, sin números de migración.
+      expect(grupo.textContent).not.toMatch(/migraci[oó]n/i);
     }
     // La ayuda anterior lo afirmaba, y era falso: nadie lo edita.
     expect(screen.queryByText(/exclusivo del superadministrador/i)).toBeNull();

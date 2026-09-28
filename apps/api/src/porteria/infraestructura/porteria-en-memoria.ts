@@ -6,7 +6,9 @@ import type {
   DatosDeTurno,
   NuevaSesion,
   PerfilDePortero,
+  PoolDePorteros,
   RepositorioDePerfiles,
+  RepositorioDePools,
   RepositorioDeSesiones,
   RepositorioDeTurnos,
   TurnoRegistrado,
@@ -132,5 +134,32 @@ export class SesionesEnMemoria implements RepositorioDeSesiones {
         s.estado !== 'cerrada' &&
         (porteroId === undefined || s.porteroId === porteroId),
     );
+  }
+}
+
+/**
+ * H1 · el pool en memoria: el MISMO que usa el repositorio de cuentas en
+ * memoria para dar los números (una sola fuente, como la tabla de la 0042).
+ */
+export class PoolsEnMemoria implements RepositorioDePools {
+  constructor(
+    private readonly fuente: {
+      poolDe(copropiedadId: string): {
+        inicio: number;
+        fin: number;
+        siguiente: number;
+        cupo: number;
+      };
+    },
+  ) {}
+
+  async de(copropiedadId: string): Promise<PoolDePorteros | null> {
+    const p = this.fuente.poolDe(copropiedadId);
+    return { inicio: p.inicio, fin: p.fin, siguiente: p.siguiente, cupo: p.cupo };
+  }
+
+  async fijarCupo(copropiedadId: string, cupo: number): Promise<boolean> {
+    this.fuente.poolDe(copropiedadId).cupo = cupo;
+    return true;
   }
 }

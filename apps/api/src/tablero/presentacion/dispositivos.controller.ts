@@ -5,6 +5,8 @@ import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
+import { ALCANCE_DE_EQUIPOS } from '../../equipos';
+import type { AlcanceDeEquipos } from '../../equipos';
 import { OPERACIONES_DE_DISPOSITIVO } from '../aplicacion/operaciones-de-dispositivo';
 import type {
   OperacionDeDispositivo,
@@ -55,6 +57,8 @@ export class DispositivosController {
   constructor(
     @Inject(OPERACIONES_DE_DISPOSITIVO) private readonly operaciones: OperacionesDeDispositivo,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    // 15-L · no se encola una orden para el equipo de OTRA copropiedad.
+    @Inject(ALCANCE_DE_EQUIPOS) private readonly equiposDeLaRuta: AlcanceDeEquipos,
   ) {}
 
   private async ordenar(
@@ -64,6 +68,12 @@ export class DispositivosController {
     operacion: OperacionDeDispositivo,
   ): Promise<ResultadoDeOperacionDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, `dispositivos/${operacion}`);
+    await this.equiposDeLaRuta.exigir(
+      ctx,
+      copropiedadId,
+      dispositivoId,
+      `dispositivos/${operacion}`,
+    );
     return this.operaciones.solicitar({
       copropiedadId,
       dispositivoId,

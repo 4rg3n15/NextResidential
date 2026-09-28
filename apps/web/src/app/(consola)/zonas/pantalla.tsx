@@ -296,7 +296,7 @@ export const PantallaDeZonas = ({
         descripcion={
           editar === null
             ? 'Nombre, tipo, aforo e icono. El horario y las normas se pueden dejar para después.'
-            : 'El aforo lo garantiza la base; el horario lo aplica el motor de reglas (RN-14, CA-15).'
+            : 'El aforo y el horario se cumplen siempre, aunque la persona tenga permiso para la zona.'
         }
         etiquetaEnviar={editar === null ? 'Crear zona' : 'Guardar cambios'}
         enviando={enviando}
@@ -339,7 +339,7 @@ export const PantallaDeZonas = ({
           max={100000}
           value={formulario.aforoMaximo}
           onChange={(e) => cambiar('aforoMaximo', e.target.value)}
-          ayuda="Personas a la vez. 0 = sin límite práctico. Lo garantiza la base de datos (RN-14)."
+          ayuda="Personas a la vez. 0 = sin límite práctico."
           required
         />
         <label className="block space-y-1.5">

@@ -19,4 +19,21 @@ export interface EscuchaActiva {
   readonly detalle: string;
   /** Cierra el flujo y deja de reintentar. Idempotente. */
   detener(): void;
+  /**
+   * A5 (15-L) · `false` cuando la escucha terminó SOLA —el equipo rechazó la
+   * credencial— y quien la armó tiene que volver a pedirla. Ausente = sigue.
+   */
+  activa?(): boolean;
+  /**
+   * C4 (15-L) · cuándo llegó por última vez ALGO del equipo por esta escucha
+   * —un evento o su propio latido—. Es la señal de vida más barata: no cuesta
+   * una petición. `null` si todavía no llegó nada.
+   */
+  ultimaSenal?(): Date | null;
+  /**
+   * C7 (15-L) · el equipo rechazó la conexión porque otra plataforma —p. ej.
+   * HikCentral— la tiene o agotó las que admite: la frase, con el remedio.
+   * `null` si no hay rechazo vigente.
+   */
+  rechazoPorOtraPlataforma?(): string | null;
 }

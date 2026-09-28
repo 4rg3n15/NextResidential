@@ -26,6 +26,8 @@ import {
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Aislamiento } from '../../multiempresa/aislamiento';
+import { ALCANCE_DE_EQUIPOS } from '../../equipos';
+import type { AlcanceDeEquipos } from '../../equipos';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
@@ -60,6 +62,7 @@ import {
 export class VideoController {
   constructor(
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    @Inject(ALCANCE_DE_EQUIPOS) private readonly equiposDeLaRuta: AlcanceDeEquipos,
     @Inject(NegociarVistaEnVivo) private readonly negociar: NegociarVistaEnVivo,
   ) {}
 
@@ -90,6 +93,8 @@ export class VideoController {
     @Res({ passthrough: true }) respuesta: Response,
   ): Promise<string> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/video');
+    // 15-L · la fuga del Bloque 0.4: el equipo tiene que ser de ESTA copropiedad.
+    await this.equiposDeLaRuta.exigir(ctx, copropiedadId, dispositivoId, 'guardia/video');
     const oferta: unknown = peticion.body;
     if (typeof oferta !== 'string' || !oferta.startsWith('v=0')) {
       throw new BadRequestException(`La oferta viaja como ${TIPO_SDP} y empieza por «v=0»`);

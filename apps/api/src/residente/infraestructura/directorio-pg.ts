@@ -224,6 +224,8 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
         vehicular: boolean;
         estado: string;
         acompanantes: string;
+        revocada_en: Date | null;
+        motivo_revocacion: string | null;
       }>(
         `SELECT a.id,
                 p.nombre_completo AS visitante,
@@ -233,10 +235,16 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
                 a.placa,
                 a.permite_acceso_vehicular AS vehicular,
                 a.estado,
+                a.revocada_en,
+                a.motivo_revocacion,
                 (SELECT count(*) FROM public.autorizacion_acompanantes ac
                   WHERE ac.autorizacion_id = a.id) AS acompanantes
            FROM public.autorizaciones a
-           JOIN public.personas p ON p.id = a.visitante_id
+           -- H-15L-C01 · visitante_id es de visitantes, no de personas:
+           -- unirlo directo a personas dejaba la lista SIEMPRE vacía.
+           JOIN public.visitantes vi ON vi.copropiedad_id = a.copropiedad_id
+                                    AND vi.id = a.visitante_id
+           JOIN public.personas p ON p.id = vi.persona_id
           WHERE a.copropiedad_id = $1 AND a.vivienda_id = $2
           ORDER BY lower(a.vigencia) DESC
           LIMIT 200`,
@@ -252,6 +260,8 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
         permiteAccesoVehicular: f.vehicular,
         estado: f.estado,
         acompanantes: Number(f.acompanantes),
+        revocadaEn: f.revocada_en?.toISOString() ?? null,
+        motivoRevocacion: f.motivo_revocacion,
       }));
     });
   }
@@ -283,10 +293,11 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
         persona: string | null;
         zona: string | null;
         decidido_por_edge: boolean;
+        de_visitante: boolean;
       }>(
         `SELECT e.id, e.ocurrido_en, e.tipo, e.resultado, e.motivo, e.metodo,
                 e.placa_detectada, p.nombre_completo AS persona, z.nombre AS zona,
-                e.decidido_por_edge
+                e.decidido_por_edge, e.autorizacion_id IS NOT NULL AS de_visitante
            FROM public.eventos e
       LEFT JOIN public.personas p ON p.id = e.persona_id
       LEFT JOIN public.zonas    z ON z.id = e.zona_id
@@ -308,6 +319,7 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
         persona: f.persona,
         zona: f.zona,
         decididoPorEdge: f.decidido_por_edge,
+        deVisitante: f.de_visitante,
       }));
     });
   }

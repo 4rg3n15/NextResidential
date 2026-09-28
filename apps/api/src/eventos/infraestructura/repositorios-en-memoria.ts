@@ -1,5 +1,11 @@
 import type { Acceso, Alerta, FiltroDeEventos } from '@ncr/domain-core';
 import type {
+  EventoDeEquipoGuardado,
+  EventoDeEquipoNuevo,
+  FiltroDeEventosDeEquipo,
+  RepositorioEventosDeEquipo,
+} from '../aplicacion/eventos-de-equipo';
+import type {
   EventoRegistrado,
   LatidoDeDispositivo,
   PaginaDeEventos,
@@ -96,3 +102,49 @@ export class RepositorioDispositivosEnMemoria implements RepositorioDispositivos
 }
 
 export { cursorDe };
+
+/**
+ * 15-L (Bloque B) · `eventos_de_equipo` en memoria, para la suite sin base.
+ * Misma regla de idempotencia que la tabla: la clave repetida no crea fila.
+ */
+export class RepositorioEventosDeEquipoEnMemoria implements RepositorioEventosDeEquipo {
+  readonly filas: EventoDeEquipoGuardado[] = [];
+  private contador = 0;
+
+  async registrar(e: EventoDeEquipoNuevo): Promise<EventoDeEquipoGuardado | null> {
+    const repetida = this.filas.some(
+      (f) => f.copropiedadId === e.copropiedadId && f.claveIdempotencia === e.claveIdempotencia,
+    );
+    if (repetida) return null;
+    this.contador += 1;
+    const guardada: EventoDeEquipoGuardado = {
+      ...e,
+      id: `ee-${String(this.contador).padStart(8, '0')}`,
+      recibidoEn: new Date(),
+    };
+    this.filas.push(guardada);
+    return guardada;
+  }
+
+  async registrarVarios(eventos: readonly EventoDeEquipoNuevo[]): Promise<number> {
+    let nuevos = 0;
+    for (const e of eventos) if ((await this.registrar(e)) !== null) nuevos += 1;
+    return nuevos;
+  }
+
+  async consultar(f: FiltroDeEventosDeEquipo): Promise<readonly EventoDeEquipoGuardado[]> {
+    return this.filas
+      .filter(
+        (e) =>
+          e.copropiedadId === f.copropiedadId &&
+          e.ocurridoEn >= f.desde &&
+          e.ocurridoEn < f.hasta &&
+          (f.dispositivoId === undefined ||
+            f.dispositivoId === null ||
+            e.dispositivoId === f.dispositivoId) &&
+          (f.tipo === undefined || f.tipo === null || e.tipo === f.tipo),
+      )
+      .sort((a, b) => b.ocurridoEn.getTime() - a.ocurridoEn.getTime())
+      .slice(0, f.limite);
+  }
+}

@@ -26,6 +26,8 @@ const CAMARA = {
   nombre: 'Cámara de la entrada',
   tipo: 'camara_lpr',
   firmware: 'V5.3.0',
+  canalDeVideo: null,
+  zonaId: null,
   atestacion: null,
 } as unknown as Equipo;
 

@@ -83,20 +83,40 @@ export const rechazosPorCampo = (cuerpo: unknown): Record<string, string> | unde
   for (const entrada of lista) {
     if (typeof entrada !== 'object' || entrada === null) continue;
     const { clave, motivo } = entrada as { clave?: unknown; motivo?: unknown };
-    if (typeof clave === 'string' && typeof motivo === 'string') salida[clave] = motivo;
+    if (typeof clave === 'string' && typeof motivo === 'string') {
+      salida[clave] = sinCodigosDelProyecto(motivo);
+    }
   }
   return Object.keys(salida).length > 0 ? salida : undefined;
 };
+
+const CODIGO = String.raw`(?:RN|KPI|KP1|CA|HU|CU|OE|D|P|S|C|E|H-SITIO|BE)-?\d{1,3}[a-z]?`;
+const CODIGOS_ENTRE_PARENTESIS = new RegExp(String.raw`\s*\((?:\s*${CODIGO}\s*,?)+\)`, 'g');
+const CODIGO_DE_ENTRADA = new RegExp(String.raw`^\s*${CODIGO}\s*·\s*`);
+
+/**
+ * BLOQUE I (15-L) · la API explica sus rechazos citando la regla que los
+ * produce —«Dele de baja en vez de borrarla (RN-19)», «D-11 · …»—, útil en
+ * su registro y ajeno a quien usa la consola. Aquí se quitan esas citas del
+ * texto que se va a pintar; el mensaje, lo que la persona necesita, queda.
+ */
+export const sinCodigosDelProyecto = (texto: string): string =>
+  texto.replace(CODIGOS_ENTRE_PARENTESIS, '').replace(CODIGO_DE_ENTRADA, '').trim();
 
 /** Extrae un texto legible del cuerpo de error, sea cadena, arreglo u objeto. */
 export const textoDelError = (cuerpo: unknown): string => {
   if (typeof cuerpo !== 'object' || cuerpo === null) return 'Error inesperado';
   const mensaje = (cuerpo as CuerpoDeError).mensaje;
-  if (typeof mensaje === 'string') return mensaje;
+  if (typeof mensaje === 'string') return sinCodigosDelProyecto(mensaje);
   if (typeof mensaje === 'object' && mensaje !== null) {
     const interno = (mensaje as { message?: unknown }).message;
-    if (typeof interno === 'string') return interno;
-    if (Array.isArray(interno)) return interno.filter((x) => typeof x === 'string').join('. ');
+    if (typeof interno === 'string') return sinCodigosDelProyecto(interno);
+    if (Array.isArray(interno)) {
+      return interno
+        .filter((x): x is string => typeof x === 'string')
+        .map(sinCodigosDelProyecto)
+        .join('. ');
+    }
   }
   return 'Error inesperado';
 };

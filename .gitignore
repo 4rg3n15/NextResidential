@@ -55,3 +55,7 @@ openapitools.json
 # para poder subirlos como artefacto cuando el CI se pone rojo, y no se versionan.
 /.informes-de-prueba/
 docs/insumos/hikvision/evento-anpr-*.txt
+
+# ETAPA 15-L (D1) · lo que genera `pnpm sitio:video` en el Mac: la
+# configuración de go2rtc (con la IP local) y su binario. Nunca al repositorio.
+.sitio/

@@ -22,7 +22,7 @@ describe('problemaDeVigencia', () => {
 
   it('señala la vigencia que nace expirada (RN-01)', () => {
     const problema = problemaDeVigencia('2026-09-10T08:00', '2026-09-11T08:00', AHORA);
-    expect(problema).toMatch(/expirada/);
+    expect(problema).toMatch(/vencida/);
   });
 
   it('no dice nada mientras falte un campo: sería ruido al escribir', () => {

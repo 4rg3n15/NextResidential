@@ -2,6 +2,7 @@ import type { Bitacora } from '@ncr/domain-core';
 import { cnonceAleatorio, interpretarDesafio, sesionDigestCompartida } from '../barrera/digest';
 import type { Renegociacion, SesionDigest } from '../barrera/digest';
 import { intercambioParaBitacora } from './intercambio';
+import { CredencialRechazada } from '../nucleo/errores';
 
 /**
  * EL CLIENTE QUE HABLA CON UN EQUIPO. Uno solo, para los tres aparatos.
@@ -54,6 +55,13 @@ export interface OpcionesDeEquipo {
 
 /** Más holgado que el de la barrera: la carga de una plantilla no es un pulso. */
 export const TIEMPO_LIMITE_DE_EQUIPO_MS = 5000;
+
+/**
+ * A5 (15-L) · cuánto se deja de presentar una credencial que el equipo
+ * rechazó, salvo que se corrija antes. `[SUPUESTO]` S-68: del orden del
+ * bloqueo por inicios de sesión fallidos de estos equipos (30 min).
+ */
+export const VENTANA_DE_CREDENCIAL_RECHAZADA_MS = 30 * 60_000;
 
 export interface RespuestaDeEquipo {
   readonly estado: number;
@@ -209,6 +217,7 @@ export class ClienteDeEquipo {
         ...(desafioVencido ? { desafioVencido: true } : {}),
       };
     } catch (error) {
+      if (error instanceof CredencialRechazada) throw error;
       throw new EquipoInalcanzable(this.motivoDe(error), this.ahora() - comienzo);
     }
   }
@@ -344,6 +353,7 @@ export class ClienteDeEquipo {
         ...(desafioVencido ? { desafioVencido: true } : {}),
       };
     } catch (error) {
+      if (error instanceof CredencialRechazada) throw error;
       throw new EquipoInalcanzable(this.motivoDe(error), this.ahora() - comienzo);
     }
   }
@@ -366,6 +376,12 @@ export class ClienteDeEquipo {
     ruta: string,
     enviar: () => Promise<Response>,
   ): Promise<ConDigest> {
+    // A5 (15-L) · una credencial que el equipo ya rechazó no se vuelve a
+    // presentar: ni orden, ni escucha, ni sondeo. Sin red, sin intento fallido.
+    const hace = this.sesion.rechazadaHace(this.ahora(), VENTANA_DE_CREDENCIAL_RECHAZADA_MS);
+    if (hace !== null) {
+      throw new CredencialRechazada(this.opciones.dispositivoId ?? this.destino, hace);
+    }
     // ¿Viaja ya una credencial? Sin desafío previo, el primer 401 es el saludo.
     const conCredencial = this.sesion.tieneDesafio;
     const primera = await enviar();
@@ -378,6 +394,7 @@ export class ClienteDeEquipo {
        * credencial: no se repite. Un segundo intento con la misma clave sólo
        * suma un fallo más hacia el bloqueo de la cuenta del equipo.
        */
+      this.sesion.marcarRechazada(this.ahora());
       this.opciones.traza?.registrar(
         'error',
         'el equipo rechazó usuario o clave (401 sin stale): NO se reintenta',
@@ -403,6 +420,7 @@ export class ClienteDeEquipo {
     const vencido = interpretarDesafio(cabecera)?.stale === true;
     // Se guarda para la PRÓXIMA petición; ésta no se repite.
     this.sesion.renegociar(cabecera);
+    if (!vencido) this.sesion.marcarRechazada(this.ahora());
     this.opciones.traza?.registrar(
       vencido ? 'aviso' : 'error',
       vencido

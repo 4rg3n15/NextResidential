@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { JSX, ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DirectorioDeViviendas } from './viviendas/directorio';
 import { PantallaDeVehiculos } from './vehiculos/pantalla';
@@ -47,6 +47,8 @@ const CONFIGURACION = {
   politicaContingenciaEdge: 'denegar',
   umbralLatidoMinutos: 5,
   nit: '900123456',
+  ipsPorteria: [],
+  ipsGuardiaRemota: [],
   estado: 'activa',
   plazoConsentimientoHoras: 24,
   margenCacheReglasHoras: 24,
@@ -96,6 +98,29 @@ const AUTORIZACION = {
   patron: { dias: [1, 3], horaInicio: '08:00', horaFin: '18:00' },
   revocadaEn: null,
   motivoRevocacion: null,
+};
+
+/** F (15-L) · una visita tal como la lista la API. */
+const VISITA = {
+  autorizacionId: 'aut-1',
+  visitante: 'Ana Pérez',
+  documento: 'CC123',
+  viviendaId: 'viv-1',
+  vivienda: 'Casa 12',
+  desde: '2026-09-10T13:00:00.000Z',
+  hasta: '2026-09-10T15:00:00.000Z',
+  estado: 'vigente',
+  placa: 'XYZ789',
+  generadaPor: 'Portería norte',
+  generadaEn: '2026-09-10T12:55:00.000Z',
+  anuladaEn: null,
+  motivoAnulacion: null,
+  tieneFoto: true,
+  casillaDeclaradaPor: 'Portería norte',
+  casillaEn: '2026-09-10T12:55:00.000Z',
+  plantillaId: 'pla-1',
+  equiposSincronizados: 2,
+  equiposFallidos: 1,
 };
 
 const ZONA = {
@@ -174,6 +199,17 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
     }
     if (url.includes('/configuracion')) return respuesta(CONFIGURACION);
     if (url.includes('/padron/vehiculos')) return respuesta([VEHICULO]);
+    if (url.includes('/visitas/viviendas')) return respuesta([{ id: 'viv-1', nombre: 'Casa 12' }]);
+    if (url.includes('/visitas/casilla')) {
+      return respuesta({
+        plantilla: 'Declaro que {visitante} me autorizó a usar su foto para su ingreso al conjunto',
+        marcador: '{visitante}',
+        version: 'casilla-v2',
+      });
+    }
+    if (url.includes('/visitas')) {
+      return respuesta({ soloElDia: false, desde: null, hasta: null, visitas: [VISITA] });
+    }
     if (url.includes('/autorizaciones')) return respuesta([AUTORIZACION]);
     if (url.includes('/zonas')) return respuesta([ZONA]);
     if (url.includes('/dispositivos/pendientes')) return respuesta({ dispositivos: ['dis-1'] });
@@ -195,6 +231,37 @@ const servidorFalso = (): ReturnType<typeof vi.fn> =>
           notas: null,
         },
       ]);
+    }
+    if (url.includes('/eventos/linea-de-tiempo')) {
+      // 15-L (Bloque B) · accesos y eventos de equipo en una sola línea.
+      return respuesta({
+        elementos: [
+          {
+            origen: 'acceso',
+            id: EVENTO.id,
+            ocurridoEn: EVENTO.ocurridoEn,
+            dispositivoId: 'dis-1',
+            tipo: 'acceso',
+            titulo: 'Acceso negado · placa ABC123 · persona o placa en lista negra',
+            resultado: 'negado',
+            enVivo: true,
+            eventoId: EVENTO.id,
+            codigo: null,
+          },
+          {
+            origen: 'equipo',
+            id: 'ee-1',
+            ocurridoEn: '2026-09-10T09:59:00.000Z',
+            dispositivoId: 'dis-1',
+            tipo: 'puerta_forzada',
+            titulo: 'Puerta forzada',
+            resultado: null,
+            enVivo: true,
+            eventoId: null,
+            codigo: { mayor: 5, menor: 27 },
+          },
+        ],
+      });
     }
     if (url.includes('/eventos')) return respuesta({ filas: [EVENTO], siguiente: null });
     return respuesta({});
@@ -239,11 +306,22 @@ describe('vehículos', () => {
 });
 
 describe('visitantes', () => {
-  it('una recurrente ENSEÑA su patrón; sin él sería indistinguible de una que abre siempre', async () => {
-    montar(<PantallaDeVisitantes copropiedadId={COP} />);
+  it('F3 · cada visita dice su estado y en cuántos equipos está su foto, con los que fallaron', async () => {
+    montar(<PantallaDeVisitantes copropiedadId={COP} rol="administrador" />);
     await waitFor(() => expect(screen.getByText('Ana Pérez')).toBeDefined());
-    expect(screen.getByText(/Lun, Mié · 08:00–18:00/)).toBeDefined();
-    expect(screen.getByText(/Luis Gómez/)).toBeDefined();
+    const lista = screen.getByRole('list', { name: 'Visitas' });
+    expect(lista.textContent).toMatch(/Vigente/);
+    expect(lista.textContent).toMatch(/Foto en 2 equipos · 1 fallaron/);
+    // Administración ve filtros; no rechaza (eso es de portería y superadministración).
+    expect(screen.getByLabelText('Vivienda')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Rechazar' })).toBeNull();
+  });
+
+  it('F5 · portería ve sólo el día, sin filtros de fechas, y SÍ puede rechazar', async () => {
+    montar(<PantallaDeVisitantes copropiedadId={COP} rol="portero" />);
+    await waitFor(() => expect(screen.getByText('Ana Pérez')).toBeDefined());
+    expect(screen.queryByLabelText('Desde')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Rechazar' })).toBeDefined();
   });
 });
 
@@ -375,10 +453,37 @@ describe('dispositivos', () => {
 
 describe('eventos', () => {
   it('el banner de alertas críticas se pinta y el evento trae su motivo', async () => {
+    // Los NOMBRES de los equipos (DT-15L-02): la ruta que también lee el
+    // portero. La lista completa de equipos es de administración y esta
+    // pantalla ya no la pide.
+    const base = servidorFalso();
+    const pedidas: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (entrada: string | Request) => {
+        const url = typeof entrada === 'string' ? entrada : entrada.url;
+        pedidas.push(url);
+        if (url.includes('/nombres-de-equipos')) {
+          return respuesta([{ id: 'dis-1', nombre: 'Talanquera principal' }]);
+        }
+        return base(entrada);
+      }),
+    );
     montar(<PantallaDeEventos copropiedadId={COP} />);
     await waitFor(() => expect(screen.getByText(/1 alerta sin resolver/)).toBeDefined());
-    expect(screen.getByText('LISTA_NEGRA')).toBeDefined();
-    expect(screen.getByText(/Edge \(autónomo\)/)).toBeDefined();
+    // 15-L · una sola línea: el acceso con su motivo EN ESPAÑOL (no el código
+    // del dominio), el evento de equipo, y el equipo por su NOMBRE.
+    await waitFor(() => expect(screen.getByText(/persona o placa en lista negra/)).toBeDefined());
+    expect(within(screen.getByRole('table')).getByText('Puerta forzada')).toBeDefined();
+    await waitFor(() =>
+      expect(within(screen.getByRole('table')).getAllByText('Talanquera principal')).toHaveLength(
+        2,
+      ),
+    );
+    expect(screen.queryByText('LISTA_NEGRA')).toBeNull();
+    expect(pedidas.some((u) => /\/equipos(\?|$)/.test(new URL(u, 'http://x').pathname))).toBe(
+      false,
+    );
   });
 });
 

@@ -75,16 +75,10 @@ const EXENTAS = new Set([
    * del equipo, no un navegador.
    */
   '/alarm-server/:secreto',
-  /**
-   * ETAPA 15-E (A3) · la puerta del TITULAR del dato biométrico. No hay
-   * sesión ni copropiedad en la ruta: las dos van DENTRO del enlace firmado
-   * (HMAC por copropiedad, con caducidad) que nombra un solo consentimiento.
-   * Quien responde es una persona con su teléfono, no un rol; y no puede
-   * colgar de `copropiedades/:id` sin desvelarle al portador el identificador
-   * del tenant, que no necesita.
-   */
-  '/consentimiento/:token/respuesta',
-  '/consentimiento/:token/revocacion',
+  // ETAPA 15-L (H5, ADR-031) · el modo pruebas es un ajuste de TODA la
+  // plataforma: no hay copropiedad que elegir, y sólo lo escribe el
+  // superadministrador (política de la tabla y `@Roles`).
+  '/plataforma/modo-pruebas',
 ]);
 
 const escrituras = (): RutaExpuesta[] =>

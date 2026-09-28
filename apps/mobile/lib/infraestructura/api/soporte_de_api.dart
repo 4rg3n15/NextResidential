@@ -7,8 +7,10 @@
 library;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../aplicacion/sesion_en_uso.dart';
+import '../../dominio/causa_de_red.dart';
 import '../../dominio/puertos.dart';
 
 /// Ejecuta la llamada y convierte cualquier `DioException` en un `Fallo`
@@ -47,19 +49,44 @@ final _portador = RegExp(r'Bearer\s+\S+', caseSensitive: false);
 String sinTokens(String texto) =>
     texto.replaceAll(_jwt, '[token]').replaceAll(_portador, 'Bearer [token]');
 
+/// 15-L · la dirección del servidor ya no es fija: los `Dio` que hablan con la
+/// API la SIGUEN. Se fija ahora y cada vez que cambie.
+void seguirLaDireccion(ValueListenable<String> direccion, List<Dio> dios) {
+  void aplicar() {
+    for (final d in dios) {
+      d.options.baseUrl = direccion.value;
+    }
+  }
+
+  aplicar();
+  direccion.addListener(aplicar);
+}
+
 Fallo falloDeDio(DioException e) {
   if (e.type == DioExceptionType.connectionError ||
       e.type == DioExceptionType.connectionTimeout ||
       e.type == DioExceptionType.receiveTimeout) {
+    // El mensaje de Dio está en inglés y habla de sockets. El residente lee la
+    // causa en su idioma y con la dirección a la que se intentó llegar.
+    final causa = causaDeRed(
+      red: TipoDeRed.desconocida,
+      error: '${e.error ?? ''} ${e.message ?? ''}',
+      agotoElTiempo: e.type != DioExceptionType.connectionError,
+    );
     return Fallo(
       ClaseDeFallo.sinConexion,
-      e.message ?? 'Sin conexión',
+      mensajeDeCausa(causa, e.requestOptions.baseUrl),
       detalleTecnico: detalleTecnicoDe(e),
     );
   }
   final codigo = e.response?.statusCode;
   final detalle = detalleDeError(e.response?.data) ?? e.message ?? 'Error de servidor';
   return switch (codigo) {
+    // 400 y 422 son la FORMA de lo enviado. No se mezclan con `servidor`
+    // porque la bandeja de salida reintenta `servidor`, y reintentar ocho
+    // veces un formulario al que le falta la casilla sólo retrasa decirlo.
+    // [SUPUESTO] S-87: todo 400/422 es de la forma, nunca transitorio.
+    400 || 422 => Fallo(ClaseDeFallo.datosNoValidos, detalle),
     401 => Fallo(ClaseDeFallo.sesionInvalida, detalle),
     403 => Fallo(ClaseDeFallo.sinPermiso, detalle),
     404 => Fallo(ClaseDeFallo.sinVivienda, detalle),
@@ -75,15 +102,27 @@ Fallo falloDeDio(DioException e) {
 String? detalleDeError(dynamic datos) {
   if (datos is Map) {
     final mensaje = datos['mensaje'] ?? datos['message'];
-    if (mensaje is String) return mensaje;
+    if (mensaje is String) return sinCodigosDelProyecto(mensaje);
     if (mensaje is Map) {
       final interno = mensaje['message'];
-      if (interno is String) return interno;
-      if (interno is List && interno.isNotEmpty) return interno.join(', ');
+      if (interno is String) return sinCodigosDelProyecto(interno);
+      if (interno is List && interno.isNotEmpty) {
+        return interno.map((m) => sinCodigosDelProyecto('$m')).join(', ');
+      }
     }
   }
   return null;
 }
+
+const _codigo = r'(?:RN|KPI|KP1|CA|HU|CU|OE|D|P|S|C|E|H-SITIO|BE)-?\d{1,3}[a-z]?';
+final _codigosEntreParentesis = RegExp(r'\s*\((?:\s*' + _codigo + r'\s*,?)+\)');
+final _codigoDeEntrada = RegExp(r'^\s*' + _codigo + r'\s*·\s*');
+
+/// Bloque I (15-L) · la API explica sus rechazos citando la regla que los
+/// produce —«Dele de baja en vez de borrarla (RN-19)», «D-11 · …»—: útil en su
+/// registro, ajeno a quien usa la app. Se quita la cita; el mensaje queda.
+String sinCodigosDelProyecto(String texto) =>
+    texto.replaceAll(_codigosEntreParentesis, '').replaceFirst(_codigoDeEntrada, '').trim();
 
 /// La copropiedad de la ruta sale de los claims de la sesión.
 ///

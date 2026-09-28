@@ -61,7 +61,10 @@ const PANTALLAS: readonly {
 }[] = [
   { nombre: 'viviendas', montar: () => <DirectorioDeViviendas copropiedadId={COP} /> },
   { nombre: 'vehículos', montar: () => <PantallaDeVehiculos copropiedadId={COP} /> },
-  { nombre: 'visitantes', montar: () => <PantallaDeVisitantes copropiedadId={COP} /> },
+  {
+    nombre: 'visitantes',
+    montar: () => <PantallaDeVisitantes copropiedadId={COP} rol="administrador" />,
+  },
   { nombre: 'zonas comunes', montar: () => <PantallaDeZonas copropiedadId={COP} /> },
   { nombre: 'dispositivos', montar: () => <PantallaDeDispositivos copropiedadId={COP} /> },
   { nombre: 'eventos', montar: () => <PantallaDeEventos copropiedadId={COP} /> },
@@ -103,6 +106,34 @@ describe('403 · sin permiso', () => {
       await waitFor(() => expect(screen.getByText('Sin permiso')).toBeDefined());
     });
   }
+});
+
+describe('403 de la guardia REMOTA · el motivo exacto, no «sin permiso» (15-L, H4)', () => {
+  it('guardia virtual: al portero fuera de las IP permitidas le dice «No autorizado para guardia remota»', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              estado: 403,
+              mensaje: { message: 'No autorizado para guardia remota', statusCode: 403 },
+            }),
+            { status: 403, headers: { 'content-type': 'application/json' } },
+          ),
+      ),
+    );
+    render(
+      <Envoltura>
+        <PantallaDeGuardiaVirtual copropiedadId={COP} nombreDeCopropiedad="Prueba" />
+      </Envoltura>,
+    );
+    await waitFor(() =>
+      expect(screen.getByText('No autorizado para guardia remota')).toBeDefined(),
+    );
+    expect(screen.queryByText('Sin permiso')).toBeNull();
+    expect(screen.getByText(/Pídele al superadministrador que la añada/)).toBeDefined();
+  });
 });
 
 describe('404 · no encontrado, que es como llega un recurso de otra copropiedad', () => {

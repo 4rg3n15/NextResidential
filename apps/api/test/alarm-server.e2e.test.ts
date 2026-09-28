@@ -4,6 +4,9 @@ import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso'
 import type { INestApplication } from '@nestjs/common';
 import { sobreDeLectura } from '@ncr/providers';
 import { COP_A, crearApp, crearFirmante } from './utilidades';
+import { REGISTRO_DE_EVENTOS_DE_EQUIPO, REPOSITORIO_EVENTOS_DE_EQUIPO } from '../src/eventos';
+import type { RegistroDeEventosDeEquipo } from '../src/eventos';
+import type { RepositorioEventosDeEquipoEnMemoria } from '../src/eventos/infraestructura/repositorios-en-memoria';
 
 /**
  * EL EXTREMO QUE LA CÁMARA PUBLICA, POR HTTP Y CONTRA LA APLICACIÓN REAL.
@@ -102,14 +105,19 @@ describe('receptor del servidor de alarma', () => {
     expect(respuesta.body).toMatchObject({ aceptado: true, ignorado: true });
   });
 
-  it('el volcado HISTÓRICO del equipo se acepta y NO se procesa', async () => {
+  it('el volcado HISTÓRICO del equipo se acepta, se GUARDA marcado y NO se decide', async () => {
     const historico = sobreDeLectura({ placa: 'HIS123', alarmDataType: '1' });
     const respuesta = await request(app.getHttpServer())
       .post(`/alarm-server/${SECRETO}`)
       .set('content-type', historico.tipoDeContenido)
       .send(historico.cuerpo)
       .expect(200);
-    expect(respuesta.body.motivo).toMatch(/histórico/);
+    expect(respuesta.body).toEqual({ aceptado: true });
+    // 15-L (Bloque B) · ninguno se descarta: queda como histórico, sin acceso.
+    await app.get<RegistroDeEventosDeEquipo>(REGISTRO_DE_EVENTOS_DE_EQUIPO).vaciada();
+    const guardados = app.get<RepositorioEventosDeEquipoEnMemoria>(REPOSITORIO_EVENTOS_DE_EQUIPO);
+    const fila = guardados.filas.find((f) => f.carga['licensePlate'] === 'HIS123');
+    expect(fila?.enVivo).toBe(false);
   });
 
   it('H-16-1 · un sobre con RECORTES DE ROSTRO se acepta y los descarta', async () => {
@@ -181,10 +189,11 @@ describe('receptor del servidor de alarma', () => {
       .send(llamada)
       .expect(200);
     baja();
-    // Aceptada y NO registrada como acceso: el motivo lo dice. Un timbre no es
-    // una fila en `eventos`; es un aviso a quien atiende.
-    expect(respuesta.body.aceptado).toBe(true);
-    expect(respuesta.body.motivo).toMatch(/avisada a las consolas/);
+    // Un timbre no es una fila en `eventos`: es un aviso a quien atiende, y
+    // desde la 15-L (Bloque B) también un EVENTO DE EQUIPO en la línea de tiempo.
+    expect(respuesta.body).toEqual({ aceptado: true });
+    const guardados = app.get<RepositorioEventosDeEquipoEnMemoria>(REPOSITORIO_EVENTOS_DE_EQUIPO);
+    expect(guardados.filas.some((f) => f.tipo === 'llamada' && f.origen === 'equipo')).toBe(true);
     const aviso = recibidos.find((r) => r.tema === 'llamadas');
     expect(aviso?.carga).toMatchObject({
       dispositivoId: DISPOSITIVO,
@@ -195,12 +204,15 @@ describe('receptor del servidor de alarma', () => {
     });
   });
 
-  it('un evento que no es una lectura de placa se acepta y se ignora', async () => {
+  it('un evento que no es una lectura de placa se acepta y se GUARDA como evento de equipo', async () => {
     const otro =
       '<EventNotificationAlert><eventType>IO</eventType>' +
       '<alarmDataType>0</alarmDataType></EventNotificationAlert>';
     const respuesta = await publicar(SECRETO, sobre(otro)).expect(200);
-    expect(respuesta.body.ignorado).toBe(true);
+    // 15-L (Bloque B) · ninguno se descarta: queda con su tipo del equipo.
+    expect(respuesta.body).toEqual({ aceptado: true });
+    const guardados = app.get<RepositorioEventosDeEquipoEnMemoria>(REPOSITORIO_EVENTOS_DE_EQUIPO);
+    expect(guardados.filas.map((f) => f.titulo)).toContain('Evento del equipo (IO)');
   });
 
   /**

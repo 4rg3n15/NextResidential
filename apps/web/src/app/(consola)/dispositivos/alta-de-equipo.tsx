@@ -9,6 +9,7 @@ import { Campo } from '@/componentes/ui/campo';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { motivoDeRechazo } from '@/lib/equipos/caracteres-admitidos';
+import { useZonas } from '@/lib/api/consultas';
 import { FichaDeEquipo } from './ficha-del-equipo';
 
 /**
@@ -72,6 +73,10 @@ const ESPECIFICO: Readonly<
   controlador_io: null,
 };
 
+/** C2/D2 (15-L) · los tipos que tienen video, y la forma del canal (canal×100+flujo). */
+const CON_VIDEO: ReadonlySet<TipoDeEquipo> = new Set(['camara_lpr', 'terminal_facial', 'intercom']);
+const CANAL_DE_VIDEO = /^[1-9][0-9]{2,3}$/;
+
 const VERDE = 'border-exito bg-exito-suave text-exito-texto';
 const ROJO = 'border-peligro bg-peligro-suave text-peligro-texto';
 const AMBAR = 'border-aviso bg-aviso-suave text-aviso-texto';
@@ -126,6 +131,14 @@ export const AltaDeEquipo = ({
     'reporta_y_espera',
   );
   const [canalDeAudioHabilitado, setCanalDeAudioHabilitado] = useState(false);
+  // C2 (15-L) · el videoportero también abre una puerta, y cada equipo con
+  // video declara su canal; la zona dice dónde está.
+  const [puertaDelVideoportero, setPuertaDelVideoportero] = useState('1');
+  const [canalDeVideo, setCanalDeVideo] = useState('');
+  const [zonaId, setZonaId] = useState('');
+  const zonas = useZonas(copropiedadId);
+  // Sin zonas (o con una respuesta rara) se edita igual: la zona es opcional.
+  const listaDeZonas = Array.isArray(zonas.data) ? zonas.data : [];
   const [sondeo, setSondeo] = useState<ResultadoDeSondeo | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -147,8 +160,15 @@ export const AltaDeEquipo = ({
     setModoDeTerminal(equipo?.modoDeTerminal ?? 'reporta_y_espera');
     setCanalDeAudioHabilitado(equipo?.canalDeAudioHabilitado ?? false);
     setEspecifico(
-      String(equipo?.canalBarrera ?? equipo?.numeroDePuerta ?? equipo?.canalDeAudio ?? 1),
+      String(
+        equipo?.tipo === 'intercom'
+          ? (equipo.canalDeAudio ?? 1)
+          : (equipo?.canalBarrera ?? equipo?.numeroDePuerta ?? equipo?.canalDeAudio ?? 1),
+      ),
     );
+    setPuertaDelVideoportero(String(equipo?.numeroDePuerta ?? 1));
+    setCanalDeVideo(equipo?.canalDeVideo ?? '');
+    setZonaId(equipo?.zonaId ?? '');
     setSondeo(null);
     setError(undefined);
   }, [abierto, equipo]);
@@ -168,6 +188,11 @@ export const AltaDeEquipo = ({
     ...(fabricante.trim() === '' ? {} : { fabricante: fabricante.trim() }),
     ...(tipo === 'terminal_facial' ? { modoDeTerminal } : {}),
     ...(tipo === 'intercom' ? { canalDeAudioHabilitado } : {}),
+    ...(tipo === 'intercom' ? { numeroDePuerta: numero(puertaDelVideoportero) ?? 1 } : {}),
+    ...(CON_VIDEO.has(tipo) && canalDeVideo.trim() !== ''
+      ? { canalDeVideo: canalDeVideo.trim() }
+      : {}),
+    ...(zonaId === '' ? {} : { zonaId }),
   });
 
   /**
@@ -235,6 +260,9 @@ export const AltaDeEquipo = ({
             }),
       );
       await clientes.invalidateQueries({ queryKey: ['dispositivos', copropiedadId] });
+      // C1 (15-L) · la tabla de Dispositivos sale del tablero: sin esto, el
+      // equipo recién guardado aparecía al siguiente refresco (30 s), no ya.
+      await clientes.invalidateQueries({ queryKey: ['tablero', copropiedadId, 'dispositivos'] });
       setSondeo(null);
       setSecreto('');
       alCerrar();
@@ -408,7 +436,7 @@ export const AltaDeEquipo = ({
             className="mt-1 h-4 w-4 accent-marca"
           />
           <span>
-            Una persona habilitó el canal de audio EN EL APARATO (ADR-01)
+            Una persona habilitó el canal de audio EN EL APARATO
             <span className="block text-texto-apagado">
               El sistema no lo habilita solo; el sondeo comprueba si el equipo lo declara.
             </span>
@@ -427,6 +455,49 @@ export const AltaDeEquipo = ({
           ayuda={campoEspecifico.ayuda}
         />
       )}
+
+      {tipo === 'intercom' ? (
+        <Campo
+          etiqueta="Número de puerta"
+          type="number"
+          min={1}
+          max={16}
+          value={puertaDelVideoportero}
+          onChange={(e) => setPuertaDelVideoportero(e.target.value)}
+          ayuda="La puerta que abre el videoportero cuando la central lo autoriza. Normalmente 1."
+        />
+      ) : null}
+
+      {CON_VIDEO.has(tipo) ? (
+        <Campo
+          etiqueta="Canal de video (opcional)"
+          inputMode="numeric"
+          placeholder="102"
+          value={canalDeVideo}
+          onChange={(e) => setCanalDeVideo(e.target.value)}
+          ayuda="Canal × 100 + flujo: 102 es el subflujo de la primera cámara (el que mejor ve el navegador); 101 el principal. Vacío = 102."
+          {...(canalDeVideo.trim() === '' || CANAL_DE_VIDEO.test(canalDeVideo.trim())
+            ? {}
+            : { error: 'Escriba el canal como 102, 101, 202…' })}
+        />
+      ) : null}
+
+      <label className="flex flex-col gap-1 text-secundario">
+        <span className="font-medium text-texto">Zona (opcional)</span>
+        <select
+          value={zonaId}
+          onChange={(e) => setZonaId(e.target.value)}
+          aria-label="Zona del equipo"
+          className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
+        >
+          <option value="">Sin zona</option>
+          {listaDeZonas.map((z) => (
+            <option key={z.id} value={z.id}>
+              {z.nombre}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {/*
         A.5 · EL AVISO QUE TIENE QUE ESTAR EN LA PANTALLA, NO EN UNA GUÍA.

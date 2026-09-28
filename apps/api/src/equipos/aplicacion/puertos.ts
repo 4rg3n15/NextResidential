@@ -24,6 +24,10 @@ import type { ContextoTenant } from '../../autenticacion';
 export const REPOSITORIO_DE_EQUIPOS = Symbol.for('ncr.puerto.RepositorioDeEquipos');
 /** A4 · `{ activos() }`: los equipos que emiten y hay que escuchar. */
 export const EQUIPOS_QUE_EMITEN = Symbol.for('ncr.equipos.EquiposQueEmiten');
+/** C4 (15-L) · todos los equipos activos, para el latido. */
+export const EQUIPOS_ACTIVOS = Symbol.for('ncr.equipos.EquiposActivos');
+/** R1 (15-L) · `{ copropiedadDe(id) }`: de quién es un equipo que publica. */
+export const COPROPIEDAD_DE_EQUIPO = Symbol.for('ncr.equipos.CopropiedadDeEquipo');
 export const SONDA_DE_EQUIPO = Symbol.for('ncr.puerto.SondaDeEquipo');
 
 export const TIPOS_DE_EQUIPO = [
@@ -63,6 +67,10 @@ export interface AltaDeEquipo {
   readonly modoDeTerminal?: ModoDeTerminalDeclarado | null;
   /** Si una persona habilitó el canal de audio EN EL APARATO (ADR-01). */
   readonly canalDeAudioHabilitado?: boolean;
+  /** C2/D2 (15-L) · el flujo de video, canal×100+flujo. `null` = 102. */
+  readonly canalDeVideo?: string | null;
+  /** C2 (15-L) · la zona de la copropiedad donde está el equipo. */
+  readonly zonaId?: string | null;
 }
 
 /** Lo que la consola RECIBE. Sin secreto, por construcción. */
@@ -82,6 +90,8 @@ export interface DatosDeEquipo {
   readonly canalDeAudio: number | null;
   readonly modoDeTerminal: ModoDeTerminalDeclarado | null;
   readonly canalDeAudioHabilitado: boolean;
+  readonly canalDeVideo: string | null;
+  readonly zonaId: string | null;
   /**
    * Lo que el equipo declara poder hacer, descubierto al sondearlo y
    * PERSISTIDO: es lo que el proveedor mira antes de pedirle algo (O2). `null`
@@ -114,6 +124,18 @@ export interface RepositorioDeEquipos {
    * es el proceso quien los escucha, no un usuario. Lectura de servicio.
    */
   activosQueEmiten(): Promise<readonly EquipoQueEmite[]>;
+  /**
+   * C4 (15-L) · TODOS los equipos activos, de todas las copropiedades, para
+   * el latido: la cámara y el relé también tienen que verse en línea. Lectura
+   * de servicio, como la anterior.
+   */
+  activos(): Promise<readonly EquipoQueEmite[]>;
+  /**
+   * R1 (15-L) · la copropiedad de un equipo ACTIVO, por su id. Lectura de
+   * servicio como la anterior: la hace el receptor de eventos, que no tiene
+   * usuario. `null` si no existe, está inactivo o el id no es de la tabla.
+   */
+  copropiedadDeActivo(dispositivoId: string): Promise<string | null>;
   crear(
     ctx: ContextoTenant,
     copropiedadId: string,
@@ -192,19 +214,30 @@ export const CORRECCIONES = [
 ] as const;
 export type CorreccionDeEquipo = (typeof CORRECCIONES)[number];
 
+/**
+ * Correcciones con PARÁMETROS (corrección de la 15-L): no van por la ruta
+ * genérica, que sólo acepta las de `CORRECCIONES`, sino por las acciones de la
+ * ficha que las piden («Enviar eventos a este Mac», el interruptor).
+ */
+export type CorreccionConParametros = 'receptor_de_eventos';
+
 export interface DatosDeCorreccion {
   readonly host: string;
   readonly puerto: number;
   readonly protocolo: ProtocoloDeEquipo;
   readonly usuario: string;
   readonly secreto: string;
-  readonly correccion: CorreccionDeEquipo;
+  readonly correccion: CorreccionDeEquipo | CorreccionConParametros;
   /** Quién la autoriza. Sin esto no se emite la petición al equipo. */
   readonly confirmadaPor: string;
+  /** F2 (e) · para `verificacion_remota`: activar (por omisión) o desactivar. */
+  readonly activar?: boolean;
+  /** C2 · para `receptor_de_eventos`: IP del Mac, puerto y ruta con el secreto. */
+  readonly receptor?: { readonly ip: string; readonly puerto: number; readonly ruta: string };
 }
 
 export interface ResultadoDeCorreccionDeEquipo {
-  readonly correccion: CorreccionDeEquipo;
+  readonly correccion: CorreccionDeEquipo | CorreccionConParametros;
   readonly aplicada: boolean;
   readonly valorAnterior: string | null;
   readonly valorNuevo: string | null;
@@ -281,6 +314,8 @@ export interface DatosDeSondeo {
    * sola es un bloqueo salvo que alguien lo haya declarado a sabiendas.
    */
   readonly modoDeTerminal?: ModoDeTerminalDeclarado | null;
+  /** D2 · C3 (15-L) · el canal de video de la ficha, para preguntarlo por RTSP. */
+  readonly canalDeVideo?: string | null;
 }
 
 export interface SondaDeEquipo {
@@ -335,3 +370,14 @@ export interface RepositorioDeAtestaciones {
     copropiedadId: string,
   ): Promise<ReadonlyMap<string, AtestacionDelInstalador>>;
 }
+
+/**
+ * C1 (15-L) · tras editar, dar de baja, reactivar, corregir o volver a sondear
+ * un equipo, el proceso OLVIDA lo que recordaba de él (clientes con su
+ * dirección y credencial, capacidades, escucha). Sin esto, una edición en la
+ * consola no llegaba al equipo hasta reiniciar la API.
+ */
+export interface OlvidoDeEquipo {
+  olvidar(dispositivoId: string): void;
+}
+export const OLVIDO_DE_EQUIPO = Symbol.for('ncr.equipos.OlvidoDeEquipo');

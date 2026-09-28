@@ -7,7 +7,7 @@ import type {
   ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
 import type { CapacidadesDeEquipo } from './capacidades';
-import type { EscuchaActiva } from './escucha';
+import type { EscuchaActiva, TransporteDeEscucha } from './escucha';
 import type { OrigenDeVideo } from './video';
 import type { VeredictoRemoto } from './verificacion-remota';
 
@@ -68,4 +68,31 @@ export type ProveedorDeEquipos = AccessPointProvider &
      * rechaza. La credencial va dentro: nunca cruza a la presentación.
      */
     origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null>;
+    /**
+     * A4 (15-L) · ¿el equipo decide por su cuenta —una cámara sin control de la
+     * plataforma y sin atestación—? `null` si no se sabe. Lo pregunta el
+     * receptor DESPUÉS de registrar la lectura, para marcarla «la cámara
+     * decidió por su cuenta»: nunca delante de una apertura. Opcional: el
+     * simulado no lo implementa.
+     */
+    decideSolo?(dispositivoId: string): Promise<boolean | null>;
+    /**
+     * C1 (15-L) · olvida todo lo que el proceso recuerda de un equipo
+     * —clientes con su dirección y credencial, capacidades, puerta, veredicto
+     * de control— y cierra su escucha. Tras editar un equipo, la siguiente
+     * orden y la siguiente escucha usan lo guardado, sin reiniciar la API.
+     */
+    olvidar?(dispositivoId: string): void;
+    /**
+     * C3 (15-L) · la escucha del equipo, si la hay: por qué transporte y cuándo
+     * mandó algo por última vez. Es la respuesta REAL del equipo en cuanto a
+     * eventos, sin abrir una segunda conexión que podría quitarle los suyos a
+     * la escucha de la plataforma.
+     */
+    senalDeEventos?(dispositivoId: string): {
+      readonly transporte: TransporteDeEscucha;
+      readonly ultimaSenal: Date | null;
+      /** C7 (15-L) · la conexión la tiene otra plataforma: la frase con el remedio. */
+      readonly rechazo: string | null;
+    } | null;
   };

@@ -1,4 +1,4 @@
-import type { FaceTemplateProvider } from '@ncr/domain-core';
+import type { FaceTemplateProvider, Vigencia } from '@ncr/domain-core';
 import {
   PROPOSITOS,
   aplanar,
@@ -154,12 +154,18 @@ export class BovedaAesGcm implements BovedaDePlantillas {
     copropiedadId: string,
     plantillaId: string,
     dispositivoId: string,
+    vigencia?: Vigencia,
   ): Promise<void> {
     const sobre = await this.almacen.tomar(copropiedadId, plantillaId);
     if (sobre === null) throw new Error('No hay plantilla que sincronizar: ya fue suprimida');
     const vector = this.descifrar(copropiedadId, sobre);
     try {
-      await this.terminales.sincronizar(dispositivoId, plantillaId, new Uint8Array(vector));
+      await this.terminales.sincronizar(
+        dispositivoId,
+        plantillaId,
+        new Uint8Array(vector),
+        vigencia,
+      );
     } finally {
       // El claro no sobrevive a la llamada ni siquiera en memoria.
       vector.fill(0);

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type {
   HechoDeBitacora,
+  PoolDePorteros,
   Portero,
   TipoDeHechoDeBitacora,
   TurnoDePorteria,
@@ -15,7 +16,20 @@ export const clavesDePorteria = {
   porteros: (id: string) => ['porteria', id, 'porteros'] as const,
   turnos: (id: string, desde: string) => ['porteria', id, 'turnos', desde] as const,
   bitacora: (id: string, tipo: string) => ['porteria', id, 'bitacora', tipo] as const,
+  pool: (id: string) => ['porteria', id, 'pool'] as const,
 };
+
+/** H1 · H2 (15-L) · el pool de números de la copropiedad, el siguiente y el cupo. */
+export const usePoolDePorteros = (copropiedadId: string): UseQueryResult<PoolDePorteros> =>
+  useQuery({
+    queryKey: clavesDePorteria.pool(copropiedadId),
+    queryFn: async () =>
+      desenvolver(
+        await cliente.GET('/copropiedades/{id}/porteros/pool', {
+          params: { path: { id: copropiedadId } },
+        }),
+      ),
+  });
 
 export const usePorteros = (copropiedadId: string): UseQueryResult<readonly Portero[]> =>
   useQuery({

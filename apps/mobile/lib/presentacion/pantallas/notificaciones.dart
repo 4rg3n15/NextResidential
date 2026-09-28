@@ -1,219 +1,155 @@
-/// M-7 · HU-34 · Notificaciones, y el registro del aparato.
+/// M-7 · HU-34 · Notificaciones: lo que pasó con las visitas del residente.
 ///
 /// ═════════════════════════════════════════════════════════════════════════════
-/// LO QUE ESTA PANTALLA TIENE QUE DEJAR CLARO
+/// LO QUE ESTA PANTALLA TIENE QUE DEJAR CLARO (15-L)
 ///
-/// Que las notificaciones estén «activadas» en la app no significa que lleguen.
-/// Hacen falta tres cosas y las tres pueden fallar por separado: el permiso del
-/// sistema, un token del servicio de mensajería, y que ese token esté
-/// **registrado en el conjunto**. Una pantalla que las resumiera en un
-/// interruptor dejaría al residente creyendo que le avisarán cuando llegue su
-/// visitante, y no le avisarían.
+/// Esta compilación no lleva servicio de mensajería: con la app cerrada no
+/// llega nada al teléfono. La pantalla anterior enseñaba el registro del
+/// aparato para avisos push —permiso, token, registro— con un botón
+/// «Activar», y eso prometía algo que no podía pasar. Ahora dice la verdad
+/// con una frase: «Los avisos llegan mientras la app está abierta».
 ///
-/// Por eso aquí hay tres estados visibles, no uno. Es el mismo criterio que el
-/// resto de la app: decir lo que pasa en vez de un aspa o un visto.
-///
-/// ═════════════════════════════════════════════════════════════════════════════
-/// EL TOKEN ROTA SOLO
-///
-/// Caduca, cambia al reinstalar, cambia al restaurar una copia de seguridad. Por
-/// eso el registro se reintenta al abrir la app y no solo cuando el residente
-/// entra aquí, y por eso el servidor identifica el aparato por su
-/// `instalacionId` y no por el token: si la fila se identificara por el token,
-/// cada rotación dejaría un registro huérfano al que se seguiría notificando.
+/// Lo que lista sale de la API —la misma que usa la consola—: las visitas que
+/// portería o la administración rechazaron, con el motivo que escribieron, y
+/// los ingresos de sus visitantes, con fecha y hora. Se recarga sola mientras
+/// está a la vista y al tirar hacia abajo; abrirla las marca como vistas y el
+/// contador de Inicio vuelve a cero.
 library;
 
 import 'package:flutter/material.dart';
 
-/// En qué punto de los tres está el aparato.
-enum EstadoDeAvisos {
-  /// Todavía no se ha preguntado nada.
-  sinDeterminar,
+import '../../aplicacion/estado.dart';
+import '../../configuracion/tema.dart';
+import '../../dominio/notificaciones.dart';
+import '../controlador.dart';
+import '../widgets/estados.dart';
+import 'comunes.dart';
 
-  /// El residente dijo que no al permiso del sistema. NO es un error.
-  permisoNegado,
+/// La frase que sustituye a cualquier interruptor de avisos. Una sola, para que
+/// el perfil y esta pantalla no puedan decir cosas distintas.
+const avisosConLaAppAbierta = 'Los avisos llegan mientras la app está abierta';
 
-  /// Hay permiso, pero no hay token: el servicio de mensajería no respondió.
-  sinToken,
+/// La fila del perfil que lleva aquí. Vive con la pantalla, y no en el perfil,
+/// para que la frase de la fila y la de la pantalla no puedan separarse: es
+/// lo que es verdad en esta compilación, sin interruptor.
+class FilaDeNotificaciones extends StatelessWidget {
+  const FilaDeNotificaciones({super.key, required this.alAbrir});
+  final void Function() alAbrir;
 
-  /// Hay token y el conjunto lo tiene registrado.
-  registrado,
-
-  /// Hay token y el registro en el servidor falló.
-  sinRegistrar,
+  @override
+  Widget build(BuildContext context) => Card(
+    child: ListTile(
+      leading: const Icon(Icons.notifications_outlined),
+      title: const Text('Notificaciones'),
+      subtitle: const Text(avisosConLaAppAbierta, style: TextStyle(fontSize: 12)),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: alAbrir,
+    ),
+  );
 }
-
-/// Una línea para el resumen del Perfil. Vive AQUÍ, junto a los estados, para
-/// que el resumen y el detalle no puedan decir cosas distintas: si se escribiera
-/// en `perfil.dart`, añadir un estado dejaría el resumen mintiendo y nada lo
-/// notaría.
-String resumenDeAvisos(EstadoDeAvisos estado) => switch (estado) {
-      EstadoDeAvisos.sinDeterminar => 'Sin activar',
-      EstadoDeAvisos.permisoNegado => 'El teléfono no da permiso',
-      EstadoDeAvisos.sinToken => 'Activadas, pero sin canal de aviso',
-      EstadoDeAvisos.registrado => 'Activas en este teléfono',
-      EstadoDeAvisos.sinRegistrar => 'Activadas, pero el conjunto no lo sabe',
-    };
 
 class PantallaDeNotificaciones extends StatelessWidget {
   const PantallaDeNotificaciones({
     super.key,
-    required this.estado,
-    required this.alActivar,
-    required this.alReintentar,
-    this.ultimoRegistro,
-    this.detalleDelFallo,
+    required this.controlador,
+    required this.alPedirAcceso,
+    this.alRecargar,
   });
 
-  final EstadoDeAvisos estado;
-  final Future<void> Function() alActivar;
-  final Future<void> Function() alReintentar;
-  final DateTime? ultimoRegistro;
-  final String? detalleDelFallo;
+  final ControladorDeVista<List<Notificacion>> controlador;
+  final VoidCallback alPedirAcceso;
+
+  /// Tirar hacia abajo: la vuelta del ciclo del armazón, si la hay.
+  final Future<void> Function()? alRecargar;
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Notificaciones')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            'Le avisamos cuando su visitante llega a la portería, cuando se le niega el '
-            'acceso a alguien que usted autorizó y cuando la administración publica una alerta.',
-            style: t.textTheme.bodyMedium,
+      body: AnimatedBuilder(
+        animation: controlador,
+        builder: (context, _) => RefreshIndicator(
+          onRefresh: alRecargar ?? controlador.refrescar,
+          child: VistaConEstado<List<Notificacion>>(
+            // Vacía no es un aviso aparte: la explicación de arriba tiene que
+            // verse también cuando todavía no hay nada.
+            estado: switch (controlador.estado) {
+              Vacio<List<Notificacion>>() => const ConDatos<List<Notificacion>>([]),
+              final e => e,
+            },
+            alReintentar: controlador.cargarAhora,
+            alPedirAcceso: alPedirAcceso,
+            conDatos: (lista, {required bool desdeCache}) => ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                const _SinMensajeria(),
+                const SizedBox(height: 16),
+                if (desdeCache) const MarcaDeCache(),
+                if (lista.isEmpty)
+                  const Text(
+                    'Todavía no hay avisos. Aquí aparecerán las visitas que rechacen en portería '
+                    'y los ingresos de sus visitantes.',
+                    style: TextStyle(color: Paleta.textoSuave),
+                  ),
+                ...lista.map(_FilaDeNotificacion.new),
+              ],
+            ),
           ),
-          const SizedBox(height: 24),
-          _Tarjeta(estado: estado, detalle: detalleDelFallo, ultimoRegistro: ultimoRegistro),
-          const SizedBox(height: 16),
-          switch (estado) {
-            EstadoDeAvisos.sinDeterminar => FilledButton.icon(
-                onPressed: alActivar,
-                icon: const Icon(Icons.notifications_active_outlined),
-                label: const Text('Activar notificaciones'),
-              ),
-            EstadoDeAvisos.permisoNegado => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // No se puede reabrir el diálogo del sistema una vez negado:
-                  // ofrecer un botón que «vuelva a pedir» sería mentir.
-                  Text(
-                    'El permiso se concede desde los ajustes del teléfono, en la ficha de esta '
-                    'aplicación. La app no puede volver a preguntarlo.',
-                    style: t.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: alReintentar,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Ya lo concedí, comprobar'),
-                  ),
-                ],
-              ),
-            EstadoDeAvisos.sinToken ||
-            EstadoDeAvisos.sinRegistrar =>
-              FilledButton.icon(
-                onPressed: alReintentar,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
-              ),
-            EstadoDeAvisos.registrado => OutlinedButton.icon(
-                onPressed: alReintentar,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Comprobar de nuevo'),
-              ),
-          },
-        ],
+        ),
       ),
     );
   }
 }
 
-class _Tarjeta extends StatelessWidget {
-  const _Tarjeta({required this.estado, this.detalle, this.ultimoRegistro});
-  final EstadoDeAvisos estado;
-  final String? detalle;
-  final DateTime? ultimoRegistro;
+class _SinMensajeria extends StatelessWidget {
+  const _SinMensajeria();
 
   @override
   Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme;
-    final (icono, color, titulo, cuerpo) = switch (estado) {
-      EstadoDeAvisos.sinDeterminar => (
-          Icons.notifications_none,
-          c.outline,
-          'Sin activar',
-          'Todavía no ha activado las notificaciones en este aparato.',
-        ),
-      EstadoDeAvisos.permisoNegado => (
-          Icons.notifications_off_outlined,
-          c.error,
-          'El teléfono no lo permite',
-          'Usted negó el permiso de notificaciones. Sin él no podemos avisarle de nada.',
-        ),
-      EstadoDeAvisos.sinToken => (
-          Icons.cloud_off_outlined,
-          c.error,
-          'El servicio de avisos no respondió',
-          'Hay permiso, pero el teléfono no obtuvo su identificador de avisos. '
-              'Suele arreglarse con conexión a internet y volviendo a intentar.',
-        ),
-      EstadoDeAvisos.sinRegistrar => (
-          Icons.sync_problem_outlined,
-          c.error,
-          'Este aparato no está registrado en el conjunto',
-          // El caso más engañoso: el teléfono está listo y aun así no llegan.
-          'El teléfono está listo, pero el conjunto todavía no lo tiene apuntado, '
-              'así que los avisos NO llegarán a este aparato.',
-        ),
-      EstadoDeAvisos.registrado => (
-          Icons.notifications_active_outlined,
-          c.primary,
-          'Activas en este aparato',
-          'El conjunto tiene apuntado este teléfono y le avisará.',
-        ),
-    };
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: color),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icono, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(titulo, style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 4),
-                Text(cuerpo),
-                if (detalle != null) ...[
-                  const SizedBox(height: 8),
-                  Text(detalle!, style: Theme.of(context).textTheme.bodySmall),
-                ],
-                if (ultimoRegistro != null && estado == EstadoDeAvisos.registrado) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Última comprobación: ${_hm(ultimoRegistro!)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ],
-            ),
+    final t = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.info_outline, size: 20, color: t.colorScheme.outline),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('$avisosConLaAppAbierta.', style: t.textTheme.titleSmall),
+              const SizedBox(height: 2),
+              Text(
+                'Con la app cerrada no llegan avisos a este teléfono. Al abrirla, aquí verá lo '
+                'que pasó con sus visitas.',
+                style: t.textTheme.bodySmall,
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+}
 
-  static String _hm(DateTime d) {
-    final l = d.toLocal();
-    return '${l.hour.toString().padLeft(2, '0')}:${l.minute.toString().padLeft(2, '0')}';
+class _FilaDeNotificacion extends StatelessWidget {
+  const _FilaDeNotificacion(this.n);
+  final Notificacion n;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icono, color) = switch (n.tipo) {
+      TipoDeNotificacion.visitaRechazada => (Icons.block_outlined, Paleta.peligroSuave.texto),
+      TipoDeNotificacion.ingresoDeVisitante => (Icons.login_outlined, Paleta.exitoSuave.texto),
+      TipoDeNotificacion.otra => (Icons.notifications_none, Paleta.neutroSuave.texto),
+    };
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(icono, color: color),
+        title: Text(n.texto),
+        subtitle: Text(momentoLegible(n.en)),
+      ),
+    );
   }
 }

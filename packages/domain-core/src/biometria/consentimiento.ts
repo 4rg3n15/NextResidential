@@ -20,6 +20,22 @@ import { errorDominio } from '../compartido/errores';
  * El agregado NO conoce la plantilla: la relación va en el otro sentido —la
  * plantilla apunta a su consentimiento—, porque la vida del consentimiento no
  * depende de que haya plantilla y sí al revés.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ETAPA 15-L (F4) · DOS ORÍGENES, Y NO SE CONFUNDEN — decisión del cliente
+ *
+ * El cliente decidió que la única constancia obligatoria sea una casilla en el
+ * formulario de la autorización: «El visitante autorizó el uso de su foto para
+ * el ingreso». Quien la marca es quien REGISTRA (residente, portero,
+ * administración), no el titular. Eso no se disfraza de lo que no es: el
+ * consentimiento lleva su ORIGEN, y uno `declarado_por_quien_registra` nunca
+ * pasa por `otorgar()` ni se confunde con uno `otorgado_por_el_titular`. La
+ * regla de titularidad sigue intacta para todo lo demás —otorgar, rechazar y
+ * revocar siguen siendo del titular—; lo que se añade es una declaración con
+ * autor, momento y versión del texto (ADR-032, riesgo legal aceptado por el
+ * cliente). Si el titular está presente, puede CONFIRMARLO él mismo
+ * (`confirmarPorElTitular`, D-10): entonces el origen pasa a ser el suyo.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 export const ESTADOS_CONSENTIMIENTO = [
   'pendiente',
@@ -32,6 +48,27 @@ export type EstadoConsentimiento = (typeof ESTADOS_CONSENTIMIENTO)[number];
 
 export const CANALES = ['app', 'sms', 'correo', 'whatsapp', 'presencial'] as const;
 export type CanalConsentimiento = (typeof CANALES)[number];
+
+/** F4 (15-L) · quién dejó constancia del consentimiento. */
+export const ORIGENES_DE_CONSENTIMIENTO = [
+  'otorgado_por_el_titular',
+  'declarado_por_quien_registra',
+] as const;
+export type OrigenDeConsentimiento = (typeof ORIGENES_DE_CONSENTIMIENTO)[number];
+
+/** Lo que se sabe de una declaración: quién marcó la casilla, cuándo y sobre qué texto. */
+export interface DatosDeDeclaracion {
+  readonly id: string;
+  readonly copropiedadId: string;
+  readonly titularId: string;
+  readonly finalidad: string;
+  /** La versión del TEXTO de la casilla que se marcó. */
+  readonly versionPolitica: string;
+  readonly canal: CanalConsentimiento;
+  /** La cuenta que marcó la casilla. Nunca vacía. */
+  readonly declaradoPor: string;
+  readonly ahora: Date;
+}
 
 export interface DatosConsentimiento {
   readonly id: string;
@@ -46,6 +83,10 @@ export interface DatosConsentimiento {
   readonly revocadoEn?: Date | null;
   readonly evidenciaId?: string | null;
   readonly estado?: EstadoConsentimiento;
+  /** F4 · por omisión, del titular: es lo que había antes de la 15-L. */
+  readonly origen?: OrigenDeConsentimiento;
+  /** F4 · quién marcó la casilla, si el origen es la declaración. */
+  readonly declaradoPor?: string | null;
 }
 
 export class ConsentimientoBiometrico {
@@ -61,6 +102,8 @@ export class ConsentimientoBiometrico {
     readonly revocadoEn: Date | null,
     readonly evidenciaId: string | null,
     readonly estado: EstadoConsentimiento,
+    readonly origen: OrigenDeConsentimiento,
+    readonly declaradoPor: string | null,
   ) {
     Object.freeze(this);
   }
@@ -100,7 +143,40 @@ export class ConsentimientoBiometrico {
         datos.revocadoEn ?? null,
         datos.evidenciaId ?? null,
         datos.estado ?? 'pendiente',
+        datos.origen ?? 'otorgado_por_el_titular',
+        datos.declaradoPor ?? null,
       ),
+    );
+  }
+
+  /**
+   * F4 (15-L) · la casilla del formulario: nace VIGENTE, con el ORIGEN
+   * «declarado por quien registra», su autor y la versión del texto. No pasa
+   * por `otorgar()`: no es el titular quien acepta, y el registro lo dice.
+   */
+  static declarar(d: DatosDeDeclaracion): Resultado<ConsentimientoBiometrico, ErrorDominio> {
+    if (d.declaradoPor.trim() === '') {
+      return fallo(
+        errorDominio('DATO_INVALIDO', 'La declaración necesita saber quién marcó la casilla', 'F4'),
+      );
+    }
+    const r = ConsentimientoBiometrico.solicitar({
+      id: d.id,
+      copropiedadId: d.copropiedadId,
+      titularId: d.titularId,
+      finalidad: d.finalidad,
+      versionPolitica: d.versionPolitica,
+      canal: d.canal,
+      solicitadoEn: d.ahora,
+    });
+    if (!r.ok) return r;
+    return exito(
+      r.valor.con({
+        estado: 'vigente',
+        otorgadoEn: d.ahora,
+        origen: 'declarado_por_quien_registra',
+        declaradoPor: d.declaradoPor,
+      }),
     );
   }
 
@@ -117,7 +193,38 @@ export class ConsentimientoBiometrico {
       cambios.revocadoEn === undefined ? this.revocadoEn : (cambios.revocadoEn ?? null),
       cambios.evidenciaId === undefined ? this.evidenciaId : (cambios.evidenciaId ?? null),
       cambios.estado ?? this.estado,
+      cambios.origen ?? this.origen,
+      cambios.declaradoPor === undefined ? this.declaradoPor : (cambios.declaradoPor ?? null),
     );
+  }
+
+  /**
+   * D-10 como OPCIÓN (15-L, F4): el titular, presente, confirma él mismo una
+   * declaración vigente. El origen pasa a ser suyo; la vigencia no cambia.
+   */
+  confirmarPorElTitular(
+    quienConfirma: string,
+    ahora: Date,
+  ): Resultado<ConsentimientoBiometrico, ErrorDominio> {
+    if (quienConfirma !== this.titularId) {
+      return fallo(
+        errorDominio(
+          'INVARIANTE_VIOLADA',
+          'Solo el titular del dato biométrico puede confirmar su consentimiento',
+          'RN-10',
+        ),
+      );
+    }
+    if (!this.vigente || this.origen !== 'declarado_por_quien_registra') {
+      return fallo(
+        errorDominio(
+          'INVARIANTE_VIOLADA',
+          'Solo se confirma una declaración vigente de quien registró la visita',
+          'F4',
+        ),
+      );
+    }
+    return exito(this.con({ origen: 'otorgado_por_el_titular', otorgadoEn: ahora }));
   }
 
   /**

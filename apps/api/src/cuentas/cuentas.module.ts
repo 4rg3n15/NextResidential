@@ -6,6 +6,7 @@ import type { Bitacora, Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { VerificadorDeJwt } from '../autenticacion';
+import { IntentosDeAcceso, PresenciaDeSuperadministrador } from '../plataforma';
 import { BITACORA_DE_IDENTIDAD } from '../comun/bitacora-de-identidad';
 import type { BitacoraDeIdentidad } from '../comun/bitacora-de-identidad';
 import {
@@ -19,6 +20,7 @@ import {
 } from './aplicacion/puertos';
 import type {
   AdministradorDeCuentas,
+  ControlDeIntentos,
   GanchosDeSesion,
   IgualadorDeTiempo,
   LectorDeToken,
@@ -90,6 +92,7 @@ export class CuentasModule {
             LECTOR_DE_TOKEN,
             GANCHOS_DE_SESION,
             IGUALADOR_DE_TIEMPO,
+            IntentosDeAcceso,
           ],
           useFactory: (
             p: ProveedorDeIdentidad,
@@ -97,7 +100,10 @@ export class CuentasModule {
             l: LectorDeToken,
             g: GanchosDeSesion,
             t: IgualadorDeTiempo,
-          ) => new IniciarSesion(p, r, l, g, t),
+            // H5 (15-L) · el bloqueo temporal por (IP, identificador), con el
+            // modo pruebas dentro: lo implementa el módulo de plataforma.
+            i: ControlDeIntentos,
+          ) => new IniciarSesion(p, r, l, g, t, i),
         },
         {
           provide: CambiarContrasena,
@@ -135,8 +141,12 @@ export class CuentasModule {
         },
         {
           provide: CerrarSesion,
-          inject: [PROVEEDOR_DE_IDENTIDAD, GANCHOS_DE_SESION],
-          useFactory: (p: ProveedorDeIdentidad, g: GanchosDeSesion) => new CerrarSesion(p, g),
+          inject: [PROVEEDOR_DE_IDENTIDAD, GANCHOS_DE_SESION, PresenciaDeSuperadministrador],
+          useFactory: (
+            p: ProveedorDeIdentidad,
+            g: GanchosDeSesion,
+            presencia: PresenciaDeSuperadministrador,
+          ) => new CerrarSesion(p, g, presencia),
         },
         {
           provide: CrearCuentaPorUsuario,

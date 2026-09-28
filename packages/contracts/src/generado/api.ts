@@ -13,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Inicio de sesión por correo, o por código (o NIT) y usuario */
+        /** Inicio de sesión por correo, por código y usuario, o por número de portero */
         post: operations["CuentasController_acceso"];
         delete?: never;
         options?: never;
@@ -329,91 +329,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/biometria/capturas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Valida la calidad y solicita el consentimiento al TITULAR (CU-02, CA-08) */
-        post: operations["BiometriaController_capturarRostro"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Estado de un consentimiento, sin dato biométrico alguno */
-        get: operations["BiometriaController_verConsentimiento"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/aceptacion-presencial": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** El TITULAR, presente, escribe su identidad y acepta la política (D-10, RN-10) */
-        post: operations["BiometriaController_aceptarPresencialmente"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/enlace": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Emite el enlace firmado con el que el TITULAR responde (RN-10) */
-        post: operations["BiometriaController_emitirEnlaceDeConsentimiento"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/respuesta": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** El TITULAR acepta o rechaza. Nadie responde por él (RN-10) */
-        post: operations["BiometriaController_responderConsentimiento"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/copropiedades/{id}/biometria/consentimientos/{consentimientoId}/revocacion": {
         parameters: {
             query?: never;
@@ -569,6 +484,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/equipos-simulados": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Si las órdenes de la consola llegan a equipos reales (franja F3) */
+        get: operations["EquiposSimuladosController_estado"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/equipos/prueba-de-conexion": {
         parameters: {
             query?: never;
@@ -671,6 +603,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/equipos/{equipoId}/enviar-eventos-a-este-mac": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** C2 · escribe en la cámara el servidor de alarmas con la IP actual del Mac, el puerto de la API y la ruta con su secreto, y lo lee de vuelta */
+        post: operations["ConfiguracionEnSitioController_enviarEventos"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
         parameters: {
             query?: never;
@@ -682,6 +631,23 @@ export interface paths {
         put?: never;
         /** Vuelve a poner en servicio un equipo dado de baja */
         post: operations["EquiposController_reactivar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}/verificacion-remota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** F2 · activa o desactiva la verificación remota de la terminal (AcsCfg) y la lee de vuelta. Desactivarla es el plan B sin código */
+        put: operations["ConfiguracionEnSitioController_cambiarVerificacion"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -731,6 +697,23 @@ export interface paths {
         };
         /** Flujo de eventos y alertas en vivo (SSE) */
         get: operations["EventosController_flujo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/eventos/linea-de-tiempo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accesos y eventos de equipo en una sola línea de tiempo, con filtros (Bloque B) */
+        get: operations["LineaDeTiempoController_lineaDeTiempo"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1017,40 +1000,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/consentimientos/{consentimientoId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** ¿Respondió mi visitante? pendiente, aceptado o rechazado (RN-10) */
-        get: operations["MiHogarController_estadoDelConsentimiento"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/copropiedades/{id}/mi/autorizaciones/{autorizacionId}/rostro": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Capturo el rostro de mi visitante; el consentimiento se le pide A ÉL (RN-10) */
-        post: operations["MiController_capturarRostro"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/copropiedades/{id}/mi/familia": {
         parameters: {
             query?: never;
@@ -1077,6 +1026,23 @@ export interface paths {
         };
         /** El historial de mi vivienda, con los filtros del mockup (HU-33, M-6) */
         get: operations["MiController_historial"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/notificaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mis notificaciones: visitas rechazadas con su motivo e ingresos de mis visitantes */
+        get: operations["MisNotificacionesController_notificaciones"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1190,6 +1156,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/mi/visitas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Autorizo a un visitante con su foto y la casilla (F1, F4) */
+        post: operations["MisVisitasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/visitas/ultimas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mis últimos visitantes, uno por persona (F6) */
+        get: operations["MisVisitasController_ultimas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/visitas/{autorizacionId}/repeticion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vuelvo a autorizar a un visitante anterior con su foto (F6) */
+        post: operations["MisVisitasController_repetir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/vivienda": {
         parameters: {
             query?: never;
@@ -1216,6 +1233,23 @@ export interface paths {
         };
         /** Zonas comunes con aforo y horario en vivo (HU-19, M-5) */
         get: operations["MiController_zonas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/nombres-de-equipos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El nombre de cada equipo de la copropiedad, sin nada más */
+        get: operations["NombresDeEquiposController_nombres"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1494,8 +1528,42 @@ export interface paths {
         /** Porteros de la copropiedad, quién está de turno y con sesión */
         get: operations["SupervisionController_listar"];
         put?: never;
-        /** Alta de portero con usuario y contraseña inicial (cambio obligatorio) */
+        /** Alta de portero con nombre, documento y contraseña temporal; recibe el siguiente número del pool (cambio de contraseña obligatorio) */
         post: operations["SupervisionController_alta"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/porteros/cupo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cupo de porteros activos de la copropiedad (0 a 999), auditado */
+        put: operations["PoolDePorterosController_fijarCupo"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/porteros/pool": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pool de números de portero de la copropiedad, el siguiente a asignar y el cupo */
+        get: operations["PoolDePorterosController_pool"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1519,6 +1587,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/porteros/{usuarioId}/baja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Da de baja a un portero: cierra sus sesiones y su número no se reutiliza */
+        post: operations["PoolDePorterosController_baja"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/residentes/cuentas": {
         parameters: {
             query?: never;
@@ -1531,6 +1616,24 @@ export interface paths {
         put?: never;
         /** Alta de un residente con usuario y contraseña inicial (3.1) */
         post: operations["SupervisionDeResidentesController_alta"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/residentes/cuentas/{usuarioId}/perfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Perfil de un residente (datos personales y de contacto) */
+        get: operations["PerfilDeResidentesController_ver"];
+        /** Edita el perfil de un residente; queda en su bitácora con el autor */
+        put: operations["PerfilDeResidentesController_editar"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1668,6 +1771,92 @@ export interface paths {
         put?: never;
         /** Restablece la contraseña de una cuenta con una temporal y cambio obligatorio */
         post: operations["CuentasController_restablecimiento"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Visitas: las del día en portería; con filtros en administración */
+        get: operations["VisitasController_lista"];
+        put?: never;
+        /** Genera la autorización de un visitante con su foto (F1, F2, F3, F4) */
+        post: operations["VisitasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas/casilla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El texto de la casilla de consentimiento y su versión */
+        get: operations["VisitasController_casilla"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas/viviendas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Las viviendas activas, para elegir a cuál va la visita */
+        get: operations["VisitasController_viviendas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas/{autorizacionId}/equipos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** En qué equipos está la foto de la visita, equipo por equipo (F3) */
+        get: operations["VisitasController_equipos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/visitas/{autorizacionId}/rechazo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rechaza la visita: la anula y retira la foto de los equipos (F2) */
+        post: operations["VisitasController_rechazo"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1923,6 +2112,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plataforma/modo-pruebas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Si el modo pruebas está activo */
+        get: operations["PlataformaController_leer"];
+        /** Activa o desactiva el modo pruebas (sólo superadministrador) */
+        put: operations["PlataformaController_cambiar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/porteria/perfil": {
         parameters: {
             query?: never;
@@ -2015,11 +2222,9 @@ export interface components {
         AccesoDto: {
             /** @description Cuentas por correo */
             correo?: string;
-            /** @description Código corto de la copropiedad (D1): 3 a 8 letras o números */
+            /** @description Código corto de la copropiedad (D1): 3 a 8 letras o números. Con él, el usuario es el del residente; sin él, el usuario es el NÚMERO del portero (ADR-031) */
             codigo?: string;
-            /** @description NIT de la copropiedad */
-            nit?: string;
-            /** @description Nombre de usuario */
+            /** @description Usuario del residente (con código) o número del portero (sin código) */
             usuario?: string;
             /** Format: password */
             contrasena: string;
@@ -2033,16 +2238,6 @@ export interface components {
             desde: string;
             /** Format: date-time */
             hasta: string;
-        };
-        AceptacionPresencialDto: {
-            /** @description Nombre completo, escrito por el propio titular */
-            nombreCompleto: string;
-            /** @description Número de documento, escrito por el propio titular */
-            numeroDocumento: string;
-            /** @description Versión de la política que se le mostró y aceptó */
-            versionPolitica: string;
-            /** @description Declaración expresa del titular: leyó y acepta. Sólo `true`; lo demás es 400. */
-            aceptaPolitica: boolean;
         };
         AceptadoDto: {
             /** @example true */
@@ -2118,6 +2313,10 @@ export interface components {
             modoDeTerminal?: "reporta_y_espera" | "decide_el_equipo";
             /** @default false */
             canalDeAudioHabilitado: boolean;
+            /** @example 102 */
+            canalDeVideo?: string;
+            /** Format: uuid */
+            zonaId?: string;
             /** @default true */
             probarConexion: boolean;
         };
@@ -2137,8 +2336,8 @@ export interface components {
             porteria?: string | null;
             /** @description Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas. */
             sectores: string[];
-            /** @description Identificación del portero como usuario */
-            usuario: string;
+            /** @description Documento de identidad */
+            documento?: string;
             /** Format: password */
             contrasenaInicial: string;
         };
@@ -2211,6 +2410,9 @@ export interface components {
             texto: string;
         };
         BajaDeEquipoDto: {
+            motivo: string;
+        };
+        BajaDePorteroDto: {
             motivo: string;
         };
         BajaDeZonaAplicadaDto: {
@@ -2286,6 +2488,20 @@ export interface components {
              * @example 2
              */
             topeVehiculosPropios?: number;
+            /**
+             * @description H4 · IP o redes CIDR del computador de portería (sólo superadministrador)
+             * @example [
+             *       "192.0.2.10"
+             *     ]
+             */
+            ipsPorteria?: string[];
+            /**
+             * @description H4 · IP o redes CIDR permitidas para la guardia remota de porteros (sólo superadministrador)
+             * @example [
+             *       "198.51.100.0/24"
+             *     ]
+             */
+            ipsGuardiaRemota?: string[];
         };
         CampoRechazadoDto: {
             campo: string;
@@ -2302,6 +2518,14 @@ export interface components {
             estado: "si" | "no" | "desconocida";
             maximo: number | null;
             almacenadas: number | null;
+        };
+        CapacidadDeVideoDto: {
+            /** @enum {string} */
+            estado: "si" | "no" | "desconocida";
+            /** @description «H.264», «H.265»… */
+            codec: string | null;
+            /** @description Canal preguntado (canal×100+flujo) */
+            canal: string | null;
         };
         CapacidadesDeEquipoDto: {
             /** @enum {string} */
@@ -2322,20 +2546,7 @@ export interface components {
             reconocimientoDePlacas: "si" | "no" | "desconocida";
             /** @enum {string} */
             estadoDeBarrera: "si" | "no" | "desconocida";
-        };
-        CapturarRostroDto: {
-            /** @description El TITULAR del dato: el visitante (RN-10) */
-            titularId: string;
-            autorizacionId?: string;
-            medidas: components["schemas"]["MedidasDto"];
-            /** @description Dato biométrico en base64, cifrado en la bóveda al guardarse. Con la terminal de la ETAPA 15 es la imagen del rostro reducida, no un vector derivado: el equipo construye la plantilla y no admite otra cosa. */
-            vector: string;
-            /** @description Versión de la política de tratamiento aceptada */
-            versionPolitica: string;
-            /** @enum {string} */
-            canal: "app" | "sms" | "correo" | "whatsapp" | "presencial";
-            /** @description Instante de supresión programada (RN-11) */
-            suprimirEn: string;
+            video: components["schemas"]["CapacidadDeVideoDto"];
         };
         CargarPadronDto: {
             /** @description Contenido CSV con cabecera; sin bytes nulos. */
@@ -2347,6 +2558,10 @@ export interface components {
              * @description Hoja .xlsx en base64. Se valida el TIPO REAL por firma, nunca la extensión.
              */
             xlsxBase64: string;
+        };
+        CodigoDelEquipoDto: {
+            mayor: number;
+            menor: number;
         };
         CodigosDeRecuperacionDto: {
             /**
@@ -2421,7 +2636,7 @@ export interface components {
             /** @example 3 */
             versionReglasActual: number;
             /**
-             * @description D1 · código corto de acceso; null mientras no se asigne (sólo se entra por NIT).
+             * @description D1 · código corto con el que entran los residentes; null mientras no se asigne.
              * @example MIRA
              */
             codigoCorto: string | null;
@@ -2435,6 +2650,20 @@ export interface components {
              * @example 2
              */
             topeVehiculosPropios: number;
+            /**
+             * @description H4 · IP (o redes CIDR) del computador de portería
+             * @example [
+             *       "192.0.2.10"
+             *     ]
+             */
+            ipsPorteria: string[];
+            /**
+             * @description H4 · IP (o redes CIDR) desde las que un portero puede hacer guardia remota. Vacía: sólo desde la IP de una sesión activa de superadministrador
+             * @example [
+             *       "198.51.100.0/24"
+             *     ]
+             */
+            ipsGuardiaRemota: string[];
             /**
              * @description D5 c · solo lectura: modo de aprobación de terceros (ADR-027).
              * @enum {string}
@@ -2577,6 +2806,9 @@ export interface components {
             debeCambiarContrasena: boolean;
             creadaEn: string;
         };
+        CupoDePorterosDto: {
+            cupo: number;
+        };
         DatosDeTurnoDto: {
             /** Format: uuid */
             porteroId: string;
@@ -2605,6 +2837,8 @@ export interface components {
             porteria?: string | null;
             /** @description Torres, sectores o fincas. INFORMATIVOS (P-17): no filtran alarmas. */
             sectores: string[];
+            /** @description Documento de identidad (H2). En la edición, ausente = no se cambia */
+            documento?: string;
         };
         DecisionDelEdgeDto: {
             /** @description Lo que el Edge resolvió en la portería */
@@ -2719,6 +2953,10 @@ export interface components {
             modoDeTerminal?: "reporta_y_espera" | "decide_el_equipo";
             /** @default false */
             canalDeAudioHabilitado: boolean;
+            /** @example 102 */
+            canalDeVideo?: string;
+            /** Format: uuid */
+            zonaId?: string;
             /** @default true */
             probarConexion: boolean;
         };
@@ -2737,6 +2975,25 @@ export interface components {
             agrupacion?: string | null;
             /** @enum {string} */
             estadoAdministrativo?: "al_dia" | "en_mora" | "suspendida";
+        };
+        ElementoDeLineaDeTiempoDto: {
+            /** @enum {string} */
+            origen: "acceso" | "equipo" | "plataforma";
+            id: string;
+            /** Format: date-time */
+            ocurridoEn: string;
+            /** Format: uuid */
+            dispositivoId: string;
+            /** @description `acceso` o el tipo normalizado del evento de equipo */
+            tipo: string;
+            /** @description Lo que la consola enseña, en español */
+            titulo: string;
+            /** @enum {string|null} */
+            resultado: "permitido" | "negado" | null;
+            /** @description `false` para lo que el equipo declaró histórico */
+            enVivo: boolean;
+            eventoId: string | null;
+            codigo: components["schemas"]["CodigoDelEquipoDto"] | null;
         };
         EmergenciaDto: {
             /** @description Qué ocurre. Obligatorio. */
@@ -2762,24 +3019,11 @@ export interface components {
             /** @description Pasado el umbral de KPI-34 */
             demorado: boolean;
         };
-        EnlaceDeConsentimientoDto: {
-            /** Format: uuid */
-            consentimientoId: string;
-            /** @description Estado del consentimiento al emitir el enlace */
-            estado: string;
-            /** @description Token firmado; vale sólo para este consentimiento y caduca */
-            token: string;
-            /** @description Ruta en la API: /consentimiento/<token> */
-            ruta: string;
-            /** @description URL completa si API_URL_PUBLICA está declarada; null si no lo está */
-            url: string | null;
-            /**
-             * @description H-SITIO-10 · si otro aparato puede abrir `url`. `bucle_local`: 127.0.0.1/localhost, que en un teléfono es el propio teléfono; la consola lo advierte junto al QR.
-             * @enum {string}
-             */
-            alcance: "ausente" | "bucle_local" | "alcanzable";
-            /** @description Caducidad del enlace (ISO 8601) */
-            expiraEn: string;
+        EquipoDeLaSincronizacionDto: {
+            dispositivoId: string;
+            nombre: string;
+            sincronizada: boolean;
+            detalle: string;
         };
         EquipoDto: {
             id: string;
@@ -2795,6 +3039,10 @@ export interface components {
             /** @enum {string|null} */
             modoDeTerminal: "reporta_y_espera" | "decide_el_equipo" | null;
             canalDeAudioHabilitado: boolean;
+            /** @description Flujo de video; `null` = 102 */
+            canalDeVideo: string | null;
+            /** Format: uuid */
+            zonaId: string | null;
             capacidades: components["schemas"]["CapacidadesDeEquipoDto"] | null;
             /** @enum {string} */
             verificacion: "no_verificado" | "verificado" | "rechazado";
@@ -2804,6 +3052,13 @@ export interface components {
             estado: "activo" | "inactivo";
             /** @description D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó. */
             atestacion: components["schemas"]["AtestacionDeEquipoDto"] | null;
+        };
+        EquipoOmitidoDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            nombre: string;
+            /** @description Por qué no recibió la plantilla, en palabras */
+            detalle: string;
         };
         EquiposDto: {
             equipos: components["schemas"]["EquipoDto"][];
@@ -2850,10 +3105,6 @@ export interface components {
             /** @description A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice. */
             formatoDeAudio: string | null;
         };
-        EstadoDeConsentimientoDto: {
-            /** @enum {string} */
-            estado: "pendiente" | "aceptado" | "rechazado" | "revocado" | "expirado";
-        };
         EstadoDeDispositivosDto: {
             dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
             /** @example 3 */
@@ -2862,6 +3113,14 @@ export interface components {
             degradados: number;
             /** @example 0 */
             caidos: number;
+        };
+        EstadoDeEquiposSimuladosDto: {
+            /** @description Si la API opera con el proveedor simulado */
+            simulado: boolean;
+            /** @description Equipos activos dados de alta en ESTA copropiedad */
+            equiposRegistrados: number;
+            /** @description La franja de la consola, sólo si hay equipos reales que no recibirán órdenes */
+            aviso: string | null;
         };
         EstadoDeMiAltaDto: {
             completa: boolean;
@@ -3001,6 +3260,23 @@ export interface components {
             /** @description `null` significa SIN MUESTRAS, que no es lo mismo que incumplir */
             cumple?: boolean | null;
         };
+        FotoDeVisitaDto: {
+            /** @description La foto frontal, JPEG o PNG, en base64 */
+            contenidoBase64: string;
+            /** @enum {string} */
+            tipoMime: "image/jpeg" | "image/png";
+            medidas: components["schemas"]["MedidasDeFotoDto"];
+        };
+        FotoEnEquipoDto: {
+            dispositivoId: string;
+            equipo: string;
+            /** @enum {string} */
+            estado: "pendiente" | "sincronizada" | "fallida" | "suprimida";
+            detalle: string | null;
+            intentos: number;
+            /** Format: date-time */
+            actualizadoEn: string;
+        };
         FotografiaAdjuntadaDto: {
             adjuntada: boolean;
             tipoMime: string;
@@ -3049,6 +3325,25 @@ export interface components {
             /** @description De baja, reactivadas por «sobrescribir». */
             reactivadas: number;
         };
+        GenerarVisitaDto: {
+            /**
+             * Format: date-time
+             * @description Fecha y hora de la visita
+             */
+            inicio: string;
+            duracionMinutos: number;
+            placa?: string | null;
+            observaciones?: string | null;
+            /** @description La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria. */
+            casillaMarcada: boolean;
+            nombre: string;
+            /** @enum {string} */
+            tipoDocumento: "cedula" | "cedula_extranjeria" | "pasaporte" | "otro";
+            documento: string;
+            /** Format: uuid */
+            viviendaId: string;
+            foto: components["schemas"]["FotoDeVisitaDto"];
+        };
         GrupoProyectadoDto: {
             agrupacion: string | null;
             cantidad: number;
@@ -3073,7 +3368,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            tipo: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
+            tipo: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "baja_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
             /** Format: date-time */
             ocurridoEn: string;
             /** Format: uuid */
@@ -3098,7 +3393,7 @@ export interface components {
         };
         HechoDePorteriaDto: {
             /** @enum {string} */
-            hecho: "portero_editado" | "turno_retirado";
+            hecho: "portero_editado" | "turno_retirado" | "cupo_actualizado" | "portero_dado_de_baja";
         };
         HistorialDeOrdenesDto: {
             ordenes: components["schemas"]["OrdenEjecutadaDto"][];
@@ -3157,6 +3452,18 @@ export interface components {
             copropiedadId: string;
             dispositivoId: string;
         };
+        LineaDeTiempoDto: {
+            elementos: components["schemas"]["ElementoDeLineaDeTiempoDto"][];
+        };
+        ListaDeVisitasDto: {
+            /** @description La lista es la del día, sin importar los filtros pedidos */
+            soloElDia: boolean;
+            /** Format: date-time */
+            desde: string | null;
+            /** Format: date-time */
+            hasta: string | null;
+            visitas: components["schemas"]["VisitaDto"][];
+        };
         ListoDto: {
             /** @example listo */
             estado: string;
@@ -3180,13 +3487,7 @@ export interface components {
             /** @description Uno por evento procesado, EN ORDEN. Se corta en el primero que falla. */
             resultados: components["schemas"]["ResultadoDeReconciliacionDto"][];
         };
-        MedidasDeCapturaDto: {
-            nitidez: number;
-            iluminacion: number;
-            rostrosDetectados: number;
-            proporcionRostro: number;
-        };
-        MedidasDto: {
+        MedidasDeFotoDto: {
             rostrosDetectados: number;
             nitidez: number;
             iluminacion: number;
@@ -3205,6 +3506,13 @@ export interface components {
             permiteAccesoVehicular: boolean;
             estado: string;
             acompanantes: number;
+            /**
+             * @description Lo que enseña la tarjeta de la app, con el reloj del servidor: vigente, programada, vencida o rechazada (anulada por portería o superadministración)
+             * @enum {string}
+             */
+            situacion: "vigente" | "programada" | "vencida" | "rechazada";
+            /** @description El motivo que escribió quien la rechazó. `null` si no está rechazada */
+            motivoRechazo: string | null;
         };
         MiEventoDto: {
             /** Format: uuid */
@@ -3221,12 +3529,26 @@ export interface components {
             zona: string | null;
             /** @description KPI-31 · decidido por el Edge: la app lo marca, no lo esconde. */
             decididoPorEdge: boolean;
+            /** @description El acceso fue por una autorización de visita */
+            deVisitante: boolean;
         };
         MiInicioDto: {
             vivienda: components["schemas"]["MiViviendaDto"];
             vinculo: components["schemas"]["MiVinculoDto"];
             /** @description Si puede crear autorizaciones: exige vivienda activa (RN-13) y ser titular (RN-05). Lo decide el servidor; la app no repite la regla. */
             puedeAutorizar: boolean;
+        };
+        MiNotificacionDto: {
+            /** @description Estable: la app la usa para saber qué ya vio */
+            id: string;
+            /** @enum {string} */
+            tipo: "visita_rechazada" | "ingreso_de_visitante";
+            /** Format: date-time */
+            en: string;
+            visitante: string | null;
+            motivo: string | null;
+            /** Format: uuid */
+            autorizacionId: string | null;
         };
         MiVehiculoDto: {
             /** Format: uuid */
@@ -3244,6 +3566,39 @@ export interface components {
             esTitular: boolean;
             /** @description P-11 · por defecto el más restrictivo mientras no se defina. */
             nivelAcceso: string | null;
+        };
+        MiVisitaDto: {
+            /**
+             * Format: date-time
+             * @description Fecha y hora de la visita
+             */
+            inicio: string;
+            duracionMinutos: number;
+            placa?: string | null;
+            observaciones?: string | null;
+            /** @description La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria. */
+            casillaMarcada: boolean;
+            nombre: string;
+            documento: string;
+            foto: components["schemas"]["FotoDeVisitaDto"];
+            /** @description La reusa cada reintento sin conexión */
+            claveDeIdempotencia: string;
+        };
+        MiVisitaGeneradaDto: {
+            creada: boolean;
+            /** Format: uuid */
+            id: string | null;
+            repetida: boolean;
+            /** @enum {string|null} */
+            motivo: "LISTA_NEGRA" | "VIVIENDA_INACTIVA" | "SIN_NIVEL_DE_ACCESO" | "PLACA_DUPLICADA" | null;
+            explicacion: string | null;
+            /** @description Por qué la foto no sirvió, si no sirvió */
+            motivosDeFoto: string[];
+            /** @description Equipos de la copropiedad que admiten rostros */
+            equipos: number;
+            sincronizadas: number;
+            fallidas: number;
+            avisoDeSincronizacion: string | null;
         };
         MiViviendaDto: {
             /** Format: uuid */
@@ -3297,6 +3652,19 @@ export interface components {
             hasta?: string;
             placa?: string | null;
             observaciones?: string | null;
+        };
+        ModoPruebasDto: {
+            /** @description Con el modo pruebas activo, las restricciones de porteros se evalúan y se registran sin bloquear, no hay bloqueo por intentos fallidos y el límite de peticiones es más alto */
+            activo: boolean;
+        };
+        MotivoDeConfiguracionDto: {
+            /** @description Por qué se cambia. Queda en la auditoría junto a quién y cuándo. */
+            motivo: string;
+        };
+        NombreDeEquipoDto: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
         };
         NotasDeAlertaDto: {
             notas: string;
@@ -3492,14 +3860,28 @@ export interface components {
         PlazaRetiradaDto: {
             retirada: boolean;
         };
+        PoolDePorterosDto: {
+            inicio: number;
+            fin: number;
+            /** @description El próximo número que se asignará */
+            siguiente: number;
+            /** @description Porteros activos que admite (máximo 999) */
+            cupo: number;
+            /** @description Porteros activos ahora */
+            activos: number;
+        };
         PorteroCreadoDto: {
             /** Format: uuid */
             usuarioId: string;
+            /** @description El número con el que entrará el portero (H2, ADR-031) */
+            numero: number;
         };
         PorteroDto: {
             /** Format: uuid */
             usuarioId: string;
-            usuario: string | null;
+            /** @description H2 (ADR-031) · el número con el que entra el portero */
+            numero: number | null;
+            documento: string | null;
             nombre: string;
             telefono: string | null;
             correoContacto: string | null;
@@ -3521,6 +3903,9 @@ export interface components {
             /** @example umbralConfianzaPlaca */
             clave: string;
             /** @example debe estar entre 0,500 y 1,000 */
+            motivo: string;
+        };
+        RechazoDeVisitaDto: {
             motivo: string;
         };
         RecuperacionDeFactorDto: {
@@ -3582,6 +3967,13 @@ export interface components {
             /** @example B */
             agrupacion?: string;
         };
+        RepetirVisitaDto: {
+            /** Format: date-time */
+            inicio: string;
+            duracionMinutos: number;
+            casillaMarcada: boolean;
+            claveDeIdempotencia: string;
+        };
         ReservaDelDiaDto: {
             /** Format: uuid */
             id: string;
@@ -3591,18 +3983,6 @@ export interface components {
             /** Format: date-time */
             hasta: string;
             personas: number;
-        };
-        ResponderConsentimientoDto: {
-            /** @description true acepta, false rechaza. Lo responde el TITULAR. */
-            acepta: boolean;
-            /** @description Evidencia de la aceptación (RN-09) */
-            evidenciaId?: string;
-        };
-        RespuestaDeConsentimientoDto: {
-            /** @description Estado resultante del consentimiento */
-            estado: string;
-            /** @description Si el titular aceptó: el resultado de empujar cada plantilla a todas las terminales. Vacío si rechazó o si no había plantilla pendiente. */
-            propagacion: components["schemas"]["SincronizacionTotalDto"][];
         };
         RestablecimientoDeContrasenaDto: {
             /**
@@ -3640,6 +4020,13 @@ export interface components {
             personasCreadas: number;
             /** @description Identificadores que traían la palabra dentro («Casa 42») y se guardaron sin ella. Se recorta y se cuenta: contarlo es lo que impide que el recorte sea silencioso. */
             identificadoresRecortados: number;
+        };
+        ResultadoDeConfiguracionDto: {
+            aplicada: boolean;
+            valorAnterior: string | null;
+            valorNuevo: string | null;
+            /** @description Qué pasó, en palabras */
+            detalle: string;
         };
         ResultadoDeCorreccionDto: {
             /** @enum {string} */
@@ -3720,35 +4107,6 @@ export interface components {
         RevocarAutorizacionDto: {
             motivo: string;
         };
-        RostroCapturadoDto: {
-            aceptada: boolean;
-            /** @description Por qué no sirve la foto. Vacío cuando sí sirve. */
-            motivos: string[];
-            /** Format: uuid */
-            plantillaId: string | null;
-            /**
-             * Format: uuid
-             * @description El consentimiento queda PENDIENTE. Nadie responde por el titular (RN-10).
-             */
-            consentimientoId: string | null;
-            /** @description A3 (15-E) · el enlace que el residente ENTREGA al visitante para que responda desde su teléfono, sin cuenta. De un solo uso y con caducidad. URL completa si la API declara API_URL_PUBLICA; si no, la ruta. Nulo cuando la captura no se aceptó. */
-            enlaceDeConsentimiento: string | null;
-            /** @description A quién se le pidió: el visitante, no el residente que tomó la foto */
-            titular: string | null;
-            calidad: number | null;
-        };
-        RostroDeMiVisitanteDto: {
-            /** @description Plantilla derivada, en base64. Entra cifrada a la bóveda y no vuelve a salir. */
-            vector: string;
-            medidas: components["schemas"]["MedidasDeCapturaDto"];
-            /** @description Versión de la política de tratamiento que se le mostró */
-            versionPolitica: string;
-            /**
-             * Format: date-time
-             * @description Cuándo se suprime la plantilla. RN-11: no más allá de la visita.
-             */
-            suprimirEn: string;
-        };
         SaludDto: {
             /** @example vivo */
             estado: string;
@@ -3798,6 +4156,8 @@ export interface components {
             sincronizadas: number;
             fallidas: number;
             porTerminal: components["schemas"]["ResultadoPorTerminalDto"][];
+            /** @description A3 (15-L) · terminales y videoporteros sin biblioteca de rostros: se omiten y se dice */
+            omitidas: components["schemas"]["EquipoOmitidoDto"][];
         };
         SincronizarPlantillaDto: {
             dispositivoId: string;
@@ -3805,6 +4165,13 @@ export interface components {
         SolicitudDeCanalDto: {
             /** Format: uuid */
             dispositivoId: string;
+        };
+        TextoDeLaCasillaDto: {
+            /** @description Texto de la casilla con el marcador {visitante}: el cliente lo sustituye por el nombre escrito en el formulario */
+            plantilla: string;
+            /** @description El marcador que se sustituye: {visitante} */
+            marcador: string;
+            version: string;
         };
         TokenDeNotificacionDto: {
             /** @description Identificador estable del aparato */
@@ -3920,6 +4287,12 @@ export interface components {
             conteo: number | null;
             motivo: string | null;
         };
+        VerificacionRemotaDto: {
+            /** @description Por qué se cambia. Queda en la auditoría junto a quién y cuándo. */
+            motivo: string;
+            /** @description `true` = la terminal reporta y espera el veredicto; `false` = decide sola (plan B) */
+            activar: boolean;
+        };
         VetoDto: {
             placa?: string | null;
             /** @description Documento de la persona a vetar; se resuelve en ESTA copropiedad */
@@ -3956,11 +4329,68 @@ export interface components {
             /** @description El mismo motivo en castellano llano; lo escribe el dominio, no la pantalla */
             explicacion: string | null;
         };
+        VisitaDto: {
+            autorizacionId: string;
+            visitante: string;
+            documento: string;
+            viviendaId: string;
+            vivienda: string;
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
+            /** @enum {string} */
+            estado: "programada" | "vigente" | "vencida" | "anulada";
+            placa: string | null;
+            generadaPor: string | null;
+            /** Format: date-time */
+            generadaEn: string;
+            /** Format: date-time */
+            anuladaEn: string | null;
+            motivoAnulacion: string | null;
+            tieneFoto: boolean;
+            casillaDeclaradaPor: string | null;
+            /** Format: date-time */
+            casillaEn: string | null;
+            plantillaId: string | null;
+            equiposSincronizados: number;
+            equiposFallidos: number;
+        };
+        VisitaGeneradaDto: {
+            generada: boolean;
+            autorizacionId: string | null;
+            /** @description Por qué no sirvió la foto, si no sirvió */
+            motivosDeFoto: string[];
+            /** @description Equipos con biblioteca de rostros de la copropiedad */
+            equipos: number;
+            sincronizadas: number;
+            fallidas: number;
+            porEquipo: components["schemas"]["EquipoDeLaSincronizacionDto"][];
+            avisoDeSincronizacion: string | null;
+        };
+        VisitaRechazadaDto: {
+            equiposRetirados: number;
+            equiposPendientes: number;
+        };
+        VisitanteRecienteDto: {
+            /** Format: uuid */
+            autorizacionId: string;
+            visitante: string;
+            documento: string;
+            /** Format: date-time */
+            ultimaVisita: string;
+            placa: string | null;
+            tieneFoto: boolean;
+        };
         VistaPreviaDeGeneracionDto: {
             total: number;
             grupos: components["schemas"]["GrupoProyectadoDto"][];
             /** @description Las que ya existen activas. Con una sola, la confirmacion se niega entera: la generacion solo inserta y nunca sustituye nada. */
             colisiones: components["schemas"]["ViviendaProyectadaDto"][];
+        };
+        ViviendaDeVisitaDto: {
+            id: string;
+            nombre: string;
         };
         ViviendaDto: {
             /** Format: uuid */
@@ -4038,7 +4468,7 @@ export interface operations {
                     "application/json": components["schemas"]["SesionDeAccesoDto"];
                 };
             };
-            /** @description Código o NIT, usuario o contraseña incorrectos */
+            /** @description Usuario, código o contraseña incorrectos */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -4056,7 +4486,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorApiDto"];
                 };
             };
-            /** @description 5/min por cuenta, 10/min por origen declarado, 30/min por dirección (S-50) */
+            /** @description 5/min por (IP, cuenta), 10/min y 30/min por dirección (S-50); y, fuera del modo pruebas, 5 fallos del mismo identificador desde la misma IP bloquean 5 minutos (H5) */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -4628,123 +5058,6 @@ export interface operations {
             };
         };
     };
-    BiometriaController_capturarRostro: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CapturarRostroDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    BiometriaController_verConsentimiento: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    BiometriaController_aceptarPresencialmente: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AceptacionPresencialDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RespuestaDeConsentimientoDto"];
-                };
-            };
-        };
-    };
-    BiometriaController_emitirEnlaceDeConsentimiento: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnlaceDeConsentimientoDto"];
-                };
-            };
-        };
-    };
-    BiometriaController_responderConsentimiento: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResponderConsentimientoDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RespuestaDeConsentimientoDto"];
-                };
-            };
-        };
-    };
     BiometriaController_revocarConsentimiento: {
         parameters: {
             query?: never;
@@ -5017,6 +5330,27 @@ export interface operations {
             };
         };
     };
+    EquiposSimuladosController_estado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeEquiposSimuladosDto"];
+                };
+            };
+        };
+    };
     EquiposController_probar: {
         parameters: {
             query?: never;
@@ -5168,6 +5502,32 @@ export interface operations {
             };
         };
     };
+    ConfiguracionEnSitioController_enviarEventos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MotivoDeConfiguracionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeConfiguracionDto"];
+                };
+            };
+        };
+    };
     EquiposController_reactivar: {
         parameters: {
             query?: never;
@@ -5186,6 +5546,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EquipoDto"];
+                };
+            };
+        };
+    };
+    ConfiguracionEnSitioController_cambiarVerificacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificacionRemotaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeConfiguracionDto"];
                 };
             };
         };
@@ -5311,6 +5697,45 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    LineaDeTiempoController_lineaDeTiempo: {
+        parameters: {
+            query: {
+                /** @description Inicio del rango, ISO-8601 con zona */
+                desde: string;
+                /** @description Fin del rango, EXCLUIDO */
+                hasta: string;
+                dispositivoId?: string;
+                /** @description `acceso` para sólo accesos, o un tipo de evento de equipo (p. ej. `puerta_forzada`) */
+                tipo?: string;
+                limite?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LineaDeTiempoDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
                 };
             };
         };
@@ -5991,55 +6416,6 @@ export interface operations {
             };
         };
     };
-    MiHogarController_estadoDelConsentimiento: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                autorizacionId: string;
-                consentimientoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EstadoDeConsentimientoDto"];
-                };
-            };
-        };
-    };
-    MiController_capturarRostro: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                autorizacionId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RostroDeMiVisitanteDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RostroCapturadoDto"];
-                };
-            };
-        };
-    };
     MiController_familia: {
         parameters: {
             query?: never;
@@ -6081,6 +6457,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MiEventoDto"][];
+                };
+            };
+        };
+    };
+    MisNotificacionesController_notificaciones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiNotificacionDto"][];
                 };
             };
         };
@@ -6295,6 +6692,78 @@ export interface operations {
             };
         };
     };
+    MisVisitasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MiVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiVisitaGeneradaDto"];
+                };
+            };
+        };
+    };
+    MisVisitasController_ultimas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitanteRecienteDto"][];
+                };
+            };
+        };
+    };
+    MisVisitasController_repetir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepetirVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiVisitaGeneradaDto"];
+                };
+            };
+        };
+    };
     MiController_vivienda: {
         parameters: {
             query?: never;
@@ -6333,6 +6802,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MiZonaDto"][];
+                };
+            };
+        };
+    };
+    NombresDeEquiposController_nombres: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NombreDeEquipoDto"][];
                 };
             };
         };
@@ -6802,7 +7292,7 @@ export interface operations {
             query: {
                 desde: string;
                 hasta: string;
-                tipo?: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
+                tipo?: "inicio_de_sesion" | "acceso_rechazado" | "cierre_de_sesion" | "inicio_de_patrullaje" | "fin_de_patrullaje" | "codigo_incorrecto" | "turno_asignado" | "turno_extra" | "turno_editado" | "turno_retirado" | "solape_de_turno" | "alta_de_portero" | "edicion_de_portero" | "baja_de_portero" | "restablecimiento_de_contrasena" | "cambio_de_contrasena";
             };
             header?: never;
             path: {
@@ -6868,6 +7358,52 @@ export interface operations {
             };
         };
     };
+    PoolDePorterosController_fijarCupo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CupoDePorterosDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HechoDePorteriaDto"];
+                };
+            };
+        };
+    };
+    PoolDePorterosController_pool: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolDePorterosDto"];
+                };
+            };
+        };
+    };
     SupervisionController_editar: {
         parameters: {
             query?: never;
@@ -6881,6 +7417,32 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DatosDelPorteroDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HechoDePorteriaDto"];
+                };
+            };
+        };
+    };
+    PoolDePorterosController_baja: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuarioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BajaDePorteroDto"];
             };
         };
         responses: {
@@ -6936,6 +7498,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CuentaDeResidenteCreadaDto"];
+                };
+            };
+        };
+    };
+    PerfilDeResidentesController_ver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuarioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerfilDelResidenteDto"];
+                };
+            };
+        };
+    };
+    PerfilDeResidentesController_editar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuarioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerfilDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDePerfilDto"];
                 };
             };
         };
@@ -7165,6 +7775,149 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    VisitasController_lista: {
+        parameters: {
+            query?: {
+                desde?: string;
+                hasta?: string;
+                viviendaId?: string;
+                estado?: "programada" | "vigente" | "vencida" | "anulada";
+                /** @description Nombre o documento del visitante */
+                texto?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaDeVisitasDto"];
+                };
+            };
+        };
+    };
+    VisitasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerarVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitaGeneradaDto"];
+                };
+            };
+        };
+    };
+    VisitasController_casilla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextoDeLaCasillaDto"];
+                };
+            };
+        };
+    };
+    VisitasController_viviendas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViviendaDeVisitaDto"][];
+                };
+            };
+        };
+    };
+    VisitasController_equipos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FotoEnEquipoDto"][];
+                };
+            };
+        };
+    };
+    VisitasController_rechazo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RechazoDeVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitaRechazadaDto"];
                 };
             };
         };
@@ -7537,6 +8290,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LatenciasDto"];
+                };
+            };
+        };
+    };
+    PlataformaController_leer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModoPruebasDto"];
+                };
+            };
+        };
+    };
+    PlataformaController_cambiar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModoPruebasDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModoPruebasDto"];
                 };
             };
         };

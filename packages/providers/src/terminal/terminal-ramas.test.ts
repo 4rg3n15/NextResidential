@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Bitacora } from '@ncr/domain-core';
 import { TerminalFacial } from './terminal-facial';
 import { equipoSimulado } from '../simulacion/equipo-simulado';
+import { jpegConMedidas } from '../simulacion/imagenes-de-prueba';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -54,7 +55,7 @@ describe('15-K · el rechazo de la carga se ve en la bitácora (H-SITIO-04)', ()
     };
     const terminal = terminalCon({ '/FDLib/FDSetUp': 'rechazo' }, traza);
     await expect(
-      terminal.sincronizar('t-1', '5e2b7c1a-0000-4000-8000-0000000000d1', new Uint8Array([1, 2])),
+      terminal.sincronizar('t-1', '5e2b7c1a-0000-4000-8000-0000000000d1', jpegConMedidas()),
     ).rejects.toBeDefined();
     const carga = lineas.find((l) => l.mensaje === 'carga de plantilla en la terminal');
     expect(carga?.nivel).toBe('error');

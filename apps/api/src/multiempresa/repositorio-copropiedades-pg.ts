@@ -30,6 +30,8 @@ interface FilaDeConfiguracion {
   readonly codigo_corto: string | null;
   readonly telefono_porteria: string | null;
   readonly tope_vehiculos_propios: number;
+  readonly ips_porteria: string[] | null;
+  readonly ips_guardia_remota: string[] | null;
 }
 
 const aConfiguracion = (f: FilaDeConfiguracion): ConfiguracionDeCopropiedad => ({
@@ -50,6 +52,8 @@ const aConfiguracion = (f: FilaDeConfiguracion): ConfiguracionDeCopropiedad => (
   codigoCorto: f.codigo_corto,
   telefonoPorteria: f.telefono_porteria,
   topeVehiculosPropios: Number(f.tope_vehiculos_propios),
+  ipsPorteria: f.ips_porteria ?? [],
+  ipsGuardiaRemota: f.ips_guardia_remota ?? [],
   aprobacionDeTerceros: 'automatica',
 });
 
@@ -76,7 +80,10 @@ const CAMPOS_DE_CONFIGURACION = `
        version_reglas_actual,
        codigo_corto,
        telefono_porteria,
-       tope_vehiculos_propios`;
+       tope_vehiculos_propios,
+       -- H4 (15-L) · abbrev: una IP sin la máscara /32, una red con la suya.
+       ARRAY(SELECT abbrev(x) FROM unnest(ips_porteria) x) AS ips_porteria,
+       ARRAY(SELECT abbrev(x) FROM unnest(ips_guardia_remota) x) AS ips_guardia_remota`;
 
 /**
  * Catálogo de copropiedades contra PostgreSQL, **por los dos caminos de
@@ -210,6 +217,8 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
       codigoCorto: 'codigo_corto = $#',
       telefonoPorteria: 'telefono_porteria = $#',
       topeVehiculosPropios: 'tope_vehiculos_propios = $#',
+      ipsPorteria: 'ips_porteria = $#::inet[]',
+      ipsGuardiaRemota: 'ips_guardia_remota = $#::inet[]',
       /**
        * B.5 · `umbral_confianza_placa` y `umbral_latido_dispositivo` YA NO se
        * escriben desde aquí. No es que el mapa los ignore: es que no hay
@@ -221,7 +230,7 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
     };
 
     const asignaciones: string[] = [];
-    const valores: (string | number | null)[] = [];
+    const valores: (string | number | null | readonly string[])[] = [];
     for (const [clave, valor] of Object.entries(efectivos)) {
       const plantilla = COLUMNA[clave];
       if (plantilla === undefined || valor === undefined) continue;

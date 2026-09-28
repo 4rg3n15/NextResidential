@@ -191,6 +191,14 @@ const entornoDeApi = (doble, puerto) => ({
   SUPABASE_JWKS_URL: doble.jwksUrl,
   DATABASE_URL: 'marcador',
   DATABASE_POOLER_URL: 'marcador',
+  /**
+   * 15-L · explícito. Este camino se escribió para adaptadores EN MEMORIA y
+   * confiaba en el valor por omisión, que la 15-K cambió a `postgres`. No se
+   * notó mientras el acceso por correo iba directo al proveedor de identidad;
+   * desde H (15-L) todo acceso pasa por `/auth/acceso`, que consulta el modo
+   * pruebas y los intentos, y con la base de marcador contestaba 500.
+   */
+  PERSISTENCIA_DE_EVENTOS: 'memoria',
   INGESTA_FIRMA_SECRETO: 'secreto-de-ingesta-para-el-camino-e2e-32',
   BIOMETRIA_LLAVE: 'llave-de-biometria-para-el-camino-e2e-32+',
   BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
@@ -307,7 +315,8 @@ const principal = async () => {
    * red**, no sólo por el bucle local. Sin eso, el paso 3.bis no puede existir,
    * y ese paso es el que encontró D-67.
    */
-  lanzar('node', [binDeNext, 'start', '-H', '0.0.0.0', '-p', String(puertoWeb)], {
+  // 15-L (H6) · el servidor de producción de la consola (`pnpm start`), no `next start`.
+  lanzar('node', ['servidor.mjs', '-H', '0.0.0.0', '-p', String(puertoWeb)], {
     cwd: resolve(raiz, 'apps/web'),
     env: entornoWeb,
     detached: true,
@@ -785,7 +794,7 @@ const principal = async () => {
   });
   if (!(await esperar(`http://127.0.0.1:${puertoApiConVariable}/health`, 'la API'))) return;
 
-  lanzar('node', [binDeNext, 'start', '-p', String(puertoWebConVariable)], {
+  lanzar('node', ['servidor.mjs', '-p', String(puertoWebConVariable)], {
     cwd: resolve(raiz, 'apps/web'),
     env: {
       ...entornoWeb,

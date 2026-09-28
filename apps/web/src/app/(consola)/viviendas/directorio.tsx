@@ -391,7 +391,7 @@ export const DirectorioDeViviendas = ({
                       {v.autorizacionesVigentes} autorización
                       {v.autorizacionesVigentes === 1 ? '' : 'es'} vigente
                       {v.autorizacionesVigentes === 1 ? '' : 's'}
-                      {v.estado === 'inactivo' ? ' — siguen abriendo (RN-13)' : ''}
+                      {v.estado === 'inactivo' ? ' — siguen abriendo' : ''}
                     </span>
                   ) : null}
                   <span className="ml-auto">
@@ -556,7 +556,7 @@ export const DirectorioDeViviendas = ({
       >
         <p className="rounded-md border border-peligro bg-peligro-suave px-3 py-2 text-secundario text-peligro-texto">
           Es para la vivienda <strong>creada por error</strong>. Si ya tiene historial, use
-          «Desactivar»: el historial de accesos no se borra nunca (RN-19).
+          «Desactivar»: el historial de accesos no se borra nunca.
         </p>
       </DialogoDeConfirmacion>
 
@@ -579,7 +579,7 @@ export const DirectorioDeViviendas = ({
             Conserva <strong>{baja.autorizacionesVigentes}</strong> autorización
             {baja.autorizacionesVigentes === 1 ? '' : 'es'} vigente
             {baja.autorizacionesVigentes === 1 ? '' : 's'}: seguirán permitiendo el acceso hasta que
-            expiren o se revoquen (RN-13).
+            expiren o se revoquen.
           </p>
         ) : null}
       </DialogoDeConfirmacion>

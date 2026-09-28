@@ -9,8 +9,11 @@ import '../models/alta_de_cuenta_de_residente_dto.dart';
 import '../models/anadir_ocupantes_dto.dart';
 import '../models/cuenta_de_residente_creada_dto.dart';
 import '../models/cuenta_de_residente_dto.dart';
+import '../models/perfil_del_residente_dto.dart';
+import '../models/perfil_dto.dart';
 import '../models/plaza_de_ocupante_dto.dart';
 import '../models/plaza_retirada_dto.dart';
+import '../models/resultado_de_perfil_dto.dart';
 import '../models/retiro_de_ocupante_dto.dart';
 import '../models/vehiculo_de_residente_dto.dart';
 
@@ -31,6 +34,21 @@ abstract class ResidentesApi {
   Future<CuentaDeResidenteCreadaDto> supervisionDeResidentesControllerAlta({
     @Path('id') required String id,
     @Body() required AltaDeCuentaDeResidenteDto body,
+  });
+
+  /// Perfil de un residente (datos personales y de contacto)
+  @GET('/copropiedades/{id}/residentes/cuentas/{usuarioId}/perfil')
+  Future<PerfilDelResidenteDto> perfilDeResidentesControllerVer({
+    @Path('id') required String id,
+    @Path('usuarioId') required String usuarioId,
+  });
+
+  /// Edita el perfil de un residente; queda en su bitácora con el autor
+  @PUT('/copropiedades/{id}/residentes/cuentas/{usuarioId}/perfil')
+  Future<ResultadoDePerfilDto> perfilDeResidentesControllerEditar({
+    @Path('id') required String id,
+    @Path('usuarioId') required String usuarioId,
+    @Body() required PerfilDto body,
   });
 
   /// Vehículos registrados por residentes, con fecha y vivienda (D5 a)

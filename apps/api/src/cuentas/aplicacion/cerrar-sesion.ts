@@ -12,9 +12,19 @@ export class CerrarSesion {
   constructor(
     private readonly proveedor: ProveedorDeIdentidad,
     private readonly ganchos: GanchosDeSesion,
+    /**
+     * H4 b (15-L) · el superadministrador que cierra sesión deja de contar
+     * para la regla de transición de los porteros: su IP ya no les sirve.
+     */
+    private readonly presencia: { cerrar(sesionId: string): Promise<void> } = {
+      cerrar: async () => undefined,
+    },
   ) {}
 
   async ejecutar(ctx: ContextoTenant, accessToken: string | null): Promise<void> {
+    if (ctx.rol === 'superadministrador' && ctx.sesionId !== undefined) {
+      await this.presencia.cerrar(ctx.sesionId);
+    }
     const gancho = this.ganchos.de(ctx.rol);
     if (gancho !== undefined && ctx.copropiedadId !== null && ctx.sesionId !== undefined) {
       await gancho.alCerrar({

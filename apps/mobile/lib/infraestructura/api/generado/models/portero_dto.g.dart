@@ -8,7 +8,8 @@ part of 'portero_dto.dart';
 
 PorteroDto _$PorteroDtoFromJson(Map<String, dynamic> json) => PorteroDto(
   usuarioId: json['usuarioId'] as String,
-  usuario: json['usuario'] as String?,
+  numero: json['numero'] as num?,
+  documento: json['documento'] as String?,
   nombre: json['nombre'] as String,
   telefono: json['telefono'] as String?,
   correoContacto: json['correoContacto'] as String?,
@@ -30,7 +31,8 @@ PorteroDto _$PorteroDtoFromJson(Map<String, dynamic> json) => PorteroDto(
 Map<String, dynamic> _$PorteroDtoToJson(PorteroDto instance) =>
     <String, dynamic>{
       'usuarioId': instance.usuarioId,
-      'usuario': instance.usuario,
+      'numero': instance.numero,
+      'documento': instance.documento,
       'nombre': instance.nombre,
       'telefono': instance.telefono,
       'correoContacto': instance.correoContacto,

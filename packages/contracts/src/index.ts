@@ -32,6 +32,9 @@ export type EstadoDeDispositivos = Esquemas['EstadoDeDispositivosDto'];
 export type DispositivoDelTablero = Esquemas['DispositivoDelTableroDto'];
 export type EventoRegistrado = Esquemas['EventoRegistradoDto'];
 export type PaginaDeEventos = Esquemas['PaginaDeEventosDto'];
+/** 15-L (Bloque B) · accesos y eventos de equipo en una sola línea de tiempo. */
+export type ElementoDeLineaDeTiempo = Esquemas['ElementoDeLineaDeTiempoDto'];
+export type LineaDeTiempo = Esquemas['LineaDeTiempoDto'];
 export type AlertaExpuesta = Esquemas['AlertaExpuestaDto'];
 export type ErrorApi = Esquemas['ErrorApiDto'];
 /** ETAPA 14 · tablero de las cinco latencias comprometidas (RNF-11.3). */
@@ -112,6 +115,10 @@ export type ResultadoDeSondeo = Esquemas['ResultadoDeSondeoDto'];
 export type FichaDelEquipo = Esquemas['FichaDelEquipoDto'];
 export type HallazgoDelEquipo = Esquemas['HallazgoDelEquipoDto'];
 export type ResultadoDeCorreccion = Esquemas['ResultadoDeCorreccionDto'];
+/** Corrección de la 15-L · «Enviar eventos a este Mac» y el interruptor de verificación remota. */
+export type ResultadoDeConfiguracion = Esquemas['ResultadoDeConfiguracionDto'];
+/** F3 · ¿llegan las órdenes a un equipo real? La franja de la consola. */
+export type EstadoDeEquiposSimulados = Esquemas['EstadoDeEquiposSimuladosDto'];
 export type TipoDeEquipo = Equipo['tipo'];
 /** Los cuatro tipos de conjunto, tomados del contrato. */
 export type TipoDeCopropiedad = NonNullable<ConfiguracionDeCopropiedad['tipo']>;
@@ -140,8 +147,20 @@ export type TurnoDePorteria = Esquemas['TurnoDto'];
 export type TurnoGuardado = Esquemas['TurnoGuardadoDto'];
 export type HechoDeBitacora = Esquemas['HechoDeBitacoraDto'];
 export type TipoDeHechoDeBitacora = HechoDeBitacora['tipo'];
+/** ETAPA 15-L (H, ADR-031) · el pool de números de portero y el modo pruebas. */
+export type PoolDePorteros = Esquemas['PoolDePorterosDto'];
+export type ModoPruebas = Esquemas['ModoPruebasDto'];
 
 /** ETAPA 15-I · residentes: cuentas, plazas de ocupante y vehículos registrados por ellos. */
 export type CuentaDeResidente = Esquemas['CuentaDeResidenteDto'];
 export type PlazaDeOcupante = Esquemas['PlazaDeOcupanteDto'];
 export type VehiculoDeResidente = Esquemas['VehiculoDeResidenteDto'];
+
+/** ETAPA 15-L (F) · visitas con foto y casilla: generar, listar, rechazar, equipos. */
+export type Visita = Esquemas['VisitaDto'];
+export type ListaDeVisitas = Esquemas['ListaDeVisitasDto'];
+export type EstadoDeVisita = Visita['estado'];
+export type FotoEnEquipo = Esquemas['FotoEnEquipoDto'];
+export type ViviendaDeVisita = Esquemas['ViviendaDeVisitaDto'];
+export type VisitaGenerada = Esquemas['VisitaGeneradaDto'];
+export type TextoDeLaCasilla = Esquemas['TextoDeLaCasillaDto'];

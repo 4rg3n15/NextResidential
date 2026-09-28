@@ -30,6 +30,8 @@ EdicionDeEquipoDto _$EdicionDeEquipoDtoFromJson(Map<String, dynamic> json) =>
           : EdicionDeEquipoDtoModoDeTerminal.fromJson(
               json['modoDeTerminal'] as String,
             ),
+      canalDeVideo: json['canalDeVideo'] as String?,
+      zonaId: json['zonaId'] as String?,
     );
 
 Map<String, dynamic> _$EdicionDeEquipoDtoToJson(EdicionDeEquipoDto instance) =>
@@ -47,5 +49,7 @@ Map<String, dynamic> _$EdicionDeEquipoDtoToJson(EdicionDeEquipoDto instance) =>
       'fabricante': instance.fabricante,
       'modoDeTerminal': instance.modoDeTerminal,
       'canalDeAudioHabilitado': instance.canalDeAudioHabilitado,
+      'canalDeVideo': instance.canalDeVideo,
+      'zonaId': instance.zonaId,
       'probarConexion': instance.probarConexion,
     };

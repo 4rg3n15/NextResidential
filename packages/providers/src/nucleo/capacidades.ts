@@ -53,6 +53,13 @@ export interface CapacidadDeBiblioteca {
   readonly maximo: number | null;
   /** Cuántas hay ahora. `null` si no se consultó. */
   readonly almacenadas: number | null;
+  /**
+   * F4 (15-L) · POR QUÉ no se pudo leer, en palabras («el equipo contestó
+   * HTTP 400 (badParameters) a …»). Sólo con `estado === 'desconocida'`; en
+   * `si` y `no` falta o es `null`. Es lo que la ficha enseña en «no se pudo
+   * leer (motivo)»: sin él, `desconocida` no dice qué mirar.
+   */
+  readonly motivo?: string | null;
 }
 
 export interface CapacidadDeAudio {
@@ -62,6 +69,23 @@ export interface CapacidadDeAudio {
   /** Códec en lenguaje neutro (p. ej. `g711u`). `null` si no se conoce. */
   readonly formato: string | null;
 }
+
+/**
+ * D2 · C3 (15-L) · el video, preguntado al equipo por RTSP: si lo entrega, en
+ * qué códec y por qué canal. El navegador reproduce H.264; con H.265 la
+ * consola lo dice en vez de quedarse en negro.
+ */
+export interface CapacidadDeVideo {
+  readonly estado: EstadoDeCapacidad;
+  /** «H.264», «H.265»… leído de lo que describe el equipo. `null` si no se sabe. */
+  readonly codec: string | null;
+  /** El canal preguntado (canal×100+flujo). `null` si no se preguntó. */
+  readonly canal: string | null;
+}
+
+/** ¿El navegador puede reproducirlo? Sólo H.264 se da por sí. */
+export const videoReproducible = (video: CapacidadDeVideo): boolean | null =>
+  video.codec === null ? null : video.codec === 'H.264';
 
 /**
  * Las capacidades que el sistema consulta antes de pedir algo a un equipo.
@@ -81,6 +105,8 @@ export interface CapacidadesDeEquipo {
   readonly bibliotecaDeRostros: CapacidadDeBiblioteca;
   /** ¿Gestiona personas (alta/baja) a las que asignar una plantilla? */
   readonly gestionDePersonas: EstadoDeCapacidad;
+  /** F4 (15-L) · por qué `gestionDePersonas` quedó `desconocida`; como `motivo` de la biblioteca. */
+  readonly motivoDeGestionDePersonas?: string | null;
   /** ¿Audio bidireccional (ADR-01)? */
   readonly audioBidireccional: CapacidadDeAudio;
   /** ¿Señaliza llamadas (timbre) hacia la plataforma y admite contestarlas? */
@@ -98,10 +124,15 @@ export interface CapacidadesDeEquipo {
    * equipo que sólo abre por orden declara `no`, y la consola lo ve así.
    */
   readonly bloqueoDeAcceso: EstadoDeCapacidad;
+  /** D2 (15-L) · ¿Entrega video por RTSP, y en qué códec? */
+  readonly video: CapacidadDeVideo;
 }
 
 /** Nombre de cada capacidad, para nombrarla en un error o en una pantalla. */
-export type NombreDeCapacidad = Exclude<keyof CapacidadesDeEquipo, 'origen'>;
+export type NombreDeCapacidad = Exclude<
+  keyof CapacidadesDeEquipo,
+  'origen' | 'motivoDeGestionDePersonas'
+>;
 
 /** Todo `desconocida`: lo que se sabe de un equipo del que nadie preguntó. */
 export const CAPACIDADES_SIN_CONSULTAR: CapacidadesDeEquipo = Object.freeze<CapacidadesDeEquipo>({
@@ -116,6 +147,7 @@ export const CAPACIDADES_SIN_CONSULTAR: CapacidadesDeEquipo = Object.freeze<Capa
   reconocimientoDePlacas: 'desconocida',
   estadoDeBarrera: 'desconocida',
   bloqueoDeAcceso: 'desconocida',
+  video: { estado: 'desconocida', codec: null, canal: null },
 });
 
 /** El estado de una capacidad, sea simple o compuesta. */
@@ -169,6 +201,7 @@ export const CAPACIDADES_COMPLETAS: CapacidadesDeEquipo = Object.freeze<Capacida
   reconocimientoDePlacas: 'si',
   estadoDeBarrera: 'si',
   bloqueoDeAcceso: 'si',
+  video: { estado: 'si', codec: 'H.264', canal: '102' },
 });
 
 /**
@@ -189,7 +222,15 @@ export const capacidadesDesdeJson = (crudo: unknown): CapacidadesDeEquipo => {
     typeof valor === 'object' && valor !== null ? (valor as Record<string, unknown>) : {};
   const biblioteca = compuesta(objeto['bibliotecaDeRostros']);
   const audio = compuesta(objeto['audioBidireccional']);
+  const video = compuesta(objeto['video']);
   const origen = objeto['origen'];
+  const estadoDeBiblioteca = estado(biblioteca['estado']);
+  const personas = estado(objeto['gestionDePersonas']);
+  // F4 · el motivo sólo acompaña a `desconocida`: en `si`/`no` no se arrastra.
+  const motivo = (e: EstadoDeCapacidad, valor: unknown): string | null =>
+    e === 'desconocida' ? texto(valor) : null;
+  const motivoDeBiblioteca = motivo(estadoDeBiblioteca, biblioteca['motivo']);
+  const motivoDePersonas = motivo(personas, objeto['motivoDeGestionDePersonas']);
   return {
     origen:
       origen === 'descubiertas' || origen === 'declaradas' || origen === 'sin_consultar'
@@ -198,11 +239,13 @@ export const capacidadesDesdeJson = (crudo: unknown): CapacidadesDeEquipo => {
     aperturaRemota: estado(objeto['aperturaRemota']),
     verificacionRemota: estado(objeto['verificacionRemota']),
     bibliotecaDeRostros: {
-      estado: estado(biblioteca['estado']),
+      estado: estadoDeBiblioteca,
       maximo: numero(biblioteca['maximo']),
       almacenadas: numero(biblioteca['almacenadas']),
+      ...(motivoDeBiblioteca === null ? {} : { motivo: motivoDeBiblioteca }),
     },
-    gestionDePersonas: estado(objeto['gestionDePersonas']),
+    gestionDePersonas: personas,
+    ...(motivoDePersonas === null ? {} : { motivoDeGestionDePersonas: motivoDePersonas }),
     audioBidireccional: {
       estado: estado(audio['estado']),
       canal: numero(audio['canal']),
@@ -213,5 +256,11 @@ export const capacidadesDesdeJson = (crudo: unknown): CapacidadesDeEquipo => {
     reconocimientoDePlacas: estado(objeto['reconocimientoDePlacas']),
     estadoDeBarrera: estado(objeto['estadoDeBarrera']),
     bloqueoDeAcceso: estado(objeto['bloqueoDeAcceso']),
+    // Unas capacidades guardadas antes de la 15-L no traen video: desconocida.
+    video: {
+      estado: estado(video['estado']),
+      codec: texto(video['codec']),
+      canal: texto(video['canal']),
+    },
   };
 };

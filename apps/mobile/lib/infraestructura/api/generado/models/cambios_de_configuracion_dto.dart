@@ -22,6 +22,8 @@ class CambiosDeConfiguracionDto {
     this.codigoCorto,
     this.telefonoPorteria,
     this.topeVehiculosPropios,
+    this.ipsPorteria,
+    this.ipsGuardiaRemota,
   });
   
   factory CambiosDeConfiguracionDto.fromJson(Map<String, Object?> json) => _$CambiosDeConfiguracionDtoFromJson(json);
@@ -42,6 +44,12 @@ class CambiosDeConfiguracionDto {
 
   /// D5 a · vehículos propios por vivienda (sólo superadministrador)
   final num? topeVehiculosPropios;
+
+  /// H4 · IP o redes CIDR del computador de portería (sólo superadministrador)
+  final List<String>? ipsPorteria;
+
+  /// H4 · IP o redes CIDR permitidas para la guardia remota de porteros (sólo superadministrador)
+  final List<String>? ipsGuardiaRemota;
 
   Map<String, Object?> toJson() => _$CambiosDeConfiguracionDtoToJson(this);
 }

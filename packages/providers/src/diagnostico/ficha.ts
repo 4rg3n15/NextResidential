@@ -1,7 +1,8 @@
-import type { DiagnosticoDeEquipo } from './diagnostico-de-equipo';
+import type { DiagnosticoDeEquipo, VideoDelEquipo } from './diagnostico-de-equipo';
 import type { ClaseDeCorreccion } from './correcciones';
 import { IMAGENES } from '../camara/receptor-en-el-equipo';
 import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
+import { hallazgoDeRostros } from './hallazgo-de-rostros';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -136,33 +137,25 @@ const hallazgosDeTerminal = (c: CapacidadesDeEquipo): HallazgoDelEquipo[] => {
       // «no»: con `desconocida` no hay documento que leer-modificar-escribir.
       correccion: c.verificacionRemota === 'no' ? 'verificacion_remota' : null,
     },
-    biblioteca.estado === 'si'
-      ? {
-          campo: 'biblioteca de rostros',
-          estado: ocupacion !== null && ocupacion >= 0.9 ? 'aviso' : 'conforme',
-          valorLeido:
-            biblioteca.almacenadas === null || biblioteca.maximo === null
-              ? 'declarada'
-              : `${String(biblioteca.almacenadas)} de ${String(biblioteca.maximo)} plantillas`,
-          valorCorrecto: 'con espacio para las plantillas vigentes',
-          detalle:
-            ocupacion !== null && ocupacion >= 0.9
-              ? 'La biblioteca está al 90 % o más: la siguiente sincronización puede fallar por ' +
-                'falta de espacio. Suprima las plantillas vencidas antes'
-              : 'La terminal admite plantillas y tiene espacio',
-          correccion: null,
-        }
-      : desdeCapacidad('biblioteca de rostros', biblioteca.estado, {
-          si: { valor: 'declarada', detalle: 'La terminal admite plantillas' },
-          no: {
-            estado: 'bloqueo',
-            detalle:
-              'La terminal no declara biblioteca de rostros: no se le puede sincronizar ' +
-              'ninguna plantilla y no reconocerá a nadie',
-          },
-          desconocida: 'No se pudo leer si la terminal admite plantillas ni cuántas',
-          valorCorrecto: 'con espacio para las plantillas vigentes',
-        }),
+    hallazgoDeRostros(biblioteca, {
+      ocupacion:
+        biblioteca.almacenadas === null || biblioteca.maximo === null
+          ? null
+          : `${String(biblioteca.almacenadas)} de ${String(biblioteca.maximo)} plantillas`,
+      avisoDeAdmite: ocupacion !== null && ocupacion >= 0.9,
+      detalleDeAdmite:
+        ocupacion !== null && ocupacion >= 0.9
+          ? 'La biblioteca está al 90 % o más: la siguiente sincronización puede fallar por ' +
+            'falta de espacio. Suprima las plantillas vencidas antes'
+          : 'La terminal admite plantillas y tiene espacio',
+      no: {
+        estado: 'bloqueo',
+        detalle:
+          'La terminal no declara biblioteca de rostros: no se le puede sincronizar ' +
+          'ninguna plantilla y no reconocerá a nadie',
+      },
+      valorCorrecto: 'admite, con espacio para las plantillas vigentes',
+    }),
     desdeCapacidad('gestión de personas', c.gestionDePersonas, {
       si: { valor: 'sí', detalle: 'La terminal admite dar de alta y de baja personas' },
       no: {
@@ -242,23 +235,20 @@ const hallazgosDeVideoportero = (c: CapacidadesDeEquipo): HallazgoDelEquipo[] =>
    * el tipo del aparato dejaría en sitio un visitante con consentimiento y
    * sin puerta.
    */
-  desdeCapacidad('reconocimiento facial en este equipo', c.bibliotecaDeRostros.estado, {
-    si: {
-      valor:
-        c.bibliotecaDeRostros.maximo === null
-          ? 'biblioteca declarada'
-          : `biblioteca de hasta ${String(c.bibliotecaDeRostros.maximo)} rostros`,
-      detalle:
-        'Las plantillas con consentimiento vigente se sincronizan también a este equipo (RN-09)',
-    },
+  hallazgoDeRostros(c.bibliotecaDeRostros, {
+    ocupacion:
+      c.bibliotecaDeRostros.maximo === null
+        ? null
+        : `hasta ${String(c.bibliotecaDeRostros.maximo)} rostros`,
+    detalleDeAdmite:
+      'Las plantillas con consentimiento vigente se sincronizan también a este equipo (RN-09)',
     no: {
       estado: 'aviso',
       detalle:
         'NO APLICA POR CAPACIDAD: el equipo no declara biblioteca de rostros. Ninguna plantilla ' +
         'se le envía; el acceso por este equipo es por llamada y apertura remota',
     },
-    desconocida: 'No se pudo leer si el equipo tiene biblioteca de rostros: sondee de nuevo',
-    valorCorrecto: 'sí, si el modelo la trae',
+    valorCorrecto: 'admite, si el modelo la trae',
   }),
   desdeCapacidad('suscripción a eventos', c.suscripcionDeEventos, {
     si: { valor: 'sí', detalle: 'El equipo admite que la plataforma se suscriba a sus eventos' },
@@ -270,6 +260,60 @@ const hallazgosDeVideoportero = (c: CapacidadesDeEquipo): HallazgoDelEquipo[] =>
     valorCorrecto: 'sí',
   }),
 ];
+
+/**
+ * D2 · C3 (15-L) · el video, con la respuesta RTSP del equipo: qué códec
+ * describe en qué canal. H.265 no es un bloqueo —el acceso funciona sin
+ * video— pero se dice alto: sin esto, la consola quedaba en negro.
+ */
+const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
+  const campo = `video en vivo (canal ${v.canal})`;
+  const base = { campo, valorCorrecto: 'H.264', correccion: null } as const;
+  if (v.clase === 'respondio' && v.codec === 'H.264') {
+    return {
+      ...base,
+      estado: 'conforme',
+      valorLeido: `H.264 · respuesta RTSP del equipo`,
+      detalle: 'El navegador lo reproduce: la guardia, la portería y la ficha tendrán video',
+    };
+  }
+  if (v.clase === 'respondio') {
+    return {
+      ...base,
+      estado: 'aviso',
+      valorLeido: v.codec ?? 'sin video en lo que describe',
+      detalle:
+        v.codec === 'H.265'
+          ? `El equipo entrega H.265 en el canal ${v.canal} y el navegador no lo reproduce: la ` +
+            'consola lo dirá en vez de mostrar negro. Cámbielo a H.264 en el equipo (codificación ' +
+            'del flujo) o elija otro canal en la ficha, y vuelva a probar'
+          : `El equipo describe el canal ${v.canal} sin un video H.264 legible: elija otro canal o ` +
+            'cambie la codificación en el equipo',
+    };
+  }
+  if (v.clase === 'rechazo') {
+    return {
+      ...base,
+      estado: 'aviso',
+      valorLeido: `RTSP ${String(v.estado)}`,
+      detalle: `El equipo no tiene el canal ${v.canal}: elija otro en la ficha (102 es el subflujo de la primera cámara)`,
+    };
+  }
+  if (v.clase === 'credencial') {
+    return {
+      ...base,
+      estado: 'aviso',
+      valorLeido: 'credencial rechazada por RTSP',
+      detalle:
+        'El equipo aceptó la credencial por HTTP pero no por RTSP: revise que el usuario de ' +
+        'servicio tenga permiso de vista en vivo. No se reintenta',
+    };
+  }
+  return noComprobado(
+    campo,
+    `El equipo no contestó por RTSP en el puerto ${String(v.puerto)}: ${v.detalle}`,
+  );
+};
 
 export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
   const hallazgos: HallazgoDelEquipo[] = [];
@@ -290,6 +334,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
           : hallazgosDeVideoportero(c)),
       );
     }
+    if (diagnostico.video !== undefined) hallazgos.push(hallazgoDeVideo(diagnostico.video));
     hallazgos.push(hallazgoDelReloj(diagnostico));
     return {
       modelo: diagnostico.modelo,
@@ -460,6 +505,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
   }
 
   // ── 6 · El reloj, invisible hasta que corrompe la trazabilidad ────────────
+  if (diagnostico.video !== undefined) hallazgos.push(hallazgoDeVideo(diagnostico.video));
   hallazgos.push(hallazgoDelReloj(diagnostico));
 
   if (diagnostico.reportaEstadoDeBarrera === false) {

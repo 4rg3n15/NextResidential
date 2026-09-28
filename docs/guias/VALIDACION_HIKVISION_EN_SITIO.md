@@ -63,29 +63,28 @@ charset=UTF-8`, el cuerpo con espacio de nombres y `version="2.0"` y el
   | `PROVEEDOR_DE_EQUIPOS=hikvision`                                                       | Equipos reales (con `simulado`, ninguno)                                                                                                                                              |
   | `CARGADOR_DE_CONTEXTO=postgres`                                                        | El motor lee autorizaciones, padrón y lista negra de la base                                                                                                                          |
   | `PERSISTENCIA_DE_EVENTOS=postgres`, `PERSISTENCIA_DE_BIOMETRIA=postgres`               | Histórico, evidencias, biometría y la lista de Dispositivos en la base (con `memoria` no hay trazabilidad, y el equipo dado de alta no aparece: H-SITIO-02)                           |
-  | `API_URL_PUBLICA`                                                                      | `http://<IP-del-Mac>:3000`. **Nunca `127.0.0.1` ni `localhost`**: el teléfono del VISITANTE abre contra ella el enlace y el QR del consentimiento (H-SITIO-10)                        |
   | `GO2RTC_URL`                                                                           | `http://127.0.0.1:1984`: el puente de vídeo, visto desde la API                                                                                                                       |
   | `ALARM_SERVER_EQUIPOS`                                                                 | `copropiedad\|equipo\|secreto\|ip` de la cámara (se completa en sitio, paso V.2.7)                                                                                                    |
   | `INGESTA_FIRMA_SECRETO`                                                                | Firma de la ingesta del Edge                                                                                                                                                          |
-  | `BIOMETRIA_LLAVE`, `BIOMETRIA_LLAVE_REF`                                               | Bóveda biométrica, enlace del titular, códigos de patrullaje y de ocupante (ADR-025)                                                                                                  |
+  | `BIOMETRIA_LLAVE`, `BIOMETRIA_LLAVE_REF`                                               | Bóveda biométrica, códigos de patrullaje y de ocupante (ADR-025)                                                                                                                      |
   | `EQUIPOS_LLAVE`, `EQUIPOS_LLAVE_REF`                                                   | Cifrado de las claves de servicio de los equipos en la base                                                                                                                           |
   | `EVIDENCIA_BUCKET`                                                                     | Bucket privado de evidencias (si falta, la API avisa y usa memoria)                                                                                                                   |
   | `BARRERA_*`, `TERMINAL_*`, `VIDEOPORTERO_*`                                            | `HOST`, `PUERTO`, `USUARIO`, `CLAVE`, `CANAL` de cada equipo, para el guion de sitio (§8.1). Sólo en el `.env` local                                                                  |
 
 - [ ] **`apps/web/.env`**: **`API_URL=http://127.0.0.1:3000`**, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`; `PUENTE_VIDEO_URL` vacío (ADR-022).
       `API_URL` la resuelve el **servidor** de la consola, que corre en el mismo Mac que la API; el navegador nunca habla con ella (todo pasa por `/api/ncr`, [`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](CONSOLA_EN_RED_Y_DESPLIEGUE.md) §4). Con la IP del Mac en vez del bucle local, `next start` —que es producción— **no arranca**: exige `https` a toda API que no sea de bucle local (§2.7.8).
-- [ ] **go2rtc** descargado para el Mac, con un `go2rtc.yaml` mínimo: `api.listen: "127.0.0.1:1984"` y `webrtc.listen: ":8555"` (`candidates` con la IP del Mac). **Sin equipos en el fichero**: la API registra cada flujo al pedirlo (§3.3).
-- [ ] **App en el iPhone físico** (Xcode con la cuenta de desarrollo, iPhone de confianza), compilada en **Debug**, que es la única configuración que permite HTTP a una IP privada ([`DESPLIEGUE.md`](DESPLIEGUE.md) §8.1):
+- [ ] **go2rtc**: `pnpm sitio:video -- --preparar` con Internet, ANTES de salir (descarga el binario a `.sitio/bin/` y escribe `.sitio/go2rtc.yaml` desde `apps/api/.env`; [`INTEGRACION_HIKVISION.md`](INTEGRACION_HIKVISION.md) §6, punto 4). **Sin equipos ni credenciales en el fichero**: la API registra cada flujo al pedirlo (§3.3). En sitio, si la IP del Mac cambió, basta con repetir `pnpm sitio:video`.
+- [ ] **App en el iPhone físico** (Xcode con la cuenta de desarrollo, iPhone de confianza), compilada en **Release**, instalada una vez y abierta desde el ícono sin el Mac conectado ([`APP_EN_IPHONE.md`](APP_EN_IPHONE.md), ADR-033):
 
   ```
   cd apps/mobile
-  flutter run -d <id-del-iPhone> \
-    --dart-define=API_URL=http://<IP-del-Mac>:3000 \
+  flutter run --release -d <id-del-iPhone> \
+    --dart-define=API_URL=http://<nombre>.local:3000 \
     --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
     --dart-define=SUPABASE_PUBLISHABLE_KEY=<la PUBLICABLE, nunca la secreta>
   ```
 
-  Al primer uso, acepte los permisos de **cámara** (foto del visitante, hito 3) y de **red local** (H-SITIO-11: sin él, «No hay conexión con el servidor» aunque Safari abra la API). En Debug, un fallo de red muestra el panel de detalle con la URL compilada y el tipo de error: anótelo si aparece.
+  Al primer uso, acepte los permisos de **cámara** (foto del visitante, hito 3) y de **red local** (H-SITIO-11: sin él, «No hay conexión con el servidor» aunque Safari abra la API). Si la app no llega, «Cambiar servidor» con la dirección que sí abrió Safari. Con Apple ID gratuito la app caduca a los 7 días.
 
 - [ ] **Superadministrador** con MFA inscrito (arranque en frío: `scripts/registrar-copropiedad.mjs` y `scripts/aprovisionar-rol.mjs`).
 - [ ] **La copropiedad de prueba**, desde Configuración → Ajustes de plataforma (superadministrador): **código corto** (p. ej. `MIRA`; es el que teclean app y consola, D1), tipo y etiquetas de vivienda, **teléfono de portería** (D7) y tope de vehículos propios (2).
@@ -96,7 +95,7 @@ charset=UTF-8`, el cuerpo con espacio de nombres y `version="2.0"` y el
 
 ### V.2 · En sitio
 
-1. **Red.** Mac, iPhone y equipos en la misma LAN. Anote la IP del Mac: es la de `API_URL_PUBLICA`, la de la consola por IP, la de la app y la del Alarm Server. **No** es la de `API_URL` de la consola, que sigue en `127.0.0.1`.
+1. **Red.** Mac, iPhone y equipos en la misma LAN. Anote la IP del Mac: es la de la consola por IP, la de la app y la del Alarm Server. **No** es la de `API_URL` de la consola, que sigue en `127.0.0.1`.
 2. **Estado previo de los equipos, capturado ANTES de tocar nada** —ni la consola, ni el panel web de ningún equipo—:
 
    ```
@@ -116,7 +115,7 @@ node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs \
 
 Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con el cuerpo y el Content-Type de formulario), la respuesta (`statusCode 1`, `subStatusCode ok`) y **pregunta si la puerta se movió**: mírela y conteste `s` o `n`. Sale en 0 sólo si las dos se movieron. Si una **no** se movió con la orden aceptada, H-SITIO-13 sigue abierto en ese equipo: no haga sus escenarios de puerta y devuelva la carpeta `abrir/`. Si la terminal contesta `400 badXmlContent`, algo entre el Mac y el equipo le quita el cuerpo (H-SITIO-15).
 
-3. **Arranque.** Primero go2rtc. Después compile y arranque la API **con `start`**, guardando su bitácora en la carpeta de sitio:
+3. **Arranque.** Primero go2rtc, en su propia terminal: `pnpm sitio:video` (queda en primer plano). Después compile y arranque la API **con `start`**, guardando su bitácora en la carpeta de sitio:
 
    ```
    pnpm turbo run build --filter=@ncr/api --filter=@ncr/web
@@ -127,7 +126,7 @@ Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con 
 
 4. **Consola en el Mac, abierta POR IP**: `pnpm --filter @ncr/web start` (puerto 3100) y, en el navegador, `http://<IP-del-Mac>:3100`. No en Netlify: el SSE y el audio pasan por su servidor (C-37, P-20). Por IP es como la abrirá cualquier otro aparato, y es la única forma de ver lo que verán ellos (D-67 y D-68 sólo aparecían por IP).
    **Una excepción, y es del navegador, no de la consola:** el **audio de la guardia (V2)** necesita el micrófono, y el navegador sólo lo concede en contexto seguro. `http://<IP>` sin TLS no lo es; `http://127.0.0.1:3100` sí. V2 se hace en el propio Mac por `127.0.0.1` ([`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](CONSOLA_EN_RED_Y_DESPLIEGUE.md) §3).
-5. **Acceso** a la consola como superadministrador: código o NIT de la copropiedad, usuario, contraseña y MFA.
+5. **Acceso** a la consola como superadministrador: su correo, su contraseña y MFA.
 6. **Registrar los tres equipos**: Dispositivos → + Agregar equipo (§9), con el usuario de servicio de cada uno. «Probar conexión» descubre modelo, firmware y capacidades (ADR-019). **El equipo aparece en la tabla aunque la ficha lo rechace** (H-SITIO-01, 02): se corrige desde su ficha. Cada ficha muestra, en «Respuesta del equipo», lo que el equipo contestó, saneado.
 
    - **La cámara**: en verde con `ctrlMode=1`, `CRIndex=210`, `detectionUpLoadPicturesType` distinto de «all» y formato XML. Si bloquea por operaciones de barrera no catalogadas (`barrierGateOper=0` NO se da por «no abre»: en la visita abría con 0) o por un disparador ilegible, **pruébelo físicamente** —una placa de la lista blanca del equipo y una desconocida; **ninguna** abre— y regístrelo con «Atestar» como superadministrador (D-11, [ADR-030](../decisiones/ADR-030-atestacion-del-instalador.md)). Queda en **ámbar**, nunca en verde, y sólo para ese firmware. Si alguna abre, es hallazgo de bloqueo (§4.1): pare.
@@ -148,7 +147,7 @@ Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con 
 
    En Perfil, «Llamar a portería» tiene que marcar el número registrado.
 
-10. **El portero de prueba** entra en la consola (por IP) con el código o el NIT, su usuario y su turno.
+10. **El portero de prueba** entra en la consola (por IP) con **su número y su contraseña**, dentro de su turno (ADR-031). Con el modo pruebas activo entra desde cualquier IP; para demostrar la lista blanca, [`ENTREGA_EN_SITIO.md`](ENTREGA_EN_SITIO.md) §3 bis.
 11. **Los 16 escenarios por canal**, con la hoja delante. Orden sugerido:
 
     1. L1–L5 con la visita creada en la app, y otra vez creada en la consola;
@@ -158,7 +157,7 @@ Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con 
 
     Cada fila lleva su evento de `/eventos` y su evidencia; sin identificador de evento no hay PASA (RN-02). La única excepción es V1, porque un timbre no deja evento. La lista negra de L5 y T5 se crea en Listas negras → Vetar.
     **Evidencia cruda, en cada fila:** las líneas de `api.log` de ese escenario —cada evento que llega de un equipo deja una línea `info` con tipo, equipo y resultado, y cada orden su petición y su respuesta saneadas (H-SITIO-13, 14)— o el fichero de `--capturar` que lo muestre. **Un FALLA sin evidencia cruda no se puede corregir desde aquí.**
-    **Consentimiento:** si el teléfono del visitante no abre el enlace, el titular puede aceptar en persona en la misma pantalla de la foto —«El titular está aquí: consentimiento presencial»—, escribiendo **él** su nombre y su documento (D-10, [ADR-029](../decisiones/ADR-029-consentimiento-presencial-del-titular.md); su validez jurídica está PENDIENTE DE DEFINICIÓN del área legal). El operador no rellena nada por él.
+    **Consentimiento:** la única constancia es la casilla del formulario, «Declaro que <nombre del visitante> me autorizó a usar su foto para su ingreso al conjunto» (decisión final del cliente, [ADR-032](../decisiones/ADR-032-consentimiento-declarado-por-quien-registra.md), enmienda). No hay enlace ni confirmación presencial.
 
 12. **Limpieza de datos de prueba:**
     1. levante los vetos de prueba;

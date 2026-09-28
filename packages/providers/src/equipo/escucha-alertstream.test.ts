@@ -74,7 +74,9 @@ describe('el volcado histórico NO llega al sistema', () => {
     return { escucha, peticion };
   };
 
-  it('descarta lo histórico, lo CUENTA, y emite sólo lo vivo', async () => {
+  it('lo histórico llega MARCADO como histórico, se CUENTA, y lo vivo como vivo', async () => {
+    // 15-L (Bloque B) · antes se tiraba; ahora se guarda como histórico y no
+    // decide ni avisa. La marca `enVivo: false` es la línea que lo impide.
     const { escucha } = montar([
       bloque({ currentEvent: false }),
       bloque({ currentEvent: false }),
@@ -85,13 +87,12 @@ describe('el volcado histórico NO llega al sistema', () => {
     const vistos = [];
     for await (const evento of escucha.escuchar(cancelar.signal)) {
       vistos.push(evento);
-      cancelar.abort();
+      if (evento.enVivo) cancelar.abort();
     }
 
-    expect(vistos).toHaveLength(1);
-    expect(vistos[0]?.enVivo).toBe(true);
+    expect(vistos.map((e) => e.enVivo)).toEqual([false, false, true]);
     // El número es lo único que distingue «el equipo está mudo» de «volcó 412
-    // viejos y los tiramos todos».
+    // viejos», y se sigue contando.
     expect(escucha.historicosDescartados).toBe(2);
   });
 
@@ -101,13 +102,12 @@ describe('el volcado histórico NO llega al sistema', () => {
     // eventos falsos en una tabla que no admite borrado.
     const { escucha } = montar([bloque({}), bloque({ currentEvent: true })]);
     const cancelar = new AbortController();
-    let vivos = 0;
+    const vivos: boolean[] = [];
     for await (const evento of escucha.escuchar(cancelar.signal)) {
-      expect(evento.enVivo).toBe(true);
-      vivos += 1;
-      cancelar.abort();
+      vivos.push(evento.enVivo);
+      if (evento.enVivo) cancelar.abort();
     }
-    expect(vivos).toBe(1);
+    expect(vivos).toEqual([false, true]);
     expect(escucha.historicosDescartados).toBe(1);
   });
 
@@ -241,7 +241,7 @@ describe('6.5 · el tercer transporte: suscripción, elegido por CAPACIDAD', () 
     expect(transporteSegunCapacidades(capacidadesDeclaradas({}))).toBe('alertStream');
   });
 
-  it('la suscripción abre el flujo con POST y un cuerpo, y filtra lo histórico igual', async () => {
+  it('la suscripción abre el flujo con POST y un cuerpo, y marca lo histórico igual', async () => {
     const llamadas: { url: string; metodo: string; cuerpo: unknown }[] = [];
     const peticion = vi.fn(async (url: string, opciones: RequestInit) => {
       llamadas.push({ url, metodo: opciones.method ?? 'GET', cuerpo: opciones.body });
@@ -262,13 +262,13 @@ describe('6.5 · el tercer transporte: suscripción, elegido por CAPACIDAD', () 
     const vistos = [];
     for await (const evento of escucha.escuchar(cancelar.signal)) {
       vistos.push(evento);
-      cancelar.abort();
+      if (evento.enVivo) cancelar.abort();
     }
     expect(escucha.transporte).toBe('subscribeEvent');
     expect(llamadas[0]?.url).toMatch(/subscribeEvent$/);
     expect(llamadas[0]?.metodo).toBe('POST');
     expect(String(llamadas[0]?.cuerpo)).toContain('SubscribeEvent');
-    expect(vistos).toHaveLength(1);
+    expect(vistos.map((e) => e.enVivo)).toEqual([false, true]);
     expect(escucha.historicosDescartados).toBe(1);
   });
 });
@@ -304,5 +304,34 @@ describe('A4 · detener durante la espera entre reintentos', () => {
         new Promise((_, no) => setTimeout(() => no(new Error('colgado')), 500)),
       ]),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('C4 (15-L) · la escucha recuerda cuándo habló el equipo por última vez', () => {
+  it('un latido del equipo, aunque no sea un evento, cuenta como señal de vida', async () => {
+    let reloj = 1_000;
+    const escucha = new EscuchaDeAlertStream({
+      host: 'equipo.invalid',
+      usuario: 'u',
+      clave: 'c',
+      dispositivoId: 'terminal-1',
+      familia: 'terminal',
+      peticion: (async () =>
+        flujoDe([
+          JSON.stringify({ eventType: 'heartBeat', dateTime: '2026-09-27T10:00:00-05:00' }),
+          bloque({ currentEvent: true, channelID: 1 }),
+        ])) as unknown as typeof fetch,
+      esperar: async () => undefined,
+      azar: () => 0.5,
+      ahora: () => (reloj += 500),
+    });
+    expect(escucha.ultimaSenal()).toBeNull();
+
+    const cancelar = new AbortController();
+    for await (const evento of escucha.escuchar(cancelar.signal)) {
+      if (evento.enVivo) cancelar.abort();
+    }
+    // Dos trozos leídos: el último marca la hora de la señal.
+    expect(escucha.ultimaSenal()?.getTime()).toBeGreaterThan(1_000);
   });
 });

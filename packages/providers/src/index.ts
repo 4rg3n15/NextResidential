@@ -47,6 +47,7 @@ export * from './mock/intercom-simulado';
 export * from './mock/simulacion';
 export * from './hikvision/hikvision-provider';
 export * from './hikvision/registro-de-equipos';
+export { RegistroEnCache } from './hikvision/registro-en-cache';
 export * from './fabrica';
 export {
   capacidadesDesdeDeviceCap,
@@ -85,6 +86,9 @@ export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';
 // ── Diagnóstico y corrección de un equipo, para la consola ───────────────────
 export * from './diagnostico/diagnostico-de-equipo';
 export * from './diagnostico/correcciones';
+export type { DestinoDeEventos } from './diagnostico/correcciones-de-sitio';
+// C2 (corrección de la 15-L) · la IP del Mac en la red de cada equipo.
+export * from './red/ip-hacia-el-equipo';
 export * from './diagnostico/ficha';
 export type { VeredictoDeControl, HallazgoDeConfiguracion } from './camara/veredicto-de-control';
 export type { VeredictoDeDisparador } from './camara/disparadores-vinculados';
@@ -95,8 +99,29 @@ export type { VeredictoDeCapacidadAnpr } from './camara/capacidades-anpr';
 export { EquipoDecidePorSuCuenta } from './camara/modo-de-control';
 export type { VeredictoDeModo } from './camara/modo-de-control';
 export { EquipoInalcanzable } from './equipo/cliente';
+// 15-L · lo que el operador lee cuando una orden no sale (A1, Bloque I).
+export { motivoLegible } from './nucleo/motivo-legible';
+// A2 (15-L) · lo que la API valida y configura de la persona y la foto que
+// van a la terminal: la zona, los límites y el error que los hace cumplir.
+export {
+  FotoNoAdmitida,
+  LIMITES_DE_FOTO_POR_OMISION,
+  inspeccionarFoto,
+} from './terminal/foto-del-rostro';
+export type { LimitesDeFoto, FotoInspeccionada } from './terminal/foto-del-rostro';
+export { ZONA_POR_OMISION, zonaValida } from './terminal/persona-en-el-equipo';
+export type { AjustesDePersona } from './terminal/persona-en-el-equipo';
 export type { ReaccionAlError, ErrorDelFabricante } from './equipo/errores-del-fabricante';
 export { LISTAS_DEL_EQUIPO_NO_SE_USAN } from './equipo/errores-del-fabricante';
+/** C7 (15-L) · la escucha rechazada por otra plataforma, en la misma frase en todos lados. */
+export {
+  clasificarConexionDeEventosRechazada,
+  REMEDIO_OTRA_PLATAFORMA,
+} from './equipo/conexion-de-eventos-rechazada';
+export type {
+  ConexionDeEventosRechazada,
+  ClaseDeRechazoDeEventos,
+} from './equipo/conexion-de-eventos-rechazada';
 
 // ── El simulado de equipo, que es infraestructura de PRUEBA ──────────────────
 /**
@@ -106,3 +131,8 @@ export { LISTAS_DEL_EQUIPO_NO_SE_USAN } from './equipo/errores-del-fabricante';
  */
 export * from './simulacion/equipo-simulado';
 export * from './simulacion/camara-que-publica';
+export { jpegConMedidas } from './simulacion/imagenes-de-prueba';
+export { negacionesLocalesPor, personasPor } from './simulacion/personas-simuladas';
+export { servidorRtspSimulado } from './simulacion/servidor-rtsp';
+export type { ServidorRtspSimulado, GuionRtsp } from './simulacion/servidor-rtsp';
+export type { PersonaSimulada } from './simulacion/personas-simuladas';

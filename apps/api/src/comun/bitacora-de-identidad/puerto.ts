@@ -21,6 +21,7 @@ export const TIPOS_DE_HECHO = [
   'solape_de_turno',
   'alta_de_portero',
   'edicion_de_portero',
+  'baja_de_portero',
   'restablecimiento_de_contrasena',
   'cambio_de_contrasena',
 ] as const;

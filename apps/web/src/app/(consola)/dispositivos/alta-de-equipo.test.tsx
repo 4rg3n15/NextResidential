@@ -35,6 +35,7 @@ const sondeo = (clase: string) => ({
 const servidor = (clase: string): ReturnType<typeof vi.fn> =>
   vi.fn(async (entrada: Request) => {
     if (entrada.url.includes('/prueba-de-conexion')) return respuesta(sondeo(clase));
+    if (entrada.url.endsWith('/zonas')) return respuesta([]);
     return respuesta({ id: '20000000-0000-4000-8000-000000000002' });
   });
 
@@ -99,5 +100,83 @@ describe('H-SITIO-01 · guardar tras probar deja que el servidor fije el estado'
     it('tras un rechazo de credencial NO se reintenta: acerca el bloqueo de la cuenta', async () => {
       expect((await probarYGuardar())['probarConexion']).toBe(false);
     });
+  });
+});
+
+describe('C2 (15-L) · el videoportero edita su puerta, su canal de video y su zona', () => {
+  const VIDEOPORTERO = {
+    id: '20000000-0000-4000-8000-000000000009',
+    nombre: 'Videoportero de la entrada',
+    tipo: 'intercom',
+    modelo: null,
+    firmware: null,
+    canalBarrera: null,
+    numeroDePuerta: 2,
+    canalDeAudio: 1,
+    fabricante: null,
+    modoDeTerminal: null,
+    canalDeAudioHabilitado: true,
+    canalDeVideo: '101',
+    zonaId: null,
+    capacidades: null,
+    verificacion: 'verificado',
+    verificadoEn: null,
+    motivoNoVerificado: null,
+    estado: 'activo',
+    atestacion: null,
+  } as const;
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (entrada: Request) =>
+        entrada.url.endsWith('/zonas')
+          ? respuesta([{ id: 'z-1', nombre: 'Portería' }])
+          : respuesta({ ...VIDEOPORTERO }),
+      ),
+    );
+  });
+
+  it('lo guardado llega relleno, y lo cambiado viaja en la edición', async () => {
+    const consultas = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidadas = vi.spyOn(consultas, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={consultas}>
+        <AltaDeEquipo
+          copropiedadId={COP}
+          abierto
+          alCerrar={() => undefined}
+          equipo={VIDEOPORTERO as never}
+        />
+      </QueryClientProvider>,
+    );
+    expect((screen.getByLabelText('Número de puerta') as HTMLInputElement).value).toBe('2');
+    const canal = screen.getByLabelText(/Canal de video/) as HTMLInputElement;
+    expect(canal.value).toBe('101');
+
+    fireEvent.change(canal, { target: { value: '1a2' } });
+    expect(await screen.findByText('Escriba el canal como 102, 101, 202…')).toBeTruthy();
+    fireEvent.change(canal, { target: { value: '202' } });
+    await screen.findByRole('option', { name: 'Portería' });
+    fireEvent.change(screen.getByLabelText('Zona del equipo'), { target: { value: 'z-1' } });
+
+    const dialogo = screen.getByRole('dialog');
+    fireEvent.click(dialogo.querySelector<HTMLButtonElement>('button[type="submit"]')!);
+    const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    let edicion: Request | undefined;
+    await waitFor(() => {
+      edicion = (espia.mock.calls as [Request][]).map(([r]) => r).find((r) => r.method === 'PUT');
+      expect(edicion).toBeDefined();
+    });
+    expect(await edicion!.clone().json()).toMatchObject({
+      numeroDePuerta: 2,
+      canalDeAudio: 1,
+      canalDeVideo: '202',
+      zonaId: 'z-1',
+    });
+    // C1 · la tabla de Dispositivos (que sale del tablero) se refresca ya.
+    await waitFor(() =>
+      expect(invalidadas).toHaveBeenCalledWith({ queryKey: ['tablero', COP, 'dispositivos'] }),
+    );
   });
 });

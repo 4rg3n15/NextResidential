@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
+
+import '../dobles/visitas.dart';
 
 Vivienda vivienda({String? agrupacion, bool activa = true}) => Vivienda(
       id: 'v',
@@ -64,36 +68,43 @@ void main() {
     });
   });
 
-  group('Autorizacion.vigenteEn', () {
-    final desde = DateTime.utc(2026, 9, 18, 10);
-    final hasta = DateTime.utc(2026, 9, 18, 14);
-    Autorizacion a(String estado) => Autorizacion(
+  group('Autorizacion · la situación es la del SERVIDOR (15-L)', () {
+    Autorizacion a({required SituacionDeVisita situacion, String? motivo}) => Autorizacion(
           id: 'a',
           visitante: 'Visitante',
           tipo: 'unica',
-          desde: desde,
-          hasta: hasta,
+          desde: DateTime.utc(2026, 9, 18, 10),
+          hasta: DateTime.utc(2026, 9, 18, 14),
           placa: null,
           permiteAccesoVehicular: false,
-          estado: estado,
+          estado: 'activa',
           acompanantes: 0,
+          situacion: situacion,
+          motivoRechazo: motivo,
         );
 
-    test('dentro de la vigencia y activa', () {
-      expect(a('activa').vigenteEn(DateTime.utc(2026, 9, 18, 12)), isTrue);
+    test('sin situación del servidor, se dice que no se sabe; no se calcula', () {
+      // La app calculaba «vigente» con su reloj y la consola decía otra cosa.
+      // Ya no hay cuenta en el teléfono: lo que no llegó, no se inventa.
+      final sinSituacion = Autorizacion(
+        id: 'a',
+        visitante: 'Visitante',
+        tipo: 'unica',
+        desde: DateTime.utc(2026, 9, 18, 10),
+        hasta: DateTime.utc(2026, 9, 18, 14),
+        placa: null,
+        permiteAccesoVehicular: false,
+        estado: 'activa',
+        acompanantes: 0,
+      );
+      expect(sinSituacion.situacion, SituacionDeVisita.desconocida);
+      expect(sinSituacion.motivoRechazo, isNull);
     });
 
-    test('en el instante de inicio, sí; en el de fin, no', () {
-      // El borde, explícito: `[desde, hasta)`, igual que el `tstzrange` de la
-      // base. Si la app lo leyera al revés, marcaría vigente algo que la API
-      // acaba de negar.
-      expect(a('activa').vigenteEn(desde), isTrue);
-      expect(a('activa').vigenteEn(hasta), isFalse);
-    });
-
-    test('revocada nunca está vigente, aunque la hora encaje', () {
-      // RN-06 y la revocación: la ventana temporal no basta.
-      expect(a('revocada').vigenteEn(DateTime.utc(2026, 9, 18, 12)), isFalse);
+    test('la rechazada lleva el motivo que escribió portería', () {
+      final r = a(situacion: SituacionDeVisita.rechazada, motivo: 'No la esperan');
+      expect(r.situacion, SituacionDeVisita.rechazada);
+      expect(r.motivoRechazo, 'No la esperan');
     });
   });
 
@@ -162,6 +173,35 @@ void main() {
     test('justo en el límite ya está lleno, no «queda una»', () {
       expect(z(10, 10).lleno, isTrue);
       expect(z(10, 9).lleno, isFalse);
+    });
+  });
+
+  group('15-L · la visita con foto y casilla', () {
+    test('el fin es el inicio más la duración, sin rehacer la suma en la pantalla', () {
+      final v = visitaDePrueba('k1');
+      expect(v.hasta, DateTime.utc(2026, 9, 20, 18));
+    });
+
+    test('la foto viaja en base64 y conserva las medidas con que se juzgó', () {
+      final f = FotoDeVisita.deJpeg(bytesDeJpeg, medidasBuenas);
+      expect(base64Decode(f.jpegBase64), bytesDeJpeg);
+      expect(f.medidas, same(medidasBuenas));
+    });
+
+    test('FotoRechazada dice razones en palabras, sin repetir y sin códigos', () {
+      const r = FotoRechazada(['NITIDEZ', 'NITIDEZ', 'ILUMINACION', 'ENCUADRE', 'SIN_ROSTRO']);
+      expect(r.razones, [
+        'la foto está borrosa',
+        'la luz no es suficiente o sobra',
+        'el rostro no está bien encuadrado',
+        'no se ve ningún rostro',
+      ]);
+      expect(r, isA<VisitaNoCreada>(), reason: 'la bandeja no la reintenta');
+    });
+
+    test('un código que la app no conoce no se enseña crudo', () {
+      expect(razonDeLaFoto('ENCUADRE_OBLICUO'), isNot(contains('ENCUADRE')));
+      expect(razonDeLaFoto('ENCUADRE_OBLICUO'), contains('calidad'));
     });
   });
 }

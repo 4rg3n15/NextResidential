@@ -8,6 +8,8 @@ export interface PerfilDePortero {
   readonly porteria: string | null;
   readonly sectores: readonly string[];
   readonly correoContacto: string | null;
+  /** H2 (15-L) · documento del portero, normalizado. `null` en los anteriores a la 15-L. */
+  readonly documento?: string | null;
 }
 
 export interface RepositorioDePerfiles {
@@ -119,3 +121,19 @@ export interface ZonasHorarias {
   de(copropiedadId: string): Promise<string | null>;
 }
 export const ZONAS_HORARIAS = Symbol.for('ncr.puerto.ZonasHorarias');
+
+/** H1 · H2 (15-L) · el pool de identificadores de la copropiedad y su cupo. */
+export interface PoolDePorteros {
+  readonly inicio: number;
+  readonly fin: number;
+  /** El próximo número que se asignará. */
+  readonly siguiente: number;
+  /** Porteros activos que admite. */
+  readonly cupo: number;
+}
+export interface RepositorioDePools {
+  de(copropiedadId: string): Promise<PoolDePorteros | null>;
+  /** `false` si la copropiedad no tiene pool. */
+  fijarCupo(copropiedadId: string, cupo: number, actorId: string): Promise<boolean>;
+}
+export const REPOSITORIO_DE_POOLS = Symbol.for('ncr.puerto.RepositorioDePoolsDePorteros');

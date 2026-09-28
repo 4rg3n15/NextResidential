@@ -23,6 +23,8 @@ import type { EquipoRegistrado } from './registro-de-equipos';
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const PUERTO_RTSP = 554;
+/** D2 (15-L) · el subflujo del canal 1: lo que el navegador reproduce con menos retardo. */
+export const CANAL_DE_VIDEO_POR_OMISION = '102';
 
 const CON_VIDEO: ReadonlySet<EquipoRegistrado['tipo']> = new Set([
   'camara_lpr',
@@ -34,15 +36,27 @@ const CON_VIDEO: ReadonlySet<EquipoRegistrado['tipo']> = new Set([
 const credencial = (usuario: string, clave: string): string =>
   `${encodeURIComponent(usuario)}:${encodeURIComponent(clave)}`;
 
+/** El canal declarado, o 102. Termina en 01 → flujo principal; si no, secundario. */
+export const canalDeVideoDe = (equipo: Pick<EquipoRegistrado, 'canalDeVideo'>): string =>
+  equipo.canalDeVideo ?? CANAL_DE_VIDEO_POR_OMISION;
+
+/** La ruta RTSP del flujo, sin credencial: la usa también la sonda de códec. */
+export const caminoRtspDe = (canal: string): string => `/Streaming/Channels/${canal}`;
+
+/**
+ * C2/D2 (15-L) · el canal sale de la ficha del equipo y el puerto del `.env`
+ * (`VIDEO_PUERTO_RTSP`): nada de esto obliga a tocar código en sitio.
+ */
 export const origenRtspDe = (
   equipo: EquipoRegistrado,
-  flujo: 'principal' | 'secundario' = 'secundario',
+  puerto: number = PUERTO_RTSP,
 ): OrigenDeVideo | null => {
   if (!CON_VIDEO.has(equipo.tipo)) return null;
-  const sufijo = flujo === 'principal' ? '01' : '02';
+  const canal = canalDeVideoDe(equipo);
+  const flujo = canal.endsWith('01') ? 'principal' : 'secundario';
   return {
-    rtsp: `rtsp://${credencial(equipo.usuario, equipo.clave)}@${equipo.host}:${String(PUERTO_RTSP)}/Streaming/Channels/1${sufijo}`,
+    rtsp: `rtsp://${credencial(equipo.usuario, equipo.clave)}@${equipo.host}:${String(puerto)}${caminoRtspDe(canal)}`,
     flujo,
-    detalle: `flujo ${flujo} del canal 1 por RTSP (S-46); el puente lo sirve por WebRTC`,
+    detalle: `flujo ${canal} (${flujo}) por RTSP (S-46); el puente lo sirve por WebRTC`,
   };
 };

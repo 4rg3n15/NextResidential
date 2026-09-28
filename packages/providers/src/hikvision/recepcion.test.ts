@@ -50,21 +50,22 @@ describe('los cuatro desenlaces', () => {
     expect(r.publicacion?.transporte).toBe('escucha');
   });
 
-  it('lo HISTÓRICO se corta aquí y no llega a nadie', () => {
-    // Sin esto, la portería mostraría accesos de hace días como si ocurrieran
-    // ahora, en una tabla append-only que no se puede limpiar.
+  it('lo HISTÓRICO sigue adelante MARCADO: se guarda, no decide (15-L, Bloque B)', () => {
+    // Antes se cortaba aquí. Ahora llega con `enVivo: false`: el ingestor lo
+    // guarda como histórico y nadie lo toma por algo que ocurre ahora.
     const historico = xml().replace('<alarmDataType>0<', '<alarmDataType>1<');
     const r = recibirPublicacionDeEquipo(sobre(historico), TIPO, DISPOSITIVO, AHORA);
     expect(r.desenlace).toBe('historico');
-    expect(r.publicacion).toBeNull();
+    expect(r.publicacion?.evento.enVivo).toBe(false);
   });
 
-  it('un evento que no es de placa se acepta y se ignora', () => {
+  it('un evento que no es de placa se acepta y se GUARDA como evento de equipo', () => {
     const otro =
       '<EventNotificationAlert><eventType>tamperDetection</eventType>' +
       '<alarmDataType>0</alarmDataType></EventNotificationAlert>';
     const r = recibirPublicacionDeEquipo(sobre(otro), TIPO, DISPOSITIVO, AHORA);
-    expect(r.desenlace).toBe('sin_placa');
+    expect(r.desenlace).toBe('evento_de_equipo');
+    expect(r.publicacion?.evento.titulo).toBe('Evento del equipo (tamperDetection)');
   });
 
   it('un sobre ilegible NO LANZA: devuelve su desenlace', () => {

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { equipoSimulado } from './equipo-simulado';
 import { jpegDePrueba, publicarLectura, sobreDeLectura, xmlDeLectura } from './camara-que-publica';
+import { jpegConMedidas } from './imagenes-de-prueba';
 import { TerminalFacial } from '../terminal/terminal-facial';
 import { RutaNoSoportada } from '../terminal/terminal-facial';
 import { Videoportero } from '../videoportero/videoportero';
@@ -29,7 +30,7 @@ describe('la terminal facial contra un equipo simulado', () => {
     // El simulado contesta 401 al primer intento, como el aparato: si aceptara
     // a la primera, la renegociación no se ejercitaría nunca.
     await expect(
-      terminal().sincronizar('t-1', 'plantilla-1', new Uint8Array([1, 2, 3])),
+      terminal().sincronizar('t-1', 'plantilla-1', jpegConMedidas()),
     ).resolves.toBeUndefined();
   });
 
@@ -42,7 +43,7 @@ describe('la terminal facial contra un equipo simulado', () => {
     // Es el desenlace ESPERADO de once de las doce rutas del catálogo. Probar
     // sólo el camino feliz de una ruta sin verificar es probar la suposición.
     const conHueco = terminal(['cargar la plantilla facial']);
-    await expect(conHueco.sincronizar('t-1', 'p-1', new Uint8Array([1]))).rejects.toBeInstanceOf(
+    await expect(conHueco.sincronizar('t-1', 'p-1', jpegConMedidas())).rejects.toBeInstanceOf(
       RutaNoSoportada,
     );
   });
@@ -134,7 +135,7 @@ describe('el videoportero contra un equipo simulado', () => {
 });
 
 describe('el flujo de eventos con volcado histórico', () => {
-  it('entrega lo vivo y descarta lo viejo, que es la trampa de la puesta en marcha', async () => {
+  it('entrega lo vivo como vivo y lo viejo MARCADO como viejo: la trampa de la puesta en marcha', async () => {
     const historicos = Array.from({ length: 5 }, (_, i) => ({
       eventType: 'doorbell',
       currentEvent: false,
@@ -158,11 +159,13 @@ describe('el flujo de eventos con volcado histórico', () => {
     const vistos = [];
     for await (const evento of escucha.escuchar(cancelar.signal)) {
       vistos.push(evento);
-      cancelar.abort();
+      if (evento.enVivo) cancelar.abort();
     }
 
-    expect(vistos).toHaveLength(1);
-    expect(vistos[0]?.clase).toBe('timbre');
+    // 15-L · los cinco viejos llegan con `enVivo: false` (se guardan como
+    // históricos, no suenan) y el vivo, con `true`.
+    expect(vistos.filter((e) => !e.enVivo)).toHaveLength(5);
+    expect(vistos.filter((e) => e.enVivo).map((e) => e.clase)).toEqual(['timbre']);
     expect(escucha.historicosDescartados).toBe(5);
   });
 });

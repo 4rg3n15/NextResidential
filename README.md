@@ -369,9 +369,7 @@ casa» y «en sitio», es
    `PERSISTENCIA_DE_EVENTOS=postgres` y `PERSISTENCIA_DE_BIOMETRIA=postgres`
    (con `memoria` el arranque avisa que no hay trazabilidad);
    `CARGADOR_DE_CONTEXTO=postgres`; `PROVEEDOR_DE_EQUIPOS=hikvision`;
-   `API_URL_PUBLICA` con la IP de la máquina, porque el teléfono del visitante
-   abre el enlace de consentimiento contra ella; `GO2RTC_URL` si va a haber
-   video; `ALARM_SERVER_EQUIPOS` con la cámara. Arranque, compilado y no con
+   `GO2RTC_URL` si va a haber video; `ALARM_SERVER_EQUIPOS` con la cámara. Arranque, compilado y no con
    `start:dev` (15-K): `pnpm turbo run build --filter=@ncr/api` y
    `pnpm --filter @ncr/api start`. La bitácora dice qué persistencia, qué
    accionador, qué puente y qué conexión de pg-boss quedaron activos.
@@ -385,8 +383,9 @@ casa» y «en sitio», es
    se abre **por IP** (`http://<IP>:3100`). Por IP sin TLS se ve el video; el
    micrófono exige `https` o el bucle local
    ([`CONSOLA_EN_RED_Y_DESPLIEGUE.md`](docs/guias/CONSOLA_EN_RED_Y_DESPLIEGUE.md)).
-   Se entra con el **código corto o el NIT** de la copropiedad, el usuario y la
-   contraseña (D1).
+   Se entra con el **correo** (administración), el **número de portero** (porteros,
+   ADR-031) o el **código corto** de la copropiedad y el usuario (residentes, D1),
+   y la contraseña.
 5. **App del residente**: `flutter run --dart-define=API_URL=http://<IP>:3000`
    desde `apps/mobile` (en el iPhone, en Debug). Se entra con el código de la
    copropiedad, el usuario y la contraseña; el primer ingreso pide cambiarla,

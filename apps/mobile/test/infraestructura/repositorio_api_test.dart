@@ -4,16 +4,16 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
-import 'package:ncr_residente/dominio/calidad_de_captura.dart';
 import 'package:ncr_residente/dominio/entidades.dart';
 import 'package:ncr_residente/dominio/acceso.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/dominio/sesion.dart';
 import 'package:ncr_residente/infraestructura/api/generado/clients/residente_api.dart';
-import 'package:ncr_residente/infraestructura/api/generado/models/patron_de_visita_dto.dart';
 import 'package:ncr_residente/infraestructura/api/generado/models/token_de_notificacion_dto_plataforma.dart';
 import 'package:ncr_residente/infraestructura/api/repositorio_api.dart';
 import 'package:ncr_residente/infraestructura/sesion/almacen_seguro.dart';
+
+import '../dobles/visitas.dart';
 
 /// Adaptador de transporte falso. No hay librería de dobles: lo que hace falta
 /// es controlar qué contesta el servidor, y eso son veinte líneas.
@@ -298,14 +298,53 @@ void main() {
             'permiteAccesoVehicular': true,
             'estado': 'activa',
             'acompanantes': 2,
+            'situacion': 'vigente',
+            'motivoRechazo': null,
           },
         ]),
       );
       final a = (await repo.misAutorizaciones()).single;
       expect(a.desde.toUtc().hour, 14);
       expect(a.acompanantes, 2);
-      expect(a.vigenteEn(DateTime.utc(2026, 9, 20, 15)), isTrue);
-      expect(a.vigenteEn(DateTime.utc(2026, 9, 20, 19)), isFalse);
+      // 15-L · la situación la da el servidor; la app no la recalcula.
+      expect(a.situacion, SituacionDeVisita.vigente);
+      expect(a.motivoRechazo, isNull);
+    });
+
+    test('autorizaciones: las cuatro situaciones del servidor, y la rechazada con su motivo',
+        () async {
+      Map<String, Object?> una(String id, String situacion, [String? motivo]) => {
+            'id': id,
+            'visitante': 'Visitante $id',
+            'tipo': 'unica',
+            'desde': '2026-09-20T14:00:00.000Z',
+            'hasta': '2026-09-20T18:00:00.000Z',
+            'placa': null,
+            'permiteAccesoVehicular': false,
+            'estado': situacion == 'rechazada' ? 'revocada' : 'activa',
+            'acompanantes': 0,
+            'situacion': situacion,
+            'motivoRechazo': motivo,
+          };
+      final (repo, _) = await montar(
+        (_, _) => json(200, [
+          una('a-1', 'vigente'),
+          una('a-2', 'programada'),
+          una('a-3', 'vencida'),
+          una('a-4', 'rechazada', 'El residente no la espera'),
+          una('a-5', 'situacion_del_futuro'),
+        ]),
+      );
+      final l = await repo.misAutorizaciones();
+      expect(l.map((a) => a.situacion), [
+        SituacionDeVisita.vigente,
+        SituacionDeVisita.programada,
+        SituacionDeVisita.vencida,
+        SituacionDeVisita.rechazada,
+        // Una que esta versión no conoce no se disfraza de otra.
+        SituacionDeVisita.desconocida,
+      ]);
+      expect(l[3].motivoRechazo, 'El residente no la espera');
     });
 
     test('historial: el evento decidido por el Edge se distingue (CA-21)', () async {
@@ -322,6 +361,7 @@ void main() {
             'persona': 'Visitante',
             'zona': 'Piscina',
             'decididoPorEdge': true,
+            'deVisitante': true,
           },
         ]),
       );
@@ -358,46 +398,89 @@ void main() {
     });
   });
 
-  group('M-4 · crear visita', () {
-    NuevaVisita visita({String? placa}) => NuevaVisita(
-          visitante: 'Plomero',
-          documento: '1020304050',
-          desde: DateTime.utc(2026, 9, 20, 14),
-          hasta: DateTime.utc(2026, 9, 20, 18),
-          placa: placa,
-          permiteAccesoVehicular: placa != null,
-          acompanantes: const ['Ayudante'],
-          zonasPermitidas: const ['z-1'],
-          observaciones: null,
-          patron: const PatronDeVisita(
-            dias: {DiaDeSemana.lunes},
-            minutoInicio: 480,
-            minutoFin: 1080,
-            desplazamientoUtcMinutos: -300,
-          ),
-          claveDeIdempotencia: 'k-1',
-        );
+  /// Lo que vio el servidor: el cuerpo después de pasar por JSON, que es
+  /// donde los objetos anidados del cliente generado se vuelven mapas.
+  Map<String, dynamic> cuerpoEnviado(ServidorFalso servidor) =>
+      jsonDecode(jsonEncode(servidor.peticiones.single.data)) as Map<String, dynamic>;
 
-    test('envía la clave y las fechas EN UTC, no la hora local del teléfono', () async {
-      final (repo, servidor) = await montar(
-        (_, _) => json(201, {
-          'creada': true,
-          'id': 'a-1',
-          'repetida': false,
-          'motivo': null,
-          'explicacion': null,
-        }),
+  Map<String, Object?> generada({
+    bool creada = true,
+    String? id = 'a-1',
+    bool repetida = false,
+    String? motivo,
+    String? explicacion,
+    List<String> motivosDeFoto = const [],
+    int equipos = 3,
+    int sincronizadas = 2,
+    int fallidas = 1,
+    String? aviso,
+  }) =>
+      {
+        'creada': creada,
+        'id': id,
+        'repetida': repetida,
+        'motivo': motivo,
+        'explicacion': explicacion,
+        'motivosDeFoto': motivosDeFoto,
+        'equipos': equipos,
+        'sincronizadas': sincronizadas,
+        'fallidas': fallidas,
+        'avisoDeSincronizacion': aviso,
+      };
+
+  group('F1 · crear visita con foto y casilla', () {
+    test('va a mi/visitas con inicio EN UTC, duración, foto y casilla, y SIN vivienda', () async {
+      final (repo, servidor) = await montar((_, _) => json(200, generada()));
+      final local = DateTime(2026, 9, 20, 9, 30);
+      final r = await repo.crearVisita(
+        NuevaVisita(
+          visitante: 'Plomero Pérez',
+          documento: '79000111',
+          inicio: local,
+          duracionMinutos: 120,
+          placa: 'ABC123',
+          foto: fotoDeVisita(),
+          casillaMarcada: true,
+          claveDeIdempotencia: 'k-000001',
+        ),
       );
-      final r = await repo.crearVisita(visita());
+
+      expect(servidor.peticiones.single.method, 'POST');
+      expect(servidor.peticiones.single.path, '/copropiedades/cop-1/mi/visitas');
+      final cuerpo = cuerpoEnviado(servidor);
+      expect(cuerpo['nombre'], 'Plomero Pérez');
+      expect(cuerpo['documento'], '79000111');
+      // La API espera ISO-8601 CON zona: la hora local del teléfono sin huso
+      // la interpretaría el servidor en el suyo.
+      expect(cuerpo['inicio'], endsWith('Z'));
+      expect(DateTime.parse(cuerpo['inicio'] as String).isAtSameMomentAs(local), isTrue);
+      expect(cuerpo['duracionMinutos'], 120);
+      expect(cuerpo['casillaMarcada'], isTrue);
+      expect(cuerpo['claveDeIdempotencia'], 'k-000001');
+      final foto = cuerpo['foto'] as Map<String, dynamic>;
+      expect(foto['tipoMime'], 'image/jpeg');
+      expect(base64Decode(foto['contenidoBase64'] as String), bytesDeJpeg);
+      expect((foto['medidas'] as Map)['rostrosDetectados'], 1);
+      // Y lo que NO va: la vivienda. La deriva el servidor del vínculo.
+      expect(cuerpo.keys.where((k) => k.toLowerCase().contains('vivienda')), isEmpty);
 
       expect(r, isA<VisitaCreada>());
-      expect((r as VisitaCreada).id, 'a-1');
-      // `data` es el mapa que produjo el cliente generado; los campos
-      // anidados siguen siendo objetos suyos hasta que Dio los serializa.
-      final cuerpo = servidor.peticiones.single.data as Map<String, dynamic>;
-      expect(cuerpo['claveDeIdempotencia'], 'k-1');
-      expect(cuerpo['desde'], endsWith('Z'));
-      expect((cuerpo['patron'] as PatronDeVisitaDto).minutoFin, 1080);
+      final v = r as VisitaCreada;
+      expect(v.id, 'a-1');
+      expect((v.equipos, v.sincronizadas, v.fallidas), (3, 2, 1));
+    });
+
+    test('una foto que el servidor no aceptó llega como FotoRechazada, con sus motivos', () async {
+      final (repo, _) = await montar(
+        (_, _) => json(
+          200,
+          generada(creada: false, id: null, motivosDeFoto: ['NITIDEZ', 'ROSTROS_MULTIPLES']),
+        ),
+      );
+      final r = await repo.crearVisita(visitaDePrueba('k-000002'));
+      expect(r, isA<FotoRechazada>());
+      expect((r as FotoRechazada).motivos, ['NITIDEZ', 'ROSTROS_MULTIPLES']);
+      expect(r.razones, ['la foto está borrosa', 'se ve más de un rostro']);
     });
 
     test('los cuatro motivos tipados se traducen, con su explicación', () async {
@@ -408,15 +491,17 @@ void main() {
         ('PLACA_DUPLICADA', MotivoDeRechazo.placaDuplicada),
       ]) {
         final (repo, _) = await montar(
-          (_, _) => json(201, {
-            'creada': false,
-            'id': null,
-            'repetida': false,
-            'motivo': texto,
-            'explicacion': 'El dominio escribe este texto.',
-          }),
+          (_, _) => json(
+            200,
+            generada(
+              creada: false,
+              id: null,
+              motivo: texto,
+              explicacion: 'El dominio escribe este texto.',
+            ),
+          ),
         );
-        final r = await repo.crearVisita(visita());
+        final r = await repo.crearVisita(visitaDePrueba('k-000003'));
         expect(r, isA<VisitaRechazada>(), reason: texto);
         expect((r as VisitaRechazada).motivo, esperado);
         expect(r.explicacion, 'El dominio escribe este texto.');
@@ -426,17 +511,87 @@ void main() {
     test('UN MOTIVO DESCONOCIDO NO se toma por creada', () async {
       // Es la dirección segura de §2.1.4: una versión nueva del servidor con un
       // motivo que esta app no conoce tiene que seguir siendo un rechazo. Lo
-      // contrario diría «visita registrada» sobre algo que el conjunto negó.
+      // contrario diría «visita autorizada» sobre algo que el conjunto negó.
       final (repo, _) = await montar(
-        (_, _) => json(201, {
-          'creada': false,
-          'id': null,
-          'repetida': false,
-          'motivo': 'MOTIVO_DEL_FUTURO',
-          'explicacion': 'No se pudo.',
-        }),
+        (_, _) => json(
+          200,
+          generada(creada: false, id: null, motivo: 'MOTIVO_DEL_FUTURO', explicacion: 'No.'),
+        ),
       );
-      expect(await repo.crearVisita(visita()), isA<VisitaRechazada>());
+      expect(await repo.crearVisita(visitaDePrueba('k-000004')), isA<VisitaRechazada>());
+    });
+
+    test('un 422 es un formulario que el servidor no admite, y no se confunde con un 500', () async {
+      final (repo, _) = await montar(
+        (_, _) => json(422, {'mensaje': 'Falta confirmar que el visitante autorizó el uso de su foto'}),
+      );
+      await expectLater(
+        repo.crearVisita(visitaDePrueba('k-000005')),
+        throwsA(
+          isA<Fallo>()
+              .having((f) => f.clase, 'clase', ClaseDeFallo.datosNoValidos)
+              .having((f) => f.detalle, 'detalle', contains('autorizó')),
+        ),
+      );
+    });
+  });
+
+  group('F6 · últimos visitantes y volver a autorizar', () {
+    test('los últimos visitantes se traducen uno a uno', () async {
+      final (repo, servidor) = await montar(
+        (_, _) => json(200, [
+          {
+            'autorizacionId': 'aut-7',
+            'visitante': 'Plomero Pérez',
+            'documento': '79000111',
+            'ultimaVisita': '2026-09-12T15:00:00.000Z',
+            'placa': null,
+            'tieneFoto': true,
+          },
+        ]),
+      );
+      final l = await repo.ultimosVisitantes();
+      expect(servidor.peticiones.single.path, '/copropiedades/cop-1/mi/visitas/ultimas');
+      expect(l.single.autorizacionId, 'aut-7');
+      expect(l.single.placa, isNull);
+      expect(l.single.tieneFoto, isTrue);
+      expect(l.single.ultimaVisita.toUtc().hour, 15);
+    });
+
+    test('volver a autorizar lleva la visita EN LA RUTA y sólo cuándo, cuánto y la casilla',
+        () async {
+      final (repo, servidor) = await montar((_, _) => json(200, generada(id: 'a-9')));
+      final r = await repo.volverAAutorizar(
+        autorizacionId: 'aut-7',
+        inicio: DateTime.utc(2026, 9, 27, 13),
+        duracionMinutos: 60,
+        casillaMarcada: true,
+        claveDeIdempotencia: 'k-000006',
+      );
+
+      expect(servidor.peticiones.single.path, '/copropiedades/cop-1/mi/visitas/aut-7/repeticion');
+      final cuerpo = cuerpoEnviado(servidor);
+      // Nada de nombre, documento, placa ni foto: los copia el servidor.
+      expect(cuerpo.keys.toSet(), {'inicio', 'duracionMinutos', 'casillaMarcada', 'claveDeIdempotencia'});
+      expect(cuerpo['inicio'], '2026-09-27T13:00:00.000Z');
+      expect(cuerpo['duracionMinutos'], 60);
+      expect((r as VisitaCreada).id, 'a-9');
+    });
+
+    test('una visita que no es de su vivienda (404) se dice con el motivo del servidor', () async {
+      final (repo, _) = await montar(
+        (_, _) => json(404, {'mensaje': 'Esa visita no es de su vivienda'}),
+      );
+      await expectLater(
+        repo.volverAAutorizar(
+          autorizacionId: 'ajena',
+          inicio: DateTime.utc(2026, 9, 27, 13),
+          duracionMinutos: 60,
+          casillaMarcada: true,
+          claveDeIdempotencia: 'k-000007',
+        ),
+        throwsA(isA<Fallo>().having((f) => f.detalle, 'detalle', 'Esa visita no es de su vivienda')),
+      );
     });
   });
 
@@ -453,84 +608,6 @@ void main() {
       final cuerpo = servidor.peticiones.single.data as Map<String, dynamic>;
       expect(cuerpo['instalacionId'], 'inst-1');
       expect(cuerpo['plataforma'], TokenDeNotificacionDtoPlataforma.ios);
-    });
-  });
-
-  group('CU-02 · captura de rostro', () {
-    const medidas = MedidasDeCaptura(
-      nitidez: 0.8,
-      iluminacion: 0.5,
-      rostrosDetectados: 1,
-      proporcionRostro: 0.4,
-    );
-
-    Future<ResultadoDeCaptura> capturar(RepositorioApiDelResidente repo) => repo.capturarRostro(
-          autorizacionId: 'a-1',
-          medidas: medidas,
-          vector: Uint8List.fromList(List<int>.filled(32, 9)),
-          versionPolitica: 'v1.0',
-          suprimirEn: DateTime.utc(2026, 9, 21, 12),
-        );
-
-    test('el vector viaja en base64 y la ruta cuelga de la AUTORIZACIÓN', () async {
-      final (repo, servidor) = await montar(
-        (_, _) => json(201, {
-          'aceptada': true,
-          'motivos': <String>[],
-          'plantillaId': 'p-1',
-          'consentimientoId': 'c-1',
-          'titular': 'Plomero Pérez',
-          'calidad': 0.87,
-        }),
-      );
-      final r = await capturar(repo);
-
-      expect(r, isA<CapturaAceptada>());
-      expect((r as CapturaAceptada).titular, 'Plomero Pérez');
-      // De la autorización sale el titular: RN-10 vive en la forma de la ruta.
-      expect(servidor.peticiones.single.path, contains('/autorizaciones/a-1/rostro'));
-      final cuerpo = servidor.peticiones.single.data as Map<String, dynamic>;
-      expect(base64Decode(cuerpo['vector'] as String).length, 32);
-      // Y lo que NO va: el titular. Si el cuerpo lo llevara, la app podría
-      // pedirle el consentimiento a quien quisiera.
-      expect(cuerpo.containsKey('titularId'), isFalse);
-    });
-
-    test('un rechazo de calidad del servidor llega con sus motivos (KPI-16)', () async {
-      final (repo, _) = await montar(
-        (_, _) => json(201, {
-          'aceptada': false,
-          'motivos': ['NITIDEZ', 'ROSTROS_MULTIPLES'],
-          'plantillaId': null,
-          'consentimientoId': null,
-          'titular': null,
-          'calidad': null,
-        }),
-      );
-      final r = await capturar(repo);
-      expect(r, isA<CapturaRechazada>());
-      expect((r as CapturaRechazada).motivos, ['NITIDEZ', 'ROSTROS_MULTIPLES']);
-    });
-
-    test('aceptada SIN consentimiento es contrato roto, y se dice', () async {
-      // Tratarlo como éxito dejaría al residente creyendo que el trámite acabó
-      // cuando no hay a quién pedirle nada.
-      final (repo, _) = await montar(
-        (_, _) => json(201, {
-          'aceptada': true,
-          'motivos': <String>[],
-          'plantillaId': 'p-1',
-          'consentimientoId': null,
-          'titular': 'Plomero',
-          'calidad': 0.9,
-        }),
-      );
-      await expectLater(
-        capturar(repo),
-        throwsA(
-          isA<Fallo>().having((f) => f.detalle, 'detalle', contains('sin solicitud')),
-        ),
-      );
     });
   });
 }

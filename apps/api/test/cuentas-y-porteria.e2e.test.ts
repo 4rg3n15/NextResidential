@@ -16,6 +16,7 @@ import {
   CLAVE_PUBLICO,
 } from '../src/comun/decoradores';
 import { MENSAJE_CAMBIO_PENDIENTE } from '../src/comun/guardas/cambio-de-contrasena.guard';
+import { MENSAJE_GUARDIA_REMOTA } from '../src/plataforma';
 import {
   COP_A,
   COP_B,
@@ -24,6 +25,7 @@ import {
   direccionDe,
   enumerarRutas,
   rutasConMetadato,
+  sinModoPruebas,
   tokenDe,
 } from './utilidades';
 import type { Firmante } from './utilidades';
@@ -43,8 +45,6 @@ import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
  * ═════════════════════════════════════════════════════════════════════════════
  */
 
-const NIT_A = '900123456-7';
-const NIT_B = '800765432-1';
 const INICIAL = 'Inicial#2026';
 const NUEVA = 'Garita#2026x';
 const CLAVE_DEL_ADMINISTRADOR = 'Clave#2026';
@@ -61,6 +61,8 @@ interface Banco {
   superadmin: string;
   admin: string;
   cuerpos: string[];
+  /** H2 (ADR-031) · etiqueta de la suite → número que asignó la API. */
+  numeros: Map<string, string>;
 }
 
 const bancos: Banco[] = [];
@@ -85,8 +87,6 @@ const montar = async (inicio = '2026-09-26T02:00:00Z'): Promise<Banco> => {
   );
   const cuentas = app.get(RepositorioDeCuentasEnMemoria);
   referencia.cuentas = cuentas;
-  cuentas.declararCopropiedad(NIT_A, COP_A);
-  cuentas.declararCopropiedad(NIT_B, COP_B);
   const banco: Banco = {
     app,
     firmante,
@@ -102,6 +102,7 @@ const montar = async (inicio = '2026-09-26T02:00:00Z'): Promise<Banco> => {
     }),
     admin: await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A }),
     cuerpos: [],
+    numeros: new Map(),
   };
   bancos.push(banco);
   return banco;
@@ -141,16 +142,21 @@ const texto = (r: { body: { mensaje?: unknown } }): string => {
   return typeof interno === 'string' ? interno : JSON.stringify(m);
 };
 
-const alta = async (b: Banco, usuario: string, extra: object = {}): Promise<string> => {
+/**
+ * H2 (ADR-031) · el alta lleva nombre, documento y contraseña temporal; el
+ * número lo asigna la API, y la suite lo guarda bajo una etiqueta legible.
+ */
+const alta = async (b: Banco, etiqueta: string, extra: object = {}): Promise<string> => {
   const r = await pedir(b, 'post', `/copropiedades/${COP_A}/porteros`, b.superadmin, {
-    usuario,
+    documento: etiqueta.replace(/\./g, '-'),
     contrasenaInicial: INICIAL,
-    nombre: `Portero ${usuario}`,
+    nombre: `Portero ${etiqueta}`,
     porteria: 'Norte',
     sectores: ['Torre 1', 'Torre 2'],
     ...extra,
   });
   expect(r.status, JSON.stringify(r.body)).toBe(201);
+  b.numeros.set(etiqueta, String(r.body.numero));
   return r.body.usuarioId as string;
 };
 
@@ -171,8 +177,26 @@ const turno = (
     ...extra,
   });
 
-const acceso = (b: Banco, usuario: string, contrasena: string, origen?: string, nit = NIT_A) =>
-  pedir(b, 'post', '/auth/acceso', undefined, { nit, usuario, contrasena }, origen);
+/** H3 (ADR-031) · el portero entra con su NÚMERO y su contraseña; nada más. */
+const acceso = (b: Banco, etiqueta: string, contrasena: string, origen?: string) =>
+  pedir(
+    b,
+    'post',
+    '/auth/acceso',
+    undefined,
+    { usuario: b.numeros.get(etiqueta) ?? etiqueta, contrasena },
+    origen,
+  );
+
+/** Lo mismo, desde otra IP de navegador: la que reenvía el proxy de confianza (H6). */
+const accesoDesde = async (b: Banco, ip: string, etiqueta: string, contrasena: string) => {
+  const r = await request(b.app.getHttpServer())
+    .post('/auth/acceso')
+    .set('x-forwarded-for', ip)
+    .send({ usuario: b.numeros.get(etiqueta) ?? etiqueta, contrasena });
+  b.cuerpos.push(JSON.stringify(r.body ?? {}) + (r.text ?? ''));
+  return r;
+};
 
 /** Alta + turno amplio + primer cambio hecho: un portero listo para operar. */
 const porteroListo = async (b: Banco, usuario: string): Promise<{ id: string; token: string }> => {
@@ -200,41 +224,46 @@ const bitacora = async (b: Banco, tipo?: string) => {
 
 // ─── B1 ───────────────────────────────────────────────────────────────────────
 
-describe('B1 · cuentas por nombre de usuario (ADR-023)', () => {
+describe('B1 · porteros por NÚMERO del pool de la copropiedad (ADR-031)', () => {
   let b: Banco;
   beforeAll(async () => {
     b = await montar();
+    // Aquí se prueban el bloqueo y los límites: sin el modo pruebas (H5).
+    await sinModoPruebas(b.app);
   });
 
-  it('el superadministrador da de alta un portero por usuario, y el correo sintético sólo llega al proveedor', async () => {
+  it('el superadministrador da de alta un portero con documento y recibe su número; el correo sintético sólo llega al proveedor', async () => {
     const id = await alta(b, 'Porteria.Norte');
     expect(id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(b.proveedor.correosRecibidos).toEqual([`porteria.norte@${COP_A}.usuarios.ncr.invalid`]);
+    expect(b.numeros.get('Porteria.Norte')).toBe('1001');
+    expect(b.proveedor.correosRecibidos).toHaveLength(1);
+    expect(b.proveedor.correosRecibidos[0]).toMatch(
+      new RegExp(`^p[0-9a-f]{12}@${COP_A}\\.usuarios\\.ncr\\.invalid$`),
+    );
     const lista = await pedir(b, 'get', `/copropiedades/${COP_A}/porteros`, b.superadmin);
     expect(lista.body.porteros[0]).toMatchObject({
-      usuario: 'porteria.norte',
+      numero: 1001,
+      documento: 'PORTERIA-NORTE',
       debeCambiarContrasena: true,
       sectores: ['Torre 1', 'Torre 2'],
     });
+    expect(lista.body.porteros[0]).not.toHaveProperty('usuario');
   });
 
-  it('el mismo usuario en la misma copropiedad es un duplicado, sin distinguir mayúsculas', async () => {
-    const r = await pedir(b, 'post', `/copropiedades/${COP_A}/porteros`, b.superadmin, {
-      usuario: 'PORTERIA.NORTE',
-      contrasenaInicial: INICIAL,
-      nombre: 'Otro',
-      sectores: [],
-    });
-    expect(r.status).toBe(409);
+  it('la siguiente alta recibe el siguiente número del pool', async () => {
+    await alta(b, 'porteria.sur');
+    expect(b.numeros.get('porteria.sur')).toBe('1002');
+    const pool = await pedir(b, 'get', `/copropiedades/${COP_A}/porteros/pool`, b.superadmin);
+    expect(pool.body).toMatchObject({ inicio: 1001, fin: 1999, siguiente: 1003, cupo: 999 });
   });
 
-  it('formato de usuario y política de la contraseña inicial se validan en el servidor', async () => {
+  it('formato del documento y política de la contraseña inicial se validan en el servidor', async () => {
     const base = { nombre: 'X', sectores: [] };
     expect(
       (
         await pedir(b, 'post', `/copropiedades/${COP_A}/porteros`, b.superadmin, {
           ...base,
-          usuario: 'con espacio',
+          documento: 'con signo!',
           contrasenaInicial: INICIAL,
         })
       ).status,
@@ -243,18 +272,29 @@ describe('B1 · cuentas por nombre de usuario (ADR-023)', () => {
       (
         await pedir(b, 'post', `/copropiedades/${COP_A}/porteros`, b.superadmin, {
           ...base,
-          usuario: 'valido',
+          documento: 'VALIDO-1',
           contrasenaInicial: 'corta',
         })
       ).status,
     ).toBe(400);
   });
 
+  it('el alta ya no admite escoger el usuario: el campo no existe', async () => {
+    const r = await pedir(b, 'post', `/copropiedades/${COP_A}/porteros`, b.superadmin, {
+      usuario: 'escogido',
+      documento: 'ESCOGIDO',
+      contrasenaInicial: INICIAL,
+      nombre: 'E',
+      sectores: [],
+    });
+    expect(r.status).toBe(400);
+  });
+
   it('ni el administrador ni el portero dan de alta porteros', async () => {
     const portero = await tokenDe(b.firmante, { rol: 'portero', copropiedadId: COP_A });
     for (const t of [b.admin, portero]) {
       const r = await pedir(b, 'post', `/copropiedades/${COP_A}/porteros`, t, {
-        usuario: 'intruso',
+        documento: 'INTRUSO',
         contrasenaInicial: INICIAL,
         nombre: 'I',
         sectores: [],
@@ -281,23 +321,151 @@ describe('B1 · cuentas por nombre de usuario (ADR-023)', () => {
     expect(typeof r.body.accessToken).toBe('string');
   });
 
-  it('NIT, usuario o contraseña equivocados responden EXACTAMENTE lo mismo', async () => {
+  it('un portero por CORREO anterior a la 15-H entra con su número; por correo, ya no', async () => {
+    const authUserId = b.proveedor.declarar('garita.vieja@ejemplo.co', INICIAL);
+    b.cuentas.declararCuentaPorCorreo({
+      usuarioId: '00000000-0000-4000-8000-0000000000c2',
+      authUserId,
+      copropiedadId: COP_A,
+      rol: 'portero',
+      correo: 'garita.vieja@ejemplo.co',
+      numeroDePortero: 1003,
+    });
+    // Por número llega al proveedor con SU correo real: la contraseña vale, y
+    // lo que lo frena después es una regla de portero —aquí la de IP, porque
+    // este banco no tiene el modo pruebas—, no la identidad (401).
+    const porNumero = await pedir(b, 'post', '/auth/acceso', undefined, {
+      usuario: '1003',
+      contrasena: INICIAL,
+    });
+    expect(porNumero.status).toBe(403);
+    expect(texto(porNumero)).toBe(MENSAJE_GUARDIA_REMOTA);
+    // H3 · por correo, un portero ya no entra: el número es su única puerta.
+    const porCorreo = await pedir(b, 'post', '/auth/acceso', undefined, {
+      correo: 'garita.vieja@ejemplo.co',
+      contrasena: INICIAL,
+    });
+    expect(porCorreo.status).toBe(401);
+  });
+
+  it('número, contraseña o código equivocados responden EXACTAMENTE lo mismo', async () => {
     const respuestas = await Promise.all([
-      acceso(b, 'porteria.norte', 'Equivocada#1'),
-      acceso(b, 'no.existe', INICIAL),
-      acceso(b, 'porteria.norte', INICIAL, undefined, '999999999'),
+      acceso(b, 'Porteria.Norte', 'Equivocada#1'),
+      acceso(b, '1999', INICIAL),
+      acceso(b, 'no.es.un.numero', INICIAL),
+      pedir(b, 'post', '/auth/acceso', undefined, {
+        codigo: 'ZZZ999',
+        usuario: 'porteria.norte',
+        contrasena: INICIAL,
+      }),
     ]);
-    expect(respuestas.map((r) => r.status)).toEqual([401, 401, 401]);
+    expect(respuestas.map((r) => r.status)).toEqual([401, 401, 401, 401]);
     expect(new Set(respuestas.map(texto)).size).toBe(1);
   });
 
-  it('el sexto intento contra la MISMA cuenta en un minuto es 429, aunque cambie el origen (S-50)', async () => {
+  it('el NIT ya no es un campo de la entrada', async () => {
+    const r = await pedir(b, 'post', '/auth/acceso', undefined, {
+      nit: '900123456-7',
+      usuario: '1001',
+      contrasena: INICIAL,
+    });
+    expect(r.status).toBe(400);
+  });
+
+  it('el sexto intento contra el MISMO número desde la MISMA IP es 429 con Retry-After (H5)', async () => {
     const estados: number[] = [];
+    let espera: string | undefined;
     for (let i = 0; i < 6; i += 1) {
-      estados.push((await acceso(b, 'porteria.sur', 'Equivocada#1', `198.51.100.${i}`)).status);
+      const r = await accesoDesde(b, '198.51.100.10', 'porteria.sur', 'Equivocada#1');
+      estados.push(r.status);
+      espera ??= r.headers['retry-after'] as string | undefined;
     }
-    expect(estados.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
-    expect(estados[5]).toBe(429);
+    expect(estados).toEqual([401, 401, 401, 401, 401, 429]);
+    expect(Number(espera)).toBeGreaterThan(0);
+  });
+
+  it('el bloqueo es por (IP, número), NUNCA por el número a secas: desde otra IP entra', async () => {
+    const r = await accesoDesde(b, '198.51.100.11', 'porteria.sur', INICIAL);
+    expect(r.status, JSON.stringify(r.body)).not.toBe(429);
+    expect(r.status).not.toBe(401);
+  });
+});
+
+// ─── Cupo y baja ─────────────────────────────────────────────────────────────
+
+describe('H2 · cupo y baja del portero (ADR-031)', () => {
+  let b: Banco;
+  beforeAll(async () => {
+    b = await montar();
+  });
+
+  it('el cupo se fija (0 a 999), y lleno rechaza el alta con un mensaje claro', async () => {
+    await alta(b, 'uno');
+    const fuera = await pedir(b, 'put', `/copropiedades/${COP_A}/porteros/cupo`, b.superadmin, {
+      cupo: 1000,
+    });
+    expect(fuera.status).toBe(400);
+    const cupo = await pedir(b, 'put', `/copropiedades/${COP_A}/porteros/cupo`, b.superadmin, {
+      cupo: 1,
+    });
+    expect(cupo.status, JSON.stringify(cupo.body)).toBe(200);
+    const r = await pedir(b, 'post', `/copropiedades/${COP_A}/porteros`, b.superadmin, {
+      documento: 'SOBRA',
+      contrasenaInicial: INICIAL,
+      nombre: 'Sobra',
+      sectores: [],
+    });
+    expect(r.status).toBe(409);
+    expect(texto(r)).toMatch(/cupo de porteros activos/);
+  });
+
+  it('la baja libera la plaza, pero el número no vuelve: el siguiente es otro', async () => {
+    const id = [
+      ...(await pedir(b, 'get', `/copropiedades/${COP_A}/porteros`, b.superadmin)).body.porteros,
+    ][0].usuarioId as string;
+    const sinMotivo = await pedir(
+      b,
+      'post',
+      `/copropiedades/${COP_A}/porteros/${id}/baja`,
+      b.superadmin,
+      { motivo: 'x' },
+    );
+    expect(sinMotivo.status).toBe(400);
+    const baja = await pedir(
+      b,
+      'post',
+      `/copropiedades/${COP_A}/porteros/${id}/baja`,
+      b.superadmin,
+      {
+        motivo: 'Terminó su contrato',
+      },
+    );
+    expect(baja.status, JSON.stringify(baja.body)).toBe(200);
+    const otra = await pedir(
+      b,
+      'post',
+      `/copropiedades/${COP_A}/porteros/${id}/baja`,
+      b.superadmin,
+      {
+        motivo: 'Otra vez',
+      },
+    );
+    expect(otra.status).toBe(404);
+    await alta(b, 'dos');
+    expect(b.numeros.get('uno')).toBe('1001');
+    expect(b.numeros.get('dos')).toBe('1002');
+    expect((await bitacora(b, 'baja_de_portero')).map((h) => h.detalle)).toEqual([
+      'Terminó su contrato',
+    ]);
+  });
+
+  it('ni el administrador ni el portero dan de baja ni tocan el cupo', async () => {
+    const portero = await tokenDe(b.firmante, { rol: 'portero', copropiedadId: COP_A });
+    for (const t of [b.admin, portero]) {
+      expect(
+        (await pedir(b, 'put', `/copropiedades/${COP_A}/porteros/cupo`, t, { cupo: 5 })).status,
+      ).toBe(403);
+    }
   });
 });
 
@@ -717,7 +885,8 @@ describe('permisos del portero, por guarda declarativa y contra la API real (E-0
     const perfil = await pedir(b, 'get', '/porteria/perfil', portero);
     expect(perfil.status).toBe(200);
     expect(perfil.body).toMatchObject({
-      usuario: 'garita',
+      numero: Number(b.numeros.get('garita')),
+      documento: 'GARITA',
       porteria: 'Norte',
       sectores: ['Torre 1', 'Torre 2'],
     });

@@ -91,3 +91,33 @@ describe('EscuchasDeEquipos (A4)', () => {
     expect(await escuchas.rearmar()).toEqual({ armadas: 0, detenidas: 0, activas: 0 });
   });
 });
+
+describe('A5 (15-L) · una escucha que terminó sola se vuelve a pedir, sin repetir la bitácora', () => {
+  it('credencial rechazada: se rearma en la siguiente vuelta y la línea no se repite', async () => {
+    const lineas: string[] = [];
+    const bitacora: Bitacora = { registrar: (_n, m) => void lineas.push(m) };
+    const escuchar = vi.fn(
+      async (id: string): Promise<EscuchaActiva> => ({
+        dispositivoId: id,
+        transporte: 'escucha',
+        detalle: 'flujo de alertas del equipo',
+        detener: () => undefined,
+        // Como la del proveedor cuando el equipo rechaza la credencial.
+        activa: () => false,
+      }),
+    );
+    const escuchas = new EscuchasDeEquipos(
+      { activos: async () => [equipo('a')] },
+      { escuchar },
+      bitacora,
+      { habilitadas: true, intervaloMs: 60_000 },
+    );
+    await escuchas.rearmar();
+    await escuchas.rearmar();
+    await escuchas.rearmar();
+    // Se vuelve a pedir cada vuelta: sólo así entra la credencial corregida…
+    expect(escuchar).toHaveBeenCalledTimes(3);
+    // …pero la bitácora lo dice una vez, no cada 30 s.
+    expect(lineas.filter((l) => l === 'escucha de equipo')).toHaveLength(1);
+  });
+});

@@ -197,7 +197,10 @@ describe('H-SITIO-14 · el flujo multipart con foto', () => {
     expect(await escuchar(rechaza, t)).toEqual([]);
     const rechazo = t.lineas.find((l) => l.mensaje === 'escucha: el equipo rechazó la conexión');
     expect(rechazo?.c['estadoHttp']).toBe(401);
-    expect(t.lineas.some((l) => l.mensaje === 'escucha: la conexión falló')).toBe(true);
+    // A5 (15-L) · y la escucha SE DETIENE: reconectar con la clave rechazada
+    // es sumar inicios de sesión fallidos hasta que el equipo bloquee la IP.
+    expect(t.lineas.some((l) => /credencial rechazada — se DETIENE/.test(l.mensaje))).toBe(true);
+    expect(t.lineas.some((l) => l.mensaje === 'escucha: se reconecta')).toBe(false);
   });
 });
 

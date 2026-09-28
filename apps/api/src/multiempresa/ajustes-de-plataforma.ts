@@ -34,9 +34,11 @@ export const normalizarTelefono = (valor: string): string => valor.replace(/[\s(
 const FORMATO_TELEFONO = /^\+?[0-9]{7,15}$/;
 
 /**
- * `[SUPUESTO]` S-58 · la consola acepta «código o NIT» en UN campo (D1). Un
- * código de 5 a 8 cifras sin letras sería indistinguible de un NIT y la consola
- * lo mandaría como NIT: se rechaza al asignarlo, con el remedio en el mensaje.
+ * `[SUPUESTO]` S-58 · un código de 5 a 8 cifras sin letras se rechaza al
+ * asignarlo. Nació porque la consola aceptaba «código o NIT» en un campo; desde
+ * la 15-L (ADR-031) el NIT ya no entra, pero el campo «Usuario» toma las cifras
+ * por el NÚMERO de un portero, y un código sólo de cifras se confundiría con él
+ * al primer despiste. Se conserva, con ese motivo en el mensaje.
  */
 export const pareceUnNit = (codigo: string): boolean => /^[0-9]{5,8}$/.test(codigo);
 
@@ -45,7 +47,7 @@ export const validarCodigoCorto = (valor: string | number): string | null => {
   const c = codigoCorto(valor);
   if (!c.ok) return c.error;
   return pareceUnNit(c.valor)
-    ? 'un código de 5 o más cifras sin letras se confunde con un NIT: añada al menos una letra'
+    ? 'un código de 5 o más cifras sin letras se confunde con un número de portero: añada al menos una letra'
     : null;
 };
 

@@ -9,6 +9,7 @@ import {
 } from '../src/cuentas';
 import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -27,7 +28,6 @@ import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
  * Se OMITE sin `DATABASE_URL_PRUEBAS`, y lo dice: una omisión no es un verde.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const SUPER = '00000000-0000-4000-8000-000000000001';
 const INICIAL = 'Inicial#2026';
 const NUEVA = 'Hogar#2026xy';
@@ -84,13 +84,9 @@ afterAll(async () => {
   await pool?.end();
 });
 
-const omitida = (): boolean => {
-  if (disponible) return false;
-  console.log(
-    'OMITIDA: sin DATABASE_URL_PRUEBAS o sin la migración 0038. Se ejecuta con --con-base.',
-  );
-  return true;
-};
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin la migración 0038', () => disponible);
+const omitida = (): boolean => !disponible;
 
 const http = () => request((app as INestApplication).getHttpServer());
 const comoSuper = (metodo: 'get' | 'post' | 'patch', ruta: string) =>
@@ -132,8 +128,9 @@ const residenteNuevo = async (n: number): Promise<string> => {
     .set('x-ncr-origen', origen)
     // La forma EXACTA del cliente Dart generado: los opcionales viajan como
     // `null`. Con `!== undefined` en el servidor, esto era un acceso por
-    // «correo: null» y respondía 401 (hallazgo H-15I-04).
-    .send({ correo: null, codigo: CODIGO.toLowerCase(), nit: null, usuario, contrasena: INICIAL });
+    // «correo: null» y respondía 401 (hallazgo H-15I-04). Sin `nit` desde la
+    // 15-L (ADR-031): el cliente regenerado ya no lo lleva.
+    .send({ correo: null, codigo: CODIGO.toLowerCase(), usuario, contrasena: INICIAL });
   expect(primero.status, JSON.stringify(primero.body)).toBe(200);
   expect(primero.body.debeCambiarContrasena).toBe(true);
   // Con el cambio pendiente, ni siquiera el alta: 403 (ADR-023).
@@ -213,11 +210,11 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
     expect(JSON.stringify(inexistente.body)).toContain(MENSAJE_CREDENCIALES);
     expect(sinCorrelacion(deOtra.body)).toEqual(sinCorrelacion(inexistente.body));
     expect(bienEnSuCasa.status).toBe(200);
-    // La consola sigue aceptando el NIT como alternativa (D1).
+    // H3 (15-L, ADR-031) · el NIT ya no es una forma de entrar: ni se admite el campo.
     const porNit = await http()
       .post('/auth/acceso')
       .send({ nit: '900987654', usuario, contrasena: INICIAL });
-    expect(porNit.status).toBe(200);
+    expect(porNit.status).toBe(400);
   });
 
   it('3.2 · primer ingreso: la vivienda sin cuenta se vincula con «no lo tengo»', async () => {
@@ -437,6 +434,18 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
     }
     const cabe = await con(primero).post(`/copropiedades/${COP_A}/mi/vehiculos`, nueva);
     expect(cabe.body.registrado, JSON.stringify(cabe.body)).toBe(true);
+
+    // 3i (corrección de la 15-L) · lo que el residente cambió en la APP es lo
+    // que la CONSOLA lista en su siguiente recarga: la misma API, la misma base.
+    const consola = await comoSuper('get', `/copropiedades/${COP_A}/residentes/vehiculos`);
+    const porPlaca = new Map(
+      (consola.body as { placa: string; activo: boolean }[]).map((v) => [v.placa, v.activo]),
+    );
+    expect(porPlaca.get(nueva.placa)).toBe(true);
+    for (const v of propios.rows.slice(0, 2)) {
+      const dado = (consola.body as { id: string; activo: boolean }[]).find((x) => x.id === v.id);
+      expect(dado?.activo ?? false, 'dado de baja en la app, inactivo en la consola').toBe(false);
+    }
   });
 
   it('ADR-04 · altas CONCURRENTES no rebasan el tope: la base decide', async () => {
@@ -510,6 +519,61 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
       [`%${SUFIJO}1%`],
     );
     expect(filtrado?.n).toBe('0');
+  });
+
+  it('G (15-L) · el superadministrador edita el perfil del residente: mismas reglas, y el rastro dice quién y qué campos', async () => {
+    if (omitida()) return;
+    const usuarioId = (
+      JSON.parse(Buffer.from(primero.split('.')[1] ?? '', 'base64url').toString('utf8')) as {
+        usuario_id: string;
+      }
+    ).usuario_id;
+    const ruta = `/copropiedades/${COP_A}/residentes/cuentas/${usuarioId}/perfil`;
+    const visto = await comoSuper('get', ruta);
+    expect(visto.status, JSON.stringify(visto.body)).toBe(200);
+    const cambio = await http()
+      .put(ruta)
+      .set('Authorization', `Bearer ${superadmin}`)
+      .send({
+        ...perfil(1),
+        nombres: 'Ana Lucía',
+        numeroDocumento: `8${SUFIJO}1`,
+        telefono: '+573009990011',
+      });
+    expect(cambio.status, JSON.stringify(cambio.body)).toBe(200);
+    expect(cambio.body.perfil).toMatchObject({
+      nombreCompleto: `Ana Lucía Prueba ${SUFIJO}`,
+      telefono: '+573009990011',
+    });
+    // El residente ve lo que cambió el superadministrador.
+    expect((await con(primero).get(`/copropiedades/${COP_A}/mi/perfil`)).body.nombres).toBe(
+      'Ana Lucía',
+    );
+    const hecho = await uno<{ actor: string; detalle: string }>(
+      `SELECT actor_id::text AS actor, detalle FROM public.bitacora_de_residentes
+        WHERE usuario_id = $1 AND tipo = 'perfil_editado' ORDER BY ocurrido_en DESC LIMIT 1`,
+      [usuarioId],
+    );
+    expect(hecho?.actor).toBe(SUPER);
+    expect(hecho?.detalle).toMatch(/^editado por el superadministrador: .*nombres/);
+    expect(hecho?.detalle).toMatch(/telefono/);
+    expect(hecho?.detalle).not.toContain(SUFIJO);
+    // Las mismas reglas: un documento de otra persona, no; una fecha imposible, 400.
+    const usado = await http()
+      .put(ruta)
+      .set('Authorization', `Bearer ${superadmin}`)
+      .send(perfil(3));
+    expect(usado.body.motivo).toBe('DOCUMENTO_EN_USO');
+    const mala = await http()
+      .put(ruta)
+      .set('Authorization', `Bearer ${superadmin}`)
+      .send({ ...perfil(1), numeroDocumento: `8${SUFIJO}1`, fechaNacimiento: '2999-01-01' });
+    expect(mala.status).toBe(400);
+    // Desde otra copropiedad, el mismo residente no existe.
+    expect(
+      (await comoSuper('get', `/copropiedades/${COP_B}/residentes/cuentas/${usuarioId}/perfil`))
+        .status,
+    ).toBe(404);
   });
 
   it('KPI-36/37 · camino de servicio: la copropiedad ajena no ve ni toca las plazas de ésta', async () => {

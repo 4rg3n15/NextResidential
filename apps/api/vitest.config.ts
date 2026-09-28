@@ -27,7 +27,19 @@ export default defineConfig({
     }),
   ],
   resolve: {
-    alias: {
+    alias: [
+      /**
+       * 15-L · y `@ncr/providers` también, por el mismo motivo. Sin esto, la
+       * prueba de la verificación armada siguió en verde con R2 DESHECHO en el
+       * fuente: la API cargaba el `dist/` compilado antes, con la corrección
+       * dentro. Es el falso verde de la ETAPA 04 con otro paquete. La
+       * expresión es exacta para no alcanzar la subruta `/operacion`, que
+       * ninguna prueba de `apps/` importa (control de extensibilidad).
+       */
+      {
+        find: /^@ncr\/providers$/,
+        replacement: resolve(__dirname, '../../packages/providers/src/index.ts'),
+      },
       /**
        * Las pruebas resuelven `@ncr/domain-core` a su CÓDIGO FUENTE, no a su
        * `dist/`.
@@ -43,8 +55,11 @@ export default defineConfig({
        * Con el alias, la suite no puede quedar desincronizada del código: no
        * existe artefacto intermedio que pueda envejecer.
        */
-      '@ncr/domain-core': resolve(__dirname, '../../packages/domain-core/src/index.ts'),
-    },
+      {
+        find: '@ncr/domain-core',
+        replacement: resolve(__dirname, '../../packages/domain-core/src/index.ts'),
+      },
+    ],
   },
   test: {
     ...informeDe('api'),

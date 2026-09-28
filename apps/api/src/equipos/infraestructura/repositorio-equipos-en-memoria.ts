@@ -50,6 +50,42 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
     );
   }
 
+  /**
+   * 15-L · un equipo que ya estaba en `dispositivos` antes de la prueba (el
+   * seed, o el alta de otra etapa). Sin él, el banco sin base no tenía de
+   * quién es cada equipo, y la comprobación de que el equipo es de la
+   * copropiedad de la ruta no se podía ejercitar sin base.
+   */
+  sembrar(
+    copropiedadId: string,
+    equipo: { readonly id: string; readonly nombre: string; readonly tipo: DatosDeEquipo['tipo'] },
+  ): void {
+    this.lista(copropiedadId).push({
+      id: equipo.id,
+      nombre: equipo.nombre,
+      tipo: equipo.tipo,
+      host: `${equipo.id}.invalid`,
+      puerto: 80,
+      protocolo: 'http',
+      usuario: 'servicio',
+      modelo: null,
+      firmware: null,
+      fabricante: null,
+      canalBarrera: null,
+      numeroDePuerta: null,
+      canalDeAudio: null,
+      modoDeTerminal: null,
+      canalDeAudioHabilitado: false,
+      canalDeVideo: null,
+      zonaId: null,
+      capacidades: null,
+      verificacion: 'no_verificado',
+      verificadoEn: null,
+      motivoNoVerificado: null,
+      estado: 'activo',
+    });
+  }
+
   /** Solo para que la suite compruebe que hay sobre y que NO es el texto. */
   sobreDe(copropiedadId: string, equipoId: string): Buffer | undefined {
     return this.sobres.get(`${copropiedadId}/${equipoId}`);
@@ -69,6 +105,23 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       }
     }
     return todos;
+  }
+
+  async activos(): Promise<readonly EquipoQueEmite[]> {
+    return [...this.equipos].flatMap(([copropiedadId, equipos]) =>
+      equipos
+        .filter((e) => e.estado === 'activo')
+        .map((e) => ({ dispositivoId: e.id, copropiedadId, nombre: e.nombre })),
+    );
+  }
+
+  async copropiedadDeActivo(dispositivoId: string): Promise<string | null> {
+    for (const [copropiedadId, equipos] of this.equipos) {
+      if (equipos.some((e) => e.id === dispositivoId && e.estado === 'activo')) {
+        return copropiedadId;
+      }
+    }
+    return null;
   }
 
   async crear(
@@ -94,6 +147,8 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       canalDeAudio: alta.canalDeAudio ?? null,
       modoDeTerminal: alta.modoDeTerminal ?? null,
       canalDeAudioHabilitado: alta.canalDeAudioHabilitado ?? false,
+      canalDeVideo: alta.canalDeVideo ?? null,
+      zonaId: alta.zonaId ?? null,
       capacidades: veredicto.capacidades ?? null,
       verificacion: this.verificacionDe(veredicto),
       verificadoEn: veredicto.verificado ? new Date(0).toISOString() : null,
@@ -143,6 +198,8 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       canalDeAudio: alta.canalDeAudio ?? null,
       modoDeTerminal: alta.modoDeTerminal ?? null,
       canalDeAudioHabilitado: alta.canalDeAudioHabilitado ?? false,
+      canalDeVideo: alta.canalDeVideo ?? null,
+      zonaId: alta.zonaId ?? null,
       // Recién descubiertas sustituyen; un sondeo fallido conserva las viejas.
       capacidades: veredicto.capacidades ?? actual.capacidades,
       verificacion: this.verificacionDe(veredicto),

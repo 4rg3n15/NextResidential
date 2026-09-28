@@ -556,4 +556,12 @@ UPDATE public.copropiedades SET codigo_corto = 'MIRA', telefono_porteria = '+576
 UPDATE public.copropiedades SET codigo_corto = 'ROBLE'
  WHERE id = '10000000-0000-4000-8000-000000000002' AND codigo_corto IS NULL;
 
+-- ETAPA 15-L (H2, ADR-031) · el portero de demostración entra con su NÚMERO. La
+-- 0042 numera a los porteros que ya existían al migrar; éste se siembra
+-- después, así que recibe el suyo aquí, por la MISMA función que usa el alta:
+-- el primero del pool de su copropiedad.
+UPDATE public.usuarios
+   SET numero_de_portero = app.asignar_numero_de_portero(copropiedad_id)
+ WHERE id = '00000000-0000-4000-8000-000000000011' AND numero_de_portero IS NULL;
+
 COMMIT;

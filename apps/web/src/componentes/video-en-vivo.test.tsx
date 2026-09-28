@@ -60,6 +60,91 @@ describe('VideoEnVivo (A5)', () => {
     });
     render(<VideoEnVivo copropiedadId={COP} dispositivoId={DISP} negociar={negociar} />);
     await esperar();
-    expect(screen.getByText('Este equipo no ofrece video')).toBeTruthy();
+    expect(screen.getByText('Sin video de este equipo')).toBeTruthy();
+  });
+
+  it('D2 (15-L) · con H.265 se dice el códec y qué hacer, no un negro', async () => {
+    const negociar = vi.fn(async () => {
+      throw new ErrorDeVistaEnVivo(
+        'sin_video',
+        'Este equipo entrega H.265 en el canal 101 y el navegador no lo reproduce: cámbielo a H.264',
+      );
+    });
+    render(<VideoEnVivo copropiedadId={COP} dispositivoId={DISP} negociar={negociar} />);
+    await esperar();
+    expect(screen.getByText(/entrega H\.265 en el canal 101/)).toBeTruthy();
+  });
+
+  it('D3 (15-L) · negoció y no llega imagen: «Sin señal», con reintento', async () => {
+    vi.useFakeTimers();
+    try {
+      const negociar = vi.fn(
+        async (): Promise<ConexionEnVivo> => ({
+          latenciaNegociacionMs: 50,
+          cerrar: () => undefined,
+        }),
+      );
+      render(
+        <VideoEnVivo
+          copropiedadId={COP}
+          dispositivoId={DISP}
+          negociar={negociar}
+          plazoPrimerCuadroMs={1000}
+        />,
+      );
+      await esperar();
+      expect(screen.getByText('En vivo')).toBeTruthy();
+      await act(async () => {
+        vi.advanceTimersByTime(1001);
+      });
+      expect(screen.getByText('Sin señal')).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Reintentar/ })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('D3 (15-L) · con imagen a tiempo, no hay «sin señal»', async () => {
+    vi.useFakeTimers();
+    try {
+      const negociar = vi.fn(
+        async (): Promise<ConexionEnVivo> => ({
+          latenciaNegociacionMs: 50,
+          cerrar: () => undefined,
+        }),
+      );
+      const vista = render(
+        <VideoEnVivo
+          copropiedadId={COP}
+          dispositivoId={DISP}
+          negociar={negociar}
+          plazoPrimerCuadroMs={1000}
+        />,
+      );
+      await esperar();
+      fireEvent(vista.container.querySelector('video') as HTMLVideoElement, new Event('playing'));
+      await act(async () => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(screen.queryByText('Sin señal')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('D3 (15-L) · si la conexión se cae después de negociar, se dice', async () => {
+    let cortar: (() => void) | undefined;
+    const negociar = vi.fn(
+      async (_u: string, o: OpcionesDeNegociacion): Promise<ConexionEnVivo> => {
+        cortar = o.alCortarse;
+        return { latenciaNegociacionMs: 50, cerrar: () => undefined };
+      },
+    );
+    render(<VideoEnVivo copropiedadId={COP} dispositivoId={DISP} negociar={negociar} />);
+    await esperar();
+    await act(async () => {
+      cortar?.();
+    });
+    expect(screen.getByText('Se cortó el video')).toBeTruthy();
   });
 });

@@ -11,6 +11,7 @@ import { DecidirAcceso } from '../src/autorizaciones/aplicacion/evaluar-acceso';
 import type { ResolutorDePlaca } from '../src/autorizaciones/aplicacion/puertos';
 import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-pg';
 import { RepositorioCopropiedadesPg } from '../src/multiempresa/repositorio-copropiedades-pg';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -26,7 +27,6 @@ import { RepositorioCopropiedadesPg } from '../src/multiempresa/repositorio-copr
  * aquí es un fallo del cargador o del esquema, nunca «datos que faltan».
  */
 
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP_A = '10000000-0000-4000-8000-000000000001';
 const COP_B = '10000000-0000-4000-8000-000000000002';
 const DISPOSITIVO = '90000000-0000-4000-8000-000000000001';
@@ -109,6 +109,9 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool?.end();
 });
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
 
 describe('D-25 · el motor decide con el contexto de la base (tabla 9.1)', () => {
   it('la base de pruebas contesta', () => {

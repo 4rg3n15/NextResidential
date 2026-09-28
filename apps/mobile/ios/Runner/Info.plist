@@ -4,10 +4,15 @@
 <dict>
 	<!-- ETAPA 15-I (hito 3): la foto del visitante para la terminal facial. -->
 	<key>NSCameraUsageDescription</key>
-	<string>La cámara toma la foto del rostro de su visitante para la terminal facial del conjunto. El visitante decide si acepta.</string>
-	<!-- image_picker exige declararla aunque la app sólo abre la cámara. -->
+	<string>La cámara toma la foto del rostro de su visitante, con su autorización, para la terminal facial del conjunto.</string>
+	<!--
+	  Corrección de la 15-L: «Elegir de la galería». En iOS 14 o posterior (la
+	  app exige 15) la galería es PHPicker, que corre fuera de la app y NO pide
+	  este permiso, tampoco con el acceso limitado. La clave se declara porque
+	  image_picker la exige; el texto dice la verdad por si el sistema la enseña.
+	-->
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>La app no lee su fototeca: sólo usa la foto que toma con la cámara.</string>
+	<string>Cuando elige en su galería la foto de su visitante, la app usa sólo esa foto, reducida, para la terminal facial del conjunto. No lee ni guarda el resto de sus fotos.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -37,34 +42,29 @@
 	por la IP privada del Mac en sitio, y en un iPhone físico iOS exige esta
 	clave para pedir el permiso de red local: sin ella la conexión se corta y la
 	app sólo decía «No hay conexión con el servidor» mientras Safari —que es de
-	Apple y no pasa por este permiso— abría la misma API. Va FUERA del bloque de
-	depuración: un despliegue del conjunto también puede servir la API en la
-	red local, y la clave sólo describe el permiso; no concede nada por sí sola.
+	Apple y no pasa por este permiso— abría la misma API. Va en TODAS las
+	configuraciones: la clave sólo describe el permiso; no concede nada por sí
+	sola.
 	-->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>La app se conecta al servidor de Next Control de su conjunto, que está en la red local.</string>
 	<!--
-	A6 · Excepción de App Transport Security SOLO en depuración.
-	Xcode preprocesa este fichero con el preprocesador de C (INFOPLIST_PREPROCESS
-	en ios/Flutter/Debug.xcconfig y Release.xcconfig). NCR_DEPURACION sólo se
-	define en Debug.xcconfig, así que en Release y Profile el bloque de abajo se
-	elimina y la app compilada NO lleva NSAppTransportSecurity. Las directivas
-	van envueltas en comentarios XML para que el fichero crudo siga siendo un
-	plist válido para cualquier herramienta que lo lea sin preprocesar.
-	NSAllowsLocalNetworking cubre la API de desarrollo por IP privada; nunca
-	NSAllowsArbitraryLoads.
-	-->
-	<!--
-#if NCR_DEPURACION
+	Corrección de la 15-L · App Transport Security, IGUAL en Debug, Release y
+	Profile. La app se usa en sitio compilada en Release y abierta desde el
+	ícono, sin el Mac conectado; la excepción de ATS tiene que ir en el binario
+	que se instala. NSAllowsLocalNetworking relaja ATS sólo para lo local (los
+	nombres .local y los que no tienen dominio); nunca NSAllowsArbitraryLoads.
+	No es lo que hace falta para el transporte de la app: Dio usa dart:io, que
+	abre sockets POSIX y NO pasa por ATS (Bloque 0.5); lo que sí lo alcanza es
+	el permiso de red local de arriba. Va para cualquier componente que use el
+	sistema de URL de Apple (un WebView, un plugin nativo). Lo comprueba
+	scripts/lib/info-plist-ios.mjs en las tres configuraciones.
 	-->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<!--
-#endif
-	-->
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

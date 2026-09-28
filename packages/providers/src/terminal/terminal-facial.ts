@@ -2,6 +2,7 @@ import type {
   AccessPointProvider,
   FaceTemplateProvider,
   ResultadoAccionamiento,
+  Vigencia,
 } from '@ncr/domain-core';
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
 import type { OpcionesDeEquipo, RespuestaDeEquipo } from '../equipo/cliente';
@@ -13,6 +14,10 @@ import { BibliotecaLlena } from '../nucleo/errores';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 import { recuentoDeLaBiblioteca } from './recuento-de-biblioteca';
 import { confirmada, exigirConfirmacion } from '../equipo/confirmacion-isapi';
+import { personaEnElEquipo } from './persona-en-el-equipo';
+import type { AjustesDePersona } from './persona-en-el-equipo';
+import { exigirFotoAdmisible } from './foto-del-rostro';
+import type { LimitesDeFoto } from './foto-del-rostro';
 
 /**
  * TERMINAL FACIAL · `DS-K1T344MBFWX-E1` · V4.47.0 build 250722.
@@ -75,6 +80,10 @@ export interface OpcionesDeTerminal extends OpcionesDeEquipo {
   readonly numeroDePuerta?: number | null;
   /** Máximo de plantillas que el equipo declara. `null` si no lo dijo. */
   readonly bibliotecaMaximo?: number | null;
+  /** A2 (15-L) · zona y plantilla horaria con que se escribe la persona. */
+  readonly persona?: AjustesDePersona;
+  /** A2 (15-L) · peso y lado máximos de la foto, del `.env`. */
+  readonly limitesDeFoto?: LimitesDeFoto;
 }
 
 /** Lo que el equipo contesta cuando la ruta no existe en ese firmware. */
@@ -121,6 +130,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     dispositivoId: string,
     plantillaId: string,
     plantilla: Uint8Array,
+    vigencia?: Vigencia,
   ): Promise<void> {
     /**
      * ═════════════════════════════════════════════════════════════════════════
@@ -143,6 +153,9 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
           'reconoce a nadie (RN-11)',
       );
     }
+    // A2 (15-L) · que sea una imagen y quepa, ANTES de tocar el equipo: una
+    // foto que la terminal no admite es un `400` que no dice por qué.
+    exigirFotoAdmisible(plantilla, this.opciones.limitesDeFoto);
 
     // Antes de subir: ¿cabe? Preguntar cuesta una consulta; no preguntar deja
     // un rechazo del equipo que hay que interpretar después. Y el recuento
@@ -153,7 +166,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       throw new BibliotecaLlena(dispositivoId, maximo);
     }
 
-    await this.altaDePersona(dispositivoId, plantillaId);
+    await this.altaDePersona(dispositivoId, plantillaId, vigencia);
 
     const ruta = rutaPara('cargar la plantilla facial', 'terminal');
     const separador = `----ncr${String(plantilla.byteLength)}`;
@@ -420,20 +433,29 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
    * Alta de la persona. Si ya existe, se **modifica** en vez de fallar: la
    * sincronización tiene que poder reintentarse sin que la segunda vez rompa.
    */
-  private async altaDePersona(dispositivoId: string, plantillaId: string): Promise<void> {
+  private async altaDePersona(
+    dispositivoId: string,
+    plantillaId: string,
+    vigencia: Vigencia | undefined,
+  ): Promise<void> {
     const ruta = rutaPara('dar de alta la persona a la que pertenece la plantilla', 'terminal');
     // H-SITIO-04 · 32 letras y dígitos: el máximo que la guía da por general.
     const identificador = identificadorEnElEquipo(plantillaId);
-    const persona = JSON.stringify({
-      UserInfo: {
-        employeeNo: identificador,
-        // El nombre NO viaja: el equipo no es fuente de verdad y no hay
-        // motivo para dejar datos personales en un aparato cuyo registro se
-        // puede borrar por API. La identidad vive en `plantillas_biometricas`.
-        name: identificador,
-        userType: 'normal',
-        Valid: { enable: false },
-      },
+    // A2 (15-L) · con vigencia, el equipo caduca la credencial por su cuenta.
+    const registro = personaEnElEquipo(
+      identificador,
+      vigencia,
+      this.opciones.numeroDePuerta,
+      this.opciones.persona,
+    );
+    const persona = JSON.stringify({ UserInfo: registro });
+    this.opciones.traza?.registrar('info', 'alta de persona en la terminal', {
+      dispositivoId,
+      tipoDePersona: registro.userType,
+      vigente: registro.Valid.enable
+        ? { desde: registro.Valid.beginTime, hasta: registro.Valid.endTime }
+        : null,
+      puerta: registro.doorRight ?? null,
     });
     const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta, {
       tipo: 'application/json',

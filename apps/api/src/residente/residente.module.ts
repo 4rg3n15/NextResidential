@@ -1,3 +1,4 @@
+import { PerfilDeResidentesController } from './presentacion/perfil-de-residentes.controller';
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
@@ -20,18 +21,27 @@ import { AutorizacionesDelResidentePg } from './infraestructura/autorizaciones-p
 import { ZonasDelResidentePg } from './infraestructura/zonas-pg';
 import { NotificacionesDelResidentePg } from './infraestructura/notificaciones-pg';
 import { CrearMiAutorizacion } from './aplicacion/crear-mi-autorizacion';
-import { CapturarRostroDeMiVisitante } from './aplicacion/capturar-rostro-de-mi-visitante';
 import { RegistrarMiAparato, VerMisZonas } from './aplicacion/casos-de-uso-11b';
 import {
   ResolverMiAmbito,
   VerMiFamilia,
   VerMiHistorial,
-  VerMisAutorizaciones,
   VerMisVehiculos,
   VerMiVivienda,
 } from './aplicacion/casos-de-uso';
-import { BiometriaModule, CapturarRostro, EmitirEnlaceDeConsentimiento } from '../biometria';
+import { BiometriaModule } from '../biometria';
 import { MiController } from './presentacion/mi.controller';
+import { MisVisitasController } from './presentacion/mis-visitas.controller';
+import { MisNotificacionesController } from './presentacion/mis-notificaciones.controller';
+import { VerMisNotificaciones, VerMisVisitasConSituacion } from './aplicacion/mis-notificaciones';
+import { GenerarMiVisita, MisUltimosVisitantes, VolverAAutorizar } from './aplicacion/mis-visitas';
+import { RevocarAutorizacion } from '../autorizaciones';
+import {
+  AvisoDeVisitas,
+  DatosParaVolverAAutorizar,
+  RegistrarRostroDeVisita,
+  UltimosVisitantes,
+} from '../visitas';
 import { MiAltaController } from './presentacion/mi-alta.controller';
 import { MiHogarController } from './presentacion/mi-hogar.controller';
 import {
@@ -63,12 +73,18 @@ export class ResidenteModule {
       imports: [BiometriaModule.registrar()],
       controllers: [
         MiController,
+        // 15-L · lo que le importa al residente, desde la API (sin push).
+        MisNotificacionesController,
         // ETAPA 15-I · primer ingreso, ocupantes, perfil, vehículos propios y
         // su supervisión por el superadministrador.
         MiAltaController,
         MiHogarController,
         SupervisionDeResidentesController,
         OcupantesDeViviendaController,
+        // 15-L (G) · el superadministrador edita el perfil de un residente.
+        PerfilDeResidentesController,
+        // 15-L (F) · sus visitas con foto y casilla, y «Volver a autorizar».
+        MisVisitasController,
       ],
       providers: [
         ...PROVEEDORES_DEL_HOGAR,
@@ -94,10 +110,16 @@ export class ResidenteModule {
           useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente) => new VerMisVehiculos(r, d),
         },
         {
-          provide: VerMisAutorizaciones,
-          inject: [ResolverMiAmbito, DIRECTORIO_DEL_RESIDENTE],
-          useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente) =>
-            new VerMisAutorizaciones(r, d),
+          provide: VerMisVisitasConSituacion,
+          inject: [ResolverMiAmbito, DIRECTORIO_DEL_RESIDENTE, RELOJ],
+          useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente, reloj: Reloj) =>
+            new VerMisVisitasConSituacion(r, d, reloj),
+        },
+        {
+          provide: VerMisNotificaciones,
+          inject: [ResolverMiAmbito, DIRECTORIO_DEL_RESIDENTE, RELOJ],
+          useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente, reloj: Reloj) =>
+            new VerMisNotificaciones(r, d, reloj),
         },
         {
           provide: AUTORIZACIONES_DEL_RESIDENTE,
@@ -121,21 +143,6 @@ export class ResidenteModule {
             new CrearMiAutorizacion(r, a, reloj),
         },
         {
-          provide: CapturarRostroDeMiVisitante,
-          inject: [
-            ResolverMiAmbito,
-            AUTORIZACIONES_DEL_RESIDENTE,
-            CapturarRostro,
-            EmitirEnlaceDeConsentimiento,
-          ],
-          useFactory: (
-            r: ResolverMiAmbito,
-            a: AutorizacionesDelResidente,
-            c: CapturarRostro,
-            e: EmitirEnlaceDeConsentimiento,
-          ) => new CapturarRostroDeMiVisitante(r, a, c, e),
-        },
-        {
           provide: VerMisZonas,
           inject: [ResolverMiAmbito, ZONAS_DEL_RESIDENTE, RELOJ],
           useFactory: (r: ResolverMiAmbito, z: ZonasDelResidente, reloj: Reloj) =>
@@ -151,6 +158,36 @@ export class ResidenteModule {
           provide: VerMiHistorial,
           inject: [ResolverMiAmbito, DIRECTORIO_DEL_RESIDENTE],
           useFactory: (r: ResolverMiAmbito, d: DirectorioDelResidente) => new VerMiHistorial(r, d),
+        },
+        {
+          provide: GenerarMiVisita,
+          inject: [
+            ResolverMiAmbito,
+            CrearMiAutorizacion,
+            AUTORIZACIONES_DEL_RESIDENTE,
+            RegistrarRostroDeVisita,
+            RevocarAutorizacion,
+            AvisoDeVisitas,
+          ],
+          useFactory: (
+            r: ResolverMiAmbito,
+            crear: CrearMiAutorizacion,
+            a: AutorizacionesDelResidente,
+            rostro: RegistrarRostroDeVisita,
+            revocar: RevocarAutorizacion,
+            aviso: AvisoDeVisitas,
+          ) => new GenerarMiVisita(r, crear, a, rostro, revocar, aviso),
+        },
+        {
+          provide: VolverAAutorizar,
+          inject: [ResolverMiAmbito, DatosParaVolverAAutorizar, GenerarMiVisita],
+          useFactory: (r: ResolverMiAmbito, d: DatosParaVolverAAutorizar, g: GenerarMiVisita) =>
+            new VolverAAutorizar(r, d, g),
+        },
+        {
+          provide: MisUltimosVisitantes,
+          inject: [ResolverMiAmbito, UltimosVisitantes],
+          useFactory: (r: ResolverMiAmbito, u: UltimosVisitantes) => new MisUltimosVisitantes(r, u),
         },
       ],
     };

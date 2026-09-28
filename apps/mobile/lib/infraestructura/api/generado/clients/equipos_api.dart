@@ -13,8 +13,13 @@ import '../models/correccion_de_equipo_dto.dart';
 import '../models/edicion_de_equipo_dto.dart';
 import '../models/equipo_dto.dart';
 import '../models/equipos_dto.dart';
+import '../models/estado_de_equipos_simulados_dto.dart';
+import '../models/motivo_de_configuracion_dto.dart';
+import '../models/nombre_de_equipo_dto.dart';
+import '../models/resultado_de_configuracion_dto.dart';
 import '../models/resultado_de_correccion_dto.dart';
 import '../models/resultado_de_sondeo_dto.dart';
+import '../models/verificacion_remota_dto.dart';
 
 part 'equipos_api.g.dart';
 
@@ -33,6 +38,12 @@ abstract class EquiposApi {
   Future<EquipoDto> equiposControllerCrear({
     @Path('id') required String id,
     @Body() required AltaDeEquipoDto body,
+  });
+
+  /// Si las órdenes de la consola llegan a equipos reales (franja F3)
+  @GET('/copropiedades/{id}/equipos-simulados')
+  Future<EstadoDeEquiposSimuladosDto> equiposSimuladosControllerEstado({
+    @Path('id') required String id,
   });
 
   /// Prueba la conexión DESDE EL SERVIDOR, sin guardar nada
@@ -81,10 +92,32 @@ abstract class EquiposApi {
     @Path('equipoId') required String equipoId,
   });
 
+  /// C2 · escribe en la cámara el servidor de alarmas con la IP actual del Mac, el puerto de la API y la ruta con su secreto, y lo lee de vuelta
+  @POST('/copropiedades/{id}/equipos/{equipoId}/enviar-eventos-a-este-mac')
+  Future<ResultadoDeConfiguracionDto> configuracionEnSitioControllerEnviarEventos({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+    @Body() required MotivoDeConfiguracionDto body,
+  });
+
   /// Vuelve a poner en servicio un equipo dado de baja
   @POST('/copropiedades/{id}/equipos/{equipoId}/reactivacion')
   Future<EquipoDto> equiposControllerReactivar({
     @Path('id') required String id,
     @Path('equipoId') required String equipoId,
+  });
+
+  /// F2 · activa o desactiva la verificación remota de la terminal (AcsCfg) y la lee de vuelta. Desactivarla es el plan B sin código
+  @PUT('/copropiedades/{id}/equipos/{equipoId}/verificacion-remota')
+  Future<ResultadoDeConfiguracionDto> configuracionEnSitioControllerCambiarVerificacion({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+    @Body() required VerificacionRemotaDto body,
+  });
+
+  /// El nombre de cada equipo de la copropiedad, sin nada más
+  @GET('/copropiedades/{id}/nombres-de-equipos')
+  Future<List<NombreDeEquipoDto>> nombresDeEquiposControllerNombres({
+    @Path('id') required String id,
   });
 }

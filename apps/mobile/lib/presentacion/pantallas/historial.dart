@@ -47,13 +47,14 @@ class PantallaDeHistorial extends StatelessWidget {
             ),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: controlador.cargarAhora,
+                onRefresh: controlador.refrescar,
                 child: VistaConEstado<List<EventoDeAcceso>>(
                   estado: controlador.estado,
                   alReintentar: controlador.cargarAhora,
                   alPedirAcceso: alPedirAcceso,
                   mensajeVacio: 'Sin accesos registrados en el periodo elegido.',
                   conDatos: (eventos, {required desdeCache}) => ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     children: [
                       if (desdeCache) const MarcaDeCache(),

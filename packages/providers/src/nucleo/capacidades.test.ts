@@ -65,6 +65,27 @@ describe('capacidades neutrales · tres estados, y `desconocida` no es `si`', ()
     expect(c.senalizacionDeLlamada).toBe('desconocida');
   });
 
+  it('F4 · el MOTIVO de lo que no se pudo leer viaja con `desconocida`, y sólo con ella', () => {
+    const motivo = 'el equipo contestó HTTP 400 (badParameters) a «leer qué admite…»';
+    const c = capacidadesDesdeJson({
+      bibliotecaDeRostros: { estado: 'desconocida', maximo: null, almacenadas: null, motivo },
+      gestionDePersonas: 'desconocida',
+      motivoDeGestionDePersonas: motivo,
+    });
+    expect(c.bibliotecaDeRostros.motivo).toBe(motivo);
+    expect(c.motivoDeGestionDePersonas).toBe(motivo);
+    // Un motivo colgado de un `si` o de un `no` es basura: no se arrastra.
+    const firme = capacidadesDesdeJson({
+      bibliotecaDeRostros: { estado: 'si', maximo: 5, almacenadas: 0, motivo },
+      gestionDePersonas: 'no',
+      motivoDeGestionDePersonas: motivo,
+    });
+    expect(firme.bibliotecaDeRostros).toEqual({ estado: 'si', maximo: 5, almacenadas: 0 });
+    expect('motivoDeGestionDePersonas' in firme).toBe(false);
+    // El motivo no es una capacidad: `estadoDe`/`soporta` no lo nombran.
+    expect(estadoDe(c, 'gestionDePersonas')).toBe('desconocida');
+  });
+
   it('un JSON que no es un objeto —null, texto, número— es «sin consultar»', () => {
     expect(capacidadesDesdeJson(null)).toEqual(CAPACIDADES_SIN_CONSULTAR);
     expect(capacidadesDesdeJson('si')).toEqual(CAPACIDADES_SIN_CONSULTAR);

@@ -72,7 +72,13 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     clave: 'tablero',
     etiqueta: 'Dashboard',
     ruta: '/tablero',
-    roles: OPERACION,
+    /**
+     * 15-L · sin el portero. La API nunca le dio los indicadores del tablero
+     * (administración y central), y la consola lo aterrizaba ahí: tres
+     * rechazos en la primera pantalla de su turno. Lo destapó el recorrido
+     * de la entrega; el portero entra por Portería.
+     */
+    roles: ['superadministrador', 'administrador', 'operador_central'],
     pendienteDeEtapa: null,
     icono: 'LayoutDashboard',
   },
@@ -112,22 +118,6 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     roles: OPERACION,
     pendienteDeEtapa: null,
     icono: 'ShieldBan',
-  },
-  /**
-   * ETAPA 15 · anticipo autorizado del punto 4 de la ETAPA 16.
-   *
-   * Va junto a Visitantes y no en Dispositivos porque lo que se captura es el
-   * rostro de **una persona que visita**, y quien lo hace está atendiéndola.
-   * Colgarlo del inventario de equipos lo habría convertido en una tarea de
-   * mantenimiento, que es justo lo que no es.
-   */
-  {
-    clave: 'biometria',
-    etiqueta: 'Rostro del visitante',
-    ruta: '/biometria',
-    roles: OPERACION,
-    pendienteDeEtapa: null,
-    icono: 'ScanFace',
   },
   {
     clave: 'zonas',
@@ -189,7 +179,8 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     // C-12 · son DOS superficies, no una: el portero atiende su puerta y el
     // operador de central atiende varias copropiedades que no ve.
     ruta: '/guardia',
-    roles: ['superadministrador', 'administrador', 'operador_central'],
+    // 15-L (H4) · y el portero: la guardia remota, desde las IP permitidas.
+    roles: ['superadministrador', 'administrador', 'operador_central', 'portero'],
     pendienteDeEtapa: null,
     icono: 'RadioTower',
   },
@@ -259,9 +250,11 @@ export const NOMBRE_DE_ROL: Readonly<Record<Rol, string>> = {
  *
  * El residente **no tiene consola web**: su superficie es la app Flutter de la
  * ETAPA 11. Se le dice, en vez de dejarlo en un tablero vacío sin explicación.
- * La identidad de servicio no es una persona y nunca inicia sesión aquí.
+ * La identidad de servicio no es una persona y nunca inicia sesión aquí. El
+ * portero empieza su turno en Portería, que es su pantalla.
  */
 export const rutaInicialDe = (rol: Rol): string => {
   if (rol === 'residente' || rol === 'servicio') return '/sin-consola';
+  if (rol === 'portero') return '/porteria';
   return '/tablero';
 };

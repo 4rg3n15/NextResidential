@@ -22,6 +22,8 @@ export class RecuperarFactorDto {
   })
   @IsString()
   @Length(11, 11)
-  @Matches(/^[A-Fa-f0-9]{5}-[A-Fa-f0-9]{5}$/, { message: 'código de recuperación con formato no válido' })
+  @Matches(/^[A-Fa-f0-9]{5}-[A-Fa-f0-9]{5}$/, {
+    message: 'código de recuperación con formato no válido',
+  })
   codigo!: string;
 }

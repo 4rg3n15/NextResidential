@@ -16,6 +16,7 @@ import type { OrdenConResultado } from '@/componentes/resultado-de-orden';
 import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
 import { DialogoDeMotivo } from '@/componentes/dialogo-motivo';
 import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
+import { VideoEnVivo } from '@/componentes/video-en-vivo';
 
 /**
  * Consola de PORTERÍA — HU-21 a HU-24.
@@ -226,6 +227,9 @@ export const PantallaDePorteria = ({
                 */}
                 <Evidencia copropiedadId={copropiedadId} eventoId={actual.eventoId} />
 
+                {/* D3 (15-L) · el video del equipo del evento, con sus estados. */}
+                <VideoEnVivo copropiedadId={copropiedadId} dispositivoId={actual.dispositivoId} />
+
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Boton
                     variante="exito"
@@ -299,7 +303,7 @@ export const PantallaDePorteria = ({
           <Tarjeta>
             <CabeceraDeTarjeta
               titulo="Historial inmediato"
-              descripcion="Lo accionado a mano en esta portería (HU-23)."
+              descripcion="Lo que se abrió o se negó a mano en esta portería."
             />
             <CuerpoDeTarjeta>
               {ultimaOrden !== null ? (
@@ -338,7 +342,7 @@ export const PantallaDePorteria = ({
           <Tarjeta>
             <CabeceraDeTarjeta
               titulo="Alertas y listas negras"
-              descripcion="Lo que exige mirar antes de abrir (HU-24)."
+              descripcion="Lo que hay que revisar antes de abrir."
             />
             <CuerpoDeTarjeta>
               <div className="flex items-start gap-2 text-secundario text-texto-apagado">
@@ -348,9 +352,9 @@ export const PantallaDePorteria = ({
                   strokeWidth={1.75}
                 />
                 <p>
-                  Las listas negras vetan por sí solas: el motor las aplica con precedencia sobre
-                  cualquier autorización vigente (RN-06), y un evento vetado llega aquí marcado como
-                  de atención inmediata.
+                  La lista negra manda sobre cualquier autorización: una persona o una placa vetada
+                  no entra aunque tenga visita autorizada, y el intento llega aquí marcado como de
+                  atención inmediata.
                 </p>
               </div>
             </CuerpoDeTarjeta>

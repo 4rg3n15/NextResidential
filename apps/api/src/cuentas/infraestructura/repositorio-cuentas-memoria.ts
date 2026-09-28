@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { Rol } from '../../autenticacion';
 import type { NombreDeUsuario } from '../dominio/nombre-de-usuario';
 import type {
+  AccesoDeCuenta,
   AltaDeCuenta,
+  AltaEnBase,
   DirectorioDeCuentas,
   IdentidadDeCuenta,
   RepositorioDeCuentas,
@@ -13,6 +15,17 @@ interface CuentaGuardada extends IdentidadDeCuenta {
   readonly debeCambiarContrasena: boolean;
   readonly nombre: string;
   readonly telefono: string | null;
+  readonly numeroDePortero?: number;
+  /** H2 (15-L) · `false` tras la baja: la fila se queda, el número también. */
+  readonly activa?: boolean;
+}
+
+/** H1 · el pool en memoria: el mismo contrato que la tabla de la 0042. */
+interface PoolEnMemoria {
+  readonly inicio: number;
+  readonly fin: number;
+  siguiente: number;
+  cupo: number;
 }
 
 /**
@@ -22,13 +35,23 @@ interface CuentaGuardada extends IdentidadDeCuenta {
  */
 export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, DirectorioDeCuentas {
   private readonly cuentas = new Map<string, CuentaGuardada>();
-  private readonly nits = new Map<string, string>();
   private readonly codigos = new Map<string, string>();
+  private readonly pools = new Map<string, PoolEnMemoria>();
 
-  /** Para sembrar desde la suite: una copropiedad con su NIT y, si lo tiene, su código (D1). */
-  declararCopropiedad(nit: string, copropiedadId: string, codigo?: string): void {
-    this.nits.set(nit, copropiedadId);
-    if (codigo !== undefined) this.codigos.set(codigo, copropiedadId);
+  /** H1 · el pool de una copropiedad; se asigna al primer uso, en orden (1001, 2001…). */
+  poolDe(copropiedadId: string): PoolEnMemoria {
+    let pool = this.pools.get(copropiedadId);
+    if (pool === undefined) {
+      const n = this.pools.size + 1;
+      pool = { inicio: n * 1000 + 1, fin: n * 1000 + 999, siguiente: n * 1000 + 1, cupo: 999 };
+      this.pools.set(copropiedadId, pool);
+    }
+    return pool;
+  }
+
+  /** Para sembrar desde la suite: el código corto de una copropiedad (D1). */
+  declararCodigo(codigo: string, copropiedadId: string): void {
+    this.codigos.set(codigo, copropiedadId);
   }
 
   /** Para sembrar desde la suite: una cuenta por correo, como las anteriores a 15-H. */
@@ -38,7 +61,10 @@ export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, Dire
     copropiedadId: string | null;
     rol: Rol;
     correo: string;
+    /** Un portero por correo anterior a la 15-H recibe número en la 0042. */
+    numeroDePortero?: number;
   }): void {
+    if (c.numeroDePortero !== undefined && c.copropiedadId !== null) this.poolDe(c.copropiedadId);
     this.cuentas.set(c.usuarioId, {
       usuarioId: c.usuarioId,
       authUserId: c.authUserId,
@@ -48,13 +74,14 @@ export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, Dire
       debeCambiarContrasena: false,
       nombre: c.correo,
       telefono: null,
+      ...(c.numeroDePortero === undefined ? {} : { numeroDePortero: c.numeroDePortero }),
     });
   }
 
   /** Para el proveedor falso de la suite: los claims que emitiría el gancho 0024/0037. */
   claimsDe(authUserId: string): Record<string, unknown> | null {
     const c = [...this.cuentas.values()].find((x) => x.authUserId === authUserId);
-    if (c === undefined || c.rol === null) return null;
+    if (c === undefined || c.rol === null || c.activa === false) return null;
     return {
       usuario_id: c.usuarioId,
       rol: c.rol,
@@ -65,10 +92,6 @@ export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, Dire
 
   cambioPendiente(usuarioId: string): boolean {
     return this.cuentas.get(usuarioId)?.debeCambiarContrasena ?? false;
-  }
-
-  async copropiedadPorNit(nit: string): Promise<string | null> {
-    return this.nits.get(nit) ?? null;
   }
 
   async copropiedadPorCodigo(codigo: string): Promise<string | null> {
@@ -88,8 +111,21 @@ export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, Dire
     );
   }
 
-  async crearPorNombre(alta: AltaDeCuenta): Promise<string | null> {
-    if (await this.existeNombre(alta.copropiedadId, alta.usuario)) return null;
+  async crearPorNombre(alta: AltaDeCuenta): Promise<AltaEnBase> {
+    if (await this.existeNombre(alta.copropiedadId, alta.usuario)) {
+      return { ok: false, motivo: 'DUPLICADO' };
+    }
+    let numeroDePortero: number | null = null;
+    if (alta.rol === 'portero') {
+      const pool = this.poolDe(alta.copropiedadId);
+      const activos = [...this.cuentas.values()].filter(
+        (c) => c.copropiedadId === alta.copropiedadId && c.rol === 'portero' && c.activa !== false,
+      ).length;
+      if (activos >= pool.cupo) return { ok: false, motivo: 'CUPO' };
+      if (pool.siguiente > pool.fin) return { ok: false, motivo: 'POOL_AGOTADO' };
+      numeroDePortero = pool.siguiente;
+      pool.siguiente += 1;
+    }
     const usuarioId = randomUUID();
     this.cuentas.set(usuarioId, {
       usuarioId,
@@ -100,8 +136,22 @@ export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, Dire
       debeCambiarContrasena: true,
       nombre: alta.nombre,
       telefono: alta.telefono,
+      ...(numeroDePortero === null ? {} : { numeroDePortero }),
     });
-    return usuarioId;
+    return { ok: true, usuarioId, numeroDePortero };
+  }
+
+  async cuentaDePortero(
+    numero: number,
+  ): Promise<{ readonly copropiedadId: string; readonly acceso: AccesoDeCuenta } | null> {
+    const copropiedadId = [...this.pools.entries()].find(
+      ([, p]) => numero >= p.inicio && numero <= p.fin,
+    )?.[0];
+    if (copropiedadId === undefined) return null;
+    const c = [...this.cuentas.values()].find(
+      (x) => x.copropiedadId === copropiedadId && x.numeroDePortero === numero,
+    );
+    return c === undefined ? null : { copropiedadId, acceso: c.acceso };
   }
 
   async fijarCambioObligatorio(usuarioId: string, pendiente: boolean): Promise<void> {
@@ -120,9 +170,10 @@ export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, Dire
         {
           usuarioId: c.usuarioId,
           usuario: c.acceso.tipo === 'usuario' ? c.acceso.usuario : null,
+          numeroDePortero: c.numeroDePortero ?? null,
           nombre: c.nombre,
           telefono: c.telefono,
-          activa: true,
+          activa: c.activa !== false,
           debeCambiarContrasena: c.debeCambiarContrasena,
         },
       ];
@@ -137,6 +188,13 @@ export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, Dire
     const c = this.cuentas.get(usuarioId);
     if (c === undefined || c.copropiedadId !== copropiedadId) return false;
     this.cuentas.set(usuarioId, { ...c, nombre: datos.nombre, telefono: datos.telefono });
+    return true;
+  }
+
+  async darDeBaja(copropiedadId: string, usuarioId: string): Promise<boolean> {
+    const c = this.cuentas.get(usuarioId);
+    if (c === undefined || c.copropiedadId !== copropiedadId || c.activa === false) return false;
+    this.cuentas.set(usuarioId, { ...c, activa: false });
     return true;
   }
 }

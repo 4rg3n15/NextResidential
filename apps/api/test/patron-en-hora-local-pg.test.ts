@@ -13,6 +13,7 @@ import type { ResolutorDePlaca } from '../src/autorizaciones/aplicacion/puertos'
 import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-pg';
 import { RepositorioCopropiedadesPg } from '../src/multiempresa/repositorio-copropiedades-pg';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -34,7 +35,6 @@ import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
  * ═════════════════════════════════════════════════════════════════════════════
  */
 
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP = '10000000-0000-4000-8000-000000000001';
 const VIVIENDA_CON_TITULAR = '30000000-0000-4000-8000-000000000001';
 const DISPOSITIVO = '90000000-0000-4000-8000-000000000001';
@@ -173,6 +173,9 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool?.end();
 });
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+exigirBase('sin DATABASE_URL_PRUEBAS o sin semillas', () => disponible);
 
 describe('H-15I-05 · el patrón guardado en hora local se evalúa en la hora de la copropiedad', () => {
   it('la base de pruebas contesta y la copropiedad está en America/Bogota', async () => {

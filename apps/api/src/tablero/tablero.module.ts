@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EquiposModule } from '../equipos';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
 import { BITACORA, RELOJ } from '@ncr/domain-core';
@@ -40,6 +41,8 @@ export class TableroModule {
   static registrar(): DynamicModule {
     return {
       module: TableroModule,
+      // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
+      imports: [EquiposModule.registrar()],
       controllers: [TableroController, DispositivosController],
       providers: [
         OperacionesEnMemoria,

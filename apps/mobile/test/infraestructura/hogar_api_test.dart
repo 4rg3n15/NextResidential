@@ -227,20 +227,6 @@ void main() {
     expect(servidor.peticiones.single.path, '/copropiedades/cop-1/mi/vehiculos/veh-1/desactivacion');
   });
 
-  test('RN-10 · un estado de consentimiento desconocido NO se pinta como aceptado', () async {
-    var estado = 'aceptado';
-    final (_, hogar, _) = await montar((_) => json(200, {'estado': estado}));
-    expect(
-      await hogar.estadoDelConsentimiento(autorizacionId: 'a', consentimientoId: 'c'),
-      EstadoDeConsentimiento.aceptado,
-    );
-    estado = 'algo_nuevo';
-    expect(
-      await hogar.estadoDelConsentimiento(autorizacionId: 'a', consentimientoId: 'c'),
-      EstadoDeConsentimiento.pendiente,
-    );
-  });
-
   test('ADR-023 · el cambio de contraseña pasa el motivo del servidor', () async {
     final (_, _, cuenta) = await montar((_) => json(400, {
           'mensaje': {'message': 'A la contraseña le falta: un número'},

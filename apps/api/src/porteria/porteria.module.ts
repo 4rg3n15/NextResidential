@@ -13,13 +13,17 @@ import {
   DIRECTORIO_DE_CUENTAS,
   GANCHOS_DE_SESION,
   PROVEEDOR_DE_IDENTIDAD,
+  RepositorioDeCuentasEnMemoria,
 } from '../cuentas';
+import { ControlDeIpDePorteros, REGISTRO_DE_SEGURIDAD } from '../plataforma';
+import type { EventoDeSeguridad } from '../plataforma';
 import type { DirectorioDeCuentas, GanchosDeSesion, ProveedorDeIdentidad } from '../cuentas';
 import { REPOSITORIO_COPROPIEDADES } from '../multiempresa/repositorio-copropiedades';
 import type { RepositorioCopropiedades } from '../multiempresa/repositorio-copropiedades';
 import {
   CODIGO_DE_PATRULLAJE,
   REPOSITORIO_DE_PERFILES,
+  REPOSITORIO_DE_POOLS,
   REPOSITORIO_DE_SESIONES,
   REPOSITORIO_DE_TURNOS,
   ZONAS_HORARIAS,
@@ -27,6 +31,7 @@ import {
 import type {
   CodigoDePatrullaje,
   RepositorioDePerfiles,
+  RepositorioDePools,
   RepositorioDeSesiones,
   RepositorioDeTurnos,
   ZonasHorarias,
@@ -37,15 +42,18 @@ import { GestionDePorteros } from './aplicacion/porteros';
 import { CalendarioDeTurnos } from './aplicacion/turnos';
 import { PanelDeSupervision } from './aplicacion/supervision';
 import { CodigoDePatrullajeHmac } from './infraestructura/codigo-de-patrullaje';
-import { PerfilesPg, TurnosPg } from './infraestructura/porteria-pg';
+import { PerfilesPg, PoolsPg, TurnosPg } from './infraestructura/porteria-pg';
+import { CupoDePorteros } from './aplicacion/cupo-de-porteros';
 import { SesionesPg } from './infraestructura/sesiones-pg';
 import {
   PerfilesEnMemoria,
+  PoolsEnMemoria,
   SesionesEnMemoria,
   TurnosEnMemoria,
 } from './infraestructura/porteria-en-memoria';
 import { ZonasDesdeCatalogo } from './infraestructura/zonas-desde-catalogo';
 import { PorteriaController } from './presentacion/porteria.controller';
+import { PoolDePorterosController } from './presentacion/pool-de-porteros.controller';
 import { SupervisionController } from './presentacion/supervision.controller';
 
 const enBase = (c: Configuracion): boolean => c.PERSISTENCIA_DE_EVENTOS === 'postgres';
@@ -71,7 +79,10 @@ export class PorteriaModule implements OnModuleInit {
   static registrar(): DynamicModule {
     return {
       module: PorteriaModule,
-      controllers: [PorteriaController, SupervisionController],
+      // `PoolDePorterosController` ANTES que supervisión: su `PUT porteros/cupo`
+      // tiene que registrarse antes que `PUT porteros/:usuarioId`, que lo
+      // tomaría por un usuario y respondería 400.
+      controllers: [PorteriaController, PoolDePorterosController, SupervisionController],
       providers: [
         PerfilesEnMemoria,
         TurnosEnMemoria,
@@ -95,6 +106,29 @@ export class PorteriaModule implements OnModuleInit {
             enBase(c) ? new SesionesPg(pool) : m,
         },
         {
+          provide: REPOSITORIO_DE_POOLS,
+          inject: [CONFIGURACION, Pool, RepositorioDeCuentasEnMemoria],
+          useFactory: (c: Configuracion, pool: Pool, m: RepositorioDeCuentasEnMemoria) =>
+            enBase(c) ? new PoolsPg(pool) : new PoolsEnMemoria(m),
+        },
+        {
+          provide: CupoDePorteros,
+          inject: [
+            REPOSITORIO_DE_POOLS,
+            REPOSITORIO_DE_PERFILES,
+            DIRECTORIO_DE_CUENTAS,
+            REGISTRO_DE_SEGURIDAD,
+            RELOJ,
+          ],
+          useFactory: (
+            pools: RepositorioDePools,
+            p: RepositorioDePerfiles,
+            d: DirectorioDeCuentas,
+            seg: { registrar(e: EventoDeSeguridad): Promise<void> },
+            reloj: Reloj,
+          ) => new CupoDePorteros(pools, p, d, seg, reloj),
+        },
+        {
           provide: CODIGO_DE_PATRULLAJE,
           inject: [CONFIGURACION],
           useFactory: (c: Configuracion) => new CodigoDePatrullajeHmac(c.BIOMETRIA_LLAVE),
@@ -113,6 +147,7 @@ export class PorteriaModule implements OnModuleInit {
             CODIGO_DE_PATRULLAJE,
             BITACORA_DE_IDENTIDAD,
             RELOJ,
+            ControlDeIpDePorteros,
           ],
           useFactory: (
             p: RepositorioDePerfiles,
@@ -121,7 +156,8 @@ export class PorteriaModule implements OnModuleInit {
             codigo: CodigoDePatrullaje,
             b: BitacoraDeIdentidad,
             reloj: Reloj,
-          ) => new ControlDeSesiones(p, t, s, codigo, b, reloj),
+            origen: ControlDeIpDePorteros,
+          ) => new ControlDeSesiones(p, t, s, codigo, b, reloj, origen),
         },
         {
           provide: Patrullaje,
@@ -152,6 +188,7 @@ export class PorteriaModule implements OnModuleInit {
             REPOSITORIO_DE_SESIONES,
             BITACORA_DE_IDENTIDAD,
             RELOJ,
+            ControlDeSesiones,
           ],
           useFactory: (
             crear: CrearCuentaPorUsuario,
@@ -161,7 +198,8 @@ export class PorteriaModule implements OnModuleInit {
             s: RepositorioDeSesiones,
             b: BitacoraDeIdentidad,
             reloj: Reloj,
-          ) => new GestionDePorteros(crear, d, p, t, s, b, reloj),
+            control: ControlDeSesiones,
+          ) => new GestionDePorteros(crear, d, p, t, s, b, reloj, control),
         },
         {
           provide: CalendarioDeTurnos,

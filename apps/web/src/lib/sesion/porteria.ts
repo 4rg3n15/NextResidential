@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import type { EstadoDeSesionDePorteria } from '@ncr/contracts';
 import { configuracion } from '../configuracion';
+import { reenvioDeIpActual } from './ip-del-navegador';
 import { tokenVigente } from './token';
 
 /**
@@ -46,7 +47,11 @@ export const estadoDePorteria = cache(async (): Promise<EstadoDeSesionDePorteria
   const { apiUrl } = configuracion();
   try {
     const r = await fetch(`${apiUrl}/porteria/sesion`, {
-      headers: { Authorization: `Bearer ${token.accessToken}`, Accept: 'application/json' },
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        Accept: 'application/json',
+        ...(await reenvioDeIpActual()),
+      },
       cache: 'no-store',
     });
     return r.ok ? ((await r.json()) as EstadoDeSesionDePorteria) : null;

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { RutaNoSoportada, TerminalFacial } from './terminal-facial';
 import type { ModoDeTerminal } from './terminal-facial';
 import { equipoSimulado } from '../simulacion/equipo-simulado';
+import { jpegConMedidas } from '../simulacion/imagenes-de-prueba';
 
 /** Respuesta de equipo, sin red. ADR-03: la suite corre sin un solo aparato. */
 const respuesta = (estado: number, cuerpo = '', cabeceras: Record<string, string> = {}): Response =>
@@ -73,7 +74,7 @@ describe('alta de plantilla', () => {
     // Al revés el equipo rechaza el rostro por no tener a quién asignárselo, y
     // el error que devuelve no lo dice.
     const { terminal, llamadas } = montar([respuesta(200, OK_XML), respuesta(200, OK_XML)]);
-    await terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1, 2, 3]));
+    await terminal.sincronizar('terminal-1', 'plantilla-7', jpegConMedidas());
 
     // A3 · el recuento previo abre la secuencia y la búsqueda posterior la
     // cierra: un 200 de la carga no acredita nada por sí solo (RN-09).
@@ -93,7 +94,7 @@ describe('alta de plantilla', () => {
         : respuesta(200, OK_XML),
     );
     await expect(
-      terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])),
+      terminal.sincronizar('terminal-1', 'plantilla-7', jpegConMedidas()),
     ).rejects.toThrow(/NO aparece en su biblioteca/);
   });
 
@@ -104,7 +105,7 @@ describe('alta de plantilla', () => {
         : respuesta(200, OK_XML),
     );
     await expect(
-      terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])),
+      terminal.sincronizar('terminal-1', 'plantilla-7', jpegConMedidas()),
     ).rejects.toThrow(/recuento de la biblioteca no subió/);
   });
 
@@ -115,7 +116,7 @@ describe('alta de plantilla', () => {
         : respuesta(200, OK_XML),
     );
     await expect(
-      terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])),
+      terminal.sincronizar('terminal-1', 'plantilla-7', jpegConMedidas()),
     ).resolves.toBeUndefined();
   });
 
@@ -123,7 +124,7 @@ describe('alta de plantilla', () => {
     // El aparato no es fuente de verdad y su registro se puede borrar por API.
     // No hay motivo para dejarle datos personales.
     const { terminal, llamadas } = montar([respuesta(200, OK_XML), respuesta(200, OK_XML)]);
-    await terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1]));
+    await terminal.sincronizar('terminal-1', 'plantilla-7', jpegConMedidas());
     const alta = llamadas.find((l) => l.url.includes('UserInfo/Record'));
     expect(String(alta?.cuerpo)).not.toMatch(/nombre|apellido/i);
     // H-SITIO-04 · sólo letras y dígitos: el identificador que el equipo admite.
@@ -138,7 +139,8 @@ describe('alta de plantilla', () => {
       respuesta(200, OK_XML),
       respuesta(200, OK_XML),
     ]);
-    await terminal.sincronizar('terminal-1', uuid, new Uint8Array([1, 2, 3]));
+    const foto = jpegConMedidas();
+    await terminal.sincronizar('terminal-1', uuid, foto);
     const alta = String(llamadas.find((l) => l.url.includes('UserInfo/Record'))?.cuerpo);
     expect(alta).toContain(`"employeeNo":"${compacto}"`);
     expect(alta).not.toContain(uuid);
@@ -151,7 +153,7 @@ describe('alta de plantilla', () => {
     expect(cuerpo).toContain('"faceLibType":"blackFD"');
     expect(cuerpo).not.toContain('{"FaceDataRecord"');
     expect(cuerpo).toContain('name="img"; filename="facePic.jpg"');
-    expect(cuerpo).toMatch(/Content-Length: 3\r\n/);
+    expect(cuerpo).toContain(`Content-Length: ${String(foto.byteLength)}\r\n`);
   });
 
   it('H-SITIO-04 · el rechazo de la carga dice statusCode, subStatusCode, errorCode y errorMsg', async () => {
@@ -164,7 +166,7 @@ describe('alta de plantilla', () => {
           '"errorCode":1610612737,"errorMsg":"FPID"}',
       ),
     ]);
-    const fallo = await terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])).then(
+    const fallo = await terminal.sincronizar('terminal-1', 'plantilla-7', jpegConMedidas()).then(
       () => null,
       (e: unknown) => e as Error,
     );
@@ -182,12 +184,15 @@ describe('alta de plantilla', () => {
       respuesta(200, OK_XML),
     ]);
     await expect(
-      terminal.sincronizar('terminal-1', 'plantilla-7', new Uint8Array([1])),
+      terminal.sincronizar('terminal-1', 'plantilla-7', jpegConMedidas()),
     ).resolves.toBeUndefined();
   });
 
   it('envía la imagen como multipart y con sus BYTES intactos', async () => {
-    const imagen = new Uint8Array([0xff, 0xd8, 0x00, 0x80, 0xfe]);
+    // Con relleno propio: los bytes de en medio tienen que llegar tal cual.
+    const imagen = jpegConMedidas(320, 240, 5).map((b, i, todos) =>
+      i >= todos.length - 7 && i < todos.length - 2 ? 0x80 + i : b,
+    );
     const { terminal, llamadas } = montar([respuesta(200, OK_XML), respuesta(200, OK_XML)]);
     await terminal.sincronizar('terminal-1', 'p-1', imagen);
 
@@ -207,7 +212,7 @@ describe('cuando la ruta DOCUMENTADA no existe en este firmware', () => {
       respuesta(200, OK_XML),
       respuesta(200, '<statusString>notSupport</statusString>'),
     ]);
-    await expect(terminal.sincronizar('t-1', 'p-1', new Uint8Array([1]))).rejects.toBeInstanceOf(
+    await expect(terminal.sincronizar('t-1', 'p-1', jpegConMedidas())).rejects.toBeInstanceOf(
       RutaNoSoportada,
     );
   });
@@ -227,9 +232,7 @@ describe('cuando la ruta DOCUMENTADA no existe en este firmware', () => {
       respuesta(200, OK_XML), // recuento previo
       respuesta(500, 'fallo interno'),
     ]);
-    await expect(terminal.sincronizar('t-1', 'p-1', new Uint8Array([1]))).rejects.toThrow(
-      /HTTP 500/,
-    );
+    await expect(terminal.sincronizar('t-1', 'p-1', jpegConMedidas())).rejects.toThrow(/HTTP 500/);
     expect(llamadas).toHaveLength(2);
     expect(llamadas[1]?.url).toContain('UserInfo/Record');
   });
@@ -419,7 +422,7 @@ describe('15-K (§5) · la baja de la persona de la carga de prueba', () => {
       modo: 'decide_el_equipo',
     });
     const plantillaId = '5e2b7c1a-0000-4000-8000-000000000001';
-    await terminal.sincronizar('t-1', plantillaId, new Uint8Array([0xff, 0xd8, 0xff, 0xd9]));
+    await terminal.sincronizar('t-1', plantillaId, jpegConMedidas());
     const r = await terminal.darDeBajaPersona(plantillaId);
     expect(r.ok).toBe(true);
     expect((await terminal.suprimirYVerificar('t-1', plantillaId)).ausente).toBe(true);

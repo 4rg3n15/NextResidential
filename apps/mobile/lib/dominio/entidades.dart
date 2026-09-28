@@ -17,6 +17,14 @@
 /// construye otro (§2.4).
 library;
 
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'calidad_de_captura.dart';
+import 'situacion_de_visita.dart';
+
+export 'situacion_de_visita.dart';
+
 class Vivienda {
   const Vivienda({
     required this.id,
@@ -132,6 +140,8 @@ class Autorizacion {
     required this.permiteAccesoVehicular,
     required this.estado,
     required this.acompanantes,
+    this.situacion = SituacionDeVisita.desconocida,
+    this.motivoRechazo,
   });
 
   final String id;
@@ -144,8 +154,12 @@ class Autorizacion {
   final String estado;
   final int acompanantes;
 
-  bool vigenteEn(DateTime ahora) =>
-      estado == 'activa' && !ahora.isBefore(desde) && ahora.isBefore(hasta);
+  /// Lo que enseña la tarjeta, decidido por el SERVIDOR con su reloj (ver
+  /// `situacion_de_visita.dart`). La app no lo recalcula.
+  final SituacionDeVisita situacion;
+
+  /// El motivo que escribió quien la rechazó. `null` si no está rechazada.
+  final String? motivoRechazo;
 }
 
 class EventoDeAcceso {
@@ -184,78 +198,116 @@ class EventoDeAcceso {
 
 /// Los cuatro chips del mockup M-6.
 enum PeriodoDeHistorial { hoy, semana, mes, todo }
-
 // ═══════════════════════════════════════════════════════════════════════════
-// M-4 · Crear visitante (ETAPA 11-B)
+// M-4 · Nuevo visitante con foto y casilla (15-L, bloque F)
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Días de la semana del patrón de recurrencia. `0` es domingo, como en la API
-/// y como en `Date.getDay()`: un enumerado propio con otro orden obligaría a
-/// traducir en dos sitios y a equivocarse en uno.
-enum DiaDeSemana { domingo, lunes, martes, miercoles, jueves, viernes, sabado }
+/// La foto frontal del visitante, lista para viajar: un JPEG en base64 y las
+/// medidas con las que se juzgó.
+///
+/// ─────────────────────────────────────────────────────────────────────────────
+/// POR QUÉ LAS MEDIDAS VIAJAN CON LA FOTO
+///
+/// Porque el servidor vuelve a juzgar la calidad con ellas (una validación que
+/// sólo ocurre en el teléfono se salta con un cliente modificado), y porque la
+/// bandeja de salida guarda las dos cosas juntas: una foto sin sus medidas no
+/// se podría reenviar tras un corte de red.
+///
+/// Las medidas son las EFECTIVAS: si la cámara no trae detector de rostros y el
+/// residente confirmó el encuadre, llevan el rostro y la proporción que esa
+/// confirmación declara, no los ceros de la foto cruda.
+///
+/// La foto vive en memoria mientras el formulario está abierto. Si no hay red,
+/// espera en la bandeja de salida, que desde 15-L se guarda en el llavero del
+/// teléfono (Keychain · Keystore) para sobrevivir al cierre de la app, y se
+/// borra de ahí en cuanto el conjunto contesta. No queda en ningún otro sitio.
+class FotoDeVisita {
+  const FotoDeVisita({required this.jpegBase64, required this.medidas});
 
-extension NombreDelDia on DiaDeSemana {
-  String get corto => const ['D', 'L', 'M', 'X', 'J', 'V', 'S'][index];
-  String get largo =>
-      const ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][index];
+  /// Desde los bytes que entregó la cámara. La conversión vive aquí y no en la
+  /// pantalla para que la pantalla no tenga que saber cómo viaja una imagen.
+  factory FotoDeVisita.deJpeg(Uint8List jpeg, MedidasDeCaptura medidas) =>
+      FotoDeVisita(jpegBase64: base64Encode(jpeg), medidas: medidas);
+
+  final String jpegBase64;
+  final MedidasDeCaptura medidas;
 }
 
-/// HU-09 · RN-22 · El patrón: qué días y entre qué horas.
-class PatronDeVisita {
-  const PatronDeVisita({
-    required this.dias,
-    required this.minutoInicio,
-    required this.minutoFin,
-    required this.desplazamientoUtcMinutos,
-  });
-
-  final Set<DiaDeSemana> dias;
-
-  /// Minutos desde medianoche, en la zona del conjunto.
-  final int minutoInicio;
-  final int minutoFin;
-
-  /// Bogotá es −300. Va explícito y no se deduce del teléfono: un residente de
-  /// viaje no debe crear una visita con la franja de otro huso.
-  final int desplazamientoUtcMinutos;
-
-  bool get esValido => dias.isNotEmpty && minutoFin > minutoInicio;
-}
-
-/// Lo que la pantalla M-4 compone. `viviendaId` NO está, y no es un olvido: el
-/// servidor la deriva de la identidad, y si estuviera aquí la app podría
-/// mandarla (el segundo eje del aislamiento).
+/// F1 · lo que el formulario del residente compone. `viviendaId` NO está, y no
+/// es un olvido: el servidor la deriva de la identidad, y si estuviera aquí la
+/// app podría mandarla (el segundo eje del aislamiento).
+///
+/// Tampoco hay recurrencia, acompañantes ni zonas: esta ruta no los recibe. Una
+/// visita es UNA persona con su documento, UN inicio y UNA duración, con su
+/// foto frontal y la casilla. Nace autorizada y la foto sale a los equipos.
 class NuevaVisita {
   const NuevaVisita({
     required this.visitante,
-    required this.desde,
-    required this.hasta,
+    required this.documento,
+    required this.inicio,
+    required this.duracionMinutos,
+    required this.foto,
+    required this.casillaMarcada,
     required this.claveDeIdempotencia,
-    this.documento,
     this.placa,
-    this.permiteAccesoVehicular = false,
-    this.acompanantes = const [],
-    this.zonasPermitidas = const [],
     this.observaciones,
-    this.patron,
   });
 
   final String visitante;
-  final String? documento;
-  final DateTime desde;
-  final DateTime hasta;
+
+  /// Obligatorio: sin documento la lista negra sólo se podría cruzar por
+  /// placa, y un visitante a pie quedaría sin comprobar.
+  final String documento;
+
+  /// Fecha y hora de la visita. Viaja en UTC; la pantalla la muestra en la
+  /// hora del teléfono.
+  final DateTime inicio;
+
+  /// Cuánto dura. El servidor admite de 15 minutos a 24 horas.
+  final int duracionMinutos;
+
   final String? placa;
-  final bool permiteAccesoVehicular;
-
-  /// HU-08 · nombres, no un contador: sin identidad por acompañante, RN-02
-  /// sería incumplible para todos menos el primero.
-  final List<String> acompanantes;
-  final List<String> zonasPermitidas;
   final String? observaciones;
-  final PatronDeVisita? patron;
+  final FotoDeVisita foto;
 
-  /// RN-17 · se genera ANTES del primer intento y se repite en cada reintento.
+  /// F4 · la casilla. La marca el residente, y el servidor registra quién la
+  /// marcó, cuándo y con qué versión del texto —la fija él, no la app—. Sin
+  /// ella no se crea nada.
+  final bool casillaMarcada;
+
+  /// RN-17 · se genera al ABRIR el formulario y se repite en cada reintento.
   final String claveDeIdempotencia;
+
+  /// Cuándo termina. No viaja: el servidor lo calcula con la misma suma, y se
+  /// ofrece aquí para que la pantalla diga «hasta las 18:00» sin rehacerla.
+  DateTime get hasta => inicio.add(Duration(minutes: duracionMinutos));
+}
+
+/// F6 · un visitante que ya vino, uno por persona y el más reciente primero.
+///
+/// Es lo que hace útil «Volver a autorizar»: quien viene cada semana no debería
+/// dictar otra vez su nombre y su documento ni posar para otra foto.
+class VisitanteReciente {
+  const VisitanteReciente({
+    required this.autorizacionId,
+    required this.visitante,
+    required this.documento,
+    required this.ultimaVisita,
+    required this.placa,
+    required this.tieneFoto,
+  });
+
+  /// La autorización de su ÚLTIMA visita. De ella copia el servidor el nombre,
+  /// el documento, la placa y la foto; la app no reenvía ninguno de los cuatro.
+  final String autorizacionId;
+  final String visitante;
+  final String documento;
+  final DateTime ultimaVisita;
+  final String? placa;
+
+  /// Sin foto guardada no hay nada que copiar: el servidor contestaría que se
+  /// registre como visitante nuevo, y la pantalla lo dice antes de intentarlo.
+  final bool tieneFoto;
 }
 
 /// Los cuatro motivos por los que el servidor NO crea la visita.
@@ -266,22 +318,49 @@ class NuevaVisita {
 /// textos es la familia de defecto que este repositorio persigue.
 enum MotivoDeRechazo { listaNegra, viviendaInactiva, sinNivelDeAcceso, placaDuplicada }
 
-/// Lo que devuelve crear una visita. El rechazo **no es un error**: es una
-/// respuesta con su motivo, y por eso viaja en el mismo tipo que el éxito.
+/// Lo que devuelve crear una visita (o volver a autorizarla). El rechazo **no
+/// es un error**: es una respuesta con su motivo, y por eso viaja en el mismo
+/// tipo que el éxito.
 sealed class ResultadoDeVisita {
   const ResultadoDeVisita();
 }
 
 class VisitaCreada extends ResultadoDeVisita {
-  const VisitaCreada({required this.id, required this.repetida});
+  const VisitaCreada({
+    required this.id,
+    required this.repetida,
+    this.equipos = 0,
+    this.sincronizadas = 0,
+    this.fallidas = 0,
+    this.avisoDeSincronizacion,
+  });
   final String id;
 
   /// `true` = era un reintento y el servidor devolvió la de antes (RN-17). La
   /// pantalla lo dice: «ya la habíamos registrado», no «creada» dos veces.
   final bool repetida;
+
+  /// F3 · a cuántos equipos con reconocimiento facial se envió la foto, en
+  /// cuántos quedó y en cuántos no. Es lo que permite decir «la foto quedó en
+  /// 2 de 3 equipos» en vez de un «listo» que no promete nada comprobable.
+  final int equipos;
+  final int sincronizadas;
+  final int fallidas;
+
+  /// Por qué no se pudo sincronizar, si fue así. Lo escribe el servidor.
+  final String? avisoDeSincronizacion;
 }
 
-class VisitaRechazada extends ResultadoDeVisita {
+/// El servidor contestó y NO creó la visita.
+///
+/// Las dos formas comparten esta raíz porque comparten la regla que importa: no
+/// son fallos de transporte y **reintentarlas daría la misma respuesta**, así
+/// que la bandeja de salida nunca las reintenta.
+sealed class VisitaNoCreada extends ResultadoDeVisita {
+  const VisitaNoCreada();
+}
+
+class VisitaRechazada extends VisitaNoCreada {
   const VisitaRechazada({required this.motivo, required this.explicacion});
   final MotivoDeRechazo motivo;
 
@@ -290,6 +369,33 @@ class VisitaRechazada extends ResultadoDeVisita {
   /// teléfono y el portero otra, dejan de confiar en las dos.
   final String explicacion;
 }
+
+/// El servidor volvió a juzgar la foto y no le sirvió (la calidad se juzga
+/// aquí antes de enviar, y allí otra vez). Es una respuesta, no un error: el
+/// residente repite la foto y vuelve a registrar.
+class FotoRechazada extends VisitaNoCreada {
+  const FotoRechazada(this.motivos);
+
+  /// Los códigos TAL COMO LLEGAN. No se enseñan nunca: se enseña [razones].
+  final List<String> motivos;
+
+  /// Lo que se le dice al residente, sin códigos y sin repetir.
+  List<String> get razones => motivos.map(razonDeLaFoto).toSet().toList();
+}
+
+/// Traduce un código de rechazo de la foto a palabras.
+///
+/// Un código que el servidor añada mañana no se enseña crudo: cae en una frase
+/// genérica que sigue siendo verdad. Enseñar «ENCUADRE_OBLICUO» a un residente
+/// no le dice qué hacer con el teléfono.
+String razonDeLaFoto(String codigo) => switch (codigo) {
+  'ROSTROS_MULTIPLES' => 'se ve más de un rostro',
+  'SIN_ROSTRO' => 'no se ve ningún rostro',
+  'NITIDEZ' => 'la foto está borrosa',
+  'ILUMINACION' => 'la luz no es suficiente o sobra',
+  'ENCUADRE' => 'el rostro no está bien encuadrado',
+  _ => 'la foto no tiene la calidad que piden los equipos',
+};
 
 /// Qué puede hacer el residente ante cada rechazo. Es lo que convierte un
 /// motivo en una pantalla: sin esto, los cuatro se pintarían igual.
@@ -383,44 +489,4 @@ class AparatoDeNotificaciones {
   final String instalacionId;
   final String token;
   final PlataformaDelAparato plataforma;
-}
-
-/// CU-02 · qué pasó con la foto del visitante.
-///
-/// `aceptada` con un consentimiento PENDIENTE es el único desenlace bueno, y
-/// «pendiente» es literal: la plantilla no se sincroniza con ninguna terminal
-/// hasta que el titular responda (RN-09). Quien responde es el VISITANTE, no el
-/// residente que tomó la foto (RN-10), y por eso aquí no hay ningún método para
-/// aceptar: la app del residente no puede.
-sealed class ResultadoDeCaptura {
-  const ResultadoDeCaptura();
-}
-
-class CapturaAceptada extends ResultadoDeCaptura {
-  const CapturaAceptada({
-    required this.consentimientoId,
-    required this.titular,
-    required this.calidad,
-    this.enlaceDeConsentimiento,
-  });
-
-  final String consentimientoId;
-
-  /// Punto 5 (15-I) · el enlace de UN solo uso con el que el VISITANTE responde
-  /// desde su teléfono (RN-10). El residente lo entrega —QR o compartir—; no lo
-  /// responde él. `null` si la API no lo emitió.
-  final String? enlaceDeConsentimiento;
-
-  /// A QUIÉN se le pidió. Se enseña por su nombre para que el residente
-  /// entienda que la respuesta no le toca a él.
-  final String titular;
-  final double calidad;
-}
-
-/// El servidor volvió a juzgar la calidad y no pasó (KPI-16). Es una respuesta,
-/// no un error: la app pinta los mismos consejos que pinta su propia
-/// validación, porque los motivos son los mismos.
-class CapturaRechazada extends ResultadoDeCaptura {
-  const CapturaRechazada(this.motivos);
-  final List<String> motivos;
 }

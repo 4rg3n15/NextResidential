@@ -86,6 +86,68 @@ class _ResidentesApi implements ResidentesApi {
   }
 
   @override
+  Future<PerfilDelResidenteDto> perfilDeResidentesControllerVer({
+    required String id,
+    required String usuarioId,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<PerfilDelResidenteDto>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/residentes/cuentas/${usuarioId}/perfil',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late PerfilDelResidenteDto _value;
+    try {
+      _value = PerfilDelResidenteDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<ResultadoDePerfilDto> perfilDeResidentesControllerEditar({
+    required String id,
+    required String usuarioId,
+    required PerfilDto body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body.toJson());
+    final _options = _setStreamType<ResultadoDePerfilDto>(
+      Options(method: 'PUT', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/residentes/cuentas/${usuarioId}/perfil',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late ResultadoDePerfilDto _value;
+    try {
+      _value = ResultadoDePerfilDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<List<VehiculoDeResidenteDto>>
   supervisionDeResidentesControllerVehiculos({required String id}) async {
     final _extra = <String, dynamic>{};

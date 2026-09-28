@@ -33,10 +33,7 @@ import {
   SesionDto,
 } from './respuestas';
 import { RecuperarFactorDto } from './dtos';
-import {
-  ADMINISTRADOR_DE_FACTORES,
-  REPOSITORIO_CODIGOS_MFA,
-} from '../aplicacion/puertos';
+import { ADMINISTRADOR_DE_FACTORES, REPOSITORIO_CODIGOS_MFA } from '../aplicacion/puertos';
 import type { AdministradorDeFactores, RepositorioCodigosMfa } from '../aplicacion/puertos';
 import { casarCodigo, generarCodigosDeRecuperacion } from '../dominio/codigos-recuperacion';
 import { ErrorApiDto } from '../../comun/respuestas';

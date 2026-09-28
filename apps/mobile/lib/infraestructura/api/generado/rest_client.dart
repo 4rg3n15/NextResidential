@@ -21,10 +21,12 @@ import 'clients/padron_api.dart';
 import 'clients/porteria_api.dart';
 import 'clients/residentes_api.dart';
 import 'clients/tablero_api.dart';
+import 'clients/visitas_api.dart';
 import 'clients/zonas_api.dart';
 import 'clients/salud_api.dart';
 import 'clients/ingesta_api.dart';
 import 'clients/observabilidad_api.dart';
+import 'clients/plataforma_api.dart';
 
 /// Next Control Residencial — API `v0.1.0`.
 ///
@@ -58,10 +60,12 @@ class RestClient {
   PorteriaApi? _porteria;
   ResidentesApi? _residentes;
   TableroApi? _tablero;
+  VisitasApi? _visitas;
   ZonasApi? _zonas;
   SaludApi? _salud;
   IngestaApi? _ingesta;
   ObservabilidadApi? _observabilidad;
+  PlataformaApi? _plataforma;
 
   CuentasApi get cuentas => _cuentas ??= CuentasApi(_dio, baseUrl: _baseUrl);
 
@@ -97,6 +101,8 @@ class RestClient {
 
   TableroApi get tablero => _tablero ??= TableroApi(_dio, baseUrl: _baseUrl);
 
+  VisitasApi get visitas => _visitas ??= VisitasApi(_dio, baseUrl: _baseUrl);
+
   ZonasApi get zonas => _zonas ??= ZonasApi(_dio, baseUrl: _baseUrl);
 
   SaludApi get salud => _salud ??= SaludApi(_dio, baseUrl: _baseUrl);
@@ -104,4 +110,6 @@ class RestClient {
   IngestaApi get ingesta => _ingesta ??= IngestaApi(_dio, baseUrl: _baseUrl);
 
   ObservabilidadApi get observabilidad => _observabilidad ??= ObservabilidadApi(_dio, baseUrl: _baseUrl);
+
+  PlataformaApi get plataforma => _plataforma ??= PlataformaApi(_dio, baseUrl: _baseUrl);
 }

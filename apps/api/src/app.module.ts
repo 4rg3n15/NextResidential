@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { GuardaDeLimites } from './comun/guardas/limites.guard';
 import { ConfiguracionModule } from './configuracion/configuracion.module';
 import { AutenticacionModule } from './autenticacion';
 import { GuardaDeAutenticacion } from './comun/guardas/autenticacion.guard';
@@ -10,6 +11,7 @@ import { GuardaDeCambioDeContrasena } from './comun/guardas/cambio-de-contrasena
 import { BitacoraDeIdentidadModule } from './comun/bitacora-de-identidad';
 import { CuentasModule, limitadoresDeAcceso } from './cuentas';
 import { GuardaDeTurnoDePorteria, PorteriaModule } from './porteria';
+import { GuardaDeOrigen, ModoPruebas, PlataformaModule } from './plataforma';
 import { MultiempresaModule } from './multiempresa/multiempresa.module';
 import { PoolModule } from './persistencia/pool.module';
 import { PadronModule } from './padron';
@@ -20,6 +22,7 @@ import { ProveedoresModule } from './proveedores';
 import { BiometriaModule } from './biometria';
 import { TableroModule } from './tablero';
 import { ResidenteModule } from './residente';
+import { VisitasModule } from './visitas';
 import { limitadorPorDispositivo } from './eventos';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
@@ -45,6 +48,7 @@ import { SONDA_POSTGRES, SondaDePostgresPg } from './arranque/sonda-postgres';
 import { GuardiaModule } from './guardia';
 import { AlarmServerModule } from './alarmserver';
 import { PlanificacionModule, conexionDePgBoss } from './planificacion';
+import { RegistroEnCache } from '@ncr/providers';
 import { EquiposModule, RegistroDeEquiposPg } from './equipos';
 
 /**
@@ -129,8 +133,10 @@ export class AppModule {
           // D5 · con el adaptador real, el registro lee `dispositivos` y descifra
           // el sobre de la credencial. Antes no había registro y la API no
           // arrancaba en modo hardware.
+          // F2 (corrección de la 15-L) · recordado 30 s y olvidado al editar:
+          // el veredicto a la terminal no relee la base en cada rostro.
           registroDesde: ({ pool, configuracion }) =>
-            new RegistroDeEquiposPg(pool, configuracion.EQUIPOS_LLAVE),
+            new RegistroEnCache(new RegistroDeEquiposPg(pool, configuracion.EQUIPOS_LLAVE)),
           // 15-K (§4) · y el simulado reconoce los equipos activos de la base.
           conocidoDesde: ({ pool, configuracion }) => {
             const registro = new RegistroDeEquiposPg(pool, configuracion.EQUIPOS_LLAVE);
@@ -144,6 +150,7 @@ export class AppModule {
          * de autenticación, de la que lee el verificador de tokens, y antes de
          * portería, que crea cuentas e inscribe su gancho de sesión.
          */
+        PlataformaModule.registrar(),
         CuentasModule.registrar(),
         /**
          * ETAPA 15-H (ADR-024) · portería: porteros, turnos, sesiones y
@@ -177,6 +184,12 @@ export class AppModule {
          * módulo lo escribe, y el orden deja claro cuál depende de cuál.
          */
         EquiposModule.registrar(),
+        /**
+         * F (15-L) · «Generar autorización» con foto y casilla. Después de
+         * autorizaciones, biometría y eventos, cuyos casos de uso orquesta, y
+         * ANTES del residente, que genera sus visitas con la misma segunda mitad.
+         */
+        VisitasModule.registrar(),
         // La superficie del residente, después del padrón: lee por su propio
         // puerto y no entra en el de administración (ver `mi.controller.ts`).
         ResidenteModule.registrar(),
@@ -197,17 +210,27 @@ export class AppModule {
         // por IP —el de siempre— y `dispositivo` por equipo firmante (D-28).
         // Uno solo no sirve: en la ingesta todos los equipos comparten IP, y el
         // tope por IP los suma a todos. La prueba de carga lo demostró.
-        ThrottlerModule.forRoot([
-          {
-            name: 'default',
-            ttl: config.THROTTLE_TTL_SEGUNDOS * 1000,
-            limit: config.THROTTLE_LIMITE,
+        // H5 (15-L) · con el modo pruebas activo los topes SUBEN
+        // (`MODO_PRUEBAS_FACTOR_DE_LIMITE`), nunca se apagan (§2.7.5). Se
+        // resuelven en cada petición: apagar el modo surte efecto sin reiniciar.
+        ThrottlerModule.forRootAsync({
+          inject: [ModoPruebas],
+          useFactory: (modo: ModoPruebas) => {
+            const factor = async (): Promise<number> =>
+              (await modo.activo()) ? config.MODO_PRUEBAS_FACTOR_DE_LIMITE : 1;
+            return [
+              {
+                name: 'default',
+                ttl: config.THROTTLE_TTL_SEGUNDOS * 1000,
+                limit: async () => config.THROTTLE_LIMITE * (await factor()),
+              },
+              limitadorPorDispositivo(config.THROTTLE_DISPOSITIVO_LIMITE),
+              // ETAPA 15-H (S-50) · el inicio de sesión cuenta también por
+              // (IP, cuenta) y por IP. Sólo en su ruta (`skipIf`).
+              ...limitadoresDeAcceso(factor),
+            ];
           },
-          limitadorPorDispositivo(config.THROTTLE_DISPOSITIVO_LIMITE),
-          // ETAPA 15-H (S-50) · el inicio de sesión cuenta también por cuenta y
-          // por el origen que declara la consola. Sólo en su ruta (`skipIf`).
-          ...limitadoresDeAcceso(),
-        ]),
+        }),
       ],
       controllers: [SaludController],
       providers: [
@@ -221,7 +244,7 @@ export class AppModule {
           provide: SONDA_POSTGRES,
           useValue: new SondaDePostgresPg(config.DATABASE_POOLER_URL),
         },
-        { provide: APP_GUARD, useClass: ThrottlerGuard },
+        { provide: APP_GUARD, useClass: GuardaDeLimites },
         { provide: APP_GUARD, useClass: GuardaDeAutenticacion },
         { provide: APP_GUARD, useClass: GuardaDeRoles },
         // ETAPA 15-H (ADR-023) · después de roles: una ruta que el rol no
@@ -230,6 +253,9 @@ export class AppModule {
         // ETAPA 15-H (ADR-024) · la última: turno vigente y patrullaje del
         // portero, consultados en CADA petición con el reloj inyectado.
         { provide: APP_GUARD, useClass: GuardaDeTurnoDePorteria },
+        // H4 (15-L) · de dónde viene el portero, en cada petición; y desde dónde
+        // está el superadministrador (regla de transición).
+        { provide: APP_GUARD, useClass: GuardaDeOrigen },
         InterceptorDeCorrelacion,
       ],
     };

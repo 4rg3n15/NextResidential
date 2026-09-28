@@ -3,6 +3,7 @@ import { registrar } from '@/lib/registro';
 import type { NextRequest } from 'next/server';
 import { configuracion } from '@/lib/configuracion';
 import { tokenVigente } from '@/lib/sesion/token';
+import { reenvioDeIp } from '@/lib/ip-de-la-peticion';
 
 /**
  * Proxy de la consola hacia la API (patrón BFF).
@@ -70,6 +71,10 @@ const reenviar = async (peticion: NextRequest, segmentos: string[]): Promise<Res
     if (DEL_CLIENTE.has(clave.toLowerCase())) cabeceras.set(clave, valor);
   });
   cabeceras.set('authorization', `Bearer ${token.accessToken}`);
+  // H6 (15-L) · la IP del navegador; la del proxy sería siempre 127.0.0.1.
+  for (const [clave, valor] of Object.entries(reenvioDeIp(peticion.headers))) {
+    cabeceras.set(clave, valor);
+  }
 
   const cuerpo =
     peticion.method === 'GET' || peticion.method === 'HEAD' ? undefined : peticion.body;

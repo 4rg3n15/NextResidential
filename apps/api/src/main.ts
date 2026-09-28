@@ -48,10 +48,10 @@ import {
   guardarCuerpoCrudo,
 } from './autorizaciones';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from './comun/sobre-de-equipo';
+import { RUTAS_CON_FOTO_DE_VISITA } from './visitas';
 import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from './comun/ruta-de-audio';
 import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from './comun/ruta-de-video';
 import { AppModule } from './app.module';
-import { avisoDeUrlPublica } from './comun/url-publica';
 import { MOTIVO_SIN_METADATOS, emiteMetadatosDeTipos } from './arranque/metadatos-de-tipos';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
 import { aplicarSaneamiento, aplicarSeguridad } from './seguridad';
@@ -130,6 +130,10 @@ async function arrancar(): Promise<void> {
     RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
     express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
   );
+  // F (15-L) · «Generar autorización» lleva la foto en el cuerpo: mismo tope.
+  for (const ruta of RUTAS_CON_FOTO_DE_VISITA) {
+    app.use(ruta, express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }));
+  }
   app.use(express.json({ limit: config.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
   app.use(express.urlencoded({ limit: config.LIMITE_PAYLOAD, extended: false }));
   // §2.7.4 · saneamiento DESPUÉS de los parsers: antes no hay cuerpo que sanear.
@@ -145,15 +149,6 @@ async function arrancar(): Promise<void> {
 
   await app.listen(config.PORT);
   bitacora.registrar('info', 'API arrancada', { puerto: config.PORT, entorno: config.NODE_ENV });
-
-  // H-SITIO-10 · con el proveedor real, una URL pública de bucle local produce
-  // enlaces y QR que ningún teléfono abre. En sitio se descubrió delante del
-  // titular; ahora sale en la terminal al arrancar, como error.
-  const avisoDeUrl = avisoDeUrlPublica(config);
-  if (avisoDeUrl !== null) {
-    bitacora.registrar('error', avisoDeUrl, { API_URL_PUBLICA: config.API_URL_PUBLICA });
-    console.error(`\n✗ ${avisoDeUrl}\n`);
-  }
 
   /**
    * Los recursos externos se comprueban AL ARRANCAR, hablando con el recurso

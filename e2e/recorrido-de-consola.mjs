@@ -5,7 +5,8 @@
  * El 26/09/2026, en sitio, tres defectos que la suite no veía se vieron en el
  * primer minuto de uso: el alta de un equipo no aparecía en «Dispositivos»
  * (H-SITIO-02), la edición no se guardaba (H-SITIO-08) y el superadministrador
- * no podía comprobar el consentimiento (H-SITIO-03). Los tres vivían en la
+ * no podía llevar la foto de un visitante a los equipos (H-SITIO-03). Los tres
+ * vivían en la
  * COSTURA entre la consola, el proxy, la API y la base: cada pieza tenía sus
  * pruebas en verde con dobles de las otras.
  *
@@ -26,9 +27,16 @@
  *
  * Como SUPERADMINISTRADOR: acceso con segundo factor, alta de la cámara y de
  * la terminal, ficha con diagnóstico y corrección, edición (PUT), apertura
- * desde Portería y desde Guardia virtual con su «Historial inmediato», y el
- * consentimiento: enlace, respuesta del titular, estado y sincronización.
- * Como PORTERO: turno asignado por el superadministrador y apertura con motivo.
+ * desde Portería y desde Guardia virtual con su «Historial inmediato».
+ * Como PORTERO: turno asignado por el superadministrador, acceso con su número
+ * y apertura con motivo.
+ *
+ * Y la VISITA de la entrega (F, 15-L), con los dos a la vez: el
+ * superadministrador genera la autorización con foto y casilla, nace vigente,
+ * la foto llega a la terminal; el portero recibe el aviso en su pantalla y la
+ * rechaza con motivo, y la foto SALE de la terminal —lo dice el equipo
+ * simulado, no la consola—. Al final, los eventos se ven y ninguna pantalla
+ * de ninguno de los dos roles enseña un código del proyecto (Bloque I).
  *
  * Las afirmaciones que cazan los defectos de sitio llevan su identificador:
  * `e2e/recorrido-negativo.mjs` los reintroduce uno a uno y exige verlos fallar.
@@ -39,8 +47,8 @@
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { createHmac, randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createServer as servidorHttp } from 'node:http';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
@@ -56,7 +64,7 @@ const raizApi = process.env.NCR_RAIZ_API ?? raiz;
 const raizWeb = process.env.NCR_RAIZ_WEB ?? raiz;
 const requerirDe = (paquete) => createRequire(resolve(raiz, paquete, 'package.json'));
 const { Pool } = requerirDe('apps/api')('pg');
-const { equipoSimulado, aperturasFisicasPor, escriturasSinCuerpoPor } =
+const { equipoSimulado, aperturasFisicasPor, escriturasSinCuerpoPor, plantillasPor } =
   requerirDe('apps/api')('@ncr/providers');
 /** Rótulos del simulado: el oráculo de lo que el EQUIPO hizo (anexo 15-K). */
 const CAMARA_SIMULADA = 'camara-del-recorrido';
@@ -306,6 +314,31 @@ const entornoDePsql = () => ({
   PGUSER: process.env.PGUSER ?? 'postgres',
 });
 
+/** Huella de lo que construye la plantilla: migraciones y semillas, por contenido. */
+const huellaDelEsquema = () => {
+  const h = createHash('sha256');
+  for (const dir of ['supabase/migrations', 'supabase/seed']) {
+    for (const f of readdirSync(resolve(raiz, dir)).sort()) {
+      if (!f.endsWith('.sql')) continue;
+      h.update(f).update(readFileSync(resolve(raiz, dir, f)));
+    }
+  }
+  return `ncr-esquema-${h.digest('hex').slice(0, 32)}`;
+};
+
+/** El número de portero de una cuenta, leído de la copia del recorrido. */
+const numeroDelPortero = (correo) =>
+  spawnSync(
+    'psql',
+    [
+      '-d',
+      BASE,
+      '-Atqc',
+      `SELECT numero_de_portero FROM public.usuarios WHERE lower(correo::text) = lower('${correo.replace(/'/g, "''")}')`,
+    ],
+    { encoding: 'utf8', env: entornoDePsql() },
+  ).stdout.trim();
+
 const prepararBase = () => {
   // La plantilla se migra y siembra UNA vez; cada recorrido parte de una copia
   // recién hecha, así que ni hereda lo que dejó el anterior ni ensucia la base
@@ -315,11 +348,20 @@ const prepararBase = () => {
       encoding: 'utf8',
       env: entornoDePsql(),
     });
-  const existe = psql(`SELECT 1 FROM pg_database WHERE datname = '${BASE_PLANTILLA}'`);
+  /**
+   * 15-L · la plantilla lleva la HUELLA de las migraciones y semillas con que
+   * se hizo, y se rehace si cambian. Antes bastaba con que existiera: con una
+   * migración nueva (la 0042), el recorrido corría contra un esquema viejo y
+   * fallaba por algo que no era la consola.
+   */
+  const huella = huellaDelEsquema();
+  const existe = psql(
+    `SELECT coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database WHERE datname = '${BASE_PLANTILLA}'`,
+  );
   if (existe.status !== 0) {
     throw new Error(`psql no alcanza la base de pruebas: ${existe.stderr.trim()}`);
   }
-  if (existe.stdout.trim() !== '1' || process.env.NCR_RECREAR_PLANTILLA === '1') {
+  if (existe.stdout.trim() !== huella || process.env.NCR_RECREAR_PLANTILLA === '1') {
     const r = spawnSync('bash', ['supabase/verificar.sh', '--con-semillas', '--modo-supabase'], {
       cwd: raiz,
       encoding: 'utf8',
@@ -328,6 +370,9 @@ const prepararBase = () => {
     writeFileSync('/tmp/ncr-recorrido-base.log', `${r.stdout}${r.stderr}`);
     if (r.status !== 0)
       throw new Error('no se pudo migrar la base (ver /tmp/ncr-recorrido-base.log)');
+    const marca = psql(`COMMENT ON DATABASE ${BASE_PLANTILLA} IS '${huella}'`);
+    if (marca.status !== 0)
+      throw new Error(`no se pudo marcar la plantilla: ${marca.stderr.trim()}`);
   }
   // Dos órdenes separadas: `psql -c` con varias sentencias las mete en UNA
   // transacción, y ni DROP ni CREATE DATABASE se admiten dentro de una.
@@ -374,7 +419,6 @@ const arrancarApi = (doble, puerto, puertoWeb) => {
     EQUIPOS_LLAVE: 'llave-de-equipos-para-el-recorrido-32+++',
     EQUIPOS_LLAVE_REF: 'env:EQUIPOS_LLAVE',
     CORS_ALLOWED_ORIGINS: `http://127.0.0.1:${String(puertoWeb)}`,
-    API_URL_PUBLICA: `http://127.0.0.1:${String(puerto)}`,
     PLANIFICADOR_HABILITADO: 'false',
   };
   if (!existsSync(resolve(cwd, 'dist/main.js'))) {
@@ -408,7 +452,9 @@ const arrancarConsola = (doble, puertoApi, puertoWeb) => {
       throw new Error('no compila la consola (ver /tmp/ncr-recorrido-build-web.log)');
     }
   }
-  return lanzar('node', [binDeNext, 'start', '-H', '127.0.0.1', '-p', String(puertoWeb)], {
+  // 15-L (H6) · el servidor de PRODUCCIÓN de la consola, que fija la IP del
+  // navegador en `X-Forwarded-For`; `next start` a secas se la dejaría poner a él.
+  return lanzar('node', ['servidor.mjs', '-H', '127.0.0.1', '-p', String(puertoWeb)], {
     cwd,
     env: entorno,
     detached: true,
@@ -595,13 +641,26 @@ const principal = async () => {
     ejecutable === undefined ? {} : { executablePath: ejecutable },
   );
   try {
-    await recorridoDelSuperadministrador(navegador, base, puertoApi, {
+    const admin = await recorridoDelSuperadministrador(navegador, base, puertoApi, {
       puertoCamara,
       claveCamara,
       puertoTerminal,
       claveTerminal,
     });
-    await recorridoDelPortero(navegador, base);
+    const portero = await recorridoDelPortero(navegador, base);
+    await visitaConFoto(admin, portero, base);
+    await eventosVisibles(admin.pagina, base, admin.sufijo);
+    await sinTextoTecnico({ superadministrador: admin.pagina, portero: portero.pagina }, base);
+    afirmar(
+      admin.malas.length === 0,
+      `ninguna petición del superadministrador falló (${admin.malas.join(', ') || 'ninguna'})`,
+    );
+    afirmar(
+      portero.malas.length === 0,
+      `ninguna petición del portero falló (${portero.malas.join(', ') || 'ninguna'})`,
+    );
+    await admin.contexto.close();
+    await portero.contexto.close();
     /**
      * H-SITIO-15 · al FINAL, no tras la puerta: así cuenta también las
      * escrituras de la sincronización de la plantilla (persona y rostro) y la
@@ -642,7 +701,9 @@ const arrarcarDoble = (lectura) =>
 
 /** Ficha: diagnóstico, corrección del modo de control y nuevo diagnóstico. */
 const diagnosticarYCorregir = async (pagina, camara) => {
-  await filaDe(pagina, camara).getByRole('button', { name: 'Ficha' }).click();
+  // C3 (15-L) · el botón que abre la ficha se llama «Probar conexión»: la ficha
+  // SONDEA el equipo. El recorrido buscaba «Ficha» y se quedó esperando.
+  await filaDe(pagina, camara).getByRole('button', { name: 'Probar conexión' }).click();
   const dialogo = pagina.getByRole('dialog', { name: new RegExp(`Ficha de ${camara}`) });
   const hallazgo = dialogo.locator('li', { hasText: 'quién decide · modo de control' }).first();
   await hallazgo.waitFor({ timeout: 30_000 });
@@ -833,51 +894,7 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
     'H-SITIO-13 · la orden llega a la terminal y su PUERTA se mueve: lo dice el equipo, no la consola',
   );
 
-  paso('10 · Rostro del visitante: enlace, respuesta del titular, estado y sincronización');
-  await bloque('consentimiento', async () => {
-    await pagina.goto(`${base}/biometria`, { waitUntil: 'networkidle' });
-    const buscador = pagina.getByLabel('Titular del dato biométrico');
-    await buscador.fill('Maria Fernanda');
-    await pagina.getByRole('option', { name: /Maria Fernanda Lopez/ }).click();
-    await pagina.getByLabel('Fotografía del rostro').setInputFiles({
-      name: 'sintetica.png',
-      mimeType: 'image/png',
-      buffer: pngSintetico(),
-    });
-    await pagina.getByText('Se ve un solo rostro, de frente y bien encuadrado').click();
-    await pagina.getByRole('button', { name: 'Solicitar consentimiento y guardar' }).click();
-    await pagina.getByRole('button', { name: 'Generar enlace para el titular' }).click();
-    const enlace = await pagina.locator('input[aria-label="Enlace del titular"]').inputValue();
-    afirmar(/\/consentimiento\//.test(enlace), 'el enlace del titular se emite');
-
-    const titular = await navegador.newPage();
-    await titular.goto(enlace, { waitUntil: 'load' });
-    await titular.getByRole('button', { name: 'Acepto', exact: true }).click();
-    await titular.getByText('Consentimiento otorgado').waitFor({ timeout: 20_000 });
-    ok('el titular acepta desde SU página, sin sesión');
-    await titular.close();
-
-    // La tarjeta de seguimiento: ahí aparece el resultado, o el error de la API.
-    // (La alerta de «bucle local» ya está en ella: API_URL_PUBLICA=127.0.0.1.)
-    const tarjeta = pagina.locator('div[role="status"]', { hasText: 'Consentimiento solicitado' });
-    await pagina.getByRole('button', { name: /Comprobar respuesta y sincronizar/ }).click();
-    await tarjeta
-      .getByText(/equipos con biblioteca de rostros|Ningún equipo activo|No se pudo|no autorizado/i)
-      .first()
-      .waitFor({ timeout: 30_000 })
-      .catch(() => undefined);
-    const texto = (await tarjeta.innerText()).replace(/\s+/g, ' ');
-    afirmar(
-      /vigente/.test(texto) && !/No se pudo comprobar|Rol no autorizado/.test(texto),
-      `H-SITIO-03 · el superadministrador comprueba el consentimiento: vigente (${texto.slice(0, 160)})`,
-    );
-    afirmar(
-      /\b1 de 1\b/.test(texto),
-      `la plantilla llega a la terminal con biblioteca de rostros (${(/\d+ de \d+/.exec(texto) ?? ['sin resultado'])[0]})`,
-    );
-  });
-
-  paso('11 · Porteros: el superadministrador asigna un turno que cubre ahora');
+  paso('10 · Porteros: el superadministrador asigna un turno que cubre ahora');
   await bloque('turno', async () => {
     await pagina.goto(`${base}/porteros`, { waitUntil: 'networkidle' });
     await pagina.getByRole('button', { name: 'Asignar turno' }).click();
@@ -896,11 +913,7 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
     afirmar(r.status() === 201, `el turno del portero se guarda (${String(r.status())})`);
   });
 
-  afirmar(
-    malas.length === 0,
-    `ninguna petición del superadministrador falló (${malas.join(', ') || 'ninguna'})`,
-  );
-  await contexto.close();
+  return { contexto, pagina, malas, sufijo, terminal };
 };
 
 const recorridoDelPortero = async (navegador, base) => {
@@ -909,10 +922,18 @@ const recorridoDelPortero = async (navegador, base) => {
   const malas = [];
   vigilar(pagina, malas);
 
-  paso('12 · portero: entra en su turno y abre con motivo');
+  paso('11 · portero: entra en su turno con su número y abre con motivo');
   await bloque('acceso del portero', async () => {
     await pagina.goto(`${base}/acceso`, { waitUntil: 'networkidle' });
-    await pagina.fill('input[name="correo"]', PORTERO.correo);
+    // H3 (15-L, ADR-031) · el portero entra con su NÚMERO: la 0042 se lo dio al
+    // sembrado, que era una cuenta por correo. Sin código ni NIT.
+    const numero = numeroDelPortero(PORTERO.correo);
+    afirmar(/^\d{4,}$/.test(numero), `el portero sembrado tiene número (${numero || 'ninguno'})`);
+    await pagina.fill('input[name="correo"]', numero);
+    afirmar(
+      (await pagina.locator('input[name="copropiedad"]').count()) === 0,
+      'con un número, la consola no pide el código de la copropiedad',
+    );
     await pagina.fill('input[name="contrasena"]', PORTERO.contrasena);
     await pagina.click('button[type="submit"]');
     await pagina.waitForURL((u) => !u.pathname.startsWith('/acceso'), { timeout: 30_000 });
@@ -934,11 +955,232 @@ const recorridoDelPortero = async (navegador, base) => {
       'la apertura del portero queda en su «Historial inmediato»',
     );
   });
-  afirmar(
-    malas.length === 0,
-    `ninguna petición del portero falló (${malas.join(', ') || 'ninguna'})`,
-  );
-  await contexto.close();
+  return { contexto, pagina, malas };
+};
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * F (15-L) · LA VISITA DE LA ENTREGA, CON LOS DOS ROLES A LA VEZ
+ *
+ * El superadministrador genera la autorización con foto y casilla (F1, F4);
+ * nace vigente (F2); la foto llega a la terminal (F3). El portero, con su
+ * pantalla abierta, recibe el aviso sin recargar y la rechaza con motivo: la
+ * autorización queda anulada y la foto SALE de la terminal. Lo de la terminal
+ * no lo dice la consola: lo dice el equipo simulado, que guarda las personas
+ * que de verdad le escribieron y le borraron.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+const visitaConFoto = async (admin, portero, base) => {
+  const nombre = `Visitante del recorrido ${admin.sufijo}`;
+  const documento = `9${String(Date.now()).slice(-8)}`;
+  // La biblioteca de rostros de la terminal simulada: la plantilla de esta
+  // visita es la que aparece al generarla.
+  const claves = () => new Set(plantillasPor.get(TERMINAL_SIMULADA) ?? []);
+  const antes = claves();
+  let nuevas = [];
+  let generada = false;
+
+  paso('12 · Visitantes: el superadministrador genera la autorización con foto y casilla');
+  // El portero espera en SU pantalla de visitas, con el canal en vivo abierto.
+  await bloque('el portero con la pantalla abierta', async () => {
+    // Un flujo de eventos no «responde» hasta que se cierra: se espera la PETICIÓN.
+    const canal = portero.pagina.waitForRequest(
+      (r) => /\/api\/ncr\/copropiedades\/[^/]+\/eventos\/flujo$/.test(new URL(r.url()).pathname),
+      { timeout: 30_000 },
+    );
+    await portero.pagina.goto(`${base}/visitantes`, { waitUntil: 'domcontentloaded' });
+    await canal;
+    ok('el portero tiene abierta «Visitantes» y su canal en vivo');
+  });
+  await bloque('generar autorización', async () => {
+    const pagina = admin.pagina;
+    await pagina.goto(`${base}/visitantes`, { waitUntil: 'networkidle' });
+    await pagina.getByRole('button', { name: 'Generar autorización' }).click();
+    const dialogo = pagina.getByRole('dialog');
+    await dialogo.getByLabel('Nombre del visitante').fill(nombre);
+    await dialogo.getByLabel('Número de documento').fill(documento);
+    const vivienda = dialogo.locator('select[name="viviendaId"]');
+    await vivienda.locator('option').nth(1).waitFor({ state: 'attached', timeout: 20_000 });
+    await vivienda.selectOption({ index: 1 });
+    await dialogo.getByLabel('Foto frontal del visitante').setInputFiles({
+      name: 'visitante.png',
+      mimeType: 'image/png',
+      buffer: pngSintetico(),
+    });
+    // Chromium sin detector de rostros pide la confirmación del encuadre.
+    const encuadre = dialogo.getByText(/Este navegador no cuenta rostros/);
+    await dialogo
+      .getByText(/Este navegador no cuenta rostros|La foto sirve/)
+      .first()
+      .waitFor({ timeout: 20_000 });
+    if (await encuadre.isVisible()) await encuadre.click();
+    await dialogo.getByText('La foto sirve').waitFor({ timeout: 20_000 });
+    const enviar = dialogo.getByRole('button', { name: 'Generar autorización' });
+    afirmar(
+      await enviar.isDisabled(),
+      'F4 · sin la casilla marcada el formulario no deja generar la autorización',
+    );
+    await dialogo.locator('input[name="casilla"]').check();
+    const respuesta = pagina.waitForResponse(
+      (r) => r.request().method() === 'POST' && /\/visitas$/.test(new URL(r.url()).pathname),
+      { timeout: 60_000 },
+    );
+    await enviar.click();
+    const r = await respuesta;
+    const cuerpo = await r.json().catch(() => ({}));
+    generada = r.ok() && cuerpo.generada === true;
+    afirmar(
+      generada,
+      `H-SITIO-03 · el superadministrador genera la autorización con foto (${String(r.status())})`,
+    );
+    await dialogo.getByText('Autorización generada.').waitFor({ timeout: 20_000 });
+    const resumen = (await dialogo.getByRole('status').first().innerText()).replace(/\s+/g, ' ');
+    afirmar(
+      /Foto enviada a 1 de 1 equipos/.test(resumen),
+      `F3 · la consola dice a cuántos equipos llegó la foto (${resumen.slice(0, 120)})`,
+    );
+    nuevas = [...claves()].filter((k) => !antes.has(k));
+    afirmar(
+      nuevas.length === 1,
+      `F3 · la foto está en la biblioteca de la TERMINAL: lo dice el equipo (${String(nuevas.length)} nueva)`,
+    );
+    await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+    const tarjeta = pagina
+      .getByRole('list', { name: 'Visitas' })
+      .locator('li', { hasText: nombre });
+    await tarjeta.first().waitFor({ timeout: 20_000 });
+    afirmar(
+      /Vigente/.test(await tarjeta.first().innerText()),
+      'F2 · la visita nace VIGENTE, sin que nadie la apruebe',
+    );
+    await tarjeta.first().getByRole('button', { name: 'Ver detalle' }).click();
+    const enEquipo = tarjeta.first().locator('li', { hasText: admin.terminal });
+    await enEquipo.waitFor({ timeout: 20_000 });
+    afirmar(
+      /La tiene/.test(await enEquipo.innerText()),
+      'F3 · el detalle dice, equipo por equipo, que la terminal tiene la foto',
+    );
+  });
+
+  paso('13 · el portero recibe el aviso en su pantalla, sin recargar');
+  let aviso = null;
+  await bloque('aviso al portero', async () => {
+    if (!generada) throw new Error('no hay visita generada');
+    aviso = portero.pagina.getByRole('alertdialog', { name: /Nueva visita para/ });
+    await aviso.waitFor({ timeout: 20_000 });
+    afirmar(
+      (await aviso.innerText()).includes(nombre),
+      'F2 · el aviso en vivo trae al visitante y dice que ya está autorizada',
+    );
+  });
+
+  paso('14 · el portero la rechaza con motivo: anulada, y la foto sale de la terminal');
+  await bloque('rechazo', async () => {
+    if (aviso === null) throw new Error('no llegó el aviso');
+    await aviso.getByRole('button', { name: 'Rechazar' }).click();
+    await portero.pagina.locator('textarea#motivo').fill('Recorrido: el residente no la espera');
+    await portero.pagina.getByRole('button', { name: 'Rechazar visita' }).click();
+    const resumen = portero.pagina.getByText(/Visita rechazada\./).first();
+    await resumen.waitFor({ timeout: 30_000 });
+    afirmar(
+      /La foto salió de 1 equipos\./.test(await resumen.innerText()),
+      `F2 · el rechazo dice de cuántos equipos salió la foto (${(await resumen.innerText()).trim()})`,
+    );
+    const quedan = claves();
+    afirmar(
+      nuevas.length === 1 && nuevas.every((k) => !quedan.has(k)),
+      'RN-11 · la foto ya NO está en la biblioteca de la terminal: el rechazo la suprimió',
+    );
+    // El superadministrador lo ve sin recargar: el mismo canal en vivo.
+    const tarjeta = admin.pagina
+      .getByRole('list', { name: 'Visitas' })
+      .locator('li', { hasText: nombre })
+      .first();
+    const anulada = await tarjeta
+      .getByText(/Anulada/)
+      .first()
+      .waitFor({ timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+    afirmar(anulada, 'F2 · el superadministrador ve la visita ANULADA en su lista, en vivo');
+    const portal = portero.pagina.getByRole('list', { name: 'Visitas' });
+    afirmar(
+      /Anulada/.test(await portal.locator('li', { hasText: nombre }).first().innerText()),
+      'F5 · la lista del día del portero la muestra anulada, no la borra',
+    );
+  });
+};
+
+/** B (15-L) · lo que pasó en el recorrido está en «Eventos y alertas». */
+const eventosVisibles = async (pagina, base, sufijo) => {
+  paso('15 · Eventos y alertas: lo ocurrido en el recorrido se ve');
+  await bloque('eventos', async () => {
+    await pagina.goto(`${base}/eventos`, { waitUntil: 'networkidle' });
+    const placa = `R${sufijo.toUpperCase()}99`;
+    const visto = await pagina
+      .getByText(placa)
+      .first()
+      .waitFor({ timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+    afirmar(visto, `la lectura de placa ${placa} del recorrido aparece en «Eventos y alertas»`);
+    const linea = await pagina
+      .getByText('Línea de tiempo')
+      .first()
+      .isVisible()
+      .catch(() => false);
+    afirmar(linea, 'la «Línea de tiempo» de lo que dijeron los equipos está en la pantalla');
+  });
+};
+
+/**
+ * I (15-L) · CERO TEXTO TÉCNICO, EN LA PANTALLA DE VERDAD.
+ *
+ * El patrón es el de la prueba del fuente (`apps/web/src/texto-visible.test.ts`),
+ * leído de ella para que no se separen. Aquí se aplica a lo que la persona VE:
+ * cada entrada de SU menú, con los datos del recorrido dentro —también lo que
+ * llega de la API, que la prueba del fuente no alcanza—.
+ */
+const TEXTO_TECNICO = (() => {
+  const fuente = readFileSync(resolve(raiz, 'apps/web/src/texto-visible.test.ts'), 'utf8');
+  const m = /export const TEXTO_TECNICO =\s*\/(.+)\/;/.exec(fuente);
+  if (m === null) throw new Error('no se encontró TEXTO_TECNICO en la prueba del fuente');
+  return new RegExp(m[1]);
+})();
+
+const sinTextoTecnico = async (paginas, base) => {
+  paso('16 · cero texto técnico en cada pantalla de cada rol');
+  for (const [rol, pagina] of Object.entries(paginas)) {
+    await bloque(`pantallas del ${rol}`, async () => {
+      // `/` lleva a cada rol a SU pantalla de inicio: el portero, a Portería.
+      await pagina.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+      const menu = pagina.getByRole('navigation', { name: 'Navegación principal' });
+      await menu.locator('a[href^="/"]').first().waitFor({ timeout: 20_000 });
+      const rutas = [
+        ...new Set(
+          await menu
+            .locator('a[href^="/"]')
+            .evaluateAll((as) => as.map((a) => a.getAttribute('href') ?? '')),
+        ),
+      ].filter((r) => r !== '');
+      const hallazgos = [];
+      for (const ruta of rutas) {
+        await pagina.goto(`${base}${ruta}`, { waitUntil: 'networkidle' });
+        const texto = await pagina.locator('body').innerText();
+        const m = TEXTO_TECNICO.exec(texto);
+        if (m !== null) {
+          const i = Math.max(0, m.index - 40);
+          hallazgos.push(`${ruta}: «…${texto.slice(i, m.index + 40).replace(/\s+/g, ' ')}…»`);
+        }
+      }
+      afirmar(
+        rutas.length > 0 && hallazgos.length === 0,
+        `Bloque I · ${String(rutas.length)} pantallas del ${rol} sin códigos del proyecto${
+          hallazgos.length > 0 ? `: ${hallazgos.join(' · ')}` : ''
+        }`,
+      );
+    });
+  }
 };
 
 principal()

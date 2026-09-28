@@ -13,6 +13,7 @@ import type {
   TipoDeEquipo,
   EquipoQueEmite,
 } from '../aplicacion/puertos';
+import { cambiosDeEquipo } from '../aplicacion/cambios-de-equipo';
 import { capacidadesDesdeJson } from '@ncr/providers';
 import { claimsDeServicio } from '../../comun/claims-de-servicio';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
@@ -57,6 +58,8 @@ interface FilaDeEquipo {
   readonly canal_de_audio: number | null;
   readonly modo_de_terminal: ModoDeTerminalDeclarado | null;
   readonly canal_de_audio_habilitado: boolean;
+  readonly canal_de_video: string | null;
+  readonly zona_id: string | null;
   readonly capacidades: unknown;
   readonly verificacion: EstadoDeVerificacion;
   readonly verificado_en: Date | null;
@@ -67,7 +70,7 @@ interface FilaDeEquipo {
 const CAMPOS = `
   id, nombre, tipo::text AS tipo, host, puerto, protocolo::text AS protocolo, usuario,
   modelo, firmware, fabricante, canal_barrera, numero_de_puerta, canal_de_audio,
-  modo_de_terminal, canal_de_audio_habilitado, capacidades,
+  modo_de_terminal, canal_de_audio_habilitado, canal_de_video, zona_id, capacidades,
   verificacion::text AS verificacion, verificado_en, motivo_no_verificado,
   estado::text AS estado`;
 
@@ -87,6 +90,8 @@ const aDatos = (f: FilaDeEquipo): DatosDeEquipo => ({
   canalDeAudio: f.canal_de_audio,
   modoDeTerminal: f.modo_de_terminal,
   canalDeAudioHabilitado: f.canal_de_audio_habilitado,
+  canalDeVideo: f.canal_de_video,
+  zonaId: f.zona_id,
   // Se lee sin confiar en la forma: lo corrupto vuelve a DESCONOCIDA.
   capacidades: f.capacidades === null ? null : capacidadesDesdeJson(f.capacidades),
   verificacion: f.verificacion,
@@ -190,6 +195,49 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     });
   }
 
+  async activos(): Promise<readonly EquipoQueEmite[]> {
+    const lectura: ContextoTenant = {
+      usuarioId: ACTOR_INGESTA,
+      rol: 'superadministrador',
+      copropiedadId: null,
+      copropiedadesAtendidas: [],
+      mfaVerificado: true,
+    };
+    return this.conCliente(lectura, async (c) => {
+      const { rows } = await c.query<{ id: string; copropiedad_id: string; nombre: string }>(
+        `SELECT id, copropiedad_id, nombre FROM public.dispositivos
+          WHERE estado = 'activo' ORDER BY copropiedad_id, nombre`,
+      );
+      return rows.map((r) => ({
+        dispositivoId: r.id,
+        copropiedadId: r.copropiedad_id,
+        nombre: r.nombre,
+      }));
+    });
+  }
+
+  async copropiedadDeActivo(dispositivoId: string): Promise<string | null> {
+    // Un id que no es UUID no está en la tabla: se dice que no, en vez de
+    // dejar que PostgreSQL lance por el tipo de la columna.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dispositivoId)) {
+      return null;
+    }
+    const lectura: ContextoTenant = {
+      usuarioId: ACTOR_INGESTA,
+      rol: 'superadministrador',
+      copropiedadId: null,
+      copropiedadesAtendidas: [],
+      mfaVerificado: true,
+    };
+    return this.conCliente(lectura, async (c) => {
+      const { rows } = await c.query<{ copropiedad_id: string }>(
+        `SELECT copropiedad_id FROM public.dispositivos WHERE id = $1 AND estado = 'activo'`,
+        [dispositivoId],
+      );
+      return rows[0]?.copropiedad_id ?? null;
+    });
+  }
+
   async listar(ctx: ContextoTenant, copropiedadId: string): Promise<readonly DatosDeEquipo[]> {
     return this.conCliente(ctx, async (c) => {
       const { rows } = await c.query<FilaDeEquipo>(
@@ -266,11 +314,13 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
               credencial_ref, modelo, firmware, canal_barrera, numero_de_puerta,
               canal_de_audio, verificacion, verificado_en, motivo_no_verificado,
               creado_por, actualizado_por, fabricante, modo_de_terminal,
-              canal_de_audio_habilitado, capacidades, capacidades_descubiertas_en)
+              canal_de_audio_habilitado, capacidades, capacidades_descubiertas_en,
+              canal_de_video, zona_id)
            VALUES ($1, $2, $3::tipo_dispositivo, $4, $5, $6::protocolo_equipo, $7,
                    'vault:pendiente', $8, $9, $10, $11, $12,
                    $13::verificacion_equipo, $14, $15, $16, $16, $17, $18, $19,
-                   $20::jsonb, CASE WHEN $20::jsonb IS NULL THEN NULL ELSE now() END)
+                   $20::jsonb, CASE WHEN $20::jsonb IS NULL THEN NULL ELSE now() END,
+                   $21, $22)
            RETURNING ${CAMPOS}`,
           [
             copropiedadId,
@@ -293,6 +343,8 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
             alta.modoDeTerminal ?? null,
             alta.canalDeAudioHabilitado ?? false,
             veredicto.capacidades === undefined ? null : JSON.stringify(veredicto.capacidades),
+            alta.canalDeVideo ?? null,
+            alta.zonaId ?? null,
           ],
         );
         const fila = rows[0];
@@ -376,6 +428,13 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     return this.conCliente(ctx, async (c) => {
       await c.query('BEGIN');
       try {
+        // C2 (15-L) · lo que había, para auditar qué cambió y no sólo que cambió.
+        const previa = await c.query<FilaDeEquipo>(
+          `SELECT ${CAMPOS} FROM public.dispositivos
+            WHERE id = $2 AND copropiedad_id = $1 FOR UPDATE`,
+          [copropiedadId, equipoId],
+        );
+        const antes = previa.rows[0];
         const { rows } = await c.query<FilaDeEquipo>(
           `UPDATE public.dispositivos
               SET nombre = $3, tipo = $4::tipo_dispositivo, host = $5, puerto = $6,
@@ -389,7 +448,8 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
                   -- un sondeo que no alcanzó el equipo conserva las que había.
                   capacidades = COALESCE($21::jsonb, capacidades),
                   capacidades_descubiertas_en = CASE WHEN $21::jsonb IS NULL
-                    THEN capacidades_descubiertas_en ELSE now() END
+                    THEN capacidades_descubiertas_en ELSE now() END,
+                  canal_de_video = $22, zona_id = $23
             WHERE id = $2 AND copropiedad_id = $1
         RETURNING ${CAMPOS}`,
           [
@@ -414,10 +474,12 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
             alta.modoDeTerminal ?? null,
             alta.canalDeAudioHabilitado ?? false,
             veredicto.capacidades === undefined ? null : JSON.stringify(veredicto.capacidades),
+            alta.canalDeVideo ?? null,
+            alta.zonaId ?? null,
           ],
         );
         const fila = rows[0];
-        if (fila === undefined) {
+        if (fila === undefined || antes === undefined) {
           await c.query('ROLLBACK');
           return null;
         }
@@ -426,7 +488,13 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
         if (alta.secreto !== undefined) {
           await this.guardarSecreto(c, copropiedadId, actorId, equipoId, alta.secreto);
         }
-        await this.auditar(c, copropiedadId, actorId, 'equipos/edicion', fila.nombre);
+        await this.auditar(
+          c,
+          copropiedadId,
+          actorId,
+          'equipos/edicion',
+          `${fila.nombre} · ${cambiosDeEquipo(aDatos(antes), aDatos(fila), alta.secreto !== undefined)}`,
+        );
         await c.query('COMMIT');
         return aDatos(fila);
       } catch (error) {

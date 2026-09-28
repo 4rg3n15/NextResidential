@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { z } from 'zod';
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 
@@ -98,6 +99,38 @@ export const esquemaConfiguracion = z.object({
   CORS_ALLOWED_ORIGINS: noVacio('CORS_ALLOWED_ORIGINS'),
 
   /**
+   * H6 (15-L) · de quién se cree la `X-Forwarded-For`. `loopback` por omisión:
+   * la consola corre en la misma máquina y su proxy `/api/ncr` llega por el
+   * bucle local con la IP del navegador. Un balanceador delante de la API se
+   * añade aquí (coma; IP o CIDR). Nunca «todos»: creer a cualquiera deja que
+   * el cliente escriba su propia IP y se salte la lista blanca de porteros.
+   */
+  /**
+   * H5 (15-L) · cuánto SUBEN los límites de peticiones con el modo pruebas
+   * activo. Nunca se apagan (§2.7.5): el superadministrador, el portero y la
+   * consola comparten la IP del Mac en la entrega.
+   */
+  MODO_PRUEBAS_FACTOR_DE_LIMITE: z.coerce.number().int().min(2).max(100).default(10),
+
+  API_PROXIES_DE_CONFIANZA: z
+    .string()
+    .trim()
+    .default('loopback')
+    .refine(
+      (v) =>
+        v
+          .split(',')
+          .map((x) => x.trim())
+          .every((x) => {
+            if (x === 'loopback' || x === 'linklocal' || x === 'uniquelocal') return true;
+            const [ip, prefijo] = x.split('/');
+            if (isIP(ip ?? '') === 0) return false;
+            return prefijo === undefined || /^\d{1,3}$/.test(prefijo);
+          }),
+      'API_PROXIES_DE_CONFIANZA: «loopback» o direcciones/CIDR separados por coma',
+    ),
+
+  /**
    * RNF-03.11 · Secreto de firma del Alarm Server. La ingesta de eventos de
    * hardware es un endpoint sin sesión de usuario: lo único que acredita al
    * emisor es esta firma, así que sin secreto no hay ingesta. Se exige aquí y
@@ -122,6 +155,19 @@ export const esquemaConfiguracion = z.object({
    * —«entrada 2: el secreto tiene 12 caracteres»—, cosa que un `regex` de Zod
    * no haría.
    */
+  /**
+   * C2 (corrección de la 15-L) · la IP con la que ESTA API se anuncia a las
+   * cámaras en «Enviar eventos a este Mac». Vacía = la del Mac en la red de
+   * cada cámara (la interfaz cuya subred la contiene). Se define sólo si hay
+   * algo que las interfaces no dicen: un NAT, un puente, una VLAN enrutada.
+   */
+  ALARM_SERVER_IP_ANUNCIADA: z
+    .string()
+    .optional()
+    .refine(
+      (v) => v === undefined || v.trim() === '' || isIP(v.trim()) === 4,
+      'ALARM_SERVER_IP_ANUNCIADA debe ser una IPv4 (o quedar vacía)',
+    ),
   ALARM_SERVER_EQUIPOS: z
     .string()
     .optional()
@@ -215,6 +261,74 @@ export const esquemaConfiguracion = z.object({
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════
+   * LA TERMINAL CUANDO LA PLATAFORMA NO CONTESTA · ETAPA 15-L, decisión del cliente
+   *
+   * La corrección «verificación remota» de la consola escribe en la terminal
+   * `offlineDevCheckOpenDoorEnabled` con este valor. `false` (por omisión, y
+   * también lo que trae el equipo): sin la API, la terminal NO abre por su
+   * cuenta; el plan B es abrir desde la consola o con la llave
+   * (`docs/guias/ENTREGA_EN_SITIO.md`). `true` la deja abrir con su propio
+   * reconocimiento cuando la plataforma no está: nadie queda fuera, y el motor
+   * de reglas deja de decidir mientras tanto.
+   */
+  TERMINAL_ABRE_SIN_PLATAFORMA: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /**
+   * 15-L · `remoteCheckTimeout` que la misma corrección escribe, en segundos.
+   * F2 (corrección de la 15-L) · por omisión 8, no el 5 de fábrica: en la red
+   * de sitio el camino completo —el hecho llega, el motor decide, el veredicto
+   * vuelve— necesita holgura, y el ensayo mide p50/p95 contra este valor.
+   */
+  TERMINAL_PLAZO_DE_VERIFICACION_S: z.coerce.number().int().min(1).max(60).default(8),
+  /**
+   * A5 (15-L) · plazo de cada petición a un equipo, en ms. Por omisión 5000:
+   * holgado para cargar una plantilla, corto para no dejar a un portero
+   * esperando. En una red de sitio lenta se sube aquí, sin tocar código.
+   */
+  EQUIPOS_TIEMPO_LIMITE_MS: z.coerce.number().int().min(500).max(30_000).default(5000),
+  /**
+   * A2 (15-L) · zona en la que la terminal lleva su reloj: la vigencia del
+   * visitante se le escribe en hora local sin desfase. Una zona mal escrita
+   * IMPIDE EL ARRANQUE: si no, la credencial caducaría a la hora equivocada.
+   */
+  EQUIPOS_ZONA_HORARIA: z
+    .string()
+    .default('America/Bogota')
+    .refine((zona) => {
+      try {
+        new Intl.DateTimeFormat('en-CA', { timeZone: zona });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'zona horaria IANA desconocida (p. ej. America/Bogota)'),
+  /** A2 (15-L) · `planTemplateNo` de la puerta en el alta de persona. «1» por omisión. */
+  TERMINAL_PLAN_DE_HORARIO: z
+    .string()
+    .regex(/^\d{1,5}$/, 'número de plantilla horaria del equipo')
+    .default('1'),
+  /**
+   * A2 (15-L) · peso y lado mayor máximos de la foto que se sube a una
+   * terminal. No son del fabricante —la guía no los fija—: son el valor
+   * prudente de la práctica, y se cambian aquí si el equipo declara otros.
+   */
+  EQUIPOS_FOTO_KB_MAXIMOS: z.coerce.number().int().min(16).max(2048).default(200),
+  /**
+   * D2 (15-L) · puerto RTSP de los equipos. 554 es el de fábrica; si en sitio
+   * lo cambiaron, se dice aquí y no en el código.
+   */
+  VIDEO_PUERTO_RTSP: z.coerce.number().int().min(1).max(65535).default(554),
+  /**
+   * C4 (15-L) · cada cuántos segundos se toma el latido de los equipos
+   * (señal de su escucha o una lectura real de su identidad). 0 lo apaga.
+   */
+  EQUIPOS_LATIDO_S: z.coerce.number().int().min(0).max(3600).default(60),
+  EQUIPOS_FOTO_LADO_MAXIMO: z.coerce.number().int().min(160).max(4096).default(1024),
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
    * QUIÉN CARGA EL CONTEXTO DEL MOTOR · D-25, ETAPA 15-D
    *
    *   postgres     (por omisión) — lee autorizaciones, padrón y lista negra
@@ -252,19 +366,6 @@ export const esquemaConfiguracion = z.object({
   PERSISTENCIA_DE_BIOMETRIA: z.enum(['postgres', 'memoria']).default('postgres'),
 
   /**
-   * A3 (15-E) · el origen PÚBLICO con el que se construye el enlace que
-   * recibe el titular para responder su consentimiento (`/consentimiento/…`).
-   * Opcional: sin él la API entrega el token y la ruta, y la consola dice
-   * qué falta. Tiene que ser lo que el teléfono del visitante alcanza, que en
-   * sitio es la IP del Mac —no `localhost`—.
-   */
-  API_URL_PUBLICA: z
-    .string()
-    .trim()
-    .url('API_URL_PUBLICA debe ser una URL absoluta (http://<IP>:3000)')
-    .optional(),
-
-  /**
    * A5 (15-E) · el puente de video RTSP → WebRTC (go2rtc), visto DESDE LA API.
    * Opcional: sin él la vista en vivo responde 503 con motivo y el resto de la
    * consola sigue. Es una dirección INTERNA (`http://127.0.0.1:1984` cuando
@@ -278,9 +379,6 @@ export const esquemaConfiguracion = z.object({
     .trim()
     .url('GO2RTC_URL debe ser una URL absoluta (http://127.0.0.1:1984)')
     .optional(),
-
-  /** P-03 · plazo de respuesta al consentimiento, en horas. Supuesto: 24 h. */
-  BIOMETRIA_PLAZO_CONSENTIMIENTO_HORAS: z.coerce.number().int().min(1).max(168).default(24),
 
   /**
    * Tope del cuerpo de una petición (§2.7.8). Lo consume `express.json({ limit })`,

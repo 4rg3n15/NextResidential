@@ -6,6 +6,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'capacidad_de_audio_dto.dart';
 import 'capacidad_de_biblioteca_dto.dart';
+import 'capacidad_de_video_dto.dart';
 import 'capacidades_de_equipo_dto_apertura_remota.dart';
 import 'capacidades_de_equipo_dto_estado_de_barrera.dart';
 import 'capacidades_de_equipo_dto_gestion_de_personas.dart';
@@ -30,6 +31,7 @@ class CapacidadesDeEquipoDto {
     required this.suscripcionDeEventos,
     required this.reconocimientoDePlacas,
     required this.estadoDeBarrera,
+    required this.video,
   });
   
   factory CapacidadesDeEquipoDto.fromJson(Map<String, Object?> json) => _$CapacidadesDeEquipoDtoFromJson(json);
@@ -44,6 +46,7 @@ class CapacidadesDeEquipoDto {
   final CapacidadesDeEquipoDtoSuscripcionDeEventos suscripcionDeEventos;
   final CapacidadesDeEquipoDtoReconocimientoDePlacas reconocimientoDePlacas;
   final CapacidadesDeEquipoDtoEstadoDeBarrera estadoDeBarrera;
+  final CapacidadDeVideoDto video;
 
   Map<String, Object?> toJson() => _$CapacidadesDeEquipoDtoToJson(this);
 }

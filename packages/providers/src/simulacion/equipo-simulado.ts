@@ -11,8 +11,44 @@ import {
   exigeCuerpo,
 } from './comportamientos-de-sitio';
 import type { PoliticaDeNonceDelEquipo } from './comportamientos-de-sitio';
+import { VerificacionRemotaSimulada } from './verificacion-remota-simulada';
+import type { AlEmitir, FlujoEnVivo } from './verificacion-remota-simulada';
+import {
+  decisionLocal,
+  horaDePared,
+  leerPersona,
+  negacionesLocalesPor,
+  negadoEnLocal,
+  personasPor,
+} from './personas-simuladas';
+import type { PersonaSimulada } from './personas-simuladas';
+import {
+  CANALES_POR_OMISION,
+  CAPACIDADES_DE_CANAL,
+  ESPACIO,
+  canalesDeAudio,
+  capacidadesDelSistema,
+  datosBasicos,
+  disparador,
+  documentoDelReceptor,
+  entranceParam,
+  ordenesDePuerta,
+  receptorEscrito,
+  receptorInicial,
+} from './documentos-del-simulado';
+import type { CanalDeAudioSimulado } from './documentos-del-simulado';
+import { caminoCasa, respuestaDe } from './respuesta-simulada';
+import { conSituacionesDeSitio } from './situaciones-de-sitio';
+import type { SituacionesDeSitio } from './situaciones-de-sitio';
 
 export { aperturasFisicasPor, escriturasSinCuerpoPor } from './comportamientos-de-sitio';
+export {
+  FlujoEnVivo,
+  desenlacesDeVerificacionPor,
+  PLAZO_DE_VERIFICACION_MS,
+} from './verificacion-remota-simulada';
+export type { DesenlaceDeVerificacion, VerificacionResuelta } from './verificacion-remota-simulada';
+export type { SituacionesDeSitio } from './situaciones-de-sitio';
 
 /**
  * UN EQUIPO QUE HABLA COMO LOS DE VERDAD, Y QUE NO EXISTE.
@@ -55,6 +91,19 @@ export interface GuionDeEquipo {
   readonly sinSoporte?: readonly string[];
   /** Bloques que el flujo de eventos entrega al conectar, en orden. */
   readonly flujo?: readonly Record<string, unknown>[];
+  /**
+   * 15-L · un flujo que se queda ABIERTO y emite cuando la prueba lo pide,
+   * como el del equipo. Si está, manda sobre `flujo`.
+   */
+  readonly enVivo?: FlujoEnVivo;
+  /**
+   * 15-L · el canal de verificación con el que está configurada la terminal.
+   * Sólo con `ISAPI` (modo armado) pregunta por el flujo: con `ISAPIListen`
+   * pregunta a un servidor de escucha que la plataforma no abre.
+   */
+  readonly canalDeVerificacion?: 'ISAPI' | 'ISAPIListen';
+  /** 15-L · plazo de la verificación, en ms, para probar el vencimiento. */
+  readonly plazoDeVerificacionMs?: number;
   /** Identidad que devuelve la ruta de `deviceInfo`. */
   readonly modelo?: string;
   readonly firmware?: string;
@@ -144,187 +193,29 @@ export interface GuionDeEquipo {
   readonly rechazaCredencial?: boolean;
   /** Anexo 15-K · cuándo vence el nonce. Por omisión, a los 20 s. */
   readonly nonce?: PoliticaDeNonceDelEquipo;
+  /** A2 (15-L) · la puerta que gobierna esta terminal, para su `doorRight`. */
+  readonly puerta?: number;
+  /** A2 (15-L) · la zona del reloj del equipo. America/Bogota por omisión. */
+  readonly zonaHoraria?: string;
+  /**
+   * J (15-L) · tercera respuesta engañosa de sitio: la apertura contesta 2xx
+   * SIN `statusCode 1` y el relé no se mueve. No es un éxito.
+   */
+  readonly aperturaSinConfirmar?: boolean;
+  /** J (15-L) · lo que declara la gestión de personas (`supportFunction`). */
+  readonly funcionesDePersonas?: string;
+  /** J2 (15-L) · la serie que declara: un respaldo de otro equipo no se aplica. */
+  readonly serie?: string;
+  /** C2 (15-L) · a dónde publica la cámara. Lo escrito después se lee (tiene estado). */
+  readonly receptor?: {
+    readonly ip?: string;
+    readonly nombre?: string;
+    readonly puerto?: number;
+    readonly url?: string;
+  };
+  /** C7 y F4 (15-L) · lo que HikCentral y el firmware «Ultra» hicieron en sitio. */
+  readonly situaciones?: SituacionesDeSitio;
 }
-
-/**
- * ═════════════════════════════════════════════════════════════════════════════
- * LOS DOCUMENTOS SON LOS DE LA GUÍA, LITERALES
- *
- * No están escritos «como nos conviene»: llevan los nombres de elemento, el
- * espacio de nombres y las erratas del esquema del fabricante. Un simulado que
- * respondiera lo que el analizador espera no probaría el analizador — probaría
- * que dos ficheros nuestros se entienden entre sí.
- *
- * De ahí que el documento de parámetros de entrada traiga la lista de políticas
- * de vehículo y la de relés aunque la mayoría de las pruebas no las miren: es
- * lo que el equipo manda, y leerlo entero es justo lo que la 15-C añadió.
- */
-const ESPACIO = 'http://www.isapi.org/ver20/XMLSchema';
-
-const entranceParam = (guion: GuionDeEquipo): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<EntranceParamList version="2.0" xmlns="${ESPACIO}">`,
-    '<EntranceParam>',
-    '<laneNum>1</laneNum>',
-    '<bEnable>true</bEnable>',
-    `<ctrlMode>${guion.ctrlMod ?? '1'}</ctrlMode>`,
-    '<relateTriggerMode>vehicleDetect</relateTriggerMode>',
-    '<vehInfoManagList>',
-    '<vehInfoManag>',
-    '<vehInfoManagNum>1</vehInfoManagNum>',
-    '<barrierGateOper>off</barrierGateOper>',
-    '<upAlarmEnable>true</upAlarmEnable>',
-    '<hostUpAlarmEnable>true</hostUpAlarmEnable>',
-    '</vehInfoManag>',
-    '<vehInfoManag>',
-    '<vehInfoManagNum>2</vehInfoManagNum>',
-    `<barrierGateOper>${guion.operacionDeListaBlanca ?? 'off'}</barrierGateOper>`,
-    '<upAlarmEnable>true</upAlarmEnable>',
-    '<hostUpAlarmEnable>true</hostUpAlarmEnable>',
-    '</vehInfoManag>',
-    '</vehInfoManagList>',
-    '<relayList><relay>',
-    '<relayNum>1</relayNum>',
-    '<relayFunction>1</relayFunction>',
-    '</relay></relayList>',
-    `<notCloseCarFollow>${guion.noCierraConVehiculosPegados === true ? 'true' : 'false'}</notCloseCarFollow>`,
-    '<bigCarKeepOpen><enabled>false</enabled><duration>1</duration></bigCarKeepOpen>',
-    '<ParkingDetection><enabled>false</enabled><judgeTime>1</judgeTime></ParkingDetection>',
-    '</EntranceParam>',
-    '</EntranceParamList>',
-  ].join('');
-
-const disparador = (guion: GuionDeEquipo): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<EventTrigger version="2.0" xmlns="${ESPACIO}">`,
-    '<id>vehicledetection-1</id>',
-    '<eventType>vehicledetection</eventType>',
-    '<EventTriggerNotificationList>',
-    '<EventTriggerNotification>',
-    '<id>1</id>',
-    '<notificationMethod>center</notificationMethod>',
-    '</EventTriggerNotification>',
-    ...(guion.disparadorAccionaPuerto === undefined
-      ? []
-      : [
-          '<EventTriggerNotification>',
-          '<id>2</id>',
-          '<notificationMethod>IO</notificationMethod>',
-          `<outputIOPortID>${guion.disparadorAccionaPuerto}</outputIOPortID>`,
-          '</EventTriggerNotification>',
-        ]),
-    '</EventTriggerNotificationList>',
-    '</EventTrigger>',
-  ].join('');
-
-const datosBasicos = (guion: GuionDeEquipo): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<BasicInfo version="2.0" xmlns="${ESPACIO}">`,
-    '<channelID>1</channelID>',
-    '<directionNo>Upward</directionNo>',
-    '<monitoringSiteID>SITIO1</monitoringSiteID>',
-    '<deviceID>EQUIPO1</deviceID>',
-    '<monitorDescription>ENTRADA</monitorDescription>',
-    '<defaultCHN>1</defaultCHN>',
-    '<region>other</region>',
-    `<CRIndex>${guion.indiceDePais ?? '210'}</CRIndex>`,
-    '</BasicInfo>',
-  ].join('');
-
-const CAPACIDADES_DE_CANAL = [
-  '<?xml version="1.0" encoding="UTF-8"?>',
-  `<BasicInfoCap version="2.0" xmlns="${ESPACIO}">`,
-  '<channelID opt="1"/>',
-  '<region opt="default,EU,CIS,EU_CIS,ME"/>',
-  '<CRIndex opt="0,210,253,254"/>',
-  '</BasicInfoCap>',
-].join('');
-
-const receptor = (guion: GuionDeEquipo): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<HttpHostNotificationList version="2.0" xmlns="${ESPACIO}">`,
-    '<HttpHostNotification>',
-    '<id>1</id>',
-    '<url>/alarm-server</url>',
-    '<protocolType>HTTP</protocolType>',
-    `<parameterFormatType>${guion.formatoDeNotificacion ?? 'XML'}</parameterFormatType>`,
-    '<addressingFormatType>ipaddress</addressingFormatType>',
-    '<ipAddress>198.51.100.10</ipAddress>',
-    '<portNo>3000</portNo>',
-    '<httpAuthenticationMethod>none</httpAuthenticationMethod>',
-    '<ANPR>',
-    `<detectionUpLoadPicturesType>${guion.imagenesDelEvento ?? 'detectionPicture'}</detectionUpLoadPicturesType>`,
-    '</ANPR>',
-    '</HttpHostNotification>',
-    '</HttpHostNotificationList>',
-  ].join('');
-
-/**
- * El documento de capacidades, con las claves de los VOLCADOS REALES del
- * 23/09/2026 (`docs/insumos/hikvision/hik-*.xml`): `ITCCap` en la cámara,
- * `VideoIntercomCap` y `AudioCap` en el videoportero, `isSupportSubscribeEvent`
- * en los dos. Lo que el simulado declara se lee con el mismo lector que leerá
- * el aparato.
- */
-const capacidadesDelSistema = (guion: GuionDeEquipo): string => {
-  const canales = guion.canalesDeAudio ?? CANALES_POR_OMISION;
-  const conAudio = canales.length > 0;
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<DeviceCap version="2.0" xmlns="${ESPACIO}">`,
-    '<SysCap>',
-    ...(guion.familia === 'camara'
-      ? []
-      : [
-          '<AudioCap>',
-          `<audioInputNums>${conAudio ? '1' : '0'}</audioInputNums>`,
-          `<audioOutputNums>${conAudio ? '1' : '0'}</audioOutputNums>`,
-          '</AudioCap>',
-        ]),
-    `<isSupportSubscribeEvent>${guion.admiteSuscripcion === false ? 'false' : 'true'}</isSupportSubscribeEvent>`,
-    '</SysCap>',
-    ...(guion.familia === 'camara'
-      ? [
-          '<ITCCap>',
-          `<isSupportVehicleDetection>${guion.declaraReconocimiento === false ? 'false' : 'true'}</isSupportVehicleDetection>`,
-          '</ITCCap>',
-        ]
-      : [
-          '<VideoIntercomCap>',
-          `<isSupportRemoteOpenDoor>${guion.aperturaRemota === false ? 'false' : 'true'}</isSupportRemoteOpenDoor>`,
-          `<isSupportCallSignal>${guion.senalizaLlamadas === true ? 'true' : 'false'}</isSupportCallSignal>`,
-          '</VideoIntercomCap>',
-        ]),
-    '</DeviceCap>',
-  ].join('');
-};
-
-/** Un canal habilitado con G.711 µ-law: lo que el equipo real declara, salvo que viene deshabilitado. */
-const CANALES_POR_OMISION = [{ id: 1, habilitado: true, codec: 'G.711ulaw' }] as const;
-
-const canalesDeAudio = (guion: GuionDeEquipo): string =>
-  [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<TwoWayAudioChannelList version="2.0" xmlns="${ESPACIO}">`,
-    ...(guion.canalesDeAudio ?? CANALES_POR_OMISION).map(
-      (c) =>
-        `<TwoWayAudioChannel><id>${String(c.id)}</id><enabled>${c.habilitado ? 'true' : 'false'}</enabled>` +
-        `<audioCompressionType>${c.codec ?? 'G.711ulaw'}</audioCompressionType>` +
-        '<audioInputType>MicIn</audioInputType><speakerVolume>50</speakerVolume>' +
-        '<noisereduce>false</noisereduce></TwoWayAudioChannel>',
-    ),
-    '</TwoWayAudioChannelList>',
-  ].join('');
-
-const ordenesDePuerta = (guion: GuionDeEquipo): string =>
-  '<?xml version="1.0" encoding="UTF-8"?>' +
-  `<RemoteControlDoorCap version="2.0" xmlns="${ESPACIO}">` +
-  `<cmd opt="${(guion.ordenesDePuerta ?? ['open', 'close']).join(',')}"/>` +
-  '</RemoteControlDoorCap>';
 
 /** Respuestas de error con el código de estado general del fabricante. */
 const ERROR_OCUPADO =
@@ -341,6 +232,14 @@ const PARAMETRO_MALO =
   '"errorCode":1610612737,"errorMsg":"badParameters"}';
 
 /** Como la guía: `subStatusCode` es obligatorio también en el «OK». */
+/** A2 (15-L) · `[SUPUESTO]` S-70: el texto exacto de estos dos no está en el extracto. */
+const PERSONA_YA_EXISTE =
+  '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"employeeNoAlreadyExist",' +
+  '"errorCode":1610637344,"errorMsg":"employeeNoAlreadyExist"}';
+const PERSONA_NO_EXISTE =
+  '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"employeeNoNotExist",' +
+  '"errorCode":1610637345,"errorMsg":"employeeNoNotExist"}';
+
 const OK =
   '<ResponseStatus><statusCode>1</statusCode><statusString>OK</statusString>' +
   '<subStatusCode>ok</subStatusCode></ResponseStatus>';
@@ -350,29 +249,22 @@ const NO_SOPORTA =
 /** El reino del desafío Digest del simulado. */
 const REINO = 'equipo-simulado';
 
-const respuestaDe = (
-  estado: number,
-  cuerpo: string,
-  cabeceras: Record<string, string> = {},
-): Response =>
-  ({
-    status: estado,
-    ok: estado >= 200 && estado < 300,
-    headers: new Headers(cabeceras),
-    text: async () => cuerpo,
-    body: null,
-  }) as unknown as Response;
-
 /** Flujo de eventos: los bloques, uno detrás de otro, y después se cierra. */
-const cuerpoDeFlujo = (bloques: readonly Record<string, unknown>[]): ReadableStream<Uint8Array> => {
+const cuerpoDeFlujo = (
+  bloques: readonly Record<string, unknown>[],
+  alEmitir: AlEmitir,
+): ReadableStream<Uint8Array> => {
   const codificador = new TextEncoder();
   let i = 0;
   return {
     getReader: () => ({
-      read: async () =>
-        i < bloques.length
-          ? { done: false, value: codificador.encode(JSON.stringify(bloques[i++])) }
-          : { done: true, value: undefined },
+      read: async () => {
+        const bloque = bloques[i++];
+        if (bloque === undefined) return { done: true, value: undefined };
+        // A2 · el equipo puede negar en local: entonces emite OTRO bloque.
+        const emitido = alEmitir(bloque) ?? bloque;
+        return { done: false, value: codificador.encode(JSON.stringify(emitido)) };
+      },
       cancel: async () => undefined,
     }),
   } as unknown as ReadableStream<Uint8Array>;
@@ -390,38 +282,65 @@ const cuerpoBinario = (trozos: readonly Uint8Array[]): ReadableStream<Uint8Array
   } as unknown as ReadableStream<Uint8Array>;
 };
 
-/**
- * Devuelve un `fetch` que se comporta como el equipo descrito.
- *
- * Se inyecta en cualquier adaptador —todos aceptan `peticion`— y con él la
- * suite recorre el camino entero sin un solo aparato.
- */
-/**
- * ¿Casa la ruta del catálogo con el camino pedido? Las rutas con `{canal}` se
- * comparan como patrón: el simulado acepta cualquier número, igual que el
- * aparato acepta cualquier canal que exista. Qué canal era el bueno lo decide
- * la prueba mirando la petición, no el emparejamiento.
- */
-const caminoCasa = (rutaDelCatalogo: string, camino: string): boolean => {
-  const base = rutaDelCatalogo.split('?')[0] ?? rutaDelCatalogo;
-  if (!base.includes('{canal}')) return base === camino;
-  const patron = new RegExp(
-    '^' +
-      base
-        .split('{canal}')
-        .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-        .join('\\d+') +
-      '$',
-  );
-  return patron.test(camino);
-};
-
 /** Lo que cada terminal simulada recibió como veredicto, por destino (A2). */
 export const veredictosRecibidosPor = new Map<string, string[]>();
+/**
+ * F (15-L) · la biblioteca de rostros de cada terminal simulada, por destino:
+ * el recorrido de la consola pregunta al EQUIPO si el rechazo de una visita
+ * le quitó la plantilla, no a la pantalla que dice que sí.
+ */
+export const plantillasPor = new Map<string, ReadonlySet<string>>();
 
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
-  /** Estado mutable del equipo: la corrección lo cambia y la lectura lo ve. */
-  let verificacionRemota = guion.verificacionRemota !== false;
+  /**
+   * Estado mutable del equipo: la corrección lo cambia y la lectura lo ve. Es
+   * el `AcsCfg` entero de la guía, no un booleano: la corrección de la 15-L
+   * escribe también el canal y la apertura sin plataforma, y un simulado que
+   * sólo guardara el interruptor diría «aplicada» sin que lo estuviera.
+   */
+  const acs: Record<string, unknown> = {
+    remoteCheckDoorEnabled: guion.verificacionRemota !== false,
+    checkChannelType: guion.canalDeVerificacion ?? 'ISAPI',
+    needDeviceCheck: true,
+    remoteCheckTimeout: 5,
+    offlineDevCheckOpenDoorEnabled: false,
+  };
+  const verificacion = new VerificacionRemotaSimulada(guion.destino, guion.plazoDeVerificacionMs);
+  /** A2 (15-L) · las personas dadas de alta, con su vigencia y sus puertas. */
+  const personas = new Map<string, PersonaSimulada>();
+  if (guion.destino !== undefined) personasPor.set(guion.destino, personas);
+  /**
+   * Antes de preguntar, la terminal decide en local (S-70): fuera de vigencia o
+   * sin permiso de puerta, niega y emite otro bloque. Después, sólo en modo
+   * armado y con el interruptor puesto, pregunta por el flujo.
+   */
+  const preguntaPorElFlujo: AlEmitir = (bloque) => {
+    const acceso = bloque['AccessControllerEvent'] as Record<string, unknown> | undefined;
+    const quien = acceso?.['employeeNoString'] ?? acceso?.['employeeNo'];
+    if (acceso !== undefined && (typeof quien === 'string' || typeof quien === 'number')) {
+      const decision = decisionLocal(
+        personas.get(String(quien)),
+        horaDePared(bloque['dateTime'] ?? acceso['time'], guion.zonaHoraria ?? 'America/Bogota'),
+        guion.puerta ?? 1,
+      );
+      if (decision !== 'pregunta') {
+        if (guion.destino !== undefined) {
+          const lista = negacionesLocalesPor.get(guion.destino) ?? [];
+          lista.push(`${String(quien)}:${decision}`);
+          negacionesLocalesPor.set(guion.destino, lista);
+        }
+        return negadoEnLocal(bloque);
+      }
+    }
+    if (acs['remoteCheckDoorEnabled'] === true && acs['checkChannelType'] === 'ISAPI') {
+      verificacion.alEmitir(bloque);
+    }
+    return undefined;
+  };
+  const flujoDeEventos = (): ReadableStream<Uint8Array> =>
+    guion.enVivo === undefined
+      ? cuerpoDeFlujo(guion.flujo ?? [], preguntaPorElFlujo)
+      : guion.enVivo.cuerpo(preguntaPorElFlujo);
   /** 15-K (§4) · el modo de control también: la corrección lo escribe y se lee. */
   let modoDeControl = guion.ctrlMod ?? '1';
   const veredictosRecibidos: string[] = [];
@@ -429,14 +348,19 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   const sinSoporte = new Set(guion.sinSoporte ?? []);
   /** Estado de la biblioteca de rostros: lo que se carga se cuenta y se busca. */
   const plantillas = new Set<string>();
+  if (guion.destino !== undefined) plantillasPor.set(guion.destino, plantillas);
   const almacenadasSinNombre = guion.bibliotecaAlmacenadas ?? 0;
   const enBiblioteca = (): number => almacenadasSinNombre + plantillas.size;
   /** Audio recibido, para devolverlo como eco por el flujo de salida. */
   const audioRecibido: Uint8Array[] = [];
+  /** J2 (15-L) · los canales de audio, que la reversión escribe y se leen. */
+  const canales: CanalDeAudioSimulado[] = [...(guion.canalesDeAudio ?? CANALES_POR_OMISION)];
   /** Anexo 15-K · el Digest del equipo, con el nonce que vence. */
   const digest = new DigestDelEquipo(guion.usuario, guion.clave, REINO, guion.nonce);
+  /** C2 (15-L) · a dónde publica la cámara: lo escrito se vuelve a leer. */
+  let receptor = receptorInicial(guion);
 
-  return (async (entrada: string | URL, opciones?: RequestInit): Promise<Response> => {
+  const equipo = (async (entrada: string | URL, opciones?: RequestInit): Promise<Response> => {
     const url = new URL(typeof entrada === 'string' ? entrada : String(entrada));
     const metodo = opciones?.method ?? 'GET';
     const cabeceras = (opciones?.headers ?? {}) as Record<string, string>;
@@ -518,35 +442,72 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     if (escribe && guion.reinicioNecesario === true) return respuestaDe(200, ERROR_REINICIO);
 
     if (catalogada.proposito === 'leer los canales de audio bidireccional del equipo') {
-      return respuestaDe(200, canalesDeAudio(guion));
+      return respuestaDe(200, canalesDeAudio(canales));
+    }
+    if (catalogada.proposito === 'configurar un canal de audio bidireccional') {
+      // Engañosa 1 también aquí: sin espacio de nombres, «OK» y nada cambia.
+      const cuerpo = String(opciones?.body ?? '');
+      const id = Number(/channels\/(\d+)$/.exec(url.pathname)?.[1]);
+      const i = canales.findIndex((c) => c.id === id);
+      const activo = /<enabled>\s*(true|false)\s*</.exec(cuerpo)?.[1];
+      if (i < 0 || activo === undefined) return respuestaDe(400, PARAMETRO_MALO);
+      const actual = canales[i];
+      if (actual !== undefined && cuerpo.includes(`xmlns="${ESPACIO}"`)) {
+        canales[i] = { ...actual, habilitado: activo === 'true' };
+      }
+      return respuestaDe(200, OK);
+    }
+    if (catalogada.proposito === 'leer qué admite la gestión de personas') {
+      return respuestaDe(
+        200,
+        JSON.stringify({
+          UserInfo: {
+            supportFunction: { '@opt': guion.funcionesDePersonas ?? 'post,delete,put,get,setUp' },
+            maxRecordNum: 3000,
+            userType: { '@opt': 'normal,visitor,blackList' },
+          },
+        }),
+      );
     }
     if (catalogada.proposito === 'leer qué órdenes admite la puerta desde la plataforma') {
       return respuestaDe(200, ordenesDePuerta(guion));
     }
     if (catalogada.proposito === 'leer si la terminal espera el veredicto de la plataforma') {
       // H-SITIO-05 · el interruptor con el nombre de la guía.
-      return respuestaDe(
-        200,
-        JSON.stringify({
-          AcsCfg: { remoteCheckDoorEnabled: verificacionRemota, checkChannelType: 'ISAPI' },
-        }),
-      );
+      return respuestaDe(200, JSON.stringify({ AcsCfg: acs }));
     }
     if (catalogada.proposito === 'fijar que la terminal espere el veredicto de la plataforma') {
       // Leer-modificar-escribir de verdad: lo que se escribe es lo que la
       // siguiente lectura devuelve. Sin esto, la corrección parecería aplicada
       // y la ficha seguiría en bloqueo.
-      const cuerpo = String(opciones?.body ?? '');
-      const pedido = /"remoteCheckDoorEnabled"\s*:\s*(true|false)/.exec(cuerpo)?.[1];
-      if (pedido === undefined) return respuestaDe(400, ERROR_AVERIADO);
-      verificacionRemota = pedido === 'true';
+      let escrito: unknown;
+      try {
+        escrito = (JSON.parse(String(opciones?.body ?? '')) as { AcsCfg?: unknown }).AcsCfg;
+      } catch {
+        return respuestaDe(400, ERROR_AVERIADO);
+      }
+      if (
+        typeof escrito !== 'object' ||
+        escrito === null ||
+        typeof (escrito as Record<string, unknown>)['remoteCheckDoorEnabled'] !== 'boolean'
+      ) {
+        return respuestaDe(400, ERROR_AVERIADO);
+      }
+      // Sólo los campos que el equipo tiene: uno desconocido no se inventa.
+      for (const [campo, valor] of Object.entries(escrito)) {
+        if (campo in acs) acs[campo] = valor;
+      }
       return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'responder la verificación remota de la terminal') {
       // Sin verificación remota activa no hay petición pendiente que contestar.
-      if (!verificacionRemota) return respuestaDe(200, NO_SOPORTA);
+      if (acs['remoteCheckDoorEnabled'] !== true) return respuestaDe(200, NO_SOPORTA);
       const cuerpo = String(opciones?.body ?? '');
       veredictosRecibidos.push(cuerpo);
+      // 15-L · la terminal ACTÚA: abre con `success` a tiempo y con su serie.
+      if (verificacion.contestar(cuerpo) === 'abrio') {
+        anotarEn(aperturasFisicasPor, guion.destino);
+      }
       return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'leer qué admite la biblioteca de rostros') {
@@ -590,12 +551,21 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         return respuestaDe(400, PARAMETRO_MALO);
       }
       plantillas.delete(empleado);
+      personas.delete(empleado);
       return respuestaDe(200, OK);
     }
-    if (catalogada.proposito === 'dar de alta la persona a la que pertenece la plantilla') {
-      // H-SITIO-04 · como la guía: el `employeeNo` admite hasta 32 bytes.
-      const empleado = /"employeeNo"\s*:\s*"([^"]*)"/.exec(String(opciones?.body ?? ''))?.[1];
-      if (empleado === undefined || empleado.length > 32) return respuestaDe(400, PARAMETRO_MALO);
+    if (
+      catalogada.proposito === 'dar de alta la persona a la que pertenece la plantilla' ||
+      catalogada.proposito === 'modificar la persona a la que pertenece la plantilla'
+    ) {
+      // H-SITIO-04 · como la guía: el `employeeNo` admite hasta 32 bytes. A2 ·
+      // y el registro entero se valida y se RECUERDA, con su vigencia.
+      const leida = leerPersona(String(opciones?.body ?? ''));
+      if (leida === null) return respuestaDe(400, PARAMETRO_MALO);
+      const alta = catalogada.proposito.startsWith('dar de alta');
+      if (alta && personas.has(leida.id)) return respuestaDe(400, PERSONA_YA_EXISTE);
+      if (!alta && !personas.has(leida.id)) return respuestaDe(400, PERSONA_NO_EXISTE);
+      personas.set(leida.id, leida.persona);
       return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'cargar la plantilla facial') {
@@ -618,6 +588,9 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         fpid !== undefined &&
         /^[A-Za-z0-9]{1,63}$/.test(fpid);
       if (!conforme) return respuestaDe(400, PARAMETRO_MALO);
+      // A2 (15-L) · el rostro se enlaza a una persona por `FPID` = `employeeNo`:
+      // sin persona previa, el equipo no tiene a quién dárselo.
+      if (!personas.has(fpid)) return respuestaDe(400, PERSONA_NO_EXISTE);
       plantillas.add(fpid);
       return respuestaDe(200, OK);
     }
@@ -665,21 +638,28 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       // relé no se mueve; con ellos, abre. Sólo el equipo sabe la diferencia.
       const desenlace = desenlaceDeApertura(String(opciones?.body ?? ''));
       if (desenlace === 'mal_formada') return respuestaDe(400, CONTENIDO_XML_MALO);
+      // J (15-L) · engañosa 3: 2xx sin `statusCode 1`, y el relé quieto.
+      if (guion.aperturaSinConfirmar === true) return respuestaDe(200, '');
       if (desenlace === 'acciona') anotarEn(aperturasFisicasPor, guion.destino);
+      return respuestaDe(200, OK);
+    }
+    if (catalogada.proposito === 'accionar la barrera vehicular') {
+      // J (15-L) · el oráculo de la talanquera, como el de las puertas.
+      if (guion.aperturaSinConfirmar === true) return respuestaDe(200, '');
+      if (/<ctrlMode>\s*open\s*<\/ctrlMode>/.test(String(opciones?.body ?? ''))) {
+        anotarEn(aperturasFisicasPor, guion.destino);
+      }
       return respuestaDe(200, OK);
     }
     if (catalogada.proposito === 'contestar o rechazar una llamada del videoportero') {
       return respuestaDe(200, guion.senalizaLlamadas === true ? OK : NO_SOPORTA);
     }
-    if (catalogada.proposito === 'suscribirse a los eventos del equipo') {
+    if (
+      catalogada.proposito === 'suscribirse a los eventos del equipo' ||
+      catalogada.proposito === 'escuchar los eventos que el equipo emite'
+    ) {
       const respuesta = respuestaDe(200, '');
-      Object.defineProperty(respuesta, 'body', { value: cuerpoDeFlujo(guion.flujo ?? []) });
-      return respuesta;
-    }
-
-    if (catalogada.proposito === 'escuchar los eventos que el equipo emite') {
-      const respuesta = respuestaDe(200, '');
-      Object.defineProperty(respuesta, 'body', { value: cuerpoDeFlujo(guion.flujo ?? []) });
+      Object.defineProperty(respuesta, 'body', { value: flujoDeEventos() });
       return respuesta;
     }
 
@@ -708,7 +688,16 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     }
 
     if (catalogada.proposito === 'leer a qué receptor publica el equipo') {
-      return respuestaDe(200, receptor(guion));
+      return respuestaDe(200, documentoDelReceptor(receptor));
+    }
+    if (
+      catalogada.proposito === 'apuntar el equipo a nuestro receptor' ||
+      catalogada.proposito === 'apuntar un receptor concreto por su identificador'
+    ) {
+      const escrito = receptorEscrito(receptor, String(opciones?.body ?? ''));
+      if (escrito === null) return respuestaDe(400, PARAMETRO_MALO);
+      receptor = escrito;
+      return respuestaDe(200, OK);
     }
 
     if (catalogada.proposito === 'leer si este modelo reporta el estado de la barrera') {
@@ -774,12 +763,15 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         200,
         `<DeviceInfo><model>${guion.modelo ?? 'SIMULADO'}</model>` +
           `<firmwareVersion>${guion.firmware ?? 'V0.0.0'}</firmwareVersion>` +
-          '<serialNumber>SIM0000001</serialNumber></DeviceInfo>',
+          `<serialNumber>${guion.serie ?? 'SIM0000001'}</serialNumber></DeviceInfo>`,
       );
     }
 
     return respuestaDe(200, OK);
   }) as typeof fetch;
+  return guion.situaciones === undefined
+    ? equipo
+    : conSituacionesDeSitio(equipo, guion.situaciones);
 };
 
 /**

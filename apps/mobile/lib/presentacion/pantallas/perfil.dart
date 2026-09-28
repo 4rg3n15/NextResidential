@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'notificaciones.dart';
+import 'notificaciones.dart' show FilaDeNotificaciones;
 import 'ocupantes.dart';
 
 import '../../aplicacion/estado.dart';
@@ -26,9 +26,10 @@ import '../controlador.dart';
 /// El nombre que se muestra es el de la PERSONA, no el correo de la sesión:
 /// una cuenta por usuario no tiene correo que enseñar (C-36).
 ///
-/// El interruptor «Resumen semanal» sigue deshabilitado con su motivo: no hay
-/// dónde guardar esa preferencia, y uno que se mueve sin guardar nada es una
-/// mentira con animación.
+/// 15-L · **ningún interruptor de avisos.** Esta compilación no lleva servicio
+/// de mensajería: la fila de notificaciones dice «Los avisos llegan mientras la
+/// app está abierta» y lleva a la lista. El «Resumen semanal» deshabilitado se
+/// quitó: un interruptor que no se puede mover sigue prometiendo algo.
 class PantallaDePerfil extends StatelessWidget {
   const PantallaDePerfil({
     super.key,
@@ -44,8 +45,21 @@ class PantallaDePerfil extends StatelessWidget {
     required this.alEditarPerfil,
     required this.alCambiarVivienda,
     required this.alCambiarContrasena,
-    required this.estadoDeAvisos,
+    this.alRecargar,
   });
+
+  /// 15-L · tirar hacia abajo: la vuelta del ciclo del armazón, si la hay.
+  final Future<void> Function()? alRecargar;
+
+  Future<void> _recargar() async {
+    final r = alRecargar;
+    if (r != null) return r();
+    await Future.wait([
+      controladorDeInicio.refrescar(),
+      controladorDePerfil.refrescar(),
+      controladorDeOcupantes.refrescar(),
+    ]);
+  }
 
   final ControladorDeVista controladorDeInicio;
   final ControladorDeVista<PerfilDelResidente> controladorDePerfil;
@@ -59,10 +73,6 @@ class PantallaDePerfil extends StatelessWidget {
   final void Function(PerfilDelResidente perfil) alEditarPerfil;
   final void Function(PerfilDelResidente? perfil) alCambiarVivienda;
   final void Function() alCambiarContrasena;
-
-  /// En qué punto está el registro del aparato. Se recibe como VALOR: el perfil
-  /// no tiene por qué saber que hay un controlador detrás.
-  final EstadoDeAvisos estadoDeAvisos;
 
   static T? _datos<T>(Estado<T> e) => switch (e) {
     ConDatos<T>(datos: final d) => d,
@@ -85,132 +95,112 @@ class PantallaDePerfil extends StatelessWidget {
         final ocupantes = _datos(controladorDeOcupantes.estado);
         final nombre = perfil?.nombreCompleto ?? '';
         final t = Theme.of(context).textTheme;
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text('Mi perfil', style: t.headlineSmall),
-            const SizedBox(height: 16),
-            Card(
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Paleta.peligroSuave.fondo,
-                  child: Text(
-                    nombre.isEmpty ? '?' : nombre.characters.first.toUpperCase(),
-                    style: TextStyle(color: Paleta.peligroSuave.texto, fontWeight: FontWeight.w700),
+        return RefreshIndicator(
+          onRefresh: _recargar,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text('Mi perfil', style: t.headlineSmall),
+              const SizedBox(height: 16),
+              Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Paleta.peligroSuave.fondo,
+                    child: Text(
+                      nombre.isEmpty ? '?' : nombre.characters.first.toUpperCase(),
+                      style: TextStyle(
+                        color: Paleta.peligroSuave.texto,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    nombre.isEmpty ? 'Mi cuenta' : nombre,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: hogar == null
+                      ? null
+                      : Text(
+                          '${hogar.vivienda.titulo} · '
+                          '${hogar.vinculo.esTitular ? 'Titular' : 'Residente'}',
+                        ),
+                ),
+              ),
+              if (perfil != null) ...[
+                const SizedBox(height: 12),
+                _Datos(perfil: perfil, alEditar: () => alEditarPerfil(perfil)),
+                const SizedBox(height: 12),
+                Card(
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.apartment_outlined),
+                        title: Text(perfil.copropiedadNombre),
+                        subtitle: Text(perfil.copropiedadDireccion ?? 'Sin dirección registrada'),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        key: const Key('perfil.cambiarVivienda'),
+                        leading: const Icon(Icons.home_outlined),
+                        title: Text(hogar?.vivienda.titulo ?? 'Mi vivienda'),
+                        subtitle: const Text('Cambiar de vivienda exige un código'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => alCambiarVivienda(perfil),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        key: const Key('perfil.porteria'),
+                        leading: const Icon(Icons.phone_outlined),
+                        title: const Text('Llamar a portería'),
+                        subtitle: Text(
+                          perfil.telefonoPorteria ?? 'La administración no registró el teléfono',
+                        ),
+                        onTap: () => llamarAPorteria(context, llamador, perfil.telefonoPorteria),
+                      ),
+                    ],
                   ),
                 ),
-                title: Text(
-                  nombre.isEmpty ? 'Mi cuenta' : nombre,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: hogar == null
-                    ? null
-                    : Text(
-                        '${hogar.vivienda.titulo} · '
-                        '${hogar.vinculo.esTitular ? 'Titular' : 'Residente'}',
-                      ),
-              ),
-            ),
-            if (perfil != null) ...[
-              const SizedBox(height: 12),
-              _Datos(perfil: perfil, alEditar: () => alEditarPerfil(perfil)),
-              const SizedBox(height: 12),
+              ],
+              if (ocupantes != null && ocupantes.declarada) ...[
+                const SizedBox(height: 12),
+                TarjetaDeOcupantes(ocupantes: ocupantes),
+              ],
+              const SizedBox(height: 20),
+              Text('Atajos', style: t.titleMedium),
+              const SizedBox(height: 8),
               Card(
                 child: Column(
                   children: [
-                    ListTile(
-                      leading: const Icon(Icons.apartment_outlined),
-                      title: Text(perfil.copropiedadNombre),
-                      subtitle: Text(perfil.copropiedadDireccion ?? 'Sin dirección registrada'),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      key: const Key('perfil.cambiarVivienda'),
-                      leading: const Icon(Icons.home_outlined),
-                      title: Text(hogar?.vivienda.titulo ?? 'Mi vivienda'),
-                      subtitle: const Text('Cambiar de vivienda exige un código'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => alCambiarVivienda(perfil),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      key: const Key('perfil.porteria'),
-                      leading: const Icon(Icons.phone_outlined),
-                      title: const Text('Llamar a portería'),
-                      subtitle: Text(
-                        perfil.telefonoPorteria ?? 'La administración no registró el teléfono',
-                      ),
-                      onTap: () => llamarAPorteria(context, llamador, perfil.telefonoPorteria),
-                    ),
+                    _Atajo(Icons.people_outline, 'Mi familia', alAbrirFamilia),
+                    _Atajo(Icons.directions_car_outlined, 'Mis vehículos', alAbrirVehiculos),
+                    _Atajo(Icons.history, 'Historial de accesos', alAbrirHistorial),
+                    _Atajo(Icons.password_outlined, 'Cambiar contraseña', alCambiarContrasena),
                   ],
                 ),
               ),
+              const SizedBox(height: 20),
+              Text('Preferencias', style: t.titleMedium),
+              const SizedBox(height: 8),
+              FilaDeNotificaciones(alAbrir: alAbrirNotificaciones),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: alCerrarSesion,
+                icon: const Icon(Icons.logout),
+                label: const Text('Cerrar sesión'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  foregroundColor: Paleta.peligroSuave.texto,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Cerrar sesión borra los tokens del llavero del dispositivo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Paleta.textoSuave, fontSize: 12),
+              ),
             ],
-            if (ocupantes != null && ocupantes.declarada) ...[
-              const SizedBox(height: 12),
-              TarjetaDeOcupantes(ocupantes: ocupantes),
-            ],
-            const SizedBox(height: 20),
-            Text('Atajos', style: t.titleMedium),
-            const SizedBox(height: 8),
-            Card(
-              child: Column(
-                children: [
-                  _Atajo(Icons.people_outline, 'Mi familia', alAbrirFamilia),
-                  _Atajo(Icons.directions_car_outlined, 'Mis vehículos', alAbrirVehiculos),
-                  _Atajo(Icons.history, 'Historial de accesos', alAbrirHistorial),
-                  _Atajo(Icons.password_outlined, 'Cambiar contraseña', alCambiarContrasena),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text('Preferencias', style: t.titleMedium),
-            const SizedBox(height: 8),
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.notifications_outlined),
-                    title: const Text('Notificaciones'),
-                    // El resumen dice el estado REAL, no «activadas».
-                    subtitle: Text(
-                      resumenDeAvisos(estadoDeAvisos),
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: alAbrirNotificaciones,
-                  ),
-                  const Divider(height: 1),
-                  const SwitchListTile(
-                    value: false,
-                    // `null` deshabilita de verdad.
-                    onChanged: null,
-                    title: Text('Resumen semanal'),
-                    subtitle: Text(
-                      'Sin dónde guardar la preferencia todavía.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              onPressed: alCerrarSesion,
-              icon: const Icon(Icons.logout),
-              label: const Text('Cerrar sesión'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                foregroundColor: Paleta.peligroSuave.texto,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Cerrar sesión borra los tokens del llavero del dispositivo.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Paleta.textoSuave, fontSize: 12),
-            ),
-          ],
+          ),
         );
       },
     );

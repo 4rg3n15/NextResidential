@@ -18,6 +18,8 @@
     "prepare": "husky",
     "verificar:etapa": "./scripts/verificar-etapa.sh",
     "portabilidad": "node scripts/lib/portabilidad.mjs",
+    "sitio:video": "node scripts/sitio-video.mjs",
+    "sitio:ensayo": "node scripts/sitio-ensayo.mjs",
     "metricas": "node scripts/lib/metricas.mjs",
     "mermaid": "node scripts/lib/mermaid-analizable.mjs",
     "pwa": "node scripts/lib/pwa-instalable.mjs",

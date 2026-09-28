@@ -111,3 +111,25 @@ describe('negociarVistaEnVivo (A5)', () => {
     expect((error as ErrorDeVistaEnVivo).codigo).toBe('navegador');
   });
 });
+
+describe('D3 (15-L) · la conexión que se cae después de negociar', () => {
+  it.each(['failed', 'disconnected'] as const)('«%s» avisa; «connected» no', async (estado) => {
+    const conexion = new ConexionFalsa();
+    let cortes = 0;
+    await negociarVistaEnVivo(rutaWhep('cop-a', 'disp-1'), {
+      alFlujo: () => undefined,
+      alCortarse: () => {
+        cortes += 1;
+      },
+      crearConexion: () => conexion as unknown as RTCPeerConnection,
+      fetchFn: (async () => new Response('v=0\r\nrespuesta', { status: 201 })) as typeof fetch,
+    });
+    const alCambiar = conexion.escuchas.get('connectionstatechange');
+    Object.assign(conexion, { connectionState: 'connected' });
+    alCambiar?.({});
+    expect(cortes).toBe(0);
+    Object.assign(conexion, { connectionState: estado });
+    alCambiar?.({});
+    expect(cortes).toBe(1);
+  });
+});

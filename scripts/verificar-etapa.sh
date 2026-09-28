@@ -18,13 +18,27 @@
 # si no se declara contra qué corrió.
 #
 #   ./scripts/verificar-etapa.sh            # artefactos limpios + suite completa
-#   ./scripts/verificar-etapa.sh --con-base # además, la suite SQL y KPI-03
+#   ./scripts/verificar-etapa.sh --con-base # además, la suite SQL y KPI-03; y
+#                                         # omitir por falta de base FALLA (H-15L-C01)
 # =============================================================================
 set -uo pipefail
 cd "$(dirname "$0")/.."
 CON_BASE=0
 for a in "$@"; do [[ "$a" == "--con-base" ]] && CON_BASE=1; done
 fallos=0
+# ─────────────────────────────────────────────────────────────────────────────
+# H-15L-C01 · CON `--con-base`, OMITIR POR FALTA DE BASE ES FALLAR.
+#
+# `visitas-pg.test.ts` estuvo en verde con la base local caída: cada prueba
+# salía por `if (omitida()) return;`, y una prueba que retorna antes de su
+# primera aserción PASA. La lista de visitas del residente salía vacía contra
+# PostgreSQL y nadie lo vio. Con esta variable, `apps/api/test/base-exigida.ts`
+# convierte cada omisión en un fallo con el nombre de la prueba; el paso 5 las
+# nombra además desde el informe JSON (`omisiones-sin-base.mjs`), por si la
+# variable no llegara. Sin `--con-base` se quita, para que un valor que el
+# usuario tenga en su shell no cambie la regla: ahí las omisiones se permiten.
+# ─────────────────────────────────────────────────────────────────────────────
+if [[ "$CON_BASE" == "1" ]]; then export NCR_BASE_EXIGIDA=1; else unset NCR_BASE_EXIGIDA; fi
 
 # Límite de tiempo por paso. `timeout` es de GNU coreutils y macOS no lo trae,
 # así que el plazo lo impone `con-limite.mjs`, que se comporta igual en las dos
@@ -346,6 +360,26 @@ elif grep -qE "[0-9]+ skipped|[0-9]+ todo" <<<"$salida"; then
   grep -E "Tests +[0-9]" <<<"$salida" | grep -E "skipped|todo" | sed 's/^/     /'
 else
   ok "suite completa en verde, sin una sola prueba saltada"
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+# H-15L-C01 · UNA PRUEBA OMITIDA POR FALTA DE BASE NO ES UN VERDE, Y SE NOMBRA.
+#
+# Lo de arriba ve las SALTADAS (D-112); no ve la prueba que entra, no encuentra
+# la base y retorna: vitest la da por «passed». Así pasó `visitas-pg.test.ts`
+# con la base caída. Con `--con-base` cada una ya falla por `NCR_BASE_EXIGIDA`;
+# aquí se leen los informes JSON de este mismo paso y se NOMBRA cada prueba
+# omitida —fallada por esa causa o, si la variable no llegó, marcada—, y con
+# `--con-base` cualquiera es un fallo. Sin él se permiten y se cuentan por
+# fichero. Y siempre: ningún fichero de prueba lee `DATABASE_URL_PRUEBAS` por su
+# cuenta ni usa la base sin el guardián de `apps/api/test/base-exigida.ts`.
+# ─────────────────────────────────────────────────────────────────────────────
+if salida_omis=$(node scripts/lib/omisiones-sin-base.mjs \
+     $([[ "$CON_BASE" == "1" ]] && echo --exigida) "$RAIZ_DEL_REPO" 2>&1); then
+  ok "$(tail -1 <<<"$salida_omis")"
+  grep -E "^  – " <<<"$salida_omis" | head -30 | sed 's/^/   /'
+else
+  mal "hay pruebas OMITIDAS por falta de base con --con-base, o ficheros que leen la base sin el guardián"
+  head -60 <<<"$salida_omis" | sed 's/^/     /'
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1044,6 +1078,27 @@ else
   printf '%s\n%s\n' "${salida_guion:-}" "${salida_abrir:-}" | grep -E "✗|⚠|VEREDICTO" | head -12 | sed 's/^/     /'
 fi
 rm -rf "$ensayo_guion"
+
+paso "12f · pnpm sitio:ensayo contra los equipos simulados: nueve pasos por equipo, respaldo y reversión"
+# 15-L (J) · el ensayo del día de entrega, como lo ejecutará el usuario: los
+# nueve pasos en los tres equipos simulados (más las comprobaciones de la
+# plataforma), y `--capturar`/`--restaurar` sobre
+# una carpeta temporal —nunca en el repositorio—. Sin terminal, nadie contesta
+# «¿se movió?»: en simulado contesta el oráculo del equipo.
+ensayo_sitio="$(mktemp -d "${TMPDIR:-/tmp}/ncr-ensayo.XXXXXX")"
+if salida_ensayo=$(con_limite "$LIMITE_CORTO" node scripts/sitio-ensayo.mjs --simulado </dev/null 2>&1) &&
+  grep -q "VEREDICTO: SIN FALLOS" <<<"$salida_ensayo" &&
+  con_limite "$LIMITE_CORTO" node scripts/sitio-ensayo.mjs --simulado \
+    --capturar="$ensayo_sitio/respaldo" </dev/null >/dev/null 2>&1 &&
+  con_limite "$LIMITE_CORTO" node scripts/sitio-ensayo.mjs --simulado \
+    --restaurar="$ensayo_sitio/respaldo" </dev/null >/dev/null 2>&1; then
+  grep -E "^VEREDICTO" <<<"$salida_ensayo" | sed 's/^/   /'
+  ok "el ensayo recorre los tres equipos simulados, respalda y revierte su configuración"
+else
+  mal "pnpm sitio:ensayo falla contra los equipos simulados (ensayo, --capturar o --restaurar)"
+  grep -E "FALLO|✗|VEREDICTO" <<<"${salida_ensayo:-}" | head -12 | sed 's/^/     /'
+fi
+rm -rf "$ensayo_sitio"
 
 if [[ "$CON_BASE" == "1" ]]; then
   paso "13 · KPI-03 y la inmutabilidad de un evento REAL, contra base (requiere --con-base)"

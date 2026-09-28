@@ -13,6 +13,7 @@ import {
   ConsultarDispositivos,
   ConsultarIndicadores,
 } from '../src/tablero/aplicacion/casos-de-uso';
+import { URL_BASE, exigirBase as guardianDeLaBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -30,7 +31,6 @@ import {
  * más urge corregir desde su ficha.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const URL_BASE = process.env.DATABASE_URL_PRUEBAS;
 const COP_A = '10000000-0000-4000-8000-000000000001';
 const COP_B = '10000000-0000-4000-8000-000000000002';
 const LLAVE = 'llave-de-equipos-solo-para-pruebas-32+';
@@ -171,6 +171,9 @@ const exigirBase = (): Pool => {
   }
   return pool;
 };
+
+// H-15L-C01 · con `--con-base`, una prueba sin base FALLA aquí, con su nombre.
+guardianDeLaBase('sin el rol de la API o sin las semillas', () => disponible);
 
 describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real', () => {
   it('un equipo dado de alta —verificado o «decide solo»— aparece en Dispositivos', async () => {
