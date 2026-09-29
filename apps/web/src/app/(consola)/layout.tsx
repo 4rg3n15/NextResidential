@@ -54,8 +54,12 @@ const LayoutDeConsola = async ({
   const alcance = await alcanceActivo();
   const enPruebas = await modoPruebasActivo();
   // F3 (corrección de la 15-L) · con equipos simulados, ninguna orden llega a un aparato.
+  // 15-M · la API sólo se lo da a los roles de operación; al residente ninguna
+  // orden suya llega a un aparato, así que no se le pregunta. [SUPUESTO] S-155.
   const simulados =
-    alcance.copropiedadId === null ? null : await avisoDeEquiposSimulados(alcance.copropiedadId);
+    alcance.copropiedadId === null || sesion.rol === 'residente'
+      ? null
+      : await avisoDeEquiposSimulados(alcance.copropiedadId);
 
   return (
     <ProveedorDeConsultas>

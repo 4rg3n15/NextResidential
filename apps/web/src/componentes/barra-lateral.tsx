@@ -55,6 +55,18 @@ export const BarraLateral = ({
 }): JSX.Element => {
   const rutaActual = usePathname();
   const elementos = navegacionDe(rol);
+  /**
+   * 15-M · el activo es el de la coincidencia MÁS LARGA. Con el menú del
+   * residente, «/mi» es prefijo de «/mi/familia»: sin esto se marcarían dos
+   * entradas a la vez y `aria-current` mentiría.
+   */
+  const coincide = (ruta: string): boolean =>
+    rutaActual === ruta || rutaActual.startsWith(`${ruta}/`);
+  const rutaActiva = elementos
+    .filter((e) => coincide(e.ruta))
+    .reduce<
+      string | null
+    >((mejor, e) => (mejor === null || e.ruta.length > mejor.length ? e.ruta : mejor), null);
 
   return (
     <nav
@@ -86,7 +98,7 @@ export const BarraLateral = ({
           desbordamiento vuelve a la página — que es el defecto de partida. */}
       <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
         {elementos.map((e) => {
-          const activo = rutaActual === e.ruta || rutaActual.startsWith(`${e.ruta}/`);
+          const activo = e.ruta === rutaActiva;
           const disponible = e.pendienteDeEtapa === null;
 
           if (!disponible) {

@@ -56,6 +56,13 @@ export const ICONOS_DE_NAVEGACION = [
   'UserCog',
   // ETAPA 15-I · HU-35 · la lista negra desde la consola.
   'ShieldBan',
+  // ETAPA 15-M (C3, D-12) · el menú del residente: sus ocho pantallas.
+  'House',
+  'Users',
+  'UserRoundPlus',
+  'History',
+  'Bell',
+  'CircleUserRound',
 ] as const;
 export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 
@@ -66,6 +73,50 @@ const OPERACION: readonly Rol[] = [
   'portero',
   'operador_central',
 ];
+
+/**
+ * ETAPA 15-M (C3, D-12) · EL RESIDENTE EN LA CONSOLA WEB.
+ *
+ * Decisión del cliente del 2026-09-29: el residente opera también desde el
+ * navegador, con las MISMAS funciones que la app (C-44). Su menú es SÓLO el
+ * suyo —las ocho pantallas del mockup móvil, en el mismo orden— y ninguna
+ * entrada de administración, portería ni guardia lo lleva como rol: la
+ * interfaz oculta, y la API deniega por `@Roles('residente')` en cada ruta.
+ * Todas cuelgan de `/mi`, que es la misma raíz de la API (`…/mi/…`): la
+ * vivienda la resuelve el servidor desde el token y nunca viaja en la URL.
+ *
+ * [SUPUESTO] S-150 · «Perfil» del residente es `/mi/perfil` con clave propia
+ * (`mi-perfil-residente`): `/mi-perfil` es la ficha del portero y no se
+ * mezcla con el perfil de la vivienda.
+ */
+const PANTALLAS_DEL_RESIDENTE: readonly Pick<
+  ElementoDeNavegacion,
+  'clave' | 'etiqueta' | 'ruta' | 'icono'
+>[] = [
+  { clave: 'mi', etiqueta: 'Mi vivienda', ruta: '/mi', icono: 'House' },
+  { clave: 'mi-familia', etiqueta: 'Mi familia', ruta: '/mi/familia', icono: 'Users' },
+  { clave: 'mi-vehiculos', etiqueta: 'Mis vehículos', ruta: '/mi/vehiculos', icono: 'Car' },
+  { clave: 'mi-visitas', etiqueta: 'Visitas', ruta: '/mi/visitas', icono: 'UserRoundPlus' },
+  { clave: 'mi-zonas', etiqueta: 'Zonas comunes', ruta: '/mi/zonas', icono: 'Trees' },
+  { clave: 'mi-historial', etiqueta: 'Historial', ruta: '/mi/historial', icono: 'History' },
+  {
+    clave: 'mi-notificaciones',
+    etiqueta: 'Notificaciones',
+    ruta: '/mi/notificaciones',
+    icono: 'Bell',
+  },
+  {
+    clave: 'mi-perfil-residente',
+    etiqueta: 'Perfil',
+    ruta: '/mi/perfil',
+    icono: 'CircleUserRound',
+  },
+];
+const RESIDENTE: readonly ElementoDeNavegacion[] = PANTALLAS_DEL_RESIDENTE.map((e) => ({
+  ...e,
+  roles: ['residente'],
+  pendienteDeEtapa: null,
+}));
 
 export const NAVEGACION: readonly ElementoDeNavegacion[] = [
   {
@@ -230,6 +281,7 @@ export const NAVEGACION: readonly ElementoDeNavegacion[] = [
     pendienteDeEtapa: null,
     icono: 'IdCard',
   },
+  ...RESIDENTE,
 ];
 
 export const navegacionDe = (rol: Rol): readonly ElementoDeNavegacion[] =>
@@ -248,13 +300,14 @@ export const NOMBRE_DE_ROL: Readonly<Record<Rol, string>> = {
 /**
  * Ruta de aterrizaje tras el acceso.
  *
- * El residente **no tiene consola web**: su superficie es la app Flutter de la
- * ETAPA 11. Se le dice, en vez de dejarlo en un tablero vacío sin explicación.
+ * El residente aterriza en «Mi vivienda» (15-M, D-12): hasta esa decisión su
+ * única superficie era la app Flutter y aquí se le mandaba a `/sin-consola`.
  * La identidad de servicio no es una persona y nunca inicia sesión aquí. El
  * portero empieza su turno en Portería, que es su pantalla.
  */
 export const rutaInicialDe = (rol: Rol): string => {
-  if (rol === 'residente' || rol === 'servicio') return '/sin-consola';
+  if (rol === 'servicio') return '/sin-consola';
+  if (rol === 'residente') return '/mi';
   if (rol === 'portero') return '/porteria';
   return '/tablero';
 };

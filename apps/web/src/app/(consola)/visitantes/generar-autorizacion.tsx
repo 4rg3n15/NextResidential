@@ -45,7 +45,8 @@ const ahoraLocal = (): { fecha: string; hora: string } => {
   };
 };
 
-const MOTIVOS_DE_FOTO: Readonly<Record<string, string>> = {
+/** Por qué la foto no sirvió, en castellano. Lo comparte «Visitas» del residente (15-M). */
+export const MOTIVOS_DE_FOTO: Readonly<Record<string, string>> = {
   ROSTROS_MULTIPLES: 'se ve más de un rostro',
   SIN_ROSTRO: 'no se ve ningún rostro',
   NITIDEZ: 'la foto está borrosa',
