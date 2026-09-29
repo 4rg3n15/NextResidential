@@ -31,6 +31,19 @@ export interface PoliticaDeNonce {
    */
   readonly reutilizaNonceVigente?: boolean;
   readonly ahora?: () => number;
+  /**
+   * E1 (15-M) · cómo contesta a un resumen CORRECTO sobre un nonce que ya no
+   * vale. `stale` (por omisión): `401` con desafío nuevo y `stale="TRUE"`,
+   * como manda la RFC. `sin_desafio`: `401` SIN `WWW-Authenticate` (la
+   * terminal del 28/09). `stale_false`: `401` con desafío y `stale="FALSE"`,
+   * indistinguible de una clave mala (el videoportero del 28/09).
+   */
+  readonly alVencer?: 'stale' | 'sin_desafio' | 'stale_false';
+  /**
+   * E1-f · con la clave mala, el equipo declara la cuenta bloqueada por
+   * estos segundos en el cuerpo (`lockStatus`/`unlockTime`).
+   */
+  readonly bloqueaPorSegundos?: number;
 }
 
 export interface EstadisticasDigest {
@@ -72,8 +85,13 @@ export const servidorDigest = (opciones: {
     return nonce;
   };
 
-  const desafio = (stale: boolean, mismoNonce = false): Response =>
-    new Response('<userCheck><statusValue>401</statusValue></userCheck>', {
+  const CUERPO_401 = '<userCheck><statusValue>401</statusValue></userCheck>';
+  const cuerpoBloqueado = (segundos: number): string =>
+    '<userCheck><statusValue>401</statusValue><statusString>Unauthorized</statusString>' +
+    `<lockStatus>lock</lockStatus><retryTimes>0</retryTimes><unlockTime>${String(segundos)}</unlockTime></userCheck>`;
+
+  const desafio = (stale: boolean, mismoNonce = false, cuerpo = CUERPO_401): Response =>
+    new Response(cuerpo, {
       status: 401,
       headers: {
         'www-authenticate':
@@ -82,6 +100,13 @@ export const servidorDigest = (opciones: {
           `stale="${stale ? 'TRUE' : 'FALSE'}"`,
       },
     });
+
+  /** E1 · el 401 a un nonce que ya no vale, según lo que el equipo haga. */
+  const nonceRechazado = (): Response => {
+    const modo = opciones.politica?.alVencer ?? 'stale';
+    if (modo === 'sin_desafio') return new Response(CUERPO_401, { status: 401 });
+    return desafio(modo === 'stale');
+  };
 
   const reutilizable = (): boolean =>
     opciones.politica?.reutilizaNonceVigente === true && nonce !== null && !vencido();
@@ -113,12 +138,13 @@ export const servidorDigest = (opciones: {
     const nonceUsado = valor(autorizacion, 'nonce');
     if (!resumenCorrecto(autorizacion, metodo, nonceUsado)) {
       desafios.clave += 1;
-      return desafio(false);
+      const bloqueo = opciones.politica?.bloqueaPorSegundos;
+      return desafio(false, false, bloqueo === undefined ? CUERPO_401 : cuerpoBloqueado(bloqueo));
     }
     // El resumen es bueno: lo que falle ahora es el nonce, no la clave.
     if (nonceUsado !== nonce || vencido()) {
       desafios.vencido += 1;
-      return desafio(true);
+      return nonceRechazado();
     }
     const nc = parseInt(valor(autorizacion, 'nc'), 16);
     if (Number.isNaN(nc) || nc <= ultimoNc) {

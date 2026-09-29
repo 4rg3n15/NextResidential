@@ -96,9 +96,30 @@ export interface PoliticaDeNonceDelEquipo {
   /** Peticiones que admite un nonce. Por omisión, sin límite. */
   readonly usosMaximos?: number;
   readonly ahora?: () => number;
+  /**
+   * E1 (15-M) · cómo contesta a un resumen correcto sobre un nonce que ya no
+   * vale: `stale` (RFC), `sin_desafio` (401 sin `WWW-Authenticate`, la
+   * terminal del 28/09) o `stale_false` (el videoportero del 28/09).
+   */
+  readonly alVencer?: 'stale' | 'sin_desafio' | 'stale_false';
 }
 
 export type AccesoDigest = 'autenticado' | 'sin_credencial' | 'clave' | 'vencido';
+
+/** E1 · cuántos 401 dio el equipo simulado y por qué; el oráculo de C8. */
+export interface DesafiosDelEquipo {
+  readonly primero: number;
+  readonly vencido: number;
+  readonly clave: number;
+}
+
+/** Lo que el equipo contesta cuando NO autentica: cabeceras y cuerpo. */
+export interface RechazoDigest {
+  readonly cabeceras: Record<string, string>;
+  readonly cuerpo: string;
+}
+
+const CUERPO_401 = '<userCheck><statusValue>401</statusValue></userCheck>';
 
 const md5 = (t: string): string => createHash('md5').update(t, 'utf8').digest('hex');
 
@@ -111,6 +132,7 @@ export class DigestDelEquipo {
   private usos = 0;
   private readonly ncUsados = new Set<string>();
   private readonly ahora: () => number;
+  private readonly desafios = { primero: 0, vencido: 0, clave: 0 };
 
   constructor(
     private readonly usuario: string,
@@ -143,6 +165,44 @@ export class DigestDelEquipo {
       `Digest realm="${this.reino}", nonce="${this.vigente()}", qop="auth", ` +
       `stale="${stale ? 'TRUE' : 'FALSE'}"`
     );
+  }
+
+  estadisticas(): DesafiosDelEquipo {
+    return { ...this.desafios };
+  }
+
+  /**
+   * E1 · la respuesta a un acceso que no autenticó. Un nonce vencido se
+   * contesta según `alVencer`; una clave mala, con el cuerpo `userCheck`, y
+   * con el bloqueo declarado si el guion dice cuánto dura.
+   */
+  rechazo(
+    acceso: Exclude<AccesoDigest, 'autenticado'>,
+    bloqueoSegundos: number | null,
+  ): RechazoDigest {
+    if (acceso === 'sin_credencial') {
+      this.desafios.primero += 1;
+      return {
+        cabeceras: { 'www-authenticate': this.cabeceraDeDesafio(false) },
+        cuerpo: CUERPO_401,
+      };
+    }
+    if (acceso === 'vencido') {
+      this.desafios.vencido += 1;
+      const modo = this.politica.alVencer ?? 'stale';
+      if (modo === 'sin_desafio') return { cabeceras: {}, cuerpo: CUERPO_401 };
+      return {
+        cabeceras: { 'www-authenticate': this.cabeceraDeDesafio(modo === 'stale') },
+        cuerpo: CUERPO_401,
+      };
+    }
+    this.desafios.clave += 1;
+    const cuerpo =
+      bloqueoSegundos === null
+        ? CUERPO_401
+        : '<userCheck><statusValue>401</statusValue><statusString>Unauthorized</statusString>' +
+          `<lockStatus>lock</lockStatus><retryTimes>0</retryTimes><unlockTime>${String(bloqueoSegundos)}</unlockTime></userCheck>`;
+    return { cabeceras: { 'www-authenticate': this.cabeceraDeDesafio(false) }, cuerpo };
   }
 
   comprobar(autorizacion: string | null, metodo: string): AccesoDigest {

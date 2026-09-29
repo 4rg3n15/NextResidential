@@ -10,7 +10,7 @@ import {
   escriturasSinCuerpoPor,
   exigeCuerpo,
 } from './comportamientos-de-sitio';
-import type { PoliticaDeNonceDelEquipo } from './comportamientos-de-sitio';
+import type { DesafiosDelEquipo, PoliticaDeNonceDelEquipo } from './comportamientos-de-sitio';
 import { VerificacionRemotaSimulada } from './verificacion-remota-simulada';
 import type { AlEmitir, FlujoEnVivo } from './verificacion-remota-simulada';
 import {
@@ -191,6 +191,8 @@ export interface GuionDeEquipo {
   readonly reinicioNecesario?: boolean;
   /** Rechaza la credencial aunque el Digest sea correcto: cuenta bloqueada. */
   readonly rechazaCredencial?: boolean;
+  /** E1-f (15-M) · con la clave mala, declara la cuenta bloqueada por estos segundos. */
+  readonly cuentaBloqueadaSegundos?: number;
   /** Anexo 15-K · cuándo vence el nonce. Por omisión, a los 20 s. */
   readonly nonce?: PoliticaDeNonceDelEquipo;
   /** A2 (15-L) · la puerta que gobierna esta terminal, para su `doorRight`. */
@@ -290,6 +292,8 @@ export const veredictosRecibidosPor = new Map<string, string[]>();
  * le quitó la plantilla, no a la pantalla que dice que sí.
  */
 export const plantillasPor = new Map<string, ReadonlySet<string>>();
+/** E1 (15-M) · los 401 que dio cada equipo simulado y por qué, por destino. */
+export const desafiosPor = new Map<string, () => DesafiosDelEquipo>();
 
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   /**
@@ -357,6 +361,7 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   const canales: CanalDeAudioSimulado[] = [...(guion.canalesDeAudio ?? CANALES_POR_OMISION)];
   /** Anexo 15-K · el Digest del equipo, con el nonce que vence. */
   const digest = new DigestDelEquipo(guion.usuario, guion.clave, REINO, guion.nonce);
+  if (guion.destino !== undefined) desafiosPor.set(guion.destino, () => digest.estadisticas());
   /** C2 (15-L) · a dónde publica la cámara: lo escrito se vuelve a leer. */
   let receptor = receptorInicial(guion);
 
@@ -413,9 +418,10 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         ? 'clave'
         : digest.comprobar(cabeceras['authorization'] ?? null, metodo);
     if (acceso !== 'autenticado') {
-      return respuestaDe(401, '', {
-        'www-authenticate': digest.cabeceraDeDesafio(acceso === 'vencido'),
-      });
+      // E1 (15-M) · según `alVencer`: con desafío `stale`, sin desafío, o
+      // `stale="FALSE"`; y el `userCheck` con el bloqueo si el guion lo dice.
+      const rechazo = digest.rechazo(acceso, guion.cuentaBloqueadaSegundos ?? null);
+      return respuestaDe(401, rechazo.cuerpo, rechazo.cabeceras);
     }
 
     // Una ruta que el adaptador pide y el catálogo no conoce es un error de

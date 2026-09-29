@@ -20,6 +20,7 @@ export interface RespuestaConfirmable {
   readonly ok: boolean;
   readonly cuerpo: string;
   readonly desafioVencido?: boolean;
+  readonly sinDesafio?: boolean;
 }
 
 export const confirmada = (respuesta: RespuestaConfirmable): boolean => {
@@ -38,6 +39,7 @@ export const exigirConfirmacion = (
   if (!respuesta.ok || (r.statusCode !== null && r.statusCode !== 1)) {
     throw comoErrorNeutral(dispositivoId, respuesta.cuerpo, respuesta.estado, {
       desafioVencido: respuesta.desafioVencido,
+      sinDesafio: respuesta.sinDesafio,
     });
   }
   throw new OrdenSinConfirmar(

@@ -2,6 +2,7 @@ import type { Bitacora } from '@ncr/domain-core';
 import { cnonceAleatorio, interpretarDesafio, sesionDigestCompartida } from '../barrera/digest';
 import type { Renegociacion, SesionDigest } from '../barrera/digest';
 import { intercambioParaBitacora } from './intercambio';
+import { interpretarUserCheck } from './user-check';
 import { CredencialRechazada } from '../nucleo/errores';
 
 /**
@@ -22,8 +23,9 @@ import { CredencialRechazada } from '../nucleo/errores';
  * EL DESAFÍO SE REUTILIZA, Y NO ES COSMÉTICA
  *
  * Cada `401` extra cuenta como intento fallido para el equipo, y estos aparatos
- * **bloquean la cuenta** tras unos pocos. Se renegocia UNA vez por petición y
- * no se insiste: dos rechazos seguidos son credenciales, no caducidad.
+ * **bloquean la cuenta** tras unos pocos. Un `401` al nonce guardado NUNCA es
+ * la clave: se descarta y se hace UN intercambio limpio (E1). Sólo el `401`
+ * que responde a la autenticación de ESE intercambio es la credencial.
  */
 
 export interface OpcionesDeEquipo {
@@ -51,6 +53,12 @@ export interface OpcionesDeEquipo {
   readonly traza?: Bitacora;
   /** Para la bitácora: el equipo al que pertenece este cliente. */
   readonly dispositivoId?: string;
+  /**
+   * E1-c (15-M) · una sesión Digest PROPIA de esta conexión: su desafío y su
+   * `nc`, sin pisar ni heredar los de las demás. La escucha larga la usa. La
+   * marca «credencial rechazada» sigue siendo una por equipo.
+   */
+  readonly sesionPropia?: boolean;
 }
 
 /** Más holgado que el de la barrera: la carga de una plantilla no es un pulso. */
@@ -73,6 +81,11 @@ export interface RespuestaDeEquipo {
    * resumen y rechazó el nonce. NO es una clave errónea.
    */
   readonly desafioVencido?: boolean;
+  /**
+   * E1-b (15-M) · el `401` final llegó a una petición SIN credencial y SIN
+   * `WWW-Authenticate`: no hubo con qué autenticarse. NO es la clave.
+   */
+  readonly sinDesafio?: boolean;
 }
 
 /** Lo que el llamante pide además de la petición en sí. */
@@ -137,7 +150,22 @@ export class EquipoInalcanzable extends Error {
 interface ConDigest {
   readonly respuesta: Response;
   readonly desafioVencido: boolean;
+  readonly sinDesafio: boolean;
 }
+
+/**
+ * Lee el cuerpo SIN consumirlo para quien lo lea después: clona si la respuesta
+ * lo permite (la de `fetch`); una simulada sin `clone` se lee tal cual, porque
+ * su `text()` se puede llamar más de una vez.
+ */
+const leerSinConsumir = async (respuesta: Response): Promise<string> => {
+  try {
+    const legible = typeof respuesta.clone === 'function' ? respuesta.clone() : respuesta;
+    return await legible.text();
+  } catch {
+    return '';
+  }
+};
 
 /** Libera el socket de una respuesta que no se va a leer. */
 const descartar = async (respuesta: Response): Promise<void> => {
@@ -168,7 +196,16 @@ export class ClienteDeEquipo {
       this.base,
       { usuario: opciones.usuario, clave: opciones.clave },
       opciones.generarCnonce ?? cnonceAleatorio,
+      { propia: opciones.sesionPropia === true },
     );
+  }
+
+  /**
+   * E1-e · «Probar conexión»: quien pulsa el botón decide presentar la clave
+   * una vez más, aunque el equipo la rechazara hace un momento.
+   */
+  olvidarRechazo(): void {
+    this.sesion.olvidarRechazo();
   }
 
   async pedir(
@@ -182,7 +219,7 @@ export class ClienteDeEquipo {
     }
     const comienzo = this.ahora();
     try {
-      const { respuesta, desafioVencido } = await this.conDigest(metodo, ruta, () =>
+      const { respuesta, desafioVencido, sinDesafio } = await this.conDigest(metodo, ruta, () =>
         this.enviar(metodo, ruta, cuerpo),
       );
       const texto = await respuesta.text();
@@ -215,6 +252,7 @@ export class ClienteDeEquipo {
         cuerpo: texto,
         latenciaMs,
         ...(desafioVencido ? { desafioVencido: true } : {}),
+        ...(sinDesafio ? { sinDesafio: true } : {}),
       };
     } catch (error) {
       if (error instanceof CredencialRechazada) throw error;
@@ -271,10 +309,11 @@ export class ClienteDeEquipo {
     readonly estado: number;
     readonly tipo: string | null;
     readonly desafioVencido: boolean;
+    readonly sinDesafio: boolean;
     readonly trozos: AsyncIterable<Uint8Array>;
   }> {
     const metodo = peticion?.metodo ?? 'GET';
-    const { respuesta, desafioVencido } = await this.conDigest(metodo, ruta, () =>
+    const { respuesta, desafioVencido, sinDesafio } = await this.conDigest(metodo, ruta, () =>
       this.enviar(metodo, ruta, peticion?.cuerpo, cancelar),
     );
     const cuerpo = respuesta.body;
@@ -300,6 +339,7 @@ export class ClienteDeEquipo {
       estado: respuesta.status,
       tipo: respuesta.headers.get('content-type'),
       desafioVencido,
+      sinDesafio,
       trozos: trozos(),
     };
   }
@@ -342,7 +382,7 @@ export class ClienteDeEquipo {
   ): Promise<RespuestaDeEquipo> {
     const comienzo = this.ahora();
     try {
-      const { respuesta, desafioVencido } = await this.conDigest('PUT', ruta, () =>
+      const { respuesta, desafioVencido, sinDesafio } = await this.conDigest('PUT', ruta, () =>
         this.enviarFlujo('PUT', ruta, cuerpo(), tipo, cancelar),
       );
       return {
@@ -351,6 +391,7 @@ export class ClienteDeEquipo {
         cuerpo: '',
         latenciaMs: this.ahora() - comienzo,
         ...(desafioVencido ? { desafioVencido: true } : {}),
+        ...(sinDesafio ? { sinDesafio: true } : {}),
       };
     } catch (error) {
       if (error instanceof CredencialRechazada) throw error;
@@ -360,14 +401,23 @@ export class ClienteDeEquipo {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════
-   * H-SITIO-12 · UN SOLO REINTENTO, Y EL `401` FINAL CLASIFICADO
+   * E1 (15-M) · QUÉ `401` ES LA CLAVE, Y CUÁL NO
    *
-   * Ante `401` se toma el desafío que trae —compartido con los demás clientes
-   * del mismo equipo— y se repite UNA vez. Si el segundo también es `401`:
+   * En sitio (28/09) la terminal y el videoportero contestaban `401` al nonce
+   * que la escucha larga había negociado y las demás peticiones reutilizaban
+   * —a veces sin `WWW-Authenticate`, a veces con `stale="false"`— y las dos
+   * ramas de aquí lo leían como «usuario o clave». `curl --digest` entraba
+   * porque cada vez hace el intercambio limpio. Ahora:
    *
-   *  · con `stale=true` es un nonce vencido otra vez, NO la clave. Se dice así
-   *    y quien llama lo trata como reintentable;
-   *  · sin él, es la credencial. No se insiste: el equipo bloquea la cuenta.
+   *  (b) un `401` a una petición que viajó con el nonce GUARDADO nunca es la
+   *      clave: se descarta el nonce y se hace UN intercambio limpio —sin
+   *      credencial → `401` con desafío → autenticada—, traiga o no desafío
+   *      ese `401`, diga `stale` lo que diga;
+   *  (a) sólo el `401` que responde a la autenticación de ESE intercambio es
+   *      la credencial (con `stale=true` es un nonce vencido otra vez, no la
+   *      clave), y entonces no se insiste: el equipo bloquea la cuenta (d);
+   *  · un `401` SIN desafío a la petición sin credencial no es la clave —no
+   *    se presentó— y se dice aparte (`sinDesafio`).
    *
    * Aplica igual a órdenes, sondeos y suscripciones: todas pasan por aquí.
    */
@@ -378,57 +428,110 @@ export class ClienteDeEquipo {
   ): Promise<ConDigest> {
     // A5 (15-L) · una credencial que el equipo ya rechazó no se vuelve a
     // presentar: ni orden, ni escucha, ni sondeo. Sin red, sin intento fallido.
-    const hace = this.sesion.rechazadaHace(this.ahora(), VENTANA_DE_CREDENCIAL_RECHAZADA_MS);
+    const ahora = this.ahora();
+    const hace = this.sesion.rechazadaHace(ahora, VENTANA_DE_CREDENCIAL_RECHAZADA_MS);
     if (hace !== null) {
-      throw new CredencialRechazada(this.opciones.dispositivoId ?? this.destino, hace);
+      const segundos = this.sesion.segundosDeBloqueo(ahora);
+      throw new CredencialRechazada(
+        this.opciones.dispositivoId ?? this.destino,
+        hace,
+        segundos === null ? null : { segundosParaDesbloquear: segundos },
+      );
     }
-    // ¿Viaja ya una credencial? Sin desafío previo, el primer 401 es el saludo.
-    const conCredencial = this.sesion.tieneDesafio;
-    const primera = await enviar();
-    if (primera.status !== 401) return { respuesta: primera, desafioVencido: false };
+    let primera = await enviar();
+    if (primera.status !== 401)
+      return { respuesta: primera, desafioVencido: false, sinDesafio: false };
 
-    const renegociacion = this.sesion.renegociar(primera.headers.get('www-authenticate'));
-    if (renegociacion !== null && conCredencial && !renegociacion.vencido) {
-      /**
-       * Anexo 15-K (d) · con credencial enviada, un `401` SIN `stale` es la
-       * credencial: no se repite. Un segundo intento con la misma clave sólo
-       * suma un fallo más hacia el bloqueo de la cuenta del equipo.
-       */
-      this.sesion.marcarRechazada(this.ahora());
+    if (this.sesion.tieneDesafio) {
+      // (b) · viajó con el nonce guardado y el equipo lo rechazó: no vale. Se
+      // descarta y se negocia otro desde cero, en ESTE intercambio.
+      const stale = interpretarDesafio(primera.headers.get('www-authenticate'))?.stale;
       this.opciones.traza?.registrar(
-        'error',
-        'el equipo rechazó usuario o clave (401 sin stale): NO se reintenta',
+        'info',
+        'el equipo rechazó el nonce guardado: se descarta y se negocia limpio (NO es la clave)',
+        {
+          ...this.contexto(),
+          metodo,
+          ruta,
+          conDesafio: stale !== undefined,
+          stale: stale ?? null,
+        },
+      );
+      this.sesion.descartarDesafio();
+      await descartar(primera);
+      primera = await enviar();
+      if (primera.status !== 401) {
+        return { respuesta: primera, desafioVencido: false, sinDesafio: false };
+      }
+    }
+
+    // Aquí `primera` es el 401 a una petición SIN credencial: el saludo.
+    const renegociacion = this.sesion.renegociar(primera.headers.get('www-authenticate'));
+    if (renegociacion === null) {
+      this.opciones.traza?.registrar(
+        'aviso',
+        'el equipo contestó 401 SIN desafío Digest a una petición sin credencial: no es la clave',
         { ...this.contexto(), metodo, ruta },
       );
-      return { respuesta: primera, desafioVencido: false };
-    }
-    if (renegociacion === null) {
-      this.opciones.traza?.registrar('aviso', 'el equipo contestó 401 SIN desafío Digest', {
-        ...this.contexto(),
-        metodo,
-        ruta,
-      });
-      return { respuesta: primera, desafioVencido: false };
+      return { respuesta: primera, desafioVencido: false, sinDesafio: true };
     }
     this.anotarRenegociacion(renegociacion, metodo, ruta);
     await descartar(primera);
 
     const segunda = await enviar();
-    if (segunda.status !== 401) return { respuesta: segunda, desafioVencido: false };
+    if (segunda.status !== 401)
+      return { respuesta: segunda, desafioVencido: false, sinDesafio: false };
 
+    // (a) · 401 limpio → autenticación → 401: la credencial, salvo `stale`.
     const cabecera = segunda.headers.get('www-authenticate');
     const vencido = interpretarDesafio(cabecera)?.stale === true;
     // Se guarda para la PRÓXIMA petición; ésta no se repite.
     this.sesion.renegociar(cabecera);
-    if (!vencido) this.sesion.marcarRechazada(this.ahora());
+    if (!vencido) await this.marcarRechazada(segunda, metodo, ruta);
+    else {
+      this.opciones.traza?.registrar(
+        'aviso',
+        'el equipo venció el desafío Digest recién negociado: NO es la clave',
+        { ...this.contexto(), metodo, ruta },
+      );
+    }
+    return { respuesta: segunda, desafioVencido: vencido, sinDesafio: false };
+  }
+
+  /**
+   * (d) · UN intento fallido real por credencial. Se lee el cuerpo del `401`
+   * (E1-f): si el equipo declara la cuenta bloqueada y por cuánto, la marca
+   * dura eso; si no, la ventana de A5.
+   */
+  private async marcarRechazada(respuesta: Response, metodo: string, ruta: string): Promise<void> {
+    const comprobacion = interpretarUserCheck(await leerSinConsumir(respuesta));
+    const bloqueoMs =
+      comprobacion?.bloqueada === true && comprobacion.segundosParaDesbloquear !== null
+        ? comprobacion.segundosParaDesbloquear * 1000
+        : null;
+    this.sesion.marcarRechazada(this.ahora(), bloqueoMs);
+    // (d) · y se olvida el desafío: cuando se vuelva a presentar —pasada la
+    // ventana o por «Probar conexión»— será UN intercambio limpio, un solo
+    // resumen malo, no una preventiva más una renegociada.
+    this.sesion.descartarDesafio();
     this.opciones.traza?.registrar(
-      vencido ? 'aviso' : 'error',
-      vencido
-        ? 'el equipo venció el desafío Digest dos veces seguidas: NO es la clave'
-        : 'el equipo rechazó usuario o clave tras renegociar el Digest: NO se reintenta',
-      { ...this.contexto(), metodo, ruta },
+      'error',
+      comprobacion?.bloqueada === true
+        ? 'el equipo declara la cuenta BLOQUEADA: NO se reintenta'
+        : 'el equipo rechazó usuario o clave en un intercambio limpio: NO se reintenta',
+      {
+        ...this.contexto(),
+        metodo,
+        ruta,
+        ...(comprobacion === null
+          ? {}
+          : {
+              bloqueada: comprobacion.bloqueada,
+              segundosParaDesbloquear: comprobacion.segundosParaDesbloquear,
+              intentosRestantes: comprobacion.intentosRestantes,
+            }),
+      },
     );
-    return { respuesta: segunda, desafioVencido: vencido };
   }
 
   private anotarRenegociacion(r: Renegociacion, metodo: string, ruta: string): void {

@@ -26,8 +26,8 @@ import { URL_BASE, exigirBase } from './base-exigida';
  *
  * Lectura de placa → `POST /alarm-server/<secreto>` (el sobre multipart tal
  * como lo emite el firmware) → decisión del motor → `AccionadorPorProveedor`
- * → adaptador Hikvision → `ControlDeBarreraVehicular` → Digest → `PUT
- * …/barrierGate` en la cámara → evento. Es la única ruta verificada con
+ * → adaptador del fabricante → control de barrera → Digest → la orden de
+ * apertura en la cámara → evento. Es la única ruta verificada con
  * hardware, y la ETAPA 15-M toca la ingesta y el cliente Digest que hay
  * debajo: esta suite se escribió ANTES y sus aserciones no cambian.
  *

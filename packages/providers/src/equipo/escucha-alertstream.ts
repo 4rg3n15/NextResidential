@@ -5,6 +5,7 @@ import {
   motivoDeDescarte,
 } from '../hikvision/contratos-de-evento';
 import { ClienteDeEquipo } from './cliente';
+import { interpretarUserCheck } from './user-check';
 import { CredencialRechazada } from '../nucleo/errores';
 import { lectorPara } from './partes-del-flujo';
 import type { ParteDelFlujo as ParteCruda } from './partes-del-flujo';
@@ -82,7 +83,9 @@ export class EscuchaDeAlertStream {
   private readonly ahora: () => number;
 
   constructor(private readonly opciones: OpcionesDeEscucha) {
-    this.cliente = new ClienteDeEquipo(opciones);
+    // E1-c (15-M) · la escucha negocia SU desafío: el nonce de una conexión
+    // que dura horas no pisa el de las órdenes ni hereda el suyo.
+    this.cliente = new ClienteDeEquipo({ ...opciones, sesionPropia: true });
     this.ahora = opciones.ahora ?? (() => Date.now());
     this.esperar = opciones.esperar ?? ((ms) => new Promise((listo) => setTimeout(listo, ms)));
     this.azar = opciones.azar ?? Math.random;
@@ -221,11 +224,21 @@ export class EscuchaDeAlertStream {
       this.anotar('error', 'escucha: el equipo rechazó la conexión', {
         estadoHttp: flujo.estado,
         desafioVencido: flujo.desafioVencido,
+        sinDesafio: flujo.sinDesafio,
         cuerpo: recortado(sinSecretos(cuerpo), 512),
         ...(ocupada === null ? {} : { motivo: ocupada.frase, clase: ocupada.clase }),
       });
-      if (flujo.estado === 401 && !flujo.desafioVencido) {
-        throw new CredencialRechazada(this.opciones.dispositivoId);
+      // E1 (15-M) · sólo el 401 a la autenticación del intercambio limpio es
+      // la clave; sin desafío o con el nonce vencido, se vuelve a intentar.
+      if (flujo.estado === 401 && !flujo.desafioVencido && !flujo.sinDesafio) {
+        const comprobacion = interpretarUserCheck(cuerpo);
+        throw new CredencialRechazada(
+          this.opciones.dispositivoId,
+          undefined,
+          comprobacion?.bloqueada === true
+            ? { segundosParaDesbloquear: comprobacion.segundosParaDesbloquear }
+            : null,
+        );
       }
       throw new Error(
         ocupada?.frase ?? `el equipo contestó HTTP ${String(flujo.estado)} a la escucha`,

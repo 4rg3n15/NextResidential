@@ -114,6 +114,11 @@ export class ReinicioNecesario extends ErrorDeEquipo {
  * Credencial rechazada. **Nunca se reintenta en bucle**: el aparato bloquea
  * la cuenta de servicio tras unos pocos intentos y hay que ir a desbloquearla.
  */
+export interface BloqueoDeclarado {
+  /** Segundos hasta el desbloqueo, si el equipo los dijo. */
+  readonly segundosParaDesbloquear: number | null;
+}
+
 export class CredencialRechazada extends ErrorDeEquipo {
   readonly reintentable = false;
   constructor(
@@ -124,15 +129,53 @@ export class CredencialRechazada extends ErrorDeEquipo {
      * el equipo ahora.
      */
     readonly rechazadaHaceMs?: number,
+    /**
+     * E1-f (15-M) · el equipo dijo en el cuerpo que la cuenta está BLOQUEADA
+     * (`lockStatus`/`unlockTime`): no es una clave mal escrita, es un bloqueo
+     * que vence solo. `null` = no declaró bloqueo.
+     */
+    readonly bloqueo: BloqueoDeclarado | null = null,
   ) {
+    super(dispositivoId, CredencialRechazada.texto(dispositivoId, rechazadaHaceMs, bloqueo));
+  }
+
+  private static texto(
+    dispositivoId: string,
+    hace: number | undefined,
+    bloqueo: BloqueoDeclarado | null,
+  ): string {
+    const tiempo =
+      bloqueo === null
+        ? ''
+        : bloqueo.segundosParaDesbloquear === null
+          ? ' (el equipo declara la cuenta BLOQUEADA)'
+          : ` (el equipo declara la cuenta BLOQUEADA: se desbloquea en ${String(bloqueo.segundosParaDesbloquear)} s)`;
+    if (hace === undefined || hace < 60_000) {
+      return (
+        `El equipo ${dispositivoId} acaba de rechazar el usuario o la clave${tiempo}. NO se ` +
+        'reintenta: estos aparatos bloquean la cuenta tras unos pocos intentos fallidos'
+      );
+    }
+    return (
+      `Credencial rechazada por el equipo ${dispositivoId} hace ` +
+      `${String(Math.round(hace / 60_000))} min${tiempo}: no se vuelve a presentar hasta que se ` +
+      'corrija en la consola o se pulse «Probar conexión», para que el equipo no bloquee esta dirección'
+    );
+  }
+}
+
+/**
+ * E1-b (15-M) · el equipo contestó `401` a una petición SIN credencial y SIN
+ * `WWW-Authenticate`: no hay con qué autenticarse, y NO es la clave —nunca se
+ * presentó—. Se reintenta más tarde, como un fallo pasajero del equipo.
+ */
+export class SinDesafioDigest extends ErrorDeEquipo {
+  readonly reintentable = true;
+  constructor(dispositivoId: string) {
     super(
       dispositivoId,
-      rechazadaHaceMs === undefined
-        ? `El equipo ${dispositivoId} rechazó el usuario o la clave. NO se reintenta: estos ` +
-            'aparatos bloquean la cuenta tras unos pocos intentos fallidos'
-        : `Credencial rechazada por el equipo ${dispositivoId} hace ` +
-            `${String(Math.round(rechazadaHaceMs / 60_000))} min: no se vuelve a presentar ` +
-            'hasta que se corrija en la consola, para que el equipo no bloquee esta dirección',
+      `El equipo ${dispositivoId} contestó 401 sin ofrecer un desafío Digest: no se pudo ` +
+        'autenticar y no es la clave (no se presentó). Reintente en unos segundos',
     );
   }
 }

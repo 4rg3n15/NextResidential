@@ -83,6 +83,13 @@ export class SondaPorProveedor implements SondaDeEquipo {
       usuario: datos.usuario,
       clave: datos.secreto,
       familia: familiaDe(datos.tipo),
+      /**
+       * E1-e (15-M) · esta sonda la dispara una PERSONA (alta, edición,
+       * «Probar conexión», diagnóstico): si el equipo rechazó la clave hace
+       * un rato, aquí se decide presentarla una vez más. El sondeo periódico
+       * no pasa por aquí y respeta la marca.
+       */
+      olvidarRechazo: true,
       ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
       ...(this.traza === undefined ? {} : { traza: this.traza }),
       ...(datos.canalBarrera === undefined || datos.canalBarrera === null

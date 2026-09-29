@@ -505,7 +505,13 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
   }
 
   private exigir(
-    respuesta: { ok: boolean; cuerpo: string; estado: number; desafioVencido?: boolean },
+    respuesta: {
+      ok: boolean;
+      cuerpo: string;
+      estado: number;
+      desafioVencido?: boolean;
+      sinDesafio?: boolean;
+    },
     proposito: string,
     ruta: string,
     dispositivoId: string,

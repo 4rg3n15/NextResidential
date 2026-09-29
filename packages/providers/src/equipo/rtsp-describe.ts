@@ -170,11 +170,22 @@ export const describirRtsp = async (opciones: OpcionesRtsp): Promise<ResultadoRt
           : `Basic ${Buffer.from(`${opciones.usuario}:${opciones.clave}`).toString('base64')}`;
       respuesta = await conexion.pedir(peticion(2, autorizacion));
       if (respuesta.estado === 401) {
+        // E1-g (15-M) · fue un intercambio limpio (DESCRIBE sin credencial →
+        // 401 → DESCRIBE autenticada), así que este 401 sí es la credencial.
+        // Se anota QUÉ ofreció el equipo y QUÉ esquema se envió, sin la clave,
+        // para que la visita compare con el panel del aparato.
+        const ofrecido =
+          desafio === null
+            ? `sin desafío Digest (cabecera: ${oferta === null ? 'ausente' : oferta.slice(0, 80)})`
+            : `Digest realm="${desafio.realm}", qop=${desafio.qop ?? 'ninguno'}, algorithm=${desafio.algorithm}`;
         return {
           clase: 'credencial',
           estado: 401,
           codec: null,
-          detalle: 'el equipo rechazó la credencial por RTSP (no se reintenta)',
+          detalle:
+            'el equipo rechazó la credencial por RTSP en un intercambio limpio (no se reintenta) · ' +
+            `ofreció ${ofrecido} · se envió ${desafio === null ? 'Basic' : 'Digest'} con el usuario ` +
+            `«${opciones.usuario}»`,
         };
       }
     }
