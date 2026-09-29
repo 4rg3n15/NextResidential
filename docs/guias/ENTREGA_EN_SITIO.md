@@ -9,7 +9,8 @@
 > Documentos de apoyo: [`INTEGRACION_HIKVISION.md`](INTEGRACION_HIKVISION.md)
 > (cada equipo en detalle), [`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md)
 > (la hoja de los 16 escenarios), [`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) (la app
-> en el iPhone).
+> en el iPhone) y, desde la 15-M, [`VISITA-29-09.md`](VISITA-29-09.md) (los ajustes
+> en el panel web de cada equipo y cómo los comprueba la plataforma).
 
 ## Índice
 
@@ -36,10 +37,12 @@ Con Internet, en la oficina:
    `.sitio/go2rtc.yaml` escrito desde el `.env`. Anote el SHA-256 que imprime.
 3. `pnpm sitio:ensayo -- --simulado`: el ensayo entero contra los equipos
    simulados. Tiene que terminar en `VEREDICTO: SIN FALLOS`. Si no, no salga.
-4. En `apps/api/.env`, los tres equipos: `BARRERA_*`, `TERMINAL_*`,
-   `VIDEOPORTERO_*` (`HOST`, `PUERTO`, `USUARIO`, `CLAVE`, `CANAL`), con el
-   usuario de servicio de cada uno. **Sólo en ese fichero**: ni en la hoja, ni en
-   un documento, ni en una foto.
+4. **Los equipos, en la consola** (Dispositivos → alta), N de cada tipo, con su
+   IP, usuario y credencial: el ensayo, la puesta en marcha y el respaldo los
+   leen de ahí (15-M, C6). `BARRERA_*`, `TERMINAL_*` y `VIDEOPORTERO_*`
+   (`HOST`, `PUERTO`, `USUARIO`, `CLAVE`, `CANAL`) en `apps/api/.env` quedan de
+   respaldo, sólo si la base no está. Las credenciales, **sólo en la consola o en
+   ese fichero**: ni en la hoja, ni en un documento, ni en una foto.
 5. La app en el iPhone, **compilada en Release** con el nombre `.local` del Mac
    (`--dart-define=API_URL=http://<nombre>.local:3000`), instalada **una sola
    vez** con cable y abierta después desde el ícono, sin cable ni Mac conectado
@@ -145,8 +148,11 @@ pnpm sitio:ensayo -- --capturar=$HOME/ncr-sitio/respaldo
 Guarda, por equipo, la configuración que la entrega puede cambiar: quién
 controla la barrera, a qué receptor publica la cámara, su disparador y su país;
 si la terminal espera el veredicto; los canales de audio del videoportero.
-Ficheros `0600`, uno por equipo. Un documento que lleve una contraseña se guarda
-**sin ella** y queda marcado «se restaura a mano».
+Ficheros `0600`, uno por equipo, con la familia y el número de serie del aparato
+en el nombre (15-M). Si dos fichas dan la misma serie —dos entradas con la IP
+del mismo equipo—, la segunda no pisa a la primera: se dice y cuenta como
+fallo. Un documento que lleve una contraseña se guarda **sin ella** y queda
+marcado «se restaura a mano».
 
 **Después, las comprobaciones del Mac**, sin mover nada:
 
@@ -193,7 +199,8 @@ escriba el motivo («entrega en sitio») y pulse **«Enviar eventos a este Mac»
 
 - la API toma la IP del Mac **en la red de la cámara** (o
   `ALARM_SERVER_IP_ANUNCIADA` si la definió), el puerto de la API y la ruta con
-  el secreto de `ALARM_SERVER_EQUIPOS`;
+  el secreto de **esa** cámara: el que la API emitió al darla de alta en la
+  consola o, para la cámara del 28/09, el de `ALARM_SERVER_EQUIPOS` (15-M, C6);
 - la escribe en el servidor de alarmas de la cámara y **la lee de vuelta**: sólo
   dice «aplicada» si la cámara quedó apuntando ahí;
 - queda en la auditoría con la dirección anterior y la nueva (nunca el secreto).
@@ -343,8 +350,8 @@ pnpm sitio:ensayo -- --restaurar=$HOME/ncr-sitio/respaldo
 Por cada documento: `igual` (no se tocó), `restaurado` (se escribió **y se
 releyó igual**), `fallo` (el equipo dijo «OK» pero la lectura no coincide:
 hágalo en su panel web) o `no_restaurable` (llevaba contraseña o no se pudo
-leer al capturarlo: a mano). Un respaldo de otro equipo —otra serie— no se
-aplica. La hora y la zona **no** se restauran: se dejan bien.
+leer al capturarlo: a mano). Cada equipo busca **su** respaldo por familia y
+número de serie; uno de otro equipo —otra serie u otra familia— no se aplica. La hora y la zona **no** se restauran: se dejan bien.
 
 La persona de prueba del paso 6 ya se dio de baja en el ensayo; si el ensayo
 dijo lo contrario, bórrela en el panel de la terminal por su número (`ENSAYO…`).
