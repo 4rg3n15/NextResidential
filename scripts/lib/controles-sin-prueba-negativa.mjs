@@ -64,6 +64,10 @@ const NEGATIVAS = 'scripts/lib/pruebas-negativas.mjs';
 const EXENTOS = new Map([
   ['scripts/lib/con-limite.mjs', 'envoltorio de tiempo límite: no juzga, solo mata'],
   ['scripts/lib/pruebas-negativas.mjs', 'ES la suite negativa; probarse a sí misma no añade nada'],
+  [
+    'scripts/lib/go2rtc-para-pruebas.mjs',
+    'prepara el binario de go2rtc para el paso 5, no juzga: si no lo consigue, las pruebas se saltan y la comprobación de saltadas (con su negativa) lo pone en rojo',
+  ],
 ]);
 
 /**

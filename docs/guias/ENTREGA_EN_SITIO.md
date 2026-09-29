@@ -110,8 +110,11 @@ expected key`. Se escribe con **permisos 0600**, y si en el fichero quedó un
   el guion **lo retira al arrancar y al cerrar** y lo dice por pantalla.
 - La API registra cada flujo con **`PATCH /api/streams`** (antes `PUT`): el
   flujo vive **en memoria** y go2rtc **no escribe nada al fichero**, así que la
-  credencial del equipo no toca el disco (RN-21). `GET /api/streams` la
-  devuelve tachada (`rtsp://***@…`).
+  credencial del equipo no toca el disco (RN-21). **Ojo:** la versión oficial
+  de go2rtc (v1.9.14) devuelve esa fuente **en claro** por `GET /api/streams`;
+  la compilación de camera.ui la tachaba. Por eso la API de go2rtc escucha
+  sólo en `127.0.0.1` y `pnpm sitio:video` se niega a abrirla a la red sin
+  `--api-en-red`: sólo la lee quien ya está en el Mac.
 - La fuente lleva **`#backchannel=0`**. Sin él, go2rtc pide en el DESCRIBE el
   canal de retorno ONVIF (`Require: www.onvif.org/ver20/backchannel`); un
   equipo que cierra la conexión ante eso —y rechaza la reconexión inmediata—

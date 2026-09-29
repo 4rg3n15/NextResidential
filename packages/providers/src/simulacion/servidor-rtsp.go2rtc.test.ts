@@ -80,7 +80,11 @@ describe.skipIf(binario === null)(
       expect(puente.yaml()).not.toMatch(/rtsp:\/\//);
       const lista = await (await fetch(`${puente.url}/api/streams`)).text();
       expect(lista).toContain('ncr-patch');
-      expect(lista).not.toContain(CLAVE);
+      // 15-M · lo que se garantiza es el DISCO, no la API de go2rtc: la versión
+      // OFICIAL v1.9.14 devuelve la fuente EN CLARO por `GET /api/streams` (la
+      // compilación de camera.ui la tachaba, y con ella se escribió esta prueba).
+      // Por eso esa API sólo escucha en 127.0.0.1 (`pnpm sitio:video` se niega a
+      // otra dirección sin `--api-en-red`) y la plataforma nunca la reenvía.
     });
 
     it('sin #backchannel=0 el equipo cierra (HTTP 500 · EOF); con él, hay SDP', async () => {

@@ -14,12 +14,12 @@
     "lint": {},
     "test": {
       "dependsOn": ["^build"],
-      "env": ["DATABASE_URL_PRUEBAS", "NCR_BASE_EXIGIDA", "NCR_CLAIMS_ARRANQUE"]
+      "env": ["DATABASE_URL_PRUEBAS", "NCR_BASE_EXIGIDA", "NCR_CLAIMS_ARRANQUE", "GO2RTC_BIN"]
     },
     "test:cobertura": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
-      "env": ["DATABASE_URL_PRUEBAS", "NCR_BASE_EXIGIDA", "NCR_CLAIMS_ARRANQUE"]
+      "env": ["DATABASE_URL_PRUEBAS", "NCR_BASE_EXIGIDA", "NCR_CLAIMS_ARRANQUE", "GO2RTC_BIN"]
     }
   }
 }
