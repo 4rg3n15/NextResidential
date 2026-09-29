@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { AtestacionDeEquipoDto } from './dtos-atestacion';
+import { EstadoDelEquipoDto } from './dto-estado-del-equipo';
 import {
   IsBoolean,
   IsIn,
@@ -253,6 +254,34 @@ export class EquipoDto {
       'nunca se atestó.',
   })
   atestacion!: AtestacionDeEquipoDto | null;
+  /** E5 (15-M) · el estado unificado: lista, ficha y tablero, el mismo criterio. */
+  @ApiProperty({ type: EstadoDelEquipoDto }) estadoDelEquipo!: EstadoDelEquipoDto;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) sondeadoEn!: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Cuándo se leyeron modelo y firmware del propio equipo («dato del …»)',
+  })
+  identidadLeidaEn!: string | null;
+}
+
+/**
+ * C6 (15-M) · la respuesta del ALTA. Es un `EquipoDto` más el secreto con el
+ * que la cámara publicará en el Alarm Server, que la API acaba de emitir y que
+ * sale por aquí UNA sola vez: ninguna lectura posterior lo devuelve, y «Enviar
+ * eventos a este Mac» lo escribe en la cámara sin enseñarlo. `null` para todo
+ * lo que no es una cámara LPR.
+ */
+export class EquipoCreadoDto extends EquipoDto {
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Secreto de Alarm Server de la cámara, emitido en el alta y mostrado SOLO aquí. ' +
+      'La ruta que la cámara publica es /alarm-server/<secreto>. `null` si no es cámara LPR.',
+  })
+  secretoDelAlarmServer!: string | null;
 }
 
 /**
@@ -288,7 +317,20 @@ export class DocumentoCrudoDelEquipoDto {
   @ApiProperty({ type: String }) contenido!: string;
 }
 
+/** E4 (15-M) · a dónde publica el equipo, con la ruta sin su secreto. */
+export class ReceptorDeLaFichaDto {
+  @ApiProperty({ type: String, nullable: true }) host!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) puerto!: number | null;
+  @ApiProperty({ type: String, description: 'La ruta con el secreto oculto: /alarm-server/••••' })
+  ruta!: string;
+}
+
 export class FichaDelEquipoDto {
+  @ApiPropertyOptional({
+    type: [ReceptorDeLaFichaDto],
+    description: 'E4 · los receptores («HTTP listening») que el equipo tiene escritos',
+  })
+  receptores?: ReceptorDeLaFichaDto[];
   @ApiProperty({ type: String, nullable: true }) modelo!: string | null;
   @ApiProperty({ type: String, nullable: true }) firmware!: string | null;
   @ApiProperty({ type: String, nullable: true }) serie!: string | null;
@@ -350,6 +392,15 @@ export class ResultadoDeSondeoDto {
   @ApiProperty({ type: String, nullable: true }) firmware!: string | null;
   @ApiProperty({ type: Number, nullable: true }) latenciaMs!: number | null;
   @ApiProperty({ type: Boolean }) verificado!: boolean;
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description:
+      'E5 · 10 · cuando el sondeo actual no leyó modelo y firmware, la fecha en que se leyeron ' +
+      'los que se enseñan («dato del DD-MM-YYYY»). Ausente o nulo = son de este sondeo.',
+  })
+  identidadDel?: string | null;
   @ApiPropertyOptional({
     type: FichaDelEquipoDto,
     description:

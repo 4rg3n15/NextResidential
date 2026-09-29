@@ -13,6 +13,8 @@ import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
 import { EstadoCargando, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useAlertasAbiertas, useNombresDeEquipos } from '@/lib/api/consultas';
+import { fechaYHora } from '@/lib/fechas';
+import { AlertasAbiertas } from './alertas-abiertas';
 import { abrirCanal } from '@/lib/sse/canal';
 import type { EstadoDelCanal } from '@/lib/sse/canal';
 import { ORIGEN, TIPOS_DE_LA_LINEA } from './tipos-de-evento';
@@ -221,12 +223,21 @@ export const PantallaDeEventos = ({
           <ul className="mt-1 space-y-0.5">
             {criticas.slice(0, 4).map((a) => (
               <li key={a.id} className="text-secundario text-peligro-texto">
-                {a.tipo} · {new Date(a.generadaEn).toLocaleString('es-CO')}
+                {a.tipo.replace(/_/g, ' ')} ·{' '}
+                {a.dispositivoId === null ? '' : `${nombreDe(a.dispositivoId)} · `}
+                {fechaYHora(a.generadaEn)}
               </li>
             ))}
           </ul>
         </div>
       ) : null}
+
+      {/* E5 / C7 (15-M) · la cola entera, filtrable, con archivo lógico y motivo. */}
+      <AlertasAbiertas
+        copropiedadId={copropiedadId}
+        nombreDe={nombreDe}
+        equipos={(equipos.data ?? []).map((e) => ({ id: e.id, nombre: e.nombre }))}
+      />
 
       {consulta.isLoading ? <EstadoCargando etiqueta="Cargando eventos" /> : null}
 

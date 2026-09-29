@@ -1,4 +1,12 @@
-import type { Acceso, Alerta, FiltroDeEventos, TipoDeEvento } from '@ncr/domain-core';
+import type {
+  Acceso,
+  Alerta,
+  EstadoDeAlerta,
+  FiltroDeEventos,
+  Severidad,
+  TipoDeAlerta,
+  TipoDeEvento,
+} from '@ncr/domain-core';
 import type { MotivoAcceso, ResultadoAcceso } from '@ncr/domain-core';
 
 /**
@@ -58,10 +66,47 @@ export interface RepositorioEventos {
   porId(copropiedadId: string, eventoId: string): Promise<EventoRegistrado | null>;
 }
 
+/** E5 (15-M) · lo justo de la última alerta de un (equipo, tipo, clave) para deduplicar. */
+export interface UltimaAlerta {
+  readonly id: string;
+  readonly generadaEn: Date;
+  readonly estado: EstadoDeAlerta;
+  readonly archivada: boolean;
+}
+
+/** E5 (15-M) · filtros de la cola de alertas de la consola. */
+export interface FiltroDeAlertas {
+  readonly dispositivoId?: string | null;
+  readonly severidad?: Severidad | null;
+  readonly tipo?: TipoDeAlerta | null;
+}
+
 export interface RepositorioAlertas {
   guardar(alerta: Alerta, actorId: string): Promise<void>;
   porId(copropiedadId: string, alertaId: string): Promise<Alerta | null>;
-  abiertasDe(copropiedadId: string): Promise<readonly Alerta[]>;
+  /** Abiertas y en atención, NO archivadas, con filtros opcionales. */
+  abiertasDe(copropiedadId: string, filtro?: FiltroDeAlertas): Promise<readonly Alerta[]>;
+  /**
+   * La más reciente del mismo equipo y tipo —y clave, si se da: el prefijo
+   * `[clave]` de las notas—, archivada o no. `null` si nunca hubo.
+   */
+  ultimaDe(
+    copropiedadId: string,
+    dispositivoId: string,
+    tipo: TipoDeAlerta,
+    clave?: string,
+  ): Promise<UltimaAlerta | null>;
+  /**
+   * Archivo LÓGICO con motivo y autor (RN-19): la fila queda; deja de listarse.
+   * Devuelve cuántas se archivaron (las ya archivadas o ajenas no cuentan).
+   */
+  archivar(
+    copropiedadId: string,
+    alertaIds: readonly string[],
+    motivo: string,
+    actorId: string,
+    ahora: Date,
+  ): Promise<number>;
 }
 
 /**
@@ -98,9 +143,27 @@ export interface LatidoDeDispositivo {
   readonly ultimoLatido: Date | null;
 }
 
+/** E5 (15-M) · lo que el latido supo del equipo, para escribirlo en la base (0044). */
+export interface EstadoObservado {
+  readonly estadoSalud: 'saludable' | 'degradado' | 'caido';
+  /** `null` cuando no se sondeó (bastó la señal de la escucha). */
+  readonly sondeo: 'alcanzado' | 'credencial' | 'inalcanzable' | null;
+  readonly credencialRechazada: boolean;
+}
+
 export interface RepositorioDispositivos {
   latidos(copropiedadId: string): Promise<readonly LatidoDeDispositivo[]>;
   registrarLatido(copropiedadId: string, dispositivoId: string, ahora: Date): Promise<void>;
+  /**
+   * E5 (15-M) · escribe `estado_salud` CON LA REALIDAD que el latido observó
+   * (antes nadie lo escribía: valía `saludable` en un equipo inalcanzable).
+   */
+  registrarEstado(
+    copropiedadId: string,
+    dispositivoId: string,
+    observado: EstadoObservado,
+    ahora: Date,
+  ): Promise<void>;
 }
 
 /**

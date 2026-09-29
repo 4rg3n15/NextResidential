@@ -106,6 +106,8 @@ export interface ReceptorEsperado {
 
 export interface EquipoDeEnsayo extends OpcionesDeEquipo {
   readonly familia: FamiliaDeEnsayo;
+  /** C6 (15-M) · el nombre de la ficha, cuando el equipo viene del registro (N por familia). */
+  readonly nombre?: string;
   /** Carril de la cámara o puerta de la terminal y del videoportero. */
   readonly puerta: number;
   /** `102` por omisión: el subflujo (D2). */

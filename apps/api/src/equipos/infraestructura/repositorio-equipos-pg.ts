@@ -4,6 +4,7 @@ import type { ContextoTenant } from '../../autenticacion';
 import { PROPOSITOS, cifrar, descifrar, derivarLlave } from '../../comun/cripto/sobre-aes-gcm';
 import type {
   AltaDeEquipo,
+  ClaseDeSondeo,
   DatosDeEquipo,
   EstadoDeVerificacion,
   ModoDeTerminalDeclarado,
@@ -65,14 +66,36 @@ interface FilaDeEquipo {
   readonly verificado_en: Date | null;
   readonly motivo_no_verificado: string | null;
   readonly estado: 'activo' | 'inactivo';
+  readonly ultimo_latido: Date | null;
+  readonly sondeado_en: Date | null;
+  readonly ultimo_sondeo: ClaseDeSondeo | null;
+  readonly identidad_leida_en: Date | null;
+  readonly credencial_rechazada_en: Date | null;
+  readonly estado_salud: 'saludable' | 'degradado' | 'caido';
+  readonly periodo_latido_s: string | null;
+  readonly latidos_tolerados: number | null;
+  readonly umbral_latido_s: string | null;
 }
 
+/**
+ * E5 (0044) · las señales del estado y el umbral de la copropiedad van en la
+ * misma lectura: la lista y el tablero deciden con el MISMO criterio.
+ */
 const CAMPOS = `
   id, nombre, tipo::text AS tipo, host, puerto, protocolo::text AS protocolo, usuario,
   modelo, firmware, fabricante, canal_barrera, numero_de_puerta, canal_de_audio,
   modo_de_terminal, canal_de_audio_habilitado, canal_de_video, zona_id, capacidades,
   verificacion::text AS verificacion, verificado_en, motivo_no_verificado,
-  estado::text AS estado`;
+  estado::text AS estado, ultimo_latido, sondeado_en, ultimo_sondeo, identidad_leida_en,
+  credencial_rechazada_en, estado_salud::text AS estado_salud,
+  (SELECT extract(epoch FROM co.periodo_latido) FROM public.copropiedades co
+     WHERE co.id = dispositivos.copropiedad_id) AS periodo_latido_s,
+  (SELECT co.latidos_tolerados FROM public.copropiedades co
+     WHERE co.id = dispositivos.copropiedad_id) AS latidos_tolerados,
+  (SELECT extract(epoch FROM co.umbral_latido_dispositivo) FROM public.copropiedades co
+     WHERE co.id = dispositivos.copropiedad_id) AS umbral_latido_s`;
+
+const iso = (d: Date | null): string | null => (d === null ? null : d.toISOString());
 
 const aDatos = (f: FilaDeEquipo): DatosDeEquipo => ({
   id: f.id,
@@ -98,7 +121,46 @@ const aDatos = (f: FilaDeEquipo): DatosDeEquipo => ({
   verificadoEn: f.verificado_en === null ? null : f.verificado_en.toISOString(),
   motivoNoVerificado: f.motivo_no_verificado,
   estado: f.estado,
+  ultimoLatido: iso(f.ultimo_latido),
+  sondeadoEn: iso(f.sondeado_en),
+  ultimoSondeo: f.ultimo_sondeo,
+  identidadLeidaEn: iso(f.identidad_leida_en),
+  credencialRechazadaEn: iso(f.credencial_rechazada_en),
+  estadoSalud: f.estado_salud,
+  umbralDeLatido:
+    f.periodo_latido_s === null || f.latidos_tolerados === null || f.umbral_latido_s === null
+      ? null
+      : {
+          periodoSegundos: Number(f.periodo_latido_s),
+          latidosTolerados: Number(f.latidos_tolerados),
+          silencioParaCaidoSegundos: Number(f.umbral_latido_s),
+        },
 });
+
+/**
+ * E5 (0044) · anota el sondeo que acaba de hacerse: cuándo, con qué desenlace,
+ * si leyó modelo y firmware, y si el equipo rechazó la clave. Un guardado SIN
+ * sondear no anota nada: sería afirmar un sondeo que no hubo.
+ */
+const anotarSondeo = async (
+  c: PoolClient,
+  copropiedadId: string,
+  equipoId: string,
+  veredicto: ResultadoDeSondeo,
+): Promise<FilaDeEquipo | undefined> => {
+  if (veredicto.sinSondear === true) return undefined;
+  const { rows } = await c.query<FilaDeEquipo>(
+    `UPDATE public.dispositivos
+        SET sondeado_en = now(), ultimo_sondeo = $3,
+            identidad_leida_en = CASE WHEN $4 THEN now() ELSE identidad_leida_en END,
+            credencial_rechazada_en = CASE WHEN $3 = 'credencial' THEN now()
+                                           ELSE credencial_rechazada_en END
+      WHERE id = $2 AND copropiedad_id = $1
+  RETURNING ${CAMPOS}`,
+    [copropiedadId, equipoId, veredicto.clase, veredicto.modelo !== null],
+  );
+  return rows[0];
+};
 
 const verificacionDe = (v: ResultadoDeSondeo): EstadoDeVerificacion =>
   v.verificado ? 'verificado' : v.clase === 'decide_solo' ? 'rechazado' : 'no_verificado';
@@ -349,6 +411,7 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
         );
         const fila = rows[0];
         if (fila === undefined) throw new Error('El alta del equipo no devolvió fila');
+        const anotada = (await anotarSondeo(c, copropiedadId, fila.id, veredicto)) ?? fila;
 
         // La referencia apunta a la bóveda del propio equipo. Se escribe DESPUÉS
         // de conocer el id y ANTES del COMMIT: no existe un instante en que la
@@ -362,7 +425,7 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
         }
         await this.auditar(c, copropiedadId, actorId, 'equipos/alta', fila.nombre);
         await c.query('COMMIT');
-        return aDatos(fila);
+        return aDatos(anotada);
       } catch (error) {
         await c.query('ROLLBACK');
         throw error;
@@ -407,9 +470,10 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
           await c.query('ROLLBACK');
           return null;
         }
+        const anotada = (await anotarSondeo(c, copropiedadId, equipoId, veredicto)) ?? fila;
         await this.auditar(c, copropiedadId, actorId, 'equipos/diagnostico', fila.nombre);
         await c.query('COMMIT');
-        return aDatos(fila);
+        return aDatos(anotada);
       } catch (error) {
         await c.query('ROLLBACK');
         throw error;
@@ -483,6 +547,7 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
           await c.query('ROLLBACK');
           return null;
         }
+        const anotada = (await anotarSondeo(c, copropiedadId, equipoId, veredicto)) ?? fila;
         // `undefined` = «no lo cambies». Es la única lectura posible: una
         // pantalla que no muestra el secreto tampoco puede reenviarlo.
         if (alta.secreto !== undefined) {
@@ -496,7 +561,7 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
           `${fila.nombre} · ${cambiosDeEquipo(aDatos(antes), aDatos(fila), alta.secreto !== undefined)}`,
         );
         await c.query('COMMIT');
-        return aDatos(fila);
+        return aDatos(anotada);
       } catch (error) {
         await c.query('ROLLBACK');
         throw error;

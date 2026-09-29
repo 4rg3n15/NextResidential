@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { EquiposModule } from '../equipos';
+import { EquiposModule, LECTOR_DE_SENALES } from '../equipos';
+import type { LectorDeSenales } from '../equipos';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
 import { BITACORA, RELOJ } from '@ncr/domain-core';
@@ -87,9 +88,10 @@ export class TableroModule {
         },
         {
           provide: ConsultarDispositivos,
-          inject: [REPOSITORIO_TABLERO, RELOJ],
-          useFactory: (repo: RepositorioTablero, reloj: Reloj) =>
-            new ConsultarDispositivos(repo, reloj),
+          // E5 (15-M) · la señal de la escucha: el mismo lector que usa la ficha.
+          inject: [REPOSITORIO_TABLERO, RELOJ, LECTOR_DE_SENALES],
+          useFactory: (repo: RepositorioTablero, reloj: Reloj, senales: LectorDeSenales) =>
+            new ConsultarDispositivos(repo, reloj, senales),
         },
       ],
       exports: [REPOSITORIO_TABLERO],

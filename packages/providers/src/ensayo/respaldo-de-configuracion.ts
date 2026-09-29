@@ -148,6 +148,18 @@ const leer = async (cliente: ClienteDeEquipo, r: Recurso, e: EquipoDeEnsayo): Pr
   return respuesta.cuerpo;
 };
 
+/**
+ * C6 (15-M) · la SERIE del equipo, leída del propio aparato. Es lo que
+ * identifica un respaldo: con N equipos de la misma familia el nombre del
+ * fichero ya no puede ser la familia. `null` si el equipo no dijo quién es.
+ */
+export const leerSerieDelEquipo = async (equipo: EquipoDeEnsayo): Promise<string | null> => {
+  const cliente = new ClienteDeEquipo(equipo);
+  const id = rutaPara('leer la identidad del equipo (modelo, firmware, serie)', 'comun');
+  const identidad = await cliente.pedir(id.metodo, id.ruta);
+  return identidad.ok ? etiqueta(identidad.cuerpo, 'serialNumber') : null;
+};
+
 export const capturarRespaldo = async (
   equipo: EquipoDeEnsayo,
   ahora: Date,

@@ -25,6 +25,8 @@ import type { FamiliaDeEnsayo, OpcionesDeEnsayo, ResultadoDePaso } from './tipos
  */
 export interface InformeDeEnsayo {
   readonly familia: FamiliaDeEnsayo;
+  /** C6 (15-M) · el nombre de la ficha, si el equipo viene del registro. */
+  readonly nombre?: string;
   readonly modelo: string | null;
   readonly firmware: string | null;
   readonly pasos: readonly ResultadoDePaso[];
@@ -58,6 +60,7 @@ export const ensayarEquipo = async (
   });
   const informe = (pasos: readonly ResultadoDePaso[]): InformeDeEnsayo => ({
     familia: equipo.familia,
+    ...(equipo.nombre === undefined ? {} : { nombre: equipo.nombre }),
     modelo: d.modelo,
     firmware: d.firmware,
     pasos,

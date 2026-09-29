@@ -25,6 +25,9 @@ export const textoDelResultado = (r: ResultadoDeConfiguracion): string =>
     ? `${r.detalle}. Antes: ${r.valorAnterior ?? '(sin valor)'} → ahora: ${r.valorNuevo ?? '(sin cambio)'}. Queda constancia de quién y cuándo.`
     : r.detalle;
 
+/** E4 (15-M) · los tipos que pueden publicar en un servidor de alarmas. */
+const PUBLICAN: ReadonlySet<string> = new Set(['camara_lpr', 'terminal_facial', 'intercom']);
+
 export const AccionesDeSitio = ({
   copropiedadId,
   equipo,
@@ -56,22 +59,53 @@ export const AccionesDeSitio = ({
     }
   };
 
-  if (equipo.tipo !== 'camara_lpr' && equipo.tipo !== 'terminal_facial') return null;
+  if (
+    equipo.tipo !== 'camara_lpr' &&
+    equipo.tipo !== 'terminal_facial' &&
+    equipo.tipo !== 'intercom'
+  ) {
+    return null;
+  }
   const deshabilitado = motivo === null || enCurso !== null;
+  // E4 (15-M) · la terminal y el videoportero los ESCUCHA la plataforma: el
+  // receptor («HTTP listening») que traen del sitio es un resto y se apaga.
+  const escuchado = equipo.tipo === 'terminal_facial' || equipo.tipo === 'intercom';
 
   return (
     <div className="space-y-2 rounded-md border border-borde px-3 py-3">
       <p className="text-etiqueta font-medium text-texto">
-        {equipo.tipo === 'camara_lpr' ? 'Eventos de la cámara' : 'Verificación remota'}
+        {equipo.tipo === 'camara_lpr' ? 'Eventos de la cámara' : 'Eventos del equipo'}
       </p>
       <p className="text-secundario text-texto-apagado">
         {equipo.tipo === 'camara_lpr'
           ? 'Si el Mac cambió de red, la cámara sigue enviando a la IP de antes. Esto le escribe la IP de ahora y lo comprueba leyéndolo de vuelta.'
-          : 'Desactivarla es el plan B si la terminal no recibe a tiempo la respuesta de la plataforma: vuelve a abrir con su propio reconocimiento y la plataforma deja de decidir.'}
+          : 'Este equipo no necesita publicar: la plataforma lo escucha por su flujo. Si su ficha muestra un receptor huérfano (un «HTTP listening» a una dirección que ya no existe), apáguelo aquí; «Enviar eventos a este Mac» sólo si en sitio la escucha no basta.'}
         {motivo === null ? ' Escriba antes el motivo.' : ''}
       </p>
       <div className="flex flex-wrap gap-2">
-        {equipo.tipo === 'camara_lpr' ? (
+        {escuchado ? (
+          <Boton
+            type="button"
+            tamano="sm"
+            variante="secundario"
+            disabled={deshabilitado}
+            onClick={() =>
+              void ejecutar('receptor', async () =>
+                desenvolver(
+                  await cliente.POST('/copropiedades/{id}/equipos/{equipoId}/desactivar-receptor', {
+                    ...ruta,
+                    body: { motivo: motivo ?? '' },
+                  }),
+                ),
+              )
+            }
+          >
+            {enCurso === 'receptor' ? 'Apagando…' : 'Desactivar el receptor huérfano'}
+          </Boton>
+        ) : null}
+        {/* E4 (15-M) · para TODO equipo que publica: la cámara siempre; la
+            terminal y el videoportero sólo si en sitio la escucha no basta. */}
+        {PUBLICAN.has(equipo.tipo) ? (
           <Boton
             type="button"
             tamano="sm"
@@ -90,32 +124,44 @@ export const AccionesDeSitio = ({
           >
             {enCurso === 'eventos' ? 'Enviando…' : 'Enviar eventos a este Mac'}
           </Boton>
-        ) : (
-          [true, false].map((activar) => (
-            <Boton
-              key={String(activar)}
-              type="button"
-              tamano="sm"
-              variante={activar ? 'secundario' : 'peligro'}
-              disabled={deshabilitado}
-              onClick={() =>
-                void ejecutar(String(activar), async () =>
-                  desenvolver(
-                    await cliente.PUT(
-                      '/copropiedades/{id}/equipos/{equipoId}/verificacion-remota',
-                      {
-                        ...ruta,
-                        body: { activar, motivo: motivo ?? '' },
-                      },
+        ) : null}
+      </div>
+      {equipo.tipo === 'terminal_facial' ? (
+        <>
+          <p className="text-etiqueta font-medium text-texto">Verificación remota</p>
+          <p className="text-secundario text-texto-apagado">
+            Desactivarla es el plan B si la terminal no recibe a tiempo la respuesta de la
+            plataforma: vuelve a abrir con su propio reconocimiento y la plataforma deja de decidir.
+          </p>
+        </>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {equipo.tipo === 'terminal_facial'
+          ? [true, false].map((activar) => (
+              <Boton
+                key={String(activar)}
+                type="button"
+                tamano="sm"
+                variante={activar ? 'secundario' : 'peligro'}
+                disabled={deshabilitado}
+                onClick={() =>
+                  void ejecutar(String(activar), async () =>
+                    desenvolver(
+                      await cliente.PUT(
+                        '/copropiedades/{id}/equipos/{equipoId}/verificacion-remota',
+                        {
+                          ...ruta,
+                          body: { activar, motivo: motivo ?? '' },
+                        },
+                      ),
                     ),
-                  ),
-                )
-              }
-            >
-              {activar ? 'Verificación remota: activar' : 'Verificación remota: desactivar'}
-            </Boton>
-          ))
-        )}
+                  )
+                }
+              >
+                {activar ? 'Verificación remota: activar' : 'Verificación remota: desactivar'}
+              </Boton>
+            ))
+          : null}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import type { CapacidadesDeEquipo, FichaDelEquipo } from '@ncr/providers';
+import type { UmbralDeLatido } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 
 /**
@@ -102,6 +103,19 @@ export interface DatosDeEquipo {
   readonly verificadoEn: string | null;
   readonly motivoNoVerificado: string | null;
   readonly estado: 'activo' | 'inactivo';
+  /**
+   * E5 (15-M) · las señales persistidas con las que `estadoDelEquipo` decide
+   * el estado, iguales para la lista, la ficha y el tablero (0044).
+   */
+  readonly ultimoLatido: string | null;
+  readonly sondeadoEn: string | null;
+  readonly ultimoSondeo: ClaseDeSondeo | null;
+  /** Cuándo se leyeron modelo y firmware del propio equipo («dato del …»). */
+  readonly identidadLeidaEn: string | null;
+  readonly credencialRechazadaEn: string | null;
+  readonly estadoSalud: 'saludable' | 'degradado' | 'caido';
+  /** El umbral de latido de la copropiedad; `null` en memoria (se usa el de fábrica). */
+  readonly umbralDeLatido: UmbralDeLatido | null;
 }
 
 /**
@@ -211,6 +225,8 @@ export const CORRECCIONES = [
   'formato_del_receptor',
   /** A2 (15-E) · la terminal pasa a reportar y esperar. Cambia quién decide. */
   'verificacion_remota',
+  /** E4 (15-M) · apaga el receptor huérfano de una terminal o videoportero (la API los escucha). */
+  'desactivar_receptor',
 ] as const;
 export type CorreccionDeEquipo = (typeof CORRECCIONES)[number];
 
@@ -298,6 +314,8 @@ export interface ResultadoDeSondeo {
    * —se instala el lunes— pero queda NO VERIFICADO y se dice por qué.
    */
   readonly verificado: boolean;
+  /** `true` sólo en `SIN_PROBAR`: no hubo sondeo y no se anota como tal (0044). */
+  readonly sinSondear?: true;
 }
 
 export interface DatosDeSondeo {
@@ -330,6 +348,7 @@ export const SIN_PROBAR: ResultadoDeSondeo = {
   firmware: null,
   latenciaMs: null,
   verificado: false,
+  sinSondear: true,
 };
 
 /**
@@ -381,3 +400,17 @@ export interface OlvidoDeEquipo {
   olvidar(dispositivoId: string): void;
 }
 export const OLVIDO_DE_EQUIPO = Symbol.for('ncr.equipos.OlvidoDeEquipo');
+
+/**
+ * E4 (15-M) · 7 · a dónde DEBERÍA publicar un equipo para que sus eventos
+ * lleguen a esta plataforma: la IP del Mac hacia el equipo y el puerto de la
+ * API. Lo resuelve la infraestructura (interfaces de red, `.env`).
+ */
+export const RECEPTOR_ESPERADO = Symbol.for('ncr.equipos.ReceptorEsperado');
+export interface ResolutorDeReceptorEsperado {
+  hacia(hostDelEquipo: string): {
+    readonly ip: string | null;
+    readonly motivo?: string;
+    readonly puerto: number;
+  };
+}

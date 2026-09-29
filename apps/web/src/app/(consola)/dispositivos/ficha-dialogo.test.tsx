@@ -32,6 +32,19 @@ const TERMINAL: Equipo = {
   canalDeVideo: null,
   zonaId: null,
   atestacion: null,
+  estadoDelEquipo: {
+    enLinea: 'sin_comprobar',
+    motivo: 'Nadie lo ha sondeado todavía y no ha mandado nada',
+    alcanzable: null,
+    autenticacion: 'sin_comprobar',
+    autenticacionRechazadaHaceMin: null,
+    escucha: 'no_aplica',
+    ultimoEvento: null,
+    ultimoLatido: null,
+    ultimaSenal: null,
+  },
+  sondeadoEn: null,
+  identidadLeidaEn: null,
 };
 
 const SONDEO = {

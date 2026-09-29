@@ -9,6 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -27,8 +28,13 @@ import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { REPOSITORIO_ALERTAS } from '../aplicacion/puertos';
 import type { RepositorioAlertas } from '../aplicacion/puertos';
-import { NotasDeAlertaDto } from './dtos';
-import { AlertaExpuestaDto } from './respuestas';
+import {
+  ArchivoDeAlertaDto,
+  ArchivoMasivoDeAlertasDto,
+  FiltroDeAlertasDto,
+  NotasDeAlertaDto,
+} from './dtos';
+import { AlertaExpuestaDto, ArchivoDeAlertasResultadoDto } from './respuestas';
 import { ErrorApiDto } from '../../comun/respuestas';
 
 /**
@@ -56,9 +62,67 @@ export class AlertasController {
   async abiertas(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Query() filtro: FiltroDeAlertasDto,
   ): Promise<readonly AlertaExpuestaDto[]> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'alertas');
-    return (await this.alertas.abiertasDe(copropiedadId)).map(exponer);
+    // E5 (15-M) · por equipo y severidad; las archivadas no salen (siguen en la base).
+    return (
+      await this.alertas.abiertasDe(copropiedadId, {
+        dispositivoId: filtro.dispositivoId ?? null,
+        severidad: filtro.severidad ?? null,
+        tipo: filtro.tipo ?? null,
+      })
+    ).map(exponer);
+  }
+
+  /**
+   * E5 (15-M) · ARCHIVAR: no es resolver ni borrar. Una alerta de ruido —la
+   * cámara sin atestación repitiendo lo mismo— sale de la cola con motivo,
+   * autor e instante, y la fila sigue en la base (RN-19). Individual y masivo
+   * por el mismo camino, para que la auditoría sea la misma.
+   */
+  @Post('archivar')
+  @Roles('operador_central', 'administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Archiva varias alertas con un motivo. Archivo lógico, nunca borrado' })
+  @ApiCreatedResponse({ type: ArchivoDeAlertasResultadoDto })
+  async archivarVarias(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Body() dto: ArchivoMasivoDeAlertasDto,
+  ): Promise<ArchivoDeAlertasResultadoDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'alertas/archivo');
+    const ids = [...new Set(dto.ids)];
+    const archivadas = await this.alertas.archivar(
+      copropiedadId,
+      ids,
+      dto.motivo,
+      ctx.usuarioId,
+      this.reloj.ahora(),
+    );
+    return { archivadas, omitidas: ids.length - archivadas };
+  }
+
+  @Post(':alertaId/archivar')
+  @Roles('operador_central', 'administrador', 'superadministrador')
+  @ApiOperation({ summary: 'Archiva una alerta con motivo. Archivo lógico, nunca borrado' })
+  @ApiCreatedResponse({ type: ArchivoDeAlertasResultadoDto })
+  @ApiNotFoundResponse({ type: ErrorApiDto })
+  async archivar(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('alertaId', ParseUUIDPipe) alertaId: string,
+    @Body() dto: ArchivoDeAlertaDto,
+  ): Promise<ArchivoDeAlertasResultadoDto> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'alertas/archivo');
+    await this.buscar(copropiedadId, alertaId);
+    const archivadas = await this.alertas.archivar(
+      copropiedadId,
+      [alertaId],
+      dto.motivo,
+      ctx.usuarioId,
+      this.reloj.ahora(),
+    );
+    return { archivadas, omitidas: 1 - archivadas };
   }
 
   @Post(':alertaId/atencion')

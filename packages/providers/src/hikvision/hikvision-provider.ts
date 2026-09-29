@@ -146,7 +146,13 @@ export class HikvisionProvider
   private readonly intercomos = new Map<string, IntercomDeEquipo>();
   /** A4 · escuchas abiertas, una por equipo. */
   private readonly escuchas = new Map<string, EscuchaActiva>();
-  private enSesion: string | null = null;
+  /**
+   * C6 (15-M) · los videoporteros con sesión de audio ABIERTA. Era un único
+   * `enSesion`: el segundo videoportero pisaba al primero. Una sesión por
+   * equipo (exclusividad por equipo, ADR-01); la exclusividad ENTRE operadores
+   * sobre un mismo equipo la lleva cada `IntercomDeEquipo`.
+   */
+  private readonly sesiones = new Set<string>();
 
   constructor(private readonly opciones: OpcionesDeHikvision) {
     this.fuente = opciones.fuente ?? new FuenteDePlacas();
@@ -171,6 +177,7 @@ export class HikvisionProvider
     this.puertas.delete(dispositivoId);
     this.terminales.delete(dispositivoId);
     this.intercomos.delete(dispositivoId);
+    this.sesiones.delete(dispositivoId);
     this.escuchas.get(dispositivoId)?.detener();
     this.escuchas.delete(dispositivoId);
     // F2 · y el registro que lo recordaba para contestar rápido a la terminal.
@@ -512,38 +519,78 @@ export class HikvisionProvider
   async abrirSesion(dispositivoId: string, operadorId: string): Promise<EstadoSesionIntercom> {
     const intercom = await this.intercomDe(dispositivoId);
     const estado = await intercom.abrirSesion(dispositivoId, operadorId);
-    if (estado === 'abierta') this.enSesion = dispositivoId;
+    if (estado === 'abierta') this.sesiones.add(dispositivoId);
     return estado;
   }
 
+  // C6 · la forma CON dispositivo (`IntercomPorEquipo`): una sesión por equipo.
+
+  async enviarAudioA(dispositivoId: string, fragmento: Uint8Array): Promise<void> {
+    await this.sesionDe(dispositivoId).enviarAudio(fragmento);
+  }
+
+  recibirAudioDe(dispositivoId: string): AsyncIterable<Uint8Array> {
+    return this.sesionDe(dispositivoId).recibirAudio();
+  }
+
+  async cerrarSesionDe(dispositivoId: string, motivo: string): Promise<void> {
+    if (!this.sesiones.has(dispositivoId)) return;
+    this.sesiones.delete(dispositivoId);
+    await this.intercomos.get(dispositivoId)?.cerrarSesion(motivo);
+  }
+
+  async estadoSesionDe(dispositivoId: string): Promise<EstadoSesionIntercom> {
+    if (!this.sesiones.has(dispositivoId)) return 'cerrada';
+    return (await this.intercomos.get(dispositivoId)?.estadoSesion()) ?? 'cerrada';
+  }
+
+  // Los métodos del puerto SIN dispositivo: valen con una sola sesión abierta.
+
   async enviarAudio(fragmento: Uint8Array): Promise<void> {
-    await this.enSesionActual().enviarAudio(fragmento);
+    await this.enviarAudioA(this.unicaSesion(), fragmento);
   }
 
   recibirAudio(): AsyncIterable<Uint8Array> {
-    return this.enSesionActual().recibirAudio();
+    return this.recibirAudioDe(this.unicaSesion());
   }
 
+  /** Sin dispositivo se cierran TODAS: colgar de más no filtra audio a nadie. */
   async cerrarSesion(motivo: string): Promise<void> {
-    if (this.enSesion === null) return;
-    const intercom = this.intercomos.get(this.enSesion);
-    this.enSesion = null;
-    if (intercom !== undefined) await intercom.cerrarSesion(motivo);
+    for (const dispositivoId of [...this.sesiones])
+      await this.cerrarSesionDe(dispositivoId, motivo);
   }
 
   async estadoSesion(): Promise<EstadoSesionIntercom> {
-    if (this.enSesion === null) return 'cerrada';
-    return (this.intercomos.get(this.enSesion) ?? null)?.estadoSesion() ?? 'cerrada';
+    for (const dispositivoId of this.sesiones) {
+      if ((await this.estadoSesionDe(dispositivoId)) === 'abierta') return 'abierta';
+    }
+    return 'cerrada';
   }
 
   // ── Interno ──────────────────────────────────────────────────────────────
 
-  private enSesionActual(): IntercomDeEquipo {
-    const intercom = this.enSesion === null ? undefined : this.intercomos.get(this.enSesion);
+  private sesionDe(dispositivoId: string): IntercomDeEquipo {
+    const intercom = this.sesiones.has(dispositivoId)
+      ? this.intercomos.get(dispositivoId)
+      : undefined;
     if (intercom === undefined) {
-      throw new Error('No hay ninguna sesión de audio abierta contra un equipo');
+      throw new Error(`No hay ninguna sesión de audio abierta contra el equipo ${dispositivoId}`);
     }
     return intercom;
+  }
+
+  /** La única sesión abierta, para el puerto sin dispositivo. Varias = ambiguo. */
+  private unicaSesion(): string {
+    const [primera, ...otras] = [...this.sesiones];
+    if (primera === undefined) {
+      throw new Error('No hay ninguna sesión de audio abierta contra un equipo');
+    }
+    if (otras.length > 0) {
+      throw new Error(
+        `Hay ${String(this.sesiones.size)} sesiones de audio abiertas: indique el dispositivo`,
+      );
+    }
+    return primera;
   }
 
   private async buscar(dispositivoId: string): Promise<EquipoRegistrado | null> {

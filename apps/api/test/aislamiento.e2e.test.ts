@@ -118,8 +118,18 @@ afterAll(async () => {
   await app?.close();
 });
 
-const cuerpoDe = (r: RutaExpuesta): Record<string, unknown> =>
-  r.ruta.includes('ingesta') ? { copropiedadId: COP_B } : {};
+const cuerpoDe = (r: RutaExpuesta): Record<string, unknown> => {
+  if (r.ruta.includes('ingesta')) return { copropiedadId: COP_B };
+  // C9 (15-M) · la baja exige motivo: sin él, el 400 del pipe llegaría antes
+  // que la barrera de alcance, y la ruta parecería cubierta sin estarlo.
+  if (r.ruta.endsWith('/baja')) return { motivo: 'Baja de prueba de aislamiento' };
+  // E5 (15-M) · el archivo de alertas exige motivo (y la lista, identificadores).
+  if (r.ruta.endsWith('/alertas/archivar')) return { ids: [OTRO_ID], motivo: 'Aislamiento' };
+  if (r.ruta.endsWith('/archivar') || r.ruta.endsWith('/desactivar-receptor')) {
+    return { motivo: 'Prueba de aislamiento' };
+  }
+  return {};
+};
 
 /**
  * Identificador de relleno para los parámetros que NO son la copropiedad

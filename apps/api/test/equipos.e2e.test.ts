@@ -456,7 +456,10 @@ describe('O4 · la ficha es por tipo y el sondeo posterior usa la clave guardada
     );
     expect(campos).toContain('quién decide la apertura');
     expect(campos).toContain('Rostros');
-    expect(campos.some((c) => /país|receptor|disparador/.test(c))).toBe(false);
+    expect(campos.some((c) => /país|disparador/.test(c))).toBe(false);
+    // E4 (15-M) · el receptor SÍ sale en la terminal: un «HTTP listening»
+    // escrito en ella es un resto huérfano que la ficha tiene que enseñar.
+    expect(campos).toContain('receptor de eventos (servidor de alarmas)');
     expect(prueba.body.verificado).toBe(true);
     expect(prueba.body.capacidades.verificacionRemota).toBe('si');
   });

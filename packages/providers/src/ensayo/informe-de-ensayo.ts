@@ -24,7 +24,8 @@ export const sinSecretosConocidos = (texto: string, secretos: readonly string[])
 
 export const lineasDelInforme = (i: InformeDeEnsayo, secretos: readonly string[]): string[] => {
   const identidad = [i.modelo, i.firmware].filter((x) => x !== null).join(' · ');
-  const lineas = [`── ${ROTULO[i.familia]}${identidad === '' ? '' : ` (${identidad})`}`];
+  const nombre = i.nombre === undefined ? '' : ` «${i.nombre}»`;
+  const lineas = [`── ${ROTULO[i.familia]}${nombre}${identidad === '' ? '' : ` (${identidad})`}`];
   for (const p of i.pasos) {
     lineas.push(
       `  ${String(p.numero)}. ${p.titulo.padEnd(38, '.')} ${PALABRA[p.estado]} — ${p.causa}`,

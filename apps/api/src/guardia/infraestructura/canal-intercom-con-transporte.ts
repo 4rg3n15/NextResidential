@@ -137,7 +137,7 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
       this.abiertos.delete(clave);
       this.formatos.delete(clave);
       try {
-        await this.proveedor.cerrarSesion('el operador colgó');
+        await this.cerrarEnElEquipo(dispositivoId, 'el operador colgó');
       } catch (error) {
         // El cierre en el equipo es lo mejor que se puede hacer; si falla, el
         // aparato lo suelta por su vencimiento. Se registra y no se retiene.
@@ -162,7 +162,9 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
       // El turno caducó por inactividad y el equipo seguía con el canal
       // abierto: se cierra ahí también, que es lo que ADR-01 exige del cierre.
       this.abiertos.delete(clave);
-      await this.proveedor.cerrarSesion('turno caducado por inactividad').catch(() => undefined);
+      await this.cerrarEnElEquipo(dispositivoId, 'turno caducado por inactividad').catch(
+        () => undefined,
+      );
     }
     return this.conTransporte(
       turno,
@@ -194,7 +196,11 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
     operadorId: string,
   ): AsyncIterable<Uint8Array> {
     this.exigirTitular(copropiedadId, dispositivoId, operadorId);
-    for await (const trozo of this.proveedor.recibirAudio()) yield trozo;
+    // C6 (15-M) · el audio es DE ESTE equipo: con N videoporteros en sesión, el
+    // puerto sin dispositivo no sabría cuál. Si el proveedor no distingue
+    // (simulado), la forma de siempre.
+    const fuente = this.proveedor.recibirAudioDe?.(dispositivoId) ?? this.proveedor.recibirAudio();
+    for await (const trozo of fuente) yield trozo;
   }
 
   async enviarAudio(
@@ -204,6 +210,19 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
     fragmento: Uint8Array,
   ): Promise<void> {
     this.exigirTitular(copropiedadId, dispositivoId, operadorId);
-    await this.proveedor.enviarAudio(fragmento);
+    if (this.proveedor.enviarAudioA !== undefined) {
+      await this.proveedor.enviarAudioA(dispositivoId, fragmento);
+    } else {
+      await this.proveedor.enviarAudio(fragmento);
+    }
+  }
+
+  /** C6 · cerrar la sesión de ESTE equipo, sin colgar la de otro videoportero. */
+  private async cerrarEnElEquipo(dispositivoId: string, motivo: string): Promise<void> {
+    if (this.proveedor.cerrarSesionDe !== undefined) {
+      await this.proveedor.cerrarSesionDe(dispositivoId, motivo);
+    } else {
+      await this.proveedor.cerrarSesion(motivo);
+    }
   }
 }

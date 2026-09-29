@@ -379,16 +379,15 @@ describe('lo que NO se le pregunta a un equipo que no es una cámara', () => {
     expect(d.control).toBeNull();
     expect(d.disparador).toBeNull();
     expect(d.pais).toBeNull();
-    expect(d.receptor).toBeNull();
+    // E4 (15-M) · el receptor es la excepción: se lee en toda familia (huérfano en la terminal).
+    expect(d.receptor).not.toBeNull();
     expect(d.capacidades).toBeNull();
     expect(d.reportaEstadoDeBarrera).toBeNull();
   });
 
   it('y ninguna de esas consultas aparece como SIN RESPUESTA: no se hicieron', async () => {
     const d = await diagnosticarTerminal();
-    expect(d.sinRespuesta.some((s) => /barrera|placas|receptor|disparador/.test(s.que))).toBe(
-      false,
-    );
+    expect(d.sinRespuesta.some((s) => /barrera|placas|disparador/.test(s.que))).toBe(false);
   });
 
   it('el reloj sí se comprueba: la trazabilidad no depende de la familia', async () => {

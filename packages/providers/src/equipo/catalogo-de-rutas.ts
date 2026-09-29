@@ -177,7 +177,7 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     metodo: 'PUT',
     ruta: '/ISAPI/Event/notification/httpHosts',
     procedencia: 'guia_oficial',
-    familia: 'camara',
+    familia: 'comun',
     fuente:
       'Guía oficial ANPR del fabricante, notificación HTTP. Admite también la forma ' +
       'con identificador de servidor al final de la ruta',

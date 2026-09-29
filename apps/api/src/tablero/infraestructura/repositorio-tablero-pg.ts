@@ -14,6 +14,7 @@ import type {
   ResultadoDeSincronizacion,
   SeveridadDeAlerta,
 } from '../aplicacion/puertos';
+import type { ClaseDeSondeo } from '../../equipos';
 
 /**
  * Adaptador PostgreSQL del tablero.
@@ -229,6 +230,9 @@ export class RepositorioTableroPg implements RepositorioTablero {
       ultima_sincronizacion: Date | null;
       ultimo_resultado: string | null;
       sincronizaciones_fallidas: string;
+      sondeado_en: Date | null;
+      ultimo_sondeo: ClaseDeSondeo | null;
+      credencial_rechazada_en: Date | null;
     }>(
       copropiedadId,
       /**
@@ -255,6 +259,7 @@ export class RepositorioTableroPg implements RepositorioTablero {
        */
       `SELECT d.id, d.nombre, d.tipo::text AS tipo, d.zona_id,
               d.modelo, d.firmware, d.ultimo_latido, d.ultima_sincronizacion,
+              d.sondeado_en, d.ultimo_sondeo, d.credencial_rechazada_en,
               u.estado::text AS ultimo_resultado,
               COALESCE(f.fallidas, 0) AS sincronizaciones_fallidas
          FROM public.dispositivos d
@@ -287,6 +292,9 @@ export class RepositorioTableroPg implements RepositorioTablero {
       ultimoResultadoDeSincronizacion:
         f.ultimo_resultado === null ? null : (f.ultimo_resultado as ResultadoDeSincronizacion),
       sincronizacionesFallidas: Number(f.sincronizaciones_fallidas),
+      sondeadoEn: f.sondeado_en,
+      ultimoSondeo: f.ultimo_sondeo,
+      credencialRechazadaEn: f.credencial_rechazada_en,
     }));
   }
 }

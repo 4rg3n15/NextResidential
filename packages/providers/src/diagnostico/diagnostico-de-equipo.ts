@@ -225,7 +225,9 @@ export const diagnosticarEquipo = async (
   const paisAdmitido = esCamara
     ? await pedir('leer qué países admite el algoritmo de este equipo')
     : null;
-  const receptor = esCamara ? await pedir('leer a qué receptor publica el equipo') : null;
+  // E4 (15-M) · el receptor se lee en TODAS las familias: en una terminal o un
+  // videoportero es un resto huérfano que la ficha tiene que enseñar.
+  const receptor = await pedir('leer a qué receptor publica el equipo', 'comun');
   const barrera = esCamara
     ? await pedir('leer si este modelo reporta el estado de la barrera')
     : null;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aplicarCorreccion } from './correcciones';
-import { conDestino } from './correcciones-de-sitio';
+import { conDestino, conReceptorApagado } from './correcciones-de-sitio';
 
 /**
  * C2 y F2 (corrección de la 15-L) · las dos escrituras del día de entrega,
@@ -219,5 +219,32 @@ describe('F2 (e) · «Verificación remota: activar / desactivar»', () => {
     const sinDoc: Guion = { receptor: null, acs: null, escritos: [] };
     expect((await corregir(sinDoc, { clase: 'verificacion_remota' })).aplicada).toBe(false);
     expect([...sinCampo.escritos, ...sinDoc.escritos]).toEqual([]);
+  });
+});
+
+/** E4 (15-M) · apagar el receptor huérfano: `enabled=false` si el esquema lo trae; si no, a vacío. */
+describe('conReceptorApagado', () => {
+  const con = (extra: string): string =>
+    '<HttpHostNotificationList><HttpHostNotification><id>1</id>' +
+    extra +
+    '<url>/alarm-server/abc</url><addressingFormatType>ipaddress</addressingFormatType>' +
+    '<ipAddress>192.0.2.140</ipAddress><portNo>8080</portNo>' +
+    '</HttpHostNotification></HttpHostNotificationList>';
+
+  it('con `enabled`, lo pone en false y no toca la dirección', () => {
+    const r = conReceptorApagado(con('<enabled>true</enabled>'));
+    expect(r).toContain('<enabled>false</enabled>');
+    expect(r).toContain('<ipAddress>192.0.2.140</ipAddress>');
+  });
+
+  it('sin `enabled`, apunta el primer receptor a la dirección vacía', () => {
+    const r = conReceptorApagado(con(''));
+    expect(r).toContain('<ipAddress>0.0.0.0</ipAddress>');
+    expect(r).toContain('<portNo>80</portNo>');
+    expect(r).toContain('<url>/</url>');
+  });
+
+  it('sin ningún receptor no hay nada que apagar', () => {
+    expect(conReceptorApagado('<HttpHostNotificationList/>')).toBeNull();
   });
 });

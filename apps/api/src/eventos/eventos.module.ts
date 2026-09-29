@@ -13,6 +13,7 @@ import type { DynamicModule } from '@nestjs/common';
 import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
+import { ALERTAS_DE_EQUIPO, AbrirAlertaDeEquipo } from './aplicacion/deduplicacion-de-alertas';
 import { ACTOR_INGESTA } from '../comun/actores-de-servicio';
 import type { Configuracion } from '../configuracion/esquema';
 import { Pool } from 'pg';
@@ -363,6 +364,7 @@ export class EventosModule {
             GENERADOR_DE_ID,
             BITACORA,
             NOTIFICADOR_PUSH,
+            CONFIGURACION,
           ],
           useFactory: (
             motor: MotorDeDecision,
@@ -374,6 +376,7 @@ export class EventosModule {
             ids: GeneradorDeId,
             bitacora: Bitacora,
             push: NotificadorPush,
+            config: Configuracion,
           ) =>
             new RegistrarAcceso(
               motor,
@@ -385,6 +388,40 @@ export class EventosModule {
               ids,
               bitacora,
               push,
+              // E5 (15-M) · una alerta por (equipo, tipo) y ventana.
+              { ventanaDeDuplicadosMs: config.ALERTAS_VENTANA_DEDUP_S * 1000 },
+            ),
+        },
+        {
+          /**
+           * E5 (15-M) · las alertas ligadas a un EQUIPO (la cámara decide sola,
+           * el reloj desviado): una por condición, selladas con la hora de
+           * recepción. Las abre el ingestor a través de este puerto.
+           */
+          provide: ALERTAS_DE_EQUIPO,
+          inject: [
+            REPOSITORIO_ALERTAS,
+            EscalarAlerta,
+            RELOJ,
+            GENERADOR_DE_ID,
+            BITACORA,
+            CONFIGURACION,
+          ],
+          useFactory: (
+            alertas: RepositorioAlertas,
+            escalador: EscalarAlerta,
+            reloj: Reloj,
+            ids: GeneradorDeId,
+            bitacora: Bitacora,
+            config: Configuracion,
+          ) =>
+            new AbrirAlertaDeEquipo(
+              alertas,
+              escalador,
+              reloj,
+              ids,
+              bitacora,
+              config.ALERTAS_VENTANA_DEDUP_S * 1000,
             ),
         },
         {
@@ -464,6 +501,7 @@ export class EventosModule {
         REGISTRO_DE_EVIDENCIA,
         REPOSITORIO_ALERTAS,
         REPOSITORIO_DISPOSITIVOS,
+        ALERTAS_DE_EQUIPO,
         CANAL_TIEMPO_REAL,
         CanalEnProceso,
         RegistrarAcceso,

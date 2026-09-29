@@ -325,6 +325,14 @@ export const esquemaConfiguracion = z.object({
    * (señal de su escucha o una lectura real de su identidad). 0 lo apaga.
    */
   EQUIPOS_LATIDO_S: z.coerce.number().int().min(0).max(3600).default(60),
+  /**
+   * E5 (15-M) · ventana, en segundos, dentro de la cual una alerta del mismo
+   * (equipo, tipo) NO se repite. Las persistentes (la cámara decide sola, el
+   * reloj desviado) además no se repiten mientras haya una abierta.
+   */
+  ALERTAS_VENTANA_DEDUP_S: z.coerce.number().int().min(0).max(86_400).default(600),
+  /** E5 (15-M) · desvío del reloj del equipo, en segundos, a partir del cual se avisa. */
+  EQUIPOS_DESVIO_DE_RELOJ_S: z.coerce.number().int().min(1).max(3600).default(30),
   EQUIPOS_FOTO_LADO_MAXIMO: z.coerce.number().int().min(160).max(4096).default(1024),
 
   /**

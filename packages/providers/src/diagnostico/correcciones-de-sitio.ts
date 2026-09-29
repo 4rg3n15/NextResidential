@@ -246,3 +246,78 @@ export const corregirVerificacionRemota = async (
         'ya no decide el acceso (confirmado al leerlo de vuelta)',
   };
 };
+
+// ── E4 (15-M) · APAGAR EL RECEPTOR HUÉRFANO DE UN EQUIPO QUE LA API ESCUCHA ──
+
+/** Dirección no enrutable: el equipo deja de publicar a nadie. [SUPUESTO] S-121. */
+const DESTINO_VACIO = { ip: '0.0.0.0', puerto: 80, ruta: '/' } as const;
+
+/**
+ * El primer receptor, apagado. Si el esquema del equipo trae `enabled`, se
+ * pone en `false`; si no, se apunta a la dirección vacía. `null` si el bloque
+ * no admite ninguna de las dos formas.
+ */
+export const conReceptorApagado = (documento: string): string | null => {
+  const primero = bloques(documento, 'HttpHostNotification')[0];
+  if (primero === undefined) return null;
+  const apagado = reemplazarEtiqueta(primero, 'enabled', 'false');
+  if (apagado !== null) return documento.replace(primero, apagado);
+  return conDestino(documento, DESTINO_VACIO);
+};
+
+const receptorApagado = (r: { host: string | null; url: string | null } | undefined): boolean =>
+  r === undefined || r.host === null || r.host === DESTINO_VACIO.ip || r.host === '';
+
+/**
+ * Una terminal o un videoportero no publican al servidor de alarmas: la
+ * plataforma los ESCUCHA. Un receptor escrito en ellos es un resto de otra
+ * configuración que reintenta contra una dirección que no existe. Se lee, se
+ * apaga el primero y se lee de vuelta.
+ */
+export const desactivarReceptorDeEventos = async (
+  cliente: ClienteDeEquipo,
+): Promise<ResultadoDeEscritura> => {
+  const lectura = rutaPara('leer a qué receptor publica el equipo', 'comun');
+  const leida = await cliente.pedir(lectura.metodo, lectura.ruta);
+  if (!leida.ok || rechazado(leida.cuerpo)) {
+    return noAplicada('El equipo no devolvió su configuración de receptor: no se escribe a ciegas');
+  }
+  const previo = leerReceptores(leida.cuerpo)[0];
+  const anterior = previo === undefined ? null : direccion(previo.host, previo.puerto);
+  if (previo === undefined || receptorApagado(previo)) {
+    return {
+      aplicada: true,
+      valorAnterior: anterior,
+      valorNuevo: anterior,
+      detalle: 'El equipo no tenía ningún receptor activo: nada que apagar',
+    };
+  }
+  const documento = conReceptorApagado(leida.cuerpo);
+  if (documento === null) {
+    return noAplicada('El receptor del equipo no admite apagarse ni apuntarse a vacío', anterior);
+  }
+  const escritura = rutaPara('apuntar el equipo a nuestro receptor', 'comun');
+  const escrita = await cliente.pedir(escritura.metodo, escritura.ruta, {
+    tipo: 'application/xml',
+    contenido: documento,
+  });
+  if (!confirmada(escrita) || rechazado(escrita.cuerpo)) {
+    return noAplicada(interpretarError(escrita.cuerpo).detalle, anterior);
+  }
+  const deVuelta = await cliente.pedir(lectura.metodo, lectura.ruta);
+  const ahora = deVuelta.ok ? leerReceptores(deVuelta.cuerpo)[0] : undefined;
+  const apagadoPorBandera = deVuelta.ok && /<(?:\w+:)?enabled>\s*false\s*</i.test(deVuelta.cuerpo);
+  return apagadoPorBandera || receptorApagado(ahora)
+    ? {
+        aplicada: true,
+        valorAnterior: anterior,
+        valorNuevo: 'apagado',
+        detalle:
+          'El receptor huérfano quedó apagado (confirmado al leerlo de vuelta): la plataforma sigue escuchando al equipo por su flujo',
+      }
+    : noAplicada(
+        'El equipo aceptó el cambio, pero al leerlo de vuelta el receptor sigue activo ' +
+          `(${direccion(ahora?.host ?? null, ahora?.puerto ?? null) ?? 'sin dirección'})`,
+        anterior,
+      );
+};

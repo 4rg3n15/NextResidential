@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { Alerta, esExito } from '@ncr/domain-core';
 import type { Bitacora, EstadoDeAlerta, Severidad, TipoDeAlerta } from '@ncr/domain-core';
-import type { RepositorioAlertas } from '../aplicacion/puertos';
+import type { FiltroDeAlertas, RepositorioAlertas, UltimaAlerta } from '../aplicacion/puertos';
 import { claimsDeServicio } from '../../comun/claims-de-servicio';
 
 /**
@@ -168,15 +168,85 @@ export class RepositorioAlertasPg implements RepositorioAlertas {
     });
   }
 
-  async abiertasDe(copropiedadId: string): Promise<readonly Alerta[]> {
+  async abiertasDe(copropiedadId: string, filtro?: FiltroDeAlertas): Promise<readonly Alerta[]> {
     return this.conServicio(copropiedadId, async (c) => {
+      // E5 (15-M) · las archivadas no se listan (siguen en la tabla, RN-19).
+      const parametros: unknown[] = [copropiedadId];
+      const condiciones = ['copropiedad_id = $1', "estado <> 'resuelta'", 'archivada_en IS NULL'];
+      const dispositivoIdPedido = filtro?.dispositivoId ?? null;
+      if (dispositivoIdPedido !== null) {
+        parametros.push(dispositivoIdPedido);
+        condiciones.push(`dispositivo_id = $${String(parametros.length)}`);
+      }
+      const severidadPedido = filtro?.severidad ?? null;
+      if (severidadPedido !== null) {
+        parametros.push(severidadPedido);
+        condiciones.push(`severidad = $${String(parametros.length)}::severidad_alerta`);
+      }
+      const tipoPedido = filtro?.tipo ?? null;
+      if (tipoPedido !== null) {
+        parametros.push(tipoPedido);
+        condiciones.push(`tipo = $${String(parametros.length)}::tipo_alerta`);
+      }
       const { rows } = await c.query<FilaAlerta>(
         `SELECT ${CAMPOS} FROM public.alertas
-          WHERE copropiedad_id = $1 AND estado <> 'resuelta'
+          WHERE ${condiciones.join(' AND ')}
           ORDER BY generada_en DESC LIMIT 200`,
-        [copropiedadId],
+        parametros,
       );
       return rows.map(rehidratarAlerta).filter((a): a is Alerta => a !== null);
+    });
+  }
+
+  async ultimaDe(
+    copropiedadId: string,
+    dispositivoId: string,
+    tipo: TipoDeAlerta,
+    clave?: string,
+  ): Promise<UltimaAlerta | null> {
+    return this.conServicio(copropiedadId, async (c) => {
+      const parametros: unknown[] = [copropiedadId, dispositivoId, tipo];
+      const porClave = clave === undefined ? '' : ' AND notas LIKE $4';
+      if (clave !== undefined) parametros.push(`[${clave.replace(/[%_\\]/g, '\\$&')}]%`);
+      const { rows } = await c.query<{
+        id: string;
+        generada_en: Date;
+        estado: EstadoDeAlerta;
+        archivada_en: Date | null;
+      }>(
+        `SELECT id, generada_en, estado, archivada_en FROM public.alertas
+          WHERE copropiedad_id = $1 AND dispositivo_id = $2 AND tipo = $3::tipo_alerta${porClave}
+          ORDER BY generada_en DESC LIMIT 1`,
+        parametros,
+      );
+      const f = rows[0];
+      return f === undefined
+        ? null
+        : {
+            id: f.id,
+            generadaEn: f.generada_en,
+            estado: f.estado,
+            archivada: f.archivada_en !== null,
+          };
+    });
+  }
+
+  async archivar(
+    copropiedadId: string,
+    alertaIds: readonly string[],
+    motivo: string,
+    actorId: string,
+    ahora: Date,
+  ): Promise<number> {
+    if (alertaIds.length === 0) return 0;
+    return this.conServicio(copropiedadId, async (c) => {
+      const { rowCount } = await c.query(
+        `UPDATE public.alertas
+            SET archivada_en = $3, archivada_por = $4, motivo_archivo = $5, actualizado_por = $4
+          WHERE copropiedad_id = $1 AND id = ANY($2::uuid[]) AND archivada_en IS NULL`,
+        [copropiedadId, [...alertaIds], ahora, actorId, motivo],
+      );
+      return rowCount ?? 0;
     });
   }
 }

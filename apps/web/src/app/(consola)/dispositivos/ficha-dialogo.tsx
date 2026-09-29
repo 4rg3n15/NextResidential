@@ -16,6 +16,14 @@ import { AccionesDeSitio } from './acciones-de-sitio';
 /** D3 (15-L) · los equipos que entregan video por RTSP. */
 const CON_VIDEO = new Set<Equipo['tipo']>(['camara_lpr', 'terminal_facial', 'intercom']);
 
+/** DD-MM-YYYY, como lo pide la ficha («dato del …»). */
+export const fechaCorta = (iso: string): string => {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${String(d.getFullYear())}`;
+};
+
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * O4 · LA FICHA DE UN EQUIPO EN SERVICIO
@@ -147,6 +155,16 @@ export const FichaDialogo = ({
           {sondeo.latenciaMs === null ? '' : ` · ${String(Math.round(sondeo.latenciaMs))} ms`}
         </p>
       )}
+
+      {/* E5 · 10 (15-M) · si el sondeo de hoy no leyó modelo y firmware, los guardados
+          se enseñan con la fecha en que se leyeron: nunca como si fueran de ahora. */}
+      {sondeo !== null && sondeo.identidadDel !== undefined && sondeo.identidadDel !== null ? (
+        <p className="text-secundario text-aviso-texto">
+          {sondeo.modelo ?? 'Modelo sin declarar'}
+          {sondeo.firmware === null ? '' : ` · ${sondeo.firmware}`} · dato del{' '}
+          {fechaCorta(sondeo.identidadDel)} (el sondeo de hoy no alcanzó el equipo)
+        </p>
+      ) : null}
 
       {aviso !== null ? (
         <p

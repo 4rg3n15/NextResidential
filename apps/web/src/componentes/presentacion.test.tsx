@@ -24,6 +24,18 @@ const dispositivo = (parcial: Partial<DispositivoDelTablero> = {}): DispositivoD
   // equipo recién instalado no tiene ningún problema que resolver.
   ultimoResultadoDeSincronizacion: null,
   sincronizacionesFallidas: 0,
+  // E5 (15-M) · el estado unificado, el mismo de la lista y la ficha.
+  estadoDelEquipo: {
+    enLinea: 'en_linea',
+    motivo: 'Con señal hace 30 s por su latido',
+    alcanzable: true,
+    autenticacion: 'aceptada',
+    autenticacionRechazadaHaceMin: null,
+    escucha: 'no_aplica',
+    ultimoEvento: null,
+    ultimoLatido: '2026-09-09T12:00:00Z',
+    ultimaSenal: '2026-09-09T12:00:00Z',
+  },
   ...parcial,
 });
 

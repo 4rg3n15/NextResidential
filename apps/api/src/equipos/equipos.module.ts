@@ -13,8 +13,13 @@ import {
   REPOSITORIO_DE_EQUIPOS,
   OLVIDO_DE_EQUIPO,
   SONDA_DE_EQUIPO,
+  RECEPTOR_ESPERADO,
 } from './aplicacion/puertos';
-import type { CorrectorDeEquipo, OlvidoDeEquipo } from './aplicacion/puertos';
+import type {
+  CorrectorDeEquipo,
+  OlvidoDeEquipo,
+  ResolutorDeReceptorEsperado,
+} from './aplicacion/puertos';
 import { LECTOR_DE_SENALES } from './aplicacion/senal-de-eventos';
 import type { LectorDeSenales } from './aplicacion/senal-de-eventos';
 import { PROVEEDOR_DE_EQUIPOS } from '../proveedores';
@@ -35,9 +40,16 @@ import { RepositorioDeEquiposPg } from './infraestructura/repositorio-equipos-pg
 import { SondaPorProveedor } from './infraestructura/sonda-por-proveedor';
 import { CorrectorPorProveedor } from './infraestructura/corrector-por-proveedor';
 import { CopropiedadDeEquipoEnCache } from './infraestructura/copropiedad-de-equipo-en-cache';
-import { IpDelMacPorInterfaces, SecretosDeLaDeclaracion } from './infraestructura/ip-del-mac';
+import { IpDelMacPorInterfaces, SecretosPropiosODeclarados } from './infraestructura/ip-del-mac';
+import {
+  SECRETOS_DE_ALARM_SERVER,
+  SecretosDeAlarmServerEnMemoria,
+} from './aplicacion/secretos-de-alarm-server';
+import type { SecretosDeAlarmServer } from './aplicacion/secretos-de-alarm-server';
+import { SecretosDeAlarmServerPg } from './infraestructura/secretos-de-alarm-server-pg';
 import {
   CambiarVerificacionRemota,
+  DesactivarReceptorHuerfano,
   EnviarEventosAEsteMac,
 } from './aplicacion/configuracion-en-sitio';
 import { ConfiguracionEnSitioController } from './presentacion/configuracion-en-sitio.controller';
@@ -89,21 +101,71 @@ export class EquiposModule {
         {
           // C2 (corrección de la 15-L) · «Enviar eventos a este Mac».
           provide: EnviarEventosAEsteMac,
-          inject: [REPOSITORIO_DE_EQUIPOS, CORRECTOR_DE_EQUIPO, CONFIGURACION, OLVIDO_DE_EQUIPO],
+          inject: [
+            REPOSITORIO_DE_EQUIPOS,
+            CORRECTOR_DE_EQUIPO,
+            CONFIGURACION,
+            OLVIDO_DE_EQUIPO,
+            SECRETOS_DE_ALARM_SERVER,
+          ],
           useFactory: (
             equipos: RepositorioDeEquipos,
             corrector: CorrectorDeEquipo,
             c: Configuracion,
             olvido: OlvidoDeEquipo,
+            propios: SecretosDeAlarmServer,
           ) =>
             new EnviarEventosAEsteMac(
               equipos,
               corrector,
               new IpDelMacPorInterfaces(c.ALARM_SERVER_IP_ANUNCIADA),
-              new SecretosDeLaDeclaracion(c.ALARM_SERVER_EQUIPOS),
+              // C6 (15-M) · el secreto PROPIO de la cámara (emitido en el alta)
+              // manda; la declaración del .env queda de respaldo; sin ninguno,
+              // se emite uno aquí mismo (cámaras anteriores a la 0045).
+              new SecretosPropiosODeclarados(propios, c.ALARM_SERVER_EQUIPOS),
               c.PORT,
               olvido,
             ),
+        },
+        {
+          /**
+           * C6 (15-M) · el secreto de Alarm Server de cada cámara: emitido en el
+           * alta, cifrado en `dispositivos` (0045) con la bóveda de equipos, y
+           * buscado por huella cuando la cámara publica. En memoria sólo sin
+           * base (la suite), como las atestaciones.
+           */
+          provide: SECRETOS_DE_ALARM_SERVER,
+          inject: [Pool, CONFIGURACION],
+          useFactory: (pool: Pool, c: Configuracion): SecretosDeAlarmServer =>
+            c.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new SecretosDeAlarmServerPg(pool, c.EQUIPOS_LLAVE)
+              : new SecretosDeAlarmServerEnMemoria(),
+        },
+        {
+          // E4 (15-M) · 7 · a dónde debería publicar un equipo: IP del Mac hacia él + PORT.
+          provide: RECEPTOR_ESPERADO,
+          inject: [CONFIGURACION],
+          useFactory: (c: Configuracion): ResolutorDeReceptorEsperado => {
+            const ips = new IpDelMacPorInterfaces(c.ALARM_SERVER_IP_ANUNCIADA);
+            return {
+              hacia: (host) => {
+                const ip = ips.hacia(host);
+                return ip.ip === null
+                  ? { ip: null, motivo: ip.motivo, puerto: c.PORT }
+                  : { ip: ip.ip, puerto: c.PORT };
+              },
+            };
+          },
+        },
+        {
+          // E4 (15-M) · «Desactivar el receptor huérfano» de terminal y videoportero.
+          provide: DesactivarReceptorHuerfano,
+          inject: [REPOSITORIO_DE_EQUIPOS, CORRECTOR_DE_EQUIPO, OLVIDO_DE_EQUIPO],
+          useFactory: (
+            equipos: RepositorioDeEquipos,
+            corrector: CorrectorDeEquipo,
+            olvido: OlvidoDeEquipo,
+          ) => new DesactivarReceptorHuerfano(equipos, corrector, olvido),
         },
         {
           // F2 (corrección de la 15-L) · el interruptor de la verificación remota.
@@ -225,7 +287,9 @@ export class EquiposModule {
         },
       ],
       exports: [
+        LECTOR_DE_SENALES,
         REPOSITORIO_DE_EQUIPOS,
+        SECRETOS_DE_ALARM_SERVER,
         TERMINALES_DE_ROSTROS,
         EQUIPOS_QUE_EMITEN,
         EQUIPOS_ACTIVOS,

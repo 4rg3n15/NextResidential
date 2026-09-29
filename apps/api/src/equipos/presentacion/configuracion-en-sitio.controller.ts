@@ -19,6 +19,7 @@ import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import {
   CambiarVerificacionRemota,
+  DesactivarReceptorHuerfano,
   EnviarEventosAEsteMac,
 } from '../aplicacion/configuracion-en-sitio';
 import type { ResultadoDeCorreccionDeEquipo } from '../aplicacion/puertos';
@@ -60,8 +61,31 @@ export class ConfiguracionEnSitioController {
   constructor(
     @Inject(EnviarEventosAEsteMac) private readonly enviar: EnviarEventosAEsteMac,
     @Inject(CambiarVerificacionRemota) private readonly verificacion: CambiarVerificacionRemota,
+    @Inject(DesactivarReceptorHuerfano) private readonly desactivar: DesactivarReceptorHuerfano,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
+
+  @Post('desactivar-receptor')
+  @HttpCode(200)
+  @Roles('superadministrador', 'administrador')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'E4 · apaga el receptor huérfano («HTTP listening») de una terminal o un videoportero, ' +
+      'que la plataforma escucha por su flujo, y lo lee de vuelta',
+  })
+  @ApiOkResponse({ type: ResultadoDeConfiguracionDto })
+  async desactivarReceptor(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('equipoId', ParseUUIDPipe) equipoId: string,
+    @Body() dto: MotivoDeConfiguracionDto,
+  ): Promise<ResultadoDeConfiguracionDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/receptor');
+    return desenvolver(
+      await this.desactivar.ejecutar(destino, copropiedadId, equipoId, dto.motivo),
+    );
+  }
 
   @Post('enviar-eventos-a-este-mac')
   @HttpCode(200)

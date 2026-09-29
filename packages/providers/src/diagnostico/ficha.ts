@@ -1,6 +1,7 @@
 import type { DiagnosticoDeEquipo, VideoDelEquipo } from './diagnostico-de-equipo';
 import type { ClaseDeCorreccion } from './correcciones';
 import { IMAGENES } from '../camara/receptor-en-el-equipo';
+import type { VeredictoDelReceptor } from '../camara/receptor-en-el-equipo';
 import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
 import { hallazgoDeRostros } from './hallazgo-de-rostros';
 
@@ -37,6 +38,13 @@ export interface HallazgoDelEquipo {
   readonly correccion: ClaseDeCorreccion | null;
 }
 
+export interface ReceptorDeLaFicha {
+  readonly host: string | null;
+  readonly puerto: number | null;
+  /** La ruta con el secreto oculto: `/alarm-server/••••`. */
+  readonly ruta: string;
+}
+
 export interface FichaDelEquipo {
   readonly modelo: string | null;
   readonly firmware: string | null;
@@ -44,6 +52,11 @@ export interface FichaDelEquipo {
   readonly horaDelEquipo: string | null;
   readonly desvioDeRelojSegundos: number | null;
   readonly hallazgos: readonly HallazgoDelEquipo[];
+  /**
+   * E4 (15-M) · a dónde publica el equipo, sin la ruta (lleva el secreto):
+   * la API compara con su propia dirección y dice si es el suyo.
+   */
+  readonly receptores?: readonly ReceptorDeLaFicha[];
   /** Consultas que no contestaron, con el motivo. Se enseñan. */
   readonly sinComprobar: readonly string[];
   /** H-SITIO-01 · lo que el equipo contestó, saneado. Sólo cámaras. */
@@ -315,6 +328,64 @@ const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
   );
 };
 
+/** `/alarm-server/<secreto>` → `/alarm-server/••••`: nada después del primer tramo sale. */
+const rutaOculta = (url: string | null): string => {
+  if (url === null) return '(sin ruta)';
+  const tramos = (url.split('?')[0] ?? '').split('/').filter((t) => t !== '');
+  if (tramos.length === 0) return '/';
+  return `/${[tramos[0], ...tramos.slice(1).map(() => '••••')].join('/')}`;
+};
+
+const receptoresDe = (receptor: VeredictoDelReceptor | null): readonly ReceptorDeLaFicha[] =>
+  receptor === null
+    ? []
+    : receptor.receptores
+        .filter((r) => r.host !== null && r.host !== '' && r.host !== '0.0.0.0')
+        .map((r) => ({ host: r.host, puerto: r.puerto, ruta: rutaOculta(r.url) }));
+
+/**
+ * E4 (15-M) · la terminal y el videoportero NO publican al servidor de
+ * alarmas: la plataforma los escucha por su flujo. Un receptor escrito en
+ * ellos es un resto de otra configuración que reintenta contra una dirección
+ * que ya no existe; se enseña y se ofrece apagarlo.
+ */
+const hallazgoDelReceptorHuerfano = (receptor: VeredictoDelReceptor | null): HallazgoDelEquipo => {
+  const base = {
+    campo: 'receptor de eventos (servidor de alarmas)',
+    valorCorrecto: 'ninguno: la plataforma escucha a este equipo, el push no hace falta',
+  } as const;
+  if (receptor === null || !receptor.leido) {
+    return {
+      ...base,
+      estado: 'no_comprobado',
+      valorLeido: null,
+      detalle: 'El equipo no devolvió su configuración de receptor',
+      correccion: null,
+    };
+  }
+  const activos = receptoresDe(receptor);
+  if (activos.length === 0) {
+    return {
+      ...base,
+      estado: 'conforme',
+      valorLeido: 'sin receptor',
+      detalle: 'No publica a ningún servidor de alarmas: correcto, la plataforma lo escucha',
+      correccion: null,
+    };
+  }
+  return {
+    ...base,
+    estado: 'aviso',
+    valorLeido: activos
+      .map((r) => `${r.host ?? '?'}:${String(r.puerto ?? 80)} ${r.ruta}`)
+      .join(' · '),
+    detalle:
+      'Tiene un receptor huérfano: este equipo no necesita publicar, la plataforma lo ESCUCHA. ' +
+      'Reintentará contra esa dirección hasta que se apague. Pulse «Desactivar el receptor huérfano»',
+    correccion: 'desactivar_receptor',
+  };
+};
+
 export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
   const hallazgos: HallazgoDelEquipo[] = [];
 
@@ -336,6 +407,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
     }
     if (diagnostico.video !== undefined) hallazgos.push(hallazgoDeVideo(diagnostico.video));
     hallazgos.push(hallazgoDelReloj(diagnostico));
+    hallazgos.push(hallazgoDelReceptorHuerfano(diagnostico.receptor));
     return {
       modelo: diagnostico.modelo,
       firmware: diagnostico.firmware,
@@ -343,6 +415,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
       horaDelEquipo: diagnostico.hora?.leida ?? null,
       desvioDeRelojSegundos: diagnostico.hora?.desvioSegundos ?? null,
       hallazgos,
+      receptores: receptoresDe(diagnostico.receptor),
       sinComprobar: diagnostico.sinRespuesta.map((s) => `${s.que}: ${s.motivo}`),
     };
   }
@@ -528,6 +601,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
     horaDelEquipo: diagnostico.hora?.leida ?? null,
     desvioDeRelojSegundos: diagnostico.hora?.desvioSegundos ?? null,
     hallazgos,
+    receptores: receptoresDe(diagnostico.receptor),
     sinComprobar: diagnostico.sinRespuesta.map((s) => `${s.que}: ${s.motivo}`),
     // H-SITIO-01: lo que el equipo contestó, saneado, para leerlo junto al veredicto.
     ...(diagnostico.crudos === undefined ? {} : { crudos: diagnostico.crudos }),

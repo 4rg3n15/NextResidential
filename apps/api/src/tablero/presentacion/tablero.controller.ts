@@ -1,4 +1,5 @@
 import { Controller, Get, Inject, NotFoundException, Param, ParseUUIDPipe } from '@nestjs/common';
+import { aEstadoDelEquipoDto } from '../../equipos';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
@@ -106,6 +107,7 @@ export class TableroController {
           modelo: d.modelo,
           firmware: administrativo ? d.firmware : null,
           estado: d.estado,
+          estadoDelEquipo: aEstadoDelEquipoDto(d.estadoDelEquipo),
           ultimoLatido: d.ultimoLatido === null ? null : d.ultimoLatido.toISOString(),
           ultimaSincronizacion:
             d.ultimaSincronizacion === null ? null : d.ultimaSincronizacion.toISOString(),

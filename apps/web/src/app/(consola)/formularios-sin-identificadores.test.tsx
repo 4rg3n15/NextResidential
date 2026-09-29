@@ -481,6 +481,13 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
     'datos personales en texto; el residente viaja en la ruta desde su fila, nadie lo teclea',
   'porteros/pool-y-baja.tsx':
     'cupo numérico y motivo en texto; el portero viaja en la ruta desde su fila, nadie lo teclea',
+  /**
+   * E5 / C7 (15-M) · archivar alertas: las alertas se MARCAN en la lista que
+   * devuelve la API y viajan por su id (en la ruta o en `ids`); lo único que
+   * se teclea es el motivo. Lo comprueba `eventos/alertas-abiertas.test.tsx`.
+   */
+  'eventos/alertas-abiertas.tsx':
+    'las alertas se marcan de la lista que devuelve la API; sólo el motivo se teclea; prueba propia del cuerpo',
 };
 
 /**

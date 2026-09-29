@@ -1,5 +1,7 @@
-import { estadoPorLatido, ventanaDelDia } from '@ncr/domain-core';
+import { ventanaDelDia } from '@ncr/domain-core';
 import type { Reloj, VentanaDelDia } from '@ncr/domain-core';
+import { aEstadoSalud, entradasDeEstado, estadoDelEquipo } from '../../equipos';
+import type { LectorDeSenales } from '../../equipos';
 import type {
   ConteosDeAlertas,
   ConteosDelPadron,
@@ -125,21 +127,48 @@ export class ConsultarDispositivos {
   constructor(
     private readonly repositorio: RepositorioTablero,
     private readonly reloj: Reloj,
+    /** E5 (15-M) · la señal de la escucha del proceso, la misma que ve la ficha. */
+    private readonly senales: LectorDeSenales = { senal: () => null },
   ) {}
 
+  /**
+   * E5 (15-M) · UNA sola fuente de verdad: `estadoDelEquipo` del módulo de
+   * equipos, con las mismas entradas que la lista y la ficha. El escalón
+   * `saludable / degradado / caido` del tablero sale de ahí (sin comprobar =
+   * caído, como antes), y el objeto completo viaja al lado para que la consola
+   * diga POR QUÉ.
+   */
   async ejecutar(copropiedadId: string): Promise<EstadoDeDispositivos> {
     const config = await this.repositorio.configuracion(copropiedadId);
     if (config === null) throw new CopropiedadDesconocida(copropiedadId);
 
     const ahora = this.reloj.ahora();
-    const dispositivos = (await this.repositorio.dispositivos(copropiedadId)).map((d) => ({
-      ...d,
-      estado: estadoPorLatido(d.ultimoLatido, ahora, config.umbralDeLatido),
-      segundosSinLatir:
-        d.ultimoLatido === null
-          ? null
-          : Math.max(0, Math.round((ahora.getTime() - d.ultimoLatido.getTime()) / 1000)),
-    }));
+    const iso = (d: Date | null | undefined): string | null =>
+      d === null || d === undefined ? null : d.toISOString();
+    const dispositivos = (await this.repositorio.dispositivos(copropiedadId)).map((d) => {
+      const unificado = estadoDelEquipo(
+        entradasDeEstado(
+          {
+            ultimoLatido: iso(d.ultimoLatido),
+            sondeadoEn: iso(d.sondeadoEn),
+            ultimoSondeo: d.ultimoSondeo ?? null,
+            credencialRechazadaEn: iso(d.credencialRechazadaEn),
+            umbralDeLatido: config.umbralDeLatido,
+          },
+          this.senales.senal(d.id),
+        ),
+        ahora,
+      );
+      return {
+        ...d,
+        estado: aEstadoSalud(unificado.enLinea),
+        estadoDelEquipo: unificado,
+        segundosSinLatir:
+          unificado.ultimaSenal === null
+            ? null
+            : Math.max(0, Math.round((ahora.getTime() - unificado.ultimaSenal.getTime()) / 1000)),
+      };
+    });
 
     const contar = (estado: string): number =>
       dispositivos.filter((d) => d.estado === estado).length;

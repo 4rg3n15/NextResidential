@@ -17,7 +17,8 @@ import type {
  *    con ella el servidor de alarmas que la cámara tiene escrito. Aquí se
  *    decide adónde apuntarla —la IP del Mac en la red de la cámara, o
  *    `ALARM_SERVER_IP_ANUNCIADA`—, con el puerto de esta API y la ruta con el
- *    secreto de la cámara (`ALARM_SERVER_EQUIPOS`).
+ *    secreto de la cámara (el suyo, emitido en el alta —C6, 15-M—, o el de
+ *    `ALARM_SERVER_EQUIPOS` para la cámara declarada a mano).
  *  · F2 (e) · «Verificación remota: activar/desactivar»: el plan B sin código.
  *
  * Las dos leen de vuelta (lo hace el proveedor), quedan en la auditoría con el
@@ -33,9 +34,17 @@ export interface ResolutorDeIpDelMac {
   ): { readonly ip: string } | { readonly ip: null; readonly motivo: string };
 }
 
-/** El secreto con el que la cámara se acredita en el servidor de alarmas. */
+/**
+ * El secreto con el que la cámara se acredita en el servidor de alarmas.
+ * C6 (15-M) · el propio de la cámara, el declarado en el .env o uno recién
+ * emitido, en ese orden: siempre hay uno, y quien lo elige es la infraestructura.
+ */
 export interface SecretosDelAlarmServer {
-  secretoDe(dispositivoId: string): string | null;
+  secretoPara(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipo: Pick<DatosDeEquipo, 'id' | 'host'>,
+  ): Promise<string>;
 }
 
 export type RepositorioDeLaFicha = Pick<
@@ -78,6 +87,18 @@ const accesoDe = (equipo: DatosDeEquipo, secreto: string) => ({
   secreto,
 });
 
+/** E4 (15-M) · los tipos que admiten un receptor HTTP («HTTP listening»). */
+export const PUBLICAN_POR_SERVIDOR_DE_ALARMAS: ReadonlySet<DatosDeEquipo['tipo']> = new Set([
+  'camara_lpr',
+  'terminal_facial',
+  'intercom',
+]);
+/** E4 (15-M) · los que la plataforma ESCUCHA: su receptor es un resto huérfano. */
+export const ESCUCHADOS_POR_LA_PLATAFORMA: ReadonlySet<DatosDeEquipo['tipo']> = new Set([
+  'terminal_facial',
+  'intercom',
+]);
+
 export class EnviarEventosAEsteMac {
   constructor(
     private readonly repo: RepositorioDeLaFicha,
@@ -97,27 +118,22 @@ export class EnviarEventosAEsteMac {
     const leido = await conCredencial(this.repo, ctx, copropiedadId, equipoId);
     if (!leido.ok) return leido;
     const { equipo, secreto } = leido.valor;
-    if (equipo.tipo !== 'camara_lpr') {
+    // E4 (15-M) · todo equipo que PUBLIQUE por servidor de alarmas: la cámara
+    // siempre; la terminal y el videoportero también lo admiten (aunque la
+    // API los escuche, en sitio los tres tenían un receptor escrito).
+    if (!PUBLICAN_POR_SERVIDOR_DE_ALARMAS.has(equipo.tipo)) {
       return fallo(
         errorDominio(
           'OPERACION_NO_PERMITIDA',
-          'Sólo la cámara publica en el servidor de alarmas: la terminal y el videoportero ' +
-            'los escucha la API por su cuenta',
-        ),
-      );
-    }
-    const secretoDeRuta = this.secretos.secretoDe(equipo.id);
-    if (secretoDeRuta === null) {
-      return fallo(
-        errorDominio(
-          'OPERACION_NO_PERMITIDA',
-          'La cámara no está declarada en ALARM_SERVER_EQUIPOS del .env de la API ' +
-            '(copropiedad|dispositivo|secreto|ip): sin su secreto la API rechazaría sus eventos',
+          'Este equipo no publica en un servidor de alarmas: el relé y el controlador de E/S ' +
+            'no emiten eventos por HTTP',
         ),
       );
     }
     const ip = this.ips.hacia(equipo.host);
     if (ip.ip === null) return fallo(errorDominio('OPERACION_NO_PERMITIDA', ip.motivo));
+    // C6 (15-M) · el secreto de ESTA cámara: propio, declarado o recién emitido.
+    const secretoDeRuta = await this.secretos.secretoPara(ctx, copropiedadId, equipo);
 
     const resultado = await this.corrector.corregir({
       ...accesoDe(equipo, secreto),
@@ -171,6 +187,54 @@ export class CambiarVerificacionRemota {
       ctx,
       copropiedadId,
       `${equipo.nombre} · verificación remota: ${resultado.valorAnterior ?? '(sin valor)'} → ` +
+        `${resultado.valorNuevo ?? '(sin cambio)'} · ${motivo}`,
+    );
+    this.olvido.olvidar(equipo.id);
+    return exito(resultado);
+  }
+}
+
+/**
+ * E4 (15-M) · «Desactivar el receptor huérfano». La terminal y el videoportero
+ * no necesitan publicar: la plataforma los ESCUCHA por su flujo. El receptor
+ * que traían del sitio (un «HTTP listening» a una dirección que ya no existe)
+ * reintenta en vano; aquí se apaga, se lee de vuelta y queda en la auditoría
+ * por el mismo camino que la verificación remota.
+ */
+export class DesactivarReceptorHuerfano {
+  constructor(
+    private readonly repo: RepositorioDeLaFicha,
+    private readonly corrector: CorrectorDeEquipo,
+    private readonly olvido: OlvidoDeEquipo,
+  ) {}
+
+  async ejecutar(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+    motivo: string,
+  ): Promise<Resultado<ResultadoDeCorreccionDeEquipo, ErrorDominio>> {
+    const leido = await conCredencial(this.repo, ctx, copropiedadId, equipoId);
+    if (!leido.ok) return leido;
+    const { equipo, secreto } = leido.valor;
+    if (!ESCUCHADOS_POR_LA_PLATAFORMA.has(equipo.tipo)) {
+      return fallo(
+        errorDominio(
+          'OPERACION_NO_PERMITIDA',
+          'Sólo la terminal y el videoportero tienen un receptor huérfano: la cámara SÍ necesita ' +
+            'publicar en el servidor de alarmas (use «Enviar eventos a este Mac»)',
+        ),
+      );
+    }
+    const resultado = await this.corrector.corregir({
+      ...accesoDe(equipo, secreto),
+      correccion: 'desactivar_receptor',
+      confirmadaPor: ctx.usuarioId,
+    });
+    await this.repo.auditarCorreccion(
+      ctx,
+      copropiedadId,
+      `${equipo.nombre} · receptor huérfano: ${resultado.valorAnterior ?? '(sin valor)'} → ` +
         `${resultado.valorNuevo ?? '(sin cambio)'} · ${motivo}`,
     );
     this.olvido.olvidar(equipo.id);

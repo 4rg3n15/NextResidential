@@ -51,6 +51,15 @@ export const PROPOSITOS = {
   codigoDePatrullaje: 'ncr:codigo-de-patrullaje:v1',
   /** 15-I (ADR-025) · el código de vinculación de cada plaza de ocupante. */
   codigoDeOcupante: 'ncr:codigo-de-ocupante:v1',
+  /** 15-M (C6) · el secreto con el que CADA cámara publica en el Alarm Server. */
+  secretoDeAlarmServer: 'ncr:secreto-de-alarm-server:v1',
+  /**
+   * 15-M (C6) · la HUELLA (HMAC) de ese secreto, para buscarlo al acreditar una
+   * publicación. Se deriva con sal FIJA y no por copropiedad: cuando llega el
+   * secreto todavía no se sabe de qué copropiedad es; la huella es lo que lo
+   * dice. Con llave: un volcado de la base no permite verificar uno adivinado.
+   */
+  huellaDeAlarmServer: 'ncr:huella-de-secreto-de-alarm-server:v1',
 } as const;
 
 export type Proposito = (typeof PROPOSITOS)[keyof typeof PROPOSITOS];

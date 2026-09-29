@@ -1,6 +1,10 @@
 import type { Pool, PoolClient } from 'pg';
 import { claimsDeServicio } from '../../comun/claims-de-servicio';
-import type { LatidoDeDispositivo, RepositorioDispositivos } from '../aplicacion/puertos';
+import type {
+  EstadoObservado,
+  LatidoDeDispositivo,
+  RepositorioDispositivos,
+} from '../aplicacion/puertos';
 
 /**
  * C4 (ETAPA 15-L) · el latido de cada equipo, en `dispositivos.ultimo_latido`.
@@ -39,6 +43,32 @@ export class RepositorioDispositivosPg implements RepositorioDispositivos {
             SET ultimo_latido = GREATEST(COALESCE(ultimo_latido, '-infinity'::timestamptz), $3)
           WHERE copropiedad_id = $1 AND id = $2 AND estado = 'activo'`,
         [copropiedadId, dispositivoId, ahora],
+      ),
+    );
+  }
+
+  async registrarEstado(
+    copropiedadId: string,
+    dispositivoId: string,
+    observado: EstadoObservado,
+    ahora: Date,
+  ): Promise<void> {
+    await this.como(copropiedadId, (c) =>
+      c.query(
+        `UPDATE public.dispositivos
+            SET estado_salud = $3::estado_dispositivo, salud_actualizada_en = $4,
+                sondeado_en = CASE WHEN $5::text IS NULL THEN sondeado_en ELSE $4 END,
+                ultimo_sondeo = COALESCE($5::text, ultimo_sondeo),
+                credencial_rechazada_en = CASE WHEN $6 THEN $4 ELSE credencial_rechazada_en END
+          WHERE copropiedad_id = $1 AND id = $2 AND estado = 'activo'`,
+        [
+          copropiedadId,
+          dispositivoId,
+          observado.estadoSalud,
+          ahora,
+          observado.sondeo,
+          observado.credencialRechazada,
+        ],
       ),
     );
   }
