@@ -148,6 +148,44 @@ const leer = async (cliente: ClienteDeEquipo, r: Recurso, e: EquipoDeEnsayo): Pr
   return respuesta.cuerpo;
 };
 
+/**
+ * OTROS FALLOS (15-M) · el respaldo se identifica por FAMILIA y SERIE, las dos.
+ *
+ * En el ensayo simulado todos los equipos decían la misma serie: con la serie
+ * sola como llave, la reversión de la cámara encontró el respaldo del
+ * videoportero y lo rechazó por ser de otra familia, y la segunda cámara pisó
+ * el fichero de la primera sin decirlo. En sitio dos familias no comparten
+ * serie, pero dos fichas que apuntan al MISMO aparato (IP repetida en el
+ * registro) sí: eso se dice, no se sobrescribe.
+ */
+export const ficheroDelRespaldo = (familia: FamiliaDeEnsayo, serie: string): string =>
+  `${familia}-${serie.replace(/[^A-Za-z0-9._-]/g, '_')}.json`;
+
+export const llaveDelRespaldo = (familia: FamiliaDeEnsayo, serie: string): string =>
+  `${familia}|${serie}`;
+
+/**
+ * El respaldo de ESTE equipo entre los leídos de la carpeta, o `null`. Nunca
+ * uno de otra familia aunque la serie coincida.
+ */
+export const respaldoPara = <R extends Pick<RespaldoDeEquipo, 'familia' | 'serie'>>(
+  respaldos: readonly R[],
+  familia: FamiliaDeEnsayo,
+  serie: string,
+): R | null => respaldos.find((r) => r.familia === familia && r.serie === serie) ?? null;
+
+/**
+ * C6 (15-M) · la SERIE del equipo, leída del propio aparato. Es lo que
+ * identifica un respaldo: con N equipos de la misma familia el nombre del
+ * fichero ya no puede ser la familia. `null` si el equipo no dijo quién es.
+ */
+export const leerSerieDelEquipo = async (equipo: EquipoDeEnsayo): Promise<string | null> => {
+  const cliente = new ClienteDeEquipo(equipo);
+  const id = rutaPara('leer la identidad del equipo (modelo, firmware, serie)', 'comun');
+  const identidad = await cliente.pedir(id.metodo, id.ruta);
+  return identidad.ok ? etiqueta(identidad.cuerpo, 'serialNumber') : null;
+};
+
 export const capturarRespaldo = async (
   equipo: EquipoDeEnsayo,
   ahora: Date,

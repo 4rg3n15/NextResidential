@@ -6,6 +6,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'documento_crudo_del_equipo_dto.dart';
 import 'hallazgo_del_equipo_dto.dart';
+import 'receptor_de_la_ficha_dto.dart';
 
 part 'ficha_del_equipo_dto.g.dart';
 
@@ -19,11 +20,14 @@ class FichaDelEquipoDto {
     required this.desvioDeRelojSegundos,
     required this.hallazgos,
     required this.sinComprobar,
+    this.receptores,
     this.crudos,
   });
   
   factory FichaDelEquipoDto.fromJson(Map<String, Object?> json) => _$FichaDelEquipoDtoFromJson(json);
   
+  /// E4 · los receptores («HTTP listening») que el equipo tiene escritos
+  final List<ReceptorDeLaFichaDto>? receptores;
   final String? modelo;
   final String? firmware;
   final String? serie;

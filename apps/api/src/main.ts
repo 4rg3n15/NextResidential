@@ -69,6 +69,8 @@ import type { Bitacora } from '@ncr/domain-core';
 import { ProveedorDeJwks } from './autenticacion';
 import { comprobarRecursosExternos } from './arranque/recursos-externos';
 import { SONDA_POSTGRES, recursoBaseDeDatos } from './arranque/sonda-postgres';
+import { abrirPuertoMientrasArranca } from './arranque/puerto-mientras-arranca';
+import { instalarCierreOrdenado } from './arranque/cierre-ordenado';
 import type { SondaDePostgres } from './arranque/sonda-postgres';
 import {
   recursoBucketDeEvidencia,
@@ -84,10 +86,15 @@ async function arrancar(): Promise<void> {
   // el proceso muere aquí con un motivo legible y un código de salida útil,
   // en vez de dentro del contenedor de inyección (§2.7.1).
   const config = cargarConfiguracion(process.env);
+  // Otros fallos (15-M) · mientras se construye todo, el puerto contesta 503.
+  const puertoDeArranque = await abrirPuertoMientrasArranca(config.PORT);
 
   const bitacoraDeArranque = new BitacoraEstructurada(undefined, config.LOG_LEVEL);
   const app = await NestFactory.create<NestExpressApplication>(AppModule.conConfiguracion(config), {
     logger: new AdaptadorDeBitacoraNest(bitacoraDeArranque),
+    // Otros fallos (15-M) · al cerrar, las conexiones abiertas (SSE de la consola,
+    // también las que reconectan durante el cierre) se cortan: no retienen el apagado.
+    forceCloseConnections: true,
   });
   const bitacora = app.get<Bitacora>(BITACORA);
 
@@ -145,8 +152,11 @@ async function arrancar(): Promise<void> {
   // Correlación primero, latencias después: el cronómetro se lee en el log de
   // la misma petición que lo produjo.
   app.useGlobalInterceptors(app.get(InterceptorDeCorrelacion), app.get(InterceptorDeLatencias));
-  app.enableShutdownHooks();
+  // Otros fallos (15-M) · cierre ordenado: corta el SSE, cierra módulos y
+  // pools, y no se cuelga (`cierre-ordenado.ts`). Sustituye a enableShutdownHooks.
+  instalarCierreOrdenado(app, bitacora);
 
+  await puertoDeArranque?.cerrar();
   await app.listen(config.PORT);
   bitacora.registrar('info', 'API arrancada', { puerto: config.PORT, entorno: config.NODE_ENV });
 

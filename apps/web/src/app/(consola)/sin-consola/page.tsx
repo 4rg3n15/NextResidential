@@ -3,11 +3,12 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { sesionActual } from '@/lib/sesion/servidor';
 
-export const metadata: Metadata = { title: 'Tu aplicación llega en la ETAPA 11' };
+export const metadata: Metadata = { title: 'Sin consola para esta identidad' };
 export const dynamic = 'force-dynamic';
 
 /**
- * El residente que entra por el navegador.
+ * La identidad que entra por el navegador sin tener consola (hoy, sólo la de
+ * servicio: desde la 15-M el residente tiene la suya en `/mi`, D-12).
  *
  * **No es «sin permiso», y antes lo decía.** Reusaba `EstadoSinPermiso`, con su
  * candado y su título «Sin permiso», y eso describe mal el hecho: el residente
@@ -23,6 +24,8 @@ export const dynamic = 'force-dynamic';
 const SinConsola = async (): Promise<JSX.Element> => {
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
+  // 15-M (D-12) · el residente YA tiene consola: su inicio es «Mi vivienda».
+  if (sesion.rol === 'residente') redirect('/mi');
 
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-6 py-16 text-center">
@@ -45,38 +48,11 @@ const SinConsola = async (): Promise<JSX.Element> => {
         </svg>
       </div>
 
-      <h1 className="text-titulo text-texto">Tu acceso está listo</h1>
+      <h1 className="text-titulo text-texto">Esta identidad no usa la consola</h1>
       <p className="mt-2 text-cuerpo text-texto-apagado">
-        La consola web es para la administración y la portería. Como residente, tu superficie es la
-        aplicación móvil de Next Control Residencial, que se entrega en la{' '}
-        <strong className="font-semibold text-texto">ETAPA 11</strong>.
-      </p>
-
-      <div className="mt-8 w-full rounded-tarjeta border border-borde bg-tarjeta p-5 text-left">
-        <p className="text-etiqueta uppercase tracking-wide text-texto-apagado">
-          Lo que podrás hacer desde la aplicación
-        </p>
-        <ul className="mt-3 space-y-2 text-cuerpo text-texto">
-          {[
-            'Autorizar visitantes, con vigencia y acompañantes',
-            'Registrar los vehículos de tu vivienda',
-            'Solicitar acceso a las zonas comunes',
-            'Consultar el historial de accesos de tu vivienda',
-          ].map((linea) => (
-            <li key={linea} className="flex items-start gap-2">
-              <span
-                aria-hidden="true"
-                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-marca"
-              />
-              {linea}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <p className="mt-6 text-secundario text-texto-apagado">
-        Mientras tanto, tu cuenta ya está activa y tus autorizaciones las puede crear por ti la
-        administración de tu copropiedad.
+        La consola web es para las personas: administración, portería, guardia virtual y residentes.
+        Una identidad de servicio o integración se conecta a la API por su propio canal y no tiene
+        pantallas aquí.
       </p>
     </div>
   );

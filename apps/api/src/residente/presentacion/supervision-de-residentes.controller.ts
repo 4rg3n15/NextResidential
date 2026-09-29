@@ -20,8 +20,14 @@ import {
   CuentasDeResidentesDelSuperadmin,
   OcupantesDelSuperadmin,
 } from '../aplicacion/supervision-de-residentes';
-import { AltaDeCuentaDeResidenteDto, AnadirOcupantesDto, RetiroDeOcupanteDto } from './dtos-hogar';
 import {
+  AltaDeCuentaDeResidenteDto,
+  AnadirOcupantesDto,
+  BajaDeResidenteDto,
+  RetiroDeOcupanteDto,
+} from './dtos-hogar';
+import {
+  CuentaDadaDeBajaDto,
   CuentaDeResidenteCreadaDto,
   CuentaDeResidenteDto,
   PlazaDeOcupanteDto,
@@ -82,6 +88,30 @@ export class SupervisionDeResidentesController {
     }
     if (r.rechazo.motivo === 'FORMATO') throw new BadRequestException(r.rechazo.detalle);
     throw new ConflictException('El proveedor de identidad no aceptó la cuenta');
+  }
+
+  /**
+   * C9 (15-M) · «Eliminar» un residente es darlo de BAJA con motivo (RN-19,
+   * CA-02): superadministrador y administrador. La cuenta y el rol quedan
+   * inactivos (el gancho de claims ya no emite tokens: sesión revocada al
+   * siguiente refresco), los vínculos de vivienda se cierran, las plantillas se
+   * suprimen (RN-11) y las autorizaciones vigentes se conservan (RN-13).
+   */
+  @Post('cuentas/:usuarioId/baja')
+  @HttpCode(200)
+  @Roles('superadministrador', 'administrador')
+  @ApiOperation({ summary: 'Da de baja a un residente con motivo; nunca borrado físico (RN-19)' })
+  @ApiOkResponse({ type: CuentaDadaDeBajaDto })
+  async baja(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('usuarioId', ParseUUIDPipe) usuarioId: string,
+    @Body() dto: BajaDeResidenteDto,
+  ): Promise<CuentaDadaDeBajaDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, id, 'residentes/cuentas');
+    const r = await this.cuentas.baja(destino, id, usuarioId, dto.motivo.trim());
+    if (r === null) throw new NotFoundException('No hay un residente activo con ese identificador');
+    return { dadaDeBaja: true, plantillasSuprimidas: r.plantillasSuprimidas };
   }
 
   @Get('vehiculos')

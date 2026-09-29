@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mic, MicOff, PhoneCall, PhoneOff, Siren } from 'lucide-react';
 import { AvisoDeLlamada } from '@/componentes/aviso-de-llamada';
 import { ControlesDeAudio } from '@/componentes/controles-de-audio';
-import { VideoEnVivo } from '@/componentes/video-en-vivo';
+import { EquiposEnVivo } from './equipos-en-vivo';
 import type { LlamadaEntrante } from '@/lib/sse/llamadas';
 import type { EnAtencion } from '@ncr/contracts';
 import { cliente, desenvolver, ErrorDeApi } from '@/lib/api/cliente';
@@ -133,17 +133,28 @@ export const PantallaDeGuardiaVirtual = ({
     setError(e instanceof ErrorDeApi ? e.message : 'No se pudo completar. Vuelve a intentarlo.');
   };
 
+  /**
+   * Otros fallos (15-M) · el equipo viaja con la acción: al terminar una
+   * llamada se suelta el canal del equipo de ESA llamada, aunque el foco ya
+   * haya cambiado cuando la petición sale.
+   */
   const audio = useMutation({
-    mutationFn: async (accion: 'abrir' | 'cerrar') =>
+    mutationFn: async ({
+      accion,
+      dispositivoId,
+    }: {
+      accion: 'abrir' | 'cerrar';
+      dispositivoId: string;
+    }) =>
       desenvolver(
         accion === 'abrir'
           ? await cliente.POST('/copropiedades/{id}/guardia/intercom/abrir', {
               params: { path: { id: copropiedadId } },
-              body: { dispositivoId: foco?.dispositivoId ?? '' },
+              body: { dispositivoId },
             })
           : await cliente.POST('/copropiedades/{id}/guardia/intercom/cerrar', {
               params: { path: { id: copropiedadId } },
-              body: { dispositivoId: foco?.dispositivoId ?? '' },
+              body: { dispositivoId },
             }),
       ),
     onSuccess: invalidar,
@@ -302,7 +313,19 @@ export const PantallaDeGuardiaVirtual = ({
               }
               accion={
                 llamada === null ? undefined : (
-                  <Boton variante="secundario" tamano="sm" onClick={() => setLlamada(null)}>
+                  <Boton
+                    variante="secundario"
+                    tamano="sm"
+                    onClick={() => {
+                      // Otros fallos (15-M) · terminar la llamada suelta el turno o
+                      // la cola del canal: si no, el operador lo recibía después y
+                      // lo retenía 90 s sin nadie hablando.
+                      if (foco !== undefined && (tienePalabra || esperandoTurno)) {
+                        audio.mutate({ accion: 'cerrar', dispositivoId: foco.dispositivoId });
+                      }
+                      setLlamada(null);
+                    }}
+                  >
                     <PhoneOff className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
                     Terminar llamada
                   </Boton>
@@ -314,14 +337,6 @@ export const PantallaDeGuardiaVirtual = ({
                 <EstadoVacio titulo="Nadie seleccionado" descripcion="La cola está vacía." />
               ) : (
                 <div className="space-y-4">
-                  {/*
-                    A5 (15-E) · VIDEO EN VIVO por WHEP a través de la API: el
-                    navegador nunca ve RTSP ni credenciales. El componente
-                    mide negociación y primer cuadro (KPI-33) y dice con su
-                    causa cada negativa.
-                  */}
-                  <VideoEnVivo copropiedadId={copropiedadId} dispositivoId={foco.dispositivoId} />
-
                   {/* ── Audio: exclusivo por dispositivo (ADR-01) ── */}
                   <div className="flex flex-wrap items-center gap-2 rounded-tarjeta border border-borde px-3 py-2">
                     <Distintivo tono={tienePalabra ? 'exito' : esperandoTurno ? 'aviso' : 'neutro'}>
@@ -335,7 +350,15 @@ export const PantallaDeGuardiaVirtual = ({
                       variante={tienePalabra ? 'secundario' : 'primario'}
                       tamano="sm"
                       cargando={audio.isPending}
-                      onClick={() => audio.mutate(tienePalabra ? 'cerrar' : 'abrir')}
+                      onClick={() =>
+                        // Otros fallos (15-M) · «Salir de la cola» SUELTA el puesto
+                        // en la cola; antes volvía a pedir el canal y el operador
+                        // seguía esperando su turno.
+                        audio.mutate({
+                          accion: tienePalabra || esperandoTurno ? 'cerrar' : 'abrir',
+                          dispositivoId: foco.dispositivoId,
+                        })
+                      }
                     >
                       {tienePalabra ? (
                         <>
@@ -432,6 +455,17 @@ export const PantallaDeGuardiaVirtual = ({
               )}
             </CuerpoDeTarjeta>
           </Tarjeta>
+
+          {/*
+            C10 (15-M) · el VIDEO ya no cuelga del foco: cualquier cámara,
+            terminal o videoportero activo, con apertura por equipo y motivo,
+            y la línea de tiempo del equipo elegido. La llamada propone el suyo.
+          */}
+          <EquiposEnVivo
+            copropiedadId={copropiedadId}
+            propuesto={foco?.dispositivoId}
+            eventoId={foco?.eventoId}
+          />
         </div>
       </div>
 

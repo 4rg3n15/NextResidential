@@ -9,7 +9,8 @@
 > Documentos de apoyo: [`INTEGRACION_HIKVISION.md`](INTEGRACION_HIKVISION.md)
 > (cada equipo en detalle), [`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md)
 > (la hoja de los 16 escenarios), [`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) (la app
-> en el iPhone).
+> en el iPhone) y, desde la 15-M, [`VISITA-29-09.md`](VISITA-29-09.md) (los ajustes
+> en el panel web de cada equipo y cómo los comprueba la plataforma).
 
 ## Índice
 
@@ -36,10 +37,12 @@ Con Internet, en la oficina:
    `.sitio/go2rtc.yaml` escrito desde el `.env`. Anote el SHA-256 que imprime.
 3. `pnpm sitio:ensayo -- --simulado`: el ensayo entero contra los equipos
    simulados. Tiene que terminar en `VEREDICTO: SIN FALLOS`. Si no, no salga.
-4. En `apps/api/.env`, los tres equipos: `BARRERA_*`, `TERMINAL_*`,
-   `VIDEOPORTERO_*` (`HOST`, `PUERTO`, `USUARIO`, `CLAVE`, `CANAL`), con el
-   usuario de servicio de cada uno. **Sólo en ese fichero**: ni en la hoja, ni en
-   un documento, ni en una foto.
+4. **Los equipos, en la consola** (Dispositivos → alta), N de cada tipo, con su
+   IP, usuario y credencial: el ensayo, la puesta en marcha y el respaldo los
+   leen de ahí (15-M, C6). `BARRERA_*`, `TERMINAL_*` y `VIDEOPORTERO_*`
+   (`HOST`, `PUERTO`, `USUARIO`, `CLAVE`, `CANAL`) en `apps/api/.env` quedan de
+   respaldo, sólo si la base no está. Las credenciales, **sólo en la consola o en
+   ese fichero**: ni en la hoja, ni en un documento, ni en una foto.
 5. La app en el iPhone, **compilada en Release** con el nombre `.local` del Mac
    (`--dart-define=API_URL=http://<nombre>.local:3000`), instalada **una sola
    vez** con cable y abierta después desde el ícono, sin cable ni Mac conectado
@@ -96,6 +99,42 @@ El **cortafuegos del Mac** tiene que aceptar conexiones entrantes de `node`
 (Ajustes del Sistema → Red → Cortafuegos → Opciones); si macOS pregunta al
 arrancar la API, **Permitir**. Sin eso, ni Safari ni la app del iPhone llegan.
 
+### 1 bis · Video: qué genera `pnpm sitio:video` y qué se comprobó con el binario
+
+Lo visto el 28/09 y lo que cambió (15-M, E2/C1):
+
+- `.sitio/go2rtc.yaml` **no lleva `streams:`** —ni `streams: {}`—: con esa
+  clave go2rtc rechazaba el alta de cada flujo con `400 … did not find
+expected key`. Se escribe con **permisos 0600**, y si en el fichero quedó un
+  `streams:` de una versión anterior (con la URL RTSP y la credencial dentro),
+  el guion **lo retira al arrancar y al cerrar** y lo dice por pantalla.
+- La API registra cada flujo con **`PATCH /api/streams`** (antes `PUT`): el
+  flujo vive **en memoria** y go2rtc **no escribe nada al fichero**, así que la
+  credencial del equipo no toca el disco (RN-21). **Ojo:** la versión oficial
+  de go2rtc (v1.9.14) devuelve esa fuente **en claro** por `GET /api/streams`;
+  la compilación de camera.ui la tachaba. Por eso la API de go2rtc escucha
+  sólo en `127.0.0.1` y `pnpm sitio:video` se niega a abrirla a la red sin
+  `--api-en-red`: sólo la lee quien ya está en el Mac.
+- La fuente lleva **`#backchannel=0`**. Sin él, go2rtc pide en el DESCRIBE el
+  canal de retorno ONVIF (`Require: www.onvif.org/ver20/backchannel`); un
+  equipo que cierra la conexión ante eso —y rechaza la reconexión inmediata—
+  produce el `HTTP 500 · EOF` de la visita anterior. El audio de la guardia no
+  va por ahí (ADR-01), así que no se pierde nada.
+- **Sin STUN** (`ice_servers: []`): consola y puente están en la misma red. Con
+  el STUN de Google por omisión y sin Internet, cada negociación tardaba **5 s
+  exactos** (lo que expira la recogida ICE); ahora contesta enseguida.
+- La ficha del equipo ofrece **la lista de canales de video que el equipo
+  declara** (`Streaming/channels`), con su códec, y propone el subflujo
+  (`x02`). «No tiene el canal 102» ya no se adivina: se elige.
+- Con `GO2RTC_URL` en el `.env`, el **paso 7 de `pnpm sitio:ensayo`** además
+  negocia WebRTC de verdad contra go2rtc (PATCH + `POST /api/webrtc`) y mide
+  los milisegundos; sin credencial en ninguna línea.
+
+Todo esto está probado contra el binario real (go2rtc 1.9.14): con
+`GO2RTC_BIN=<ruta al binario>` las pruebas `servidor-rtsp.go2rtc.test.ts` y
+`puente-go2rtc.real.test.ts` lo repiten en el escritorio; sin la variable se
+omiten con nombre («OMITIDA: sin GO2RTC_BIN»).
+
 > **Si el paso 3 dice que faltan migraciones**, la API arrancada sin ellas falla
 > al leer dispositivos (la 0041 añade el canal de video). Pare la API, haga el
 > paso 3 y vuelva a arrancarla. Por eso las comprobaciones van antes que nada más.
@@ -112,8 +151,11 @@ pnpm sitio:ensayo -- --capturar=$HOME/ncr-sitio/respaldo
 Guarda, por equipo, la configuración que la entrega puede cambiar: quién
 controla la barrera, a qué receptor publica la cámara, su disparador y su país;
 si la terminal espera el veredicto; los canales de audio del videoportero.
-Ficheros `0600`, uno por equipo. Un documento que lleve una contraseña se guarda
-**sin ella** y queda marcado «se restaura a mano».
+Ficheros `0600`, uno por equipo, con la familia y el número de serie del aparato
+en el nombre (15-M). Si dos fichas dan la misma serie —dos entradas con la IP
+del mismo equipo—, la segunda no pisa a la primera: se dice y cuenta como
+fallo. Un documento que lleve una contraseña se guarda **sin ella** y queda
+marcado «se restaura a mano».
 
 **Después, las comprobaciones del Mac**, sin mover nada:
 
@@ -160,7 +202,8 @@ escriba el motivo («entrega en sitio») y pulse **«Enviar eventos a este Mac»
 
 - la API toma la IP del Mac **en la red de la cámara** (o
   `ALARM_SERVER_IP_ANUNCIADA` si la definió), el puerto de la API y la ruta con
-  el secreto de `ALARM_SERVER_EQUIPOS`;
+  el secreto de **esa** cámara: el que la API emitió al darla de alta en la
+  consola o, para la cámara del 28/09, el de `ALARM_SERVER_EQUIPOS` (15-M, C6);
 - la escribe en el servidor de alarmas de la cámara y **la lee de vuelta**: sólo
   dice «aplicada» si la cámara quedó apuntando ahí;
 - queda en la auditoría con la dirección anterior y la nueva (nunca el secreto).
@@ -310,8 +353,8 @@ pnpm sitio:ensayo -- --restaurar=$HOME/ncr-sitio/respaldo
 Por cada documento: `igual` (no se tocó), `restaurado` (se escribió **y se
 releyó igual**), `fallo` (el equipo dijo «OK» pero la lectura no coincide:
 hágalo en su panel web) o `no_restaurable` (llevaba contraseña o no se pudo
-leer al capturarlo: a mano). Un respaldo de otro equipo —otra serie— no se
-aplica. La hora y la zona **no** se restauran: se dejan bien.
+leer al capturarlo: a mano). Cada equipo busca **su** respaldo por familia y
+número de serie; uno de otro equipo —otra serie u otra familia— no se aplica. La hora y la zona **no** se restauran: se dejan bien.
 
 La persona de prueba del paso 6 ya se dio de baja en el ensayo; si el ensayo
 dijo lo contrario, bórrela en el panel de la terminal por su número (`ENSAYO…`).
@@ -329,6 +372,7 @@ Lo que se hace si algo no funciona el día de la entrega. Ninguno exige código.
 | **Cualquiera**                | Rechaza la conexión de eventos, o un rostro cargado desaparece    | Otra plataforma —HikCentral— tiene el equipo: **deshabilítelo en HikCentral durante la prueba** y repita el paso. El ensayo y la ficha lo dicen con esas palabras.                                                                                                                                                                                                                                                                        |
 | **Terminal**                  | El rostro no se sincroniza                                        | Seguimiento por terminal en la consola: el motivo sale en palabras (foto, persona, biblioteca llena). El visitante entra por Portería con motivo, o por placa.                                                                                                                                                                                                                                                                            |
 | **Videoportero**              | Sin audio                                                         | Habilitar el audio bidireccional en su panel y «Probar conexión». Si no hay forma: la guardia llama al **teléfono de portería** (configurado en Ajustes) y abre desde la consola.                                                                                                                                                                                                                                                         |
-| **Videoportero / cualquiera** | Video negro o «sin señal»                                         | «Probar conexión» dice el códec: H.265 → subflujo a H.264 en el panel, o canal `101` en la ficha. ICE: `VIDEO_IP_ANUNCIADA` y `pnpm sitio:video` de nuevo.                                                                                                                                                                                                                                                                                |
+| **Videoportero / cualquiera** | Video negro o «sin señal»                                         | «Probar conexión» dice el códec: H.265 → subflujo a H.264 en el panel, o el canal en la ficha (la lista muestra los que declara el equipo). ICE: `VIDEO_IP_ANUNCIADA` y `pnpm sitio:video` de nuevo.                                                                                                                                                                                                                                      |
+| **Cualquiera**                | La consola dice el motivo del video en palabras                   | Cada frase trae su remedio: «go2rtc no está en marcha» → `pnpm sitio:video`; «`streams:` sobrante» → parar y rearrancar `pnpm sitio:video` (regenera el fichero); «el equipo cerró la conexión (backchannel)» → canal de la ficha y permiso de vista en vivo del usuario de servicio; «no tiene ese canal» → otro canal de la lista; «rechazó la credencial por RTSP» → permiso de vista en vivo en el panel del equipo (§1 bis).         |
 | **Cualquiera**                | «Rechazó el usuario o la clave»                                   | No reintentar. Corregir el `.env` y la credencial en la ficha (sólo reemplazable). Si el equipo bloqueó la IP del Mac, esperar su tiempo de bloqueo.                                                                                                                                                                                                                                                                                      |
 | **El Mac o la red**           | Nada contesta                                                     | Todo el sistema funciona contra los simulados: `PROVEEDOR_DE_EQUIPOS=simulado` y reinicio de la API. La demostración de la plataforma sigue; los hitos con hardware quedan para otra visita, dicho así en la hoja.                                                                                                                                                                                                                        |

@@ -10,6 +10,7 @@ import type { FotoLista } from '@/componentes/captura-de-foto';
 import { Campo } from '@/componentes/ui/campo';
 import { Ayuda } from '@/componentes/ui/ayuda';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
+import { useCuandoAlAbrir } from '@/lib/use-cuando-al-abrir';
 import {
   clavesDeVisitas,
   textoDeLaCasilla,
@@ -35,17 +36,8 @@ export const DURACIONES = [
   { minutos: 1440, etiqueta: '24 horas' },
 ] as const;
 
-/** Hoy y la hora actual, en hora local del navegador, para precargar el formulario. */
-const ahoraLocal = (): { fecha: string; hora: string } => {
-  const d = new Date();
-  const dos = (n: number): string => String(n).padStart(2, '0');
-  return {
-    fecha: `${String(d.getFullYear())}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`,
-    hora: `${dos(d.getHours())}:${dos(d.getMinutes())}`,
-  };
-};
-
-const MOTIVOS_DE_FOTO: Readonly<Record<string, string>> = {
+/** Por qué la foto no sirvió, en castellano. Lo comparte «Visitas» del residente (15-M). */
+export const MOTIVOS_DE_FOTO: Readonly<Record<string, string>> = {
   ROSTROS_MULTIPLES: 'se ve más de un rostro',
   SIN_ROSTRO: 'no se ve ningún rostro',
   NITIDEZ: 'la foto está borrosa',
@@ -73,14 +65,12 @@ export const GenerarAutorizacion = ({
   const consultas = useQueryClient();
   const viviendas = useViviendasDeVisitas(copropiedadId);
   const casilla = useTextoDeLaCasilla(copropiedadId);
-  const inicial = ahoraLocal();
+  const { fecha, hora, setFecha, setHora, reponer } = useCuandoAlAbrir(abierto);
 
   const [nombre, setNombre] = useState('');
   const [tipoDocumento, setTipo] = useState<TipoDeDocumento>('cedula');
   const [documento, setDocumento] = useState('');
   const [viviendaId, setViviendaId] = useState('');
-  const [fecha, setFecha] = useState(inicial.fecha);
-  const [hora, setHora] = useState(inicial.hora);
   const [duracion, setDuracion] = useState(120);
   const [placa, setPlaca] = useState('');
   const [foto, setFoto] = useState<FotoLista | null>(null);
@@ -101,6 +91,7 @@ export const GenerarAutorizacion = ({
     casillaMarcada;
 
   const limpiar = (): void => {
+    reponer();
     setNombre('');
     setDocumento('');
     setViviendaId('');
@@ -168,6 +159,12 @@ export const GenerarAutorizacion = ({
       {resultado !== null ? (
         <div role="status" className="space-y-1 rounded-md border border-borde p-3 text-secundario">
           <p className="font-medium text-texto">Autorización generada.</p>
+          {/* C9 (15-M) · la placa, confirmada con nombre y las dos fechas, tal como la escribe la API. */}
+          {resultado.confirmacionDePlaca !== null ? (
+            <p role="status" className="font-medium text-exito-texto">
+              {resultado.confirmacionDePlaca}
+            </p>
+          ) : null}
           <p>
             Foto enviada a {String(resultado.sincronizadas)} de {String(resultado.equipos)} equipos
             {resultado.fallidas > 0 ? `; ${String(resultado.fallidas)} no la aceptaron` : ''}.

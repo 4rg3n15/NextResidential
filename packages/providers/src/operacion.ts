@@ -45,7 +45,14 @@ export { equiposSimulados, aperturasFisicasPor } from './simulacion/equipo-simul
 // reversión de la configuración, y el informe sin credenciales.
 export { ensayarEquipo } from './ensayo/ensayo-en-sitio';
 export type { InformeDeEnsayo } from './ensayo/ensayo-en-sitio';
-export { capturarRespaldo, restaurarRespaldo } from './ensayo/respaldo-de-configuracion';
+export {
+  capturarRespaldo,
+  ficheroDelRespaldo,
+  leerSerieDelEquipo,
+  llaveDelRespaldo,
+  respaldoPara,
+  restaurarRespaldo,
+} from './ensayo/respaldo-de-configuracion';
 export type { RespaldoDeEquipo, ResultadoDeRestauracion } from './ensayo/respaldo-de-configuracion';
 export { lineasDelInforme, recuentoDe, sinSecretosConocidos } from './ensayo/informe-de-ensayo';
 export { GESTO } from './ensayo/paso-de-eventos';

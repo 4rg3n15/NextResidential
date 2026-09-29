@@ -21,7 +21,7 @@ import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { MideKpi } from '../../observabilidad';
-import { MiVisitaDto, RepetirVisitaDto } from '../../visitas';
+import { MiVisitaDto, RepetirVisitaDto, confirmacionDePlaca, hastaDe } from '../../visitas';
 import { GenerarMiVisita, MisUltimosVisitantes, VolverAAutorizar } from '../aplicacion/mis-visitas';
 import type { ResultadoDeMiVisita } from '../aplicacion/mis-visitas';
 import { MiVisitaGeneradaDto, VisitanteRecienteDto } from './respuestas';
@@ -43,7 +43,15 @@ const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
   }
 };
 
-const aRespuesta = (r: ResultadoDeMiVisita): MiVisitaGeneradaDto => {
+/**
+ * C9 (15-M) · la confirmación de la placa sale de lo que el residente ENVIÓ:
+ * placa, nombre, inicio y duración. En «volver a autorizar» el cuerpo no trae
+ * ni nombre ni placa, así que va nula ([SUPUESTO] S-132).
+ */
+const aRespuesta = (
+  r: ResultadoDeMiVisita,
+  confirmacion: string | null = null,
+): MiVisitaGeneradaDto => {
   const vacia = {
     motivo: null,
     explicacion: null,
@@ -52,6 +60,7 @@ const aRespuesta = (r: ResultadoDeMiVisita): MiVisitaGeneradaDto => {
     sincronizadas: 0,
     fallidas: 0,
     avisoDeSincronizacion: null,
+    confirmacionDePlaca: null,
   };
   if (r.creada) {
     const s = r.sincronizacion ?? null;
@@ -64,6 +73,7 @@ const aRespuesta = (r: ResultadoDeMiVisita): MiVisitaGeneradaDto => {
       sincronizadas: s?.sincronizadas ?? 0,
       fallidas: s?.fallidas ?? 0,
       avisoDeSincronizacion: r.avisoDeSincronizacion ?? null,
+      confirmacionDePlaca: confirmacion,
     };
   }
   if ('motivosDeFoto' in r) {
@@ -128,6 +138,12 @@ export class MisVisitasController {
           claveDeIdempotencia: dto.claveDeIdempotencia,
         }),
       ),
+      confirmacionDePlaca({
+        placa: dto.placa ?? null,
+        visitante: dto.nombre,
+        desde: new Date(dto.inicio),
+        hasta: hastaDe(new Date(dto.inicio), dto.duracionMinutos),
+      }),
     );
   }
 

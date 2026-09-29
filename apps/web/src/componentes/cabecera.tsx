@@ -82,7 +82,13 @@ export const Cabecera = ({
         activa={alcance.copropiedadId}
         alcanceGlobal={alcance.alcanceGlobal}
       />
-      <BuscadorGlobal copropiedadId={alcance.copropiedadId} />
+      {/* 15-M · el buscador consulta el padrón, que la API no le da al residente:
+          no se le pinta un campo que sólo devolvería rechazos. [SUPUESTO] S-155. */}
+      {sesion.rol === 'residente' ? (
+        <div className="flex-1" />
+      ) : (
+        <BuscadorGlobal copropiedadId={alcance.copropiedadId} />
+      )}
 
       <IndicadorDeCanal estado={estadoDelCanal} />
 

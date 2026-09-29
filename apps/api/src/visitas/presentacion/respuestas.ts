@@ -1,5 +1,6 @@
 import type { FotoEnEquipo, VisitaListada } from '../aplicacion/puertos';
 import type { ResultadoDeVisita } from '../aplicacion/generar-visita';
+import { confirmacionDePlaca } from '../aplicacion/confirmacion-de-placa';
 import type { FotoEnEquipoDto, VisitaDto, VisitaGeneradaDto } from './dtos';
 
 /** El agregado nunca sale crudo: DTO y mapeador (§2.2). */
@@ -23,6 +24,12 @@ export const aVisita = (v: VisitaListada): VisitaDto => ({
   plantillaId: v.plantillaId,
   equiposSincronizados: v.equiposSincronizados,
   equiposFallidos: v.equiposFallidos,
+  confirmacionDePlaca: confirmacionDePlaca({
+    placa: v.placa,
+    visitante: v.visitante,
+    desde: v.desde,
+    hasta: v.hasta,
+  }),
 });
 
 export const aFotoEnEquipo = (e: FotoEnEquipo): FotoEnEquipoDto => ({
@@ -45,6 +52,7 @@ export const aGenerada = (r: ResultadoDeVisita): VisitaGeneradaDto => {
       fallidas: 0,
       porEquipo: [],
       avisoDeSincronizacion: null,
+      confirmacionDePlaca: null,
     };
   }
   const s = r.sincronizacion;
@@ -62,5 +70,6 @@ export const aGenerada = (r: ResultadoDeVisita): VisitaGeneradaDto => {
       detalle: t.detalle,
     })),
     avisoDeSincronizacion: r.avisoDeSincronizacion,
+    confirmacionDePlaca: r.confirmacionDePlaca,
   };
 };

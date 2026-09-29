@@ -128,6 +128,21 @@ export class RepositorioPlantillasEnMemoria implements RepositorioPlantillas {
     return destinos;
   }
 
+  /** C4 (15-M) · todo lo sincronizado en un equipo, suprimido o no. */
+  async sincronizadasEn(
+    copropiedadId: string,
+    dispositivoId: string,
+  ): Promise<readonly DestinoDePlantilla[]> {
+    const destinos: DestinoDePlantilla[] = [];
+    for (const p of this.filas.values()) {
+      if (p.copropiedadId !== copropiedadId) continue;
+      if (this.sincronizaciones.get(p.id)?.has(dispositivoId) === true) {
+        destinos.push({ copropiedadId, plantillaId: p.id, dispositivoId });
+      }
+    }
+    return destinos;
+  }
+
   async guardar(plantilla: PlantillaBiometrica): Promise<void> {
     this.declarar(plantilla);
   }

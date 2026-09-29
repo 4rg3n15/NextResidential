@@ -149,12 +149,12 @@ describe('404 · no encontrado, que es como llega un recurso de otra copropiedad
   }
 });
 
-describe('503 · sin conexión, distinto de un error de datos', () => {
+describe('502 · la API no responde, distinto de un error de datos', () => {
   for (const pantalla of PANTALLAS) {
     it(`${pantalla.nombre} distingue «la API no responde» de «algo salió mal»`, async () => {
-      vi.stubGlobal('fetch', vi.fn(conCodigo(503)));
+      vi.stubGlobal('fetch', vi.fn(conCodigo(502)));
       await montarYPedir(pantalla);
-      await waitFor(() => expect(screen.getByText('Sin conexión con el servidor')).toBeDefined());
+      await waitFor(() => expect(screen.getByText('La API no responde')).toBeDefined());
     });
   }
 });

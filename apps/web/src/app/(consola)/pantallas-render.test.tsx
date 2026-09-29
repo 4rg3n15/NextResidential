@@ -161,6 +161,17 @@ const DISPOSITIVO = {
   ultimoResultadoDeSincronizacion: 'sincronizada',
   sincronizacionesFallidas: 0,
   segundosSinLatir: 30,
+  estadoDelEquipo: {
+    enLinea: 'en_linea',
+    motivo: 'Con señal hace 30 s por su latido',
+    alcanzable: true,
+    autenticacion: 'aceptada',
+    autenticacionRechazadaHaceMin: null,
+    escucha: 'no_aplica',
+    ultimoEvento: null,
+    ultimoLatido: '2026-09-10T10:00:00.000Z',
+    ultimaSenal: '2026-09-10T10:00:00.000Z',
+  },
 };
 
 const EVENTO = {
@@ -385,7 +396,7 @@ describe('dispositivos', () => {
    * orden y se leía como si reiniciara. Si la API declara que no llega al
    * equipo, el botón lo dice; y la frase de qué hacen de verdad se muestra.
    */
-  it('si la orden no llega al equipo, el BOTÓN lo dice', async () => {
+  it('si la orden no llega al equipo, los botones NO se enseñan y la pantalla dice por qué', async () => {
     const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     espia.mockImplementation(async (entrada: Request | string) => {
       const url = typeof entrada === 'string' ? entrada : entrada.url;
@@ -403,10 +414,13 @@ describe('dispositivos', () => {
     });
 
     montar(<PantallaDeDispositivos copropiedadId={COP} />);
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Reiniciar · sólo registra/ })).toBeDefined(),
-    );
-    expect(screen.getByText('ninguna llega al equipo todavía')).toBeDefined();
+    // Otros fallos (15-M) · «Reiniciar · sólo registra» se leía en sitio como si
+    // reiniciara: con un proveedor que no los ejecuta, los botones no están.
+    // Mientras la API no contesta ya se asume lo prudente; el porqué llega con ella.
+    await waitFor(() => expect(screen.getByText(/ninguna llega al equipo todavía/)).toBeDefined());
+    expect(screen.getByText(/no llegan al equipo con este proveedor/)).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Reiniciar/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Sincronizar todo/ })).toBeNull();
   });
 
   it('«nunca sincronizó» NO se muestra como un fallo', async () => {

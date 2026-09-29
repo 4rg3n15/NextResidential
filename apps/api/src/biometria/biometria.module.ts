@@ -5,7 +5,7 @@ import { BITACORA, FACE_TEMPLATE_PROVIDER, GENERADOR_DE_ID, RELOJ } from '@ncr/d
 import type { Bitacora, FaceTemplateProvider, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
-import { EquiposModule, TERMINALES_DE_ROSTROS } from '../equipos';
+import { EquiposModule, RETIRO_DE_PLANTILLAS_DE_EQUIPO, TERMINALES_DE_ROSTROS } from '../equipos';
 import {
   BOVEDA_DE_PLANTILLAS,
   CATALOGO_DE_TERMINALES,
@@ -28,6 +28,8 @@ import {
   SincronizarPlantilla,
 } from './aplicacion/casos-de-uso';
 import { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
+import { SuprimirPlantillasDeTitular } from './aplicacion/suprimir-por-titular';
+import { RetirarPlantillasDeEquipo } from './aplicacion/retirar-de-equipo';
 import { AlmacenEnMemoria, BovedaAesGcm } from './infraestructura/boveda-cifrada';
 import type { AlmacenDeBytes } from './infraestructura/boveda-cifrada';
 import {
@@ -243,6 +245,26 @@ export class BiometriaModule {
             reloj: Reloj,
           ) => new BarrerPlantillasVencidas(plantillas, boveda, reloj),
         },
+        {
+          // C9 (15-M) · la baja de un residente suprime sus plantillas (RN-11).
+          provide: SuprimirPlantillasDeTitular,
+          inject: [REPOSITORIO_PLANTILLAS, BOVEDA_DE_PLANTILLAS, RELOJ],
+          useFactory: (
+            plantillas: RepositorioPlantillas,
+            boveda: BovedaDePlantillas,
+            reloj: Reloj,
+          ) => new SuprimirPlantillasDeTitular(plantillas, boveda, reloj),
+        },
+        {
+          // C4 (15-M) · la baja de un equipo retira de él sus rostros (RN-11).
+          provide: RETIRO_DE_PLANTILLAS_DE_EQUIPO,
+          inject: [REPOSITORIO_PLANTILLAS, BOVEDA_DE_PLANTILLAS, BITACORA],
+          useFactory: (
+            plantillas: RepositorioPlantillas,
+            boveda: BovedaDePlantillas,
+            bitacora: Bitacora,
+          ) => new RetirarPlantillasDeEquipo(plantillas, boveda, bitacora),
+        },
       ],
       exports: [
         // F (15-L) · lo consume el módulo de visitas: la foto de la visita.
@@ -256,6 +278,10 @@ export class BiometriaModule {
         // rechazada se la lleva de todos.
         SincronizarPlantillaEnTerminales,
         SuprimirRostroDeAutorizacion,
+        // C9 (15-M) · lo consume el módulo del residente al dar de baja una cuenta.
+        SuprimirPlantillasDeTitular,
+        // C4 (15-M) · lo resuelve la baja de un equipo (sin importar este módulo).
+        RETIRO_DE_PLANTILLAS_DE_EQUIPO,
         REPOSITORIO_CONSENTIMIENTOS,
         REPOSITORIO_PLANTILLAS,
         BOVEDA_DE_PLANTILLAS,

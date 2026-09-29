@@ -6,7 +6,9 @@ import {
   EquipoOcupado,
   PeticionRechazada,
   ReinicioNecesario,
+  SinDesafioDigest,
 } from '../nucleo/errores';
+import { interpretarUserCheck } from './user-check';
 import type { ErrorDeEquipo } from '../nucleo/errores';
 
 /**
@@ -372,7 +374,10 @@ export const comoErrorNeutral = (
   dispositivoId: string,
   cuerpo: string,
   estadoHttp: number,
-  extra?: { readonly desafioVencido?: boolean | undefined },
+  extra?: {
+    readonly desafioVencido?: boolean | undefined;
+    readonly sinDesafio?: boolean | undefined;
+  },
 ): ErrorDeEquipo => {
   const error = interpretarError(cuerpo);
   // H-SITIO-04 · el detalle lleva los cuatro campos del cuerpo ISAPI: es lo que
@@ -384,6 +389,10 @@ export const comoErrorNeutral = (
   // H-SITIO-12 · un 401 con el nonce vencido otra vez no es la clave.
   if (estadoHttp === 401 && extra?.desafioVencido === true) {
     return new DesafioVencido(dispositivoId);
+  }
+  // E1-b (15-M) · un 401 sin desafío a una petición sin credencial tampoco.
+  if (estadoHttp === 401 && extra?.sinDesafio === true) {
+    return new SinDesafioDigest(dispositivoId);
   }
   /**
    * H-SITIO-12 · el `403` YA NO se lee siempre como credencial. La guía de la
@@ -398,7 +407,15 @@ export const comoErrorNeutral = (
     error.reaccion === 'credencial_rechazada' ||
     (estadoHttp === 403 && sinCodigoIsapi)
   ) {
-    return new CredencialRechazada(dispositivoId);
+    // E1-f · si el cuerpo declara la cuenta bloqueada, se dice con el tiempo.
+    const comprobacion = interpretarUserCheck(cuerpo);
+    return new CredencialRechazada(
+      dispositivoId,
+      undefined,
+      comprobacion?.bloqueada === true
+        ? { segundosParaDesbloquear: comprobacion.segundosParaDesbloquear }
+        : null,
+    );
   }
   if (/faceLibraryFull|libraryFull|FDLibFull/i.test(cuerpo))
     return new BibliotecaLlena(dispositivoId, null);

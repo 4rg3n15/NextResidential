@@ -1,11 +1,35 @@
 import type {
   AccessPointProvider,
+  EstadoSesionIntercom,
   FaceTemplateProvider,
   IntercomProvider,
   PlateEventSource,
   ResultadoAccionamiento,
   ResultadoDeAccionamiento,
 } from '@ncr/domain-core';
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * C6 (ETAPA 15-M) · UNA SESIÓN DE AUDIO POR VIDEOPORTERO, NO UNA POR PROCESO
+ *
+ * El puerto del dominio `IntercomProvider` abre la sesión por dispositivo pero
+ * envía, recibe, cierra y consulta SIN decir cuál: nació cuando había un solo
+ * videoportero. Con N equipos eso obligaba al adaptador a recordar «la» sesión
+ * (un `enSesion` único), y el segundo videoportero pisaba al primero.
+ *
+ * Esto NO cambia el dominio (que sigue expresando intención sin protocolo):
+ * añade, en el tipo del paquete, la forma con dispositivo. Un adaptador que la
+ * implementa mantiene UNA sesión por equipo (exclusividad por equipo, ADR-01);
+ * los métodos del puerto sin dispositivo siguen funcionando mientras haya una
+ * sola sesión abierta, que es el caso de siempre, y se niegan cuando hay
+ * varias, porque adivinar a qué videoportero va el audio no es una opción.
+ */
+export interface IntercomPorEquipo {
+  enviarAudioA(dispositivoId: string, fragmento: Uint8Array): Promise<void>;
+  recibirAudioDe(dispositivoId: string): AsyncIterable<Uint8Array>;
+  cerrarSesionDe(dispositivoId: string, motivo: string): Promise<void>;
+  estadoSesionDe(dispositivoId: string): Promise<EstadoSesionIntercom>;
+}
 import type { CapacidadesDeEquipo } from './capacidades';
 import type { EscuchaActiva, TransporteDeEscucha } from './escucha';
 import type { OrigenDeVideo } from './video';
@@ -95,4 +119,9 @@ export type ProveedorDeEquipos = AccessPointProvider &
       /** C7 (15-L) · la conexión la tiene otra plataforma: la frase con el remedio. */
       readonly rechazo: string | null;
     } | null;
+    /** C6 (15-M) · la sesión de audio POR EQUIPO. Ver `IntercomPorEquipo`. */
+    enviarAudioA?(dispositivoId: string, fragmento: Uint8Array): Promise<void>;
+    recibirAudioDe?(dispositivoId: string): AsyncIterable<Uint8Array>;
+    cerrarSesionDe?(dispositivoId: string, motivo: string): Promise<void>;
+    estadoSesionDe?(dispositivoId: string): Promise<EstadoSesionIntercom>;
   };

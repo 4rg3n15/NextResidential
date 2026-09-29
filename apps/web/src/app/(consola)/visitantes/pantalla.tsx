@@ -28,6 +28,7 @@ import {
 } from '@/lib/api/visitas';
 import type { FiltrosDeVisitas } from '@/lib/api/visitas';
 import { GenerarAutorizacion } from './generar-autorizacion';
+import { fechaYHora, rangoDeVisita } from '@/lib/fechas';
 
 const ESTADOS: readonly { valor: EstadoDeVisita; etiqueta: string; tono: TonoDeDistintivo }[] = [
   { valor: 'vigente', etiqueta: 'Vigente', tono: 'exito' },
@@ -39,16 +40,6 @@ const DEL_ESTADO = Object.fromEntries(ESTADOS.map((e) => [e.valor, e])) as Recor
   EstadoDeVisita,
   (typeof ESTADOS)[number]
 >;
-
-const fechaYHora = (iso: string): string =>
-  new Date(iso).toLocaleString('es-CO', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-const hora = (iso: string): string =>
-  new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 
 const EN_EQUIPO = {
   sincronizada: { etiqueta: 'La tiene', tono: 'exito' },
@@ -160,8 +151,12 @@ const TarjetaDeVisita = ({
                 Documento {visita.documento} · {visita.vivienda}
               </p>
               <p className="text-secundario text-texto">
-                {fechaYHora(visita.desde)} a {hora(visita.hasta)}
+                {/* C5 (15-M) · la fecha en los DOS extremos: «28-09-2026 06:56 p. m. a 29-09-2026 06:56 a. m.» */}
+                {rangoDeVisita(visita.desde, visita.hasta)}
               </p>
+              {visita.confirmacionDePlaca !== null ? (
+                <p className="text-secundario text-texto">{visita.confirmacionDePlaca}</p>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2">
                 <Distintivo tono={estado.tono}>{estado.etiqueta}</Distintivo>
                 {visita.placa !== null ? <DistintivoDePlaca placa={visita.placa} /> : null}

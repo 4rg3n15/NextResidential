@@ -1,7 +1,8 @@
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import type { ProveedorDeEquipos } from '@ncr/providers';
 import type { PuenteDeVideo } from './puertos';
-import { PuenteDeVideoNoConfigurado, SinOrigenDeVideo } from './puertos';
+import { PuenteDeVideoFallo, PuenteDeVideoNoConfigurado, SinOrigenDeVideo } from './puertos';
+import { explicarFalloDelPuente } from './causas-de-video';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -22,6 +23,8 @@ import { PuenteDeVideoNoConfigurado, SinOrigenDeVideo } from './puertos';
  *     reporta igual: como «sin video», con el motivo.
  *  3. Se asegura el flujo en el puente y se negocia. La fuente NO se anota en
  *     bitácora: se anota qué equipo, qué flujo y cuánto tardó (KPI-33).
+ *     E2/C1 (15-M) · lo que el puente conteste mal sale de aquí EN PALABRAS y
+ *     con remedio (`causas-de-video.ts`), nunca un «HTTP 500 · EOF» a secas.
  *
  * El nombre del flujo es el identificador del dispositivo con prefijo: único
  * entre copropiedades sin que el puente tenga que saber de tenants.
@@ -42,6 +45,18 @@ export interface VistaEnVivoNegociada {
 }
 
 export const nombreDeFlujo = (dispositivoId: string): string => `ncr-${dispositivoId}`;
+
+/** Un fallo del puente se relanza con su causa en palabras (E2/C1). */
+const explicado = async <T>(paso: () => Promise<T>): Promise<T> => {
+  try {
+    return await paso();
+  } catch (error) {
+    if (error instanceof PuenteDeVideoFallo) {
+      throw new PuenteDeVideoFallo(explicarFalloDelPuente(error.motivo));
+    }
+    throw error;
+  }
+};
 
 export class NegociarVistaEnVivo {
   constructor(
@@ -70,8 +85,11 @@ export class NegociarVistaEnVivo {
 
     const nombre = nombreDeFlujo(dispositivoId);
     const inicio = this.reloj.ahora().getTime();
-    await this.puente.asegurarFlujo(nombre, origen.rtsp);
-    const respuestaSdp = await this.puente.negociar(nombre, solicitud.ofertaSdp);
+    const puente = this.puente;
+    const respuestaSdp = await explicado(async () => {
+      await puente.asegurarFlujo(nombre, origen.rtsp);
+      return puente.negociar(nombre, solicitud.ofertaSdp);
+    });
     const latenciaMs = this.reloj.ahora().getTime() - inicio;
     this.bitacora.registrar('info', 'vista en vivo negociada con el puente', {
       dispositivoId,

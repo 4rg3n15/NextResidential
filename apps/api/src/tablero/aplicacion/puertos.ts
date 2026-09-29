@@ -1,4 +1,5 @@
 import type { EstadoDeDispositivo, UmbralDeLatido, VentanaDelDia } from '@ncr/domain-core';
+import type { ClaseDeSondeo, EstadoDelEquipo } from '../../equipos';
 
 /**
  * Puertos del tablero operativo (W-02).
@@ -85,12 +86,18 @@ export interface DispositivoDelTablero {
   readonly ultimoResultadoDeSincronizacion: ResultadoDeSincronizacion | null;
   /** Distingue «falló la última» de «hay catorce sin llegar». */
   readonly sincronizacionesFallidas: number;
+  /** E5 (15-M, 0044) · las señales persistidas del estado unificado. Opcionales: en memoria no hay. */
+  readonly sondeadoEn?: Date | null;
+  readonly ultimoSondeo?: ClaseDeSondeo | null;
+  readonly credencialRechazadaEn?: Date | null;
 }
 
 /** El mismo dispositivo con el estado ya derivado por el dominio. */
 export interface DispositivoConEstado extends DispositivoDelTablero {
   readonly estado: EstadoDeDispositivo;
   readonly segundosSinLatir: number | null;
+  /** E5 (15-M) · el MISMO estado que la lista y la ficha de equipos. */
+  readonly estadoDelEquipo: EstadoDelEquipo;
 }
 
 export interface RepositorioTablero {

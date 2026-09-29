@@ -481,6 +481,46 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
     'datos personales en texto; el residente viaja en la ruta desde su fila, nadie lo teclea',
   'porteros/pool-y-baja.tsx':
     'cupo numérico y motivo en texto; el portero viaja en la ruta desde su fila, nadie lo teclea',
+  /**
+   * ETAPA 15-M (C3, D-12) · el residente en la consola. Ninguna de sus
+   * escrituras pide un identificador: la vivienda la resuelve la API desde el
+   * token y nunca viaja ni en la ruta ni en el cuerpo. La visita exige FOTO y
+   * CASILLA, que el barrido no sabe dar a propósito; los ocupantes de un
+   * vehículo son casillas con los residentes que devuelve la API; el vehículo
+   * que se da de baja y el visitante que se vuelve a autorizar viajan en la
+   * RUTA desde su tarjeta. Lo comprueba `mi/formularios.test.tsx`: el cuerpo
+   * exacto que envía cada uno.
+   */
+  'mi/visitas/nueva-visita.tsx':
+    'foto y casilla obligatorias; nombre, documento, fecha, hora, duración y placa en texto; prueba propia del cuerpo enviado',
+  'mi/visitas/volver-a-autorizar.tsx':
+    'sólo fecha, hora, duración y casilla; el visitante viaja en la ruta desde su tarjeta',
+  'mi/vehiculos/nuevo-vehiculo.tsx':
+    'placa, color, modelo, marca y tipo en texto; los ocupantes son casillas con los residentes que devuelve la API',
+  'mi/vehiculos/pantalla.tsx':
+    'dar de baja: el vehículo viaja en la ruta desde su tarjeta; no hay campos',
+  'mi/perfil/editar-perfil.tsx':
+    'datos personales y de contacto en texto; el correo exige «@» y el teléfono cifras, que el barrido no teclea',
+  /**
+   * ETAPA 15-M (C10, C4, C9) · la apertura por equipo, la baja de un equipo y
+   * la baja de un residente. El equipo o el residente viajan en la RUTA (o en
+   * el cuerpo, elegido de una lista que devuelve la API); lo único que se
+   * teclea es el MOTIVO, en texto. Lo comprueban `guardia/equipos-en-vivo.test.tsx`
+   * y las pruebas de cada diálogo: el cuerpo exacto que envían.
+   */
+  'guardia/equipos-en-vivo.tsx':
+    'el equipo se elige de la lista que devuelve la API; el motivo en texto; prueba propia del cuerpo enviado',
+  'dispositivos/baja-de-equipo.tsx':
+    'el equipo viaja en la ruta desde su fila; motivo en texto y casilla de confirmación',
+  'residentes/baja-de-residente.tsx':
+    'el residente viaja en la ruta desde su fila; motivo en texto y casilla de confirmación',
+  /**
+   * E5 / C7 (15-M) · archivar alertas: las alertas se MARCAN en la lista que
+   * devuelve la API y viajan por su id (en la ruta o en `ids`); lo único que
+   * se teclea es el motivo. Lo comprueba `eventos/alertas-abiertas.test.tsx`.
+   */
+  'eventos/alertas-abiertas.tsx':
+    'las alertas se marcan de la lista que devuelve la API; sólo el motivo se teclea; prueba propia del cuerpo',
 };
 
 /**

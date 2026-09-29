@@ -19,7 +19,14 @@ const Visitantes = async (): Promise<JSX.Element> => {
   if (copropiedadId === null) {
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
-  return <PantallaDeVisitantes copropiedadId={copropiedadId} rol={sesion.rol as Rol} />;
+  // Otros fallos (15-M) · la llave reinicia filtros y selección al cambiar de copropiedad.
+  return (
+    <PantallaDeVisitantes
+      key={copropiedadId}
+      copropiedadId={copropiedadId}
+      rol={sesion.rol as Rol}
+    />
+  );
 };
 
 export default Visitantes;

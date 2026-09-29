@@ -278,7 +278,7 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
     metodo: 'GET',
     ruta: '/ISAPI/Event/notification/httpHosts',
     procedencia: 'guia_oficial',
-    familia: 'camara',
+    familia: 'comun',
     fuente:
       'Guía ISAPI integral, notificación HTTP. De aquí salen el formato, la acreditación y ' +
       'qué imágenes envía: los tres campos que deciden si el evento llega y qué trae',

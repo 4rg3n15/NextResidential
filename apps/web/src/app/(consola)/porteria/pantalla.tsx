@@ -16,7 +16,7 @@ import type { OrdenConResultado } from '@/componentes/resultado-de-orden';
 import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
 import { DialogoDeMotivo } from '@/componentes/dialogo-motivo';
 import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
-import { VideoEnVivo } from '@/componentes/video-en-vivo';
+import { EquiposEnVivo } from '../guardia/equipos-en-vivo';
 
 /**
  * Consola de PORTERÍA — HU-21 a HU-24.
@@ -227,9 +227,6 @@ export const PantallaDePorteria = ({
                 */}
                 <Evidencia copropiedadId={copropiedadId} eventoId={actual.eventoId} />
 
-                {/* D3 (15-L) · el video del equipo del evento, con sus estados. */}
-                <VideoEnVivo copropiedadId={copropiedadId} dispositivoId={actual.dispositivoId} />
-
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Boton
                     variante="exito"
@@ -266,6 +263,13 @@ export const PantallaDePorteria = ({
         </Tarjeta>
 
         <div className="space-y-4">
+          {/* C10 (15-M) · cualquier equipo en vivo; la llamada o el evento proponen el suyo. */}
+          <EquiposEnVivo
+            copropiedadId={copropiedadId}
+            propuesto={llamada?.dispositivoId ?? actual?.dispositivoId}
+            eventoId={llamada === null ? actual?.eventoId : undefined}
+          />
+
           <Tarjeta>
             <CabeceraDeTarjeta
               titulo="En espera"

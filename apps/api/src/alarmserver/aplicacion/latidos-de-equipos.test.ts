@@ -95,3 +95,79 @@ describe('LatidosDeEquipos', () => {
     expect(lineas).toContain('latido de equipos: no se pudo leer el registro');
   });
 });
+
+/** E5 (15-M) · `estado_salud` se escribe con la realidad de cada pasada. */
+describe('LatidosDeEquipos · estado observado (E5)', () => {
+  const montarConEstado = (
+    estados: Record<string, 'en_linea' | 'fuera_de_linea' | 'degradado' | Error>,
+    senales: Record<string, Date> = {},
+  ) => {
+    const observados: {
+      dispositivoId: string;
+      estadoSalud: string;
+      sondeo: string | null;
+      credencialRechazada: boolean;
+    }[] = [];
+    const latidos = new LatidosDeEquipos(
+      {
+        activos: async () =>
+          Object.keys(estados).map((dispositivoId) => ({
+            dispositivoId,
+            copropiedadId: COP,
+            nombre: dispositivoId,
+          })),
+      },
+      {
+        estado: async (id: string) => {
+          const e = estados[id];
+          if (e instanceof Error) throw e;
+          return e ?? 'fuera_de_linea';
+        },
+      },
+      { ultimaSenal: (id) => senales[id] ?? null },
+      {
+        registrarLatido: async () => undefined,
+        registrarEstado: async (_c, dispositivoId, o) =>
+          void observados.push({ dispositivoId, ...o }),
+      },
+      { ahora: () => AHORA },
+      { registrar: () => undefined },
+      { intervaloMs: 0 },
+    );
+    return { latidos, observados };
+  };
+
+  it('inalcanzable → caido; credencial rechazada → degradado; contesta → saludable; señal fresca → saludable sin sondeo', async () => {
+    const { latidos, observados } = montarConEstado(
+      {
+        apagado: 'fuera_de_linea',
+        terminal: 'degradado',
+        camara: 'en_linea',
+        porton: 'fuera_de_linea',
+      },
+      { porton: new Date(AHORA.getTime() - 5_000) },
+    );
+    await latidos.pasada();
+    const de = (id: string) => observados.find((o) => o.dispositivoId === id);
+    expect(de('apagado')).toMatchObject({
+      estadoSalud: 'caido',
+      sondeo: 'inalcanzable',
+      credencialRechazada: false,
+    });
+    expect(de('terminal')).toMatchObject({
+      estadoSalud: 'degradado',
+      sondeo: 'credencial',
+      credencialRechazada: true,
+    });
+    expect(de('camara')).toMatchObject({
+      estadoSalud: 'saludable',
+      sondeo: 'alcanzado',
+      credencialRechazada: false,
+    });
+    expect(de('porton')).toMatchObject({
+      estadoSalud: 'saludable',
+      sondeo: null,
+      credencialRechazada: false,
+    });
+  });
+});

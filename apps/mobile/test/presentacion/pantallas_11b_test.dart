@@ -161,7 +161,8 @@ void main() {
       ]);
       expect(find.text('Rechazaron la visita de Ana: El residente no la espera'), findsOneWidget);
       expect(find.text('Luis ingresó'), findsOneWidget);
-      expect(find.text('20/09 · 09:05'), findsNWidgets(2));
+      // C5 (15-M) · DD-MM-YYYY, con año: la única fecha corta de la app.
+      expect(find.text('20-09-2026 · 09:05'), findsNWidgets(2));
     });
 
     testWidgets('tirar hacia abajo la vuelve a pedir', (t) async {

@@ -46,12 +46,28 @@ describe('VideoEnVivo (A5)', () => {
     render(<VideoEnVivo copropiedadId={COP} dispositivoId={DISP} negociar={negociar} />);
     await esperar();
     expect(screen.getByText('Vista en vivo no desplegada')).toBeTruthy();
-    expect(screen.getByText('falta GO2RTC_URL')).toBeTruthy();
+    // E2/C1 (15-M) · con el remedio: cómo arrancar el puente.
+    expect(screen.getByText(/falta GO2RTC_URL.*pnpm sitio:video/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /Reintentar/ }));
     await esperar();
     expect(negociar).toHaveBeenCalledTimes(2);
     expect(screen.getByText('En vivo')).toBeTruthy();
+  });
+
+  it('E2/C1 (15-M) · «HTTP 500 · EOF» del puente se dice en palabras, con remedio', async () => {
+    const negociar = vi.fn(async () => {
+      throw new ErrorDeVistaEnVivo(
+        'puente',
+        'El puente de video no atendió la petición: negociación WebRTC con el puente: HTTP 500 · EOF',
+      );
+    });
+    render(<VideoEnVivo copropiedadId={COP} dispositivoId={DISP} negociar={negociar} />);
+    await esperar();
+    expect(screen.getByText('El puente de video no responde')).toBeTruthy();
+    expect(
+      screen.getByText(/^El equipo cerró la conexión de video \(backchannel\).*HTTP 500 · EOF/),
+    ).toBeTruthy();
   });
 
   it('«sin video» del equipo se distingue de un puente caído', async () => {

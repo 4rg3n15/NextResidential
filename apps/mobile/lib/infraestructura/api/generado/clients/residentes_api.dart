@@ -7,6 +7,8 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/alta_de_cuenta_de_residente_dto.dart';
 import '../models/anadir_ocupantes_dto.dart';
+import '../models/baja_de_residente_dto.dart';
+import '../models/cuenta_dada_de_baja_dto.dart';
 import '../models/cuenta_de_residente_creada_dto.dart';
 import '../models/cuenta_de_residente_dto.dart';
 import '../models/perfil_del_residente_dto.dart';
@@ -34,6 +36,14 @@ abstract class ResidentesApi {
   Future<CuentaDeResidenteCreadaDto> supervisionDeResidentesControllerAlta({
     @Path('id') required String id,
     @Body() required AltaDeCuentaDeResidenteDto body,
+  });
+
+  /// Da de baja a un residente con motivo; nunca borrado físico (RN-19)
+  @POST('/copropiedades/{id}/residentes/cuentas/{usuarioId}/baja')
+  Future<CuentaDadaDeBajaDto> supervisionDeResidentesControllerBaja({
+    @Path('id') required String id,
+    @Path('usuarioId') required String usuarioId,
+    @Body() required BajaDeResidenteDto body,
   });
 
   /// Perfil de un residente (datos personales y de contacto)

@@ -15,6 +15,7 @@ import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 import { recuentoDeLaBiblioteca } from './recuento-de-biblioteca';
 import { confirmada, exigirConfirmacion } from '../equipo/confirmacion-isapi';
 import { personaEnElEquipo } from './persona-en-el-equipo';
+import { propositoDeLaCarga, tipoDePersonaConVigencia } from './forma-del-alta';
 import type { AjustesDePersona } from './persona-en-el-equipo';
 import { exigirFotoAdmisible } from './foto-del-rostro';
 import type { LimitesDeFoto } from './foto-del-rostro';
@@ -84,6 +85,10 @@ export interface OpcionesDeTerminal extends OpcionesDeEquipo {
   readonly persona?: AjustesDePersona;
   /** A2 (15-L) · peso y lado máximos de la foto, del `.env`. */
   readonly limitesDeFoto?: LimitesDeFoto;
+  /** E3 (15-M) · tipos de persona que el equipo declara (`UserInfo/capabilities`). */
+  readonly tiposDePersona?: readonly string[] | undefined;
+  /** E3 (15-M) · operaciones que declara su biblioteca (`FDLib/capabilities`). */
+  readonly operacionesDeBiblioteca?: readonly string[] | undefined;
 }
 
 /** Lo que el equipo contesta cuando la ruta no existe en ese firmware. */
@@ -166,9 +171,19 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       throw new BibliotecaLlena(dispositivoId, maximo);
     }
 
+    // E3 (15-M) · la operación la dice el EQUIPO: si no declara ninguna de las
+    // dos, no se da de alta ni la persona (nada que dejar a medias en él).
+    const proposito = propositoDeLaCarga(this.opciones);
+    if (proposito === null) {
+      throw new RutaNoSoportada(
+        'cargar la plantilla facial',
+        `FDLib (el equipo declara: ${(this.opciones.operacionesDeBiblioteca ?? []).join(', ')})`,
+      );
+    }
+
     await this.altaDePersona(dispositivoId, plantillaId, vigencia);
 
-    const ruta = rutaPara('cargar la plantilla facial', 'terminal');
+    const ruta = rutaPara(proposito, 'terminal');
     const separador = `----ncr${String(plantilla.byteLength)}`;
     /**
      * H-SITIO-04 · el registro PLANO, como el «Request Message» de la guía
@@ -442,12 +457,11 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
     // H-SITIO-04 · 32 letras y dígitos: el máximo que la guía da por general.
     const identificador = identificadorEnElEquipo(plantillaId);
     // A2 (15-L) · con vigencia, el equipo caduca la credencial por su cuenta.
-    const registro = personaEnElEquipo(
-      identificador,
-      vigencia,
-      this.opciones.numeroDePuerta,
-      this.opciones.persona,
-    );
+    const registro = personaEnElEquipo(identificador, vigencia, this.opciones.numeroDePuerta, {
+      ...this.opciones.persona,
+      // E3 (15-M) · `normal` si el equipo declara que no admite `visitor`.
+      tipoConVigencia: tipoDePersonaConVigencia(this.opciones),
+    });
     const persona = JSON.stringify({ UserInfo: registro });
     this.opciones.traza?.registrar('info', 'alta de persona en la terminal', {
       dispositivoId,
@@ -505,7 +519,13 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
   }
 
   private exigir(
-    respuesta: { ok: boolean; cuerpo: string; estado: number; desafioVencido?: boolean },
+    respuesta: {
+      ok: boolean;
+      cuerpo: string;
+      estado: number;
+      desafioVencido?: boolean;
+      sinDesafio?: boolean;
+    },
     proposito: string,
     ruta: string,
     dispositivoId: string,

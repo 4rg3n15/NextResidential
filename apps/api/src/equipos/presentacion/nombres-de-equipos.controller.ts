@@ -5,17 +5,29 @@ import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { REPOSITORIO_DE_EQUIPOS } from '../aplicacion/puertos';
-import type { DatosDeEquipo, RepositorioDeEquipos } from '../aplicacion/puertos';
+import { TIPOS_DE_EQUIPO } from '../aplicacion/puertos';
+import type { DatosDeEquipo, RepositorioDeEquipos, TipoDeEquipo } from '../aplicacion/puertos';
 
 export class NombreDeEquipoDto {
   @ApiProperty({ type: String, format: 'uuid' }) id!: string;
   @ApiProperty({ type: String }) nombre!: string;
+  /** C10 (15-M) · el tipo dice si el equipo tiene cámara: la guardia elige entre ésos. */
+  @ApiProperty({ enum: TIPOS_DE_EQUIPO }) tipo!: TipoDeEquipo;
+  /** C10 (15-M) · uno dado de baja conserva el nombre en la línea de tiempo, pero no se elige. */
+  @ApiProperty({ type: Boolean }) activo!: boolean;
 }
 
-/** Sólo el identificador y el nombre: ni dirección, ni usuario, ni credencial. */
-export const aNombreDeEquipo = (e: Pick<DatosDeEquipo, 'id' | 'nombre'>): NombreDeEquipoDto => ({
+/**
+ * Sólo identificador, nombre, tipo y si está activo: ni dirección, ni usuario,
+ * ni credencial. El tipo y el estado no dicen nada de la red del conjunto.
+ */
+export const aNombreDeEquipo = (
+  e: Pick<DatosDeEquipo, 'id' | 'nombre' | 'tipo' | 'estado'>,
+): NombreDeEquipoDto => ({
   id: e.id,
   nombre: e.nombre,
+  tipo: e.tipo,
+  activo: e.estado === 'activo',
 });
 
 /**

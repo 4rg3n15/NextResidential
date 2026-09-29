@@ -10,7 +10,7 @@ import {
   escriturasSinCuerpoPor,
   exigeCuerpo,
 } from './comportamientos-de-sitio';
-import type { PoliticaDeNonceDelEquipo } from './comportamientos-de-sitio';
+import type { DesafiosDelEquipo, PoliticaDeNonceDelEquipo } from './comportamientos-de-sitio';
 import { VerificacionRemotaSimulada } from './verificacion-remota-simulada';
 import type { AlEmitir, FlujoEnVivo } from './verificacion-remota-simulada';
 import {
@@ -191,6 +191,8 @@ export interface GuionDeEquipo {
   readonly reinicioNecesario?: boolean;
   /** Rechaza la credencial aunque el Digest sea correcto: cuenta bloqueada. */
   readonly rechazaCredencial?: boolean;
+  /** E1-f (15-M) · con la clave mala, declara la cuenta bloqueada por estos segundos. */
+  readonly cuentaBloqueadaSegundos?: number;
   /** Anexo 15-K · cuándo vence el nonce. Por omisión, a los 20 s. */
   readonly nonce?: PoliticaDeNonceDelEquipo;
   /** A2 (15-L) · la puerta que gobierna esta terminal, para su `doorRight`. */
@@ -204,6 +206,18 @@ export interface GuionDeEquipo {
   readonly aperturaSinConfirmar?: boolean;
   /** J (15-L) · lo que declara la gestión de personas (`supportFunction`). */
   readonly funcionesDePersonas?: string;
+  /**
+   * E3 (15-M) · los `userType` que admite (`normal,visitor,blackList` por
+   * omisión). El DS-KD9633 del 29/09 sólo `normal`: un alta con otro tipo se
+   * rechaza con `badParameters`, como el equipo.
+   */
+  readonly tiposDePersona?: string;
+  /**
+   * E3 (15-M) · las operaciones que declara su biblioteca (`supportFunction`
+   * de FDLib). Sin ella no las declara y admite las dos cargas. El DS-KD9633:
+   * `post,delete,put,get` — sin `setUp`, así que `FDSetUp` le es `notSupport`.
+   */
+  readonly operacionesDeBiblioteca?: string;
   /** J2 (15-L) · la serie que declara: un respaldo de otro equipo no se aplica. */
   readonly serie?: string;
   /** C2 (15-L) · a dónde publica la cámara. Lo escrito después se lee (tiene estado). */
@@ -245,6 +259,13 @@ const OK =
   '<subStatusCode>ok</subStatusCode></ResponseStatus>';
 const NO_SOPORTA =
   '<ResponseStatus><statusCode>4</statusCode><statusString>notSupport</statusString></ResponseStatus>';
+
+/** E3 (15-M) · ¿la lista `@opt` declarada trae ese valor? Sin distinguir mayúsculas. */
+const declara = (lista: string, valor: string): boolean =>
+  lista
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .includes(valor.toLowerCase());
 
 /** El reino del desafío Digest del simulado. */
 const REINO = 'equipo-simulado';
@@ -290,6 +311,8 @@ export const veredictosRecibidosPor = new Map<string, string[]>();
  * le quitó la plantilla, no a la pantalla que dice que sí.
  */
 export const plantillasPor = new Map<string, ReadonlySet<string>>();
+/** E1 (15-M) · los 401 que dio cada equipo simulado y por qué, por destino. */
+export const desafiosPor = new Map<string, () => DesafiosDelEquipo>();
 
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   /**
@@ -357,6 +380,7 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   const canales: CanalDeAudioSimulado[] = [...(guion.canalesDeAudio ?? CANALES_POR_OMISION)];
   /** Anexo 15-K · el Digest del equipo, con el nonce que vence. */
   const digest = new DigestDelEquipo(guion.usuario, guion.clave, REINO, guion.nonce);
+  if (guion.destino !== undefined) desafiosPor.set(guion.destino, () => digest.estadisticas());
   /** C2 (15-L) · a dónde publica la cámara: lo escrito se vuelve a leer. */
   let receptor = receptorInicial(guion);
 
@@ -413,9 +437,10 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         ? 'clave'
         : digest.comprobar(cabeceras['authorization'] ?? null, metodo);
     if (acceso !== 'autenticado') {
-      return respuestaDe(401, '', {
-        'www-authenticate': digest.cabeceraDeDesafio(acceso === 'vencido'),
-      });
+      // E1 (15-M) · según `alVencer`: con desafío `stale`, sin desafío, o
+      // `stale="FALSE"`; y el `userCheck` con el bloqueo si el guion lo dice.
+      const rechazo = digest.rechazo(acceso, guion.cuentaBloqueadaSegundos ?? null);
+      return respuestaDe(401, rechazo.cuerpo, rechazo.cabeceras);
     }
 
     // Una ruta que el adaptador pide y el catálogo no conoce es un error de
@@ -464,7 +489,7 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
           UserInfo: {
             supportFunction: { '@opt': guion.funcionesDePersonas ?? 'post,delete,put,get,setUp' },
             maxRecordNum: 3000,
-            userType: { '@opt': 'normal,visitor,blackList' },
+            userType: { '@opt': guion.tiposDePersona ?? 'normal,visitor,blackList' },
           },
         }),
       );
@@ -513,7 +538,14 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     if (catalogada.proposito === 'leer qué admite la biblioteca de rostros') {
       return respuestaDe(
         200,
-        JSON.stringify({ FDLibCap: { maxFDRecordNum: guion.bibliotecaMaximo ?? 5000 } }),
+        JSON.stringify({
+          FDLibCap: {
+            maxFDRecordNum: guion.bibliotecaMaximo ?? 5000,
+            ...(guion.operacionesDeBiblioteca === undefined
+              ? {}
+              : { supportFunction: { '@opt': guion.operacionesDeBiblioteca } }),
+          },
+        }),
       );
     }
     if (catalogada.proposito === 'contar las plantillas de la biblioteca de rostros') {
@@ -562,13 +594,28 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       // y el registro entero se valida y se RECUERDA, con su vigencia.
       const leida = leerPersona(String(opciones?.body ?? ''));
       if (leida === null) return respuestaDe(400, PARAMETRO_MALO);
+      // E3 (15-M) · un `userType` que el equipo no declara: `badParameters`.
+      if (!declara(guion.tiposDePersona ?? 'normal,visitor,blackList', leida.persona.tipo)) {
+        return respuestaDe(400, PARAMETRO_MALO);
+      }
       const alta = catalogada.proposito.startsWith('dar de alta');
       if (alta && personas.has(leida.id)) return respuestaDe(400, PERSONA_YA_EXISTE);
       if (!alta && !personas.has(leida.id)) return respuestaDe(400, PERSONA_NO_EXISTE);
       personas.set(leida.id, leida.persona);
       return respuestaDe(200, OK);
     }
-    if (catalogada.proposito === 'cargar la plantilla facial') {
+    if (
+      catalogada.proposito === 'cargar la plantilla facial' ||
+      catalogada.proposito === 'añadir la plantilla facial a la biblioteca'
+    ) {
+      // E3 (15-M) · la operación que la biblioteca no declara: `notSupport`.
+      const operacion = catalogada.proposito.startsWith('cargar') ? 'setUp' : 'post';
+      if (
+        guion.operacionesDeBiblioteca !== undefined &&
+        !declara(guion.operacionesDeBiblioteca, operacion)
+      ) {
+        return respuestaDe(200, NO_SOPORTA);
+      }
       const maximo = guion.bibliotecaMaximo ?? 5000;
       if (enBiblioteca() >= maximo) return respuestaDe(400, LLENA);
       const cuerpo = Buffer.isBuffer(opciones?.body)

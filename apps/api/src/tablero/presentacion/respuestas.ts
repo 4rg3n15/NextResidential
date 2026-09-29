@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { EstadoDelEquipoDto } from '../../equipos';
 
 /**
  * DTOs de SALIDA del tablero.
@@ -118,6 +119,9 @@ export class DispositivoDelTableroDto {
       'no leído de la columna estado_salud, que puede ir por detrás.',
   })
   estado!: 'saludable' | 'degradado' | 'caido';
+
+  /** E5 (15-M) · el MISMO estado que la lista y la ficha de equipos, con su motivo. */
+  @ApiProperty({ type: EstadoDelEquipoDto }) estadoDelEquipo!: EstadoDelEquipoDto;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) ultimoLatido!: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) ultimaSincronizacion!:

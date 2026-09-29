@@ -39,13 +39,16 @@ describe('terminal facial · veredictos propios, no los de una cámara', () => {
     // Lo de la cámara no se pregunta ni se inventa.
     expect(d.control).toBeNull();
     expect(d.pais).toBeNull();
-    expect(d.receptor).toBeNull();
+    // E4 (15-M) · el receptor SÍ se lee en toda familia: en la terminal es un
+    // resto huérfano que la ficha tiene que enseñar (y ofrecer apagar).
+    expect(d.receptor).not.toBeNull();
   });
 
-  it('la ficha NO trae país, receptor ni disparadores: son de cámara', async () => {
+  it('la ficha NO trae país ni disparadores (son de cámara), y SÍ el receptor huérfano', async () => {
     const ficha = fichaDe(await diagnosticar('terminal', { verificacionRemota: true }));
     const nombres = campos(ficha.hallazgos);
-    expect(nombres.some((c) => /país|receptor|disparador|matrícula/.test(c))).toBe(false);
+    expect(nombres.some((c) => /país|disparador|matrícula/.test(c))).toBe(false);
+    expect(nombres).toContain('receptor de eventos (servidor de alarmas)');
     expect(nombres).toContain('quién decide la apertura');
     expect(nombres).toContain('Rostros');
     expect(nombres).toContain('apertura desde la plataforma');
@@ -79,7 +82,8 @@ describe('terminal facial · veredictos propios, no los de una cámara', () => {
     const ficha = fichaDe(await diagnosticar('terminal', { sinCapacidades: true }));
     expect(
       ficha.hallazgos
-        .filter((h) => h.campo !== 'reloj del equipo')
+        // E4 (15-M) · el receptor no depende de las capacidades: se lee aparte.
+        .filter((h) => h.campo !== 'reloj del equipo' && !/receptor/.test(h.campo))
         .every((h) => h.estado === 'no_comprobado'),
     ).toBe(true);
   });

@@ -78,8 +78,9 @@ describe('H-SITIO-12 · órdenes: la segunda orden, con el nonce vencido, se ace
 
     const e = estadisticas();
     expect(e.atendidas).toBe(3);
-    // Un primer contacto y dos vencimientos: nunca la clave.
-    expect(e.desafios).toEqual({ primero: 1, vencido: 2, repetido: 0, clave: 0 });
+    // Dos vencimientos, cada uno seguido de un saludo limpio (E1-b, 15-M): el
+    // nonce rechazado se descarta y se negocia otro desde cero. Nunca la clave.
+    expect(e.desafios).toEqual({ primero: 3, vencido: 2, repetido: 0, clave: 0 });
   });
 
   it('dos clientes del MISMO equipo comparten el nonce y no repiten `nc`', async () => {

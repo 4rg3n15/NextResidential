@@ -6,38 +6,14 @@ import 'package:json_annotation/json_annotation.dart';
 
 @JsonEnum()
 enum Tipo3 {
-  @JsonValue('inicio_de_sesion')
-  inicioDeSesion('inicio_de_sesion'),
-  @JsonValue('acceso_rechazado')
-  accesoRechazado('acceso_rechazado'),
-  @JsonValue('cierre_de_sesion')
-  cierreDeSesion('cierre_de_sesion'),
-  @JsonValue('inicio_de_patrullaje')
-  inicioDePatrullaje('inicio_de_patrullaje'),
-  @JsonValue('fin_de_patrullaje')
-  finDePatrullaje('fin_de_patrullaje'),
-  @JsonValue('codigo_incorrecto')
-  codigoIncorrecto('codigo_incorrecto'),
-  @JsonValue('turno_asignado')
-  turnoAsignado('turno_asignado'),
-  @JsonValue('turno_extra')
-  turnoExtra('turno_extra'),
-  @JsonValue('turno_editado')
-  turnoEditado('turno_editado'),
-  @JsonValue('turno_retirado')
-  turnoRetirado('turno_retirado'),
-  @JsonValue('solape_de_turno')
-  solapeDeTurno('solape_de_turno'),
-  @JsonValue('alta_de_portero')
-  altaDePortero('alta_de_portero'),
-  @JsonValue('edicion_de_portero')
-  edicionDePortero('edicion_de_portero'),
-  @JsonValue('baja_de_portero')
-  bajaDePortero('baja_de_portero'),
-  @JsonValue('restablecimiento_de_contrasena')
-  restablecimientoDeContrasena('restablecimiento_de_contrasena'),
-  @JsonValue('cambio_de_contrasena')
-  cambioDeContrasena('cambio_de_contrasena'),
+  @JsonValue('accesos_por_periodo')
+  accesosPorPeriodo('accesos_por_periodo'),
+  @JsonValue('visitantes_frecuentes')
+  visitantesFrecuentes('visitantes_frecuentes'),
+  @JsonValue('uso_de_zonas')
+  usoDeZonas('uso_de_zonas'),
+  @JsonValue('auditoria_de_sistema')
+  auditoriaDeSistema('auditoria_de_sistema'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

@@ -25,8 +25,20 @@ describe('estadoSegunCodigo · el 404 NO se presenta como «sin permiso»', () =
     expect(screen.getByText('Sin permiso')).toBeDefined();
   });
 
-  it('un 503 se presenta como falta de conexión, no como error de datos', () => {
-    render(estadoSegunCodigo(503, 'da igual'));
+  it('un 502 (la API no responde) se presenta como falta de conexión, no como error de datos', () => {
+    render(estadoSegunCodigo(502, 'da igual'));
+    expect(screen.getByText('La API no responde')).toBeDefined();
+  });
+
+  it('un 503 es la API que CONTESTA «no disponible»: se dice su motivo, no «sin conexión»', () => {
+    render(estadoSegunCodigo(503, 'La API está arrancando: vuelva a intentarlo en unos segundos'));
+    expect(screen.getByText('Servicio no disponible por ahora')).toBeDefined();
+    expect(screen.getByText(/La API está arrancando/)).toBeDefined();
+    expect(screen.queryByText('Sin conexión con el servidor')).toBeNull();
+  });
+
+  it('sin respuesta alguna (código 0) es falta de conexión', () => {
+    render(estadoSegunCodigo(0, 'da igual'));
     expect(screen.getByText('Sin conexión con el servidor')).toBeDefined();
   });
 
@@ -92,7 +104,8 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
     // superadministrador (B4), y «Mi perfil», del portero (E-02). La 15-I añade
     // «Residentes», también sólo del superadministrador (3.1, D5 a, D6), y
     // «Listas negras» (HU-35), que sí ve el administrador.
-    expect(NAVEGACION).toHaveLength(16);
+    // La 15-M (C3, D-12) añade las OCHO pantallas del residente, que sólo él ve.
+    expect(NAVEGACION).toHaveLength(24);
   });
 
   it('15-I · sólo el superadministrador supervisa residentes', () => {
@@ -128,9 +141,36 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
     expect(claves).toContain('guardia');
   });
 
-  it('el residente no tiene consola web: se le dice, no se le deja en blanco', () => {
-    expect(navegacionDe('residente')).toHaveLength(0);
-    expect(rutaInicialDe('residente')).toBe('/sin-consola');
+  it('15-M (D-12) · el residente tiene su menú de ocho, sólo el suyo, y aterriza en «Mi vivienda»', () => {
+    const claves = navegacionDe('residente').map((e) => e.clave);
+    expect(claves).toEqual([
+      'mi',
+      'mi-familia',
+      'mi-vehiculos',
+      'mi-visitas',
+      'mi-zonas',
+      'mi-historial',
+      'mi-notificaciones',
+      'mi-perfil-residente',
+    ]);
+    expect(rutaInicialDe('residente')).toBe('/mi');
+    // Y NINGUNA entrada de administración, portería ni guardia lo lleva.
+    for (const e of NAVEGACION.filter((x) => !x.clave.startsWith('mi'))) {
+      expect(e.roles, e.clave).not.toContain('residente');
+    }
+    // Ni el resto ve las suyas.
+    for (const rol of [
+      'superadministrador',
+      'administrador',
+      'portero',
+      'operador_central',
+    ] as const) {
+      expect(
+        navegacionDe(rol)
+          .map((e) => e.clave)
+          .filter((c) => c.startsWith('mi-') || c === 'mi'),
+      ).toEqual(rol === 'portero' ? ['mi-perfil'] : []);
+    }
   });
 
   it('la identidad de servicio tampoco entra en la consola', () => {

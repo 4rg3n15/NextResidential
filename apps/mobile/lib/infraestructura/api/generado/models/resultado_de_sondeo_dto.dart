@@ -19,6 +19,7 @@ class ResultadoDeSondeoDto {
     required this.firmware,
     required this.latenciaMs,
     required this.verificado,
+    this.identidadDel,
     this.ficha,
     this.capacidades,
   });
@@ -32,6 +33,9 @@ class ResultadoDeSondeoDto {
   final String? firmware;
   final num? latenciaMs;
   final bool verificado;
+
+  /// E5 · 10 · cuando el sondeo actual no leyó modelo y firmware, la fecha en que se leyeron los que se enseñan («dato del DD-MM-YYYY»). Ausente o nulo = son de este sondeo.
+  final DateTime? identidadDel;
 
   /// Qué hay que cambiar en el equipo, campo por campo. Ausente cuando no se sondeó: la falta de ficha no es una ficha vacía.
   final FichaDelEquipoDto? ficha;

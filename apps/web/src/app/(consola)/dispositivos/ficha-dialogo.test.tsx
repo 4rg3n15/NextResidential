@@ -32,6 +32,19 @@ const TERMINAL: Equipo = {
   canalDeVideo: null,
   zonaId: null,
   atestacion: null,
+  estadoDelEquipo: {
+    enLinea: 'sin_comprobar',
+    motivo: 'Nadie lo ha sondeado todavía y no ha mandado nada',
+    alcanzable: null,
+    autenticacion: 'sin_comprobar',
+    autenticacionRechazadaHaceMin: null,
+    escucha: 'no_aplica',
+    ultimoEvento: null,
+    ultimoLatido: null,
+    ultimaSenal: null,
+  },
+  sondeadoEn: null,
+  identidadLeidaEn: null,
 };
 
 const SONDEO = {
@@ -185,5 +198,45 @@ describe('D3 (15-L) · el video en vivo desde la ficha', () => {
     abrir({ ...TERMINAL, tipo: 'rele' });
     await screen.findByRole('dialog');
     expect(screen.queryByRole('button', { name: 'Ver video en vivo' })).toBeNull();
+  });
+});
+
+describe('otros fallos (15-M) · un sondeo lento no se pinta en la ficha de otro equipo', () => {
+  it('se abre A, se cambia a B mientras A sondea: la ficha enseña B aunque A conteste después', async () => {
+    let contestarA: (r: Response) => void = () => undefined;
+    const conModelo = (modelo: string) => ({
+      ...SONDEO,
+      modelo,
+      ficha: { ...SONDEO.ficha, modelo },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (entrada: string | Request) => {
+        const url = typeof entrada === 'string' ? entrada : entrada.url;
+        if (url.includes('/equipos/eq-1/diagnostico')) {
+          return new Promise<Response>((resolver) => {
+            contestarA = resolver;
+          });
+        }
+        if (url.includes('/equipos/eq-2/diagnostico')) return respuesta(conModelo('MODELO-DE-B'));
+        return respuesta({});
+      }),
+    );
+    const B: Equipo = { ...TERMINAL, id: 'eq-2', nombre: 'Terminal de la piscina' };
+    const { rerender } = render(
+      <Envoltura>
+        <FichaDialogo copropiedadId={COP} equipo={TERMINAL} alCerrar={() => undefined} />
+      </Envoltura>,
+    );
+    rerender(
+      <Envoltura>
+        <FichaDialogo copropiedadId={COP} equipo={B} alCerrar={() => undefined} />
+      </Envoltura>,
+    );
+    await waitFor(() => expect(screen.getAllByText(/MODELO-DE-B/).length).toBeGreaterThan(0));
+    contestarA(respuesta(conModelo('MODELO-DE-A')));
+    await new Promise((listo) => setTimeout(listo, 20));
+    expect(screen.queryAllByText(/MODELO-DE-A/)).toHaveLength(0);
+    expect(screen.getAllByText(/MODELO-DE-B/).length).toBeGreaterThan(0);
   });
 });

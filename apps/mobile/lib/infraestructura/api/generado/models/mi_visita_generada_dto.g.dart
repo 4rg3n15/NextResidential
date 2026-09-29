@@ -22,6 +22,7 @@ MiVisitaGeneradaDto _$MiVisitaGeneradaDtoFromJson(Map<String, dynamic> json) =>
       sincronizadas: json['sincronizadas'] as num,
       fallidas: json['fallidas'] as num,
       avisoDeSincronizacion: json['avisoDeSincronizacion'] as String?,
+      confirmacionDePlaca: json['confirmacionDePlaca'] as String?,
     );
 
 Map<String, dynamic> _$MiVisitaGeneradaDtoToJson(
@@ -37,4 +38,5 @@ Map<String, dynamic> _$MiVisitaGeneradaDtoToJson(
   'sincronizadas': instance.sincronizadas,
   'fallidas': instance.fallidas,
   'avisoDeSincronizacion': instance.avisoDeSincronizacion,
+  'confirmacionDePlaca': instance.confirmacionDePlaca,
 };

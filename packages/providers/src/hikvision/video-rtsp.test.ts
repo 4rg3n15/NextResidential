@@ -24,19 +24,23 @@ describe('origen RTSP (A5, S-46)', () => {
   it('el flujo secundario por omisión, con la credencial codificada dentro', () => {
     const origen = origenRtspDe(equipo('camara_lpr'));
     expect(origen?.rtsp).toBe(
-      'rtsp://servicio:cl%40ve%3Arara@203.0.113.20:554/Streaming/Channels/102',
+      'rtsp://servicio:cl%40ve%3Arara@203.0.113.20:554/Streaming/Channels/102#backchannel=0',
     );
     expect(origen?.flujo).toBe('secundario');
   });
 
   it('C2/D2 (15-L) · el canal sale de la ficha y el puerto de la configuración', () => {
     const principal = origenRtspDe({ ...equipo('intercom'), canalDeVideo: '101' }, 8554);
-    expect(principal?.rtsp).toMatch(/@203\.0\.113\.20:8554\/Streaming\/Channels\/101$/);
+    expect(principal?.rtsp).toMatch(
+      /@203\.0\.113\.20:8554\/Streaming\/Channels\/101#backchannel=0$/,
+    );
     expect(principal?.flujo).toBe('principal');
     const otraCamara = origenRtspDe({ ...equipo('camara_lpr'), canalDeVideo: '202' });
-    expect(otraCamara?.rtsp).toMatch(/:554\/Streaming\/Channels\/202$/);
+    expect(otraCamara?.rtsp).toMatch(/:554\/Streaming\/Channels\/202#backchannel=0$/);
     expect(otraCamara?.flujo).toBe('secundario');
     // `null` en la ficha es «el de siempre»: el subflujo del canal 1.
-    expect(origenRtspDe({ ...equipo('camara_lpr'), canalDeVideo: null })?.rtsp).toMatch(/102$/);
+    expect(origenRtspDe({ ...equipo('camara_lpr'), canalDeVideo: null })?.rtsp).toMatch(
+      /102#backchannel=0$/,
+    );
   });
 });

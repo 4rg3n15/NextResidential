@@ -19,6 +19,32 @@ import type {
  * mapa que nadie más lee, exactamente como la tabla que no tiene política de
  * lectura para ningún token de usuario.
  */
+/** E5 (0044) · lo que un sondeo deja anotado, igual que en PostgreSQL. */
+const anotacionDeSondeo = (
+  veredicto: ResultadoDeSondeo,
+  actual: DatosDeEquipo,
+): Pick<
+  DatosDeEquipo,
+  'sondeadoEn' | 'ultimoSondeo' | 'identidadLeidaEn' | 'credencialRechazadaEn'
+> =>
+  veredicto.sinSondear === true
+    ? {
+        sondeadoEn: actual.sondeadoEn,
+        ultimoSondeo: actual.ultimoSondeo,
+        identidadLeidaEn: actual.identidadLeidaEn,
+        credencialRechazadaEn: actual.credencialRechazadaEn,
+      }
+    : {
+        sondeadoEn: new Date(0).toISOString(),
+        ultimoSondeo: veredicto.clase,
+        identidadLeidaEn:
+          veredicto.modelo === null ? actual.identidadLeidaEn : new Date(0).toISOString(),
+        credencialRechazadaEn:
+          veredicto.clase === 'credencial'
+            ? new Date(0).toISOString()
+            : actual.credencialRechazadaEn,
+      };
+
 export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
   private readonly equipos = new Map<string, DatosDeEquipo[]>();
   /** Sobres cifrados, por `copropiedad/equipo`. Aquí no hay texto en claro. */
@@ -83,6 +109,13 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       verificadoEn: null,
       motivoNoVerificado: null,
       estado: 'activo',
+      ultimoLatido: null,
+      sondeadoEn: null,
+      ultimoSondeo: null,
+      identidadLeidaEn: null,
+      credencialRechazadaEn: null,
+      estadoSalud: 'caido',
+      umbralDeLatido: null,
     });
   }
 
@@ -154,6 +187,13 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       verificadoEn: veredicto.verificado ? new Date(0).toISOString() : null,
       motivoNoVerificado: veredicto.verificado ? null : veredicto.detalle,
       estado: 'activo',
+      ultimoLatido: null,
+      sondeadoEn: veredicto.sinSondear === true ? null : new Date(0).toISOString(),
+      ultimoSondeo: veredicto.sinSondear === true ? null : veredicto.clase,
+      identidadLeidaEn: veredicto.modelo === null ? null : new Date(0).toISOString(),
+      credencialRechazadaEn: null,
+      estadoSalud: 'caido',
+      umbralDeLatido: null,
     };
     this.lista(copropiedadId).push(equipo);
     if (alta.secreto !== undefined) this.guardarSecreto(copropiedadId, equipo.id, alta.secreto);
@@ -205,6 +245,7 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       verificacion: this.verificacionDe(veredicto),
       verificadoEn: veredicto.verificado ? new Date(0).toISOString() : null,
       motivoNoVerificado: veredicto.verificado ? null : veredicto.detalle,
+      ...anotacionDeSondeo(veredicto, actual),
     }));
     if (nuevo === null) return null;
     if (alta.secreto !== undefined) this.guardarSecreto(copropiedadId, equipoId, alta.secreto);
@@ -226,6 +267,7 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       verificacion: this.verificacionDe(veredicto),
       verificadoEn: veredicto.verificado ? new Date(0).toISOString() : null,
       motivoNoVerificado: veredicto.verificado ? null : veredicto.detalle,
+      ...anotacionDeSondeo(veredicto, actual),
     }));
     if (nuevo !== null)
       this.auditoria.push({

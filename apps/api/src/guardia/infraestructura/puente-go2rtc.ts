@@ -8,9 +8,14 @@ import { PuenteDeVideoFallo } from '../aplicacion/puertos';
  * go2rtc recibe el RTSP del equipo y lo sirve por WebRTC. Dos llamadas de su
  * API HTTP, y ninguna más:
  *
- *  - `PUT /api/streams?name=<nombre>&src=<rtsp>` registra la fuente bajo el
- *    nombre; volver a hacerlo REEMPLAZA la fuente, así que es idempotente y
- *    sirve también cuando la credencial del equipo cambió `[SUPUESTO S-47]`.
+ *  - `PATCH /api/streams?name=<nombre>&src=<rtsp>` registra la fuente bajo el
+ *    nombre EN MEMORIA; volver a hacerlo la reemplaza, así que es idempotente
+ *    y sirve también cuando la credencial del equipo cambió `[SUPUESTO S-47]`.
+ *    Hasta la 15-M era `PUT`, y en sitio (28/09) se vio lo que eso hace: go2rtc
+ *    ESCRIBE la fuente —con la credencial— en su `go2rtc.yaml`, y con un
+ *    `streams: {}` en el fichero contesta 400 («did not find expected key»).
+ *    Con `PATCH` el fichero no se toca (RN-21); comprobado con el binario real
+ *    en `puente-go2rtc.real.test.ts`.
  *  - `POST /api/webrtc?src=<nombre>` con `Content-Type: application/sdp` es el
  *    WHEP de go2rtc: la oferta va en el cuerpo y la respuesta SDP vuelve con
  *    `201` (o `200`).
@@ -65,7 +70,7 @@ export class PuenteGo2rtc implements PuenteDeVideo {
     const consulta = new URLSearchParams({ name: nombre, src: fuente });
     await this.llamar(
       `/api/streams?${consulta.toString()}`,
-      { method: 'PUT' },
+      { method: 'PATCH' },
       'registro del flujo en el puente',
     );
   }

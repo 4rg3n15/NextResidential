@@ -333,6 +333,7 @@ class VisitaCreada extends ResultadoDeVisita {
     this.sincronizadas = 0,
     this.fallidas = 0,
     this.avisoDeSincronizacion,
+    this.confirmacionDePlaca,
   });
   final String id;
 
@@ -349,6 +350,10 @@ class VisitaCreada extends ResultadoDeVisita {
 
   /// Por qué no se pudo sincronizar, si fue así. Lo escribe el servidor.
   final String? avisoDeSincronizacion;
+
+  /// C9 (15-M) · «Placa XXX registrada para la visita de …, del … al …». La
+  /// escribe el servidor; `null` sin placa.
+  final String? confirmacionDePlaca;
 }
 
 /// El servidor contestó y NO creó la visita.

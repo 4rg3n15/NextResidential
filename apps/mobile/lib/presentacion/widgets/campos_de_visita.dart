@@ -38,9 +38,9 @@ DateTime alMinuto(DateTime d) {
   return DateTime(l.year, l.month, l.day, l.hour, l.minute);
 }
 
-String _dos(int n) => n.toString().padLeft(2, '0');
-String fechaLegible(DateTime d) => '${_dos(d.day)}/${_dos(d.month)}/${d.year}';
-String horaLegible(DateTime d) => '${_dos(d.hour)}:${_dos(d.minute)}';
+/// C5 (15-M) · una sola función de fecha en toda la app: `fechaCorta`.
+String fechaLegible(DateTime d) => fechaCorta(d);
+String horaLegible(DateTime d) => horaCorta(d);
 
 /// Fecha, hora y duración. Sin estado propio: el formulario tiene el valor.
 class CuandoYCuantoDura extends StatelessWidget {
@@ -72,6 +72,9 @@ class CuandoYCuantoDura extends StatelessWidget {
       initialDate: inicio.isBefore(primero) ? primero : inicio,
       firstDate: primero,
       lastDate: primero.add(const Duration(days: 365)),
+      // C5 (15-M) · el selector habla español de Colombia: días, meses y
+      // orden día-mes-año como el resto de la app.
+      locale: const Locale('es', 'CO'),
     );
     if (fecha == null) return;
     alCambiarInicio(DateTime(fecha.year, fecha.month, fecha.day, inicio.hour, inicio.minute));
@@ -196,6 +199,10 @@ class DesenlaceDeVisita extends StatelessWidget {
           titulo: 'Visita autorizada',
           cuerpo: [
             'La portería ya puede verla.',
+            // C9 (15-M) · la placa, confirmada con nombre y las dos fechas,
+            // con las palabras que manda el servidor.
+            if (v.confirmacionDePlaca != null && v.confirmacionDePlaca!.isNotEmpty)
+              '${v.confirmacionDePlaca!}.',
             _enLosEquipos(v),
             if (v.avisoDeSincronizacion != null) v.avisoDeSincronizacion!,
           ].join(' '),

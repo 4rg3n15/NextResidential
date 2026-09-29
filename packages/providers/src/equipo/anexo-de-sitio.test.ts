@@ -246,14 +246,18 @@ describe('anexo 15-K · (d) el Digest: nonce vencido, un reintento; 401 sin stal
     await terminal.abrir(destino, 'operador-1');
     t += 25_000; // en sitio, la segunda orden llegó entre 9 y 35 s después
     await expect(terminal.abrir(destino, 'operador-1')).resolves.toMatchObject({ aceptado: true });
+    // E1-b (15-M) · el 401 al nonce guardado se contesta con un intercambio
+    // limpio: saludo sin credencial, desafío, autenticada. Tres viajes, una orden.
     const segunda = vistas.slice(2).map((v) => v.estado);
-    expect(segunda).toEqual([401, 200]);
+    expect(segunda).toEqual([401, 401, 200]);
     expect(aperturasFisicasPor.get(destino)).toBe(2);
   });
 
-  it('con la credencial ya enviada, un 401 SIN stale es la clave y no se repite', async () => {
+  it('con la credencial ya enviada, un 401 SIN stale NO es la clave: lo es sólo el 401 del intercambio limpio', async () => {
     // El equipo cambia de clave entre dos órdenes: la segunda viaja con un
-    // resumen que ya no vale. Un segundo intento sólo acercaría el bloqueo.
+    // resumen que ya no vale. E1 (15-M): ese 401 se contesta con UN intercambio
+    // limpio (saludo, desafío, autenticada) y sólo el 401 a esa autenticación
+    // es la credencial. Tres viajes, un solo resumen malo presentado limpio.
     let clave = CLAVE;
     const simulados = new Map<string, typeof fetch>();
     const actual = (): typeof fetch => {
@@ -274,6 +278,7 @@ describe('anexo 15-K · (d) el Digest: nonce vencido, un reintento; 401 sin stal
     await expect(terminal.abrir('t-clave', 'operador-1')).rejects.toBeInstanceOf(
       CredencialRechazada,
     );
-    expect(vistas.length - antes).toBe(1);
+    expect(vistas.length - antes).toBe(3);
+    expect(vistas.slice(antes).map((v) => v.estado)).toEqual([401, 401, 401]);
   });
 });

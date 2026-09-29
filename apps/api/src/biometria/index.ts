@@ -34,6 +34,9 @@ export type { ResultadoBarrido } from './aplicacion/casos-de-uso';
 export type { ResultadoCaptura, SolicitudDeCaptura } from './aplicacion/casos-de-uso';
 // F (15-L) · la visita envía su foto a todos los equipos con el mismo caso de uso.
 export { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
+// C9 (15-M) · la baja de un residente suprime sus plantillas (RN-11).
+export { SuprimirPlantillasDeTitular } from './aplicacion/suprimir-por-titular';
+export type { ResultadoDeSupresionPorTitular } from './aplicacion/suprimir-por-titular';
 export type { ResultadoDeSincronizacionTotal } from './aplicacion/sincronizacion-total';
 export {
   BOVEDA_DE_PLANTILLAS,

@@ -275,13 +275,31 @@ export const useDispositivosPendientes = (copropiedadId: string): UseQueryResult
     refetchInterval: 20_000,
   });
 
-export const useAlertasAbiertas = (copropiedadId: string): UseQueryResult<AlertaExpuesta[]> =>
+/** E5 (15-M) · filtros de la cola de alertas: por equipo y por severidad. */
+export interface FiltroDeAlertas {
+  readonly dispositivoId?: string | undefined;
+  readonly severidad?: 'informativa' | 'media' | 'alta' | 'critica' | undefined;
+}
+
+export const useAlertasAbiertas = (
+  copropiedadId: string,
+  filtro: FiltroDeAlertas = {},
+): UseQueryResult<AlertaExpuesta[]> =>
   useQuery({
-    queryKey: clavesDe09B.alertas(copropiedadId),
+    // El filtro va DETRÁS de la clave base: invalidar ['alertas', c] refresca todas.
+    queryKey: [...clavesDe09B.alertas(copropiedadId), filtro],
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/alertas', {
-          params: { path: { id: copropiedadId } },
+          params: {
+            path: { id: copropiedadId },
+            query: {
+              ...(filtro.dispositivoId === undefined
+                ? {}
+                : { dispositivoId: filtro.dispositivoId }),
+              ...(filtro.severidad === undefined ? {} : { severidad: filtro.severidad }),
+            },
+          },
         }),
       ),
   });
@@ -433,7 +451,15 @@ export const useEquipos = (copropiedadId: string): UseQueryResult<Equipos> =>
  */
 export const useNombresDeEquipos = (
   copropiedadId: string,
-): UseQueryResult<readonly { readonly id: string; readonly nombre: string }[]> =>
+): UseQueryResult<
+  readonly {
+    readonly id: string;
+    readonly nombre: string;
+    /** C10 (15-M) · el tipo dice si tiene cámara; `activo`, si se puede elegir. */
+    readonly tipo: string;
+    readonly activo: boolean;
+  }[]
+> =>
   useQuery({
     queryKey: ['dispositivos', copropiedadId, 'nombres'] as const,
     enabled: copropiedadId !== '',

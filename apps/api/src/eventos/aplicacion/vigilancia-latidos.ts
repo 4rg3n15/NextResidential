@@ -2,6 +2,7 @@ import { Alerta, alertaDeDispositivoCaido, esFallo, estadoPorLatido } from '@ncr
 import type { Bitacora, GeneradorDeId, Reloj, UmbralDeLatido } from '@ncr/domain-core';
 import type { RepositorioAlertas, RepositorioDispositivos } from './puertos';
 import type { EscalarAlerta } from './escalamiento';
+import { VENTANA_DE_DUPLICADOS_MS } from './deduplicacion-de-alertas';
 
 export interface ParteDeVigilancia {
   readonly revisados: number;
@@ -41,10 +42,11 @@ export class VigilarLatidos {
   ): Promise<ParteDeVigilancia> {
     const ahora = this.reloj.ahora();
     const latidos = await this.dispositivos.latidos(copropiedadId);
-    const abiertas = await this.alertas.abiertasDe(copropiedadId);
-    const yaAlertados = new Set(
-      abiertas.filter((a) => a.tipo === 'dispositivo_caido').map((a) => a.dispositivoId),
-    );
+    // Otros fallos (15-M) · sólo las de equipo caído: el listado se corta en
+    // 200 y, mezclado con el ruido de otros tipos, dejaba fuera las más viejas
+    // y cada pasada las duplicaba.
+    const abiertas = await this.alertas.abiertasDe(copropiedadId, { tipo: 'dispositivo_caido' });
+    const yaAlertados = new Set(abiertas.map((a) => a.dispositivoId));
 
     const caidos: string[] = [];
     const degradados: string[] = [];
@@ -60,6 +62,7 @@ export class VigilarLatidos {
 
       caidos.push(latido.dispositivoId);
       if (yaAlertados.has(latido.dispositivoId)) continue;
+      if (await this.archivadaHacePoco(copropiedadId, latido.dispositivoId, ahora)) continue;
 
       const descriptor = alertaDeDispositivoCaido(latido.dispositivoId);
       const alerta = Alerta.abrir({
@@ -87,5 +90,22 @@ export class VigilarLatidos {
     }
 
     return { revisados: latidos.length, caidos, degradados, alertasAbiertas };
+  }
+
+  /**
+   * Otros fallos (15-M) · una alerta de equipo caído que alguien ARCHIVÓ como
+   * ruido no se reabre en la pasada siguiente: se respeta la misma ventana de
+   * duplicados que las demás alertas de equipo (E5). Una RESUELTA sí vuelve a
+   * alertar en cuanto el equipo cae otra vez: resolverla dice que se arregló.
+   */
+  private async archivadaHacePoco(
+    copropiedadId: string,
+    dispositivoId: string,
+    ahora: Date,
+  ): Promise<boolean> {
+    const ultima = await this.alertas.ultimaDe(copropiedadId, dispositivoId, 'dispositivo_caido');
+    if (ultima === null || !ultima.archivada || ultima.estado === 'resuelta') return false;
+    const haceMs = ahora.getTime() - ultima.generadaEn.getTime();
+    return haceMs >= 0 && haceMs < VENTANA_DE_DUPLICADOS_MS;
   }
 }

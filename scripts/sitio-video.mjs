@@ -12,6 +12,18 @@
  *   2. Genera `.sitio/go2rtc.yaml`, que NO se versiona: sin flujos y SIN
  *      CREDENCIALES. La API registra el flujo RTSP de cada equipo al pedirlo,
  *      con la credencial que guarda cifrada; el fichero no la ve nunca.
+ *
+ *      E2/C1 (15-M, visto en sitio el 28/09): el fichero NO lleva `streams:`
+ *      —ni `streams: {}`—, porque con esa clave go2rtc rechaza el alta de un
+ *      flujo con «did not find expected key». La API lo registra con `PATCH`,
+ *      que lo deja EN MEMORIA y no escribe nada al fichero; el `PUT` anterior
+ *      sí persistía la URL RTSP con la credencial (RN-21). Por si quedó un
+ *      `streams:` de una versión anterior, se retira al ARRANCAR y al CERRAR,
+ *      y el fichero se deja con permisos 0600.
+ *      Sin STUN (`ice_servers: []`): consola y puente están en la misma red y,
+ *      con el STUN de Google por omisión y sin Internet, cada negociación
+ *      tardaba 5 s exactos (lo que expira la recogida ICE) frente a los < 2 s
+ *      de KPI-33.
  *   3. Si go2rtc no está (ni en el PATH, ni en `.sitio/bin`, ni en
  *      `GO2RTC_BIN`), lo descarga para la arquitectura del Mac y dice su
  *      SHA-256. La versión se fija con `GO2RTC_VERSION` (p. ej. v1.9.9).
@@ -34,6 +46,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { yamlSinStreams } from './lib/go2rtc-yaml.mjs';
 import { arch, platform } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -108,7 +121,7 @@ const yaml = [
   `  listen: ":${puertoWebrtc}"`,
   '  candidates:',
   `    - "${ip}:${puertoWebrtc}"`,
-  'streams: {}',
+  '  ice_servers: []',
   'log:',
   '  level: info',
   '',
@@ -116,8 +129,21 @@ const yaml = [
 
 mkdirSync(carpeta, { recursive: true });
 const rutaYaml = join(carpeta, 'go2rtc.yaml');
-writeFileSync(rutaYaml, yaml);
-console.log(`✓ configuración: ${rutaYaml}`);
+/** Retira cualquier `streams:` que go2rtc (o una versión anterior) dejara en el fichero. */
+const limpiar = (momento) => {
+  if (!existsSync(rutaYaml)) return;
+  const actual = readFileSync(rutaYaml, 'utf8');
+  const limpio = yamlSinStreams(actual);
+  if (limpio === actual) return;
+  writeFileSync(rutaYaml, limpio, { mode: 0o600 });
+  console.log(
+    `  ⚠ se retiró un bloque streams: del fichero (${momento}): los flujos van en memoria`,
+  );
+};
+limpiar('al arrancar');
+writeFileSync(rutaYaml, yaml, { mode: 0o600 });
+chmodSync(rutaYaml, 0o600);
+console.log(`✓ configuración: ${rutaYaml} (0600, sin flujos)`);
 console.log(`  API de go2rtc en ${escucha} · medio WebRTC anunciado en ${ip}:${puertoWebrtc}`);
 if (soloConfiguracion) process.exit(0);
 
@@ -172,4 +198,8 @@ console.log(`▶ ${binario} -config ${rutaYaml}   (Ctrl+C para parar)`);
 console.log(`  Compruebe desde la API: curl http://${escucha}/api`);
 const proceso = spawn(binario, ['-config', rutaYaml], { stdio: 'inherit' });
 for (const senal of ['SIGINT', 'SIGTERM']) process.on(senal, () => proceso.kill(senal));
-proceso.on('exit', (codigo) => process.exit(codigo ?? 0));
+proceso.on('exit', (codigo) => {
+  limpiar('al cerrar');
+  chmodSync(rutaYaml, 0o600);
+  process.exit(codigo ?? 0);
+});

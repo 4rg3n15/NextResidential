@@ -170,3 +170,12 @@ export class AnadirOcupantesDto {
 export class RetiroDeOcupanteDto {
   @ApiProperty({ maxLength: 300 }) @IsString() @MinLength(3) @MaxLength(300) motivo!: string;
 }
+
+/** C9 (15-M) · la baja de un residente lleva motivo obligatorio (RN-19, CA-02). */
+export class BajaDeResidenteDto {
+  @ApiProperty({ minLength: 5, maxLength: 300 })
+  @IsString()
+  @MinLength(5, { message: 'El motivo de la baja debe tener al menos 5 caracteres' })
+  @MaxLength(300, { message: 'El motivo de la baja no puede pasar de 300 caracteres' })
+  motivo!: string;
+}

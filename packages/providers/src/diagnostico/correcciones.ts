@@ -12,7 +12,11 @@ import {
 import { IMAGENES } from '../camara/receptor-en-el-equipo';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import { confirmada } from '../equipo/confirmacion-isapi';
-import { corregirReceptorDeEventos, corregirVerificacionRemota } from './correcciones-de-sitio';
+import {
+  corregirReceptorDeEventos,
+  corregirVerificacionRemota,
+  desactivarReceptorDeEventos,
+} from './correcciones-de-sitio';
 import type { DestinoDeEventos, ResultadoDeEscritura } from './correcciones-de-sitio';
 
 /**
@@ -49,7 +53,9 @@ export type ClaseDeCorreccion =
   /** A2 · la terminal pasa a REPORTAR Y ESPERAR el veredicto de la plataforma. */
   | 'verificacion_remota'
   /** C2 (corrección de la 15-L) · el servidor de alarmas de la cámara apunta a este Mac. */
-  | 'receptor_de_eventos';
+  | 'receptor_de_eventos'
+  /** E4 (15-M) · apaga el receptor huérfano de una terminal o videoportero que la API ESCUCHA. */
+  | 'desactivar_receptor';
 
 export interface ResultadoDeCorreccion {
   readonly clase: ClaseDeCorreccion;
@@ -206,6 +212,8 @@ export const aplicarCorreccion = async (
               : { plazoS: opciones.plazoDeVerificacionS }),
           }),
         );
+      case 'desactivar_receptor':
+        return conClase('desactivar_receptor', await desactivarReceptorDeEventos(cliente));
       case 'receptor_de_eventos':
         return opciones.receptor === undefined
           ? noAplicada(

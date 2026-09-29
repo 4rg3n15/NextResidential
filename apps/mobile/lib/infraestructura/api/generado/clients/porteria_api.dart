@@ -20,7 +20,7 @@ import '../models/portero_dto.dart';
 import '../models/porteros_dto.dart';
 import '../models/resultado_de_desbloqueo_dto.dart';
 import '../models/retiro_de_turno_dto.dart';
-import '../models/tipo3.dart';
+import '../models/tipo4.dart';
 import '../models/turno_guardado_dto.dart';
 import '../models/turnos_dto.dart';
 
@@ -36,7 +36,7 @@ abstract class PorteriaApi {
     @Path('id') required String id,
     @Query('desde') required DateTime desde,
     @Query('hasta') required DateTime hasta,
-    @Query('tipo') Tipo3? tipo,
+    @Query('tipo') Tipo4? tipo,
   });
 
   /// Porteros de la copropiedad, quién está de turno y con sesión

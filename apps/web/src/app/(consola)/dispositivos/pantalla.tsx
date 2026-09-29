@@ -16,6 +16,8 @@ import { useDispositivos, useDispositivosPendientes, useEquipos } from '@/lib/ap
 import { AltaDeEquipo } from './alta-de-equipo';
 import { FichaDialogo } from './ficha-dialogo';
 import { DialogoDeAtestacion, distintivoDeAtestacion } from './atestacion-dialogo';
+import { fechaCorta } from './ficha-dialogo';
+import { DialogoDeBajaDeEquipo, EquiposDadosDeBaja } from './baja-de-equipo';
 
 /**
  * O4 · lo que el equipo DECLARA, en una frase por tipo. Sale de las capacidades
@@ -141,11 +143,23 @@ const VERIFICACION: Readonly<
 
 type Operacion = 'configuracion' | 'sincronizacion' | 'reinicio';
 
-const ESTADO = {
-  saludable: { tono: 'exito', texto: 'En línea' },
+/**
+ * E5 (15-M) · el estado sale de `estadoDelEquipo`, la MISMA función que la
+ * ficha y la lista de equipos: en sitio, la lista decía «Fuera de línea» de
+ * un videoportero que entregaba eventos. «Sin comprobar» es un estado propio:
+ * nadie lo miró, y eso no es «caído».
+ */
+const ESTADO: Readonly<
+  Record<
+    DispositivoDelTablero['estadoDelEquipo']['enLinea'],
+    { tono: TonoDeDistintivo; texto: string }
+  >
+> = {
+  en_linea: { tono: 'exito', texto: 'En línea' },
   degradado: { tono: 'aviso', texto: 'Degradado' },
-  caido: { tono: 'peligro', texto: 'Fuera de línea' },
-} as const;
+  fuera_de_linea: { tono: 'peligro', texto: 'Fuera de línea' },
+  sin_comprobar: { tono: 'neutro', texto: 'Sin comprobar' },
+};
 
 /**
  * El resultado de la última sincronización, con su palabra.
@@ -199,6 +213,9 @@ export const PantallaDeDispositivos = ({
   const [error, setError] = useState<string | null>(null);
   const [enCurso, setEnCurso] = useState<string | null>(null);
   const [dandoDeAlta, setDandoDeAlta] = useState(false);
+  // C4 (15-M) · la baja con motivo y la vista de los dados de baja (RN-19).
+  const [bajaDe, setBajaDe] = useState<Equipo | null>(null);
+  const [ver, setVer] = useState<'activos' | 'baja'>('activos');
 
   /**
    * Las tres rutas se escriben ENTERAS y no se componen con una plantilla. El
@@ -276,21 +293,35 @@ export const PantallaDeDispositivos = ({
       clave: 'modelo',
       titulo: 'Modelo · firmware',
       texto: (d) => `${d.modelo ?? ''} ${d.firmware ?? ''}`,
-      celda: (d) => (
-        <p className="text-secundario text-texto-apagado">
-          {d.modelo ?? 'Modelo sin registrar'} · {d.firmware ?? 'firmware desconocido'}
-        </p>
-      ),
+      celda: (d) => {
+        // E5 · 10 (15-M) · si el equipo no está en línea, modelo y firmware son de
+        // otro día: se dice cuál, en vez de enseñarlos como de hoy.
+        const leidoEl = porId.get(d.id)?.identidadLeidaEn ?? null;
+        const viejo = d.estadoDelEquipo.enLinea !== 'en_linea' && leidoEl !== null;
+        return (
+          <p className="text-secundario text-texto-apagado">
+            {d.modelo ?? 'Modelo sin registrar'} · {d.firmware ?? 'firmware desconocido'}
+            {viejo ? ` · dato del ${fechaCorta(leidoEl)}` : ''}
+          </p>
+        );
+      },
     },
     {
       clave: 'estado',
       titulo: 'Estado',
-      texto: (d) => d.estado,
+      texto: (d) => `${ESTADO[d.estadoDelEquipo.enLinea].texto} ${d.estadoDelEquipo.motivo}`,
       celda: (d) =>
         sincronizando.has(d.id) ? (
           <Distintivo tono="marca">Sincronizando</Distintivo>
         ) : (
-          <Distintivo tono={ESTADO[d.estado].tono}>{ESTADO[d.estado].texto}</Distintivo>
+          <div className="flex flex-col gap-1">
+            <Distintivo tono={ESTADO[d.estadoDelEquipo.enLinea].tono}>
+              {ESTADO[d.estadoDelEquipo.enLinea].texto}
+            </Distintivo>
+            <span className="text-secundario text-texto-apagado" title={d.estadoDelEquipo.motivo}>
+              {d.estadoDelEquipo.motivo}
+            </span>
+          </div>
         ),
     },
     {
@@ -392,6 +423,14 @@ export const PantallaDeDispositivos = ({
               >
                 Editar
               </Boton>
+              <Boton
+                variante="peligro"
+                tamano="sm"
+                disabled={enCurso !== null}
+                onClick={() => setBajaDe(porId.get(d.id) ?? null)}
+              >
+                Dar de baja
+              </Boton>
               {puedeAtestar && porId.get(d.id)?.tipo === 'camara_lpr' ? (
                 <Boton
                   variante="secundario"
@@ -404,31 +443,36 @@ export const PantallaDeDispositivos = ({
               ) : null}
             </>
           ) : null}
-          {(['configuracion', 'sincronizacion', 'reinicio'] as const).map((op) => (
-            <Boton
-              key={op}
-              variante={op === 'reinicio' ? 'peligro' : 'secundario'}
-              tamano="sm"
-              cargando={enCurso === `${d.id}:${op}`}
-              disabled={enCurso !== null}
-              onClick={() => void ordenar(d.id, op)}
-              title={detalleDeEjecucion}
-            >
-              {op === 'configuracion'
-                ? 'Configurar'
-                : op === 'sincronizacion'
-                  ? 'Sincronizar'
-                  : 'Reiniciar'}
-              {soloRegistra ? ' · sólo registra' : ''}
-            </Boton>
-          ))}
+          {/* E5 · 10 (15-M) · si la orden NO llega al equipo, el botón no se enseña:
+              en sitio «Reiniciar · sólo registra» se leía como si reiniciara. */}
+          {soloRegistra
+            ? null
+            : (['configuracion', 'sincronizacion', 'reinicio'] as const).map((op) => (
+                <Boton
+                  key={op}
+                  variante={op === 'reinicio' ? 'peligro' : 'secundario'}
+                  tamano="sm"
+                  cargando={enCurso === `${d.id}:${op}`}
+                  disabled={enCurso !== null}
+                  onClick={() => void ordenar(d.id, op)}
+                  title={detalleDeEjecucion}
+                >
+                  {op === 'configuracion'
+                    ? 'Configurar'
+                    : op === 'sincronizacion'
+                      ? 'Sincronizar'
+                      : 'Reiniciar'}
+                </Boton>
+              ))}
         </div>
       ),
     },
   ];
 
   const equipos = consulta.data?.dispositivos ?? [];
-  const enLinea = equipos.filter((d) => d.estado === 'saludable').length;
+  const enLinea = equipos.filter((d) => d.estadoDelEquipo.enLinea === 'en_linea').length;
+  const sinComprobar = equipos.filter((d) => d.estadoDelEquipo.enLinea === 'sin_comprobar').length;
+  const dadosDeBaja = (inventario.data?.equipos ?? []).filter((e) => e.estado === 'inactivo');
 
   /**
    * A.4 · «Sincronizar todo» encola la orden en CADA equipo, una por una y por
@@ -451,8 +495,12 @@ export const PantallaDeDispositivos = ({
             <>
               <Distintivo tono="exito">{enLinea} en línea</Distintivo>
               <Distintivo tono="peligro">
-                {equipos.filter((d) => d.estado === 'caido').length} fuera de línea
+                {equipos.filter((d) => d.estadoDelEquipo.enLinea === 'fuera_de_linea').length} fuera
+                de línea
               </Distintivo>
+              {sinComprobar > 0 ? (
+                <Distintivo tono="neutro">{sinComprobar} sin comprobar</Distintivo>
+              ) : null}
               {sincronizando.size > 0 ? (
                 <Distintivo tono="marca">{sincronizando.size} sincronizando</Distintivo>
               ) : null}
@@ -461,15 +509,17 @@ export const PantallaDeDispositivos = ({
         }
         acciones={
           <div className="flex gap-2">
-            <Boton
-              variante="secundario"
-              tamano="sm"
-              disabled={enCurso !== null || equipos.length === 0}
-              onClick={() => void sincronizarTodo()}
-              title={detalleDeEjecucion}
-            >
-              Sincronizar todo{soloRegistra ? ' · sólo registra' : ''}
-            </Boton>
+            {soloRegistra ? null : (
+              <Boton
+                variante="secundario"
+                tamano="sm"
+                disabled={enCurso !== null || equipos.length === 0}
+                onClick={() => void sincronizarTodo()}
+                title={detalleDeEjecucion}
+              >
+                Sincronizar todo
+              </Boton>
+            )}
             <Boton tamano="sm" onClick={() => setDandoDeAlta(true)}>
               + Agregar equipo
             </Boton>
@@ -493,6 +543,12 @@ export const PantallaDeDispositivos = ({
         equipo={fichaDe}
         alCerrar={() => setFichaDe(null)}
       />
+      <DialogoDeBajaDeEquipo
+        copropiedadId={copropiedadId}
+        equipo={bajaDe}
+        alCerrar={() => setBajaDe(null)}
+        alDarDeBaja={setAviso}
+      />
       {puedeAtestar ? (
         <DialogoDeAtestacion
           copropiedadId={copropiedadId}
@@ -502,9 +558,11 @@ export const PantallaDeDispositivos = ({
         />
       ) : null}
 
-      {soloRegistra && detalleDeEjecucion !== undefined ? (
+      {soloRegistra ? (
         <p className="mb-3 rounded-md border border-aviso bg-aviso-suave px-3 py-2 text-secundario text-aviso-texto">
-          {detalleDeEjecucion}
+          Configurar, sincronizar y reiniciar no llegan al equipo con este proveedor: los botones no
+          se muestran para no parecer que actúan.
+          {detalleDeEjecucion === undefined ? '' : ` ${detalleDeEjecucion}`}
         </p>
       ) : null}
       {aviso !== null ? (
@@ -524,19 +582,47 @@ export const PantallaDeDispositivos = ({
         </p>
       ) : null}
 
-      <TablaDeDatos
-        titulo="Equipos de la copropiedad"
-        columnas={columnas}
-        filas={equipos}
-        claveDeFila={(d) => d.id}
-        cargando={consulta.isLoading}
-        buscador={{ marcador: 'Buscar por nombre, tipo o modelo' }}
-        vacio={{
-          titulo: 'Sin dispositivos',
-          descripcion:
-            'No hay equipos registrados en esta copropiedad. Use «Agregar equipo» con la dirección, el usuario y la clave del aparato.',
-        }}
-      />
+      <div role="group" aria-label="Qué equipos ver" className="mb-3 flex gap-2">
+        <Boton
+          variante={ver === 'activos' ? 'primario' : 'secundario'}
+          tamano="sm"
+          aria-pressed={ver === 'activos'}
+          onClick={() => setVer('activos')}
+        >
+          Activos ({equipos.length})
+        </Boton>
+        <Boton
+          variante={ver === 'baja' ? 'primario' : 'secundario'}
+          tamano="sm"
+          aria-pressed={ver === 'baja'}
+          onClick={() => setVer('baja')}
+        >
+          Dados de baja ({dadosDeBaja.length})
+        </Boton>
+      </div>
+
+      {ver === 'baja' ? (
+        <EquiposDadosDeBaja
+          copropiedadId={copropiedadId}
+          equipos={dadosDeBaja}
+          cargando={inventario.isLoading}
+          alAvisar={setAviso}
+        />
+      ) : (
+        <TablaDeDatos
+          titulo="Equipos de la copropiedad"
+          columnas={columnas}
+          filas={equipos}
+          claveDeFila={(d) => d.id}
+          cargando={consulta.isLoading}
+          buscador={{ marcador: 'Buscar por nombre, tipo o modelo' }}
+          vacio={{
+            titulo: 'Sin dispositivos',
+            descripcion:
+              'No hay equipos registrados en esta copropiedad. Use «Agregar equipo» con la dirección, el usuario y la clave del aparato.',
+          }}
+        />
+      )}
     </>
   );
 };

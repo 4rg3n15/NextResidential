@@ -1,4 +1,4 @@
-import type { OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import type { BeforeApplicationShutdown, OnApplicationBootstrap } from '@nestjs/common';
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import type { ProveedorDeEquipos } from '@ncr/providers';
 import type { EquiposParaEscucha } from './puertos';
@@ -40,11 +40,24 @@ export interface SenalesDeEscucha {
   ultimaSenal(dispositivoId: string): Date | null;
 }
 
-export interface RegistroDeLatidos {
-  registrarLatido(copropiedadId: string, dispositivoId: string, ahora: Date): Promise<void>;
+export interface EstadoObservadoDelLatido {
+  readonly estadoSalud: 'saludable' | 'degradado' | 'caido';
+  readonly sondeo: 'alcanzado' | 'credencial' | 'inalcanzable' | null;
+  readonly credencialRechazada: boolean;
 }
 
-export class LatidosDeEquipos implements OnApplicationBootstrap, OnApplicationShutdown {
+export interface RegistroDeLatidos {
+  registrarLatido(copropiedadId: string, dispositivoId: string, ahora: Date): Promise<void>;
+  /** E5 (15-M) · `estado_salud` con la realidad de ESTA pasada. Opcional para dobles antiguos. */
+  registrarEstado?(
+    copropiedadId: string,
+    dispositivoId: string,
+    observado: EstadoObservadoDelLatido,
+    ahora: Date,
+  ): Promise<void>;
+}
+
+export class LatidosDeEquipos implements OnApplicationBootstrap, BeforeApplicationShutdown {
   private temporizador: ReturnType<typeof setInterval> | null = null;
   private enCurso = false;
 
@@ -66,7 +79,8 @@ export class LatidosDeEquipos implements OnApplicationBootstrap, OnApplicationSh
     this.temporizador.unref();
   }
 
-  onApplicationShutdown(): void {
+  /** Otros fallos (15-M) · antes del cierre del pool; ver `EscuchasDeEquipos`. */
+  beforeApplicationShutdown(): void {
     if (this.temporizador !== null) clearInterval(this.temporizador);
     this.temporizador = null;
   }
@@ -100,11 +114,28 @@ export class LatidosDeEquipos implements OnApplicationBootstrap, OnApplicationSh
     try {
       if (senal !== null && ahora.getTime() - senal.getTime() <= FRESCURA_DE_SENAL_MS) {
         await this.latidos.registrarLatido(copropiedadId, dispositivoId, senal);
+        await this.anotar(copropiedadId, dispositivoId, 'saludable', null, false);
         return 'porSenal';
       }
-      if ((await this.proveedor.estado(dispositivoId)) !== 'en_linea') return 'sinRespuesta';
-      await this.latidos.registrarLatido(copropiedadId, dispositivoId, this.reloj.ahora());
-      return 'porSondeo';
+      /**
+       * E5 (15-M) · el sondeo se ESCRIBE, conteste lo que conteste: `degradado`
+       * es «contesta pero rechaza la credencial» (el proveedor lo separa así) y
+       * `fuera_de_linea` es «no contesta». Antes sólo se escribía el latido del
+       * que respondía bien y `estado_salud` se quedaba en `saludable` para
+       * siempre, también en el equipo inalcanzable del 28/09.
+       */
+      const estado = await this.proveedor.estado(dispositivoId);
+      if (estado === 'en_linea') {
+        await this.latidos.registrarLatido(copropiedadId, dispositivoId, this.reloj.ahora());
+        await this.anotar(copropiedadId, dispositivoId, 'saludable', 'alcanzado', false);
+        return 'porSondeo';
+      }
+      if (estado === 'degradado') {
+        await this.anotar(copropiedadId, dispositivoId, 'degradado', 'credencial', true);
+      } else {
+        await this.anotar(copropiedadId, dispositivoId, 'caido', 'inalcanzable', false);
+      }
+      return 'sinRespuesta';
     } catch (error) {
       this.bitacora.registrar('aviso', 'latido de equipo: sin respuesta', {
         dispositivoId,
@@ -112,5 +143,20 @@ export class LatidosDeEquipos implements OnApplicationBootstrap, OnApplicationSh
       });
       return 'sinRespuesta';
     }
+  }
+
+  private async anotar(
+    copropiedadId: string,
+    dispositivoId: string,
+    estadoSalud: EstadoObservadoDelLatido['estadoSalud'],
+    sondeo: EstadoObservadoDelLatido['sondeo'],
+    credencialRechazada: boolean,
+  ): Promise<void> {
+    await this.latidos.registrarEstado?.(
+      copropiedadId,
+      dispositivoId,
+      { estadoSalud, sondeo, credencialRechazada },
+      this.reloj.ahora(),
+    );
   }
 }

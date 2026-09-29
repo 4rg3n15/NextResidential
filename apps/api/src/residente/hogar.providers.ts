@@ -5,6 +5,7 @@ import type { Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { CrearCuentaPorUsuario } from '../cuentas';
+import { SuprimirPlantillasDeTitular } from '../biometria';
 import {
   ALTA_DEL_RESIDENTE,
   BITACORA_DE_RESIDENTES,
@@ -159,6 +160,7 @@ export const PROVEEDORES_DEL_HOGAR: Provider[] = [
       VEHICULOS_PROPIOS,
       BITACORA_DE_RESIDENTES,
       RELOJ,
+      SuprimirPlantillasDeTitular,
     ],
     useFactory: (
       crear: CrearCuentaPorUsuario,
@@ -166,7 +168,8 @@ export const PROVEEDORES_DEL_HOGAR: Provider[] = [
       v: VehiculosPropios,
       b: BitacoraDeResidentes,
       r: Reloj,
-    ) => new CuentasDeResidentesDelSuperadmin(crear, cuentas, v, b, r),
+      s: SuprimirPlantillasDeTitular,
+    ) => new CuentasDeResidentesDelSuperadmin(crear, cuentas, v, b, r, s),
   },
   {
     provide: OcupantesDelSuperadmin,

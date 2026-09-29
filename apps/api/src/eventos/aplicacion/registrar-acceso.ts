@@ -26,6 +26,7 @@ import type {
 } from './puertos';
 import { TEMA_EVENTOS } from './puertos';
 import type { EscalarAlerta } from './escalamiento';
+import { VENTANA_DE_DUPLICADOS_MS, debeAbrirAlerta } from './deduplicacion-de-alertas';
 
 export interface HechoEntrante {
   readonly copropiedadId: string;
@@ -119,6 +120,8 @@ export class RegistrarAcceso {
     private readonly ids: GeneradorDeId,
     private readonly bitacora: Bitacora,
     private readonly push?: NotificadorPush,
+    /** E5 (15-M) · ventana de deduplicación de alertas por (equipo, tipo). */
+    private readonly opciones: { readonly ventanaDeDuplicadosMs?: number } = {},
   ) {}
 
   async ejecutar(
@@ -232,13 +235,44 @@ export class RegistrarAcceso {
     const descriptor = clasificarAcceso(acceso);
     if (descriptor === null) return null;
 
+    /**
+     * E5 (15-M) · UNA por (equipo, tipo) y ventana, no una por lectura. En
+     * sitio, cada placa de la cámara sin atestación abría una alerta nueva.
+     */
+    const ahora = this.reloj.ahora();
+    // [SUPUESTO] S-124 · lista negra y pánico NUNCA se deduplican: dos intentos
+    // seguidos pueden ser dos personas distintas, y cada uno tiene que llegar
+    // al operador (RN-06, RN-18). El ruido de sitio era el `acceso_dudoso`.
+    const siempre = descriptor.tipo === 'lista_negra' || descriptor.tipo === 'panico';
+    const ultima = siempre
+      ? null
+      : await this.alertas.ultimaDe(acceso.copropiedadId, acceso.dispositivoId, descriptor.tipo);
+    const decision = debeAbrirAlerta({
+      ultima,
+      ahora,
+      ventanaMs: this.opciones.ventanaDeDuplicadosMs ?? VENTANA_DE_DUPLICADOS_MS,
+      persistente: false,
+    });
+    if (!decision.abrir) {
+      this.bitacora.registrar('debug', 'alerta del evento deduplicada', {
+        eventoId: acceso.id,
+        dispositivoId: acceso.dispositivoId,
+        tipo: descriptor.tipo,
+        motivo: decision.motivo,
+      });
+      return ultima?.id ?? null;
+    }
+
     const abierta = Alerta.abrir({
       id: this.ids.nuevo(),
       copropiedadId: acceso.copropiedadId,
       tipo: descriptor.tipo,
       severidad: descriptor.severidad,
-      generadaEn: acceso.ocurridoEn,
+      // E5 (15-M) · la hora de RECEPCIÓN de la API, no la del equipo: con el
+      // reloj de la cámara adelantado, KPI-25 salía negativo (-53 s en sitio).
+      generadaEn: ahora,
       eventoId: acceso.id,
+      dispositivoId: acceso.dispositivoId,
       notas: descriptor.porQue,
     });
     if (esFallo(abierta)) {

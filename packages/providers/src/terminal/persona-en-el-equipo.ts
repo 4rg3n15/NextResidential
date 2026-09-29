@@ -42,6 +42,11 @@ export interface AjustesDePersona {
   readonly zonaHoraria?: string;
   /** `planTemplateNo` de la puerta. «1» por omisión; «65535» es 7×24 en otros modelos. */
   readonly planDeHorario?: string;
+  /**
+   * E3 (15-M) · el `userType` con vigencia, según lo que el EQUIPO declara
+   * (`forma-del-alta.ts`). `visitor` por omisión, que es lo de siempre.
+   */
+  readonly tipoConVigencia?: 'visitor' | 'normal';
 }
 
 export interface PersonaEnElEquipo {
@@ -131,9 +136,11 @@ export const personaEnElEquipo = (
      * `[SUPUESTO]` S-69: una plantilla que se sincroniza CON vigencia es de un
      * visitante. En este sistema el dato biométrico sincronizado es el del
      * visitante (ETAPA 08, RN-10) y su vigencia es la de su autorización; el
-     * residente no la lleva.
+     * residente no la lleva. E3 (15-M): si el equipo declara que no admite
+     * `visitor` (el DS-KD9633 sólo admite `normal`), va `normal` con la misma
+     * vigencia en `Valid`.
      */
-    userType: 'visitor',
+    userType: ajustes.tipoConVigencia ?? 'visitor',
     Valid: {
       enable: true,
       beginTime,

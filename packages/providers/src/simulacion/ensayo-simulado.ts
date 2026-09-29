@@ -34,6 +34,8 @@ import { VerificacionesSimuladas } from './verificaciones-simuladas';
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const SECRETO_DEL_RECEPTOR_SIMULADO = 'secreto-simulado-del-receptor-sin-valor';
+/** C6 (15-M) · la SEGUNDA cámara publica con OTRO secreto: uno por cámara. */
+export const SECRETO_DEL_RECEPTOR_SIMULADO_2 = 'secreto-simulado-de-la-segunda-camara-sin-valor';
 
 const USUARIO = 'servicio';
 const CLAVE = 'clave-simulada';
@@ -47,11 +49,16 @@ const RED_DEL_MAC = {
 const HOST_DE_LA_CAMARA = '198.51.100.20';
 
 export interface EnsayoSimulado {
+  /** C6 · SEIS equipos: dos cámaras, dos terminales, dos videoporteros (N por familia). */
   readonly equipos: readonly EquipoDeEnsayo[];
-  readonly interlocutorDe: (familia: FamiliaDeEnsayo) => Interlocutor;
+  readonly interlocutorDe: (familia: FamiliaDeEnsayo, equipo?: EquipoDeEnsayo) => Interlocutor;
   readonly plataforma: EventosDeLaPlataforma;
+  /** Las de la PRIMERA terminal (compatibilidad); `verificacionesDe` las de cada una. */
   readonly verificaciones: VerificacionesDeLaPlataforma;
+  readonly verificacionesDe: (equipo: EquipoDeEnsayo) => VerificacionesDeLaPlataforma;
+  /** El receptor de la PRIMERA cámara (compatibilidad); `receptorEsperadoDe` el de cada una. */
   readonly receptorEsperado: ReceptorEsperado;
+  readonly receptorEsperadoDe: (equipo: EquipoDeEnsayo) => ReceptorEsperado;
   readonly entorno: EntornoDeLaPlataforma;
   readonly equiposReales: number;
   cerrar(): Promise<void>;
@@ -66,13 +73,16 @@ const horaDeBogota = (): string =>
     .format(new Date())
     .replace(' ', 'T') + '-05:00';
 
-/** Quien «mira» contesta lo que el simulado ACCIONÓ, y lo dice por `avisar`. */
+/**
+ * Quien «mira» contesta lo que el simulado ACCIONÓ, y lo dice por `avisar`.
+ * C6 · mira el equipo por su NOMBRE DE HOST simulado (hay dos por familia).
+ */
 const personaSimulada = (avisar: (linea: string) => void) => {
   let antes = 0;
   let destino = '';
-  return (familia: FamiliaDeEnsayo): Interlocutor => ({
+  return (familia: FamiliaDeEnsayo, host = `${familia}-1.simulado.invalid`): Interlocutor => ({
     indicar: async (texto) => {
-      destino = `${familia}.simulado.invalid`;
+      destino = host;
       antes = aperturasFisicasPor.get(destino) ?? 0;
       avisar(`     ▶ ${texto}`);
     },
@@ -92,35 +102,69 @@ export const montarEnsayoSimulado = async (
     clave: CLAVE,
     canales: { 102: 'H264' },
   });
-  const flujo = new FlujoEnVivo();
-  const guion = (familia: FamiliaDeEnsayo, extra: Partial<GuionDeEquipo>): typeof fetch =>
-    equiposSimulados({
-      [`${familia}.simulado.invalid`]: {
-        familia,
-        usuario: USUARIO,
-        clave: CLAVE,
-        hora: horaDeBogota(),
-        ...extra,
-      },
-    });
-  const peticiones: Readonly<Record<FamiliaDeEnsayo, typeof fetch>> = {
-    camara: guion('camara', {
-      receptor: {
-        ip: RED_DEL_MAC['en-simulada'][0].address,
-        puerto: PUERTO_DE_LA_API,
-        url: `/alarm-server/${SECRETO_DEL_RECEPTOR_SIMULADO}`,
-      },
-    }),
-    terminal: guion('terminal', { verificacionRemota: true, enVivo: flujo }),
-    videoportero: guion('videoportero', {
+  /** C6 · un flujo en vivo POR TERMINAL: el flujo simulado admite un solo lector. */
+  const flujos = new Map<string, FlujoEnVivo>();
+  const flujoDe = (host: string): FlujoEnVivo => {
+    const f = flujos.get(host) ?? new FlujoEnVivo();
+    flujos.set(host, f);
+    return f;
+  };
+  /**
+   * C6 · DOS equipos por familia, cada uno con su propio nombre de host
+   * simulado, su nombre de ficha y —las cámaras— su propio secreto de
+   * receptor. Es lo que el registro de la consola produce con N equipos.
+   */
+  const receptor = (secreto: string) => ({
+    ip: RED_DEL_MAC['en-simulada'][0].address,
+    puerto: PUERTO_DE_LA_API,
+    url: `/alarm-server/${secreto}`,
+  });
+  const secretoDeCamara: Readonly<Record<string, string>> = {
+    'camara-1.simulado.invalid': SECRETO_DEL_RECEPTOR_SIMULADO,
+    'camara-2.simulado.invalid': SECRETO_DEL_RECEPTOR_SIMULADO_2,
+  };
+  const guionDe = (familia: FamiliaDeEnsayo, host: string): GuionDeEquipo => {
+    // Otros fallos (15-M) · cada aparato su serie, como en sitio: con una sola
+    // para los seis, el respaldo de una cámara pisaba al de la otra.
+    const serie = `SIM-${host.split('.')[0] ?? familia}`;
+    const base = { familia, usuario: USUARIO, clave: CLAVE, hora: horaDeBogota(), serie };
+    if (familia === 'camara') {
+      return {
+        ...base,
+        receptor: receptor(secretoDeCamara[host] ?? SECRETO_DEL_RECEPTOR_SIMULADO),
+      };
+    }
+    if (familia === 'terminal') return { ...base, verificacionRemota: true, enVivo: flujoDe(host) };
+    return {
+      ...base,
       aperturaRemota: true,
       canalesDeAudio: [{ id: 1, habilitado: true, codec: 'G.711ulaw' }],
       bibliotecaEnVideoportero: true,
-    }),
+    };
   };
-  // HTTP al simulado de su familia; RTSP al servidor del bucle local.
-  const equipoDe = (familia: FamiliaDeEnsayo): EquipoDeEnsayo => ({
+  const NOMBRES: Readonly<Record<FamiliaDeEnsayo, readonly [string, string]>> = {
+    camara: ['Cámara entrada', 'Cámara salida'],
+    terminal: ['Terminal peatonal', 'Terminal piscina'],
+    videoportero: ['Videoportero norte', 'Videoportero sur'],
+  };
+  const hosts = (['camara', 'terminal', 'videoportero'] as const).flatMap((familia) =>
+    [1, 2].map((n) => ({ familia, host: `${familia}-${String(n)}.simulado.invalid`, n })),
+  );
+  const peticion = equiposSimulados(
+    Object.fromEntries(hosts.map(({ familia, host }) => [host, guionDe(familia, host)])),
+  );
+  // HTTP al simulado de SU host; RTSP al servidor del bucle local.
+  const equipoDe = ({
     familia,
+    host,
+    n,
+  }: {
+    familia: FamiliaDeEnsayo;
+    host: string;
+    n: number;
+  }): EquipoDeEnsayo => ({
+    familia,
+    nombre: NOMBRES[familia][n === 1 ? 0 : 1],
     host: '127.0.0.1',
     usuario: USUARIO,
     clave: CLAVE,
@@ -129,25 +173,42 @@ export const montarEnsayoSimulado = async (
     puertoRtsp: rtsp.puerto,
     peticion: (async (u: string | URL, o?: RequestInit) => {
       const url = new URL(String(u));
-      url.hostname = `${familia}.simulado.invalid`;
-      return peticiones[familia](url, o);
+      url.hostname = host;
+      return peticion(url, o);
     }) as typeof fetch,
   });
-  const equipos = (['camara', 'terminal', 'videoportero'] as const).map(equipoDe);
-  const terminal = equipos[1];
+  const equipos = hosts.map(equipoDe);
+  const terminal = equipos.find((e) => e.familia === 'terminal');
   if (terminal === undefined) throw new Error('el ensayo simulado perdió la terminal');
+  const hostDe = (equipo: EquipoDeEnsayo): string =>
+    hosts.find((h) => h.familia === equipo.familia && NOMBRES[h.familia][h.n - 1] === equipo.nombre)
+      ?.host ?? `${equipo.familia}-1.simulado.invalid`;
+  const persona = personaSimulada(avisar);
+  const verificacionesDe = (equipo: EquipoDeEnsayo): VerificacionesDeLaPlataforma =>
+    new VerificacionesSimuladas({ conexion: equipo, flujo: flujoDe(hostDe(equipo)) });
+  const receptorEsperadoDe = (equipo: EquipoDeEnsayo): ReceptorEsperado => ({
+    direccion: ipHaciaElEquipo(HOST_DE_LA_CAMARA, RED_DEL_MAC),
+    puerto: PUERTO_DE_LA_API,
+    secretos: [secretoDeCamara[hostDe(equipo)] ?? SECRETO_DEL_RECEPTOR_SIMULADO],
+  });
   return {
     equipos,
-    interlocutorDe: personaSimulada(avisar),
+    // El guion pide el interlocutor por familia; aquí se resuelve al PRIMER
+    // equipo de esa familia salvo que se pida por equipo (`interlocutorDe` con
+    // el equipo en `equipos` lo hace `personaSimulada` por host).
+    interlocutorDe: (familia: FamiliaDeEnsayo, equipo?: EquipoDeEnsayo) =>
+      persona(familia, equipo === undefined ? undefined : hostDe(equipo)),
     plataforma: {
       primeroDesde: async () => ({ titulo: 'Evento simulado', ocurridoEn: new Date() }),
     },
-    verificaciones: new VerificacionesSimuladas({ conexion: terminal, flujo }),
+    verificaciones: verificacionesDe(terminal),
+    verificacionesDe,
     receptorEsperado: {
       direccion: ipHaciaElEquipo(HOST_DE_LA_CAMARA, RED_DEL_MAC),
       puerto: PUERTO_DE_LA_API,
       secretos: [SECRETO_DEL_RECEPTOR_SIMULADO],
     },
+    receptorEsperadoDe,
     entorno: {
       PROVEEDOR_DE_EQUIPOS: PROVEEDORES_REALES[0],
       DATABASE_URL: 'postgresql://ensayo@pooler.simulado.invalid:5432/postgres',

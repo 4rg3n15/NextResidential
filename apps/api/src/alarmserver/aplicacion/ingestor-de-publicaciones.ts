@@ -6,7 +6,7 @@ import type {
   ResultadoDeIngesta,
   VeredictoRemoto,
 } from '@ncr/providers';
-import type { RegistrarAcceso } from '../../eventos';
+import type { AlertasDeEquipo, RegistrarAcceso } from '../../eventos';
 import { registroSinBase } from '../../eventos';
 import type { RegistroDeEvidencia, TipoDeEvidencia } from '../../eventos';
 import type { AccionadorDePuerta } from '../../guardia';
@@ -97,7 +97,18 @@ export const INGESTOR_DE_EQUIPOS = Symbol.for('ncr.alarmserver.IngestorDeEquipos
 export interface ComplementosDelIngestor {
   readonly eventosDeEquipo?: RegistroDeConstancias;
   readonly control?: { decideSolo?(dispositivoId: string): Promise<boolean | null> };
+  /**
+   * E5 (15-M) · las alertas ligadas al equipo, deduplicadas: la cámara que
+   * decide sola es UNA alerta por cámara mientras dure; el reloj desviado, una
+   * con el valor. Sin esto (dobles antiguos) se conserva la constancia por lectura.
+   */
+  readonly alertas?: AlertasDeEquipo;
+  /** Desvío del reloj del equipo, en ms, a partir del cual se avisa. */
+  readonly desvioDeRelojMs?: number;
 }
+
+/** [SUPUESTO] S-122 · 30 s de desvío ya fecha mal los eventos y se avisa. */
+export const DESVIO_DE_RELOJ_MS = 30_000;
 
 export class IngestorDeEquipos implements IngestorDePublicaciones {
   constructor(
@@ -143,11 +154,16 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     };
     try {
       const resultado = await this.procesar(publicacion);
-      this.bitacora.registrar('info', 'evento de equipo', {
-        ...linea,
-        resultado: resultado.registrado ? 'registrado' : 'no registrado',
-        ...(resultado.motivo === null ? {} : { motivo: resultado.motivo }),
-      });
+      // E5 (15-M) · el volcado histórico (miles de `currentEvent=false` en
+      // ráfaga) NO deja una línea por evento: su resumen lo escribe el
+      // registro por lotes. Lo vivo sigue dejando su línea.
+      if (evento.enVivo) {
+        this.bitacora.registrar('info', 'evento de equipo', {
+          ...linea,
+          resultado: resultado.registrado ? 'registrado' : 'no registrado',
+          ...(resultado.motivo === null ? {} : { motivo: resultado.motivo }),
+        });
+      }
       return resultado;
     } catch (error) {
       this.bitacora.registrar('error', 'evento de equipo', {
@@ -209,6 +225,10 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
           'en la zona del servidor correría el histórico sin que nada fallara',
       });
     }
+
+    // E5 (15-M) · el desvío del reloj del equipo se AVISA una vez, con el valor;
+    // la latencia se mide con la hora de recepción, nunca con la del equipo.
+    void this.avisarSiElRelojSeDesvio(evento, copropiedadId);
 
     const referencia =
       evento.referenciaDelEquipo ?? `${evento.placa ?? ''}-${String(+evento.ocurridoEn)}`;
@@ -524,7 +544,29 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
           'la cámara no opera bajo control de la plataforma y no tiene atestación vigente: ' +
           'la talanquera la gobierna el equipo';
       }
-      if (motivo !== null) {
+      if (motivo === null) return;
+      const alertas = this.complementos.alertas;
+      if (alertas === undefined) {
+        await this.constancias.decidioLaCamara(evento, copropiedadId, motivo, eventoId);
+        return;
+      }
+      // E5 (15-M) · UNA alerta por cámara mientras dure la condición: la
+      // constancia en la línea de tiempo sólo acompaña a la alerta que se abre;
+      // las lecturas siguientes no crean nada más.
+      const abierta = await alertas.ejecutar(
+        {
+          copropiedadId,
+          dispositivoId: evento.dispositivoId,
+          tipo: 'acceso_dudoso',
+          severidad: 'alta',
+          clave: 'camara_decide_sola',
+          notas: `La cámara decidió por su cuenta: ${motivo}`,
+          persistente: true,
+          eventoId,
+        },
+        ACTOR_INGESTA,
+      );
+      if (abierta.alerta !== null) {
         await this.constancias.decidioLaCamara(evento, copropiedadId, motivo, eventoId);
       }
     } catch (error) {
@@ -533,6 +575,42 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  /**
+   * E5 (15-M) · la hora del equipo contra la de RECEPCIÓN: si se desvía más
+   * del umbral, UNA alerta (deduplicada por ventana) con el valor medido. En
+   * sitio el reloj adelantado daba latencias de -53 s. Nunca lanza.
+   */
+  private async avisarSiElRelojSeDesvio(
+    evento: EventoDeEquipo,
+    copropiedadId: string,
+  ): Promise<void> {
+    const alertas = this.complementos.alertas;
+    // Sólo lo VIVO: un volcado histórico trae horas pasadas por definición.
+    if (alertas === undefined || evento.horaSinDesplazamiento || !evento.enVivo) return;
+    const desvioMs = evento.ocurridoEn.getTime() - this.reloj.ahora().getTime();
+    const umbral = this.complementos.desvioDeRelojMs ?? DESVIO_DE_RELOJ_MS;
+    if (Math.abs(desvioMs) < umbral) return;
+    const segundos = Math.round(desvioMs / 1000);
+    await alertas.ejecutar(
+      {
+        copropiedadId,
+        dispositivoId: evento.dispositivoId,
+        // [SUPUESTO] S-123 · el dominio no tiene un tipo para el reloj y no se
+        // toca en esta etapa: `acceso_dudoso` INFORMATIVA (los accesos de ese
+        // equipo quedan mal fechados), distinguida por su clave. Nunca
+        // `sabotaje`: el operador lo leería como manipulación del equipo.
+        tipo: 'acceso_dudoso',
+        severidad: 'informativa',
+        clave: 'reloj_desviado',
+        notas:
+          `El reloj del equipo va ${String(Math.abs(segundos))} s ${segundos > 0 ? 'adelantado' : 'atrasado'} ` +
+          'respecto de la API: sincronícelo (NTP) o sus eventos quedarán mal fechados',
+        persistente: true,
+      },
+      ACTOR_INGESTA,
+    );
   }
 
   /** Devuelve el veredicto y MIDE cuánto tardó el equipo en aceptarlo. */

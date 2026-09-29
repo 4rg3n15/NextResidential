@@ -11,6 +11,7 @@ import { Distintivo } from '@/componentes/ui/distintivo';
 import { EstadoError } from '@/componentes/estados';
 import { useCuentasDeResidentes } from './consultas';
 import { DialogoDeResidente, DialogoDeRestablecimientoDeResidente } from './dialogos';
+import { DialogoDeBajaDeResidente } from './baja-de-residente';
 import { OcupantesPorVivienda } from './ocupantes';
 import { DialogoDePerfilDeResidente } from './perfil-de-residente';
 import { VehiculosDeResidentes } from './vehiculos-de-residentes';
@@ -32,6 +33,9 @@ export const PantallaDeResidentes = ({
   const [alta, setAlta] = useState(false);
   const [restablecer, setRestablecer] = useState<CuentaDeResidente | null>(null);
   const [perfil, setPerfil] = useState<CuentaDeResidente | null>(null);
+  // C9 (15-M) · «eliminar» = baja con motivo (RN-19, CA-02).
+  const [bajaDe, setBajaDe] = useState<CuentaDeResidente | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const lista = cuentas.data ?? [];
   const sinVivienda = lista.filter((c) => c.vivienda === null).length;
 
@@ -84,6 +88,11 @@ export const PantallaDeResidentes = ({
           <Boton variante="fantasma" tamano="sm" onClick={() => setRestablecer(c)}>
             Restablecer contraseña
           </Boton>
+          {c.activa ? (
+            <Boton variante="peligro" tamano="sm" onClick={() => setBajaDe(c)}>
+              Dar de baja
+            </Boton>
+          ) : null}
         </div>
       ),
     },
@@ -99,6 +108,14 @@ export const PantallaDeResidentes = ({
         }
         acciones={<Boton onClick={() => setAlta(true)}>Nuevo residente</Boton>}
       />
+      {aviso !== null ? (
+        <p
+          role="status"
+          className="rounded-md border border-borde bg-lienzo px-3 py-2 text-secundario text-texto-apagado"
+        >
+          {aviso}
+        </p>
+      ) : null}
       {cuentas.isError ? (
         <EstadoError
           descripcion={cuentas.error.message}
@@ -134,6 +151,12 @@ export const PantallaDeResidentes = ({
         copropiedadId={copropiedadId}
         cuenta={restablecer}
         alCerrar={() => setRestablecer(null)}
+      />
+      <DialogoDeBajaDeResidente
+        copropiedadId={copropiedadId}
+        cuenta={bajaDe}
+        alCerrar={() => setBajaDe(null)}
+        alDarDeBaja={setAviso}
       />
     </div>
   );

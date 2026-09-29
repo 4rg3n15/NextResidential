@@ -33,8 +33,11 @@ const GuardiaVirtual = async (): Promise<JSX.Element> => {
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
   const activa = alcance.disponibles.find((c) => c.id === alcance.copropiedadId);
+  // Otros fallos (15-M) · la llave reinicia el estado del cliente al cambiar de
+  // copropiedad: sin ella, lo abierto en la anterior seguía en pantalla.
   return (
     <PantallaDeGuardiaVirtual
+      key={alcance.copropiedadId}
       copropiedadId={alcance.copropiedadId}
       nombreDeCopropiedad={activa?.nombre ?? 'la copropiedad activa'}
     />

@@ -210,6 +210,18 @@ salida_pruebas="$(mktemp)"
 # consola de turbo no tiene el mismo formato en todas las máquinas, y un
 # control que depende del formato no vigila lo que cree).
 rm -f apps/*/.informe-paso5.json packages/*/.informe-paso5.json
+# 15-M · las pruebas contra go2rtc REAL (E2/C1) se omiten sin binario, y con
+# `--con-base` una omisión no declarada es FALLO (D-112). Ningún otro paso las
+# ejercería, así que no se declaran: se pone el binario OFICIAL, fijado por
+# versión y por huella SHA-256 (`go2rtc-para-pruebas.mjs`). Si no se consigue,
+# se dice aquí y la comprobación de saltadas de más abajo lo convierte en FALLO.
+if go2rtc_bin=$(node scripts/lib/go2rtc-para-pruebas.mjs "$RAIZ_DEL_REPO" 2>&1); then
+  GO2RTC_BIN=$(printf '%s\n' "$go2rtc_bin" | tail -n 1)
+  export GO2RTC_BIN
+  ok "go2rtc real para las pruebas del puente de video: $GO2RTC_BIN"
+else
+  echo "   · sin go2rtc real: $(printf '%s\n' "$go2rtc_bin" | tail -n 1)"
+fi
 TURBO_TELEMETRY_DISABLED=1 con_limite "$LIMITE_LARGO" pnpm exec turbo run test -- \
   --reporter=default --reporter=json --outputFile=.informe-paso5.json \
   >"$salida_pruebas" 2>&1

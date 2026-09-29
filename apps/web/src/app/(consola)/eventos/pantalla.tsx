@@ -13,12 +13,11 @@ import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
 import { EstadoCargando, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useAlertasAbiertas, useNombresDeEquipos } from '@/lib/api/consultas';
+import { diaLocalHace, fechaYHora, rangoDeDias } from '@/lib/fechas';
+import { AlertasAbiertas } from './alertas-abiertas';
 import { abrirCanal } from '@/lib/sse/canal';
 import type { EstadoDelCanal } from '@/lib/sse/canal';
 import { ORIGEN, TIPOS_DE_LA_LINEA } from './tipos-de-evento';
-
-const haceDias = (dias: number): string =>
-  new Date(Date.now() - dias * 86_400_000).toISOString().slice(0, 10);
 
 /** El color acompaña al texto, nunca lo sustituye (el distintivo lleva icono). */
 const tonoDe = (e: ElementoDeLineaDeTiempo): TonoDeDistintivo => {
@@ -52,21 +51,22 @@ export const PantallaDeEventos = ({
 }: {
   readonly copropiedadId: string;
 }): JSX.Element => {
-  const [desde, setDesde] = useState(haceDias(7));
-  const [hasta, setHasta] = useState(haceDias(0));
+  const [desde, setDesde] = useState(() => diaLocalHace(7));
+  const [hasta, setHasta] = useState(() => diaLocalHace(0));
   const [tipo, setTipo] = useState('');
   const [dispositivoId, setDispositivoId] = useState('');
   const [enVivo, setEnVivo] = useState<EstadoDelCanal>('conectando');
   const clientes = useQueryClient();
 
+  /**
+   * El fin es EXCLUSIVO en el dominio: se pide el día siguiente a `hasta`.
+   * Otros fallos (15-M) · con un campo vacío o al revés, se siguen enseñando
+   * los últimos 7 días y se dice por qué, en vez de tumbar la página.
+   */
+  const rangoPedido = useMemo(() => rangoDeDias(desde, hasta), [desde, hasta]);
   const rango = useMemo(
-    () => ({
-      desde: new Date(`${desde}T00:00:00`).toISOString(),
-      // El fin es EXCLUSIVO en el dominio, así que se pide el día siguiente:
-      // pedir `hasta` a las 00:00 dejaría fuera el día que el usuario eligió.
-      hasta: new Date(new Date(`${hasta}T00:00:00`).getTime() + 86_400_000).toISOString(),
-    }),
-    [desde, hasta],
+    () => rangoPedido ?? rangoDeDias(diaLocalHace(7), diaLocalHace(0)) ?? { desde: '', hasta: '' },
+    [rangoPedido],
   );
 
   const clave = ['linea-de-tiempo', copropiedadId, rango.desde, rango.hasta, tipo, dispositivoId];
@@ -221,12 +221,21 @@ export const PantallaDeEventos = ({
           <ul className="mt-1 space-y-0.5">
             {criticas.slice(0, 4).map((a) => (
               <li key={a.id} className="text-secundario text-peligro-texto">
-                {a.tipo} · {new Date(a.generadaEn).toLocaleString('es-CO')}
+                {a.tipo.replace(/_/g, ' ')} ·{' '}
+                {a.dispositivoId === null ? '' : `${nombreDe(a.dispositivoId)} · `}
+                {fechaYHora(a.generadaEn)}
               </li>
             ))}
           </ul>
         </div>
       ) : null}
+
+      {/* E5 / C7 (15-M) · la cola entera, filtrable, con archivo lógico y motivo. */}
+      <AlertasAbiertas
+        copropiedadId={copropiedadId}
+        nombreDe={nombreDe}
+        equipos={(equipos.data ?? []).map((e) => ({ id: e.id, nombre: e.nombre }))}
+      />
 
       {consulta.isLoading ? <EstadoCargando etiqueta="Cargando eventos" /> : null}
 
@@ -257,6 +266,11 @@ export const PantallaDeEventos = ({
                 className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
               />
             </label>
+            {rangoPedido === null ? (
+              <span role="status" className="text-secundario text-aviso-texto">
+                Fechas incompletas o al revés: se muestran los últimos 7 días.
+              </span>
+            ) : null}
             <label className="flex items-center gap-2 text-secundario">
               <span className="text-texto-apagado">Tipo</span>
               <select

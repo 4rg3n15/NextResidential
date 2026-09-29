@@ -19,10 +19,20 @@ import { Aislamiento } from '../../multiempresa/aislamiento';
 import { RELOJ, vigenciaDeAtestacion } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
 import { LECTOR_DE_SENALES, hallazgoDeEventos } from '../aplicacion/senal-de-eventos';
+import { entradasDeEstado, estadoDelEquipo } from '../aplicacion/estado-del-equipo';
+import { ModuleRef } from '@nestjs/core';
+import { RETIRO_DE_PLANTILLAS_DE_EQUIPO } from '../aplicacion/retiro-de-plantillas';
+import type {
+  ResultadoDeRetiroDePlantillas,
+  RetiroDePlantillasDeEquipo,
+} from '../aplicacion/retiro-de-plantillas';
+import { aEstadoDelEquipoDto } from './dto-estado-del-equipo';
 import type { LectorDeSenales } from '../aplicacion/senal-de-eventos';
+import { conDatosGuardados, conReceptorDeLaPlataforma } from '../aplicacion/ficha-en-servicio';
 import {
   CORRECTOR_DE_EQUIPO,
   OLVIDO_DE_EQUIPO,
+  RECEPTOR_ESPERADO,
   REPOSITORIO_DE_ATESTACIONES,
   REPOSITORIO_DE_EQUIPOS,
   SIN_PROBAR,
@@ -36,14 +46,17 @@ import type {
   OlvidoDeEquipo,
   RepositorioDeAtestaciones,
   RepositorioDeEquipos,
+  ResolutorDeReceptorEsperado,
   ResultadoDeSondeo,
   SondaDeEquipo,
 } from '../aplicacion/puertos';
 import {
+  BajaDeEquipoResultadoDto,
   AltaDeEquipoDto,
   BajaDeEquipoDto,
   CapacidadesDeEquipoDto,
   CorreccionDeEquipoDto,
+  EquipoCreadoDto,
   EquipoDto,
   EquiposDto,
   FichaDelEquipoDto,
@@ -52,6 +65,8 @@ import {
   EdicionDeEquipoDto,
 } from './dtos';
 import type { AtestacionDeEquipoDto } from './dtos-atestacion';
+import { SECRETOS_DE_ALARM_SERVER } from '../aplicacion/secretos-de-alarm-server';
+import type { SecretosDeAlarmServer } from '../aplicacion/secretos-de-alarm-server';
 
 /**
  * D-11 · la atestación a su DTO, con la vigencia calculada contra el firmware
@@ -119,6 +134,12 @@ const aFicha = (ficha: FichaDelEquipo): FichaDelEquipoDto => ({
   ...(ficha.crudos === undefined
     ? {}
     : { crudos: ficha.crudos.map((c) => ({ titulo: c.titulo, contenido: c.contenido })) }),
+  // E4 (15-M) · el receptor, campo a campo y con la ruta ya sin secreto.
+  ...(ficha.receptores === undefined
+    ? {}
+    : {
+        receptores: ficha.receptores.map((r) => ({ host: r.host, puerto: r.puerto, ruta: r.ruta })),
+      }),
 });
 
 /** Campo a campo, por la misma razón que la ficha: lo que sale es una decisión. */
@@ -160,7 +181,13 @@ export class EquiposController {
     @Inject(REPOSITORIO_DE_ATESTACIONES) private readonly atestaciones: RepositorioDeAtestaciones,
     @Inject(OLVIDO_DE_EQUIPO) private readonly olvido: OlvidoDeEquipo,
     @Inject(LECTOR_DE_SENALES) private readonly senales: LectorDeSenales,
+    /** C4 (15-M) · para resolver el retiro de rostros sin importar biometría. */
+    @Inject(ModuleRef) private readonly modulos: ModuleRef,
     @Inject(RELOJ) private readonly reloj: Reloj,
+    /** E4 (15-M) · a dónde debería publicar el equipo para llegar a esta plataforma. */
+    @Inject(RECEPTOR_ESPERADO) private readonly receptorEsperado: ResolutorDeReceptorEsperado,
+    /** C6 (15-M) · el secreto de Alarm Server que se emite al dar de alta una cámara. */
+    @Inject(SECRETOS_DE_ALARM_SERVER) private readonly secretos: SecretosDeAlarmServer,
   ) {}
 
   /** D-11 · los equipos con su atestación más reciente, en una sola consulta. */
@@ -208,6 +235,13 @@ export class EquiposController {
       motivoNoVerificado: e.motivoNoVerificado,
       estado: e.estado,
       atestacion: atestacion === null ? null : aAtestacionDto(atestacion, e.firmware),
+      // E5 (15-M) · el MISMO criterio que la ficha y el tablero, con la señal
+      // de la escucha del proceso y el reloj inyectado.
+      estadoDelEquipo: aEstadoDelEquipoDto(
+        estadoDelEquipo(entradasDeEstado(e, this.senales.senal(e.id)), this.reloj.ahora()),
+      ),
+      sondeadoEn: e.sondeadoEn,
+      identidadLeidaEn: e.identidadLeidaEn,
     };
   }
 
@@ -358,19 +392,29 @@ export class EquiposController {
 
   @Post()
   @Roles('superadministrador', 'administrador')
-  @ApiOperation({ summary: 'Da de alta un equipo; el secreto se guarda cifrado' })
-  @ApiOkResponse({ type: EquipoDto })
+  @ApiOperation({
+    summary:
+      'Da de alta un equipo; el secreto se guarda cifrado. Una cámara LPR recibe además su ' +
+      'secreto de Alarm Server, que se muestra SOLO en esta respuesta',
+  })
+  @ApiOkResponse({ type: EquipoCreadoDto })
   async crear(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Body() dto: AltaDeEquipoDto,
-  ): Promise<EquipoDto> {
+  ): Promise<EquipoCreadoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/alta');
     const veredicto = await this.sondear(dto);
     const equipo = await this.repo
       .crear(ctx, copropiedadId, this.altaDesdeDto(dto), veredicto)
       .catch(zonaAjena);
-    return this.aDtoCompleto(ctx, copropiedadId, equipo);
+    // C6 (15-M) · la cámara nace con su secreto de Alarm Server: lo emite la
+    // API, se guarda cifrado (0045) y sale UNA vez, aquí. Nada de .env.
+    const secretoDelAlarmServer =
+      equipo.tipo === 'camara_lpr'
+        ? await this.secretos.emitir(ctx, copropiedadId, { id: equipo.id, host: equipo.host })
+        : null;
+    return { ...(await this.aDtoCompleto(ctx, copropiedadId, equipo)), secretoDelAlarmServer };
   }
 
   @Put(':equipoId')
@@ -434,7 +478,7 @@ export class EquiposController {
           'sondearlo, porque el sistema no la muestra ni la reenvía',
       );
     }
-    const veredicto = await this.sonda.probar({
+    const sondeado = await this.sonda.probar({
       host: equipo.host,
       puerto: equipo.puerto,
       protocolo: equipo.protocolo,
@@ -445,12 +489,27 @@ export class EquiposController {
       modoDeTerminal: equipo.modoDeTerminal,
       canalDeVideo: equipo.canalDeVideo,
     });
-    await this.repo.registrarSondeo(ctx, copropiedadId, equipoId, veredicto);
+    await this.repo.registrarSondeo(ctx, copropiedadId, equipoId, sondeado);
+    // E4 · 7 / E5 · 10 (15-M) · ¿publica en ESTA plataforma?, y los datos
+    // guardados con su fecha cuando el sondeo de hoy no los leyó.
+    const veredicto = conDatosGuardados(
+      sondeado.ficha === undefined
+        ? sondeado
+        : {
+            ...sondeado,
+            ficha: conReceptorDeLaPlataforma(
+              sondeado.ficha,
+              this.receptorEsperado.hacia(equipo.host),
+              equipo.tipo,
+            ),
+          },
+      equipo,
+    );
     // C1 (15-L) · capacidades nuevas en la base: el proceso deja las viejas.
     this.olvido.olvidar(equipoId);
     // C3 (15-L) · eventos: la señal real de la escucha, no una segunda conexión.
     const emite = equipo.tipo === 'terminal_facial' || equipo.tipo === 'intercom';
-    return this.aResultado(
+    const resultado = this.aResultado(
       emite && veredicto.ficha !== undefined
         ? {
             ...veredicto,
@@ -464,6 +523,9 @@ export class EquiposController {
           }
         : veredicto,
     );
+    return veredicto.identidadDel === null
+      ? resultado
+      : { ...resultado, identidadDel: veredicto.identidadDel };
   }
 
   /**
@@ -533,19 +595,58 @@ export class EquiposController {
 
   @Post(':equipoId/baja')
   @Roles('superadministrador', 'administrador')
-  @ApiOperation({ summary: 'Baja lógica con motivo. Nunca borrado físico (RN-19)' })
-  @ApiOkResponse({ type: EquipoDto })
+  @ApiOperation({
+    summary:
+      'Baja lógica con motivo (RN-19). Antes, retira del equipo los rostros sincronizados ' +
+      '(RN-11); los que no pudo quitar se devuelven como pendientes',
+  })
+  @ApiOkResponse({ type: BajaDeEquipoResultadoDto })
   async desactivar(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('equipoId', ParseUUIDPipe) equipoId: string,
     @Body() dto: BajaDeEquipoDto,
-  ): Promise<EquipoDto> {
+  ): Promise<BajaDeEquipoResultadoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/baja');
+    // C4 (15-M) · los rostros salen ANTES de la baja: después el proveedor ya
+    // no encuentra el equipo en el registro y no podría hablarle.
+    const retiro =
+      (await this.repo.copropiedadDeActivo(equipoId)) === copropiedadId
+        ? await this.retirarPlantillas(ctx, copropiedadId, equipoId)
+        : { retiradas: 0, pendientes: 0 };
     const equipo = await this.repo.desactivar(ctx, copropiedadId, equipoId, dto.motivo);
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
+    if (retiro.retiradas + retiro.pendientes > 0) {
+      await this.repo.auditarCorreccion(
+        ctx,
+        copropiedadId,
+        `${equipo.nombre} · baja: ${String(retiro.retiradas)} rostro(s) retirado(s) del equipo, ` +
+          `${String(retiro.pendientes)} pendiente(s) (el equipo no contestó)`,
+      );
+    }
     this.olvido.olvidar(equipoId);
-    return this.aDtoCompleto(ctx, copropiedadId, equipo);
+    return {
+      ...(await this.aDtoCompleto(ctx, copropiedadId, equipo)),
+      plantillasRetiradas: retiro.retiradas,
+      plantillasPendientes: retiro.pendientes,
+    };
+  }
+
+  /** Por `ModuleRef`: biometría importa equipos, así que equipos no la importa. */
+  private async retirarPlantillas(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+  ): Promise<ResultadoDeRetiroDePlantillas> {
+    let retiro: RetiroDePlantillasDeEquipo | null = null;
+    try {
+      retiro = this.modulos.get<RetiroDePlantillasDeEquipo>(RETIRO_DE_PLANTILLAS_DE_EQUIPO, {
+        strict: false,
+      });
+    } catch {
+      return { retiradas: 0, pendientes: 0 };
+    }
+    return retiro.ejecutar(ctx, copropiedadId, equipoId);
   }
 
   @Post(':equipoId/reactivacion')

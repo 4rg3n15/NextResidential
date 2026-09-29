@@ -30,6 +30,7 @@ VisitaDto _$VisitaDtoFromJson(Map<String, dynamic> json) => VisitaDto(
   plantillaId: json['plantillaId'] as String?,
   equiposSincronizados: json['equiposSincronizados'] as num,
   equiposFallidos: json['equiposFallidos'] as num,
+  confirmacionDePlaca: json['confirmacionDePlaca'] as String?,
 );
 
 Map<String, dynamic> _$VisitaDtoToJson(VisitaDto instance) => <String, dynamic>{
@@ -52,4 +53,5 @@ Map<String, dynamic> _$VisitaDtoToJson(VisitaDto instance) => <String, dynamic>{
   'plantillaId': instance.plantillaId,
   'equiposSincronizados': instance.equiposSincronizados,
   'equiposFallidos': instance.equiposFallidos,
+  'confirmacionDePlaca': instance.confirmacionDePlaca,
 };

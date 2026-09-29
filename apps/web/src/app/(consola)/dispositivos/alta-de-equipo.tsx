@@ -11,6 +11,7 @@ import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { motivoDeRechazo } from '@/lib/equipos/caracteres-admitidos';
 import { useZonas } from '@/lib/api/consultas';
 import { FichaDeEquipo } from './ficha-del-equipo';
+import { CampoCanalDeVideo, canalPorOmision } from './canal-de-video';
 
 /**
  * Alta de un equipo desde la consola — A.1, A.3, A.4 y A.5.
@@ -167,7 +168,8 @@ export const AltaDeEquipo = ({
       ),
     );
     setPuertaDelVideoportero(String(equipo?.numeroDePuerta ?? 1));
-    setCanalDeVideo(equipo?.canalDeVideo ?? '');
+    // E2/C1 (15-M) · sin canal guardado, el subflujo (x02) de los que el equipo declara.
+    setCanalDeVideo(equipo?.canalDeVideo ?? canalPorOmision(equipo?.capacidades?.video.canales));
     setZonaId(equipo?.zonaId ?? '');
     setSondeo(null);
     setError(undefined);
@@ -469,13 +471,10 @@ export const AltaDeEquipo = ({
       ) : null}
 
       {CON_VIDEO.has(tipo) ? (
-        <Campo
-          etiqueta="Canal de video (opcional)"
-          inputMode="numeric"
-          placeholder="102"
-          value={canalDeVideo}
-          onChange={(e) => setCanalDeVideo(e.target.value)}
-          ayuda="Canal × 100 + flujo: 102 es el subflujo de la primera cámara (el que mejor ve el navegador); 101 el principal. Vacío = 102."
+        <CampoCanalDeVideo
+          valor={canalDeVideo}
+          alCambiar={setCanalDeVideo}
+          canales={equipo?.capacidades?.video.canales}
           {...(canalDeVideo.trim() === '' || CANAL_DE_VIDEO.test(canalDeVideo.trim())
             ? {}
             : { error: 'Escriba el canal como 102, 101, 202…' })}

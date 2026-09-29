@@ -172,6 +172,23 @@ describe('RegistrarAcceso · alertas y escalamiento (RN-18, CA-18)', () => {
     expect(constancia.alertaId).not.toBeNull();
     expect(abiertas[0]?.tipo).toBe('acceso_dudoso');
   });
+  it('E5 (15-M) · el mismo acceso dudoso del mismo equipo en la ventana: UNA alerta, no una por lectura', async () => {
+    const m = montar(motorPermite(COP, true));
+    const primera = abrir(await m.caso.ejecutar(hecho({ referenciaExterna: 'r-1' }), ACTOR));
+    const segunda = abrir(await m.caso.ejecutar(hecho({ referenciaExterna: 'r-2' }), ACTOR));
+    expect((await m.alertas.abiertasDe(COP)).length).toBe(1);
+    // La segunda lectura apunta a la alerta que ya estaba: nada se pierde.
+    expect(segunda.alertaId).toBe(primera.alertaId);
+    expect(m.bitacora.lineas.some((l) => /deduplicada/.test(l.mensaje))).toBe(true);
+  });
+
+  it('E5 (15-M) · la lista negra NUNCA se deduplica: dos intentos, dos alertas al operador', async () => {
+    const m = montar(motorNiega(COP, 'LISTA_NEGRA'));
+    abrir(await m.caso.ejecutar(hecho({ referenciaExterna: 'ln-1' }), ACTOR));
+    abrir(await m.caso.ejecutar(hecho({ referenciaExterna: 'ln-2' }), ACTOR));
+    const abiertas = await m.alertas.abiertasDe(COP);
+    expect(abiertas.filter((a) => a.tipo === 'lista_negra')).toHaveLength(2);
+  });
 });
 
 describe('RegistrarAcceso · el transporte no puede tumbar la ingesta', () => {

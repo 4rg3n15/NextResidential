@@ -6,6 +6,7 @@ import { RefreshCw, Video, VideoOff } from 'lucide-react';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { ErrorDeVistaEnVivo, negociarVistaEnVivo, rutaWhep } from '@/lib/video/whep';
+import { fraseDeErrorDeVideo } from './causas-de-video';
 import type { ConexionEnVivo, OpcionesDeNegociacion } from '@/lib/video/whep';
 
 /**
@@ -37,6 +38,8 @@ type Fase =
 export const PLAZO_PRIMER_CUADRO_MS = 8000;
 
 const TITULO_POR_CODIGO: Record<string, string> = {
+  // Otros fallos (15-M) · la API caída o arrancando: no es el video.
+  sin_api: 'La API no responde',
   sin_puente: 'Vista en vivo no desplegada',
   // 409 · no ofrece video, o lo entrega en un códec que el navegador no
   // reproduce (H.265): el mensaje de la API dice cuál de las dos.
@@ -99,7 +102,8 @@ export const VideoEnVivo = ({
         if (!vigente) return;
         const codigo = error instanceof ErrorDeVistaEnVivo ? error.codigo : 'red';
         const mensaje = error instanceof Error ? error.message : String(error);
-        setFase({ tipo: 'error', codigo, mensaje });
+        // E2/C1 (15-M) · en palabras y con remedio, nunca el JSON ni el «EOF» a secas.
+        setFase({ tipo: 'error', codigo, mensaje: fraseDeErrorDeVideo(codigo, mensaje) });
       });
     return () => {
       vigente = false;

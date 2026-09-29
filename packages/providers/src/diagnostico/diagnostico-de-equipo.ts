@@ -4,6 +4,7 @@ import { recortado, sinSecretos } from '../equipo/intercambio';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { interpretarError } from '../equipo/errores-del-fabricante';
+import { bloqueoEnPalabras, interpretarUserCheck } from '../equipo/user-check';
 import { etiqueta } from '../equipo/xml';
 import { juzgarCapacidadesAnpr } from '../camara/capacidades-anpr';
 import type { VeredictoDeCapacidadAnpr } from '../camara/capacidades-anpr';
@@ -119,6 +120,13 @@ export const DESVIO_TOLERABLE_SEGUNDOS = 60;
 export interface OpcionesDeDiagnostico extends OpcionesDeEquipo {
   /** `camara` pide las consultas que sólo tienen sentido en una cámara. */
   readonly familia: FamiliaDiagnosticada;
+  /**
+   * E1-e (15-M) · «Probar conexión»: la persona decide presentar la clave
+   * otra vez aunque el equipo la rechazara hace un momento. El sondeo
+   * periódico NO lo pone: presentar cada cinco minutos una clave rechazada
+   * es lo que bloquea la dirección del servidor en el equipo.
+   */
+  readonly olvidarRechazo?: boolean;
   readonly ahoraDelServidor?: () => Date;
   /** Carril de la cámara. Si no se declaró, el VERIFICADO (ver `camara/carril.ts`). */
   readonly canal?: number;
@@ -146,6 +154,7 @@ export const diagnosticarEquipo = async (
   opciones: OpcionesDeDiagnostico,
 ): Promise<DiagnosticoDeEquipo> => {
   const cliente = new ClienteDeEquipo(opciones);
+  if (opciones.olvidarRechazo === true) cliente.olvidarRechazo();
   const sinRespuesta: { que: string; motivo: string }[] = [];
 
   /** Pide una ruta del catálogo. `null` sin lanzar, anotando el motivo. */
@@ -216,7 +225,9 @@ export const diagnosticarEquipo = async (
   const paisAdmitido = esCamara
     ? await pedir('leer qué países admite el algoritmo de este equipo')
     : null;
-  const receptor = esCamara ? await pedir('leer a qué receptor publica el equipo') : null;
+  // E4 (15-M) · el receptor se lee en TODAS las familias: en una terminal o un
+  // videoportero es un resto huérfano que la ficha tiene que enseñar.
+  const receptor = await pedir('leer a qué receptor publica el equipo', 'comun');
   const barrera = esCamara
     ? await pedir('leer si este modelo reporta el estado de la barrera')
     : null;
@@ -277,7 +288,13 @@ export const diagnosticarEquipo = async (
   if (video !== undefined && capacidadesDelEquipo !== null) {
     capacidadesDelEquipo = {
       ...capacidadesDelEquipo,
-      video: { estado: estadoDelVideo(video), codec: video.codec, canal: video.canal },
+      // E2/C1 · se conservan los canales declarados (`canales`) que descubrió el equipo.
+      video: {
+        ...capacidadesDelEquipo.video,
+        estado: estadoDelVideo(video),
+        codec: video.codec,
+        canal: video.canal,
+      },
     };
   }
 
@@ -350,12 +367,26 @@ const contactar = async (
   const identidad = rutaPara('leer la identidad del equipo (modelo, firmware, serie)', 'comun');
   try {
     const respuesta = await cliente.pedir(identidad.metodo, identidad.ruta);
+    if (respuesta.estado === 401 && respuesta.sinDesafio === true) {
+      // E1-b · no se presentó la clave: el equipo no ofreció con qué.
+      return {
+        clase: 'alcanzado',
+        detalle:
+          'Hay un equipo en esa dirección pero contestó 401 sin ofrecer un desafío Digest: no ' +
+          'se pudo autenticar y NO es la clave (no se presentó). Vuelva a probar en unos segundos',
+        latenciaMs: respuesta.latenciaMs,
+      };
+    }
     if (respuesta.estado === 401 || respuesta.estado === 403) {
+      // E1-f · acaba de rechazarla, en un intercambio limpio; con el bloqueo
+      // que el equipo declare en el cuerpo, si lo declara.
+      const bloqueo = bloqueoEnPalabras(interpretarUserCheck(respuesta.cuerpo));
       return {
         clase: 'credencial',
         detalle:
-          'Hay un equipo en esa dirección y rechazó el usuario o la clave. NO reintente a ' +
-          'ciegas: estos aparatos bloquean la cuenta tras unos pocos intentos fallidos',
+          'Hay un equipo en esa dirección y acaba de rechazar el usuario o la clave' +
+          `${bloqueo === '' ? '' : `: ${bloqueo}`}. NO reintente a ciegas: estos aparatos ` +
+          'bloquean la cuenta tras unos pocos intentos fallidos',
         latenciaMs: respuesta.latenciaMs,
       };
     }
@@ -380,13 +411,26 @@ const contactar = async (
     };
   } catch (error) {
     if (error instanceof CredencialRechazada) {
-      // A5 (15-L) · la rechazó ya en la pregunta anterior y no se volvió a
-      // presentar: es la credencial, no el cable.
+      // A5 (15-L) · la rechazó ya —en la pregunta anterior o hace un rato— y
+      // no se volvió a presentar: es la credencial, no el cable. E1-f: se
+      // distingue «acaba de» de «hace N min», y se dice el bloqueo declarado.
+      const hace =
+        error.rechazadaHaceMs === undefined || error.rechazadaHaceMs < 60_000
+          ? 'acaba de rechazar el usuario o la clave'
+          : `rechazó el usuario o la clave hace ${String(Math.round(error.rechazadaHaceMs / 60_000))} min ` +
+            'y NO se ha vuelto a presentar (se presenta de nuevo al pulsar «Probar conexión» o al ' +
+            'editar la credencial)';
+      const bloqueo =
+        error.bloqueo === null
+          ? ''
+          : error.bloqueo.segundosParaDesbloquear === null
+            ? '; el equipo declara la cuenta BLOQUEADA'
+            : `; el equipo declara la cuenta BLOQUEADA, se desbloquea en ${String(error.bloqueo.segundosParaDesbloquear)} s`;
       return {
         clase: 'credencial',
         detalle:
-          'Hay un equipo en esa dirección y rechazó el usuario o la clave. NO reintente a ' +
-          'ciegas: estos aparatos bloquean la cuenta tras unos pocos intentos fallidos',
+          `Hay un equipo en esa dirección y ${hace}${bloqueo}. NO reintente a ciegas: estos ` +
+          'aparatos bloquean la cuenta tras unos pocos intentos fallidos',
         latenciaMs: latencia,
       };
     }

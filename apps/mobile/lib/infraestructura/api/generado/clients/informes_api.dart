@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/informe_dto.dart';
-import '../models/tipo2.dart';
+import '../models/tipo3.dart';
 
 part 'informes_api.g.dart';
 
@@ -20,7 +20,7 @@ abstract class InformesApi {
     @Path('id') required String id,
     @Query('desde') required String desde,
     @Query('hasta') required String hasta,
-    @Query('tipo') Tipo2? tipo,
+    @Query('tipo') Tipo3? tipo,
     @Query('viviendaId') String? viviendaId,
     @Query('dispositivoId') String? dispositivoId,
   });

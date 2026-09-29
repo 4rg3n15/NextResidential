@@ -28,6 +28,7 @@ import {
   ReinicioNecesario,
 } from '../nucleo/errores';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
+import { SesionesDeAudioFicticias } from './sesiones-de-audio';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
 /**
@@ -93,8 +94,8 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
   readonly bloqueos = new Map<string, boolean>();
   readonly veredictos: { dispositivoId: string; veredicto: VeredictoRemoto }[] = [];
   private readonly canales = new Map<string, EstadoDelCanal>();
-  private readonly audio: Uint8Array[] = [];
-  private enSesion: string | null = null;
+  /** C6 (15-M) · una sesión por videoportero, no una por proceso. */
+  private readonly sesiones = new SesionesDeAudioFicticias();
 
   constructor(private readonly opciones: OpcionesFicticias) {
     for (const equipo of opciones.equipos) this.equipos.set(equipo.dispositivoId, equipo);
@@ -283,24 +284,22 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
     const solicitud = solicitarCanal(vigente, operadorId, ahora);
     this.canales.set(dispositivoId, solicitud.estado);
     if (solicitud.resultado === 'en_espera') return 'en_espera';
-    this.enSesion = dispositivoId;
+    this.sesiones.abrir(dispositivoId);
     return 'abierta';
   }
 
-  async enviarAudio(fragmento: Uint8Array): Promise<void> {
-    if (this.enSesion === null) throw new Error('No hay ninguna sesión de audio abierta');
-    this.audio.push(fragmento);
+  // C6 · la forma CON dispositivo (`IntercomPorEquipo`).
+
+  async enviarAudioA(dispositivoId: string, fragmento: Uint8Array): Promise<void> {
+    this.sesiones.enviar(dispositivoId, fragmento);
   }
 
-  async *recibirAudio(): AsyncIterable<Uint8Array> {
-    if (this.enSesion === null) throw new Error('No hay ninguna sesión de audio abierta');
-    for (const fragmento of this.audio.splice(0, this.audio.length)) yield fragmento;
+  async *recibirAudioDe(dispositivoId: string): AsyncIterable<Uint8Array> {
+    for (const fragmento of this.sesiones.recibir(dispositivoId)) yield fragmento;
   }
 
-  async cerrarSesion(_motivo: string): Promise<void> {
-    const dispositivoId = this.enSesion;
-    this.enSesion = null;
-    if (dispositivoId === null) return;
+  async cerrarSesionDe(dispositivoId: string, _motivo: string): Promise<void> {
+    if (!this.sesiones.cerrar(dispositivoId)) return;
     const estado = this.canales.get(dispositivoId) ?? canalLibre(dispositivoId);
     if (estado.titular !== null) {
       this.canales.set(
@@ -310,9 +309,31 @@ export class ProveedorFicticio implements ProveedorDeEquipos {
     }
   }
 
-  async estadoSesion(): Promise<EstadoSesionIntercom> {
-    if (this.enSesion === null) return 'cerrada';
-    const estado = this.canales.get(this.enSesion);
+  async estadoSesionDe(dispositivoId: string): Promise<EstadoSesionIntercom> {
+    if (!this.sesiones.tiene(dispositivoId)) return 'cerrada';
+    const estado = this.canales.get(dispositivoId);
     return estado === undefined || estado.titular === null ? 'cerrada' : 'abierta';
+  }
+
+  // Los métodos del puerto SIN dispositivo: valen con una sola sesión abierta.
+
+  async enviarAudio(fragmento: Uint8Array): Promise<void> {
+    await this.enviarAudioA(this.sesiones.unica(), fragmento);
+  }
+
+  recibirAudio(): AsyncIterable<Uint8Array> {
+    return this.recibirAudioDe(this.sesiones.unica());
+  }
+
+  async cerrarSesion(motivo: string): Promise<void> {
+    for (const dispositivoId of this.sesiones.todas())
+      await this.cerrarSesionDe(dispositivoId, motivo);
+  }
+
+  async estadoSesion(): Promise<EstadoSesionIntercom> {
+    for (const dispositivoId of this.sesiones.todas()) {
+      if ((await this.estadoSesionDe(dispositivoId)) === 'abierta') return 'abierta';
+    }
+    return 'cerrada';
   }
 }

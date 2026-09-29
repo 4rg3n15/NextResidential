@@ -1,13 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { Acceso, VersionDeReglas, esExito, negar, permitir } from '@ncr/domain-core';
+import { Acceso, Alerta, VersionDeReglas, esExito, negar, permitir } from '@ncr/domain-core';
 import type { HechoDeAcceso, Reloj } from '@ncr/domain-core';
 import type { ContextoTenant } from '../src/autenticacion';
 import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositorio-equipos-pg';
 import type { ResultadoDeSondeo } from '../src/equipos';
 import { RepositorioEventosPgDeServicio } from '../src/eventos/infraestructura/repositorio-eventos-pg-de-servicio';
 import { RepositorioTableroPg } from '../src/tablero/infraestructura/repositorio-tablero-pg';
+import { RepositorioAlertasPg } from '../src/eventos/infraestructura/repositorio-alertas-pg';
+import { ACTOR_INGESTA } from '../src/comun/actores-de-servicio';
 import {
   ConsultarAccesosPorHora,
   ConsultarDispositivos,
@@ -255,6 +257,41 @@ describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real'
     expect(indicadores.padron.vehiculosActivos).toBeGreaterThan(0);
     expect(indicadores.ventana.zonaHoraria).toBe('America/Bogota');
     expect(indicadores.alertas.pendientes).toBeGreaterThanOrEqual(0);
+  });
+
+  it('otros fallos (15-M) · una alerta archivada deja de contar como pendiente', async () => {
+    const p = exigirBase();
+    const tablero = new RepositorioTableroPg(p);
+    const alertas = new RepositorioAlertasPg(p, { registrar: () => undefined });
+    // Una alerta de equipo necesita su equipo: el primero del inventario de COP_A.
+    const inventario = await new RepositorioDeEquiposPg(p, LLAVE, 'env:EQUIPOS_LLAVE').listar(
+      ctxAdmin(COP_A),
+      COP_A,
+    );
+    const dispositivoId = inventario[0]?.id;
+    if (dispositivoId === undefined) throw new Error('COP_A no tiene ningún equipo');
+    const antes = (await tablero.conteosDeAlertas(COP_A)).pendientes;
+    const alerta = Alerta.abrir({
+      id: randomUUID(),
+      copropiedadId: COP_A,
+      tipo: 'acceso_dudoso',
+      severidad: 'informativa',
+      generadaEn: new Date(),
+      dispositivoId,
+      notas: `ruido de prueba ${CORRIDA}`,
+    });
+    if (!esExito(alerta)) throw new Error(alerta.error.detalle);
+    await alertas.guardar(alerta.valor, ACTOR_INGESTA);
+    expect((await tablero.conteosDeAlertas(COP_A)).pendientes).toBe(antes + 1);
+    const archivadas = await alertas.archivar(
+      COP_A,
+      [alerta.valor.id],
+      'ruido de prueba',
+      ACTOR_INGESTA,
+      new Date(),
+    );
+    expect(archivadas).toBe(1);
+    expect((await tablero.conteosDeAlertas(COP_A)).pendientes).toBe(antes);
   });
 
   it('los accesos por hora cuentan los eventos del día en la hora LOCAL del conjunto', async () => {

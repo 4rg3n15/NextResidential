@@ -98,7 +98,10 @@ describe('15-K · el 401 que no es Digest (H-SITIO-12)', () => {
       .filter((l) => l.mensaje === 'Digest renegociado con el equipo')
       .map((l) => (l.datos as { motivo: string }).motivo);
     expect(motivos[0]).toBe('primer contacto');
-    expect(motivos.slice(1).some((m) => /nonce/.test(m))).toBe(true);
+    // E1-b (15-M) · el nonce rechazado se descarta y el nuevo llega en un
+    // intercambio limpio: otro «primer contacto», anotado con su porqué.
+    expect(traza.lineas.some((l) => /nonce guardado: se descarta/.test(l.mensaje))).toBe(true);
+    expect(motivos).toHaveLength(2);
   });
 });
 

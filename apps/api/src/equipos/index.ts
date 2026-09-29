@@ -38,3 +38,25 @@ export type {
   SondaDeEquipo,
   TipoDeEquipo,
 } from './aplicacion/puertos';
+/**
+ * C6 (15-M) · el secreto con el que cada cámara publica en el Alarm Server: lo
+ * emite este módulo en el alta y lo ACREDITA el receptor, por este barril.
+ */
+export { SECRETOS_DE_ALARM_SERVER } from './aplicacion/secretos-de-alarm-server';
+export type { SecretosDeAlarmServer } from './aplicacion/secretos-de-alarm-server';
+/**
+ * E5 (15-M) · UNA fuente de verdad del estado del equipo: la lista, la ficha
+ * y el tablero la comparten. Sale por el barril con su DTO y el lector de la
+ * señal de la escucha, para que el tablero no reinvente el criterio.
+ */
+export { aEstadoSalud, entradasDeEstado, estadoDelEquipo } from './aplicacion/estado-del-equipo';
+export type { EntradasDeEstado, EstadoDelEquipo, EnLinea } from './aplicacion/estado-del-equipo';
+export { LECTOR_DE_SENALES } from './aplicacion/senal-de-eventos';
+export type { LectorDeSenales, SenalDeEventos } from './aplicacion/senal-de-eventos';
+export { EstadoDelEquipoDto, aEstadoDelEquipoDto } from './presentacion/dto-estado-del-equipo';
+// C4 (15-M) · el puerto que la baja consume; lo satisface biometría.
+export { RETIRO_DE_PLANTILLAS_DE_EQUIPO } from './aplicacion/retiro-de-plantillas';
+export type {
+  ResultadoDeRetiroDePlantillas,
+  RetiroDePlantillasDeEquipo,
+} from './aplicacion/retiro-de-plantillas';

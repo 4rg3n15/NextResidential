@@ -9,6 +9,7 @@ import { pasoDeAudio } from './paso-de-audio';
 import { pasoDeEventos } from './paso-de-eventos';
 import { pasoDeVerificacion } from './paso-de-verificacion';
 import { pasoDeConexion, pasoDeConfiguracion, pasoDeHora, pasoDeVideo } from './pasos-de-lectura';
+import { pasoDeVideoWebrtc } from './paso-de-video-webrtc';
 import { PASOS_DEL_ENSAYO, resultado } from './tipos';
 import type { FamiliaDeEnsayo, OpcionesDeEnsayo, ResultadoDePaso } from './tipos';
 
@@ -24,6 +25,8 @@ import type { FamiliaDeEnsayo, OpcionesDeEnsayo, ResultadoDePaso } from './tipos
  */
 export interface InformeDeEnsayo {
   readonly familia: FamiliaDeEnsayo;
+  /** C6 (15-M) · el nombre de la ficha, si el equipo viene del registro. */
+  readonly nombre?: string;
   readonly modelo: string | null;
   readonly firmware: string | null;
   readonly pasos: readonly ResultadoDePaso[];
@@ -57,6 +60,7 @@ export const ensayarEquipo = async (
   });
   const informe = (pasos: readonly ResultadoDePaso[]): InformeDeEnsayo => ({
     familia: equipo.familia,
+    ...(equipo.nombre === undefined ? {} : { nombre: equipo.nombre }),
     modelo: d.modelo,
     firmware: d.firmware,
     pasos,
@@ -92,7 +96,8 @@ export const ensayarEquipo = async (
   pasos.push(await pasoDeEventos(o));
   pasos.push(await pasoDeApertura(o));
   pasos.push(await pasoDeRostro(o, c, esperar));
-  pasos.push(pasoDeVideo(d, equipo.familia));
+  // E2/C1 (15-M) · la sonda RTSP y, con GO2RTC_URL, la negociación WebRTC real.
+  pasos.push(await pasoDeVideoWebrtc(o, pasoDeVideo(d, equipo.familia)));
   pasos.push(await pasoDeAudio(o, c, esperar));
   pasos.push(await pasoDeVerificacion(o, c));
   return informe(pasos);

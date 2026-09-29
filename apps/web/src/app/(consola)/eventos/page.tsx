@@ -18,7 +18,8 @@ const Eventos = async (): Promise<JSX.Element> => {
   if (copropiedadId === null) {
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
-  return <PantallaDeEventos copropiedadId={copropiedadId} />;
+  // Otros fallos (15-M) · la llave reinicia filtros al cambiar de copropiedad.
+  return <PantallaDeEventos key={copropiedadId} copropiedadId={copropiedadId} />;
 };
 
 export default Eventos;

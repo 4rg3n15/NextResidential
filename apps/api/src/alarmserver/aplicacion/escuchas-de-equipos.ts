@@ -1,4 +1,4 @@
-import type { OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import type { BeforeApplicationShutdown, OnApplicationBootstrap } from '@nestjs/common';
 import type { Bitacora } from '@ncr/domain-core';
 import type { EscuchaActiva, ProveedorDeEquipos } from '@ncr/providers';
 import type { EquiposParaEscucha } from './puertos';
@@ -27,7 +27,7 @@ export interface ParteDeEscuchas {
   readonly activas: number;
 }
 
-export class EscuchasDeEquipos implements OnApplicationBootstrap, OnApplicationShutdown {
+export class EscuchasDeEquipos implements OnApplicationBootstrap, BeforeApplicationShutdown {
   private readonly activas = new Map<string, EscuchaActiva>();
   /** A5 (15-L) · lo último que se dijo de cada equipo: sólo se repite si cambia. */
   private readonly ultimoParte = new Map<string, string>();
@@ -58,7 +58,14 @@ export class EscuchasDeEquipos implements OnApplicationBootstrap, OnApplicationS
     this.temporizador.unref();
   }
 
-  onApplicationShutdown(): void {
+  /**
+   * Otros fallos (15-M) · se detienen ANTES de que se cierre el pool. Nest llama
+   * a `onApplicationShutdown` en el mismo orden que al arrancar —primero los
+   * módulos más profundos, y el pool es de ellos—, así que una escucha que
+   * parara ahí podía seguir consultando un pool ya cerrado. `beforeApplicationShutdown`
+   * corre para todos antes que cualquier `onApplicationShutdown`.
+   */
+  beforeApplicationShutdown(): void {
     if (this.temporizador !== null) clearInterval(this.temporizador);
     this.temporizador = null;
     for (const escucha of this.activas.values()) escucha.detener();

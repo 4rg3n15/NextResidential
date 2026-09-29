@@ -18,8 +18,11 @@ const Dispositivos = async (): Promise<JSX.Element> => {
   if (copropiedadId === null) {
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
+  // Otros fallos (15-M) · la llave reinicia el estado del cliente al cambiar de
+  // copropiedad: sin ella, lo abierto en la anterior seguía en pantalla.
   return (
     <PantallaDeDispositivos
+      key={copropiedadId}
       copropiedadId={copropiedadId}
       puedeAtestar={sesion.rol === 'superadministrador'}
     />

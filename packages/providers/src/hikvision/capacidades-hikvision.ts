@@ -16,6 +16,7 @@ import {
   motivoDeLaRespuesta,
 } from './rostros-y-personas';
 import type { RespuestaDeCapacidad } from './rostros-y-personas';
+import { descubrirCanalesDeVideo } from './canales-de-video';
 
 /**
  * DE LO QUE EL EQUIPO DECLARA A LO QUE EL SISTEMA PREGUNTA · ETAPA 15-D (O2).
@@ -247,9 +248,15 @@ export const descubrirCapacidades = async (
   /** Rostros y personas viven en el catálogo de la terminal (F4). */
   const deAcceso = (proposito: string): Promise<RespuestaDeCapacidad> =>
     consultar(proposito, 'terminal');
-  const conMotivo = (p: { estado: EstadoDeCapacidad; motivo: string | null }) => ({
+  const conMotivo = (p: {
+    estado: EstadoDeCapacidad;
+    motivo: string | null;
+    tipos?: readonly string[];
+  }) => ({
     gestionDePersonas: p.estado,
     ...(p.motivo === null ? {} : { motivoDeGestionDePersonas: p.motivo }),
+    // E3 (15-M) · los `userType` declarados viajan con la capacidad.
+    ...(p.tipos === undefined ? {} : { tiposDePersona: p.tipos }),
   });
 
   const sistema = await pedir('leer las capacidades del equipo', 'comun');
@@ -258,6 +265,24 @@ export const descubrirCapacidades = async (
   const parciales: { -readonly [K in keyof CapacidadesDeEquipo]?: CapacidadesDeEquipo[K] } = {
     ...base,
   };
+
+  if (familia !== 'comun') {
+    // E2/C1 (15-M) · qué flujos lista el equipo: la ficha los ofrece; el
+    // códec y el estado los pone la sonda RTSP del canal elegido (diagnóstico).
+    const { canales, motivo } = await descubrirCanalesDeVideo((p) => consultar(p, 'comun'));
+    parciales.video = {
+      estado: base.video?.estado ?? 'desconocida',
+      codec: null,
+      canal: null,
+      ...(canales.length === 0 ? {} : { canales }),
+    };
+    if (motivo !== null) {
+      opciones.traza?.registrar('aviso', 'canales de video sin leer', {
+        ...(opciones.dispositivoId === undefined ? {} : { dispositivoId: opciones.dispositivoId }),
+        motivo,
+      });
+    }
+  }
 
   if (familia === 'videoportero' || familia === 'terminal') {
     const canales = await pedir(

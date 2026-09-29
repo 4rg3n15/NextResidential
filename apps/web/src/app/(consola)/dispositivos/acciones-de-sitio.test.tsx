@@ -106,11 +106,33 @@ describe('las acciones del día de entrega, en la ficha', () => {
     await waitFor(() => expect(alFallar).toHaveBeenCalled());
   });
 
-  it('el videoportero no tiene estas acciones', () => {
-    const { container } = render(
+  it('E4 (15-M) · el videoportero: explica que no hace falta publicar y apaga el receptor huérfano con motivo', async () => {
+    conApi({ ...RESULTADO, valorAnterior: '192.0.2.140:8080', valorNuevo: 'sin receptor' });
+    const alTerminar = vi.fn();
+    render(
       <AccionesDeSitio
         copropiedadId={COP}
         equipo={equipo('intercom')}
+        motivo="resto de otra configuración"
+        alTerminar={alTerminar}
+        alFallar={() => undefined}
+      />,
+    );
+    expect(screen.getByText(/no necesita publicar: la plataforma lo escucha/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Enviar eventos a este Mac' })).toBeTruthy();
+    expect(screen.queryByText(/Verificación remota: desactivar/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivar el receptor huérfano' }));
+    await waitFor(() => expect(alTerminar).toHaveBeenCalled());
+    expect(pedidas[0]!.method).toBe('POST');
+    expect(pedidas[0]!.url).toMatch(/\/desactivar-receptor$/);
+    expect(await pedidas[0]!.clone().json()).toEqual({ motivo: 'resto de otra configuración' });
+  });
+
+  it('el relé no publica eventos: no tiene estas acciones', () => {
+    const { container } = render(
+      <AccionesDeSitio
+        copropiedadId={COP}
+        equipo={equipo('rele')}
         motivo="x x x x x"
         alTerminar={() => undefined}
         alFallar={() => undefined}

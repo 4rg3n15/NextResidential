@@ -102,3 +102,10 @@ export class AlertaExpuestaDto {
 
   @ApiProperty({ type: String, nullable: true }) notas!: string | null;
 }
+
+/** E5 (15-M) · cuántas alertas quedaron archivadas por la orden. */
+export class ArchivoDeAlertasResultadoDto {
+  @ApiProperty({ type: Number }) archivadas!: number;
+  @ApiProperty({ type: Number, description: 'Pedidas y no archivadas: ajenas o ya archivadas' })
+  omitidas!: number;
+}

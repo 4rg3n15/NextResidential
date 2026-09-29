@@ -16,12 +16,14 @@ import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 import type { EquipoDeclarado } from '../comun/equipos-de-alarm-server';
 import { INGESTOR_DE_EQUIPOS, IngestorDeEquipos } from './aplicacion/ingestor-de-publicaciones';
 import {
+  ALERTAS_DE_EQUIPO,
   CANAL_TIEMPO_REAL,
   REGISTRO_DE_EVENTOS_DE_EQUIPO,
   REGISTRO_DE_EVIDENCIA,
   REPOSITORIO_DISPOSITIVOS,
 } from '../eventos';
 import type {
+  AlertasDeEquipo,
   CanalTiempoReal,
   RegistroDeEventosDeEquipo,
   RegistroDeEvidencia,
@@ -176,6 +178,8 @@ export class AlarmServerModule {
             REGISTRO_DE_EVIDENCIA,
             COPROPIEDAD_DE_EQUIPO,
             REGISTRO_DE_EVENTOS_DE_EQUIPO,
+            CONFIGURACION,
+            ALERTAS_DE_EQUIPO,
           ],
           useFactory: (
             referencia: ModuleRef,
@@ -193,6 +197,8 @@ export class AlarmServerModule {
             registroDeEvidencia: RegistroDeEvidencia,
             registroDeEquipos: LocalizadorDeCopropiedadDeEquipo,
             eventosDeEquipo: RegistroDeEventosDeEquipo,
+            c: Configuracion,
+            alertas: AlertasDeEquipo,
           ) => {
             const ingestor = new IngestorDeEquipos(
               registrar,
@@ -200,6 +206,13 @@ export class AlarmServerModule {
                * Token PROPIO no hace falta aquí: el accionador se resuelve
                * por `ModuleRef` con `strict: false`, que busca la instancia
                * ÚNICA que `app.module.ts` registró. Ver la nota de arriba.
+               *
+               * C6 (15-M) · NO se decora: es la ruta verificada de la cámara
+               * (regla dura del encargo). Con N cámaras en el registro, el
+               * accionador ya abre el relé de la que publicó por el proveedor,
+               * con su host y su clave; `BARRERA_*` sigue siendo la
+               * compatibilidad declarada de UNA barrera, no un respaldo para
+               * cualquier cámara (abriría la barrera equivocada).
                */
               referencia.get<AccionadorDePuerta>(ACCIONADOR_DE_PUERTA, { strict: false }),
               evidencia,
@@ -219,7 +232,13 @@ export class AlarmServerModule {
               // H-15I-07 · la foto queda en `evidencias` y el evento la referencia.
               registroDeEvidencia,
               // 15-L · la línea de tiempo (Bloque B) y «¿decide sola?» (A4).
-              { eventosDeEquipo, control: proveedor },
+              // E5 (15-M) · una alerta por condición, no una por lectura.
+              {
+                eventosDeEquipo,
+                control: proveedor,
+                alertas,
+                desvioDeRelojMs: c.EQUIPOS_DESVIO_DE_RELOJ_S * 1000,
+              },
             );
             fuente.fijarIngestor(ingestor);
             return ingestor;

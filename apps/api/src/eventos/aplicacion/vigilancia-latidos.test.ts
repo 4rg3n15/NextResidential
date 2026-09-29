@@ -106,6 +106,19 @@ describe('VigilarLatidos · CA-26, RN-12, P-06', () => {
     expect((await m.caso.ejecutar(COP, ACTOR)).alertasAbiertas).toBe(1);
   });
 
+  it('otros fallos (15-M) · archivada como ruido, la pasada siguiente NO la reabre dentro de la ventana', async () => {
+    const m = montar();
+    m.dispositivos.declarar(COP, 'disp-1', haceSegundos(400));
+    await m.caso.ejecutar(COP, ACTOR);
+    const abierta = (await m.alertas.abiertasDe(COP))[0];
+    if (abierta === undefined) throw new Error('debería existir una alerta');
+    expect(await m.alertas.archivar(COP, [abierta.id], 'ruido de sitio', ACTOR, T0)).toBe(1);
+
+    const siguiente = await m.caso.ejecutar(COP, ACTOR);
+    expect(siguiente.caidos).toEqual(['disp-1']);
+    expect(siguiente.alertasAbiertas).toBe(0);
+  });
+
   it('admite el umbral propio de la copropiedad (P-06 configurable)', async () => {
     const m = montar();
     m.dispositivos.declarar(COP, 'disp-1', haceSegundos(40));

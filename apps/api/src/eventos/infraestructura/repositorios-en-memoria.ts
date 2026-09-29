@@ -1,4 +1,4 @@
-import type { Acceso, Alerta, FiltroDeEventos } from '@ncr/domain-core';
+import type { Acceso, Alerta, FiltroDeEventos, TipoDeAlerta } from '@ncr/domain-core';
 import type {
   EventoDeEquipoGuardado,
   EventoDeEquipoNuevo,
@@ -6,13 +6,16 @@ import type {
   RepositorioEventosDeEquipo,
 } from '../aplicacion/eventos-de-equipo';
 import type {
+  EstadoObservado,
   EventoRegistrado,
+  FiltroDeAlertas,
   LatidoDeDispositivo,
   PaginaDeEventos,
   RepositorioAlertas,
   RepositorioDispositivos,
   RepositorioEventos,
   ResultadoAnexado,
+  UltimaAlerta,
 } from '../aplicacion/puertos';
 import { cursorDe, filtrarYPaginar, mapearAcceso } from './proyeccion-eventos';
 
@@ -69,15 +72,83 @@ export class RepositorioAlertasEnMemoria implements RepositorioAlertas {
     return this.porId_.get(`${copropiedadId}|${alertaId}`) ?? null;
   }
 
-  async abiertasDe(copropiedadId: string): Promise<readonly Alerta[]> {
+  /** E5 (15-M) · el archivo es lógico también aquí: la alerta queda, marcada. */
+  private readonly archivadas = new Map<string, { motivo: string; por: string; en: Date }>();
+
+  async abiertasDe(copropiedadId: string, filtro?: FiltroDeAlertas): Promise<readonly Alerta[]> {
     return [...this.porId_.values()].filter(
-      (a) => a.copropiedadId === copropiedadId && a.estado !== 'resuelta',
+      (a) =>
+        a.copropiedadId === copropiedadId &&
+        a.estado !== 'resuelta' &&
+        !this.archivadas.has(`${copropiedadId}|${a.id}`) &&
+        ((filtro?.dispositivoId ?? null) === null || a.dispositivoId === filtro?.dispositivoId) &&
+        ((filtro?.severidad ?? null) === null || a.severidad === filtro?.severidad) &&
+        ((filtro?.tipo ?? null) === null || a.tipo === filtro?.tipo),
     );
+  }
+
+  async ultimaDe(
+    copropiedadId: string,
+    dispositivoId: string,
+    tipo: TipoDeAlerta,
+    clave?: string,
+  ): Promise<UltimaAlerta | null> {
+    const candidatas = [...this.porId_.values()]
+      .filter(
+        (a) =>
+          a.copropiedadId === copropiedadId &&
+          a.dispositivoId === dispositivoId &&
+          a.tipo === tipo &&
+          (clave === undefined || (a.notas ?? '').startsWith(`[${clave}]`)),
+      )
+      .sort((a, b) => b.generadaEn.getTime() - a.generadaEn.getTime());
+    const ultima = candidatas[0];
+    return ultima === undefined
+      ? null
+      : {
+          id: ultima.id,
+          generadaEn: ultima.generadaEn,
+          estado: ultima.estado,
+          archivada: this.archivadas.has(`${copropiedadId}|${ultima.id}`),
+        };
+  }
+
+  async archivar(
+    copropiedadId: string,
+    alertaIds: readonly string[],
+    motivo: string,
+    actorId: string,
+    ahora: Date,
+  ): Promise<number> {
+    let n = 0;
+    for (const id of alertaIds) {
+      const clave = `${copropiedadId}|${id}`;
+      if (!this.porId_.has(clave) || this.archivadas.has(clave)) continue;
+      this.archivadas.set(clave, { motivo, por: actorId, en: ahora });
+      n += 1;
+    }
+    return n;
+  }
+
+  /** Sólo para pruebas: el archivo de una alerta, si lo hay. */
+  archivoDe(copropiedadId: string, alertaId: string): { motivo: string; por: string } | null {
+    return this.archivadas.get(`${copropiedadId}|${alertaId}`) ?? null;
   }
 }
 
 export class RepositorioDispositivosEnMemoria implements RepositorioDispositivos {
   private readonly latidos_ = new Map<string, LatidoDeDispositivo>();
+  /** E5 (15-M) · el último estado observado por equipo; para pruebas. */
+  readonly estados = new Map<string, EstadoObservado & { readonly en: Date }>();
+
+  async registrarEstado(
+    copropiedadId: string,
+    dispositivoId: string,
+    observado: EstadoObservado,
+    ahora: Date,
+  ): Promise<void> {
+    this.estados.set(`${copropiedadId}|${dispositivoId}`, { ...observado, en: ahora });
+  }
 
   async latidos(copropiedadId: string): Promise<readonly LatidoDeDispositivo[]> {
     return [...this.latidos_.values()].filter((l) => l.copropiedadId === copropiedadId);

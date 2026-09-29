@@ -25,7 +25,7 @@ class _PorteriaApi implements PorteriaApi {
     required String id,
     required DateTime desde,
     required DateTime hasta,
-    Tipo3? tipo,
+    Tipo4? tipo,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{

@@ -7,7 +7,9 @@
  *   1 conexión y Digest · 2 hora frente al Mac · 3 configuración · 4 eventos
  *   (la cámara: ¿publica en ESTE Mac?) · 5 apertura (con alguien mirando) ·
  *   6 alta, espera y baja de un rostro (terminal y videoportero con biblioteca)
- *   · 7 video · 8 audio · 9 tiempo de la verificación remota (terminal: cinco
+ *   · 7 video (sonda RTSP y, con GO2RTC_URL en el .env, negociación WebRTC real
+ *     contra go2rtc: registro por PATCH y POST /api/webrtc, sin credencial en la
+ *     salida) · 8 audio · 9 tiempo de la verificación remota (terminal: cinco
  *   presentaciones, p50/p95 contra su plazo)
  * y dice OK/FALLO por paso, con la causa y la acción. Antes, las comprobaciones
  * del Mac —la API por el bucle local y POR LA IP DEL MAC (la del iPhone), el
@@ -23,10 +25,18 @@
  *   otras: --espera=<s> (60) · --espera-sincronizacion=<s> (60; en --simulado,
  *   0,2 s) · --sin-plataforma · --informe=<ruta.md> · --env=<ruta>
  *
+ * C6 (15-M) · LOS EQUIPOS SALEN DEL REGISTRO DE LA CONSOLA: con la base al
+ * alcance (DATABASE_URL) y EQUIPOS_LLAVE, se ensaya UN paso por cada equipo
+ * activo de `dispositivos` con usuario y credencial —N cámaras, N terminales,
+ * N videoporteros, con cualquier IP— con la credencial descifrada por la misma
+ * bóveda que usa la API. Las variables BARRERA_*, TERMINAL_* y VIDEOPORTERO_*
+ * quedan de RESPALDO: sólo si la base no está o el registro no tiene equipos.
+ * `--equipo=<familia|nombre>` filtra por familia o por el nombre de la ficha.
+ *
  * Lee `apps/api/.env` —el mismo de la API—: BARRERA_*, TERMINAL_*,
  * VIDEOPORTERO_* (HOST, PUERTO, USUARIO, CLAVE, CANAL, CANAL_VIDEO), PORT,
  * ALARM_SERVER_EQUIPOS, ALARM_SERVER_IP_ANUNCIADA, TERMINAL_PLAZO_DE_VERIFICACION_S,
- * PROVEEDOR_DE_EQUIPOS y las cadenas de la base. NUNCA imprime una credencial:
+ * PROVEEDOR_DE_EQUIPOS, EQUIPOS_LLAVE y las cadenas de la base. NUNCA imprime una credencial:
  * toda línea pasa por el tachado de los valores secretos del `.env` (también
  * los secretos de ruta de ALARM_SERVER_EQUIPOS). Informes y respaldos, sólo
  * FUERA del repositorio.
@@ -45,6 +55,7 @@ import {
   eventosDeLaPlataforma,
   verificacionesDeLaPlataforma,
 } from './lib/ensayo-plataforma.mjs';
+import { elegirEquipos, numero } from './lib/equipos-del-ensayo.mjs';
 import {
   comprobacionesDeLaPlataforma,
   comprobacionesDelMac,
@@ -108,38 +119,10 @@ const decir = (linea = '') => {
   console.log(limpia);
 };
 
-const FAMILIAS = [
-  { familia: 'camara', prefijo: 'BARRERA' },
-  { familia: 'terminal', prefijo: 'TERMINAL' },
-  { familia: 'videoportero', prefijo: 'VIDEOPORTERO' },
-];
 const pedidas = (valor('equipo') ?? 'camara,terminal,videoportero').split(',');
-const numero = (texto, porOmision) => {
-  const n = Number(texto);
-  return texto !== undefined && texto !== '' && Number.isInteger(n) && n > 0 ? n : porOmision;
-};
-
-/** Un equipo del .env, o `null` si no está declarado. */
-const desdeEntorno = ({ familia, prefijo }) => {
-  const e = (s) => (process.env[`${prefijo}_${s}`] ?? '').trim();
-  if (e('HOST') === '' && e('USUARIO') === '' && e('CLAVE') === '') return null;
-  const faltan = ['HOST', 'USUARIO', 'CLAVE'].filter((s) => e(s) === '');
-  if (faltan.length > 0)
-    salir(`faltan ${faltan.map((s) => `${prefijo}_${s}`).join(', ')} en el .env`);
-  const video = e('CANAL_VIDEO') || '102';
-  if (!/^[1-9][0-9]{2,3}$/.test(video)) salir(`${prefijo}_CANAL_VIDEO no es un canal: «${video}»`);
-  return {
-    familia,
-    host: e('HOST'),
-    puerto: numero(e('PUERTO'), 80),
-    usuario: e('USUARIO'),
-    clave: e('CLAVE'),
-    puerta: numero(e('CANAL'), 1),
-    canalDeVideo: video,
-    puertoRtsp: numero(process.env.VIDEO_PUERTO_RTSP, 554),
-    tiempoLimiteMs: numero(process.env.EQUIPOS_TIEMPO_LIMITE_MS, 5000),
-  };
-};
+/** C6 · `--equipo=` admite la familia (camara) o el nombre de la ficha (Entrada norte). */
+const pedido = (e) =>
+  pedidas.includes(e.familia) || (e.nombre !== undefined && pedidas.includes(e.nombre));
 
 /** La persona delante del equipo. Sin terminal no hay nadie: `null`. */
 const persona = () => {
@@ -175,11 +158,22 @@ const principal = async () => {
   );
   // En `--simulado`, los tres equipos y la plataforma los monta el paquete.
   const sim = simulado ? await P.montarEnsayoSimulado((l) => decir(l)) : null;
-  const equipos = (
-    sim === null ? FAMILIAS.map(desdeEntorno).filter((e) => e !== null) : sim.equipos
-  ).filter((e) => pedidas.includes(e.familia));
+  let pool = null;
+  if (!simulado && (process.env.DATABASE_URL ?? '') !== '' && !bandera('sin-plataforma')) {
+    const { Pool } = createRequire(join(RAIZ, 'apps/api/package.json'))('pg');
+    pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+  }
+  // C6 · PRIMERO el registro de la consola (N equipos); el .env sólo de respaldo.
+  const elegidos = await elegirEquipos({ sim, pool, entorno: process.env, decir, salir });
+  const origenDeLosEquipos = elegidos.origen;
+  let equipos = elegidos.equipos;
+  equipos = equipos.filter(pedido);
+  decir(`Equipos: ${equipos.length} · origen: ${origenDeLosEquipos}`);
   if (equipos.length === 0)
-    salir('ningún equipo declarado en el .env (BARRERA_*, TERMINAL_*, VIDEOPORTERO_*)');
+    salir(
+      'ningún equipo: dé de alta los equipos en la consola (o declare BARRERA_*, TERMINAL_*, ' +
+        'VIDEOPORTERO_* en el .env como respaldo)',
+    );
 
   const capturar = valor('capturar');
   const restaurarDe = valor('restaurar');
@@ -200,11 +194,6 @@ const principal = async () => {
     process.exit(fallos > 0 ? 1 : 0);
   }
 
-  let pool = null;
-  if (!simulado && (process.env.DATABASE_URL ?? '') !== '' && !bandera('sin-plataforma')) {
-    const { Pool } = createRequire(join(RAIZ, 'apps/api/package.json'))('pg');
-    pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
-  }
   if (!simulado) await comprobacionesDelMac({ pool, decir, raiz: RAIZ });
   // F3 y C1 · cuentan en el veredicto, también en `--simulado` (su API simulada).
   const comprobaciones =
@@ -227,13 +216,24 @@ const principal = async () => {
       : simulado
         ? 200
         : 60_000;
-  /** C2 · a dónde debe publicar la cámara: la IP del Mac EN SU RED y el PORT de la API. */
+  /**
+   * C2 · a dónde debe publicar la cámara: la IP del Mac EN SU RED y el PORT de
+   * la API. C6 · con el secreto PROPIO de la cámara (emitido en el alta) además
+   * de los declarados en el .env; en `--simulado`, el de cada cámara simulada.
+   */
   const receptorDe = (equipo) =>
+    sim?.receptorEsperadoDe?.(equipo) ??
     sim?.receptorEsperado ?? {
       direccion: ipDelMacHacia(P.ipHaciaElEquipo, equipo.host),
       puerto: numero(process.env.PORT, 3000),
-      secretos: SECRETOS_DE_ALARMA,
+      secretos: [
+        ...SECRETOS_DE_ALARMA,
+        ...(typeof equipo.secretoDeAlarmServer === 'string' ? [equipo.secretoDeAlarmServer] : []),
+      ],
     };
+  // Los secretos propios de las cámaras tampoco salen por pantalla.
+  for (const e of equipos)
+    if (typeof e.secretoDeAlarmServer === 'string') SECRETOS.push(e.secretoDeAlarmServer);
   const informes = [];
   const ROTULO = {
     camara: 'Cámara LPR',
@@ -242,19 +242,24 @@ const principal = async () => {
   };
   for (const equipo of equipos) {
     decir('');
-    decir(`▷ ${ROTULO[equipo.familia]}: ensayando…`);
-    if (pool !== null) {
+    const nombre = equipo.nombre === undefined ? '' : ` «${equipo.nombre}»`;
+    decir(`▷ ${ROTULO[equipo.familia]}${nombre}: ensayando…`);
+    if (pool !== null && equipo.dispositivoId === undefined) {
       const alta = await equipoRegistrado(pool, equipo.host).catch(() => []);
       if (alta.length === 0) decir('  ⚠ este equipo no está registrado en la consola con esta IP');
     }
     const informe = await P.ensayarEquipo({
       equipo,
-      interlocutor: sim === null ? persona() : sim.interlocutorDe(equipo.familia),
+      interlocutor: sim === null ? persona() : sim.interlocutorDe(equipo.familia, equipo),
       soloLectura: bandera('solo-lectura'),
       ...(plataforma === undefined ? {} : { plataforma }),
-      ...(verificaciones === undefined ? {} : { verificaciones }),
+      ...((sim?.verificacionesDe?.(equipo) ?? verificaciones) === undefined
+        ? {}
+        : { verificaciones: sim?.verificacionesDe?.(equipo) ?? verificaciones }),
       ...(foto === undefined ? {} : { foto }),
       ...(equipo.familia === 'camara' ? { receptorEsperado: receptorDe(equipo) } : {}),
+      // E2/C1 (15-M) · con GO2RTC_URL el paso 7 negocia WebRTC contra el puente real.
+      ...(process.env.GO2RTC_URL ? { puente: { url: process.env.GO2RTC_URL } } : {}),
       esperaDeEventoMs: numero(valor('espera'), 60) * 1000,
       esperaDeSincronizacionMs,
       plazoDeVerificacionS: numero(process.env.TERMINAL_PLAZO_DE_VERIFICACION_S, 8),

@@ -146,6 +146,19 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     fuente: 'Documentación ISAPI del fabricante, sección de sistema',
     confirmarEnSitio: 'qué módulos declara soportar: decide qué rutas tienen sentido probar',
   },
+  {
+    // E2/C1 (15-M) · qué flujos hay de verdad: en sitio la cámara no tenía el 102.
+    proposito: 'leer los canales de video del equipo',
+    metodo: 'GET',
+    ruta: '/ISAPI/Streaming/channels',
+    procedencia: 'documentada',
+    familia: 'comun',
+    fuente:
+      'Documentación ISAPI del fabricante, sección de streaming: StreamingChannelList con ' +
+      'un StreamingChannel por flujo (id, enabled, Video/videoCodecType)',
+    confirmarEnSitio:
+      'qué canales lista cada equipo y con qué códec; el subflujo (x02) es el que ve la consola',
+  },
 
   // ── CONFIGURAR EL RECEPTOR DESDE AQUÍ, en vez de a mano en la interfaz ───
   {
@@ -164,7 +177,7 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     metodo: 'PUT',
     ruta: '/ISAPI/Event/notification/httpHosts',
     procedencia: 'guia_oficial',
-    familia: 'camara',
+    familia: 'comun',
     fuente:
       'Guía oficial ANPR del fabricante, notificación HTTP. Admite también la forma ' +
       'con identificador de servidor al final de la ruta',
@@ -293,6 +306,26 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     confirmarEnSitio:
       'el identificador de la biblioteca del equipo, y si el envío es multipart con ' +
       'la imagen o lleva la imagen en base64',
+    dejaRastro: true,
+  },
+  {
+    /**
+     * E3 (15-M) · la carga por `post`, para el equipo que declara esa
+     * operación en su biblioteca y NO `setUp` (el DS-KD9633 del 29/09). Sólo
+     * se usa cuando el equipo lo DECLARA (`terminal/forma-del-alta.ts`); el
+     * cuerpo es el mismo multipart que el de `FDSetUp` `[SUPUESTO]` S-107.
+     */
+    proposito: 'añadir la plantilla facial a la biblioteca',
+    metodo: 'POST',
+    ruta: '/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json',
+    procedencia: 'documentada',
+    familia: 'terminal',
+    fuente:
+      'Encargo de la ETAPA 15-M (E3): el videoportero declara en su biblioteca de rostros la ' +
+      'operación post y no setUp; documentación ISAPI del fabricante, FDLib/FaceDataRecord',
+    confirmarEnSitio:
+      'el extracto «Intelligent/FDLib/FaceDataRecord (multipart)» del modelo: nombre de las ' +
+      'partes del formulario y campos requeridos del registro',
     dejaRastro: true,
   },
   {
