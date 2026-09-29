@@ -248,9 +248,15 @@ export const descubrirCapacidades = async (
   /** Rostros y personas viven en el catálogo de la terminal (F4). */
   const deAcceso = (proposito: string): Promise<RespuestaDeCapacidad> =>
     consultar(proposito, 'terminal');
-  const conMotivo = (p: { estado: EstadoDeCapacidad; motivo: string | null }) => ({
+  const conMotivo = (p: {
+    estado: EstadoDeCapacidad;
+    motivo: string | null;
+    tipos?: readonly string[];
+  }) => ({
     gestionDePersonas: p.estado,
     ...(p.motivo === null ? {} : { motivoDeGestionDePersonas: p.motivo }),
+    // E3 (15-M) · los `userType` declarados viajan con la capacidad.
+    ...(p.tipos === undefined ? {} : { tiposDePersona: p.tipos }),
   });
 
   const sistema = await pedir('leer las capacidades del equipo', 'comun');

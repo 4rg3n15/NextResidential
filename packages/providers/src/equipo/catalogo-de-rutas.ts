@@ -309,6 +309,26 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     dejaRastro: true,
   },
   {
+    /**
+     * E3 (15-M) · la carga por `post`, para el equipo que declara esa
+     * operación en su biblioteca y NO `setUp` (el DS-KD9633 del 29/09). Sólo
+     * se usa cuando el equipo lo DECLARA (`terminal/forma-del-alta.ts`); el
+     * cuerpo es el mismo multipart que el de `FDSetUp` `[SUPUESTO]` S-107.
+     */
+    proposito: 'añadir la plantilla facial a la biblioteca',
+    metodo: 'POST',
+    ruta: '/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json',
+    procedencia: 'documentada',
+    familia: 'terminal',
+    fuente:
+      'Encargo de la ETAPA 15-M (E3): el videoportero declara en su biblioteca de rostros la ' +
+      'operación post y no setUp; documentación ISAPI del fabricante, FDLib/FaceDataRecord',
+    confirmarEnSitio:
+      'el extracto «Intelligent/FDLib/FaceDataRecord (multipart)» del modelo: nombre de las ' +
+      'partes del formulario y campos requeridos del registro',
+    dejaRastro: true,
+  },
+  {
     proposito: 'suprimir la plantilla facial',
     metodo: 'PUT',
     ruta: '/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json',

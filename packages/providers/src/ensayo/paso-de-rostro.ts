@@ -86,6 +86,8 @@ export const pasoDeRostro = async (
     `ENSAYO${randomBytes(4).toString('hex')}`,
     esperaMs,
     esperar,
+    // E3 (15-M) · el alta de prueba es la que el equipo DECLARA, como en producción.
+    capacidades,
   );
   const tras =
     esperaMs >= 1000 ? `${String(Math.round(esperaMs / 1000))} s` : `${String(esperaMs)} ms`;

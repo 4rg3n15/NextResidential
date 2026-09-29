@@ -737,6 +737,7 @@ export class HikvisionProvider
       numeroDePuerta: equipo.numeroDePuerta ?? null,
       bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
       ...this.ajustesDeBiblioteca(),
+      ...declaradoParaElAlta(capacidades),
     });
     this.terminales.set(equipo.dispositivoId, creada);
     return creada;
@@ -780,6 +781,8 @@ export class HikvisionProvider
       numeroDePuerta: equipo.numeroDePuerta ?? null,
       bibliotecaMaximo: capacidades.bibliotecaDeRostros.maximo,
       ...this.ajustesDeBiblioteca(),
+      // E3 (15-M) · el videoportero da de alta como DECLARA, no como la terminal.
+      ...declaradoParaElAlta(capacidades),
     });
     this.terminales.set(dispositivoId, creada);
     return creada;
@@ -830,3 +833,16 @@ export class HikvisionProvider
     return creado;
   }
 }
+
+/**
+ * E3 (15-M) · lo que el equipo declaró sobre personas y biblioteca, para que
+ * el alta de un rostro sea la que ÉL admite (`terminal/forma-del-alta.ts`).
+ */
+const declaradoParaElAlta = (
+  c: CapacidadesDeEquipo,
+): Pick<OpcionesDeTerminal, 'tiposDePersona' | 'operacionesDeBiblioteca'> => ({
+  ...(c.tiposDePersona === undefined ? {} : { tiposDePersona: c.tiposDePersona }),
+  ...(c.bibliotecaDeRostros.operaciones === undefined
+    ? {}
+    : { operacionesDeBiblioteca: c.bibliotecaDeRostros.operaciones }),
+});

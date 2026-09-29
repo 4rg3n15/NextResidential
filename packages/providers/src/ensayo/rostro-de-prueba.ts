@@ -1,4 +1,5 @@
 import type { OpcionesDeEquipo } from '../equipo/cliente';
+import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
 import { confirmada } from '../equipo/confirmacion-isapi';
 import { TerminalFacial } from '../terminal/terminal-facial';
 import { identificadorEnElEquipo } from '../terminal/identificador-en-el-equipo';
@@ -43,8 +44,19 @@ export const rostroDePrueba = async (
   plantillaId: string,
   esperaMs: number,
   esperar: (ms: number) => Promise<void>,
+  capacidades: CapacidadesDeEquipo | null = null,
 ): Promise<ResultadoDelRostroDePrueba> => {
-  const equipo = new TerminalFacial({ ...conexion, modo: 'decide_el_equipo' });
+  // E3 (15-M) · con lo que el equipo declara: `normal` y `post` en el DS-KD9633.
+  const equipo = new TerminalFacial({
+    ...conexion,
+    modo: 'decide_el_equipo',
+    ...(capacidades?.tiposDePersona === undefined
+      ? {}
+      : { tiposDePersona: capacidades.tiposDePersona }),
+    ...(capacidades?.bibliotecaDeRostros.operaciones === undefined
+      ? {}
+      : { operacionesDeBiblioteca: capacidades.bibliotecaDeRostros.operaciones }),
+  });
   const employeeNo = identificadorEnElEquipo(plantillaId);
   let aceptada = false;
   let rechazo: string | null = null;

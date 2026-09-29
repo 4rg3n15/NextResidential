@@ -1,6 +1,7 @@
 import type { CapacidadDeBiblioteca, EstadoDeCapacidad } from '../nucleo/capacidades';
 import { resumenIsapi } from '../equipo/errores-del-fabricante';
 import { recuentoDeLaBiblioteca } from '../terminal/recuento-de-biblioteca';
+import { listaDeclarada } from '../terminal/forma-del-alta';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -116,11 +117,29 @@ export const bibliotecaDesde = (
   // Anexo 15-K · `recordDataNumber` de la biblioteca, como la guía («Face
   // Picture Search»); `totalNum` es la forma anterior, que se sigue leyendo.
   const almacenadas = recuentoDeLaBiblioteca(recuentoJson);
+  // E3 (15-M) · qué operaciones declara (`post`, `setUp`…) `[SUPUESTO]` S-109.
+  const operaciones = listaDeclarada(campoDe(capacidadesJson, 'FDLibCap', 'supportFunction'));
   return {
     estado: capacidadesJson === null && recuentoJson === null ? 'desconocida' : 'si',
     maximo,
     almacenadas,
+    ...(operaciones === undefined ? {} : { operaciones }),
   };
+};
+
+/** `raiz[a][b]` de un JSON, o `undefined` si no es JSON o no está. */
+const campoDe = (json: string | null, a: string, b: string): unknown => {
+  if (json === null) return undefined;
+  try {
+    const raiz: unknown = JSON.parse(json);
+    const nivel =
+      typeof raiz === 'object' && raiz !== null ? (raiz as Record<string, unknown>)[a] : undefined;
+    return typeof nivel === 'object' && nivel !== null
+      ? (nivel as Record<string, unknown>)[b]
+      : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 export const descubrirBiblioteca = async (
@@ -147,6 +166,8 @@ export interface PersonasDescubiertas {
   readonly estado: EstadoDeCapacidad;
   /** Sólo con `desconocida`: por qué. */
   readonly motivo: string | null;
+  /** E3 (15-M) · los `userType` que declara la consulta dedicada, si los dice. */
+  readonly tipos?: readonly string[];
 }
 
 /**
@@ -160,7 +181,10 @@ export const descubrirPersonas = async (
   controlDeAcceso?: RespuestaDeCapacidad,
 ): Promise<PersonasDescubiertas> => {
   const dedicada = await consultar(PREGUNTA_DE_PERSONAS);
-  if (dedicada.cuerpo !== null) return { estado: 'si', motivo: null };
+  if (dedicada.cuerpo !== null) {
+    const tipos = listaDeclarada(campoDe(dedicada.cuerpo, 'UserInfo', 'userType'));
+    return { estado: 'si', motivo: null, ...(tipos === undefined ? {} : { tipos }) };
+  }
   const general = controlDeAcceso ?? (await consultar(PREGUNTA_DE_CONTROL_DE_ACCESO));
   if (general.cuerpo !== null) return { estado: 'si', motivo: null };
   if (familia === 'videoportero' && dedicada.noAdmite && general.noAdmite) {
