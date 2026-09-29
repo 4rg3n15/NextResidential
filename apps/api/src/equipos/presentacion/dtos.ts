@@ -178,6 +178,13 @@ export class CapacidadDeAudioDto {
   @ApiProperty({ type: String, nullable: true }) formato!: string | null;
 }
 
+/** E2/C1 (15-M) · un canal de video que el equipo declara en su lista de flujos. */
+export class CanalDeVideoDto {
+  @ApiProperty({ type: String, description: 'canal×100+flujo, p. ej. 102' }) id!: string;
+  @ApiProperty({ type: String, nullable: true, description: '«H.264», «H.265»…' })
+  codec!: string | null;
+}
+
 /** D2 (15-L) · el video que el equipo describe por RTSP. */
 export class CapacidadDeVideoDto {
   @ApiProperty({ type: String, enum: ESTADOS_DE_CAPACIDAD }) estado!: string;
@@ -185,6 +192,13 @@ export class CapacidadDeVideoDto {
   codec!: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Canal preguntado (canal×100+flujo)' })
   canal!: string | null;
+  /** E2/C1 · los canales descubiertos; ausente si el equipo no los listó. */
+  @ApiProperty({
+    type: [CanalDeVideoDto],
+    required: false,
+    description: 'Canales de video que el equipo declara; la ficha los ofrece en una lista',
+  })
+  canales?: readonly CanalDeVideoDto[];
 }
 
 export class CapacidadesDeEquipoDto {

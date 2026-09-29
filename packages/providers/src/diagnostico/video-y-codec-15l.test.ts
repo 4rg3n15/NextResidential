@@ -105,7 +105,9 @@ describe('el origen del video respeta lo que el equipo contestó', () => {
   });
 
   it('si la ficha ya apunta a otro canal, la respuesta vieja no manda', async () => {
-    expect((await proveedorCon('102').origenDeVideo('v-1'))?.rtsp).toMatch(/Channels\/102$/);
+    expect((await proveedorCon('102').origenDeVideo('v-1'))?.rtsp).toMatch(
+      /Channels\/102#backchannel=0$/,
+    );
   });
 
   it('sin escucha abierta, no hay señal de eventos que contar', () => {

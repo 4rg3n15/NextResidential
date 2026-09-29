@@ -14,12 +14,12 @@ const banco = (responder: (url: string, init: RequestInit) => Response) => {
 };
 
 describe('PuenteGo2rtc (A5)', () => {
-  it('registra el flujo con PUT /api/streams?name&src, con la fuente codificada', async () => {
+  it('registra el flujo con PATCH /api/streams?name&src (en memoria, nunca al YAML), con la fuente codificada', async () => {
     const { puente, llamadas } = banco(() => new Response('', { status: 200 }));
     await puente.asegurarFlujo('ncr-equipo-1', RTSP);
     expect(llamadas).toHaveLength(1);
     const [llamada] = llamadas;
-    expect(llamada?.init.method).toBe('PUT');
+    expect(llamada?.init.method).toBe('PATCH');
     const url = new URL(llamada?.url ?? '');
     expect(url.pathname).toBe('/api/streams');
     expect(url.searchParams.get('name')).toBe('ncr-equipo-1');

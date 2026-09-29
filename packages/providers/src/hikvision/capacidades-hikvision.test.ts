@@ -332,3 +332,48 @@ describe('H-SITIO-09 · la biblioteca de rostros del VIDEOPORTERO se pregunta', 
     expect(c.gestionDePersonas).toBe('no');
   });
 });
+
+describe('E2/C1 (15-M) · los canales de video declarados llegan a las capacidades', () => {
+  const CRED = { usuario: 'servicio', clave: 'k' } as const;
+  const LISTA =
+    '<StreamingChannelList><StreamingChannel><id>101</id><enabled>true</enabled>' +
+    '<Video><videoCodecType>H.265</videoCodecType></Video></StreamingChannel>' +
+    '<StreamingChannel><id>102</id><enabled>true</enabled>' +
+    '<Video><videoCodecType>H.264</videoCodecType></Video></StreamingChannel></StreamingChannelList>';
+  /** El simulado contesta a todo; la lista de canales la pone esta prueba. */
+  const conCanales = (familia: 'camara' | 'terminal' | 'videoportero', lista: string | null) => {
+    const simulado = equipoSimulado({ familia, ...CRED });
+    const peticion: typeof fetch = async (entrada, init) => {
+      const url = String(entrada);
+      if (url.endsWith('/ISAPI/Streaming/channels')) {
+        return lista === null
+          ? new Response('', { status: 404 })
+          : new Response(lista, { status: 200, headers: { 'content-type': 'application/xml' } });
+      }
+      return simulado(entrada, init);
+    };
+    return new ClienteDeEquipo({ host: 'x.invalid', ...CRED, peticion });
+  };
+
+  it('cámara y terminal traen `video.canales` con id y códec, en el orden del equipo', async () => {
+    for (const familia of ['camara', 'terminal'] as const) {
+      const c = await descubrirCapacidades({ cliente: conCanales(familia, LISTA), familia });
+      expect(c.video.canales).toEqual([
+        { id: '101', codec: 'H.265' },
+        { id: '102', codec: 'H.264' },
+      ]);
+      // El códec y el canal en uso los pone la sonda RTSP, no esta lista.
+      expect(c.video.codec).toBeNull();
+      expect(c.video.canal).toBeNull();
+    }
+  });
+
+  it('un equipo que no lista sus canales no trae el campo, y no falla', async () => {
+    const c = await descubrirCapacidades({
+      cliente: conCanales('videoportero', null),
+      familia: 'videoportero',
+    });
+    expect(c.video.canales).toBeUndefined();
+    expect(c.origen).toBe('descubiertas');
+  });
+});

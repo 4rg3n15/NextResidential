@@ -3,7 +3,7 @@ import type { Bitacora } from '@ncr/domain-core';
 import type { OrigenDeVideo, ProveedorDeEquipos } from '@ncr/providers';
 import { NegociarVistaEnVivo, nombreDeFlujo } from './vista-en-vivo';
 import type { PuenteDeVideo } from './puertos';
-import { PuenteDeVideoNoConfigurado, SinOrigenDeVideo } from './puertos';
+import { PuenteDeVideoFallo, PuenteDeVideoNoConfigurado, SinOrigenDeVideo } from './puertos';
 
 const DISPOSITIVO = 'e0000000-0000-4000-8000-000000000001';
 const RTSP = 'rtsp://usuario:clave-secreta@equipo.local:554/Streaming/Channels/102';
@@ -103,5 +103,61 @@ describe('D2 (15-L) · un video que el navegador no reproduce se dice antes de n
     expect(error).toBeInstanceOf(SinOrigenDeVideo);
     expect((error as Error).message).toMatch(/entrega H\.265 en el canal 101 .* cámbielo a H\.264/);
     expect(asegurados).toEqual([]);
+  });
+});
+
+describe('E2/C1 (15-M) · un fallo del puente sale en palabras, con remedio y sin la fuente', () => {
+  const conPuenteQueFalla = (motivo: string, enRegistro = false) => {
+    const puente: PuenteDeVideo = {
+      asegurarFlujo: async () => {
+        if (enRegistro) throw new PuenteDeVideoFallo(motivo);
+      },
+      negociar: async () => {
+        throw new PuenteDeVideoFallo(motivo);
+      },
+    };
+    const proveedor = { origenDeVideo: async () => origen } as unknown as ProveedorDeEquipos;
+    const bitacora = { registrar: () => undefined } as unknown as Bitacora;
+    return new NegociarVistaEnVivo(proveedor, puente, bitacora, { ahora: () => new Date(0) });
+  };
+
+  it('«HTTP 500 · EOF» se explica como cierre del equipo (backchannel) y conserva el dato técnico', async () => {
+    const error = await conPuenteQueFalla('negociación WebRTC con el puente: HTTP 500 · EOF')
+      .ejecutar(solicitud)
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PuenteDeVideoFallo);
+    const mensaje = (error as Error).message;
+    expect(mensaje).toMatch(/cerró la conexión de video \(backchannel/);
+    expect(mensaje).toContain('HTTP 500 · EOF');
+    expect(mensaje).not.toContain('clave-secreta');
+  });
+
+  it('un puente apagado manda a `pnpm sitio:video`; un `streams:` sobrante, a regenerar', async () => {
+    const apagado = await conPuenteQueFalla('registro del flujo en el puente: fetch failed', true)
+      .ejecutar(solicitud)
+      .catch((e: unknown) => (e as Error).message);
+    expect(apagado).toMatch(/go2rtc no está en marcha.*pnpm sitio:video/);
+    const yaml = await conPuenteQueFalla(
+      'registro del flujo en el puente: HTTP 400 · yaml: line 9: did not find expected key',
+      true,
+    )
+      .ejecutar(solicitud)
+      .catch((e: unknown) => (e as Error).message);
+    expect(yaml).toMatch(/streams:.*pnpm sitio:video/);
+  });
+
+  it('un canal que el equipo no tiene manda a la ficha; lo desconocido pasa tal cual', async () => {
+    const canal = await conPuenteQueFalla(
+      'negociación WebRTC con el puente: HTTP 500 · 412 Precondition Failed',
+    )
+      .ejecutar(solicitud)
+      .catch((e: unknown) => (e as Error).message);
+    expect(canal).toMatch(/no tiene ese canal de video: elija otro canal en la ficha/);
+    const raro = await conPuenteQueFalla(
+      'negociación WebRTC con el puente: HTTP 500 · algo inédito',
+    )
+      .ejecutar(solicitud)
+      .catch((e: unknown) => (e as Error).message);
+    expect(raro).toContain('algo inédito');
   });
 });

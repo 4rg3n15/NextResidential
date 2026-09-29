@@ -6,6 +6,7 @@ import { RefreshCw, Video, VideoOff } from 'lucide-react';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { ErrorDeVistaEnVivo, negociarVistaEnVivo, rutaWhep } from '@/lib/video/whep';
+import { fraseDeErrorDeVideo } from './causas-de-video';
 import type { ConexionEnVivo, OpcionesDeNegociacion } from '@/lib/video/whep';
 
 /**
@@ -99,7 +100,8 @@ export const VideoEnVivo = ({
         if (!vigente) return;
         const codigo = error instanceof ErrorDeVistaEnVivo ? error.codigo : 'red';
         const mensaje = error instanceof Error ? error.message : String(error);
-        setFase({ tipo: 'error', codigo, mensaje });
+        // E2/C1 (15-M) · en palabras y con remedio, nunca el JSON ni el «EOF» a secas.
+        setFase({ tipo: 'error', codigo, mensaje: fraseDeErrorDeVideo(codigo, mensaje) });
       });
     return () => {
       vigente = false;

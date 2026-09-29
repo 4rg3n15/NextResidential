@@ -81,6 +81,13 @@ export interface CapacidadDeVideo {
   readonly codec: string | null;
   /** El canal preguntado (canal×100+flujo). `null` si no se preguntó. */
   readonly canal: string | null;
+  /**
+   * E2/C1 (15-M) · los canales que el equipo DECLARA (lista de flujos), con su
+   * códec cuando lo dice. Opcional: unas capacidades guardadas antes no lo
+   * traen, y un equipo que no lista sus canales tampoco. La ficha los ofrece
+   * en vez de pedir el número a ciegas.
+   */
+  readonly canales?: readonly { readonly id: string; readonly codec: string | null }[];
 }
 
 /** ¿El navegador puede reproducirlo? Sólo H.264 se da por sí. */
@@ -223,6 +230,13 @@ export const capacidadesDesdeJson = (crudo: unknown): CapacidadesDeEquipo => {
   const biblioteca = compuesta(objeto['bibliotecaDeRostros']);
   const audio = compuesta(objeto['audioBidireccional']);
   const video = compuesta(objeto['video']);
+  // E2/C1 · los canales declarados: sólo entradas con `id` de texto; lo demás se descarta.
+  const canales = (Array.isArray(video['canales']) ? video['canales'] : []).flatMap(
+    (c: unknown) => {
+      const id = texto(compuesta(c)['id']);
+      return id === null ? [] : [{ id, codec: texto(compuesta(c)['codec']) }];
+    },
+  );
   const origen = objeto['origen'];
   const estadoDeBiblioteca = estado(biblioteca['estado']);
   const personas = estado(objeto['gestionDePersonas']);
@@ -261,6 +275,7 @@ export const capacidadesDesdeJson = (crudo: unknown): CapacidadesDeEquipo => {
       estado: estado(video['estado']),
       codec: texto(video['codec']),
       canal: texto(video['canal']),
+      ...(canales.length === 0 ? {} : { canales }),
     },
   };
 };

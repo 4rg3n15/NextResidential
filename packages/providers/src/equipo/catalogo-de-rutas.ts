@@ -146,6 +146,19 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     fuente: 'Documentación ISAPI del fabricante, sección de sistema',
     confirmarEnSitio: 'qué módulos declara soportar: decide qué rutas tienen sentido probar',
   },
+  {
+    // E2/C1 (15-M) · qué flujos hay de verdad: en sitio la cámara no tenía el 102.
+    proposito: 'leer los canales de video del equipo',
+    metodo: 'GET',
+    ruta: '/ISAPI/Streaming/channels',
+    procedencia: 'documentada',
+    familia: 'comun',
+    fuente:
+      'Documentación ISAPI del fabricante, sección de streaming: StreamingChannelList con ' +
+      'un StreamingChannel por flujo (id, enabled, Video/videoCodecType)',
+    confirmarEnSitio:
+      'qué canales lista cada equipo y con qué códec; el subflujo (x02) es el que ve la consola',
+  },
 
   // ── CONFIGURAR EL RECEPTOR DESDE AQUÍ, en vez de a mano en la interfaz ───
   {

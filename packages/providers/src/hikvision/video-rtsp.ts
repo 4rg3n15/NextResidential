@@ -23,6 +23,19 @@ import type { EquipoRegistrado } from './registro-de-equipos';
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const PUERTO_RTSP = 554;
+
+/**
+ * E2/C1 (15-M) · lo que se añade a la fuente PARA EL PUENTE, no para el equipo.
+ *
+ * Visto en sitio el 28/09: la negociación terminaba en «HTTP 500 · EOF». El
+ * puente (go2rtc) pide por omisión el canal de retorno ONVIF en el DESCRIBE
+ * (`Require: www.onvif.org/ver20/backchannel`) y el equipo, en vez de contestar
+ * «551 Option not supported», CIERRA la conexión: el puente lee fin de flujo y
+ * eso es el EOF. `#backchannel=0` le dice al puente que no lo pida; el audio de
+ * la guardia no va por aquí (ADR-01: va por el canal de audio bidireccional).
+ * Reproducido con el binario real en `simulacion/servidor-rtsp.go2rtc.test.ts`.
+ */
+export const OPCION_SIN_BACKCHANNEL = '#backchannel=0';
 /** D2 (15-L) · el subflujo del canal 1: lo que el navegador reproduce con menos retardo. */
 export const CANAL_DE_VIDEO_POR_OMISION = '102';
 
@@ -43,6 +56,24 @@ export const canalDeVideoDe = (equipo: Pick<EquipoRegistrado, 'canalDeVideo'>): 
 /** La ruta RTSP del flujo, sin credencial: la usa también la sonda de códec. */
 export const caminoRtspDe = (canal: string): string => `/Streaming/Channels/${canal}`;
 
+export interface ConexionRtsp {
+  readonly host: string;
+  readonly puerto: number;
+  readonly usuario: string;
+  readonly clave: string;
+  readonly canal: string;
+}
+
+/**
+ * La URL RTSP completa de un flujo, con credencial y con la opción del puente.
+ * SÓLO para el puente de video: jamás a un cliente, a una bitácora ni a un
+ * informe (RN-21). El ensayo en sitio la construye por aquí para negociar
+ * WebRTC de verdad contra go2rtc (paso 7).
+ */
+export const urlRtspDe = (c: ConexionRtsp): string =>
+  `rtsp://${credencial(c.usuario, c.clave)}@${c.host}:${String(c.puerto)}` +
+  `${caminoRtspDe(c.canal)}${OPCION_SIN_BACKCHANNEL}`;
+
 /**
  * C2/D2 (15-L) · el canal sale de la ficha del equipo y el puerto del `.env`
  * (`VIDEO_PUERTO_RTSP`): nada de esto obliga a tocar código en sitio.
@@ -55,7 +86,13 @@ export const origenRtspDe = (
   const canal = canalDeVideoDe(equipo);
   const flujo = canal.endsWith('01') ? 'principal' : 'secundario';
   return {
-    rtsp: `rtsp://${credencial(equipo.usuario, equipo.clave)}@${equipo.host}:${String(puerto)}${caminoRtspDe(canal)}`,
+    rtsp: urlRtspDe({
+      host: equipo.host,
+      puerto,
+      usuario: equipo.usuario,
+      clave: equipo.clave,
+      canal,
+    }),
     flujo,
     detalle: `flujo ${canal} (${flujo}) por RTSP (S-46); el puente lo sirve por WebRTC`,
   };

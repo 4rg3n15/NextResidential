@@ -96,6 +96,39 @@ El **cortafuegos del Mac** tiene que aceptar conexiones entrantes de `node`
 (Ajustes del Sistema → Red → Cortafuegos → Opciones); si macOS pregunta al
 arrancar la API, **Permitir**. Sin eso, ni Safari ni la app del iPhone llegan.
 
+### 1 bis · Video: qué genera `pnpm sitio:video` y qué se comprobó con el binario
+
+Lo visto el 28/09 y lo que cambió (15-M, E2/C1):
+
+- `.sitio/go2rtc.yaml` **no lleva `streams:`** —ni `streams: {}`—: con esa
+  clave go2rtc rechazaba el alta de cada flujo con `400 … did not find
+expected key`. Se escribe con **permisos 0600**, y si en el fichero quedó un
+  `streams:` de una versión anterior (con la URL RTSP y la credencial dentro),
+  el guion **lo retira al arrancar y al cerrar** y lo dice por pantalla.
+- La API registra cada flujo con **`PATCH /api/streams`** (antes `PUT`): el
+  flujo vive **en memoria** y go2rtc **no escribe nada al fichero**, así que la
+  credencial del equipo no toca el disco (RN-21). `GET /api/streams` la
+  devuelve tachada (`rtsp://***@…`).
+- La fuente lleva **`#backchannel=0`**. Sin él, go2rtc pide en el DESCRIBE el
+  canal de retorno ONVIF (`Require: www.onvif.org/ver20/backchannel`); un
+  equipo que cierra la conexión ante eso —y rechaza la reconexión inmediata—
+  produce el `HTTP 500 · EOF` de la visita anterior. El audio de la guardia no
+  va por ahí (ADR-01), así que no se pierde nada.
+- **Sin STUN** (`ice_servers: []`): consola y puente están en la misma red. Con
+  el STUN de Google por omisión y sin Internet, cada negociación tardaba **5 s
+  exactos** (lo que expira la recogida ICE); ahora contesta enseguida.
+- La ficha del equipo ofrece **la lista de canales de video que el equipo
+  declara** (`Streaming/channels`), con su códec, y propone el subflujo
+  (`x02`). «No tiene el canal 102» ya no se adivina: se elige.
+- Con `GO2RTC_URL` en el `.env`, el **paso 7 de `pnpm sitio:ensayo`** además
+  negocia WebRTC de verdad contra go2rtc (PATCH + `POST /api/webrtc`) y mide
+  los milisegundos; sin credencial en ninguna línea.
+
+Todo esto está probado contra el binario real (go2rtc 1.9.14): con
+`GO2RTC_BIN=<ruta al binario>` las pruebas `servidor-rtsp.go2rtc.test.ts` y
+`puente-go2rtc.real.test.ts` lo repiten en el escritorio; sin la variable se
+omiten con nombre («OMITIDA: sin GO2RTC_BIN»).
+
 > **Si el paso 3 dice que faltan migraciones**, la API arrancada sin ellas falla
 > al leer dispositivos (la 0041 añade el canal de video). Pare la API, haga el
 > paso 3 y vuelva a arrancarla. Por eso las comprobaciones van antes que nada más.
@@ -329,6 +362,7 @@ Lo que se hace si algo no funciona el día de la entrega. Ninguno exige código.
 | **Cualquiera**                | Rechaza la conexión de eventos, o un rostro cargado desaparece    | Otra plataforma —HikCentral— tiene el equipo: **deshabilítelo en HikCentral durante la prueba** y repita el paso. El ensayo y la ficha lo dicen con esas palabras.                                                                                                                                                                                                                                                                        |
 | **Terminal**                  | El rostro no se sincroniza                                        | Seguimiento por terminal en la consola: el motivo sale en palabras (foto, persona, biblioteca llena). El visitante entra por Portería con motivo, o por placa.                                                                                                                                                                                                                                                                            |
 | **Videoportero**              | Sin audio                                                         | Habilitar el audio bidireccional en su panel y «Probar conexión». Si no hay forma: la guardia llama al **teléfono de portería** (configurado en Ajustes) y abre desde la consola.                                                                                                                                                                                                                                                         |
-| **Videoportero / cualquiera** | Video negro o «sin señal»                                         | «Probar conexión» dice el códec: H.265 → subflujo a H.264 en el panel, o canal `101` en la ficha. ICE: `VIDEO_IP_ANUNCIADA` y `pnpm sitio:video` de nuevo.                                                                                                                                                                                                                                                                                |
+| **Videoportero / cualquiera** | Video negro o «sin señal»                                         | «Probar conexión» dice el códec: H.265 → subflujo a H.264 en el panel, o el canal en la ficha (la lista muestra los que declara el equipo). ICE: `VIDEO_IP_ANUNCIADA` y `pnpm sitio:video` de nuevo.                                                                                                                                                                                                                                      |
+| **Cualquiera**                | La consola dice el motivo del video en palabras                   | Cada frase trae su remedio: «go2rtc no está en marcha» → `pnpm sitio:video`; «`streams:` sobrante» → parar y rearrancar `pnpm sitio:video` (regenera el fichero); «el equipo cerró la conexión (backchannel)» → canal de la ficha y permiso de vista en vivo del usuario de servicio; «no tiene ese canal» → otro canal de la lista; «rechazó la credencial por RTSP» → permiso de vista en vivo en el panel del equipo (§1 bis).         |
 | **Cualquiera**                | «Rechazó el usuario o la clave»                                   | No reintentar. Corregir el `.env` y la credencial en la ficha (sólo reemplazable). Si el equipo bloqueó la IP del Mac, esperar su tiempo de bloqueo.                                                                                                                                                                                                                                                                                      |
 | **El Mac o la red**           | Nada contesta                                                     | Todo el sistema funciona contra los simulados: `PROVEEDOR_DE_EQUIPOS=simulado` y reinicio de la API. La demostración de la plataforma sigue; los hitos con hardware quedan para otra visita, dicho así en la hoja.                                                                                                                                                                                                                        |

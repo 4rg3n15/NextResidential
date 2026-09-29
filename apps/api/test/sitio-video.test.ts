@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -13,6 +13,11 @@ import { join, resolve } from 'node:path';
  * se exige es lo que promete la guía: la API de go2rtc en el bucle local, el
  * medio anunciado en la IP y el puerto del `.env`, ningún flujo y NINGUNA
  * credencial en el fichero, aunque el `.env` las tenga.
+ *
+ * E2/C1 (15-M) · y lo visto en sitio el 28/09: NINGUNA clave `streams:` (con
+ * ella go2rtc rechazaba el alta del flujo), el fichero a 0600, sin STUN, y un
+ * `streams:` que hubiera dejado una versión anterior —con la URL RTSP y la
+ * credencial— se retira al arrancar.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const GUION = resolve(__dirname, '../../../scripts/sitio-video.mjs');
@@ -54,11 +59,39 @@ describe('pnpm sitio:video · configuración de go2rtc (D1)', () => {
     expect(yaml).toContain('listen: "127.0.0.1:1984"');
     expect(yaml).toContain('listen: ":8600"');
     expect(yaml).toContain('- "192.0.2.10:8600"');
-    expect(yaml).toContain('streams: {}');
+    // E2/C1 · sin `streams:` (ni vacío): los flujos van en memoria por PATCH.
+    expect(yaml).not.toMatch(/^streams/m);
+    expect(yaml).toContain('ice_servers: []');
     expect(yaml).toMatch(/rtsp:\n {2}listen: ""/);
     expect(yaml).not.toContain(CLAVE);
     expect(yaml).not.toMatch(/rtsp:\/\//);
     expect(r.salida).not.toContain(CLAVE);
+  });
+
+  it('E2/C1 · el fichero queda a 0600 y un streams: anterior (con credencial) se retira', () => {
+    corrida += 1;
+    const ruta = join(carpeta, `api-${String(corrida)}.env`);
+    const destino = join(carpeta, `sitio-${String(corrida)}`);
+    writeFileSync(ruta, 'GO2RTC_URL=http://127.0.0.1:1984\nVIDEO_IP_ANUNCIADA=192.0.2.16\n');
+    mkdirSync(destino, { recursive: true });
+    writeFileSync(
+      join(destino, 'go2rtc.yaml'),
+      `api:\n  listen: "127.0.0.1:1984"\nstreams:\n  ncr-x:\n    - rtsp://servicio:${CLAVE}@192.0.2.30:554/Streaming/Channels/102\nlog:\n  level: info\n`,
+      { mode: 0o644 },
+    );
+    const r = spawnSync(
+      process.execPath,
+      [GUION, '--solo-configuracion', '--env', ruta, '--dir', destino],
+      { encoding: 'utf8', timeout: 20_000 },
+    );
+    expect(r.status, `${r.stdout}${r.stderr}`).toBe(0);
+    expect(r.stdout).toMatch(/se retiró un bloque streams:/);
+    expect(r.stdout).not.toContain(CLAVE);
+    const yaml = readFileSync(join(destino, 'go2rtc.yaml'), 'utf8');
+    expect(yaml).not.toContain(CLAVE);
+    expect(yaml).not.toMatch(/rtsp:\/\//);
+    expect(yaml).not.toMatch(/^streams/m);
+    expect(statSync(join(destino, 'go2rtc.yaml')).mode & 0o777).toBe(0o600);
   });
 
   it('sin puerto en la URL, el de go2rtc; sin puerto WebRTC, el 8555', () => {

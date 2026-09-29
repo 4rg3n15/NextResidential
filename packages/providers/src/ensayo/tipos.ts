@@ -113,8 +113,20 @@ export interface EquipoDeEnsayo extends OpcionesDeEquipo {
   readonly puertoRtsp: number;
 }
 
+/**
+ * E2/C1 (15-M) · el puente de video (go2rtc), si `GO2RTC_URL` está en el
+ * `.env`: con él, el paso 7 además negocia WebRTC de verdad. `fetchFn` es
+ * inyectable para las pruebas.
+ */
+export interface PuenteDeEnsayo {
+  readonly url: string;
+  readonly fetchFn?: typeof fetch;
+}
+
 export interface OpcionesDeEnsayo {
   readonly equipo: EquipoDeEnsayo;
+  /** E2/C1 · sin él, el paso 7 se queda en la sonda RTSP y lo dice. */
+  readonly puente?: PuenteDeEnsayo;
   readonly interlocutor: Interlocutor;
   /** Sin apertura, sin rostro, sin audio: nada que mueva o escriba. */
   readonly soloLectura: boolean;

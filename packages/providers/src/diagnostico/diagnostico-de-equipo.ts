@@ -286,7 +286,13 @@ export const diagnosticarEquipo = async (
   if (video !== undefined && capacidadesDelEquipo !== null) {
     capacidadesDelEquipo = {
       ...capacidadesDelEquipo,
-      video: { estado: estadoDelVideo(video), codec: video.codec, canal: video.canal },
+      // E2/C1 · se conservan los canales declarados (`canales`) que descubrió el equipo.
+      video: {
+        ...capacidadesDelEquipo.video,
+        estado: estadoDelVideo(video),
+        codec: video.codec,
+        canal: video.canal,
+      },
     };
   }
 

@@ -7,7 +7,9 @@
  *   1 conexión y Digest · 2 hora frente al Mac · 3 configuración · 4 eventos
  *   (la cámara: ¿publica en ESTE Mac?) · 5 apertura (con alguien mirando) ·
  *   6 alta, espera y baja de un rostro (terminal y videoportero con biblioteca)
- *   · 7 video · 8 audio · 9 tiempo de la verificación remota (terminal: cinco
+ *   · 7 video (sonda RTSP y, con GO2RTC_URL en el .env, negociación WebRTC real
+ *     contra go2rtc: registro por PATCH y POST /api/webrtc, sin credencial en la
+ *     salida) · 8 audio · 9 tiempo de la verificación remota (terminal: cinco
  *   presentaciones, p50/p95 contra su plazo)
  * y dice OK/FALLO por paso, con la causa y la acción. Antes, las comprobaciones
  * del Mac —la API por el bucle local y POR LA IP DEL MAC (la del iPhone), el
@@ -255,6 +257,8 @@ const principal = async () => {
       ...(verificaciones === undefined ? {} : { verificaciones }),
       ...(foto === undefined ? {} : { foto }),
       ...(equipo.familia === 'camara' ? { receptorEsperado: receptorDe(equipo) } : {}),
+      // E2/C1 (15-M) · con GO2RTC_URL el paso 7 negocia WebRTC contra el puente real.
+      ...(process.env.GO2RTC_URL ? { puente: { url: process.env.GO2RTC_URL } } : {}),
       esperaDeEventoMs: numero(valor('espera'), 60) * 1000,
       esperaDeSincronizacionMs,
       plazoDeVerificacionS: numero(process.env.TERMINAL_PLAZO_DE_VERIFICACION_S, 8),

@@ -9,6 +9,7 @@ import { pasoDeAudio } from './paso-de-audio';
 import { pasoDeEventos } from './paso-de-eventos';
 import { pasoDeVerificacion } from './paso-de-verificacion';
 import { pasoDeConexion, pasoDeConfiguracion, pasoDeHora, pasoDeVideo } from './pasos-de-lectura';
+import { pasoDeVideoWebrtc } from './paso-de-video-webrtc';
 import { PASOS_DEL_ENSAYO, resultado } from './tipos';
 import type { FamiliaDeEnsayo, OpcionesDeEnsayo, ResultadoDePaso } from './tipos';
 
@@ -92,7 +93,8 @@ export const ensayarEquipo = async (
   pasos.push(await pasoDeEventos(o));
   pasos.push(await pasoDeApertura(o));
   pasos.push(await pasoDeRostro(o, c, esperar));
-  pasos.push(pasoDeVideo(d, equipo.familia));
+  // E2/C1 (15-M) · la sonda RTSP y, con GO2RTC_URL, la negociación WebRTC real.
+  pasos.push(await pasoDeVideoWebrtc(o, pasoDeVideo(d, equipo.familia)));
   pasos.push(await pasoDeAudio(o, c, esperar));
   pasos.push(await pasoDeVerificacion(o, c));
   return informe(pasos);
