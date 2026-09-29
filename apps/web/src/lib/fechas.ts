@@ -72,3 +72,31 @@ export const rangoDeVisita = (desde: string | Date, hasta: string | Date): strin
   if (a === null || b === null) return '—';
   return `${fechaCorta(a)} ${horaDoce(a)} a ${fechaCorta(b)} ${horaDoce(b)}`;
 };
+
+/**
+ * Otros fallos (15-M) · el día de hace `dias` días, en la fecha LOCAL del
+ * navegador (`YYYY-MM-DD` para un `<input type="date">`). Con `toISOString`
+ * salía la fecha UTC: en Colombia, desde las 19:00, «hasta hoy» proponía mañana.
+ */
+export const diaLocalHace = (dias: number, ahora: Date = new Date()): string =>
+  ahoraLocal(new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() - dias, 12)).fecha;
+
+/**
+ * Otros fallos (15-M) · el rango de días de un filtro, con el fin EXCLUSIVO
+ * del dominio (el día siguiente a `hasta`, a las 00:00 locales). `null` si un
+ * extremo está vacío o no es una fecha, o si `desde` va después de `hasta`:
+ * antes, vaciar un campo lanzaba `RangeError` y tumbaba la página entera.
+ */
+export const rangoDeDias = (
+  desde: string,
+  hasta: string,
+): { readonly desde: string; readonly hasta: string } | null => {
+  const dia = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const a = dia.exec(desde);
+  const b = dia.exec(hasta);
+  if (a === null || b === null) return null;
+  const inicio = new Date(Number(a[1]), Number(a[2]) - 1, Number(a[3]));
+  const fin = new Date(Number(b[1]), Number(b[2]) - 1, Number(b[3]) + 1);
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime()) || inicio >= fin) return null;
+  return { desde: inicio.toISOString(), hasta: fin.toISOString() };
+};

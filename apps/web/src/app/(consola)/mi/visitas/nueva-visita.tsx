@@ -7,7 +7,7 @@ import { CapturaDeFoto } from '@/componentes/captura-de-foto';
 import type { FotoLista } from '@/componentes/captura-de-foto';
 import { Campo } from '@/componentes/ui/campo';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
-import { ahoraLocal } from '@/lib/fechas';
+import { useCuandoAlAbrir } from '@/lib/use-cuando-al-abrir';
 import { DURACIONES } from '../../visitantes/generar-autorizacion';
 import { CasillaDeLaFoto, desenlaceDe } from './casilla';
 
@@ -35,11 +35,9 @@ export const NuevaVisita = ({
   readonly alCerrar: () => void;
   readonly alRegistrar: () => void;
 }): JSX.Element => {
-  const inicial = ahoraLocal();
+  const { fecha, hora, setFecha, setHora, reponer } = useCuandoAlAbrir(abierto);
   const [nombre, setNombre] = useState('');
   const [documento, setDocumento] = useState('');
-  const [fecha, setFecha] = useState(inicial.fecha);
-  const [hora, setHora] = useState(inicial.hora);
   const [duracion, setDuracion] = useState(120);
   const [placa, setPlaca] = useState('');
   const [observaciones, setObservaciones] = useState('');
@@ -64,6 +62,7 @@ export const NuevaVisita = ({
   const completo = faltan.length === 0;
 
   const limpiar = (): void => {
+    reponer();
     setNombre('');
     setDocumento('');
     setPlaca('');

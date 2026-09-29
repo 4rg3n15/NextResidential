@@ -6,6 +6,8 @@ import {
   horaCorta,
   rangoConFechas,
   rangoDeVisita,
+  diaLocalHace,
+  rangoDeDias,
 } from './fechas';
 
 describe('fechas de la consola · DD-MM-YYYY y rangos con fecha en los dos extremos', () => {
@@ -44,5 +46,26 @@ describe('fechas de la consola · DD-MM-YYYY y rangos con fecha en los dos extre
       '29-09-2026 12:05 a. m. a 29-09-2026 12:00 p. m.',
     );
     expect(rangoDeVisita('x', hasta)).toBe('—');
+  });
+});
+
+describe('otros fallos (15-M) · días locales y rango de filtro', () => {
+  it('«hace N días» es la fecha LOCAL, también de noche en Colombia', () => {
+    // 29-09 a las 20:00 locales: en UTC ya es el 30.
+    const noche = new Date(2026, 8, 29, 20, 0);
+    expect(diaLocalHace(0, noche)).toBe('2026-09-29');
+    expect(diaLocalHace(7, noche)).toBe('2026-09-22');
+  });
+
+  it('un rango válido pide hasta el día siguiente, exclusivo', () => {
+    const r = rangoDeDias('2026-09-22', '2026-09-29');
+    expect(r?.desde).toBe(new Date(2026, 8, 22).toISOString());
+    expect(r?.hasta).toBe(new Date(2026, 8, 30).toISOString());
+  });
+
+  it('vacío, incompleto o al revés: null, nunca una excepción', () => {
+    expect(rangoDeDias('', '2026-09-29')).toBeNull();
+    expect(rangoDeDias('2026-09-2', '2026-09-29')).toBeNull();
+    expect(rangoDeDias('2026-09-30', '2026-09-29')).toBeNull();
   });
 });

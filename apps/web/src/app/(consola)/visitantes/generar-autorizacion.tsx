@@ -10,6 +10,7 @@ import type { FotoLista } from '@/componentes/captura-de-foto';
 import { Campo } from '@/componentes/ui/campo';
 import { Ayuda } from '@/componentes/ui/ayuda';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
+import { useCuandoAlAbrir } from '@/lib/use-cuando-al-abrir';
 import {
   clavesDeVisitas,
   textoDeLaCasilla,
@@ -34,16 +35,6 @@ export const DURACIONES = [
   { minutos: 720, etiqueta: '12 horas' },
   { minutos: 1440, etiqueta: '24 horas' },
 ] as const;
-
-/** Hoy y la hora actual, en hora local del navegador, para precargar el formulario. */
-const ahoraLocal = (): { fecha: string; hora: string } => {
-  const d = new Date();
-  const dos = (n: number): string => String(n).padStart(2, '0');
-  return {
-    fecha: `${String(d.getFullYear())}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`,
-    hora: `${dos(d.getHours())}:${dos(d.getMinutes())}`,
-  };
-};
 
 /** Por qué la foto no sirvió, en castellano. Lo comparte «Visitas» del residente (15-M). */
 export const MOTIVOS_DE_FOTO: Readonly<Record<string, string>> = {
@@ -74,14 +65,12 @@ export const GenerarAutorizacion = ({
   const consultas = useQueryClient();
   const viviendas = useViviendasDeVisitas(copropiedadId);
   const casilla = useTextoDeLaCasilla(copropiedadId);
-  const inicial = ahoraLocal();
+  const { fecha, hora, setFecha, setHora, reponer } = useCuandoAlAbrir(abierto);
 
   const [nombre, setNombre] = useState('');
   const [tipoDocumento, setTipo] = useState<TipoDeDocumento>('cedula');
   const [documento, setDocumento] = useState('');
   const [viviendaId, setViviendaId] = useState('');
-  const [fecha, setFecha] = useState(inicial.fecha);
-  const [hora, setHora] = useState(inicial.hora);
   const [duracion, setDuracion] = useState(120);
   const [placa, setPlaca] = useState('');
   const [foto, setFoto] = useState<FotoLista | null>(null);
@@ -102,6 +91,7 @@ export const GenerarAutorizacion = ({
     casillaMarcada;
 
   const limpiar = (): void => {
+    reponer();
     setNombre('');
     setDocumento('');
     setViviendaId('');

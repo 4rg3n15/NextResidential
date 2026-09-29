@@ -39,6 +39,22 @@ export const ControlesDeAudio = ({
   const [error, setError] = useState<string | undefined>(undefined);
   const reproduccion = useRef<ControlDeAudio | null>(null);
   const captura = useRef<ControlDeAudio | null>(null);
+  /**
+   * Otros fallos (15-M) · lo que el operador QUIERE ahora, no lo que ya se
+   * abrió. `getUserMedia` tarda —y la primera vez espera al permiso—: si suelta
+   * el botón antes de que el micrófono abra, al abrir se cierra en el acto en
+   * vez de quedar transmitiendo sin nadie pulsando. `abriendo` evita que la
+   * autorrepetición del teclado abra varias capturas a la vez.
+   */
+  const quiereHablar = useRef(false);
+  const abriendo = useRef(false);
+  const montado = useRef(true);
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
 
   const url = rutaDeAudio(copropiedadId, dispositivoId);
 
@@ -74,9 +90,11 @@ export const ControlesDeAudio = ({
   }, [url, formato]);
 
   const empezarAHablar = async (): Promise<void> => {
-    if (formato === null || captura.current !== null) return;
+    quiereHablar.current = true;
+    if (formato === null || captura.current !== null || abriendo.current) return;
+    abriendo.current = true;
     try {
-      captura.current = await capturarMicrofono(formato, (trozo) => {
+      const abierta = await capturarMicrofono(formato, (trozo) => {
         void fetch(url, {
           method: 'POST',
           credentials: 'same-origin',
@@ -86,13 +104,21 @@ export const ControlesDeAudio = ({
           if (!r.ok) setError(`El equipo no aceptó el audio (HTTP ${String(r.status)})`);
         });
       });
+      if (!quiereHablar.current || !montado.current) {
+        abierta.detener();
+        return;
+      }
+      captura.current = abierta;
       setHablando(true);
     } catch (fallo) {
       setError(fallo instanceof Error ? fallo.message : 'No se pudo abrir el micrófono.');
+    } finally {
+      abriendo.current = false;
     }
   };
 
   const dejarDeHablar = (): void => {
+    quiereHablar.current = false;
     captura.current?.detener();
     captura.current = null;
     setHablando(false);

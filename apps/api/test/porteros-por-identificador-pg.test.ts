@@ -412,12 +412,20 @@ describe('H7 (15-L) · porteros por identificador, contra la base real', () => {
       ip: IP_DE_PORTERIA,
     });
     expect(ordenes.status, JSON.stringify(ordenes.body)).toBe(200);
+    // Otros fallos (15-M) · la cola alimenta la pantalla de Portería: con 403
+    // aquí, el portero en su garita no veía nada. Antes esta prueba fijaba el 403.
     const cola = await pedir('get', `/copropiedades/${cop1}/guardia/cola`, {
       token: p1001.token,
       ip: IP_DE_PORTERIA,
     });
-    expect(cola.status).toBe(403);
-    expect(texto(cola)).toBe(MENSAJE_GUARDIA_REMOTA);
+    expect(cola.status, JSON.stringify(cola.body)).toBe(200);
+    // Lo que sí es guardia remota —el intercom— sigue sin admitir esta IP.
+    const intercom = await pedir('get', `/copropiedades/${cop1}/guardia/intercom/${randomUUID()}`, {
+      token: p1001.token,
+      ip: IP_DE_PORTERIA,
+    });
+    expect(intercom.status).toBe(403);
+    expect(texto(intercom)).toBe(MENSAJE_GUARDIA_REMOTA);
   });
 
   it('8 · lista vacía: el portero entra desde la IP de una sesión ACTIVA de superadministrador (el mismo Mac)', async () => {

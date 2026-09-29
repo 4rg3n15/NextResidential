@@ -133,17 +133,28 @@ export const PantallaDeGuardiaVirtual = ({
     setError(e instanceof ErrorDeApi ? e.message : 'No se pudo completar. Vuelve a intentarlo.');
   };
 
+  /**
+   * Otros fallos (15-M) · el equipo viaja con la acción: al terminar una
+   * llamada se suelta el canal del equipo de ESA llamada, aunque el foco ya
+   * haya cambiado cuando la petición sale.
+   */
   const audio = useMutation({
-    mutationFn: async (accion: 'abrir' | 'cerrar') =>
+    mutationFn: async ({
+      accion,
+      dispositivoId,
+    }: {
+      accion: 'abrir' | 'cerrar';
+      dispositivoId: string;
+    }) =>
       desenvolver(
         accion === 'abrir'
           ? await cliente.POST('/copropiedades/{id}/guardia/intercom/abrir', {
               params: { path: { id: copropiedadId } },
-              body: { dispositivoId: foco?.dispositivoId ?? '' },
+              body: { dispositivoId },
             })
           : await cliente.POST('/copropiedades/{id}/guardia/intercom/cerrar', {
               params: { path: { id: copropiedadId } },
-              body: { dispositivoId: foco?.dispositivoId ?? '' },
+              body: { dispositivoId },
             }),
       ),
     onSuccess: invalidar,
@@ -302,7 +313,19 @@ export const PantallaDeGuardiaVirtual = ({
               }
               accion={
                 llamada === null ? undefined : (
-                  <Boton variante="secundario" tamano="sm" onClick={() => setLlamada(null)}>
+                  <Boton
+                    variante="secundario"
+                    tamano="sm"
+                    onClick={() => {
+                      // Otros fallos (15-M) · terminar la llamada suelta el turno o
+                      // la cola del canal: si no, el operador lo recibía después y
+                      // lo retenía 90 s sin nadie hablando.
+                      if (foco !== undefined && (tienePalabra || esperandoTurno)) {
+                        audio.mutate({ accion: 'cerrar', dispositivoId: foco.dispositivoId });
+                      }
+                      setLlamada(null);
+                    }}
+                  >
                     <PhoneOff className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
                     Terminar llamada
                   </Boton>
@@ -327,7 +350,15 @@ export const PantallaDeGuardiaVirtual = ({
                       variante={tienePalabra ? 'secundario' : 'primario'}
                       tamano="sm"
                       cargando={audio.isPending}
-                      onClick={() => audio.mutate(tienePalabra ? 'cerrar' : 'abrir')}
+                      onClick={() =>
+                        // Otros fallos (15-M) · «Salir de la cola» SUELTA el puesto
+                        // en la cola; antes volvía a pedir el canal y el operador
+                        // seguía esperando su turno.
+                        audio.mutate({
+                          accion: tienePalabra || esperandoTurno ? 'cerrar' : 'abrir',
+                          dispositivoId: foco.dispositivoId,
+                        })
+                      }
                     >
                       {tienePalabra ? (
                         <>

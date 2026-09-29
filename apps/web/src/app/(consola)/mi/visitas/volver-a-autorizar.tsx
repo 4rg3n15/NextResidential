@@ -6,7 +6,8 @@ import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { Campo } from '@/componentes/ui/campo';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import type { VisitanteReciente } from '@/lib/api/residente';
-import { ahoraLocal, fechaCorta } from '@/lib/fechas';
+import { fechaCorta } from '@/lib/fechas';
+import { useCuandoAlAbrir } from '@/lib/use-cuando-al-abrir';
 import { DURACIONES } from '../../visitantes/generar-autorizacion';
 import { CasillaDeLaFoto, desenlaceDe } from './casilla';
 
@@ -30,9 +31,7 @@ export const VolverAAutorizar = ({
   readonly alCerrar: () => void;
   readonly alRegistrar: () => void;
 }): JSX.Element => {
-  const inicial = ahoraLocal();
-  const [fecha, setFecha] = useState(inicial.fecha);
-  const [hora, setHora] = useState(inicial.hora);
+  const { fecha, hora, setFecha, setHora } = useCuandoAlAbrir(visitante !== null);
   const [duracion, setDuracion] = useState(120);
   const [casilla, setCasilla] = useState(false);
   const [clave, setClave] = useState(() => globalThis.crypto.randomUUID());

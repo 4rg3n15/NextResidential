@@ -178,7 +178,10 @@ export class RepositorioTableroPg implements RepositorioTablero {
                 min(array_position(ARRAY['critica','alta','media','informativa'],
                                    severidad::text))] AS severidad
          FROM public.alertas
-        WHERE copropiedad_id = $1 AND estado <> 'resuelta'`,
+        WHERE copropiedad_id = $1 AND estado <> 'resuelta'
+          -- Otros fallos (15-M) · lo archivado no está pendiente: archivar 300
+          -- alertas de ruido dejaba el tablero marcando 300.
+          AND archivada_en IS NULL`,
       [copropiedadId],
     );
     const f = rows[0];

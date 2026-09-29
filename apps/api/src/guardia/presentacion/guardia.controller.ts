@@ -259,8 +259,14 @@ export class GuardiaController {
    * La espera se calcula aquí, en cada consulta. Guardarla la haría envejecer:
    * la consola pintaría un número que dejó de ser cierto en cuanto se guardó.
    */
-  // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
-  @SoloGuardiaRemota()
+  /**
+   * Otros fallos (15-M) · SIN `@SoloGuardiaRemota`. La pantalla de Portería
+   * —la consola presencial, la que C-40 deja al computador de portería— se
+   * alimenta de esta cola: con el decorador, un portero en su garita recibía
+   * 403 y toda la pantalla quedaba en «Sin permiso». La IP de portería sigue
+   * sin bastar para lo que sí es guardia remota: el intercom, el aviso al
+   * residente y la emergencia.
+   */
   @Get('cola')
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Cola de atención con tiempo de espera (CU-03, HU-25)' })

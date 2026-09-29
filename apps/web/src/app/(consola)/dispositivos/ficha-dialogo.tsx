@@ -1,7 +1,7 @@
 'use client';
 
 import type { JSX } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Equipo, ResultadoDeSondeo } from '@ncr/contracts';
 import { Campo } from '@/componentes/ui/campo';
@@ -69,26 +69,35 @@ export const FichaDialogo = ({
   const [conVideo, setConVideo] = useState(false);
   useEffect(() => setConVideo(false), [equipo]);
 
+  /**
+   * Otros fallos (15-M) · el equipo que está abierto AHORA. Un sondeo lento de
+   * otra ficha —cerrada con Esc mientras sondeaba— no puede pintarse en ésta:
+   * la ficha de B enseñaba el diagnóstico de A y las correcciones iban a B.
+   */
+  const abierto = useRef<string | null>(null);
+  abierto.current = equipo?.id ?? null;
+
   const sondear = async (id: string): Promise<void> => {
     setSondeando(true);
     setError(undefined);
     try {
-      setSondeo(
-        desenvolver(
-          await cliente.POST('/copropiedades/{id}/equipos/{equipoId}/diagnostico', {
-            params: { path: { id: copropiedadId, equipoId: id } },
-          }),
-        ),
+      const resultado = desenvolver(
+        await cliente.POST('/copropiedades/{id}/equipos/{equipoId}/diagnostico', {
+          params: { path: { id: copropiedadId, equipoId: id } },
+        }),
       );
+      if (abierto.current !== id) return;
+      setSondeo(resultado);
       // La verificación y las capacidades acaban de cambiar en el inventario.
       await clientes.invalidateQueries({ queryKey: ['dispositivos', copropiedadId] });
       // C1 (15-L) · la tabla de Dispositivos sale del tablero: también se refresca.
       await clientes.invalidateQueries({ queryKey: ['tablero', copropiedadId, 'dispositivos'] });
     } catch (e) {
+      if (abierto.current !== id) return;
       setSondeo(null);
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo sondear el equipo');
     } finally {
-      setSondeando(false);
+      if (abierto.current === id) setSondeando(false);
     }
   };
 

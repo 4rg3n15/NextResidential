@@ -28,7 +28,8 @@ const Porteria = async (): Promise<JSX.Element> => {
   if (alcance.copropiedadId === null) {
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
-  return <PantallaDePorteria copropiedadId={alcance.copropiedadId} />;
+  // Otros fallos (15-M) · la llave reinicia el estado al cambiar de copropiedad.
+  return <PantallaDePorteria key={alcance.copropiedadId} copropiedadId={alcance.copropiedadId} />;
 };
 
 export default Porteria;
