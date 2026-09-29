@@ -39,8 +39,9 @@ export const cliente = createClient<paths>({
  *
  * `estado` se conserva porque la interfaz decide con él: 401 lleva al acceso,
  * 403 muestra «sin permiso», 404 muestra «no encontrado» —que en este sistema
- * es también lo que devuelve un recurso de otra copropiedad, a propósito— y 503
- * muestra «sin conexión».
+ * es también lo que devuelve un recurso de otra copropiedad, a propósito—, 502
+ * «la API no responde» (el proxy no la alcanzó) y 503 el motivo con que la API
+ * dice que no está disponible (otros fallos, 15-M: antes 503 era las dos cosas).
  */
 export class ErrorDeApi extends Error {
   constructor(

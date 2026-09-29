@@ -114,11 +114,23 @@ describe('transporte', () => {
     expect(respuesta.status).toBe(404);
   });
 
-  it('la API caída se distingue con 503, no con un 500 genérico', async () => {
+  it('la API caída se distingue con 502 (pasarela), no con un 500 ni con el 503 de la API', async () => {
     fetchFalso.mockRejectedValueOnce(new Error('ECONNREFUSED'));
     const respuesta = await invocar('http://consola/api/ncr/health', ['health']);
+    expect(respuesta.status).toBe(502);
+    expect(await respuesta.json()).toMatchObject({ estado: 502, correlacion: 'api-inalcanzable' });
+  });
+
+  it('un 503 de la API (arrancando) pasa tal cual: la API contestó', async () => {
+    fetchFalso.mockResolvedValueOnce(
+      new Response(JSON.stringify({ estado: 503, mensaje: 'La API está arrancando' }), {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const respuesta = await invocar('http://consola/api/ncr/health', ['health']);
     expect(respuesta.status).toBe(503);
-    expect(await respuesta.json()).toMatchObject({ estado: 503 });
+    expect(await respuesta.json()).toMatchObject({ mensaje: 'La API está arrancando' });
   });
 
   it('nunca marca la respuesta como cacheable', async () => {

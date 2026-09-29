@@ -38,6 +38,8 @@ type Fase =
 export const PLAZO_PRIMER_CUADRO_MS = 8000;
 
 const TITULO_POR_CODIGO: Record<string, string> = {
+  // Otros fallos (15-M) · la API caída o arrancando: no es el video.
+  sin_api: 'La API no responde',
   sin_puente: 'Vista en vivo no desplegada',
   // 409 · no ofrece video, o lo entrega en un códec que el navegador no
   // reproduce (H.265): el mensaje de la API dice cuál de las dos.

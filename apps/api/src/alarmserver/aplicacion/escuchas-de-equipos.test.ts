@@ -57,7 +57,7 @@ describe('EscuchasDeEquipos (A4)', () => {
   it('apagar el proceso detiene todas', async () => {
     const { escuchas, detenidas } = montar([equipo('a'), equipo('b')]);
     await escuchas.onApplicationBootstrap();
-    escuchas.onApplicationShutdown();
+    escuchas.beforeApplicationShutdown();
     expect(detenidas.sort()).toEqual(['a', 'b']);
   });
 
@@ -66,7 +66,7 @@ describe('EscuchasDeEquipos (A4)', () => {
     await escuchas.onApplicationBootstrap();
     expect(escuchar).not.toHaveBeenCalled();
     expect(lineas).toContain('escuchas de equipo desactivadas');
-    escuchas.onApplicationShutdown();
+    escuchas.beforeApplicationShutdown();
   });
 
   it('si el registro no responde, no se cae: se registra y se conserva lo que había', async () => {

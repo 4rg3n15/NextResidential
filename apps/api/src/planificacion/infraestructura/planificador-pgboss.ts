@@ -47,6 +47,9 @@ export interface OpcionesPlanificador {
  */
 const ZONA_POR_OMISION = 'UTC';
 
+/** Otros fallos (15-M) · plazo de un barrido en curso al apagar; menor que `PLAZO_DE_CIERRE_MS`. */
+export const PLAZO_DE_PARADA_MS = 6_000;
+
 export class PlanificadorPgBoss implements Planificador {
   private readonly trabajos: TrabajoProgramado[] = [];
   private boss: PgBoss | null = null;
@@ -115,6 +118,9 @@ export class PlanificadorPgBoss implements Planificador {
   async detener(): Promise<void> {
     const boss = this.boss;
     this.boss = null;
-    if (boss !== null) await boss.stop({ graceful: true });
+    // Otros fallos (15-M) · un barrido en curso tiene este plazo para terminar;
+    // si no, pg-boss lo marca fallido y se repite en la próxima pasada (son
+    // idempotentes). Cabe dentro del plazo del cierre ordenado. [SUPUESTO] S-157.
+    if (boss !== null) await boss.stop({ graceful: true, timeout: PLAZO_DE_PARADA_MS });
   }
 }

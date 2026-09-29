@@ -13,6 +13,7 @@
  * ve la cámara por IP y se habla sólo por `https` o `localhost`.
  */
 export type CodigoDeVistaEnVivo =
+  | 'sin_api' // 502 del proxy o 503 del arranque: la API no está para contestar
   | 'sin_puente' // 503 · la API no tiene GO2RTC_URL
   | 'sin_video' // 409 · el equipo no ofrece video
   | 'puente' // 502 · el puente falló
@@ -55,7 +56,15 @@ export interface OpcionesDeNegociacion {
 export const rutaWhep = (copropiedadId: string, dispositivoId: string): string =>
   `/api/ncr/copropiedades/${encodeURIComponent(copropiedadId)}/guardia/video/${encodeURIComponent(dispositivoId)}/whep`;
 
-const codigoSegunEstado = (estado: number): CodigoDeVistaEnVivo => {
+/**
+ * Otros fallos (15-M) · la API caída (502 del proxy, `api-inalcanzable`) o
+ * arrancando (503 del puerto de arranque, `api-arrancando`) no es un fallo del
+ * puente de video ni un puente sin desplegar: se dice que es la API.
+ */
+const CORRELACIONES_SIN_API: ReadonlySet<string> = new Set(['api-inalcanzable', 'api-arrancando']);
+
+const codigoSegunEstado = (estado: number, correlacion: string | null): CodigoDeVistaEnVivo => {
+  if (correlacion !== null && CORRELACIONES_SIN_API.has(correlacion)) return 'sin_api';
   if (estado === 503) return 'sin_puente';
   if (estado === 409) return 'sin_video';
   if (estado === 502) return 'puente';
@@ -63,18 +72,25 @@ const codigoSegunEstado = (estado: number): CodigoDeVistaEnVivo => {
   return 'red';
 };
 
-const mensajeDe = async (respuesta: Response): Promise<string> => {
+const cuerpoDelError = async (
+  respuesta: Response,
+): Promise<{ readonly mensaje: string; readonly correlacion: string | null }> => {
   const texto = await respuesta.text().catch(() => '');
+  let correlacion: string | null = null;
   try {
     const cuerpo: unknown = JSON.parse(texto);
-    if (typeof cuerpo === 'object' && cuerpo !== null && 'mensaje' in cuerpo) {
-      const { mensaje } = cuerpo as { mensaje: unknown };
-      if (typeof mensaje === 'string') return mensaje;
+    if (typeof cuerpo === 'object' && cuerpo !== null) {
+      const { mensaje, correlacion: c } = cuerpo as { mensaje?: unknown; correlacion?: unknown };
+      if (typeof c === 'string') correlacion = c;
+      if (typeof mensaje === 'string') return { mensaje, correlacion };
     }
   } catch {
     // no era JSON: se usa el texto tal cual
   }
-  return texto === '' ? `HTTP ${String(respuesta.status)}` : texto.slice(0, 200);
+  return {
+    mensaje: texto === '' ? `HTTP ${String(respuesta.status)}` : texto.slice(0, 200),
+    correlacion,
+  };
 };
 
 /** Espera al ICE local completo, o al plazo: WHEP sin «trickle» manda todo junto. */
@@ -134,7 +150,8 @@ export const negociarVistaEnVivo = async (
       cache: 'no-store',
     });
     if (!respuesta.ok) {
-      throw new ErrorDeVistaEnVivo(codigoSegunEstado(respuesta.status), await mensajeDe(respuesta));
+      const { mensaje, correlacion } = await cuerpoDelError(respuesta);
+      throw new ErrorDeVistaEnVivo(codigoSegunEstado(respuesta.status, correlacion), mensaje);
     }
     await conexion.setRemoteDescription({ type: 'answer', sdp: await respuesta.text() });
     return {

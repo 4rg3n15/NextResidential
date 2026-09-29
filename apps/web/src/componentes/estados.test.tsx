@@ -25,8 +25,20 @@ describe('estadoSegunCodigo · el 404 NO se presenta como «sin permiso»', () =
     expect(screen.getByText('Sin permiso')).toBeDefined();
   });
 
-  it('un 503 se presenta como falta de conexión, no como error de datos', () => {
-    render(estadoSegunCodigo(503, 'da igual'));
+  it('un 502 (la API no responde) se presenta como falta de conexión, no como error de datos', () => {
+    render(estadoSegunCodigo(502, 'da igual'));
+    expect(screen.getByText('La API no responde')).toBeDefined();
+  });
+
+  it('un 503 es la API que CONTESTA «no disponible»: se dice su motivo, no «sin conexión»', () => {
+    render(estadoSegunCodigo(503, 'La API está arrancando: vuelva a intentarlo en unos segundos'));
+    expect(screen.getByText('Servicio no disponible por ahora')).toBeDefined();
+    expect(screen.getByText(/La API está arrancando/)).toBeDefined();
+    expect(screen.queryByText('Sin conexión con el servidor')).toBeNull();
+  });
+
+  it('sin respuesta alguna (código 0) es falta de conexión', () => {
+    render(estadoSegunCodigo(0, 'da igual'));
     expect(screen.getByText('Sin conexión con el servidor')).toBeDefined();
   });
 

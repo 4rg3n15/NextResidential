@@ -103,6 +103,24 @@ describe('negociarVistaEnVivo (A5)', () => {
     },
   );
 
+  it.each([
+    [502, 'api-inalcanzable'],
+    [503, 'api-arrancando'],
+  ])(
+    'otros fallos (15-M) · HTTP %i con correlación «%s» es la API, no el puente: código sin_api',
+    async (estado, correlacion) => {
+      const { negociar } = banco(
+        () =>
+          new Response(JSON.stringify({ estado, correlacion, mensaje: 'La API no responde' }), {
+            status: estado,
+          }),
+      );
+      const error = await negociar().catch((e: unknown) => e);
+      expect((error as ErrorDeVistaEnVivo).codigo).toBe('sin_api');
+      expect((error as Error).message).toBe('La API no responde');
+    },
+  );
+
   it('sin RTCPeerConnection en el entorno: código «navegador»', async () => {
     const error = await negociarVistaEnVivo('/x', { alFlujo: () => undefined }).catch(
       (e: unknown) => e,

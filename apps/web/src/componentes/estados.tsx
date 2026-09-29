@@ -182,13 +182,17 @@ export const EstadoNoEncontrado = (): JSX.Element => (
 /** 5 · SIN CONEXIÓN — la API no responde. No es lo mismo que un error de datos. */
 export const EstadoSinConexion = ({
   alReintentar,
+  titulo = 'Sin conexión con el servidor',
+  descripcion = 'La consola no alcanza la API. Los datos que ves pueden estar desactualizados.',
 }: {
   readonly alReintentar?: (() => void) | undefined;
+  readonly titulo?: string;
+  readonly descripcion?: string;
 }): JSX.Element => (
   <MarcoDeEstado
     tono="aviso"
-    titulo="Sin conexión con el servidor"
-    descripcion="La consola no alcanza la API. Los datos que ves pueden estar desactualizados."
+    titulo={titulo}
+    descripcion={descripcion}
     icono={
       <Icono>
         <path
@@ -231,6 +235,32 @@ export const estadoSegunCodigo = (
   }
   if (codigo === 403) return <EstadoSinPermiso />;
   if (codigo === 404) return <EstadoNoEncontrado />;
-  if (codigo === 503 || codigo === 0) return <EstadoSinConexion alReintentar={alReintentar} />;
+  /**
+   * Otros fallos (15-M) · «la API está caída» y «la API contestó con un error»
+   * no se resuelven igual, y en sitio se pintaban iguales:
+   *  · 0: ni siquiera llegó respuesta (sin red, o la consola misma caída);
+   *  · 502: el proxy de la consola no alcanzó la API (apagada o reiniciándose);
+   *  · 503: la API SÍ contestó que no está disponible —arrancando, o sin un
+   *    servicio que necesita—, y su motivo se enseña tal cual.
+   */
+  if (codigo === 0) return <EstadoSinConexion alReintentar={alReintentar} />;
+  if (codigo === 502) {
+    return (
+      <EstadoSinConexion
+        alReintentar={alReintentar}
+        titulo="La API no responde"
+        descripcion="La consola está en línea pero la API de Next Control no contesta: está apagada o reiniciándose. Los datos que ves pueden estar desactualizados."
+      />
+    );
+  }
+  if (codigo === 503) {
+    return (
+      <EstadoError
+        titulo="Servicio no disponible por ahora"
+        descripcion={descripcion}
+        alReintentar={alReintentar}
+      />
+    );
+  }
   return <EstadoError descripcion={descripcion} alReintentar={alReintentar} />;
 };

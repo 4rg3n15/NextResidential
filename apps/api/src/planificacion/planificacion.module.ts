@@ -1,5 +1,9 @@
 import { Injectable, Module } from '@nestjs/common';
-import type { DynamicModule, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import type {
+  BeforeApplicationShutdown,
+  DynamicModule,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { Pool } from 'pg';
@@ -44,7 +48,7 @@ export const ACTOR_DEL_PLANIFICADOR = '00000000-0000-4000-8000-000000000001';
  * antes de tiempo encontraría repositorios a medio construir.
  */
 @Injectable()
-export class CicloDelPlanificador implements OnApplicationBootstrap, OnApplicationShutdown {
+export class CicloDelPlanificador implements OnApplicationBootstrap, BeforeApplicationShutdown {
   constructor(
     @Inject(PLANIFICADOR) private readonly planificador: Planificador,
     @Inject(CATALOGO_DE_COPROPIEDADES) private readonly catalogo: CatalogoDeCopropiedades,
@@ -124,7 +128,12 @@ export class CicloDelPlanificador implements OnApplicationBootstrap, OnApplicati
     });
   }
 
-  async onApplicationShutdown(): Promise<void> {
+  /**
+   * Otros fallos (15-M) · se detiene ANTES de que se cierre el pool: los
+   * barridos consultan la base por él, y Nest cierra el pool en
+   * `onApplicationShutdown` en el mismo orden que al arrancar.
+   */
+  async beforeApplicationShutdown(): Promise<void> {
     await this.planificador.detener();
   }
 }

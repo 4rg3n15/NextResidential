@@ -16,7 +16,7 @@ import { nombreDeVivienda } from '@/lib/vocabulario';
  *
  * `estadoDeConsulta` es el mismo tratamiento que el resto de la consola: el
  * esqueleto mientras carga, y ante un fallo el estado que corresponde al
- * código —401 sesión, 403 sin permiso, 404 no encontrado, sin conexión—
+ * código —401 sesión, 403 sin permiso, 404 no encontrado, 502 la API no responde, 503 la API dice que no está disponible—
  * con reintento. Se centraliza para que las ocho pantallas no lo repitan.
  */
 export const estadoDeConsulta = (

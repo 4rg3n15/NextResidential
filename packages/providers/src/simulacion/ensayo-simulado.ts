@@ -124,7 +124,10 @@ export const montarEnsayoSimulado = async (
     'camara-2.simulado.invalid': SECRETO_DEL_RECEPTOR_SIMULADO_2,
   };
   const guionDe = (familia: FamiliaDeEnsayo, host: string): GuionDeEquipo => {
-    const base = { familia, usuario: USUARIO, clave: CLAVE, hora: horaDeBogota() };
+    // Otros fallos (15-M) · cada aparato su serie, como en sitio: con una sola
+    // para los seis, el respaldo de una cámara pisaba al de la otra.
+    const serie = `SIM-${host.split('.')[0] ?? familia}`;
+    const base = { familia, usuario: USUARIO, clave: CLAVE, hora: horaDeBogota(), serie };
     if (familia === 'camara') {
       return {
         ...base,

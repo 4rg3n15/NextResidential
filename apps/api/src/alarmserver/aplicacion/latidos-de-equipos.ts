@@ -1,4 +1,4 @@
-import type { OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import type { BeforeApplicationShutdown, OnApplicationBootstrap } from '@nestjs/common';
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import type { ProveedorDeEquipos } from '@ncr/providers';
 import type { EquiposParaEscucha } from './puertos';
@@ -57,7 +57,7 @@ export interface RegistroDeLatidos {
   ): Promise<void>;
 }
 
-export class LatidosDeEquipos implements OnApplicationBootstrap, OnApplicationShutdown {
+export class LatidosDeEquipos implements OnApplicationBootstrap, BeforeApplicationShutdown {
   private temporizador: ReturnType<typeof setInterval> | null = null;
   private enCurso = false;
 
@@ -79,7 +79,8 @@ export class LatidosDeEquipos implements OnApplicationBootstrap, OnApplicationSh
     this.temporizador.unref();
   }
 
-  onApplicationShutdown(): void {
+  /** Otros fallos (15-M) · antes del cierre del pool; ver `EscuchasDeEquipos`. */
+  beforeApplicationShutdown(): void {
     if (this.temporizador !== null) clearInterval(this.temporizador);
     this.temporizador = null;
   }

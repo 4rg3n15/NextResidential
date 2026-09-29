@@ -92,8 +92,13 @@ const reenviar = async (peticion: NextRequest, segmentos: string[]): Promise<Res
     } as RequestInit);
   } catch (e) {
     /**
-     * La API caída no es un error de la consola: se distingue con un 503 para
-     * que la interfaz muestre «sin conexión» y no «algo salió mal».
+     * La API caída no es un error de la consola: se distingue con un 502 para
+     * que la interfaz muestre «la API no responde» y no «algo salió mal».
+     *
+     * Otros fallos (15-M) · era 503, el MISMO código con que la API dice «no
+     * disponible» cuando SÍ contesta —arrancando, o sin el puente de video—,
+     * y la consola los pintaba iguales. 502 es lo que es: la pasarela (este
+     * proxy) no alcanzó el servidor de detrás.
      *
      * **Y se registra con la ruta y la causa.** Un `503` mudo aquí costó una
      * ronda entera: `POST /api/ncr/auth/mfa/codigos` fallaba, parecía una ruta
@@ -108,12 +113,12 @@ const reenviar = async (peticion: NextRequest, segmentos: string[]): Promise<Res
     });
     return NextResponse.json(
       {
-        estado: 503,
+        estado: 502,
         correlacion: 'api-inalcanzable',
         mensaje:
-          'La API de Next Control no responde. Comprueba que está levantada y que API_URL apunta a ella.',
+          'La API de Next Control no responde: está apagada, reiniciándose, o API_URL no apunta a ella.',
       },
-      { status: 503 },
+      { status: 502 },
     );
   }
 
