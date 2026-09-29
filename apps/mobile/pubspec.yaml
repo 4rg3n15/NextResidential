@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # C5 (15-M) · textos de los selectores de fecha y hora en español.
+  flutter_localizations:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -37,7 +40,7 @@ dependencies:
   dio: ^5.7.0
   flutter_secure_storage: ^9.2.2
   provider: ^6.1.2
-  intl: ^0.19.0
+  intl: ^0.20.3
   json_annotation: ^4.9.0
   connectivity_plus: ^6.1.0
   retrofit: ^4.4.1

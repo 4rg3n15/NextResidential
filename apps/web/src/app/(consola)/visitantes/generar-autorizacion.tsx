@@ -168,6 +168,12 @@ export const GenerarAutorizacion = ({
       {resultado !== null ? (
         <div role="status" className="space-y-1 rounded-md border border-borde p-3 text-secundario">
           <p className="font-medium text-texto">Autorización generada.</p>
+          {/* C9 (15-M) · la placa, confirmada con nombre y las dos fechas, tal como la escribe la API. */}
+          {resultado.confirmacionDePlaca !== null ? (
+            <p role="status" className="font-medium text-exito-texto">
+              {resultado.confirmacionDePlaca}
+            </p>
+          ) : null}
           <p>
             Foto enviada a {String(resultado.sincronizadas)} de {String(resultado.equipos)} equipos
             {resultado.fallidas > 0 ? `; ${String(resultado.fallidas)} no la aceptaron` : ''}.

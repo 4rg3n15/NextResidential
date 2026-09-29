@@ -3,6 +3,7 @@ import type { ErrorDominio, MotivoRechazoCaptura, Resultado } from '@ncr/domain-
 import type { ContextoTenant } from '../../autenticacion';
 import type { CrearAutorizacion, RevocarAutorizacion } from '../../autorizaciones';
 import type { AvisoDeVisitas } from './aviso-de-visitas';
+import { confirmacionDePlaca } from './confirmacion-de-placa';
 import type { DatosDeVisitante, PersonasDeVisita } from './puertos';
 import { revisarFoto } from './rostro-de-visita';
 import type { FotoDeVisita, RegistrarRostroDeVisita, RostroRegistrado } from './rostro-de-visita';
@@ -24,7 +25,12 @@ export interface EntradaDeVisita {
 }
 
 export type ResultadoDeVisita =
-  | ({ readonly generada: true; readonly autorizacionId: string } & RostroRegistrado)
+  | ({
+      readonly generada: true;
+      readonly autorizacionId: string;
+      /** C9 (15-M) · la frase de la placa, o `null` si la visita no lleva. */
+      readonly confirmacionDePlaca: string | null;
+    } & RostroRegistrado)
   | { readonly generada: false; readonly motivosDeFoto: readonly MotivoRechazoCaptura[] };
 
 export const hastaDe = (inicio: Date, duracionMinutos: number): Date =>
@@ -44,11 +50,17 @@ export const revisarForma = (
       ),
     );
   }
-  if (
-    !Number.isInteger(duracionMinutos) ||
-    duracionMinutos < DURACION_MINIMA_MINUTOS ||
-    duracionMinutos > DURACION_MAXIMA_MINUTOS
-  ) {
+  // C9 (15-M) · una visita de 0 minutos —«de 02:33 a 02:33»— no autoriza a
+  // nadie y se rechaza con palabras, antes que el resto de la cota.
+  if (!Number.isInteger(duracionMinutos) || duracionMinutos <= 0) {
+    return fallo(
+      errorDominio(
+        'DATO_INVALIDO',
+        'La visita debe durar más de cero minutos: la hora de fin tiene que ser posterior a la de inicio',
+      ),
+    );
+  }
+  if (duracionMinutos < DURACION_MINIMA_MINUTOS || duracionMinutos > DURACION_MAXIMA_MINUTOS) {
     return fallo(
       errorDominio('DATO_INVALIDO', 'La duración debe estar entre 15 minutos y 24 horas'),
     );
@@ -117,7 +129,17 @@ export class GenerarVisita {
     if (esFallo(rostro)) return rostro;
 
     await this.aviso.nueva(copropiedadId, autorizacionId);
-    return exito({ generada: true, autorizacionId, ...rostro.valor });
+    return exito({
+      generada: true,
+      autorizacionId,
+      confirmacionDePlaca: confirmacionDePlaca({
+        placa: entrada.placa,
+        visitante: entrada.visitante.nombre,
+        desde: entrada.inicio,
+        hasta,
+      }),
+      ...rostro.valor,
+    });
   }
 
   private async registrarOAnular(

@@ -16,6 +16,9 @@ DispositivoDelTableroDto _$DispositivoDelTableroDtoFromJson(
   modelo: json['modelo'] as String?,
   firmware: json['firmware'] as String?,
   estado: DispositivoDelTableroDtoEstado.fromJson(json['estado'] as String),
+  estadoDelEquipo: EstadoDelEquipoDto.fromJson(
+    json['estadoDelEquipo'] as Map<String, dynamic>,
+  ),
   ultimoLatido: json['ultimoLatido'] == null
       ? null
       : DateTime.parse(json['ultimoLatido'] as String),
@@ -42,6 +45,7 @@ Map<String, dynamic> _$DispositivoDelTableroDtoToJson(
   'modelo': instance.modelo,
   'firmware': instance.firmware,
   'estado': instance.estado,
+  'estadoDelEquipo': instance.estadoDelEquipo,
   'ultimoLatido': instance.ultimoLatido?.toIso8601String(),
   'ultimaSincronizacion': instance.ultimaSincronizacion?.toIso8601String(),
   'segundosSinLatir': instance.segundosSinLatir,

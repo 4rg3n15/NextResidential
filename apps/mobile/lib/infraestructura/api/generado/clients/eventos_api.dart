@@ -12,7 +12,7 @@ import '../models/linea_de_tiempo_dto.dart';
 import '../models/motivo.dart';
 import '../models/pagina_de_eventos_dto.dart';
 import '../models/resultado.dart';
-import '../models/tipo.dart';
+import '../models/tipo2.dart';
 import '../models/url_de_evidencia_dto.dart';
 
 part 'eventos_api.g.dart';
@@ -37,7 +37,7 @@ abstract class EventosApi {
     @Query('personaId') String? personaId,
     @Query('dispositivoId') String? dispositivoId,
     @Query('zonaId') String? zonaId,
-    @Query('tipo') Tipo? tipo,
+    @Query('tipo') Tipo2? tipo,
     @Query('resultado') Resultado? resultado,
     @Query('motivo') Motivo? motivo,
     @Query('tamanoPagina') num? tamanoPagina,
@@ -62,7 +62,7 @@ abstract class EventosApi {
     @Query('personaId') String? personaId,
     @Query('dispositivoId') String? dispositivoId,
     @Query('zonaId') String? zonaId,
-    @Query('tipo') Tipo? tipo,
+    @Query('tipo') Tipo2? tipo,
     @Query('resultado') Resultado? resultado,
     @Query('motivo') Motivo? motivo,
     @Query('tamanoPagina') num? tamanoPagina,

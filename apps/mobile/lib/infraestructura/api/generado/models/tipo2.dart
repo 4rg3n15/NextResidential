@@ -6,14 +6,16 @@ import 'package:json_annotation/json_annotation.dart';
 
 @JsonEnum()
 enum Tipo2 {
-  @JsonValue('accesos_por_periodo')
-  accesosPorPeriodo('accesos_por_periodo'),
-  @JsonValue('visitantes_frecuentes')
-  visitantesFrecuentes('visitantes_frecuentes'),
-  @JsonValue('uso_de_zonas')
-  usoDeZonas('uso_de_zonas'),
-  @JsonValue('auditoria_de_sistema')
-  auditoriaDeSistema('auditoria_de_sistema'),
+  @JsonValue('ingreso')
+  ingreso('ingreso'),
+  @JsonValue('salida')
+  salida('salida'),
+  @JsonValue('denegado')
+  denegado('denegado'),
+  @JsonValue('alerta')
+  alerta('alerta'),
+  @JsonValue('manual')
+  manual('manual'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

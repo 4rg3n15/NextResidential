@@ -20,6 +20,14 @@ import { DURACION_MAXIMA_MINUTOS, DURACION_MINIMA_MINUTOS } from '../aplicacion/
 import { ESTADOS_DE_VISITA, ESTADOS_EN_EQUIPO, TIPOS_DE_DOCUMENTO } from '../aplicacion/puertos';
 
 /**
+ * C9 (15-M) · el DTO rechaza CON PALABRAS una visita sin duración: «de 02:33
+ * a 02:33» no autoriza a nadie. La capa de aplicación (`revisarForma`) lo
+ * vuelve a comprobar por si alguien llega sin pasar por aquí.
+ */
+export const MENSAJE_DURACION_MINIMA =
+  'La visita debe durar más de cero minutos (mínimo 15): la hora de fin tiene que ser posterior a la de inicio';
+
+/**
  * El DTO valida FORMA; la casilla, la duración y la calidad de la foto las
  * juzga el caso de uso, y la vigencia el agregado (§2.7.3). Aquí se acota el
  * TAMAÑO de todo lo que entra.
@@ -77,9 +85,9 @@ class FormaDeVisitaDto {
   inicio!: string;
 
   @ApiProperty({ minimum: DURACION_MINIMA_MINUTOS, maximum: DURACION_MAXIMA_MINUTOS })
-  @IsInt()
-  @Min(DURACION_MINIMA_MINUTOS)
-  @Max(DURACION_MAXIMA_MINUTOS)
+  @IsInt({ message: 'La duración debe ser un número entero de minutos' })
+  @Min(DURACION_MINIMA_MINUTOS, { message: MENSAJE_DURACION_MINIMA })
+  @Max(DURACION_MAXIMA_MINUTOS, { message: 'La visita no puede durar más de 24 horas' })
   duracionMinutos!: number;
 
   @ApiPropertyOptional({ type: String, maxLength: 8, nullable: true })
@@ -166,9 +174,9 @@ export class RepetirVisitaDto {
   inicio!: string;
 
   @ApiProperty({ minimum: DURACION_MINIMA_MINUTOS, maximum: DURACION_MAXIMA_MINUTOS })
-  @IsInt()
-  @Min(DURACION_MINIMA_MINUTOS)
-  @Max(DURACION_MAXIMA_MINUTOS)
+  @IsInt({ message: 'La duración debe ser un número entero de minutos' })
+  @Min(DURACION_MINIMA_MINUTOS, { message: MENSAJE_DURACION_MINIMA })
+  @Max(DURACION_MAXIMA_MINUTOS, { message: 'La visita no puede durar más de 24 horas' })
   duracionMinutos!: number;
 
   @ApiProperty()
@@ -240,6 +248,8 @@ export class VisitaDto {
   @ApiProperty({ type: String, nullable: true }) plantillaId!: string | null;
   @ApiProperty() equiposSincronizados!: number;
   @ApiProperty() equiposFallidos!: number;
+  /** C9 (15-M) · «Placa XXX registrada para la visita de …, del … al …», o nulo sin placa. */
+  @ApiProperty({ type: String, nullable: true }) confirmacionDePlaca!: string | null;
 }
 
 export class ListaDeVisitasDto {
@@ -284,6 +294,9 @@ export class VisitaGeneradaDto {
   porEquipo!: EquipoDeLaSincronizacionDto[];
   @ApiProperty({ type: String, nullable: true })
   avisoDeSincronizacion!: string | null;
+  /** C9 (15-M) · la confirmación de la placa, tal cual se muestra; nulo sin placa. */
+  @ApiProperty({ type: String, nullable: true })
+  confirmacionDePlaca!: string | null;
 }
 
 export class VisitaRechazadaDto {

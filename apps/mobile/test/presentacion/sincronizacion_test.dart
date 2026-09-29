@@ -87,7 +87,8 @@ void main() {
     await esperar(t, const Duration(seconds: 20));
     expect(find.text('Rechazaron la visita de Eva: Otra'), findsOneWidget);
 
-    await t.pageBack();
+    // C5 (15-M) · la app habla español: el tooltip ya no es «Back», así que se toca el BackButton de Material.
+      await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
     expect(find.text('Nada nuevo'), findsOneWidget);
   });

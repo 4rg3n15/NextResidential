@@ -10,6 +10,7 @@ import 'equipo_dto_estado.dart';
 import 'equipo_dto_modo_de_terminal.dart';
 import 'equipo_dto_tipo.dart';
 import 'equipo_dto_verificacion.dart';
+import 'estado_del_equipo_dto.dart';
 
 part 'equipo_dto.g.dart';
 
@@ -35,6 +36,9 @@ class EquipoDto {
     required this.motivoNoVerificado,
     required this.estado,
     required this.atestacion,
+    required this.estadoDelEquipo,
+    required this.sondeadoEn,
+    required this.identidadLeidaEn,
   });
   
   factory EquipoDto.fromJson(Map<String, Object?> json) => _$EquipoDtoFromJson(json);
@@ -62,6 +66,11 @@ class EquipoDto {
 
   /// D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó.
   final AtestacionDeEquipoDto? atestacion;
+  final EstadoDelEquipoDto estadoDelEquipo;
+  final DateTime? sondeadoEn;
+
+  /// Cuándo se leyeron modelo y firmware del propio equipo («dato del …»)
+  final DateTime? identidadLeidaEn;
 
   Map<String, Object?> toJson() => _$EquipoDtoToJson(this);
 }

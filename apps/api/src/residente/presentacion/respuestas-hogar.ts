@@ -123,6 +123,12 @@ export class CuentaDeResidenteDto {
   @ApiProperty() creadaEn!: string;
 }
 
+/** C9 (15-M) · lo que contesta la baja: hecha, y cuántas plantillas se suprimieron. */
+export class CuentaDadaDeBajaDto {
+  @ApiProperty() dadaDeBaja!: boolean;
+  @ApiProperty() plantillasSuprimidas!: number;
+}
+
 export class CuentaDeResidenteCreadaDto {
   @ApiProperty({ format: 'uuid' }) usuarioId!: string;
 }

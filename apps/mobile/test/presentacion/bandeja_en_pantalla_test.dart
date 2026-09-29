@@ -37,7 +37,8 @@ void main() {
 
     await registrarDesdeElFormulario(t);
     expect(find.text('Quedó pendiente de enviarse'), findsOneWidget);
-    await t.pageBack();
+    // C5 (15-M) · la app habla español: el tooltip ya no es «Back», así que se toca el BackButton de Material.
+      await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
     expect(find.text('Pendiente de envío'), findsOneWidget);
     expect(find.text('Plomero Pérez'), findsOneWidget);
@@ -73,7 +74,8 @@ void main() {
     // El servidor la crea, pero la respuesta no llega: la app no puede saberlo.
     await registrarDesdeElFormulario(t);
     expect(find.text('Quedó pendiente de enviarse'), findsOneWidget);
-    await t.pageBack();
+    // C5 (15-M) · la app habla español: el tooltip ya no es «Back», así que se toca el BackButton de Material.
+      await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
 
     mundo.reloj.avanzar(const Duration(minutes: 1));

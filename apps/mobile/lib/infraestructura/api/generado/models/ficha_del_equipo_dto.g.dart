@@ -19,6 +19,9 @@ FichaDelEquipoDto _$FichaDelEquipoDtoFromJson(Map<String, dynamic> json) =>
       sinComprobar: (json['sinComprobar'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
+      receptores: (json['receptores'] as List<dynamic>?)
+          ?.map((e) => ReceptorDeLaFichaDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
       crudos: (json['crudos'] as List<dynamic>?)
           ?.map(
             (e) =>
@@ -29,6 +32,7 @@ FichaDelEquipoDto _$FichaDelEquipoDtoFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$FichaDelEquipoDtoToJson(FichaDelEquipoDto instance) =>
     <String, dynamic>{
+      'receptores': instance.receptores,
       'modelo': instance.modelo,
       'firmware': instance.firmware,
       'serie': instance.serie,

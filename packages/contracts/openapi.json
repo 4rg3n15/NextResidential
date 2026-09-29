@@ -446,6 +446,45 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "dispositivoId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "severidad",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "informativa",
+                "media",
+                "alta",
+                "critica"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "lista_negra",
+                "sabotaje",
+                "dispositivo_caido",
+                "acceso_dudoso",
+                "panico",
+                "apertura_fallida"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -479,6 +518,116 @@
           }
         ],
         "summary": "Alertas abiertas y en atención, con su cumplimiento de KPI-25",
+        "tags": [
+          "alertas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/alertas/archivar": {
+      "post": {
+        "operationId": "AlertasController_archivarVarias",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchivoMasivoDeAlertasDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchivoDeAlertasResultadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archiva varias alertas con un motivo. Archivo lógico, nunca borrado",
+        "tags": [
+          "alertas"
+        ]
+      }
+    },
+    "/copropiedades/{id}/alertas/{alertaId}/archivar": {
+      "post": {
+        "operationId": "AlertasController_archivar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "alertaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchivoDeAlertaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchivoDeAlertasResultadoDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archiva una alerta con motivo. Archivo lógico, nunca borrado",
         "tags": [
           "alertas"
         ]
@@ -1463,7 +1612,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EquipoDto"
+                  "$ref": "#/components/schemas/EquipoCreadoDto"
                 }
               }
             }
@@ -1474,7 +1623,7 @@
             "bearer": []
           }
         ],
-        "summary": "Da de alta un equipo; el secreto se guarda cifrado",
+        "summary": "Da de alta un equipo; el secreto se guarda cifrado. Una cámara LPR recibe además su secreto de Alarm Server, que se muestra SOLO en esta respuesta",
         "tags": [
           "equipos"
         ]
@@ -1707,7 +1856,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EquipoDto"
+                  "$ref": "#/components/schemas/BajaDeEquipoResultadoDto"
                 }
               }
             }
@@ -1718,7 +1867,7 @@
             "bearer": []
           }
         ],
-        "summary": "Baja lógica con motivo. Nunca borrado físico (RN-19)",
+        "summary": "Baja lógica con motivo (RN-19). Antes, retira del equipo los rostros sincronizados (RN-11); los que no pudo quitar se devuelven como pendientes",
         "tags": [
           "equipos"
         ]
@@ -1773,6 +1922,60 @@
           }
         ],
         "summary": "Corrige un campo del equipo. Exige confirmación y deja constancia",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/equipos/{equipoId}/desactivar-receptor": {
+      "post": {
+        "operationId": "ConfiguracionEnSitioController_desactivarReceptor",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MotivoDeConfiguracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoDeConfiguracionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "E4 · apaga el receptor huérfano («HTTP listening») de una terminal o un videoportero, que la plataforma escucha por su flujo, y lo lee de vuelta",
         "tags": [
           "equipos"
         ]
@@ -5730,6 +5933,60 @@
         ]
       }
     },
+    "/copropiedades/{id}/residentes/cuentas/{usuarioId}/baja": {
+      "post": {
+        "operationId": "SupervisionDeResidentesController_baja",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaDeResidenteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaDadaDeBajaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Da de baja a un residente con motivo; nunca borrado físico (RN-19)",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
     "/copropiedades/{id}/residentes/cuentas/{usuarioId}/perfil": {
       "get": {
         "operationId": "PerfilDeResidentesController_ver",
@@ -7908,6 +8165,58 @@
           "motivo"
         ]
       },
+      "ArchivoDeAlertaDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "ArchivoDeAlertasResultadoDto": {
+        "type": "object",
+        "properties": {
+          "archivadas": {
+            "type": "number"
+          },
+          "omitidas": {
+            "type": "number",
+            "description": "Pedidas y no archivadas: ajenas o ya archivadas"
+          }
+        },
+        "required": [
+          "archivadas",
+          "omitidas"
+        ]
+      },
+      "ArchivoMasivoDeAlertasDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          },
+          "ids": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "motivo",
+          "ids"
+        ]
+      },
       "AtestacionDeEquipoDto": {
         "type": "object",
         "properties": {
@@ -8114,11 +8423,165 @@
         "properties": {
           "motivo": {
             "type": "string",
+            "minLength": 5,
             "maxLength": 300
           }
         },
         "required": [
           "motivo"
+        ]
+      },
+      "BajaDeEquipoResultadoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "camara_lpr",
+              "terminal_facial",
+              "intercom",
+              "rele",
+              "controlador_io"
+            ]
+          },
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "firmware": {
+            "type": "string",
+            "nullable": true
+          },
+          "canalBarrera": {
+            "type": "number",
+            "nullable": true
+          },
+          "numeroDePuerta": {
+            "type": "number",
+            "nullable": true
+          },
+          "canalDeAudio": {
+            "type": "number",
+            "nullable": true
+          },
+          "fabricante": {
+            "type": "string",
+            "nullable": true
+          },
+          "modoDeTerminal": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "reporta_y_espera",
+              "decide_el_equipo"
+            ]
+          },
+          "canalDeAudioHabilitado": {
+            "type": "boolean"
+          },
+          "canalDeVideo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Flujo de video; `null` = 102"
+          },
+          "zonaId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "capacidades": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CapacidadesDeEquipoDto"
+              }
+            ]
+          },
+          "verificacion": {
+            "type": "string",
+            "enum": [
+              "no_verificado",
+              "verificado",
+              "rechazado"
+            ]
+          },
+          "verificadoEn": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivoNoVerificado": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "inactivo"
+            ]
+          },
+          "atestacion": {
+            "nullable": true,
+            "description": "D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AtestacionDeEquipoDto"
+              }
+            ]
+          },
+          "estadoDelEquipo": {
+            "$ref": "#/components/schemas/EstadoDelEquipoDto"
+          },
+          "sondeadoEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "identidadLeidaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Cuándo se leyeron modelo y firmware del propio equipo («dato del …»)"
+          },
+          "plantillasRetiradas": {
+            "type": "number"
+          },
+          "plantillasPendientes": {
+            "type": "number",
+            "description": "Siguen en el equipo: no contestó al retirarlas"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "tipo",
+          "modelo",
+          "firmware",
+          "canalBarrera",
+          "numeroDePuerta",
+          "canalDeAudio",
+          "fabricante",
+          "modoDeTerminal",
+          "canalDeAudioHabilitado",
+          "canalDeVideo",
+          "zonaId",
+          "capacidades",
+          "verificacion",
+          "verificadoEn",
+          "motivoNoVerificado",
+          "estado",
+          "atestacion",
+          "estadoDelEquipo",
+          "sondeadoEn",
+          "identidadLeidaEn",
+          "plantillasRetiradas",
+          "plantillasPendientes"
         ]
       },
       "BajaDePorteroDto": {
@@ -8127,6 +8590,19 @@
           "motivo": {
             "type": "string",
             "minLength": 3,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "BajaDeResidenteDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 5,
             "maxLength": 300
           }
         },
@@ -8386,6 +8862,24 @@
           "motivo"
         ]
       },
+      "CanalDeVideoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "canal×100+flujo, p. ej. 102"
+          },
+          "codec": {
+            "type": "string",
+            "nullable": true,
+            "description": "«H.264», «H.265»…"
+          }
+        },
+        "required": [
+          "id",
+          "codec"
+        ]
+      },
       "CapacidadDeAudioDto": {
         "type": "object",
         "properties": {
@@ -8458,6 +8952,13 @@
             "type": "string",
             "nullable": true,
             "description": "Canal preguntado (canal×100+flujo)"
+          },
+          "canales": {
+            "description": "Canales de video que el equipo declara; la ficha los ofrece en una lista",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CanalDeVideoDto"
+            }
           }
         },
         "required": [
@@ -9047,7 +9548,8 @@
               "pais_del_algoritmo",
               "imagenes_del_receptor",
               "formato_del_receptor",
-              "verificacion_remota"
+              "verificacion_remota",
+              "desactivar_receptor"
             ]
           },
           "motivo": {
@@ -9156,6 +9658,21 @@
           "nombre",
           "tipo",
           "aforoMaximo"
+        ]
+      },
+      "CuentaDadaDeBajaDto": {
+        "type": "object",
+        "properties": {
+          "dadaDeBaja": {
+            "type": "boolean"
+          },
+          "plantillasSuprimidas": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "dadaDeBaja",
+          "plantillasSuprimidas"
         ]
       },
       "CuentaDeResidenteCreadaDto": {
@@ -9510,6 +10027,9 @@
             ],
             "description": "Derivado del último latido contra el umbral de la copropiedad (migración 0020), no leído de la columna estado_salud, que puede ir por detrás."
           },
+          "estadoDelEquipo": {
+            "$ref": "#/components/schemas/EstadoDelEquipoDto"
+          },
           "ultimoLatido": {
             "type": "string",
             "format": "date-time",
@@ -9548,6 +10068,7 @@
           "modelo",
           "firmware",
           "estado",
+          "estadoDelEquipo",
           "ultimoLatido",
           "ultimaSincronizacion",
           "segundosSinLatir",
@@ -9866,6 +10387,156 @@
           "demorado"
         ]
       },
+      "EquipoCreadoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "camara_lpr",
+              "terminal_facial",
+              "intercom",
+              "rele",
+              "controlador_io"
+            ]
+          },
+          "modelo": {
+            "type": "string",
+            "nullable": true
+          },
+          "firmware": {
+            "type": "string",
+            "nullable": true
+          },
+          "canalBarrera": {
+            "type": "number",
+            "nullable": true
+          },
+          "numeroDePuerta": {
+            "type": "number",
+            "nullable": true
+          },
+          "canalDeAudio": {
+            "type": "number",
+            "nullable": true
+          },
+          "fabricante": {
+            "type": "string",
+            "nullable": true
+          },
+          "modoDeTerminal": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "reporta_y_espera",
+              "decide_el_equipo"
+            ]
+          },
+          "canalDeAudioHabilitado": {
+            "type": "boolean"
+          },
+          "canalDeVideo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Flujo de video; `null` = 102"
+          },
+          "zonaId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "capacidades": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CapacidadesDeEquipoDto"
+              }
+            ]
+          },
+          "verificacion": {
+            "type": "string",
+            "enum": [
+              "no_verificado",
+              "verificado",
+              "rechazado"
+            ]
+          },
+          "verificadoEn": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivoNoVerificado": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "inactivo"
+            ]
+          },
+          "atestacion": {
+            "nullable": true,
+            "description": "D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AtestacionDeEquipoDto"
+              }
+            ]
+          },
+          "estadoDelEquipo": {
+            "$ref": "#/components/schemas/EstadoDelEquipoDto"
+          },
+          "sondeadoEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "identidadLeidaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Cuándo se leyeron modelo y firmware del propio equipo («dato del …»)"
+          },
+          "secretoDelAlarmServer": {
+            "type": "string",
+            "nullable": true,
+            "description": "Secreto de Alarm Server de la cámara, emitido en el alta y mostrado SOLO aquí. La ruta que la cámara publica es /alarm-server/<secreto>. `null` si no es cámara LPR."
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "tipo",
+          "modelo",
+          "firmware",
+          "canalBarrera",
+          "numeroDePuerta",
+          "canalDeAudio",
+          "fabricante",
+          "modoDeTerminal",
+          "canalDeAudioHabilitado",
+          "canalDeVideo",
+          "zonaId",
+          "capacidades",
+          "verificacion",
+          "verificadoEn",
+          "motivoNoVerificado",
+          "estado",
+          "atestacion",
+          "estadoDelEquipo",
+          "sondeadoEn",
+          "identidadLeidaEn",
+          "secretoDelAlarmServer"
+        ]
+      },
       "EquipoDeLaSincronizacionDto": {
         "type": "object",
         "properties": {
@@ -9992,6 +10663,20 @@
                 "$ref": "#/components/schemas/AtestacionDeEquipoDto"
               }
             ]
+          },
+          "estadoDelEquipo": {
+            "$ref": "#/components/schemas/EstadoDelEquipoDto"
+          },
+          "sondeadoEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "identidadLeidaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Cuándo se leyeron modelo y firmware del propio equipo («dato del …»)"
           }
         },
         "required": [
@@ -10013,7 +10698,10 @@
           "verificadoEn",
           "motivoNoVerificado",
           "estado",
-          "atestacion"
+          "atestacion",
+          "estadoDelEquipo",
+          "sondeadoEn",
+          "identidadLeidaEn"
         ]
       },
       "EquipoOmitidoDto": {
@@ -10297,6 +10985,77 @@
           "motivoCierre"
         ]
       },
+      "EstadoDelEquipoDto": {
+        "type": "object",
+        "properties": {
+          "enLinea": {
+            "type": "string",
+            "enum": [
+              "en_linea",
+              "degradado",
+              "fuera_de_linea",
+              "sin_comprobar"
+            ],
+            "description": "Una sola fuente de verdad: última señal (latido, evento, escucha o sondeo) contra el umbral de la copropiedad, con la credencial y la escucha por delante"
+          },
+          "motivo": {
+            "type": "string",
+            "description": "Por qué, en una frase para la pantalla"
+          },
+          "alcanzable": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "`null` = nadie lo ha sondeado"
+          },
+          "autenticacion": {
+            "type": "string",
+            "enum": [
+              "aceptada",
+              "rechazada",
+              "sin_comprobar"
+            ]
+          },
+          "autenticacionRechazadaHaceMin": {
+            "type": "number",
+            "nullable": true
+          },
+          "escucha": {
+            "type": "string",
+            "enum": [
+              "abierta",
+              "cerrada",
+              "rechazada",
+              "no_aplica"
+            ]
+          },
+          "ultimoEvento": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ultimoLatido": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ultimaSenal": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "enLinea",
+          "motivo",
+          "alcanzable",
+          "autenticacion",
+          "autenticacionRechazadaHaceMin",
+          "escucha",
+          "ultimoEvento",
+          "ultimoLatido",
+          "ultimaSenal"
+        ]
+      },
       "EventoIngestaDto": {
         "type": "object",
         "properties": {
@@ -10557,6 +11316,13 @@
       "FichaDelEquipoDto": {
         "type": "object",
         "properties": {
+          "receptores": {
+            "description": "E4 · los receptores («HTTP listening») que el equipo tiene escritos",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceptorDeLaFichaDto"
+            }
+          },
           "modelo": {
             "type": "string",
             "nullable": true
@@ -11042,7 +11808,8 @@
               "pais_del_algoritmo",
               "imagenes_del_receptor",
               "formato_del_receptor",
-              "verificacion_remota"
+              "verificacion_remota",
+              "desactivar_receptor"
             ],
             "description": "Qué corrección lo arregla desde la consola. Nulo si no la hay."
           }
@@ -11869,6 +12636,10 @@
           "avisoDeSincronizacion": {
             "type": "string",
             "nullable": true
+          },
+          "confirmacionDePlaca": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -11881,7 +12652,8 @@
           "equipos",
           "sincronizadas",
           "fallidas",
-          "avisoDeSincronizacion"
+          "avisoDeSincronizacion",
+          "confirmacionDePlaca"
         ]
       },
       "MiViviendaDto": {
@@ -12101,11 +12873,26 @@
           },
           "nombre": {
             "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "camara_lpr",
+              "terminal_facial",
+              "intercom",
+              "rele",
+              "controlador_io"
+            ]
+          },
+          "activo": {
+            "type": "boolean"
           }
         },
         "required": [
           "id",
-          "nombre"
+          "nombre",
+          "tipo",
+          "activo"
         ]
       },
       "NotasDeAlertaDto": {
@@ -12876,6 +13663,28 @@
           "total"
         ]
       },
+      "ReceptorDeLaFichaDto": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "nullable": true
+          },
+          "puerto": {
+            "type": "number",
+            "nullable": true
+          },
+          "ruta": {
+            "type": "string",
+            "description": "La ruta con el secreto oculto: /alarm-server/••••"
+          }
+        },
+        "required": [
+          "host",
+          "puerto",
+          "ruta"
+        ]
+      },
       "RechazoDeAjusteDto": {
         "type": "object",
         "properties": {
@@ -13273,7 +14082,8 @@
               "pais_del_algoritmo",
               "imagenes_del_receptor",
               "formato_del_receptor",
-              "verificacion_remota"
+              "verificacion_remota",
+              "desactivar_receptor"
             ]
           },
           "aplicada": {
@@ -13437,6 +14247,12 @@
           },
           "verificado": {
             "type": "boolean"
+          },
+          "identidadDel": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "E5 · 10 · cuando el sondeo actual no leyó modelo y firmware, la fecha en que se leyeron los que se enseñan («dato del DD-MM-YYYY»). Ausente o nulo = son de este sondeo."
           },
           "ficha": {
             "description": "Qué hay que cambiar en el equipo, campo por campo. Ausente cuando no se sondeó: la falta de ficha no es una ficha vacía.",
@@ -14388,6 +15204,10 @@
           },
           "equiposFallidos": {
             "type": "number"
+          },
+          "confirmacionDePlaca": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -14409,7 +15229,8 @@
           "casillaEn",
           "plantillaId",
           "equiposSincronizados",
-          "equiposFallidos"
+          "equiposFallidos",
+          "confirmacionDePlaca"
         ]
       },
       "VisitaGeneradaDto": {
@@ -14448,6 +15269,10 @@
           "avisoDeSincronizacion": {
             "type": "string",
             "nullable": true
+          },
+          "confirmacionDePlaca": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -14458,7 +15283,8 @@
           "sincronizadas",
           "fallidas",
           "porEquipo",
-          "avisoDeSincronizacion"
+          "avisoDeSincronizacion",
+          "confirmacionDePlaca"
         ]
       },
       "VisitaRechazadaDto": {

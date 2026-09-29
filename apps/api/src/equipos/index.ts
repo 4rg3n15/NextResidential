@@ -54,3 +54,9 @@ export type { EntradasDeEstado, EstadoDelEquipo, EnLinea } from './aplicacion/es
 export { LECTOR_DE_SENALES } from './aplicacion/senal-de-eventos';
 export type { LectorDeSenales, SenalDeEventos } from './aplicacion/senal-de-eventos';
 export { EstadoDelEquipoDto, aEstadoDelEquipoDto } from './presentacion/dto-estado-del-equipo';
+// C4 (15-M) · el puerto que la baja consume; lo satisface biometría.
+export { RETIRO_DE_PLANTILLAS_DE_EQUIPO } from './aplicacion/retiro-de-plantillas';
+export type {
+  ResultadoDeRetiroDePlantillas,
+  RetiroDePlantillasDeEquipo,
+} from './aplicacion/retiro-de-plantillas';

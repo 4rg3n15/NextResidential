@@ -10,7 +10,14 @@ NombreDeEquipoDto _$NombreDeEquipoDtoFromJson(Map<String, dynamic> json) =>
     NombreDeEquipoDto(
       id: json['id'] as String,
       nombre: json['nombre'] as String,
+      tipo: NombreDeEquipoDtoTipo.fromJson(json['tipo'] as String),
+      activo: json['activo'] as bool,
     );
 
 Map<String, dynamic> _$NombreDeEquipoDtoToJson(NombreDeEquipoDto instance) =>
-    <String, dynamic>{'id': instance.id, 'nombre': instance.nombre};
+    <String, dynamic>{
+      'id': instance.id,
+      'nombre': instance.nombre,
+      'tipo': instance.tipo,
+      'activo': instance.activo,
+    };

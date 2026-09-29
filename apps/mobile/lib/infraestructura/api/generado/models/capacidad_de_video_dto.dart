@@ -4,6 +4,7 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'canal_de_video_dto.dart';
 import 'capacidad_de_video_dto_estado.dart';
 
 part 'capacidad_de_video_dto.g.dart';
@@ -14,6 +15,7 @@ class CapacidadDeVideoDto {
     required this.estado,
     required this.codec,
     required this.canal,
+    this.canales,
   });
   
   factory CapacidadDeVideoDto.fromJson(Map<String, Object?> json) => _$CapacidadDeVideoDtoFromJson(json);
@@ -25,6 +27,9 @@ class CapacidadDeVideoDto {
 
   /// Canal preguntado (canal×100+flujo)
   final String? canal;
+
+  /// Canales de video que el equipo declara; la ficha los ofrece en una lista
+  final List<CanalDeVideoDto>? canales;
 
   Map<String, Object?> toJson() => _$CapacidadDeVideoDtoToJson(this);
 }

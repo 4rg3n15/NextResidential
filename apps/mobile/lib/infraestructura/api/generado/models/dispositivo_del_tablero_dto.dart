@@ -7,6 +7,7 @@ import 'package:json_annotation/json_annotation.dart';
 import 'dispositivo_del_tablero_dto_estado.dart';
 import 'dispositivo_del_tablero_dto_tipo.dart';
 import 'dispositivo_del_tablero_dto_ultimo_resultado_de_sincronizacion.dart';
+import 'estado_del_equipo_dto.dart';
 
 part 'dispositivo_del_tablero_dto.g.dart';
 
@@ -20,6 +21,7 @@ class DispositivoDelTableroDto {
     required this.modelo,
     required this.firmware,
     required this.estado,
+    required this.estadoDelEquipo,
     required this.ultimoLatido,
     required this.ultimaSincronizacion,
     required this.segundosSinLatir,
@@ -38,6 +40,7 @@ class DispositivoDelTableroDto {
 
   /// Derivado del último latido contra el umbral de la copropiedad (migración 0020), no leído de la columna estado_salud, que puede ir por detrás.
   final DispositivoDelTableroDtoEstado estado;
+  final EstadoDelEquipoDto estadoDelEquipo;
   final DateTime? ultimoLatido;
   final DateTime? ultimaSincronizacion;
   final num? segundosSinLatir;

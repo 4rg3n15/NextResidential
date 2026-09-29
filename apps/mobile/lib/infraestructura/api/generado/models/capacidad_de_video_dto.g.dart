@@ -11,6 +11,9 @@ CapacidadDeVideoDto _$CapacidadDeVideoDtoFromJson(Map<String, dynamic> json) =>
       estado: CapacidadDeVideoDtoEstado.fromJson(json['estado'] as String),
       codec: json['codec'] as String?,
       canal: json['canal'] as String?,
+      canales: (json['canales'] as List<dynamic>?)
+          ?.map((e) => CanalDeVideoDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
 
 Map<String, dynamic> _$CapacidadDeVideoDtoToJson(
@@ -19,4 +22,5 @@ Map<String, dynamic> _$CapacidadDeVideoDtoToJson(
   'estado': instance.estado,
   'codec': instance.codec,
   'canal': instance.canal,
+  'canales': instance.canales,
 };

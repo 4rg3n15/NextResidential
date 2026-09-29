@@ -48,7 +48,7 @@ class _EquiposApi implements EquiposApi {
   }
 
   @override
-  Future<EquipoDto> equiposControllerCrear({
+  Future<EquipoCreadoDto> equiposControllerCrear({
     required String id,
     required AltaDeEquipoDto body,
   }) async {
@@ -57,7 +57,7 @@ class _EquiposApi implements EquiposApi {
     final _headers = <String, dynamic>{};
     final _data = <String, dynamic>{};
     _data.addAll(body.toJson());
-    final _options = _setStreamType<EquipoDto>(
+    final _options = _setStreamType<EquipoCreadoDto>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
@@ -68,9 +68,9 @@ class _EquiposApi implements EquiposApi {
           .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
     );
     final _result = await _dio.fetch<Map<String, Object?>>(_options);
-    late EquipoDto _value;
+    late EquipoCreadoDto _value;
     try {
-      _value = EquipoDto.fromJson(_result.data!);
+      _value = EquipoCreadoDto.fromJson(_result.data!);
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
       rethrow;
@@ -203,7 +203,7 @@ class _EquiposApi implements EquiposApi {
   }
 
   @override
-  Future<EquipoDto> equiposControllerDesactivar({
+  Future<BajaDeEquipoResultadoDto> equiposControllerDesactivar({
     required String id,
     required String equipoId,
     required BajaDeEquipoDto body,
@@ -213,7 +213,7 @@ class _EquiposApi implements EquiposApi {
     final _headers = <String, dynamic>{};
     final _data = <String, dynamic>{};
     _data.addAll(body.toJson());
-    final _options = _setStreamType<EquipoDto>(
+    final _options = _setStreamType<BajaDeEquipoResultadoDto>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
@@ -224,9 +224,9 @@ class _EquiposApi implements EquiposApi {
           .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
     );
     final _result = await _dio.fetch<Map<String, Object?>>(_options);
-    late EquipoDto _value;
+    late BajaDeEquipoResultadoDto _value;
     try {
-      _value = EquipoDto.fromJson(_result.data!);
+      _value = BajaDeEquipoResultadoDto.fromJson(_result.data!);
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
       rethrow;
@@ -259,6 +259,39 @@ class _EquiposApi implements EquiposApi {
     late ResultadoDeCorreccionDto _value;
     try {
       _value = ResultadoDeCorreccionDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<ResultadoDeConfiguracionDto>
+  configuracionEnSitioControllerDesactivarReceptor({
+    required String id,
+    required String equipoId,
+    required MotivoDeConfiguracionDto body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body.toJson());
+    final _options = _setStreamType<ResultadoDeConfiguracionDto>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/equipos/${equipoId}/desactivar-receptor',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late ResultadoDeConfiguracionDto _value;
+    try {
+      _value = ResultadoDeConfiguracionDto.fromJson(_result.data!);
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
       rethrow;

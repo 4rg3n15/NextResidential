@@ -29,6 +29,7 @@ const visita = (extra: Partial<Visita> = {}): Visita => ({
   plantillaId: 'p-1',
   equiposSincronizados: 2,
   equiposFallidos: 0,
+  confirmacionDePlaca: null,
   ...extra,
 });
 

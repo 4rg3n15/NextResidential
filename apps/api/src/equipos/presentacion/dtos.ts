@@ -151,9 +151,10 @@ export class AltaDeEquipoDto {
 export class EdicionDeEquipoDto extends PartialType(AltaDeEquipoDto) {}
 
 export class BajaDeEquipoDto {
-  @ApiProperty({ type: String, maxLength: 300 })
+  /** C4 (15-M) · el motivo es la constancia de la baja (RN-19): cinco letras como mínimo. */
+  @ApiProperty({ type: String, minLength: 5, maxLength: 300 })
   @IsString()
-  @Length(3, 300)
+  @Length(5, 300, { message: 'El motivo de la baja debe tener entre 5 y 300 caracteres' })
   motivo!: string;
 }
 
@@ -417,4 +418,15 @@ export class ResultadoDeSondeoDto {
 
 export class EquiposDto {
   @ApiProperty({ type: [EquipoDto] }) equipos!: EquipoDto[];
+}
+
+/**
+ * C4 (15-M) · la baja devuelve el equipo y lo que pasó con sus rostros: los
+ * que se retiraron del aparato y los que quedaron PENDIENTES porque no
+ * contestó (RN-11). Nunca se da por retirado lo que sigue en él.
+ */
+export class BajaDeEquipoResultadoDto extends EquipoDto {
+  @ApiProperty({ type: Number }) plantillasRetiradas!: number;
+  @ApiProperty({ type: Number, description: 'Siguen en el equipo: no contestó al retirarlas' })
+  plantillasPendientes!: number;
 }

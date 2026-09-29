@@ -21,6 +21,7 @@ class MiVisitaGeneradaDto {
     required this.sincronizadas,
     required this.fallidas,
     required this.avisoDeSincronizacion,
+    required this.confirmacionDePlaca,
   });
   
   factory MiVisitaGeneradaDto.fromJson(Map<String, Object?> json) => _$MiVisitaGeneradaDtoFromJson(json);
@@ -39,6 +40,7 @@ class MiVisitaGeneradaDto {
   final num sincronizadas;
   final num fallidas;
   final String? avisoDeSincronizacion;
+  final String? confirmacionDePlaca;
 
   Map<String, Object?> toJson() => _$MiVisitaGeneradaDtoToJson(this);
 }

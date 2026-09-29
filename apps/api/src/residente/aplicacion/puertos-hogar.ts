@@ -224,8 +224,26 @@ export interface CuentaDeResidente {
   readonly creadaEn: string;
 }
 
+/** C9 (15-M) · lo que la baja necesita saber después: la persona, para sus plantillas. */
+export interface CuentaDadaDeBaja {
+  readonly usuarioId: string;
+  readonly personaId: string | null;
+}
+
 export interface CuentasDeResidentes {
   listar(copropiedadId: string): Promise<readonly CuentaDeResidente[]>;
+  /**
+   * C9 (15-M) · baja lógica con motivo (RN-19, CA-02): la cuenta, su rol de
+   * residente y sus vínculos de vivienda pasan a `inactivo` en una sola
+   * transacción, con constancia en `auditoria_seguridad`. `null` si no hay
+   * una cuenta de residente ACTIVA con ese identificador en la copropiedad.
+   */
+  darDeBaja(
+    copropiedadId: string,
+    usuarioId: string,
+    motivo: string,
+    actorId: string,
+  ): Promise<CuentaDadaDeBaja | null>;
 }
 
 export type TipoDeHechoDeResidente =

@@ -133,16 +133,40 @@ class EsqueletoCorto extends StatelessWidget {
   }
 }
 
-/// Fecha y hora en la zona del dispositivo, en formato corto y legible.
+String _dos(int n) => n.toString().padLeft(2, '0');
+
+/// C5 (15-M) · LA ÚNICA fecha corta de la app: `DD-MM-YYYY`, en la hora del
+/// teléfono. Toda pantalla que escriba una fecha pasa por aquí; el «dd/MM» y
+/// el «dd/MM/yyyy» que convivían se leían distinto en dos pantallas seguidas.
+String fechaCorta(DateTime cuando) {
+  final l = cuando.toLocal();
+  return '${_dos(l.day)}-${_dos(l.month)}-${l.year}';
+}
+
+/// `HH:MM` en la hora del teléfono, reloj de 24 horas.
+String horaCorta(DateTime cuando) {
+  final l = cuando.toLocal();
+  return '${_dos(l.hour)}:${_dos(l.minute)}';
+}
+
+/// Fecha y hora en la zona del dispositivo: `DD-MM-YYYY · HH:MM`.
 ///
-/// Sin `intl` con locale fijo: el residente ve la hora como su teléfono la
-/// muestra. Forzar un formato colombiano en un teléfono configurado en otro
-/// idioma es una decisión que nadie pidió.
-String momentoLegible(DateTime cuando) {
-  final local = cuando.toLocal();
-  final dd = local.day.toString().padLeft(2, '0');
-  final mm = local.month.toString().padLeft(2, '0');
-  final hh = local.hour.toString().padLeft(2, '0');
-  final min = local.minute.toString().padLeft(2, '0');
-  return '$dd/$mm · $hh:$min';
+/// Sin `intl` con locale fijo para la hora: el residente ve la hora como su
+/// teléfono la muestra. La fecha sí va siempre con año: una visita «del 28»
+/// sin mes ni año no dice para cuándo es.
+String momentoLegible(DateTime cuando) => '${fechaCorta(cuando)} · ${horaCorta(cuando)}';
+
+/// C9 (15-M) · la confirmación de una placa cuando el servidor no la mandó
+/// (listas guardadas antes del cambio): la misma frase, con las mismas fechas.
+String confirmacionDePlaca({
+  required String? placa,
+  required String visitante,
+  required DateTime desde,
+  required DateTime hasta,
+}) {
+  final p = placa?.trim() ?? '';
+  if (p.isEmpty) return '';
+  final quien = visitante.trim().isEmpty ? 'el visitante' : visitante.trim();
+  return 'Placa $p registrada para la visita de $quien, '
+      'del ${fechaCorta(desde)} ${horaCorta(desde)} al ${fechaCorta(hasta)} ${horaCorta(hasta)}';
 }

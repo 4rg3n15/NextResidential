@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import type {
   BitacoraDeResidentes,
+  CuentaDadaDeBaja,
   CuentaDeResidente,
   CuentasDeResidentes,
   HechoDeResidente,
@@ -58,9 +59,11 @@ export class CuentasDeResidentesPg implements CuentasDeResidentes {
                 u.creado_en
            FROM public.usuarios u
           WHERE u.copropiedad_id = $1
+            -- C9 (15-M) · también las dadas de baja: el rol queda inactivo
+            -- pero la cuenta se enseña «De baja» (RN-19), no desaparece.
             AND EXISTS (SELECT 1 FROM public.roles_usuario ru
                          WHERE ru.usuario_id = u.id AND ru.rol = 'residente'
-                           AND ru.estado = 'activo' AND ru.copropiedad_id = $1)
+                           AND ru.copropiedad_id = $1)
           ORDER BY u.creado_en DESC
           LIMIT 1000`,
         [copropiedadId],
@@ -74,6 +77,65 @@ export class CuentasDeResidentesPg implements CuentasDeResidentes {
         debeCambiarContrasena: f.debe_cambiar,
         creadaEn: f.creado_en.toISOString(),
       }));
+    });
+  }
+
+  /**
+   * C9 (15-M) · LA BAJA, EN UNA TRANSACCIÓN Y SIN BORRAR NADA (RN-19).
+   *
+   * Tres `UPDATE` y una constancia: la cuenta (`usuarios`), su rol de
+   * residente (`roles_usuario`) y sus vínculos de vivienda (`residentes`).
+   * Con la cuenta y el rol inactivos, el gancho de claims de Supabase
+   * (`custom_access_token_hook`, 0024) rechaza el siguiente refresco del
+   * token: la sesión no sobrevive a los 5 minutos del JWT. Las autorizaciones
+   * vigentes NO se tocan (RN-13) y no nacen nuevas porque ya no hay vínculo.
+   */
+  async darDeBaja(
+    copropiedadId: string,
+    usuarioId: string,
+    motivo: string,
+    actorId: string,
+  ): Promise<CuentaDadaDeBaja | null> {
+    return comoServicio(this.pool, copropiedadId, actorId, async (c) => {
+      const { rows } = await c.query<{ id: string; persona_id: string | null; nombre: string }>(
+        `UPDATE public.usuarios u
+            SET estado = 'inactivo', desactivado_en = now(), desactivado_por = $3,
+                motivo_desactivacion = $4, actualizado_por = $3, actualizado_en = now()
+          WHERE u.id = $2 AND u.copropiedad_id = $1 AND u.estado = 'activo'
+            -- C9 (15-M) · también las dadas de baja: el rol queda inactivo
+            -- pero la cuenta se enseña «De baja» (RN-19), no desaparece.
+            AND EXISTS (SELECT 1 FROM public.roles_usuario ru
+                         WHERE ru.usuario_id = u.id AND ru.rol = 'residente'
+                           AND ru.copropiedad_id = $1)
+      RETURNING u.id, u.persona_id, u.nombre`,
+        [copropiedadId, usuarioId, actorId, motivo],
+      );
+      const cuenta = rows[0];
+      if (cuenta === undefined) return null;
+      await c.query(
+        `UPDATE public.roles_usuario
+            SET estado = 'inactivo', desactivado_en = now(), desactivado_por = $3,
+                motivo_desactivacion = $4, actualizado_por = $3, actualizado_en = now()
+          WHERE usuario_id = $2 AND copropiedad_id = $1 AND estado = 'activo'`,
+        [copropiedadId, usuarioId, actorId, motivo],
+      );
+      if (cuenta.persona_id !== null) {
+        await c.query(
+          `UPDATE public.residentes
+              SET estado = 'inactivo', desactivado_en = now(), desactivado_por = $3,
+                  motivo_desactivacion = $4, actualizado_por = $3, actualizado_en = now()
+            WHERE persona_id = $2 AND copropiedad_id = $1 AND estado = 'activo'`,
+          [copropiedadId, cuenta.persona_id, actorId, motivo],
+        );
+      }
+      await c.query(
+        `INSERT INTO public.auditoria_seguridad
+           (copropiedad_id_actor, copropiedad_id_objetivo, usuario_id, tipo, recurso,
+            identificador_solicitado, resultado, creado_por)
+         VALUES ($1, $1, $2, 'cambio_configuracion', 'residentes/baja', $3, 'permitido', $2)`,
+        [copropiedadId, actorId, `${cuenta.nombre} · ${motivo}`.slice(0, 500)],
+      );
+      return { usuarioId: cuenta.id, personaId: cuenta.persona_id };
     });
   }
 }

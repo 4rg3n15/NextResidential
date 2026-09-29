@@ -20,6 +20,12 @@ import { RELOJ, vigenciaDeAtestacion } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
 import { LECTOR_DE_SENALES, hallazgoDeEventos } from '../aplicacion/senal-de-eventos';
 import { entradasDeEstado, estadoDelEquipo } from '../aplicacion/estado-del-equipo';
+import { ModuleRef } from '@nestjs/core';
+import { RETIRO_DE_PLANTILLAS_DE_EQUIPO } from '../aplicacion/retiro-de-plantillas';
+import type {
+  ResultadoDeRetiroDePlantillas,
+  RetiroDePlantillasDeEquipo,
+} from '../aplicacion/retiro-de-plantillas';
 import { aEstadoDelEquipoDto } from './dto-estado-del-equipo';
 import type { LectorDeSenales } from '../aplicacion/senal-de-eventos';
 import { conDatosGuardados, conReceptorDeLaPlataforma } from '../aplicacion/ficha-en-servicio';
@@ -45,6 +51,7 @@ import type {
   SondaDeEquipo,
 } from '../aplicacion/puertos';
 import {
+  BajaDeEquipoResultadoDto,
   AltaDeEquipoDto,
   BajaDeEquipoDto,
   CapacidadesDeEquipoDto,
@@ -174,6 +181,8 @@ export class EquiposController {
     @Inject(REPOSITORIO_DE_ATESTACIONES) private readonly atestaciones: RepositorioDeAtestaciones,
     @Inject(OLVIDO_DE_EQUIPO) private readonly olvido: OlvidoDeEquipo,
     @Inject(LECTOR_DE_SENALES) private readonly senales: LectorDeSenales,
+    /** C4 (15-M) · para resolver el retiro de rostros sin importar biometría. */
+    @Inject(ModuleRef) private readonly modulos: ModuleRef,
     @Inject(RELOJ) private readonly reloj: Reloj,
     /** E4 (15-M) · a dónde debería publicar el equipo para llegar a esta plataforma. */
     @Inject(RECEPTOR_ESPERADO) private readonly receptorEsperado: ResolutorDeReceptorEsperado,
@@ -586,19 +595,58 @@ export class EquiposController {
 
   @Post(':equipoId/baja')
   @Roles('superadministrador', 'administrador')
-  @ApiOperation({ summary: 'Baja lógica con motivo. Nunca borrado físico (RN-19)' })
-  @ApiOkResponse({ type: EquipoDto })
+  @ApiOperation({
+    summary:
+      'Baja lógica con motivo (RN-19). Antes, retira del equipo los rostros sincronizados ' +
+      '(RN-11); los que no pudo quitar se devuelven como pendientes',
+  })
+  @ApiOkResponse({ type: BajaDeEquipoResultadoDto })
   async desactivar(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('equipoId', ParseUUIDPipe) equipoId: string,
     @Body() dto: BajaDeEquipoDto,
-  ): Promise<EquipoDto> {
+  ): Promise<BajaDeEquipoResultadoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'equipos/baja');
+    // C4 (15-M) · los rostros salen ANTES de la baja: después el proveedor ya
+    // no encuentra el equipo en el registro y no podría hablarle.
+    const retiro =
+      (await this.repo.copropiedadDeActivo(equipoId)) === copropiedadId
+        ? await this.retirarPlantillas(ctx, copropiedadId, equipoId)
+        : { retiradas: 0, pendientes: 0 };
     const equipo = await this.repo.desactivar(ctx, copropiedadId, equipoId, dto.motivo);
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
+    if (retiro.retiradas + retiro.pendientes > 0) {
+      await this.repo.auditarCorreccion(
+        ctx,
+        copropiedadId,
+        `${equipo.nombre} · baja: ${String(retiro.retiradas)} rostro(s) retirado(s) del equipo, ` +
+          `${String(retiro.pendientes)} pendiente(s) (el equipo no contestó)`,
+      );
+    }
     this.olvido.olvidar(equipoId);
-    return this.aDtoCompleto(ctx, copropiedadId, equipo);
+    return {
+      ...(await this.aDtoCompleto(ctx, copropiedadId, equipo)),
+      plantillasRetiradas: retiro.retiradas,
+      plantillasPendientes: retiro.pendientes,
+    };
+  }
+
+  /** Por `ModuleRef`: biometría importa equipos, así que equipos no la importa. */
+  private async retirarPlantillas(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    equipoId: string,
+  ): Promise<ResultadoDeRetiroDePlantillas> {
+    let retiro: RetiroDePlantillasDeEquipo | null = null;
+    try {
+      retiro = this.modulos.get<RetiroDePlantillasDeEquipo>(RETIRO_DE_PLANTILLAS_DE_EQUIPO, {
+        strict: false,
+      });
+    } catch {
+      return { retiradas: 0, pendientes: 0 };
+    }
+    return retiro.ejecutar(ctx, copropiedadId, equipoId);
   }
 
   @Post(':equipoId/reactivacion')

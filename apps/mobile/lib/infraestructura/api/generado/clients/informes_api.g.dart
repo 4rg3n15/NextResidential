@@ -25,7 +25,7 @@ class _InformesApi implements InformesApi {
     required String id,
     required String desde,
     required String hasta,
-    Tipo2? tipo,
+    Tipo3? tipo,
     String? viviendaId,
     String? dispositivoId,
   }) async {

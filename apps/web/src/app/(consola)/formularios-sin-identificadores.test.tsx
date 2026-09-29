@@ -488,6 +488,19 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    */
   'eventos/alertas-abiertas.tsx':
     'las alertas se marcan de la lista que devuelve la API; sólo el motivo se teclea; prueba propia del cuerpo',
+  /**
+   * ETAPA 15-M (C10, C4, C9) · la apertura por equipo, la baja de un equipo y
+   * la baja de un residente. El equipo o el residente viajan en la RUTA (o en
+   * el cuerpo, elegido de una lista que devuelve la API); lo único que se
+   * teclea es el MOTIVO, en texto. Lo comprueban `guardia/equipos-en-vivo.test.tsx`
+   * y las pruebas de cada diálogo: el cuerpo exacto que envían.
+   */
+  'guardia/equipos-en-vivo.tsx':
+    'el equipo se elige de la lista que devuelve la API; el motivo en texto; prueba propia del cuerpo enviado',
+  'dispositivos/baja-de-equipo.tsx':
+    'el equipo viaja en la ruta desde su fila; motivo en texto y casilla de confirmación',
+  'residentes/baja-de-residente.tsx':
+    'el residente viaja en la ruta desde su fila; motivo en texto y casilla de confirmación',
 };
 
 /**

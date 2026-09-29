@@ -30,6 +30,7 @@ class VisitaDto {
     required this.plantillaId,
     required this.equiposSincronizados,
     required this.equiposFallidos,
+    required this.confirmacionDePlaca,
   });
   
   factory VisitaDto.fromJson(Map<String, Object?> json) => _$VisitaDtoFromJson(json);
@@ -53,6 +54,7 @@ class VisitaDto {
   final String? plantillaId;
   final num equiposSincronizados;
   final num equiposFallidos;
+  final String? confirmacionDePlaca;
 
   Map<String, Object?> toJson() => _$VisitaDtoToJson(this);
 }

@@ -19,6 +19,7 @@ class VisitaGeneradaDto {
     required this.fallidas,
     required this.porEquipo,
     required this.avisoDeSincronizacion,
+    required this.confirmacionDePlaca,
   });
   
   factory VisitaGeneradaDto.fromJson(Map<String, Object?> json) => _$VisitaGeneradaDtoFromJson(json);
@@ -35,6 +36,7 @@ class VisitaGeneradaDto {
   final num fallidas;
   final List<EquipoDeLaSincronizacionDto> porEquipo;
   final String? avisoDeSincronizacion;
+  final String? confirmacionDePlaca;
 
   Map<String, Object?> toJson() => _$VisitaGeneradaDtoToJson(this);
 }

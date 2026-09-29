@@ -76,6 +76,16 @@ class FilaDeAutorizacion extends StatelessWidget {
                 if (conHasta) 'hasta ${momentoLegible(a.hasta)}',
               ].join(' · '),
             ),
+            // C9 (15-M) · la placa, confirmada con las DOS fechas.
+            if (a.placa != null)
+              Text(
+                confirmacionDePlaca(
+                  placa: a.placa,
+                  visitante: a.visitante,
+                  desde: a.desde,
+                  hasta: a.hasta,
+                ),
+              ),
             // El motivo lo escribió quien la rechazó; es lo que el residente
             // necesita para saber qué pasó sin llamar a portería.
             if (rechazada && motivo != null && motivo.isNotEmpty)

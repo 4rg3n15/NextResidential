@@ -314,6 +314,23 @@ export class RepositorioPlantillasPg implements RepositorioPlantillas {
     );
   }
 
+  /** C4 (15-M) · todo lo que el equipo tiene sincronizado, para retirarlo en su baja. */
+  async sincronizadasEn(
+    copropiedadId: string,
+    dispositivoId: string,
+  ): Promise<readonly DestinoDePlantilla[]> {
+    return conServicio(this.pool, copropiedadId, async (c) => {
+      const { rows } = await c.query<{ plantilla_id: string }>(
+        `SELECT s.plantilla_id
+           FROM public.plantilla_sincronizaciones s
+          WHERE s.copropiedad_id = $1 AND s.dispositivo_id = $2 AND s.estado = 'sincronizada'
+          ORDER BY s.creado_en`,
+        [copropiedadId, dispositivoId],
+      );
+      return rows.map((r) => ({ copropiedadId, plantillaId: r.plantilla_id, dispositivoId }));
+    });
+  }
+
   /** La cola de CA-10 tal como la define el índice `sincronizaciones_por_retirar_idx`. */
   async porRetirar(copropiedadId: string): Promise<readonly DestinoDePlantilla[]> {
     return conServicio(this.pool, copropiedadId, async (c) => {

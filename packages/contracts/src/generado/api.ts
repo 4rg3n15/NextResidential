@@ -191,6 +191,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/alertas/archivar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archiva varias alertas con un motivo. Archivo lógico, nunca borrado */
+        post: operations["AlertasController_archivarVarias"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/alertas/{alertaId}/archivar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archiva una alerta con motivo. Archivo lógico, nunca borrado */
+        post: operations["AlertasController_archivar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/alertas/{alertaId}/atencion": {
         parameters: {
             query?: never;
@@ -476,7 +510,7 @@ export interface paths {
         /** Equipos de la copropiedad, sin credenciales */
         get: operations["EquiposController_listar"];
         put?: never;
-        /** Da de alta un equipo; el secreto se guarda cifrado */
+        /** Da de alta un equipo; el secreto se guarda cifrado. Una cámara LPR recibe además su secreto de Alarm Server, que se muestra SOLO en esta respuesta */
         post: operations["EquiposController_crear"];
         delete?: never;
         options?: never;
@@ -561,7 +595,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Baja lógica con motivo. Nunca borrado físico (RN-19) */
+        /** Baja lógica con motivo (RN-19). Antes, retira del equipo los rostros sincronizados (RN-11); los que no pudo quitar se devuelven como pendientes */
         post: operations["EquiposController_desactivar"];
         delete?: never;
         options?: never;
@@ -580,6 +614,23 @@ export interface paths {
         put?: never;
         /** Corrige un campo del equipo. Exige confirmación y deja constancia */
         post: operations["EquiposController_corregir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}/desactivar-receptor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** E4 · apaga el receptor huérfano («HTTP listening») de una terminal o un videoportero, que la plataforma escucha por su flujo, y lo lee de vuelta */
+        post: operations["ConfiguracionEnSitioController_desactivarReceptor"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1622,6 +1673,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/residentes/cuentas/{usuarioId}/baja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Da de baja a un residente con motivo; nunca borrado físico (RN-19) */
+        post: operations["SupervisionDeResidentesController_baja"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/residentes/cuentas/{usuarioId}/perfil": {
         parameters: {
             query?: never;
@@ -2354,6 +2422,18 @@ export interface components {
             abierta: boolean;
             motivo: string;
         };
+        ArchivoDeAlertaDto: {
+            motivo: string;
+        };
+        ArchivoDeAlertasResultadoDto: {
+            archivadas: number;
+            /** @description Pedidas y no archivadas: ajenas o ya archivadas */
+            omitidas: number;
+        };
+        ArchivoMasivoDeAlertasDto: {
+            motivo: string;
+            ids: string[];
+        };
         AtestacionDeEquipoDto: {
             id: string;
             firmware: string;
@@ -2412,7 +2492,49 @@ export interface components {
         BajaDeEquipoDto: {
             motivo: string;
         };
+        BajaDeEquipoResultadoDto: {
+            id: string;
+            nombre: string;
+            /** @enum {string} */
+            tipo: "camara_lpr" | "terminal_facial" | "intercom" | "rele" | "controlador_io";
+            modelo: string | null;
+            firmware: string | null;
+            canalBarrera: number | null;
+            numeroDePuerta: number | null;
+            canalDeAudio: number | null;
+            fabricante: string | null;
+            /** @enum {string|null} */
+            modoDeTerminal: "reporta_y_espera" | "decide_el_equipo" | null;
+            canalDeAudioHabilitado: boolean;
+            /** @description Flujo de video; `null` = 102 */
+            canalDeVideo: string | null;
+            /** Format: uuid */
+            zonaId: string | null;
+            capacidades: components["schemas"]["CapacidadesDeEquipoDto"] | null;
+            /** @enum {string} */
+            verificacion: "no_verificado" | "verificado" | "rechazado";
+            verificadoEn: string | null;
+            motivoNoVerificado: string | null;
+            /** @enum {string} */
+            estado: "activo" | "inactivo";
+            /** @description D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó. */
+            atestacion: components["schemas"]["AtestacionDeEquipoDto"] | null;
+            estadoDelEquipo: components["schemas"]["EstadoDelEquipoDto"];
+            /** Format: date-time */
+            sondeadoEn: string | null;
+            /**
+             * Format: date-time
+             * @description Cuándo se leyeron modelo y firmware del propio equipo («dato del …»)
+             */
+            identidadLeidaEn: string | null;
+            plantillasRetiradas: number;
+            /** @description Siguen en el equipo: no contestó al retirarlas */
+            plantillasPendientes: number;
+        };
         BajaDePorteroDto: {
+            motivo: string;
+        };
+        BajaDeResidenteDto: {
             motivo: string;
         };
         BajaDeZonaAplicadaDto: {
@@ -2507,6 +2629,12 @@ export interface components {
             campo: string;
             motivo: string;
         };
+        CanalDeVideoDto: {
+            /** @description canal×100+flujo, p. ej. 102 */
+            id: string;
+            /** @description «H.264», «H.265»… */
+            codec: string | null;
+        };
         CapacidadDeAudioDto: {
             /** @enum {string} */
             estado: "si" | "no" | "desconocida";
@@ -2526,6 +2654,8 @@ export interface components {
             codec: string | null;
             /** @description Canal preguntado (canal×100+flujo) */
             canal: string | null;
+            /** @description Canales de video que el equipo declara; la ficha los ofrece en una lista */
+            canales?: components["schemas"]["CanalDeVideoDto"][];
         };
         CapacidadesDeEquipoDto: {
             /** @enum {string} */
@@ -2759,7 +2889,7 @@ export interface components {
         };
         CorreccionDeEquipoDto: {
             /** @enum {string} */
-            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota";
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota" | "desactivar_receptor";
             /** @description Por qué se corrige. Queda en la auditoría junto a quién y cuándo. */
             motivo: string;
         };
@@ -2791,6 +2921,10 @@ export interface components {
             /** @example dumbbell */
             icono?: string | null;
             normas?: string[];
+        };
+        CuentaDadaDeBajaDto: {
+            dadaDeBaja: boolean;
+            plantillasSuprimidas: number;
         };
         CuentaDeResidenteCreadaDto: {
             /** Format: uuid */
@@ -2910,6 +3044,7 @@ export interface components {
              * @enum {string}
              */
             estado: "saludable" | "degradado" | "caido";
+            estadoDelEquipo: components["schemas"]["EstadoDelEquipoDto"];
             /** Format: date-time */
             ultimoLatido: string | null;
             /** Format: date-time */
@@ -3019,6 +3154,44 @@ export interface components {
             /** @description Pasado el umbral de KPI-34 */
             demorado: boolean;
         };
+        EquipoCreadoDto: {
+            id: string;
+            nombre: string;
+            /** @enum {string} */
+            tipo: "camara_lpr" | "terminal_facial" | "intercom" | "rele" | "controlador_io";
+            modelo: string | null;
+            firmware: string | null;
+            canalBarrera: number | null;
+            numeroDePuerta: number | null;
+            canalDeAudio: number | null;
+            fabricante: string | null;
+            /** @enum {string|null} */
+            modoDeTerminal: "reporta_y_espera" | "decide_el_equipo" | null;
+            canalDeAudioHabilitado: boolean;
+            /** @description Flujo de video; `null` = 102 */
+            canalDeVideo: string | null;
+            /** Format: uuid */
+            zonaId: string | null;
+            capacidades: components["schemas"]["CapacidadesDeEquipoDto"] | null;
+            /** @enum {string} */
+            verificacion: "no_verificado" | "verificado" | "rechazado";
+            verificadoEn: string | null;
+            motivoNoVerificado: string | null;
+            /** @enum {string} */
+            estado: "activo" | "inactivo";
+            /** @description D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó. */
+            atestacion: components["schemas"]["AtestacionDeEquipoDto"] | null;
+            estadoDelEquipo: components["schemas"]["EstadoDelEquipoDto"];
+            /** Format: date-time */
+            sondeadoEn: string | null;
+            /**
+             * Format: date-time
+             * @description Cuándo se leyeron modelo y firmware del propio equipo («dato del …»)
+             */
+            identidadLeidaEn: string | null;
+            /** @description Secreto de Alarm Server de la cámara, emitido en el alta y mostrado SOLO aquí. La ruta que la cámara publica es /alarm-server/<secreto>. `null` si no es cámara LPR. */
+            secretoDelAlarmServer: string | null;
+        };
         EquipoDeLaSincronizacionDto: {
             dispositivoId: string;
             nombre: string;
@@ -3052,6 +3225,14 @@ export interface components {
             estado: "activo" | "inactivo";
             /** @description D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó. */
             atestacion: components["schemas"]["AtestacionDeEquipoDto"] | null;
+            estadoDelEquipo: components["schemas"]["EstadoDelEquipoDto"];
+            /** Format: date-time */
+            sondeadoEn: string | null;
+            /**
+             * Format: date-time
+             * @description Cuándo se leyeron modelo y firmware del propio equipo («dato del …»)
+             */
+            identidadLeidaEn: string | null;
         };
         EquipoOmitidoDto: {
             /** Format: uuid */
@@ -3146,6 +3327,28 @@ export interface components {
             patrullajeDesde: string | null;
             motivoCierre: string | null;
         };
+        EstadoDelEquipoDto: {
+            /**
+             * @description Una sola fuente de verdad: última señal (latido, evento, escucha o sondeo) contra el umbral de la copropiedad, con la credencial y la escucha por delante
+             * @enum {string}
+             */
+            enLinea: "en_linea" | "degradado" | "fuera_de_linea" | "sin_comprobar";
+            /** @description Por qué, en una frase para la pantalla */
+            motivo: string;
+            /** @description `null` = nadie lo ha sondeado */
+            alcanzable: boolean | null;
+            /** @enum {string} */
+            autenticacion: "aceptada" | "rechazada" | "sin_comprobar";
+            autenticacionRechazadaHaceMin: number | null;
+            /** @enum {string} */
+            escucha: "abierta" | "cerrada" | "rechazada" | "no_aplica";
+            /** Format: date-time */
+            ultimoEvento: string | null;
+            /** Format: date-time */
+            ultimoLatido: string | null;
+            /** Format: date-time */
+            ultimaSenal: string | null;
+        };
         EventoIngestaDto: {
             copropiedadId: string;
             dispositivoId: string;
@@ -3223,6 +3426,8 @@ export interface components {
             cantidad: number;
         };
         FichaDelEquipoDto: {
+            /** @description E4 · los receptores («HTTP listening») que el equipo tiene escritos */
+            receptores?: components["schemas"]["ReceptorDeLaFichaDto"][];
             modelo: string | null;
             firmware: string | null;
             serie: string | null;
@@ -3362,7 +3567,7 @@ export interface components {
              * @description Qué corrección lo arregla desde la consola. Nulo si no la hay.
              * @enum {string|null}
              */
-            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota" | null;
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota" | "desactivar_receptor" | null;
         };
         HechoDeBitacoraDto: {
             /** Format: uuid */
@@ -3599,6 +3804,7 @@ export interface components {
             sincronizadas: number;
             fallidas: number;
             avisoDeSincronizacion: string | null;
+            confirmacionDePlaca: string | null;
         };
         MiViviendaDto: {
             /** Format: uuid */
@@ -3665,6 +3871,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             nombre: string;
+            /** @enum {string} */
+            tipo: "camara_lpr" | "terminal_facial" | "intercom" | "rele" | "controlador_io";
+            activo: boolean;
         };
         NotasDeAlertaDto: {
             notas: string;
@@ -3899,6 +4108,12 @@ export interface components {
             semana: string;
             total: number;
         };
+        ReceptorDeLaFichaDto: {
+            host: string | null;
+            puerto: number | null;
+            /** @description La ruta con el secreto oculto: /alarm-server/•••• */
+            ruta: string;
+        };
         RechazoDeAjusteDto: {
             /** @example umbralConfianzaPlaca */
             clave: string;
@@ -4030,7 +4245,7 @@ export interface components {
         };
         ResultadoDeCorreccionDto: {
             /** @enum {string} */
-            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota";
+            correccion: "modo_de_control" | "pais_del_algoritmo" | "imagenes_del_receptor" | "formato_del_receptor" | "verificacion_remota" | "desactivar_receptor";
             aplicada: boolean;
             valorAnterior: string | null;
             valorNuevo: string | null;
@@ -4075,6 +4290,11 @@ export interface components {
             firmware: string | null;
             latenciaMs: number | null;
             verificado: boolean;
+            /**
+             * Format: date-time
+             * @description E5 · 10 · cuando el sondeo actual no leyó modelo y firmware, la fecha en que se leyeron los que se enseñan («dato del DD-MM-YYYY»). Ausente o nulo = son de este sondeo.
+             */
+            identidadDel?: string | null;
             /** @description Qué hay que cambiar en el equipo, campo por campo. Ausente cuando no se sondeó: la falta de ficha no es una ficha vacía. */
             ficha?: components["schemas"]["FichaDelEquipoDto"];
             /** @description Lo que el equipo declaró poder hacer. Ausente cuando no se alcanzó. */
@@ -4355,6 +4575,7 @@ export interface components {
             plantillaId: string | null;
             equiposSincronizados: number;
             equiposFallidos: number;
+            confirmacionDePlaca: string | null;
         };
         VisitaGeneradaDto: {
             generada: boolean;
@@ -4367,6 +4588,7 @@ export interface components {
             fallidas: number;
             porEquipo: components["schemas"]["EquipoDeLaSincronizacionDto"][];
             avisoDeSincronizacion: string | null;
+            confirmacionDePlaca: string | null;
         };
         VisitaRechazadaDto: {
             equiposRetirados: number;
@@ -4765,7 +4987,11 @@ export interface operations {
     };
     AlertasController_abiertas: {
         parameters: {
-            query?: never;
+            query?: {
+                dispositivoId?: string;
+                severidad?: "informativa" | "media" | "alta" | "critica";
+                tipo?: "lista_negra" | "sabotaje" | "dispositivo_caido" | "acceso_dudoso" | "panico" | "apertura_fallida";
+            };
             header?: never;
             path: {
                 id: string;
@@ -4780,6 +5006,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertaExpuestaDto"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    AlertasController_archivarVarias: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArchivoMasivoDeAlertasDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchivoDeAlertasResultadoDto"];
+                };
+            };
+        };
+    };
+    AlertasController_archivar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                alertaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArchivoDeAlertaDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchivoDeAlertasResultadoDto"];
                 };
             };
             404: {
@@ -5325,7 +5610,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EquipoDto"];
+                    "application/json": components["schemas"]["EquipoCreadoDto"];
                 };
             };
         };
@@ -5449,7 +5734,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EquipoDto"];
+                    "application/json": components["schemas"]["BajaDeEquipoResultadoDto"];
                 };
             };
         };
@@ -5476,6 +5761,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultadoDeCorreccionDto"];
+                };
+            };
+        };
+    };
+    ConfiguracionEnSitioController_desactivarReceptor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MotivoDeConfiguracionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoDeConfiguracionDto"];
                 };
             };
         };
@@ -7498,6 +7809,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CuentaDeResidenteCreadaDto"];
+                };
+            };
+        };
+    };
+    SupervisionDeResidentesController_baja: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuarioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BajaDeResidenteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuentaDadaDeBajaDto"];
                 };
             };
         };

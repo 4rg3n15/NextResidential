@@ -49,7 +49,7 @@ describe('DT-15L-02 · nombres de equipos para portería y central', () => {
   it('y SÓLO el nombre: ni dirección, ni usuario, ni credencial', async () => {
     const r = await pedir(portero, `/copropiedades/${COP_A}/nombres-de-equipos`);
     for (const e of r.body as Record<string, unknown>[]) {
-      expect(Object.keys(e).sort()).toEqual(['id', 'nombre']);
+      expect(Object.keys(e).sort()).toEqual(['activo', 'id', 'nombre', 'tipo']);
     }
     expect(JSON.stringify(r.body)).not.toMatch(/host|usuario|secreto|credencial|clave|puerto/i);
   });

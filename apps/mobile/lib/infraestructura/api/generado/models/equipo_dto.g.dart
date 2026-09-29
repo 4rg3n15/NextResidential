@@ -36,6 +36,15 @@ EquipoDto _$EquipoDtoFromJson(Map<String, dynamic> json) => EquipoDto(
       : AtestacionDeEquipoDto.fromJson(
           json['atestacion'] as Map<String, dynamic>,
         ),
+  estadoDelEquipo: EstadoDelEquipoDto.fromJson(
+    json['estadoDelEquipo'] as Map<String, dynamic>,
+  ),
+  sondeadoEn: json['sondeadoEn'] == null
+      ? null
+      : DateTime.parse(json['sondeadoEn'] as String),
+  identidadLeidaEn: json['identidadLeidaEn'] == null
+      ? null
+      : DateTime.parse(json['identidadLeidaEn'] as String),
 );
 
 Map<String, dynamic> _$EquipoDtoToJson(EquipoDto instance) => <String, dynamic>{
@@ -58,4 +67,7 @@ Map<String, dynamic> _$EquipoDtoToJson(EquipoDto instance) => <String, dynamic>{
   'motivoNoVerificado': instance.motivoNoVerificado,
   'estado': instance.estado,
   'atestacion': instance.atestacion,
+  'estadoDelEquipo': instance.estadoDelEquipo,
+  'sondeadoEn': instance.sondeadoEn?.toIso8601String(),
+  'identidadLeidaEn': instance.identidadLeidaEn?.toIso8601String(),
 };

@@ -23,9 +23,17 @@ class _AlertasApi implements AlertasApi {
   @override
   Future<List<AlertaExpuestaDto>> alertasControllerAbiertas({
     required String id,
+    String? dispositivoId,
+    Severidad? severidad,
+    Tipo? tipo,
   }) async {
     final _extra = <String, dynamic>{};
-    final queryParameters = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{
+      r'dispositivoId': dispositivoId,
+      r'severidad': severidad?.toJson(),
+      r'tipo': tipo?.toJson(),
+    };
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<List<AlertaExpuestaDto>>(
@@ -47,6 +55,69 @@ class _AlertasApi implements AlertasApi {
                 AlertaExpuestaDto.fromJson(i as Map<String, dynamic>),
           )
           .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<ArchivoDeAlertasResultadoDto> alertasControllerArchivarVarias({
+    required String id,
+    required ArchivoMasivoDeAlertasDto body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body.toJson());
+    final _options = _setStreamType<ArchivoDeAlertasResultadoDto>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/alertas/archivar',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late ArchivoDeAlertasResultadoDto _value;
+    try {
+      _value = ArchivoDeAlertasResultadoDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<ArchivoDeAlertasResultadoDto> alertasControllerArchivar({
+    required String id,
+    required String alertaId,
+    required ArchivoDeAlertaDto body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body.toJson());
+    final _options = _setStreamType<ArchivoDeAlertasResultadoDto>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/alertas/${alertaId}/archivar',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late ArchivoDeAlertasResultadoDto _value;
+    try {
+      _value = ArchivoDeAlertasResultadoDto.fromJson(_result.data!);
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
       rethrow;

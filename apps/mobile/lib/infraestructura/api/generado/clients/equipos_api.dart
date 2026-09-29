@@ -9,8 +9,10 @@ import '../models/alta_de_equipo_dto.dart';
 import '../models/atestacion_de_equipo_dto.dart';
 import '../models/atestacion_de_equipo_entrada_dto.dart';
 import '../models/baja_de_equipo_dto.dart';
+import '../models/baja_de_equipo_resultado_dto.dart';
 import '../models/correccion_de_equipo_dto.dart';
 import '../models/edicion_de_equipo_dto.dart';
+import '../models/equipo_creado_dto.dart';
 import '../models/equipo_dto.dart';
 import '../models/equipos_dto.dart';
 import '../models/estado_de_equipos_simulados_dto.dart';
@@ -33,9 +35,9 @@ abstract class EquiposApi {
     @Path('id') required String id,
   });
 
-  /// Da de alta un equipo; el secreto se guarda cifrado
+  /// Da de alta un equipo; el secreto se guarda cifrado. Una cámara LPR recibe además su secreto de Alarm Server, que se muestra SOLO en esta respuesta
   @POST('/copropiedades/{id}/equipos')
-  Future<EquipoDto> equiposControllerCrear({
+  Future<EquipoCreadoDto> equiposControllerCrear({
     @Path('id') required String id,
     @Body() required AltaDeEquipoDto body,
   });
@@ -69,9 +71,9 @@ abstract class EquiposApi {
     @Body() required AtestacionDeEquipoEntradaDto body,
   });
 
-  /// Baja lógica con motivo. Nunca borrado físico (RN-19)
+  /// Baja lógica con motivo (RN-19). Antes, retira del equipo los rostros sincronizados (RN-11); los que no pudo quitar se devuelven como pendientes
   @POST('/copropiedades/{id}/equipos/{equipoId}/baja')
-  Future<EquipoDto> equiposControllerDesactivar({
+  Future<BajaDeEquipoResultadoDto> equiposControllerDesactivar({
     @Path('id') required String id,
     @Path('equipoId') required String equipoId,
     @Body() required BajaDeEquipoDto body,
@@ -83,6 +85,14 @@ abstract class EquiposApi {
     @Path('id') required String id,
     @Path('equipoId') required String equipoId,
     @Body() required CorreccionDeEquipoDto body,
+  });
+
+  /// E4 · apaga el receptor huérfano («HTTP listening») de una terminal o un videoportero, que la plataforma escucha por su flujo, y lo lee de vuelta
+  @POST('/copropiedades/{id}/equipos/{equipoId}/desactivar-receptor')
+  Future<ResultadoDeConfiguracionDto> configuracionEnSitioControllerDesactivarReceptor({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+    @Body() required MotivoDeConfiguracionDto body,
   });
 
   /// Sondea un equipo en servicio con su clave guardada y devuelve su ficha

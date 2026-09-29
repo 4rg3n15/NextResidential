@@ -3,6 +3,7 @@ import { RELOJ } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type { CrearCuentaPorUsuario, RechazoDeAlta } from '../../cuentas';
+import type { SuprimirPlantillasDeTitular } from '../../biometria';
 import { plazasVisibles } from './ocupantes';
 import type { PlazaVisible } from './ocupantes';
 import {
@@ -55,10 +56,34 @@ export class CuentasDeResidentesDelSuperadmin {
     @Inject(VEHICULOS_PROPIOS) private readonly vehiculos: VehiculosPropios,
     @Inject(BITACORA_DE_RESIDENTES) private readonly bitacora: BitacoraDeResidentes,
     @Inject(RELOJ) private readonly reloj: Reloj,
+    /** C9 (15-M) · sin él, la baja deja las plantillas vivas hasta que venzan. */
+    private readonly suprimirPlantillas: SuprimirPlantillasDeTitular | null = null,
   ) {}
 
   listar(copropiedadId: string): Promise<readonly CuentaDeResidente[]> {
     return this.cuentas.listar(copropiedadId);
+  }
+
+  /**
+   * C9 (15-M) · BAJA CON MOTIVO (RN-19, CA-02). Nada se borra: la cuenta, el
+   * rol y los vínculos quedan inactivos y auditados; sus plantillas
+   * biométricas se suprimen (RN-11); las autorizaciones vigentes se conservan
+   * y no se crean nuevas (RN-13). `null` = no hay residente activo con ese id.
+   */
+  async baja(
+    ctx: ContextoTenant,
+    copropiedadId: string,
+    usuarioId: string,
+    motivo: string,
+  ): Promise<{ readonly plantillasSuprimidas: number } | null> {
+    const hecha = await this.cuentas.darDeBaja(copropiedadId, usuarioId, motivo, ctx.usuarioId);
+    if (hecha === null) return null;
+    let plantillasSuprimidas = 0;
+    if (hecha.personaId !== null && this.suprimirPlantillas !== null) {
+      const r = await this.suprimirPlantillas.ejecutar(ctx, copropiedadId, hecha.personaId);
+      plantillasSuprimidas = r.suprimidas;
+    }
+    return { plantillasSuprimidas };
   }
 
   async alta(

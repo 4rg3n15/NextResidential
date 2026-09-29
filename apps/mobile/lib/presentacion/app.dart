@@ -38,6 +38,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../aplicacion/avisos_en_uso.dart';
 import '../aplicacion/envio_de_visitas.dart';
@@ -81,6 +82,15 @@ class AppDelResidente extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: temaClaro(),
         darkTheme: temaOscuro(),
+        // C5 (15-M) · los selectores de fecha y hora hablan español de
+        // Colombia; sin esto el `locale` del `showDatePicker` no tiene textos.
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('es', 'CO'), Locale('es'), Locale('en')],
+        locale: const Locale('es', 'CO'),
         home: Armazon(dependencias: dependencias),
       ),
     );

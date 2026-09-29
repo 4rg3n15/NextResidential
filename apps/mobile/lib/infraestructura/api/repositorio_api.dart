@@ -336,6 +336,8 @@ ResultadoDeVisita _resultadoDe(MiVisitaGeneradaDto d) {
       sincronizadas: d.sincronizadas.toInt(),
       fallidas: d.fallidas.toInt(),
       avisoDeSincronizacion: d.avisoDeSincronizacion,
+      // C9 (15-M) · la frase la compone el servidor: la misma en consola y app.
+      confirmacionDePlaca: d.confirmacionDePlaca,
     );
   }
   // La foto no sirvió: el servidor ni siquiera llegó a mirar las reglas de la

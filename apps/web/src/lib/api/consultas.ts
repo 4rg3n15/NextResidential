@@ -451,7 +451,15 @@ export const useEquipos = (copropiedadId: string): UseQueryResult<Equipos> =>
  */
 export const useNombresDeEquipos = (
   copropiedadId: string,
-): UseQueryResult<readonly { readonly id: string; readonly nombre: string }[]> =>
+): UseQueryResult<
+  readonly {
+    readonly id: string;
+    readonly nombre: string;
+    /** C10 (15-M) · el tipo dice si tiene cámara; `activo`, si se puede elegir. */
+    readonly tipo: string;
+    readonly activo: boolean;
+  }[]
+> =>
   useQuery({
     queryKey: ['dispositivos', copropiedadId, 'nombres'] as const,
     enabled: copropiedadId !== '',

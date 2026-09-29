@@ -71,6 +71,11 @@ export interface RepositorioPlantillas {
   deAutorizacionesRevocadas(copropiedadId: string): Promise<readonly PlantillaBiometrica[]>;
   /** Cola de retirada de CA-10: derivada, nunca un estado que alguien escribe. */
   porRetirar(copropiedadId: string): Promise<readonly DestinoDePlantilla[]>;
+  /** C4 (15-M) · lo que está SINCRONIZADO en un equipo, suprimido o no. */
+  sincronizadasEn(
+    copropiedadId: string,
+    dispositivoId: string,
+  ): Promise<readonly DestinoDePlantilla[]>;
   guardar(plantilla: PlantillaBiometrica, actorId: string): Promise<void>;
   /** Borra el vector y marca la fila. Suprimir es borrar, no etiquetar (CA-10). */
   suprimirVector(copropiedadId: string, plantillaId: string, actorId: string): Promise<void>;

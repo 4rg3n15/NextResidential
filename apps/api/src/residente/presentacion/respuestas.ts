@@ -227,6 +227,8 @@ export class MiVisitaGeneradaDto {
   @ApiProperty() sincronizadas!: number;
   @ApiProperty() fallidas!: number;
   @ApiProperty({ type: String, nullable: true }) avisoDeSincronizacion!: string | null;
+  /** C9 (15-M) · «Placa XXX registrada para la visita de …, del … al …»; nulo sin placa. */
+  @ApiProperty({ type: String, nullable: true }) confirmacionDePlaca!: string | null;
 }
 
 /** F6 · un visitante reciente de mi vivienda, con lo que hace falta para repetirlo. */
