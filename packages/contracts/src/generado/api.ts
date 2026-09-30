@@ -2505,6 +2505,8 @@ export interface components {
         AvisoAlResidenteDto: {
             /** Format: uuid */
             viviendaId: string;
+            /** Format: uuid */
+            dispositivoId?: string;
             texto: string;
         };
         BajaDeEquipoDto: {
@@ -3111,10 +3113,10 @@ export interface components {
             canalDeAudioHabilitado: boolean;
             /** @example 102 */
             canalDeVideo?: string;
-            /** Format: uuid */
-            zonaId?: string;
             /** @default true */
             probarConexion: boolean;
+            /** Format: uuid */
+            zonaId?: string | null;
         };
         EditarVehiculoDto: {
             placa?: string;

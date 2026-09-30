@@ -10,11 +10,13 @@ AvisoAlResidenteDto _$AvisoAlResidenteDtoFromJson(Map<String, dynamic> json) =>
     AvisoAlResidenteDto(
       viviendaId: json['viviendaId'] as String,
       texto: json['texto'] as String,
+      dispositivoId: json['dispositivoId'] as String?,
     );
 
 Map<String, dynamic> _$AvisoAlResidenteDtoToJson(
   AvisoAlResidenteDto instance,
 ) => <String, dynamic>{
   'viviendaId': instance.viviendaId,
+  'dispositivoId': instance.dispositivoId,
   'texto': instance.texto,
 };

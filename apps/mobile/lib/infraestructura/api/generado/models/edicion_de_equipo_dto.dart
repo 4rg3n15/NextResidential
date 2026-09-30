@@ -47,8 +47,8 @@ class EdicionDeEquipoDto {
   final EdicionDeEquipoDtoModoDeTerminal? modoDeTerminal;
   final bool canalDeAudioHabilitado;
   final String? canalDeVideo;
-  final String? zonaId;
   final bool probarConexion;
+  final String? zonaId;
 
   Map<String, Object?> toJson() => _$EdicionDeEquipoDtoToJson(this);
 }

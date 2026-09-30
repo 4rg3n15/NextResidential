@@ -8537,6 +8537,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "texto": {
             "type": "string",
             "minLength": 4,
@@ -10312,13 +10316,14 @@
             "pattern": "^[1-9][0-9]{2,3}$",
             "example": "102"
           },
-          "zonaId": {
-            "type": "string",
-            "format": "uuid"
-          },
           "probarConexion": {
             "type": "boolean",
             "default": true
+          },
+          "zonaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },

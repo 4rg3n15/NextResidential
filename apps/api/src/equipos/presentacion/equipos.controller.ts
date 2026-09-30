@@ -286,7 +286,8 @@ export class EquiposController {
       ...((dto.canalDeVideo ?? actual.canalDeVideo ?? undefined) === undefined
         ? {}
         : { canalDeVideo: dto.canalDeVideo ?? actual.canalDeVideo }),
-      ...((dto.zonaId ?? actual.zonaId ?? undefined) === undefined
+      // O2 (15-N) · `null` es «sin zona»: no se rellena con la guardada.
+      ...(dto.zonaId === null || (dto.zonaId ?? actual.zonaId ?? undefined) === undefined
         ? {}
         : { zonaId: dto.zonaId ?? actual.zonaId }),
       ...(dto.probarConexion === undefined ? {} : { probarConexion: dto.probarConexion }),

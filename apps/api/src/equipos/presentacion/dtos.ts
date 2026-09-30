@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { AtestacionDeEquipoDto } from './dtos-atestacion';
 import { EstadoDelEquipoDto } from './dto-estado-del-equipo';
 import {
@@ -148,7 +148,19 @@ export class AltaDeEquipoDto {
  * como está; lo que viene, sustituye. El secreto sigue la misma regla desde la
  * 15-B: ausente = no lo cambies.
  */
-export class EdicionDeEquipoDto extends PartialType(AltaDeEquipoDto) {}
+export class EdicionDeEquipoDto extends PartialType(
+  OmitType(AltaDeEquipoDto, ['zonaId'] as const),
+) {
+  /**
+   * O2 (15-N) · DT-15M-04 · la edición es parcial y lo ausente se conserva;
+   * por eso «sin zona» no puede ser «ausente». `null` la QUITA; ausente no la
+   * toca. Cualquier otro valor tiene que ser un UUID, como en el alta.
+   */
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  zonaId?: string | null;
+}
 
 export class BajaDeEquipoDto {
   /** C4 (15-M) · el motivo es la constancia de la baja (RN-19): cinco letras como mínimo. */

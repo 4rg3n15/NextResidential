@@ -222,13 +222,18 @@ export const PantallaDeGuardiaVirtual = ({
     onError: alFallar,
   });
 
+  // O3 (15-N) · DT-15M-05 · a nombre de SU vivienda y del equipo que se
+  // atiende. Sin vivienda no hay a quién avisar: el botón se apaga (antes se
+  // mandaba la copropiedad como si fuera una vivienda).
+  const viviendaDelFoco = foco?.viviendaId ?? null;
   const avisar = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (viviendaId: string) =>
       desenvolver(
         await cliente.POST('/copropiedades/{id}/guardia/avisar-residente', {
           params: { path: { id: copropiedadId } },
           body: {
-            viviendaId: foco?.viviendaId ?? copropiedadId,
+            viviendaId,
+            ...(foco?.dispositivoId === undefined ? {} : { dispositivoId: foco.dispositivoId }),
             texto: 'Tienes una visita esperando en la portería',
           },
         }),
@@ -452,7 +457,13 @@ export const PantallaDeGuardiaVirtual = ({
                     <Boton
                       variante="secundario"
                       cargando={avisar.isPending}
-                      onClick={() => avisar.mutate()}
+                      disabled={viviendaDelFoco === null}
+                      {...(viviendaDelFoco === null
+                        ? { title: 'Este elemento no tiene vivienda: no hay a quién avisar' }
+                        : {})}
+                      onClick={() => {
+                        if (viviendaDelFoco !== null) avisar.mutate(viviendaDelFoco);
+                      }}
                     >
                       <PhoneCall className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
                       Avisar al residente

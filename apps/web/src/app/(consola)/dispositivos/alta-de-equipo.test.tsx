@@ -192,6 +192,32 @@ describe('C2 (15-L) · el videoportero edita su puerta, su canal de video y su z
       expect(invalidadas).toHaveBeenCalledWith({ queryKey: ['tablero', COP, 'dispositivos'] }),
     );
   });
+
+  // O2 (15-N) · DT-15M-04 · al editar, lo vacío «conserva»; la zona no puede
+  // ser eso: «Sin zona» viaja como `null`, que el servidor lee «quítala».
+  it('«Sin zona» en un equipo con zona viaja como null en la edición', async () => {
+    render(
+      <Envoltura>
+        <AltaDeEquipo
+          copropiedadId={COP}
+          abierto
+          alCerrar={() => undefined}
+          equipo={{ ...VIDEOPORTERO, zonaId: 'z-1' } as never}
+        />
+      </Envoltura>,
+    );
+    await screen.findByRole('option', { name: 'Portería' });
+    fireEvent.change(screen.getByLabelText('Zona del equipo'), { target: { value: '' } });
+    const dialogo = screen.getByRole('dialog');
+    fireEvent.click(dialogo.querySelector<HTMLButtonElement>('button[type="submit"]')!);
+    const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    let edicion: Request | undefined;
+    await waitFor(() => {
+      edicion = (espia.mock.calls as [Request][]).map(([r]) => r).find((r) => r.method === 'PUT');
+      expect(edicion).toBeDefined();
+    });
+    expect(await edicion!.clone().json()).toMatchObject({ zonaId: null });
+  });
 });
 
 /**

@@ -237,6 +237,15 @@ export class AvisoAlResidenteDto {
   @IsUUID()
   viviendaId!: string;
 
+  /**
+   * O3 (15-N) · el equipo que se atiende (el videoportero de la llamada). La
+   * alerta va a su nombre: antes llevaba la vivienda en ese campo (DT-15M-05).
+   */
+  @ApiProperty({ required: false, format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  dispositivoId?: string;
+
   @ApiProperty({ minLength: 4, maxLength: 200 })
   @IsString()
   @MinLength(4)

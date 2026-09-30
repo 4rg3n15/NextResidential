@@ -194,7 +194,9 @@ export const AltaDeEquipo = ({
     ...(CON_VIDEO.has(tipo) && canalDeVideo.trim() !== ''
       ? { canalDeVideo: canalDeVideo.trim() }
       : {}),
-    ...(zonaId === '' ? {} : { zonaId }),
+    // O2 (15-N) · al editar, lo vacío CONSERVA; «Sin zona» no puede ser eso:
+    // viaja como `null`, que el servidor lee «quítala» (DT-15M-04).
+    ...(zonaId !== '' ? { zonaId } : editando ? { zonaId: null } : {}),
   });
 
   /**

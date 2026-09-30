@@ -78,6 +78,14 @@ import { MideKpi } from '../../observabilidad';
  * Un recurso de otra copropiedad responde **404 y no 403**: un 403 confirmaría
  * que el identificador existe.
  */
+/** O3 (15-N) · quién avisó, en la constancia del aviso al residente. */
+const QUIEN_AVISA: Readonly<Record<string, string>> = {
+  portero: 'el portero',
+  operador_central: 'la guardia virtual',
+  administrador: 'la administración',
+  superadministrador: 'el superadministrador',
+};
+
 @ApiTags('guardia')
 @ApiBearerAuth()
 @Controller('copropiedades/:id/guardia')
@@ -450,8 +458,13 @@ export class GuardiaController {
       tipo: 'acceso_dudoso',
       severidad: 'informativa',
       generadaEn: this.reloj.ahora(),
-      dispositivoId: dto.viviendaId,
-      notas: `Aviso al residente: ${dto.texto}`,
+      // O3 (15-N) · a nombre del EQUIPO que se atiende (o de la consola, como
+      // la emergencia) y del operador que avisa —`actorId` del escalamiento—;
+      // la vivienda va en la constancia, no en el campo del equipo.
+      dispositivoId: dto.dispositivoId ?? 'consola-guardia',
+      notas:
+        `Aviso al residente de la vivienda ${dto.viviendaId}, ` +
+        `de ${QUIEN_AVISA[ctx.rol] ?? 'un operador'}: ${dto.texto}`,
     });
     if (esFallo(alerta)) throw new BadRequestException(alerta.error.detalle);
     await this.escalar.ejecutar(alerta.valor, ctx.usuarioId);

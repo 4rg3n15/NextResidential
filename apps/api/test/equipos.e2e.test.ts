@@ -988,3 +988,55 @@ describe('C3 (15-L) · «Probar conexión» de un videoportero dice cómo van su
     expect(eventos?.valorLeido).toMatch(/flujo de alertas · última señal hace \d+ s/);
   });
 });
+
+/**
+ * O2 (15-N) · DT-15M-04 · «Sin zona» QUITA la zona
+ *
+ * La edición es parcial: lo ausente se conserva (O5). Por eso «sin zona» no
+ * podía ser «ausente»: se leía «sin cambio» y la zona se quedaba. Ahora
+ * `zonaId: null` es «quítala», y ausente sigue siendo «no la toques».
+ */
+describe('O2 (15-N) · DT-15M-04 · «Sin zona» quita la zona de un equipo', () => {
+  const ZONA = '30000000-0000-4000-8000-0000000000a1';
+  const alcanza = { probar: async () => ALCANZADO };
+
+  it('zonaId null la quita; ausente la conserva', async () => {
+    const { app: a, firmante } = await conEquipos(alcanza);
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, zonaId: ZONA, probarConexion: false })
+      .expect(201);
+    expect(creado.body.zonaId).toBe(ZONA);
+
+    const sinTocar = await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Renombrado', probarConexion: false })
+      .expect(200);
+    expect(sinTocar.body.zonaId).toBe(ZONA);
+
+    const sinZona = await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ zonaId: null, probarConexion: false })
+      .expect(200);
+    expect(sinZona.body.zonaId).toBeNull();
+  });
+
+  it('un zonaId que no es UUID se sigue rechazando', async () => {
+    const { app: a, firmante } = await conEquipos(alcanza);
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, probarConexion: false })
+      .expect(201);
+    await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ zonaId: 'sin-zona', probarConexion: false })
+      .expect(400);
+  });
+});
