@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { vigilarPool } from '../persistencia/con-cliente';
 import type { RecursoExterno, ResultadoDeRecurso } from './recursos-externos';
 
 export const SONDA_POSTGRES = Symbol.for('ncr.SondaDePostgres');
@@ -30,12 +31,18 @@ export class SondaDePostgresPg implements SondaDePostgres {
   constructor(private readonly cadena: string) {}
 
   private obtener(): Pool {
-    this.pool ??= new Pool({
-      connectionString: this.cadena,
-      max: 1,
-      connectionTimeoutMillis: 2000,
-      idleTimeoutMillis: 10_000,
-    });
+    // 15-O · con oyente de `'error'`: su conexión ociosa también la puede cortar
+    // el servidor, y sin él la sonda de `/ready` tumbaba el proceso entero.
+    this.pool ??= vigilarPool(
+      new Pool({
+        connectionString: this.cadena,
+        max: 1,
+        connectionTimeoutMillis: 2000,
+        idleTimeoutMillis: 10_000,
+        application_name: 'ncr-api-sonda',
+      }),
+      () => undefined,
+    );
     return this.pool;
   }
 

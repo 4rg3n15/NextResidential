@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * Una transacción con los claims de SERVICIO de UNA copropiedad y el actor
@@ -14,24 +15,23 @@ export const conServicio = async <T>(
   actorId: string | null,
   fn: (c: PoolClient) => Promise<T>,
 ): Promise<T> => {
-  const cliente = await pool.connect();
-  try {
-    await cliente.query('BEGIN');
-    await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify({
-        rol: 'servicio',
-        usuario_id: actorId ?? ACTOR_INGESTA,
-        copropiedad_id: copropiedadId,
-        copropiedades: [copropiedadId],
-      }),
-    ]);
-    const r = await fn(cliente);
-    await cliente.query('COMMIT');
-    return r;
-  } catch (error) {
-    await cliente.query('ROLLBACK');
-    throw error;
-  } finally {
-    cliente.release();
-  }
+  return conCliente(pool, async (cliente) => {
+    try {
+      await cliente.query('BEGIN');
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
+        JSON.stringify({
+          rol: 'servicio',
+          usuario_id: actorId ?? ACTOR_INGESTA,
+          copropiedad_id: copropiedadId,
+          copropiedades: [copropiedadId],
+        }),
+      ]);
+      const r = await fn(cliente);
+      await cliente.query('COMMIT');
+      return r;
+    } catch (error) {
+      await cliente.query('ROLLBACK');
+      throw error;
+    }
+  });
 };

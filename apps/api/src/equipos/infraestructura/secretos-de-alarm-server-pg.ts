@@ -17,6 +17,7 @@ import type {
   SecretosDeAlarmServer,
 } from '../aplicacion/secretos-de-alarm-server';
 import { nuevoSecretoDeAlarmServer } from '../aplicacion/secretos-de-alarm-server';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -75,13 +76,10 @@ export class SecretosDeAlarmServerPg implements SecretosDeAlarmServer {
   }
 
   private async conClaims<T>(claims: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [claims]);
       return await fn(cliente);
-    } finally {
-      cliente.release();
-    }
+    });
   }
 
   private claimsDe(ctx: ContextoTenant): string {

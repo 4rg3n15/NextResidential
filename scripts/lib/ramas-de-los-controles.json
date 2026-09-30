@@ -14,6 +14,7 @@
   "scripts/lib/estabilidad.mjs": 13,
   "scripts/lib/flutter-sin-secretos.mjs": 8,
   "scripts/lib/frontera-append-only.mjs": 1,
+  "scripts/lib/frontera-conexiones.mjs": 0,
   "scripts/lib/frontera-construccion.mjs": 6,
   "scripts/lib/frontera-csp.mjs": 0,
   "scripts/lib/frontera-extensibilidad.mjs": 3,

@@ -10,6 +10,7 @@ import type {
   TipoDeCopropiedad,
 } from './configuracion';
 import { cambiosEfectivos, resumenDeCambios } from './configuracion';
+import { conCliente } from '../persistencia/con-cliente';
 
 /** `interval` de PostgreSQL → horas y minutos, sin depender del formato de texto. */
 interface FilaDeConfiguracion {
@@ -118,8 +119,7 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
   }
 
   async listarParaElAlcance(ctx: ContextoTenant): Promise<readonly CopropiedadResumen[]> {
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(this.claimsDe(ctx)),
       ]);
@@ -139,9 +139,7 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
         zonaHoraria: r.zona_horaria,
       }));
       return filtrarPorAlcance(ctx, leidas);
-    } finally {
-      cliente.release();
-    }
+    });
   }
 
   /**
@@ -168,8 +166,7 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
     if (!filtrarPorAlcance(ctx, await this.listarParaElAlcance(ctx)).some((c) => c.id === id)) {
       return null;
     }
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(this.claimsDe(ctx)),
       ]);
@@ -179,9 +176,7 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
       );
       const fila = rows[0];
       return fila === undefined ? null : aConfiguracion(fila);
-    } finally {
-      cliente.release();
-    }
+    });
   }
 
   /**
@@ -239,8 +234,7 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
       asignaciones.push(plantilla.replace('$#', `$${String(valores.length)}`));
     }
 
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(this.claimsDe(ctx)),
       ]);
@@ -291,8 +285,6 @@ export class RepositorioCopropiedadesPg implements RepositorioCopropiedades {
         }
         throw error;
       }
-    } finally {
-      cliente.release();
-    }
+    });
   }
 }

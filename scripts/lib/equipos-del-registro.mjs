@@ -21,6 +21,7 @@
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { createDecipheriv, hkdfSync } from 'node:crypto';
+import { conCliente } from './con-cliente.mjs';
 
 /** Los propósitos de la bóveda, idénticos a `sobre-aes-gcm.ts` de la API. */
 const PROPOSITOS = {
@@ -61,21 +62,19 @@ const desaplanar = (plano) => ({
   cuerpo: plano.subarray(LONGITUD_IV + LONGITUD_ETIQUETA),
 });
 
-const conClaims = async (pool, claims, fn) => {
-  const cliente = await pool.connect();
-  try {
-    await cliente.query('BEGIN READ ONLY');
-    await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [claims]);
-    const r = await fn(cliente);
-    await cliente.query('COMMIT');
-    return r;
-  } catch (error) {
-    await cliente.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    cliente.release();
-  }
-};
+const conClaims = (pool, claims, fn) =>
+  conCliente(pool, async (cliente) => {
+    try {
+      await cliente.query('BEGIN READ ONLY');
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [claims]);
+      const r = await fn(cliente);
+      await cliente.query('COMMIT');
+      return r;
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    }
+  });
 
 /**
  * Los equipos del registro con su credencial descifrada, en la forma que

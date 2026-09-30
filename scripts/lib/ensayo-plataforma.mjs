@@ -19,25 +19,24 @@
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { readdirSync } from 'node:fs';
+import { conCliente } from './con-cliente.mjs';
 
 const CLAIMS_DE_LECTURA = JSON.stringify({ rol: 'superadministrador' });
 
 /** Una lectura con claims, en una transacción que no puede escribir. */
-const leer = async (pool, sql, parametros) => {
-  const cliente = await pool.connect();
-  try {
-    await cliente.query('BEGIN READ ONLY');
-    await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [CLAIMS_DE_LECTURA]);
-    const { rows } = await cliente.query(sql, parametros);
-    await cliente.query('COMMIT');
-    return rows;
-  } catch (error) {
-    await cliente.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    cliente.release();
-  }
-};
+const leer = (pool, sql, parametros) =>
+  conCliente(pool, async (cliente) => {
+    try {
+      await cliente.query('BEGIN READ ONLY');
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [CLAIMS_DE_LECTURA]);
+      const { rows } = await cliente.query(sql, parametros);
+      await cliente.query('COMMIT');
+      return rows;
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    }
+  });
 
 const esperar = (ms) => new Promise((listo) => setTimeout(listo, ms));
 

@@ -67,6 +67,8 @@ const describir = (cadena) => {
 const REMEDIO = './supabase/verificar.sh --con-semillas --modo-supabase';
 
 const cliente = new Client({ connectionString: url, connectionTimeoutMillis: 5000 });
+// 15-O · un corte a mitad de la comprobación es un «no», no una excepción sin oyente.
+cliente.on('error', () => undefined);
 try {
   await cliente.connect();
   const { rows } = await cliente.query('select version() as v, current_user as u');

@@ -18,6 +18,7 @@ import { cambiosDeEquipo } from '../aplicacion/cambios-de-equipo';
 import { capacidadesDesdeJson } from '@ncr/providers';
 import { claimsDeServicio } from '../../comun/claims-de-servicio';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * Equipos en PostgreSQL — A.1 y A.2.
@@ -179,8 +180,7 @@ export const leerSobre = async (
   copropiedadId: string,
   equipoId: string,
 ): Promise<string | null> => {
-  const cliente = await pool.connect();
-  try {
+  return conCliente(pool, async (cliente) => {
     await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
       JSON.stringify(claimsDeServicio(copropiedadId)),
     ]);
@@ -195,9 +195,7 @@ export const leerSobre = async (
     return descifrar(llave, { iv: fila.iv, cuerpo: fila.cuerpo, etiqueta: fila.etiqueta }).toString(
       'utf8',
     );
-  } finally {
-    cliente.release();
-  }
+  });
 };
 
 @Injectable()
@@ -218,15 +216,12 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
   }
 
   private async conCliente<T>(ctx: ContextoTenant, fn: (c: PoolClient) => Promise<T>): Promise<T> {
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(this.claims(ctx)),
       ]);
       return await fn(cliente);
-    } finally {
-      cliente.release();
-    }
+    });
   }
 
   /**

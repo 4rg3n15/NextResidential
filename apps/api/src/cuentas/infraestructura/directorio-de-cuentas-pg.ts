@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import type { DirectorioDeCuentas, ResumenDeCuenta } from '../aplicacion/puertos';
+import { conCliente } from '../../persistencia/con-cliente';
 
 interface Fila {
   id: string;
@@ -89,25 +90,24 @@ export class DirectorioDeCuentasPg implements DirectorioDeCuentas {
     sql: string,
     parametros: unknown[],
   ): Promise<{ rows: T[]; rowCount: number | null }> {
-    const cliente = await this.pool.connect();
-    try {
-      await cliente.query('BEGIN');
-      await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({
-          rol: 'superadministrador',
-          usuario_id: actorId ?? '00000000-0000-4000-8000-000000000003',
-          copropiedad_id: null,
-          copropiedades: [],
-        }),
-      ]);
-      const r = await cliente.query<T>(sql, parametros);
-      await cliente.query('COMMIT');
-      return { rows: r.rows, rowCount: r.rowCount };
-    } catch (error) {
-      await cliente.query('ROLLBACK');
-      throw error;
-    } finally {
-      cliente.release();
-    }
+    return conCliente(this.pool, async (cliente) => {
+      try {
+        await cliente.query('BEGIN');
+        await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
+          JSON.stringify({
+            rol: 'superadministrador',
+            usuario_id: actorId ?? '00000000-0000-4000-8000-000000000003',
+            copropiedad_id: null,
+            copropiedades: [],
+          }),
+        ]);
+        const r = await cliente.query<T>(sql, parametros);
+        await cliente.query('COMMIT');
+        return { rows: r.rows, rowCount: r.rowCount };
+      } catch (error) {
+        await cliente.query('ROLLBACK');
+        throw error;
+      }
+    });
   }
 }

@@ -3,6 +3,7 @@ import type { EquipoRegistrado, RegistroDeEquipos } from '@ncr/providers';
 import { capacidadesDesdeJson } from '@ncr/providers';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import { leerSobre } from './repositorio-equipos-pg';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -123,8 +124,7 @@ export class RegistroDeEquiposPg implements RegistroDeEquipos {
   }
 
   private async fila(dispositivoId: string): Promise<FilaDeRegistro | null> {
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         CLAIMS_DE_LECTURA,
       ]);
@@ -143,8 +143,6 @@ export class RegistroDeEquiposPg implements RegistroDeEquipos {
         [dispositivoId],
       );
       return rows[0] ?? null;
-    } finally {
-      cliente.release();
-    }
+    });
   }
 }

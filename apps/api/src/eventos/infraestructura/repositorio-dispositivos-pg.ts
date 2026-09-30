@@ -5,6 +5,7 @@ import type {
   LatidoDeDispositivo,
   RepositorioDispositivos,
 } from '../aplicacion/puertos';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * C4 (ETAPA 15-L) · el latido de cada equipo, en `dispositivos.ultimo_latido`.
@@ -74,14 +75,11 @@ export class RepositorioDispositivosPg implements RepositorioDispositivos {
   }
 
   private async como<T>(copropiedadId: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(claimsDeServicio(copropiedadId)),
       ]);
       return await fn(cliente);
-    } finally {
-      cliente.release();
-    }
+    });
   }
 }

@@ -28,6 +28,7 @@ import type {
   ViviendaEnLista,
 } from '../aplicacion/puertos';
 import type { Placa, TipoDeDocumento, ViviendaProyectada } from '@ncr/domain-core';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /** Violación de restricción única en PostgreSQL. */
 const VIOLACION_UNICA = '23505';
@@ -64,15 +65,12 @@ export class RepositorioPadronPg implements RepositorioPadron {
       // Ya estamos dentro de una transacción con su contexto fijado.
       return fn(this.ejecutor as PoolClient);
     }
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(this.claims),
       ]);
       return await fn(cliente);
-    } finally {
-      cliente.release();
-    }
+    });
   }
 
   /**
@@ -546,8 +544,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     const { copropiedadId, viviendas, actorId } = generacion;
     if (viviendas.length === 0) return { creadas: 0, colisiones: [] };
 
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(this.claims),
       ]);
@@ -631,9 +628,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
         await cliente.query('ROLLBACK');
         throw e;
       }
-    } finally {
-      cliente.release();
-    }
+    });
   }
 
   // ═══════════════════════════ O3 · edición y borrado ═══════════════════════
@@ -976,20 +971,19 @@ export class RepositorioPadronPg implements RepositorioPadron {
    * reintentar duplicaría las que sí pasaron.
    */
   async enTransaccion<T>(operacion: (repo: RepositorioPadron) => Promise<T>): Promise<T> {
-    const cliente = await this.pool.connect();
-    try {
-      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        JSON.stringify(this.claims),
-      ]);
-      await cliente.query('BEGIN');
-      const resultado = await operacion(new RepositorioPadronPg(this.pool, this.claims, cliente));
-      await cliente.query('COMMIT');
-      return resultado;
-    } catch (e) {
-      await cliente.query('ROLLBACK');
-      throw e;
-    } finally {
-      cliente.release();
-    }
+    return conCliente(this.pool, async (cliente) => {
+      try {
+        await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
+          JSON.stringify(this.claims),
+        ]);
+        await cliente.query('BEGIN');
+        const resultado = await operacion(new RepositorioPadronPg(this.pool, this.claims, cliente));
+        await cliente.query('COMMIT');
+        return resultado;
+      } catch (e) {
+        await cliente.query('ROLLBACK');
+        throw e;
+      }
+    });
   }
 }

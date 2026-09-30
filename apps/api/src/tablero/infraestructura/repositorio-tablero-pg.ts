@@ -15,6 +15,7 @@ import type {
   SeveridadDeAlerta,
 } from '../aplicacion/puertos';
 import type { ClaseDeSondeo } from '../../equipos';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * Adaptador PostgreSQL del tablero.
@@ -52,21 +53,20 @@ export class RepositorioTableroPg implements RepositorioTablero {
     sql: string,
     parametros: readonly unknown[],
   ): Promise<{ rows: F[] }> {
-    const cliente = await this.pool.connect();
-    try {
-      await cliente.query('BEGIN READ ONLY');
-      await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify(claimsDeServicio(copropiedadId)),
-      ]);
-      const resultado = await cliente.query<F>(sql, [...parametros]);
-      await cliente.query('COMMIT');
-      return { rows: resultado.rows };
-    } catch (error) {
-      await cliente.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      cliente.release();
-    }
+    return conCliente(this.pool, async (cliente) => {
+      try {
+        await cliente.query('BEGIN READ ONLY');
+        await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
+          JSON.stringify(claimsDeServicio(copropiedadId)),
+        ]);
+        const resultado = await cliente.query<F>(sql, [...parametros]);
+        await cliente.query('COMMIT');
+        return { rows: resultado.rows };
+      } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      }
+    });
   }
 
   async configuracion(copropiedadId: string): Promise<ConfiguracionDeTablero | null> {

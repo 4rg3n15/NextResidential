@@ -4,6 +4,7 @@ import { Catch, HttpException, HttpStatus } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { Bitacora } from '@ncr/domain-core';
 import type { ReporteDeErrores } from '../../observabilidad';
+import { esErrorDeConexion } from '../../persistencia/con-cliente';
 
 /**
  * Manejo global de errores.
@@ -32,6 +33,20 @@ import type { ReporteDeErrores } from '../../observabilidad';
  * la misma forma. El texto útil —«Too Many Requests»— se conserva.
  * ═══════════════════════════════════════════════════════════════════════════
  */
+/**
+ * 15-O · el cuerpo del 503 cuando se perdió la conexión con PostgreSQL. No lleva
+ * el texto de `pg` (es nuestro y es un 5xx: no sale); lleva un CÓDIGO que la
+ * consola reconoce para decir «base de datos no disponible» y no «error».
+ */
+export const CODIGO_BASE_DE_DATOS_NO_DISPONIBLE = 'BASE_DE_DATOS_NO_DISPONIBLE';
+export const SEGUNDOS_ANTES_DE_REINTENTAR = 5;
+const MENSAJE_BASE_DE_DATOS_NO_DISPONIBLE = {
+  codigo: CODIGO_BASE_DE_DATOS_NO_DISPONIBLE,
+  message:
+    'Base de datos no disponible por ahora: se perdió la conexión con PostgreSQL. ' +
+    'La API sigue en marcha; reintente en unos segundos.',
+};
+
 const sinNombreDeClase = (respuesta: string | object): string | object =>
   typeof respuesta === 'string'
     ? respuesta.replace(/^[A-Za-z]+(Exception|Error):\s*/, '')
@@ -58,6 +73,8 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
       (peticion.headers['x-request-id'] as string | undefined) ?? 'sin-correlacion';
 
     const esHttp = excepcion instanceof HttpException;
+    // 15-O · un corte de la base no es un fallo del programa: 503 y Retry-After.
+    const sinBase = !esHttp && esErrorDeConexion(excepcion);
     /**
      * ═══════════════════════════════════════════════════════════════════════
      * EL 4xx QUE NO ES DE NEST SIGUE SIENDO UN 4xx · H-13-12
@@ -89,7 +106,9 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
 
     const estado = esHttp
       ? excepcion.getStatus()
-      : (codigoDeBiblioteca ?? HttpStatus.INTERNAL_SERVER_ERROR);
+      : sinBase
+        ? HttpStatus.SERVICE_UNAVAILABLE
+        : (codigoDeBiblioteca ?? HttpStatus.INTERNAL_SERVER_ERROR);
 
     // `correlacion` NO se repite en el contexto: desde la ETAPA 14 la bitácora
     // la pone en el nivel superior de TODA línea, y duplicarla aquí solo hacía
@@ -119,6 +138,7 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
       });
     }
 
+    if (sinBase) respuesta.setHeader('Retry-After', String(SEGUNDOS_ANTES_DE_REINTENTAR));
     respuesta.status(estado).json({
       estado,
       correlacion,
@@ -128,11 +148,13 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
       // un texto nuestro para no depender de lo que escriba una dependencia.
       mensaje: esHttp
         ? sinNombreDeClase(excepcion.getResponse())
-        : codigoDeBiblioteca === undefined
-          ? 'Error interno'
-          : // A3 (15-E) · sólo un error PROPIO marcado dice su motivo; el de
-            // una dependencia sigue normalizado (H-13-12).
-            (mensajeExpuesto(excepcion) ?? 'Petición rechazada'),
+        : sinBase
+          ? MENSAJE_BASE_DE_DATOS_NO_DISPONIBLE
+          : codigoDeBiblioteca === undefined
+            ? 'Error interno'
+            : // A3 (15-E) · sólo un error PROPIO marcado dice su motivo; el de
+              // una dependencia sigue normalizado (H-13-12).
+              (mensajeExpuesto(excepcion) ?? 'Petición rechazada'),
     });
   }
 }

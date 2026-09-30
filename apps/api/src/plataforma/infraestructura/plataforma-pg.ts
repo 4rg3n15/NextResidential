@@ -10,6 +10,7 @@ import type {
   ReglasDeIp,
   RepositorioDeReglasDeIp,
 } from '../aplicacion/puertos';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -29,16 +30,16 @@ const con = async <T>(
   claims: string,
   fn: (c: PoolClient) => Promise<T>,
 ): Promise<T> => {
-  const cliente = await pool.connect();
-  try {
-    await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [claims]);
-    return await fn(cliente);
-  } finally {
-    await cliente
-      .query("SELECT set_config('request.jwt.claims', '', false)")
-      .catch(() => undefined);
-    cliente.release();
-  }
+  return conCliente(pool, async (cliente) => {
+    try {
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [claims]);
+      return await fn(cliente);
+    } finally {
+      await cliente
+        .query("SELECT set_config('request.jwt.claims', '', false)")
+        .catch(() => undefined);
+    }
+  });
 };
 
 const ipOnull = (ip: string | null): string | null => {
