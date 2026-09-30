@@ -238,6 +238,40 @@ describe('Digest MD5', () => {
     expect(cabecera).toContain('opaque="5ccc069c403ebaf9f0171e9517f40e41"');
   });
 
+  it('V3 (15-N) · con MD5 el cálculo es el de siempre: vector MD5 de la RFC 7616', () => {
+    const desafio = interpretarDesafio(
+      'Digest realm="http-auth@example.org", qop="auth, auth-int", algorithm=MD5, nonce="7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v", opaque="FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS"',
+    );
+    const cabecera = construirAutorizacion(
+      desafio!,
+      { usuario: 'Mufasa', clave: 'Circle of Life' },
+      'GET',
+      '/dir/index.html',
+      1,
+      'f2/wE4q74E6zIJEtWaHKaf5wv/H5QzzpXusqGemxURZJ',
+    );
+    expect(cabecera).toContain('response="8ca523f5e9506fed4657c9700eebdbec"');
+    expect(cabecera).toContain('algorithm=MD5');
+  });
+
+  it('V3 (15-N) · un desafío SHA-256 se responde con SHA-256: vector de la RFC 7616', () => {
+    const desafio = interpretarDesafio(
+      'Digest realm="http-auth@example.org", qop="auth, auth-int", algorithm=SHA-256, nonce="7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v", opaque="FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS"',
+    );
+    const cabecera = construirAutorizacion(
+      desafio!,
+      { usuario: 'Mufasa', clave: 'Circle of Life' },
+      'GET',
+      '/dir/index.html',
+      1,
+      'f2/wE4q74E6zIJEtWaHKaf5wv/H5QzzpXusqGemxURZJ',
+    );
+    expect(cabecera).toContain(
+      'response="753927fa0e85d155564e2e272a28d1802ca10daf4496794697cf8db5856cb6c1"',
+    );
+    expect(cabecera).toContain('algorithm=SHA-256');
+  });
+
   it('interpreta el desafío con y sin comillas, y en cualquier orden', () => {
     const conComillas = interpretarDesafio(DESAFIO);
     const sinComillas = interpretarDesafio(

@@ -69,7 +69,42 @@ export const fraseDeErrorDeVideo = (codigo: string, mensaje: string): string => 
       ? causa.frase.replace('ese canal de video', `el canal ${canal}`)
       : causa.frase;
   // Lo que ya venía explicado por la API no se repite: sólo se antepone la frase corta.
-  return /pnpm sitio:video|elija otro canal|permiso de vista en vivo/.test(texto)
+  return /pnpm sitio:video|elija otro canal|elija uno de los que declara|permiso de vista en vivo|Probar conexión|rechazó la credencial por RTSP/.test(
+    texto,
+  )
     ? texto
     : `${frase[0]?.toUpperCase() ?? ''}${frase.slice(1)} (${texto.slice(0, 160)})`;
 };
+
+/**
+ * V5 (15-N) · EL TÍTULO DEL RECUADRO, SEGÚN LA CAUSA Y NO SÓLO EL CÓDIGO
+ *
+ * Un 502 era siempre «El puente de video no responde», también cuando el
+ * puente respondía y quien rechazaba era el equipo. El mensaje de la API ya
+ * dice la causa (preguntada al equipo si hacía falta): el título la nombra.
+ * Sin causa reconocida, el título por código.
+ */
+const TITULOS_POR_CAUSA: readonly { readonly patron: RegExp; readonly titulo: string }[] = [
+  {
+    patron: /no está en marcha|ECONNREFUSED|fetch failed|no escucha en GO2RTC_URL/i,
+    titulo: 'El puente de video está caído',
+  },
+  { patron: /oferta de video del navegador/i, titulo: 'El puente rechazó la oferta del navegador' },
+  {
+    patron: /no tiene el canal|no tiene ese canal|sin canal/i,
+    titulo: 'El equipo no tiene ese canal',
+  },
+  {
+    patron: /credencial por RTSP|sólo acepta Digest SHA-256/i,
+    titulo: 'El equipo rechazó la credencial de video',
+  },
+  {
+    patron: /permiso de vista en vivo \(RTSP 403\)/i,
+    titulo: 'Usuario sin permiso de vista en vivo',
+  },
+  { patron: /H\.265|códec/i, titulo: 'Códec que el navegador no reproduce' },
+  { patron: /sesión RTSP/i, titulo: 'El equipo rechazó la sesión de video' },
+];
+
+export const tituloPorCausa = (mensaje: string): string | null =>
+  TITULOS_POR_CAUSA.find((t) => t.patron.test(mensaje))?.titulo ?? null;

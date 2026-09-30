@@ -41,7 +41,8 @@ const CAUSAS: readonly Causa[] = [
       '(la lista muestra los que declara; el subflujo x02 es el que ve la consola)',
   },
   {
-    patron: /\b401\b|Unauthorized/i,
+    // V5 (15-N) · lo que go2rtc dice cuando el equipo rechaza la credencial RTSP.
+    patron: /\b401\b|Unauthorized|wrong user\/pass/i,
     frase:
       'el equipo rechazó la credencial por RTSP: el usuario de servicio necesita permiso de ' +
       'vista en vivo en el panel del equipo (Usuarios → permisos → Vista en directo)',
@@ -51,6 +52,21 @@ const CAUSAS: readonly Causa[] = [
     frase:
       'el puente no conoce el flujo o el equipo no tiene ese camino: reintente y, si ' +
       'persiste, revise el canal en la ficha y reinicie `pnpm sitio:video`',
+  },
+  {
+    // V5 (15-N) · go2rtc no dice cuál: 403, 404, 412 o 454. La API pregunta al
+    // equipo cuando puede; si no, esto.
+    patron: /wrong response on DESCRIBE/i,
+    frase:
+      'el equipo rechazó el flujo pedido (canal inexistente, usuario sin permiso de vista en ' +
+      'vivo o sesiones agotadas): pulse «Probar conexión» en la ficha para saber cuál',
+  },
+  {
+    // V5 (15-N) · la oferta del navegador rechazada por el puente (SDP ilegible).
+    patron: /sdp:|SessionDescription|invalid (?:offer|sdp)|unmarshal/i,
+    frase:
+      'el puente rechazó la oferta de video del navegador: recargue la consola; si persiste, ' +
+      'el navegador no es compatible (use Chrome, Edge o Safari actuales)',
   },
   {
     patron: /EOF|\b551\b|Option not supported|connection reset|ECONNRESET|broken pipe/i,

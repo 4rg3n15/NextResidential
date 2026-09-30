@@ -26,7 +26,12 @@ import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
 import { EscuchaDeAlertStream, transporteSegunCapacidades } from '../equipo/escucha-alertstream';
 import type { EscuchaActiva, TransporteDeEscucha } from '../nucleo/escucha';
 import type { OrigenDeVideo } from '../nucleo/video';
-import { canalDeVideoDe, origenRtspDe } from './video-rtsp';
+import { PUERTO_RTSP, caminoRtspDe, eleccionDeCanalDe, origenRtspDe } from './video-rtsp';
+import { fraseDeEleccion } from '../nucleo/canal-de-video';
+import type { CanalDeclaradoDeVideo } from '../nucleo/canal-de-video';
+import { describirRtsp } from '../equipo/rtsp-describe';
+import { diagnosticoDeVideoDesde } from '../equipo/diagnostico-de-video';
+import type { DiagnosticoDeVideo } from '../nucleo/video';
 import { EquipoDecidePorSuCuenta } from '../camara/modo-de-control';
 import { leerVeredictoDeControl } from '../camara/veredicto-de-control';
 import { leerDisparador } from '../camara/disparadores-vinculados';
@@ -354,11 +359,23 @@ export class HikvisionProvider
    */
   async origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null> {
     const equipo = await this.resolver(dispositivoId);
+    // V2 (15-N) · el canal sale de lo que el equipo DECLARA: de sus capacidades
+    // guardadas o, si faltan, descubiertas ahora (una vez por proceso).
+    const declarados = await this.canalesDeclarados(dispositivoId, equipo);
+    const eleccion = eleccionDeCanalDe(equipo, declarados);
+    if (eleccion.origen === 'propuesto' && eleccion.sustituido !== null) {
+      this.opciones.traza?.registrar('aviso', 'canal de video de la ficha sustituido', {
+        dispositivoId,
+        canal: eleccion.canal,
+        motivo: fraseDeEleccion(eleccion),
+      });
+    }
     // D2 (15-L) · si la última respuesta RTSP del equipo, en ESTE canal, fue un
     // códec que el navegador no reproduce, se dice ahora y no con un negro.
     const video = equipo.capacidades?.video;
-    const canal = canalDeVideoDe(equipo);
+    const canal = eleccion.canal;
     if (
+      canal !== null &&
       video !== undefined &&
       video.codec !== null &&
       video.codec !== 'H.264' &&
@@ -366,7 +383,45 @@ export class HikvisionProvider
     ) {
       throw new VideoNoReproducible(dispositivoId, video.codec, canal);
     }
-    return origenRtspDe(equipo, this.opciones.puertoRtsp);
+    return origenRtspDe(equipo, this.opciones.puertoRtsp, declarados);
+  }
+
+  /** V2 (15-N) · los canales declarados; un descubrimiento fallido no tumba el video. */
+  private async canalesDeclarados(
+    dispositivoId: string,
+    equipo: EquipoRegistrado,
+  ): Promise<readonly CanalDeclaradoDeVideo[] | undefined> {
+    const guardados = equipo.capacidades?.video?.canales;
+    if (guardados !== undefined && guardados.length > 0) return guardados;
+    try {
+      return (await this.capacidadesDe(dispositivoId)).video?.canales;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * V5 (15-N) · cuando el puente no pudo tomar el flujo («wrong response on
+   * DESCRIBE», «wrong user/pass»), go2rtc no dice el código: se le pregunta al
+   * equipo por RTSP —la misma sonda del diagnóstico— y se cuenta en palabras.
+   */
+  async sondearVideo(dispositivoId: string): Promise<DiagnosticoDeVideo> {
+    const equipo = await this.resolver(dispositivoId);
+    const eleccion = eleccionDeCanalDe(equipo, await this.canalesDeclarados(dispositivoId, equipo));
+    if (eleccion.canal === null) {
+      return { canal: null, causa: 'sin_canal', codec: null, frase: fraseDeEleccion(eleccion) };
+    }
+    const r = await describirRtsp({
+      host: equipo.host,
+      puerto: this.opciones.puertoRtsp ?? PUERTO_RTSP,
+      camino: caminoRtspDe(eleccion.canal),
+      usuario: equipo.usuario,
+      clave: equipo.clave,
+      ...(this.opciones.tiempoLimiteMs === undefined
+        ? {}
+        : { tiempoLimiteMs: this.opciones.tiempoLimiteMs }),
+    });
+    return diagnosticoDeVideoDesde(eleccion.canal, r);
   }
 
   /** C3 (15-L) · la señal de la escucha de este equipo, si hay escucha. */

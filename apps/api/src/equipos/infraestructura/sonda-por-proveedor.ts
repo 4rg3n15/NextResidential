@@ -97,7 +97,8 @@ export class SondaPorProveedor implements SondaDeEquipo {
         : { canal: datos.canalBarrera }),
       ...(this.puertoRtsp === undefined || !CON_VIDEO.has(datos.tipo)
         ? {}
-        : { video: { puerto: this.puertoRtsp, canal: datos.canalDeVideo ?? '102' } }),
+        : // V2 (15-N) · sin canal en la ficha, el diagnóstico elige uno DECLARADO.
+          { video: { puerto: this.puertoRtsp, canal: datos.canalDeVideo ?? null } }),
     });
 
     const ficha = fichaDe(diagnostico);
@@ -109,12 +110,16 @@ export class SondaPorProveedor implements SondaDeEquipo {
      */
     const capacidades =
       diagnostico.contacto.clase === 'alcanzado' ? diagnostico.capacidadesDelEquipo : null;
+    // V2 (15-N) · el canal propuesto entre los declarados viaja para guardarse.
+    const propuesto =
+      diagnostico.video?.origenDelCanal === 'propuesto' ? diagnostico.video.canal : undefined;
     const base = {
       modelo: diagnostico.modelo,
       firmware: diagnostico.firmware,
       latenciaMs: diagnostico.contacto.latenciaMs,
       ficha,
       ...(capacidades === null ? {} : { capacidades }),
+      ...(propuesto === undefined ? {} : { canalDeVideo: propuesto }),
     };
 
     /**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Bitacora } from '@ncr/domain-core';
 import type { OrigenDeVideo, ProveedorDeEquipos } from '@ncr/providers';
-import { NegociarVistaEnVivo, nombreDeFlujo } from './vista-en-vivo';
+import { NegociarVistaEnVivo, nombreDeFlujo, videoActivoEnRespuesta } from './vista-en-vivo';
 import type { PuenteDeVideo } from './puertos';
 import { PuenteDeVideoFallo, PuenteDeVideoNoConfigurado, SinOrigenDeVideo } from './puertos';
 
@@ -9,6 +9,8 @@ const DISPOSITIVO = 'e0000000-0000-4000-8000-000000000001';
 const RTSP = 'rtsp://usuario:clave-secreta@equipo.local:554/Streaming/Channels/102';
 
 const origen: OrigenDeVideo = { rtsp: RTSP, flujo: 'secundario', detalle: 'flujo secundario' };
+const RESPUESTA_CON_VIDEO =
+  'v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 108\r\na=rtpmap:108 H264/90000\r\na=sendonly\r\n';
 
 const banco = (resuelve: () => Promise<OrigenDeVideo | null>, conPuente = true) => {
   const asegurados: { nombre: string; fuente: string }[] = [];
@@ -20,7 +22,8 @@ const banco = (resuelve: () => Promise<OrigenDeVideo | null>, conPuente = true) 
     },
     negociar: async (nombre, oferta) => {
       negociadas.push({ nombre, oferta });
-      return 'v=0\r\nrespuesta';
+      // V5 (15-N) · una respuesta con su sección de video, como la de go2rtc.
+      return RESPUESTA_CON_VIDEO;
     },
   };
   const proveedor = { origenDeVideo: resuelve } as unknown as ProveedorDeEquipos;
@@ -73,7 +76,7 @@ describe('NegociarVistaEnVivo (A5)', () => {
     const salida = await caso.ejecutar(solicitud);
     expect(asegurados).toEqual([{ nombre: nombreDeFlujo(DISPOSITIVO), fuente: RTSP }]);
     expect(negociadas).toEqual([{ nombre: nombreDeFlujo(DISPOSITIVO), oferta: 'v=0\r\noferta' }]);
-    expect(salida.respuestaSdp).toBe('v=0\r\nrespuesta');
+    expect(salida.respuestaSdp).toBe(RESPUESTA_CON_VIDEO);
     expect(salida.flujo).toBe('secundario');
     expect(salida.latenciaMs).toBe(250);
   });
@@ -159,5 +162,95 @@ describe('E2/C1 (15-M) · un fallo del puente sale en palabras, con remedio y si
       .ejecutar(solicitud)
       .catch((e: unknown) => (e as Error).message);
     expect(raro).toContain('algo inédito');
+  });
+});
+
+describe('V5 (15-N) · por qué no hay video, en palabras', () => {
+  const conPuenteQue = (
+    negociar: PuenteDeVideo['negociar'],
+    sondearVideo?: ProveedorDeEquipos['sondearVideo'],
+  ) => {
+    const sondeos: string[] = [];
+    const proveedor = {
+      origenDeVideo: async () => origen,
+      ...(sondearVideo === undefined
+        ? {}
+        : {
+            sondearVideo: async (id: string) => {
+              sondeos.push(id);
+              return sondearVideo(id);
+            },
+          }),
+    } as unknown as ProveedorDeEquipos;
+    const puente: PuenteDeVideo = { asegurarFlujo: async () => undefined, negociar };
+    const bitacora = { registrar: () => undefined } as unknown as Bitacora;
+    const caso = new NegociarVistaEnVivo(proveedor, puente, bitacora, { ahora: () => new Date(0) });
+    return { caso, sondeos };
+  };
+  const falla = (motivo: string) => async () => {
+    throw new PuenteDeVideoFallo(motivo);
+  };
+
+  it('«wrong response on DESCRIBE»: se le pregunta al equipo y manda su respuesta', async () => {
+    const { caso, sondeos } = conPuenteQue(
+      falla('negociación WebRTC con el puente: HTTP 500 · streams: wrong response on DESCRIBE'),
+      async () => ({
+        canal: '102',
+        causa: 'sin_canal',
+        codec: null,
+        frase: 'el equipo no tiene el canal 102 (RTSP 412): elija uno de los que declara',
+      }),
+    );
+    const error = await caso.ejecutar(solicitud).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PuenteDeVideoFallo);
+    expect((error as Error).message).toMatch(/no tiene el canal 102 \(RTSP 412\)/);
+    expect(sondeos).toEqual([DISPOSITIVO]);
+  });
+
+  it('sin sonda en el proveedor: la frase del puente, no el texto técnico a secas', async () => {
+    const { caso } = conPuenteQue(falla('HTTP 500 · streams: wrong response on DESCRIBE'));
+    const error = await caso.ejecutar(solicitud).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/Probar conexión/);
+  });
+
+  it('«wrong user/pass»: credencial RTSP en palabras', async () => {
+    const { caso } = conPuenteQue(falla('HTTP 500 · streams: wrong user/pass'));
+    const error = await caso.ejecutar(solicitud).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/rechazó la credencial por RTSP/);
+  });
+
+  it('el puente no alcanzable NO dispara la sonda: es el puente, no el equipo', async () => {
+    const { caso, sondeos } = conPuenteQue(falla('fetch failed · ECONNREFUSED'), async () => ({
+      canal: '101',
+      causa: 'ninguna',
+      codec: 'H.264',
+      frase: '',
+    }));
+    const error = await caso.ejecutar(solicitud).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/go2rtc no está en marcha/);
+    expect(sondeos).toEqual([]);
+  });
+
+  it('respuesta con el video «inactive» (equipo en H.265): códec no soportado, no un negro', async () => {
+    const { caso } = conPuenteQue(
+      async () => 'v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 108\r\na=inactive\r\n',
+      async () => ({
+        canal: '101',
+        causa: 'codec',
+        codec: 'H.265',
+        frase: 'el equipo entrega H.265 en el canal 101 y el navegador sólo reproduce H.264',
+      }),
+    );
+    const error = await caso.ejecutar(solicitud).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/H\.265 en el canal 101/);
+  });
+
+  it('videoActivoEnRespuesta: sin sección de video, puerto 0 o inactive → no', () => {
+    expect(videoActivoEnRespuesta(RESPUESTA_CON_VIDEO)).toBe(true);
+    expect(videoActivoEnRespuesta('v=0\r\nm=audio 9 X 0\r\n')).toBe(false);
+    expect(videoActivoEnRespuesta('v=0\r\nm=video 0 X 96\r\n')).toBe(false);
+    expect(videoActivoEnRespuesta('v=0\r\nm=video 9 X 96\r\na=inactive\r\nm=audio 9 X 0\r\n')).toBe(
+      false,
+    );
   });
 });

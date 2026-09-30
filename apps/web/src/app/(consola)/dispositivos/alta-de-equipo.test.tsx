@@ -193,3 +193,37 @@ describe('C2 (15-L) · el videoportero edita su puerta, su canal de video y su z
     );
   });
 });
+
+/**
+ * V2 (15-N) · «Probar conexión» propone el canal que el equipo DECLARA y el
+ * alta lo guarda. La cámara del 29/09 quedó registrada con el 102, que no tiene.
+ */
+describe('V2 · el canal de video propuesto es uno de los que el equipo declara', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (entrada: Request) => {
+        if (entrada.url.includes('/prueba-de-conexion')) {
+          return respuesta({
+            ...sondeo('alcanzado'),
+            capacidades: {
+              origen: 'descubierta',
+              video: {
+                estado: 'si',
+                codec: 'H.264',
+                canal: '101',
+                canales: [{ id: '101', codec: 'H.264' }],
+              },
+            },
+          });
+        }
+        if (entrada.url.endsWith('/zonas')) return respuesta([]);
+        return respuesta({ id: '20000000-0000-4000-8000-000000000002' });
+      }),
+    );
+  });
+
+  it('tras probar, el alta envía el 101 que la cámara declara', async () => {
+    expect((await probarYGuardar())['canalDeVideo']).toBe('101');
+  });
+});

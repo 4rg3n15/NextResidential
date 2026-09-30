@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fraseDeErrorDeVideo } from './causas-de-video';
+import { fraseDeErrorDeVideo, tituloPorCausa } from './causas-de-video';
 
 /**
  * E2/C1 (15-M) · lo que ve la guardia cuando no hay video: palabras y remedio.
@@ -46,5 +46,36 @@ describe('fraseDeErrorDeVideo', () => {
       'go2rtc no está en marcha o no escucha en GO2RTC_URL: arránquelo con `pnpm sitio:video` (fetch failed)';
     expect(fraseDeErrorDeVideo('puente', explicado)).toBe(explicado);
     expect(fraseDeErrorDeVideo('red', 'algo inédito')).toBe('algo inédito');
+  });
+});
+
+describe('V5 (15-N) · el título nombra la causa, no sólo el código', () => {
+  it.each([
+    [
+      'go2rtc no está en marcha o no escucha en GO2RTC_URL (fetch failed)',
+      /puente de video está caído/,
+    ],
+    ['el puente rechazó la oferta de video del navegador: recargue', /rechazó la oferta/],
+    [
+      'el equipo no tiene el canal 102 (RTSP 412): elija uno de los que declara',
+      /no tiene ese canal/,
+    ],
+    [
+      'el equipo rechazó la credencial por RTSP (la misma que acepta por HTTP)',
+      /credencial de video/,
+    ],
+    ['el equipo entrega H.265 en el canal 101 y el navegador sólo reproduce H.264', /Códec/],
+    ['el equipo rechazó la sesión RTSP (RTSP 454 Session Not Found)', /sesión de video/],
+  ])('%s', (mensaje, titulo) => {
+    expect(tituloPorCausa(mensaje)).toMatch(titulo);
+  });
+
+  it('sin causa reconocida, ninguno: manda el título por código', () => {
+    expect(tituloPorCausa('algo inédito')).toBeNull();
+  });
+
+  it('lo que la API ya explicó con remedio no se duplica', () => {
+    const t = 'el equipo no tiene el canal 102 (RTSP 412): elija uno de los que declara';
+    expect(fraseDeErrorDeVideo('puente', t)).toBe(t);
   });
 });

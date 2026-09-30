@@ -20,9 +20,9 @@ import { reportaEstadoDeBarrera } from '../barrera/barrera-de-entrada';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import { descubrirCapacidades } from '../hikvision/capacidades-hikvision';
 import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
-import { describirRtsp } from '../equipo/rtsp-describe';
 import type { ResultadoRtsp } from '../equipo/rtsp-describe';
-import { caminoRtspDe } from '../hikvision/video-rtsp';
+import { sondearVideoDelEquipo } from './video-del-diagnostico';
+import type { OrigenDelCanal } from '../nucleo/canal-de-video';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -134,13 +134,20 @@ export interface OpcionesDeDiagnostico extends OpcionesDeEquipo {
    * D2 · C3 (15-L) · con él, se le pregunta al equipo por RTSP qué video
    * entrega en ese canal y puerto (los de su ficha y del `.env`).
    */
-  readonly video?: { readonly puerto: number; readonly canal: string };
+  readonly video?: { readonly puerto: number; readonly canal: string | null };
 }
 
 /** D2 · C3 (15-L) · lo que el equipo contestó por RTSP, con lo que se preguntó. */
 export interface VideoDelEquipo extends ResultadoRtsp {
   readonly canal: string;
   readonly puerto: number;
+  /**
+   * V2 (15-N) · de dónde salió el canal: la ficha, o propuesto entre los que
+   * el equipo declara (y cuál de la ficha sustituyó). Con `propuesto`, el
+   * canal se GUARDA en la ficha: es el que el equipo tiene.
+   */
+  readonly origenDelCanal?: OrigenDelCanal;
+  readonly sustituido?: string | null;
 }
 
 const estadoDelVideo = (r: ResultadoRtsp): EstadoDeCapacidad =>
@@ -274,17 +281,7 @@ export const diagnosticarEquipo = async (
   const video: VideoDelEquipo | undefined =
     opciones.video === undefined || opciones.familia === 'comun'
       ? undefined
-      : {
-          ...(await describirRtsp({
-            host: opciones.host,
-            puerto: opciones.video.puerto,
-            camino: caminoRtspDe(opciones.video.canal),
-            usuario: opciones.usuario,
-            clave: opciones.clave,
-          })),
-          canal: opciones.video.canal,
-          puerto: opciones.video.puerto,
-        };
+      : await sondearVideoDelEquipo(opciones, opciones.video, capacidadesDelEquipo);
   if (video !== undefined && capacidadesDelEquipo !== null) {
     capacidadesDelEquipo = {
       ...capacidadesDelEquipo,

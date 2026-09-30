@@ -23,6 +23,10 @@ export const REINO_RTSP = 'IP Camera(simulada)';
 export const REQUIRE_BACKCHANNEL = 'www.onvif.org/ver20/backchannel';
 
 export const md5 = (t: string): string => createHash('md5').update(t, 'utf8').digest('hex');
+const sha256 = (t: string): string => createHash('sha256').update(t, 'utf8').digest('hex');
+
+/** V3 (15-N) · los desafíos que el equipo simulado ofrece, en su orden. */
+export type DesafioSimulado = 'md5' | 'sha256' | 'basic';
 
 /** La cabecera de una petición RTSP (hasta la línea en blanco), ya separada. */
 export const leerPeticion = (cabecera: string): PeticionRtsp | null => {
@@ -53,10 +57,17 @@ export const respuestaRtsp = (
     cuerpo,
   ].join('\r\n');
 
-export const desafioDigest = (nonce: string): readonly string[] => [
-  `WWW-Authenticate: Digest realm="${REINO_RTSP}", nonce="${nonce}", stale="FALSE"`,
-  `WWW-Authenticate: Basic realm="${REINO_RTSP}"`,
-];
+export const desafioDigest = (
+  nonce: string,
+  ofrecidos: readonly DesafioSimulado[] = ['md5', 'basic'],
+): readonly string[] =>
+  ofrecidos.map((o) =>
+    o === 'basic'
+      ? `WWW-Authenticate: Basic realm="${REINO_RTSP}"`
+      : o === 'sha256'
+        ? `WWW-Authenticate: Digest realm="${REINO_RTSP}", nonce="${nonce}", algorithm=SHA-256, stale="FALSE"`
+        : `WWW-Authenticate: Digest realm="${REINO_RTSP}", nonce="${nonce}", stale="FALSE"`,
+  );
 
 /** ¿La cabecera `Authorization` lleva el Digest correcto para ESTE método? */
 export const digestValido = (
@@ -65,11 +76,17 @@ export const digestValido = (
   nonce: string,
   usuario: string,
   clave: string,
+  ofrecidos: readonly DesafioSimulado[] = ['md5', 'basic'],
 ): boolean => {
   const campo = (n: string): string =>
     new RegExp(`${n}="?([^",]+)"?`, 'i').exec(autorizacion)?.[1] ?? '';
-  const ha1 = md5(`${usuario}:${REINO_RTSP}:${clave}`);
-  const esperado = md5(`${ha1}:${nonce}:${md5(`${metodo}:${campo('uri')}`)}`);
+  // V3 (15-N) · el resumen del algoritmo que declara la respuesta (sin él, MD5),
+  // y SÓLO si el equipo lo ofreció: uno en «SHA256» no acepta un MD5.
+  const pideSha = /^SHA-?256$/i.test(campo('algorithm'));
+  if (!ofrecidos.includes(pideSha ? 'sha256' : 'md5')) return false;
+  const h = pideSha ? sha256 : md5;
+  const ha1 = h(`${usuario}:${REINO_RTSP}:${clave}`);
+  const esperado = h(`${ha1}:${nonce}:${h(`${metodo}:${campo('uri')}`)}`);
   return campo('username') === usuario && campo('response') === esperado;
 };
 

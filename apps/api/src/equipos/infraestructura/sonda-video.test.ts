@@ -42,9 +42,48 @@ describe('SondaPorProveedor · video', () => {
     );
   });
 
-  it('sin canal en la ficha pregunta el 102', async () => {
-    const r = await sonda(rtsp.puerto).probar(datos(null));
+  /**
+   * V2 (15-N) · esta prueba fijaba «sin canal en la ficha pregunta el 102», que
+   * es lo que dejó la cámara del 29/09 sin video (no tiene el 102). Ahora se
+   * pregunta uno de los que el equipo DECLARA y el veredicto lo trae para
+   * guardarlo en la ficha.
+   */
+  const sondaQueDeclara = (canales: readonly { id: string; codec: string }[]) =>
+    new SondaPorProveedor(
+      equipoSimulado({ familia: 'videoportero', ...CREDENCIAL, canalesDeVideo: canales }),
+      undefined,
+      rtsp.puerto,
+    );
+
+  it('V2 · sin canal en la ficha: el subflujo que el equipo declara, y se propone guardarlo', async () => {
+    const r = await sondaQueDeclara([
+      { id: '101', codec: 'H.265' },
+      { id: '102', codec: 'H.264' },
+    ]).probar(datos(null));
     expect(r.capacidades?.video.codec).toBe('H.264');
+    expect(r.canalDeVideo).toBe('102');
+  });
+
+  it('V2 · la ficha con un canal que el equipo NO declara: se prueba y se guarda el suyo', async () => {
+    const r = await sondaQueDeclara([{ id: '101', codec: 'H.265' }]).probar(datos('102'));
+    expect(r.canalDeVideo).toBe('101');
+    expect(r.capacidades?.video.canal).toBe('101');
+  });
+
+  it('V2 · la ficha manda si el equipo declara su canal: no se propone nada', async () => {
+    const r = await sondaQueDeclara([
+      { id: '101', codec: 'H.265' },
+      { id: '102', codec: 'H.264' },
+    ]).probar(datos('101'));
+    expect(r.canalDeVideo).toBeUndefined();
+  });
+
+  it('V2 · sin canal en la ficha y sin lista del equipo: no se pregunta a ciegas', async () => {
+    const r = await sonda(rtsp.puerto).probar(datos(null));
+    expect(r.canalDeVideo).toBeUndefined();
+    expect(r.ficha?.hallazgos.find((h) => h.campo.startsWith('video en vivo'))?.detalle).toMatch(
+      /sin canal/i,
+    );
   });
 
   it('sin puerto RTSP configurado, no se pregunta el video', async () => {

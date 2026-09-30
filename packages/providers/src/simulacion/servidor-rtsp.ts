@@ -11,7 +11,7 @@ import {
   sdpDe,
   transporteDeRespuesta,
 } from './rtsp-mensajes';
-import type { PeticionRtsp } from './rtsp-mensajes';
+import type { DesafioSimulado, PeticionRtsp } from './rtsp-mensajes';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -46,6 +46,12 @@ export interface GuionRtsp {
   readonly cerrarSiPideBackchannel?: boolean;
   /** E2 · tras ese corte, cierra también toda conexión nueva durante estos ms. */
   readonly rechazaReconexionMs?: number;
+  /** V3 (15-N) · los desafíos del 401, en orden. Por omisión Digest (MD5) y Basic. */
+  readonly desafios?: readonly DesafioSimulado[];
+  /** V3 (15-N) · qué contesta a un canal que no tiene (por omisión `404 Not Found`). */
+  readonly estadoSinCanal?: string;
+  /** V3 (15-N) · respuesta fija por canal, ya autenticado (p. ej. `403 Forbidden`). */
+  readonly estadosPorCanal?: Readonly<Record<string, string>>;
 }
 
 export interface ServidorRtspSimulado {
@@ -75,7 +81,7 @@ export const servidorRtspSimulado = async (guion: GuionRtsp): Promise<ServidorRt
     const autorizacion = p.cabeceras.get('authorization');
     const autenticado =
       autorizacion !== undefined &&
-      digestValido(autorizacion, p.metodo, nonce, guion.usuario, guion.clave);
+      digestValido(autorizacion, p.metodo, nonce, guion.usuario, guion.clave, guion.desafios);
 
     if (p.metodo === 'OPTIONS') {
       responder('200 OK', ['Public: OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN, GET_PARAMETER']);
@@ -92,13 +98,18 @@ export const servidorRtspSimulado = async (guion: GuionRtsp): Promise<ServidorRt
         }
       }
       if (!autenticado) {
-        responder('401 Unauthorized', desafioDigest(nonce));
+        responder('401 Unauthorized', desafioDigest(nonce, guion.desafios));
         return;
       }
       const canal = canalDeLaUri(p.uri) ?? '';
+      const fijo = guion.estadosPorCanal?.[canal];
+      if (fijo !== undefined) {
+        responder(fijo);
+        return;
+      }
       const codec = guion.canales[canal];
       if (codec === undefined) {
-        responder('404 Not Found');
+        responder(guion.estadoSinCanal ?? '404 Not Found');
         return;
       }
       responder(

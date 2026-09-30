@@ -405,7 +405,7 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
             alta.modoDeTerminal ?? null,
             alta.canalDeAudioHabilitado ?? false,
             veredicto.capacidades === undefined ? null : JSON.stringify(veredicto.capacidades),
-            alta.canalDeVideo ?? null,
+            veredicto.canalDeVideo ?? alta.canalDeVideo ?? null,
             alta.zonaId ?? null,
           ],
         );
@@ -450,7 +450,8 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
                   motivo_no_verificado = $7, actualizado_por = $8,
                   capacidades = COALESCE($9::jsonb, capacidades),
                   capacidades_descubiertas_en = CASE WHEN $9::jsonb IS NULL
-                    THEN capacidades_descubiertas_en ELSE now() END
+                    THEN capacidades_descubiertas_en ELSE now() END,
+                  canal_de_video = COALESCE($10, canal_de_video)
             WHERE id = $2 AND copropiedad_id = $1
         RETURNING ${CAMPOS}`,
           [
@@ -463,6 +464,8 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
             veredicto.verificado ? null : veredicto.detalle,
             actorId,
             veredicto.capacidades === undefined ? null : JSON.stringify(veredicto.capacidades),
+            // V2 (15-N) · el canal que el equipo declara, si la ficha no tenía uno suyo.
+            veredicto.canalDeVideo ?? null,
           ],
         );
         const fila = rows[0];
@@ -538,7 +541,7 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
             alta.modoDeTerminal ?? null,
             alta.canalDeAudioHabilitado ?? false,
             veredicto.capacidades === undefined ? null : JSON.stringify(veredicto.capacidades),
-            alta.canalDeVideo ?? null,
+            veredicto.canalDeVideo ?? alta.canalDeVideo ?? null,
             alta.zonaId ?? null,
           ],
         );

@@ -34,6 +34,10 @@ import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
  */
 const binario = binarioGo2rtc();
 const EQUIPO = '70000000-0000-4000-8000-000000000001'; // «Portería de A», un intercom
+// V5 · tres equipos más de A en el banco, cada uno con un fallo de video distinto.
+const EN_H265 = '90000000-0000-4000-8000-000000000001';
+const SIN_ESE_CANAL = '90000000-0000-4000-8000-0000000000ff';
+const CLAVE_MALA = '00000000-0000-4000-8000-0000000000ff';
 const CLAVE = 'clave-rtsp-que-no-debe-salir';
 
 describe.skipIf(binario === null)(
@@ -49,19 +53,25 @@ describe.skipIf(binario === null)(
       equipoRtsp = await servidorRtspSimulado({
         usuario: 'servicio',
         clave: CLAVE,
-        canales: { '101': 'H264' },
+        canales: { '101': 'H264', '201': 'H265' },
+        // La cámara del 29/09: a un canal que no tiene contesta 412.
+        estadoSinCanal: '412 Precondition Failed',
+      });
+      const equipo = (dispositivoId: string, canalDeVideo: string, clave = CLAVE) => ({
+        dispositivoId,
+        tipo: 'intercom' as const,
+        host: '127.0.0.1',
+        puerto: 80,
+        protocolo: 'http' as const,
+        usuario: 'servicio',
+        clave,
+        canalDeVideo,
       });
       const registro = new RegistroEnMemoria([
-        {
-          dispositivoId: EQUIPO,
-          tipo: 'intercom',
-          host: '127.0.0.1',
-          puerto: 80,
-          protocolo: 'http',
-          usuario: 'servicio',
-          clave: CLAVE,
-          canalDeVideo: '101',
-        },
+        equipo(EQUIPO, '101'),
+        equipo(EN_H265, '201'),
+        equipo(SIN_ESE_CANAL, '102'),
+        equipo(CLAVE_MALA, '101', 'otra-clave-que-tampoco-debe-salir'),
       ]);
       const firmante = await crearFirmante();
       app = await crearApp(
@@ -94,9 +104,9 @@ describe.skipIf(binario === null)(
       await equipoRtsp?.cerrar();
     });
 
-    const whep = (oferta: string) =>
+    const whep = (oferta: string, dispositivo = EQUIPO) =>
       request(app.getHttpServer())
-        .post(`/copropiedades/${COP_A}/guardia/video/${EQUIPO}/whep`)
+        .post(`/copropiedades/${COP_A}/guardia/video/${dispositivo}/whep`)
         .set('Authorization', `Bearer ${token}`)
         .set('content-type', 'application/sdp')
         .send(oferta);
@@ -117,6 +127,33 @@ describe.skipIf(binario === null)(
       const res = await whep(OFERTA_SDP_DE_NAVEGADOR.trimEnd());
       expect(res.status, JSON.stringify(res.body ?? res.text)).toBe(201);
       expect(res.text.startsWith('v=0')).toBe(true);
+    }, 30_000);
+
+    /**
+     * V5 (15-N) · go2rtc contesta lo mismo («wrong response on DESCRIBE») a un
+     * canal que no existe, a un usuario sin permiso y a sesiones agotadas; y
+     * con H.265 contesta 201 con el video inactivo. La API pregunta al equipo
+     * y lo dice en palabras, con el canal y el código.
+     */
+    it('V5 · canal que el equipo no tiene (412): 502 con el canal y el código, no «EOF»', async () => {
+      const res = await whep(OFERTA_SDP_DE_NAVEGADOR, SIN_ESE_CANAL);
+      expect(res.status).toBe(502);
+      expect(JSON.stringify(res.body)).toMatch(/no tiene el canal 102 \(RTSP 412\)/);
+    }, 30_000);
+
+    it('V5 · equipo en H.265: 502 «códec», en vez de un reproductor negro', async () => {
+      const res = await whep(OFERTA_SDP_DE_NAVEGADOR, EN_H265);
+      expect(res.status).toBe(502);
+      expect(JSON.stringify(res.body)).toMatch(/H\.265 en el canal 201/);
+    }, 30_000);
+
+    it('V5 · credencial RTSP rechazada: en palabras y sin la clave', async () => {
+      const res = await whep(OFERTA_SDP_DE_NAVEGADOR, CLAVE_MALA);
+      expect(res.status).toBe(502);
+      const cuerpo = JSON.stringify(res.body);
+      expect(cuerpo).toMatch(/rechazó la credencial por RTSP/);
+      expect(cuerpo).not.toContain('otra-clave-que-tampoco-debe-salir');
+      expect(cuerpo).not.toContain(CLAVE);
     }, 30_000);
   },
 );

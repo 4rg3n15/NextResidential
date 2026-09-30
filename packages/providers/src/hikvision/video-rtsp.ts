@@ -1,4 +1,7 @@
 import type { OrigenDeVideo } from '../nucleo/video';
+import { elegirCanalDeVideo } from '../nucleo/canal-de-video';
+import type { CanalDeclaradoDeVideo, EleccionDeCanal } from '../nucleo/canal-de-video';
+import { SinCanalDeVideo } from '../nucleo/errores';
 import type { EquipoRegistrado } from './registro-de-equipos';
 
 /**
@@ -36,8 +39,6 @@ export const PUERTO_RTSP = 554;
  * Reproducido con el binario real en `simulacion/servidor-rtsp.go2rtc.test.ts`.
  */
 export const OPCION_SIN_BACKCHANNEL = '#backchannel=0';
-/** D2 (15-L) · el subflujo del canal 1: lo que el navegador reproduce con menos retardo. */
-export const CANAL_DE_VIDEO_POR_OMISION = '102';
 
 const CON_VIDEO: ReadonlySet<EquipoRegistrado['tipo']> = new Set([
   'camara_lpr',
@@ -49,9 +50,14 @@ const CON_VIDEO: ReadonlySet<EquipoRegistrado['tipo']> = new Set([
 const credencial = (usuario: string, clave: string): string =>
   `${encodeURIComponent(usuario)}:${encodeURIComponent(clave)}`;
 
-/** El canal declarado, o 102. Termina en 01 → flujo principal; si no, secundario. */
-export const canalDeVideoDe = (equipo: Pick<EquipoRegistrado, 'canalDeVideo'>): string =>
-  equipo.canalDeVideo ?? CANAL_DE_VIDEO_POR_OMISION;
+/**
+ * V2 (15-N) · el canal de la ficha si el equipo lo declara; si no, uno de los
+ * que declara (`nucleo/canal-de-video.ts`). Nunca el 102 a ciegas.
+ */
+export const eleccionDeCanalDe = (
+  equipo: Pick<EquipoRegistrado, 'canalDeVideo'>,
+  declarados: readonly CanalDeclaradoDeVideo[] | undefined,
+): EleccionDeCanal => elegirCanalDeVideo(equipo.canalDeVideo, declarados);
 
 /** La ruta RTSP del flujo, sin credencial: la usa también la sonda de códec. */
 export const caminoRtspDe = (canal: string): string => `/Streaming/Channels/${canal}`;
@@ -81,9 +87,11 @@ export const urlRtspDe = (c: ConexionRtsp): string =>
 export const origenRtspDe = (
   equipo: EquipoRegistrado,
   puerto: number = PUERTO_RTSP,
+  declarados: readonly CanalDeclaradoDeVideo[] | undefined = equipo.capacidades?.video?.canales,
 ): OrigenDeVideo | null => {
   if (!CON_VIDEO.has(equipo.tipo)) return null;
-  const canal = canalDeVideoDe(equipo);
+  const { canal } = eleccionDeCanalDe(equipo, declarados);
+  if (canal === null) throw new SinCanalDeVideo(equipo.dispositivoId);
   const flujo = canal.endsWith('01') ? 'principal' : 'secundario';
   return {
     rtsp: urlRtspDe({

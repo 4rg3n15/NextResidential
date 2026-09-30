@@ -79,6 +79,20 @@ export class VideoNoReproducible extends ErrorDeEquipo {
   }
 }
 
+/**
+ * V2 (15-N) · no hay canal de video que pedir: la ficha no tiene uno y el
+ * equipo no lista los suyos. Antes se pedía el 102 a ciegas.
+ */
+export class SinCanalDeVideo extends ErrorDeEquipo {
+  constructor(dispositivoId: string) {
+    super(
+      dispositivoId,
+      'Este equipo no lista sus canales de video y su ficha no tiene uno: pulse «Probar ' +
+        'conexión» en su ficha o escriba el canal (canal × 100 + flujo)',
+    );
+  }
+}
+
 /** Ocupado ahora. Reintentable con espera. Es FALLO_TECNICO, no denegación. */
 export class EquipoOcupado extends ErrorDeEquipo {
   readonly reintentable = true;

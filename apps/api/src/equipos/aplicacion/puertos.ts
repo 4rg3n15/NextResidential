@@ -316,6 +316,12 @@ export interface ResultadoDeSondeo {
   readonly verificado: boolean;
   /** `true` sólo en `SIN_PROBAR`: no hubo sondeo y no se anota como tal (0044). */
   readonly sinSondear?: true;
+  /**
+   * V2 (15-N) · el canal de video que el sondeo PROPONE —uno de los que el
+   * equipo declara— porque la ficha no tenía canal o tenía uno que el equipo
+   * no tiene. El repositorio lo guarda en la ficha. Ausente si la ficha manda.
+   */
+  readonly canalDeVideo?: string;
 }
 
 export interface DatosDeSondeo {

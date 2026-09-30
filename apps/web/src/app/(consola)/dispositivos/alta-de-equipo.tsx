@@ -221,14 +221,24 @@ export const AltaDeEquipo = ({
     setEnviando(true);
     setError(undefined);
     try {
-      setSondeo(
-        desenvolver(
-          await cliente.POST('/copropiedades/{id}/equipos/prueba-de-conexion', {
-            params: { path: { id: copropiedadId } },
-            body: cuerpo() as never,
-          }),
-        ),
+      const resultado = desenvolver(
+        await cliente.POST('/copropiedades/{id}/equipos/prueba-de-conexion', {
+          params: { path: { id: copropiedadId } },
+          body: cuerpo() as never,
+        }),
       );
+      setSondeo(resultado);
+      // V2 (15-N) · el canal que el equipo DECLARA, si el del formulario no lo es:
+      // la cámara del 29/09 quedó con el 102, que no tiene. Se guarda al guardar.
+      const declarados = resultado.capacidades?.video.canales;
+      if (
+        CON_VIDEO.has(tipo) &&
+        declarados !== undefined &&
+        declarados.length > 0 &&
+        !declarados.some((c) => c.id === canalDeVideo.trim())
+      ) {
+        setCanalDeVideo(canalPorOmision(declarados));
+      }
     } catch (e) {
       setSondeo(null);
       setError(e instanceof ErrorDeApi ? e.message : 'No se pudo probar la conexión');

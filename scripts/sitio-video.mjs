@@ -36,6 +36,11 @@
  *   opciones: --env <ruta> (apps/api/.env) · --dir <carpeta> (.sitio)
  *             --api-en-red  (deja la API de go2rtc fuera del bucle local)
  *
+ * V5 (15-N) · el operador en OTRO equipo de la LAN recibe el medio en la IP
+ * anunciada y el puerto WebRTC (TCP y UDP): se comprueba que esa IP es de
+ * este Mac y, ya arrancado, que el puerto contesta en ella
+ * (`lib/candidato-webrtc.mjs`). La guía dice qué abrir en el cortafuegos.
+ *
  * La API de go2rtc da de alta flujos y, con ellos, órdenes que ejecuta el Mac:
  * abierta a la red, cualquiera en el conjunto la usaría. Por eso, si
  * `GO2RTC_URL` no es del bucle local, NO arranca salvo con `--api-en-red`.
@@ -51,6 +56,8 @@ import { arch, platform } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ipDelMac } from './lib/red-del-mac.mjs';
+import { candidatoDeEsteEquipo, comprobarPuertoWebrtc } from './lib/candidato-webrtc.mjs';
+import { networkInterfaces } from 'node:os';
 
 const RAIZ = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);
@@ -109,6 +116,9 @@ const puertoWebrtc = env.get('VIDEO_PUERTO_WEBRTC') || '8555';
 if (!/^\d{1,5}$/.test(puertoWebrtc) || Number(puertoWebrtc) > 65535) {
   salir(`VIDEO_PUERTO_WEBRTC no es un puerto: «${puertoWebrtc}»`);
 }
+
+const candidato = candidatoDeEsteEquipo(ip, networkInterfaces());
+if (!candidato.propio) console.warn(`⚠ ${candidato.frase}`);
 
 const yaml = [
   '# Generado por `pnpm sitio:video` desde apps/api/.env. NO se versiona.',
@@ -197,6 +207,12 @@ if (preparar) {
 console.log(`▶ ${binario} -config ${rutaYaml}   (Ctrl+C para parar)`);
 console.log(`  Compruebe desde la API: curl http://${escucha}/api`);
 const proceso = spawn(binario, ['-config', rutaYaml], { stdio: 'inherit' });
+// V5 (15-N) · ya arrancado, ¿el medio contesta en la IP anunciada?
+setTimeout(() => {
+  void comprobarPuertoWebrtc(ip, Number(puertoWebrtc)).then((r) =>
+    console.log(`${r.ok ? '✓' : '⚠'} ${r.frase}`),
+  );
+}, 1500);
 for (const senal of ['SIGINT', 'SIGTERM']) process.on(senal, () => proceso.kill(senal));
 proceso.on('exit', (codigo) => {
   limpiar('al cerrar');

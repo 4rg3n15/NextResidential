@@ -46,16 +46,25 @@ export interface VistaEnVivoNegociada {
 
 export const nombreDeFlujo = (dispositivoId: string): string => `ncr-${dispositivoId}`;
 
-/** Un fallo del puente se relanza con su causa en palabras (E2/C1). */
-const explicado = async <T>(paso: () => Promise<T>): Promise<T> => {
-  try {
-    return await paso();
-  } catch (error) {
-    if (error instanceof PuenteDeVideoFallo) {
-      throw new PuenteDeVideoFallo(explicarFalloDelPuente(error.motivo));
-    }
-    throw error;
-  }
+/**
+ * V5 (15-N) · go2rtc contesta «wrong response on DESCRIBE» para 403, 404, 412
+ * y 454 por igual, y «wrong user/pass» también cuando el equipo sólo acepta
+ * SHA-256 (medido con el binario oficial). Con estos dos, el código lo sabe
+ * el EQUIPO: se le pregunta por RTSP antes de contestar al operador.
+ */
+const PIDE_PREGUNTAR_AL_EQUIPO = /wrong response on DESCRIBE|wrong user\/pass/i;
+
+/**
+ * V5 (15-N) · ¿la respuesta del puente trae video que el navegador vaya a
+ * recibir? Con un equipo en H.265 y una oferta sin H.265, go2rtc contesta 201
+ * con la sección de video `inactive`: la consola quedaba en negro.
+ */
+export const videoActivoEnRespuesta = (sdp: string): boolean => {
+  const secciones = sdp.split(/\r?\n(?=m=)/);
+  const video = secciones.find((s) => s.startsWith('m=video'));
+  if (video === undefined) return false;
+  if (/^m=video 0 /.test(video)) return false;
+  return !/^a=inactive\s*$/m.test(video);
 };
 
 export class NegociarVistaEnVivo {
@@ -65,6 +74,26 @@ export class NegociarVistaEnVivo {
     private readonly bitacora: Bitacora,
     private readonly reloj: Reloj,
   ) {}
+
+  /**
+   * El fallo en palabras (E2/C1) y, cuando el puente no dice el código, con lo
+   * que contesta el equipo (V5). La sonda no puede empeorar la respuesta: si
+   * falla, queda la explicación del puente.
+   */
+  private async explicar(
+    dispositivoId: string,
+    motivo: string,
+    sinVideo = false,
+  ): Promise<PuenteDeVideoFallo> {
+    const preguntar = sinVideo || PIDE_PREGUNTAR_AL_EQUIPO.test(motivo);
+    if (preguntar && this.proveedor.sondearVideo !== undefined) {
+      const diagnostico = await this.proveedor.sondearVideo(dispositivoId).catch(() => null);
+      if (diagnostico !== null && diagnostico.causa !== 'ninguna') {
+        return new PuenteDeVideoFallo(`${diagnostico.frase} (${motivo})`);
+      }
+    }
+    return new PuenteDeVideoFallo(explicarFalloDelPuente(motivo));
+  }
 
   async ejecutar(solicitud: SolicitudDeVistaEnVivo): Promise<VistaEnVivoNegociada> {
     if (this.puente === null) throw new PuenteDeVideoNoConfigurado();
@@ -86,10 +115,21 @@ export class NegociarVistaEnVivo {
     const nombre = nombreDeFlujo(dispositivoId);
     const inicio = this.reloj.ahora().getTime();
     const puente = this.puente;
-    const respuestaSdp = await explicado(async () => {
+    let respuestaSdp: string;
+    try {
       await puente.asegurarFlujo(nombre, origen.rtsp);
-      return puente.negociar(nombre, solicitud.ofertaSdp);
-    });
+      respuestaSdp = await puente.negociar(nombre, solicitud.ofertaSdp);
+    } catch (error) {
+      if (!(error instanceof PuenteDeVideoFallo)) throw error;
+      throw await this.explicar(dispositivoId, error.motivo);
+    }
+    if (!videoActivoEnRespuesta(respuestaSdp)) {
+      throw await this.explicar(
+        dispositivoId,
+        'el puente negoció sin video: el equipo entrega un códec que el navegador no reproduce',
+        true,
+      );
+    }
     const latenciaMs = this.reloj.ahora().getTime() - inicio;
     this.bitacora.registrar('info', 'vista en vivo negociada con el puente', {
       dispositivoId,
