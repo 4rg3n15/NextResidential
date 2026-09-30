@@ -492,18 +492,23 @@ export const PantallaDeGuardiaVirtual = ({
                       Emergencia escalada con severidad crítica.
                     </p>
                   ) : null}
-                  {ultimaOrden !== null ? (
-                    <p role="status" className="text-secundario text-texto-apagado">
-                      Última orden: {resultadoDeOrden(ultimaOrden).texto}
-                    </p>
-                  ) : null}
-                  {error !== undefined && pidiendo === null ? (
-                    <p role="alert" className="text-secundario text-peligro-texto">
-                      {error}
-                    </p>
-                  ) : null}
                 </div>
               )}
+              {/*
+                15-N · FUERA del elemento atendido: la orden lo saca de la cola
+                (P-22) y la tarjeta se vacía; lo que contestó el equipo —también
+                un rechazo (O1)— tiene que seguir a la vista.
+              */}
+              {ultimaOrden !== null ? (
+                <p role="status" className="mt-3 text-secundario text-texto-apagado">
+                  Última orden: {resultadoDeOrden(ultimaOrden).texto}
+                </p>
+              ) : null}
+              {error !== undefined && pidiendo === null ? (
+                <p role="alert" className="mt-3 text-secundario text-peligro-texto">
+                  {error}
+                </p>
+              ) : null}
             </CuerpoDeTarjeta>
           </Tarjeta>
 

@@ -1128,9 +1128,18 @@ const visitaConFoto = async (admin, portero, base) => {
       .then(() => true)
       .catch(() => false);
     afirmar(anulada, 'F2 · el superadministrador ve la visita ANULADA en su lista, en vivo');
+    // 15-N · se ESPERA como la del superadministrador: leerla en el mismo
+    // instante era una carrera con su propio refresco (rojo intermitente).
     const portal = portero.pagina.getByRole('list', { name: 'Visitas' });
     afirmar(
-      /Anulada/.test(await portal.locator('li', { hasText: nombre }).first().innerText()),
+      await portal
+        .locator('li', { hasText: nombre })
+        .first()
+        .getByText(/Anulada/)
+        .first()
+        .waitFor({ timeout: 20_000 })
+        .then(() => true)
+        .catch(() => false),
       'F5 · la lista del día del portero la muestra anulada, no la borra',
     );
   });
