@@ -35,6 +35,13 @@
  *                                             # (antes de salir, con Internet)
  *   opciones: --env <ruta> (apps/api/.env) · --dir <carpeta> (.sitio)
  *             --api-en-red  (deja la API de go2rtc fuera del bucle local)
+ *             --permitir-traza (V4: api/rtsp en trace o debug; la clave de
+ *             los equipos quedaría en el registro)
+ *
+ * V4 (15-N) · el registro de go2rtc sale de `VIDEO_REGISTRO` (por omisión
+ * `info`) y NUNCA pone `api` ni `rtsp` en trace/debug sin `--permitir-traza`:
+ * a ese nivel go2rtc escribe la URL RTSP de cada equipo con su clave
+ * (`lib/registro-de-go2rtc.mjs`).
  *
  * V5 (15-N) · el operador en OTRO equipo de la LAN recibe el medio en la IP
  * anunciada y el puerto WebRTC (TCP y UDP): se comprueba que esa IP es de
@@ -56,6 +63,7 @@ import { arch, platform } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ipDelMac } from './lib/red-del-mac.mjs';
+import { juzgarRegistro } from './lib/registro-de-go2rtc.mjs';
 import { candidatoDeEsteEquipo, comprobarPuertoWebrtc } from './lib/candidato-webrtc.mjs';
 import { networkInterfaces } from 'node:os';
 
@@ -67,6 +75,7 @@ const opcion = (nombre, porOmision) => {
 };
 const soloConfiguracion = args.includes('--solo-configuracion');
 const apiEnRed = args.includes('--api-en-red');
+const permitirTraza = args.includes('--permitir-traza');
 const preparar = args.includes('--preparar');
 const rutaEnv = resolve(RAIZ, opcion('--env', 'apps/api/.env'));
 const carpeta = resolve(RAIZ, opcion('--dir', '.sitio'));
@@ -117,6 +126,10 @@ if (!/^\d{1,5}$/.test(puertoWebrtc) || Number(puertoWebrtc) > 65535) {
   salir(`VIDEO_PUERTO_WEBRTC no es un puerto: «${puertoWebrtc}»`);
 }
 
+const registro = juzgarRegistro(env.get('VIDEO_REGISTRO') ?? '', permitirTraza);
+if (registro.error !== null) salir(registro.error);
+if (registro.aviso !== null) console.warn(`⚠ ${registro.aviso}`);
+
 const candidato = candidatoDeEsteEquipo(ip, networkInterfaces());
 if (!candidato.propio) console.warn(`⚠ ${candidato.frase}`);
 
@@ -132,8 +145,7 @@ const yaml = [
   '  candidates:',
   `    - "${ip}:${puertoWebrtc}"`,
   '  ice_servers: []',
-  'log:',
-  '  level: info',
+  ...registro.lineas,
   '',
 ].join('\n');
 
