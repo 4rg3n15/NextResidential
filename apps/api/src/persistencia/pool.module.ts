@@ -43,13 +43,14 @@ export const ESPERA_MAXIMA_POR_CONEXION_MS = 10_000;
  * «too many connections» en un módulo que apenas tenía carga.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * LO QUE NO SE UNIFICA, Y POR QUÉ
+ * LA SONDA DE `/ready`, UNIFICADA DESDE LA 15-O
  *
- * La **sonda de arranque** conserva su propia conexión a propósito. Es la que
- * responde `/ready`, y tiene que poder contestar precisamente cuando el pool
- * principal está agotado: si compartiera pool, la sonda esperaría en la misma
- * cola que la saturó y `/ready` se quedaría colgado en vez de decir 503. Una
- * comprobación de salud que depende del recurso que vigila no vigila nada.
+ * Tenía su propia conexión para no esperar en la cola del pool agotado. El
+ * precio apareció en sitio (30/09/2026): decía «la base contesta» con el pool
+ * de la API roto, y gastaba un cliente de los quince del pooler gratuito. Ahora
+ * mira ESTE pool y no se queda en su cola: con todas las conexiones ocupadas y
+ * peticiones esperando responde `agotado` sin pedir otra, y en otro caso pide
+ * una con tope de dos segundos (`arranque/sonda-postgres.ts`).
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * CIERRE ORDENADO

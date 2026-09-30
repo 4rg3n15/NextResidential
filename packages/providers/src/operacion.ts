@@ -75,6 +75,7 @@ export type { IpHaciaElEquipo, InterfazDeRed } from './red/ip-hacia-el-equipo';
 // la escucha que ya tiene otra plataforma; y el `--simulado` entero, montado aquí.
 export {
   juzgarConexionDePgBoss,
+  juzgarPresupuestoDeConexiones,
   juzgarProveedorDeEquipos,
   lineasDeComprobaciones,
 } from './ensayo/comprobaciones-de-plataforma';

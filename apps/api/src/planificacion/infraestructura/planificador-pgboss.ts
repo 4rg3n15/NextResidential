@@ -1,7 +1,9 @@
 import PgBoss from 'pg-boss';
 import type { Bitacora } from '@ncr/domain-core';
+import { categoriaDeFallo, motivoSinSecretos } from '../../persistencia/con-cliente';
 import type {
   ColaAPedido,
+  EstadoDelPlanificador,
   Planificador,
   TrabajoAPedido,
   TrabajoProgramado,
@@ -41,7 +43,24 @@ export interface OpcionesPlanificador {
   readonly bitacora: Bitacora;
   /** Zona horaria de las expresiones cron. UTC a propósito: ver abajo. */
   readonly zonaHoraria?: string;
+  /**
+   * 15-O · conexiones del pool PROPIO de pg-boss. Cuenta en el presupuesto del
+   * pooler de Supabase junto con `PG_POOL_MAX` (`PGBOSS_POOL_MAX`).
+   */
+  readonly maximoDeConexiones?: number;
+  /** 15-O · esperas entre reintentos de arranque. Inyectables para la prueba. */
+  readonly reintento?: { readonly primeraEsperaMs: number; readonly esperaMaximaMs: number };
 }
+
+/** 15-O · el nombre con el que pg-boss se presenta a PostgreSQL (`pg_stat_activity`). */
+export const NOMBRE_DE_APLICACION_DE_PGBOSS = 'ncr-pgboss';
+
+/**
+ * 15-O · si pg-boss no arranca, se reintenta solo: 5 s, 10 s, 20 s… hasta cinco
+ * minutos entre intentos. Antes un fallo al arrancar lo dejaba parado hasta el
+ * siguiente reinicio de la API, y sólo lo decía una línea del arranque.
+ */
+export const REINTENTO_DE_ARRANQUE = { primeraEsperaMs: 5_000, esperaMaximaMs: 300_000 } as const;
 
 /**
  * UTC y no la zona de la copropiedad. Los horarios de estos tres trabajos son
@@ -59,8 +78,20 @@ export class PlanificadorPgBoss implements Planificador, ColaAPedido {
   private readonly trabajos: TrabajoProgramado[] = [];
   private readonly aPedido: TrabajoAPedido[] = [];
   private boss: PgBoss | null = null;
+  private situacion: EstadoDelPlanificador = { fase: 'detenido' };
+  private ultimoError: EstadoDelPlanificador['ultimoError'];
+  private intentos = 0;
+  private siguienteIntento: NodeJS.Timeout | undefined;
+  private parado = false;
 
   constructor(private readonly opciones: OpcionesPlanificador) {}
+
+  /** 15-O · la fase, y el último error del motor aunque siga en marcha. */
+  estado(): EstadoDelPlanificador {
+    return this.ultimoError === undefined
+      ? this.situacion
+      : { ...this.situacion, ultimoError: this.ultimoError };
+  }
 
   get programados(): readonly TrabajoProgramado[] {
     return this.trabajos;
@@ -70,24 +101,108 @@ export class PlanificadorPgBoss implements Planificador, ColaAPedido {
     this.trabajos.push(trabajo);
   }
 
+  /**
+   * 15-O · un intento; si falla, deja programado el siguiente y RELANZA para
+   * que el arranque lo registre. `/ready` publica `reintentando` con el motivo
+   * hasta que uno salga bien.
+   */
   async arrancar(): Promise<void> {
-    if (this.boss !== null) return;
+    if (
+      this.boss !== null ||
+      this.siguienteIntento !== undefined ||
+      this.situacion.fase === 'arrancando'
+    ) {
+      return;
+    }
+    this.parado = false;
+    try {
+      await this.intentar();
+    } catch (error) {
+      this.programarReintento(error);
+      throw error;
+    }
+  }
+
+  private programarReintento(error: unknown): void {
+    if (this.parado) return;
+    const { primeraEsperaMs, esperaMaximaMs } = this.opciones.reintento ?? REINTENTO_DE_ARRANQUE;
+    const esperaMs = Math.min(primeraEsperaMs * 2 ** (this.intentos - 1), esperaMaximaMs);
+    const motivo = `${categoriaDeFallo(error)}; intento ${String(this.intentos)}, el siguiente en ${String(Math.round(esperaMs / 1000))} s`;
+    this.situacion = { fase: 'reintentando', motivo };
+    this.siguienteIntento = setTimeout(() => {
+      this.siguienteIntento = undefined;
+      if (this.parado) return;
+      this.intentar().then(
+        () => {
+          this.opciones.bitacora.registrar('info', 'el planificador arrancó tras reintentar', {
+            intentos: this.intentos,
+          });
+        },
+        (otro: unknown) => {
+          this.opciones.bitacora.registrar('error', 'el planificador sigue sin arrancar', {
+            error: motivoSinSecretos(otro),
+            intentos: this.intentos,
+          });
+          this.programarReintento(otro);
+        },
+      );
+    }, esperaMs);
+    // No retiene el proceso: un cierre ordenado no espera al próximo intento.
+    this.siguienteIntento.unref();
+  }
+
+  private async intentar(): Promise<void> {
+    this.intentos += 1;
+    this.situacion = { fase: 'arrancando' };
     const boss = new PgBoss({
       connectionString: this.opciones.cadenaDeConexion,
       schema: this.opciones.esquema,
       // El planificador no necesita concurrencia: son tres barridos por hora.
       // Un pool pequeño evita competir por conexiones con el tráfico real, que
-      // comparte el tope del proyecto Supabase (D-66).
-      max: 2,
+      // comparte el tope del proyecto Supabase (D-66, 15-O).
+      max: this.opciones.maximoDeConexiones ?? 2,
+      application_name: NOMBRE_DE_APLICACION_DE_PGBOSS,
     });
+    /**
+     * 15-O · el `'error'` de pg-boss reúne el de su pool (una conexión ociosa
+     * que la base cortó), el de sus bucles de mantenimiento y el de los
+     * trabajos. Ninguno lo detiene: sus bucles capturan y siguen, y su pool
+     * abre otra conexión en la siguiente consulta. Se registra y se publica
+     * en `/ready`; no se calla.
+     */
     boss.on('error', (error: unknown) => {
+      const cola =
+        error !== null && typeof error === 'object'
+          ? (error as { queue?: unknown }).queue
+          : undefined;
+      this.ultimoError = {
+        momento: new Date(),
+        categoria:
+          typeof cola === 'string'
+            ? `falló un trabajo de la cola ${cola}`
+            : categoriaDeFallo(error),
+      };
       this.opciones.bitacora.registrar('error', 'pg-boss', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? motivoSinSecretos(error)
+            : motivoSinSecretos(String((error as { message?: unknown }).message ?? error)),
       });
     });
-    await boss.start();
+    try {
+      await boss.start();
+      await this.darDeAlta(boss);
+    } catch (error) {
+      // Lo que llegó a abrir se cierra: sin esto cada intento fallido dejaría
+      // conexiones colgando contra el mismo tope que lo hizo fallar.
+      await boss.stop({ graceful: false, timeout: 1_000 }).catch(() => undefined);
+      throw error;
+    }
     this.boss = boss;
+    this.situacion = { fase: 'en-marcha' };
+  }
 
+  private async darDeAlta(boss: PgBoss): Promise<void> {
     for (const trabajo of this.trabajos) {
       await boss.createQueue(trabajo.nombre);
       await boss.work(trabajo.nombre, async () => {
@@ -171,6 +286,10 @@ export class PlanificadorPgBoss implements Planificador, ColaAPedido {
   async detener(): Promise<void> {
     const boss = this.boss;
     this.boss = null;
+    this.parado = true;
+    clearTimeout(this.siguienteIntento);
+    this.siguienteIntento = undefined;
+    this.situacion = { fase: 'detenido' };
     // Otros fallos (15-M) · un barrido en curso tiene este plazo para terminar;
     // si no, pg-boss lo marca fallido y se repite en la próxima pasada (son
     // idempotentes). Cabe dentro del plazo del cierre ordenado. [SUPUESTO] S-157.

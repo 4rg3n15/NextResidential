@@ -1,6 +1,7 @@
 import type { Bitacora } from '@ncr/domain-core';
 import type {
   ColaAPedido,
+  EstadoDelPlanificador,
   Planificador,
   TrabajoAPedido,
   TrabajoProgramado,
@@ -47,6 +48,11 @@ export class PlanificadorInerte implements Planificador, ColaAPedido {
 
   async detener(): Promise<void> {
     /* no hay nada que detener */
+  }
+
+  /** 15-O · dice que no hay motor y por qué: `/ready` lo publica como aviso. */
+  estado(): EstadoDelPlanificador {
+    return { fase: 'inerte', motivo: this.motivo };
   }
 
   /** R1 (15-N) · sin pg-boss no hay cola: quien encola lo hace en el proceso. */

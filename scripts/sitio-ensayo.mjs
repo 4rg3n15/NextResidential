@@ -206,6 +206,7 @@ const principal = async () => {
       : [
           P.juzgarProveedorDeEquipos(sim.entorno, sim.equiposReales),
           P.juzgarConexionDePgBoss(sim.entorno),
+          P.juzgarPresupuestoDeConexiones(sim.entorno),
         ];
   decir(`── Comprobaciones de la plataforma${sim === null ? '' : ' (API simulada)'}`);
   for (const l of P.lineasDeComprobaciones(comprobaciones, SECRETOS)) decir(l);

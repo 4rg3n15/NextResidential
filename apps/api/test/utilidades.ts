@@ -67,7 +67,11 @@ export { COP_A, COP_B, EQUIPO_DE_B } from './constantes';
 
 export const configuracionDePrueba: Configuracion = {
   NODE_ENV: 'test',
-  PG_POOL_MAX: 20,
+  PG_POOL_MAX: 10,
+  SUPABASE_POOLER_MAX_CLIENTES: 15,
+  PGBOSS_POOL_MAX: 2,
+  EVENTOS_HISTORICOS_LOTE: 500,
+  EVENTOS_HISTORICOS_POR_SEGUNDO: 500,
   PORT: 0,
   // H6 (15-L) · supertest llega por el bucle local: como el proxy de la consola.
   API_PROXIES_DE_CONFIANZA: 'loopback',

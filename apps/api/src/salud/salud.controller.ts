@@ -12,8 +12,16 @@ import { Publico } from '../comun/decoradores';
 import { ProveedorDeJwks, describirEstadoDeJwks } from '../autenticacion';
 import type { Configuracion } from '../configuracion/esquema';
 import { SONDA_POSTGRES } from '../arranque/sonda-postgres';
-import type { SondaDePostgres } from '../arranque/sonda-postgres';
+import type { ResultadoDeLaBase, SondaDePostgres } from '../arranque/sonda-postgres';
+import { PLANIFICADOR } from '../planificacion';
+import type { Planificador } from '../planificacion';
 import { ListoDto, SaludDto } from './respuestas';
+
+/**
+ * 15-O · un corte ya repuesto, o un error del planificador, se sigue avisando
+ * en `/ready` durante este tiempo: quien mira después de un parpadeo ve qué pasó.
+ */
+export const VENTANA_DE_AVISO_MS = 5 * 60_000;
 
 /**
  * `/health` y `/ready` son cosas distintas y por eso son dos rutas.
@@ -34,6 +42,7 @@ export class SaludController {
     @Inject(CONFIGURACION) private readonly config: Configuracion,
     @Inject(ProveedorDeJwks) private readonly jwks: ProveedorDeJwks,
     @Inject(SONDA_POSTGRES) private readonly postgres: SondaDePostgres,
+    @Inject(PLANIFICADOR) private readonly planificador: Planificador,
   ) {}
 
   @Publico()
@@ -74,11 +83,61 @@ export class SaludController {
        * misma familia que el JWKS — una sonda que no sonda—, y por eso se
        * revisó al mismo tiempo.
        */
-      postgres: (await this.postgres.comprobar()).estado === 'ok' ? 'ok' : 'no-disponible',
+      postgres: 'ok',
+    };
+    /**
+     * 15-O · por el pool de la API, y con motivo. `agotado` (todas sus
+     * conexiones ocupadas y peticiones esperando) no es lo mismo que
+     * `no-disponible` (la base no contesta, o el pooler no admite más).
+     */
+    const base = await this.postgres.comprobar();
+    const motivos: Record<string, string> = {};
+    if (base.estado !== 'ok') {
+      dependencias.postgres = base.clase ?? 'no-disponible';
+      motivos.postgres =
+        dependencias.postgres === 'agotado'
+          ? `pool de la API agotado: ${base.detalle}`
+          : `base de datos no disponible: ${base.detalle}`;
+    }
+    const avisos = this.avisos(base);
+    const detalle = {
+      dependencias,
+      ...(Object.keys(motivos).length > 0 ? { motivos } : {}),
+      ...(Object.keys(avisos).length > 0 ? { avisos } : {}),
     };
     if (Object.values(dependencias).some((estado) => estado !== 'ok')) {
-      throw new ServiceUnavailableException({ estado: 'no-listo', dependencias });
+      throw new ServiceUnavailableException({ estado: 'no-listo', ...detalle });
     }
-    return { estado: 'listo', dependencias };
+    return { estado: 'listo', ...detalle };
+  }
+
+  /**
+   * 15-O · lo que no saca la API del balanceador pero no puede callarse: el
+   * planificador (pg-boss) que no está en marcha —sin él RN-11 no se cumple— y
+   * un corte reciente de la base, ya repuesto.
+   */
+  private avisos(base: ResultadoDeLaBase): Record<string, string> {
+    const avisos: Record<string, string> = {};
+    const ahora = this.reloj.ahora().getTime();
+    const haceSegundos = (m: Date): number => Math.max(0, Math.round((ahora - m.getTime()) / 1000));
+    const reciente = (m: Date): boolean => ahora - m.getTime() < VENTANA_DE_AVISO_MS;
+    const plan = this.planificador.estado();
+    if (plan.fase !== 'en-marcha') {
+      avisos.planificador = plan.motivo === undefined ? plan.fase : `${plan.fase}: ${plan.motivo}`;
+    } else if (plan.ultimoError !== undefined && reciente(plan.ultimoError.momento)) {
+      avisos.planificador =
+        `en marcha; último error hace ${String(haceSegundos(plan.ultimoError.momento))} s: ` +
+        plan.ultimoError.categoria;
+    }
+    if (
+      base.estado === 'ok' &&
+      base.ultimoCorte !== undefined &&
+      reciente(base.ultimoCorte.momento)
+    ) {
+      avisos.postgres =
+        `${base.ultimoCorte.categoria} hace ${String(haceSegundos(base.ultimoCorte.momento))} s; ` +
+        'el pool la descartó y ya responde';
+    }
+    return avisos;
   }
 }

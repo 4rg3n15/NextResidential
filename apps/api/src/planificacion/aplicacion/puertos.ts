@@ -28,6 +28,27 @@ export interface Planificador {
   detener(): Promise<void>;
   /** Trabajos dados de alta, para el informe de salud y las pruebas. */
   readonly programados: readonly TrabajoProgramado[];
+  /** 15-O · en qué está, para `/ready`: un planificador parado no puede callar. */
+  estado(): EstadoDelPlanificador;
+}
+
+/**
+ * 15-O · `inerte`: no hay motor (la suite, `PLANIFICADOR_HABILITADO=false`).
+ * `reintentando`: no pudo arrancar y lo vuelve a intentar solo.
+ */
+export type FaseDelPlanificador =
+  | 'detenido'
+  | 'arrancando'
+  | 'en-marcha'
+  | 'reintentando'
+  | 'inerte';
+
+export interface EstadoDelPlanificador {
+  readonly fase: FaseDelPlanificador;
+  /** Por qué no está en marcha, en palabras y sin secretos. */
+  readonly motivo?: string;
+  /** El último `'error'` que emitió el motor, aunque siga en marcha. */
+  readonly ultimoError?: { readonly momento: Date; readonly categoria: string };
 }
 
 /**

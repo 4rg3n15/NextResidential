@@ -26,6 +26,7 @@ import { PlanificadorPgBoss } from './infraestructura/planificador-pgboss';
 import { PlanificadorInerte } from './infraestructura/planificador-inerte';
 import { CatalogoDeCopropiedadesPg } from './infraestructura/catalogo-copropiedades-pg';
 import type { ConexionDePgBoss } from './infraestructura/conexion-de-pgboss';
+import { motivoSinSecretos } from '../persistencia/con-cliente';
 
 /**
  * Identidad del planificador en las columnas de auditoría.
@@ -128,10 +129,12 @@ export class CicloDelPlanificador implements OnApplicationBootstrap, BeforeAppli
         'error',
         'el planificador NO arrancó: los barridos no se ejecutarán',
         {
-          error: error instanceof Error ? error.message : String(error),
+          error: motivoSinSecretos(error),
           consecuencia:
             'RN-11 (supresión de plantillas en 24 h), CA-26 (terminal caída) y el reinicio ' +
             'de aforos quedan sin ejecutar hasta que el planificador arranque',
+          // 15-O · ya no se queda así hasta el próximo reinicio de la API.
+          remedio: 'se reintenta solo con espera creciente; /ready publica su estado',
         },
       );
     });
@@ -234,6 +237,8 @@ export interface OpcionesPlanificacion {
   readonly conexion?: ConexionDePgBoss;
   readonly esquema: string;
   readonly habilitado: boolean;
+  /** 15-O · el pool propio de pg-boss (`PGBOSS_POOL_MAX`), dentro del presupuesto. */
+  readonly maximoDeConexiones?: number;
 }
 
 /**
@@ -290,6 +295,9 @@ export class PlanificacionModule {
               cadenaDeConexion: conexion.cadena,
               esquema: opciones.esquema,
               bitacora,
+              ...(opciones.maximoDeConexiones === undefined
+                ? {}
+                : { maximoDeConexiones: opciones.maximoDeConexiones }),
             });
           },
         },

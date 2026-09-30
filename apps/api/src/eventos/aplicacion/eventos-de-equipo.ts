@@ -100,9 +100,33 @@ export const aLaConsola = (e: EventoDeEquipoGuardado) => ({
 export interface OpcionesDelRegistro {
   /** Techo de la cola de históricos. Lo que no cabe se cuenta y se dice. */
   readonly maximoEnCola?: number;
-  /** Filas por lote al vaciar la cola. */
+  /** Filas por lote al vaciar la cola: UN `INSERT` por lote y copropiedad. */
   readonly lote?: number;
+  /**
+   * 15-O · cuánto se espera a que el volcado se acumule antes del primer
+   * lote. Sin esto, cada evento que llegaba suelto era su propio `INSERT`.
+   */
+  readonly ventanaMs?: number;
+  /** 15-O · tope de eventos históricos escritos por segundo. */
+  readonly porSegundo?: number;
+  /** 15-O · la espera, inyectable para las pruebas. */
+  readonly esperar?: (ms: number) => Promise<void>;
 }
+
+/**
+ * 15-O · los valores por omisión del volcado histórico. En sitio (30/09/2026)
+ * cientos de «volcado histórico de equipo guardado» en treinta segundos: la
+ * cola se vaciaba en cuanto entraba un evento, así que cada uno —o cada dos—
+ * pedía una conexión y hacía su `INSERT`, con dos equipos volcando a la vez
+ * contra un pooler de quince clientes. Ahora: un cuarto de segundo para
+ * acumular, lotes de 500 (14 parámetros por fila: 7 000, lejos
+ * del tope de 65 535 de PostgreSQL) y como mucho 500 eventos por segundo. Un
+ * volcado de 5 000 tarda así unos diez segundos y usa UNA conexión cada vez.
+ */
+export const VOLCADO_POR_OMISION = { lote: 500, ventanaMs: 250, porSegundo: 500 } as const;
+
+const esperarDeVerdad = (ms: number): Promise<void> =>
+  new Promise((listo) => setTimeout(listo, ms));
 
 export class RegistroDeEventosDeEquipo {
   private readonly cola: EventoDeEquipoNuevo[] = [];
@@ -183,10 +207,14 @@ export class RegistroDeEventosDeEquipo {
   }
 
   private async vaciar(): Promise<void> {
-    // Un tic antes de empezar: lo vivo que llegó a la vez va primero.
-    await new Promise((listo) => setImmediate(listo));
+    const esperar = this.opciones.esperar ?? esperarDeVerdad;
+    const porSegundo = this.opciones.porSegundo ?? VOLCADO_POR_OMISION.porSegundo;
+    // 15-O · se deja acumular el volcado antes del primer lote (y lo vivo que
+    // llegó a la vez va primero, como antes con el tic).
+    await esperar(this.opciones.ventanaMs ?? VOLCADO_POR_OMISION.ventanaMs);
     while (this.cola.length > 0) {
-      const lote = this.cola.splice(0, this.opciones.lote ?? 200);
+      const inicio = this.reloj.ahora().getTime();
+      const lote = this.cola.splice(0, this.opciones.lote ?? VOLCADO_POR_OMISION.lote);
       try {
         const nuevos = await this.repositorio.registrarVarios(lote);
         this.bitacora.registrar('info', 'volcado histórico de equipo guardado', {
@@ -200,7 +228,11 @@ export class RegistroDeEventosDeEquipo {
           error: error instanceof Error ? error.message : String(error),
         });
       }
-      await new Promise((listo) => setImmediate(listo));
+      // 15-O · tope por segundo: un lote de N eventos ocupa al menos N/porSegundo s.
+      const minimoMs = (lote.length / porSegundo) * 1000;
+      const restante = minimoMs - (this.reloj.ahora().getTime() - inicio);
+      if (restante > 0) await esperar(restante);
+      else await new Promise((listo) => setImmediate(listo));
     }
   }
 }

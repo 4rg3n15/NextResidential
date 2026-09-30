@@ -360,9 +360,12 @@ psql "$DATABASE_URL" -c "
 ```
 
 Antes de D-66 el tope era **35** —20 + 10 + 5, tres pools que no se conocían—.
-Ahora el tope es uno solo, `PG_POOL_MAX`, que por defecto vale **20**. La sonda
-de arranque conserva su conexión aparte a propósito: tiene que poder responder
-`/ready` justo cuando el pool principal está saturado.
+Ahora el tope es uno solo, `PG_POOL_MAX`, que por defecto vale **10** desde la
+15-O (antes 20) y que, con pg-boss, tiene que caber en
+`SUPABASE_POOLER_MAX_CLIENTES`: la API no arranca si no
+(`CONEXION_SUPABASE.md`, «Presupuesto de conexiones»). La sonda de `/ready` ya
+no tiene conexión aparte: mira el pool de la API sin esperar en su cola, y
+responde `agotado` cuando está saturado.
 
 ---
 

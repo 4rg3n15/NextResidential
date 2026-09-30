@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { Pool } from 'pg';
 import type { DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -205,6 +206,7 @@ export class AppModule {
           // En pruebas NUNCA: una suite que levanta veinte aplicaciones abriría
           // veinte conexiones de pg-boss contra una base que no existe.
           habilitado: config.PLANIFICADOR_HABILITADO && config.NODE_ENV !== 'test',
+          maximoDeConexiones: config.PGBOSS_POOL_MAX,
         }),
         // Dos limitadores con NOMBRE, y cada uno cuenta por lo suyo: `default`
         // por IP —el de siempre— y `dispositivo` por equipo firmante (D-28).
@@ -240,9 +242,11 @@ export class AppModule {
         // La sonda de la base se registra aquí, junto al controlador de salud
         // que la consulta, y no dentro de un módulo de dominio: `/ready` no
         // pertenece a ningún módulo de negocio.
+        // 15-O · por el pool de la API: `/ready` dice si ÉL tiene conexiones sanas.
         {
           provide: SONDA_POSTGRES,
-          useValue: new SondaDePostgresPg(config.DATABASE_POOLER_URL),
+          inject: [Pool],
+          useFactory: (pool: Pool) => new SondaDePostgresPg(pool, config.PG_POOL_MAX),
         },
         { provide: APP_GUARD, useClass: GuardaDeLimites },
         { provide: APP_GUARD, useClass: GuardaDeAutenticacion },

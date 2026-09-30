@@ -148,3 +148,88 @@ describe('el repositorio en memoria filtra como la tabla', () => {
     expect(await r.registrarVarios([evento(1), evento(4)])).toBe(1);
   });
 });
+
+describe('15-O · el volcado histórico no satura el pooler', () => {
+  const repositorioQueCuenta = () => {
+    const lotes: number[] = [];
+    const repositorio: RepositorioEventosDeEquipo = {
+      registrar: async () => null,
+      registrarVarios: async (l) => {
+        lotes.push(l.length);
+        return l.length;
+      },
+      consultar: async () => [],
+    };
+    return { lotes, repositorio };
+  };
+  const bitacoraMuda: Bitacora = { registrar: () => undefined };
+  const canalMudo = { publicar: async () => 0 };
+
+  it('un volcado que llega de a uno se guarda en UN lote, no en uno por evento', async () => {
+    const { lotes, repositorio } = repositorioQueCuenta();
+    let soltar = (): void => undefined;
+    const ventana = new Promise<void>((r) => {
+      soltar = r;
+    });
+    const registro = new RegistroDeEventosDeEquipo(
+      repositorio,
+      canalMudo,
+      bitacoraMuda,
+      { ahora: () => new Date(0) },
+      { ventanaMs: 250, esperar: (ms) => (ms === 250 ? ventana : Promise.resolve()) },
+    );
+    // Como en sitio: el flujo del equipo los entrega de uno en uno, con la
+    // cola vaciándose entre medias si nadie la retiene.
+    for (let i = 0; i < 300; i += 1) {
+      registro.historico(evento(i, { enVivo: false }));
+      await new Promise((r) => setImmediate(r));
+    }
+    soltar();
+    await registro.vaciada();
+    expect(lotes).toEqual([300]);
+  });
+
+  it('tope por segundo: 1 200 eventos en lotes de 500 tardan al menos 2,4 s', async () => {
+    const { lotes, repositorio } = repositorioQueCuenta();
+    const esperas: number[] = [];
+    const registro = new RegistroDeEventosDeEquipo(
+      repositorio,
+      canalMudo,
+      bitacoraMuda,
+      { ahora: () => new Date(0) },
+      {
+        lote: 500,
+        porSegundo: 500,
+        ventanaMs: 250,
+        esperar: async (ms) => void esperas.push(ms),
+      },
+    );
+    for (let i = 0; i < 1200; i += 1) registro.historico(evento(i, { enVivo: false }));
+    await registro.vaciada();
+    expect(lotes).toEqual([500, 500, 200]);
+    expect(esperas).toEqual([250, 1000, 1000, 400]);
+  });
+
+  it('lo vivo no espera a la ventana ni al tope del volcado', async () => {
+    const { repositorio } = repositorioQueCuenta();
+    const registrados: string[] = [];
+    const conVivo: RepositorioEventosDeEquipo = {
+      ...repositorio,
+      registrar: async (e) => {
+        registrados.push(e.claveIdempotencia);
+        return { ...e, id: 'x', recibidoEn: new Date(0) };
+      },
+    };
+    const registro = new RegistroDeEventosDeEquipo(
+      conVivo,
+      canalMudo,
+      bitacoraMuda,
+      { ahora: () => new Date(0) },
+      // Una ventana que no termina nunca: si lo vivo pasara por ella, no llegaría.
+      { esperar: () => new Promise<void>(() => undefined) },
+    );
+    registro.historico(evento(1, { enVivo: false }));
+    await registro.vivo(evento(2));
+    expect(registrados).toEqual(['clave-de-prueba-2']);
+  });
+});

@@ -75,7 +75,13 @@ export class BaseDeDatosNoDisponible extends Error {
 
 /** Lo último que se supo de las conexiones de un pool, para `/ready`. */
 export interface SaludDeConexiones {
-  readonly ultimoCorte: { readonly momento: Date; readonly motivo: string } | null;
+  readonly ultimoCorte: {
+    readonly momento: Date;
+    /** El texto de `pg`, sin cadenas de conexión: para la bitácora. */
+    readonly motivo: string;
+    /** La clase de fallo, apta para `/ready` (pública). */
+    readonly categoria: string;
+  } | null;
   readonly ultimaConexionSana: Date | null;
 }
 
@@ -84,7 +90,11 @@ const salud = new WeakMap<Pool, { corte: SaludDeConexiones['ultimoCorte']; sana:
 const anotar = (pool: Pool, cambio: { corte?: Error; sana?: true }): void => {
   const actual = salud.get(pool) ?? { corte: null, sana: null };
   if (cambio.corte !== undefined) {
-    actual.corte = { momento: new Date(), motivo: motivoSinSecretos(cambio.corte) };
+    actual.corte = {
+      momento: new Date(),
+      motivo: motivoSinSecretos(cambio.corte),
+      categoria: categoriaDeFallo(cambio.corte),
+    };
   }
   if (cambio.sana === true) actual.sana = new Date();
   salud.set(pool, actual);
@@ -103,6 +113,32 @@ export const saludDe = (pool: Pool): SaludDeConexiones => {
 export const motivoSinSecretos = (error: unknown): string => {
   const crudo = error instanceof Error ? error.message : String(error);
   return crudo.replace(/\S+:\/\/\S+/g, '<cadena de conexión>').slice(0, 200);
+};
+
+/**
+ * Qué clase de fallo fue, en palabras y SIN el texto de `pg`: es lo que puede
+ * salir por `/ready`, que es pública, y el texto original puede llevar el host
+ * («getaddrinfo ENOTFOUND db.<ref>.supabase.co»).
+ */
+export const categoriaDeFallo = (error: unknown): string => {
+  const causa = error instanceof BaseDeDatosNoDisponible ? error.causa : error;
+  const codigo =
+    causa !== null && typeof causa === 'object' ? (causa as { code?: unknown }).code : undefined;
+  const mensaje = causa instanceof Error ? causa.message : '';
+  if (codigo === '53300' || /EMAXCONN|max clients|too many|remaining connection/i.test(mensaje)) {
+    return 'el pooler no admite más clientes (límite de conexiones alcanzado)';
+  }
+  if (codigo === 'ETIMEDOUT' || /timeout|tiempo/i.test(mensaje)) {
+    return 'la base no respondió a tiempo';
+  }
+  if (
+    ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH'].includes(
+      String(codigo),
+    )
+  ) {
+    return 'no se pudo abrir una conexión con la base';
+  }
+  return esErrorDeConexion(causa) ? 'la base cortó la conexión' : 'la base respondió con un error';
 };
 
 /**
