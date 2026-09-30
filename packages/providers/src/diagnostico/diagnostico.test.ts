@@ -363,7 +363,9 @@ describe('lo que NO se le pregunta a un equipo que no es una cámara', () => {
       protocolo: 'http',
       ...CREDENCIAL,
       familia: 'terminal',
-      peticion: terminal(),
+      // R2 (15-N) · la hora del equipo, declarada: el simulado ya no está por
+      // omisión en 1970 (eso frenaría toda alta con vigencia), sino en hora.
+      peticion: terminal({ hora: new Date(0).toISOString() }),
       ahoraDelServidor: () => new Date(0),
     });
 

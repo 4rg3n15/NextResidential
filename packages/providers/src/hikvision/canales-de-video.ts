@@ -1,4 +1,5 @@
 import { bloques, etiqueta } from '../equipo/xml';
+import { canalPropuesto } from '../nucleo/canal-de-video';
 import type { ConsultaDeCapacidad } from './rostros-y-personas';
 
 /**
@@ -47,10 +48,14 @@ export const canalesDeVideoDesde = (xml: string): readonly CanalDeVideoDeclarado
       return [{ id, codec: codecNormalizado(etiqueta(video, 'videoCodecType')) }];
     });
 
-/** El subflujo (`x02`) si existe, si no el primero; `null` sin canales. */
+/**
+ * El subflujo (`x02`) si existe, si no el primero; `null` sin canales. V2
+ * (15-N) · la regla vive en `nucleo/canal-de-video.ts`, que es la que decide
+ * el canal del video en vivo; aquí sólo se reexpone con su nombre de 15-M.
+ */
 export const canalDeVideoPorOmision = (
   canales: readonly Pick<CanalDeVideoDeclarado, 'id'>[],
-): string | null => canales.find((c) => c.id.endsWith('02'))?.id ?? canales[0]?.id ?? null;
+): string | null => canalPropuesto(canales.map((c) => ({ id: c.id, codec: null })));
 
 export interface CanalesDescubiertos {
   readonly canales: readonly CanalDeVideoDeclarado[];

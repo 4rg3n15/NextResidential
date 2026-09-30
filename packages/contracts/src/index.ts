@@ -52,6 +52,9 @@ export type OrdenManual = Esquemas['OrdenManualDto'];
 export type OrdenEjecutada = Esquemas['OrdenEjecutadaDto'];
 export type ColaDeAtencion = Esquemas['ColaDeAtencionDto'];
 export type EnAtencion = Esquemas['EnAtencionDto'];
+/** G2 (15-N) · qué abre sola la Atención y qué suena, por disparador. */
+export type PreferenciasDeAtencion = Esquemas['PreferenciasDeAtencionDto'];
+export type DisparadorDeAtencion = EnAtencion['disparador'];
 export type EstadoDeCanal = Esquemas['EstadoDeCanalDto'];
 export type CambiosDeConfiguracion = Esquemas['CambiosDeConfiguracionDto'];
 export type ConfiguracionRechazada = Esquemas['ConfiguracionRechazadaDto'];

@@ -83,7 +83,9 @@ export class RepositorioAlertasEnMemoria implements RepositorioAlertas {
         !this.archivadas.has(`${copropiedadId}|${a.id}`) &&
         ((filtro?.dispositivoId ?? null) === null || a.dispositivoId === filtro?.dispositivoId) &&
         ((filtro?.severidad ?? null) === null || a.severidad === filtro?.severidad) &&
-        ((filtro?.tipo ?? null) === null || a.tipo === filtro?.tipo),
+        ((filtro?.tipo ?? null) === null || a.tipo === filtro?.tipo) &&
+        a.generadaEn.getTime() >= (filtro?.desde ?? new Date(0)).getTime() &&
+        a.generadaEn.getTime() < (filtro?.hasta ?? new Date(8.64e15)).getTime(),
     );
   }
 
@@ -190,7 +192,9 @@ export class RepositorioEventosDeEquipoEnMemoria implements RepositorioEventosDe
     this.contador += 1;
     const guardada: EventoDeEquipoGuardado = {
       ...e,
-      id: `ee-${String(this.contador).padStart(8, '0')}`,
+      // Con forma de UUID, como en la base: el id viaja como `eventoId` en la
+      // orden manual que lo atiende (G1, 15-N), y ese campo se valida como UUID.
+      id: `ee000000-0000-4000-8000-${String(this.contador).padStart(12, '0')}`,
       recibidoEn: new Date(),
     };
     this.filas.push(guardada);
@@ -204,18 +208,23 @@ export class RepositorioEventosDeEquipoEnMemoria implements RepositorioEventosDe
   }
 
   async consultar(f: FiltroDeEventosDeEquipo): Promise<readonly EventoDeEquipoGuardado[]> {
+    // G1 (15-N) · por recepción, como la base (la cola de atención).
+    const hora = (e: EventoDeEquipoGuardado): Date =>
+      f.porRecepcion === true ? e.recibidoEn : e.ocurridoEn;
     return this.filas
       .filter(
         (e) =>
           e.copropiedadId === f.copropiedadId &&
-          e.ocurridoEn >= f.desde &&
-          e.ocurridoEn < f.hasta &&
+          hora(e) >= f.desde &&
+          hora(e) < f.hasta &&
           (f.dispositivoId === undefined ||
             f.dispositivoId === null ||
             e.dispositivoId === f.dispositivoId) &&
-          (f.tipo === undefined || f.tipo === null || e.tipo === f.tipo),
+          (f.tipo === undefined || f.tipo === null || e.tipo === f.tipo) &&
+          (f.tipos === undefined || f.tipos === null || f.tipos.includes(e.tipo)) &&
+          (f.soloEnVivo !== true || (e.enVivo && e.origen === 'equipo')),
       )
-      .sort((a, b) => b.ocurridoEn.getTime() - a.ocurridoEn.getTime())
+      .sort((a, b) => hora(b).getTime() - hora(a).getTime())
       .slice(0, f.limite);
   }
 }

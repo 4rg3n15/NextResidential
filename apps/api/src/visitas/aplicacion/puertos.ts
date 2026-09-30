@@ -91,7 +91,18 @@ export interface VisitaListada {
   readonly equiposFallidos: number;
 }
 
-export const ESTADOS_EN_EQUIPO = ['pendiente', 'sincronizada', 'fallida', 'suprimida'] as const;
+/**
+ * R1 (15-N) · `omitida`: el equipo no recibe plantillas (no admite rostros, o
+ * aún no se sabe porque nadie lo sondeó). Hasta la 15-N no aparecía en la
+ * visita: la consola callaba que ese equipo nunca la iba a tener.
+ */
+export const ESTADOS_EN_EQUIPO = [
+  'pendiente',
+  'sincronizada',
+  'fallida',
+  'suprimida',
+  'omitida',
+] as const;
 export type EstadoEnEquipo = (typeof ESTADOS_EN_EQUIPO)[number];
 
 export interface FotoEnEquipo {

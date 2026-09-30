@@ -32,7 +32,7 @@ export interface IntercomPorEquipo {
 }
 import type { CapacidadesDeEquipo } from './capacidades';
 import type { EscuchaActiva, TransporteDeEscucha } from './escucha';
-import type { OrigenDeVideo } from './video';
+import type { DiagnosticoDeVideo, OrigenDeVideo } from './video';
 import type { VeredictoRemoto } from './verificacion-remota';
 
 /**
@@ -92,6 +92,12 @@ export type ProveedorDeEquipos = AccessPointProvider &
      * rechaza. La credencial va dentro: nunca cruza a la presentación.
      */
     origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null>;
+    /**
+     * V5 (15-N) · por qué no hay video, preguntado al equipo por RTSP. Lo pide
+     * la API sólo cuando el puente falló sin decir el código. Opcional: el
+     * simulado no tiene equipo al que preguntar.
+     */
+    sondearVideo?(dispositivoId: string): Promise<DiagnosticoDeVideo>;
     /**
      * A4 (15-L) · ¿el equipo decide por su cuenta —una cámara sin control de la
      * plataforma y sin atestación—? `null` si no se sabe. Lo pregunta el

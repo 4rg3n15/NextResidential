@@ -52,6 +52,8 @@ export interface EventoRegistrado {
   readonly motivoManual: string | null;
   readonly evidenciaId: string | null;
   readonly decididoPorEdge: boolean;
+  /** R2 (15-N) · cuándo lo guardó la plataforma (`registrado_en`). Opcional: dobles antiguos. */
+  readonly registradoEn?: Date;
 }
 
 export interface PaginaDeEventos {
@@ -79,6 +81,9 @@ export interface FiltroDeAlertas {
   readonly dispositivoId?: string | null;
   readonly severidad?: Severidad | null;
   readonly tipo?: TipoDeAlerta | null;
+  /** A2 (15-N) · por fecha de generación: `[desde, hasta)`. */
+  readonly desde?: Date | null;
+  readonly hasta?: Date | null;
 }
 
 export interface RepositorioAlertas {

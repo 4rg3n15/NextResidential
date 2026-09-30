@@ -2,6 +2,12 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createServer } from 'node:net';
+import type { AddressInfo } from 'node:net';
+import {
+  candidatoDeEsteEquipo,
+  comprobarPuertoWebrtc,
+} from '../../../scripts/lib/candidato-webrtc.mjs';
 import { join, resolve } from 'node:path';
 
 /**
@@ -160,5 +166,68 @@ describe('pnpm sitio:video · configuración de go2rtc (D1)', () => {
     );
     expect(r.status).toBe(1);
     expect(`${r.stdout}${r.stderr}`).toMatch(/no existe .*copie apps\/api\/\.env\.example/);
+  });
+
+  /**
+   * V4 (15-N) · con `api` en trace, go2rtc escribe la URL RTSP de cada equipo
+   * con su clave (visto en sitio el 29/09). El guion no lo arranca así sin
+   * `--permitir-traza`, tampoco si `api`/`rtsp` heredan el nivel general.
+   */
+  it.each([['info,api=trace'], ['debug'], ['info,rtsp=debug'], ['trace,webrtc=info']])(
+    'V4 · VIDEO_REGISTRO=%s se niega: la clave quedaría en el registro',
+    (registro) => {
+      const r = correr(`GO2RTC_URL=http://127.0.0.1:1984\nVIDEO_REGISTRO=${registro}\n`);
+      expect(r.codigo, r.salida).toBe(1);
+      expect(r.salida).toMatch(/CON SU CLAVE .*--permitir-traza/);
+    },
+  );
+
+  it('V4 · con --permitir-traza arranca, pero lo avisa y pide rotar la clave', () => {
+    const r = correr(
+      'GO2RTC_URL=http://127.0.0.1:1984\nVIDEO_REGISTRO=info,api=trace\n',
+      '--permitir-traza',
+    );
+    expect(r.codigo, r.salida).toBe(0);
+    expect(r.salida).toMatch(/⚠ .*ROTE la clave/);
+    expect(r.yaml()).toContain('  api: trace');
+  });
+
+  it('V4 · por omisión info; subir OTRO módulo se permite', () => {
+    expect(correr('GO2RTC_URL=http://127.0.0.1:1984\n').yaml()).toMatch(/log:\n {2}level: info\n/);
+    const r = correr('GO2RTC_URL=http://127.0.0.1:1984\nVIDEO_REGISTRO=info,webrtc=debug\n');
+    expect(r.codigo, r.salida).toBe(0);
+    expect(r.yaml()).toContain('  webrtc: debug');
+    expect(r.salida).not.toMatch(/CON SU CLAVE/);
+  });
+
+  it('V4 · un VIDEO_REGISTRO que no es un nivel no llega al YAML', () => {
+    const r = correr('GO2RTC_URL=http://127.0.0.1:1984\nVIDEO_REGISTRO=info\\napi: trace\n');
+    expect(r.codigo).toBe(1);
+    expect(r.salida).toMatch(/VIDEO_REGISTRO no es válido/);
+  });
+
+  it('V5 · una IP anunciada que no es de este equipo se avisa: el operador en la LAN no vería video', () => {
+    const r = correr('GO2RTC_URL=http://127.0.0.1:1984\nVIDEO_IP_ANUNCIADA=192.0.2.77\n');
+    expect(r.codigo, r.salida).toBe(0);
+    expect(r.salida).toMatch(/192\.0\.2\.77 no es una dirección de este equipo/);
+  });
+});
+
+describe('V5 (15-N) · el candidato WebRTC para un operador en otra máquina de la LAN', () => {
+  it('la IP anunciada tiene que ser de este equipo', () => {
+    const interfaces = { en0: [{ address: '192.0.2.5' }] } as never;
+    expect(candidatoDeEsteEquipo('192.0.2.5', interfaces).propio).toBe(true);
+    expect(candidatoDeEsteEquipo('192.0.2.9', interfaces)).toMatchObject({ propio: false });
+  });
+
+  it('el puerto WebRTC contesta en la IP anunciada: sí con go2rtc escuchando, no sin él', async () => {
+    const servidor = createServer();
+    await new Promise<void>((listo) => servidor.listen(0, '127.0.0.1', listo));
+    const { port } = servidor.address() as AddressInfo;
+    expect((await comprobarPuertoWebrtc('127.0.0.1', port)).ok).toBe(true);
+    await new Promise<void>((listo) => servidor.close(() => listo()));
+    const cerrado = await comprobarPuertoWebrtc('127.0.0.1', port);
+    expect(cerrado.ok).toBe(false);
+    expect(cerrado.frase).toMatch(/no recibirá video/);
   });
 });

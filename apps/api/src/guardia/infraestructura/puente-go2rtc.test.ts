@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PuenteGo2rtc, redactar } from './puente-go2rtc';
+import { PuenteGo2rtc, conFinDeLinea, redactar } from './puente-go2rtc';
 import { PuenteDeVideoFallo } from '../aplicacion/puertos';
 
 const RTSP = 'rtsp://usuario:clave-secreta@equipo.local:554/Streaming/Channels/102';
@@ -42,7 +42,9 @@ describe('PuenteGo2rtc (A5)', () => {
     expect((llamada?.init.headers as Record<string, string>)['content-type']).toBe(
       'application/sdp',
     );
-    expect(llamada?.init.body).toBe('v=0\r\noferta');
+    // V1 (15-N) · esta aserción fijaba el reenvío de una oferta SIN CRLF final,
+    // que go2rtc rechaza con «EOF»: era el defecto. El puente la repone.
+    expect(llamada?.init.body).toBe('v=0\r\noferta\r\n');
   });
 
   it('un HTTP no 2xx es PuenteDeVideoFallo con el código, y SIN la credencial', async () => {
@@ -73,5 +75,23 @@ describe('PuenteGo2rtc (A5)', () => {
     expect(redactar(`a ${RTSP} b rtsps://u:p@x/y c`)).toBe(
       'a rtsp://[redactado] b rtsp://[redactado] c',
     );
+  });
+});
+
+describe('V1 (15-N) · la oferta sale hacia el puente con su CRLF final', () => {
+  it('repone el CRLF que un cliente —o un intermediario— quitó, sin duplicarlo', () => {
+    expect(conFinDeLinea('v=0\r\ns=-')).toBe('v=0\r\ns=-\r\n');
+    expect(conFinDeLinea('v=0\r\ns=-\r\n')).toBe('v=0\r\ns=-\r\n');
+    expect(conFinDeLinea('v=0\r\ns=-\n')).toBe('v=0\r\ns=-\r\n');
+  });
+
+  it('negociar envía al puente la oferta terminada en CRLF', async () => {
+    let enviado = '';
+    const puente = new PuenteGo2rtc('http://puente', async (_url, init) => {
+      enviado = String(init.body);
+      return new Response('v=0\r\n', { status: 201 });
+    });
+    await puente.negociar('ncr-x', 'v=0\r\ns=-');
+    expect(enviado.endsWith('\r\n')).toBe(true);
   });
 });

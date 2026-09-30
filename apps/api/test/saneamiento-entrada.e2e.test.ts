@@ -21,16 +21,11 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import express from 'express';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
-import { aplicarSaneamiento, aplicarSeguridad } from '../src/seguridad';
-import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
-import { FiltroGlobalDeExcepciones } from '../src/comun/filtros/filtro-global';
-import { BITACORA } from '@ncr/domain-core';
-import type { Bitacora } from '@ncr/domain-core';
+import { montarTuberiaHttp } from '../src/arranque/tuberia-http';
 import { SONDA_POSTGRES } from '../src/arranque/sonda-postgres';
 import { ProveedorDeJwks } from '../src/autenticacion/infraestructura/jwks';
 import {
@@ -51,6 +46,7 @@ import { REPOSITORIO_DE_EQUIPOS } from '../src/equipos';
 let app: INestApplication;
 let portero = '';
 let administrador = '';
+let operador = '';
 const OTRO = '00000000-0000-4000-8000-0000000000ff';
 const srv = () => app.getHttpServer();
 
@@ -58,6 +54,11 @@ beforeAll(async () => {
   const f = await crearFirmante();
   portero = await tokenDe(f, { rol: 'portero', copropiedadId: COP_A });
   administrador = await tokenDe(f, { rol: 'administrador', copropiedadId: COP_A });
+  operador = await tokenDe(f, {
+    rol: 'operador_central',
+    copropiedadId: null,
+    copropiedades: [COP_A],
+  });
   const modulo = await conSesionDePorteriaDeLaSuite(
     Test.createTestingModule({
       imports: [AppModule.conConfiguracion(configuracionDePrueba)],
@@ -87,15 +88,10 @@ beforeAll(async () => {
     .useFactory({ factory: registroDelBanco })
     .compile();
 
-  // ─── EXACTAMENTE el orden de main.ts (77, 82, 83, 85) ───
+  // V1 (15-N) · la MISMA función que `main.ts`, no una réplica: hasta la 15-N
+  // aquí se copiaban cinco líneas y faltaban los parsers de formato (audio, SDP).
   app = modulo.createNestApplication<NestExpressApplication>({ logger: false });
-  aplicarSeguridad(app, configuracionDePrueba);
-  app.use(
-    express.json({ limit: configuracionDePrueba.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }),
-  );
-  app.use(express.urlencoded({ limit: configuracionDePrueba.LIMITE_PAYLOAD, extended: false }));
-  aplicarSaneamiento(app);
-  app.useGlobalFilters(new FiltroGlobalDeExcepciones(app.get<Bitacora>(BITACORA)));
+  montarTuberiaHttp(app, configuracionDePrueba);
   await app.init();
   await app.listen(0);
 }, 60_000);
@@ -265,5 +261,27 @@ describe('H-13-09 · una carga por encima del antiguo techo llega completa', () 
     if (r.status === 201 || r.status === 200) {
       expect(r.body.filasLeidas).toBe(FILAS);
     }
+  });
+});
+
+/**
+ * V1 (15-N) · UN CUERPO QUE ES UN FORMATO NO SE SANEA COMO TEXTO
+ *
+ * El saneamiento recorría el Buffer del audio del operador como si fuera un
+ * objeto y lo convertía en `{0: …, 1: …}`: el controlador ya no veía bytes y
+ * respondía 400 a TODO trozo («El audio viaja como application/octet-stream,
+ * no vacío»). Con la marca de cuerpo crudo, el trozo llega entero y quien
+ * contesta es el canal: sin la palabra, 409 «No hay audio con el equipo».
+ */
+describe('V1 · el audio del operador llega como bytes, no como objeto', () => {
+  const INTERCOM_DE_A = '70000000-0000-4000-8000-000000000001';
+  it('un trozo de audio no responde 400 por el saneamiento: responde el canal (409 sin la palabra)', async () => {
+    const res = await request(srv())
+      .post(`/copropiedades/${COP_A}/guardia/intercom/${INTERCOM_DE_A}/audio`)
+      .set('Authorization', `Bearer ${operador}`)
+      .set('content-type', 'application/octet-stream')
+      .send(Buffer.from([0xff, 0x7f, 0x00, 0x10, 0x20]));
+    expect(res.status, JSON.stringify(res.body)).toBe(409);
+    expect(JSON.stringify(res.body)).toMatch(/No hay audio con el equipo/);
   });
 });

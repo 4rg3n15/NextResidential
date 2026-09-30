@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  desvioEnPalabras,
   ahoraLocal,
   fechaCorta,
   fechaYHora,
@@ -67,5 +68,13 @@ describe('otros fallos (15-M) · días locales y rango de filtro', () => {
     expect(rangoDeDias('', '2026-09-29')).toBeNull();
     expect(rangoDeDias('2026-09-2', '2026-09-29')).toBeNull();
     expect(rangoDeDias('2026-09-30', '2026-09-29')).toBeNull();
+  });
+});
+
+describe('R2 (15-N) · el desvío del reloj en palabras', () => {
+  it('horas cuando son horas; minutos y segundos si no', () => {
+    expect(desvioEnPalabras(-46_727)).toBe('12 h 58 min atrasado');
+    expect(desvioEnPalabras(250)).toBe('4 min 10 s adelantado');
+    expect(desvioEnPalabras(-45)).toBe('45 s atrasado');
   });
 });

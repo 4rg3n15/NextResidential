@@ -20,6 +20,7 @@ import '../models/historial_de_ordenes_dto.dart';
 import '../models/orden_de_bloqueo_dto.dart';
 import '../models/orden_ejecutada_dto.dart';
 import '../models/orden_manual_dto.dart';
+import '../models/preferencias_de_atencion_dto.dart';
 import '../models/solicitud_de_canal_dto.dart';
 
 part 'guardia_api.g.dart';
@@ -48,9 +49,9 @@ abstract class GuardiaApi {
     @Path('id') required String id,
   });
 
-  /// Cola de atención con tiempo de espera (CU-03, HU-25)
+  /// Cola de atención: lo que necesita a una persona (CU-03, P-22)
   @GET('/copropiedades/{id}/guardia/cola')
-  Future<ColaDeAtencionDto> guardiaControllerCola({
+  Future<ColaDeAtencionDto> atencionControllerConsultar({
     @Path('id') required String id,
   });
 
@@ -109,6 +110,19 @@ abstract class GuardiaApi {
   @GET('/copropiedades/{id}/guardia/ordenes')
   Future<HistorialDeOrdenesDto> guardiaControllerHistorialDeOrdenes({
     @Path('id') required String id,
+  });
+
+  /// Preferencias de atención de la copropiedad (G2)
+  @GET('/copropiedades/{id}/guardia/preferencias')
+  Future<PreferenciasDeAtencionDto> atencionControllerLeer({
+    @Path('id') required String id,
+  });
+
+  /// Cambia las preferencias de atención (G2)
+  @PUT('/copropiedades/{id}/guardia/preferencias')
+  Future<PreferenciasDeAtencionDto> atencionControllerGuardar({
+    @Path('id') required String id,
+    @Body() required PreferenciasDeAtencionDto body,
   });
 
   /// Negocia la vista en vivo del equipo (WHEP): oferta SDP dentro, respuesta SDP fuera

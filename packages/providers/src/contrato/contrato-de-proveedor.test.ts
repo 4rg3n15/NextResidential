@@ -170,6 +170,11 @@ const SIMULADO: CasoDeContrato = {
 const guionDePortero = (mundo: MundoDeContrato): GuionDeEquipo => ({
   familia: 'videoportero',
   ...CREDENCIAL,
+  // V2 (15-N) · como el de verdad, lista sus flujos: el canal sale de aquí.
+  canalesDeVideo: [
+    { id: '101', codec: 'H.264' },
+    { id: '102', codec: 'H.264' },
+  ],
   ...(mundo.porteroSinAperturaRemota === true ? { aperturaRemota: false } : {}),
   ...(mundo.porteroSinAudio === true ? { canalesDeAudio: [] } : {}),
   ...(mundo.porteroOcupado === true ? { ocupado: true } : {}),

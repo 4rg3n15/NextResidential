@@ -45,7 +45,14 @@ class TerminalEspia implements FaceTemplateProvider {
   readonly recibidas: { dispositivoId: string; plantillaId: string; bytes: number }[] = [];
   readonly retiradas: string[] = [];
   falla = false;
+  /** R2 (15-N) · el error del proveedor con el reloj desviado, por su nombre. */
+  relojDesviado: string | null = null;
   async sincronizar(dispositivoId: string, plantillaId: string, plantilla: Uint8Array) {
+    if (this.relojDesviado !== null) {
+      const e = new Error(this.relojDesviado);
+      e.name = 'RelojDelEquipoDesviado';
+      throw e;
+    }
     if (this.falla) throw new Error('terminal fuera de línea');
     this.recibidas.push({ dispositivoId, plantillaId, bytes: plantilla.length });
   }
@@ -190,6 +197,41 @@ describe('SincronizarPlantilla · RN-09, se pregunta en el instante de empujar',
     expect(terminal.recibidas).toEqual([
       { dispositivoId: 'disp-1', plantillaId: r.plantillaId, bytes: VECTOR.length },
     ]);
+  });
+
+  it('R2 (15-N) · con el reloj del equipo desviado, se dice que no se le envió, y por qué', async () => {
+    const r = await capturaValida();
+    await responder.ejecutar(ctx, {
+      consentimientoId: r.consentimientoId,
+      quienResponde: TITULAR,
+      acepta: true,
+    });
+    terminal.relojDesviado = 'el reloj del equipo va 12 h 58 min atrasado: no se le da de alta';
+    const s = await sincronizar.ejecutar(ctx, {
+      plantillaId: r.plantillaId,
+      dispositivoId: 'disp-1',
+    });
+    expect(esFallo(s) && s.error.detalle).toBe(
+      'No se le envió: el reloj del equipo va 12 h 58 min atrasado: no se le da de alta',
+    );
+    expect(terminal.recibidas).toEqual([]);
+  });
+
+  it('un rechazo del equipo se dice sin su identificador (la visita ya enseña su nombre)', async () => {
+    const r = await capturaValida();
+    await responder.ejecutar(ctx, {
+      consentimientoId: r.consentimientoId,
+      quienResponde: TITULAR,
+      acepta: true,
+    });
+    terminal.falla = true;
+    const s = await sincronizar.ejecutar(ctx, {
+      plantillaId: r.plantillaId,
+      dispositivoId: 'disp-1',
+    });
+    expect(esFallo(s) && s.error.detalle).toBe(
+      'El equipo no aceptó la plantilla: terminal fuera de línea',
+    );
   });
 
   it('revocado ENTRE habilitar y empujar, ya no se empuja', async () => {

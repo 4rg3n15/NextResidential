@@ -81,8 +81,11 @@ export class AccionadorPorProveedor implements AccionadorDePuerta, BloqueoDeAcce
     }
     const resultado = await this.traducir(async () => {
       const r = await this.proveedor.abrir(dispositivoId, actorId);
-      return r.aceptado
-        ? ordenAceptada(r.latenciaMs)
+      // O1 (15-N) · rechazo ≠ sin respuesta (DT-15M-06): el portero resuelve
+      // uno desbloqueando o revisando el equipo y el otro llamando al técnico.
+      if (r.aceptado) return ordenAceptada(r.latenciaMs);
+      return r.rechazo !== undefined
+        ? ordenRechazada(r.rechazo, r.latenciaMs)
         : ordenInalcanzable('el equipo no respondió a la orden de apertura', r.latenciaMs);
     });
     this.anotar('accionar', dispositivoId, this.rotulo(), resultado);

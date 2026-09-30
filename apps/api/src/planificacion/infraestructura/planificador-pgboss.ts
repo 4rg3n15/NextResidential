@@ -1,6 +1,11 @@
 import PgBoss from 'pg-boss';
 import type { Bitacora } from '@ncr/domain-core';
-import type { Planificador, TrabajoProgramado } from '../aplicacion/puertos';
+import type {
+  ColaAPedido,
+  Planificador,
+  TrabajoAPedido,
+  TrabajoProgramado,
+} from '../aplicacion/puertos';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -50,8 +55,9 @@ const ZONA_POR_OMISION = 'UTC';
 /** Otros fallos (15-M) · plazo de un barrido en curso al apagar; menor que `PLAZO_DE_CIERRE_MS`. */
 export const PLAZO_DE_PARADA_MS = 6_000;
 
-export class PlanificadorPgBoss implements Planificador {
+export class PlanificadorPgBoss implements Planificador, ColaAPedido {
   private readonly trabajos: TrabajoProgramado[] = [];
+  private readonly aPedido: TrabajoAPedido[] = [];
   private boss: PgBoss | null = null;
 
   constructor(private readonly opciones: OpcionesPlanificador) {}
@@ -110,6 +116,53 @@ export class PlanificadorPgBoss implements Planificador {
       this.opciones.bitacora.registrar('info', 'trabajo programado dado de alta', {
         trabajo: trabajo.nombre,
         cron: trabajo.cron,
+        descripcion: trabajo.descripcion,
+      });
+    }
+    await this.atenderColas(boss);
+  }
+
+  /** R1 (15-N) · quien atiende una cola a pedido. Antes de `arrancar`. */
+  atender(trabajo: TrabajoAPedido): void {
+    this.aPedido.push(trabajo);
+  }
+
+  async encolar(
+    nombre: string,
+    datos: Readonly<Record<string, string>>,
+    clave?: string,
+  ): Promise<boolean> {
+    const boss = this.boss;
+    if (boss === null) return false;
+    await boss.send(nombre, { ...datos }, clave === undefined ? {} : { singletonKey: clave });
+    return true;
+  }
+
+  /** Las colas a pedido, con su trabajador. Sin horario: se encolan desde la aplicación. */
+  private async atenderColas(boss: PgBoss): Promise<void> {
+    for (const trabajo of this.aPedido) {
+      await boss.createQueue(trabajo.nombre);
+      await boss.work<Readonly<Record<string, string>>>(trabajo.nombre, async (lote) => {
+        for (const job of lote) {
+          const inicio = Date.now();
+          try {
+            const parte = await trabajo.ejecutar(job.data);
+            this.opciones.bitacora.registrar('info', 'trabajo a pedido ejecutado', {
+              trabajo: trabajo.nombre,
+              duracionMs: Date.now() - inicio,
+              ...parte,
+            });
+          } catch (error) {
+            this.opciones.bitacora.registrar('error', 'trabajo a pedido fallido', {
+              trabajo: trabajo.nombre,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          }
+        }
+      });
+      this.opciones.bitacora.registrar('info', 'cola a pedido atendida', {
+        trabajo: trabajo.nombre,
         descripcion: trabajo.descripcion,
       });
     }

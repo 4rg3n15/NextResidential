@@ -31,6 +31,18 @@ export const SEVERIDAD: Readonly<Record<string, { tono: TonoDeDistintivo; texto:
 
 export const MINIMO_MOTIVO_DE_ARCHIVO = 3;
 
+/**
+ * A2 (15-N) · un día del calendario (`AAAA-MM-DD`, lo que da `<input
+ * type="date">`) como instante del inicio de ese día EN EL NAVEGADOR; con
+ * `siguiente`, el del día después: el filtro es `[desde, hasta)`.
+ */
+export const inicioDelDia = (dia: string, siguiente = false): string | undefined => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dia);
+  if (m === null) return undefined;
+  const fecha = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + (siguiente ? 1 : 0));
+  return Number.isNaN(fecha.getTime()) ? undefined : fecha.toISOString();
+};
+
 export const AlertasAbiertas = ({
   copropiedadId,
   nombreDe,
@@ -42,7 +54,13 @@ export const AlertasAbiertas = ({
 }): JSX.Element => {
   const clientes = useQueryClient();
   const [filtro, setFiltro] = useState<FiltroDeAlertas>({});
-  const alertas = useAlertasAbiertas(copropiedadId, filtro);
+  const [diaDesde, setDiaDesde] = useState('');
+  const [diaHasta, setDiaHasta] = useState('');
+  const alertas = useAlertasAbiertas(copropiedadId, {
+    ...filtro,
+    desde: inicioDelDia(diaDesde),
+    hasta: inicioDelDia(diaHasta, true),
+  });
   const [marcadas, setMarcadas] = useState<ReadonlySet<string>>(new Set());
   const [motivo, setMotivo] = useState('');
   const [enCurso, setEnCurso] = useState(false);
@@ -85,6 +103,12 @@ export const AlertasAbiertas = ({
       setEnCurso(false);
     }
   };
+
+  // A2 (15-N) · sólo lo que se VE: marcar lo que un filtro esconde sería
+  // archivar a ciegas.
+  const todasMarcadas = lista.length > 0 && lista.every((a) => marcadas.has(a.id));
+  const marcarTodasLasVisibles = (): void =>
+    setMarcadas(todasMarcadas ? new Set() : new Set(lista.map((a) => a.id)));
 
   const alternar = (id: string): void => {
     const siguiente = new Set(marcadas);
@@ -137,6 +161,26 @@ export const AlertasAbiertas = ({
               ))}
             </select>
           </label>
+          <label className="flex items-center gap-2 text-secundario">
+            <span className="text-texto-apagado">Desde</span>
+            <input
+              type="date"
+              value={diaDesde}
+              onChange={(e) => setDiaDesde(e.target.value)}
+              aria-label="Alertas generadas desde el día"
+              className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-secundario">
+            <span className="text-texto-apagado">Hasta</span>
+            <input
+              type="date"
+              value={diaHasta}
+              onChange={(e) => setDiaHasta(e.target.value)}
+              aria-label="Alertas generadas hasta el día (incluido)"
+              className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
+            />
+          </label>
         </div>
       </div>
 
@@ -182,6 +226,16 @@ export const AlertasAbiertas = ({
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Boton
+          tamano="sm"
+          variante="secundario"
+          disabled={lista.length === 0}
+          onClick={marcarTodasLasVisibles}
+        >
+          {todasMarcadas
+            ? 'Desmarcar todas'
+            : `Seleccionar todas las visibles${lista.length > 0 ? ` (${String(lista.length)})` : ''}`}
+        </Boton>
         <label className="flex flex-1 items-center gap-2 text-secundario">
           <span className="text-texto-apagado">Motivo del archivo</span>
           <input

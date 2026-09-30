@@ -57,6 +57,10 @@ describe('CampoCanalDeVideo', () => {
     expect(campo.tagName).toBe('INPUT');
     expect(campo.value).toBe('1a2');
     expect(screen.getByText('Escriba el canal')).toBeTruthy();
-    expect(screen.getByText(/Vacío = 102/)).toBeTruthy();
+    // O6 (15-N) · desde V2 un canal vacío NO es el 102 (la cámara del 29/09 no
+    // lo tiene): se usa el que el equipo declare. La ayuda no puede decir otra cosa.
+    expect(screen.queryByText(/Vacío = 102/)).toBeNull();
+    expect(screen.getByText(/Vacío: el que el equipo declare/)).toBeTruthy();
+    expect(campo.placeholder).not.toBe('102');
   });
 });

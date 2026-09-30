@@ -31,8 +31,11 @@ export const desdeEntorno = ({ familia, prefijo }, entorno, salir) => {
   const faltan = ['HOST', 'USUARIO', 'CLAVE'].filter((s) => e(s) === '');
   if (faltan.length > 0)
     salir(`faltan ${faltan.map((s) => `${prefijo}_${s}`).join(', ')} en el .env`);
-  const video = e('CANAL_VIDEO') || '102';
-  if (!/^[1-9][0-9]{2,3}$/.test(video)) salir(`${prefijo}_CANAL_VIDEO no es un canal: «${video}»`);
+  // V2 (15-N) · sin canal en el .env, el que el equipo declara (nunca 102 a ciegas).
+  const video = e('CANAL_VIDEO') || null;
+  if (video !== null && !/^[1-9][0-9]{2,3}$/.test(video)) {
+    salir(`${prefijo}_CANAL_VIDEO no es un canal: «${video}»`);
+  }
   return {
     familia,
     host: e('HOST'),

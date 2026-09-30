@@ -14,3 +14,27 @@ export interface OrigenDeVideo {
   readonly flujo: 'principal' | 'secundario';
   readonly detalle: string;
 }
+
+/**
+ * V5 (15-N) · por qué no hay video, preguntado al EQUIPO cuando el puente no
+ * lo dice (go2rtc contesta «wrong response on DESCRIBE» para 403, 404, 412 y
+ * 454 por igual). Neutral: la frase ya viene en palabras, sin marca.
+ */
+export type CausaDeVideo =
+  | 'ninguna'
+  | 'credencial'
+  | 'solo_sha256'
+  | 'sin_permiso'
+  | 'sin_canal'
+  | 'sesion'
+  | 'codec'
+  | 'inalcanzable'
+  | 'otro';
+
+export interface DiagnosticoDeVideo {
+  readonly canal: string | null;
+  readonly causa: CausaDeVideo;
+  readonly codec: string | null;
+  /** En palabras y con el remedio; nunca la credencial. */
+  readonly frase: string;
+}

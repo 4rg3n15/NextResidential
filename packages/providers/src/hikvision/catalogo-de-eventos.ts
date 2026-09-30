@@ -25,6 +25,8 @@ export const TIPOS_DE_EVENTO_DE_EQUIPO = [
   'rostro_capturado_para_verificacion',
   'tarjeta_valida',
   'tarjeta_rechazada',
+  // R2 (15-N) · la negación que decide el propio equipo, con su motivo.
+  'acceso_negado_por_el_equipo',
   'lista_negra',
   'timbre',
   'llamada',
@@ -61,20 +63,48 @@ export const TIPOS_DE_EVENTO_DE_EQUIPO = [
 ] as const;
 export type TipoDeEventoDeEquipo = (typeof TIPOS_DE_EVENTO_DE_EQUIPO)[number];
 
+/**
+ * R2 (15-N) · el motivo del DOMINIO con que el equipo negó, cuando lo dice.
+ * Es un subconjunto literal de `MotivoAcceso` (`@ncr/domain-core`): aquí no se
+ * importa el dominio, y el tipo lo comprueba quien lo consume.
+ */
+export type MotivoDelEquipo = 'VIGENCIA_EXPIRADA' | 'FUERA_DE_HORARIO' | 'ZONA_NO_AUTORIZADA';
+
 interface Entrada {
   readonly tipo: TipoDeEventoDeEquipo;
   readonly titulo: string;
+  readonly motivo?: MotivoDelEquipo;
 }
 
-const e = (tipo: TipoDeEventoDeEquipo, titulo: string): Entrada => ({ tipo, titulo });
+const e = (tipo: TipoDeEventoDeEquipo, titulo: string, motivo?: MotivoDelEquipo): Entrada =>
+  motivo === undefined ? { tipo, titulo } : { tipo, titulo, motivo };
 
 /** `mayor/menor` → tipo y título. El menor en decimal, como llega en el JSON. */
 const POR_CODIGO: Readonly<Record<string, Entrada>> = {
   // 5 · eventos de control de acceso
   '5/1': e('tarjeta_valida', 'Tarjeta válida'),
-  '5/6': e('tarjeta_rechazada', 'Tarjeta sin permiso'),
-  '5/7': e('tarjeta_rechazada', 'Tarjeta fuera de horario'),
-  '5/8': e('tarjeta_rechazada', 'Tarjeta vencida'),
+  /**
+   * R2 (15-N) · 0x06 «No Permission», 0x07 «Invalid Card Swiping Time
+   * Period», 0x08 «Expired Card» (Access_Control_Event_Types…, Other Events
+   * 0x5). La serie los usa para la PERSONA —rostro o tarjeta—: el 29/09 el
+   * videoportero reconoció la cara y negó por «permiso vencido». Se dicen con
+   * el motivo del dominio, nunca como «fallo técnico».
+   */
+  '5/6': e(
+    'acceso_negado_por_el_equipo',
+    'El equipo negó el acceso: sin permiso en esta puerta',
+    'ZONA_NO_AUTORIZADA',
+  ),
+  '5/7': e(
+    'acceso_negado_por_el_equipo',
+    'El equipo negó el acceso: fuera de su periodo',
+    'FUERA_DE_HORARIO',
+  ),
+  '5/8': e(
+    'acceso_negado_por_el_equipo',
+    'El equipo negó el acceso: permiso vencido',
+    'VIGENCIA_EXPIRADA',
+  ),
   '5/9': e('tarjeta_rechazada', 'Tarjeta no registrada'),
   '5/21': e('puerta_desbloqueada', 'Cerradura liberada'),
   '5/22': e('puerta_bloqueada', 'Cerradura asegurada'),
@@ -85,6 +115,8 @@ const POR_CODIGO: Readonly<Record<string, Entrada>> = {
   '5/27': e('puerta_forzada', 'Puerta forzada'),
   '5/28': e('puerta_abierta_demasiado_tiempo', 'Puerta abierta demasiado tiempo'),
   '5/37': e('timbre', 'Timbre'),
+  // G3 (15-N) · 0x33 «Call Center» (Other Events 0x5): la llamada a la central.
+  '5/51': e('llamada', 'Llamada a la central'),
   '5/75': e('rostro_reconocido', 'Rostro reconocido'),
   '5/76': e('rostro_no_reconocido', 'Rostro no reconocido'),
   '5/77': e('rostro_reconocido', 'Rostro reconocido (con código de persona)'),
@@ -92,6 +124,12 @@ const POR_CODIGO: Readonly<Record<string, Entrada>> = {
   '5/79': e('rostro_no_reconocido', 'Rostro: tiempo agotado'),
   '5/80': e('rostro_no_reconocido', 'Rostro no reconocido'),
   '5/113': e('lista_negra', 'Persona en lista negra del equipo'),
+  // R2 (15-N) · 0x76 «Authentication Failed: Authentication Schedule in Sleeping Mode».
+  '5/118': e(
+    'acceso_negado_por_el_equipo',
+    'El equipo negó el acceso: fuera de su horario de autenticación',
+    'FUERA_DE_HORARIO',
+  ),
   '5/135': e('puerta_forzada', 'Paso forzado'),
   '5/146': e('rostro_capturado_para_verificacion', 'Rostro capturado para verificación'),
   // 3 · operaciones
@@ -139,6 +177,15 @@ export const eventoDeLlamada = (orden: string | null | undefined): Entrada => {
     e('desconocido', `Llamada del equipo (orden «${orden.trim().slice(0, 30)}»)`)
   );
 };
+
+/** R2 (15-N) · el motivo del dominio con que el equipo negó, si el código lo dice. */
+export const motivoDelEquipo = (
+  mayor: number | null,
+  menor: number | null,
+): MotivoDelEquipo | null =>
+  mayor === null || menor === null
+    ? null
+    : (POR_CODIGO[`${String(mayor)}/${String(menor)}`]?.motivo ?? null);
 
 /** Un código que el catálogo reconoce como un ROSTRO que pide decisión. */
 export const esCodigoDeRostro = (mayor: number, menor: number): boolean => {

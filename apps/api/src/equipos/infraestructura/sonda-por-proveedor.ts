@@ -67,6 +67,8 @@ export class SondaPorProveedor implements SondaDeEquipo {
      * al equipo qué video entrega en el canal de su ficha. Sin él, no.
      */
     private readonly puertoRtsp?: number,
+    /** R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`: la ficha juzga el reloj con el umbral de las altas. */
+    private readonly desvioDeRelojMaximoS?: number,
   ) {}
 
   async probar(datos: DatosDeSondeo): Promise<ResultadoDeSondeo> {
@@ -90,6 +92,9 @@ export class SondaPorProveedor implements SondaDeEquipo {
        * no pasa por aquí y respeta la marca.
        */
       olvidarRechazo: true,
+      ...(this.desvioDeRelojMaximoS === undefined
+        ? {}
+        : { desvioDeRelojMaximoS: this.desvioDeRelojMaximoS }),
       ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
       ...(this.traza === undefined ? {} : { traza: this.traza }),
       ...(datos.canalBarrera === undefined || datos.canalBarrera === null
@@ -97,7 +102,8 @@ export class SondaPorProveedor implements SondaDeEquipo {
         : { canal: datos.canalBarrera }),
       ...(this.puertoRtsp === undefined || !CON_VIDEO.has(datos.tipo)
         ? {}
-        : { video: { puerto: this.puertoRtsp, canal: datos.canalDeVideo ?? '102' } }),
+        : // V2 (15-N) · sin canal en la ficha, el diagnóstico elige uno DECLARADO.
+          { video: { puerto: this.puertoRtsp, canal: datos.canalDeVideo ?? null } }),
     });
 
     const ficha = fichaDe(diagnostico);
@@ -109,12 +115,16 @@ export class SondaPorProveedor implements SondaDeEquipo {
      */
     const capacidades =
       diagnostico.contacto.clase === 'alcanzado' ? diagnostico.capacidadesDelEquipo : null;
+    // V2 (15-N) · el canal propuesto entre los declarados viaja para guardarse.
+    const propuesto =
+      diagnostico.video?.origenDelCanal === 'propuesto' ? diagnostico.video.canal : undefined;
     const base = {
       modelo: diagnostico.modelo,
       firmware: diagnostico.firmware,
       latenciaMs: diagnostico.contacto.latenciaMs,
       ficha,
       ...(capacidades === null ? {} : { capacidades }),
+      ...(propuesto === undefined ? {} : { canalDeVideo: propuesto }),
     };
 
     /**

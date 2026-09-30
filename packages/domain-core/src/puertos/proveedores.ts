@@ -12,6 +12,12 @@ import type { Vigencia } from '../autorizaciones/vigencia';
 export interface ResultadoAccionamiento {
   readonly aceptado: boolean;
   readonly latenciaMs: number;
+  /**
+   * O1 (15-N) · con `aceptado: false`, el equipo CONTESTÓ y dijo que no: por
+   * qué, en lenguaje del operador. Ausente, «no aceptado» es que no contestó.
+   * Opcional y aditivo: quien no lo lee se comporta como antes.
+   */
+  readonly rechazo?: string;
 }
 
 export interface AccessPointProvider {

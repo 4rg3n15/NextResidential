@@ -1,4 +1,5 @@
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
+import { desvioEnPalabras } from '../nucleo/reloj-del-equipo';
 import { CredencialRechazada } from '../nucleo/errores';
 import { recortado, sinSecretos } from '../equipo/intercambio';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
@@ -20,9 +21,9 @@ import { reportaEstadoDeBarrera } from '../barrera/barrera-de-entrada';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import { descubrirCapacidades } from '../hikvision/capacidades-hikvision';
 import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
-import { describirRtsp } from '../equipo/rtsp-describe';
 import type { ResultadoRtsp } from '../equipo/rtsp-describe';
-import { caminoRtspDe } from '../hikvision/video-rtsp';
+import { sondearVideoDelEquipo } from './video-del-diagnostico';
+import type { OrigenDelCanal } from '../nucleo/canal-de-video';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -128,19 +129,28 @@ export interface OpcionesDeDiagnostico extends OpcionesDeEquipo {
    */
   readonly olvidarRechazo?: boolean;
   readonly ahoraDelServidor?: () => Date;
+  /** R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`: el reloj se juzga con el umbral que frena las altas. */
+  readonly desvioDeRelojMaximoS?: number;
   /** Carril de la cámara. Si no se declaró, el VERIFICADO (ver `camara/carril.ts`). */
   readonly canal?: number;
   /**
    * D2 · C3 (15-L) · con él, se le pregunta al equipo por RTSP qué video
    * entrega en ese canal y puerto (los de su ficha y del `.env`).
    */
-  readonly video?: { readonly puerto: number; readonly canal: string };
+  readonly video?: { readonly puerto: number; readonly canal: string | null };
 }
 
 /** D2 · C3 (15-L) · lo que el equipo contestó por RTSP, con lo que se preguntó. */
 export interface VideoDelEquipo extends ResultadoRtsp {
   readonly canal: string;
   readonly puerto: number;
+  /**
+   * V2 (15-N) · de dónde salió el canal: la ficha, o propuesto entre los que
+   * el equipo declara (y cuál de la ficha sustituyó). Con `propuesto`, el
+   * canal se GUARDA en la ficha: es el que el equipo tiene.
+   */
+  readonly origenDelCanal?: OrigenDelCanal;
+  readonly sustituido?: string | null;
 }
 
 const estadoDelVideo = (r: ResultadoRtsp): EstadoDeCapacidad =>
@@ -274,17 +284,7 @@ export const diagnosticarEquipo = async (
   const video: VideoDelEquipo | undefined =
     opciones.video === undefined || opciones.familia === 'comun'
       ? undefined
-      : {
-          ...(await describirRtsp({
-            host: opciones.host,
-            puerto: opciones.video.puerto,
-            camino: caminoRtspDe(opciones.video.canal),
-            usuario: opciones.usuario,
-            clave: opciones.clave,
-          })),
-          canal: opciones.video.canal,
-          puerto: opciones.video.puerto,
-        };
+      : await sondearVideoDelEquipo(opciones, opciones.video, capacidadesDelEquipo);
   if (video !== undefined && capacidadesDelEquipo !== null) {
     capacidadesDelEquipo = {
       ...capacidadesDelEquipo,
@@ -336,7 +336,13 @@ export const diagnosticarEquipo = async (
     capacidadesDelEquipo,
     ...(video === undefined ? {} : { video }),
     hora:
-      hora === null ? null : juzgarHora(hora, (opciones.ahoraDelServidor ?? (() => new Date()))()),
+      hora === null
+        ? null
+        : juzgarHora(
+            hora,
+            (opciones.ahoraDelServidor ?? (() => new Date()))(),
+            opciones.desvioDeRelojMaximoS,
+          ),
     sinRespuesta,
   };
 };
@@ -453,7 +459,12 @@ const contactar = async (
  * histórico queda desplazado sin un solo error en el registro. Se descubre
  * cuando una auditoría compara dos fuentes, que es el peor momento posible.
  */
-export const juzgarHora = (cuerpo: string, ahoraDelServidor: Date): HoraDelEquipo => {
+export const juzgarHora = (
+  cuerpo: string,
+  ahoraDelServidor: Date,
+  /** R2 (15-N) · el umbral de la API (`EQUIPOS_DESVIO_DE_RELOJ_S`), el mismo que frena las altas. */
+  toleranciaSegundos: number = DESVIO_TOLERABLE_SEGUNDOS,
+): HoraDelEquipo => {
   const leida = etiqueta(cuerpo, 'localTime') ?? etiqueta(cuerpo, 'time');
   if (leida === null || Number.isNaN(Date.parse(leida))) {
     return {
@@ -464,15 +475,17 @@ export const juzgarHora = (cuerpo: string, ahoraDelServidor: Date): HoraDelEquip
     };
   }
   const desvio = Math.round((Date.parse(leida) - ahoraDelServidor.getTime()) / 1000);
-  const excesiva = Math.abs(desvio) > DESVIO_TOLERABLE_SEGUNDOS;
+  const excesiva = Math.abs(desvio) > toleranciaSegundos;
   return {
     leida,
     desvioSegundos: desvio,
     excesiva,
+    // R2 (15-N) · en horas cuando son horas: «46727 s» no le dice nada a nadie.
     detalle: excesiva
-      ? `El reloj del equipo va ${String(Math.abs(desvio))} s ${desvio > 0 ? 'adelantado' : 'atrasado'} ` +
-        'respecto del servidor. No produce ningún error: fecha mal los eventos, y eso sólo ' +
-        'se ve cuando una auditoría compara dos fuentes'
+      ? `El reloj del equipo va ${desvioEnPalabras(desvio)} respecto del servidor. No produce ` +
+        'ningún error: fecha mal los eventos y, en una terminal o un videoportero, niega con ' +
+        '«permiso vencido» a quien tiene la visita vigente. Mientras siga así, no se le da de alta ' +
+        'a nadie con vigencia: sincronice su hora (Configuración → Sistema → Hora, con NTP)'
       : `El reloj del equipo está dentro de tolerancia (${String(desvio)} s)`,
   };
 };

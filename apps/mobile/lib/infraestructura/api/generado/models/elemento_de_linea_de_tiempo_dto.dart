@@ -23,6 +23,8 @@ class ElementoDeLineaDeTiempoDto {
     required this.enVivo,
     required this.eventoId,
     required this.codigo,
+    required this.horaDelEquipo,
+    required this.relojDesviadoSegundos,
   });
   
   factory ElementoDeLineaDeTiempoDto.fromJson(Map<String, Object?> json) => _$ElementoDeLineaDeTiempoDtoFromJson(json);
@@ -43,6 +45,12 @@ class ElementoDeLineaDeTiempoDto {
   final bool enVivo;
   final String? eventoId;
   final CodigoDelEquipoDto? codigo;
+
+  /// R2 (15-N) · con el reloj del equipo desviado, la hora que DIJO el equipo; `ocurridoEn` es entonces la de recepción de la plataforma
+  final DateTime? horaDelEquipo;
+
+  /// Segundos que el reloj del equipo iba por delante (negativo: atrasado)
+  final num? relojDesviadoSegundos;
 
   Map<String, Object?> toJson() => _$ElementoDeLineaDeTiempoDtoToJson(this);
 }

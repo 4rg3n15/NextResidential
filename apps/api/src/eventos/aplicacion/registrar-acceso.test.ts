@@ -158,11 +158,38 @@ describe('RegistrarAcceso · alertas y escalamiento (RN-18, CA-18)', () => {
     expect(abiertas[0]?.escaladaDentroDelPlazo()).toBe(true);
   });
 
-  it('una negación ordinaria no genera alerta', async () => {
+  it('una negación que no necesita a nadie (tarjeta) no genera alerta', async () => {
+    // Hasta la 15-N esta prueba usaba una PLACA con vigencia expirada: el
+    // cliente decidió lo contrario en P-22 (C-45) y esa placa ahora sí pide
+    // a una persona. Lo que sigue sin alertar es lo que P-22 no nombra.
     const m = montar(motorNiega(COP, 'VIGENCIA_EXPIRADA'));
-    const constancia = abrir(await m.caso.ejecutar(hecho(), ACTOR));
+    const constancia = abrir(await m.caso.ejecutar(hecho({ metodo: 'tarjeta' }), ACTOR));
     expect(constancia.alertaId).toBeNull();
     expect((await m.alertas.abiertasDe(COP)).length).toBe(0);
+  });
+
+  it('P-22 (15-N) · una placa con la vigencia expirada abre UNA alerta de atención', async () => {
+    const m = montar(motorNiega(COP, 'VIGENCIA_EXPIRADA'));
+    const primera = abrir(await m.caso.ejecutar(hecho({ referenciaExterna: 'p-1' }), ACTOR));
+    const segunda = abrir(await m.caso.ejecutar(hecho({ referenciaExterna: 'p-2' }), ACTOR));
+    const abiertas = await m.alertas.abiertasDe(COP);
+    expect(abiertas).toHaveLength(1);
+    expect(abiertas[0]?.tipo).toBe('acceso_dudoso');
+    expect(abiertas[0]?.notas).toMatch(/placa sin autorización vigente \(VIGENCIA_EXPIRADA\)/);
+    expect(segunda.alertaId).toBe(primera.alertaId);
+  });
+
+  it('P-22 (15-N) · un rostro fuera de horario abre alerta de atención', async () => {
+    const m = montar(motorNiega(COP, 'FUERA_DE_HORARIO'));
+    abrir(await m.caso.ejecutar(hecho({ metodo: 'facial' }), ACTOR));
+    const [alerta] = await m.alertas.abiertasDe(COP);
+    expect(alerta?.notas).toMatch(/persona no autorizada/);
+  });
+
+  it('P-22 (15-N) · una negación MANUAL no alerta: ya la decidió una persona', async () => {
+    const m = montar(motorNiega(COP, 'VIGENCIA_EXPIRADA'));
+    abrir(await m.caso.ejecutar(hecho({ metodo: 'manual' }), ACTOR));
+    expect(await m.alertas.abiertasDe(COP)).toHaveLength(0);
   });
 
   it('P-07 · un permiso con lectura sin confirmar escala a un humano', async () => {

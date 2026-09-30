@@ -8,6 +8,7 @@ import type { Rol } from '@ncr/contracts';
 import type { AlcanceActivo } from '../copropiedad';
 import { FormularioDeConfiguracion } from './formulario';
 import { InterruptorDeModoPruebas } from './modo-pruebas';
+import { PreferenciasDeAtencionEditables } from './preferencias-de-atencion';
 
 /**
  * Configuración, ahora editable (bloque 7 de la ETAPA 09-B).
@@ -216,6 +217,12 @@ export const PantallaDeConfiguracion = ({
             bloqueado="Comprobado por los dos caminos: RLS en la base y contexto en la aplicación. No es configurable por definición."
           >
             Activo y forzado
+          </Dato>
+          <Dato
+            etiqueta="Avisos de la guardia y la portería"
+            ayuda="Qué pasa solo a «Atención» y qué suena, por tipo de aviso. Por omisión, todo."
+          >
+            <PreferenciasDeAtencionEditables copropiedadId={alcance.copropiedadId ?? ''} />
           </Dato>
           {sesion.rol === 'superadministrador' ? (
             <Dato

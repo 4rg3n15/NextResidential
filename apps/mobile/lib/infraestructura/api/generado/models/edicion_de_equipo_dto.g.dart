@@ -50,6 +50,6 @@ Map<String, dynamic> _$EdicionDeEquipoDtoToJson(EdicionDeEquipoDto instance) =>
       'modoDeTerminal': instance.modoDeTerminal,
       'canalDeAudioHabilitado': instance.canalDeAudioHabilitado,
       'canalDeVideo': instance.canalDeVideo,
-      'zonaId': instance.zonaId,
       'probarConexion': instance.probarConexion,
+      'zonaId': instance.zonaId,
     };

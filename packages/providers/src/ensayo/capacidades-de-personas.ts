@@ -1,4 +1,14 @@
+import { rutaPara } from '../equipo/catalogo-de-rutas';
+import {
+  operacionesDeclaradasDeLaBiblioteca,
+  tiposDeclaradosDePersona,
+} from '../hikvision/rostros-y-personas';
 import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
+import {
+  PROPOSITO_CARGA_SETUP,
+  propositoDeLaCarga,
+  tipoDePersonaConVigencia,
+} from '../terminal/forma-del-alta';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -10,8 +20,16 @@ import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
  * `.env` (EQUIPOS_FOTO_*) y aquí se CONTRASTA con lo que declara el aparato real:
  *  · la biblioteca: qué operaciones admite (`supportFDFunction`), en qué
  *    formatos (`facePicFormat`) y cuántos rostros caben;
- *  · las personas: si admite el alta (`supportFunction` con «post»), cuántas
- *    caben (`maxRecordNum`) y si conoce el tipo «visitor» que escribe A2.
+ *  · las personas: si admite el alta (`supportFunction` con «post») y cuántas
+ *    caben (`maxRecordNum`).
+ *
+ * R3 (15-N) · el paso NO exige una forma fija («setUp» y «visitor», la de la
+ * terminal): en sitio marcaba FALLO al DS-KD9633, que la 15-M da de alta por
+ * `post` y como `normal` y que reconoció al visitante. Ahora juzga la forma
+ * que SE USARÁ, con la misma decisión (`terminal/forma-del-alta.ts`) y las
+ * mismas lecturas (`hikvision/rostros-y-personas.ts`) que el alta real, y la
+ * escribe en la nota: tipo de persona y método y ruta de la carga. Sólo es
+ * FALLO lo que haría fallar ese alta.
  *
  * Los nombres de campo varían de un firmware a otro en mayúsculas y en
  * anidamiento, así que se buscan por nombre en todo el documento.
@@ -75,13 +93,8 @@ export const juzgarPersonasYRostros = (
   if (biblioteca === null) {
     fallos.push('no se pudo leer qué admite la biblioteca de rostros');
   } else {
-    const funciones = opciones(buscar(biblioteca, /^supportFDFunction$/i));
-    if (funciones !== null && !funciones.includes('setup')) {
-      fallos.push(
-        `la biblioteca no declara «setUp» (declara ${funciones.join(', ')}): la carga de ` +
-          'rostros de la plataforma usa esa operación',
-      );
-    }
+    const fallo = falloDeLaCarga(bibliotecaCruda, biblioteca);
+    if (fallo !== null) fallos.push(fallo);
     const formatos = opciones(buscar(biblioteca, /^facePicFormat$/i));
     if (formatos !== null && !formatos.some((f) => f === 'jpg' || f === 'jpeg')) {
       fallos.push(`la biblioteca no admite JPEG (admite ${formatos.join(', ')})`);
@@ -104,11 +117,12 @@ export const juzgarPersonasYRostros = (
       `el equipo no declara el alta de personas («post»; declara ${funciones.join(', ')})`,
     );
   }
-  const tipos = opciones(buscar(personas, /^userType$/i));
-  if (tipos !== null && !tipos.includes('visitor')) {
+  const tipos = tiposDeclaradosDePersona(personasCrudas);
+  const tipo = tipoDePersonaConVigencia({ tiposDePersona: tipos });
+  if (tipos !== undefined && !tipos.map((t) => t.toLowerCase()).includes(tipo)) {
     fallos.push(
-      `el equipo no conoce el tipo «visitor» (conoce ${tipos.join(', ')}): el alta de un ` +
-        'visitante con vigencia fallará en este firmware',
+      `el equipo no admite ni «visitor» ni «normal» (declara ${tipos.join(', ')}): el alta de ` +
+        'un visitante con vigencia fallará en este firmware',
     );
   }
   const maximo = numero(buscar(personas, /^maxRecordNum$/i));
@@ -116,5 +130,47 @@ export const juzgarPersonasYRostros = (
     `personas: ${maximo === null ? 'capacidad no declarada' : `hasta ${String(maximo)}`}` +
       (funciones === null ? '' : ` · operaciones ${funciones.join(', ')}`),
   );
+  const proposito = propositoDeLaCarga({
+    operacionesDeBiblioteca: operacionesDeclaradasDeLaBiblioteca(bibliotecaCruda),
+  });
+  if (fallos.length === 0 && proposito !== null) {
+    const persona = rutaPara('dar de alta la persona a la que pertenece la plantilla', 'terminal');
+    const carga = rutaPara(proposito, 'terminal');
+    notas.push(
+      `forma de alta: persona «${tipo}» con su vigencia (${persona.metodo} ${persona.ruta}) · ` +
+        `rostro por ${carga.metodo} ${carga.ruta}`,
+    );
+  }
   return { fallos, notas };
+};
+
+/**
+ * R3 (15-N) · lo que haría fallar la CARGA del rostro, con la operación que el
+ * alta elegirá. El alta lee `FDLibCap.supportFunction` (S-109); la guía del
+ * fabricante llama `supportFDFunction` al mismo dato. Si el equipo sólo lo
+ * declara ahí y sin «setUp», el alta no lo ve, usará «setUp» y fallará: eso se
+ * dice, en vez de dar por buena una carga que no va a entrar.
+ */
+const falloDeLaCarga = (bibliotecaCruda: string | null, biblioteca: unknown): string | null => {
+  const leidas = operacionesDeclaradasDeLaBiblioteca(bibliotecaCruda);
+  if (leidas !== undefined) {
+    return propositoDeLaCarga({ operacionesDeBiblioteca: leidas }) === null
+      ? `la biblioteca no declara ni «setUp» ni «post» (declara ${leidas.join(', ')}): la ` +
+          'plataforma no puede cargarle rostros'
+      : null;
+  }
+  const documentadas = opciones(buscar(biblioteca, /^supportFDFunction$/i));
+  if (documentadas === null || documentadas.includes('setup')) return null;
+  if (!documentadas.includes('post')) {
+    return (
+      `la biblioteca no declara ni «setUp» ni «post» (declara ${documentadas.join(', ')}): la ` +
+      'plataforma no puede cargarle rostros'
+    );
+  }
+  const setUp = rutaPara(PROPOSITO_CARGA_SETUP, 'terminal');
+  return (
+    `la biblioteca declara sus operaciones en supportFDFunction (${documentadas.join(', ')}) ` +
+    `sin «setUp», y el alta las lee en FDLibCap.supportFunction (S-109): usaría ` +
+    `${setUp.metodo} ${setUp.ruta} y fallaría. Guarde la respuesta del equipo y repórtela`
+  );
 };

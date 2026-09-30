@@ -38,6 +38,14 @@
  */
 export * from './nucleo/capacidades';
 export * from './nucleo/errores';
+// R2 (15-N) · el motivo del dominio con que el equipo negó, por su código.
+export { motivoDelEquipo } from './hikvision/catalogo-de-eventos';
+export type { MotivoDelEquipo } from './hikvision/catalogo-de-eventos';
+export {
+  DESVIO_DE_RELOJ_POR_OMISION_S,
+  desvioDelReloj,
+  desvioEnPalabras,
+} from './nucleo/reloj-del-equipo';
 export type { ProveedorDeEquipos } from './nucleo/proveedor';
 export type { VeredictoRemoto } from './nucleo/verificacion-remota';
 
@@ -80,7 +88,9 @@ export type { TransporteDeFlujo, OpcionesDeEscucha } from './equipo/escucha-aler
 /** A4 (15-E) · lo que el proveedor devuelve al pedirle que escuche un equipo. */
 export type { EscuchaActiva, TransporteDeEscucha } from './nucleo/escucha';
 /** A5 (15-E) · el origen RTSP que el proveedor entrega al puente de video. */
-export type { OrigenDeVideo } from './nucleo/video';
+export type { CausaDeVideo, DiagnosticoDeVideo, OrigenDeVideo } from './nucleo/video';
+// V2 (15-N) · el canal de video, elegido entre los que el equipo declara.
+export * from './nucleo/canal-de-video';
 export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';
 
 // ── Diagnóstico y corrección de un equipo, para la consola ───────────────────
@@ -143,4 +153,6 @@ export {
   binarioGo2rtc,
 } from './simulacion/go2rtc-de-pruebas';
 export type { Go2rtcDePruebas } from './simulacion/go2rtc-de-pruebas';
+// V1 (15-N) · la oferta del navegador, con su CRLF final, para la prueba extremo a extremo.
+export { OFERTA_SDP_DE_NAVEGADOR } from './simulacion/oferta-de-navegador';
 export type { PersonaSimulada } from './simulacion/personas-simuladas';

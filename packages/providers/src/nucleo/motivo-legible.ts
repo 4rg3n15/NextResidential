@@ -1,6 +1,7 @@
 import {
   BibliotecaLlena,
   VideoNoReproducible,
+  SinCanalDeVideo,
   CapacidadNoSoportada,
   CredencialRechazada,
   DesafioVencido,
@@ -47,6 +48,9 @@ export const motivoLegible = (error: unknown): string => {
       `el equipo entrega ${error.codec} en el canal ${error.canal} y el navegador no lo ` +
       'reproduce: cámbielo a H.264 en el equipo o elija otro canal en su ficha'
     );
+  }
+  if (error instanceof SinCanalDeVideo) {
+    return 'el equipo no lista sus canales de video y su ficha no tiene uno: pulse «Probar conexión»';
   }
   if (error instanceof OrdenSinConfirmar) {
     return 'el equipo contestó sin confirmar la orden: puede que la puerta no se haya movido';

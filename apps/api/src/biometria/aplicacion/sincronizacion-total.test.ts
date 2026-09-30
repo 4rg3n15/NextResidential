@@ -1,3 +1,4 @@
+import { EnviarPlantillasAEquipo } from './enviar-a-equipo';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Bitacora, FaceTemplateProvider, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
@@ -226,5 +227,75 @@ describe('RevocarConsentimiento · retirada INMEDIATA de las terminales (CA-11, 
     expect(await plantillas.porRetirar(COP)).toEqual([
       { copropiedadId: COP, plantillaId, dispositivoId: 'v-1' },
     ]);
+  });
+});
+
+describe('R1 (15-N) · «Enviar a equipos pendientes»: sólo a los que no la tienen', () => {
+  it('la que ya está en la terminal no se vuelve a pedir; al videoportero, sí', async () => {
+    const { plantillaId, consentimientoId } = await captura();
+    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: true });
+    terminales.caidas.add('v-1');
+    await enTerminales.ejecutar(ctx, { plantillaId });
+    terminales.caidas.clear();
+    terminales.recibidas.length = 0;
+
+    const r = await enTerminales.ejecutar(ctx, { plantillaId, soloPendientes: true });
+    expect(r.ok && r.valor).toMatchObject({ terminales: 1, sincronizadas: 1, fallidas: 0 });
+    expect(terminales.recibidas).toEqual([`v-1/${plantillaId}`]);
+  });
+});
+
+describe('R1 (15-N) · EnviarPlantillasAEquipo: lo que le falta al equipo que empieza a recibir', () => {
+  const enviar = () =>
+    new EnviarPlantillasAEquipo(
+      plantillas,
+      new SincronizarPlantilla(
+        consentimientos,
+        plantillas,
+        new BovedaAesGcm(LLAVE, 'env:X', almacenCompartido, terminales),
+        new RelojFijo(),
+      ),
+      bitacora,
+    );
+  let almacenCompartido: AlmacenEnMemoria;
+
+  beforeEach(() => {
+    almacenCompartido = new AlmacenEnMemoria();
+    const boveda = new BovedaAesGcm(LLAVE, 'env:X', almacenCompartido, terminales);
+    capturar = new CapturarRostro(consentimientos, plantillas, boveda, new RelojFijo(), new Ids());
+  });
+
+  it('envía las vigentes que no tiene, cuenta las que no lo son y no repite las que ya tiene', async () => {
+    const vigente = await captura();
+    await responder.ejecutar(ctx, {
+      consentimientoId: vigente.consentimientoId,
+      quienResponde: TITULAR,
+      acepta: true,
+    });
+    const sinConsentimiento = await captura();
+    const r = await enviar().ejecutar(ctx, 'v-1');
+    expect(r).toEqual({ enviadas: 1, fallidas: 0, noVigentes: 1 });
+    expect(terminales.recibidas).toEqual([`v-1/${vigente.plantillaId}`]);
+    expect(terminales.recibidas).not.toContain(`v-1/${sinConsentimiento.plantillaId}`);
+
+    terminales.recibidas.length = 0;
+    expect(await enviar().ejecutar(ctx, 'v-1')).toEqual({
+      enviadas: 0,
+      fallidas: 0,
+      noVigentes: 1,
+    });
+    expect(terminales.recibidas).toEqual([]);
+  });
+
+  it('lo que el equipo no acepta queda escrito por equipo', async () => {
+    const { plantillaId, consentimientoId } = await captura();
+    await responder.ejecutar(ctx, { consentimientoId, quienResponde: TITULAR, acepta: true });
+    terminales.caidas.add('v-1');
+    expect(await enviar().ejecutar(ctx, 'v-1')).toEqual({
+      enviadas: 0,
+      fallidas: 1,
+      noVigentes: 0,
+    });
+    expect(plantillas.fallos.get(`${plantillaId}/v-1`)).toMatch(/no aceptó la plantilla/);
   });
 });

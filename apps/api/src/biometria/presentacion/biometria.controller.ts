@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -25,7 +26,11 @@ import {
 } from '../aplicacion/casos-de-uso';
 import { SincronizarPlantillaEnTerminales } from '../aplicacion/sincronizacion-total';
 import type { ResultadoDeSincronizacionTotal } from '../aplicacion/sincronizacion-total';
-import { SincronizacionTotalDto, SincronizarPlantillaDto } from './dtos';
+import {
+  SincronizacionTotalConsultaDto,
+  SincronizacionTotalDto,
+  SincronizarPlantillaDto,
+} from './dtos';
 
 const aSincronizacionDto = (r: ResultadoDeSincronizacionTotal): SincronizacionTotalDto => ({
   plantillaId: r.plantillaId,
@@ -153,6 +158,7 @@ export class BiometriaController {
     @Param('id', ParseUUIDPipe) copropiedadId: string,
     @Param('plantillaId', ParseUUIDPipe) plantillaId: string,
     @Contexto() ctx: ContextoTenant,
+    @Query() consulta: SincronizacionTotalConsultaDto,
   ): Promise<SincronizacionTotalDto> {
     const destino = await this.aislamiento.exigirAlcance(
       ctx,
@@ -160,7 +166,13 @@ export class BiometriaController {
       'biometria/plantillas',
     );
     return aSincronizacionDto(
-      desenvolver(await this.sincronizarEnTerminales.ejecutar(destino, { plantillaId })),
+      desenvolver(
+        await this.sincronizarEnTerminales.ejecutar(destino, {
+          plantillaId,
+          // R1 (15-N) · «Enviar a equipos pendientes».
+          soloPendientes: consulta.soloPendientes === 'true',
+        }),
+      ),
     );
   }
 

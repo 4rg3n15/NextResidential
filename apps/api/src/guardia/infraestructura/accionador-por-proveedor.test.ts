@@ -89,6 +89,23 @@ describe('AccionadorPorProveedor · lo que contesta el proveedor no se maquilla'
     expect(r.latenciaMs).toBe(3000);
   });
 
+  it('O1 (15-N) · un RECHAZO del equipo es «rechazada» con su motivo, no «no respondió»', async () => {
+    const proveedor = proveedorDoble({
+      abrir: vi.fn(async () => ({
+        aceptado: false,
+        latenciaMs: 80,
+        rechazo: 'El equipo no aceptó la orden (HTTP 200)',
+      })),
+    });
+    const accionador = new AccionadorPorProveedor(proveedor, 'x', bitacora(), null);
+    const r = await accionador.accionar(DISPOSITIVO, true, 'op');
+    expect(r.estado).toBe('rechazada');
+    expect(r.estado === 'rechazada' ? r.motivo : '').toBe(
+      'El equipo no aceptó la orden (HTTP 200)',
+    );
+    expect(r.latenciaMs).toBe(80);
+  });
+
   it('un error tipado del proveedor baja como RECHAZADA con su motivo, nunca sube como 500', async () => {
     const proveedor = proveedorDoble({
       abrir: vi.fn(async () => {

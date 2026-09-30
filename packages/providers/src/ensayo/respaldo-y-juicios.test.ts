@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { canonico, capturarRespaldo, restaurarRespaldo } from './respaldo-de-configuracion';
+import {
+  avisoDeZona,
+  canonico,
+  capturarRespaldo,
+  restaurarRespaldo,
+} from './respaldo-de-configuracion';
 import {
   desfaseDeZonaIana,
   desfaseDeZonaPosix,
@@ -244,14 +249,65 @@ describe('personas y rostros declarados frente a lo que se va a mandar (paso 3, 
     );
   });
 
-  it('sin setUp, sin JPEG, sin alta, sin «visitor»: cada uno es un fallo con su porqué', () => {
+  it('ni setUp ni post, sin JPEG, sin alta: cada uno es un fallo con su porqué', () => {
     const j = juzgarPersonasYRostros(
       JSON.stringify({ supportFDFunction: 'get,delete', facePicFormat: { '@opt': 'bmp' } }),
       JSON.stringify({ supportFunction: 'get', userType: { '@opt': 'normal,blackList' } }),
       L,
     );
-    expect(j.fallos).toHaveLength(4);
-    expect(j.fallos.join(' | ')).toMatch(/setUp.*JPEG.*post.*visitor/);
+    expect(j.fallos).toHaveLength(3);
+    expect(j.fallos.join(' | ')).toMatch(/ni «setUp» ni «post».*JPEG.*post/);
+  });
+
+  // R3 (15-N) · el DS-KD9633 del 29/09: biblioteca con `post` y sin `setUp`,
+  // personas sólo `normal`. La 15-M le da de alta así y el equipo reconoció al
+  // visitante; el paso 3 lo seguía marcando FALLO por exigir la forma de la
+  // terminal. Lo que se juzga es la forma que SE USARÁ, con la misma decisión
+  // que el alta real (`terminal/forma-del-alta.ts`).
+  it('R3 · videoportero con «post» sin «setUp» y «normal» sin «visitor»: OK, con la forma de alta', () => {
+    const j = juzgarPersonasYRostros(
+      JSON.stringify({
+        FDLibCap: {
+          supportFunction: { '@opt': 'post,delete,put,get' },
+          supportFDFunction: 'post,delete,put,get',
+          maxFDRecordNum: 1000,
+        },
+      }),
+      JSON.stringify({
+        UserInfo: {
+          supportFunction: { '@opt': 'post,delete,put,get' },
+          userType: { '@opt': 'normal' },
+          maxRecordNum: 1000,
+        },
+      }),
+      L,
+    );
+    expect(j.fallos).toEqual([]);
+    const notas = j.notas.join(' | ');
+    expect(notas).toMatch(/forma de alta: persona «normal» con su vigencia/);
+    expect(notas).toMatch(/POST \/ISAPI\/Intelligent\/FDLib\/FaceDataRecord/);
+  });
+
+  it('R3 · terminal con «setUp» y «visitor»: OK, con la forma de siempre', () => {
+    const j = juzgarPersonasYRostros(
+      JSON.stringify({ FDLibCap: { supportFunction: { '@opt': 'post,delete,put,get,setUp' } } }),
+      JSON.stringify({ UserInfo: { userType: { '@opt': 'normal,visitor,blackList' } } }),
+      L,
+    );
+    expect(j.fallos).toEqual([]);
+    const notas = j.notas.join(' | ');
+    expect(notas).toMatch(/forma de alta: persona «visitor» con su vigencia/);
+    expect(notas).toMatch(/PUT \/ISAPI\/Intelligent\/FDLib\/FDSetUp/);
+  });
+
+  it('R3 · si sólo lo declara donde el alta no lo lee, lo dice: el alta usaría setUp', () => {
+    const j = juzgarPersonasYRostros(
+      JSON.stringify({ FDLibCap: { supportFDFunction: 'post,delete,put,get' } }),
+      JSON.stringify({ UserInfo: {} }),
+      L,
+    );
+    expect(j.fallos).toHaveLength(1);
+    expect(j.fallos[0]).toMatch(/supportFDFunction.*sin «setUp».*FDSetUp/);
   });
 
   it('lo que el equipo no contestó es un fallo, no un «conforme»', () => {
@@ -268,5 +324,31 @@ describe('el informe no imprime credenciales', () => {
     expect(
       sinSecretosConocidos('usuario servicio, clave s3cr3t', ['s3cr3t', 'servicio', 'x']),
     ).toBe('usuario ••••, clave ••••');
+  });
+});
+
+describe('R2 (15-N) · la zona y la hora del respaldo se LEEN, nunca se restauran', () => {
+  it('el respaldo guarda la hora del equipo; restaurar no la escribe', async () => {
+    const e = equipo('terminal', { hora: '2026-09-27T01:00:00+08:00' });
+    const respaldo = await capturarRespaldo(e, AHORA);
+    expect(respaldo.horaDelEquipo).toContain('<localTime>2026-09-27T01:00:00+08:00</localTime>');
+    const r = await restaurarRespaldo(e, respaldo);
+    expect(r.map((x) => x.clave)).not.toContain('hora');
+  });
+
+  it('avisa si la zona del respaldo no es la del conjunto, y lo dice en horas', () => {
+    const conOtraZona = {
+      horaDelEquipo:
+        '<Time><localTime>2026-09-27T01:00:00+08:00</localTime><timeZone>CST-8:00:00</timeZone></Time>',
+    };
+    const aviso = avisoDeZona(conOtraZona, 'America/Bogota', AHORA);
+    expect(aviso).toMatch(/otra zona horaria/);
+    expect(aviso).toMatch(/NO se restaura/);
+    const conLaDelConjunto = {
+      horaDelEquipo:
+        '<Time><localTime>2026-09-27T09:00:00-05:00</localTime><timeZone>CST+5:00:00</timeZone></Time>',
+    };
+    expect(avisoDeZona(conLaDelConjunto, 'America/Bogota', AHORA)).toBeNull();
+    expect(avisoDeZona({}, 'America/Bogota', AHORA)).toBeNull();
   });
 });

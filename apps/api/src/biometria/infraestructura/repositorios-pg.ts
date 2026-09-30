@@ -314,6 +314,40 @@ export class RepositorioPlantillasPg implements RepositorioPlantillas {
     );
   }
 
+  /** R1 (15-N) · sin suprimir, con consentimiento vigente y que ESE equipo no tiene. */
+  async pendientesParaEquipo(
+    copropiedadId: string,
+    dispositivoId: string,
+  ): Promise<readonly string[]> {
+    const filas = await this.varias(
+      copropiedadId,
+      `estado <> 'suprimida' AND vector_cifrado IS NOT NULL
+         AND consentimiento_id IN (
+           SELECT c.id FROM public.consentimientos_biometricos c
+            WHERE c.copropiedad_id = $1 AND c.estado = 'vigente')
+         AND id NOT IN (
+           SELECT s.plantilla_id FROM public.plantilla_sincronizaciones s
+            WHERE s.copropiedad_id = $1 AND s.dispositivo_id = $2 AND s.estado = 'sincronizada')`,
+      [dispositivoId],
+    );
+    return filas.map((p) => p.id);
+  }
+
+  /** R1 (15-N) · los equipos que ya tienen la plantilla. */
+  async equiposQueLaTienen(
+    copropiedadId: string,
+    plantillaId: string,
+  ): Promise<ReadonlySet<string>> {
+    return conServicio(this.pool, copropiedadId, async (c) => {
+      const { rows } = await c.query<{ dispositivo_id: string }>(
+        `SELECT s.dispositivo_id FROM public.plantilla_sincronizaciones s
+          WHERE s.copropiedad_id = $1 AND s.plantilla_id = $2 AND s.estado = 'sincronizada'`,
+        [copropiedadId, plantillaId],
+      );
+      return new Set(rows.map((r) => r.dispositivo_id));
+    });
+  }
+
   /** C4 (15-M) · todo lo que el equipo tiene sincronizado, para retirarlo en su baja. */
   async sincronizadasEn(
     copropiedadId: string,

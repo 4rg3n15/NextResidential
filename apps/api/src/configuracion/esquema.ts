@@ -331,6 +331,11 @@ export const esquemaConfiguracion = z.object({
    * reloj desviado) además no se repiten mientras haya una abierta.
    */
   ALERTAS_VENTANA_DEDUP_S: z.coerce.number().int().min(0).max(86_400).default(600),
+  /**
+   * G1 (15-N) · cuánto sigue en la cola de atención algo que nadie atendió.
+   * Después sale de la cola y queda en Eventos. 5 minutos por omisión (P-22).
+   */
+  GUARDIA_VIGENCIA_EN_COLA_S: z.coerce.number().int().min(30).max(3600).default(300),
   /** E5 (15-M) · desvío del reloj del equipo, en segundos, a partir del cual se avisa. */
   EQUIPOS_DESVIO_DE_RELOJ_S: z.coerce.number().int().min(1).max(3600).default(30),
   EQUIPOS_FOTO_LADO_MAXIMO: z.coerce.number().int().min(160).max(4096).default(1024),

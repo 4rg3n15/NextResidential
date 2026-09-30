@@ -26,12 +26,16 @@ class _AlertasApi implements AlertasApi {
     String? dispositivoId,
     Severidad? severidad,
     Tipo? tipo,
+    DateTime? desde,
+    DateTime? hasta,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{
       r'dispositivoId': dispositivoId,
       r'severidad': severidad?.toJson(),
       r'tipo': tipo?.toJson(),
+      r'desde': desde?.toIso8601String(),
+      r'hasta': hasta?.toIso8601String(),
     };
     queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};

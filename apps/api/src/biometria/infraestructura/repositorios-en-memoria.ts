@@ -167,6 +167,29 @@ export class RepositorioPlantillasEnMemoria implements RepositorioPlantillas {
   async registrarRetirada(destino: DestinoDePlantilla): Promise<void> {
     this.sincronizaciones.get(destino.plantillaId)?.delete(destino.dispositivoId);
   }
+
+  /** R1 (15-N) · sin suprimir y que ese equipo no tiene; el consentimiento lo juzga el caso de uso. */
+  async pendientesParaEquipo(
+    copropiedadId: string,
+    dispositivoId: string,
+  ): Promise<readonly string[]> {
+    return [...this.filas.values()]
+      .filter(
+        (p) =>
+          p.copropiedadId === copropiedadId &&
+          !p.suprimida &&
+          this.sincronizaciones.get(p.id)?.has(dispositivoId) !== true,
+      )
+      .map((p) => p.id);
+  }
+
+  async equiposQueLaTienen(
+    copropiedadId: string,
+    plantillaId: string,
+  ): Promise<ReadonlySet<string>> {
+    const p = this.filas.get(this.clave(copropiedadId, plantillaId));
+    return p === undefined ? new Set() : new Set(this.sincronizaciones.get(plantillaId) ?? []);
+  }
 }
 
 /** Se reexporta para que las pruebas no dependan de un detalle de `@ncr`. */

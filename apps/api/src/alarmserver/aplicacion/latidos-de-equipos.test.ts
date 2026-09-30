@@ -14,6 +14,7 @@ const montar = (
   senales: Record<string, Date> = {},
 ) => {
   const escritos: { dispositivoId: string; en: Date }[] = [];
+  const vueltas: { dispositivoId: string; senal: string }[] = [];
   const lineas: string[] = [];
   const bitacora: Bitacora = { registrar: (_n, m) => void lineas.push(m) };
   const estado = vi.fn(async (id: string) => {
@@ -37,9 +38,12 @@ const montar = (
     },
     { ahora: () => AHORA },
     bitacora,
-    { intervaloMs: 0 },
+    {
+      intervaloMs: 0,
+      alVolver: async (_c, dispositivoId, senal) => void vueltas.push({ dispositivoId, senal }),
+    },
   );
-  return { latidos, escritos, estado, lineas };
+  return { latidos, escritos, estado, lineas, vueltas };
 };
 
 describe('LatidosDeEquipos', () => {
@@ -62,6 +66,22 @@ describe('LatidosDeEquipos', () => {
     );
     expect(await latidos.pasada()).toEqual({ porSenal: 0, porSondeo: 1, sinRespuesta: 2 });
     expect(escritos).toEqual([{ dispositivoId: 'camara', en: AHORA }]);
+  });
+
+  it('A1 (15-N) · el equipo que late avisa de que VOLVIÓ (evento de su escucha o sondeo); el que calla, no', async () => {
+    const hace = new Date(AHORA.getTime() - 5_000);
+    const { latidos, vueltas } = montar(
+      { terminal: 'fuera_de_linea', camara: 'en_linea', portero: 'fuera_de_linea' },
+      { terminal: hace },
+    );
+    await latidos.pasada();
+    expect(vueltas).toEqual(
+      expect.arrayContaining([
+        { dispositivoId: 'terminal', senal: 'evento' },
+        { dispositivoId: 'camara', senal: 'sondeo' },
+      ]),
+    );
+    expect(vueltas.map((v) => v.dispositivoId)).not.toContain('portero');
   });
 
   it('un equipo que revienta al preguntarle queda sin latido y se dice', async () => {

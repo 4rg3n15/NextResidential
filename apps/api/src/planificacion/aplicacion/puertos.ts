@@ -30,6 +30,36 @@ export interface Planificador {
   readonly programados: readonly TrabajoProgramado[];
 }
 
+/**
+ * R1 (15-N) · TRABAJOS A PEDIDO, NO POR HORARIO. «Cuando un equipo pasa a
+ * recibir plantillas, se encolan las que le faltan»: un trabajo con datos que
+ * se encola una vez, con la misma cola de pg-boss y sus reintentos. Sin
+ * planificador (la suite, un proceso sólo HTTP), `encolar` devuelve `false` y
+ * quien encola decide hacerlo en el proceso.
+ */
+export const COLA_A_PEDIDO = Symbol.for('ncr.puerto.ColaAPedido');
+
+export interface TrabajoAPedido {
+  readonly nombre: string;
+  readonly descripcion: string;
+  /** Idempotente, como los programados: pg-boss puede reintentarlo. */
+  ejecutar(datos: Readonly<Record<string, string>>): Promise<Readonly<Record<string, number>>>;
+}
+
+export interface ColaAPedido {
+  /** Registra quién atiende la cola. Antes de `arrancar`. */
+  atender(trabajo: TrabajoAPedido): void;
+  /**
+   * `true` si quedó encolado; `false` si no hay planificador en marcha. Con
+   * `clave`, dos encolados iguales seguidos son uno (el primero pendiente).
+   */
+  encolar(
+    nombre: string,
+    datos: Readonly<Record<string, string>>,
+    clave?: string,
+  ): Promise<boolean>;
+}
+
 export const CATALOGO_DE_COPROPIEDADES = Symbol.for('ncr.puerto.CatalogoDeCopropiedades');
 
 /**

@@ -6,6 +6,10 @@ import { EstadoSinPermiso } from '@/componentes/estados';
 import { alcanceActivo, motivoSinCopropiedad } from '../copropiedad';
 import { PantallaDeGuardiaVirtual } from './pantalla';
 
+/** G2 (15-N) · `?atender=<id>` del aviso de otra pantalla; sólo un UUID, nada más. */
+const elementoPedido = (valor: string | string[] | undefined): string | undefined =>
+  typeof valor === 'string' && /^[0-9a-f-]{36}$/i.test(valor) ? valor : undefined;
+
 export const metadata: Metadata = { title: 'Guardia virtual' };
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +22,11 @@ export const dynamic = 'force-dynamic';
  * copropiedad delante para que la caché del navegador no mezcle dos tenants
  * (KPI-35) — una fuga silenciosa que no sale de la máquina del operador.
  */
-const GuardiaVirtual = async (): Promise<JSX.Element> => {
+const GuardiaVirtual = async ({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ atender?: string | string[] }>;
+}): Promise<JSX.Element> => {
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
   // 15-L (H4) · el portero también hace guardia remota, pero SÓLO desde las IP
@@ -40,6 +48,7 @@ const GuardiaVirtual = async (): Promise<JSX.Element> => {
       key={alcance.copropiedadId}
       copropiedadId={alcance.copropiedadId}
       nombreDeCopropiedad={activa?.nombre ?? 'la copropiedad activa'}
+      atender={elementoPedido((await searchParams).atender)}
     />
   );
 };

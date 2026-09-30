@@ -275,10 +275,13 @@ export const useDispositivosPendientes = (copropiedadId: string): UseQueryResult
     refetchInterval: 20_000,
   });
 
-/** E5 (15-M) · filtros de la cola de alertas: por equipo y por severidad. */
+/** E5 (15-M) · filtros de la cola de alertas: por equipo y por severidad; A2 (15-N) · y fechas. */
 export interface FiltroDeAlertas {
   readonly dispositivoId?: string | undefined;
   readonly severidad?: 'informativa' | 'media' | 'alta' | 'critica' | undefined;
+  /** Instantes ISO: `[desde, hasta)`. */
+  readonly desde?: string | undefined;
+  readonly hasta?: string | undefined;
 }
 
 export const useAlertasAbiertas = (
@@ -298,6 +301,8 @@ export const useAlertasAbiertas = (
                 ? {}
                 : { dispositivoId: filtro.dispositivoId }),
               ...(filtro.severidad === undefined ? {} : { severidad: filtro.severidad }),
+              ...(filtro.desde === undefined ? {} : { desde: filtro.desde }),
+              ...(filtro.hasta === undefined ? {} : { hasta: filtro.hasta }),
             },
           },
         }),

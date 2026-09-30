@@ -114,6 +114,8 @@ const FUERA_DE_ZOD = new Map([
   ['API:VIDEO_IP_ANUNCIADA', 'la lee scripts/sitio-video.mjs'],
   ['API:VIDEO_PUERTO_WEBRTC', 'ídem'],
   ['API:GO2RTC_VERSION', 'ídem'],
+  // V4 (15-N) · el nivel del registro de go2rtc, validado por sitio:video.
+  ['API:VIDEO_REGISTRO', 'ídem'],
   ['API:BARRERA_CANAL_VIDEO', 'la lee scripts/sitio-ensayo.mjs'],
   ['API:TERMINAL_CANAL_VIDEO', 'ídem'],
   ['API:VIDEOPORTERO_CANAL_VIDEO', 'ídem'],

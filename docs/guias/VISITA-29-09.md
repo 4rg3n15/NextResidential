@@ -119,6 +119,16 @@ y la cara se sube por `POST FDLib/FaceDataRecord`. Si el equipo no declara
 ninguna operación de carga, la plataforma no da de alta ni la persona y lo
 dice. El paso 6 del ensayo lo prueba de punta a punta.
 
+**Paso 3 del ensayo (corregido en la 15-N, R3).** Ya no exige `setUp` ni
+`visitor`: juzga con la misma decisión que el alta real y lo que escribe es la
+forma que se usará, por ejemplo «forma de alta: persona «normal» con su
+vigencia (POST …/UserInfo/Record) · rostro por POST …/FDLib/FaceDataRecord».
+Sólo marca FALLO lo que haría fallar ese alta: ni `setUp` ni `post`, sin JPEG,
+sin alta de personas, ni `visitor` ni `normal`, o las operaciones declaradas
+sólo en `supportFDFunction` sin `setUp` (el alta las lee en
+`FDLibCap.supportFunction`, S-109): en ese último caso, guarde la respuesta del
+equipo y repórtela.
+
 > Las rutas del videoportero para personas y rostros están **documentadas, no
 > verificadas** contra su manual ISAPI (S-107). Los extractos pedidos están en
 > el informe de la etapa.

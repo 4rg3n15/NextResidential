@@ -174,6 +174,8 @@ export class ProveedoresModule {
               },
               // D2 (15-L) · el puerto RTSP, del `.env`.
               puertoRtsp: configuracion.VIDEO_PUERTO_RTSP,
+              // R2 (15-N) · el reloj del equipo, antes de dar de alta con vigencia.
+              desvioDeRelojMaximoS: configuracion.EQUIPOS_DESVIO_DE_RELOJ_S,
               ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
             });

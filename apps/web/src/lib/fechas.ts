@@ -100,3 +100,21 @@ export const rangoDeDias = (
   if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime()) || inicio >= fin) return null;
   return { desde: inicio.toISOString(), hasta: fin.toISOString() };
 };
+
+/**
+ * R2 (15-N) · el desvío del reloj de un equipo en palabras: «12 h 58 min
+ * atrasado», «4 min 10 s adelantado». `segundos` es cuánto iba POR DELANTE.
+ */
+export const desvioEnPalabras = (segundos: number): string => {
+  const total = Math.abs(Math.round(segundos));
+  const h = Math.floor(total / 3600);
+  const min = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const cuanto =
+    h > 0
+      ? `${String(h)} h ${String(min)} min`
+      : min > 0
+        ? `${String(min)} min ${String(s)} s`
+        : `${String(s)} s`;
+  return `${cuanto} ${segundos > 0 ? 'adelantado' : 'atrasado'}`;
+};

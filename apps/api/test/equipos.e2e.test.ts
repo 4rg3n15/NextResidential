@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
@@ -9,6 +9,10 @@ import { SondaPorProveedor } from '../src/equipos/infraestructura/sonda-por-prov
 import { OLVIDO_DE_EQUIPO } from '../src/equipos/aplicacion/puertos';
 import { LECTOR_DE_SENALES } from '../src/equipos/aplicacion/senal-de-eventos';
 import { capacidadesDescubiertas, equiposSimulados } from '@ncr/providers';
+import { ALERTAS_DE_EQUIPO } from '../src/eventos';
+import { REENVIO_DE_PLANTILLAS_A_EQUIPO } from '../src/equipos';
+import type { ReenvioDePlantillasAEquipo } from '../src/equipos';
+import type { AlertasDeEquipo } from '../src/eventos';
 
 /**
  * A · APROVISIONAMIENTO DE EQUIPOS DESDE LA CONSOLA
@@ -183,6 +187,129 @@ describe('A.2 · el secreto es de ESCRITURA: entra y no vuelve', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ motivo: 'se retiró para mantenimiento' });
     expect(repo.auditoria.map((x) => x.recurso)).toEqual(['equipos/alta', 'equipos/baja']);
+  });
+});
+
+describe('R1 (15-N) · el equipo que PASA a recibir plantillas recibe las que le faltan', () => {
+  const conRostros = capacidadesDescubiertas({
+    bibliotecaDeRostros: { estado: 'si', maximo: 500, almacenadas: 0 },
+  });
+  const sinSaber = capacidadesDescubiertas({});
+
+  it('en el alta con biblioteca: se encola el reenvío de ESE equipo', async () => {
+    const { app: a, firmante } = await conEquipos({
+      probar: async () => ({ ...ALCANZADO, capacidades: conRostros }),
+    });
+    const espia = vi.spyOn(
+      a.get<ReenvioDePlantillasAEquipo>(REENVIO_DE_PLANTILLAS_A_EQUIPO, { strict: false }),
+      'encolar',
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, tipo: 'intercom' });
+    expect(creado.status).toBe(201);
+    expect(espia).toHaveBeenCalledWith(COP_B, creado.body.id);
+  });
+
+  it('de «no se sabe» a «sí» al editar: se encola; si ya recibía, no', async () => {
+    let capacidades = sinSaber;
+    const { app: a, firmante } = await conEquipos({
+      probar: async () => ({ ...ALCANZADO, capacidades }),
+    });
+    const espia = vi.spyOn(
+      a.get<ReenvioDePlantillasAEquipo>(REENVIO_DE_PLANTILLAS_A_EQUIPO, { strict: false }),
+      'encolar',
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, tipo: 'intercom' });
+    expect(espia).not.toHaveBeenCalled();
+
+    capacidades = conRostros;
+    const editar = () =>
+      request(a.getHttpServer())
+        .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ ...ALTA, tipo: 'intercom', nombre: 'Videoportero torre B' });
+    expect((await editar()).status).toBe(200);
+    expect(espia).toHaveBeenCalledTimes(1);
+    await editar();
+    expect(espia).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('A1 (15-N) · la baja archiva las alertas abiertas del equipo', () => {
+  it('una alerta abierta del equipo sale de la lista y del contador al darlo de baja', async () => {
+    const { app: a, firmante } = await conEquipos({ probar: async () => ALCANZADO });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(ALTA);
+    const id = creado.body.id as string;
+    await a.get<AlertasDeEquipo>(ALERTAS_DE_EQUIPO).ejecutar(
+      {
+        copropiedadId: COP_B,
+        dispositivoId: id,
+        tipo: 'dispositivo_caido',
+        severidad: 'alta',
+        clave: 'caido',
+        notas: 'sin latido',
+        persistente: true,
+      },
+      'prueba',
+    );
+    const lista = () =>
+      request(a.getHttpServer())
+        .get(`/copropiedades/${COP_B}/alertas`)
+        .query({ dispositivoId: id })
+        .set('Authorization', `Bearer ${token}`);
+    expect((await lista()).body).toHaveLength(1);
+    await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/${id}/baja`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ motivo: 'equipo reemplazado' })
+      .expect(201);
+    expect((await lista()).body).toEqual([]);
+    const tablero = await request(a.getHttpServer())
+      .get(`/copropiedades/${COP_B}/tablero/indicadores`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(tablero.status).toBe(200);
+    expect(tablero.body.alertas.pendientes).toBe(0);
+  });
+});
+
+describe('A2 (15-N) · la lista de alertas se filtra por fecha', () => {
+  it('desde incluido, hasta excluido; una fecha que no es fecha es 400', async () => {
+    const { app: a, firmante } = await conEquipos({ probar: async () => ALCANZADO });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    await a.get<AlertasDeEquipo>(ALERTAS_DE_EQUIPO).ejecutar(
+      {
+        copropiedadId: COP_B,
+        dispositivoId: '20000000-0000-4000-8000-000000000001',
+        tipo: 'acceso_dudoso',
+        severidad: 'media',
+        clave: 'fecha',
+        notas: 'para filtrar',
+        persistente: false,
+      },
+      'prueba',
+    );
+    const pedir = (query: Record<string, string>) =>
+      request(a.getHttpServer())
+        .get(`/copropiedades/${COP_B}/alertas`)
+        .query(query)
+        .set('Authorization', `Bearer ${token}`);
+    const ayer = new Date(Date.now() - 86_400_000).toISOString();
+    const manana = new Date(Date.now() + 86_400_000).toISOString();
+    expect((await pedir({ desde: ayer, hasta: manana })).body).toHaveLength(1);
+    expect((await pedir({ desde: manana })).body).toEqual([]);
+    expect((await pedir({ hasta: ayer })).body).toEqual([]);
+    expect((await pedir({ desde: 'ayer' })).status).toBe(400);
   });
 });
 
@@ -859,5 +986,57 @@ describe('C3 (15-L) · «Probar conexión» de un videoportero dice cómo van su
     ).find((h) => h.campo === 'eventos del equipo');
     expect(eventos).toMatchObject({ estado: 'conforme' });
     expect(eventos?.valorLeido).toMatch(/flujo de alertas · última señal hace \d+ s/);
+  });
+});
+
+/**
+ * O2 (15-N) · DT-15M-04 · «Sin zona» QUITA la zona
+ *
+ * La edición es parcial: lo ausente se conserva (O5). Por eso «sin zona» no
+ * podía ser «ausente»: se leía «sin cambio» y la zona se quedaba. Ahora
+ * `zonaId: null` es «quítala», y ausente sigue siendo «no la toques».
+ */
+describe('O2 (15-N) · DT-15M-04 · «Sin zona» quita la zona de un equipo', () => {
+  const ZONA = '30000000-0000-4000-8000-0000000000a1';
+  const alcanza = { probar: async () => ALCANZADO };
+
+  it('zonaId null la quita; ausente la conserva', async () => {
+    const { app: a, firmante } = await conEquipos(alcanza);
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, zonaId: ZONA, probarConexion: false })
+      .expect(201);
+    expect(creado.body.zonaId).toBe(ZONA);
+
+    const sinTocar = await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Renombrado', probarConexion: false })
+      .expect(200);
+    expect(sinTocar.body.zonaId).toBe(ZONA);
+
+    const sinZona = await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ zonaId: null, probarConexion: false })
+      .expect(200);
+    expect(sinZona.body.zonaId).toBeNull();
+  });
+
+  it('un zonaId que no es UUID se sigue rechazando', async () => {
+    const { app: a, firmante } = await conEquipos(alcanza);
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, probarConexion: false })
+      .expect(201);
+    await request(a.getHttpServer())
+      .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ zonaId: 'sin-zona', probarConexion: false })
+      .expect(400);
   });
 });

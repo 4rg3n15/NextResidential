@@ -105,3 +105,111 @@ describe('ConsultarLineaDeTiempo', () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe('R2 (15-N) · con el reloj del equipo desviado, la hora que se enseña es la de recepción', () => {
+  const RECIBIDO = new Date(Date.UTC(2026, 8, 29, 20, 0, 0));
+  const vivo = (ocurridoEn: Date, extra: Partial<EventoRegistrado> = {}): EventoRegistrado => ({
+    ...acceso(1, 'negado'),
+    ocurridoEn,
+    registradoEn: RECIBIDO,
+    ...extra,
+  });
+  const consultar = (filas: EventoRegistrado[], tolerancia?: number) =>
+    new ConsultarLineaDeTiempo(
+      {
+        anexar: async () => {
+          throw new Error('x');
+        },
+        consultar: async () => ({ filas, siguiente: null }),
+        porId: async () => null,
+      },
+      new RepositorioEventosDeEquipoEnMemoria(),
+      tolerancia,
+    ).ejecutar({
+      copropiedadId: COP,
+      desde: new Date(Date.UTC(2026, 8, 29)),
+      hasta: new Date(Date.UTC(2026, 8, 30)),
+      dispositivoId: null,
+      tipo: 'acceso',
+      limite: 10,
+    });
+
+  it('13 h atrasado: recepción, con la hora del equipo y el desvío', async () => {
+    const trece = new Date(RECIBIDO.getTime() - 46_727_000);
+    const r = await consultar([vivo(trece)], 30);
+    if (!r.ok) throw new Error('fallo');
+    expect(r.valor.elementos[0]).toMatchObject({
+      ocurridoEn: RECIBIDO.toISOString(),
+      horaDelEquipo: trece.toISOString(),
+      relojDesviadoSegundos: -46_727,
+    });
+  });
+
+  it('dentro de tolerancia, la del equipo y sin marca', async () => {
+    const r = await consultar([vivo(new Date(RECIBIDO.getTime() - 10_000))], 30);
+    if (!r.ok) throw new Error('fallo');
+    expect(r.valor.elementos[0]?.relojDesviadoSegundos).toBeNull();
+  });
+
+  it('lo que decidió el Edge sin conexión llega tarde a propósito: no se marca', async () => {
+    const r = await consultar(
+      [vivo(new Date(RECIBIDO.getTime() - 3_600_000), { decididoPorEdge: true })],
+      30,
+    );
+    if (!r.ok) throw new Error('fallo');
+    expect(r.valor.elementos[0]?.relojDesviadoSegundos).toBeNull();
+  });
+});
+
+describe('R2 (15-N) · también en lo que emite el equipo en vivo; nunca en su histórico', () => {
+  it('en vivo y 13 h atrás: recepción con marca; el histórico conserva su hora', async () => {
+    const deEquipo = new RepositorioEventosDeEquipoEnMemoria();
+    const trece = new Date(Date.now() - 46_727_000);
+    for (const [enVivo, clave] of [
+      [true, 'vivo'],
+      [false, 'hist'],
+    ] as const) {
+      await deEquipo.registrar({
+        copropiedadId: COP,
+        dispositivoId: EQUIPO,
+        tipo: 'acceso_negado_por_el_equipo',
+        titulo: `negado ${clave}`,
+        codigoMayor: 5,
+        codigoMenor: 8,
+        origen: 'equipo',
+        enVivo,
+        ocurridoEn: trece,
+        horaDelEquipo: null,
+        eventoId: null,
+        claveIdempotencia: clave,
+        carga: {},
+        creadoPor: 'x',
+      });
+    }
+    const r = await new ConsultarLineaDeTiempo(
+      {
+        anexar: async () => {
+          throw new Error('x');
+        },
+        consultar: async () => ({ filas: [], siguiente: null }),
+        porId: async () => null,
+      },
+      deEquipo,
+      30,
+    ).ejecutar({
+      copropiedadId: COP,
+      desde: new Date(Date.now() - 86_400_000),
+      hasta: new Date(Date.now() + 60_000),
+      dispositivoId: null,
+      tipo: null,
+      limite: 10,
+    });
+    if (!r.ok) throw new Error('fallo');
+    const vivo = r.valor.elementos.find((e) => e.titulo === 'negado vivo');
+    const hist = r.valor.elementos.find((e) => e.titulo.startsWith('negado hist'));
+    expect(vivo?.relojDesviadoSegundos).toBeLessThan(-46_000);
+    expect(vivo?.horaDelEquipo).toBe(trece.toISOString());
+    expect(hist?.relojDesviadoSegundos).toBeNull();
+    expect(hist?.ocurridoEn).toBe(trece.toISOString());
+  });
+});

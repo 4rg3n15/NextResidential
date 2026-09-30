@@ -35,6 +35,7 @@ import { ErrorApiDto } from '../../comun/respuestas';
 import { MideKpi } from '../../observabilidad';
 import { TIPO_SDP } from '../../comun/ruta-de-video';
 import { NegociarVistaEnVivo } from '../aplicacion/vista-en-vivo';
+import { motivoDeOfertaInvalida } from './oferta-sdp';
 import {
   PuenteDeVideoFallo,
   PuenteDeVideoNoConfigurado,
@@ -96,8 +97,10 @@ export class VideoController {
     // 15-L · la fuga del Bloque 0.4: el equipo tiene que ser de ESTA copropiedad.
     await this.equiposDeLaRuta.exigir(ctx, copropiedadId, dispositivoId, 'guardia/video');
     const oferta: unknown = peticion.body;
-    if (typeof oferta !== 'string' || !oferta.startsWith('v=0')) {
-      throw new BadRequestException(`La oferta viaja como ${TIPO_SDP} y empieza por «v=0»`);
+    // V1 (15-N) · la validación de su formato: no pasa por el saneamiento de texto.
+    const motivo = motivoDeOfertaInvalida(oferta);
+    if (motivo !== null || typeof oferta !== 'string') {
+      throw new BadRequestException(motivo ?? `La oferta viaja como ${TIPO_SDP}`);
     }
     try {
       const vista = await this.negociar.ejecutar({

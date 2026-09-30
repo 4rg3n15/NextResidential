@@ -89,9 +89,13 @@ class _BiometriaApi implements BiometriaApi {
   Future<SincronizacionTotalDto> biometriaControllerSincronizarEnTodas({
     required String id,
     required String plantillaId,
+    SoloPendientes? soloPendientes,
   }) async {
     final _extra = <String, dynamic>{};
-    final queryParameters = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{
+      r'soloPendientes': soloPendientes?.toJson(),
+    };
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<SincronizacionTotalDto>(

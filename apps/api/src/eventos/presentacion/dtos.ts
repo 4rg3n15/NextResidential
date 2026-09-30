@@ -90,6 +90,16 @@ export class FiltroDeAlertasDto {
   @IsOptional()
   @IsIn([...TIPOS_DE_ALERTA])
   tipo?: (typeof TIPOS_DE_ALERTA)[number];
+  /** A2 (15-N) · generadas desde este instante (incluido). */
+  @ApiPropertyOptional({ format: 'date-time' })
+  @IsOptional()
+  @IsISO8601()
+  desde?: string;
+  /** A2 (15-N) · generadas antes de este instante (excluido). */
+  @ApiPropertyOptional({ format: 'date-time' })
+  @IsOptional()
+  @IsISO8601()
+  hasta?: string;
 }
 
 /** E5 (15-M) · archivar UNA alerta: el motivo es obligatorio y queda con quién y cuándo. */

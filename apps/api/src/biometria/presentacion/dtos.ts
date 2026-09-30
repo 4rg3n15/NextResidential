@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsUUID } from 'class-validator';
 
 export class SincronizarPlantillaDto {
   @ApiProperty()
@@ -32,4 +32,12 @@ export class SincronizacionTotalDto {
       'A3 (15-L) · terminales y videoporteros sin biblioteca de rostros: se omiten y se dice',
   })
   omitidas!: EquipoOmitidoDto[];
+}
+
+/** R1 (15-N) · «Enviar a equipos pendientes»: sólo a los que todavía no la tienen. */
+export class SincronizacionTotalConsultaDto {
+  @ApiPropertyOptional({ enum: ['true', 'false'] })
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  soloPendientes?: 'true' | 'false';
 }

@@ -68,7 +68,7 @@ export interface AltaDeEquipo {
   readonly modoDeTerminal?: ModoDeTerminalDeclarado | null;
   /** Si una persona habilitó el canal de audio EN EL APARATO (ADR-01). */
   readonly canalDeAudioHabilitado?: boolean;
-  /** C2/D2 (15-L) · el flujo de video, canal×100+flujo. `null` = 102. */
+  /** C2/D2 (15-L) · el flujo de video, canal×100+flujo. `null` = el que declara (V2). */
   readonly canalDeVideo?: string | null;
   /** C2 (15-L) · la zona de la copropiedad donde está el equipo. */
   readonly zonaId?: string | null;
@@ -316,6 +316,12 @@ export interface ResultadoDeSondeo {
   readonly verificado: boolean;
   /** `true` sólo en `SIN_PROBAR`: no hubo sondeo y no se anota como tal (0044). */
   readonly sinSondear?: true;
+  /**
+   * V2 (15-N) · el canal de video que el sondeo PROPONE —uno de los que el
+   * equipo declara— porque la ficha no tenía canal o tenía uno que el equipo
+   * no tiene. El repositorio lo guarda en la ficha. Ausente si la ficha manda.
+   */
+  readonly canalDeVideo?: string;
 }
 
 export interface DatosDeSondeo {

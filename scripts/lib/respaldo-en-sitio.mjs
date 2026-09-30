@@ -80,7 +80,7 @@ const respaldosEn = (carpeta, decir) => {
   return leidos;
 };
 
-export const restaurar = async ({ P, equipos, carpeta, decir }) => {
+export const restaurar = async ({ P, equipos, carpeta, decir, zonaDelConjunto }) => {
   let fallos = 0;
   const respaldos = respaldosEn(carpeta, decir);
   for (const e of equipos) {
@@ -97,6 +97,13 @@ export const restaurar = async ({ P, equipos, carpeta, decir }) => {
       );
       continue;
     }
+    // R2 (15-N) · la zona y la hora NO se restauran; si el respaldo trae otra
+    // zona, se dice, para que nadie crea que la devolvió.
+    const aviso =
+      zonaDelConjunto === undefined || typeof P.avisoDeZona !== 'function'
+        ? null
+        : P.avisoDeZona(respaldo, zonaDelConjunto, new Date());
+    if (aviso !== null) decir(`  ⚠ ${rotulo(e)} · zona: ${aviso}`);
     const resultados = await P.restaurarRespaldo(e, respaldo);
     for (const r of resultados) {
       if (r.estado === 'fallo') fallos += 1;

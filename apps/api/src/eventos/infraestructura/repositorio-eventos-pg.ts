@@ -54,6 +54,7 @@ interface FilaEvento {
   motivo_manual: string | null;
   evidencia_id: string | null;
   decidido_por_edge: boolean;
+  registrado_en: Date;
 }
 
 /**
@@ -201,7 +202,7 @@ export class RepositorioEventosPg implements RepositorioEventos {
         `SELECT id, copropiedad_id, ocurrido_en, tipo, resultado, motivo, metodo,
                 persona_id, vivienda_id, zona_id, dispositivo_id, placa_detectada,
                 confianza, regla_aplicada, version_reglas, operador_id, motivo_manual,
-                evidencia_id, decidido_por_edge
+                evidencia_id, decidido_por_edge, registrado_en
            FROM public.eventos
           WHERE ${condiciones.join(' AND ')}
           ORDER BY ocurrido_en DESC, id DESC
@@ -222,7 +223,7 @@ export class RepositorioEventosPg implements RepositorioEventos {
         `SELECT id, copropiedad_id, ocurrido_en, tipo, resultado, motivo, metodo,
                 persona_id, vivienda_id, zona_id, dispositivo_id, placa_detectada,
                 confianza, regla_aplicada, version_reglas, operador_id, motivo_manual,
-                evidencia_id, decidido_por_edge
+                evidencia_id, decidido_por_edge, registrado_en
            FROM public.eventos WHERE copropiedad_id=$1 AND id=$2`,
         [copropiedadId, eventoId],
       ),
@@ -261,4 +262,5 @@ const mapearFila = (f: FilaEvento): EventoRegistrado => ({
   motivoManual: f.motivo_manual,
   evidenciaId: f.evidencia_id,
   decididoPorEdge: f.decidido_por_edge,
+  registradoEn: f.registrado_en,
 });

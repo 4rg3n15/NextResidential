@@ -35,6 +35,16 @@ export const PLAZO_DEL_PUENTE_MS = 5_000;
 export const redactar = (texto: string): string =>
   texto.replace(/rtsps?:\/\/[^\s"'<>]+/gi, 'rtsp://[redactado]');
 
+/**
+ * V1 (15-N) · SDP (RFC 8866) termina cada línea en CRLF, también la última, y
+ * el analizador del puente la EXIGE: sin ella lee fin de flujo y contesta
+ * «EOF» sin llegar al equipo (Bloque 0: `webrtc.go:272`, `SetOffer`). Un
+ * navegador la manda; cualquier otro cliente —o un intermediario que recorte—
+ * puede no hacerlo. Se repone aquí, que es el último punto antes del puente.
+ */
+export const conFinDeLinea = (sdp: string): string =>
+  sdp.endsWith('\r\n') ? sdp : `${sdp.replace(/[\r\n]+$/, '')}\r\n`;
+
 export class PuenteGo2rtc implements PuenteDeVideo {
   private readonly base: string;
 
@@ -82,7 +92,7 @@ export class PuenteGo2rtc implements PuenteDeVideo {
       {
         method: 'POST',
         headers: { 'content-type': 'application/sdp', accept: 'application/sdp' },
-        body: ofertaSdp,
+        body: conFinDeLinea(ofertaSdp),
       },
       'negociación WebRTC con el puente',
     );

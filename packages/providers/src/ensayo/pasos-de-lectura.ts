@@ -148,7 +148,14 @@ export const pasoDeVideo = (d: DiagnosticoDeEquipo, familia: FamiliaDeEnsayo): R
   const v = d.video;
   const p = PREFIJO[familia];
   if (v === undefined) return resultado('video', 'no_aplica', 'Este equipo no entrega video');
-  const donde = `canal ${v.canal}, puerto RTSP ${String(v.puerto)}`;
+  // V2 (15-N) · de dónde salió el canal, si no fue de la ficha.
+  const donde =
+    `canal ${v.canal}, puerto RTSP ${String(v.puerto)}` +
+    (v.origenDelCanal === 'propuesto'
+      ? v.sustituido === null || v.sustituido === undefined
+        ? ', declarado por el equipo'
+        : `, declarado por el equipo en lugar del ${v.sustituido}`
+      : '');
   if (v.clase === 'credencial') {
     return resultado(
       'video',
@@ -168,10 +175,11 @@ export const pasoDeVideo = (d: DiagnosticoDeEquipo, familia: FamiliaDeEnsayo): R
     );
   }
   if (v.clase === 'rechazo') {
+    // V3 (15-N) · 403, 404/412 y 454 en palabras (la sonda ya lo dice).
     return resultado(
       'video',
       'fallo',
-      `El equipo no tiene ese flujo (${donde}, RTSP ${String(v.estado)})`,
+      `${v.detalle.charAt(0).toUpperCase()}${v.detalle.slice(1)} (${donde})`,
       `Pruebe otro canal en ${p}_CANAL_VIDEO (101 es el principal) y, si funciona, póngalo ` +
         'también en la ficha del equipo en la consola',
     );

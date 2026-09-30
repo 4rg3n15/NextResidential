@@ -208,6 +208,54 @@ describe('HU-29 · emergencia', () => {
 });
 
 /**
+ * O3 (15-N) · DT-15M-05 · el aviso al residente se guardaba como una alerta
+ * con la VIVIENDA en el campo del equipo. Ahora va a nombre del equipo que
+ * se atiende (y del operador que avisa), con la vivienda en la constancia.
+ */
+describe('O3 · el aviso al residente, atribuido al operador y al equipo', () => {
+  const VIVIENDA = '40000000-0000-4000-8000-0000000000b1';
+  const VIDEOPORTERO = '20000000-0000-4000-8000-0000000000b2';
+
+  it('la alerta lleva el equipo, no la vivienda, y dice quién avisó', async () => {
+    const token = await tokenDe(firmante, {
+      rol: 'operador_central',
+      copropiedadId: null,
+      copropiedades: [COP_B],
+    });
+    await request(app.getHttpServer())
+      .post(`/copropiedades/${COP_B}/guardia/avisar-residente`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ viviendaId: VIVIENDA, dispositivoId: VIDEOPORTERO, texto: 'Tiene una visita' })
+      .expect(202)
+      .expect((r) => {
+        // O6 (15-N) · la respuesta no promete un envío que no ocurre.
+        expect(r.body.detalle).not.toMatch(/ETAPA 11/);
+        expect(r.body.detalle).toMatch(/no le llega a la app del residente/);
+      });
+
+    const admin = await como('administrador', COP_B);
+    const delEquipo = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_B}/alertas`)
+      .query({ dispositivoId: VIDEOPORTERO })
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    const avisos = (delEquipo.body as { notas: string | null }[]).filter((a) =>
+      (a.notas ?? '').startsWith('Aviso al residente'),
+    );
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]?.notas).toContain(VIVIENDA);
+    expect(avisos[0]?.notas).toMatch(/la guardia virtual/);
+
+    const aNombreDeLaVivienda = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_B}/alertas`)
+      .query({ dispositivoId: VIVIENDA })
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    expect(aNombreDeLaVivienda.body).toEqual([]);
+  });
+});
+
+/**
  * A5 (15-E) · LA VISTA EN VIVO POR WHEP, A TRAVÉS DE LA API.
  *
  * Sin `GO2RTC_URL` en el banco, así que lo que se demuestra es el ORDEN de las

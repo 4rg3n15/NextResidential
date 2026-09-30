@@ -282,12 +282,19 @@ const hallazgosDeVideoportero = (c: CapacidadesDeEquipo): HallazgoDelEquipo[] =>
 const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
   const campo = `video en vivo (canal ${v.canal})`;
   const base = { campo, valorCorrecto: 'H.264', correccion: null } as const;
+  // V2 (15-N) · si el canal no salió de la ficha, se dice cuál y por qué.
+  const delCanal =
+    v.origenDelCanal === 'propuesto'
+      ? v.sustituido === null || v.sustituido === undefined
+        ? ` · canal ${v.canal} propuesto entre los que el equipo declara; se guarda en la ficha`
+        : ` · la ficha tenía el ${v.sustituido}, que el equipo NO declara: se usó y se guarda el ${v.canal}`
+      : '';
   if (v.clase === 'respondio' && v.codec === 'H.264') {
     return {
       ...base,
       estado: 'conforme',
       valorLeido: `H.264 · respuesta RTSP del equipo`,
-      detalle: 'El navegador lo reproduce: la guardia, la portería y la ficha tendrán video',
+      detalle: `El navegador lo reproduce: la guardia, la portería y la ficha tendrán video${delCanal}`,
     };
   }
   if (v.clase === 'respondio') {
@@ -296,20 +303,21 @@ const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
       estado: 'aviso',
       valorLeido: v.codec ?? 'sin video en lo que describe',
       detalle:
-        v.codec === 'H.265'
+        (v.codec === 'H.265'
           ? `El equipo entrega H.265 en el canal ${v.canal} y el navegador no lo reproduce: la ` +
             'consola lo dirá en vez de mostrar negro. Cámbielo a H.264 en el equipo (codificación ' +
             'del flujo) o elija otro canal en la ficha, y vuelva a probar'
           : `El equipo describe el canal ${v.canal} sin un video H.264 legible: elija otro canal o ` +
-            'cambie la codificación en el equipo',
+            'cambie la codificación en el equipo') + delCanal,
     };
   }
   if (v.clase === 'rechazo') {
+    // V3 (15-N) · 403, 404/412 y 454 no son lo mismo: la sonda ya lo dice en palabras.
     return {
       ...base,
       estado: 'aviso',
-      valorLeido: `RTSP ${String(v.estado)}`,
-      detalle: `El equipo no tiene el canal ${v.canal}: elija otro en la ficha (102 es el subflujo de la primera cámara)`,
+      valorLeido: v.estado === null ? 'sin canal' : `RTSP ${String(v.estado)}`,
+      detalle: `${v.detalle.charAt(0).toUpperCase()}${v.detalle.slice(1)}${delCanal}`,
     };
   }
   if (v.clase === 'credencial') {
@@ -319,7 +327,9 @@ const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
       valorLeido: 'credencial rechazada por RTSP',
       detalle:
         'El equipo aceptó la credencial por HTTP pero no por RTSP: revise que el usuario de ' +
-        'servicio tenga permiso de vista en vivo. No se reintenta',
+        'servicio tenga permiso de vista en vivo y el modo de autenticación RTSP. No se ' +
+        `reintenta. ${v.ofrecido === undefined ? '' : `Ofreció ${v.ofrecido}; `}` +
+        `${v.enviado === undefined ? '' : `se envió ${v.enviado}.`}`,
     };
   }
   return noComprobado(

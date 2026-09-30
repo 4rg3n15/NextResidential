@@ -9,6 +9,10 @@ export { EventosModule } from './eventos.module';
 export { RegistrarAcceso } from './aplicacion/registrar-acceso';
 /** E5 (15-M) · alertas por EQUIPO, deduplicadas: las abre el ingestor por este puerto. */
 export { ALERTAS_DE_EQUIPO } from './aplicacion/deduplicacion-de-alertas';
+export {
+  AlertasDelCicloDelEquipo,
+  NOTA_DE_RESOLUCION_AUTOMATICA,
+} from './aplicacion/alertas-del-ciclo-del-equipo';
 export type { AlertasDeEquipo, AlertaDeEquipoNueva } from './aplicacion/deduplicacion-de-alertas';
 export {
   CANAL_TIEMPO_REAL,
@@ -26,6 +30,16 @@ export type {
   RepositorioEventos,
 } from './aplicacion/puertos';
 export { REGISTRO_DE_EVIDENCIA, registroSinBase } from './aplicacion/registro-de-evidencia';
+/** G1 (15-N) · qué necesita a una persona (P-22): lo usan la cola, las alertas y la ingesta. */
+export {
+  DISPARADORES_CRITICOS,
+  DISPARADORES_DE_ATENCION,
+  TIPOS_DE_EQUIPO_QUE_DISPARAN,
+  TIPOS_QUE_TERMINAN_LA_LLAMADA,
+  disparadorDeAcceso,
+  disparadorDeEventoDeEquipo,
+} from './aplicacion/disparadores-de-atencion';
+export type { DisparadorDeAtencion } from './aplicacion/disparadores-de-atencion';
 /** 15-L (Bloque B) · lo que un equipo emite y no es un acceso, y lo que la plataforma le hace. */
 export {
   REGISTRO_DE_EVENTOS_DE_EQUIPO,

@@ -185,6 +185,11 @@ export interface GuionDeEquipo {
   readonly ordenesDePuerta?: readonly string[];
   /** El equipo no contesta a la consulta de capacidades: todo queda DESCONOCIDO. */
   readonly sinCapacidades?: boolean;
+  /**
+   * V2 (15-N) · los flujos que lista en `/Streaming/channels`, con su códec.
+   * Sin él, no los lista (como un equipo que no admite la consulta).
+   */
+  readonly canalesDeVideo?: readonly { readonly id: string; readonly codec: string }[];
   /** Desenlaces de error, cada uno con su código del fabricante. */
   readonly ocupado?: boolean;
   readonly averiado?: boolean;
@@ -313,6 +318,20 @@ export const veredictosRecibidosPor = new Map<string, string[]>();
 export const plantillasPor = new Map<string, ReadonlySet<string>>();
 /** E1 (15-M) · los 401 que dio cada equipo simulado y por qué, por destino. */
 export const desafiosPor = new Map<string, () => DesafiosDelEquipo>();
+
+/** V2 (15-N) · el `StreamingChannelList` del equipo, habilitados, con su códec. */
+const listaDeFlujos = (
+  canales: readonly { readonly id: string; readonly codec: string }[],
+): string =>
+  '<StreamingChannelList version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">' +
+  canales
+    .map(
+      (c) =>
+        `<StreamingChannel><id>${c.id}</id><enabled>true</enabled>` +
+        `<Video><videoCodecType>${c.codec}</videoCodecType></Video></StreamingChannel>`,
+    )
+    .join('') +
+  '</StreamingChannelList>';
 
 export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
   /**
@@ -466,6 +485,11 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
     if (escribe && guion.averiado === true) return respuestaDe(500, ERROR_AVERIADO);
     if (escribe && guion.reinicioNecesario === true) return respuestaDe(200, ERROR_REINICIO);
 
+    if (catalogada.proposito === 'leer los canales de video del equipo') {
+      return guion.canalesDeVideo === undefined
+        ? respuestaDe(200, NO_SOPORTA)
+        : respuestaDe(200, listaDeFlujos(guion.canalesDeVideo));
+    }
     if (catalogada.proposito === 'leer los canales de audio bidireccional del equipo') {
       return respuestaDe(200, canalesDeAudio(canales));
     }
@@ -794,7 +818,9 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         200,
         '<?xml version="1.0" encoding="UTF-8"?><Time version="2.0" ' +
           'xmlns="http://www.isapi.org/ver20/XMLSchema"><timeMode>manual</timeMode>' +
-          `<localTime>${guion.hora ?? new Date(0).toISOString()}</localTime>` +
+          // R2 (15-N) · por omisión, un reloj EN HORA (el real del proceso): un
+          // equipo con 56 años de desvío frenaría toda alta con vigencia.
+          `<localTime>${guion.hora ?? new Date().toISOString()}</localTime>` +
           '<timeZone>CST+5:00:00</timeZone></Time>',
       );
     }

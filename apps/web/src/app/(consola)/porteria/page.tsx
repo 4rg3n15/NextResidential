@@ -6,6 +6,10 @@ import { EstadoSinPermiso } from '@/componentes/estados';
 import { alcanceActivo, motivoSinCopropiedad } from '../copropiedad';
 import { PantallaDePorteria } from './pantalla';
 
+/** G2 (15-N) · `?atender=<id>` del aviso de otra pantalla; sólo un UUID, nada más. */
+const elementoPedido = (valor: string | string[] | undefined): string | undefined =>
+  typeof valor === 'string' && /^[0-9a-f-]{36}$/i.test(valor) ? valor : undefined;
+
 export const metadata: Metadata = { title: 'Portería' };
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +20,11 @@ export const dynamic = 'force-dynamic';
  * le corresponde**. La comprobación de rol vive aquí y además en cada ruta de
  * la API; esta sólo evita el viaje y explica por qué.
  */
-const Porteria = async (): Promise<JSX.Element> => {
+const Porteria = async ({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ atender?: string | string[] }>;
+}): Promise<JSX.Element> => {
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
   if (sesion.rol === 'residente' || sesion.rol === 'servicio') {
@@ -29,7 +37,13 @@ const Porteria = async (): Promise<JSX.Element> => {
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
   // Otros fallos (15-M) · la llave reinicia el estado al cambiar de copropiedad.
-  return <PantallaDePorteria key={alcance.copropiedadId} copropiedadId={alcance.copropiedadId} />;
+  return (
+    <PantallaDePorteria
+      key={alcance.copropiedadId}
+      copropiedadId={alcance.copropiedadId}
+      atender={elementoPedido((await searchParams).atender)}
+    />
+  );
 };
 
 export default Porteria;

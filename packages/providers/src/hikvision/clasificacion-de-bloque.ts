@@ -71,6 +71,9 @@ export const clasificarBloque = (bloque: BloqueDeAlertStream): Clasificacion => 
     if (codigo !== null) {
       const del = eventoPorCodigo(codigo.mayor, codigo.menor);
       if (del.tipo === 'timbre') return { clase: 'timbre', ...del, codigo };
+      // G3 (15-N) · la llamada que llega como evento de control de acceso (5/51)
+      // sigue el camino de la llamada, no el de un evento cualquiera.
+      if (del.tipo === 'llamada') return { clase: 'llamada', ...del, codigo };
       const pideDecision = esCodigoDeRostro(codigo.mayor, codigo.menor) && conPersona;
       return { clase: pideDecision ? 'rostro' : 'equipo', ...del, codigo };
     }

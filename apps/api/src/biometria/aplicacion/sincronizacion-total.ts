@@ -63,7 +63,14 @@ export class SincronizarPlantillaEnTerminales {
 
   async ejecutar(
     ctx: ContextoTenant,
-    entrada: { readonly plantillaId: string },
+    entrada: {
+      readonly plantillaId: string;
+      /**
+       * R1 (15-N) · «Enviar a equipos pendientes»: sólo a los que no la
+       * tienen. Sin él, a todos (el reintento de siempre).
+       */
+      readonly soloPendientes?: boolean;
+    },
   ): Promise<Resultado<ResultadoDeSincronizacionTotal, ErrorDominio>> {
     const copropiedadId = ctx.copropiedadId;
     if (copropiedadId === null) return fallo(noEncontrado('La copropiedad'));
@@ -71,7 +78,12 @@ export class SincronizarPlantillaEnTerminales {
     const plantilla = await this.plantillas.porId(copropiedadId, entrada.plantillaId);
     if (plantilla === null) return fallo(noEncontrado('La plantilla'));
 
-    const terminales = await this.catalogo.conBibliotecaDeRostros(ctx, copropiedadId);
+    const capaces = await this.catalogo.conBibliotecaDeRostros(ctx, copropiedadId);
+    const yaLaTienen =
+      entrada.soloPendientes === true
+        ? await this.plantillas.equiposQueLaTienen(copropiedadId, plantilla.id)
+        : new Set<string>();
+    const terminales = capaces.filter((t) => !yaLaTienen.has(t.dispositivoId));
     // A3 (15-L) · lo que se omite se dice: en el resultado y en la bitácora.
     const omitidas: EquipoOmitido[] = (
       (await this.catalogo.sinBibliotecaDeRostros?.(ctx, copropiedadId)) ?? []

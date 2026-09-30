@@ -23,14 +23,7 @@ import {
   ApiConsumes,
   ApiProduces,
 } from '@nestjs/swagger';
-import {
-  Alerta,
-  BITACORA,
-  FiltroDeEventos,
-  GENERADOR_DE_ID,
-  RELOJ,
-  esFallo,
-} from '@ncr/domain-core';
+import { Alerta, BITACORA, GENERADOR_DE_ID, RELOJ, esFallo } from '@ncr/domain-core';
 import type { Bitacora, ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
 import { SoloGuardiaRemota } from '../../plataforma';
 import { Aislamiento } from '../../multiempresa/aislamiento';
@@ -40,14 +33,12 @@ import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import { ErrorApiDto } from '../../comun/respuestas';
-import { ESCALAMIENTO_DE_ALERTA, REPOSITORIO_EVENTOS } from '../../eventos';
-import type { RepositorioEventos } from '../../eventos';
+import { ESCALAMIENTO_DE_ALERTA } from '../../eventos';
 import type { EscalamientoDeAlerta } from '../aplicacion/puertos';
 import { AccionarPuertaAMano, BITACORA_DE_ORDENES } from '../aplicacion/apertura-manual';
 import type { BitacoraDeOrdenes } from '../aplicacion/apertura-manual';
 import { FijarBloqueoDeAcceso, REGISTRO_DE_BLOQUEOS } from '../aplicacion/bloqueo-de-acceso';
 import type { BloqueoVigente, RegistroDeBloqueos } from '../aplicacion/bloqueo-de-acceso';
-import { construirCola, resumenDeCola } from '../aplicacion/cola-de-atencion';
 import {
   CANAL_DE_INTERCOM,
   SinTransporteDeAudio,
@@ -60,7 +51,6 @@ import {
   AvisoAlResidenteDto,
   BloqueoVigenteDto,
   BloqueosVigentesDto,
-  ColaDeAtencionDto,
   EmergenciaDto,
   EstadoDeCanalDto,
   HistorialDeOrdenesDto,
@@ -88,6 +78,14 @@ import { MideKpi } from '../../observabilidad';
  * Un recurso de otra copropiedad responde **404 y no 403**: un 403 confirmaría
  * que el identificador existe.
  */
+/** O3 (15-N) · quién avisó, en la constancia del aviso al residente. */
+const QUIEN_AVISA: Readonly<Record<string, string>> = {
+  portero: 'el portero',
+  operador_central: 'la guardia virtual',
+  administrador: 'la administración',
+  superadministrador: 'el superadministrador',
+};
+
 @ApiTags('guardia')
 @ApiBearerAuth()
 @Controller('copropiedades/:id/guardia')
@@ -98,7 +96,6 @@ export class GuardiaController {
     @Inject(ALCANCE_DE_EQUIPOS) private readonly equiposDeLaRuta: AlcanceDeEquipos,
     @Inject(AccionarPuertaAMano) private readonly accionar: AccionarPuertaAMano,
     @Inject(BITACORA_DE_ORDENES) private readonly ordenes: BitacoraDeOrdenes,
-    @Inject(REPOSITORIO_EVENTOS) private readonly eventos: RepositorioEventos,
     @Inject(CANAL_DE_INTERCOM) private readonly intercom: CanalDeIntercom,
     @Inject(BITACORA) private readonly bitacora: Bitacora,
     @Inject(ESCALAMIENTO_DE_ALERTA) private readonly escalar: EscalamientoDeAlerta,
@@ -252,62 +249,6 @@ export class GuardiaController {
   }
 
   /* ── Guardia virtual ────────────────────────────────────────────────── */
-
-  /**
-   * HU-25 · CU-03 · la cola, ordenada por ESPERA y no por recencia.
-   *
-   * La espera se calcula aquí, en cada consulta. Guardarla la haría envejecer:
-   * la consola pintaría un número que dejó de ser cierto en cuanto se guardó.
-   */
-  /**
-   * Otros fallos (15-M) · SIN `@SoloGuardiaRemota`. La pantalla de Portería
-   * —la consola presencial, la que C-40 deja al computador de portería— se
-   * alimenta de esta cola: con el decorador, un portero en su garita recibía
-   * 403 y toda la pantalla quedaba en «Sin permiso». La IP de portería sigue
-   * sin bastar para lo que sí es guardia remota: el intercom, el aviso al
-   * residente y la emergencia.
-   */
-  @Get('cola')
-  @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
-  @ApiOperation({ summary: 'Cola de atención con tiempo de espera (CU-03, HU-25)' })
-  @ApiOkResponse({ type: ColaDeAtencionDto })
-  @ApiNotFoundResponse({ type: ErrorApiDto, description: 'Copropiedad fuera del alcance' })
-  async cola(
-    @Contexto() ctx: ContextoTenant,
-    @Param('id', ParseUUIDPipe) copropiedadId: string,
-  ): Promise<ColaDeAtencionDto> {
-    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/cola');
-    /**
-     * Se pide la ÚLTIMA hora, no «todo». La cola de atención es lo que está
-     * pasando ahora: un rango abierto recorrería todas las particiones de
-     * `eventos` para descartar casi todo, y en la pantalla que más se refresca.
-     */
-    const ahora = this.reloj.ahora();
-    const filtro = FiltroDeEventos.crear({
-      copropiedadId,
-      desde: new Date(ahora.getTime() - 60 * 60 * 1000),
-      hasta: ahora,
-      tamanoPagina: 50,
-    });
-    if (esFallo(filtro)) throw new BadRequestException(filtro.error.detalle);
-    const pagina = await this.eventos.consultar(filtro.valor);
-    const cola = construirCola(pagina.filas, ahora);
-    return {
-      cola: cola.map((e) => ({
-        eventoId: e.evento.id,
-        ocurridoEn: new Date(e.evento.ocurridoEn).toISOString(),
-        motivo: e.evento.motivo ?? null,
-        resultado: e.evento.resultado,
-        dispositivoId: e.evento.dispositivoId,
-        viviendaId: e.evento.viviendaId,
-        placaDetectada: e.evento.placaDetectada,
-        esperaSegundos: e.esperaSegundos,
-        urgencia: e.urgencia,
-        demorado: e.demorado,
-      })),
-      ...resumenDeCola(cola),
-    };
-  }
 
   /**
    * HU-26 · el canal de audio, que es **exclusivo** (ADR-01).
@@ -493,9 +434,11 @@ export class GuardiaController {
    * HU-28 · CU-03 flujo alterno 1 — el residente no contesta al intercom, y el
    * operador le avisa por otra vía.
    *
-   * Hoy el aviso se encola en el notificador; FCM llega con la ETAPA 11, que es
-   * la dueña del registro de tokens del dispositivo. Lo que **sí** existe ya es
-   * la constancia: que se intentó avisar, a qué vivienda y cuándo.
+   * Lo que existe es la constancia: que se intentó avisar, a qué vivienda,
+   * desde qué equipo, quién y cuándo. O6 (15-N) · el envío a la app del
+   * residente NO está cableado (el notificador push sigue siendo el
+   * provisional), y la respuesta lo dice en vez de prometerlo:
+   * PENDIENTE DE DEFINICIÓN (DT-15N-02).
    */
   // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
   @SoloGuardiaRemota()
@@ -517,14 +460,21 @@ export class GuardiaController {
       tipo: 'acceso_dudoso',
       severidad: 'informativa',
       generadaEn: this.reloj.ahora(),
-      dispositivoId: dto.viviendaId,
-      notas: `Aviso al residente: ${dto.texto}`,
+      // O3 (15-N) · a nombre del EQUIPO que se atiende (o de la consola, como
+      // la emergencia) y del operador que avisa —`actorId` del escalamiento—;
+      // la vivienda va en la constancia, no en el campo del equipo.
+      dispositivoId: dto.dispositivoId ?? 'consola-guardia',
+      notas:
+        `Aviso al residente de la vivienda ${dto.viviendaId}, ` +
+        `de ${QUIEN_AVISA[ctx.rol] ?? 'un operador'}: ${dto.texto}`,
     });
     if (esFallo(alerta)) throw new BadRequestException(alerta.error.detalle);
     await this.escalar.ejecutar(alerta.valor, ctx.usuarioId);
     return {
       aceptado: true,
-      detalle: 'El aviso queda registrado; el envío por FCM llega en la ETAPA 11',
+      detalle:
+        'Aviso registrado en Alertas. Todavía no le llega a la app del residente: ' +
+        'avísele por teléfono o por el citófono',
     };
   }
 

@@ -6,7 +6,7 @@ import { RefreshCw, Video, VideoOff } from 'lucide-react';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { ErrorDeVistaEnVivo, negociarVistaEnVivo, rutaWhep } from '@/lib/video/whep';
-import { fraseDeErrorDeVideo } from './causas-de-video';
+import { fraseDeErrorDeVideo, tituloPorCausa } from './causas-de-video';
 import type { ConexionEnVivo, OpcionesDeNegociacion } from '@/lib/video/whep';
 
 /**
@@ -161,7 +161,10 @@ export const VideoEnVivo = ({
                   ? 'Negociando el video con la API…'
                   : fase.tipo === 'sin_senal'
                     ? 'Sin señal'
-                    : (TITULO_POR_CODIGO[fase.codigo] ?? TITULO_POR_CODIGO['red'])}
+                    : // V5 (15-N) · el título nombra la causa (canal, credencial, códec…).
+                      (tituloPorCausa(fase.mensaje) ??
+                      TITULO_POR_CODIGO[fase.codigo] ??
+                      TITULO_POR_CODIGO['red'])}
               </p>
               {fase.tipo === 'error' && (
                 <p className="mt-1 text-distintivo text-texto-invertidoApagado">{fase.mensaje}</p>

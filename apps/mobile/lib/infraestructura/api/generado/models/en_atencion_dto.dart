@@ -4,6 +4,9 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'en_atencion_dto_disparador.dart';
+import 'en_atencion_dto_origen.dart';
+import 'en_atencion_dto_resultado.dart';
 import 'en_atencion_dto_urgencia.dart';
 
 part 'en_atencion_dto.g.dart';
@@ -12,12 +15,16 @@ part 'en_atencion_dto.g.dart';
 class EnAtencionDto {
   const EnAtencionDto({
     required this.eventoId,
+    required this.origen,
+    required this.disparador,
+    required this.titulo,
     required this.ocurridoEn,
     required this.motivo,
     required this.resultado,
     required this.dispositivoId,
     required this.viviendaId,
     required this.placaDetectada,
+    required this.conEvidencia,
     required this.esperaSegundos,
     required this.urgencia,
     required this.demorado,
@@ -25,13 +32,24 @@ class EnAtencionDto {
   
   factory EnAtencionDto.fromJson(Map<String, Object?> json) => _$EnAtencionDtoFromJson(json);
   
+  /// Id del acceso (origen «acceso») o del evento del equipo (origen «equipo»). Es el que viaja como `eventoId` en la orden manual que lo atiende.
   final String eventoId;
+  final EnAtencionDtoOrigen origen;
+
+  /// G1 (15-N) · por qué necesita a una persona (P-22).
+  final EnAtencionDtoDisparador disparador;
+  final String titulo;
+
+  /// Cuándo lo supo la plataforma: la hora de recepción, no la del equipo.
   final DateTime ocurridoEn;
   final String? motivo;
-  final String resultado;
+  final EnAtencionDtoResultado? resultado;
   final String dispositivoId;
   final String? viviendaId;
   final String? placaDetectada;
+
+  /// Hay foto o recorte que pedir por /eventos/{id}/evidencia.
+  final bool conEvidencia;
 
   /// Segundos que lleva esperando. Se CALCULA en cada consulta, no se guarda: una espera guardada envejece mal y la consola pintaría un número que dejó de ser cierto.
   final num esperaSegundos;

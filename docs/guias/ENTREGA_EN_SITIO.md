@@ -9,8 +9,10 @@
 > Documentos de apoyo: [`INTEGRACION_HIKVISION.md`](INTEGRACION_HIKVISION.md)
 > (cada equipo en detalle), [`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md)
 > (la hoja de los 16 escenarios), [`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) (la app
-> en el iPhone) y, desde la 15-M, [`VISITA-29-09.md`](VISITA-29-09.md) (los ajustes
-> en el panel web de cada equipo y cómo los comprueba la plataforma).
+> en el iPhone), desde la 15-M, [`VISITA-29-09.md`](VISITA-29-09.md) (los ajustes
+> en el panel web de cada equipo y cómo los comprueba la plataforma) y, desde la
+> 15-N, [`PROXIMA-VISITA-15N.md`](PROXIMA-VISITA-15N.md) (preparación, video desde
+> otro equipo de la red, relojes y orden de las comprobaciones).
 
 ## Índice
 

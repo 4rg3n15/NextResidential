@@ -34,7 +34,25 @@ export interface DesafioDigest {
   readonly stale: boolean;
 }
 
-const md5 = (texto: string): string => createHash('md5').update(texto, 'utf8').digest('hex');
+/**
+ * V3 (15-N) · el resumen que pide el DESAFÍO, no MD5 siempre.
+ *
+ * Hasta la 15-N `construirAutorizacion` calculaba MD5 y declaraba
+ * `algorithm=<lo que dijo el equipo>`: con un equipo que pide SHA-256 (el
+ * fabricante documenta MD5, SHA256 y MD5/SHA256 en `SecurityAlgorithm`) el
+ * resumen era falso y la clave buena salía «rechazada». Con MD5 —la cámara, el
+ * resto de equipos verificados— el cálculo es byte a byte el de antes.
+ */
+const resumenPara =
+  (algoritmo: string) =>
+  (texto: string): string =>
+    createHash(/^SHA-?256/i.test(algoritmo) ? 'sha256' : 'md5')
+      .update(texto, 'utf8')
+      .digest('hex');
+
+/** ¿Sabemos calcular el resumen que pide este desafío? */
+export const algoritmoAdmitido = (algoritmo: string): boolean =>
+  /^(MD5|SHA-?256)$/i.test(algoritmo);
 
 /**
  * Lee la cabecera del desafío.
@@ -108,14 +126,15 @@ export const construirAutorizacion = (
   contador: number,
   cnonce: string,
 ): string => {
-  const ha1 = md5(`${credenciales.usuario}:${desafio.realm}:${credenciales.clave}`);
-  const ha2 = md5(`${metodo}:${uri}`);
+  const resumen = resumenPara(desafio.algorithm);
+  const ha1 = resumen(`${credenciales.usuario}:${desafio.realm}:${credenciales.clave}`);
+  const ha2 = resumen(`${metodo}:${uri}`);
   const nc = contador.toString(16).padStart(8, '0');
 
   const respuesta =
     desafio.qop === null
-      ? md5(`${ha1}:${desafio.nonce}:${ha2}`)
-      : md5(`${ha1}:${desafio.nonce}:${nc}:${cnonce}:${desafio.qop}:${ha2}`);
+      ? resumen(`${ha1}:${desafio.nonce}:${ha2}`)
+      : resumen(`${ha1}:${desafio.nonce}:${nc}:${cnonce}:${desafio.qop}:${ha2}`);
 
   const partes = [
     `username="${credenciales.usuario}"`,

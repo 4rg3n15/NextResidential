@@ -47,6 +47,7 @@ export { ensayarEquipo } from './ensayo/ensayo-en-sitio';
 export type { InformeDeEnsayo } from './ensayo/ensayo-en-sitio';
 export {
   capturarRespaldo,
+  avisoDeZona,
   ficheroDelRespaldo,
   leerSerieDelEquipo,
   llaveDelRespaldo,

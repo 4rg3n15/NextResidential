@@ -166,7 +166,8 @@ export const equiposDelRegistro = async (
       usuario: f.usuario,
       clave,
       puerta: puerta === null ? 1 : Number(puerta),
-      canalDeVideo: f.canal_de_video ?? '102',
+      // V2 (15-N) · sin canal en la ficha, el que el equipo declara.
+      canalDeVideo: f.canal_de_video ?? null,
       puertoRtsp,
       tiempoLimiteMs,
       secretoDeAlarmServer,

@@ -26,7 +26,17 @@ const CAUSAS: readonly { readonly patron: RegExp; readonly frase: string }[] = [
     frase: 'el puente rechazó el registro por un `streams:` sobrante en su fichero',
   },
   { patron: /\b412\b|Precondition/i, frase: 'el equipo no tiene ese canal de video' },
-  { patron: /\b401\b|Unauthorized/i, frase: 'el equipo rechazó la credencial por RTSP' },
+  // V5 (15-N) · go2rtc no dice el código: la sonda RTSP de este mismo paso sí.
+  {
+    patron: /wrong response on DESCRIBE/i,
+    frase:
+      'el equipo rechazó el flujo (canal, permiso de vista en vivo o sesiones: la sonda RTSP dice cuál)',
+  },
+  {
+    patron: /\b401\b|Unauthorized|wrong user\/pass/i,
+    frase:
+      'el equipo rechazó la credencial por RTSP (si sólo ofrece Digest SHA-256, el puente no lo sabe: póngalo en MD5)',
+  },
   {
     patron: /EOF|\b551\b|connection reset|broken pipe/i,
     frase: 'el equipo cerró la conexión de video (backchannel u otro rechazo del flujo)',
@@ -52,6 +62,7 @@ const causaDe = (texto: string): string =>
 export const pasoDeVideoWebrtc = async (
   o: OpcionesDeEnsayo,
   sonda: ResultadoDePaso,
+  canalProbado: string | null = null,
 ): Promise<ResultadoDePaso> => {
   if (o.puente === undefined) {
     return {
@@ -63,6 +74,10 @@ export const pasoDeVideoWebrtc = async (
     return { ...sonda, detalle: [...sonda.detalle, 'WebRTC no probado: la sonda RTSP ya falló'] };
   }
   const { equipo } = o;
+  const canal = canalProbado ?? equipo.canalDeVideo;
+  if (canal === null) {
+    return { ...sonda, detalle: [...sonda.detalle, 'WebRTC no probado: no hay canal de video'] };
+  }
   const base = o.puente.url.replace(/\/+$/, '');
   const fetchFn = o.puente.fetchFn ?? ((entrada, init) => fetch(entrada, init));
   const nombre = `ensayo-${equipo.familia}`;
@@ -71,7 +86,7 @@ export const pasoDeVideoWebrtc = async (
     puerto: equipo.puertoRtsp,
     usuario: equipo.usuario,
     clave: equipo.clave,
-    canal: equipo.canalDeVideo,
+    canal,
   });
   const fallo = (causa: string, detalle: string): ResultadoDePaso =>
     resultado('video', 'fallo', `${sonda.causa}, pero ${causa}`, ACCION, [

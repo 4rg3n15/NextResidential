@@ -192,4 +192,64 @@ describe('C2 (15-L) · el videoportero edita su puerta, su canal de video y su z
       expect(invalidadas).toHaveBeenCalledWith({ queryKey: ['tablero', COP, 'dispositivos'] }),
     );
   });
+
+  // O2 (15-N) · DT-15M-04 · al editar, lo vacío «conserva»; la zona no puede
+  // ser eso: «Sin zona» viaja como `null`, que el servidor lee «quítala».
+  it('«Sin zona» en un equipo con zona viaja como null en la edición', async () => {
+    render(
+      <Envoltura>
+        <AltaDeEquipo
+          copropiedadId={COP}
+          abierto
+          alCerrar={() => undefined}
+          equipo={{ ...VIDEOPORTERO, zonaId: 'z-1' } as never}
+        />
+      </Envoltura>,
+    );
+    await screen.findByRole('option', { name: 'Portería' });
+    fireEvent.change(screen.getByLabelText('Zona del equipo'), { target: { value: '' } });
+    const dialogo = screen.getByRole('dialog');
+    fireEvent.click(dialogo.querySelector<HTMLButtonElement>('button[type="submit"]')!);
+    const espia = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    let edicion: Request | undefined;
+    await waitFor(() => {
+      edicion = (espia.mock.calls as [Request][]).map(([r]) => r).find((r) => r.method === 'PUT');
+      expect(edicion).toBeDefined();
+    });
+    expect(await edicion!.clone().json()).toMatchObject({ zonaId: null });
+  });
+});
+
+/**
+ * V2 (15-N) · «Probar conexión» propone el canal que el equipo DECLARA y el
+ * alta lo guarda. La cámara del 29/09 quedó registrada con el 102, que no tiene.
+ */
+describe('V2 · el canal de video propuesto es uno de los que el equipo declara', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (entrada: Request) => {
+        if (entrada.url.includes('/prueba-de-conexion')) {
+          return respuesta({
+            ...sondeo('alcanzado'),
+            capacidades: {
+              origen: 'descubierta',
+              video: {
+                estado: 'si',
+                codec: 'H.264',
+                canal: '101',
+                canales: [{ id: '101', codec: 'H.264' }],
+              },
+            },
+          });
+        }
+        if (entrada.url.endsWith('/zonas')) return respuesta([]);
+        return respuesta({ id: '20000000-0000-4000-8000-000000000002' });
+      }),
+    );
+  });
+
+  it('tras probar, el alta envía el 101 que la cámara declara', async () => {
+    expect((await probarYGuardar())['canalDeVideo']).toBe('101');
+  });
 });

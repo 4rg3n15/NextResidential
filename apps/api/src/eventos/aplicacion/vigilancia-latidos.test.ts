@@ -7,6 +7,7 @@ import {
   RepositorioDispositivosEnMemoria,
 } from '../infraestructura/repositorios-en-memoria';
 import { bitacoraDePrueba, canalCon, idsSecuenciales, relojFijo } from './dobles';
+import { AlertasDelCicloDelEquipo } from './alertas-del-ciclo-del-equipo';
 
 const COP = 'cop-1';
 const T0 = new Date('2026-09-08T14:00:00Z');
@@ -31,6 +32,7 @@ const montar = (): {
       reloj,
       idsSecuenciales('al'),
       bitacora,
+      new AlertasDelCicloDelEquipo(alertas, reloj, bitacora),
     ),
     dispositivos,
     alertas,
@@ -147,5 +149,20 @@ describe('VigilarLatidos · CA-26, RN-12, P-06', () => {
 
   it('el umbral por defecto es el conservador aprobado', () => {
     expect(UMBRAL_DE_LATIDO_POR_DEFECTO.silencioParaCaidoSegundos).toBe(300);
+  });
+});
+
+describe('A1 (15-N) · la caída que ya no es', () => {
+  it('el equipo cayó y volvió a latir: la pasada siguiente resuelve su alerta', async () => {
+    const m = montar();
+    m.dispositivos.declarar(COP, 'disp-1', haceSegundos(3600));
+    await m.caso.ejecutar(COP, ACTOR);
+    expect(await m.alertas.abiertasDe(COP)).toHaveLength(1);
+
+    m.dispositivos.declarar(COP, 'disp-1', haceSegundos(5));
+    const parte = await m.caso.ejecutar(COP, ACTOR);
+    expect(parte.caidos).toEqual([]);
+    // Ni abierta ni en el contador: resuelta, con su nota.
+    expect(await m.alertas.abiertasDe(COP)).toEqual([]);
   });
 });

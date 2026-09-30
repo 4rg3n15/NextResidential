@@ -11,11 +11,13 @@ class AvisoAlResidenteDto {
   const AvisoAlResidenteDto({
     required this.viviendaId,
     required this.texto,
+    this.dispositivoId,
   });
   
   factory AvisoAlResidenteDto.fromJson(Map<String, Object?> json) => _$AvisoAlResidenteDtoFromJson(json);
   
   final String viviendaId;
+  final String? dispositivoId;
   final String texto;
 
   Map<String, Object?> toJson() => _$AvisoAlResidenteDtoToJson(this);

@@ -14,6 +14,10 @@ ColaDeAtencionDto _$ColaDeAtencionDtoFromJson(Map<String, dynamic> json) =>
       total: json['total'] as num,
       criticos: json['criticos'] as num,
       esperaMaxima: json['esperaMaxima'] as num,
+      vigenciaSegundos: json['vigenciaSegundos'] as num,
+      preferencias: PreferenciasDeAtencionDto.fromJson(
+        json['preferencias'] as Map<String, dynamic>,
+      ),
     );
 
 Map<String, dynamic> _$ColaDeAtencionDtoToJson(ColaDeAtencionDto instance) =>
@@ -22,4 +26,6 @@ Map<String, dynamic> _$ColaDeAtencionDtoToJson(ColaDeAtencionDto instance) =>
       'total': instance.total,
       'criticos': instance.criticos,
       'esperaMaxima': instance.esperaMaxima,
+      'vigenciaSegundos': instance.vigenciaSegundos,
+      'preferencias': instance.preferencias,
     };

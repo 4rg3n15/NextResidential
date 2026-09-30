@@ -1,5 +1,13 @@
 import { Socket } from 'node:net';
-import { cnonceAleatorio, construirAutorizacion, interpretarDesafio } from '../barrera/digest';
+import { cnonceAleatorio, construirAutorizacion } from '../barrera/digest';
+import {
+  causaDeRechazoRtsp,
+  describirEnviado,
+  describirOfrecidos,
+  elegirDesafio,
+  fraseDeRechazoRtsp,
+} from './rtsp-desafios';
+import type { CausaDeRechazoRtsp } from './rtsp-desafios';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -29,6 +37,12 @@ export interface ResultadoRtsp {
   /** «H.264», «H.265», «MJPEG» u otro, leído del SDP. `null` sin SDP. */
   readonly codec: string | null;
   readonly detalle: string;
+  /** V3 (15-N) · con `rechazo`, qué significa el código (403, 404/412, 454…). */
+  readonly causa?: CausaDeRechazoRtsp;
+  /** V3 (15-N) · los desafíos que ofreció el equipo, sin nonce. */
+  readonly ofrecido?: string;
+  /** V3 (15-N) · el esquema y el usuario que se enviaron, sin la clave. */
+  readonly enviado?: string;
 }
 
 export interface OpcionesRtsp {
@@ -46,6 +60,8 @@ export interface OpcionesRtsp {
 interface RespuestaRtsp {
   readonly estado: number;
   readonly cabeceras: ReadonlyMap<string, string>;
+  /** V3 (15-N) · cada `WWW-Authenticate` por separado: unidas se mezclaban. */
+  readonly desafios: readonly string[];
   readonly cuerpo: string;
 }
 
@@ -87,11 +103,13 @@ const abrir = (opciones: OpcionesRtsp) => {
     const cabeza = bufer.subarray(0, fin).toString('latin1').split('\r\n');
     const estado = Number(/^RTSP\/1\.\d\s+(\d{3})/.exec(cabeza[0] ?? '')?.[1] ?? '0');
     const cabeceras = new Map<string, string>();
+    const desafios: string[] = [];
     for (const linea of cabeza.slice(1)) {
       const dos = linea.indexOf(':');
       if (dos < 0) continue;
       const nombre = linea.slice(0, dos).trim().toLowerCase();
       const valor = linea.slice(dos + 1).trim();
+      if (nombre === 'www-authenticate') desafios.push(valor);
       cabeceras.set(nombre, cabeceras.has(nombre) ? `${cabeceras.get(nombre)}, ${valor}` : valor);
     }
     const largo = Number(cabeceras.get('content-length') ?? '0');
@@ -100,7 +118,7 @@ const abrir = (opciones: OpcionesRtsp) => {
     bufer = bufer.subarray(fin + 4 + largo);
     const { resolver } = esperando;
     esperando = null;
-    resolver({ estado, cabeceras, cuerpo });
+    resolver({ estado, cabeceras, desafios, cuerpo });
   };
 
   socket.on('data', (d: Buffer) => {
@@ -160,41 +178,54 @@ export const describirRtsp = async (opciones: OpcionesRtsp): Promise<ResultadoRt
   const conexion = abrir(opciones);
   try {
     let respuesta = await conexion.pedir(peticion(1, null));
+    let ofrecido: string | undefined;
+    let enviado: string | undefined;
     if (respuesta.estado === 401) {
-      const oferta = respuesta.cabeceras.get('www-authenticate') ?? null;
-      const desafio = interpretarDesafio(oferta);
+      // V3 (15-N) · UN desafío elegido entre los ofrecidos (Digest MD5, SHA-256
+      // o Basic), y el resumen que ese desafío pide.
+      ofrecido = describirOfrecidos(respuesta.desafios);
+      const elegido = elegirDesafio(respuesta.desafios) ?? { esquema: 'Basic', digest: null };
+      enviado = describirEnviado(elegido, opciones.usuario);
       const credenciales = { usuario: opciones.usuario, clave: opciones.clave };
       const autorizacion =
-        desafio !== null
-          ? construirAutorizacion(desafio, credenciales, 'DESCRIBE', uri, 1, cnonceAleatorio())
+        elegido.digest !== null
+          ? construirAutorizacion(
+              elegido.digest,
+              credenciales,
+              'DESCRIBE',
+              uri,
+              1,
+              cnonceAleatorio(),
+            )
           : `Basic ${Buffer.from(`${opciones.usuario}:${opciones.clave}`).toString('base64')}`;
       respuesta = await conexion.pedir(peticion(2, autorizacion));
       if (respuesta.estado === 401) {
         // E1-g (15-M) · fue un intercambio limpio (DESCRIBE sin credencial →
         // 401 → DESCRIBE autenticada), así que este 401 sí es la credencial.
-        // Se anota QUÉ ofreció el equipo y QUÉ esquema se envió, sin la clave,
-        // para que la visita compare con el panel del aparato.
-        const ofrecido =
-          desafio === null
-            ? `sin desafío Digest (cabecera: ${oferta === null ? 'ausente' : oferta.slice(0, 80)})`
-            : `Digest realm="${desafio.realm}", qop=${desafio.qop ?? 'ninguno'}, algorithm=${desafio.algorithm}`;
         return {
           clase: 'credencial',
           estado: 401,
           codec: null,
+          ofrecido,
+          enviado,
           detalle:
             'el equipo rechazó la credencial por RTSP en un intercambio limpio (no se reintenta) · ' +
-            `ofreció ${ofrecido} · se envió ${desafio === null ? 'Basic' : 'Digest'} con el usuario ` +
-            `«${opciones.usuario}»`,
+            `ofreció ${ofrecido} · se envió ${enviado}`,
         };
       }
     }
+    const trazas = {
+      ...(ofrecido === undefined ? {} : { ofrecido }),
+      ...(enviado === undefined ? {} : { enviado }),
+    };
     if (respuesta.estado !== 200) {
       return {
         clase: 'rechazo',
         estado: respuesta.estado,
         codec: null,
-        detalle: `el equipo contestó RTSP ${String(respuesta.estado)} a ${opciones.camino}`,
+        causa: causaDeRechazoRtsp(respuesta.estado),
+        ...trazas,
+        detalle: fraseDeRechazoRtsp(respuesta.estado, opciones.camino),
       };
     }
     const codec = codecDelSdp(respuesta.cuerpo);
@@ -202,6 +233,7 @@ export const describirRtsp = async (opciones: OpcionesRtsp): Promise<ResultadoRt
       clase: 'respondio',
       estado: 200,
       codec,
+      ...trazas,
       detalle:
         codec === null
           ? 'el equipo describió el flujo, pero sin video legible en el SDP'

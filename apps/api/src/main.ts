@@ -41,28 +41,13 @@ if (process.env.NCR_IGNORAR_ENV_FILE !== '1') {
 }
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import express from 'express';
-import {
-  LIMITE_DE_FOTOGRAFIA,
-  RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
-  guardarCuerpoCrudo,
-} from './autorizaciones';
-import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from './comun/sobre-de-equipo';
-import { RUTAS_CON_FOTO_DE_VISITA } from './visitas';
-import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from './comun/ruta-de-audio';
-import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from './comun/ruta-de-video';
+// La tubería ANTES que el módulo raíz: carga sus ficheros concretos en el
+// mismo orden que el banco de pruebas, que es el orden probado (D-66).
+import { montarTuberiaHttp } from './arranque/tuberia-http';
 import { AppModule } from './app.module';
 import { MOTIVO_SIN_METADATOS, emiteMetadatosDeTipos } from './arranque/metadatos-de-tipos';
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
-import { aplicarSaneamiento, aplicarSeguridad } from './seguridad';
-import { FiltroGlobalDeExcepciones } from './comun/filtros/filtro-global';
-import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
-import { aplicarContextoDePeticion } from './comun/contexto/contexto-de-peticion';
 import { BitacoraEstructurada } from './comun/bitacora/bitacora-estructurada';
-import { InterceptorDeLatencias, REPORTE_DE_ERRORES } from './observabilidad';
-import type { ReporteDeErrores } from './observabilidad';
-import { GENERADOR_DE_ID } from '@ncr/domain-core';
-import type { GeneradorDeId } from '@ncr/domain-core';
 import { AdaptadorDeBitacoraNest } from './comun/bitacora/adaptador-nest';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
@@ -99,59 +84,12 @@ async function arrancar(): Promise<void> {
   const bitacora = app.get<Bitacora>(BITACORA);
 
   /**
-   * ═══════════════════════════════════════════════════════════════════════
-   * EL PRIMERO DE TODOS, Y EL ORDEN ES FUNCIONAL (ETAPA 14).
-   *
-   * Todo lo que corra después —seguridad, parsers, saneamiento, Nest entero—
-   * queda dentro del `AsyncLocalStorage` de la petición, y por tanto toda
-   * línea de registro que escriban lleva su correlación. Colocado más abajo,
-   * las líneas de las capas que van antes saldrían sin ella, que es
-   * exactamente la mitad que faltaba: el identificador existía y los logs no
-   * lo llevaban.
+   * V1 (15-N) · la tubería HTTP entera —contexto, seguridad, parsers,
+   * saneamiento, filtro e interceptores—, en el orden que la función explica.
+   * Es LA MISMA función que monta el banco de pruebas: la prueba extremo a
+   * extremo del video recorre lo que se despliega, no una réplica.
    */
-  aplicarContextoDePeticion(app, () => app.get<GeneradorDeId>(GENERADOR_DE_ID).nuevo());
-
-  aplicarSeguridad(app, config);
-  // Límite de tamaño de payload (§2.7.8), antes de cualquier ruta.
-  // `verify` guarda el cuerpo CRUDO antes de parsearlo: la firma del Alarm
-  // Server se calcula sobre los bytes que llegaron, y reserializar el JSON
-  // produciría otra cadena con la que ninguna firma cuadraría (RNF-03.11).
-  /**
-   * ANTES de `express.json`, y sólo bajo su propia ruta (ETAPA 15).
-   *
-   * La cámara publica `multipart/form-data`. `express.json` no lo parsea y
-   * dejaría el flujo sin consumir; montarlo después tampoco serviría, porque
-   * para entonces el cuerpo ya se habría perdido. Aquí se acumula el sobre
-   * crudo, acotado en tamaño, y `@ncr/providers` lo abre.
-   */
-  app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
-  // A4 · el audio del operador, crudo y acotado, sólo bajo su ruta.
-  app.use(
-    RUTA_DE_AUDIO_DE_INTERCOM,
-    express.raw({ type: 'application/octet-stream', limit: LIMITE_DE_TROZO_DE_AUDIO }),
-  );
-  // A5 · la oferta SDP del navegador, como texto y acotada, sólo bajo su ruta.
-  app.use(RUTA_DE_WHEP_DE_VIDEO, express.text({ type: TIPO_SDP, limit: LIMITE_DE_OFERTA_SDP }));
-  // O3 · la fotografía del visitante: más que el tope general, SÓLO en su ruta.
-  app.use(
-    RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
-    express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
-  );
-  // F (15-L) · «Generar autorización» lleva la foto en el cuerpo: mismo tope.
-  for (const ruta of RUTAS_CON_FOTO_DE_VISITA) {
-    app.use(ruta, express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }));
-  }
-  app.use(express.json({ limit: config.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
-  app.use(express.urlencoded({ limit: config.LIMITE_PAYLOAD, extended: false }));
-  // §2.7.4 · saneamiento DESPUÉS de los parsers: antes no hay cuerpo que sanear.
-  aplicarSaneamiento(app);
-
-  app.useGlobalFilters(
-    new FiltroGlobalDeExcepciones(bitacora, app.get<ReporteDeErrores>(REPORTE_DE_ERRORES)),
-  );
-  // Correlación primero, latencias después: el cronómetro se lee en el log de
-  // la misma petición que lo produjo.
-  app.useGlobalInterceptors(app.get(InterceptorDeCorrelacion), app.get(InterceptorDeLatencias));
+  montarTuberiaHttp(app, config);
   // Otros fallos (15-M) · cierre ordenado: corta el SSE, cierra módulos y
   // pools, y no se cuelga (`cierre-ordenado.ts`). Sustituye a enableShutdownHooks.
   instalarCierreOrdenado(app, bitacora);

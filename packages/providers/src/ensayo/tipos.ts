@@ -110,8 +110,11 @@ export interface EquipoDeEnsayo extends OpcionesDeEquipo {
   readonly nombre?: string;
   /** Carril de la cámara o puerta de la terminal y del videoportero. */
   readonly puerta: number;
-  /** `102` por omisión: el subflujo (D2). */
-  readonly canalDeVideo: string;
+  /**
+   * El de la ficha o del `.env`. V2 (15-N) · `null` ya no es «102»: el
+   * diagnóstico pregunta por uno de los canales que el equipo DECLARA.
+   */
+  readonly canalDeVideo: string | null;
   readonly puertoRtsp: number;
 }
 

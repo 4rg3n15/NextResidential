@@ -87,6 +87,14 @@ export interface RepositorioPlantillas {
    */
   registrarFallo(destino: DestinoDePlantilla, detalle: string, actorId: string): Promise<void>;
   registrarRetirada(destino: DestinoDePlantilla, actorId: string): Promise<void>;
+  /**
+   * R1 (15-N) · las plantillas sin suprimir que ESE equipo todavía no tiene.
+   * El consentimiento y la vigencia los vuelve a juzgar `SincronizarPlantilla`
+   * al empujar; la base puede adelantar el filtro del consentimiento.
+   */
+  pendientesParaEquipo(copropiedadId: string, dispositivoId: string): Promise<readonly string[]>;
+  /** R1 (15-N) · los equipos que YA tienen esta plantilla. */
+  equiposQueLaTienen(copropiedadId: string, plantillaId: string): Promise<ReadonlySet<string>>;
 }
 
 export interface BovedaDePlantillas {

@@ -189,6 +189,8 @@ const principal = async () => {
       equipos,
       carpeta,
       decir,
+      // R2 (15-N) · la zona del conjunto, para AVISAR si el respaldo trae otra.
+      zonaDelConjunto: process.env.EQUIPOS_ZONA_HORARIA || 'America/Bogota',
     });
     await sim?.cerrar();
     process.exit(fallos > 0 ? 1 : 0);

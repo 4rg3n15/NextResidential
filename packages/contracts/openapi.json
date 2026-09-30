@@ -485,6 +485,24 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1244,6 +1262,18 @@
             "required": true,
             "in": "path",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "soloPendientes",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
               "type": "string"
             }
           }
@@ -2898,7 +2928,7 @@
     },
     "/copropiedades/{id}/guardia/cola": {
       "get": {
-        "operationId": "GuardiaController_cola",
+        "operationId": "AtencionController_consultar",
         "parameters": [
           {
             "name": "id",
@@ -2936,7 +2966,7 @@
             "bearer": []
           }
         ],
-        "summary": "Cola de atención con tiempo de espera (CU-03, HU-25)",
+        "summary": "Cola de atención: lo que necesita a una persona (CU-03, P-22)",
         "tags": [
           "guardia"
         ]
@@ -3378,6 +3408,106 @@
           }
         ],
         "summary": "Últimas órdenes manuales de la copropiedad (HU-23)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/preferencias": {
+      "get": {
+        "operationId": "AtencionController_leer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenciasDeAtencionDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preferencias de atención de la copropiedad (G2)",
+        "tags": [
+          "guardia"
+        ]
+      },
+      "put": {
+        "operationId": "AtencionController_guardar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenciasDeAtencionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenciasDeAtencionDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia las preferencias de atención (G2)",
         "tags": [
           "guardia"
         ]
@@ -8407,6 +8537,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "texto": {
             "type": "string",
             "minLength": 4,
@@ -8488,7 +8622,7 @@
           "canalDeVideo": {
             "type": "string",
             "nullable": true,
-            "description": "Flujo de video; `null` = 102"
+            "description": "Flujo de video; `null` = el que el equipo declara (subflujo x02 si lo hay)"
           },
           "zonaId": {
             "type": "string",
@@ -9126,7 +9260,7 @@
         "type": "object",
         "properties": {
           "cola": {
-            "description": "Ordenada por espera DESCENDENTE, con lo crítico delante. No por recencia: una bandeja por recencia hunde al que lleva más tiempo esperando cada vez que llega otro.",
+            "description": "Sólo lo que necesita a una persona y llegó EN VIVO (P-22), dentro de su vigencia; ordenada por espera DESCENDENTE, con lo crítico delante. No por recencia: una bandeja por recencia hunde al que lleva más tiempo esperando cada vez que llega otro.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/EnAtencionDto"
@@ -9140,13 +9274,22 @@
           },
           "esperaMaxima": {
             "type": "number"
+          },
+          "vigenciaSegundos": {
+            "type": "number",
+            "description": "Cuánto sigue en la cola algo sin atender (GUARDIA_VIGENCIA_EN_COLA_S)."
+          },
+          "preferencias": {
+            "$ref": "#/components/schemas/PreferenciasDeAtencionDto"
           }
         },
         "required": [
           "cola",
           "total",
           "criticos",
-          "esperaMaxima"
+          "esperaMaxima",
+          "vigenciaSegundos",
+          "preferencias"
         ]
       },
       "ConfiguracionDeCopropiedadDto": {
@@ -10173,13 +10316,14 @@
             "pattern": "^[1-9][0-9]{2,3}$",
             "example": "102"
           },
-          "zonaId": {
-            "type": "string",
-            "format": "uuid"
-          },
           "probarConexion": {
             "type": "boolean",
             "default": true
+          },
+          "zonaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },
@@ -10295,6 +10439,17 @@
                 "$ref": "#/components/schemas/CodigoDelEquipoDto"
               }
             ]
+          },
+          "horaDelEquipo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "R2 (15-N) · con el reloj del equipo desviado, la hora que DIJO el equipo; `ocurridoEn` es entonces la de recepción de la plataforma"
+          },
+          "relojDesviadoSegundos": {
+            "type": "number",
+            "nullable": true,
+            "description": "Segundos que el reloj del equipo iba por delante (negativo: atrasado)"
           }
         },
         "required": [
@@ -10307,7 +10462,9 @@
           "resultado",
           "enVivo",
           "eventoId",
-          "codigo"
+          "codigo",
+          "horaDelEquipo",
+          "relojDesviadoSegundos"
         ]
       },
       "EmergenciaDto": {
@@ -10333,18 +10490,46 @@
         "properties": {
           "eventoId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Id del acceso (origen «acceso») o del evento del equipo (origen «equipo»). Es el que viaja como `eventoId` en la orden manual que lo atiende."
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "acceso",
+              "equipo"
+            ]
+          },
+          "disparador": {
+            "type": "string",
+            "enum": [
+              "llamada",
+              "rostro",
+              "placa",
+              "lista_negra",
+              "dudoso"
+            ],
+            "description": "G1 (15-N) · por qué necesita a una persona (P-22)."
+          },
+          "titulo": {
+            "type": "string"
           },
           "ocurridoEn": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Cuándo lo supo la plataforma: la hora de recepción, no la del equipo."
           },
           "motivo": {
             "type": "string",
             "nullable": true
           },
           "resultado": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "permitido",
+              "negado"
+            ]
           },
           "dispositivoId": {
             "type": "string",
@@ -10357,6 +10542,10 @@
           "placaDetectada": {
             "type": "string",
             "nullable": true
+          },
+          "conEvidencia": {
+            "type": "boolean",
+            "description": "Hay foto o recorte que pedir por /eventos/{id}/evidencia."
           },
           "esperaSegundos": {
             "type": "number",
@@ -10376,12 +10565,16 @@
         },
         "required": [
           "eventoId",
+          "origen",
+          "disparador",
+          "titulo",
           "ocurridoEn",
           "motivo",
           "resultado",
           "dispositivoId",
           "viviendaId",
           "placaDetectada",
+          "conEvidencia",
           "esperaSegundos",
           "urgencia",
           "demorado"
@@ -10444,7 +10637,7 @@
           "canalDeVideo": {
             "type": "string",
             "nullable": true,
-            "description": "Flujo de video; `null` = 102"
+            "description": "Flujo de video; `null` = el que el equipo declara (subflujo x02 si lo hay)"
           },
           "zonaId": {
             "type": "string",
@@ -10617,7 +10810,7 @@
           "canalDeVideo": {
             "type": "string",
             "nullable": true,
-            "description": "Flujo de video; `null` = 102"
+            "description": "Flujo de video; `null` = el que el equipo declara (subflujo x02 si lo hay)"
           },
           "zonaId": {
             "type": "string",
@@ -11501,7 +11694,8 @@
               "pendiente",
               "sincronizada",
               "fallida",
-              "suprimida"
+              "suprimida",
+              "omitida"
             ]
           },
           "detalle": {
@@ -13645,6 +13839,50 @@
         },
         "required": [
           "porteros"
+        ]
+      },
+      "PreferenciaDeDisparadorDto": {
+        "type": "object",
+        "properties": {
+          "abrir": {
+            "type": "boolean",
+            "description": "La Atención se abre sola con este disparador."
+          },
+          "sonar": {
+            "type": "boolean",
+            "description": "La consola suena con este disparador."
+          }
+        },
+        "required": [
+          "abrir",
+          "sonar"
+        ]
+      },
+      "PreferenciasDeAtencionDto": {
+        "type": "object",
+        "properties": {
+          "llamada": {
+            "$ref": "#/components/schemas/PreferenciaDeDisparadorDto"
+          },
+          "rostro": {
+            "$ref": "#/components/schemas/PreferenciaDeDisparadorDto"
+          },
+          "placa": {
+            "$ref": "#/components/schemas/PreferenciaDeDisparadorDto"
+          },
+          "lista_negra": {
+            "$ref": "#/components/schemas/PreferenciaDeDisparadorDto"
+          },
+          "dudoso": {
+            "$ref": "#/components/schemas/PreferenciaDeDisparadorDto"
+          }
+        },
+        "required": [
+          "llamada",
+          "rostro",
+          "placa",
+          "lista_negra",
+          "dudoso"
         ]
       },
       "PuntoDeFrecuenciaDto": {

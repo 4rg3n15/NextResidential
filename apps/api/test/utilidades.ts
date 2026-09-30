@@ -6,24 +6,8 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common';
 import { CLAVE_ROLES } from '../src/comun/decoradores';
 import type { TestingModuleBuilder } from '@nestjs/testing';
-import express from 'express';
-import { guardarCuerpoCrudo } from '../src/autorizaciones/presentacion/guardia-firma';
-import {
-  LIMITE_DE_FOTOGRAFIA,
-  RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
-} from '../src/autorizaciones/presentacion/limites';
-import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../src/comun/sobre-de-equipo';
-import { RUTAS_CON_FOTO_DE_VISITA } from '../src/visitas/presentacion/limites';
-import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from '../src/comun/ruta-de-audio';
-import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from '../src/comun/ruta-de-video';
 import type { INestApplication } from '@nestjs/common';
-import { aplicarSaneamiento, aplicarSeguridad } from '../src/seguridad';
-import { aplicarContextoDePeticion } from '../src/comun/contexto/contexto-de-peticion';
-import { InterceptorDeCorrelacion } from '../src/comun/interceptores/correlacion';
-import { InterceptorDeLatencias, REPORTE_DE_ERRORES } from '../src/observabilidad';
-import type { ReporteDeErrores } from '../src/observabilidad';
-import { GENERADOR_DE_ID } from '@ncr/domain-core';
-import type { GeneradorDeId } from '@ncr/domain-core';
+import { montarTuberiaHttp } from '../src/arranque/tuberia-http';
 import { AppModule } from '../src/app.module';
 import { ControlDeIpDePorteros, ModoPruebas } from '../src/plataforma';
 import { SONDA_POSTGRES } from '../src/arranque/sonda-postgres';
@@ -34,9 +18,6 @@ import {
 } from '../src/multiempresa/repositorio-copropiedades';
 import type { Configuracion } from '../src/configuracion/esquema';
 import type { Rol } from '../src/autenticacion/dominio/claims';
-import { BITACORA } from '@ncr/domain-core';
-import type { Bitacora } from '@ncr/domain-core';
-import { FiltroGlobalDeExcepciones } from '../src/comun/filtros/filtro-global';
 import { REPOSITORIO_DE_EQUIPOS, SIN_PROBAR, SONDA_DE_EQUIPO } from '../src/equipos';
 import { REPOSITORIO_AUTORIZACIONES_ZONA, REPOSITORIO_ZONAS } from '../src/zonas';
 import { RepositorioZonasEnMemoria } from '../src/zonas/infraestructura/repositorio-zonas-memoria';
@@ -140,6 +121,12 @@ export const configuracionDePrueba: Configuracion = {
   // conexiones de pg-boss contra una base que en este banco no existe.
   PLANIFICADOR_HABILITADO: false,
   METRICAS_VENTANA: 2048,
+  // O6 (15-N) · los valores por omisión del esquema, explícitos: este literal no
+  // pasa por él, y sin ellos la ventana de alertas valía NaN (ver
+  // `configuracion-de-prueba.test.ts`).
+  ALERTAS_VENTANA_DEDUP_S: 600,
+  GUARDIA_VIGENCIA_EN_COLA_S: 300,
+  EQUIPOS_DESVIO_DE_RELOJ_S: 30,
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 100000, // el límite se prueba aparte; aquí estorbaría
   THROTTLE_DISPOSITIVO_LIMITE: 120,
@@ -471,62 +458,13 @@ export const crearApp = async (
    * ═════════════════════════════════════════════════════════════════════════
    */
   /**
-   * ETAPA 14 · el contexto de petición va PRIMERO, igual que en `main.ts`.
-   *
-   * Y está aquí por la misma lección de H-13-11: lo que el banco no monta, el
-   * banco no prueba. Si la correlación y el interceptor de latencias se
-   * cablearan solo en `main.ts`, la suite pasaría en verde sobre una API que
-   * no es la que se despliega — que es exactamente el defecto que se corrigió
-   * cuando se descubrió que `aplicarSeguridad` no se llamaba aquí.
+   * V1 (15-N) · LA MISMA FUNCIÓN QUE `main.ts`, no una réplica: contexto,
+   * seguridad, parsers, saneamiento, filtro e interceptores. Hasta la 15-N
+   * este banco copiaba la tubería línea a línea; el defecto del video vivía
+   * justo ahí (el saneamiento recortaba la oferta SDP) y la prueba extremo a
+   * extremo tiene que recorrer lo que se despliega.
    */
-  aplicarContextoDePeticion(app, () => app.get<GeneradorDeId>(GENERADOR_DE_ID).nuevo());
-
-  aplicarSeguridad(app, efectiva);
-  /**
-   * ETAPA 15 · el acumulador del sobre crudo, ANTES de `express.json` y sólo
-   * bajo su ruta — igual que en `main.ts`, y por la misma lección de H-13-11.
-   * Si se cableara sólo allí, la suite probaría un receptor de «servidor de
-   * alarma» que nunca recibe cuerpo, y estaría en verde.
-   */
-  app.use(RUTA_DE_ALARM_SERVER, acumularSobreCrudo);
-  // A4 · el audio del operador, crudo y acotado, sólo bajo su ruta.
-  app.use(
-    RUTA_DE_AUDIO_DE_INTERCOM,
-    express.raw({ type: 'application/octet-stream', limit: LIMITE_DE_TROZO_DE_AUDIO }),
-  );
-  // A5 · la oferta SDP del navegador, como texto y acotada, sólo bajo su ruta.
-  app.use(RUTA_DE_WHEP_DE_VIDEO, express.text({ type: TIPO_SDP, limit: LIMITE_DE_OFERTA_SDP }));
-  app.use(
-    RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
-    express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
-  );
-  // F (15-L) · «Generar autorización» lleva la foto en el cuerpo: mismo tope.
-  for (const ruta of RUTAS_CON_FOTO_DE_VISITA) {
-    app.use(ruta, express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }));
-  }
-  app.use(express.json({ limit: efectiva.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));
-  app.use(express.urlencoded({ limit: efectiva.LIMITE_PAYLOAD, extended: false }));
-  aplicarSaneamiento(app);
-  /**
-   * EL MISMO FILTRO GLOBAL QUE PRODUCCIÓN.
-   *
-   * Faltaba, y la consecuencia no era teórica: `main.ts` envuelve todo error en
-   * `{ estado, correlacion, mensaje }`, mientras que aquí salía el cuerpo por
-   * defecto de Nest. Es decir, **toda aserción de esta suite sobre un cuerpo de
-   * error estaba comprobando una forma que el despliegue no produce**, y una
-   * pantalla escrita contra lo que la suite ve habría leído el campo
-   * equivocado en producción sin que nada fallara en verde.
-   *
-   * Apareció al montar el 422 de configuración (bloque 7), que es el primer
-   * error cuyo CUERPO la consola necesita —los rechazos por campo—.
-   */
-  app.useGlobalFilters(
-    new FiltroGlobalDeExcepciones(
-      app.get<Bitacora>(BITACORA),
-      app.get<ReporteDeErrores>(REPORTE_DE_ERRORES),
-    ),
-  );
-  app.useGlobalInterceptors(app.get(InterceptorDeCorrelacion), app.get(InterceptorDeLatencias));
+  montarTuberiaHttp(app, efectiva);
   await app.init();
 
   /**

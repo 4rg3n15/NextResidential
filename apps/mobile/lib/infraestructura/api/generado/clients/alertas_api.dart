@@ -26,6 +26,8 @@ abstract class AlertasApi {
     @Query('dispositivoId') String? dispositivoId,
     @Query('severidad') Severidad? severidad,
     @Query('tipo') Tipo? tipo,
+    @Query('desde') DateTime? desde,
+    @Query('hasta') DateTime? hasta,
   });
 
   /// Archiva varias alertas con un motivo. Archivo lógico, nunca borrado

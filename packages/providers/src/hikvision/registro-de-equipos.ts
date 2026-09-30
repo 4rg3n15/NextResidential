@@ -47,7 +47,7 @@ export interface EquipoRegistrado {
   readonly canalDeAudio?: number | null;
   /**
    * C2/D2 (15-L) · el flujo de video, canal×100+flujo de la guía (101 el
-   * principal del canal 1, 102 su subflujo). Ausente o `null` = 102.
+   * principal del canal 1, 102 su subflujo). Ausente o `null`: el que el equipo declara (V2, 15-N).
    */
   readonly canalDeVideo?: string | null;
   /**

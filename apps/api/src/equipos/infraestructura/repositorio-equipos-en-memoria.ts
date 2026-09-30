@@ -180,7 +180,7 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       canalDeAudio: alta.canalDeAudio ?? null,
       modoDeTerminal: alta.modoDeTerminal ?? null,
       canalDeAudioHabilitado: alta.canalDeAudioHabilitado ?? false,
-      canalDeVideo: alta.canalDeVideo ?? null,
+      canalDeVideo: veredicto.canalDeVideo ?? alta.canalDeVideo ?? null,
       zonaId: alta.zonaId ?? null,
       capacidades: veredicto.capacidades ?? null,
       verificacion: this.verificacionDe(veredicto),
@@ -238,7 +238,7 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       canalDeAudio: alta.canalDeAudio ?? null,
       modoDeTerminal: alta.modoDeTerminal ?? null,
       canalDeAudioHabilitado: alta.canalDeAudioHabilitado ?? false,
-      canalDeVideo: alta.canalDeVideo ?? null,
+      canalDeVideo: veredicto.canalDeVideo ?? alta.canalDeVideo ?? null,
       zonaId: alta.zonaId ?? null,
       // Recién descubiertas sustituyen; un sondeo fallido conserva las viejas.
       capacidades: veredicto.capacidades ?? actual.capacidades,
@@ -264,6 +264,8 @@ export class RepositorioDeEquiposEnMemoria implements RepositorioDeEquipos {
       modelo: veredicto.modelo ?? actual.modelo,
       firmware: veredicto.firmware ?? actual.firmware,
       capacidades: veredicto.capacidades ?? actual.capacidades,
+      // V2 (15-N) · el canal que el equipo declara, si la ficha no tenía uno suyo.
+      canalDeVideo: veredicto.canalDeVideo ?? actual.canalDeVideo,
       verificacion: this.verificacionDe(veredicto),
       verificadoEn: veredicto.verificado ? new Date(0).toISOString() : null,
       motivoNoVerificado: veredicto.verificado ? null : veredicto.detalle,
