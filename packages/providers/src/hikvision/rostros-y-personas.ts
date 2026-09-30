@@ -118,7 +118,7 @@ export const bibliotecaDesde = (
   // Picture Search»); `totalNum` es la forma anterior, que se sigue leyendo.
   const almacenadas = recuentoDeLaBiblioteca(recuentoJson);
   // E3 (15-M) · qué operaciones declara (`post`, `setUp`…) `[SUPUESTO]` S-109.
-  const operaciones = listaDeclarada(campoDe(capacidadesJson, 'FDLibCap', 'supportFunction'));
+  const operaciones = operacionesDeclaradasDeLaBiblioteca(capacidadesJson);
   return {
     estado: capacidadesJson === null && recuentoJson === null ? 'desconocida' : 'si',
     maximo,
@@ -126,6 +126,21 @@ export const bibliotecaDesde = (
     ...(operaciones === undefined ? {} : { operaciones }),
   };
 };
+
+/**
+ * R3 (15-N) · lo que el alta LEE de cada respuesta, en un solo sitio: el
+ * ensayo (`ensayo/capacidades-de-personas.ts`) juzga con estas mismas lecturas,
+ * así que no puede volver a exigir una forma que el alta no va a usar.
+ */
+export const operacionesDeclaradasDeLaBiblioteca = (
+  capacidadesJson: string | null,
+): readonly string[] | undefined =>
+  listaDeclarada(campoDe(capacidadesJson, 'FDLibCap', 'supportFunction'));
+
+export const tiposDeclaradosDePersona = (
+  capacidadesJson: string | null,
+): readonly string[] | undefined =>
+  listaDeclarada(campoDe(capacidadesJson, 'UserInfo', 'userType'));
 
 /** `raiz[a][b]` de un JSON, o `undefined` si no es JSON o no está. */
 const campoDe = (json: string | null, a: string, b: string): unknown => {
@@ -182,7 +197,7 @@ export const descubrirPersonas = async (
 ): Promise<PersonasDescubiertas> => {
   const dedicada = await consultar(PREGUNTA_DE_PERSONAS);
   if (dedicada.cuerpo !== null) {
-    const tipos = listaDeclarada(campoDe(dedicada.cuerpo, 'UserInfo', 'userType'));
+    const tipos = tiposDeclaradosDePersona(dedicada.cuerpo);
     return { estado: 'si', motivo: null, ...(tipos === undefined ? {} : { tipos }) };
   }
   const general = controlDeAcceso ?? (await consultar(PREGUNTA_DE_CONTROL_DE_ACCESO));
