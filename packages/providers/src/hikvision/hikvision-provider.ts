@@ -120,6 +120,11 @@ export interface OpcionesDeHikvision {
   readonly limitesDeFoto?: LimitesDeFoto;
   /** D2 (15-L) · puerto RTSP de los equipos (`VIDEO_PUERTO_RTSP`). 554 por omisión. */
   readonly puertoRtsp?: number;
+  /**
+   * R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`: con el reloj del equipo más
+   * desviado, no se da de alta a nadie con vigencia en él.
+   */
+  readonly desvioDeRelojMaximoS?: number;
 }
 
 const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
@@ -846,12 +851,20 @@ export class HikvisionProvider
   }
 
   /** A2 (15-L) · lo que el `.env` fija para toda biblioteca de rostros. */
-  private ajustesDeBiblioteca(): Pick<OpcionesDeTerminal, 'persona' | 'limitesDeFoto'> {
+  private ajustesDeBiblioteca(): Pick<
+    OpcionesDeTerminal,
+    'persona' | 'limitesDeFoto' | 'desvioDeRelojMaximoS' | 'horaDelServidor'
+  > {
     return {
       ...(this.opciones.persona === undefined ? {} : { persona: this.opciones.persona }),
       ...(this.opciones.limitesDeFoto === undefined
         ? {}
         : { limitesDeFoto: this.opciones.limitesDeFoto }),
+      // R2 (15-N) · el reloj del equipo se juzga contra el de la plataforma.
+      ...(this.opciones.desvioDeRelojMaximoS === undefined
+        ? {}
+        : { desvioDeRelojMaximoS: this.opciones.desvioDeRelojMaximoS }),
+      horaDelServidor: () => this.opciones.reloj.ahora(),
     };
   }
 

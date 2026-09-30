@@ -25,7 +25,10 @@ export const TEXTO_MOTIVO: Readonly<Record<MotivoAcceso, string>> = {
   SIN_CONSENTIMIENTO: 'Sin consentimiento biométrico vigente',
   PLACA_DESCONOCIDA: 'Placa no registrada',
   CONFIANZA_INSUFICIENTE: 'Lectura con confianza insuficiente',
-  FALLO_TECNICO: 'Fallo técnico del dispositivo',
+  // R2 (15-N) · el motor lo usa cuando le falta con qué decidir (persona o
+  // vivienda sin identificar), no sólo ante una avería: «fallo técnico del
+  // dispositivo» mandaba a revisar un equipo que estaba bien.
+  FALLO_TECNICO: 'Sin datos para decidir',
 };
 
 /**
@@ -48,7 +51,8 @@ export const DETALLE_MOTIVO: Readonly<Record<MotivoAcceso, string>> = {
   CONFIANZA_INSUFICIENTE:
     'La lectura no alcanzó el umbral de confianza; no se decide automáticamente.',
   FALLO_TECNICO:
-    'El dispositivo o el canal fallaron; el intento queda registrado como no resuelto.',
+    'El motor no tuvo con qué decidir —persona o vivienda sin identificar, o el canal falló—; ' +
+    'el intento queda registrado como no resuelto y lo atiende una persona.',
 };
 
 export const textoDeMotivo = (motivo: MotivoAcceso | null): string =>

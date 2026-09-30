@@ -205,7 +205,12 @@ export class EquiposModule {
           inject: [BITACORA, CONFIGURACION],
           useFactory: (bitacora: Bitacora, c: Configuracion) =>
             // D2 · C3 (15-L) · «Probar conexión» pregunta también el video (RTSP).
-            new SondaPorProveedor(undefined, bitacora, c.VIDEO_PUERTO_RTSP),
+            new SondaPorProveedor(
+              undefined,
+              bitacora,
+              c.VIDEO_PUERTO_RTSP,
+              c.EQUIPOS_DESVIO_DE_RELOJ_S,
+            ),
         },
         {
           // 15-L · la apertura sin plataforma y el plazo, del `.env`: nunca del código.

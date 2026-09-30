@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { canonico, capturarRespaldo, restaurarRespaldo } from './respaldo-de-configuracion';
+import {
+  avisoDeZona,
+  canonico,
+  capturarRespaldo,
+  restaurarRespaldo,
+} from './respaldo-de-configuracion';
 import {
   desfaseDeZonaIana,
   desfaseDeZonaPosix,
@@ -268,5 +273,31 @@ describe('el informe no imprime credenciales', () => {
     expect(
       sinSecretosConocidos('usuario servicio, clave s3cr3t', ['s3cr3t', 'servicio', 'x']),
     ).toBe('usuario ••••, clave ••••');
+  });
+});
+
+describe('R2 (15-N) · la zona y la hora del respaldo se LEEN, nunca se restauran', () => {
+  it('el respaldo guarda la hora del equipo; restaurar no la escribe', async () => {
+    const e = equipo('terminal', { hora: '2026-09-27T01:00:00+08:00' });
+    const respaldo = await capturarRespaldo(e, AHORA);
+    expect(respaldo.horaDelEquipo).toContain('<localTime>2026-09-27T01:00:00+08:00</localTime>');
+    const r = await restaurarRespaldo(e, respaldo);
+    expect(r.map((x) => x.clave)).not.toContain('hora');
+  });
+
+  it('avisa si la zona del respaldo no es la del conjunto, y lo dice en horas', () => {
+    const conOtraZona = {
+      horaDelEquipo:
+        '<Time><localTime>2026-09-27T01:00:00+08:00</localTime><timeZone>CST-8:00:00</timeZone></Time>',
+    };
+    const aviso = avisoDeZona(conOtraZona, 'America/Bogota', AHORA);
+    expect(aviso).toMatch(/otra zona horaria/);
+    expect(aviso).toMatch(/NO se restaura/);
+    const conLaDelConjunto = {
+      horaDelEquipo:
+        '<Time><localTime>2026-09-27T09:00:00-05:00</localTime><timeZone>CST+5:00:00</timeZone></Time>',
+    };
+    expect(avisoDeZona(conLaDelConjunto, 'America/Bogota', AHORA)).toBeNull();
+    expect(avisoDeZona({}, 'America/Bogota', AHORA)).toBeNull();
   });
 });

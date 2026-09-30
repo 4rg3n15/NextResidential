@@ -1,4 +1,5 @@
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
+import { desvioEnPalabras } from '../nucleo/reloj-del-equipo';
 import { CredencialRechazada } from '../nucleo/errores';
 import { recortado, sinSecretos } from '../equipo/intercambio';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
@@ -128,6 +129,8 @@ export interface OpcionesDeDiagnostico extends OpcionesDeEquipo {
    */
   readonly olvidarRechazo?: boolean;
   readonly ahoraDelServidor?: () => Date;
+  /** R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`: el reloj se juzga con el umbral que frena las altas. */
+  readonly desvioDeRelojMaximoS?: number;
   /** Carril de la cámara. Si no se declaró, el VERIFICADO (ver `camara/carril.ts`). */
   readonly canal?: number;
   /**
@@ -333,7 +336,13 @@ export const diagnosticarEquipo = async (
     capacidadesDelEquipo,
     ...(video === undefined ? {} : { video }),
     hora:
-      hora === null ? null : juzgarHora(hora, (opciones.ahoraDelServidor ?? (() => new Date()))()),
+      hora === null
+        ? null
+        : juzgarHora(
+            hora,
+            (opciones.ahoraDelServidor ?? (() => new Date()))(),
+            opciones.desvioDeRelojMaximoS,
+          ),
     sinRespuesta,
   };
 };
@@ -450,7 +459,12 @@ const contactar = async (
  * histórico queda desplazado sin un solo error en el registro. Se descubre
  * cuando una auditoría compara dos fuentes, que es el peor momento posible.
  */
-export const juzgarHora = (cuerpo: string, ahoraDelServidor: Date): HoraDelEquipo => {
+export const juzgarHora = (
+  cuerpo: string,
+  ahoraDelServidor: Date,
+  /** R2 (15-N) · el umbral de la API (`EQUIPOS_DESVIO_DE_RELOJ_S`), el mismo que frena las altas. */
+  toleranciaSegundos: number = DESVIO_TOLERABLE_SEGUNDOS,
+): HoraDelEquipo => {
   const leida = etiqueta(cuerpo, 'localTime') ?? etiqueta(cuerpo, 'time');
   if (leida === null || Number.isNaN(Date.parse(leida))) {
     return {
@@ -461,15 +475,17 @@ export const juzgarHora = (cuerpo: string, ahoraDelServidor: Date): HoraDelEquip
     };
   }
   const desvio = Math.round((Date.parse(leida) - ahoraDelServidor.getTime()) / 1000);
-  const excesiva = Math.abs(desvio) > DESVIO_TOLERABLE_SEGUNDOS;
+  const excesiva = Math.abs(desvio) > toleranciaSegundos;
   return {
     leida,
     desvioSegundos: desvio,
     excesiva,
+    // R2 (15-N) · en horas cuando son horas: «46727 s» no le dice nada a nadie.
     detalle: excesiva
-      ? `El reloj del equipo va ${String(Math.abs(desvio))} s ${desvio > 0 ? 'adelantado' : 'atrasado'} ` +
-        'respecto del servidor. No produce ningún error: fecha mal los eventos, y eso sólo ' +
-        'se ve cuando una auditoría compara dos fuentes'
+      ? `El reloj del equipo va ${desvioEnPalabras(desvio)} respecto del servidor. No produce ` +
+        'ningún error: fecha mal los eventos y, en una terminal o un videoportero, niega con ' +
+        '«permiso vencido» a quien tiene la visita vigente. Mientras siga así, no se le da de alta ' +
+        'a nadie con vigencia: sincronice su hora (Configuración → Sistema → Hora, con NTP)'
       : `El reloj del equipo está dentro de tolerancia (${String(desvio)} s)`,
   };
 };

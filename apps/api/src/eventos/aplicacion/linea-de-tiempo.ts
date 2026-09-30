@@ -29,6 +29,13 @@ export interface ElementoDeLineaDeTiempo {
   /** Para un acceso, su id; para un evento de equipo, el acceso al que acompaña. */
   readonly eventoId: string | null;
   readonly codigo: { readonly mayor: number; readonly menor: number } | null;
+  /**
+   * R2 (15-N) · con el reloj del equipo desviado, `ocurridoEn` es la hora de
+   * RECEPCIÓN de la plataforma y aquí van la que dijo el equipo y el desvío
+   * (segundos que iba por delante; negativo, atrasado). `null` si no lo estaba.
+   */
+  readonly horaDelEquipo: string | null;
+  readonly relojDesviadoSegundos: number | null;
 }
 
 export interface CriteriosDeLineaDeTiempo {
@@ -50,7 +57,7 @@ const MOTIVO: Readonly<Record<MotivoAcceso, string>> = {
   SIN_CONSENTIMIENTO: 'sin consentimiento biométrico vigente',
   PLACA_DESCONOCIDA: 'placa no registrada',
   CONFIANZA_INSUFICIENTE: 'lectura dudosa: la confirma la portería',
-  FALLO_TECNICO: 'fallo técnico',
+  FALLO_TECNICO: 'sin datos para decidir',
 };
 
 const METODO: Readonly<Record<string, string>> = {
@@ -61,7 +68,35 @@ const METODO: Readonly<Record<string, string>> = {
   tarjeta: 'tarjeta',
 };
 
-const deAcceso = (e: EventoRegistrado): ElementoDeLineaDeTiempo => {
+/**
+ * R2 (15-N) · el videoportero del 29/09 fechaba 13 h atrás y la consola
+ * enseñaba sus eventos «de madrugada». Si el equipo declaró una hora que se
+ * aparta de la de recepción más de lo tolerado, se enseña la de RECEPCIÓN y
+ * se marca el desvío. No aplica a lo histórico ni a lo que decidió el Edge
+ * sin conexión: ésos llegan tarde a propósito, no con el reloj mal.
+ */
+const horaMostrada = (
+  ocurridoEn: Date,
+  recibidoEn: Date | undefined,
+  aplica: boolean,
+  toleranciaS: number | undefined,
+): Pick<ElementoDeLineaDeTiempo, 'ocurridoEn' | 'horaDelEquipo' | 'relojDesviadoSegundos'> => {
+  const tal = {
+    ocurridoEn: ocurridoEn.toISOString(),
+    horaDelEquipo: null,
+    relojDesviadoSegundos: null,
+  };
+  if (!aplica || toleranciaS === undefined || recibidoEn === undefined) return tal;
+  const desvio = Math.round((ocurridoEn.getTime() - recibidoEn.getTime()) / 1000);
+  if (Math.abs(desvio) <= toleranciaS) return tal;
+  return {
+    ocurridoEn: recibidoEn.toISOString(),
+    horaDelEquipo: ocurridoEn.toISOString(),
+    relojDesviadoSegundos: desvio,
+  };
+};
+
+const deAcceso = (e: EventoRegistrado, toleranciaS?: number): ElementoDeLineaDeTiempo => {
   const como = METODO[e.metodo] ?? e.metodo;
   const placa = e.placaDetectada === null ? '' : ` ${e.placaDetectada}`;
   const titulo =
@@ -71,7 +106,7 @@ const deAcceso = (e: EventoRegistrado): ElementoDeLineaDeTiempo => {
   return {
     origen: 'acceso',
     id: e.id,
-    ocurridoEn: e.ocurridoEn.toISOString(),
+    ...horaMostrada(e.ocurridoEn, e.registradoEn, !e.decididoPorEdge, toleranciaS),
     dispositivoId: e.dispositivoId,
     tipo: 'acceso',
     titulo,
@@ -82,10 +117,10 @@ const deAcceso = (e: EventoRegistrado): ElementoDeLineaDeTiempo => {
   };
 };
 
-const deEquipo = (e: EventoDeEquipoGuardado): ElementoDeLineaDeTiempo => ({
+const deEquipo = (e: EventoDeEquipoGuardado, toleranciaS?: number): ElementoDeLineaDeTiempo => ({
   origen: e.origen,
   id: e.id,
-  ocurridoEn: e.ocurridoEn.toISOString(),
+  ...horaMostrada(e.ocurridoEn, e.recibidoEn, e.enVivo && e.origen === 'equipo', toleranciaS),
   dispositivoId: e.dispositivoId,
   tipo: e.tipo,
   titulo: e.enVivo ? e.titulo : `${e.titulo} (histórico del equipo)`,
@@ -102,6 +137,8 @@ export class ConsultarLineaDeTiempo {
   constructor(
     private readonly accesos: RepositorioEventos,
     private readonly deEquipo: RepositorioEventosDeEquipo,
+    /** R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`. Sin él, la hora es la del equipo, como antes. */
+    private readonly toleranciaDeRelojS?: number,
   ) {}
 
   async ejecutar(
@@ -140,7 +177,11 @@ export class ConsultarLineaDeTiempo {
             limite: c.limite,
           }),
     ]);
-    const elementos = [...accesos.map(deAcceso), ...delEquipo.map(deEquipo)]
+    const tolerancia = this.toleranciaDeRelojS;
+    const elementos = [
+      ...accesos.map((a) => deAcceso(a, tolerancia)),
+      ...delEquipo.map((e) => deEquipo(e, tolerancia)),
+    ]
       .sort((a, b) => b.ocurridoEn.localeCompare(a.ocurridoEn))
       .slice(0, c.limite);
     return exito({ elementos });

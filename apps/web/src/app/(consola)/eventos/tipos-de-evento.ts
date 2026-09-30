@@ -16,6 +16,8 @@ export const TIPOS_DE_LA_LINEA: readonly { readonly valor: string; readonly nomb
   { valor: 'timbre', nombre: 'Timbre' },
   { valor: 'llamada', nombre: 'Llamadas' },
   { valor: 'rostro_no_reconocido', nombre: 'Rostro no reconocido' },
+  // R2 (15-N) · vencido, fuera de horario o sin permiso, según el propio equipo.
+  { valor: 'acceso_negado_por_el_equipo', nombre: 'Negado por el equipo' },
   { valor: 'tarjeta_valida', nombre: 'Tarjeta válida' },
   { valor: 'tarjeta_rechazada', nombre: 'Tarjeta rechazada' },
   { valor: 'sabotaje', nombre: 'Sabotaje' },

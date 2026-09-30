@@ -52,6 +52,8 @@ export interface EventoRegistrado {
   readonly motivoManual: string | null;
   readonly evidenciaId: string | null;
   readonly decididoPorEdge: boolean;
+  /** R2 (15-N) · cuándo lo guardó la plataforma (`registrado_en`). Opcional: dobles antiguos. */
+  readonly registradoEn?: Date;
 }
 
 export interface PaginaDeEventos {

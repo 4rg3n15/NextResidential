@@ -10,7 +10,8 @@ import { rutaPara } from '../equipo/catalogo-de-rutas';
 import { resumenIsapi } from '../equipo/errores-del-fabricante';
 import { identificadorEnElEquipo } from './identificador-en-el-equipo';
 import { AperturaNoSoportada, abrirPuertaRemota } from '../equipo/puerta-remota';
-import { BibliotecaLlena } from '../nucleo/errores';
+import { BibliotecaLlena, RelojDelEquipoDesviado } from '../nucleo/errores';
+import { desvioDelReloj, desvioEnPalabras } from '../nucleo/reloj-del-equipo';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 import { recuentoDeLaBiblioteca } from './recuento-de-biblioteca';
 import { confirmada, exigirConfirmacion } from '../equipo/confirmacion-isapi';
@@ -89,6 +90,14 @@ export interface OpcionesDeTerminal extends OpcionesDeEquipo {
   readonly tiposDePersona?: readonly string[] | undefined;
   /** E3 (15-M) · operaciones que declara su biblioteca (`FDLib/capabilities`). */
   readonly operacionesDeBiblioteca?: readonly string[] | undefined;
+  /**
+   * R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`. Con él, antes de dar de alta a
+   * alguien CON VIGENCIA se lee el reloj del equipo y, si se desvía más, no se
+   * escribe nada. Sin él (dobles antiguos), no se comprueba.
+   */
+  readonly desvioDeRelojMaximoS?: number;
+  /** La hora del servidor con que se compara; por omisión, la del proceso. */
+  readonly horaDelServidor?: () => Date;
 }
 
 /** Lo que el equipo contesta cuando la ruta no existe en ese firmware. */
@@ -180,6 +189,11 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
         `FDLib (el equipo declara: ${(this.opciones.operacionesDeBiblioteca ?? []).join(', ')})`,
       );
     }
+
+    // R2 (15-N) · el reloj, ANTES de escribir nada: una persona dada de alta
+    // sin su rostro, o con una vigencia que el equipo lee corrida, es peor que
+    // no darla de alta. «Nunca a medias».
+    if (vigencia !== undefined) await this.exigirRelojEnHora(dispositivoId);
 
     await this.altaDePersona(dispositivoId, plantillaId, vigencia);
 
@@ -329,6 +343,31 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
         },
       }),
     });
+  }
+
+  /**
+   * R2 (15-N) · `GET /ISAPI/System/time` (Guía ISAPI integral, §5.4). Si el
+   * equipo no dice su hora con desplazamiento, no se bloquea el alta: no hay
+   * con qué juzgar, y frenar por eso rompería altas que hoy funcionan
+   * ([SUPUESTO] S-164). Si la dice y se desvía más de lo tolerado, se lanza.
+   */
+  private async exigirRelojEnHora(dispositivoId: string): Promise<void> {
+    const maximo = this.opciones.desvioDeRelojMaximoS;
+    if (maximo === undefined) return;
+    const ruta = rutaPara('leer la hora del equipo', 'terminal');
+    let cuerpo: string;
+    try {
+      const respuesta = await this.cliente.pedir(ruta.metodo, ruta.ruta);
+      if (!respuesta.ok || NO_SOPORTADO.test(respuesta.cuerpo)) return;
+      cuerpo = respuesta.cuerpo;
+    } catch (error) {
+      if (error instanceof EquipoInalcanzable) throw error;
+      return;
+    }
+    const desvio = desvioDelReloj(cuerpo, (this.opciones.horaDelServidor ?? (() => new Date()))());
+    if (desvio !== null && Math.abs(desvio) > maximo) {
+      throw new RelojDelEquipoDesviado(dispositivoId, desvio, desvioEnPalabras(desvio));
+    }
   }
 
   async contar(): Promise<number | null> {

@@ -68,6 +68,8 @@ export interface ConfiguracionDeProveedor {
   readonly limitesDeFoto?: LimitesDeFoto;
   /** D2 (15-L) · puerto RTSP de los equipos (del `.env`). */
   readonly puertoRtsp?: number;
+  /** R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`: con el reloj más desviado, no hay altas con vigencia. */
+  readonly desvioDeRelojMaximoS?: number;
   /** Semilla del simulado: la adversidad tiene que ser reproducible. */
   readonly semilla?: number;
   readonly dispositivosSimulados?: readonly string[];
@@ -184,6 +186,9 @@ registrarAdaptador({
         ? {}
         : { limitesDeFoto: configuracion.limitesDeFoto }),
       ...(configuracion.puertoRtsp === undefined ? {} : { puertoRtsp: configuracion.puertoRtsp }),
+      ...(configuracion.desvioDeRelojMaximoS === undefined
+        ? {}
+        : { desvioDeRelojMaximoS: configuracion.desvioDeRelojMaximoS }),
     }),
 });
 

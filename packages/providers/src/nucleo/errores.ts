@@ -227,6 +227,28 @@ export class BibliotecaLlena extends ErrorDeEquipo {
   }
 }
 
+/**
+ * R2 (15-N) · el reloj del equipo va desviado más de lo tolerado: dar de
+ * alta a alguien CON VIGENCIA lo dejaría negado («permiso vencido») o abierto
+ * fuera de su ventana. No se escribe nada en el equipo —ni la persona— y se
+ * dice cuánto va desviado. No se reintenta: hay que sincronizar su hora.
+ */
+export class RelojDelEquipoDesviado extends ErrorDeEquipo {
+  readonly reintentable = false;
+  constructor(
+    dispositivoId: string,
+    readonly desvioSegundos: number,
+    enPalabras: string,
+  ) {
+    super(
+      dispositivoId,
+      `el reloj del equipo va ${enPalabras}: no se le da de alta a nadie con vigencia hasta ` +
+        'sincronizar su hora (Configuración → Sistema → Hora, con NTP), porque negaría con ' +
+        '«permiso vencido» o abriría fuera de la vigencia',
+    );
+  }
+}
+
 /** Se le mandó algo mal formado. El defecto es nuestro; no se reintenta. */
 export class PeticionRechazada extends ErrorDeEquipo {
   readonly reintentable = false;

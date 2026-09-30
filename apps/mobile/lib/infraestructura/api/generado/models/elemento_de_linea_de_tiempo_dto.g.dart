@@ -25,6 +25,10 @@ ElementoDeLineaDeTiempoDto _$ElementoDeLineaDeTiempoDtoFromJson(
   codigo: json['codigo'] == null
       ? null
       : CodigoDelEquipoDto.fromJson(json['codigo'] as Map<String, dynamic>),
+  horaDelEquipo: json['horaDelEquipo'] == null
+      ? null
+      : DateTime.parse(json['horaDelEquipo'] as String),
+  relojDesviadoSegundos: json['relojDesviadoSegundos'] as num?,
 );
 
 Map<String, dynamic> _$ElementoDeLineaDeTiempoDtoToJson(
@@ -40,4 +44,6 @@ Map<String, dynamic> _$ElementoDeLineaDeTiempoDtoToJson(
   'enVivo': instance.enVivo,
   'eventoId': instance.eventoId,
   'codigo': instance.codigo,
+  'horaDelEquipo': instance.horaDelEquipo?.toIso8601String(),
+  'relojDesviadoSegundos': instance.relojDesviadoSegundos,
 };

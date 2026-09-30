@@ -38,6 +38,14 @@
  */
 export * from './nucleo/capacidades';
 export * from './nucleo/errores';
+// R2 (15-N) · el motivo del dominio con que el equipo negó, por su código.
+export { motivoDelEquipo } from './hikvision/catalogo-de-eventos';
+export type { MotivoDelEquipo } from './hikvision/catalogo-de-eventos';
+export {
+  DESVIO_DE_RELOJ_POR_OMISION_S,
+  desvioDelReloj,
+  desvioEnPalabras,
+} from './nucleo/reloj-del-equipo';
 export type { ProveedorDeEquipos } from './nucleo/proveedor';
 export type { VeredictoRemoto } from './nucleo/verificacion-remota';
 

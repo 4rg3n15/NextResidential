@@ -63,6 +63,8 @@ export interface EventoDeEquipoReciente {
   readonly origen: 'equipo' | 'plataforma';
   readonly eventoId: string | null;
   readonly recibidoEn: Date;
+  /** R2 (15-N) · el motivo del dominio con que el EQUIPO negó, si su código lo dice. */
+  readonly motivo?: string | null;
 }
 
 /** Lo que la fuente entrega: accesos, eventos de equipo y qué ya se atendió. */
@@ -194,7 +196,7 @@ export const construirCola = (
         dispositivoId: e.dispositivoId,
         llegoEn: e.recibidoEn,
         titulo: e.titulo,
-        motivo: null,
+        motivo: e.motivo ?? null,
         resultado: null,
         viviendaId: null,
         placaDetectada: null,

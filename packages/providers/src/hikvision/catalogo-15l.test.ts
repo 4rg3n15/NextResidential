@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { clasificarBloque } from './clasificacion-de-bloque';
-import { eventoDeLlamada, eventoPorCodigo, esCodigoDeRostro } from './catalogo-de-eventos';
+import {
+  eventoDeLlamada,
+  eventoPorCodigo,
+  esCodigoDeRostro,
+  motivoDelEquipo,
+} from './catalogo-de-eventos';
 import { TECHO_DE_CARGA, cargaSaneada } from './carga-saneada';
 import type { BloqueDeAlertStream } from './contratos-de-evento';
 import { motivoLegible } from '../nucleo/motivo-legible';
@@ -43,6 +48,13 @@ describe('la clase de un bloque la decide su código, no su nombre', () => {
     [{ majorEventType: 2, subEventType: 1063 }, 'equipo', 'equipo_fuera_de_linea'],
     [{ majorEventType: 3, subEventType: 1024 }, 'equipo', 'apertura_remota'],
     [{ majorEventType: 5, subEventType: 76 }, 'equipo', 'rostro_no_reconocido'],
+    // R2 (15-N) · la negación que decide el propio equipo («Other Events 0x5»:
+    // 0x06 No Permission, 0x07 Invalid … Time Period, 0x08 Expired, 0x76
+    // Authentication Schedule in Sleeping Mode). Nunca un «fallo técnico».
+    [{ majorEventType: 5, subEventType: 6 }, 'equipo', 'acceso_negado_por_el_equipo'],
+    [{ majorEventType: 5, subEventType: 7 }, 'equipo', 'acceso_negado_por_el_equipo'],
+    [{ majorEventType: 5, subEventType: 8 }, 'equipo', 'acceso_negado_por_el_equipo'],
+    [{ majorEventType: 5, subEventType: 118 }, 'equipo', 'acceso_negado_por_el_equipo'],
     [{ majorEventType: 5, subEventType: 999 }, 'equipo', 'desconocido'],
   ])('%o → %s / %s', (campos, clase, tipo) => {
     const c = clasificarBloque(acceso(campos));
@@ -197,5 +209,25 @@ describe('lo que lee el operador cuando una orden no sale (sin jerga)', () => {
     expect(texto).toMatch(esperado);
     // Nada de rutas, identificadores ni códigos del fabricante.
     expect(texto).not.toMatch(/ISAPI|\/r\b|0x[0-9a-f]+|statusCode/i);
+  });
+});
+
+describe('R2 (15-N) · el motivo de la negación del equipo, en el del dominio', () => {
+  it('vencido, fuera de periodo y fuera de horario; nunca FALLO_TECNICO', () => {
+    expect(motivoDelEquipo(5, 8)).toBe('VIGENCIA_EXPIRADA');
+    expect(motivoDelEquipo(5, 7)).toBe('FUERA_DE_HORARIO');
+    expect(motivoDelEquipo(5, 118)).toBe('FUERA_DE_HORARIO');
+    expect(motivoDelEquipo(5, 6)).toBe('ZONA_NO_AUTORIZADA');
+    expect(motivoDelEquipo(5, 25)).toBeNull();
+    expect(motivoDelEquipo(null, null)).toBeNull();
+  });
+
+  it('el título lo dice en palabras', () => {
+    expect(eventoPorCodigo(5, 8).titulo).toBe('El equipo negó el acceso: permiso vencido');
+  });
+
+  it('un menor desconocido se guarda con sus dos números a la vista', () => {
+    expect(eventoPorCodigo(5, 0x99).titulo).toBe('Evento del equipo (código 5/0x99)');
+    expect(eventoPorCodigo(5, 0x99).tipo).toBe('desconocido');
   });
 });

@@ -122,6 +122,17 @@ describe('qué entra (P-22)', () => {
     expect(ids(m)).toEqual(['a', 'b']);
   });
 
+  it('R2 · la negación del propio equipo entra como «rostro» con el motivo del equipo', () => {
+    const [e] = construirCola(
+      material(
+        [],
+        [deEquipo('n', 5, 'acceso_negado_por_el_equipo', { motivo: 'VIGENCIA_EXPIRADA' })],
+      ),
+      AHORA,
+    );
+    expect(e).toMatchObject({ disparador: 'rostro', motivo: 'VIGENCIA_EXPIRADA' });
+  });
+
   it('un tipo que no necesita a nadie (puerta abierta) no entra', () => {
     expect(ids(material([], [deEquipo('pu', 3, 'puerta_abierta')]))).toEqual([]);
   });

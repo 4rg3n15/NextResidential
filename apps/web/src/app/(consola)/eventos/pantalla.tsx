@@ -13,7 +13,7 @@ import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
 import { EstadoCargando, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useAlertasAbiertas, useNombresDeEquipos } from '@/lib/api/consultas';
-import { diaLocalHace, fechaYHora, rangoDeDias } from '@/lib/fechas';
+import { desvioEnPalabras, diaLocalHace, fechaYHora, rangoDeDias } from '@/lib/fechas';
 import { AlertasAbiertas } from './alertas-abiertas';
 import { abrirCanal } from '@/lib/sse/canal';
 import type { EstadoDelCanal } from '@/lib/sse/canal';
@@ -155,6 +155,20 @@ export const PantallaDeEventos = ({
             dateStyle: 'short',
             timeStyle: 'medium',
           })}
+          {/* R2 (15-N) · con el reloj del equipo desviado, ésta es la hora de
+              RECEPCIÓN; la del equipo se dice, marcada. */}
+          {e.relojDesviadoSegundos === null ? null : (
+            <span
+              className="mt-0.5 block text-distintivo text-aviso-texto"
+              title={
+                e.horaDelEquipo === null
+                  ? undefined
+                  : `El equipo dijo ${new Date(e.horaDelEquipo).toLocaleString('es-CO')}`
+              }
+            >
+              Hora de recepción · reloj del equipo {desvioEnPalabras(e.relojDesviadoSegundos)}
+            </span>
+          )}
         </span>
       ),
     },

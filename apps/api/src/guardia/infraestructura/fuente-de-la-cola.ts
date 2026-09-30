@@ -1,4 +1,5 @@
 import { FiltroDeEventos, esFallo } from '@ncr/domain-core';
+import { motivoDelEquipo } from '@ncr/providers';
 import type { RepositorioEventos, RepositorioEventosDeEquipo } from '../../eventos';
 import type { MaterialDeLaCola } from '../aplicacion/cola-de-atencion';
 import type { FuenteDeLaCola } from '../aplicacion/consultar-cola';
@@ -66,6 +67,8 @@ export class FuenteDeLaColaPorPuertos implements FuenteDeLaCola {
         origen: e.origen,
         eventoId: e.eventoId,
         recibidoEn: e.recibidoEn,
+        // R2 (15-N) · «permiso vencido» que decidió el equipo: VIGENCIA_EXPIRADA.
+        motivo: motivoDelEquipo(e.codigoMayor, e.codigoMenor),
       })),
       atendidos: new Set(
         ordenes.flatMap((o) =>

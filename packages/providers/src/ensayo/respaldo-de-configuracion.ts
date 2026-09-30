@@ -4,6 +4,7 @@ import { interpretarError } from '../equipo/errores-del-fabricante';
 import { etiqueta } from '../equipo/xml';
 import { motivoLegible } from '../nucleo/motivo-legible';
 import type { EquipoDeEnsayo, FamiliaDeEnsayo } from './tipos';
+import { juzgarZona } from './zona-del-equipo';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -23,6 +24,13 @@ import type { EquipoDeEnsayo, FamiliaDeEnsayo } from './tipos';
  * Un documento con una contraseña dentro no se guarda con ella: se borra y el
  * recurso queda como «no restaurable», para repetirlo a mano. Las credenciales
  * viven sólo en el `.env` (RN-21).
+ *
+ * R2 (15-N) · LA ZONA Y LA HORA NO SE RESTAURAN. El respaldo guarda el
+ * documento de hora del equipo SÓLO PARA LEER (`horaDelEquipo`): devolver una
+ * hora capturada días atrás es atrasar el reloj a propósito, que es lo que
+ * dejó al videoportero 13 h atrás el 29/09. No hay bandera que lo haga: la
+ * hora se corrige en el equipo, con NTP. Al restaurar se AVISA si la zona del
+ * respaldo no es la del conjunto (`avisoDeZona`).
  * ═════════════════════════════════════════════════════════════════════════════
  */
 interface Recurso {
@@ -99,6 +107,8 @@ export interface RespaldoDeEquipo {
   readonly modelo: string | null;
   readonly firmware: string | null;
   readonly documentos: readonly DocumentoRespaldado[];
+  /** R2 (15-N) · `/ISAPI/System/time` tal cual, para leer: NUNCA se restaura. */
+  readonly horaDelEquipo?: string | null;
 }
 
 export interface ResultadoDeRestauracion {
@@ -217,8 +227,18 @@ export const capturarRespaldo = async (
       });
     }
   }
+  // R2 (15-N) · la hora y la zona, para LEER al restaurar; nunca para escribir.
+  let horaDelEquipo: string | null = null;
+  try {
+    const h = rutaPara('leer la hora del equipo', 'comun');
+    const r = await cliente.pedir(h.metodo, h.ruta);
+    horaDelEquipo = r.ok && !NO_SOPORTADO.test(r.cuerpo) ? r.cuerpo : null;
+  } catch {
+    horaDelEquipo = null;
+  }
   return {
     version: 1,
+    horaDelEquipo,
     familia: equipo.familia,
     capturadoEn: ahora.toISOString(),
     serie: etiqueta(identidad.cuerpo, 'serialNumber'),
@@ -324,4 +344,22 @@ export const restaurarRespaldo = async (
     }
   }
   return resultados;
+};
+
+/**
+ * R2 (15-N) · si el respaldo trae una zona distinta de la del conjunto, se
+ * dice al restaurar (y no se restaura: la zona no está entre los recursos).
+ * `null` si coincide o si el respaldo no la trae.
+ */
+export const avisoDeZona = (
+  respaldo: Pick<RespaldoDeEquipo, 'horaDelEquipo'>,
+  zonaDelConjunto: string,
+  ahora: Date,
+): string | null => {
+  if (respaldo.horaDelEquipo === undefined || respaldo.horaDelEquipo === null) return null;
+  const juicio = juzgarZona(respaldo.horaDelEquipo, zonaDelConjunto, ahora);
+  return juicio.correcta === false
+    ? `el respaldo trae otra zona horaria (${juicio.detalle}); NO se restaura: la zona y la ` +
+        'hora se fijan en el equipo con NTP y la zona del conjunto'
+    : null;
 };

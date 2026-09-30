@@ -818,7 +818,9 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         200,
         '<?xml version="1.0" encoding="UTF-8"?><Time version="2.0" ' +
           'xmlns="http://www.isapi.org/ver20/XMLSchema"><timeMode>manual</timeMode>' +
-          `<localTime>${guion.hora ?? new Date(0).toISOString()}</localTime>` +
+          // R2 (15-N) · por omisión, un reloj EN HORA (el real del proceso): un
+          // equipo con 56 años de desvío frenaría toda alta con vigencia.
+          `<localTime>${guion.hora ?? new Date().toISOString()}</localTime>` +
           '<timeZone>CST+5:00:00</timeZone></Time>',
       );
     }

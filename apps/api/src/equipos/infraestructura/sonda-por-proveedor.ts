@@ -67,6 +67,8 @@ export class SondaPorProveedor implements SondaDeEquipo {
      * al equipo qué video entrega en el canal de su ficha. Sin él, no.
      */
     private readonly puertoRtsp?: number,
+    /** R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`: la ficha juzga el reloj con el umbral de las altas. */
+    private readonly desvioDeRelojMaximoS?: number,
   ) {}
 
   async probar(datos: DatosDeSondeo): Promise<ResultadoDeSondeo> {
@@ -90,6 +92,9 @@ export class SondaPorProveedor implements SondaDeEquipo {
        * no pasa por aquí y respeta la marca.
        */
       olvidarRechazo: true,
+      ...(this.desvioDeRelojMaximoS === undefined
+        ? {}
+        : { desvioDeRelojMaximoS: this.desvioDeRelojMaximoS }),
       ...(this.peticion === undefined ? {} : { peticion: this.peticion }),
       ...(this.traza === undefined ? {} : { traza: this.traza }),
       ...(datos.canalBarrera === undefined || datos.canalBarrera === null

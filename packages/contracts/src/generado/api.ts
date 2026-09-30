@@ -3150,6 +3150,13 @@ export interface components {
             enVivo: boolean;
             eventoId: string | null;
             codigo: components["schemas"]["CodigoDelEquipoDto"] | null;
+            /**
+             * Format: date-time
+             * @description R2 (15-N) · con el reloj del equipo desviado, la hora que DIJO el equipo; `ocurridoEn` es entonces la de recepción de la plataforma
+             */
+            horaDelEquipo: string | null;
+            /** @description Segundos que el reloj del equipo iba por delante (negativo: atrasado) */
+            relojDesviadoSegundos: number | null;
         };
         EmergenciaDto: {
             /** @description Qué ocurre. Obligatorio. */

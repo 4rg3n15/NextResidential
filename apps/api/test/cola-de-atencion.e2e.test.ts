@@ -130,6 +130,39 @@ describe('G1 · qué llega a la cola desde un equipo', () => {
   });
 });
 
+describe('R2 (15-N) · la negación que decide el propio equipo', () => {
+  it('«permiso vencido» (5/8) entra a la cola con VIGENCIA_EXPIRADA; nunca un acceso «fallo técnico»', async () => {
+    await publicar(
+      JSON.stringify({
+        eventType: 'AccessControllerEvent',
+        dateTime: '2026-09-30T02:00:00-05:00',
+        alarmDataType: 0,
+        AccessControllerEvent: {
+          majorEventType: 5,
+          subEventType: 8,
+          employeeNoString: 'ncr-visita-1',
+          serialNo: (serie += 1),
+        },
+      }),
+    );
+    await vaciar();
+    const r = await cola();
+    const negado = (
+      r.body.cola as { disparador: string; motivo: string | null; titulo: string }[]
+    ).find((e) => e.titulo === 'El equipo negó el acceso: permiso vencido');
+    expect(negado).toMatchObject({ disparador: 'rostro', motivo: 'VIGENCIA_EXPIRADA' });
+    const eventos = await request(app.getHttpServer())
+      .get(`/copropiedades/${COP_A}/eventos`)
+      .query({
+        desde: new Date(Date.now() - 86_400_000).toISOString(),
+        hasta: new Date(Date.now() + 60_000).toISOString(),
+      })
+      .set('Authorization', `Bearer ${await operador()}`);
+    expect(eventos.status).toBe(200);
+    expect(JSON.stringify(eventos.body)).not.toContain('FALLO_TECNICO');
+  });
+});
+
 describe('G2 · preferencias de atención por copropiedad', () => {
   const admin = () => tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
   const todas = (abrir: boolean, sonar: boolean) => ({

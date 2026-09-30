@@ -433,9 +433,12 @@ export class EventosModule {
         },
         {
           provide: ConsultarLineaDeTiempo,
-          inject: [REPOSITORIO_EVENTOS, REPOSITORIO_EVENTOS_DE_EQUIPO],
-          useFactory: (repo: RepositorioEventos, deEquipo: RepositorioEventosDeEquipo) =>
-            new ConsultarLineaDeTiempo(repo, deEquipo),
+          inject: [REPOSITORIO_EVENTOS, REPOSITORIO_EVENTOS_DE_EQUIPO, CONFIGURACION],
+          useFactory: (
+            repo: RepositorioEventos,
+            deEquipo: RepositorioEventosDeEquipo,
+            config: Configuracion,
+          ) => new ConsultarLineaDeTiempo(repo, deEquipo, config.EQUIPOS_DESVIO_DE_RELOJ_S),
         },
         {
           provide: ExportarEventos,

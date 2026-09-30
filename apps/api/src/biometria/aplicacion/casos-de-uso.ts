@@ -333,12 +333,17 @@ export class SincronizarPlantilla {
       // interno» donde el hecho era «la terminal no respondió», y no había
       // forma de distinguirlo de una denegación por consentimiento — que es
       // justo lo que nunca debe confundirse en un sistema de control de acceso.
+      //
+      // R2 (15-N) · el mensaje se lee en la visita, junto al NOMBRE del equipo:
+      // sin su identificador. Y un reloj desviado no es un rechazo del equipo:
+      // no se le llegó a enviar nada.
+      const detalle = causa instanceof Error ? causa.message : 'fallo del proveedor';
       return fallo(
         errorDominio(
           'CONFLICTO_DE_CONCURRENCIA',
-          `La terminal ${entrada.dispositivoId} no aceptó la plantilla: ${
-            causa instanceof Error ? causa.message : 'fallo del proveedor'
-          }`,
+          causa instanceof Error && causa.name === 'RelojDelEquipoDesviado'
+            ? `No se le envió: ${detalle}`
+            : `El equipo no aceptó la plantilla: ${detalle}`,
           'RN-12',
         ),
       );

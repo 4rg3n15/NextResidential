@@ -77,6 +77,21 @@ export class ElementoDeLineaDeTiempoDto {
   @ApiProperty({ description: '`false` para lo que el equipo declaró histórico' }) enVivo!: boolean;
   @ApiProperty({ type: String, nullable: true }) eventoId!: string | null;
   @ApiProperty({ type: CodigoDelEquipoDto, nullable: true }) codigo!: CodigoDelEquipoDto | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description:
+      'R2 (15-N) · con el reloj del equipo desviado, la hora que DIJO el equipo; `ocurridoEn` es ' +
+      'entonces la de recepción de la plataforma',
+  })
+  horaDelEquipo!: string | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Segundos que el reloj del equipo iba por delante (negativo: atrasado)',
+  })
+  relojDesviadoSegundos!: number | null;
 }
 
 export class LineaDeTiempoDto {

@@ -10422,6 +10422,17 @@
                 "$ref": "#/components/schemas/CodigoDelEquipoDto"
               }
             ]
+          },
+          "horaDelEquipo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "R2 (15-N) · con el reloj del equipo desviado, la hora que DIJO el equipo; `ocurridoEn` es entonces la de recepción de la plataforma"
+          },
+          "relojDesviadoSegundos": {
+            "type": "number",
+            "nullable": true,
+            "description": "Segundos que el reloj del equipo iba por delante (negativo: atrasado)"
           }
         },
         "required": [
@@ -10434,7 +10445,9 @@
           "resultado",
           "enVivo",
           "eventoId",
-          "codigo"
+          "codigo",
+          "horaDelEquipo",
+          "relojDesviadoSegundos"
         ]
       },
       "EmergenciaDto": {
