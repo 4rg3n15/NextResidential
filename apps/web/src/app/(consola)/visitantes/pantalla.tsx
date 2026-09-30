@@ -355,7 +355,7 @@ export const PantallaDeVisitantes = ({
       {consulta.isLoading ? (
         <EstadoCargando etiqueta="Cargando las visitas…" />
       ) : error !== null ? (
-        estadoSegunCodigo(error instanceof ErrorDeApi ? error.estado : 0, error.message, () => {
+        estadoSegunCodigo(error instanceof ErrorDeApi ? error : 0, error.message, () => {
           void consulta.refetch();
         })
       ) : visitas.length === 0 ? (

@@ -54,11 +54,29 @@ export class ErrorDeApi extends Error {
      * formulario obliga a adivinar cuál de los cinco falló.
      */
     readonly porCampo?: Readonly<Record<string, string>>,
+    /**
+     * 15-O · el código con que la API nombra la causa, si lo trae
+     * (`BASE_DE_DATOS_NO_DISPONIBLE`): un 503 por la base no es «la API
+     * caída», y la pantalla lo dice con su nombre.
+     */
+    readonly causa?: string,
   ) {
     super(mensaje);
     this.name = 'ErrorDeApi';
   }
 }
+
+/** 15-O · el código que la API pone cuando perdió la conexión con PostgreSQL. */
+export const CAUSA_BASE_DE_DATOS_NO_DISPONIBLE = 'BASE_DE_DATOS_NO_DISPONIBLE';
+
+/** El `codigo` de máquina del cuerpo de error, si lo trae. */
+export const causaDelError = (cuerpo: unknown): string | undefined => {
+  if (typeof cuerpo !== 'object' || cuerpo === null) return undefined;
+  const mensaje = (cuerpo as CuerpoDeError).mensaje;
+  if (typeof mensaje !== 'object' || mensaje === null) return undefined;
+  const codigo = (mensaje as { codigo?: unknown }).codigo;
+  return typeof codigo === 'string' ? codigo : undefined;
+};
 
 interface CuerpoDeError {
   estado?: number;
@@ -141,6 +159,7 @@ export const desenvolver = <T>(respuesta: {
       textoDelError(respuesta.error),
       cuerpo.correlacion,
       rechazosPorCampo(respuesta.error),
+      causaDelError(respuesta.error),
     );
   }
   if (respuesta.data === undefined) {

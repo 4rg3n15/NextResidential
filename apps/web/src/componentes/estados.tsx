@@ -2,6 +2,8 @@ import type { JSX } from 'react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { Boton } from './ui/boton';
+import { CAUSA_BASE_DE_DATOS_NO_DISPONIBLE } from '@/lib/api/cliente';
+import type { ErrorDeApi } from '@/lib/api/cliente';
 
 /**
  * Los cinco estados que `CLAUDE.md` §6 exige en TODA vista y que el mockup no
@@ -220,10 +222,30 @@ export const EstadoSinConexion = ({
  * 404 —y que alguna lo muestre como «sin permiso», deshaciendo el aislamiento—.
  */
 export const estadoSegunCodigo = (
-  codigo: number,
+  /** El código HTTP, o el `ErrorDeApi` entero cuando lo hay (15-O: trae la causa). */
+  codigoOError: number | ErrorDeApi,
   descripcion: string,
   alReintentar?: () => void,
 ): JSX.Element => {
+  const codigo = typeof codigoOError === 'number' ? codigoOError : codigoOError.estado;
+  /**
+   * 15-O · la API SÍ contestó, pero perdió la conexión con la base. En sitio
+   * (30/09/2026) la consola sólo decía «la API no responde» porque el proceso
+   * había muerto; ahora sigue vivo y lo que falta es PostgreSQL: se nombra.
+   */
+  if (
+    codigo === 503 &&
+    typeof codigoOError !== 'number' &&
+    codigoOError.causa === CAUSA_BASE_DE_DATOS_NO_DISPONIBLE
+  ) {
+    return (
+      <EstadoError
+        titulo="Base de datos no disponible"
+        descripcion="La API sigue en marcha, pero perdió la conexión con la base de datos. Suele ser un corte momentáneo: reintente en unos segundos."
+        alReintentar={alReintentar}
+      />
+    );
+  }
   if (codigo === 401) {
     return (
       <EstadoError

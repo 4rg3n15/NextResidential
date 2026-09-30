@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { estadoSegunCodigo } from './estados';
+import { CAUSA_BASE_DE_DATOS_NO_DISPONIBLE, ErrorDeApi, desenvolver } from '@/lib/api/cliente';
 import { TEXTO_MOTIVO } from '@/lib/motivos';
 import { NAVEGACION, navegacionDe, rutaInicialDe } from '@/lib/navegacion';
 
@@ -179,5 +180,47 @@ describe('navegación por rol · la interfaz oculta, no protege', () => {
 
   it('todo elemento declara sus roles: ninguno queda abierto por omisión', () => {
     expect(NAVEGACION.every((e) => e.roles.length > 0)).toBe(true);
+  });
+});
+
+describe('15-O · un 503 por la base se nombra: no es «la API caída»', () => {
+  // El cuerpo exacto que responde el filtro global de la API ante un corte.
+  const cuerpo = {
+    estado: 503,
+    correlacion: 'c-1',
+    mensaje: {
+      codigo: CAUSA_BASE_DE_DATOS_NO_DISPONIBLE,
+      message:
+        'Base de datos no disponible por ahora: se perdió la conexión con PostgreSQL. La API sigue en marcha; reintente en unos segundos.',
+    },
+  };
+  const errorDeLaApi = (): ErrorDeApi => {
+    try {
+      desenvolver({ error: cuerpo, response: new Response(null, { status: 503 }) });
+    } catch (e) {
+      if (e instanceof ErrorDeApi) return e;
+    }
+    throw new Error('desenvolver no lanzó ErrorDeApi');
+  };
+
+  it('desenvolver conserva la causa del cuerpo', () => {
+    const e = errorDeLaApi();
+    expect(e.estado).toBe(503);
+    expect(e.causa).toBe(CAUSA_BASE_DE_DATOS_NO_DISPONIBLE);
+  });
+
+  it('la pantalla dice «Base de datos no disponible», aunque su descripción propia sea otra', () => {
+    render(estadoSegunCodigo(errorDeLaApi(), 'No se pudo cargar la portería.'));
+    expect(screen.getByText('Base de datos no disponible')).toBeDefined();
+    expect(screen.getByText(/La API sigue en marcha/)).toBeDefined();
+    expect(screen.queryByText('La API no responde')).toBeNull();
+    expect(screen.queryByText('Servicio no disponible por ahora')).toBeNull();
+  });
+
+  it('otro 503 de la API sigue diciendo su motivo', () => {
+    render(
+      estadoSegunCodigo(new ErrorDeApi(503, 'La API está arrancando'), 'La API está arrancando'),
+    );
+    expect(screen.getByText('Servicio no disponible por ahora')).toBeDefined();
   });
 });

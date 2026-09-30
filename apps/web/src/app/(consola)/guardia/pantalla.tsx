@@ -251,9 +251,13 @@ export const PantallaDeGuardiaVirtual = ({
         <EstadoSinPermiso titulo={MENSAJE_GUARDIA_REMOTA} descripcion={AYUDA_GUARDIA_REMOTA} />
       );
     }
-    return estadoSegunCodigo(estado, 'No se pudo cargar la guardia virtual.', () => {
-      void cola.refetch();
-    });
+    return estadoSegunCodigo(
+      cola.error instanceof ErrorDeApi ? cola.error : estado,
+      'No se pudo cargar la guardia virtual.',
+      () => {
+        void cola.refetch();
+      },
+    );
   }
 
   const tienePalabra = canal.data?.estado === 'abierta';

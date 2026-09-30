@@ -168,9 +168,13 @@ export const FormularioDeConfiguracion = ({
   if (consulta.isPending) return <EstadoCargando etiqueta="Cargando la configuración" />;
   if (consulta.isError) {
     const estado = consulta.error instanceof ErrorDeApi ? consulta.error.estado : 0;
-    return estadoSegunCodigo(estado, 'No se pudo leer la configuración.', () => {
-      void consulta.refetch();
-    });
+    return estadoSegunCodigo(
+      consulta.error instanceof ErrorDeApi ? consulta.error : estado,
+      'No se pudo leer la configuración.',
+      () => {
+        void consulta.refetch();
+      },
+    );
   }
   if (borrador === null || consulta.data === undefined) {
     return <EstadoCargando etiqueta="Cargando la configuración" />;
