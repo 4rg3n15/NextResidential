@@ -281,12 +281,23 @@ const configuracionDe = ({ prefijo, familia }) => {
 /** Los tres equipos simulados, uno por familia, con todo lo que un equipo conforme declara. */
 const peticionSimulada = () =>
   equiposSimulados({
-    'camara.simulado.invalid': { familia: 'camara', usuario: 'servicio', clave: 'clave-simulada' },
+    // V2 (15-N) · un equipo conforme LISTA sus flujos en /Streaming/channels;
+    // la cámara, como la del conjunto, sin el 102.
+    'camara.simulado.invalid': {
+      familia: 'camara',
+      usuario: 'servicio',
+      clave: 'clave-simulada',
+      canalesDeVideo: [{ id: '101', codec: 'H.264' }],
+    },
     'terminal.simulado.invalid': {
       familia: 'terminal',
       usuario: 'servicio',
       clave: 'clave-simulada',
       verificacionRemota: true,
+      canalesDeVideo: [
+        { id: '101', codec: 'H.264' },
+        { id: '102', codec: 'H.264' },
+      ],
     },
     'videoportero.simulado.invalid': {
       familia: 'videoportero',
@@ -296,6 +307,10 @@ const peticionSimulada = () =>
       senalizaLlamadas: true,
       admiteSuscripcion: true,
       canalesDeAudio: [{ id: 1, habilitado: true, codec: 'G.711ulaw' }],
+      canalesDeVideo: [
+        { id: '101', codec: 'H.264' },
+        { id: '102', codec: 'H.264' },
+      ],
     },
   });
 

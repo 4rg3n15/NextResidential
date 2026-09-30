@@ -859,12 +859,27 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
       .innerText();
     afirmar(!/Abierta/i.test(ultima), `la consola no dice «abierta» (${ultima.trim()})`);
   });
+  /**
+   * G1/G2 (15-N) · lo atendido SALE de la cola (P-22): la placa que Portería
+   * acaba de abrir ya no está en ella, y hacer clic en ella era apoyarse en el
+   * modelo anterior. Llega OTRA lectura desconocida y la Guardia la pasa SOLA
+   * a «Atención», sin un clic, con su placa a la vista.
+   */
   await bloque('orden desde Guardia virtual', async () => {
+    if (camaraId === null) throw new Error('no hay cámara dada de alta');
+    const placa = `R${sufijo.toUpperCase()}98`;
     await pagina.goto(`${base}/guardia`, { waitUntil: 'networkidle' });
-    await pagina
-      .getByRole('button', { name: new RegExp(`R${sufijo.toUpperCase()}99`) })
-      .first()
-      .click();
+    const estado = await ingestarLectura(puertoApi, camaraId, placa);
+    afirmar(estado === 202, `la API recibe otra lectura desconocida (${String(estado)})`);
+    afirmar(
+      await pagina
+        .getByText(placa, { exact: true })
+        .first()
+        .waitFor({ timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false),
+      'G2 · la placa desconocida pasa sola a «Atención» en la Guardia, sin un clic',
+    );
     await ordenarConMotivo(pagina, 'Recorrido: apertura remota desde la central');
     ok('la orden de Guardia virtual deja su «Última orden»');
   });
@@ -939,12 +954,22 @@ const recorridoDelPortero = async (navegador, base) => {
     await pagina.waitForURL((u) => !u.pathname.startsWith('/acceso'), { timeout: 30_000 });
     ok('el portero entra dentro de su turno, sin segundo factor');
   });
+  /**
+   * G1 (15-N) · con nada en la cola —lo de antes ya se atendió—, el portero
+   * abre a mano el equipo que elige en «Equipos en vivo»: es el caso real del
+   * residente sin credencial, que no genera ningún evento que atender.
+   */
   await bloque('apertura del portero', async () => {
     await pagina.goto(`${base}/porteria`, { waitUntil: 'networkidle' });
-    await ordenarConMotivo(
-      pagina,
-      'Recorrido: residente sin credencial, identificado por documento',
-    );
+    await pagina.getByRole('button', { name: 'Abrir este equipo' }).first().click();
+    await pagina
+      .locator('textarea#motivo')
+      .fill('Recorrido: residente sin credencial, identificado por documento');
+    await pagina.getByRole('button', { name: 'Abrir', exact: true }).click();
+    await pagina
+      .getByText(/Última orden en /)
+      .first()
+      .waitFor({ timeout: 30_000 });
     afirmar(
       await pagina
         .getByText('Recorrido: residente sin credencial, identificado por documento')
