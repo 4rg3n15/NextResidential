@@ -1264,6 +1264,18 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "soloPendientes",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -11677,7 +11689,8 @@
               "pendiente",
               "sincronizada",
               "fallida",
-              "suprimida"
+              "suprimida",
+              "omitida"
             ]
           },
           "detalle": {

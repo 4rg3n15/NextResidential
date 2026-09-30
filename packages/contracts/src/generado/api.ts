@@ -3521,7 +3521,7 @@ export interface components {
             dispositivoId: string;
             equipo: string;
             /** @enum {string} */
-            estado: "pendiente" | "sincronizada" | "fallida" | "suprimida";
+            estado: "pendiente" | "sincronizada" | "fallida" | "suprimida" | "omitida";
             detalle: string | null;
             intentos: number;
             /** Format: date-time */
@@ -5449,7 +5449,9 @@ export interface operations {
     };
     BiometriaController_sincronizarEnTodas: {
         parameters: {
-            query?: never;
+            query?: {
+                soloPendientes?: "true" | "false";
+            };
             header?: never;
             path: {
                 id: string;

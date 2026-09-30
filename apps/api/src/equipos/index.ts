@@ -57,6 +57,11 @@ export { EstadoDelEquipoDto, aEstadoDelEquipoDto } from './presentacion/dto-esta
 // C4 (15-M) · el puerto que la baja consume; lo satisface biometría.
 export { RETIRO_DE_PLANTILLAS_DE_EQUIPO } from './aplicacion/retiro-de-plantillas';
 export { ARCHIVO_DE_ALERTAS_DEL_EQUIPO } from './aplicacion/archivo-de-alertas-del-equipo';
+export {
+  REENVIO_DE_PLANTILLAS_A_EQUIPO,
+  recibePlantillas,
+} from './aplicacion/reenvio-de-plantillas';
+export type { ReenvioDePlantillasAEquipo } from './aplicacion/reenvio-de-plantillas';
 export type { ArchivoDeAlertasDelEquipo } from './aplicacion/archivo-de-alertas-del-equipo';
 export type {
   ResultadoDeRetiroDePlantillas,

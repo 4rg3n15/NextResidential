@@ -46,13 +46,17 @@ const EN_EQUIPO = {
   fallida: { etiqueta: 'No la aceptó', tono: 'peligro' },
   pendiente: { etiqueta: 'Pendiente', tono: 'aviso' },
   suprimida: { etiqueta: 'Retirada', tono: 'neutro' },
+  // R1 (15-N) · el equipo no recibe plantillas: se dice, con el porqué.
+  omitida: { etiqueta: 'Omitido', tono: 'neutro' },
 } as const;
 
 /**
  * F3 (15-L) · en qué equipos está la foto de una visita, y el reintento de los
- * que no la aceptaron.
+ * que no la aceptaron. R1 (15-N) · también los que aún no la tienen
+ * («pendiente») y los que no la recibirán («omitido», con el porqué), y
+ * «Enviar a equipos pendientes», que sólo pide a los que no la tienen.
  */
-const FotoEnEquipos = ({
+export const FotoEnEquipos = ({
   copropiedadId,
   visita,
 }: {
@@ -72,7 +76,12 @@ const FotoEnEquipos = ({
       const r = desenvolver(
         await cliente.POST(
           '/copropiedades/{id}/biometria/plantillas/{plantillaId}/sincronizacion-total',
-          { params: { path: { id: copropiedadId, plantillaId: visita.plantillaId } } },
+          {
+            params: {
+              path: { id: copropiedadId, plantillaId: visita.plantillaId },
+              query: { soloPendientes: 'true' },
+            },
+          },
         ),
       );
       setMensaje(`Enviada a ${String(r.sincronizadas)} de ${String(r.terminales)} equipos.`);
@@ -100,21 +109,23 @@ const FotoEnEquipos = ({
               <Distintivo tono={EN_EQUIPO[e.estado].tono}>
                 {EN_EQUIPO[e.estado].etiqueta}
               </Distintivo>
-              {e.estado === 'fallida' && e.detalle !== null ? (
+              {(e.estado === 'fallida' || e.estado === 'omitida') && e.detalle !== null ? (
                 <span className="text-texto-apagado">{e.detalle}</span>
               ) : null}
             </li>
           ))}
         </ul>
       )}
-      {visita.plantillaId !== null && sePuedeRechazar(visita) && visita.equiposFallidos > 0 ? (
+      {visita.plantillaId !== null &&
+      sePuedeRechazar(visita) &&
+      filas.some((e) => e.estado === 'pendiente' || e.estado === 'fallida') ? (
         <Boton
           tamano="sm"
           variante="secundario"
           disabled={reintentando}
           onClick={() => void reintentar()}
         >
-          {reintentando ? 'Reintentando…' : 'Reintentar los que fallaron'}
+          {reintentando ? 'Enviando…' : 'Enviar a equipos pendientes'}
         </Boton>
       ) : null}
       {mensaje !== null ? (

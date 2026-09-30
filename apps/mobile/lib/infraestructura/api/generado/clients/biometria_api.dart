@@ -7,6 +7,7 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/sincronizacion_total_dto.dart';
 import '../models/sincronizar_plantilla_dto.dart';
+import '../models/solo_pendientes.dart';
 
 part 'biometria_api.g.dart';
 
@@ -40,5 +41,6 @@ abstract class BiometriaApi {
   Future<SincronizacionTotalDto> biometriaControllerSincronizarEnTodas({
     @Path('id') required String id,
     @Path('plantillaId') required String plantillaId,
+    @Query('soloPendientes') SoloPendientes? soloPendientes,
   });
 }

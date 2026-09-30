@@ -23,6 +23,11 @@ import { entradasDeEstado, estadoDelEquipo } from '../aplicacion/estado-del-equi
 import { ModuleRef } from '@nestjs/core';
 import { RETIRO_DE_PLANTILLAS_DE_EQUIPO } from '../aplicacion/retiro-de-plantillas';
 import { ARCHIVO_DE_ALERTAS_DEL_EQUIPO } from '../aplicacion/archivo-de-alertas-del-equipo';
+import {
+  REENVIO_DE_PLANTILLAS_A_EQUIPO,
+  recibePlantillas,
+} from '../aplicacion/reenvio-de-plantillas';
+import type { ReenvioDePlantillasAEquipo } from '../aplicacion/reenvio-de-plantillas';
 import type { ArchivoDeAlertasDelEquipo } from '../aplicacion/archivo-de-alertas-del-equipo';
 import type {
   ResultadoDeRetiroDePlantillas,
@@ -416,6 +421,8 @@ export class EquiposController {
       equipo.tipo === 'camara_lpr'
         ? await this.secretos.emitir(ctx, copropiedadId, { id: equipo.id, host: equipo.host })
         : null;
+    // R1 (15-N) · nace recibiendo plantillas: las vigentes le llegan ya.
+    await this.siEmpiezaARecibir(copropiedadId, equipo.id, null, equipo.capacidades);
     return { ...(await this.aDtoCompleto(ctx, copropiedadId, equipo)), secretoDelAlarmServer };
   }
 
@@ -444,6 +451,8 @@ export class EquiposController {
       .catch(zonaAjena);
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
     this.olvido.olvidar(equipoId);
+    // R1 (15-N) · la edición volvió a sondear: si ahora recibe plantillas, las que le faltan.
+    await this.siEmpiezaARecibir(copropiedadId, equipoId, actual.capacidades, equipo.capacidades);
     return this.aDtoCompleto(ctx, copropiedadId, equipo);
   }
 
@@ -492,6 +501,15 @@ export class EquiposController {
       canalDeVideo: equipo.canalDeVideo,
     });
     await this.repo.registrarSondeo(ctx, copropiedadId, equipoId, sondeado);
+    // R1 (15-N) · «Probar conexión» descubrió que recibe plantillas: las que le faltan.
+    if (equipo.estado === 'activo') {
+      await this.siEmpiezaARecibir(
+        copropiedadId,
+        equipoId,
+        equipo.capacidades,
+        sondeado.capacidades ?? equipo.capacidades,
+      );
+    }
     // E4 · 7 / E5 · 10 (15-M) · ¿publica en ESTA plataforma?, y los datos
     // guardados con su fecha cuando el sondeo de hoy no los leyó.
     const veredicto = conDatosGuardados(
@@ -646,6 +664,29 @@ export class EquiposController {
       plantillasRetiradas: retiro.retiradas,
       plantillasPendientes: retiro.pendientes,
     };
+  }
+
+  /**
+   * R1 (15-N) · de «no recibe» (o «no se sabe») a «recibe plantillas»: se
+   * encolan las vigentes que le faltan. Por `ModuleRef`: la planificación
+   * importa biometría, que importa equipos. Nunca lanza.
+   */
+  private async siEmpiezaARecibir(
+    copropiedadId: string,
+    equipoId: string,
+    antes: Parameters<typeof recibePlantillas>[0],
+    despues: Parameters<typeof recibePlantillas>[0],
+  ): Promise<void> {
+    if (!recibePlantillas(despues) || recibePlantillas(antes)) return;
+    let reenvio: ReenvioDePlantillasAEquipo | null = null;
+    try {
+      reenvio = this.modulos.get<ReenvioDePlantillasAEquipo>(REENVIO_DE_PLANTILLAS_A_EQUIPO, {
+        strict: false,
+      });
+    } catch {
+      return;
+    }
+    await reenvio.encolar(copropiedadId, equipoId);
   }
 
   /** Por `ModuleRef`, como el retiro: eventos importa (vía biometría) equipos. */

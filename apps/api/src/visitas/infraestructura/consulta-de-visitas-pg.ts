@@ -198,14 +198,38 @@ export class ConsultaDeVisitasPg implements ConsultaDeVisitas {
         intentos: number;
         actualizado_en: Date;
       }>(
-        `SELECT s.dispositivo_id, d.nombre AS equipo, s.estado::text AS estado,
-                s.ultimo_error AS detalle, s.intentos, s.actualizado_en
-           FROM public.plantillas_biometricas p
-           JOIN public.plantilla_sincronizaciones s
-             ON s.copropiedad_id = p.copropiedad_id AND s.plantilla_id = p.id
-           JOIN public.dispositivos d
-             ON d.copropiedad_id = s.copropiedad_id AND d.id = s.dispositivo_id
-          WHERE p.copropiedad_id = $1 AND p.autorizacion_id = $2
+        /*
+         * R1 (15-N) · TODOS los equipos que podrían tener la foto, no sólo los
+         * que tienen fila: un equipo activo de rostros sin fila está
+         * «pendiente» si recibe plantillas y «omitido» si no (con el porqué);
+         * uno con fila, en su estado. La plantilla, la más reciente de la visita.
+         */
+        `WITH plantilla AS (
+           SELECT p.id FROM public.plantillas_biometricas p
+            WHERE p.copropiedad_id = $1 AND p.autorizacion_id = $2
+            ORDER BY p.creado_en DESC LIMIT 1)
+         SELECT d.id AS dispositivo_id, d.nombre AS equipo,
+                COALESCE(s.estado::text,
+                  CASE WHEN d.capacidades -> 'bibliotecaDeRostros' ->> 'estado' = 'si'
+                       THEN 'pendiente' ELSE 'omitida' END) AS estado,
+                CASE
+                  WHEN s.estado IS NOT NULL THEN s.ultimo_error
+                  WHEN d.capacidades -> 'bibliotecaDeRostros' ->> 'estado' = 'si' THEN NULL
+                  WHEN d.capacidades -> 'bibliotecaDeRostros' ->> 'estado' = 'no'
+                    THEN 'este equipo no admite rostros'
+                  ELSE 'aún no se sabe si admite rostros: use «Probar conexión» en su ficha'
+                END AS detalle,
+                COALESCE(s.intentos, 0)::int AS intentos,
+                COALESCE(s.actualizado_en, d.actualizado_en) AS actualizado_en
+           FROM plantilla
+           JOIN public.dispositivos d ON d.copropiedad_id = $1
+           LEFT JOIN public.plantilla_sincronizaciones s
+             ON s.copropiedad_id = d.copropiedad_id AND s.dispositivo_id = d.id
+            AND s.plantilla_id = plantilla.id
+          WHERE s.plantilla_id IS NOT NULL
+             OR (d.estado = 'activo'
+                 AND (d.tipo IN ('terminal_facial', 'intercom')
+                      OR d.capacidades -> 'bibliotecaDeRostros' ->> 'estado' = 'si'))
           ORDER BY d.nombre`,
         [copropiedadId, autorizacionId],
       );

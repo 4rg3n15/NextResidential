@@ -269,6 +269,7 @@ export 'models/zona_dto.dart';
 export 'models/severidad.dart';
 export 'models/tipo.dart';
 export 'models/ver.dart';
+export 'models/solo_pendientes.dart';
 export 'models/tipo2.dart';
 export 'models/resultado.dart';
 export 'models/motivo.dart';

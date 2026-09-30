@@ -28,6 +28,7 @@ import {
   SincronizarPlantilla,
 } from './aplicacion/casos-de-uso';
 import { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
+import { EnviarPlantillasAEquipo } from './aplicacion/enviar-a-equipo';
 import { SuprimirPlantillasDeTitular } from './aplicacion/suprimir-por-titular';
 import { RetirarPlantillasDeEquipo } from './aplicacion/retirar-de-equipo';
 import { AlmacenEnMemoria, BovedaAesGcm } from './infraestructura/boveda-cifrada';
@@ -217,6 +218,16 @@ export class BiometriaModule {
             ),
         },
         {
+          // R1 (15-N) · lo que le falta al equipo que empieza a recibir plantillas.
+          provide: EnviarPlantillasAEquipo,
+          inject: [REPOSITORIO_PLANTILLAS, SincronizarPlantilla, BITACORA],
+          useFactory: (
+            plantillas: RepositorioPlantillas,
+            sincronizar: SincronizarPlantilla,
+            bitacora: Bitacora,
+          ) => new EnviarPlantillasAEquipo(plantillas, sincronizar, bitacora),
+        },
+        {
           provide: SincronizarPlantillaEnTerminales,
           inject: [REPOSITORIO_PLANTILLAS, CATALOGO_DE_TERMINALES, SincronizarPlantilla, BITACORA],
           useFactory: (
@@ -277,6 +288,7 @@ export class BiometriaModule {
         // F (15-L) · la visita generada envía su foto a todos los equipos, y la
         // rechazada se la lleva de todos.
         SincronizarPlantillaEnTerminales,
+        EnviarPlantillasAEquipo,
         SuprimirRostroDeAutorizacion,
         // C9 (15-M) · lo consume el módulo del residente al dar de baja una cuenta.
         SuprimirPlantillasDeTitular,

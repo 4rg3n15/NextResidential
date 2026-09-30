@@ -56,3 +56,5 @@ export type {
   RepositorioConsentimientos,
   RepositorioPlantillas,
 } from './aplicacion/puertos';
+// R1 (15-N) · el equipo que empieza a recibir plantillas recibe las que le faltan.
+export { EnviarPlantillasAEquipo } from './aplicacion/enviar-a-equipo';

@@ -1,3 +1,4 @@
+import { ReenvioDePlantillas } from './reenvio-de-plantillas';
 import { describe, expect, it } from 'vitest';
 import type { Bitacora } from '@ncr/domain-core';
 import { HORARIOS, trabajoPorCopropiedad } from './trabajos';
@@ -319,5 +320,37 @@ describe('CicloDelPlanificador · el arranque de la API no depende de la cola', 
       'ncr.reiniciar-aforos',
       'ncr.barrer-plantillas',
     ]);
+  });
+
+  it('R1 (15-N) · da de alta la cola a pedido del reenvío ANTES de arrancar', async () => {
+    const { bitacora } = bitacoraDePrueba();
+    const orden: string[] = [];
+    const sano: Planificador = {
+      programados: [],
+      programar: () => undefined,
+      arrancar: async () => void orden.push('arrancar'),
+      detener: async () => undefined,
+    };
+    const cola = {
+      atender: (t: { nombre: string }) => void orden.push(`atender ${t.nombre}`),
+      encolar: async () => false,
+    };
+    const reenvio = new ReenvioDePlantillas(
+      cola,
+      () => ({ ejecutar: async () => ({ enviadas: 0, fallidas: 0, noVigentes: 0 }) }),
+      'actor',
+      bitacora,
+    );
+    const ciclo = new CicloDelPlanificador(
+      sano,
+      new CatalogoDeCopropiedadesEnMemoria(['cop-a']),
+      bitacora,
+      { get: () => ({ ejecutar: async () => ({}) }) } as never,
+      reenvio,
+      cola,
+    );
+    await ciclo.onApplicationBootstrap();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(orden).toEqual(['atender ncr.reenviar-plantillas', 'arrancar']);
   });
 });

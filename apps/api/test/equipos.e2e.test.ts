@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
@@ -10,6 +10,8 @@ import { OLVIDO_DE_EQUIPO } from '../src/equipos/aplicacion/puertos';
 import { LECTOR_DE_SENALES } from '../src/equipos/aplicacion/senal-de-eventos';
 import { capacidadesDescubiertas, equiposSimulados } from '@ncr/providers';
 import { ALERTAS_DE_EQUIPO } from '../src/eventos';
+import { REENVIO_DE_PLANTILLAS_A_EQUIPO } from '../src/equipos';
+import type { ReenvioDePlantillasAEquipo } from '../src/equipos';
 import type { AlertasDeEquipo } from '../src/eventos';
 
 /**
@@ -185,6 +187,58 @@ describe('A.2 · el secreto es de ESCRITURA: entra y no vuelve', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ motivo: 'se retiró para mantenimiento' });
     expect(repo.auditoria.map((x) => x.recurso)).toEqual(['equipos/alta', 'equipos/baja']);
+  });
+});
+
+describe('R1 (15-N) · el equipo que PASA a recibir plantillas recibe las que le faltan', () => {
+  const conRostros = capacidadesDescubiertas({
+    bibliotecaDeRostros: { estado: 'si', maximo: 500, almacenadas: 0 },
+  });
+  const sinSaber = capacidadesDescubiertas({});
+
+  it('en el alta con biblioteca: se encola el reenvío de ESE equipo', async () => {
+    const { app: a, firmante } = await conEquipos({
+      probar: async () => ({ ...ALCANZADO, capacidades: conRostros }),
+    });
+    const espia = vi.spyOn(
+      a.get<ReenvioDePlantillasAEquipo>(REENVIO_DE_PLANTILLAS_A_EQUIPO, { strict: false }),
+      'encolar',
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, tipo: 'intercom' });
+    expect(creado.status).toBe(201);
+    expect(espia).toHaveBeenCalledWith(COP_B, creado.body.id);
+  });
+
+  it('de «no se sabe» a «sí» al editar: se encola; si ya recibía, no', async () => {
+    let capacidades = sinSaber;
+    const { app: a, firmante } = await conEquipos({
+      probar: async () => ({ ...ALCANZADO, capacidades }),
+    });
+    const espia = vi.spyOn(
+      a.get<ReenvioDePlantillasAEquipo>(REENVIO_DE_PLANTILLAS_A_EQUIPO, { strict: false }),
+      'encolar',
+    );
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...ALTA, tipo: 'intercom' });
+    expect(espia).not.toHaveBeenCalled();
+
+    capacidades = conRostros;
+    const editar = () =>
+      request(a.getHttpServer())
+        .put(`/copropiedades/${COP_B}/equipos/${creado.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ ...ALTA, tipo: 'intercom', nombre: 'Videoportero torre B' });
+    expect((await editar()).status).toBe(200);
+    expect(espia).toHaveBeenCalledTimes(1);
+    await editar();
+    expect(espia).toHaveBeenCalledTimes(1);
   });
 });
 

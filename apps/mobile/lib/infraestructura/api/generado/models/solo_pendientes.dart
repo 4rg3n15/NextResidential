@@ -5,23 +5,19 @@
 import 'package:json_annotation/json_annotation.dart';
 
 @JsonEnum()
-enum FotoEnEquipoDtoEstado {
-  @JsonValue('pendiente')
-  pendiente('pendiente'),
-  @JsonValue('sincronizada')
-  sincronizada('sincronizada'),
-  @JsonValue('fallida')
-  fallida('fallida'),
-  @JsonValue('suprimida')
-  suprimida('suprimida'),
-  @JsonValue('omitida')
-  omitida('omitida'),
+enum SoloPendientes {
+  /// The name has been replaced because it contains a keyword. Original name: `true`.
+  @JsonValue('true')
+  valueTrue('true'),
+  /// The name has been replaced because it contains a keyword. Original name: `false`.
+  @JsonValue('false')
+  valueFalse('false'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 
-  const FotoEnEquipoDtoEstado(this.json);
+  const SoloPendientes(this.json);
 
-  factory FotoEnEquipoDtoEstado.fromJson(String json) => values.firstWhere(
+  factory SoloPendientes.fromJson(String json) => values.firstWhere(
         (e) => e.json == json,
         orElse: () => $unknown,
       );
@@ -39,5 +35,5 @@ enum FotoEnEquipoDtoEstado {
   @override
   String toString() => json?.toString() ?? super.toString();
   /// Returns all defined enum values excluding the $unknown value.
-  static List<FotoEnEquipoDtoEstado> get $valuesDefined => values.where((value) => value != $unknown).toList();
+  static List<SoloPendientes> get $valuesDefined => values.where((value) => value != $unknown).toList();
 }

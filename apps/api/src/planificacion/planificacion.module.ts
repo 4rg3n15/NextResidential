@@ -11,9 +11,12 @@ import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { VigilarLatidos } from '../eventos';
 import { ReiniciarAforosVencidos } from '../zonas';
-import { BarrerPlantillasVencidas } from '../biometria';
-import { CATALOGO_DE_COPROPIEDADES, PLANIFICADOR } from './aplicacion/puertos';
+import { BarrerPlantillasVencidas, EnviarPlantillasAEquipo } from '../biometria';
+import { REENVIO_DE_PLANTILLAS_A_EQUIPO } from '../equipos';
+import { ReenvioDePlantillas } from './aplicacion/reenvio-de-plantillas';
+import { CATALOGO_DE_COPROPIEDADES, COLA_A_PEDIDO, PLANIFICADOR } from './aplicacion/puertos';
 import type {
+  ColaAPedido,
   CatalogoDeCopropiedades,
   Planificador,
   TrabajoProgramado,
@@ -59,9 +62,15 @@ export class CicloDelPlanificador implements OnApplicationBootstrap, BeforeAppli
      * «Cannot read properties of undefined (reading 'get')».
      */
     @Inject(ModuleRef) private readonly referencia: ModuleRef,
+    /** R1 (15-N) · opcionales sólo para los dobles de las pruebas del ciclo. */
+    @Inject(REENVIO_DE_PLANTILLAS_A_EQUIPO) private readonly reenvio?: ReenvioDePlantillas,
+    @Inject(COLA_A_PEDIDO) private readonly cola?: ColaAPedido,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    // R1 (15-N) · la cola a pedido, con su trabajador, antes de arrancar.
+    if (this.reenvio !== undefined) this.cola?.atender(this.reenvio.trabajo());
+
     /**
      * ═══════════════════════════════════════════════════════════════════════
      * LOS TRES CASOS DE USO SE RESUELVEN CON `ModuleRef` Y NO POR INYECCIÓN.
@@ -284,9 +293,23 @@ export class PlanificacionModule {
             });
           },
         },
+        // R1 (15-N) · la misma instancia es planificador y cola a pedido.
+        { provide: COLA_A_PEDIDO, useExisting: PLANIFICADOR },
+        {
+          provide: REENVIO_DE_PLANTILLAS_A_EQUIPO,
+          inject: [COLA_A_PEDIDO, ModuleRef, BITACORA],
+          useFactory: (cola: ColaAPedido, referencia: ModuleRef, bitacora: Bitacora) =>
+            new ReenvioDePlantillas(
+              cola,
+              // Por `ModuleRef` y perezoso, como los barridos: la instancia única de biometría.
+              () => referencia.get(EnviarPlantillasAEquipo, { strict: false }),
+              ACTOR_DEL_PLANIFICADOR,
+              bitacora,
+            ),
+        },
         CicloDelPlanificador,
       ],
-      exports: [PLANIFICADOR, CATALOGO_DE_COPROPIEDADES],
+      exports: [PLANIFICADOR, CATALOGO_DE_COPROPIEDADES, REENVIO_DE_PLANTILLAS_A_EQUIPO],
     };
   }
 }

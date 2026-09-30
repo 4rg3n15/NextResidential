@@ -1,5 +1,10 @@
 import type { Bitacora } from '@ncr/domain-core';
-import type { Planificador, TrabajoProgramado } from '../aplicacion/puertos';
+import type {
+  ColaAPedido,
+  Planificador,
+  TrabajoAPedido,
+  TrabajoProgramado,
+} from '../aplicacion/puertos';
 
 /**
  * Planificador que **registra y no ejecuta**.
@@ -13,8 +18,9 @@ import type { Planificador, TrabajoProgramado } from '../aplicacion/puertos';
  * `ejecutarAhora` permite dispararlos a mano: es lo que usa la prueba y lo que
  * permite a un operador forzar un barrido sin esperar al cron.
  */
-export class PlanificadorInerte implements Planificador {
+export class PlanificadorInerte implements Planificador, ColaAPedido {
   private readonly trabajos: TrabajoProgramado[] = [];
+  private readonly aPedido: TrabajoAPedido[] = [];
 
   constructor(
     private readonly bitacora: Bitacora,
@@ -41,6 +47,15 @@ export class PlanificadorInerte implements Planificador {
 
   async detener(): Promise<void> {
     /* no hay nada que detener */
+  }
+
+  /** R1 (15-N) · sin pg-boss no hay cola: quien encola lo hace en el proceso. */
+  atender(trabajo: TrabajoAPedido): void {
+    this.aPedido.push(trabajo);
+  }
+
+  async encolar(): Promise<boolean> {
+    return false;
   }
 
   /** Dispara un trabajo por su nombre. Devuelve `null` si no está programado. */

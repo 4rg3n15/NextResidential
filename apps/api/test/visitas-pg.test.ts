@@ -1,3 +1,4 @@
+import { RepositorioPlantillasPg } from '../src/biometria/infraestructura/repositorios-pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -350,6 +351,82 @@ describe('F1 · generar autorización desde la consola', () => {
     expect(porEquipo[terminalBuena]).toMatchObject({ estado: 'sincronizada' });
     expect(porEquipo[terminalQueRechaza]).toMatchObject({ estado: 'fallida' });
     expect(porEquipo[terminalQueRechaza]?.detalle).toContain('400');
+  });
+
+  it('R1 (15-N) · el equipo sin fila también sale: «pendiente» si recibe plantillas, «omitido» y por qué si no', async () => {
+    if (omitida()) return;
+    const sinSondear = await (equipos as RepositorioDeEquiposPg).crear(
+      ctxAdmin(),
+      COP_A,
+      {
+        nombre: `Videoportero sin sondear ${CORRIDA}`,
+        tipo: 'intercom',
+        host: `sin-sondear-${CORRIDA}.invalid`,
+        puerto: 80,
+        protocolo: 'http',
+        usuario: 'servicio',
+        secreto: 'clave-de-pruebas-1',
+      },
+      // Sondeado sin capacidades: lo del 29/09, «aún no se sabe si admite rostros».
+      {
+        clase: 'alcanzado',
+        detalle: 'responde',
+        modelo: 'M',
+        firmware: 'V0',
+        latenciaMs: 1,
+        verificado: true,
+      },
+    );
+    const nuevaConRostros = await alta(`Terminal nueva ${CORRIDA}`);
+    try {
+      const r = await con(admin).get(`/copropiedades/${COP_A}/visitas/${generada}/equipos`);
+      expect(r.status).toBe(200);
+      const porEquipo = Object.fromEntries(
+        (r.body as { dispositivoId: string; estado: string; detalle: string | null }[]).map((e) => [
+          e.dispositivoId,
+          e,
+        ]),
+      );
+      expect(porEquipo[sinSondear.id]).toMatchObject({
+        estado: 'omitida',
+        detalle: 'aún no se sabe si admite rostros: use «Probar conexión» en su ficha',
+      });
+      expect(porEquipo[nuevaConRostros]).toMatchObject({ estado: 'pendiente', detalle: null });
+      // Lo que ya estaba, igual.
+      expect(porEquipo[terminalBuena]).toMatchObject({ estado: 'sincronizada' });
+    } finally {
+      await (equipos as RepositorioDeEquiposPg).desactivar(
+        ctxAdmin(),
+        COP_A,
+        sinSondear.id,
+        'fin R1',
+      );
+      await (equipos as RepositorioDeEquiposPg).desactivar(
+        ctxAdmin(),
+        COP_A,
+        nuevaConRostros,
+        'fin R1',
+      );
+    }
+  });
+
+  it('R1 (15-N) · la plantilla vigente que un equipo no tiene es «pendiente para ese equipo»', async () => {
+    if (omitida()) return;
+    const repo = new RepositorioPlantillasPg(pool as Pool);
+    const nueva = await alta(`Terminal pendientes ${CORRIDA}`);
+    try {
+      const plantilla = await fila<{ id: string }>(
+        'SELECT id FROM public.plantillas_biometricas WHERE autorizacion_id = $1',
+        [generada],
+      );
+      expect(await repo.pendientesParaEquipo(COP_A, nueva)).toContain(plantilla?.id);
+      expect(await repo.pendientesParaEquipo(COP_A, terminalBuena)).not.toContain(plantilla?.id);
+      expect([...(await repo.equiposQueLaTienen(COP_A, plantilla?.id ?? ''))]).toContain(
+        terminalBuena,
+      );
+    } finally {
+      await (equipos as RepositorioDeEquiposPg).desactivar(ctxAdmin(), COP_A, nueva, 'fin R1');
+    }
   });
 });
 
