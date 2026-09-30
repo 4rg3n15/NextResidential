@@ -71,3 +71,35 @@ el navegador y go2rtc.**
 - **Contingencia**: si go2rtc no alcanza el umbral con un modelo concreto, se
   cambia el adaptador detrás de `PuenteDeVideo` (otro puente, o MSE/HLS por la
   misma ruta), sin tocar la consola ni el proveedor.
+
+## Enmienda 1 · 15-N · la credencial viaja en la consulta a go2rtc: riesgo aceptado
+
+**Hecho.** En la visita del 29/09, con el módulo `api` de go2rtc en `trace`, el
+registro del Mac guardó `PATCH /api/streams?…&src=rtsp%3A%2F%2Fusuario%3Aclave%40…`:
+la clave del equipo, sólo codificada para URL. Hay que rotarla.
+
+**Evaluado** con go2rtc v1.9.14 oficial:
+
+- La API de flujos sólo lee `name` y `src` **de la consulta**. Un `PATCH` con
+  esos campos en el cuerpo contesta 200 y no registra nada: no hay vía para
+  que la fuente viaje sin la credencial en la URL.
+- Un alias en el YAML sin credenciales no existe como tal: la fuente del alias
+  tendría que llevar la credencial **en el fichero**, que es justo lo que la
+  15-M retiró (RN-21, KPI-11).
+
+**Decisión.** **Riesgo aceptado**, con estas mitigaciones:
+
+1. go2rtc escucha su API sólo en el bucle local; la consulta nunca sale del
+   Mac (`--api-en-red` es aparte y avisa).
+2. `VIDEO_REGISTRO` (opcional, `apps/api/.env`) fija el nivel de registro,
+   por omisión `info`, y se valida antes de llegar al YAML.
+3. `pnpm sitio:video` **se niega a arrancar** si `api` o `rtsp` quedan en
+   `trace` o `debug` —también por herencia del nivel general— salvo con
+   `--permitir-traza`, que avisa y pide rotar la clave al terminar.
+4. Ninguna guía ni el ensayo sugieren subir el nivel. Si alguien lo hizo, la
+   guía de la próxima visita dice qué rotar.
+5. Cualquier `rtsp://` que go2rtc devuelva en un error se redacta antes de
+   salir de la API (sin cambio desde la decisión original).
+
+**Se revisa** si una versión posterior de go2rtc admite la fuente en el cuerpo
+o una credencial separada de la URL: sería un cambio sólo en `PuenteGo2rtc`.
