@@ -7,6 +7,7 @@ import type {
   VeredictoRemoto,
 } from '@ncr/providers';
 import type { AlertasDeEquipo, RegistrarAcceso } from '../../eventos';
+import { alertaDeAtencionDeEquipo } from './alerta-de-atencion';
 import { registroSinBase } from '../../eventos';
 import type { RegistroDeEvidencia, TipoDeEvidencia } from '../../eventos';
 import type { AccionadorDePuerta } from '../../guardia';
@@ -211,6 +212,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
       // Puerta, botón, sabotaje, estado, un código sin catalogar —o un vehículo
       // detectado sin lectura—: a la consola, nunca al motor como un acceso.
       await this.constancias.delEquipo(evento, copropiedadId);
+      // G2 (15-N) · rostro no reconocido o negado por el equipo, lista negra del equipo.
+      this.alertarAtencion(evento, copropiedadId);
       return { registrado: true, motivo: null };
     }
 
@@ -373,6 +376,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
       referenciaExterna: evento.referenciaDelEquipo,
     };
     await this.avisador.llamadaEntrante(llamada);
+    // G2 (15-N) · la llamada abre su alerta (una por equipo y ventana).
+    this.alertarAtencion(evento, copropiedadId);
     this.bitacora.registrar('info', 'llamada del videoportero recibida', {
       copropiedadId,
       dispositivoId: evento.dispositivoId,
@@ -381,6 +386,12 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     });
     // 15-L · ya no es «no registrado»: queda en `eventos_de_equipo` (Bloque B).
     return { registrado: true, motivo: null };
+  }
+
+  /** G2 (15-N) · sin esperar: la ingesta pesa más que su alerta, que nunca lanza. */
+  private alertarAtencion(evento: EventoDeEquipo, copropiedadId: string): void {
+    const nueva = alertaDeAtencionDeEquipo(evento, copropiedadId);
+    if (nueva !== null) void this.complementos.alertas?.ejecutar(nueva, ACTOR_INGESTA);
   }
 
   /** La vivienda, si el equipo dice la unidad y el padrón la reconoce. Nunca lanza. */

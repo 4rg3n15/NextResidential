@@ -3,14 +3,17 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Mic, MicOff, PhoneCall, PhoneOff, Siren } from 'lucide-react';
-import { AvisoDeLlamada } from '@/componentes/aviso-de-llamada';
+import { Mic, MicOff, PhoneCall, Siren } from 'lucide-react';
 import { ControlesDeAudio } from '@/componentes/controles-de-audio';
 import { EquiposEnVivo } from './equipos-en-vivo';
-import type { LlamadaEntrante } from '@/lib/sse/llamadas';
-import type { EnAtencion } from '@ncr/contracts';
 import { cliente, desenvolver, ErrorDeApi } from '@/lib/api/cliente';
 import { useColaDeAtencion } from '@/lib/api/consultas';
+import { useAtencion } from '@/lib/atencion/use-atencion';
+import { ETIQUETA_DE_DISPARADOR } from '@/lib/atencion/seleccion';
+import { useAtencionEnVivo } from '@/componentes/atencion-en-vivo';
+import { EvidenciaDeEvento } from '@/componentes/evidencia-de-evento';
+import { TEXTO_MOTIVO } from '@/lib/motivos';
+import type { MotivoAcceso } from '@ncr/contracts';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
@@ -55,7 +58,22 @@ import { AYUDA_GUARDIA_REMOTA, MENSAJE_GUARDIA_REMOTA } from '@/lib/guardia-remo
  *     cola en vez de rechazar. Conmutar de copropiedad no lo suelta.
  *  4. **No hay operador disponible** → la emergencia escala igual, y la cola
  *     marca en rojo lo que pasa del umbral de espera.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * G2 (15-N) · LA ATENCIÓN SE ABRE SOLA, Y NO SE LA QUITA A QUIEN YA ATIENDE
+ *
+ * Si el operador no atiende a nadie, lo primero de la cola pasa solo a
+ * «Atención»: el selector de video cambia a ESE equipo y la vista en vivo se
+ * abre sin clic, con su evidencia, la vivienda si se conoce, la espera y
+ * Abrir / Negar con motivo sobre ese equipo. Si ya atiende a alguien, el nuevo
+ * espera en la cola con su contador (`useAtencion`). La llamada del
+ * videoportero es un elemento más de la cola (G3): ya no hay un aviso aparte
+ * que se ponga delante.
  */
+
+/** El motivo del motor en palabras; el de un evento de equipo ya viene en el título. */
+const motivoEnPalabras = (motivo: string | null): string | null =>
+  motivo === null ? null : (TEXTO_MOTIVO[motivo as MotivoAcceso] ?? motivo);
 
 const MOTIVOS_DE_APERTURA = [
   'La vivienda confirma la visita por el intercom',
@@ -72,46 +90,46 @@ const MOTIVOS_DE_NEGACION = [
 export const PantallaDeGuardiaVirtual = ({
   copropiedadId,
   nombreDeCopropiedad,
+  atender,
 }: {
   readonly copropiedadId: string;
   readonly nombreDeCopropiedad: string;
+  /** G2 · el elemento que trae el aviso de otra pantalla (`?atender=…`). */
+  readonly atender?: string | undefined;
 }): JSX.Element => {
   const cola = useColaDeAtencion(copropiedadId);
   const clienteDeConsulta = useQueryClient();
-  const [seleccionado, setSeleccionado] = useState<string | null>(null);
+  const { actual, enCola, atender: elegir } = useAtencion(cola.data, atender);
+  const { llamadaDe } = useAtencionEnVivo();
   const [pidiendo, setPidiendo] = useState<'abrir' | 'negar' | 'emergencia' | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
   // H-SITIO-13 · lo que el equipo contestó a la última orden, dicho sin adorno.
   const [ultimaOrden, setUltimaOrden] = useState<OrdenConResultado | null>(null);
-  /** A4 · la llamada que el operador decidió atender. Manda sobre la cola hasta que la cierre. */
-  const [llamada, setLlamada] = useState<LlamadaEntrante | null>(null);
 
   const lista = cola.data?.cola ?? [];
-  const actual: EnAtencion | undefined = lista.find((e) => e.eventoId === seleccionado) ?? lista[0];
 
   /**
-   * Lo que se atiende: un evento de la cola o una llamada del videoportero.
-   * Las dos cosas tienen equipo y vivienda, que es lo que el audio, la
-   * apertura y el aviso al residente necesitan; el resto es descripción.
+   * Lo que se atiende: el elemento de la cola en «Atención». Una llamada trae
+   * la vivienda que declaró el equipo por el canal en vivo; un acceso, la del
+   * padrón. El audio, la apertura y el aviso al residente van sobre SU equipo.
    */
+  const llamada = actual?.disparador === 'llamada' ? llamadaDe(actual.dispositivoId) : undefined;
+  const vivienda =
+    actual === undefined
+      ? null
+      : (llamada?.vivienda ??
+        (actual.viviendaId === null ? null : `Vivienda ${actual.viviendaId}`));
   const foco =
-    llamada !== null
-      ? {
-          dispositivoId: llamada.dispositivoId,
-          viviendaId: llamada.viviendaId,
-          eventoId: undefined,
-          descripcion: `Llamada desde ${llamada.vivienda ?? 'vivienda sin identificar'}${
-            llamada.origen === null ? '' : ` · ${llamada.origen}`
-          }`,
-        }
-      : actual !== undefined
-        ? {
-            dispositivoId: actual.dispositivoId,
-            viviendaId: actual.viviendaId,
-            eventoId: actual.eventoId as string | undefined,
-            descripcion: `Vivienda ${actual.viviendaId ?? 'sin asociar'} · esperando ${String(actual.esperaSegundos)} s`,
-          }
-        : undefined;
+    actual === undefined
+      ? undefined
+      : {
+          dispositivoId: actual.dispositivoId,
+          viviendaId: actual.viviendaId ?? llamada?.viviendaId ?? null,
+          eventoId: actual.eventoId as string | undefined,
+          descripcion: `${ETIQUETA_DE_DISPARADOR[actual.disparador]} · ${
+            vivienda ?? 'vivienda sin identificar'
+          } · esperando ${String(actual.esperaSegundos)} s`,
+        };
 
   const canal = useQuery({
     queryKey: ['guardia', copropiedadId, 'canal', foco?.dispositivoId],
@@ -247,7 +265,11 @@ export const PantallaDeGuardiaVirtual = ({
         <Tarjeta>
           <CabeceraDeTarjeta
             titulo="Cola de atención"
-            descripcion={`${String(cola.data?.total ?? 0)} esperando · más antigua ${String(cola.data?.esperaMaxima ?? 0)} s`}
+            descripcion={
+              actual === undefined
+                ? `${String(cola.data?.total ?? 0)} esperando · más antigua ${String(cola.data?.esperaMaxima ?? 0)} s`
+                : `${String(enCola)} en cola mientras atiendes · más antigua ${String(cola.data?.esperaMaxima ?? 0)} s`
+            }
             accion={
               (cola.data?.criticos ?? 0) > 0 ? (
                 <Distintivo tono="peligro">{cola.data?.criticos} urgente(s)</Distintivo>
@@ -258,7 +280,7 @@ export const PantallaDeGuardiaVirtual = ({
             {lista.length === 0 ? (
               <EstadoVacio
                 titulo="Sin nadie en cola"
-                descripcion="Las llamadas al intercom y las lecturas dudosas aparecen aquí, la que más lleva esperando arriba."
+                descripcion="Las llamadas del videoportero, las personas y placas sin autorización, la lista negra y lo dudoso aparecen aquí, en vivo, la que más lleva esperando arriba."
               />
             ) : (
               <ul className="space-y-2">
@@ -266,10 +288,7 @@ export const PantallaDeGuardiaVirtual = ({
                   <li key={e.eventoId}>
                     <button
                       type="button"
-                      onClick={() => {
-                        setSeleccionado(e.eventoId);
-                        setLlamada(null);
-                      }}
+                      onClick={() => elegir(e.eventoId)}
                       aria-current={e.eventoId === actual?.eventoId}
                       className={
                         e.eventoId === actual?.eventoId
@@ -279,7 +298,8 @@ export const PantallaDeGuardiaVirtual = ({
                     >
                       <span className="flex items-center justify-between gap-2">
                         <span className="min-w-0 truncate text-secundario text-texto">
-                          {e.placaDetectada ?? e.viviendaId ?? 'Llamada al intercom'}
+                          {ETIQUETA_DE_DISPARADOR[e.disparador]}
+                          {e.placaDetectada === null ? '' : ` · ${e.placaDetectada}`}
                         </span>
                         <span
                           className={
@@ -291,11 +311,15 @@ export const PantallaDeGuardiaVirtual = ({
                           {e.esperaSegundos} s
                         </span>
                       </span>
-                      {e.urgencia === 'critica' ? (
-                        <span className="mt-1 block text-distintivo text-peligro-texto">
-                          {e.motivo}
-                        </span>
-                      ) : null}
+                      <span
+                        className={
+                          e.urgencia === 'critica'
+                            ? 'mt-1 block truncate text-distintivo text-peligro-texto'
+                            : 'mt-1 block truncate text-distintivo text-texto-apagado'
+                        }
+                      >
+                        {motivoEnPalabras(e.motivo) ?? e.titulo}
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -312,31 +336,45 @@ export const PantallaDeGuardiaVirtual = ({
                 foco === undefined ? 'Elige a quién atender en la cola.' : foco.descripcion
               }
               accion={
-                llamada === null ? undefined : (
-                  <Boton
-                    variante="secundario"
-                    tamano="sm"
-                    onClick={() => {
-                      // Otros fallos (15-M) · terminar la llamada suelta el turno o
-                      // la cola del canal: si no, el operador lo recibía después y
-                      // lo retenía 90 s sin nadie hablando.
-                      if (foco !== undefined && (tienePalabra || esperandoTurno)) {
-                        audio.mutate({ accion: 'cerrar', dispositivoId: foco.dispositivoId });
-                      }
-                      setLlamada(null);
-                    }}
-                  >
-                    <PhoneOff className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
-                    Terminar llamada
-                  </Boton>
+                actual === undefined ? undefined : (
+                  <Distintivo tono={actual.urgencia === 'critica' ? 'peligro' : 'marca'}>
+                    {actual.titulo}
+                  </Distintivo>
                 )
               }
             />
             <CuerpoDeTarjeta>
-              {foco === undefined ? (
+              {foco === undefined || actual === undefined ? (
                 <EstadoVacio titulo="Nadie seleccionado" descripcion="La cola está vacía." />
               ) : (
                 <div className="space-y-4">
+                  {/* ── G2 · qué es, dónde, cuánto espera y con qué prueba ── */}
+                  <dl className="grid gap-3 sm:grid-cols-3">
+                    <DatoDeAtencion etiqueta="Qué pasa">
+                      {motivoEnPalabras(actual.motivo) ?? actual.titulo}
+                    </DatoDeAtencion>
+                    <DatoDeAtencion etiqueta="Vivienda">
+                      {vivienda ?? 'Sin vivienda identificada'}
+                    </DatoDeAtencion>
+                    <DatoDeAtencion etiqueta="Esperando">
+                      <span className={actual.demorado ? 'font-semibold text-peligro-texto' : ''}>
+                        {String(actual.esperaSegundos)} s
+                      </span>
+                    </DatoDeAtencion>
+                    {actual.placaDetectada === null ? null : (
+                      <DatoDeAtencion etiqueta="Placa leída">
+                        <span className="font-mono tracking-wider">{actual.placaDetectada}</span>
+                      </DatoDeAtencion>
+                    )}
+                  </dl>
+                  {actual.conEvidencia ? (
+                    <EvidenciaDeEvento copropiedadId={copropiedadId} eventoId={actual.eventoId} />
+                  ) : actual.disparador === 'llamada' ? (
+                    <p className="text-secundario text-texto-apagado">
+                      La llamada no trae foto: la vista en vivo de ese equipo está abajo.
+                    </p>
+                  ) : null}
+
                   {/* ── Audio: exclusivo por dispositivo (ADR-01) ── */}
                   <div className="flex flex-wrap items-center gap-2 rounded-tarjeta border border-borde px-3 py-2">
                     <Distintivo tono={tienePalabra ? 'exito' : esperandoTurno ? 'aviso' : 'neutro'}>
@@ -459,7 +497,8 @@ export const PantallaDeGuardiaVirtual = ({
           {/*
             C10 (15-M) · el VIDEO ya no cuelga del foco: cualquier cámara,
             terminal o videoportero activo, con apertura por equipo y motivo,
-            y la línea de tiempo del equipo elegido. La llamada propone el suyo.
+            y la línea de tiempo del equipo elegido. G2 (15-N) · lo que está en
+            «Atención» propone SU equipo, y la vista en vivo se abre sin clic.
           */}
           <EquiposEnVivo
             copropiedadId={copropiedadId}
@@ -500,14 +539,19 @@ export const PantallaDeGuardiaVirtual = ({
           }}
         />
       ) : null}
-
-      <AvisoDeLlamada
-        copropiedadId={copropiedadId}
-        alAtender={(entrante) => {
-          setError(undefined);
-          setLlamada(entrante);
-        }}
-      />
     </>
   );
 };
+
+const DatoDeAtencion = ({
+  etiqueta,
+  children,
+}: {
+  readonly etiqueta: string;
+  readonly children: React.ReactNode;
+}): JSX.Element => (
+  <div>
+    <dt className="text-etiqueta uppercase tracking-wide text-texto-apagado">{etiqueta}</dt>
+    <dd className="mt-0.5 text-cuerpo text-texto">{children}</dd>
+  </div>
+);

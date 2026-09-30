@@ -832,8 +832,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Cola de atención con tiempo de espera (CU-03, HU-25) */
-        get: operations["GuardiaController_cola"];
+        /** Cola de atención: lo que necesita a una persona (CU-03, P-22) */
+        get: operations["AtencionController_consultar"];
         put?: never;
         post?: never;
         delete?: never;
@@ -940,6 +940,24 @@ export interface paths {
         put?: never;
         /** Abre o niega a mano, con motivo obligatorio (RN-08) */
         post: operations["GuardiaController_ordenar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/guardia/preferencias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preferencias de atención de la copropiedad (G2) */
+        get: operations["AtencionController_leer"];
+        /** Cambia las preferencias de atención (G2) */
+        put: operations["AtencionController_guardar"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2706,11 +2724,14 @@ export interface components {
             cantidad: number;
         };
         ColaDeAtencionDto: {
-            /** @description Ordenada por espera DESCENDENTE, con lo crítico delante. No por recencia: una bandeja por recencia hunde al que lleva más tiempo esperando cada vez que llega otro. */
+            /** @description Sólo lo que necesita a una persona y llegó EN VIVO (P-22), dentro de su vigencia; ordenada por espera DESCENDENTE, con lo crítico delante. No por recencia: una bandeja por recencia hunde al que lleva más tiempo esperando cada vez que llega otro. */
             cola: components["schemas"]["EnAtencionDto"][];
             total: number;
             criticos: number;
             esperaMaxima: number;
+            /** @description Cuánto sigue en la cola algo sin atender (GUARDIA_VIGENCIA_EN_COLA_S). */
+            vigenciaSegundos: number;
+            preferencias: components["schemas"]["PreferenciasDeAtencionDto"];
         };
         ConfiguracionDeCopropiedadDto: {
             /** @example Urbanización Mira */
@@ -3137,16 +3158,33 @@ export interface components {
             dispositivoId?: string;
         };
         EnAtencionDto: {
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description Id del acceso (origen «acceso») o del evento del equipo (origen «equipo»). Es el que viaja como `eventoId` en la orden manual que lo atiende.
+             */
             eventoId: string;
-            /** Format: date-time */
+            /** @enum {string} */
+            origen: "acceso" | "equipo";
+            /**
+             * @description G1 (15-N) · por qué necesita a una persona (P-22).
+             * @enum {string}
+             */
+            disparador: "llamada" | "rostro" | "placa" | "lista_negra" | "dudoso";
+            titulo: string;
+            /**
+             * Format: date-time
+             * @description Cuándo lo supo la plataforma: la hora de recepción, no la del equipo.
+             */
             ocurridoEn: string;
             motivo: string | null;
-            resultado: string;
+            /** @enum {string|null} */
+            resultado: "permitido" | "negado" | null;
             /** Format: uuid */
             dispositivoId: string;
             viviendaId: string | null;
             placaDetectada: string | null;
+            /** @description Hay foto o recorte que pedir por /eventos/{id}/evidencia. */
+            conEvidencia: boolean;
             /** @description Segundos que lleva esperando. Se CALCULA en cada consulta, no se guarda: una espera guardada envejece mal y la consola pintaría un número que dejó de ser cierto. */
             esperaSegundos: number;
             /** @enum {string} */
@@ -4102,6 +4140,19 @@ export interface components {
         };
         PorterosDto: {
             porteros: components["schemas"]["PorteroDto"][];
+        };
+        PreferenciaDeDisparadorDto: {
+            /** @description La Atención se abre sola con este disparador. */
+            abrir: boolean;
+            /** @description La consola suena con este disparador. */
+            sonar: boolean;
+        };
+        PreferenciasDeAtencionDto: {
+            llamada: components["schemas"]["PreferenciaDeDisparadorDto"];
+            rostro: components["schemas"]["PreferenciaDeDisparadorDto"];
+            placa: components["schemas"]["PreferenciaDeDisparadorDto"];
+            lista_negra: components["schemas"]["PreferenciaDeDisparadorDto"];
+            dudoso: components["schemas"]["PreferenciaDeDisparadorDto"];
         };
         PuntoDeFrecuenciaDto: {
             /** @description Lunes de la semana ISO, YYYY-MM-DD */
@@ -6189,7 +6240,7 @@ export interface operations {
             };
         };
     };
-    GuardiaController_cola: {
+    AtencionController_consultar: {
         parameters: {
             query?: never;
             header?: never;
@@ -6472,6 +6523,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    AtencionController_leer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferenciasDeAtencionDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    AtencionController_guardar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferenciasDeAtencionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferenciasDeAtencionDto"];
                 };
             };
             /** @description Copropiedad fuera del alcance */

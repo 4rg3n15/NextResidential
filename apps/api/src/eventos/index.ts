@@ -26,6 +26,16 @@ export type {
   RepositorioEventos,
 } from './aplicacion/puertos';
 export { REGISTRO_DE_EVIDENCIA, registroSinBase } from './aplicacion/registro-de-evidencia';
+/** G1 (15-N) · qué necesita a una persona (P-22): lo usan la cola, las alertas y la ingesta. */
+export {
+  DISPARADORES_CRITICOS,
+  DISPARADORES_DE_ATENCION,
+  TIPOS_DE_EQUIPO_QUE_DISPARAN,
+  TIPOS_QUE_TERMINAN_LA_LLAMADA,
+  disparadorDeAcceso,
+  disparadorDeEventoDeEquipo,
+} from './aplicacion/disparadores-de-atencion';
+export type { DisparadorDeAtencion } from './aplicacion/disparadores-de-atencion';
 /** 15-L (Bloque B) · lo que un equipo emite y no es un acceso, y lo que la plataforma le hace. */
 export {
   REGISTRO_DE_EVENTOS_DE_EQUIPO,

@@ -8,12 +8,20 @@ import { claimsVisibles, estadoDePorteria } from '@/lib/sesion/porteria';
 import { BloqueoDePatrullaje } from '@/componentes/bloqueo-de-patrullaje';
 import { MarcoDeConsola } from '@/componentes/marco-consola';
 import { AvisoDeVisita } from '@/componentes/aviso-de-visita';
+import { AtencionEnVivo } from '@/componentes/atencion-en-vivo';
 import { ProveedorDeConsultas } from '@/lib/api/proveedor';
 import { alcanceActivo } from './copropiedad';
 
 export const dynamic = 'force-dynamic';
 
 const AVISAN_VISITAS: ReadonlySet<string> = new Set(['portero', 'superadministrador']);
+/** G2 (15-N) · los roles que atienden la cola: a ellos se les avisa, en cualquier pantalla. */
+const ATIENDEN_LA_COLA: ReadonlySet<string> = new Set([
+  'operador_central',
+  'portero',
+  'administrador',
+  'superadministrador',
+]);
 
 /**
  * Marco de la consola. La sesión se resuelve **en el servidor y antes de pintar
@@ -65,9 +73,27 @@ const LayoutDeConsola = async ({
     <ProveedorDeConsultas>
       {simulados === null ? null : <FranjaDeEquiposSimulados texto={simulados} />}
       {enPruebas ? <FranjaDeModoPruebas /> : null}
-      <MarcoDeConsola sesion={sesion} rol={sesion.rol as Rol} alcance={alcance} porteria={porteria}>
-        {children}
-      </MarcoDeConsola>
+      {alcance.copropiedadId !== null && ATIENDEN_LA_COLA.has(sesion.rol) ? (
+        <AtencionEnVivo copropiedadId={alcance.copropiedadId} rol={sesion.rol}>
+          <MarcoDeConsola
+            sesion={sesion}
+            rol={sesion.rol as Rol}
+            alcance={alcance}
+            porteria={porteria}
+          >
+            {children}
+          </MarcoDeConsola>
+        </AtencionEnVivo>
+      ) : (
+        <MarcoDeConsola
+          sesion={sesion}
+          rol={sesion.rol as Rol}
+          alcance={alcance}
+          porteria={porteria}
+        >
+          {children}
+        </MarcoDeConsola>
+      )}
       {/* F2 (15-L) · portería y superadministración se enteran de cada visita nueva. */}
       {alcance.copropiedadId !== null && AVISAN_VISITAS.has(sesion.rol) ? (
         <AvisoDeVisita copropiedadId={alcance.copropiedadId} />

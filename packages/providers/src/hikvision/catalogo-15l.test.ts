@@ -36,6 +36,9 @@ describe('la clase de un bloque la decide su código, no su nombre', () => {
     [{ majorEventType: 5, subEventType: 27 }, 'equipo', 'puerta_forzada'],
     [{ majorEventType: 5, subEventType: 23 }, 'equipo', 'boton_de_salida'],
     [{ majorEventType: 5, subEventType: 37 }, 'timbre', 'timbre'],
+    // G3 (15-N) · 0x33 «Call Center», tabla «Other Events (0x5)» del documento
+    // «Access_Control_Event_Types_and_Event_Linkage_Types»: la llamada a la central.
+    [{ majorEventType: 5, subEventType: 51 }, 'llamada', 'llamada'],
     [{ majorEventType: 1, subEventType: 5 }, 'equipo', 'sabotaje'],
     [{ majorEventType: 2, subEventType: 1063 }, 'equipo', 'equipo_fuera_de_linea'],
     [{ majorEventType: 3, subEventType: 1024 }, 'equipo', 'apertura_remota'],

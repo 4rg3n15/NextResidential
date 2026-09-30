@@ -114,6 +114,55 @@ describe('AbrirAlertaDeEquipo · sellada con la hora de recepción y deduplicada
     expect((await alertas.abiertasDe(COP)).length).toBe(1);
   });
 
+  it('G2 (15-N) · la llamada del mismo videoportero en la ventana: UNA alerta', async () => {
+    const { alertas, abrir } = montar();
+    const llamada = {
+      copropiedadId: COP,
+      dispositivoId: CAMARA,
+      tipo: 'acceso_dudoso' as const,
+      severidad: 'alta' as const,
+      clave: 'llamada',
+      notas: 'Llamada a la central',
+      persistente: false,
+    };
+    await abrir.ejecutar(llamada, 'ingesta');
+    await abrir.ejecutar(llamada, 'ingesta');
+    expect(await alertas.abiertasDe(COP)).toHaveLength(1);
+  });
+
+  it('G2 (15-N) · dos avisos SIMULTÁNEOS de la misma llamada (VoiceTalk y 5/51): UNA alerta', async () => {
+    // Llegan en dos peticiones HTTP a la vez: sin serializar por clave, las
+    // dos leían «no hay ninguna» antes de que la otra guardara.
+    const { alertas, abrir } = montar();
+    const llamada = {
+      copropiedadId: COP,
+      dispositivoId: CAMARA,
+      tipo: 'acceso_dudoso' as const,
+      severidad: 'alta' as const,
+      clave: 'llamada',
+      notas: 'Llamada entrante',
+      persistente: false,
+    };
+    await Promise.all([abrir.ejecutar(llamada, 'ingesta'), abrir.ejecutar(llamada, 'ingesta')]);
+    expect(await alertas.abiertasDe(COP)).toHaveLength(1);
+  });
+
+  it('G2 (15-N) · la lista negra que emite un equipo NUNCA se deduplica (S-124)', async () => {
+    const { alertas, abrir } = montar();
+    const ln = {
+      copropiedadId: COP,
+      dispositivoId: CAMARA,
+      tipo: 'lista_negra' as const,
+      severidad: 'critica' as const,
+      clave: 'lista_negra',
+      notas: 'Persona en lista negra',
+      persistente: false,
+    };
+    await abrir.ejecutar(ln, 'ingesta');
+    await abrir.ejecutar(ln, 'ingesta');
+    expect(await alertas.abiertasDe(COP)).toHaveLength(2);
+  });
+
   it('dos claves distintas del mismo tipo y equipo son dos condiciones: dos alertas', async () => {
     const { alertas, abrir } = montar();
     const base = {

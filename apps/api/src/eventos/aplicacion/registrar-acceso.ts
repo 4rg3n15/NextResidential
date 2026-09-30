@@ -24,6 +24,7 @@ import type {
   RepositorioAlertas,
   RepositorioEventos,
 } from './puertos';
+import { descriptorDeAtencion } from './disparadores-de-atencion';
 import { TEMA_EVENTOS } from './puertos';
 import type { EscalarAlerta } from './escalamiento';
 import { VENTANA_DE_DUPLICADOS_MS, debeAbrirAlerta } from './deduplicacion-de-alertas';
@@ -232,7 +233,15 @@ export class RegistrarAcceso {
   }
 
   private async alertar(acceso: Acceso, actorId: string): Promise<string | null> {
-    const descriptor = clasificarAcceso(acceso);
+    // G2 (15-N) · lo que el dominio no alerta y el cliente quiere en la Atención
+    // (P-22): la persona o la placa sin autorización vigente. C-45.
+    const descriptor =
+      clasificarAcceso(acceso) ??
+      descriptorDeAtencion({
+        resultado: acceso.permitido ? 'permitido' : 'negado',
+        motivo: acceso.motivo ?? null,
+        metodo: acceso.metodo,
+      });
     if (descriptor === null) return null;
 
     /**

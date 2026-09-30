@@ -1,12 +1,16 @@
 'use client';
 
 import type { JSX } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DoorOpen, ShieldAlert, ShieldX } from 'lucide-react';
-import { AvisoDeLlamada } from '@/componentes/aviso-de-llamada';
-import type { LlamadaEntrante } from '@/lib/sse/llamadas';
+import type { MotivoAcceso } from '@ncr/contracts';
 import { cliente, desenvolver, ErrorDeApi } from '@/lib/api/cliente';
+import { useAtencion } from '@/lib/atencion/use-atencion';
+import { ETIQUETA_DE_DISPARADOR } from '@/lib/atencion/seleccion';
+import { useAtencionEnVivo } from '@/componentes/atencion-en-vivo';
+import { EvidenciaDeEvento } from '@/componentes/evidencia-de-evento';
+import { TEXTO_MOTIVO } from '@/lib/motivos';
 import { useColaDeAtencion, useOrdenesManuales } from '@/lib/api/consultas';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { Boton } from '@/componentes/ui/boton';
@@ -40,6 +44,16 @@ import { EquiposEnVivo } from '../guardia/equipos-en-vivo';
  * parece inofensivo —«no pasó nada»— y es justo el hecho que un incidente
  * necesita reconstruir. Lo que los diferencia es el color y el verbo, no la
  * fricción.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * G2 (15-N) · EL EVENTO ACTUAL SE QUEDA HASTA QUE SE ATIENDE
+ *
+ * Antes, «actual» era siempre el primero de la cola, y la cola se reordena en
+ * cada consulta: una lista negra recién llegada le quitaba la pantalla al
+ * portero que hablaba con otro visitante. Ahora lo que está en pantalla se
+ * queda hasta que sale de la cola; si no hay nada, lo primero pasa solo, con
+ * la vista en vivo de SU equipo. La llamada del videoportero es un elemento
+ * más (G3), ya no una tarjeta aparte.
  */
 
 const CUANDO = (iso: string): string =>
@@ -59,16 +73,21 @@ const MOTIVOS_DE_NEGACION = [
 
 export const PantallaDePorteria = ({
   copropiedadId,
+  atender,
 }: {
   readonly copropiedadId: string;
+  /** G2 · el elemento que trae el aviso de otra pantalla (`?atender=…`). */
+  readonly atender?: string | undefined;
 }): JSX.Element => {
   const cola = useColaDeAtencion(copropiedadId);
+  const { actual, enCola, atender: elegir } = useAtencion(cola.data, atender);
+  const { llamadaDe } = useAtencionEnVivo();
   const ordenes = useOrdenesManuales(copropiedadId);
   const clienteDeConsulta = useQueryClient();
   /**
-   * A4 · una orden nace de un evento de la cola O de una llamada del
-   * videoportero. La llamada no tiene `eventoId`: no es un acceso todavía. La
-   * orden sí lleva siempre el equipo y el motivo (RN-08, CA-16).
+   * Una orden nace de un elemento de la cola —un acceso o, desde la 15-N, lo
+   * que emite un equipo, como la llamada—, y lleva su id: así sale de la cola.
+   * Lleva siempre el equipo y el motivo (RN-08, CA-16).
    */
   const [pidiendo, setPidiendo] = useState<{
     accion: 'abrir' | 'negar';
@@ -78,7 +97,6 @@ export const PantallaDePorteria = ({
   const [error, setError] = useState<string | undefined>(undefined);
   // H-SITIO-13 · lo que el equipo contestó a la última orden, dicho sin adorno.
   const [ultimaOrden, setUltimaOrden] = useState<OrdenConResultado | null>(null);
-  const [llamada, setLlamada] = useState<LlamadaEntrante | null>(null);
 
   const ordenar = useMutation({
     mutationFn: async (entrada: {
@@ -122,7 +140,8 @@ export const PantallaDePorteria = ({
   }
 
   const lista = cola.data?.cola ?? [];
-  const actual = lista[0];
+  const enEsperaAhora = lista.filter((e) => e.eventoId !== actual?.eventoId);
+  const llamada = actual?.disparador === 'llamada' ? llamadaDe(actual.dispositivoId) : undefined;
 
   return (
     <>
@@ -131,50 +150,6 @@ export const PantallaDePorteria = ({
         descripcion="Lo que está pasando en las puertas ahora mismo. Toda apertura o negación queda con tu nombre y su motivo."
       />
 
-      {llamada !== null ? (
-        <Tarjeta>
-          <CabeceraDeTarjeta
-            titulo={`${llamada.clase === 'timbre' ? 'Timbre' : 'Llamada'} desde ${llamada.vivienda ?? 'vivienda sin identificar'}`}
-            descripcion={`${llamada.origen ?? 'Sin origen declarado'} · ${CUANDO(llamada.ocurridoEn)} · equipo ${llamada.dispositivoId.slice(0, 8)}`}
-            accion={
-              <Boton variante="secundario" tamano="sm" onClick={() => setLlamada(null)}>
-                Cerrar
-              </Boton>
-            }
-          />
-          <CuerpoDeTarjeta>
-            <div className="flex flex-wrap gap-2">
-              <Boton
-                variante="exito"
-                onClick={() => {
-                  setError(undefined);
-                  setPidiendo({ accion: 'abrir', dispositivoId: llamada.dispositivoId });
-                }}
-              >
-                <DoorOpen className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
-                Abrir con motivo
-              </Boton>
-              <Boton
-                variante="peligro"
-                onClick={() => {
-                  setError(undefined);
-                  setPidiendo({ accion: 'negar', dispositivoId: llamada.dispositivoId });
-                }}
-              >
-                <ShieldX className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
-                Negar con motivo
-              </Boton>
-            </div>
-            {llamada.viviendaId === null ? (
-              <p className="mt-3 text-distintivo text-aviso-texto">
-                El padrón no reconoce la unidad que declara el equipo; la apertura queda igualmente
-                con tu nombre y el motivo.
-              </p>
-            ) : null}
-          </CuerpoDeTarjeta>
-        </Tarjeta>
-      ) : null}
-
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Tarjeta>
           <CabeceraDeTarjeta
@@ -182,7 +157,7 @@ export const PantallaDePorteria = ({
             descripcion={
               actual === undefined
                 ? 'Sin nadie esperando en las puertas.'
-                : `Esperando ${String(actual.esperaSegundos)} s · ${CUANDO(actual.ocurridoEn)}`
+                : `${ETIQUETA_DE_DISPARADOR[actual.disparador]} · esperando ${String(actual.esperaSegundos)} s · ${CUANDO(actual.ocurridoEn)}`
             }
             accion={
               actual === undefined ? undefined : (
@@ -201,14 +176,20 @@ export const PantallaDePorteria = ({
             ) : (
               <div className="space-y-4">
                 <dl className="grid gap-3 sm:grid-cols-2">
-                  <Dato etiqueta="Resultado del motor">
-                    <Distintivo tono={actual.resultado === 'permitido' ? 'exito' : 'peligro'}>
-                      {actual.resultado === 'permitido' ? 'Permitido' : 'Denegado'}
+                  <Dato etiqueta="Qué pasa">
+                    <Distintivo tono={actual.urgencia === 'critica' ? 'peligro' : 'marca'}>
+                      {actual.titulo}
                     </Distintivo>
                   </Dato>
-                  <Dato etiqueta="Motivo">{actual.motivo ?? 'Sin motivo de denegación'}</Dato>
+                  <Dato etiqueta="Motivo">
+                    {actual.motivo === null
+                      ? actual.resultado === null
+                        ? 'Lo emitió el equipo'
+                        : 'Sin motivo de denegación'
+                      : (TEXTO_MOTIVO[actual.motivo as MotivoAcceso] ?? actual.motivo)}
+                  </Dato>
                   <Dato etiqueta="Vivienda destino">
-                    {actual.viviendaId ?? 'Sin vivienda asociada'}
+                    {llamada?.vivienda ?? actual.viviendaId ?? 'Sin vivienda asociada'}
                   </Dato>
                   <Dato etiqueta="Placa leída">
                     {actual.placaDetectada === null ? (
@@ -225,7 +206,15 @@ export const PantallaDePorteria = ({
                   las expondría en el historial del navegador de forma masiva y
                   sin que nadie las mire (RN-21).
                 */}
-                <Evidencia copropiedadId={copropiedadId} eventoId={actual.eventoId} />
+                {actual.conEvidencia ? (
+                  <EvidenciaDeEvento copropiedadId={copropiedadId} eventoId={actual.eventoId} />
+                ) : (
+                  <p className="text-secundario text-texto-apagado">
+                    {actual.disparador === 'llamada'
+                      ? 'La llamada no trae foto: la vista en vivo de ese equipo está al lado.'
+                      : 'Sin foto de este evento: la vista en vivo de ese equipo está al lado.'}
+                  </p>
+                )}
 
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Boton
@@ -263,40 +252,44 @@ export const PantallaDePorteria = ({
         </Tarjeta>
 
         <div className="space-y-4">
-          {/* C10 (15-M) · cualquier equipo en vivo; la llamada o el evento proponen el suyo. */}
+          {/* C10 (15-M) · cualquier equipo en vivo; G2 · lo que está en pantalla propone el suyo. */}
           <EquiposEnVivo
             copropiedadId={copropiedadId}
-            propuesto={llamada?.dispositivoId ?? actual?.dispositivoId}
-            eventoId={llamada === null ? actual?.eventoId : undefined}
+            propuesto={actual?.dispositivoId}
+            eventoId={actual?.eventoId}
           />
 
           <Tarjeta>
             <CabeceraDeTarjeta
               titulo="En espera"
-              descripcion={`${String(cola.data?.total ?? 0)} en la cola · ${String(cola.data?.criticos ?? 0)} de atención inmediata`}
+              descripcion={`${String(enCola)} en la cola · ${String(cola.data?.criticos ?? 0)} de atención inmediata`}
             />
             <CuerpoDeTarjeta>
-              {lista.length <= 1 ? (
+              {enEsperaAhora.length === 0 ? (
                 <p className="text-secundario text-texto-apagado">Nadie más esperando.</p>
               ) : (
                 <ul className="space-y-2">
-                  {lista.slice(1, 6).map((e) => (
-                    <li
-                      key={e.eventoId}
-                      className="flex items-center justify-between gap-3 rounded-boton border border-borde px-3 py-2"
-                    >
-                      <span className="min-w-0 truncate text-secundario text-texto">
-                        {e.placaDetectada ?? e.viviendaId ?? 'Llamada al intercom'}
-                      </span>
-                      <span
-                        className={
-                          e.demorado
-                            ? 'text-distintivo text-peligro-texto'
-                            : 'text-distintivo text-texto-apagado'
-                        }
+                  {enEsperaAhora.slice(0, 6).map((e) => (
+                    <li key={e.eventoId}>
+                      <button
+                        type="button"
+                        onClick={() => elegir(e.eventoId)}
+                        className="flex w-full items-center justify-between gap-3 rounded-boton border border-borde px-3 py-2 text-left"
                       >
-                        {e.esperaSegundos} s
-                      </span>
+                        <span className="min-w-0 truncate text-secundario text-texto">
+                          {ETIQUETA_DE_DISPARADOR[e.disparador]}
+                          {e.placaDetectada === null ? '' : ` · ${e.placaDetectada}`}
+                        </span>
+                        <span
+                          className={
+                            e.demorado
+                              ? 'text-distintivo text-peligro-texto'
+                              : 'text-distintivo text-texto-apagado'
+                          }
+                        >
+                          {e.esperaSegundos} s
+                        </span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -393,14 +386,6 @@ export const PantallaDePorteria = ({
           }}
         />
       ) : null}
-
-      <AvisoDeLlamada
-        copropiedadId={copropiedadId}
-        alAtender={(entrante) => {
-          setError(undefined);
-          setLlamada(entrante);
-        }}
-      />
     </>
   );
 };
@@ -417,70 +402,3 @@ const Dato = ({
     <dd className="mt-0.5 text-cuerpo text-texto">{children}</dd>
   </div>
 );
-
-/**
- * La evidencia, pedida **al abrir el evento** y no antes.
- *
- * Es una imagen del bucket privado servida con URL firmada de 60 s. La CSP
- * admite ese origen desde esta etapa (`img-src`); hasta ahora no lo listaba
- * porque ninguna pantalla la pintaba, y la primera miniatura habría salido rota
- * con la queja en un sitio que nadie mira.
- */
-const Evidencia = ({
-  copropiedadId,
-  eventoId,
-}: {
-  readonly copropiedadId: string;
-  readonly eventoId: string;
-}): JSX.Element => {
-  const [estado, setEstado] = useState<'pidiendo' | 'lista' | 'sin-evidencia'>('pidiendo');
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vigente = true;
-    void cliente
-      .GET('/copropiedades/{id}/eventos/{eventoId}/evidencia', {
-        params: { path: { id: copropiedadId, eventoId } },
-      })
-      .then((r) => {
-        // `vigente` evita escribir estado sobre un componente que ya cambió de
-        // evento: el operador pasa al siguiente antes de que llegue la firma, y
-        // sin esto la miniatura del anterior aparecería sobre el nuevo.
-        if (!vigente) return;
-        const enlace = (r.data as { url?: string } | undefined)?.url;
-        if (typeof enlace === 'string' && enlace !== '') {
-          setUrl(enlace);
-          setEstado('lista');
-        } else {
-          setEstado('sin-evidencia');
-        }
-      })
-      .catch(() => {
-        if (vigente) setEstado('sin-evidencia');
-      });
-    return () => {
-      vigente = false;
-    };
-  }, [copropiedadId, eventoId]);
-
-  if (estado === 'pidiendo') {
-    return (
-      <div className="h-40 w-full animate-pulse rounded-tarjeta bg-borde-suave motion-reduce:animate-none" />
-    );
-  }
-  if (estado === 'sin-evidencia' || url === null) {
-    return (
-      <p className="rounded-tarjeta border border-borde bg-lienzo px-4 py-3 text-secundario text-texto-apagado">
-        Este evento no trae evidencia fotográfica. La cámara puede no haberla enviado, o el enlace
-        firmado puede haber caducado: vuelve a abrir el evento para pedir uno nuevo.
-      </p>
-    );
-  }
-  return (
-    <img
-      src={url}
-      alt="Evidencia fotográfica del evento"
-      className="max-h-64 w-full rounded-tarjeta border border-borde object-cover"
-    />
-  );
-};

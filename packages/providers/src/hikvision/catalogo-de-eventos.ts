@@ -85,6 +85,8 @@ const POR_CODIGO: Readonly<Record<string, Entrada>> = {
   '5/27': e('puerta_forzada', 'Puerta forzada'),
   '5/28': e('puerta_abierta_demasiado_tiempo', 'Puerta abierta demasiado tiempo'),
   '5/37': e('timbre', 'Timbre'),
+  // G3 (15-N) · 0x33 «Call Center» (Other Events 0x5): la llamada a la central.
+  '5/51': e('llamada', 'Llamada a la central'),
   '5/75': e('rostro_reconocido', 'Rostro reconocido'),
   '5/76': e('rostro_no_reconocido', 'Rostro no reconocido'),
   '5/77': e('rostro_reconocido', 'Rostro reconocido (con código de persona)'),

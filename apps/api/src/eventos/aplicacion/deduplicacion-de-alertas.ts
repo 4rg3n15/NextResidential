@@ -76,6 +76,14 @@ export const notasConClave = (clave: string, notas: string): string => `[${clave
  * más que su alerta.
  */
 export class AbrirAlertaDeEquipo {
+  /**
+   * G2 (15-N) · la última decisión en curso por (copropiedad, equipo, tipo,
+   * clave). Dos avisos de la misma llamada llegan en dos peticiones a la vez
+   * (`VoiceTalkEvent` y el 5/51): sin esperar a la anterior, los dos leían «no
+   * hay ninguna» y abrían dos. Basta en un proceso: la API es una.
+   */
+  private readonly enCurso = new Map<string, Promise<unknown>>();
+
   constructor(
     private readonly alertas: RepositorioAlertas,
     private readonly escalador: EscalarAlerta,
@@ -86,14 +94,34 @@ export class AbrirAlertaDeEquipo {
   ) {}
 
   async ejecutar(nueva: AlertaDeEquipoNueva, actorId: string): Promise<ResultadoDeAlertaDeEquipo> {
+    const clave = [nueva.copropiedadId, nueva.dispositivoId, nueva.tipo, nueva.clave].join('|');
+    const anterior = this.enCurso.get(clave) ?? Promise.resolve();
+    const esta = anterior.then(() => this.decidir(nueva, actorId));
+    this.enCurso.set(clave, esta);
+    try {
+      return await esta;
+    } finally {
+      if (this.enCurso.get(clave) === esta) this.enCurso.delete(clave);
+    }
+  }
+
+  private async decidir(
+    nueva: AlertaDeEquipoNueva,
+    actorId: string,
+  ): Promise<ResultadoDeAlertaDeEquipo> {
     try {
       const ahora = this.reloj.ahora();
-      const ultima = await this.alertas.ultimaDe(
-        nueva.copropiedadId,
-        nueva.dispositivoId,
-        nueva.tipo,
-        nueva.clave,
-      );
+      // G2 (15-N) · lista negra y pánico NUNCA se deduplican (S-124): dos intentos
+      // seguidos pueden ser dos personas, y cada uno tiene que llegar al operador.
+      const siempre = nueva.tipo === 'lista_negra' || nueva.tipo === 'panico';
+      const ultima = siempre
+        ? null
+        : await this.alertas.ultimaDe(
+            nueva.copropiedadId,
+            nueva.dispositivoId,
+            nueva.tipo,
+            nueva.clave,
+          );
       const decision = debeAbrirAlerta({
         ultima,
         ahora,

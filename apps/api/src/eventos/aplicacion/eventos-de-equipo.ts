@@ -54,6 +54,15 @@ export interface FiltroDeEventosDeEquipo {
   readonly hasta: Date;
   readonly dispositivoId?: string | null;
   readonly tipo?: string | null;
+  /** G1 (15-N) · varios tipos a la vez (la cola de atención). */
+  readonly tipos?: readonly string[] | null;
+  /**
+   * G1 (15-N) · la ventana por la hora de RECEPCIÓN y no por la del equipo: un
+   * videoportero con el reloj 13 h atrasado (29/09) quedaba fuera de «lo último».
+   */
+  readonly porRecepcion?: boolean;
+  /** G1 (15-N) · sólo lo que el equipo emitió EN VIVO. */
+  readonly soloEnVivo?: boolean;
   readonly limite: number;
 }
 

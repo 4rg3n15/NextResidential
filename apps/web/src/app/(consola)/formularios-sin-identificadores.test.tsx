@@ -402,6 +402,9 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
   'porteros/calendario-de-turnos.tsx':
     'retirar un turno: el turnoId viene de la tarjeta; sólo se teclea el motivo',
   'componentes/cabecera.tsx': 'el botón «Patrullaje» no lleva cuerpo: la sesión sale del token',
+  /** G2 (15-N) · preferencias de atención: sólo casillas; la copropiedad viaja en la ruta. */
+  'configuracion/preferencias-de-atencion.tsx':
+    'diez casillas (abrir sola / sonar por disparador); ningún texto ni identificador tecleado',
   /**
    * ETAPA 15-I · supervisión de residentes. Ningún identificador se teclea: la
    * vivienda sale de un desplegable con las que devuelve la API, y la plaza, el

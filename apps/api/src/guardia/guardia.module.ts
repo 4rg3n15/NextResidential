@@ -1,6 +1,24 @@
 import { Module } from '@nestjs/common';
-import { REGISTRO_DE_EVENTOS_DE_EQUIPO } from '../eventos';
-import type { RegistroDeEventosDeEquipo } from '../eventos';
+import {
+  REGISTRO_DE_EVENTOS_DE_EQUIPO,
+  REPOSITORIO_EVENTOS,
+  REPOSITORIO_EVENTOS_DE_EQUIPO,
+} from '../eventos';
+import type {
+  RegistroDeEventosDeEquipo,
+  RepositorioEventos,
+  RepositorioEventosDeEquipo,
+} from '../eventos';
+import { AtencionController } from './presentacion/atencion.controller';
+import { ConsultarColaDeAtencion, FUENTE_DE_LA_COLA } from './aplicacion/consultar-cola';
+import type { FuenteDeLaCola } from './aplicacion/consultar-cola';
+import { PREFERENCIAS_DE_ATENCION } from './aplicacion/preferencias-de-atencion';
+import type { RepositorioDePreferenciasDeAtencion } from './aplicacion/preferencias-de-atencion';
+import { FuenteDeLaColaPorPuertos } from './infraestructura/fuente-de-la-cola';
+import {
+  PreferenciasDeAtencionEnMemoria,
+  PreferenciasDeAtencionPg,
+} from './infraestructura/preferencias-de-atencion-pg';
 import { ConstanciaDeOrdenesEnLineaDeTiempo } from './infraestructura/constancia-de-ordenes';
 import { EquiposModule } from '../equipos';
 import type { DynamicModule } from '@nestjs/common';
@@ -66,8 +84,46 @@ export class GuardiaModule {
       module: GuardiaModule,
       // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
       imports: [EquiposModule.registrar()],
-      controllers: [GuardiaController, VideoController],
+      controllers: [GuardiaController, VideoController, AtencionController],
       providers: [
+        /**
+         * G1 · G2 (15-N) · la cola de atención (P-22) y las preferencias de la
+         * copropiedad. La fuente son los tres puertos que ya existen —accesos,
+         * eventos de equipo, órdenes—: con base o en memoria es la misma.
+         */
+        {
+          provide: FUENTE_DE_LA_COLA,
+          inject: [REPOSITORIO_EVENTOS, REPOSITORIO_EVENTOS_DE_EQUIPO, BITACORA_DE_ORDENES],
+          useFactory: (
+            eventos: RepositorioEventos,
+            deEquipos: RepositorioEventosDeEquipo,
+            ordenes: BitacoraDeOrdenes,
+          ) => new FuenteDeLaColaPorPuertos(eventos, deEquipos, ordenes),
+        },
+        {
+          provide: PREFERENCIAS_DE_ATENCION,
+          inject: [CONFIGURACION, Pool],
+          useFactory: (configuracion: Configuracion, pool: Pool) =>
+            configuracion.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new PreferenciasDeAtencionPg(pool)
+              : new PreferenciasDeAtencionEnMemoria(),
+        },
+        {
+          provide: ConsultarColaDeAtencion,
+          inject: [FUENTE_DE_LA_COLA, PREFERENCIAS_DE_ATENCION, RELOJ, CONFIGURACION],
+          useFactory: (
+            fuente: FuenteDeLaCola,
+            preferencias: RepositorioDePreferenciasDeAtencion,
+            reloj: Reloj,
+            configuracion: Configuracion,
+          ) =>
+            new ConsultarColaDeAtencion(
+              fuente,
+              preferencias,
+              reloj,
+              configuracion.GUARDIA_VIGENCIA_EN_COLA_S,
+            ),
+        },
         {
           /**
            * A1 · la apertura de CUALQUIER dispositivo pasa por el proveedor

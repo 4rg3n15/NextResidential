@@ -121,6 +121,12 @@ export const configuracionDePrueba: Configuracion = {
   // conexiones de pg-boss contra una base que en este banco no existe.
   PLANIFICADOR_HABILITADO: false,
   METRICAS_VENTANA: 2048,
+  // O6 (15-N) · los valores por omisión del esquema, explícitos: este literal no
+  // pasa por él, y sin ellos la ventana de alertas valía NaN (ver
+  // `configuracion-de-prueba.test.ts`).
+  ALERTAS_VENTANA_DEDUP_S: 600,
+  GUARDIA_VIGENCIA_EN_COLA_S: 300,
+  EQUIPOS_DESVIO_DE_RELOJ_S: 30,
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 100000, // el límite se prueba aparte; aquí estorbaría
   THROTTLE_DISPOSITIVO_LIMITE: 120,

@@ -139,7 +139,14 @@ export class RepositorioEventosDeEquipoPg implements RepositorioEventosDeEquipo 
   async consultar(f: FiltroDeEventosDeEquipo): Promise<readonly EventoDeEquipoGuardado[]> {
     return this.como(f.copropiedadId, async (c) => {
       const parametros: unknown[] = [f.copropiedadId, f.desde, f.hasta];
-      const condiciones = ['copropiedad_id = $1', 'ocurrido_en >= $2', 'ocurrido_en < $3'];
+      // G1 (15-N) · por recepción, la cola de atención (índice de la 0046).
+      const columna = f.porRecepcion === true ? 'recibido_en' : 'ocurrido_en';
+      const condiciones = ['copropiedad_id = $1', `${columna} >= $2`, `${columna} < $3`];
+      if (f.soloEnVivo === true) condiciones.push("en_vivo AND origen = 'equipo'");
+      if (f.tipos !== undefined && f.tipos !== null) {
+        parametros.push([...f.tipos]);
+        condiciones.push(`tipo = ANY($${String(parametros.length)}::text[])`);
+      }
       if (f.dispositivoId !== undefined && f.dispositivoId !== null) {
         parametros.push(f.dispositivoId);
         condiciones.push(`dispositivo_id = $${String(parametros.length)}`);
@@ -152,7 +159,7 @@ export class RepositorioEventosDeEquipoPg implements RepositorioEventosDeEquipo 
       const { rows } = await c.query<Fila>(
         `SELECT * FROM public.eventos_de_equipo
           WHERE ${condiciones.join(' AND ')}
-          ORDER BY ocurrido_en DESC, recibido_en DESC
+          ORDER BY ${columna} DESC, recibido_en DESC
           LIMIT $${String(parametros.length)}`,
         parametros,
       );

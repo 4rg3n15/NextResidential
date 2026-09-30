@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
@@ -7,6 +8,7 @@ import {
   IsUUID,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import {
   LONGITUD_MAXIMA_DE_MOTIVO,
@@ -86,13 +88,33 @@ export class HistorialDeOrdenesDto {
 }
 
 export class EnAtencionDto {
-  @ApiProperty({ format: 'uuid' }) eventoId!: string;
-  @ApiProperty({ format: 'date-time' }) ocurridoEn!: string;
+  @ApiProperty({
+    format: 'uuid',
+    description:
+      'Id del acceso (origen «acceso») o del evento del equipo (origen «equipo»). Es el que ' +
+      'viaja como `eventoId` en la orden manual que lo atiende.',
+  })
+  eventoId!: string;
+  @ApiProperty({ enum: ['acceso', 'equipo'] }) origen!: string;
+  @ApiProperty({
+    enum: ['llamada', 'rostro', 'placa', 'lista_negra', 'dudoso'],
+    description: 'G1 (15-N) · por qué necesita a una persona (P-22).',
+  })
+  disparador!: string;
+  @ApiProperty() titulo!: string;
+  @ApiProperty({
+    format: 'date-time',
+    description: 'Cuándo lo supo la plataforma: la hora de recepción, no la del equipo.',
+  })
+  ocurridoEn!: string;
   @ApiProperty({ nullable: true, type: String }) motivo!: string | null;
-  @ApiProperty() resultado!: string;
+  @ApiProperty({ nullable: true, type: String, enum: ['permitido', 'negado'] })
+  resultado!: string | null;
   @ApiProperty({ format: 'uuid' }) dispositivoId!: string;
   @ApiProperty({ nullable: true, type: String }) viviendaId!: string | null;
   @ApiProperty({ nullable: true, type: String }) placaDetectada!: string | null;
+  @ApiProperty({ description: 'Hay foto o recorte que pedir por /eventos/{id}/evidencia.' })
+  conEvidencia!: boolean;
 
   @ApiProperty({
     description:
@@ -105,11 +127,45 @@ export class EnAtencionDto {
   @ApiProperty({ description: 'Pasado el umbral de KPI-34' }) demorado!: boolean;
 }
 
+export class PreferenciaDeDisparadorDto {
+  @ApiProperty({ description: 'La Atención se abre sola con este disparador.' })
+  @IsBoolean()
+  abrir!: boolean;
+  @ApiProperty({ description: 'La consola suena con este disparador.' })
+  @IsBoolean()
+  sonar!: boolean;
+}
+
+/** G2 (15-N) · por copropiedad y disparador; sin guardar, todo activado. */
+export class PreferenciasDeAtencionDto {
+  @ApiProperty({ type: PreferenciaDeDisparadorDto })
+  @ValidateNested()
+  @Type(() => PreferenciaDeDisparadorDto)
+  llamada!: PreferenciaDeDisparadorDto;
+  @ApiProperty({ type: PreferenciaDeDisparadorDto })
+  @ValidateNested()
+  @Type(() => PreferenciaDeDisparadorDto)
+  rostro!: PreferenciaDeDisparadorDto;
+  @ApiProperty({ type: PreferenciaDeDisparadorDto })
+  @ValidateNested()
+  @Type(() => PreferenciaDeDisparadorDto)
+  placa!: PreferenciaDeDisparadorDto;
+  @ApiProperty({ type: PreferenciaDeDisparadorDto })
+  @ValidateNested()
+  @Type(() => PreferenciaDeDisparadorDto)
+  lista_negra!: PreferenciaDeDisparadorDto;
+  @ApiProperty({ type: PreferenciaDeDisparadorDto })
+  @ValidateNested()
+  @Type(() => PreferenciaDeDisparadorDto)
+  dudoso!: PreferenciaDeDisparadorDto;
+}
+
 export class ColaDeAtencionDto {
   @ApiProperty({
     type: [EnAtencionDto],
     description:
-      'Ordenada por espera DESCENDENTE, con lo crítico delante. No por recencia: una bandeja ' +
+      'Sólo lo que necesita a una persona y llegó EN VIVO (P-22), dentro de su vigencia; ' +
+      'ordenada por espera DESCENDENTE, con lo crítico delante. No por recencia: una bandeja ' +
       'por recencia hunde al que lleva más tiempo esperando cada vez que llega otro.',
   })
   cola!: EnAtencionDto[];
@@ -117,6 +173,12 @@ export class ColaDeAtencionDto {
   @ApiProperty() total!: number;
   @ApiProperty() criticos!: number;
   @ApiProperty() esperaMaxima!: number;
+  @ApiProperty({
+    description: 'Cuánto sigue en la cola algo sin atender (GUARDIA_VIGENCIA_EN_COLA_S).',
+  })
+  vigenciaSegundos!: number;
+  @ApiProperty({ type: PreferenciasDeAtencionDto })
+  preferencias!: PreferenciasDeAtencionDto;
 }
 
 export class SolicitudDeCanalDto {
